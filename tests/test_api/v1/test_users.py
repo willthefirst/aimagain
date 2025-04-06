@@ -4,7 +4,7 @@ import uuid
 # Removed unused datetime import
 
 # Import User ORM model
-from app.models import User
+from app.models import User, Conversation, Participant
 # Import Session for type hinting
 from sqlalchemy.orm import Session
 # Removed unused insert, Connection
@@ -86,4 +86,65 @@ async def test_list_users_multiple_users(test_client: AsyncClient, db_session: S
     usernames_found = {item.text() for item in user_list_items}
     assert user1.username in usernames_found, f"{user1.username} not found in list"
     assert user2.username in usernames_found, f"{user2.username} not found in list"
+    assert "No users found" not in tree.body.text()
+
+# --- Tests for GET /users?participated_with=me ---
+
+async def test_list_users_participated_empty(test_client: AsyncClient, db_session: Session):
+    """Test GET /users?participated_with=me returns empty when no shared convos."""
+    # --- Setup: 'me' user exists, but no shared conversations ---
+    me_user = User(id=f"user_{uuid.uuid4()}", username="test-user-me")
+    other_user = User(id=f"user_{uuid.uuid4()}", username="other-user")
+    db_session.add_all([me_user, other_user])
+    db_session.flush()
+    # Can optionally add a convo where 'me' is invited or other user is joined, but not both joined
+
+    # --- Action ---
+    response = await test_client.get(f"{API_PREFIX}/users?participated_with=me")
+
+    # --- Assertions ---
+    assert response.status_code == 200 # Expect 200 because base route exists
+    assert "text/html" in response.headers["content-type"]
+    tree = HTMLParser(response.text)
+    # Expect empty list or specific message
+    assert "No users found" in tree.body.text() # Reuse existing empty message for now
+    assert tree.css_first('ul > li') is None 
+
+async def test_list_users_participated_success(test_client: AsyncClient, db_session: Session):
+    """Test GET /users?participated_with=me returns correct users."""
+    # --- Setup ---
+    me_user = User(id=f"user_me_{uuid.uuid4()}", username="test-user-me")
+    user_b = User(id=f"user_b_{uuid.uuid4()}", username=f"user-b-{uuid.uuid4()}") # Shared convo
+    user_c = User(id=f"user_c_{uuid.uuid4()}", username=f"user-c-{uuid.uuid4()}") # No shared convo
+    db_session.add_all([me_user, user_b, user_c])
+    db_session.flush()
+
+    # Convo 1: me and user_b are joined
+    convo1 = Conversation(id=f"conv1_{uuid.uuid4()}", slug=f"convo1-{uuid.uuid4()}", created_by_user_id=me_user.id)
+    db_session.add(convo1)
+    part1_me = Participant(id=f"p1m_{uuid.uuid4()}", user_id=me_user.id, conversation_id=convo1.id, status="joined")
+    part1_b = Participant(id=f"p1b_{uuid.uuid4()}", user_id=user_b.id, conversation_id=convo1.id, status="joined")
+    db_session.add_all([part1_me, part1_b])
+
+    # Convo 2: me joined, user_c invited (should not count)
+    convo2 = Conversation(id=f"conv2_{uuid.uuid4()}", slug=f"convo2-{uuid.uuid4()}", created_by_user_id=me_user.id)
+    db_session.add(convo2)
+    part2_me = Participant(id=f"p2m_{uuid.uuid4()}", user_id=me_user.id, conversation_id=convo2.id, status="joined")
+    part2_c = Participant(id=f"p2c_{uuid.uuid4()}", user_id=user_c.id, conversation_id=convo2.id, status="invited") # Invited only
+    db_session.add_all([part2_me, part2_c])
+    db_session.flush()
+
+    # --- Action ---
+    response = await test_client.get(f"{API_PREFIX}/users?participated_with=me")
+
+    # --- Assertions ---
+    assert response.status_code == 200
+    tree = HTMLParser(response.text)
+    user_items = tree.css('ul > li') # Adjust selector if needed
+    assert len(user_items) == 1, f"Expected 1 user, found {len(user_items)}"
+
+    users_text = " ".join([li.text() for li in user_items])
+    assert user_b.username in users_text, "User B (shared convo) not found"
+    assert user_c.username not in users_text, "User C (no shared convo) should not be found"
+    assert me_user.username not in users_text, "User 'me' should not be listed"
     assert "No users found" not in tree.body.text() 

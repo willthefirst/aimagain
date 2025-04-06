@@ -134,7 +134,7 @@ This document outlines the initial technical preferences and MVP scope for build
   - The list should be sortable (e.g., by `username`, `last_activity_at`).
   - Internal `_id`s are not exposed.
 
-**10. List Users I've Chatted With** (In Progress) 🚧
+**10. List Users I've Chatted With** ✅
 
 - **As an** authenticated user,
 - **I want to** `GET /users?participated_with=me`,
