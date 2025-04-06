@@ -121,7 +121,7 @@ This document outlines the initial technical preferences and MVP scope for build
   - If User A has a `Participant` record for this conversation with `status='joined'`, the response includes conversation details (`slug`, `name`, participant list with usernames and status) and its recent message history (e.g., last 50 messages, with pagination options).
   - If User A is 'invited' or not a participant, the API returns 403 Forbidden.
 
-**9. List All Users**
+**9. List All Users (In Progress)**
 
 - **As any** user (authenticated or not),
 - **I want to** `GET /users`,
