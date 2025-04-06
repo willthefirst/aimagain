@@ -16,72 +16,130 @@ This document outlines the initial technical preferences and MVP scope for build
 
 ### User Stories
 
-**1. Initiate a New Conversation**
+**1. Initiate a New Conversation** (Refined)
 
 - **As an** authenticated user,
-- **I want to** select another _online_ user and send them an initial message,
+- **I want to** `POST` to `/conversations`, providing the target _online_ user's ID and an initial message,
 - **So that** a new conversation is created between us, and they receive an invitation to join.
 - **Acceptance Criteria:**
-  - Given User A is authenticated and User B is online, when User A submits a request to start a conversation with User B including an initial message:
-  - A new `Conversation` record is created, linked to User A (`created_by`).
+  - Given User A is authenticated and User B is online, when User A `POST /conversations` with `{ "invitee_user_id": "user_...", "initial_message": "..." }` in body:
+  - A new `Conversation` record is created, linked to User A (`created_by`), including a unique `slug` and `last_activity_at` timestamp.
   - A new `Message` record is created with User A's initial message, linked to the new conversation and User A.
   - A `Participant` record is created for User A, linked to the new conversation, with `status='joined'` and `joined_at` set.
   - A `Participant` record is created for User B, linked to the new conversation, with `status='invited'`, `invited_by_user_id=UserA.id`, and `initial_message_id` linking to the first message.
   - User B should _not_ yet receive real-time updates for this conversation.
-  - If User B is _not_ online, the request fails with an appropriate error message, and no records are created.
-  - If User B does not exist, the request fails.
+  - If User B is _not_ online, the request fails with an appropriate error message (e.g., 400 Bad Request), and no records are created.
+  - If User B does not exist, the request fails (e.g., 404 Not Found).
+  - The `Conversation.last_activity_at` timestamp is updated.
 
-**2. View and Respond to Invitations**
+**2. View and Respond to Invitations** (Refined)
 
 - **As an** authenticated user,
-- **I want to** see a list of conversations I've been invited to, including who invited me and a preview of the first message,
+- **I want to** `GET /users/me/invitations` to see my pending invitations, including who invited me and a preview of the first message,
 - **So that** I can decide whether to accept or reject the invitation.
 - **Acceptance Criteria:**
-  - Given User B has a `Participant` record with `status='invited'`, when User B requests their list of invitations:
-  - The response includes details for each invitation: inviting user's username, conversation ID, and the content of the message linked by `initial_message_id`.
-  - When User B accepts an invitation:
+  - Given User B has a `Participant` record (`_id=part_xyz`) with `status='invited'`, when User B `GET /users/me/invitations`:
+  - The response includes details for each invitation: `participant_id` (`part_xyz`), inviting user's username, conversation `slug`, and the content of the message linked by `initial_message_id`.
+  - When User B accepts an invitation by sending a `PUT /participants/part_xyz` request with `{ "status": "joined" }`:
     - The corresponding `Participant` record's `status` is updated to `'joined'`.
     - The `joined_at` timestamp is set.
     - User B starts receiving real-time updates for the conversation.
-  - When User B rejects an invitation:
+    - The `Conversation.last_activity_at` timestamp is updated.
+  - When User B rejects an invitation by sending a `PUT /participants/part_xyz` request with `{ "status": "rejected" }`:
     - The corresponding `Participant` record's `status` is updated to `'rejected'`.
     - User B does _not_ receive real-time updates.
+    - The `Conversation.last_activity_at` timestamp is updated.
 
-**3. Access Control for Invited Users**
+**3. Access Control for Invited Users** (Unchanged)
 
 - **As an** invited user (status='invited'),
 - **I want** my access to the conversation to be restricted,
 - **So that** I cannot participate until I explicitly accept the invitation.
 - **Acceptance Criteria:**
-  - Given User B has a `Participant` record with `status='invited'` for Conversation C:
-  - User B cannot fetch the message history for Conversation C (API returns error/empty).
-  - User B cannot send messages to Conversation C (API returns error).
+  - Given User B has a `Participant` record with `status='invited'` for Conversation C (slug `conv-slug`):
+  - User B cannot `GET /conversations/conv-slug` (API returns 403 Forbidden).
+  - User B cannot fetch the message history for Conversation C (e.g., `GET /conversations/conv-slug/messages` returns 403).
+  - User B cannot send messages to Conversation C (e.g., `POST /conversations/conv-slug/messages` returns 403).
   - User B does not receive SSE updates for new messages in Conversation C.
 
-**4. Access Control for Joined Users**
+**4. Access Control for Joined Users** (Unchanged)
 
 - **As a** joined user (status='joined'),
 - **I want** full access to the conversation,
 - **So that** I can read history, send messages, and receive real-time updates.
 - **Acceptance Criteria:**
-  - Given User A has a `Participant` record with `status='joined'` for Conversation C:
-  - User A can fetch the full message history for Conversation C.
-  - User A can successfully send new messages to Conversation C.
+  - Given User A has a `Participant` record with `status='joined'` for Conversation C (slug `conv-slug`):
+  - User A can `GET /conversations/conv-slug` to retrieve conversation details.
+  - User A can fetch the full message history for Conversation C (e.g., `GET /conversations/conv-slug/messages`, possibly with pagination).
+  - User A can successfully send new messages to Conversation C (e.g., `POST /conversations/conv-slug/messages`).
+  - The `Conversation.last_activity_at` timestamp is updated upon sending a message.
   - New messages sent by other joined participants in Conversation C are delivered to User A via SSE.
 
-**5. Invite User to an Existing Conversation**
+**5. Invite User to an Existing Conversation** (Refined)
 
 - **As a** joined user (status='joined'),
-- **I want to** invite another _online_ user to a conversation I'm part of,
-- **So that** they can join our ongoing discussion.
+- **I want to** `POST` to `/conversations/{slug}/participants`, providing the target _online_ user's ID,
+- **So that** they receive an invitation to join the conversation.
 - **Acceptance Criteria:**
-  - Given User A is 'joined' in Conversation C, and User C is online but not yet a participant:
-  - When User A submits a request to invite User C to Conversation C:
-  - A new `Participant` record is created for User C, linked to Conversation C, with `status='invited'` and `invited_by_user_id=UserA.id`. The `initial_message_id` can be null in this case.
-  - User C receives the invitation (as per Story 2 requirements).
-  - If User C is _not_ online, the request fails.
-  - If User C is already a participant (status != 'rejected' or 'left'), the request fails.
-  - If User A is _not_ 'joined' in Conversation C, the request fails.
+  - Given User A is 'joined' in Conversation C (with `slug=conv-slug`), and User B is online but not yet a participant:
+  - When User A `POST /conversations/conv-slug/participants` with `{ "invitee_user_id": "user_..." }`:
+  - A new `Participant` record is created for User B, linked to Conversation C, with `status='invited'` and `invited_by_user_id=UserA.id`. `initial_message_id` can be null.
+  - User B receives the invitation (as per Story 2 requirements).
+  - The `Conversation.last_activity_at` timestamp is updated.
+  - If User B is _not_ online, the request fails (e.g., 400 Bad Request).
+  - If User B is already a participant (status is 'invited' or 'joined'), the request fails (e.g., 409 Conflict).
+  - If User A is _not_ 'joined' in Conversation C, the request fails (e.g., 403 Forbidden).
+
+**6. List All Public Conversations** (New)
+
+- **As any** user (authenticated or not),
+- **I want to** `GET /conversations`,
+- **So that** I can see a list of all active conversations on the platform.
+- **Acceptance Criteria:**
+  - The response is a list of conversation summaries.
+  - Each summary includes: `slug`, `name` (if any), list of participant `username`s (only those 'joined'), and `last_activity_at`.
+  - The list should be sortable by `last_activity_at` (descending by default).
+  - Private/internal `_id`s are not exposed.
+
+**7. List My Conversations** (New)
+
+- **As an** authenticated user,
+- **I want to** `GET /users/me/conversations`,
+- **So that** I can see all conversations I am currently part of ('joined' or 'invited').
+- **Acceptance Criteria:**
+  - The response lists conversations where the authenticated user has a `Participant` record with status 'joined' or 'invited'.
+  - Each item includes: `slug`, `name`, participant usernames (all statuses?), `last_activity_at`, and the user's own `status` ('joined' or 'invited').
+  - The list should be sortable by `last_activity_at` (descending by default).
+
+**8. View a Specific Conversation** (New)
+
+- **As an** authenticated user,
+- **I want to** `GET /conversations/{slug}`,
+- **So that** I can view the details and message history of a conversation I have joined.
+- **Acceptance Criteria:**
+  - Given User A `GET /conversations/conv-slug`:
+  - If User A has a `Participant` record for this conversation with `status='joined'`, the response includes conversation details (`slug`, `name`, participant list with usernames and status) and its recent message history (e.g., last 50 messages, with pagination options).
+  - If User A is 'invited' or not a participant, the API returns 403 Forbidden.
+
+**9. List All Users** (New)
+
+- **As any** user (authenticated or not),
+- **I want to** `GET /users`,
+- **So that** I can see a list of all registered users on the platform.
+- **Acceptance Criteria:**
+  - The response is a list of user summaries.
+  - Each summary includes: `username`, `created_at`, and a calculated `last_activity_at` (timestamp of the user's last message or participation status change, whichever is latest).
+  - The list should be sortable (e.g., by `username`, `last_activity_at`).
+  - Internal `_id`s are not exposed.
+
+**10. List Users I've Chatted With** (New)
+
+- **As an** authenticated user,
+- **I want to** `GET /users?participated_with=me`,
+- **So that** I can easily find users I share conversations with.
+- **Acceptance Criteria:**
+  - The response lists users who share at least one conversation where both the authenticated user and the listed user have status 'joined'.
+  - Each user summary includes `username`, `created_at`, `last_activity_at`.
 
 ### Authentication
 
@@ -106,10 +164,12 @@ The following describes the conceptual structure of the database tables using SQ
 
 - `_id` (PK, prefixed uuid: 'conv\_')
 - `name` (string, nullable): Optional display name for the conversation.
+- `slug` (string, unique, not null): User-friendly unique identifier (e.g., `happy-dolphin-talk`).
 - `created_by` (FK to `User._id`, not null): User who initiated the conversation.
 - `created_at`
 - `updated_at`
 - `deleted_at` (nullable)
+- `last_activity_at` (timestamp, nullable): Timestamp of the last meaningful activity (message, participant change).
 
 **`Message`**
 
@@ -131,3 +191,36 @@ The following describes the conceptual structure of the database tables using SQ
 - `updated_at`: Timestamp when status or other fields last changed.
 - `joined_at` (timestamp, nullable): Timestamp when the status became 'joined'.
 - _Constraint:_ Unique index on (`user_id`, `conversation_id`).
+
+## API Endpoints (RESTful)
+
+- `POST /conversations`
+  - Action: Initiate a new conversation by inviting a user.
+  - Body: `{ "invitee_user_id": "user_...", "initial_message": "..." }`
+  - Response: Details of the newly created conversation and participant records (or error).
+- `GET /conversations`
+  - Action: List public summaries of all conversations.
+  - Response: `[ { slug, name, participants: [username], last_activity_at }, ... ]`
+- `GET /conversations/{slug}`
+  - Action: View details and recent messages of a _joined_ conversation.
+  - Response: `{ slug, name, participants: [{username, status}], messages: [...], ... }` (Requires 'joined' status).
+- `POST /conversations/{slug}/participants`
+  - Action: Invite another user to an existing conversation.
+  - Body: `{ "invitee_user_id": "user_..." }`
+  - Response: Details of the new participant record (or error).
+- `GET /users`
+  - Action: List public summaries of all users.
+  - Response: `[ { username, created_at, last_activity_at }, ... ]`
+- `GET /users/me/conversations`
+  - Action: List conversations the current user is part of (joined or invited).
+  - Response: `[ { slug, name, participants: [username], last_activity_at, my_status }, ... ]`
+- `GET /users/me/invitations`
+  - Action: List pending conversation invitations for the current user.
+  - Response: `[ { participant_id, inviting_user: {username}, conversation: {slug}, initial_message_preview }, ... ]`
+- `PUT /participants/{participant_id}`
+  - Action: Accept or reject a conversation invitation.
+  - Body: `{ "status": "joined" | "rejected" }`
+  - Response: Updated participant record details (or error).
+- `GET /users?participated_with=me`
+  - Action: List users the current authenticated user shares 'joined' conversations with.
+  - Response: `[ { username, created_at, last_activity_at }, ... ]`
