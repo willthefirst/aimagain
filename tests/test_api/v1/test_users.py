@@ -13,7 +13,6 @@ pytestmark = pytest.mark.asyncio
 
 API_PREFIX = "/api/v1"
 
-
 async def test_list_users_empty(test_client: AsyncClient):
     """Test GET /users returns HTML with no users message when empty."""
     response = await test_client.get(f"{API_PREFIX}/users")
@@ -90,3 +89,59 @@ async def test_list_users_one_user(test_client: AsyncClient):
                 transaction.rollback()
                 # Log or handle cleanup error if necessary, but don't fail test here
                 print(f"Warning: Cleanup failed for user {test_user_id}") 
+
+
+async def test_list_users_multiple_users(test_client: AsyncClient):
+    """Test GET /users returns HTML listing multiple users when they exist."""
+    user1_id = f"user_{uuid.uuid4()}"
+    user1_username = f"test-user-one-{uuid.uuid4()}"
+    user1_data = {"_id": user1_id, "username": user1_username, "is_online": False}
+
+    user2_id = f"user_{uuid.uuid4()}"
+    user2_username = f"test-user-two-{uuid.uuid4()}"
+    user2_data = {"_id": user2_id, "username": user2_username, "is_online": True}
+
+    users_data = [user1_data, user2_data]
+
+    # --- Setup: Insert users directly into test DB ---
+    with engine.connect() as connection:
+        transaction = connection.begin()
+        try:
+            # Insert the test users
+            # Use executemany for potential efficiency if supported well by backend/driver
+            # stmt = insert(User).values(users_data) # .values() typically expects one dict
+            # connection.execute(stmt) # This might not work as expected for multiple rows directly
+            # Fallback to individual inserts or core executemany:
+            connection.execute(insert(User), users_data) # SQLAlchemy core way for multiple inserts
+
+            transaction.commit()
+        except Exception:
+            transaction.rollback()
+            raise
+
+    try:
+        # --- Action: Call the API endpoint ---
+        response = await test_client.get(f"{API_PREFIX}/users")
+
+        # --- Assertions ---
+        assert response.status_code == 200
+        assert "text/html" in response.headers["content-type"]
+        # Check for both usernames in the response
+        assert user1_username in response.text
+        assert user2_username in response.text
+        # Check that the "empty" message is NOT present
+        assert "No users found" not in response.text
+        assert "<html>" in response.text # Basic structure check
+
+    finally:
+        # --- Cleanup: Ensure users are removed ---
+        with engine.connect() as connection:
+            transaction = connection.begin()
+            try:
+                # Delete both users
+                connection.execute(text(f"DELETE FROM {User.name} WHERE _id IN (:id1, :id2)"),
+                                   {"id1": user1_id, "id2": user2_id})
+                transaction.commit()
+            except Exception:
+                transaction.rollback()
+                print(f"Warning: Cleanup failed for users {user1_id}, {user2_id}") 
