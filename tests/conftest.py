@@ -1,7 +1,8 @@
 import os
 import pytest
 import asyncio
-from httpx import AsyncClient
+import pytest_asyncio
+from httpx import AsyncClient, ASGITransport
 from sqlalchemy import create_engine
 from sqlalchemy.pool import NullPool # Use NullPool for testing to avoid shared connections
 from alembic.config import Config
@@ -63,36 +64,22 @@ def apply_migrations():
 # --- Application Fixtures ---
 
 # This fixture is crucial: it overrides the DATABASE_URL used by the app during tests
-@pytest.fixture(scope="session", autouse=True)
-def override_db_url_for_tests(monkeypatch_session):
+@pytest.fixture(scope="function", autouse=True)
+def override_db_url_for_tests(monkeypatch):
     """Ensure the app uses the TEST_DATABASE_URL during tests."""
-    print(f"\nMonkeypatching app.db.DATABASE_URL to: {TEST_DB_URL}")
-    monkeypatch_session.setenv("DATABASE_URL", TEST_DB_URL)
-    # We also need to potentially reload the module if it already read the env var
-    # Or better, ensure db module reads env var upon engine creation/function call
-    # For now, setting the env var before app import should work if db.py uses getenv directly
+    monkeypatch.setenv("DATABASE_URL", TEST_DB_URL)
 
 
-@pytest.fixture(scope="session")
-def event_loop():
-    """Create an instance of the default event loop for the session."""
-    loop = asyncio.get_event_loop_policy().new_event_loop()
-    yield loop
-    loop.close()
-
-
-@pytest.fixture(scope="session")
-async def app_instance():
+@pytest.fixture(scope="function")
+def app_instance():
     """Yield the FastAPI app instance."""
-    # Import the app *after* the environment variable has been patched
     from app.main import app
     yield app
 
 
-@pytest.fixture(scope="session")
+@pytest_asyncio.fixture(scope="function")
 async def test_client(app_instance):
     """Yield an httpx AsyncClient configured for the test app."""
-    async with AsyncClient(app=app_instance, base_url="http://testserver") as client:
-        print("\nTest client created.")
-        yield client
-        print("Test client closed.") 
+    transport = ASGITransport(app=app_instance)
+    async with AsyncClient(transport=transport, base_url="http://testserver") as client:
+        yield client 

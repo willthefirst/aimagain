@@ -5,4 +5,5 @@ alembic
 pytest
 httpx
 python-dotenv
-async-lru 
+async-lru
+pytest-asyncio 
