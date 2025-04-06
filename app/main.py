@@ -1,8 +1,12 @@
 from fastapi import FastAPI
-from .api.v1.routes import users as users_v1 # Import the user router
+# Remove Jinja2Templates import here if no longer needed directly in main
+# from fastapi.templating import Jinja2Templates
+from .api.v1.routes import users as users_v1
 
 app = FastAPI(title="Chat App")
 
+# Remove templates configuration from here
+# templates = Jinja2Templates(directory="templates")
 
 @app.get("/")
 def read_root():

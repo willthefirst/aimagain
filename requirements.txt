@@ -6,4 +6,5 @@ pytest
 httpx
 python-dotenv
 async-lru
-pytest-asyncio 
+pytest-asyncio
+Jinja2 
