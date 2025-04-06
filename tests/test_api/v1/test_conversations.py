@@ -1,6 +1,7 @@
 import pytest
 from httpx import AsyncClient
 import uuid
+from datetime import datetime, timedelta, timezone
 
 # Need ORM models and Session
 from sqlalchemy.orm import Session
@@ -75,3 +76,52 @@ async def test_list_conversations_one_convo(test_client: AsyncClient, db_session
     assert "<html>" in response.text # Basic structure check
 
     # Cleanup is handled by db_session fixture rollback 
+
+
+async def test_list_conversations_sorted(test_client: AsyncClient, db_session: Session):
+    """Test GET /conversations returns conversations sorted by last_activity_at desc."""
+    # --- Setup ---
+    now = datetime.now(timezone.utc)
+    user1 = User(_id=f"user_{uuid.uuid4()}", username=f"user-older-{uuid.uuid4()}")
+    user2 = User(_id=f"user_{uuid.uuid4()}", username=f"user-newer-{uuid.uuid4()}")
+    db_session.add_all([user1, user2])
+    db_session.flush()
+
+    # Convo 1: Older activity
+    convo_older = Conversation(
+        _id=f"conv_{uuid.uuid4()}",
+        slug=f"convo-older-{uuid.uuid4()}",
+        created_by_user_id=user1._id,
+        last_activity_at=now - timedelta(hours=1) # Explicitly older
+    )
+    # Convo 2: Newer activity
+    convo_newer = Conversation(
+        _id=f"conv_{uuid.uuid4()}",
+        slug=f"convo-newer-{uuid.uuid4()}",
+        created_by_user_id=user2._id,
+        last_activity_at=now # Explicitly newer
+    )
+    db_session.add_all([convo_older, convo_newer])
+    db_session.flush()
+
+    # Add participants (needed for display, though not strictly for sorting)
+    part_older = Participant(_id=f"part_{uuid.uuid4()}", user_id=user1._id, conversation_id=convo_older._id, status="joined")
+    part_newer = Participant(_id=f"part_{uuid.uuid4()}", user_id=user2._id, conversation_id=convo_newer._id, status="joined")
+    db_session.add_all([part_older, part_newer])
+    db_session.flush()
+
+    # --- Action ---
+    response = await test_client.get(f"{API_PREFIX}/conversations")
+
+    # --- Assertions ---
+    assert response.status_code == 200
+    assert "text/html" in response.headers["content-type"]
+
+    # Check that newer convo slug appears before older convo slug in the text
+    response_text = response.text
+    index_newer = response_text.find(convo_newer.slug)
+    index_older = response_text.find(convo_older.slug)
+
+    assert index_newer != -1, "Newer conversation slug not found in response"
+    assert index_older != -1, "Older conversation slug not found in response"
+    assert index_newer < index_older, "Conversations are not sorted by last_activity_at descending" 

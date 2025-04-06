@@ -24,7 +24,8 @@ def list_conversations(request: Request, db: Session = Depends(get_db)): # Depen
             selectinload(Conversation.participants)
             .joinedload(Participant.user)
         )
-        # Add ordering later, e.g., .order_by(Conversation.last_activity_at.desc())
+        # Order by last activity, newest first (NULLs last)
+        .order_by(Conversation.last_activity_at.desc().nullslast())
         .all()
     )
 

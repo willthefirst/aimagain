@@ -90,7 +90,7 @@ This document outlines the initial technical preferences and MVP scope for build
   - If User B is already a participant (status is 'invited' or 'joined'), the request fails (e.g., 409 Conflict).
   - If User A is _not_ 'joined' in Conversation C, the request fails (e.g., 403 Forbidden).
 
-**6. List All Public Conversations** (In Progress) ✅
+**6. List All Public Conversations** ✅
 
 - **As any** user (authenticated or not),
 - **I want to** `GET /conversations`,
