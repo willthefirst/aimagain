@@ -18,6 +18,16 @@ engine = create_engine(
 # SQLAlchemy MetaData object. Tables will be associated with this.
 metadata = MetaData()
 
+# Dependency function to get a DB connection per request
+def get_db():
+    connection = None
+    try:
+        connection = engine.connect()
+        yield connection
+    finally:
+        if connection is not None:
+            connection.close()
+
 # Optional: Function to get a DB connection (can be useful later)
 # def get_db_connection():
 #     return engine.connect() 

@@ -26,7 +26,8 @@ if config.config_file_name is not None:
 
 # Set the sqlalchemy.url configuration option using the imported DATABASE_URL
 # This ensures Alembic uses the correct database URL defined in app.db (respecting .env)
-config.set_main_option('sqlalchemy.url', DATABASE_URL)
+# ---> COMMENTED OUT FOR TESTING: Let conftest.py provide the URL via Alembic Config object
+# config.set_main_option('sqlalchemy.url', DATABASE_URL)
 
 
 # add your model's MetaData object here

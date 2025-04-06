@@ -3,10 +3,11 @@ from httpx import AsyncClient
 import uuid
 from datetime import datetime, timezone
 
-# Import DB engine and User table for direct interaction
-from app.db import engine
+# Import User table for model interaction
+# engine and text are no longer needed directly in this test file
 from app.models import User
-from sqlalchemy import insert, text
+from sqlalchemy import insert
+from sqlalchemy.engine import Connection # For type hinting the fixture
 
 # Mark all tests in this module as async
 pytestmark = pytest.mark.asyncio
@@ -31,7 +32,8 @@ async def test_list_users_empty(test_client: AsyncClient):
     assert "<html>" in response.text # Basic structure check
 
 
-async def test_list_users_one_user(test_client: AsyncClient):
+# Use the db_conn fixture
+async def test_list_users_one_user(test_client: AsyncClient, db_conn: Connection):
     """Test GET /users returns HTML listing one user when one exists."""
     test_user_id = f"user_{uuid.uuid4()}"
     test_username = f"test-user-{uuid.uuid4()}"
@@ -39,59 +41,28 @@ async def test_list_users_one_user(test_client: AsyncClient):
         "_id": test_user_id,
         "username": test_username,
         "is_online": False,
-        # created_at/updated_at use server default in model
     }
 
-    # --- Setup: Insert user directly into test DB ---
-    # NOTE: Using synchronous engine connection within the async test function.
-    # This is generally okay for simple setup/teardown in tests,
-    # but for complex interactions or testing async db drivers,
-    # you'd use an async engine/session (e.g., databases library, asyncpg).
-    with engine.connect() as connection:
-        transaction = connection.begin()
-        try:
-            # Clear any existing users first for isolation (optional, but safer)
-            # Using text() for delete as table.delete() can be complex with ORMs sometimes
-            # Commenting out delete for now, rely on cleanup below and session isolation
-            # connection.execute(text(f"DELETE FROM {User.name}"))
+    # --- Setup: Insert user using the fixture's connection ---
+    stmt = insert(User).values(test_user_data)
+    db_conn.execute(stmt)
+    # No commit needed now - API uses same transaction via dependency override
 
-            # Insert the test user
-            stmt = insert(User).values(test_user_data)
-            connection.execute(stmt)
-            transaction.commit() # Commit insert before making API call
-        except Exception:
-            transaction.rollback() # Rollback on error during setup
-            raise
+    # --- Action: Call the API endpoint ---
+    response = await test_client.get(f"{API_PREFIX}/users")
 
-    try:
-        # --- Action: Call the API endpoint ---
-        response = await test_client.get(f"{API_PREFIX}/users")
+    # --- Assertions ---
+    assert response.status_code == 200
+    assert "text/html" in response.headers["content-type"]
+    assert test_username in response.text
+    assert "No users found" not in response.text
+    assert "<html>" in response.text
 
-        # --- Assertions ---
-        assert response.status_code == 200
-        assert "text/html" in response.headers["content-type"]
-        # Check for the user's username in the response
-        assert test_username in response.text
-        # Check that the "empty" message is NOT present
-        assert "No users found" not in response.text
-        assert "<html>" in response.text # Basic structure check
-
-    finally:
-        # --- Cleanup: Ensure user is removed ---
-        # Re-opening connection and transaction for cleanup
-        with engine.connect() as connection:
-            transaction = connection.begin()
-            try:
-                 # Simple delete based on ID
-                connection.execute(text(f"DELETE FROM {User.name} WHERE _id = :id"), {"id": test_user_id})
-                transaction.commit()
-            except Exception:
-                transaction.rollback()
-                # Log or handle cleanup error if necessary, but don't fail test here
-                print(f"Warning: Cleanup failed for user {test_user_id}") 
+    # --- Cleanup: Handled automatically by the fixture's rollback ---
 
 
-async def test_list_users_multiple_users(test_client: AsyncClient):
+# Use the db_conn fixture
+async def test_list_users_multiple_users(test_client: AsyncClient, db_conn: Connection):
     """Test GET /users returns HTML listing multiple users when they exist."""
     user1_id = f"user_{uuid.uuid4()}"
     user1_username = f"test-user-one-{uuid.uuid4()}"
@@ -103,45 +74,19 @@ async def test_list_users_multiple_users(test_client: AsyncClient):
 
     users_data = [user1_data, user2_data]
 
-    # --- Setup: Insert users directly into test DB ---
-    with engine.connect() as connection:
-        transaction = connection.begin()
-        try:
-            # Insert the test users
-            # Use executemany for potential efficiency if supported well by backend/driver
-            # stmt = insert(User).values(users_data) # .values() typically expects one dict
-            # connection.execute(stmt) # This might not work as expected for multiple rows directly
-            # Fallback to individual inserts or core executemany:
-            connection.execute(insert(User), users_data) # SQLAlchemy core way for multiple inserts
+    # --- Setup: Insert users using the fixture's connection ---
+    db_conn.execute(insert(User), users_data) # Use core executemany syntax
+    # No commit needed now - API uses same transaction via dependency override
 
-            transaction.commit()
-        except Exception:
-            transaction.rollback()
-            raise
+    # --- Action: Call the API endpoint ---
+    response = await test_client.get(f"{API_PREFIX}/users")
 
-    try:
-        # --- Action: Call the API endpoint ---
-        response = await test_client.get(f"{API_PREFIX}/users")
+    # --- Assertions ---
+    assert response.status_code == 200
+    assert "text/html" in response.headers["content-type"]
+    assert user1_username in response.text
+    assert user2_username in response.text
+    assert "No users found" not in response.text
+    assert "<html>" in response.text # Basic structure check
 
-        # --- Assertions ---
-        assert response.status_code == 200
-        assert "text/html" in response.headers["content-type"]
-        # Check for both usernames in the response
-        assert user1_username in response.text
-        assert user2_username in response.text
-        # Check that the "empty" message is NOT present
-        assert "No users found" not in response.text
-        assert "<html>" in response.text # Basic structure check
-
-    finally:
-        # --- Cleanup: Ensure users are removed ---
-        with engine.connect() as connection:
-            transaction = connection.begin()
-            try:
-                # Delete both users
-                connection.execute(text(f"DELETE FROM {User.name} WHERE _id IN (:id1, :id2)"),
-                                   {"id1": user1_id, "id2": user2_id})
-                transaction.commit()
-            except Exception:
-                transaction.rollback()
-                print(f"Warning: Cleanup failed for users {user1_id}, {user2_id}") 
+    # --- Cleanup: Handled automatically by the fixture's rollback --- 
