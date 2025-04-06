@@ -11,6 +11,7 @@ from selectolax.parser import HTMLParser
 # Removed unused insert, Connection
 # Add Pydantic
 from pydantic import BaseModel
+from app.schemas.participant import ParticipantResponse # For type hint/validation
 
 # --- Placeholder Models (can be moved/refined later) ---
 class ConversationCreateRequest(BaseModel):
@@ -391,4 +392,134 @@ async def test_get_conversation_success_joined(test_client: AsyncClient, db_sess
     assert msg3.content in messages_text
     assert creator.username in messages_text # Check sender usernames
     assert me_user.username in messages_text
-    assert other_joined.username in messages_text 
+    assert other_joined.username in messages_text
+
+# --- Tests for POST /conversations/{slug}/participants ---
+
+async def test_invite_participant_success(test_client: AsyncClient, db_session: Session):
+    """Test POST /conversations/{slug}/participants successfully invites a user."""
+    # --- Setup ---
+    # User A (me, the inviter, joined)
+    me_user = User(id=f"user_{uuid.uuid4()}", username="test-user-me")
+    # User B (invitee, online, not yet participant)
+    invitee_user = User(id=f"user_{uuid.uuid4()}", username=f"invitee-{uuid.uuid4()}", is_online=True)
+    db_session.add_all([me_user, invitee_user])
+    db_session.flush()
+
+    # Conversation C
+    conversation = Conversation(
+        id=f"conv_{uuid.uuid4()}",
+        slug=f"invite-target-convo-{uuid.uuid4()}",
+        created_by_user_id=me_user.id # Created by me for simplicity
+    )
+    db_session.add(conversation)
+    db_session.flush()
+
+    # Add "me" as a joined participant
+    my_participation = Participant(
+        id=f"part_{uuid.uuid4()}", user_id=me_user.id,
+        conversation_id=conversation.id, status="joined"
+    )
+    db_session.add(my_participation)
+    db_session.flush()
+
+    invite_data = {"invitee_user_id": invitee_user.id}
+
+    # --- Action ---
+    response = await test_client.post(
+        f"{API_PREFIX}/conversations/{conversation.slug}/participants",
+        json=invite_data
+    )
+
+    # --- Assertions ---
+    assert response.status_code == 201, f"Expected 201, got {response.status_code}, Response: {response.text}"
+
+    # Assert response body structure
+    response_data = response.json()
+    assert response_data["user_id"] == invitee_user.id
+    assert response_data["conversation_id"] == conversation.id
+    assert response_data["status"] == "invited"
+    assert response_data["invited_by_user_id"] == me_user.id
+    assert response_data["initial_message_id"] is None
+    new_participant_id = response_data["id"]
+
+    # Assert database state
+    db_participant = db_session.query(Participant).filter(Participant.id == new_participant_id).first()
+    assert db_participant is not None, "New participant record not found in DB"
+    assert db_participant.user_id == invitee_user.id
+    assert db_participant.conversation_id == conversation.id
+    assert db_participant.status == "invited"
+    assert db_participant.invited_by_user_id == me_user.id
+    assert db_participant.initial_message_id is None
+
+
+async def test_invite_participant_forbidden_not_joined(test_client: AsyncClient, db_session: Session):
+    """Test POST invite returns 403 if requester is not joined."""
+    # --- Setup ---
+    me_user = User(id=f"user_{uuid.uuid4()}", username="test-user-me") # Requester
+    invitee = User(id=f"user_{uuid.uuid4()}", username=f"invitee-{uuid.uuid4()}", is_online=True)
+    creator = User(id=f"user_c_{uuid.uuid4()}", username=f"creator-{uuid.uuid4()}")
+    db_session.add_all([me_user, invitee, creator])
+    db_session.flush()
+    conversation = Conversation(id=f"conv_{uuid.uuid4()}", slug=f"invite-forbidden-{uuid.uuid4()}", created_by_user_id=creator.id)
+    db_session.add(conversation)
+    # Add 'me_user' as INVITED, not joined
+    my_part = Participant(id=f"part_me_{uuid.uuid4()}", user_id=me_user.id, conversation_id=conversation.id, status="invited")
+    db_session.add(my_part)
+    db_session.flush()
+
+    invite_data = {"invitee_user_id": invitee.id}
+
+    # --- Action ---
+    response = await test_client.post(f"{API_PREFIX}/conversations/{conversation.slug}/participants", json=invite_data)
+
+    # --- Assertions ---
+    assert response.status_code == 403
+
+
+async def test_invite_participant_conflict_already_participant(test_client: AsyncClient, db_session: Session):
+    """Test POST invite returns 409 if invitee is already a participant."""
+    # --- Setup ---
+    me_user = User(id=f"user_{uuid.uuid4()}", username="test-user-me")
+    invitee = User(id=f"user_{uuid.uuid4()}", username=f"invitee-{uuid.uuid4()}", is_online=True)
+    db_session.add_all([me_user, invitee])
+    db_session.flush()
+    conversation = Conversation(id=f"conv_{uuid.uuid4()}", slug=f"invite-conflict-{uuid.uuid4()}", created_by_user_id=me_user.id)
+    db_session.add(conversation)
+    # Add "me" as joined
+    my_part = Participant(id=f"part_me_{uuid.uuid4()}", user_id=me_user.id, conversation_id=conversation.id, status="joined")
+    # Add invitee as already joined
+    invitee_part = Participant(id=f"part_inv_{uuid.uuid4()}", user_id=invitee.id, conversation_id=conversation.id, status="joined")
+    db_session.add_all([my_part, invitee_part])
+    db_session.flush()
+
+    invite_data = {"invitee_user_id": invitee.id}
+
+    # --- Action ---
+    response = await test_client.post(f"{API_PREFIX}/conversations/{conversation.slug}/participants", json=invite_data)
+
+    # --- Assertions ---
+    assert response.status_code == 409
+
+
+async def test_invite_participant_bad_request_offline(test_client: AsyncClient, db_session: Session):
+    """Test POST invite returns 400 if invitee is offline."""
+    # --- Setup ---
+    me_user = User(id=f"user_{uuid.uuid4()}", username="test-user-me")
+    invitee = User(id=f"user_{uuid.uuid4()}", username=f"invitee-{uuid.uuid4()}", is_online=False) # Offline
+    db_session.add_all([me_user, invitee])
+    db_session.flush()
+    conversation = Conversation(id=f"conv_{uuid.uuid4()}", slug=f"invite-offline-{uuid.uuid4()}", created_by_user_id=me_user.id)
+    db_session.add(conversation)
+    my_part = Participant(id=f"part_me_{uuid.uuid4()}", user_id=me_user.id, conversation_id=conversation.id, status="joined")
+    db_session.add(my_part)
+    db_session.flush()
+
+    invite_data = {"invitee_user_id": invitee.id}
+
+    # --- Action ---
+    response = await test_client.post(f"{API_PREFIX}/conversations/{conversation.slug}/participants", json=invite_data)
+
+    # --- Assertions ---
+    assert response.status_code == 400
+

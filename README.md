@@ -77,7 +77,7 @@ This document outlines the initial technical preferences and MVP scope for build
   - The `Conversation.last_activity_at` timestamp is updated upon sending a message.
   - New messages sent by other joined participants in Conversation C are delivered to User A via SSE.
 
-**5. Invite User to an Existing Conversation**
+**5. Invite User to an Existing Conversation** ✅
 
 - **As a** joined user (status='joined'),
 - **I want to** `POST` to `/conversations/{slug}/participants`, providing the target _online_ user's ID,
@@ -134,7 +134,7 @@ This document outlines the initial technical preferences and MVP scope for build
   - The list should be sortable (e.g., by `username`, `last_activity_at`).
   - Internal `_id`s are not exposed.
 
-**10. List Users I've Chatted With**
+**10. List Users I've Chatted With** (In Progress) 🚧
 
 - **As an** authenticated user,
 - **I want to** `GET /users?participated_with=me`,

@@ -2,6 +2,10 @@
 from pydantic import BaseModel, ConfigDict
 from datetime import datetime
 
+# Schema for inviting a user to a conversation
+class ParticipantInviteRequest(BaseModel):
+    invitee_user_id: str
+
 # Schema for updating participant status
 class ParticipantUpdateRequest(BaseModel):
     status: str # Should be 'joined' or 'rejected'

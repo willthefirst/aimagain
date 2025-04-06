@@ -10,6 +10,7 @@ from app.db import get_db
 from app.models import Conversation, Participant, User, Message # Add Message
 # Import schemas
 from app.schemas.conversation import ConversationCreateRequest, ConversationResponse
+from app.schemas.participant import ParticipantInviteRequest, ParticipantResponse # Import schemas
 import uuid # For slug generation
 from datetime import datetime, timezone # For timestamps
 
@@ -190,3 +191,83 @@ def create_conversation(
     # Return the created conversation data using the response schema
     # Pydantic will automatically convert the ORM object
     return new_conversation 
+
+@router.post(
+    "/conversations/{slug}/participants",
+    response_model=ParticipantResponse, # Use ParticipantResponse
+    status_code=status.HTTP_201_CREATED,
+    tags=["conversations", "participants"]
+)
+def invite_participant(
+    slug: str,
+    request_data: ParticipantInviteRequest, # Use request schema
+    db: Session = Depends(get_db)
+    # TODO: Auth dependency
+):
+    """Invites another user to an existing conversation."""
+
+    # --- Get Conversation ---
+    conversation = db.query(Conversation).filter(Conversation.slug == slug).first()
+    if not conversation:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Conversation not found")
+
+    # --- Authorize Requesting User ---
+    # TODO: Replace placeholder with actual authenticated user
+    current_user = db.query(User).filter(User.username == "test-user-me").first()
+    if not current_user:
+        raise HTTPException(status_code=403, detail="Not authenticated (placeholder)")
+
+    # Check if current user is already joined
+    current_participant = db.query(Participant).filter(
+        Participant.conversation_id == conversation.id,
+        Participant.user_id == current_user.id,
+        Participant.status == 'joined'
+    ).first()
+    if not current_participant:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="User must be a joined participant to invite others")
+
+    # --- Validate Invitee ---
+    invitee_user = db.query(User).filter(User.id == request_data.invitee_user_id).first()
+    if not invitee_user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Invitee user not found")
+
+    # Check if invitee is online
+    if not invitee_user.is_online:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invitee user is not online")
+
+    # Check if invitee is already a participant
+    existing_invitee_participant = db.query(Participant).filter(
+        Participant.conversation_id == conversation.id,
+        Participant.user_id == invitee_user.id
+    ).first()
+    if existing_invitee_participant:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Invitee is already a participant")
+
+    # --- Create New Participant Record ---
+    now = datetime.now(timezone.utc)
+    new_participant = Participant(
+        id=f"part_{uuid.uuid4()}",
+        user_id=invitee_user.id,
+        conversation_id=conversation.id,
+        status="invited",
+        invited_by_user_id=current_user.id,
+        initial_message_id=None # No initial message for invites to existing convos
+    )
+    db.add(new_participant)
+
+    # --- Update Conversation Timestamp ---
+    conversation.last_activity_at = now
+    conversation.updated_at = now
+    db.add(conversation)
+
+    # --- Commit and Return ---
+    try:
+        db.commit()
+        db.refresh(new_participant)
+        db.refresh(conversation)
+    except Exception as e:
+        db.rollback()
+        # Log e
+        raise HTTPException(status_code=500, detail="Database error inviting participant.")
+
+    return new_participant 
