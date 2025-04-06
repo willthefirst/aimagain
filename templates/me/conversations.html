@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>My Conversations</title>
+    <style>
+      li {
+        margin-bottom: 1em;
+        border: 1px solid #ccc;
+        padding: 0.5em;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>My Conversations</h1>
+
+    {% if conversations %}
+    <ul>
+      {# conversations is now a list of dicts #} {% for convo_data in
+      conversations %}
+      <li>
+        <strong>Slug:</strong>
+        <a href="{{ url_for('get_conversation', slug=convo_data.slug) }}"
+          >{{ convo_data.slug }}</a
+        >
+        {% if convo_data.name %}<br />Name: {{ convo_data.name }}{% endif %}
+        <br />Participants: {{ convo_data.participants | join(', ') }} <br />My
+        Status: {{ convo_data.my_status }} <br />Last Activity: {{
+        convo_data.last_activity_at | default('N/A') }}
+      </li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <p>You are not part of any conversations yet.</p>
+    {% endif %}
+
+    <hr />
+    <a href="{{ url_for('list_conversations') }}">View Public Conversations</a>
+  </body>
+</html>

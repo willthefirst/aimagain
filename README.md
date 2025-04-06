@@ -103,7 +103,7 @@ This document outlines the initial technical preferences and MVP scope for build
   - The list should be sortable by `last_activity_at` (descending by default).
   - Private/internal `_id`s are not exposed.
 
-**7. List My Conversations**
+**7. List My Conversations** ✅
 
 - **As an** authenticated user,
 - **I want to** `GET /users/me/conversations`,
@@ -113,7 +113,7 @@ This document outlines the initial technical preferences and MVP scope for build
   - Each item includes: `slug`, `name`, participant usernames (all statuses?), `last_activity_at`, and the user's own `status` ('joined' or 'invited').
   - The list should be sortable by `last_activity_at` (descending by default).
 
-**8. View a Specific Conversation**
+**8. View a Specific Conversation** ✅
 
 - **As an** authenticated user,
 - **I want to** `GET /conversations/{slug}`,

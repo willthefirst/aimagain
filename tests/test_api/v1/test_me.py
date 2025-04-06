@@ -100,3 +100,80 @@ async def test_list_my_invitations_one_invitation(test_client: AsyncClient, db_s
 
     # Check emptiness message is NOT present
     assert "No pending invitations" not in tree.body.text() 
+
+# --- Tests for GET /users/me/conversations ---
+
+async def test_list_my_conversations_empty(test_client: AsyncClient, db_session: Session):
+    """Test GET /users/me/conversations returns empty when user has no conversations."""
+    # --- Setup: Ensure the placeholder 'me' user exists ---
+    me_user = User(id=f"user_{uuid.uuid4()}", username="test-user-me")
+    db_session.add(me_user)
+    db_session.flush()
+
+    # --- Action ---
+    response = await test_client.get(f"{API_PREFIX}/users/me/conversations")
+
+    # --- Assertions ---
+    # assert response.status_code == 404 # Expect 404 initially
+    # Later assertions:
+    assert response.status_code == 200
+    assert "text/html" in response.headers["content-type"]
+    tree = HTMLParser(response.text)
+    assert "You are not part of any conversations yet" in tree.body.text()
+    assert tree.css_first('ul > li') is None
+
+
+async def test_list_my_conversations_one_joined(test_client: AsyncClient, db_session: Session):
+    """Test GET /users/me/conversations shows one conversation where user is joined."""
+    # --- Setup ---
+    creator = User(id=f"user_{uuid.uuid4()}", username=f"creator-{uuid.uuid4()}")
+    me_user = User(id=f"user_{uuid.uuid4()}", username="test-user-me")
+    db_session.add_all([creator, me_user])
+    db_session.flush()
+
+    conversation = Conversation(
+        id=f"conv_{uuid.uuid4()}",
+        slug=f"my-joined-convo-{uuid.uuid4()}",
+        name="My Joined Chat",
+        created_by_user_id=creator.id
+    )
+    db_session.add(conversation)
+    db_session.flush()
+
+    # Participant record linking "me" with status "joined"
+    participant = Participant(
+        id=f"part_{uuid.uuid4()}",
+        user_id=me_user.id,
+        conversation_id=conversation.id,
+        status="joined"
+    )
+    db_session.add(participant)
+    # Add creator as also joined for realism
+    part_creator = Participant(
+        id=f"part_c_{uuid.uuid4()}", user_id=creator.id,
+        conversation_id=conversation.id, status="joined"
+    )
+    db_session.add(part_creator)
+    db_session.flush()
+
+    # --- Action ---
+    response = await test_client.get(f"{API_PREFIX}/users/me/conversations")
+
+    # --- Assertions ---
+    assert response.status_code == 200
+    tree = HTMLParser(response.text)
+    convo_items = tree.css('ul > li') # Adjust selector if needed
+    assert len(convo_items) == 1, "Expected one conversation item"
+
+    item_text = convo_items[0].text()
+    assert conversation.slug in item_text
+    assert conversation.name in item_text
+    assert me_user.username in item_text # Check participant names included
+    assert creator.username in item_text
+    # Check status, ignoring leading/trailing whitespace on lines
+    # status_found = any("My Status: joined" in line.strip() for line in item_text.split('\n'))
+    # assert status_found, f"'My Status: joined' not found in item text: {item_text!r}"
+    # Normalize whitespace and check for status substring
+    normalized_text = " ".join(item_text.split())
+    assert "My Status: joined" in normalized_text, f"'My Status: joined' not found in normalized text: {normalized_text!r}"
+    assert "You are not part of any conversations yet" not in tree.body.text() 

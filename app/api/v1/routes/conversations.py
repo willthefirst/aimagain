@@ -36,6 +36,73 @@ def list_conversations(request: Request, db: Session = Depends(get_db)): # Depen
         context={"request": request, "conversations": conversations} # Pass ORM objects
     ) 
 
+@router.get(
+    "/conversations/{slug}",
+    # response_model=..., # Add later
+    response_class=HTMLResponse, # Assuming HTML response for now
+    tags=["conversations"]
+)
+def get_conversation(
+    slug: str,
+    request: Request, # Keep request for template context
+    db: Session = Depends(get_db)
+    # TODO: Add auth dependency later
+):
+    """Retrieves details for a specific conversation."""
+    conversation = db.query(Conversation).filter(Conversation.slug == slug).first()
+    if not conversation:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Conversation not found")
+
+    # --- Authorization Check --- 
+    # TODO: Replace placeholder with actual authenticated user
+    current_user = db.query(User).filter(User.username == "test-user-me").first()
+    if not current_user:
+        raise HTTPException(status_code=403, detail="Not authenticated (placeholder)")
+
+    # Check if the current user is a participant in this conversation
+    participant = db.query(Participant).filter(
+        Participant.conversation_id == conversation.id,
+        Participant.user_id == current_user.id
+    ).first()
+
+    if not participant:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="User is not a participant in this conversation")
+    
+    # Check participant status (must be 'joined' to view)
+    if participant.status != 'joined':
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="User has not joined this conversation")
+    # --------------------------
+
+    # Authorization passed, user is joined.
+    # Fetch full conversation data with participants/users and messages/senders
+    # Using contains_eager helps load relationships based on the participant check we already did.
+    # Load messages separately with ordering.
+    conversation_details = (
+        db.query(Conversation)
+        .filter(Conversation.id == conversation.id)
+        .options(
+            selectinload(Conversation.participants).joinedload(Participant.user),
+            selectinload(Conversation.messages).joinedload(Message.sender)
+        )
+        .one() # Use one() as we know it exists from the slug check
+    )
+
+    # Sort messages by creation date (ascending) in Python
+    sorted_messages = sorted(
+        conversation_details.messages,
+        key=lambda msg: msg.created_at
+    )
+
+    return templates.TemplateResponse(
+        "conversations/detail.html",
+        {
+            "request": request,
+            "conversation": conversation_details,
+            "participants": conversation_details.participants, # Pass participants separately if needed by template
+            "messages": sorted_messages
+        }
+    )
+
 @router.post(
     "/conversations",
     response_model=ConversationResponse, # Use the response schema

@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>{{ conversation.name or conversation.slug }}</title>
+    <style>
+      body {
+        font-family: sans-serif;
+      }
+      #participants-list,
+      #messages-list {
+        list-style: none;
+        padding: 0;
+      }
+      #participants-list li,
+      #messages-list li {
+        margin-bottom: 0.5em;
+        padding: 0.5em;
+        border: 1px solid #eee;
+      }
+      #messages-list li strong {
+        display: inline-block;
+        width: 120px;
+      }
+      .message-meta {
+        font-size: 0.8em;
+        color: #666;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Conversation: {{ conversation.name or conversation.slug }}</h1>
+    <p>Slug: {{ conversation.slug }}</p>
+    <p>Last Activity: {{ conversation.last_activity_at | default('N/A') }}</p>
+
+    <h2>Participants</h2>
+    <ul id="participants-list">
+      {% for p in participants %}
+      <li>{{ p.user.username if p.user else 'Unknown' }} ({{ p.status }})</li>
+      {% else %}
+      <li>No participants found.</li>
+      {% endfor %}
+    </ul>
+
+    <h2>Messages</h2>
+    <ul id="messages-list">
+      {% for msg in messages %}
+      <li>
+        <strong>{{ msg.sender.username if msg.sender else 'Unknown' }}:</strong>
+        {{ msg.content }}
+        <span class="message-meta">({{ msg.created_at }})</span>
+      </li>
+      {% else %}
+      <li>No messages yet.</li>
+      {% endfor %}
+    </ul>
+
+    <hr />
+    {# TODO: Add form to send new message #}
+    <a href="{{ url_for('list_conversations') }}">Back to Conversations</a>
+  </body>
+</html>

@@ -43,4 +43,49 @@ def list_my_invitations(request: Request, db: Session = Depends(get_db)):
     return templates.TemplateResponse(
         name="me/invitations.html",
         context={"request": request, "invitations": invitations}
+    )
+
+@router.get("/conversations", response_class=HTMLResponse)
+def list_my_conversations(request: Request, db: Session = Depends(get_db)):
+    """Provides an HTML page listing conversations the current user is part of."""
+    current_user = db.query(User).filter(User.username == "test-user-me").first()
+    if not current_user:
+        raise HTTPException(status_code=403, detail="Not authenticated (placeholder)")
+
+    # Query conversations where the current user is a participant (joined or invited)
+    my_conversations = (
+        db.query(Conversation)
+        .join(Participant, Participant.conversation_id == Conversation.id)
+        .filter(Participant.user_id == current_user.id)
+        .filter(Participant.status.in_(['joined', 'invited']))
+        .options(
+            # Eager load *all* participants and their users for display
+            selectinload(Conversation.participants).joinedload(Participant.user)
+        )
+        .order_by(Conversation.last_activity_at.desc().nullslast())
+        .all()
+    )
+
+    # Prepare data for template, including my status in each convo
+    conversation_data = []
+    for convo in my_conversations:
+        my_part_record = next((p for p in convo.participants if p.user_id == current_user.id), None)
+        my_status = my_part_record.status if my_part_record else 'unknown'
+        all_participant_usernames = [p.user.username for p in convo.participants if p.user]
+        conversation_data.append({
+            "slug": convo.slug,
+            "name": convo.name,
+            "last_activity_at": convo.last_activity_at,
+            "participants": all_participant_usernames,
+            "my_status": my_status
+        })
+
+
+    return templates.TemplateResponse(
+        name="me/conversations.html",
+        context={
+            "request": request,
+            "conversations": conversation_data,
+            "current_user_id": current_user.id
+            }
     ) 

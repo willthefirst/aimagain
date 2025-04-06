@@ -257,4 +257,138 @@ async def test_create_conversation_invitee_offline(test_client: AsyncClient, db_
 
     # Assert no conversation was created
     count = db_session.query(Conversation).count()
-    assert count == 0, "Conversation should not have been created" 
+    assert count == 0, "Conversation should not have been created"
+
+# --- Tests for GET /conversations/{slug} ---
+
+async def test_get_conversation_not_found(test_client: AsyncClient):
+    """Test GET /conversations/{slug} returns 404 for a non-existent slug."""
+    non_existent_slug = f"convo-{uuid.uuid4()}"
+    response = await test_client.get(f"{API_PREFIX}/conversations/{non_existent_slug}")
+    assert response.status_code == 404
+
+
+async def test_get_conversation_forbidden_not_participant(test_client: AsyncClient, db_session: Session):
+    """Test GET /conversations/{slug} returns 403 if user is not a participant."""
+    # --- Setup ---
+    creator = User(id=f"user_{uuid.uuid4()}", username=f"creator-{uuid.uuid4()}")
+    # The user making the request (placeholder auth finds this user)
+    me_user = User(id=f"user_{uuid.uuid4()}", username="test-user-me")
+    db_session.add_all([creator, me_user])
+    db_session.flush()
+
+    # Conversation exists, but 'me_user' is not involved
+    conversation = Conversation(
+        id=f"conv_{uuid.uuid4()}",
+        slug=f"other-users-convo-{uuid.uuid4()}",
+        created_by_user_id=creator.id
+    )
+    db_session.add(conversation)
+    db_session.flush()
+
+    # --- Action ---
+    response = await test_client.get(f"{API_PREFIX}/conversations/{conversation.slug}")
+
+    # --- Assertions ---
+    assert response.status_code == 403
+
+
+async def test_get_conversation_forbidden_invited(test_client: AsyncClient, db_session: Session):
+    """Test GET /conversations/{slug} returns 403 if user is participant but status is 'invited'."""
+    # --- Setup ---
+    inviter = User(id=f"user_{uuid.uuid4()}", username=f"inviter-{uuid.uuid4()}")
+    me_user = User(id=f"user_{uuid.uuid4()}", username="test-user-me")
+    db_session.add_all([inviter, me_user])
+    db_session.flush()
+
+    conversation = Conversation(
+        id=f"conv_{uuid.uuid4()}",
+        slug=f"invited-status-convo-{uuid.uuid4()}",
+        created_by_user_id=inviter.id
+    )
+    db_session.add(conversation)
+    db_session.flush()
+
+    # Participant record exists, but status is 'invited'
+    participant = Participant(
+        id=f"part_{uuid.uuid4()}",
+        user_id=me_user.id,
+        conversation_id=conversation.id,
+        status="invited",
+        invited_by_user_id=inviter.id
+    )
+    db_session.add(participant)
+    db_session.flush()
+
+    # --- Action ---
+    response = await test_client.get(f"{API_PREFIX}/conversations/{conversation.slug}")
+
+    # --- Assertions ---
+    assert response.status_code == 403
+
+
+async def test_get_conversation_success_joined(test_client: AsyncClient, db_session: Session):
+    """Test GET /conversations/{slug} returns details for a joined user."""
+    # --- Setup ---
+    creator = User(id=f"user_creator_{uuid.uuid4()}", username=f"creator-{uuid.uuid4()}")
+    # Use placeholder username for the user making the request
+    me_user = User(id=f"user_me_{uuid.uuid4()}", username="test-user-me")
+    other_joined = User(id=f"user_other_{uuid.uuid4()}", username=f"other-{uuid.uuid4()}")
+    db_session.add_all([creator, me_user, other_joined])
+    db_session.flush()
+
+    conversation = Conversation(
+        id=f"conv_{uuid.uuid4()}",
+        name="Test Chat",
+        slug=f"joined-test-convo-{uuid.uuid4()}",
+        created_by_user_id=creator.id,
+        last_activity_at=datetime.now(timezone.utc) - timedelta(minutes=10)
+    )
+    db_session.add(conversation)
+    db_session.flush()
+
+    # Add messages
+    msg1 = Message(id=f"msg1_{uuid.uuid4()}", content="First message", conversation=conversation, sender=creator, created_at=datetime.now(timezone.utc) - timedelta(minutes=9))
+    msg2 = Message(id=f"msg2_{uuid.uuid4()}", content="Second message", conversation=conversation, sender=me_user, created_at=datetime.now(timezone.utc) - timedelta(minutes=5))
+    msg3 = Message(id=f"msg3_{uuid.uuid4()}", content="Third message", conversation=conversation, sender=other_joined, created_at=datetime.now(timezone.utc) - timedelta(minutes=1))
+    db_session.add_all([msg1, msg2, msg3])
+
+    # Add participants ('me' and 'other_joined' are joined)
+    part_creator = Participant(id=f"part_c_{uuid.uuid4()}", user=creator, conversation=conversation, status="joined")
+    part_me = Participant(id=f"part_me_{uuid.uuid4()}", user=me_user, conversation=conversation, status="joined")
+    part_other = Participant(id=f"part_o_{uuid.uuid4()}", user=other_joined, conversation=conversation, status="joined")
+    db_session.add_all([part_creator, part_me, part_other])
+    db_session.flush()
+
+    # --- Action ---
+    response = await test_client.get(f"{API_PREFIX}/conversations/{conversation.slug}")
+
+    # --- Assertions ---
+    assert response.status_code == 200
+    assert "text/html" in response.headers["content-type"]
+
+    tree = HTMLParser(response.text)
+
+    # Check Conversation Details
+    assert conversation.name in tree.css_first('h1').text() # Check name in title/header
+    assert conversation.slug in tree.body.text()
+
+    # Check Participants List (assuming a list with id 'participants-list')
+    participants_list = tree.css('#participants-list > li') # Adjust selector
+    assert len(participants_list) == 3, "Expected 3 participants listed"
+    participants_text = " ".join([p.text() for p in participants_list])
+    assert creator.username in participants_text
+    assert me_user.username in participants_text
+    assert other_joined.username in participants_text
+    assert "(joined)" in participants_text # Check status indication
+
+    # Check Messages List (assuming a list with id 'messages-list')
+    messages_list = tree.css('#messages-list > li') # Adjust selector
+    assert len(messages_list) == 3, "Expected 3 messages listed"
+    messages_text = " ".join([m.text() for m in messages_list])
+    assert msg1.content in messages_text
+    assert msg2.content in messages_text
+    assert msg3.content in messages_text
+    assert creator.username in messages_text # Check sender usernames
+    assert me_user.username in messages_text
+    assert other_joined.username in messages_text 
