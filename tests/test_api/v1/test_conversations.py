@@ -5,10 +5,24 @@ from datetime import datetime, timedelta, timezone
 
 # Need ORM models and Session
 from sqlalchemy.orm import Session
-from app.models import User, Conversation, Participant
+from app.models import User, Conversation, Participant, Message
 # Import HTML Parser
 from selectolax.parser import HTMLParser
 # Removed unused insert, Connection
+# Add Pydantic
+from pydantic import BaseModel
+
+# --- Placeholder Models (can be moved/refined later) ---
+class ConversationCreateRequest(BaseModel):
+    invitee_user_id: str
+    initial_message: str
+
+class ConversationResponse(BaseModel):
+    id: str
+    slug: str
+    created_by_user_id: str
+    # Add other fields as needed
+# --- End Placeholder Models ---
 
 # Mark all tests in this module as async
 pytestmark = pytest.mark.asyncio
@@ -120,4 +134,127 @@ async def test_list_conversations_sorted(test_client: AsyncClient, db_session: S
 
     assert len(slugs_in_order) == 2, "Expected two conversation items"
     assert slugs_in_order[0] == convo_newer.slug, "Newer conversation slug not first"
-    assert slugs_in_order[1] == convo_older.slug, "Older conversation slug not second" 
+    assert slugs_in_order[1] == convo_older.slug, "Older conversation slug not second"
+
+
+async def test_create_conversation_success(test_client: AsyncClient, db_session: Session):
+    """Test POST /conversations successfully creates resources."""
+    # --- Setup ---
+    creator = User(id=f"user_{uuid.uuid4()}", username=f"creator-{uuid.uuid4()}")
+    invitee = User(id=f"user_{uuid.uuid4()}", username=f"invitee-{uuid.uuid4()}", is_online=True) # Mark as online
+    db_session.add_all([creator, invitee])
+    db_session.flush()
+
+    request_data = ConversationCreateRequest(
+        invitee_user_id=invitee.id,
+        initial_message="Hello there!"
+    )
+
+    # --- Action ---
+    response = await test_client.post(
+        f"{API_PREFIX}/conversations",
+        json=request_data.model_dump() # Use model_dump for Pydantic v2+
+    )
+
+    # --- Assertions ---
+    assert response.status_code == 201, f"Expected 201, got {response.status_code}, Response: {response.text}"
+
+    # Assert response body structure (basic check)
+    response_data = response.json()
+    assert "id" in response_data
+    assert "slug" in response_data
+    assert response_data["created_by_user_id"] == creator.id
+    new_convo_id = response_data["id"]
+    new_convo_slug = response_data["slug"]
+
+    # Assert database state
+    # Fetch conversation using the ID from the response
+    db_convo = db_session.query(Conversation).filter(Conversation.id == new_convo_id).first()
+    assert db_convo is not None, "Conversation not found in database"
+    assert db_convo.slug == new_convo_slug
+    assert db_convo.created_by_user_id == creator.id
+
+    # Fetch initial message
+    # Assuming only one message exists for this new convo
+    db_message = db_session.query(Message).filter(Message.conversation_id == new_convo_id).first()
+    assert db_message is not None, "Initial message not found in database"
+    assert db_message.content == request_data.initial_message
+    assert db_message.created_by_user_id == creator.id
+
+    # Fetch participants
+    db_participants = db_session.query(Participant).filter(Participant.conversation_id == new_convo_id).all()
+    assert len(db_participants) == 2, "Expected two participants"
+
+    creator_part = next((p for p in db_participants if p.user_id == creator.id), None)
+    invitee_part = next((p for p in db_participants if p.user_id == invitee.id), None)
+
+    assert creator_part is not None, "Creator participant record not found"
+    assert creator_part.status == "joined"
+
+    assert invitee_part is not None, "Invitee participant record not found"
+    assert invitee_part.status == "invited"
+    assert invitee_part.invited_by_user_id == creator.id
+    assert invitee_part.initial_message_id == db_message.id # Check link to initial message
+
+
+async def test_create_conversation_invitee_not_found(test_client: AsyncClient, db_session: Session):
+    """Test POST /conversations returns 404 if invitee_user_id does not exist."""
+    # --- Setup ---
+    creator = User(id=f"user_{uuid.uuid4()}", username=f"creator-{uuid.uuid4()}")
+    db_session.add(creator)
+    db_session.flush()
+
+    non_existent_user_id = f"user_{uuid.uuid4()}" # ID that definitely won't exist
+
+    request_data = ConversationCreateRequest(
+        invitee_user_id=non_existent_user_id,
+        initial_message="Hello anyone?"
+    )
+
+    # --- Action ---
+    response = await test_client.post(
+        f"{API_PREFIX}/conversations",
+        json=request_data.model_dump()
+    )
+
+    # --- Assertions ---
+    assert response.status_code == 404, f"Expected 404, got {response.status_code}"
+
+    # Assert response detail (optional but good)
+    assert "Invitee user not found" in response.json().get("detail", ""), "Error detail mismatch"
+
+    # Assert no conversation was created
+    count = db_session.query(Conversation).count()
+    assert count == 0, "Conversation should not have been created"
+
+
+async def test_create_conversation_invitee_offline(test_client: AsyncClient, db_session: Session):
+    """Test POST /conversations returns 400 if invitee user is not online."""
+    # --- Setup ---
+    creator = User(id=f"user_{uuid.uuid4()}", username=f"creator-{uuid.uuid4()}")
+    invitee = User(
+        id=f"user_{uuid.uuid4()}",
+        username=f"invitee-offline-{uuid.uuid4()}",
+        is_online=False # Explicitly offline
+    )
+    db_session.add_all([creator, invitee])
+    db_session.flush()
+
+    request_data = ConversationCreateRequest(
+        invitee_user_id=invitee.id,
+        initial_message="Are you there?"
+    )
+
+    # --- Action ---
+    response = await test_client.post(
+        f"{API_PREFIX}/conversations",
+        json=request_data.model_dump()
+    )
+
+    # --- Assertions ---
+    assert response.status_code == 400, f"Expected 400, got {response.status_code}"
+    assert "Invitee user is not online" in response.json().get("detail", ""), "Error detail mismatch"
+
+    # Assert no conversation was created
+    count = db_session.query(Conversation).count()
+    assert count == 0, "Conversation should not have been created" 

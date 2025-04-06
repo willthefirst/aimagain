@@ -12,6 +12,8 @@ from alembic import command
 from dotenv import load_dotenv
 # Import the app's get_db dependency
 from app.db import get_db
+# Import Base for metadata access
+from app.models import Base
 
 # Load environment variables from .env file if it exists
 load_dotenv()
@@ -71,25 +73,36 @@ def test_engine_session() -> Engine:
     engine.dispose()
 
 
-# NEW: Fixture for managing ORM Session
+# NEW: Fixture for managing ORM Session with cleanup
 @pytest.fixture(scope="function")
 def db_session(test_engine_session: Engine):
-    """Yields a SQLAlchemy ORM session with a transaction, rolls back after."""
-    # Use the test engine for the session factory
+    """Yields a SQLAlchemy ORM session with proper cleanup for each test."""
     TestSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=test_engine_session)
     session: Session = TestSessionLocal()
     print("\nDB Session created for test function")
-    # Although Session usually manages transactions implicitly, for testing,
-    # explicitly begin/rollback can ensure isolation if autoflush/commit are triggered.
-    # We might not strictly need this if tests only use session.add/query and no flush/commit.
-    # However, keeping explicit rollback provides robust isolation against accidental commits/flushes.
-    session.begin() # Start a transaction
+
+    # --- Start Transaction --- (Optional but good practice for atomic setup)
+    session.begin()
+
     try:
         yield session # Provide session to the test
+        session.flush() # Ensure any pending changes within the test are flushed before cleanup
+        session.commit() # Commit changes made *within* the test if needed (usually not)
+    except Exception:
+        print("\nRolling back session due to test error")
+        session.rollback()
+        raise # Re-raise the exception from the test
     finally:
-        session.rollback() # Roll back any changes made during the test
-        session.close()    # Close the session
-        print("\nDB Session rolled back and closed for test function")
+        # --- Clean up Data --- (Crucial for isolation)
+        print("\nCleaning up test data...")
+        # Delete data from all tables managed by Base.metadata in reverse dependency order
+        # This ensures foreign key constraints don't cause errors during delete
+        for table in reversed(Base.metadata.sorted_tables):
+            print(f"Deleting from {table.name}")
+            session.execute(table.delete())
+        session.commit() # Commit the deletions
+        session.close() # Close the session
+        print("\nDB Session cleanup complete and closed")
 
 
 # --- Application Fixtures ---

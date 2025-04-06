@@ -16,7 +16,7 @@ This document outlines the initial technical preferences and MVP scope for build
 
 ### User Stories
 
-**1. Initiate a New Conversation**
+**1. Initiate a New Conversation** (In Progress) ✅
 
 - **As an** authenticated user,
 - **I want to** `POST` to `/conversations`, providing the target _online_ user's ID and an initial message,
