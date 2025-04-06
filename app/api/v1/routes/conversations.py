@@ -1,48 +1,44 @@
 from fastapi import APIRouter, Request, Depends
 from fastapi.responses import HTMLResponse
-from sqlalchemy.engine import Connection
-from sqlalchemy import select, join, and_ # Import join and and_
+# Import Session for type hinting and ORM features
+from sqlalchemy.orm import Session, joinedload, selectinload
+# Removed unused Connection, select, join, and_
 
 from app.core.templating import templates
 from app.db import get_db
-# Import all necessary models
-from app.models import Conversation, Participant, User
+# Import ORM models
+from app.models import Conversation, Participant, User # Keep all
 
 router = APIRouter()
 
 @router.get("/conversations", response_class=HTMLResponse, tags=["conversations"])
-def list_conversations(request: Request, db: Connection = Depends(get_db)):
-    """Provides an HTML page listing all public conversations."""
+def list_conversations(request: Request, db: Session = Depends(get_db)): # Depend on Session
+    """Provides an HTML page listing all public conversations using ORM."""
 
-    # 1. Query all conversations
-    convo_query = select(Conversation) # Add ordering later if needed
-    convo_result = db.execute(convo_query)
-    conversations_raw = convo_result.fetchall()
-
-    # 2. Prepare summaries, fetching joined participants for each
-    conversation_summaries = []
-    for convo in conversations_raw:
-        # Query for joined participants and their usernames for this conversation
-        participant_query = (
-            select(User.c.username)
-            .select_from(
-                join(Participant, User, Participant.c.user_id == User.c._id)
-            )
-            .where(
-                and_(
-                    Participant.c.conversation_id == convo._id,
-                    Participant.c.status == 'joined'
-                )
-            )
+    # Use ORM query with relationship loading to avoid N+1
+    # - selectinload fetches participants for each conversation in a separate query
+    # - joinedload fetches the user for each participant in the second query
+    conversations = (
+        db.query(Conversation)
+        .options(
+            selectinload(Conversation.participants)
+            .joinedload(Participant.user)
         )
-        participant_result = db.execute(participant_query)
-        # Fetch usernames as a list of strings
-        joined_usernames = [row[0] for row in participant_result.fetchall()]
+        # Add ordering later, e.g., .order_by(Conversation.last_activity_at.desc())
+        .all()
+    )
 
+    # Format data for the template directly from ORM objects
+    conversation_summaries = []
+    for convo in conversations:
+        # Filter participants in Python - usually efficient enough for moderate numbers
+        joined_usernames = [
+            p.user.username for p in convo.participants if p.status == 'joined' and p.user
+        ]
         conversation_summaries.append({
             "slug": convo.slug,
-            "name": convo.name, # Include name if it exists
-            "last_activity_at": convo.last_activity_at, # Include timestamp
+            "name": convo.name,
+            "last_activity_at": convo.last_activity_at,
             "participants": joined_usernames
         })
 

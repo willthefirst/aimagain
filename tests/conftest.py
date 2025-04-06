@@ -3,15 +3,15 @@ import pytest
 import asyncio
 import pytest_asyncio
 from httpx import AsyncClient, ASGITransport
-# Import Engine for type hint
 from sqlalchemy import create_engine, text, Engine
-from sqlalchemy.engine import Connection
-from sqlalchemy.pool import NullPool # Use NullPool for testing to avoid shared connections
+# Remove Connection import, add Session and sessionmaker
+from sqlalchemy.orm import sessionmaker, Session
+from sqlalchemy.pool import NullPool
 from alembic.config import Config
 from alembic import command
 from dotenv import load_dotenv
-# Import the dependency function and the app's engine
-from app.db import get_db, engine as app_engine
+# Import the app's get_db dependency
+from app.db import get_db
 
 # Load environment variables from .env file if it exists
 load_dotenv()
@@ -25,8 +25,6 @@ TEST_DB_URL = os.getenv("TEST_DATABASE_URL", DEFAULT_TEST_DB_URL)
 # Ensure we are using a test database URL
 if "test" not in TEST_DB_URL:
     pytest.fail("TEST_DATABASE_URL does not seem to be a test database. Aborting tests.")
-
-# REMOVED global test_engine definition
 
 # Alembic config for tests
 alembic_cfg = Config("alembic.ini")
@@ -73,26 +71,25 @@ def test_engine_session() -> Engine:
     engine.dispose()
 
 
-# Updated db_conn fixture: Manages the transaction for the test function
+# NEW: Fixture for managing ORM Session
 @pytest.fixture(scope="function")
-def db_conn(test_engine_session: Engine):
-    connection = test_engine_session.connect()
-    transaction = connection.begin()
-    print("\nDB Connection obtained and Transaction started for test function")
+def db_session(test_engine_session: Engine):
+    """Yields a SQLAlchemy ORM session with a transaction, rolls back after."""
+    # Use the test engine for the session factory
+    TestSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=test_engine_session)
+    session: Session = TestSessionLocal()
+    print("\nDB Session created for test function")
+    # Although Session usually manages transactions implicitly, for testing,
+    # explicitly begin/rollback can ensure isolation if autoflush/commit are triggered.
+    # We might not strictly need this if tests only use session.add/query and no flush/commit.
+    # However, keeping explicit rollback provides robust isolation against accidental commits/flushes.
+    session.begin() # Start a transaction
     try:
-        yield connection  # Provide connection within transaction to the test
+        yield session # Provide session to the test
     finally:
-        print("\nDB Transaction rolling back for test function")
-        transaction.rollback()
-        connection.close()
-
-
-# Simpler override function: Just yields the connection
-def override_get_db(connection: Connection):
-    # This generator simply yields the connection passed to it
-    print(f"\nOverride get_db yielding connection {connection}")
-    yield connection
-    print(f"\nOverride get_db finished for connection {connection}")
+        session.rollback() # Roll back any changes made during the test
+        session.close()    # Close the session
+        print("\nDB Session rolled back and closed for test function")
 
 
 # --- Application Fixtures ---
@@ -104,29 +101,26 @@ def override_db_url_for_tests(monkeypatch):
 
 
 @pytest.fixture(scope="function")
-def app_instance(db_conn: Connection): # Depends on db_conn now!
-    """Yield the FastAPI app instance with get_db overridden to use the test's transaction connection."""
+def app_instance(db_session: Session): # Depends on db_session now!
+    """Yield the FastAPI app instance with get_db overridden to use the test's session."""
     from app.main import app
 
-    # Define the override function inline for clarity, or keep separate
-    # It needs to be a generator that yields the connection from db_conn
+    # Define the override for get_db
     def get_db_override():
-        print(f"\nOverride get_db yielding connection {db_conn}")
-        yield db_conn
-        print(f"\nOverride get_db finished for connection {db_conn}")
+        print(f"\nOverride get_db yielding session {db_session}")
+        yield db_session # Yield the session provided by the db_session fixture
+        print(f"\nOverride get_db finished for session {db_session}")
 
-    # Override get_db to use our generator that yields the db_conn connection
     app.dependency_overrides[get_db] = get_db_override
-    print(f"\nApp get_db dependency overridden to use connection {db_conn} via generator")
+    print(f"\nApp get_db dependency overridden to use session {db_session}")
 
     yield app
 
-    # Clear overrides after test function finishes
     print("\nClearing app dependency overrides")
     app.dependency_overrides.clear()
 
 
-# test_client now depends on app_instance, which depends on db_conn
+# Updated test_client to depend on app_instance
 @pytest_asyncio.fixture(scope="function")
 async def test_client(app_instance):
     """Yield an httpx AsyncClient configured for the test app."""

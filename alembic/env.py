@@ -11,9 +11,8 @@ from alembic import context
 # This allows us to import 'app.db' and 'app.models'
 sys.path.insert(0, os.path.realpath(os.path.join(os.path.dirname(__file__), '..')))
 
-# Import your models' MetaData object and the DATABASE_URL
-from app.db import DATABASE_URL # This loads .env via app.db
-from app.models import metadata as target_metadata # Use your actual metadata object
+# Import the Base object from your ORM models
+from app.models import Base # Import Base
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
@@ -24,20 +23,18 @@ config = context.config
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
-# Set the sqlalchemy.url configuration option using the imported DATABASE_URL
-# This ensures Alembic uses the correct database URL defined in app.db (respecting .env)
-# ---> COMMENTED OUT FOR TESTING: Let conftest.py provide the URL via Alembic Config object
+# ---> DATABASE_URL is no longer needed here
+# ---> The URL should be set via the Config object (e.g., from alembic.ini or conftest.py)
 # config.set_main_option('sqlalchemy.url', DATABASE_URL)
 
 
 # add your model's MetaData object here
 # for 'autogenerate' support
-# from myapp import mymodel
-# target_metadata = mymodel.Base.metadata
-# ---> Our target_metadata is imported above
+# Use the metadata from the Base class
+target_metadata = Base.metadata
 
 # other values from the config, defined by the needs of env.py,
-# can be acquired:-
+# can be acquired:
 # my_important_option = config.get_main_option("my_important_option")
 # ... etc.
 
@@ -54,6 +51,7 @@ def run_migrations_offline() -> None:
     script output.
 
     """
+    # Get the URL from the config (set externally)
     url = config.get_main_option("sqlalchemy.url")
     context.configure(
         url=url,
@@ -73,6 +71,7 @@ def run_migrations_online() -> None:
     and associate a connection with the context.
 
     """
+    # engine_from_config uses the sqlalchemy.url from the config object
     connectable = engine_from_config(
         config.get_section(config.config_ini_section, {}),
         prefix="sqlalchemy.",

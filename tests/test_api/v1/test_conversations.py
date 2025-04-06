@@ -2,10 +2,10 @@ import pytest
 from httpx import AsyncClient
 import uuid
 
-# Need models and db connection/utils
-from sqlalchemy import insert
-from sqlalchemy.engine import Connection
+# Need ORM models and Session
+from sqlalchemy.orm import Session
 from app.models import User, Conversation, Participant
+# Removed unused insert, Connection
 
 # Mark all tests in this module as async
 pytestmark = pytest.mark.asyncio
@@ -25,34 +25,40 @@ async def test_list_conversations_empty(test_client: AsyncClient):
     assert "<html>" in response.text # Basic structure check
 
 
-async def test_list_conversations_one_convo(test_client: AsyncClient, db_conn: Connection):
+async def test_list_conversations_one_convo(test_client: AsyncClient, db_session: Session):
     """Test GET /conversations returns HTML listing one conversation when one exists."""
-    # --- Setup: Create user, conversation, and participant ---
-    user_id = f"user_{uuid.uuid4()}"
-    username = f"convo-creator-{uuid.uuid4()}"
-    user_data = {"_id": user_id, "username": username, "is_online": True}
-    db_conn.execute(insert(User), user_data)
+    # --- Setup: Create user, conversation, and participant objects ---
+    user = User(
+        _id=f"user_{uuid.uuid4()}",
+        username=f"convo-creator-{uuid.uuid4()}",
+        is_online=True
+    )
+    db_session.add(user)
+    db_session.flush() # Flush to get user._id if needed, although we use the object
 
-    convo_id = f"conv_{uuid.uuid4()}"
-    convo_slug = f"test-convo-{uuid.uuid4()}"
-    convo_data = {
-        "_id": convo_id,
-        "slug": convo_slug,
-        "created_by_user_id": user_id,
-        "last_activity_at": None # Or set a time
-    }
-    db_conn.execute(insert(Conversation), convo_data)
+    conversation = Conversation(
+        _id=f"conv_{uuid.uuid4()}",
+        slug=f"test-convo-{uuid.uuid4()}",
+        created_by_user_id=user._id, # Use the created user's ID
+        # We could also assign the user object to conversation.creator if lazy loading is acceptable
+        # creator=user, # This would work too due to relationships
+        last_activity_at=None
+    )
+    db_session.add(conversation)
+    db_session.flush()
 
-    part_id = f"part_{uuid.uuid4()}"
-    part_data = {
-        "_id": part_id,
-        "user_id": user_id,
-        "conversation_id": convo_id,
-        "status": "joined",
-        # Other fields like joined_at can use defaults or be set if needed
-    }
-    db_conn.execute(insert(Participant), part_data)
-    # No commit needed - using dependency override
+    participant = Participant(
+        _id=f"part_{uuid.uuid4()}",
+        user_id=user._id,
+        conversation_id=conversation._id,
+        # Alternatively, assign objects:
+        # user=user,
+        # conversation=conversation,
+        status="joined"
+    )
+    db_session.add(participant)
+    db_session.flush()
+    # No commit needed - session rollback handles cleanup
 
     # --- Action ---
     response = await test_client.get(f"{API_PREFIX}/conversations")
@@ -61,11 +67,11 @@ async def test_list_conversations_one_convo(test_client: AsyncClient, db_conn: C
     assert response.status_code == 200
     assert "text/html" in response.headers["content-type"]
     # Check for conversation details (slug)
-    assert convo_slug in response.text
+    assert conversation.slug in response.text
     # Check for participant username (only joined)
-    assert username in response.text
+    assert user.username in response.text
     # Check that the "empty" message is NOT present
     assert "No conversations found" not in response.text
     assert "<html>" in response.text # Basic structure check
 
-    # Cleanup is handled by db_conn fixture rollback 
+    # Cleanup is handled by db_session fixture rollback 

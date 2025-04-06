@@ -1,5 +1,7 @@
 import os
-from sqlalchemy import create_engine, MetaData
+from sqlalchemy import create_engine # Keep create_engine
+# Import Session and sessionmaker for ORM
+from sqlalchemy.orm import sessionmaker, Session
 from dotenv import load_dotenv
 
 # Load environment variables from .env file
@@ -15,19 +17,20 @@ engine = create_engine(
     connect_args={"check_same_thread": False} # Needed only for SQLite
 )
 
-# SQLAlchemy MetaData object. Tables will be associated with this.
-metadata = MetaData()
+# Create a configured "Session" class
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
-# Dependency function to get a DB connection per request
+# Dependency function to get an ORM Session per request
 def get_db():
-    connection = None
+    db: Session = SessionLocal()
     try:
-        connection = engine.connect()
-        yield connection
+        yield db
     finally:
-        if connection is not None:
-            connection.close()
+        db.close()
 
 # Optional: Function to get a DB connection (can be useful later)
 # def get_db_connection():
 #     return engine.connect() 
+
+# Note: Metadata is now defined in app.models as Base.metadata
+# If needed elsewhere, import from app.models 
