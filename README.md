@@ -14,6 +14,8 @@ This document outlines the initial technical preferences and MVP scope for build
 
 ## MVP Scope
 
+**Note on Authentication:** For the initial implementation of the following user stories, we will use placeholder logic (e.g., querying the first user) to represent the "authenticated user". Proper authentication (as described in the Authentication section below) will be implemented as a separate step across all relevant endpoints once the core features are functional.
+
 ### User Stories
 
 **1. Initiate a New Conversation** (In Progress) ✅
