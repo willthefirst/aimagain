@@ -18,7 +18,7 @@ This document outlines the initial technical preferences and MVP scope for build
 
 ### User Stories
 
-**1. Initiate a New Conversation** (In Progress) ✅
+**1. Initiate a New Conversation** ✅
 
 - **As an** authenticated user,
 - **I want to** `POST` to `/conversations`, providing the target _online_ user's ID and an initial message,
@@ -34,7 +34,7 @@ This document outlines the initial technical preferences and MVP scope for build
   - If User B does not exist, the request fails (e.g., 404 Not Found).
   - The `Conversation.last_activity_at` timestamp is updated.
 
-**2. View and Respond to Invitations**
+**2. View and Respond to Invitations** ✅
 
 - **As an** authenticated user,
 - **I want to** `GET /users/me/invitations` to see my pending invitations, including who invited me and a preview of the first message,

@@ -1,0 +1,21 @@
+# app/schemas/participant.py
+from pydantic import BaseModel, ConfigDict
+from datetime import datetime
+
+# Schema for updating participant status
+class ParticipantUpdateRequest(BaseModel):
+    status: str # Should be 'joined' or 'rejected'
+
+# Schema for participant response
+class ParticipantResponse(BaseModel):
+    id: str
+    user_id: str
+    conversation_id: str
+    status: str
+    invited_by_user_id: str | None = None
+    initial_message_id: str | None = None
+    created_at: datetime
+    updated_at: datetime
+    joined_at: datetime | None = None
+
+    model_config = ConfigDict(from_attributes=True) 

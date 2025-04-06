@@ -3,6 +3,8 @@ from fastapi import FastAPI
 # from fastapi.templating import Jinja2Templates
 from .api.v1.routes import users as users_v1
 from .api.v1.routes import conversations as conversations_v1
+from .api.v1.routes import me as me_v1
+from .api.v1.routes import participants as participants_v1
 
 app = FastAPI(title="Chat App")
 
@@ -17,4 +19,10 @@ def read_root():
 app.include_router(users_v1.router, prefix="/api/v1", tags=["v1", "users"])
 
 # Include the v1 conversations router
-app.include_router(conversations_v1.router, prefix="/api/v1", tags=["v1", "conversations"]) 
+app.include_router(conversations_v1.router, prefix="/api/v1", tags=["v1", "conversations"])
+
+# Include the v1 me router
+app.include_router(me_v1.router, prefix="/api/v1", tags=["v1", "me"])
+
+# Include the v1 participants router
+app.include_router(participants_v1.router, prefix="/api/v1", tags=["v1", "participants"]) 

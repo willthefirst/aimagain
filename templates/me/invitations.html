@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>My Invitations</title>
+    <style>
+      li {
+        margin-bottom: 1em;
+        border: 1px solid #ccc;
+        padding: 0.5em;
+      }
+      form {
+        display: inline;
+        margin-left: 1em;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>My Pending Invitations</h1>
+
+    {% if invitations %}
+    <ul>
+      {% for inv in invitations %}
+      <li>
+        Invited by:
+        <strong
+          >{{ inv.inviter.username if inv.inviter else 'Unknown User' }}</strong
+        ><br />
+        Conversation Slug: {{ inv.conversation.slug if inv.conversation else
+        'Unknown Conversation' }}<br />
+        {% if inv.initial_message %} Message Preview:
+        <em>{{ inv.initial_message.content }}</em><br />
+        {% endif %} {# Forms for Accept/Reject - Target PUT /participants/{id}
+        #}
+        <form
+          method="POST"
+          action="/api/v1/participants/{{ inv.id }}?_method=PUT"
+          style="display: inline">
+          {# Note: Using query param _method=PUT for standard HTML form
+          compatibility #} {# Alternatively, use JavaScript for a proper PUT
+          request #}
+          <input type="hidden" name="status" value="joined" />
+          <button type="submit">Accept</button>
+        </form>
+        <form
+          method="POST"
+          action="/api/v1/participants/{{ inv.id }}?_method=PUT"
+          style="display: inline">
+          <input type="hidden" name="status" value="rejected" />
+          <button type="submit">Reject</button>
+        </form>
+      </li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <p>No pending invitations.</p>
+    {% endif %}
+
+    <hr />
+    {# Maybe link back to conversations or profile later #}
+  </body>
+</html>
