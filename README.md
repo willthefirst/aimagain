@@ -149,6 +149,37 @@ This document outlines the initial technical preferences and MVP scope for build
 - **Data Persistence:** Loss of the session token (e.g., clearing cookies/storage) results in permanent loss of that specific user identity and associated conversation access.
 - **Future Enhancement:** Persistent authentication methods (e.g., username/password, OAuth) can be added later as an _option_ for users who wish to retain their identity across sessions.
 
+#### Implementation Plan
+
+1.  **Database Model (`Session` Table):**
+    - Define `Session` ORM model (`token` PK, `user_id` FK, `expires_at`).
+    - Add `sessions` relationship to `User` model.
+    - Generate/review Alembic migration.
+2.  **Authentication Middleware (`app/core/auth.py`):**
+    - Define constants (`SESSION_TOKEN_COOKIE_NAME`, duration).
+    - Create `AuthenticationMiddleware` (inherits `BaseHTTPMiddleware`).
+    - Implement `dispatch` logic:
+      - Read token cookie.
+      - If valid token/session -> find existing `User`.
+      - If no/invalid token -> generate new token, create new `User` (with generated username), create new `Session`.
+      - Store found/created `User` on `request.state.user`.
+      - Store new token (if created) on `request.state.new_session_token`.
+      - Call `await call_next(request)`.
+      - Check `request.state.new_session_token` and set `Set-Cookie` header on response if needed (`HttpOnly`, `SameSite`, `Path`, `Max-Age`).
+    - Add middleware to app stack in `app/main.py`.
+3.  **Current User Dependency (`app/core/auth.py`):**
+    - Create `get_current_user` dependency: reads `request.state.user`, raises 401/403 if `None`.
+    - Create `get_current_user_optional` dependency: reads `request.state.user`, returns `User | None`.
+4.  **Integrate Dependency:**
+    - Replace placeholder auth logic in routes with `Depends(get_current_user)` or `Depends(get_current_user_optional)`.
+5.  **Update Tests:**
+    - Leverage `httpx.AsyncClient`'s automatic cookie handling.
+    - Review tests relying on placeholder user ("test-user-me") and adjust setup/assertions as needed to work with dynamically created users/sessions.
+6.  **Refinement:**
+    - Implement username generator (e.g., `adjective-noun`).
+    - Consider session cleanup mechanism (optional).
+    - Ensure appropriate cookie security flags (`Secure=True`) for HTTPS deployment.
+
 ## Data Model
 
 The following describes the conceptual structure of the database tables using SQLite. Timestamps (`created_at`, `updated_at`) are standard datetime fields. IDs (`_id`) are UUIDs, prefixed according to the table. Foreign Keys are denoted by `FK`.
