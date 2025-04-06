@@ -7,4 +7,5 @@ httpx
 python-dotenv
 async-lru
 pytest-asyncio
-Jinja2 
+Jinja2
+selectolax 

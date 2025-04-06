@@ -8,18 +8,23 @@
 
     {% if conversations %}
     <ul>
-      {% for convo_summary in conversations %}
+      {# Now looping through Conversation ORM objects #} {% for convo in
+      conversations %}
       <li>
-        <strong>Slug:</strong> {{ convo_summary.slug }} {% if convo_summary.name
-        %} <br /><strong>Name:</strong> {{ convo_summary.name }} {% endif %}
-        <br /><strong>Participants:</strong>
-        {% if convo_summary.participants %} {{ convo_summary.participants |
-        join(', ') }} {% else %} (None joined yet) {% endif %}
-        <br /><strong>Last Activity:</strong> {{ convo_summary.last_activity_at
-        | default('N/A') }}
+        <strong>Slug:</strong> {{ convo.slug }} {% if convo.name %}
+        <br /><strong>Name:</strong> {{ convo.name }} {% endif %} <br /><strong
+          >Participants:</strong
+        >
+        {% set joined_participants = [] %} {% for p in convo.participants if
+        p.status == 'joined' and p.user %} {% set _ =
+        joined_participants.append(p.user.username) %} {% endfor %} {% if
+        joined_participants %} {{ joined_participants | join(', ') }} {% else %}
+        (None joined yet) {% endif %}
+        <br /><strong>Last Activity:</strong> {{ convo.last_activity_at |
+        default('N/A') }}
       </li>
       <br />
-      {# Add some spacing between list items #} {% endfor %}
+      {% endfor %}
     </ul>
     {% else %}
     <p>No conversations found.</p>

@@ -15,9 +15,7 @@ router = APIRouter()
 def list_conversations(request: Request, db: Session = Depends(get_db)): # Depend on Session
     """Provides an HTML page listing all public conversations using ORM."""
 
-    # Use ORM query with relationship loading to avoid N+1
-    # - selectinload fetches participants for each conversation in a separate query
-    # - joinedload fetches the user for each participant in the second query
+    # Query conversations with eager loading of participants and their users
     conversations = (
         db.query(Conversation)
         .options(
@@ -29,21 +27,8 @@ def list_conversations(request: Request, db: Session = Depends(get_db)): # Depen
         .all()
     )
 
-    # Format data for the template directly from ORM objects
-    conversation_summaries = []
-    for convo in conversations:
-        # Filter participants in Python - usually efficient enough for moderate numbers
-        joined_usernames = [
-            p.user.username for p in convo.participants if p.status == 'joined' and p.user
-        ]
-        conversation_summaries.append({
-            "slug": convo.slug,
-            "name": convo.name,
-            "last_activity_at": convo.last_activity_at,
-            "participants": joined_usernames
-        })
-
+    # Pass the raw ORM objects to the template
     return templates.TemplateResponse(
         name="conversations/list.html",
-        context={"request": request, "conversations": conversation_summaries}
+        context={"request": request, "conversations": conversations}
     ) 

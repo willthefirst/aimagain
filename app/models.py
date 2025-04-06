@@ -14,7 +14,7 @@ Base = declarative_base()
 class User(Base):
     __tablename__ = "users"
 
-    _id = Column(Text, primary_key=True) # e.g., "user_uuid..."
+    id = Column(Text, primary_key=True) # Renamed from _id
     username = Column(Text, unique=True, nullable=False)
     created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
     updated_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now())
@@ -34,10 +34,10 @@ class User(Base):
 class Conversation(Base):
     __tablename__ = "conversations"
 
-    _id = Column(Text, primary_key=True) # e.g., "conv_uuid..."
+    id = Column(Text, primary_key=True) # Renamed from _id
     name = Column(Text, nullable=True)
     slug = Column(Text, unique=True, nullable=False)
-    created_by_user_id = Column(Text, ForeignKey("users._id"), nullable=False)
+    created_by_user_id = Column(Text, ForeignKey("users.id"), nullable=False) # Updated FK
     created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
     updated_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now())
     deleted_at = Column(DateTime(timezone=True), nullable=True)
@@ -55,10 +55,10 @@ class Conversation(Base):
 class Message(Base):
     __tablename__ = "messages"
 
-    _id = Column(Text, primary_key=True) # e.g., "msg_uuid..."
+    id = Column(Text, primary_key=True) # Renamed from _id
     content = Column(Text, nullable=False)
-    conversation_id = Column(Text, ForeignKey("conversations._id"), nullable=False)
-    created_by_user_id = Column(Text, ForeignKey("users._id"), nullable=False)
+    conversation_id = Column(Text, ForeignKey("conversations.id"), nullable=False) # Updated FK
+    created_by_user_id = Column(Text, ForeignKey("users.id"), nullable=False) # Updated FK
     created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
 
     # Relationships
@@ -70,12 +70,12 @@ class Message(Base):
 class Participant(Base):
     __tablename__ = "participants"
 
-    _id = Column(Text, primary_key=True) # e.g., "part_uuid..."
-    user_id = Column(Text, ForeignKey("users._id"), nullable=False)
-    conversation_id = Column(Text, ForeignKey("conversations._id"), nullable=False)
+    id = Column(Text, primary_key=True) # Renamed from _id
+    user_id = Column(Text, ForeignKey("users.id"), nullable=False) # Updated FK
+    conversation_id = Column(Text, ForeignKey("conversations.id"), nullable=False) # Updated FK
     status = Column(Text, nullable=False) # 'invited', 'joined', 'rejected', 'left'
-    invited_by_user_id = Column(Text, ForeignKey("users._id"), nullable=True)
-    initial_message_id = Column(Text, ForeignKey("messages._id"), nullable=True) # First message for invites
+    invited_by_user_id = Column(Text, ForeignKey("users.id"), nullable=True) # Updated FK
+    initial_message_id = Column(Text, ForeignKey("messages.id"), nullable=True) # Updated FK
     created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
     updated_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now())
     joined_at = Column(DateTime(timezone=True), nullable=True)

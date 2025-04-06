@@ -6,6 +6,8 @@ from datetime import datetime, timedelta, timezone
 # Need ORM models and Session
 from sqlalchemy.orm import Session
 from app.models import User, Conversation, Participant
+# Import HTML Parser
+from selectolax.parser import HTMLParser
 # Removed unused insert, Connection
 
 # Mark all tests in this module as async
@@ -20,46 +22,41 @@ async def test_list_conversations_empty(test_client: AsyncClient):
 
     assert response.status_code == 200
     assert "text/html" in response.headers["content-type"]
-    # Check for specific content indicating emptiness
-    # We'll refine this assertion once we see the actual template/response
-    assert "No conversations found" in response.text
-    assert "<html>" in response.text # Basic structure check
+
+    tree = HTMLParser(response.text)
+    assert "No conversations found" in tree.body.text()
+    # Check that no conversation list items exist (e.g., assuming a <ul> for the list)
+    assert tree.css_first('ul > li') is None
 
 
 async def test_list_conversations_one_convo(test_client: AsyncClient, db_session: Session):
     """Test GET /conversations returns HTML listing one conversation when one exists."""
-    # --- Setup: Create user, conversation, and participant objects ---
+    # --- Setup ---
     user = User(
-        _id=f"user_{uuid.uuid4()}",
+        id=f"user_{uuid.uuid4()}",
         username=f"convo-creator-{uuid.uuid4()}",
         is_online=True
     )
     db_session.add(user)
-    db_session.flush() # Flush to get user._id if needed, although we use the object
+    db_session.flush()
 
     conversation = Conversation(
-        _id=f"conv_{uuid.uuid4()}",
+        id=f"conv_{uuid.uuid4()}",
         slug=f"test-convo-{uuid.uuid4()}",
-        created_by_user_id=user._id, # Use the created user's ID
-        # We could also assign the user object to conversation.creator if lazy loading is acceptable
-        # creator=user, # This would work too due to relationships
-        last_activity_at=None
+        created_by_user_id=user.id,
+        last_activity_at=datetime.now(timezone.utc)
     )
     db_session.add(conversation)
     db_session.flush()
 
     participant = Participant(
-        _id=f"part_{uuid.uuid4()}",
-        user_id=user._id,
-        conversation_id=conversation._id,
-        # Alternatively, assign objects:
-        # user=user,
-        # conversation=conversation,
+        id=f"part_{uuid.uuid4()}",
+        user_id=user.id,
+        conversation_id=conversation.id,
         status="joined"
     )
     db_session.add(participant)
     db_session.flush()
-    # No commit needed - session rollback handles cleanup
 
     # --- Action ---
     response = await test_client.get(f"{API_PREFIX}/conversations")
@@ -67,46 +64,46 @@ async def test_list_conversations_one_convo(test_client: AsyncClient, db_session
     # --- Assertions ---
     assert response.status_code == 200
     assert "text/html" in response.headers["content-type"]
-    # Check for conversation details (slug)
-    assert conversation.slug in response.text
-    # Check for participant username (only joined)
-    assert user.username in response.text
-    # Check that the "empty" message is NOT present
-    assert "No conversations found" not in response.text
-    assert "<html>" in response.text # Basic structure check
 
-    # Cleanup is handled by db_session fixture rollback 
+    tree = HTMLParser(response.text)
+    convo_items = tree.css('ul > li') # Assuming list items in a <ul>
+    assert len(convo_items) == 1, "Expected one conversation item"
+
+    item_text = convo_items[0].text()
+    assert conversation.slug in item_text, "Conversation slug not found in list item"
+    assert user.username in item_text, "Participant username not found in list item"
+    # Check last activity time format (basic check)
+    # Note: Formatting depends on template filter, might need adjustment
+    assert str(conversation.last_activity_at.year) in item_text, "Last activity year not found"
+    assert "No conversations found" not in tree.body.text()
 
 
 async def test_list_conversations_sorted(test_client: AsyncClient, db_session: Session):
     """Test GET /conversations returns conversations sorted by last_activity_at desc."""
     # --- Setup ---
     now = datetime.now(timezone.utc)
-    user1 = User(_id=f"user_{uuid.uuid4()}", username=f"user-older-{uuid.uuid4()}")
-    user2 = User(_id=f"user_{uuid.uuid4()}", username=f"user-newer-{uuid.uuid4()}")
+    user1 = User(id=f"user_{uuid.uuid4()}", username=f"user-older-{uuid.uuid4()}")
+    user2 = User(id=f"user_{uuid.uuid4()}", username=f"user-newer-{uuid.uuid4()}")
     db_session.add_all([user1, user2])
     db_session.flush()
 
-    # Convo 1: Older activity
     convo_older = Conversation(
-        _id=f"conv_{uuid.uuid4()}",
+        id=f"conv_{uuid.uuid4()}",
         slug=f"convo-older-{uuid.uuid4()}",
-        created_by_user_id=user1._id,
-        last_activity_at=now - timedelta(hours=1) # Explicitly older
+        created_by_user_id=user1.id,
+        last_activity_at=now - timedelta(hours=1)
     )
-    # Convo 2: Newer activity
     convo_newer = Conversation(
-        _id=f"conv_{uuid.uuid4()}",
+        id=f"conv_{uuid.uuid4()}",
         slug=f"convo-newer-{uuid.uuid4()}",
-        created_by_user_id=user2._id,
-        last_activity_at=now # Explicitly newer
+        created_by_user_id=user2.id,
+        last_activity_at=now
     )
     db_session.add_all([convo_older, convo_newer])
     db_session.flush()
 
-    # Add participants (needed for display, though not strictly for sorting)
-    part_older = Participant(_id=f"part_{uuid.uuid4()}", user_id=user1._id, conversation_id=convo_older._id, status="joined")
-    part_newer = Participant(_id=f"part_{uuid.uuid4()}", user_id=user2._id, conversation_id=convo_newer._id, status="joined")
+    part_older = Participant(id=f"part_{uuid.uuid4()}", user_id=user1.id, conversation_id=convo_older.id, status="joined")
+    part_newer = Participant(id=f"part_{uuid.uuid4()}", user_id=user2.id, conversation_id=convo_newer.id, status="joined")
     db_session.add_all([part_older, part_newer])
     db_session.flush()
 
@@ -117,11 +114,10 @@ async def test_list_conversations_sorted(test_client: AsyncClient, db_session: S
     assert response.status_code == 200
     assert "text/html" in response.headers["content-type"]
 
-    # Check that newer convo slug appears before older convo slug in the text
-    response_text = response.text
-    index_newer = response_text.find(convo_newer.slug)
-    index_older = response_text.find(convo_older.slug)
+    tree = HTMLParser(response.text)
+    # Get slugs from list items in order
+    slugs_in_order = [item.text().split('Slug:')[1].split()[0] for item in tree.css('ul > li')]
 
-    assert index_newer != -1, "Newer conversation slug not found in response"
-    assert index_older != -1, "Older conversation slug not found in response"
-    assert index_newer < index_older, "Conversations are not sorted by last_activity_at descending" 
+    assert len(slugs_in_order) == 2, "Expected two conversation items"
+    assert slugs_in_order[0] == convo_newer.slug, "Newer conversation slug not first"
+    assert slugs_in_order[1] == convo_older.slug, "Older conversation slug not second" 
