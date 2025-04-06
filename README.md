@@ -224,3 +224,71 @@ The following describes the conceptual structure of the database tables using SQ
 - `GET /users?participated_with=me`
   - Action: List users the current authenticated user shares 'joined' conversations with.
   - Response: `[ { username, created_at, last_activity_at }, ... ]`
+
+## Setup and Running
+
+Follow these steps to set up the project locally:
+
+1.  **Clone the Repository:**
+
+    ```bash
+    git clone <repository_url>
+    cd <repository_directory>
+    ```
+
+2.  **Create and Activate Virtual Environment:**
+    It's highly recommended to use a virtual environment.
+
+    ```bash
+    python -m venv venv  # Or use python3 if needed
+    source venv/bin/activate  # On Windows use `venv\Scripts\activate`
+    ```
+
+3.  **Install Dependencies:**
+
+    ```bash
+    pip install -r requirements.txt
+    ```
+
+4.  **Set Up Environment Variables:**
+    Copy the example environment file and customize if needed (though the defaults should work for basic setup).
+
+    ```bash
+    cp .env.example .env
+    ```
+
+    The `.env` file is ignored by git and contains environment-specific settings like database URLs. The application (`app/db.py`) and Alembic (`alembic/env.py`) are configured to read this file.
+
+5.  **Apply Database Migrations:**
+    This command creates the database file (e.g., `chat_app.db` specified in `.env`) and applies all schema migrations.
+
+    ```bash
+    alembic upgrade head
+    ```
+
+    If you make changes to the models in `app/models.py`, you'll need to generate a new migration:
+
+    ```bash
+    alembic revision --autogenerate -m "Your descriptive message"
+    ```
+
+    And then apply it:
+
+    ```bash
+    alembic upgrade head
+    ```
+
+6.  **Run the Development Server:**
+    This starts the FastAPI application using the Uvicorn server.
+
+    ```bash
+    uvicorn app.main:app --reload
+    ```
+
+    The API will typically be available at `http://127.0.0.1:8000`. You can access the interactive API documentation (Swagger UI) at `http://127.0.0.1:8000/docs`.
+
+7.  **Run Tests (Optional):**
+    To run the test suite (once tests are added):
+    ```bash
+    pytest
+    ```
