@@ -16,7 +16,7 @@ This document outlines the initial technical preferences and MVP scope for build
 
 ### User Stories
 
-**1. Initiate a New Conversation** (Refined)
+**1. Initiate a New Conversation**
 
 - **As an** authenticated user,
 - **I want to** `POST` to `/conversations`, providing the target _online_ user's ID and an initial message,
@@ -32,7 +32,7 @@ This document outlines the initial technical preferences and MVP scope for build
   - If User B does not exist, the request fails (e.g., 404 Not Found).
   - The `Conversation.last_activity_at` timestamp is updated.
 
-**2. View and Respond to Invitations** (Refined)
+**2. View and Respond to Invitations**
 
 - **As an** authenticated user,
 - **I want to** `GET /users/me/invitations` to see my pending invitations, including who invited me and a preview of the first message,
@@ -50,7 +50,7 @@ This document outlines the initial technical preferences and MVP scope for build
     - User B does _not_ receive real-time updates.
     - The `Conversation.last_activity_at` timestamp is updated.
 
-**3. Access Control for Invited Users** (Unchanged)
+**3. Access Control for Invited Users**
 
 - **As an** invited user (status='invited'),
 - **I want** my access to the conversation to be restricted,
@@ -62,7 +62,7 @@ This document outlines the initial technical preferences and MVP scope for build
   - User B cannot send messages to Conversation C (e.g., `POST /conversations/conv-slug/messages` returns 403).
   - User B does not receive SSE updates for new messages in Conversation C.
 
-**4. Access Control for Joined Users** (Unchanged)
+**4. Access Control for Joined Users**
 
 - **As a** joined user (status='joined'),
 - **I want** full access to the conversation,
@@ -75,7 +75,7 @@ This document outlines the initial technical preferences and MVP scope for build
   - The `Conversation.last_activity_at` timestamp is updated upon sending a message.
   - New messages sent by other joined participants in Conversation C are delivered to User A via SSE.
 
-**5. Invite User to an Existing Conversation** (Refined)
+**5. Invite User to an Existing Conversation**
 
 - **As a** joined user (status='joined'),
 - **I want to** `POST` to `/conversations/{slug}/participants`, providing the target _online_ user's ID,
@@ -90,7 +90,7 @@ This document outlines the initial technical preferences and MVP scope for build
   - If User B is already a participant (status is 'invited' or 'joined'), the request fails (e.g., 409 Conflict).
   - If User A is _not_ 'joined' in Conversation C, the request fails (e.g., 403 Forbidden).
 
-**6. List All Public Conversations** (New)
+**6. List All Public Conversations**
 
 - **As any** user (authenticated or not),
 - **I want to** `GET /conversations`,
@@ -101,7 +101,7 @@ This document outlines the initial technical preferences and MVP scope for build
   - The list should be sortable by `last_activity_at` (descending by default).
   - Private/internal `_id`s are not exposed.
 
-**7. List My Conversations** (New)
+**7. List My Conversations**
 
 - **As an** authenticated user,
 - **I want to** `GET /users/me/conversations`,
@@ -111,7 +111,7 @@ This document outlines the initial technical preferences and MVP scope for build
   - Each item includes: `slug`, `name`, participant usernames (all statuses?), `last_activity_at`, and the user's own `status` ('joined' or 'invited').
   - The list should be sortable by `last_activity_at` (descending by default).
 
-**8. View a Specific Conversation** (New)
+**8. View a Specific Conversation**
 
 - **As an** authenticated user,
 - **I want to** `GET /conversations/{slug}`,
@@ -121,7 +121,7 @@ This document outlines the initial technical preferences and MVP scope for build
   - If User A has a `Participant` record for this conversation with `status='joined'`, the response includes conversation details (`slug`, `name`, participant list with usernames and status) and its recent message history (e.g., last 50 messages, with pagination options).
   - If User A is 'invited' or not a participant, the API returns 403 Forbidden.
 
-**9. List All Users** (New)
+**9. List All Users**
 
 - **As any** user (authenticated or not),
 - **I want to** `GET /users`,
@@ -132,7 +132,7 @@ This document outlines the initial technical preferences and MVP scope for build
   - The list should be sortable (e.g., by `username`, `last_activity_at`).
   - Internal `_id`s are not exposed.
 
-**10. List Users I've Chatted With** (New)
+**10. List Users I've Chatted With**
 
 - **As an** authenticated user,
 - **I want to** `GET /users?participated_with=me`,
