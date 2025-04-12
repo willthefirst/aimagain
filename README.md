@@ -273,14 +273,17 @@ Follow these steps to set up the project locally:
     It's highly recommended to use a virtual environment.
 
     ```bash
-    python -m venv venv  # Or use python3 if needed
+    python3.11 -m venv venv  # Or use python3 if needed
     source venv/bin/activate  # On Windows use `venv\Scripts\activate`
     ```
 
 3.  **Install Dependencies:**
 
     ```bash
-    pip install -r requirements.txt
+    # Install the project and its dependencies defined in pyproject.toml
+    pip install .
+    # For development, you might prefer editable mode:
+    # pip install -e .
     ```
 
 4.  **Set Up Environment Variables:**

@@ -1,0 +1,28 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "chat-app"
+version = "0.1.0"
+description = "A simple chat application."
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi",
+    "uvicorn[standard]",
+    "sqlalchemy",
+    "alembic",
+    "pytest",
+    "httpx",
+    "python-dotenv",
+    "async-lru",
+    "pytest-asyncio",
+    "Jinja2",
+    "selectolax",
+]
+
+[tool.setuptools.packages.find]
+where = ["."] # Look in the root directory
+include = ["app*"] # Include only the 'app' directory and its subpackages
+exclude = ["tests*", "alembic*", "templates*"] # Explicitly exclude other top-level dirs
