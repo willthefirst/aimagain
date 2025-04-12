@@ -20,6 +20,8 @@ dependencies = [
     "pytest-asyncio",
     "Jinja2",
     "selectolax",
+    "fastapi-users[sqlalchemy]",
+    "aiosqlite"
 ]
 
 [tool.setuptools.packages.find]
