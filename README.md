@@ -1,29 +1,29 @@
-# Chat App Project
+# Chat app project
 
 This document outlines the initial technical preferences and MVP scope for building this chat application.
 
-## Core Technical Choices
+## Core technical choices
 
 - **Frontend:** Plain HTML and JavaScript.
   - Adherence to hypermedia principles.
   - Potential future enhancements with HTMX and Alpine.js, but prioritize simplicity initially.
 - **Backend:** Python.
 - **Database:** SQLite.
-- **Real-time Updates:** Server-Sent Events (SSE).
-- **Development Process:** Test-Driven Development (TDD).
+- **Real-time updates:** Server-Sent Events (SSE).
+- **Development process:** Test-Driven Development (TDD).
 
-## MVP Scope
+## MVP scope
 
-**Note on Authentication:** For the initial implementation of the following user stories, we will use placeholder logic (e.g., querying the first user) to represent the "authenticated user". Proper authentication (as described in the Authentication section below) will be implemented as a separate step across all relevant endpoints once the core features are functional.
+**Note on authentication:** For the initial implementation of the following user stories, we will use placeholder logic (e.g., querying the first user) to represent the "authenticated user". Proper authentication (as described in the Authentication section below) will be implemented as a separate step across all relevant endpoints once the core features are functional.
 
-### User Stories
+### User stories
 
-**1. Initiate a New Conversation** ✅
+**1. Initiate a new conversation** ✅
 
 - **As an** authenticated user,
 - **I want to** `POST` to `/conversations`, providing the target _online_ user's ID and an initial message,
 - **So that** a new conversation is created between us, and they receive an invitation to join.
-- **Acceptance Criteria:**
+- **Acceptance criteria:**
   - Given User A is authenticated and User B is online, when User A `POST /conversations` with `{ "invitee_user_id": "user_...", "initial_message": "..." }` in body:
   - A new `Conversation` record is created, linked to User A (`created_by`), including a unique `slug` and `last_activity_at` timestamp.
   - A new `Message` record is created with User A's initial message, linked to the new conversation and User A.
@@ -34,12 +34,12 @@ This document outlines the initial technical preferences and MVP scope for build
   - If User B does not exist, the request fails (e.g., 404 Not Found).
   - The `Conversation.last_activity_at` timestamp is updated.
 
-**2. View and Respond to Invitations** ✅
+**2. View and respond to invitations** ✅
 
 - **As an** authenticated user,
 - **I want to** `GET /users/me/invitations` to see my pending invitations, including who invited me and a preview of the first message,
 - **So that** I can decide whether to accept or reject the invitation.
-- **Acceptance Criteria:**
+- **Acceptance criteria:**
   - Given User B has a `Participant` record (`_id=part_xyz`) with `status='invited'`, when User B `GET /users/me/invitations`:
   - The response includes details for each invitation: `participant_id` (`part_xyz`), inviting user's username, conversation `slug`, and the content of the message linked by `initial_message_id`.
   - When User B accepts an invitation by sending a `PUT /participants/part_xyz` request with `{ "status": "joined" }`:
@@ -52,24 +52,24 @@ This document outlines the initial technical preferences and MVP scope for build
     - User B does _not_ receive real-time updates.
     - The `Conversation.last_activity_at` timestamp is updated.
 
-**3. Access Control for Invited Users**
+**3. Access control for invited users**
 
 - **As an** invited user (status='invited'),
 - **I want** my access to the conversation to be restricted,
 - **So that** I cannot participate until I explicitly accept the invitation.
-- **Acceptance Criteria:**
+- **Acceptance criteria:**
   - Given User B has a `Participant` record with `status='invited'` for Conversation C (slug `conv-slug`):
   - User B cannot `GET /conversations/conv-slug` (API returns 403 Forbidden).
   - User B cannot fetch the message history for Conversation C (e.g., `GET /conversations/conv-slug/messages` returns 403).
   - User B cannot send messages to Conversation C (e.g., `POST /conversations/conv-slug/messages` returns 403).
   - User B does not receive SSE updates for new messages in Conversation C.
 
-**4. Access Control for Joined Users**
+**4. Access control for joined users**
 
 - **As a** joined user (status='joined'),
 - **I want** full access to the conversation,
 - **So that** I can read history, send messages, and receive real-time updates.
-- **Acceptance Criteria:**
+- **Acceptance criteria:**
   - Given User A has a `Participant` record with `status='joined'` for Conversation C (slug `conv-slug`):
   - User A can `GET /conversations/conv-slug` to retrieve conversation details.
   - User A can fetch the full message history for Conversation C (e.g., `GET /conversations/conv-slug/messages`, possibly with pagination).
@@ -77,12 +77,12 @@ This document outlines the initial technical preferences and MVP scope for build
   - The `Conversation.last_activity_at` timestamp is updated upon sending a message.
   - New messages sent by other joined participants in Conversation C are delivered to User A via SSE.
 
-**5. Invite User to an Existing Conversation** ✅
+**5. Invite user to an existing conversation** ✅
 
 - **As a** joined user (status='joined'),
 - **I want to** `POST` to `/conversations/{slug}/participants`, providing the target _online_ user's ID,
 - **So that** they receive an invitation to join the conversation.
-- **Acceptance Criteria:**
+- **Acceptance criteria:**
   - Given User A is 'joined' in Conversation C (with `slug=conv-slug`), and User B is online but not yet a participant:
   - When User A `POST /conversations/conv-slug/participants` with `{ "invitee_user_id": "user_..." }`:
   - A new `Participant` record is created for User B, linked to Conversation C, with `status='invited'` and `invited_by_user_id=UserA.id`. `initial_message_id` can be null.
@@ -92,95 +92,58 @@ This document outlines the initial technical preferences and MVP scope for build
   - If User B is already a participant (status is 'invited' or 'joined'), the request fails (e.g., 409 Conflict).
   - If User A is _not_ 'joined' in Conversation C, the request fails (e.g., 403 Forbidden).
 
-**6. List All Public Conversations** ✅
+**6. List all public conversations** ✅
 
 - **As any** user (authenticated or not),
 - **I want to** `GET /conversations`,
 - **So that** I can see a list of all active conversations on the platform.
-- **Acceptance Criteria:**
+- **Acceptance criteria:**
   - The response is a list of conversation summaries.
   - Each summary includes: `slug`, `name` (if any), list of participant `username`s (only those 'joined'), and `last_activity_at`.
   - The list should be sortable by `last_activity_at` (descending by default).
   - Private/internal `_id`s are not exposed.
 
-**7. List My Conversations** ✅
+**7. List my conversations** ✅
 
 - **As an** authenticated user,
 - **I want to** `GET /users/me/conversations`,
 - **So that** I can see all conversations I am currently part of ('joined' or 'invited').
-- **Acceptance Criteria:**
+- **Acceptance criteria:**
   - The response lists conversations where the authenticated user has a `Participant` record with status 'joined' or 'invited'.
   - Each item includes: `slug`, `name`, participant usernames (all statuses?), `last_activity_at`, and the user's own `status` ('joined' or 'invited').
   - The list should be sortable by `last_activity_at` (descending by default).
 
-**8. View a Specific Conversation** ✅
+**8. View a specific conversation** ✅
 
 - **As an** authenticated user,
 - **I want to** `GET /conversations/{slug}`,
 - **So that** I can view the details and message history of a conversation I have joined.
-- **Acceptance Criteria:**
+- **Acceptance criteria:**
   - Given User A `GET /conversations/conv-slug`:
   - If User A has a `Participant` record for this conversation with `status='joined'`, the response includes conversation details (`slug`, `name`, participant list with usernames and status) and its recent message history (e.g., last 50 messages, with pagination options).
   - If User A is 'invited' or not a participant, the API returns 403 Forbidden.
 
-**9. List All Users** ✅
+**9. List all users** ✅
 
 - **As any** user (authenticated or not),
 - **I want to** `GET /users`,
 - **So that** I can see a list of all registered users on the platform.
-- **Acceptance Criteria:**
+- **Acceptance criteria:**
   - The response is a list of user summaries.
   - Each summary includes: `username`, `created_at`, and a calculated `last_activity_at` (timestamp of the user's last message or participation status change, whichever is latest).
   - The list should be sortable (e.g., by `username`, `last_activity_at`).
   - Internal `_id`s are not exposed.
 
-**10. List Users I've Chatted With** ✅
+**10. List users I've chatted with** ✅
 
 - **As an** authenticated user,
 - **I want to** `GET /users?participated_with=me`,
 - **So that** I can easily find users I share conversations with.
-- **Acceptance Criteria:**
+- **Acceptance criteria:**
   - The response lists users who share at least one conversation where both the authenticated user and the listed user have status 'joined'.
   - Each user summary includes `username`, `created_at`, `last_activity_at`.
 
-### Authentication
-
-- **Initial Approach:** Simple "anonymous auth" where a user is identified solely by a transient session token stored client-side (e.g., in cookies or local storage).
-- **Data Persistence:** Loss of the session token (e.g., clearing cookies/storage) results in permanent loss of that specific user identity and associated conversation access.
-- **Future Enhancement:** Persistent authentication methods (e.g., username/password, OAuth) can be added later as an _option_ for users who wish to retain their identity across sessions.
-
-#### Implementation Plan
-
-1.  **Database Model (`Session` Table):**
-    - Define `Session` ORM model (`token` PK, `user_id` FK, `expires_at`).
-    - Add `sessions` relationship to `User` model.
-    - Generate/review Alembic migration.
-2.  **Authentication Middleware (`app/core/auth.py`):**
-    - Define constants (`SESSION_TOKEN_COOKIE_NAME`, duration).
-    - Create `AuthenticationMiddleware` (inherits `BaseHTTPMiddleware`).
-    - Implement `dispatch` logic:
-      - Read token cookie.
-      - If valid token/session -> find existing `User`.
-      - If no/invalid token -> generate new token, create new `User` (with generated username), create new `Session`.
-      - Store found/created `User` on `request.state.user`.
-      - Store new token (if created) on `request.state.new_session_token`.
-      - Call `await call_next(request)`.
-      - Check `request.state.new_session_token` and set `Set-Cookie` header on response if needed (`HttpOnly`, `SameSite`, `Path`, `Max-Age`).
-    - Add middleware to app stack in `app/main.py`.
-3.  **Current User Dependency (`app/core/auth.py`):**
-    - Create `get_current_user` dependency: reads `request.state.user`, raises 401/403 if `None`.
-    - Create `get_current_user_optional` dependency: reads `request.state.user`, returns `User | None`.
-4.  **Integrate Dependency:**
-    - Replace placeholder auth logic in routes with `Depends(get_current_user)` or `Depends(get_current_user_optional)`.
-5.  **Update Tests:**
-    - Leverage `httpx.AsyncClient`'s automatic cookie handling.
-    - Review tests relying on placeholder user ("test-user-me") and adjust setup/assertions as needed to work with dynamically created users/sessions.
-6.  **Refinement:**
-    - Implement username generator (e.g., `adjective-noun`).
-    - Consider session cleanup mechanism (optional).
-    - Ensure appropriate cookie security flags (`Secure=True`) for HTTPS deployment.
-
-## Data Model
+## Data model
 
 The following describes the conceptual structure of the database tables using SQLite. Timestamps (`created_at`, `updated_at`) are standard datetime fields. IDs (`_id`) are UUIDs, prefixed according to the table. Foreign Keys are denoted by `FK`.
 
@@ -225,7 +188,7 @@ The following describes the conceptual structure of the database tables using SQ
 - `joined_at` (timestamp, nullable): Timestamp when the status became 'joined'.
 - _Constraint:_ Unique index on (`user_id`, `conversation_id`).
 
-## API Endpoints (RESTful)
+## API endpoints (RESTful)
 
 - `POST /conversations`
   - Action: Initiate a new conversation by inviting a user.
@@ -258,18 +221,18 @@ The following describes the conceptual structure of the database tables using SQ
   - Action: List users the current authenticated user shares 'joined' conversations with.
   - Response: `[ { username, created_at, last_activity_at }, ... ]`
 
-## Setup and Running
+## Setup and running
 
 Follow these steps to set up the project locally:
 
-1.  **Clone the Repository:**
+1.  **Clone the repository:**
 
     ```bash
     git clone <repository_url>
     cd <repository_directory>
     ```
 
-2.  **Create and Activate Virtual Environment:**
+2.  **Create and activate virtual environment:**
     It's highly recommended to use a virtual environment.
 
     ```bash
@@ -277,7 +240,7 @@ Follow these steps to set up the project locally:
     source venv/bin/activate  # On Windows use `venv\Scripts\activate`
     ```
 
-3.  **Install Dependencies:**
+3.  **Install dependencies:**
 
     ```bash
     # Install the project and its dependencies defined in pyproject.toml
@@ -286,7 +249,7 @@ Follow these steps to set up the project locally:
     # pip install -e .
     ```
 
-4.  **Set Up Environment Variables:**
+4.  **Set up environment variables:**
     Copy the example environment file and customize if needed (though the defaults should work for basic setup).
 
     ```bash
@@ -295,7 +258,7 @@ Follow these steps to set up the project locally:
 
     The `.env` file is ignored by git and contains environment-specific settings like database URLs. The application (`app/db.py`) and Alembic (`alembic/env.py`) are configured to read this file.
 
-5.  **Apply Database Migrations:**
+5.  **Apply database migrations:**
     This command creates the database file (e.g., `chat_app.db` specified in `.env`) and applies all schema migrations.
 
     ```bash
@@ -314,7 +277,7 @@ Follow these steps to set up the project locally:
     alembic upgrade head
     ```
 
-6.  **Run the Development Server:**
+6.  **Run the development server:**
     This starts the FastAPI application using the Uvicorn server.
 
     ```bash
@@ -323,7 +286,7 @@ Follow these steps to set up the project locally:
 
     The API will typically be available at `http://127.0.0.1:8000`. You can access the interactive API documentation (Swagger UI) at `http://127.0.0.1:8000/docs`.
 
-7.  **Run Tests (Optional):**
+7.  **Run tests (optional):**
     To run the test suite (once tests are added):
     ```bash
     pytest
