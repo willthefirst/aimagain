@@ -50,7 +50,9 @@ async def test_list_conversations_one_convo(test_client: AsyncClient, db_session
     user = User(
         id=f"user_{uuid.uuid4()}",
         username=f"convo-creator-{uuid.uuid4()}",
-        is_online=True
+        is_online=True,
+        email=f"convo-creator-{uuid.uuid4()}@example.com",
+        hashed_password=f"convo-creator-{uuid.uuid4()}",
     )
     db_session.add(user)
     db_session.flush()

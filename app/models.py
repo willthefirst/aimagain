@@ -4,6 +4,7 @@ from sqlalchemy import (
     UniqueConstraint, CheckConstraint, func
 )
 from sqlalchemy.orm import relationship, backref, declarative_base
+from fastapi_users.db import SQLAlchemyBaseUserTableUUID, SQLAlchemyUserDatabase
 
 # Create a Base class for declarative models
 Base = declarative_base()
@@ -11,7 +12,7 @@ Base = declarative_base()
 # Using TEXT for UUIDs in SQLite, ensuring prefixed IDs are handled by application logic.
 # Consider sqlalchemy.Uuid type if using PostgreSQL later.
 
-class User(Base):
+class User(SQLAlchemyBaseUserTableUUID,Base):
     __tablename__ = "users"
 
     id = Column(Text, primary_key=True) # Renamed from _id

@@ -1,5 +1,9 @@
 import os
-from sqlalchemy import create_engine # Keep create_engine
+from collections.abc import AsyncGenerator
+from fastapi import Depends
+
+
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 # Import Session and sessionmaker for ORM
 from sqlalchemy.orm import sessionmaker, Session
 from dotenv import load_dotenv
@@ -9,28 +13,20 @@ load_dotenv()
 
 # Use environment variable or default to a file named chat_app.db
 # Example: DATABASE_URL="sqlite:///./chat_app.db"
-DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./chat_app.db")
+DATABASE_URL = os.getenv("DATABASE_URL")
 
-# The connect_args is specific to SQLite
-engine = create_engine(
-    DATABASE_URL,
-    connect_args={"check_same_thread": False} # Needed only for SQLite
-)
+engine = create_async_engine(DATABASE_URL)
+async_session_maker = async_sessionmaker(engine, expire_on_commit=False)
 
-# Create a configured "Session" class
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+async def create_db_and_tables():
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
 
-# Dependency function to get an ORM Session per request
-def get_db():
-    db: Session = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
 
-# Optional: Function to get a DB connection (can be useful later)
-# def get_db_connection():
-#     return engine.connect() 
+async def get_async_session() -> AsyncGenerator[AsyncSession, None]:
+    async with async_session_maker() as session:
+        yield session
 
-# Note: Metadata is now defined in app.models as Base.metadata
-# If needed elsewhere, import from app.models 
+
+async def get_db(session: AsyncSession = Depends(get_async_session)):
+    yield SQLAlchemyUserDatabase(session, User)
