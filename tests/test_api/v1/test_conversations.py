@@ -14,6 +14,9 @@ from pydantic import BaseModel
 from app.schemas.participant import ParticipantResponse # For type hint/validation
 from typing import Optional
 
+# Import the helper function
+from tests.test_helpers import create_test_user
+
 # --- Placeholder Models (can be moved/refined later) ---
 class ConversationCreateRequest(BaseModel):
     invitee_user_id: str
@@ -30,30 +33,6 @@ class ConversationResponse(BaseModel):
 pytestmark = pytest.mark.asyncio
 
 API_PREFIX = "/api/v1"
-
-def create_test_user(
-    id: Optional[str] = None,
-    username: Optional[str] = None,
-    email: Optional[str] = None,
-    hashed_password: Optional[str] = None,
-    is_online: bool = True,
-    is_active: bool = True,  # Added fastapi-users default
-    is_superuser: bool = False, # Added fastapi-users default
-    is_verified: bool = True,   # Added fastapi-users default
-) -> User:
-    """Creates a User instance with default values for testing."""
-    unique_suffix = uuid.uuid4()
-    return User(
-        id=id or f"user_{unique_suffix}",
-        username=username or f"testuser_{unique_suffix}",
-        email=email or f"test_{unique_suffix}@example.com",
-        hashed_password=hashed_password or f"password_{unique_suffix}",
-        is_online=is_online,
-        is_active=is_active,
-        is_superuser=is_superuser,
-        is_verified=is_verified,
-    )
-
 
 async def test_list_conversations_empty(test_client: AsyncClient):
     """Test GET /conversations returns HTML with no conversations message when empty."""
