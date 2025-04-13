@@ -117,8 +117,8 @@ async def test_list_conversations_sorted(test_client: AsyncClient, db_session: S
     """Test GET /conversations returns conversations sorted by last_activity_at desc."""
     # --- Setup ---
     now = datetime.now(timezone.utc)
-    user1 = User(id=f"user_{uuid.uuid4()}", username=f"user-older-{uuid.uuid4()}")
-    user2 = User(id=f"user_{uuid.uuid4()}", username=f"user-newer-{uuid.uuid4()}")
+    user1 = create_test_user(username=f"user-older-{uuid.uuid4()}")
+    user2 = create_test_user(username=f"user-newer-{uuid.uuid4()}")
     db_session.add_all([user1, user2])
     db_session.flush()
 
@@ -161,8 +161,8 @@ async def test_list_conversations_sorted(test_client: AsyncClient, db_session: S
 async def test_create_conversation_success(test_client: AsyncClient, db_session: Session):
     """Test POST /conversations successfully creates resources."""
     # --- Setup ---
-    creator = User(id=f"user_{uuid.uuid4()}", username=f"creator-{uuid.uuid4()}")
-    invitee = User(id=f"user_{uuid.uuid4()}", username=f"invitee-{uuid.uuid4()}", is_online=True) # Mark as online
+    creator = create_test_user()
+    invitee = create_test_user(username=f"invitee-{uuid.uuid4()}", is_online=True) # Mark as online
     db_session.add_all([creator, invitee])
     db_session.flush()
 
@@ -221,7 +221,7 @@ async def test_create_conversation_success(test_client: AsyncClient, db_session:
 async def test_create_conversation_invitee_not_found(test_client: AsyncClient, db_session: Session):
     """Test POST /conversations returns 404 if invitee_user_id does not exist."""
     # --- Setup ---
-    creator = User(id=f"user_{uuid.uuid4()}", username=f"creator-{uuid.uuid4()}")
+    creator = create_test_user()
     db_session.add(creator)
     db_session.flush()
 
@@ -252,9 +252,8 @@ async def test_create_conversation_invitee_not_found(test_client: AsyncClient, d
 async def test_create_conversation_invitee_offline(test_client: AsyncClient, db_session: Session):
     """Test POST /conversations returns 400 if invitee user is not online."""
     # --- Setup ---
-    creator = User(id=f"user_{uuid.uuid4()}", username=f"creator-{uuid.uuid4()}")
-    invitee = User(
-        id=f"user_{uuid.uuid4()}",
+    creator = create_test_user(username=f"creator-{uuid.uuid4()}")
+    invitee = create_test_user(
         username=f"invitee-offline-{uuid.uuid4()}",
         is_online=False # Explicitly offline
     )
@@ -292,9 +291,9 @@ async def test_get_conversation_not_found(test_client: AsyncClient):
 async def test_get_conversation_forbidden_not_participant(test_client: AsyncClient, db_session: Session):
     """Test GET /conversations/{slug} returns 403 if user is not a participant."""
     # --- Setup ---
-    creator = User(id=f"user_{uuid.uuid4()}", username=f"creator-{uuid.uuid4()}")
+    creator = create_test_user(username=f"creator-{uuid.uuid4()}")
     # The user making the request (placeholder auth finds this user)
-    me_user = User(id=f"user_{uuid.uuid4()}", username="test-user-me")
+    me_user = create_test_user(username="test-user-me")
     db_session.add_all([creator, me_user])
     db_session.flush()
 
@@ -317,8 +316,8 @@ async def test_get_conversation_forbidden_not_participant(test_client: AsyncClie
 async def test_get_conversation_forbidden_invited(test_client: AsyncClient, db_session: Session):
     """Test GET /conversations/{slug} returns 403 if user is participant but status is 'invited'."""
     # --- Setup ---
-    inviter = User(id=f"user_{uuid.uuid4()}", username=f"inviter-{uuid.uuid4()}")
-    me_user = User(id=f"user_{uuid.uuid4()}", username="test-user-me")
+    inviter = create_test_user(username=f"inviter-{uuid.uuid4()}")
+    me_user = create_test_user(username="test-user-me")
     db_session.add_all([inviter, me_user])
     db_session.flush()
 
@@ -351,10 +350,10 @@ async def test_get_conversation_forbidden_invited(test_client: AsyncClient, db_s
 async def test_get_conversation_success_joined(test_client: AsyncClient, db_session: Session):
     """Test GET /conversations/{slug} returns details for a joined user."""
     # --- Setup ---
-    creator = User(id=f"user_creator_{uuid.uuid4()}", username=f"creator-{uuid.uuid4()}")
+    creator = create_test_user( username=f"creator-{uuid.uuid4()}")
     # Use placeholder username for the user making the request
-    me_user = User(id=f"user_me_{uuid.uuid4()}", username="test-user-me")
-    other_joined = User(id=f"user_other_{uuid.uuid4()}", username=f"other-{uuid.uuid4()}")
+    me_user = create_test_user( username="test-user-me")
+    other_joined = create_test_user( username=f"other-{uuid.uuid4()}")
     db_session.add_all([creator, me_user, other_joined])
     db_session.flush()
 
@@ -420,9 +419,9 @@ async def test_invite_participant_success(test_client: AsyncClient, db_session: 
     """Test POST /conversations/{slug}/participants successfully invites a user."""
     # --- Setup ---
     # User A (me, the inviter, joined)
-    me_user = User(id=f"user_{uuid.uuid4()}", username="test-user-me")
+    me_user = create_test_user(username="test-user-me")
     # User B (invitee, online, not yet participant)
-    invitee_user = User(id=f"user_{uuid.uuid4()}", username=f"invitee-{uuid.uuid4()}", is_online=True)
+    invitee_user = create_test_user(username=f"invitee-{uuid.uuid4()}", is_online=True)
     db_session.add_all([me_user, invitee_user])
     db_session.flush()
 
@@ -476,9 +475,9 @@ async def test_invite_participant_success(test_client: AsyncClient, db_session: 
 async def test_invite_participant_forbidden_not_joined(test_client: AsyncClient, db_session: Session):
     """Test POST invite returns 403 if requester is not joined."""
     # --- Setup ---
-    me_user = User(id=f"user_{uuid.uuid4()}", username="test-user-me") # Requester
-    invitee = User(id=f"user_{uuid.uuid4()}", username=f"invitee-{uuid.uuid4()}", is_online=True)
-    creator = User(id=f"user_c_{uuid.uuid4()}", username=f"creator-{uuid.uuid4()}")
+    me_user = create_test_user(username="test-user-me") # Requester
+    invitee = create_test_user(username=f"invitee-{uuid.uuid4()}", is_online=True)
+    creator = create_test_user(username=f"creator-{uuid.uuid4()}")
     db_session.add_all([me_user, invitee, creator])
     db_session.flush()
     conversation = Conversation(id=f"conv_{uuid.uuid4()}", slug=f"invite-forbidden-{uuid.uuid4()}", created_by_user_id=creator.id)
@@ -500,8 +499,8 @@ async def test_invite_participant_forbidden_not_joined(test_client: AsyncClient,
 async def test_invite_participant_conflict_already_participant(test_client: AsyncClient, db_session: Session):
     """Test POST invite returns 409 if invitee is already a participant."""
     # --- Setup ---
-    me_user = User(id=f"user_{uuid.uuid4()}", username="test-user-me")
-    invitee = User(id=f"user_{uuid.uuid4()}", username=f"invitee-{uuid.uuid4()}", is_online=True)
+    me_user = create_test_user(username="test-user-me")
+    invitee = create_test_user(username=f"invitee-{uuid.uuid4()}", is_online=True)
     db_session.add_all([me_user, invitee])
     db_session.flush()
     conversation = Conversation(id=f"conv_{uuid.uuid4()}", slug=f"invite-conflict-{uuid.uuid4()}", created_by_user_id=me_user.id)
@@ -525,8 +524,8 @@ async def test_invite_participant_conflict_already_participant(test_client: Asyn
 async def test_invite_participant_bad_request_offline(test_client: AsyncClient, db_session: Session):
     """Test POST invite returns 400 if invitee is offline."""
     # --- Setup ---
-    me_user = User(id=f"user_{uuid.uuid4()}", username="test-user-me")
-    invitee = User(id=f"user_{uuid.uuid4()}", username=f"invitee-{uuid.uuid4()}", is_online=False) # Offline
+    me_user = create_test_user(username="test-user-me")
+    invitee = create_test_user(username=f"invitee-{uuid.uuid4()}", is_online=False) # Offline
     db_session.add_all([me_user, invitee])
     db_session.flush()
     conversation = Conversation(id=f"conv_{uuid.uuid4()}", slug=f"invite-offline-{uuid.uuid4()}", created_by_user_id=me_user.id)
