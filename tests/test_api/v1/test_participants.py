@@ -21,7 +21,6 @@ class ParticipantUpdateRequest(BaseModel):
 
 async def test_accept_invitation_success(test_client: AsyncClient, db_session: Session):
     """Test PUT /participants/{id} successfully accepts an invitation."""
-    # --- Setup: Create inviter, invitee(me), conversation, message, and invitation ---
     inviter = create_test_user(username=f"inviter-{uuid.uuid4()}")
     me_user = create_test_user(username="test-user-me") # Use placeholder name
     db_session.add_all([inviter, me_user])
@@ -45,20 +44,16 @@ async def test_accept_invitation_success(test_client: AsyncClient, db_session: S
     )
     db_session.add(invitation)
     db_session.flush()
-    invitation_id = invitation.id # Capture the ID
+    invitation_id = invitation.id
 
     request_data = ParticipantUpdateRequest(status="joined")
 
-    # --- Action ---
-    # Simulate PUT request (using POST with _method override or directly if client supports)
-    # We assume the test client or FastAPI handles the _method override if used.
-    # For now, let's assume a direct PUT for simplicity in the test call.
+    # Simulate PUT request
     response = await test_client.put(
         f"{API_PREFIX}/participants/{invitation_id}",
         json=request_data.model_dump()
     )
 
-    # --- Assertions ---
     assert response.status_code == 200, f"Expected 200, got {response.status_code}, Response: {response.text}"
 
     # Assert response body (optional, depends on what the endpoint returns)
@@ -73,7 +68,6 @@ async def test_accept_invitation_success(test_client: AsyncClient, db_session: S
 
 async def test_reject_invitation_success(test_client: AsyncClient, db_session: Session):
     """Test PUT /participants/{id} successfully rejects an invitation."""
-    # --- Setup ---
     inviter = create_test_user(username=f"inviter-{uuid.uuid4()}")
     me_user = create_test_user(username="test-user-me")
     db_session.add_all([inviter, me_user])
@@ -91,13 +85,11 @@ async def test_reject_invitation_success(test_client: AsyncClient, db_session: S
 
     request_data = ParticipantUpdateRequest(status="rejected")
 
-    # --- Action ---
     response = await test_client.put(
         f"{API_PREFIX}/participants/{invitation_id}",
         json=request_data.model_dump()
     )
 
-    # --- Assertions ---
     assert response.status_code == 200
     db_session.refresh(invitation)
     assert invitation.status == "rejected"
@@ -105,7 +97,6 @@ async def test_reject_invitation_success(test_client: AsyncClient, db_session: S
 
 async def test_update_participant_not_owned(test_client: AsyncClient, db_session: Session):
     """Test PUT /participants/{id} returns 403 if participant belongs to another user."""
-    # --- Setup ---
     inviter = create_test_user(username=f"inviter-{uuid.uuid4()}")
     actual_owner = create_test_user(username=f"owner-{uuid.uuid4()}")
     # "me" user who will make the request (using placeholder auth)
@@ -126,18 +117,15 @@ async def test_update_participant_not_owned(test_client: AsyncClient, db_session
 
     request_data = ParticipantUpdateRequest(status="joined")
 
-    # --- Action ---
     response = await test_client.put(
         f"{API_PREFIX}/participants/{participant_id}",
         json=request_data.model_dump()
     )
 
-    # --- Assertions ---
     assert response.status_code == 403
 
 async def test_update_participant_invalid_current_status(test_client: AsyncClient, db_session: Session):
     """Test PUT /participants/{id} returns 400 if participant status is not 'invited'."""
-    # --- Setup ---
     me_user = create_test_user(username="test-user-me")
     db_session.add(me_user)
     db_session.flush()
@@ -154,18 +142,15 @@ async def test_update_participant_invalid_current_status(test_client: AsyncClien
 
     request_data = ParticipantUpdateRequest(status="rejected") # Try to change from joined -> rejected
 
-    # --- Action ---
     response = await test_client.put(
         f"{API_PREFIX}/participants/{participant_id}",
         json=request_data.model_dump()
     )
 
-    # --- Assertions ---
     assert response.status_code == 400
 
 async def test_update_participant_invalid_target_status(test_client: AsyncClient, db_session: Session):
     """Test PUT /participants/{id} returns 400 if target status is invalid."""
-    # --- Setup ---
     inviter = create_test_user(username=f"inviter-{uuid.uuid4()}")
     me_user = create_test_user(username="test-user-me")
     db_session.add_all([inviter, me_user])
@@ -181,13 +166,12 @@ async def test_update_participant_invalid_target_status(test_client: AsyncClient
     db_session.flush()
     invitation_id = invitation.id
 
-    # --- Action --- Attempt to set an invalid status
+    # Attempt to set an invalid status
     response = await test_client.put(
         f"{API_PREFIX}/participants/{invitation_id}",
         json={"status": "maybe"}
     )
 
-    # --- Assertions ---
     # Pydantic might raise 422 if enum validation is added to schema,
     # otherwise our route logic raises 400
     assert response.status_code in [400, 422]
