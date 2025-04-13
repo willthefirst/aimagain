@@ -7,6 +7,8 @@ import uuid
 
 # Import User model for setup (if needed, maybe not for empty case)
 from app.models import User, Conversation, Message, Participant
+# Import helper
+from tests.test_helpers import create_test_user
 
 # Mark all tests in this module as async
 pytestmark = pytest.mark.asyncio
@@ -17,7 +19,7 @@ API_PREFIX = "/api/v1"
 async def test_list_my_invitations_empty(test_client: AsyncClient, db_session: Session):
     """Test GET /users/me/invitations returns HTML with no invitations message when empty."""
     # --- Setup: Create a user with the username the placeholder auth expects ---
-    me_user = User(id=f"user_{uuid.uuid4()}", username="test-user-me")
+    me_user = create_test_user(username="test-user-me")
     db_session.add(me_user)
     db_session.flush()
 
@@ -29,15 +31,15 @@ async def test_list_my_invitations_empty(test_client: AsyncClient, db_session: S
 
     tree = HTMLParser(response.text)
     assert "No pending invitations" in tree.body.text()
-    assert tree.css_first('ul > li') is None # Check list is empty 
+    assert tree.css_first('ul > li') is None # Check list is empty
 
 
 async def test_list_my_invitations_one_invitation(test_client: AsyncClient, db_session: Session):
     """Test GET /users/me/invitations shows one pending invitation correctly."""
     # --- Setup ---
-    inviter = User(id=f"user_{uuid.uuid4()}", username=f"inviter-{uuid.uuid4()}")
+    inviter = create_test_user(username=f"inviter-{uuid.uuid4()}")
     # Use a predictable username for the placeholder auth logic
-    me_user = User(id=f"user_{uuid.uuid4()}", username="test-user-me")
+    me_user = create_test_user(username="test-user-me")
     db_session.add_all([inviter, me_user])
     db_session.flush()
 
@@ -99,14 +101,14 @@ async def test_list_my_invitations_one_invitation(test_client: AsyncClient, db_s
     assert my_invitation.id in form_node.attributes.get('action', ''), "Participant ID not found in form action"
 
     # Check emptiness message is NOT present
-    assert "No pending invitations" not in tree.body.text() 
+    assert "No pending invitations" not in tree.body.text()
 
 # --- Tests for GET /users/me/conversations ---
 
 async def test_list_my_conversations_empty(test_client: AsyncClient, db_session: Session):
     """Test GET /users/me/conversations returns empty when user has no conversations."""
     # --- Setup: Ensure the placeholder 'me' user exists ---
-    me_user = User(id=f"user_{uuid.uuid4()}", username="test-user-me")
+    me_user = create_test_user(username="test-user-me")
     db_session.add(me_user)
     db_session.flush()
 
@@ -126,8 +128,8 @@ async def test_list_my_conversations_empty(test_client: AsyncClient, db_session:
 async def test_list_my_conversations_one_joined(test_client: AsyncClient, db_session: Session):
     """Test GET /users/me/conversations shows one conversation where user is joined."""
     # --- Setup ---
-    creator = User(id=f"user_{uuid.uuid4()}", username=f"creator-{uuid.uuid4()}")
-    me_user = User(id=f"user_{uuid.uuid4()}", username="test-user-me")
+    creator = create_test_user(username=f"creator-{uuid.uuid4()}")
+    me_user = create_test_user(username="test-user-me")
     db_session.add_all([creator, me_user])
     db_session.flush()
 

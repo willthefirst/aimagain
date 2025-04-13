@@ -10,6 +10,8 @@ from sqlalchemy.orm import Session
 # Removed unused insert, Connection
 # Import HTML Parser
 from selectolax.parser import HTMLParser
+# Import the helper function
+from tests.test_helpers import create_test_user
 
 # Mark all tests in this module as async
 pytestmark = pytest.mark.asyncio
@@ -35,8 +37,8 @@ async def test_list_users_empty(test_client: AsyncClient):
 async def test_list_users_one_user(test_client: AsyncClient, db_session: Session):
     """Test GET /users returns HTML listing one user when one exists."""
     test_username = f"test-user-{uuid.uuid4()}"
-    user = User(
-        id=f"user_{uuid.uuid4()}",
+    # Use helper function, remove id
+    user = create_test_user(
         username=test_username,
         is_online=False
     )
@@ -60,13 +62,13 @@ async def test_list_users_one_user(test_client: AsyncClient, db_session: Session
 # Use the db_session fixture
 async def test_list_users_multiple_users(test_client: AsyncClient, db_session: Session):
     """Test GET /users returns HTML listing multiple users when they exist."""
-    user1 = User(
-        id=f"user_{uuid.uuid4()}",
+    # Use helper function, remove id
+    user1 = create_test_user(
         username=f"test-user-one-{uuid.uuid4()}",
         is_online=False
     )
-    user2 = User(
-        id=f"user_{uuid.uuid4()}",
+    # Use helper function, remove id
+    user2 = create_test_user(
         username=f"test-user-two-{uuid.uuid4()}",
         is_online=True
     )
@@ -93,8 +95,10 @@ async def test_list_users_multiple_users(test_client: AsyncClient, db_session: S
 async def test_list_users_participated_empty(test_client: AsyncClient, db_session: Session):
     """Test GET /users?participated_with=me returns empty when no shared convos."""
     # --- Setup: 'me' user exists, but no shared conversations ---
-    me_user = User(id=f"user_{uuid.uuid4()}", username="test-user-me")
-    other_user = User(id=f"user_{uuid.uuid4()}", username="other-user")
+    # Use helper function, remove id
+    me_user = create_test_user(username="test-user-me")
+    # Use helper function, remove id
+    other_user = create_test_user(username="other-user")
     db_session.add_all([me_user, other_user])
     db_session.flush()
     # Can optionally add a convo where 'me' is invited or other user is joined, but not both joined
@@ -108,14 +112,17 @@ async def test_list_users_participated_empty(test_client: AsyncClient, db_sessio
     tree = HTMLParser(response.text)
     # Expect empty list or specific message
     assert "No users found" in tree.body.text() # Reuse existing empty message for now
-    assert tree.css_first('ul > li') is None 
+    assert tree.css_first('ul > li') is None
 
 async def test_list_users_participated_success(test_client: AsyncClient, db_session: Session):
     """Test GET /users?participated_with=me returns correct users."""
     # --- Setup ---
-    me_user = User(id=f"user_me_{uuid.uuid4()}", username="test-user-me")
-    user_b = User(id=f"user_b_{uuid.uuid4()}", username=f"user-b-{uuid.uuid4()}") # Shared convo
-    user_c = User(id=f"user_c_{uuid.uuid4()}", username=f"user-c-{uuid.uuid4()}") # No shared convo
+    # Use helper function, remove id
+    me_user = create_test_user(username="test-user-me")
+    # Use helper function, remove id
+    user_b = create_test_user(username=f"user-b-{uuid.uuid4()}") # Shared convo
+    # Use helper function, remove id
+    user_c = create_test_user(username=f"user-c-{uuid.uuid4()}") # No shared convo
     db_session.add_all([me_user, user_b, user_c])
     db_session.flush()
 

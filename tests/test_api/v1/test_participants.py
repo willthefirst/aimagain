@@ -7,6 +7,8 @@ import uuid
 from app.models import User, Conversation, Message, Participant
 # Add Pydantic
 from pydantic import BaseModel
+# Import helper
+from tests.test_helpers import create_test_user
 
 # Mark all tests in this module as async
 pytestmark = pytest.mark.asyncio
@@ -20,8 +22,8 @@ class ParticipantUpdateRequest(BaseModel):
 async def test_accept_invitation_success(test_client: AsyncClient, db_session: Session):
     """Test PUT /participants/{id} successfully accepts an invitation."""
     # --- Setup: Create inviter, invitee(me), conversation, message, and invitation ---
-    inviter = User(id=f"user_{uuid.uuid4()}", username=f"inviter-{uuid.uuid4()}")
-    me_user = User(id=f"user_{uuid.uuid4()}", username="test-user-me") # Use placeholder name
+    inviter = create_test_user(username=f"inviter-{uuid.uuid4()}")
+    me_user = create_test_user(username="test-user-me") # Use placeholder name
     db_session.add_all([inviter, me_user])
     db_session.flush()
 
@@ -72,8 +74,8 @@ async def test_accept_invitation_success(test_client: AsyncClient, db_session: S
 async def test_reject_invitation_success(test_client: AsyncClient, db_session: Session):
     """Test PUT /participants/{id} successfully rejects an invitation."""
     # --- Setup ---
-    inviter = User(id=f"user_{uuid.uuid4()}", username=f"inviter-{uuid.uuid4()}")
-    me_user = User(id=f"user_{uuid.uuid4()}", username="test-user-me")
+    inviter = create_test_user(username=f"inviter-{uuid.uuid4()}")
+    me_user = create_test_user(username="test-user-me")
     db_session.add_all([inviter, me_user])
     db_session.flush()
     conversation = Conversation(id=f"conv_{uuid.uuid4()}", slug=f"reject-test-{uuid.uuid4()}", created_by_user_id=inviter.id)
@@ -104,10 +106,10 @@ async def test_reject_invitation_success(test_client: AsyncClient, db_session: S
 async def test_update_participant_not_owned(test_client: AsyncClient, db_session: Session):
     """Test PUT /participants/{id} returns 403 if participant belongs to another user."""
     # --- Setup ---
-    inviter = User(id=f"user_{uuid.uuid4()}", username=f"inviter-{uuid.uuid4()}")
-    actual_owner = User(id=f"user_{uuid.uuid4()}", username=f"owner-{uuid.uuid4()}")
+    inviter = create_test_user(username=f"inviter-{uuid.uuid4()}")
+    actual_owner = create_test_user(username=f"owner-{uuid.uuid4()}")
     # "me" user who will make the request (using placeholder auth)
-    me_user = User(id=f"user_{uuid.uuid4()}", username="test-user-me")
+    me_user = create_test_user(username="test-user-me")
     db_session.add_all([inviter, actual_owner, me_user])
     db_session.flush()
     conversation = Conversation(id=f"conv_{uuid.uuid4()}", slug=f"forbidden-test-{uuid.uuid4()}", created_by_user_id=inviter.id)
@@ -136,7 +138,7 @@ async def test_update_participant_not_owned(test_client: AsyncClient, db_session
 async def test_update_participant_invalid_current_status(test_client: AsyncClient, db_session: Session):
     """Test PUT /participants/{id} returns 400 if participant status is not 'invited'."""
     # --- Setup ---
-    me_user = User(id=f"user_{uuid.uuid4()}", username="test-user-me")
+    me_user = create_test_user(username="test-user-me")
     db_session.add(me_user)
     db_session.flush()
     conversation = Conversation(id=f"conv_{uuid.uuid4()}", slug=f"status-test-{uuid.uuid4()}", created_by_user_id=me_user.id)
@@ -164,8 +166,8 @@ async def test_update_participant_invalid_current_status(test_client: AsyncClien
 async def test_update_participant_invalid_target_status(test_client: AsyncClient, db_session: Session):
     """Test PUT /participants/{id} returns 400 if target status is invalid."""
     # --- Setup ---
-    inviter = User(id=f"user_{uuid.uuid4()}", username=f"inviter-{uuid.uuid4()}")
-    me_user = User(id=f"user_{uuid.uuid4()}", username="test-user-me")
+    inviter = create_test_user(username=f"inviter-{uuid.uuid4()}")
+    me_user = create_test_user(username="test-user-me")
     db_session.add_all([inviter, me_user])
     db_session.flush()
     conversation = Conversation(id=f"conv_{uuid.uuid4()}", slug=f"invalid-target-{uuid.uuid4()}", created_by_user_id=inviter.id)
