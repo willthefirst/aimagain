@@ -1,4 +1,3 @@
-# app/api/v1/routes/me.py
 from fastapi import APIRouter, Request, Depends, HTTPException
 from fastapi.responses import HTMLResponse
 from sqlalchemy.orm import Session, joinedload, selectinload, contains_eager # Import eager loading options

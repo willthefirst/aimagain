@@ -25,11 +25,9 @@ class ConversationResponse(BaseModel):
 
 pytestmark = pytest.mark.asyncio
 
-API_PREFIX = "/api/v1"
-
 async def test_list_conversations_empty(test_client: AsyncClient):
     """Test GET /conversations returns HTML with no conversations message when empty."""
-    response = await test_client.get(f"{API_PREFIX}/conversations")
+    response = await test_client.get(f"/conversations")
 
     assert response.status_code == 200
     assert "text/html" in response.headers["content-type"]
@@ -63,7 +61,7 @@ async def test_list_conversations_one_convo(test_client: AsyncClient, db_session
     db_session.add(participant)
     db_session.flush()
 
-    response = await test_client.get(f"{API_PREFIX}/conversations")
+    response = await test_client.get(f"/conversations")
 
     assert response.status_code == 200
     assert "text/html" in response.headers["content-type"]
@@ -108,7 +106,7 @@ async def test_list_conversations_sorted(test_client: AsyncClient, db_session: S
     db_session.add_all([part_older, part_newer])
     db_session.flush()
 
-    response = await test_client.get(f"{API_PREFIX}/conversations")
+    response = await test_client.get(f"/conversations")
 
     assert response.status_code == 200
     assert "text/html" in response.headers["content-type"]
@@ -134,7 +132,7 @@ async def test_create_conversation_success(test_client: AsyncClient, db_session:
     )
 
     response = await test_client.post(
-        f"{API_PREFIX}/conversations",
+        f"/conversations",
         json=request_data.model_dump() # Use model_dump for Pydantic v2+
     )
 
@@ -187,7 +185,7 @@ async def test_create_conversation_invitee_not_found(test_client: AsyncClient, d
     )
 
     response = await test_client.post(
-        f"{API_PREFIX}/conversations",
+        f"/conversations",
         json=request_data.model_dump()
     )
 
@@ -213,7 +211,7 @@ async def test_create_conversation_invitee_offline(test_client: AsyncClient, db_
     )
 
     response = await test_client.post(
-        f"{API_PREFIX}/conversations",
+        f"/conversations",
         json=request_data.model_dump()
     )
 
@@ -227,7 +225,7 @@ async def test_create_conversation_invitee_offline(test_client: AsyncClient, db_
 async def test_get_conversation_not_found(test_client: AsyncClient):
     """Test GET /conversations/{slug} returns 404 for a non-existent slug."""
     non_existent_slug = f"convo-{uuid.uuid4()}"
-    response = await test_client.get(f"{API_PREFIX}/conversations/{non_existent_slug}")
+    response = await test_client.get(f"/conversations/{non_existent_slug}")
     assert response.status_code == 404
 
 
@@ -248,7 +246,7 @@ async def test_get_conversation_forbidden_not_participant(test_client: AsyncClie
     db_session.add(conversation)
     db_session.flush()
 
-    response = await test_client.get(f"{API_PREFIX}/conversations/{conversation.slug}")
+    response = await test_client.get(f"/conversations/{conversation.slug}")
 
     assert response.status_code == 403
 
@@ -279,7 +277,7 @@ async def test_get_conversation_forbidden_invited(test_client: AsyncClient, db_s
     db_session.add(participant)
     db_session.flush()
 
-    response = await test_client.get(f"{API_PREFIX}/conversations/{conversation.slug}")
+    response = await test_client.get(f"/conversations/{conversation.slug}")
 
     assert response.status_code == 403
 
@@ -314,7 +312,7 @@ async def test_get_conversation_success_joined(test_client: AsyncClient, db_sess
     db_session.add_all([part_creator, part_me, part_other])
     db_session.flush()
 
-    response = await test_client.get(f"{API_PREFIX}/conversations/{conversation.slug}")
+    response = await test_client.get(f"/conversations/{conversation.slug}")
 
     assert response.status_code == 200
     assert "text/html" in response.headers["content-type"]
@@ -372,7 +370,7 @@ async def test_invite_participant_success(test_client: AsyncClient, db_session: 
     invite_data = {"invitee_user_id": invitee_user.id}
 
     response = await test_client.post(
-        f"{API_PREFIX}/conversations/{conversation.slug}/participants",
+        f"/conversations/{conversation.slug}/participants",
         json=invite_data
     )
 
@@ -412,7 +410,7 @@ async def test_invite_participant_forbidden_not_joined(test_client: AsyncClient,
 
     invite_data = {"invitee_user_id": invitee.id}
 
-    response = await test_client.post(f"{API_PREFIX}/conversations/{conversation.slug}/participants", json=invite_data)
+    response = await test_client.post(f"/conversations/{conversation.slug}/participants", json=invite_data)
 
     assert response.status_code == 403
 
@@ -432,7 +430,7 @@ async def test_invite_participant_conflict_already_participant(test_client: Asyn
 
     invite_data = {"invitee_user_id": invitee.id}
 
-    response = await test_client.post(f"{API_PREFIX}/conversations/{conversation.slug}/participants", json=invite_data)
+    response = await test_client.post(f"/conversations/{conversation.slug}/participants", json=invite_data)
 
     assert response.status_code == 409
 
@@ -451,6 +449,6 @@ async def test_invite_participant_bad_request_offline(test_client: AsyncClient, 
 
     invite_data = {"invitee_user_id": invitee.id}
 
-    response = await test_client.post(f"{API_PREFIX}/conversations/{conversation.slug}/participants", json=invite_data)
+    response = await test_client.post(f"/conversations/{conversation.slug}/participants", json=invite_data)
 
     assert response.status_code == 400

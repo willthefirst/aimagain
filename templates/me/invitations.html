@@ -33,7 +33,7 @@
         #}
         <form
           method="POST"
-          action="/api/v1/participants/{{ inv.id }}?_method=PUT"
+          action="/participants/{{ inv.id }}?_method=PUT"
           style="display: inline">
           {# Note: Using query param _method=PUT for standard HTML form
           compatibility #} {# Alternatively, use JavaScript for a proper PUT
@@ -43,7 +43,7 @@
         </form>
         <form
           method="POST"
-          action="/api/v1/participants/{{ inv.id }}?_method=PUT"
+          action="/participants/{{ inv.id }}?_method=PUT"
           style="display: inline">
           <input type="hidden" name="status" value="rejected" />
           <button type="submit">Reject</button>

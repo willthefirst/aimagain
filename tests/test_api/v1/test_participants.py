@@ -1,4 +1,3 @@
-# tests/test_api/v1/test_participants.py
 import pytest
 from httpx import AsyncClient
 from sqlalchemy.orm import Session
@@ -12,8 +11,6 @@ from tests.test_helpers import create_test_user
 
 # Mark all tests in this module as async
 pytestmark = pytest.mark.asyncio
-
-API_PREFIX = "/api/v1"
 
 # Placeholder schema
 class ParticipantUpdateRequest(BaseModel):
@@ -50,7 +47,7 @@ async def test_accept_invitation_success(test_client: AsyncClient, db_session: S
 
     # Simulate PUT request
     response = await test_client.put(
-        f"{API_PREFIX}/participants/{invitation_id}",
+        f"/participants/{invitation_id}",
         json=request_data.model_dump()
     )
 
@@ -86,7 +83,7 @@ async def test_reject_invitation_success(test_client: AsyncClient, db_session: S
     request_data = ParticipantUpdateRequest(status="rejected")
 
     response = await test_client.put(
-        f"{API_PREFIX}/participants/{invitation_id}",
+        f"/participants/{invitation_id}",
         json=request_data.model_dump()
     )
 
@@ -118,7 +115,7 @@ async def test_update_participant_not_owned(test_client: AsyncClient, db_session
     request_data = ParticipantUpdateRequest(status="joined")
 
     response = await test_client.put(
-        f"{API_PREFIX}/participants/{participant_id}",
+        f"/participants/{participant_id}",
         json=request_data.model_dump()
     )
 
@@ -143,7 +140,7 @@ async def test_update_participant_invalid_current_status(test_client: AsyncClien
     request_data = ParticipantUpdateRequest(status="rejected") # Try to change from joined -> rejected
 
     response = await test_client.put(
-        f"{API_PREFIX}/participants/{participant_id}",
+        f"/participants/{participant_id}",
         json=request_data.model_dump()
     )
 
@@ -168,7 +165,7 @@ async def test_update_participant_invalid_target_status(test_client: AsyncClient
 
     # Attempt to set an invalid status
     response = await test_client.put(
-        f"{API_PREFIX}/participants/{invitation_id}",
+        f"/participants/{invitation_id}",
         json={"status": "maybe"}
     )
 

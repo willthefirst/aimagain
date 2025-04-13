@@ -1,10 +1,10 @@
 from fastapi import FastAPI
 # Remove Jinja2Templates import here if no longer needed directly in main
 # from fastapi.templating import Jinja2Templates
-from .api.v1.routes import users as users_v1
-from .api.v1.routes import conversations as conversations_v1
-from .api.v1.routes import me as me_v1
-from .api.v1.routes import participants as participants_v1
+from .api.routes import users
+from .api.routes import conversations
+from .api.routes import me
+from .api.routes import participants
 
 app = FastAPI(title="Chat App")
 
@@ -16,13 +16,13 @@ def read_root():
     return {"message": "Welcome to the Chat App API"}
 
 # Include the v1 user router
-app.include_router(users_v1.router, prefix="/api/v1", tags=["v1", "users"])
+app.include_router(users.router, tags=["users"])
 
 # Include the v1 conversations router
-app.include_router(conversations_v1.router, prefix="/api/v1", tags=["v1", "conversations"])
+app.include_router(conversations.router, tags=["conversations"])
 
 # Include the v1 me router
-app.include_router(me_v1.router, prefix="/api/v1", tags=["v1", "me"])
+app.include_router(me.router, tags=["me"])
 
 # Include the v1 participants router
-app.include_router(participants_v1.router, prefix="/api/v1", tags=["v1", "participants"]) 
+app.include_router(participants.router, tags=["participants"]) 

@@ -10,18 +10,16 @@ from tests.test_helpers import create_test_user
 # Mark all tests in this module as async
 pytestmark = pytest.mark.asyncio
 
-API_PREFIX = "/api/v1"
-
 async def test_list_users_empty(test_client: AsyncClient):
     """Test GET /users returns HTML with no users message when empty."""
-    response = await test_client.get(f"{API_PREFIX}/users")
+    response = await test_client.get(f"/users")
 
     assert response.status_code == 200
     assert "text/html" in response.headers["content-type"]
 
     tree = HTMLParser(response.text)
     assert "No users found" in tree.body.text()
-    link_node = tree.css_first(f'a[href*="{API_PREFIX}/users"]')
+    link_node = tree.css_first(f'a[href*="/users"]')
     assert link_node is not None, "Refresh link not found"
 
 
@@ -35,7 +33,7 @@ async def test_list_users_one_user(test_client: AsyncClient, db_session: Session
     db_session.add(user)
     db_session.flush()
 
-    response = await test_client.get(f"{API_PREFIX}/users")
+    response = await test_client.get(f"/users")
 
     assert response.status_code == 200
     assert "text/html" in response.headers["content-type"]
@@ -60,7 +58,7 @@ async def test_list_users_multiple_users(test_client: AsyncClient, db_session: S
     db_session.add_all([user1, user2])
     db_session.flush()
 
-    response = await test_client.get(f"{API_PREFIX}/users")
+    response = await test_client.get(f"/users")
 
     assert response.status_code == 200
     assert "text/html" in response.headers["content-type"]
@@ -82,7 +80,7 @@ async def test_list_users_participated_empty(test_client: AsyncClient, db_sessio
     db_session.add_all([me_user, other_user])
     db_session.flush()
 
-    response = await test_client.get(f"{API_PREFIX}/users?participated_with=me")
+    response = await test_client.get(f"/users?participated_with=me")
 
     assert response.status_code == 200
     assert "text/html" in response.headers["content-type"]
@@ -113,7 +111,7 @@ async def test_list_users_participated_success(test_client: AsyncClient, db_sess
     db_session.add_all([part2_me, part2_c])
     db_session.flush()
 
-    response = await test_client.get(f"{API_PREFIX}/users?participated_with=me")
+    response = await test_client.get(f"/users?participated_with=me")
 
     assert response.status_code == 200
     tree = HTMLParser(response.text)

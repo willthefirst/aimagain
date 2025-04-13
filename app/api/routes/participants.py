@@ -1,4 +1,3 @@
-# app/api/v1/routes/participants.py
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from datetime import datetime, timezone

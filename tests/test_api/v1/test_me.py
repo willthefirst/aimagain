@@ -1,4 +1,3 @@
-# tests/test_api/v1/test_me.py
 import pytest
 from httpx import AsyncClient
 from sqlalchemy.orm import Session
@@ -13,8 +12,6 @@ from tests.test_helpers import create_test_user
 # Mark all tests in this module as async
 pytestmark = pytest.mark.asyncio
 
-API_PREFIX = "/api/v1"
-
 
 async def test_list_my_invitations_empty(test_client: AsyncClient, db_session: Session):
     """Test GET /users/me/invitations returns HTML with no invitations message when empty."""
@@ -23,7 +20,7 @@ async def test_list_my_invitations_empty(test_client: AsyncClient, db_session: S
     db_session.add(me_user)
     db_session.flush()
 
-    response = await test_client.get(f"{API_PREFIX}/users/me/invitations")
+    response = await test_client.get(f"/users/me/invitations")
 
     assert response.status_code == 200
     assert "text/html" in response.headers["content-type"]
@@ -71,7 +68,7 @@ async def test_list_my_invitations_one_invitation(test_client: AsyncClient, db_s
     db_session.flush()
 
     # The route's placeholder auth should now find 'me_user' based on the fixed username
-    response = await test_client.get(f"{API_PREFIX}/users/me/invitations")
+    response = await test_client.get(f"/users/me/invitations")
 
     assert response.status_code == 200
     assert "text/html" in response.headers["content-type"]
@@ -103,7 +100,7 @@ async def test_list_my_conversations_empty(test_client: AsyncClient, db_session:
     db_session.add(me_user)
     db_session.flush()
 
-    response = await test_client.get(f"{API_PREFIX}/users/me/conversations")
+    response = await test_client.get(f"/users/me/conversations")
 
     assert response.status_code == 200
     assert "text/html" in response.headers["content-type"]
@@ -143,7 +140,7 @@ async def test_list_my_conversations_one_joined(test_client: AsyncClient, db_ses
     db_session.add(part_creator)
     db_session.flush()
 
-    response = await test_client.get(f"{API_PREFIX}/users/me/conversations")
+    response = await test_client.get(f"/users/me/conversations")
 
     assert response.status_code == 200
     tree = HTMLParser(response.text)
