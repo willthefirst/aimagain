@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sess
 from sqlalchemy.pool import NullPool
 import asyncio
 import logging # Added for better logging
+from sqlalchemy import delete # Import delete
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -15,6 +16,7 @@ log = logging.getLogger(__name__)
 # Import your FastAPI app and base model metadata
 from app.main import app as fastapi_app # Assuming your FastAPI app instance is named 'app' in 'app.main'
 from app.models import metadata # Import your Base model metadata
+from app.models import User, Participant, Conversation # Import models for cleanup
 from app.db import get_db # Import the original dependency getter
 
 # Use a file-based SQLite database for testing to ensure persistence
@@ -62,12 +64,17 @@ async def setup_database():
 async def db_session() -> AsyncGenerator[AsyncSession, None]:
     """
     Provides a database session for each test function, managed by the sessionmaker.
-    Connects to the file-based test DB.
+    Connects to the file-based test DB. Cleans up data after the test.
     """
     async with TestingSessionLocal() as session:
         log.debug("DB session provided by fixture.")
         yield session
-        log.debug("DB session closed.")
+        log.info("Cleaning up test data after function.")
+        await session.execute(delete(Participant)) # Delete dependent first
+        await session.execute(delete(Conversation))
+        await session.execute(delete(User))
+        await session.commit() # Commit the deletions
+        log.debug("DB session closed and data cleaned.")
 
 @pytest.fixture(scope="function") # Changed scope to function to match db_session
 def app(setup_database, db_session: AsyncSession) -> Generator: # Inject db_session
