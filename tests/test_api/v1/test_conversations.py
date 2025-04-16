@@ -121,7 +121,10 @@ async def test_list_conversations_sorted(test_client: AsyncClient, db_session: A
 async def test_create_conversation_success(test_client: AsyncClient, db_session: AsyncSession):
     """Test POST /conversations successfully creates resources."""
     creator = create_test_user()
-    invitee = create_test_user(username=f"invitee-{uuid.uuid4()}", is_online=True) # Mark as online
+    creator_id = creator.id
+    invitee = create_test_user(username=f"invitee-{uuid.uuid4()}", 
+    is_online=True) # Mark as online
+    invitee_id = invitee.id
     db_session.add_all([creator, invitee])
     await db_session.flush()
 
@@ -140,7 +143,7 @@ async def test_create_conversation_success(test_client: AsyncClient, db_session:
     response_data = response.json()
     assert "id" in response_data
     assert "slug" in response_data
-    assert response_data["created_by_user_id"] == creator.id
+    assert response_data["created_by_user_id"] == creator_id
     new_convo_id = response_data["id"]
     new_convo_slug = response_data["slug"]
 
@@ -150,7 +153,7 @@ async def test_create_conversation_success(test_client: AsyncClient, db_session:
     db_convo = convo_result.scalars().first()
     assert db_convo is not None, "Conversation not found in database"
     assert db_convo.slug == new_convo_slug
-    assert db_convo.created_by_user_id == creator.id
+    assert db_convo.created_by_user_id == creator_id
 
     # Assuming only one message exists for this new convo
     msg_stmt = select(Message).filter(Message.conversation_id == new_convo_id)
@@ -158,22 +161,22 @@ async def test_create_conversation_success(test_client: AsyncClient, db_session:
     db_message = msg_result.scalars().first()
     assert db_message is not None, "Initial message not found in database"
     assert db_message.content == request_data.initial_message
-    assert db_message.created_by_user_id == creator.id
+    assert db_message.created_by_user_id == creator_id
 
     part_stmt = select(Participant).filter(Participant.conversation_id == new_convo_id)
     part_result = await db_session.execute(part_stmt)
     db_participants = part_result.scalars().all()
     assert len(db_participants) == 2, "Expected two participants"
 
-    creator_part = next((p for p in db_participants if p.user_id == creator.id), None)
-    invitee_part = next((p for p in db_participants if p.user_id == invitee.id), None)
+    creator_part = next((p for p in db_participants if p.user_id == creator_id), None)
+    invitee_part = next((p for p in db_participants if p.user_id == invitee_id), None)
 
     assert creator_part is not None, "Creator participant record not found"
     assert creator_part.status == "joined"
 
     assert invitee_part is not None, "Invitee participant record not found"
     assert invitee_part.status == "invited"
-    assert invitee_part.invited_by_user_id == creator.id
+    assert invitee_part.invited_by_user_id == creator_id
     assert invitee_part.initial_message_id == db_message.id # Check link to initial message
 
 
@@ -243,6 +246,7 @@ async def test_get_conversation_not_found(test_client: AsyncClient):
 async def test_get_conversation_forbidden_not_participant(test_client: AsyncClient, db_session: AsyncSession):
     """Test GET /conversations/{slug} returns 403 if user is not a participant."""
     creator = create_test_user(username=f"creator-{uuid.uuid4()}")
+    creator.id
     # The user making the request (placeholder auth finds this user)
     me_user = create_test_user(username="test-user-me")
     db_session.add_all([creator, me_user])
