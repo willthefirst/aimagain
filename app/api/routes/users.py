@@ -1,8 +1,7 @@
-from fastapi import APIRouter, Request, Depends
+from fastapi import APIRouter, HTTPException, Request, Depends
 from fastapi.responses import HTMLResponse
-# Import Session for type hinting
-from sqlalchemy.orm import Session
-# Removed unused Connection, select
+
+from sqlalchemy.ext.asyncio import AsyncSession
 
 # Import templates from the new core location
 from app.core.templating import templates
@@ -15,16 +14,18 @@ router = APIRouter()
 
 # Specify HTMLResponse as the default response class for this endpoint
 @router.get("/users", response_class=HTMLResponse, tags=["users"])
-def list_users(
+async def list_users(
     request: Request,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     participated_with: str | None = None # Add query parameter
 ):
     """Provides an HTML page listing registered users.
     Can be filtered to users participated with the current user.
     """
     # Placeholder for current user - needed for participated_with filter
-    current_user = db.query(User).filter(User.username == "test-user-me").first()
+    stmt = select(User).filter(User.username == "test-user-me")
+    result = await db.execute(stmt)
+    current_user = result.scalars().first()
     # if not current_user and participated_with == "me":
     #     raise HTTPException(status_code=403, detail="Authentication required for this filter")
 
@@ -50,18 +51,17 @@ def list_users(
             .scalar_subquery()
         )
 
+        stmt = select(User).filter(User.id.in_(other_user_ids_subquery))
+
         # Fetch the User objects for those IDs
-        users = (
-            db.query(User)
-            .filter(User.id.in_(other_user_ids_subquery))
-            # TODO: Add sorting later if needed (e.g., by username)
-            .order_by(User.username)
-            .all()
-        )
+        result = await db.execute(stmt)
+        users = result.scalars().all()
+        return users
     else:
         # Original query: List all users
         # TODO: Add sorting later if needed (e.g., by username)
-        users = db.query(User).order_by(User.username).all()
+        result = await db.execute(select(User)) 
+        users = result.scalars().all()
 
     return templates.TemplateResponse(
         name="users/list.html",
