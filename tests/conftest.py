@@ -1,143 +1,111 @@
 import os
 import pytest
-import asyncio
 import pytest_asyncio
+from typing import AsyncGenerator, Generator
 from httpx import AsyncClient, ASGITransport
-from sqlalchemy import create_engine, text, Engine
-# Remove Connection import, add Session and sessionmaker
-from sqlalchemy.orm import sessionmaker, Session
+from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
 from sqlalchemy.pool import NullPool
-from alembic.config import Config
-from alembic import command
-from dotenv import load_dotenv
-# Import the app's get_db dependency
-from app.db import get_db
-# Import Base for metadata access
-from app.models import Base
+import asyncio
+import logging # Added for better logging
 
-# Load environment variables from .env file if it exists
-load_dotenv()
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+log = logging.getLogger(__name__)
 
-# --- Database Fixtures ---
+# Import your FastAPI app and base model metadata
+from app.main import app as fastapi_app # Assuming your FastAPI app instance is named 'app' in 'app.main'
+from app.models import metadata # Import your Base model metadata
+from app.db import get_db # Import the original dependency getter
 
-# Default Test DB URL (can be overridden by environment variable)
-DEFAULT_TEST_DB_URL = "sqlite:///./test_chat_app.db"
-TEST_DB_URL = os.getenv("TEST_DATABASE_URL", DEFAULT_TEST_DB_URL)
+# Use a file-based SQLite database for testing to ensure persistence
+# across connections within the same test session.
+TEST_DB_PATH = "./test.db"
+TEST_DATABASE_URL = f"sqlite+aiosqlite:///{TEST_DB_PATH}"
 
-# Ensure we are using a test database URL
-if "test" not in TEST_DB_URL:
-    pytest.fail("TEST_DATABASE_URL does not seem to be a test database. Aborting tests.")
+# Create the test database engine
+# NullPool is recommended for testing with SQLite
+test_engine = create_async_engine(TEST_DATABASE_URL, poolclass=NullPool)
 
-# Alembic config for tests
-alembic_cfg = Config("alembic.ini")
-# Point alembic to the test database
-alembic_cfg.set_main_option("sqlalchemy.url", TEST_DB_URL)
+# Create a sessionmaker for the test database
+TestingSessionLocal = async_sessionmaker(
+    autocommit=False, autoflush=False, bind=test_engine
+)
 
-
-def run_migrations():
-    print(f"\nApplying migrations to test database: {TEST_DB_URL}")
-    # Ensure the test DB file directory exists if using SQLite file DB
-    db_path = TEST_DB_URL.split("///")[-1]
-    if db_path != ":memory:":
-        db_dir = os.path.dirname(db_path)
-        if db_dir and not os.path.exists(db_dir):
-            os.makedirs(db_dir)
-        # Delete existing test DB file if it exists before migrating
-        if os.path.exists(db_path):
-            print(f"Deleting existing test database file: {db_path}")
-            os.remove(db_path)
-
-    command.upgrade(alembic_cfg, "head")
-    print("Migrations applied.")
-
+# --- Fixtures ---
 
 @pytest.fixture(scope="session", autouse=True)
-def apply_migrations():
-    """Applies migrations at the start of the test session."""
-    run_migrations()
-    # No yield/cleanup needed here as it modifies the file state
+async def setup_database():
+    """
+    Fixture to create database tables before tests run and drop/delete them afterwards.
+    Runs once per session. Made autouse=True to ensure it runs.
+    Uses a file-based DB (test.db).
+    """
+    # Ensure the old DB file is removed before starting, if it exists
+    if os.path.exists(TEST_DB_PATH):
+        os.remove(TEST_DB_PATH)
 
+    async with test_engine.begin() as conn:
+        await conn.run_sync(metadata.create_all)
+    yield
+    # Optional: Drop tables if needed, though removing the file is usually sufficient
+    # async with test_engine.begin() as conn:
+    #     await conn.run_sync(metadata.drop_all)
 
-# NEW: Session-scoped fixture for the test engine
-@pytest.fixture(scope="session")
-def test_engine_session() -> Engine:
-    """Yields a SQLAlchemy engine configured for the test database."""
-    print(f"\nCreating test engine for {TEST_DB_URL}")
-    engine = create_engine(
-        TEST_DB_URL,
-        poolclass=NullPool,
-        connect_args={"check_same_thread": False}
-    )
-    yield engine
-    print("\nDisposing test engine")
-    engine.dispose()
+    # Explicitly dispose of the engine to release file handles before deleting
+    await test_engine.dispose()
 
+    # Remove the test database file
+    if os.path.exists(TEST_DB_PATH):
+        os.remove(TEST_DB_PATH)
 
-# NEW: Fixture for managing ORM Session with cleanup
-@pytest.fixture(scope="function")
-def db_session(test_engine_session: Engine):
-    """Yields a SQLAlchemy ORM session with proper cleanup for each test."""
-    TestSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=test_engine_session)
-    session: Session = TestSessionLocal()
-    print("\nDB Session created for test function")
-
-    # --- Start Transaction --- (Optional but good practice for atomic setup)
-    session.begin()
+@pytest_asyncio.fixture(scope="function")
+async def db_session() -> AsyncGenerator[AsyncSession, None]:
+    """
+    Provides a transactional database session for each test function.
+    Connects to the file-based test DB.
+    """
+    connection = await test_engine.connect()
+    transaction = await connection.begin()
+    session = TestingSessionLocal(bind=connection)
+    log.debug("DB session transaction started.")
 
     try:
-        yield session # Provide session to the test
-        session.flush() # Ensure any pending changes within the test are flushed before cleanup
-        session.commit() # Commit changes made *within* the test if needed (usually not)
-    except Exception:
-        print("\nRolling back session due to test error")
-        session.rollback()
-        raise # Re-raise the exception from the test
+        yield session
     finally:
-        # --- Clean up Data --- (Crucial for isolation)
-        print("\nCleaning up test data...")
-        # Delete data from all tables managed by Base.metadata in reverse dependency order
-        # This ensures foreign key constraints don't cause errors during delete
-        for table in reversed(Base.metadata.sorted_tables):
-            print(f"Deleting from {table.name}")
-            session.execute(table.delete())
-        session.commit() # Commit the deletions
-        session.close() # Close the session
-        print("\nDB Session cleanup complete and closed")
+        log.debug("Closing DB session and rolling back transaction.")
+        await session.close()
+        if transaction.is_active: # Ensure rollback only if active
+             await transaction.rollback() # Rollback changes after each test
+        await connection.close()
+
+@pytest.fixture(scope="session")
+def app(setup_database) -> Generator: # Depends on setup_database
+    """
+    Fixture to override the database dependency in the FastAPI app.
+    Depends on setup_database to ensure tables exist in the file DB.
+    """
+    async def override_get_db() -> AsyncGenerator[AsyncSession, None]:
+        """Dependency override for get_db."""
+        connection = await test_engine.connect()
+        session = TestingSessionLocal(bind=connection)
+        log.debug("Override get_db yielding session.")
+        try:
+            yield session
+        finally:
+            log.debug("Override get_db closing session.")
+            await session.close()
+            await connection.close()
+
+    fastapi_app.dependency_overrides[get_db] = override_get_db
+    yield fastapi_app
+    # Clean up overrides after session
+    fastapi_app.dependency_overrides.clear()
 
 
-# --- Application Fixtures ---
-
-@pytest.fixture(scope="function", autouse=True)
-def override_db_url_for_tests(monkeypatch):
-    """Ensure the app uses the TEST_DATABASE_URL during tests."""
-    monkeypatch.setenv("DATABASE_URL", TEST_DB_URL)
-
-
-@pytest.fixture(scope="function")
-def app_instance(db_session: Session): # Depends on db_session now!
-    """Yield the FastAPI app instance with get_db overridden to use the test's session."""
-    from app.main import app
-
-    # Define the override for get_db
-    def get_db_override():
-        print(f"\nOverride get_db yielding session {db_session}")
-        yield db_session # Yield the session provided by the db_session fixture
-        print(f"\nOverride get_db finished for session {db_session}")
-
-    app.dependency_overrides[get_db] = get_db_override
-    print(f"\nApp get_db dependency overridden to use session {db_session}")
-
-    yield app
-
-    print("\nClearing app dependency overrides")
-    app.dependency_overrides.clear()
-
-
-# Updated test_client to depend on app_instance
 @pytest_asyncio.fixture(scope="function")
-async def test_client(app_instance):
-    """Yield an httpx AsyncClient configured for the test app."""
-    print("\nCreating test client")
-    transport = ASGITransport(app=app_instance)
-    async with AsyncClient(transport=transport, base_url="http://testserver") as client:
-        yield client 
+async def test_client(app) -> AsyncGenerator[AsyncClient, None]:
+    """
+    Provides an HTTPX AsyncClient for making requests to the test app.
+    """
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        yield client

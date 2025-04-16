@@ -3,7 +3,8 @@ from httpx import AsyncClient
 import uuid
 
 from app.models import User, Conversation, Participant
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from selectolax.parser import HTMLParser
 from tests.test_helpers import create_test_user
 
@@ -23,7 +24,7 @@ async def test_list_users_empty(test_client: AsyncClient):
     assert link_node is not None, "Refresh link not found"
 
 
-async def test_list_users_one_user(test_client: AsyncClient, db_session: Session):
+async def test_list_users_one_user(test_client: AsyncClient, db_session: AsyncSession):
     """Test GET /users returns HTML listing one user when one exists."""
     test_username = f"test-user-{uuid.uuid4()}"
     user = create_test_user(
@@ -45,7 +46,7 @@ async def test_list_users_one_user(test_client: AsyncClient, db_session: Session
     assert "No users found" not in tree.body.text()
 
 
-async def test_list_users_multiple_users(test_client: AsyncClient, db_session: Session):
+async def test_list_users_multiple_users(test_client: AsyncClient, db_session: AsyncSession):
     """Test GET /users returns HTML listing multiple users when they exist."""
     user1 = create_test_user(
         username=f"test-user-one-{uuid.uuid4()}",
@@ -73,7 +74,7 @@ async def test_list_users_multiple_users(test_client: AsyncClient, db_session: S
     assert "No users found" not in tree.body.text()
 
 
-async def test_list_users_participated_empty(test_client: AsyncClient, db_session: Session):
+async def test_list_users_participated_empty(test_client: AsyncClient, db_session: AsyncSession):
     """Test GET /users?participated_with=me returns empty when no shared convos."""
     me_user = create_test_user(username="test-user-me")
     other_user = create_test_user(username="other-user")
@@ -88,7 +89,7 @@ async def test_list_users_participated_empty(test_client: AsyncClient, db_sessio
     assert "No users found" in tree.body.text()
     assert tree.css_first('ul > li') is None
 
-async def test_list_users_participated_success(test_client: AsyncClient, db_session: Session):
+async def test_list_users_participated_success(test_client: AsyncClient, db_session: AsyncSession):
     """Test GET /users?participated_with=me returns correct users."""
     me_user = create_test_user(username="test-user-me")
     user_b = create_test_user(username=f"user-b-{uuid.uuid4()}") # Shared convo
