@@ -4,7 +4,7 @@ import uuid
 from datetime import datetime, timedelta, timezone
 
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import func, select
 from app.models import User, Conversation, Participant, Message
 from selectolax.parser import HTMLParser
 from pydantic import BaseModel
