@@ -184,6 +184,7 @@ async def test_create_conversation_invitee_not_found(test_client: AsyncClient, d
     """Test POST /conversations returns 404 if invitee_user_id does not exist."""
     creator = create_test_user()
     db_session.add(creator)
+    await db_session.flush()
 
     non_existent_user_id = f"user_{uuid.uuid4()}" # ID that definitely won't exist
 

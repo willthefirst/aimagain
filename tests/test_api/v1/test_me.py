@@ -31,7 +31,7 @@ async def test_list_my_invitations_empty(test_client: AsyncClient, db_session: A
     assert "text/html" in response.headers["content-type"]
 
     tree = HTMLParser(response.text)
-    assert "You have no pending invitations" in tree.body.text()
+    assert "No pending invitations." in tree.body.text()
     assert tree.css_first('ul > li') is None
 
 
