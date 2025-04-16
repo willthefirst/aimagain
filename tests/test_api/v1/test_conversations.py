@@ -42,7 +42,6 @@ async def test_list_conversations_one_convo(test_client: AsyncClient, db_session
     """Test GET /conversations returns HTML listing one conversation when one exists."""
     user = create_test_user()
     db_session.add(user)
-    await db_session.flush()
 
     conversation = Conversation(
         id=f"conv_{uuid.uuid4()}",
@@ -59,6 +58,8 @@ async def test_list_conversations_one_convo(test_client: AsyncClient, db_session
         status="joined"
     )
     db_session.add(participant)
+
+    await db_session.flush()
 
     response = await test_client.get(f"/conversations")
 
@@ -83,7 +84,6 @@ async def test_list_conversations_sorted(test_client: AsyncClient, db_session: A
     user1 = create_test_user(username=f"user-older-{uuid.uuid4()}")
     user2 = create_test_user(username=f"user-newer-{uuid.uuid4()}")
     db_session.add_all([user1, user2])
-    await db_session.flush()
 
     convo_older = Conversation(
         id=f"conv_{uuid.uuid4()}",
@@ -102,6 +102,8 @@ async def test_list_conversations_sorted(test_client: AsyncClient, db_session: A
     part_older = Participant(id=f"part_{uuid.uuid4()}", user_id=user1.id, conversation_id=convo_older.id, status="joined")
     part_newer = Participant(id=f"part_{uuid.uuid4()}", user_id=user2.id, conversation_id=convo_newer.id, status="joined")
     db_session.add_all([part_older, part_newer])
+
+    await db_session.flush()
 
     response = await test_client.get(f"/conversations")
 
@@ -376,7 +378,10 @@ async def test_invite_participant_success(test_client: AsyncClient, db_session: 
     db_session.add(my_participation)
     await db_session.flush()
 
-    invite_data = {"invitee_user_id": invitee_user.id}
+    # Store the ID before the API call to prevent potential lazy-load issues
+    invitee_user_id = invitee_user.id
+    me_user_id = me_user.id
+    invite_data = {"invitee_user_id": invitee_user_id}
 
     response = await test_client.post(
         f"/conversations/{conversation.slug}/participants",
@@ -386,10 +391,11 @@ async def test_invite_participant_success(test_client: AsyncClient, db_session: 
     assert response.status_code == 201, f"Expected 201, got {response.status_code}, Response: {response.text}"
 
     response_data = response.json()
-    assert response_data["user_id"] == invitee_user.id
+    # Assert against the stored variable
+    assert response_data["user_id"] == invitee_user_id
     assert response_data["conversation_id"] == conversation.id
     assert response_data["status"] == "invited"
-    assert response_data["invited_by_user_id"] == me_user.id
+    assert response_data["invited_by_user_id"] == me_user_id
     assert response_data["initial_message_id"] is None
     new_participant_id = response_data["id"]
 
@@ -398,10 +404,10 @@ async def test_invite_participant_success(test_client: AsyncClient, db_session: 
     part_result = await db_session.execute(part_stmt)
     db_participant = part_result.scalars().first()
     assert db_participant is not None
-    assert db_participant.user_id == invitee_user.id
+    assert db_participant.user_id == invitee_user_id
     assert db_participant.conversation_id == conversation.id
     assert db_participant.status == "invited"
-    assert db_participant.invited_by_user_id == me_user.id
+    assert db_participant.invited_by_user_id == me_user_id
     assert db_participant.initial_message_id is None
 
 
