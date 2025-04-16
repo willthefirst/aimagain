@@ -1,5 +1,10 @@
-from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.orm import Session
+from fastapi import APIRouter, Depends, HTTPException
+
+# Import async session and select
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select, update
+from sqlalchemy.orm import joinedload
+
 from datetime import datetime, timezone
 
 from app.db import get_db
@@ -15,44 +20,67 @@ router = APIRouter(
     "/{participant_id}",
     response_model=ParticipantResponse # Use response schema
 )
-def update_participant_status(
+async def update_participant_status( # Make async
     participant_id: str,
     update_data: ParticipantUpdateRequest,
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_db) # Use AsyncSession
 ):
     """Updates the status of a participant record (e.g., accept/reject invitation)."""
 
     # --- Placeholder Auth ---
     # TODO: Replace with actual authenticated user
-    current_user = db.query(User).filter(User.username == "test-user-me").first()
+    current_user_stmt = select(User).filter(User.username == "test-user-me") # Use select
+    current_user_result = await db.execute(current_user_stmt) # Use await db.execute
+    current_user = current_user_result.scalars().first()
     if not current_user:
         raise HTTPException(status_code=403, detail="Not authenticated (placeholder)")
     # --- End Placeholder ---
 
-    # Find the participant record
-    participant = db.query(Participant).filter(Participant.id == participant_id).first()
+    # Fetch the participant record, ensuring it belongs to the current user
+    participant_stmt = (
+        select(Participant)
+        .where(Participant.id == participant_id)
+        # .options(joinedload(Participant.conversation)) # Optional: Load conversation if needed later
+    )
+    participant_result = await db.execute(participant_stmt) # Use await db.execute
+    participant = participant_result.scalars().first()
 
     if not participant:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Participant record not found")
+        raise HTTPException(status_code=404, detail="Participant record not found")
 
-    # Authorization: Ensure the current user is the one this record belongs to
+    # Verify the participant record belongs to the authenticated user
     if participant.user_id != current_user.id:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Cannot modify another user's participation status")
+        raise HTTPException(status_code=403, detail="Cannot modify participant record for another user")
 
-    # Validate current status (can only accept/reject if currently 'invited')
-    if participant.status != "invited":
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Cannot update status from '{participant.status}'")
+    # Validate the requested status change
+    # Currently, only allow updates from 'invited' to 'joined' or 'rejected'
+    if participant.status != 'invited':
+        raise HTTPException(status_code=400, detail=f"Cannot change status from '{participant.status}', must be 'invited'")
 
-    new_status = update_data.status
-    if new_status not in ["joined", "rejected"]:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid target status. Must be 'joined' or 'rejected'")
+    if update_data.status not in ['joined', 'rejected']:
+        # This check might be redundant if the Pydantic model uses an Enum
+        raise HTTPException(status_code=400, detail=f"Invalid target status '{update_data.status}'. Must be 'joined' or 'rejected'.")
 
-    # Update status and potentially joined_at
-    participant.status = new_status
-    now = datetime.now(timezone.utc)
-    participant.updated_at = now # Manually update timestamp (onupdate might not trigger on Session)
-    if new_status == "joined":
-        participant.joined_at = now
+    # Update the participant status
+    participant.status = update_data.status
+    if update_data.status == 'joined':
+        # Optionally set joined_at timestamp, etc.
+        # participant.joined_at = datetime.now(timezone.utc)
+        pass
+
+    # Use update statement for efficiency (optional, direct assignment works too)
+    # update_stmt = (
+    #     update(Participant)
+    #     .where(Participant.id == participant_id)
+    #     .values(status=update_data.status)
+    # )
+    # await db.execute(update_stmt)
+
+    db.add(participant) # Add the modified object back to the session
+    await db.commit() # Commit the change
+    await db.refresh(participant) # Refresh to get latest state if needed
+
+    return participant # Return the updated participant (Pydantic model handles serialization)
 
     # Update conversation last_activity_at
     # Eager load conversation if not already loaded (though it might be via session)
@@ -62,8 +90,6 @@ def update_participant_status(
         conversation.updated_at = now # Also update conversation itself
         db.add(conversation)
 
-    db.add(participant)
-
     try:
         db.commit()
         db.refresh(participant)
@@ -72,6 +98,4 @@ def update_participant_status(
     except Exception as e:
         db.rollback()
         # Log e
-        raise HTTPException(status_code=500, detail="Database error updating participant status.")
-
-    return participant 
+        raise HTTPException(status_code=500, detail="Database error updating participant status.") 

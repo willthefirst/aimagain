@@ -1,90 +1,83 @@
 from fastapi import APIRouter, Request, Depends, HTTPException
 from fastapi.responses import HTMLResponse
-from sqlalchemy.orm import Session, joinedload, selectinload, contains_eager # Import eager loading options
+from selectolax.parser import HTMLParser
+
+# Import async session and select
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
+from sqlalchemy.orm import selectinload
 
 from app.core.templating import templates
 from app.db import get_db
 from app.models import User, Participant, Conversation, Message # Ensure all models imported
 
 router = APIRouter(
-    prefix="/users/me", # Prefix for all routes in this file
+    prefix="/me",
     tags=["me"]
 )
 
 @router.get("/invitations", response_class=HTMLResponse)
-def list_my_invitations(request: Request, db: Session = Depends(get_db)):
+async def list_my_invitations(request: Request, db: AsyncSession = Depends(get_db)):
     """Provides an HTML page listing the current user's pending invitations."""
     # TODO: Replace placeholder with actual authenticated user logic
     # Placeholder: Query for a user with a specific username used in tests
-    current_user = db.query(User).filter(User.username == "test-user-me").first()
-    if not current_user:
-        # This will fail if the specific test user isn't created
-        raise HTTPException(status_code=403, detail="Not authenticated (placeholder: test-user-me not found)")
+    current_user_stmt = select(User).filter(User.username == "test-user-me")
+    current_user_result = await db.execute(current_user_stmt)
+    current_user = current_user_result.scalars().first()
 
-    # Query pending invitations for the current user
-    # Eager load related data needed for display
-    invitations = (
-        db.query(Participant)
-        .filter(Participant.user_id == current_user.id)
-        .filter(Participant.status == 'invited')
+    if not current_user:
+        # In a real app, this would likely redirect to login or be handled by middleware
+        raise HTTPException(status_code=403, detail="Not authenticated (placeholder)")
+
+    # Query for invitations (Participant records where status is 'invited')
+    invitations_stmt = (
+        select(Participant)
+        .where(Participant.user_id == current_user.id)
+        .where(Participant.status == "invited")
         .options(
-            # Load the user who invited us
-            joinedload(Participant.inviter),
-            # Load the conversation details
-            joinedload(Participant.conversation),
-            # Load the initial message (if any)
-            joinedload(Participant.initial_message)
+            selectinload(Participant.conversation).selectinload(Conversation.created_by),
+            selectinload(Participant.initial_message),
+            selectinload(Participant.invited_by)
         )
-        .order_by(Participant.created_at.desc()) # Show newest first
-        .all()
+        .order_by(Participant.created_at.desc()) # Example sort
     )
+    invitations_result = await db.execute(invitations_stmt)
+    invitations = invitations_result.scalars().all()
 
     return templates.TemplateResponse(
-        name="me/invitations.html",
-        context={"request": request, "invitations": invitations}
+        "me/list_invitations.html",
+        {"request": request, "invitations": invitations}
     )
 
 @router.get("/conversations", response_class=HTMLResponse)
-def list_my_conversations(request: Request, db: Session = Depends(get_db)):
+async def list_my_conversations(request: Request, db: AsyncSession = Depends(get_db)):
     """Provides an HTML page listing conversations the current user is part of."""
-    current_user = db.query(User).filter(User.username == "test-user-me").first()
+    # Placeholder for current user (same as above)
+    current_user_stmt = select(User).filter(User.username == "test-user-me")
+    current_user_result = await db.execute(current_user_stmt)
+    current_user = current_user_result.scalars().first()
+
     if not current_user:
         raise HTTPException(status_code=403, detail="Not authenticated (placeholder)")
 
-    # Query conversations where the current user is a participant (joined or invited)
-    my_conversations = (
-        db.query(Conversation)
-        .join(Participant, Participant.conversation_id == Conversation.id)
-        .filter(Participant.user_id == current_user.id)
-        .filter(Participant.status.in_(['joined', 'invited']))
+    # Query for conversations the user is part of (e.g., status is 'joined')
+    conversations_stmt = (
+        select(Participant)
+        .where(Participant.user_id == current_user.id)
+        .where(Participant.status == "joined") # Assuming 'joined' means part of it
         .options(
-            # Eager load *all* participants and their users for display
-            selectinload(Conversation.participants).joinedload(Participant.user)
+            selectinload(Participant.conversation)
+            # Add other eager loads if needed by the template
+            .selectinload(Conversation.last_message),
+             selectinload(Participant.conversation)
+            .selectinload(Conversation.participants).selectinload(Participant.user)
         )
-        .order_by(Conversation.last_activity_at.desc().nullslast())
-        .all()
+        .order_by(Participant.conversation.last_activity_at.desc()) # Sort by most recent activity
     )
-
-    # Prepare data for template, including my status in each convo
-    conversation_data = []
-    for convo in my_conversations:
-        my_part_record = next((p for p in convo.participants if p.user_id == current_user.id), None)
-        my_status = my_part_record.status if my_part_record else 'unknown'
-        all_participant_usernames = [p.user.username for p in convo.participants if p.user]
-        conversation_data.append({
-            "slug": convo.slug,
-            "name": convo.name,
-            "last_activity_at": convo.last_activity_at,
-            "participants": all_participant_usernames,
-            "my_status": my_status
-        })
-
+    participants_result = await db.execute(conversations_stmt)
+    participants = participants_result.scalars().unique().all()
 
     return templates.TemplateResponse(
-        name="me/conversations.html",
-        context={
-            "request": request,
-            "conversations": conversation_data,
-            "current_user_id": current_user.id
-            }
+        "me/list_conversations.html",
+        {"request": request, "participants": participants}
     ) 

@@ -32,7 +32,8 @@ async def test_list_users_one_user(test_client: AsyncClient, db_session: AsyncSe
         is_online=False
     )
     db_session.add(user)
-    db_session.flush()
+    await db_session.flush()
+    await db_session.commit()
 
     response = await test_client.get(f"/users")
 
@@ -57,7 +58,7 @@ async def test_list_users_multiple_users(test_client: AsyncClient, db_session: A
         is_online=True
     )
     db_session.add_all([user1, user2])
-    db_session.flush()
+    await db_session.flush()
 
     response = await test_client.get(f"/users")
 
@@ -79,11 +80,11 @@ async def test_list_users_participated_empty(test_client: AsyncClient, db_sessio
     me_user = create_test_user(username="test-user-me")
     other_user = create_test_user(username="other-user")
     db_session.add_all([me_user, other_user])
-    db_session.flush()
+    await db_session.flush()
 
     response = await test_client.get(f"/users?participated_with=me")
 
-    assert response.status_code == 200
+    assert response.status_code == 200, f"Expected 200 OK, got {response.status_code}"
     assert "text/html" in response.headers["content-type"]
     tree = HTMLParser(response.text)
     assert "No users found" in tree.body.text()
@@ -95,11 +96,12 @@ async def test_list_users_participated_success(test_client: AsyncClient, db_sess
     user_b = create_test_user(username=f"user-b-{uuid.uuid4()}") # Shared convo
     user_c = create_test_user(username=f"user-c-{uuid.uuid4()}") # No shared convo
     db_session.add_all([me_user, user_b, user_c])
-    db_session.flush()
+    await db_session.flush()
 
     # Convo 1: me and user_b are joined
     convo1 = Conversation(id=f"conv1_{uuid.uuid4()}", slug=f"convo1-{uuid.uuid4()}", created_by_user_id=me_user.id)
     db_session.add(convo1)
+    await db_session.flush()
     part1_me = Participant(id=f"p1m_{uuid.uuid4()}", user_id=me_user.id, conversation_id=convo1.id, status="joined")
     part1_b = Participant(id=f"p1b_{uuid.uuid4()}", user_id=user_b.id, conversation_id=convo1.id, status="joined")
     db_session.add_all([part1_me, part1_b])
@@ -107,10 +109,11 @@ async def test_list_users_participated_success(test_client: AsyncClient, db_sess
     # Convo 2: me joined, user_c invited (should not count)
     convo2 = Conversation(id=f"conv2_{uuid.uuid4()}", slug=f"convo2-{uuid.uuid4()}", created_by_user_id=me_user.id)
     db_session.add(convo2)
+    await db_session.flush()
     part2_me = Participant(id=f"p2m_{uuid.uuid4()}", user_id=me_user.id, conversation_id=convo2.id, status="joined")
     part2_c = Participant(id=f"p2c_{uuid.uuid4()}", user_id=user_c.id, conversation_id=convo2.id, status="invited") # Invited only
     db_session.add_all([part2_me, part2_c])
-    db_session.flush()
+    await db_session.flush()
 
     response = await test_client.get(f"/users?participated_with=me")
 

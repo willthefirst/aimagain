@@ -61,46 +61,29 @@ async def setup_database():
 @pytest_asyncio.fixture(scope="function")
 async def db_session() -> AsyncGenerator[AsyncSession, None]:
     """
-    Provides a transactional database session for each test function.
+    Provides a database session for each test function, managed by the sessionmaker.
     Connects to the file-based test DB.
     """
-    connection = await test_engine.connect()
-    transaction = await connection.begin()
-    session = TestingSessionLocal(bind=connection)
-    log.debug("DB session transaction started.")
-
-    try:
+    async with TestingSessionLocal() as session:
+        log.debug("DB session provided by fixture.")
         yield session
-    finally:
-        log.debug("Closing DB session and rolling back transaction.")
-        await session.close()
-        if transaction.is_active: # Ensure rollback only if active
-             await transaction.rollback() # Rollback changes after each test
-        await connection.close()
+        log.debug("DB session closed.")
 
-@pytest.fixture(scope="session")
-def app(setup_database) -> Generator: # Depends on setup_database
+@pytest.fixture(scope="function") # Changed scope to function to match db_session
+def app(setup_database, db_session: AsyncSession) -> Generator: # Inject db_session
     """
-    Fixture to override the database dependency in the FastAPI app.
-    Depends on setup_database to ensure tables exist in the file DB.
+    Fixture to override the database dependency in the FastAPI app
+    to use the test-specific session.
     """
     async def override_get_db() -> AsyncGenerator[AsyncSession, None]:
-        """Dependency override for get_db."""
-        connection = await test_engine.connect()
-        session = TestingSessionLocal(bind=connection)
-        log.debug("Override get_db yielding session.")
-        try:
-            yield session
-        finally:
-            log.debug("Override get_db closing session.")
-            await session.close()
-            await connection.close()
+        """Dependency override for get_db, yields the test's db_session."""
+        log.debug("Override get_db yielding test session.")
+        yield db_session # Yield the session from the db_session fixture
 
     fastapi_app.dependency_overrides[get_db] = override_get_db
     yield fastapi_app
-    # Clean up overrides after session
+    # Clean up overrides after test function finishes
     fastapi_app.dependency_overrides.clear()
-
 
 @pytest_asyncio.fixture(scope="function")
 async def test_client(app) -> AsyncGenerator[AsyncClient, None]:
