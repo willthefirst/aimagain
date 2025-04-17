@@ -37,7 +37,7 @@ async def list_my_invitations(request: Request, db: AsyncSession = Depends(get_d
         .where(Participant.user_id == current_user.id)
         .where(Participant.status == "invited")
         .options(
-            selectinload(Participant.conversation).selectinload(Conversation.created_by_user_id),
+            selectinload(Participant.conversation).selectinload(Conversation.creator),
             selectinload(Participant.initial_message),
             selectinload(Participant.inviter)
         )
