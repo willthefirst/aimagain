@@ -26,3 +26,6 @@ async def get_db(session: AsyncSession = Depends(get_async_session)):
         yield session
     finally:
         await session.close()
+
+async def get_user_db(session: AsyncSession = Depends(get_async_session)):
+    yield SQLAlchemyUserDatabase(session, User)
