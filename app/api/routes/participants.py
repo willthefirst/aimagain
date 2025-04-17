@@ -59,7 +59,7 @@ async def update_participant_status( # Make async
 
     if update_data.status not in ['joined', 'rejected']:
         # This check might be redundant if the Pydantic model uses an Enum
-        raise HTTPException(status_code=400, detail=f"Invalid target status '{update_data.status}'. Must be 'joined' or 'rejected'.")
+        raise HTTPException(status_code=422, detail=f"Invalid target status '{update_data.status}'. Must be 'joined' or 'rejected'.")
 
     # Update the participant status
     participant.status = update_data.status
@@ -80,7 +80,7 @@ async def update_participant_status( # Make async
     await db.commit() # Commit the change
     await db.refresh(participant) # Refresh to get latest state if needed
 
-    return participant # Return the updated participant (Pydantic model handles serialization)
+    # return participant # Return the updated participant (Pydantic model handles serialization)
 
     # Update conversation last_activity_at
     # Eager load conversation if not already loaded (though it might be via session)
