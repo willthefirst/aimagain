@@ -78,7 +78,19 @@ async def list_my_conversations(request: Request, db: AsyncSession = Depends(get
     participants_result = await db.execute(conversations_stmt)
     participants = participants_result.scalars().unique().all()
 
+     # Transform participants into conversation data
+    conversations = []
+    for participant in participants:
+        conversation = participant.conversation
+        conversations.append({
+            "slug": conversation.slug,
+            "name": conversation.name,
+            "participants": [p.user.username for p in conversation.participants],
+            "my_status": participant.status,
+            "last_activity_at": conversation.last_activity_at
+        })
+        
     return templates.TemplateResponse(
         "me/conversations.html",
-        {"request": request, "participants": participants}
-    ) 
+        {"request": request, "conversations": conversations}
+    )
