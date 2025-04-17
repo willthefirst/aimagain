@@ -80,7 +80,7 @@ async def update_participant_status( # Make async
     await db.commit() # Commit the change
     await db.refresh(participant) # Refresh to get latest state if needed
 
-    # return participant # Return the updated participant (Pydantic model handles serialization)
+    return participant # Return the updated participant (Pydantic model handles serialization)
 
     # Update conversation last_activity_at
     # Eager load conversation if not already loaded (though it might be via session)
