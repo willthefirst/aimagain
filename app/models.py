@@ -14,7 +14,7 @@ from sqlalchemy import (
     func,
 )
 from sqlalchemy.orm import relationship, backref, declarative_base
-from fastapi_users.db import SQLAlchemyBaseUserTableUUID, SQLAlchemyUserDatabase
+from fastapi_users.db import SQLAlchemyBaseUserTable
 
 # Create a Base class for declarative models
 Base = declarative_base()
@@ -23,10 +23,10 @@ Base = declarative_base()
 # Consider sqlalchemy.Uuid type if using PostgreSQL later.
 
 
-class User(SQLAlchemyBaseUserTableUUID, Base):
+class User(SQLAlchemyBaseUserTable[String], Base):
     __tablename__ = "users"
 
-    id = Column(Text, primary_key=True)  # Renamed from _id
+    id = Column(String, primary_key=True)
     username = Column(Text, unique=True, nullable=False)
     created_at = Column(
         DateTime(timezone=True), nullable=False, server_default=func.now()
