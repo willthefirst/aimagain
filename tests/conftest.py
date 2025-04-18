@@ -6,18 +6,20 @@ from httpx import AsyncClient, ASGITransport
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
 from sqlalchemy.pool import NullPool
 import asyncio
-import logging # Added for better logging
-from sqlalchemy import delete # Import delete
+import logging  # Added for better logging
+from sqlalchemy import delete  # Import delete
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 log = logging.getLogger(__name__)
 
 # Import your FastAPI app and base model metadata
-from app.main import app as fastapi_app # Assuming your FastAPI app instance is named 'app' in 'app.main'
-from app.models import metadata # Import your Base model metadata
-from app.models import User, Participant, Conversation # Import models for cleanup
-from app.db import get_db # Import the original dependency getter
+from app.main import (
+    app as fastapi_app,
+)  # Assuming your FastAPI app instance is named 'app' in 'app.main'
+from app.models import metadata  # Import your Base model metadata
+from app.models import User, Participant, Conversation  # Import models for cleanup
+from app.db import get_db  # Import the original dependency getter
 
 # Use a file-based SQLite database for testing to ensure persistence
 # across connections within the same test session.
@@ -34,6 +36,7 @@ TestingSessionLocal = async_sessionmaker(
 )
 
 # --- Fixtures ---
+
 
 @pytest.fixture(scope="session", autouse=True)
 async def setup_database():
@@ -60,6 +63,7 @@ async def setup_database():
     if os.path.exists(TEST_DB_PATH):
         os.remove(TEST_DB_PATH)
 
+
 @pytest_asyncio.fixture(scope="function")
 async def db_session() -> AsyncGenerator[AsyncSession, None]:
     """
@@ -70,32 +74,37 @@ async def db_session() -> AsyncGenerator[AsyncSession, None]:
         log.debug("DB session provided by fixture.")
         yield session
         log.info("Cleaning up test data after function.")
-        await session.execute(delete(Participant)) # Delete dependent first
+        await session.execute(delete(Participant))  # Delete dependent first
         await session.execute(delete(Conversation))
         await session.execute(delete(User))
-        await session.commit() # Commit the deletions
+        await session.commit()  # Commit the deletions
         log.debug("DB session closed and data cleaned.")
 
-@pytest.fixture(scope="function") # Changed scope to function to match db_session
-def app(setup_database, db_session: AsyncSession) -> Generator: # Inject db_session
+
+@pytest.fixture(scope="function")  # Changed scope to function to match db_session
+def app(setup_database, db_session: AsyncSession) -> Generator:  # Inject db_session
     """
     Fixture to override the database dependency in the FastAPI app
     to use the test-specific session.
     """
+
     async def override_get_db() -> AsyncGenerator[AsyncSession, None]:
         """Dependency override for get_db, yields the test's db_session."""
         log.debug("Override get_db yielding test session.")
-        yield db_session # Yield the session from the db_session fixture
+        yield db_session  # Yield the session from the db_session fixture
 
     fastapi_app.dependency_overrides[get_db] = override_get_db
     yield fastapi_app
     # Clean up overrides after test function finishes
     fastapi_app.dependency_overrides.clear()
 
+
 @pytest_asyncio.fixture(scope="function")
 async def test_client(app) -> AsyncGenerator[AsyncClient, None]:
     """
     Provides an HTTPX AsyncClient for making requests to the test app.
     """
-    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+    async with AsyncClient(
+        transport=ASGITransport(app=app), base_url="http://test"
+    ) as client:
         yield client
