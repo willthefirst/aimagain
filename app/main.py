@@ -14,7 +14,8 @@ app = FastAPI(title="Chat App")
 
 @app.get("/")
 def read_root():
-    return {"message": "Welcome to the Chat App API"}\
+    return {"message": "Welcome to the Chat App API"}
+
 
 app.include_router(
     fastapi_users.get_auth_router(auth_backend), prefix="/auth/jwt", tags=["auth"]
@@ -45,7 +46,8 @@ app.include_router(conversations.router, tags=["conversations"])
 app.include_router(me.router, tags=["me"])
 
 # Include the v1 participants router
-app.include_router(participants.router, tags=["participants"]) 
+app.include_router(participants.router, tags=["participants"])
+
 
 @app.get("/authenticated-route")
 async def authenticated_route(user: User = Depends(current_active_user)):
