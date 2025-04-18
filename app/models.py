@@ -1,3 +1,4 @@
+import uuid
 import sqlalchemy
 from sqlalchemy import (
     create_engine,
@@ -26,8 +27,10 @@ Base = declarative_base()
 class User(SQLAlchemyBaseUserTable[String], Base):
     __tablename__ = "users"
 
-    id = Column(String, primary_key=True)
-    username = Column(Text, unique=True, nullable=False)
+    id = Column(String, primary_key=True, default=lambda: f"user_{uuid.uuid4()}")
+    username = Column(
+        Text, unique=True, nullable=False, default=lambda: f"user_{uuid.uuid4()}"
+    )
     created_at = Column(
         DateTime(timezone=True), nullable=False, server_default=func.now()
     )
