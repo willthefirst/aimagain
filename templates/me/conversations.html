@@ -15,17 +15,20 @@
 
     {% if conversations %}
     <ul>
-      {# conversations is now a list of dicts #} {% for convo_data in
-      conversations %}
+      {# conversations is now a list of ORM objects (fixed route) #} {% for
+      conversation in conversations %}
       <li>
         <strong>Slug:</strong>
-        <a href="{{ url_for('get_conversation', slug=convo_data.slug) }}"
-          >{{ convo_data.slug }}</a
+        <a href="{{ url_for('get_conversation', slug=conversation.slug) }}"
+          >{{ conversation.slug }}</a
         >
-        {% if convo_data.name %}<br />Name: {{ convo_data.name }}{% endif %}
-        <br />Participants: {{ convo_data.participants | join(', ') }} <br />My
-        Status: {{ convo_data.my_status }} <br />Last Activity: {{
-        convo_data.last_activity_at | default('N/A') }}
+        {% if conversation.name %}<br />Name: {{ conversation.name }}{% endif %}
+        <br />Participants: {# Check if participants relationship is loaded and
+        not empty #} {% if conversation.participants %} {{
+        conversation.participants | map(attribute='user.username') | join(', ')
+        }} {% else %} (N/A) {% endif %} {# TODO: Add My Status if needed #} {#
+        <br />My Status: {{ ??? }} #} <br />Last Activity: {{
+        conversation.last_activity_at | default('N/A') }}
       </li>
       {% endfor %}
     </ul>

@@ -1,25 +1,26 @@
-from fastapi import APIRouter, HTTPException, Request, Depends
+from fastapi import APIRouter, Request, Depends, HTTPException
 from fastapi.responses import HTMLResponse
-
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload  # Import selectinload if needed later
+from sqlalchemy import select
+from sqlalchemy.orm import selectinload, joinedload
 
-# Import templates from the new core location
 from app.core.templating import templates
 
-# Import DB dependency function and User model
-from app.db import get_db  # Use async db dependency
-from app.models import User, Conversation, Participant
-from sqlalchemy import select, func  # Import select, func
+# Updated db dependency import
+from app.db import get_db_session
+from app.models import (
+    User,
+    Participant,
+    Conversation,
+)  # Added Participant, Conversation
 
 router = APIRouter()
 
 
-# Specify HTMLResponse as the default response class for this endpoint
 @router.get("/users", response_class=HTMLResponse, tags=["users"])
 async def list_users(
     request: Request,
-    db: AsyncSession = Depends(get_db),  # Use async db dependency
+    db: AsyncSession = Depends(get_db_session),  # Use get_db_session
     participated_with: str | None = None,  # Add query parameter
 ):
     """Provides an HTML page listing registered users.
@@ -30,55 +31,54 @@ async def list_users(
     current_user_stmt = select(User).filter(User.username == "test-user-me")
     current_user_result = await db.execute(current_user_stmt)
     current_user = current_user_result.scalars().first()
-    # Note: No exception raised here if user not found, handled below
 
-    users = []  # Initialize users list
-    if participated_with == "me":
-        if not current_user:
-            raise HTTPException(
-                status_code=403,
-                detail="Authentication required for this filter (placeholder)",
-            )
-
-        # Find IDs of conversations 'me' has joined
-        my_joined_convo_ids_stmt = (
-            select(Participant.conversation_id)
-            .where(Participant.user_id == current_user.id)
-            .where(Participant.status == "joined")
+    if participated_with == "me" and not current_user:
+        raise HTTPException(
+            status_code=403,
+            detail="Cannot filter by participation without auth (placeholder)",
         )
-        my_joined_convo_ids_result = await db.execute(my_joined_convo_ids_stmt)
-        my_joined_convo_ids = my_joined_convo_ids_result.scalars().all()
 
-        if not my_joined_convo_ids:
-            # If the user hasn't joined any conversations, the list is empty
-            users = []
-        else:
-            # Find IDs of users (excluding 'me') who are also 'joined' in those conversations
-            other_user_ids_stmt = (
-                select(Participant.user_id)
-                .where(Participant.conversation_id.in_(my_joined_convo_ids))
-                .where(Participant.user_id != current_user.id)
-                .where(Participant.status == "joined")
-                .distinct()
+    stmt = select(User)
+
+    if participated_with == "me" and current_user:
+        # Find conversations current user is joined in
+        joined_conv_subq = (
+            select(Participant.conversation_id)
+            .where(
+                Participant.user_id == current_user.id,
+                Participant.status == "joined",
             )
-            other_user_ids_result = await db.execute(other_user_ids_stmt)
-            other_user_ids = other_user_ids_result.scalars().all()
+            .subquery()
+        )
 
-            if not other_user_ids:
-                users = []
-            else:
-                # Fetch the User objects for those IDs
-                users_stmt = select(User).where(User.id.in_(other_user_ids))
-                users_result = await db.execute(users_stmt)
-                users = users_result.scalars().all()
+        # Find users who are also joined in those conversations
+        participating_user_ids_stmt = (
+            select(Participant.user_id)
+            .where(
+                Participant.conversation_id.in_(select(joined_conv_subq)),
+                Participant.user_id != current_user.id,  # Exclude the current user
+                Participant.status == "joined",
+            )
+            .distinct()
+        )
+        # Execute the subquery to get the IDs
+        participating_user_ids_result = await db.execute(participating_user_ids_stmt)
+        participating_user_ids = participating_user_ids_result.scalars().all()
 
-    else:
-        # Original query: List all users
-        # TODO: Add sorting later if needed (e.g., by username)
-        all_users_stmt = select(User)
-        all_users_result = await db.execute(all_users_stmt)
-        users = all_users_result.scalars().all()
+        # Filter the main user query by these IDs
+        stmt = stmt.filter(User.id.in_(participating_user_ids))
+    elif participated_with:
+        # Handle invalid filter values if needed
+        pass  # Or raise HTTPException for invalid filter value
+
+    # Always exclude the current user from the main list if authenticated
+    if current_user:
+        stmt = stmt.filter(User.id != current_user.id)
+
+    stmt = stmt.order_by(User.username)
+    result = await db.execute(stmt)
+    users = result.scalars().all()
 
     return templates.TemplateResponse(
-        name="users/list.html", context={"request": request, "users": users}
+        "users/list.html", {"request": request, "users": users}
     )

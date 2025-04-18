@@ -1,6 +1,7 @@
 # app/schemas/participant.py
 from pydantic import BaseModel, ConfigDict
 from datetime import datetime
+from typing import Literal
 
 
 # Schema for inviting a user to a conversation
@@ -10,7 +11,7 @@ class ParticipantInviteRequest(BaseModel):
 
 # Schema for updating participant status
 class ParticipantUpdateRequest(BaseModel):
-    status: str  # Should be 'joined' or 'rejected'
+    status: Literal["joined", "rejected"]
 
 
 # Schema for participant response

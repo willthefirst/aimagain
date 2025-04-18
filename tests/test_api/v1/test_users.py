@@ -3,7 +3,9 @@ from httpx import AsyncClient
 import uuid
 
 from app.models import User, Conversation, Participant
-from sqlalchemy.ext.asyncio import AsyncSession
+
+# Import session maker type for hinting
+from sqlalchemy.ext.asyncio import async_sessionmaker, AsyncSession
 
 from selectolax.parser import HTMLParser
 from tests.test_helpers import create_test_user
@@ -14,6 +16,7 @@ pytestmark = pytest.mark.asyncio
 
 async def test_list_users_empty(test_client: AsyncClient):
     """Test GET /users returns HTML with no users message when empty."""
+    # Implicitly depends on db_test_session_manager via test_client
     response = await test_client.get(f"/users")
 
     assert response.status_code == 200
@@ -25,13 +28,18 @@ async def test_list_users_empty(test_client: AsyncClient):
     assert link_node is not None, "Refresh link not found"
 
 
-async def test_list_users_one_user(test_client: AsyncClient, db_session: AsyncSession):
+async def test_list_users_one_user(
+    test_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],  # Inject manager
+):
     """Test GET /users returns HTML listing one user when one exists."""
     test_username = f"test-user-{uuid.uuid4()}"
     user = create_test_user(username=test_username, is_online=False)
-    db_session.add(user)
-    await db_session.flush()
-    await db_session.commit()
+
+    # Setup data
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            session.add(user)
 
     response = await test_client.get(f"/users")
 
@@ -48,13 +56,17 @@ async def test_list_users_one_user(test_client: AsyncClient, db_session: AsyncSe
 
 
 async def test_list_users_multiple_users(
-    test_client: AsyncClient, db_session: AsyncSession
+    test_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],  # Inject manager
 ):
     """Test GET /users returns HTML listing multiple users when they exist."""
     user1 = create_test_user(username=f"test-user-one-{uuid.uuid4()}", is_online=False)
     user2 = create_test_user(username=f"test-user-two-{uuid.uuid4()}", is_online=True)
-    db_session.add_all([user1, user2])
-    await db_session.flush()
+
+    # Setup data
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            session.add_all([user1, user2])
 
     response = await test_client.get(f"/users")
 
@@ -72,13 +84,17 @@ async def test_list_users_multiple_users(
 
 
 async def test_list_users_participated_empty(
-    test_client: AsyncClient, db_session: AsyncSession
+    test_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],  # Inject manager
 ):
     """Test GET /users?participated_with=me returns empty when no shared convos."""
     me_user = create_test_user(username="test-user-me")
     other_user = create_test_user(username="other-user")
-    db_session.add_all([me_user, other_user])
-    await db_session.flush()
+
+    # Setup data
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            session.add_all([me_user, other_user])
 
     response = await test_client.get(f"/users?participated_with=me")
 
@@ -90,59 +106,68 @@ async def test_list_users_participated_empty(
 
 
 async def test_list_users_participated_success(
-    test_client: AsyncClient, db_session: AsyncSession
+    test_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],  # Inject manager
 ):
     """Test GET /users?participated_with=me returns correct users."""
     me_user = create_test_user(username="test-user-me")
     user_b = create_test_user(username=f"user-b-{uuid.uuid4()}")  # Shared convo
     user_c = create_test_user(username=f"user-c-{uuid.uuid4()}")  # No shared convo
-    db_session.add_all([me_user, user_b, user_c])
-    await db_session.flush()
 
-    # Convo 1: me and user_b are joined
-    convo1 = Conversation(
-        id=f"conv1_{uuid.uuid4()}",
-        slug=f"convo1-{uuid.uuid4()}",
-        created_by_user_id=me_user.id,
-    )
-    db_session.add(convo1)
-    await db_session.flush()
-    part1_me = Participant(
-        id=f"p1m_{uuid.uuid4()}",
-        user_id=me_user.id,
-        conversation_id=convo1.id,
-        status="joined",
-    )
-    part1_b = Participant(
-        id=f"p1b_{uuid.uuid4()}",
-        user_id=user_b.id,
-        conversation_id=convo1.id,
-        status="joined",
-    )
-    db_session.add_all([part1_me, part1_b])
+    # Setup data
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            session.add_all([me_user, user_b, user_c])
+            await session.flush()
+            me_user_id = me_user.id
+            user_b_id = user_b.id
+            user_c_id = user_c.id
 
-    # Convo 2: me joined, user_c invited (should not count)
-    convo2 = Conversation(
-        id=f"conv2_{uuid.uuid4()}",
-        slug=f"convo2-{uuid.uuid4()}",
-        created_by_user_id=me_user.id,
-    )
-    db_session.add(convo2)
-    await db_session.flush()
-    part2_me = Participant(
-        id=f"p2m_{uuid.uuid4()}",
-        user_id=me_user.id,
-        conversation_id=convo2.id,
-        status="joined",
-    )
-    part2_c = Participant(
-        id=f"p2c_{uuid.uuid4()}",
-        user_id=user_c.id,
-        conversation_id=convo2.id,
-        status="invited",
-    )  # Invited only
-    db_session.add_all([part2_me, part2_c])
-    await db_session.flush()
+            # Convo 1: me and user_b are joined
+            convo1 = Conversation(
+                id=f"conv1_{uuid.uuid4()}",
+                slug=f"convo1-{uuid.uuid4()}",
+                created_by_user_id=me_user_id,
+            )
+            session.add(convo1)
+            await session.flush()
+            convo1_id = convo1.id
+            part1_me = Participant(
+                id=f"p1m_{uuid.uuid4()}",
+                user_id=me_user_id,
+                conversation_id=convo1_id,
+                status="joined",
+            )
+            part1_b = Participant(
+                id=f"p1b_{uuid.uuid4()}",
+                user_id=user_b_id,
+                conversation_id=convo1_id,
+                status="joined",
+            )
+            session.add_all([part1_me, part1_b])
+
+            # Convo 2: me joined, user_c invited (should not count)
+            convo2 = Conversation(
+                id=f"conv2_{uuid.uuid4()}",
+                slug=f"convo2-{uuid.uuid4()}",
+                created_by_user_id=me_user_id,
+            )
+            session.add(convo2)
+            await session.flush()
+            convo2_id = convo2.id
+            part2_me = Participant(
+                id=f"p2m_{uuid.uuid4()}",
+                user_id=me_user_id,
+                conversation_id=convo2_id,
+                status="joined",
+            )
+            part2_c = Participant(
+                id=f"p2c_{uuid.uuid4()}",
+                user_id=user_c_id,
+                conversation_id=convo2_id,
+                status="invited",
+            )  # Invited only
+            session.add_all([part2_me, part2_c])
 
     response = await test_client.get(f"/users?participated_with=me")
 

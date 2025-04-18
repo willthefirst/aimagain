@@ -9,7 +9,7 @@ from sqlalchemy.orm import joinedload, selectinload
 from sqlalchemy import select  # Add select
 
 from app.core.templating import templates
-from app.db import get_db  # Use async db dependency
+from app.db import get_db_session
 
 # Import ORM models
 from app.models import Conversation, Participant, User, Message  # Add Message
@@ -28,8 +28,8 @@ router = APIRouter()
 
 @router.get("/conversations", response_class=HTMLResponse, tags=["conversations"])
 async def list_conversations(
-    request: Request, db: AsyncSession = Depends(get_db)
-):  # Async function and AsyncSession
+    request: Request, db: AsyncSession = Depends(get_db_session)
+):  # Use get_db_session
     """Provides an HTML page listing all public conversations using ORM."""
 
     # Use select() for async query construction
@@ -63,7 +63,7 @@ async def list_conversations(
 async def get_conversation(  # Async function
     slug: str,
     request: Request,  # Keep request for template context
-    db: AsyncSession = Depends(get_db),  # AsyncSession
+    db: AsyncSession = Depends(get_db_session),  # Use get_db_session
     # TODO: Add auth dependency later
 ):
     """Retrieves details for a specific conversation."""
@@ -152,7 +152,7 @@ async def get_conversation(  # Async function
 )
 async def create_conversation(  # Async function
     request_data: ConversationCreateRequest,  # Use the request schema
-    db: AsyncSession = Depends(get_db),  # AsyncSession
+    db: AsyncSession = Depends(get_db_session),  # Use get_db_session
     # TODO: Add dependency for authenticated user later
 ):
     """Creates a new conversation by inviting another user."""
@@ -256,7 +256,7 @@ async def create_conversation(  # Async function
 async def invite_participant(  # Async function
     slug: str,
     request_data: ParticipantInviteRequest,  # Use request schema
-    db: AsyncSession = Depends(get_db),  # AsyncSession
+    db: AsyncSession = Depends(get_db_session),  # Use get_db_session
     # TODO: Auth dependency
 ):
     """Invites another user to an existing conversation."""

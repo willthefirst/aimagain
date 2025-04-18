@@ -1,113 +1,91 @@
-import os
-from fastapi_users.db import SQLAlchemyUserDatabase
-import pytest
-import pytest_asyncio
-from typing import Any, AsyncGenerator, Generator
-from httpx import AsyncClient, ASGITransport
-from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
-from sqlalchemy.pool import NullPool
 import asyncio
-import logging  # Added for better logging
-from sqlalchemy import delete  # Import delete
+from typing import AsyncGenerator, Any
 
-# Configure logging
-logging.basicConfig(level=logging.INFO)
-log = logging.getLogger(__name__)
+import pytest
+from fastapi import FastAPI
+from httpx import ASGITransport, AsyncClient
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+from fastapi import Depends
 
-# Import your FastAPI app and base model metadata
-from app.main import (
-    app as fastapi_app,
-)  # Assuming your FastAPI app instance is named 'app' in 'app.main'
-from app.models import metadata  # Import your Base model metadata
-from app.models import User, Participant, Conversation  # Import models for cleanup
-from app.db import get_db  # Import the original dependency getter
+# REMOVED Depends import as it's not used in fixture overrides this way
+# from fastapi import Depends
 
-# Use a file-based SQLite database for testing to ensure persistence
-# across connections within the same test session.
-TEST_DB_PATH = "./test.db"
-TEST_DATABASE_URL = f"sqlite+aiosqlite:///{TEST_DB_PATH}"
+# Assuming your FastAPI app instance is in app.main
+from app.main import app
 
-# Create the test database engine
-# NullPool is recommended for testing with SQLite
-test_engine = create_async_engine(TEST_DATABASE_URL, poolclass=NullPool)
+# Updated dependency imports from app.db
+from app.db import get_db_session, get_user_db
+from app.models import User, metadata  # Assuming your models define metadata
+from fastapi_users.db import SQLAlchemyUserDatabase
 
-# Create a sessionmaker for the test database
-TestingSessionLocal = async_sessionmaker(
-    autocommit=False, autoflush=False, bind=test_engine
-)
+# Use an in-memory SQLite database for testing
+TEST_DATABASE_URL = "sqlite+aiosqlite:///:memory:"
 
-# --- Fixtures ---
+test_engine = create_async_engine(TEST_DATABASE_URL)
+test_async_session_maker = async_sessionmaker(test_engine, expire_on_commit=False)
 
 
-@pytest.fixture(scope="session", autouse=True)
-async def setup_database():
-    """
-    Fixture to create database tables before tests run and drop/delete them afterwards.
-    Runs once per session. Made autouse=True to ensure it runs.
-    Uses a file-based DB (test.db).
-    """
-    # Ensure the old DB file is removed before starting, if it exists
-    if os.path.exists(TEST_DB_PATH):
-        os.remove(TEST_DB_PATH)
+# Fixture to provide the asyncio event loop for tests
+@pytest.fixture(scope="session")
+def event_loop():
+    # This is the default behavior, but explicit for clarity
+    policy = asyncio.get_event_loop_policy()
+    loop = policy.new_event_loop()
+    yield loop
+    loop.close()
 
+
+# Master fixture to manage table creation/dropping and provide session maker
+@pytest.fixture(scope="function")
+async def db_test_session_manager() -> (
+    AsyncGenerator[async_sessionmaker[AsyncSession], None]
+):
+    # Create tables before test runs
     async with test_engine.begin() as conn:
         await conn.run_sync(metadata.create_all)
-    yield
-    # Optional: Drop tables if needed, though removing the file is usually sufficient
-    # async with test_engine.begin() as conn:
-    #     await conn.run_sync(metadata.drop_all)
 
-    # Explicitly dispose of the engine to release file handles before deleting
-    await test_engine.dispose()
+    yield test_async_session_maker  # Provide the session maker to tests
 
-    # Remove the test database file
-    if os.path.exists(TEST_DB_PATH):
-        os.remove(TEST_DB_PATH)
+    # Drop tables after test finishes
+    async with test_engine.begin() as conn:
+        await conn.run_sync(metadata.drop_all)
 
 
-@pytest_asyncio.fixture(scope="function")
-async def db_session() -> AsyncGenerator[SQLAlchemyUserDatabase[User, Any], Any]:
-    """
-    Provides a database session for each test function, managed by the sessionmaker.
-    Connects to the file-based test DB. Cleans up data after the test.
-    """
-    async with TestingSessionLocal() as session:
-        log.debug("DB session provided by fixture.")
-        yield SQLAlchemyUserDatabase(session, User).session
-        log.info("Cleaning up test data after function.")
-        await session.execute(delete(Participant))  # Delete dependent first
-        await session.execute(delete(Conversation))
-        await session.execute(delete(User))
-        await session.commit()  # Commit the deletions
-        log.debug("DB session closed and data cleaned.")
+# Override for the raw AsyncSession dependency
+# Uses the globally defined test_async_session_maker
+# Table lifecycle managed by db_test_session_manager fixture
+async def override_get_db_session() -> AsyncGenerator[AsyncSession, None]:
+    async with test_async_session_maker() as session:
+        yield session
 
 
-@pytest.fixture(scope="function")  # Changed scope to function to match db_session
-def app(setup_database, db_session: AsyncSession) -> Generator:  # Inject db_session
-    """
-    Fixture to override the database dependency in the FastAPI app
-    to use the test-specific session.
-    """
+# Override for the FastAPI Users DB adapter dependency
+async def override_get_user_db(
+    # Depend on the *original* app dependency name.
+    # FastAPI will provide the overridden version (override_get_db_session) here.
+    session: AsyncSession = Depends(get_db_session),
+) -> SQLAlchemyUserDatabase[User, Any]:
+    yield SQLAlchemyUserDatabase(session, User)
 
-    async def override_get_db() -> (
-        AsyncGenerator[SQLAlchemyUserDatabase[User, Any], Any]
-    ):
-        """Dependency override for get_db, yields the test's db_session."""
-        log.debug("Override get_db yielding test session.")
-        yield db_session  # Yield the session from the db_session fixture
 
-    fastapi_app.dependency_overrides[get_db] = override_get_db
-    yield fastapi_app
+# Fixture for the FastAPI app with overridden dependencies
+@pytest.fixture(scope="function")
+def test_app(
+    # Explicitly depend on the manager fixture to ensure tables exist
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+) -> FastAPI:
+    app.dependency_overrides[get_db_session] = override_get_db_session
+    app.dependency_overrides[get_user_db] = override_get_user_db
+    yield app
     # Clean up overrides after test function finishes
-    fastapi_app.dependency_overrides.clear()
+    app.dependency_overrides.clear()
 
 
-@pytest_asyncio.fixture(scope="function")
-async def test_client(app) -> AsyncGenerator[AsyncClient, None]:
-    """
-    Provides an HTTPX AsyncClient for making requests to the test app.
-    """
+# Fixture for the async test client
+@pytest.fixture(scope="function")
+async def test_client(test_app: FastAPI) -> AsyncGenerator[AsyncClient, None]:
     async with AsyncClient(
-        transport=ASGITransport(app=app), base_url="http://test"
+        transport=ASGITransport(app=test_app),
+        base_url="http://test",  # Use test_app here
     ) as client:
         yield client
