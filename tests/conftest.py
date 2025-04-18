@@ -25,16 +25,6 @@ test_engine = create_async_engine(TEST_DATABASE_URL)
 test_async_session_maker = async_sessionmaker(test_engine, expire_on_commit=False)
 
 
-# Fixture to provide the asyncio event loop for tests
-@pytest.fixture(scope="session")
-def event_loop():
-    # This is the default behavior, but explicit for clarity
-    policy = asyncio.get_event_loop_policy()
-    loop = policy.new_event_loop()
-    yield loop
-    loop.close()
-
-
 # Master fixture to manage table creation/dropping and provide session maker
 @pytest.fixture(scope="function")
 async def db_test_session_manager() -> (
