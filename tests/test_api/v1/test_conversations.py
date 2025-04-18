@@ -135,7 +135,7 @@ async def test_create_conversation_success(test_client: AsyncClient, db_session:
 
     response = await test_client.post(
         f"/conversations",
-        json=request_data.model_dump() # Use model_dump for Pydantic v2+
+        json=request_data.model_dump()
     )
 
     assert response.status_code == 201, f"Expected 201, got {response.status_code}, Response: {response.text}"
