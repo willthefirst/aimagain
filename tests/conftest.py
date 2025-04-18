@@ -1,7 +1,8 @@
 import os
+from fastapi_users.db import SQLAlchemyUserDatabase
 import pytest
 import pytest_asyncio
-from typing import AsyncGenerator, Generator
+from typing import Any, AsyncGenerator, Generator
 from httpx import AsyncClient, ASGITransport
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
 from sqlalchemy.pool import NullPool
@@ -65,14 +66,14 @@ async def setup_database():
 
 
 @pytest_asyncio.fixture(scope="function")
-async def db_session() -> AsyncGenerator[AsyncSession, None]:
+async def db_session() -> AsyncGenerator[SQLAlchemyUserDatabase[User, Any], Any]:
     """
     Provides a database session for each test function, managed by the sessionmaker.
     Connects to the file-based test DB. Cleans up data after the test.
     """
     async with TestingSessionLocal() as session:
         log.debug("DB session provided by fixture.")
-        yield session
+        yield SQLAlchemyUserDatabase(session, User).session
         log.info("Cleaning up test data after function.")
         await session.execute(delete(Participant))  # Delete dependent first
         await session.execute(delete(Conversation))
@@ -88,7 +89,9 @@ def app(setup_database, db_session: AsyncSession) -> Generator:  # Inject db_ses
     to use the test-specific session.
     """
 
-    async def override_get_db() -> AsyncGenerator[AsyncSession, None]:
+    async def override_get_db() -> (
+        AsyncGenerator[SQLAlchemyUserDatabase[User, Any], Any]
+    ):
         """Dependency override for get_db, yields the test's db_session."""
         log.debug("Override get_db yielding test session.")
         yield db_session  # Yield the session from the db_session fixture

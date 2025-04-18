@@ -19,9 +19,7 @@ class UserCreateRequest(BaseModel):
 
 
 async def test_register(test_client: AsyncClient):
-    request_data = UserCreateRequest(
-        email="sdf123s2123322123323df@test.com", password="test"
-    )
+    request_data = UserCreateRequest(email="test@test.com", password="test")
     response = await test_client.post(f"/auth/register", json=request_data.model_dump())
     print(response.json())
     assert response.status_code == 201

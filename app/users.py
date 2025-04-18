@@ -10,7 +10,7 @@ from fastapi_users.authentication import (
 )
 from fastapi_users.db import SQLAlchemyUserDatabase
 
-from app.db import User, get_user_db
+from app.db import User, get_db
 
 SECRET = "SECRET"
 
@@ -33,7 +33,13 @@ class UserManager(UUIDIDMixin, BaseUserManager[User, uuid.UUID]):
         print(f"Verification requested for user {user.id}. Verification token: {token}")
 
 
-async def get_user_manager(user_db: SQLAlchemyUserDatabase = Depends(get_user_db)):
+# Working
+# (function) def get_user_db(session: AsyncSession = Depends(get_async_session)) -> AsyncGenerator[SQLAlchemyUserDatabase[User, Any], Any]
+# Not working
+# (function) def get_db(session: AsyncSession = Depends(get_async_session)) -> AsyncGenerator[AsyncSession, Any]
+
+
+async def get_user_manager(user_db: SQLAlchemyUserDatabase = Depends(get_db)):
     yield UserManager(user_db)
 
 
