@@ -212,3 +212,48 @@ async def test_reset_password_invalid_token(test_client: AsyncClient):
     reset_data = {"token": "INVALID_TOKEN", "password": "newpassword"}
     response = await test_client.post("/auth/reset-password", json=reset_data)
     assert response.status_code == 400  # Bad Request for invalid token
+
+
+# --- Tests for HTML Pages ---
+
+
+async def test_get_register_page(test_client: AsyncClient):
+    """Test GET request for the registration page."""
+    response = await test_client.get("/auth/register")
+    assert response.status_code == 200
+    assert "text/html" in response.headers["content-type"]
+    # Optional: Add checks for specific HTML content (e.g., form fields)
+    assert "<h1>Register</h1>" in response.text  # Basic check
+
+
+async def test_get_login_page(test_client: AsyncClient):
+    """Test GET request for the login page."""
+    # Note: FastAPI Users default login is POST only at /auth/jwt/login
+    # We might need a different path like /auth/login for the GET page
+    response = await test_client.get("/auth/login")
+    assert response.status_code == 200
+    assert "text/html" in response.headers["content-type"]
+    assert "<h1>Login</h1>" in response.text  # Basic check
+
+
+async def test_get_forgot_password_page(test_client: AsyncClient):
+    """Test GET request for the forgot password page."""
+    response = await test_client.get("/auth/forgot-password")
+    assert response.status_code == 200
+    assert "text/html" in response.headers["content-type"]
+    assert "<h1>Forgot Password</h1>" in response.text  # Basic check
+
+
+async def test_get_reset_password_page(test_client: AsyncClient):
+    """Test GET request for the reset password page."""
+    # This page usually requires a token in the URL path
+    reset_token = "SOME_TOKEN_FOR_TESTING_URL"  # Dummy token for URL structure
+    response = await test_client.get(f"/auth/reset-password/{reset_token}")
+    assert response.status_code == 200
+    assert "text/html" in response.headers["content-type"]
+    assert "<h1>Reset Password</h1>" in response.text  # Basic check
+    # Check if token is potentially embedded in the form/page for use by JS/form submission
+    assert (
+        f'value="{reset_token}"' in response.text
+        or f'data-token="{reset_token}"' in response.text
+    )

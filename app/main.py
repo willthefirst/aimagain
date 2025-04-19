@@ -7,6 +7,7 @@ from .api.routes import me
 from .api.routes import participants
 from app.schemas.user import UserCreate, UserRead, UserUpdate
 from app.auth_config import auth_backend, current_active_user, fastapi_users
+from .api.routes import auth_pages
 
 
 app = FastAPI(title="Chat App")
@@ -54,6 +55,9 @@ app.include_router(me.router, tags=["me"])
 
 # Include the v1 participants router
 app.include_router(participants.router, tags=["participants"])
+
+# Include the auth_pages router
+app.include_router(auth_pages.router)
 
 
 @app.get("/authenticated-route")
