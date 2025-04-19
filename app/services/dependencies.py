@@ -18,6 +18,8 @@ from app.repositories.user_repository import UserRepository
 from .conversation_service import ConversationService
 
 # Import other services here as they are created
+from .participant_service import ParticipantService
+from .user_service import UserService
 
 
 # Dependency function to provide ConversationService instance
@@ -40,3 +42,26 @@ def get_conversation_service(
 
 
 # Add dependency functions for other services here...
+
+
+def get_participant_service(
+    part_repo: ParticipantRepository = Depends(get_participant_repository),
+    conv_repo: ConversationRepository = Depends(get_conversation_repository),
+) -> ParticipantService:
+    """Provides an instance of the ParticipantService."""
+    return ParticipantService(
+        participant_repository=part_repo,
+        conversation_repository=conv_repo,
+    )
+
+
+# Add dependency provider for UserService
+def get_user_service(
+    part_repo: ParticipantRepository = Depends(get_participant_repository),
+    conv_repo: ConversationRepository = Depends(get_conversation_repository),
+) -> UserService:
+    """Provides an instance of the UserService."""
+    return UserService(
+        participant_repository=part_repo,
+        conversation_repository=conv_repo,
+    )

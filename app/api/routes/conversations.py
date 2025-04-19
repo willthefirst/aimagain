@@ -41,19 +41,13 @@ from app.schemas.conversation import ConversationCreateRequest, ConversationResp
 from app.schemas.participant import ParticipantInviteRequest, ParticipantResponse
 
 # Removed unused uuid and datetime imports if service handles them
+# Import shared error handling function
+from app.api.errors import handle_service_error
 
 
 logger = logging.getLogger(__name__)  # Setup logger for route level
 
 router = APIRouter()
-
-
-# Helper function to map Service Errors to HTTP Exceptions
-def handle_service_error(e: ServiceError):
-    logger.warning(
-        f"Service error occurred: {e.__class__.__name__} - {e.message}"
-    )  # Log service errors
-    raise HTTPException(status_code=e.status_code, detail=e.message)
 
 
 @router.get("/conversations", response_class=HTMLResponse, tags=["conversations"])

@@ -1,40 +1,46 @@
 from fastapi import APIRouter, Request, Depends, HTTPException
 from fastapi.responses import HTMLResponse
+import logging
 
 # Removed unused imports
 # from selectolax.parser import HTMLParser
 # from sqlalchemy.ext.asyncio import AsyncSession
 # from sqlalchemy import select
 # from sqlalchemy.orm import selectinload
+# from app.db import get_db_session
+# from app.repositories.dependencies import (
+#     get_user_repository,
+#     get_participant_repository,
+#     get_conversation_repository,
+# )
+# from app.repositories.user_repository import UserRepository
+# from app.repositories.participant_repository import ParticipantRepository
+# from app.repositories.conversation_repository import ConversationRepository
 
 from app.core.templating import templates
+from app.models import User
+from app.users import current_active_user
 
-# Remove direct db dependency
-# from app.db import get_db_session
-from app.models import User  # Keep User for type hint
-from app.users import current_active_user  # Import the dependency
+# Import UserService dependency
+from app.services.dependencies import get_user_service
+from app.services.user_service import UserService
+from app.services.exceptions import ServiceError, DatabaseError
 
-# Import repositories
-from app.repositories.dependencies import (
-    get_user_repository,
-    get_participant_repository,
-    get_conversation_repository,
-)
-from app.repositories.user_repository import UserRepository
-from app.repositories.participant_repository import ParticipantRepository
-from app.repositories.conversation_repository import ConversationRepository
+# Import shared error handler
+from app.api.errors import handle_service_error
 
 
+logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/users/me", tags=["me"])
 
 
 @router.get("/profile", response_class=HTMLResponse)
 async def get_my_profile(
     request: Request,
-    user: User = Depends(current_active_user),  # Use authenticated user
+    user: User = Depends(current_active_user),  # Get authenticated user
+    # No service needed here, just returning the user object directly
 ):
     """Displays the current user's profile page."""
-    # user = {"username": "test-user-me", "email": "me@example.com"} # Removed placeholder
     return templates.TemplateResponse(
         "me/profile.html", {"request": request, "user": user}
     )
@@ -43,49 +49,54 @@ async def get_my_profile(
 @router.get("/invitations", response_class=HTMLResponse)
 async def list_my_invitations(
     request: Request,
-    # Inject repositories
-    # user_repo: UserRepository = Depends(get_user_repository), # No longer needed
-    part_repo: ParticipantRepository = Depends(get_participant_repository),
-    user: User = Depends(current_active_user),  # Use authenticated user
-    # db: AsyncSession = Depends(get_db_session) # Remove direct session
+    user: User = Depends(current_active_user),
+    # Depend on the service
+    user_service: UserService = Depends(get_user_service),
 ):
-    print("Listing my invitations")  # Keep existing print
     """Provides an HTML page listing the current user's pending invitations."""
-    # TODO: Replace placeholder with actual authenticated user logic
-    # current_user = await user_repo.get_user_by_username("test-user-me") # Removed placeholder
-
-    # if not current_user:
-    #     raise HTTPException(status_code=403, detail="User not found (placeholder)") # No longer needed, handled by Depends
-
-    # Use repository to get invitations
-    invitations = await part_repo.list_user_invitations(user=user)
-
-    return templates.TemplateResponse(
-        "me/invitations.html",
-        {"request": request, "invitations": invitations},
-    )
+    try:
+        invitations = await user_service.get_user_invitations(user=user)
+        return templates.TemplateResponse(
+            "me/invitations.html",
+            {"request": request, "invitations": invitations},
+        )
+    except DatabaseError as e:
+        handle_service_error(e)
+    except ServiceError as e:
+        handle_service_error(e)
+    except Exception as e:
+        logger.error(
+            f"Unexpected error listing invitations for user {user.id}: {e}",
+            exc_info=True,
+        )
+        raise HTTPException(
+            status_code=500, detail="An unexpected server error occurred."
+        )
 
 
 @router.get("/conversations", response_class=HTMLResponse)
 async def list_my_conversations(
     request: Request,
-    # Inject repositories
-    # user_repo: UserRepository = Depends(get_user_repository), # No longer needed
-    conv_repo: ConversationRepository = Depends(get_conversation_repository),
-    user: User = Depends(current_active_user),  # Use authenticated user
-    # db: AsyncSession = Depends(get_db_session) # Remove direct session
+    user: User = Depends(current_active_user),
+    # Depend on the service
+    user_service: UserService = Depends(get_user_service),
 ):
     """Provides an HTML page listing conversations the current user is part of."""
-    # TODO: Replace placeholder with actual authenticated user logic
-    # current_user = await user_repo.get_user_by_username("test-user-me") # Removed placeholder
-
-    # if not current_user:
-    #     raise HTTPException(status_code=403, detail="User not found (placeholder)") # No longer needed, handled by Depends
-
-    # Use repository to get conversations
-    conversations = await conv_repo.list_user_conversations(user=user)
-
-    return templates.TemplateResponse(
-        "me/conversations.html",
-        {"request": request, "conversations": conversations},
-    )
+    try:
+        conversations = await user_service.get_user_conversations(user=user)
+        return templates.TemplateResponse(
+            "me/conversations.html",
+            {"request": request, "conversations": conversations},
+        )
+    except DatabaseError as e:
+        handle_service_error(e)
+    except ServiceError as e:
+        handle_service_error(e)
+    except Exception as e:
+        logger.error(
+            f"Unexpected error listing conversations for user {user.id}: {e}",
+            exc_info=True,
+        )
+        raise HTTPException(
+            status_code=500, detail="An unexpected server error occurred."
+        )
