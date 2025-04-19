@@ -265,9 +265,14 @@ async def test_create_conversation_invitee_not_found(
     )  # Use authenticated client
 
     assert response.status_code == 404, f"Expected 404, got {response.status_code}"
-    assert "Invitee user not found" in response.json().get(
-        "detail", ""
-    ), "Error detail mismatch"
+    # assert "Invitee user not found" in response.json().get(
+    #     "detail", ""
+    # ), "Error detail mismatch" # Old assertion
+    # New assertion: Check if the specific error message substring is present
+    detail = response.json().get("detail", "")
+    assert (
+        "Invitee user with ID" in detail and "not found" in detail
+    ), f"Expected detail message containing 'Invitee user with ID ... not found', got: {detail}"
 
     async with db_test_session_manager() as session:
         count_stmt = select(func.count(Conversation.id))

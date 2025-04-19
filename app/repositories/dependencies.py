@@ -7,7 +7,7 @@ from .user_repository import UserRepository
 from .participant_repository import ParticipantRepository
 
 # Import other repositories here as they are created
-# from .message_repository import MessageRepository
+from .message_repository import MessageRepository
 
 
 def get_conversation_repository(
@@ -29,6 +29,14 @@ def get_participant_repository(
 ) -> ParticipantRepository:
     """Dependency provider for ParticipantRepository."""
     return ParticipantRepository(session)
+
+
+# Add dependency provider for MessageRepository
+def get_message_repository(
+    session: AsyncSession = Depends(get_db_session),
+) -> MessageRepository:
+    """Dependency provider for MessageRepository."""
+    return MessageRepository(session)
 
 
 # def get_message_repository(...):
