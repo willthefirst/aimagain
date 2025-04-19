@@ -1,5 +1,8 @@
 import asyncio
 from typing import AsyncGenerator, Any
+from collections.abc import AsyncGenerator as AsyncGeneratorABC
+from contextlib import asynccontextmanager
+from asyncstdlib import anext
 
 import pytest
 from fastapi import FastAPI
@@ -17,6 +20,7 @@ from app.main import app
 from app.db import get_db_session, get_user_db
 from app.models import User, metadata  # Assuming your models define metadata
 from fastapi_users.db import SQLAlchemyUserDatabase
+from app.schemas.user import UserCreate  # Import UserCreate schema
 
 # Use an in-memory SQLite database for testing
 TEST_DATABASE_URL = "sqlite+aiosqlite:///:memory:"
@@ -79,3 +83,101 @@ async def test_client(test_app: FastAPI) -> AsyncGenerator[AsyncClient, None]:
         base_url="http://test",  # Use test_app here
     ) as client:
         yield client
+
+
+# Helper function to create a user (not a fixture itself)
+async def create_test_user(
+    session_maker: async_sessionmaker[AsyncSession],
+    user_data: UserCreate,
+    user_manager_dependency: Any,  # Accept the user manager dependency
+) -> User:
+    async with session_maker() as session:
+        # Need to handle async generator dependency correctly
+        user_manager_gen = user_manager_dependency(
+            SQLAlchemyUserDatabase(session, User)
+        )
+        user_manager = await anext(user_manager_gen)  # Get the manager instance
+        try:
+            user = await user_manager.create(user_data)
+            await session.commit()
+            await session.refresh(user)
+            # Ensure user is fully loaded before returning
+            return user
+        finally:
+            # Ensure the generator is closed properly
+            try:
+                # Consume the rest of the generator to clean up
+                await anext(user_manager_gen)
+            except StopAsyncIteration:
+                pass
+            # Explicitly close if it has an aclose method (good practice)
+            if hasattr(user_manager_gen, "aclose"):
+                await user_manager_gen.aclose()
+
+
+# Fixture to provide an authenticated client
+@pytest.fixture(scope="function")
+async def authenticated_client(
+    test_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    test_app: FastAPI,  # Need the app to get the dependency
+) -> AsyncGenerator[AsyncClient, None]:
+    from app.users import get_user_manager  # Import here to avoid circular deps
+
+    user_data = UserCreate(
+        email="testuser@example.com",
+        password="password123",
+        username="testuser",  # Add username if required by your UserCreate
+    )
+    # Get the actual dependency function from the app
+    user_manager_dependency = test_app.dependency_overrides.get(
+        get_user_db, get_user_db
+    )
+
+    # Create the user directly using the user manager logic
+    # We need a session to create the user manager
+    user = await create_test_user(db_test_session_manager, user_data, get_user_manager)
+
+    # Log the user in
+    login_data = {
+        "username": user_data.email,  # fastapi-users uses email as username for login
+        "password": user_data.password,
+    }
+    res = await test_client.post("/auth/jwt/login", data=login_data)
+    res.raise_for_status()  # Ensure login was successful
+    token_data = res.json()
+    access_token = token_data["access_token"]
+
+    # Set the authorization header for the client
+    test_client.headers["Authorization"] = f"Bearer {access_token}"
+
+    yield test_client
+
+    # Clean up: remove the header after the test
+    del test_client.headers["Authorization"]
+
+    # Optional: Delete the user after test if needed, though DB drop handles it
+    # async with db_test_session_manager() as session:
+    #     await session.delete(user)
+    #     await session.commit()
+
+
+# Fixture to provide the User object corresponding to the authenticated client
+@pytest.fixture(scope="function")
+async def logged_in_user(
+    authenticated_client: AsyncClient,  # Ensure this runs after auth client is set up
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+) -> User:
+    """Provides the User object for the default authenticated user."""
+    # The user was created in authenticated_client fixture
+    # Fetch the user from the DB based on the known test email
+    async with db_test_session_manager() as session:
+        from app.repositories.user_repository import UserRepository
+
+        user_repo = UserRepository(session)
+        user = await user_repo.get_user_by_email("testuser@example.com")
+        if not user:
+            pytest.fail(
+                "Test user 'testuser@example.com' not found in DB for logged_in_user fixture"
+            )
+        return user

@@ -28,19 +28,20 @@ pytestmark = pytest.mark.asyncio
 
 
 async def test_accept_invitation_success(
-    test_client: AsyncClient,
+    authenticated_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],  # Inject manager
+    logged_in_user: User,
 ):
     """Test PUT /participants/{id} successfully accepts an invitation."""
     inviter = create_test_user(username=f"inviter-{uuid.uuid4()}")
-    me_user = create_test_user(username="test-user-me")
+    me_user = logged_in_user
 
     invitation_id: Optional[UUID] = None
 
     # Setup data
     async with db_test_session_manager() as session:
         async with session.begin():
-            session.add_all([inviter, me_user])
+            session.add_all([inviter])
             await session.flush()
             inviter_id = inviter.id
             me_user_id = me_user.id
@@ -81,7 +82,7 @@ async def test_accept_invitation_success(
     request_data = ParticipantUpdateRequest(status=ParticipantStatus.JOINED)
 
     # Simulate PUT request
-    response = await test_client.put(
+    response = await authenticated_client.put(
         f"/participants/{str(invitation_id)}", json=request_data.model_dump()
     )
 
@@ -102,19 +103,20 @@ async def test_accept_invitation_success(
 
 
 async def test_reject_invitation_success(
-    test_client: AsyncClient,
+    authenticated_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],  # Inject manager
+    logged_in_user: User,
 ):
     """Test PUT /participants/{id} successfully rejects an invitation."""
     inviter = create_test_user(username=f"inviter-{uuid.uuid4()}")
-    me_user = create_test_user(username="test-user-me")
+    me_user = logged_in_user
 
     invitation_id: Optional[UUID] = None
 
     # Setup data
     async with db_test_session_manager() as session:
         async with session.begin():
-            session.add_all([inviter, me_user])
+            session.add_all([inviter])
             await session.flush()
             inviter_id = inviter.id
             me_user_id = me_user.id
@@ -143,7 +145,7 @@ async def test_reject_invitation_success(
 
     request_data = ParticipantUpdateRequest(status=ParticipantStatus.REJECTED)
 
-    response = await test_client.put(
+    response = await authenticated_client.put(
         f"/participants/{str(invitation_id)}", json=request_data.model_dump()
     )
 
@@ -161,20 +163,21 @@ async def test_reject_invitation_success(
 
 
 async def test_update_participant_not_owned(
-    test_client: AsyncClient,
+    authenticated_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],  # Inject manager
+    logged_in_user: User,
 ):
     """Test PUT /participants/{id} returns 403 if participant belongs to another user."""
     inviter = create_test_user(username=f"inviter-{uuid.uuid4()}")
     actual_owner = create_test_user(username=f"owner-{uuid.uuid4()}")
-    me_user = create_test_user(username="test-user-me")
+    me_user = logged_in_user
 
     participant_id: Optional[UUID] = None
 
     # Setup data
     async with db_test_session_manager() as session:
         async with session.begin():
-            session.add_all([inviter, actual_owner, me_user])
+            session.add_all([inviter, actual_owner])
             await session.flush()
             inviter_id = inviter.id
             owner_id = actual_owner.id
@@ -204,7 +207,7 @@ async def test_update_participant_not_owned(
 
     request_data = ParticipantUpdateRequest(status=ParticipantStatus.JOINED)
 
-    response = await test_client.put(
+    response = await authenticated_client.put(
         f"/participants/{str(participant_id)}", json=request_data.model_dump()
     )
 
@@ -212,18 +215,18 @@ async def test_update_participant_not_owned(
 
 
 async def test_update_participant_invalid_current_status(
-    test_client: AsyncClient,
+    authenticated_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],  # Inject manager
+    logged_in_user: User,
 ):
     """Test PUT /participants/{id} returns 400 if participant status is not 'invited'."""
-    me_user = create_test_user(username="test-user-me")
+    me_user = logged_in_user
 
     participant_id: Optional[UUID] = None
 
     # Setup data
     async with db_test_session_manager() as session:
         async with session.begin():
-            session.add(me_user)
             await session.flush()
             me_user_id = me_user.id
 
@@ -251,7 +254,7 @@ async def test_update_participant_invalid_current_status(
 
     request_data = ParticipantUpdateRequest(status=ParticipantStatus.REJECTED)
 
-    response = await test_client.put(
+    response = await authenticated_client.put(
         f"/participants/{str(participant_id)}", json=request_data.model_dump()
     )
 
@@ -259,19 +262,20 @@ async def test_update_participant_invalid_current_status(
 
 
 async def test_update_participant_invalid_target_status(
-    test_client: AsyncClient,
-    db_test_session_manager: async_sessionmaker[AsyncSession],  # Inject manager
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user: User,
 ):
     """Test PUT /participants/{id} returns 400 if target status is invalid."""
     inviter = create_test_user(username=f"inviter-{uuid.uuid4()}")
-    me_user = create_test_user(username="test-user-me")
+    me_user = logged_in_user
 
     invitation_id: Optional[UUID] = None
 
     # Setup data
     async with db_test_session_manager() as session:
         async with session.begin():
-            session.add_all([inviter, me_user])
+            session.add_all([inviter])
             await session.flush()
             inviter_id = inviter.id
             me_user_id = me_user.id
@@ -299,7 +303,7 @@ async def test_update_participant_invalid_target_status(
     assert invitation_id
 
     # Attempt to set an invalid status
-    response = await test_client.put(
+    response = await authenticated_client.put(
         f"/participants/{str(invitation_id)}",
         json={"status": "maybe"},
     )

@@ -12,6 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession  # Temporarily re-import
 from sqlalchemy import select  # Keep if needed for other routes
 
 from app.core.templating import templates
+from app.users import current_active_user  # Import dependency
 
 # Remove direct db session dependency
 from app.db import get_db_session  # Add back for unrefactored routes
@@ -76,6 +77,7 @@ async def get_conversation(  # Async function
     # Inject user and participant repos for auth check
     user_repo: UserRepository = Depends(get_user_repository),
     part_repo: ParticipantRepository = Depends(get_participant_repository),
+    user: User = Depends(current_active_user),  # Get authenticated user
     # TODO: Replace placeholder auth with actual user dependency
 ):
     """Retrieves details for a specific conversation."""
@@ -94,12 +96,12 @@ async def get_conversation(  # Async function
     print(
         f"--- [Route get_conversation] Attempting to find user 'test-user-me' for auth check ---"
     )  # Added print
-    current_user = await user_repo.get_user_by_username("test-user-me")  # Use repo
+    current_user = user  # Use the authenticated user
     print(
         f"--- [Route get_conversation] Found user for auth check: {current_user.username if current_user else 'None'} ---"
     )  # Added print
-    if not current_user:
-        raise HTTPException(status_code=403, detail="Not authenticated (placeholder)")
+    # if not current_user:
+    #     raise HTTPException(status_code=403, detail="Not authenticated (placeholder)") # Handled by Depends
 
     # Check participation using participant repository
     participant = await part_repo.get_participant_by_user_and_conversation(
@@ -157,6 +159,7 @@ async def create_conversation(  # Async function
     # Inject repositories
     conv_repo: ConversationRepository = Depends(get_conversation_repository),
     user_repo: UserRepository = Depends(get_user_repository),
+    user: User = Depends(current_active_user),  # Get authenticated user
     # TODO: Replace placeholder auth with actual user dependency
 ):
     """Creates a new conversation by inviting another user."""
@@ -166,12 +169,12 @@ async def create_conversation(  # Async function
     # --- User Checks (Refactored) ---
     # 1. Get creator (placeholder)
     # TODO: Replace with actual authenticated user dependency
-    creator_user = await user_repo.get_user_by_username("test-user-me")  # Use repo
+    creator_user = user  # Use the authenticated user
     print(
         f"--- [Route create_conversation] Found creator: {creator_user.username if creator_user else 'None'} ---"
     )  # Added print
-    if not creator_user:
-        raise HTTPException(status_code=403, detail="Auth user not found - placeholder")
+    # if not creator_user:
+    #     raise HTTPException(status_code=403, detail="Auth user not found - placeholder") # Handled by Depends
 
     # 2. Find invitee and check if online
     try:
@@ -229,6 +232,7 @@ async def invite_participant(  # Async function
     conv_repo: ConversationRepository = Depends(get_conversation_repository),
     user_repo: UserRepository = Depends(get_user_repository),
     part_repo: ParticipantRepository = Depends(get_participant_repository),
+    user: User = Depends(current_active_user),  # Get authenticated user
     # TODO: Replace placeholder auth with actual user dependency
 ):
     """Invites another user to an existing conversation."""
@@ -244,9 +248,9 @@ async def invite_participant(  # Async function
 
     # --- Authorize Requesting User (Refactored) ---
     # TODO: Replace placeholder with actual authenticated user dependency
-    current_user = await user_repo.get_user_by_username("test-user-me")  # Use repo
-    if not current_user:
-        raise HTTPException(status_code=403, detail="Not authenticated (placeholder)")
+    current_user = user  # Use the authenticated user
+    # if not current_user:
+    #     raise HTTPException(status_code=403, detail="Not authenticated (placeholder)") # Handled by Depends
 
     # Check if current user is joined using participant repository
     is_joined = await part_repo.check_if_user_is_joined_participant(

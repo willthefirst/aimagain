@@ -21,17 +21,19 @@ pytestmark = pytest.mark.asyncio
 
 
 async def test_list_my_invitations_empty(
-    test_client: AsyncClient,
+    authenticated_client: AsyncClient,  # Use authenticated client
+    # test_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],  # Inject manager
+    logged_in_user: User,  # Use logged-in user fixture
 ):
     """Test GET /users/me/invitations returns HTML with no invitations message when empty."""
     # Setup the authenticated user
-    me_user = create_test_user(username="test-user-me")
-    async with db_test_session_manager() as session:
-        async with session.begin():
-            session.add(me_user)
+    # me_user = create_test_user(username="test-user-me") # Removed manual user creation
+    # async with db_test_session_manager() as session:
+    #     async with session.begin():
+    #         session.add(me_user)
 
-    response = await test_client.get(f"/users/me/invitations")
+    response = await authenticated_client.get(f"/users/me/invitations")
 
     assert response.status_code == 200
     assert "text/html" in response.headers["content-type"]
@@ -42,12 +44,15 @@ async def test_list_my_invitations_empty(
 
 
 async def test_list_my_invitations_one_invitation(
-    test_client: AsyncClient,
+    authenticated_client: AsyncClient,  # Use authenticated client
+    # test_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],  # Inject manager
+    logged_in_user: User,  # Use logged-in user fixture
 ):
     """Test GET /users/me/invitations shows one pending invitation correctly."""
     inviter = create_test_user(username=f"inviter-{uuid.uuid4()}")
-    me_user = create_test_user(username="test-user-me")
+    # me_user = create_test_user(username="test-user-me") # Removed manual user creation
+    me_user = logged_in_user  # Use the user from the fixture
 
     my_invitation_id: Optional[UUID] = None
     conversation_slug: str = f"test-invite-convo-{uuid.uuid4()}"
@@ -56,7 +61,7 @@ async def test_list_my_invitations_one_invitation(
     # Setup data
     async with db_test_session_manager() as session:
         async with session.begin():
-            session.add_all([inviter, me_user])
+            session.add_all([inviter])  # Only add inviter, me_user exists
             await session.flush()
             inviter_id = inviter.id
             me_user_id = me_user.id
@@ -94,7 +99,7 @@ async def test_list_my_invitations_one_invitation(
 
     assert my_invitation_id
 
-    response = await test_client.get(f"/users/me/invitations")
+    response = await authenticated_client.get(f"/users/me/invitations")
 
     assert response.status_code == 200
     assert "text/html" in response.headers["content-type"]
@@ -121,16 +126,18 @@ async def test_list_my_invitations_one_invitation(
 
 
 async def test_list_my_conversations_empty(
-    test_client: AsyncClient,
+    authenticated_client: AsyncClient,  # Use authenticated client
+    # test_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],  # Inject manager
+    logged_in_user: User,  # Use logged-in user fixture
 ):
     """Test GET /users/me/conversations returns empty when user has no conversations."""
-    me_user = create_test_user(username="test-user-me")
-    async with db_test_session_manager() as session:
-        async with session.begin():
-            session.add(me_user)
+    # me_user = create_test_user(username="test-user-me") # Removed manual user creation
+    # async with db_test_session_manager() as session:
+    #     async with session.begin():
+    #         session.add(me_user)
 
-    response = await test_client.get(f"/users/me/conversations")
+    response = await authenticated_client.get(f"/users/me/conversations")
 
     assert response.status_code == 200
     assert "text/html" in response.headers["content-type"]
@@ -140,12 +147,15 @@ async def test_list_my_conversations_empty(
 
 
 async def test_list_my_conversations_one_joined(
-    test_client: AsyncClient,
+    authenticated_client: AsyncClient,  # Use authenticated client
+    # test_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],  # Inject manager
+    logged_in_user: User,  # Use logged-in user fixture
 ):
     """Test GET /users/me/conversations shows one conversation where user is joined."""
     creator = create_test_user(username=f"creator-{uuid.uuid4()}")
-    me_user = create_test_user(username="test-user-me")
+    # me_user = create_test_user(username="test-user-me") # Removed manual user creation
+    me_user = logged_in_user  # Use the user from the fixture
 
     conversation_slug = f"my-joined-convo-{uuid.uuid4()}"
     conversation_name = "My Joined Chat"
@@ -153,7 +163,7 @@ async def test_list_my_conversations_one_joined(
     # Setup data
     async with db_test_session_manager() as session:
         async with session.begin():
-            session.add_all([creator, me_user])
+            session.add_all([creator])  # Only add creator, me_user exists
             await session.flush()
             creator_id = creator.id
             me_user_id = me_user.id
@@ -182,7 +192,7 @@ async def test_list_my_conversations_one_joined(
             )
             session.add_all([participant, part_creator])
 
-    response = await test_client.get(f"/users/me/conversations")
+    response = await authenticated_client.get(f"/users/me/conversations")
 
     assert response.status_code == 200
     tree = HTMLParser(response.text)
@@ -201,3 +211,30 @@ async def test_list_my_conversations_one_joined(
         f'a[href*="/conversations/{conversation_slug}"]'
     )
     assert link_node is not None, f"Link to conversation {conversation_slug} not found"
+
+
+# --- Test Unauthenticated Access ---
+
+
+async def test_get_my_profile_unauthenticated(
+    test_client: AsyncClient,  # Use regular client without auth header
+):
+    """Test GET /users/me/profile returns 401 Unauthorized without authentication."""
+    response = await test_client.get("/users/me/profile")
+    assert response.status_code == 401
+
+
+async def test_list_my_invitations_unauthenticated(
+    test_client: AsyncClient,  # Use regular client without auth header
+):
+    """Test GET /users/me/invitations returns 401 Unauthorized without authentication."""
+    response = await test_client.get("/users/me/invitations")
+    assert response.status_code == 401
+
+
+async def test_list_my_conversations_unauthenticated(
+    test_client: AsyncClient,  # Use regular client without auth header
+):
+    """Test GET /users/me/conversations returns 401 Unauthorized without authentication."""
+    response = await test_client.get("/users/me/conversations")
+    assert response.status_code == 401

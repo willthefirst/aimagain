@@ -21,7 +21,9 @@ dependencies = [
     "Jinja2",
     "selectolax",
     "fastapi-users[sqlalchemy]",
-    "aiosqlite"
+    "aiosqlite",
+    "pydantic-settings",
+    "asyncstdlib"
 ]
 
 [tool.setuptools.packages.find]

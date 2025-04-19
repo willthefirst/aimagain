@@ -16,10 +16,14 @@ from tests.test_helpers import create_test_user
 pytestmark = pytest.mark.asyncio
 
 
-async def test_list_users_empty(test_client: AsyncClient):
-    """Test GET /users returns HTML with no users message when empty."""
-    # Implicitly depends on db_test_session_manager via test_client
-    response = await test_client.get(f"/users")
+async def test_list_users_empty(
+    authenticated_client: AsyncClient,  # Use authenticated client
+    # test_client: AsyncClient
+    logged_in_user: User,  # Need user for exclusion
+):
+    """Test GET /users returns HTML with no other users message when only logged in user exists."""
+    # Implicitly depends on db_test_session_manager via authenticated_client
+    response = await authenticated_client.get(f"/users")
 
     assert response.status_code == 200
     assert "text/html" in response.headers["content-type"]
@@ -31,19 +35,21 @@ async def test_list_users_empty(test_client: AsyncClient):
 
 
 async def test_list_users_one_user(
-    test_client: AsyncClient,
+    authenticated_client: AsyncClient,  # Use authenticated client
+    # test_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],  # Inject manager
+    logged_in_user: User,  # Need user for exclusion
 ):
-    """Test GET /users returns HTML listing one user when one exists."""
+    """Test GET /users returns HTML listing one other user."""
     test_username = f"test-user-{uuid.uuid4()}"
-    user = create_test_user(username=test_username, is_online=False)
+    other_user = create_test_user(username=test_username, is_online=False)
 
     # Setup data
     async with db_test_session_manager() as session:
         async with session.begin():
-            session.add(user)
+            session.add(other_user)
 
-    response = await test_client.get(f"/users")
+    response = await authenticated_client.get(f"/users")
 
     assert response.status_code == 200
     assert "text/html" in response.headers["content-type"]
@@ -54,14 +60,19 @@ async def test_list_users_one_user(
     assert (
         test_username in user_list_items[0].text()
     ), "Correct username not found in list item"
+    assert (
+        logged_in_user.username not in user_list_items[0].text()
+    ), "Logged in user should not be listed"
     assert "No users found" not in tree.body.text()
 
 
 async def test_list_users_multiple_users(
-    test_client: AsyncClient,
+    authenticated_client: AsyncClient,  # Use authenticated client
+    # test_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],  # Inject manager
+    logged_in_user: User,  # Need user for exclusion
 ):
-    """Test GET /users returns HTML listing multiple users when they exist."""
+    """Test GET /users returns HTML listing multiple other users."""
     user1 = create_test_user(username=f"test-user-one-{uuid.uuid4()}", is_online=False)
     user2 = create_test_user(username=f"test-user-two-{uuid.uuid4()}", is_online=True)
 
@@ -70,7 +81,7 @@ async def test_list_users_multiple_users(
         async with session.begin():
             session.add_all([user1, user2])
 
-    response = await test_client.get(f"/users")
+    response = await authenticated_client.get(f"/users")
 
     assert response.status_code == 200
     assert "text/html" in response.headers["content-type"]
@@ -82,23 +93,29 @@ async def test_list_users_multiple_users(
     usernames_found = {item.text() for item in user_list_items}
     assert user1.username in usernames_found, f"{user1.username} not found in list"
     assert user2.username in usernames_found, f"{user2.username} not found in list"
+    assert (
+        logged_in_user.username not in usernames_found
+    ), "Logged in user should not be listed"
     assert "No users found" not in tree.body.text()
 
 
 async def test_list_users_participated_empty(
-    test_client: AsyncClient,
+    authenticated_client: AsyncClient,  # Use authenticated client
+    # test_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],  # Inject manager
+    logged_in_user: User,  # Use logged-in user fixture
 ):
     """Test GET /users?participated_with=me returns empty when no shared convos."""
-    me_user = create_test_user(username="test-user-me")
+    # me_user = create_test_user(username="test-user-me") # Removed manual creation
+    me_user = logged_in_user
     other_user = create_test_user(username="other-user")
 
     # Setup data
     async with db_test_session_manager() as session:
         async with session.begin():
-            session.add_all([me_user, other_user])
+            session.add_all([other_user])  # Only add other user
 
-    response = await test_client.get(f"/users?participated_with=me")
+    response = await authenticated_client.get(f"/users?participated_with=me")
 
     assert response.status_code == 200, f"Expected 200 OK, got {response.status_code}"
     assert "text/html" in response.headers["content-type"]
@@ -108,18 +125,21 @@ async def test_list_users_participated_empty(
 
 
 async def test_list_users_participated_success(
-    test_client: AsyncClient,
+    authenticated_client: AsyncClient,  # Use authenticated client
+    # test_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],  # Inject manager
+    logged_in_user: User,  # Use logged-in user fixture
 ):
     """Test GET /users?participated_with=me returns correct users."""
-    me_user = create_test_user(username="test-user-me")
+    # me_user = create_test_user(username="test-user-me") # Removed manual creation
+    me_user = logged_in_user
     user_b = create_test_user(username=f"user-b-{uuid.uuid4()}")  # Shared convo
     user_c = create_test_user(username=f"user-c-{uuid.uuid4()}")  # No shared convo
 
     # Setup data
     async with db_test_session_manager() as session:
         async with session.begin():
-            session.add_all([me_user, user_b, user_c])
+            session.add_all([user_b, user_c])  # Add other users
             await session.flush()
             me_user_id = me_user.id  # UUID object
             user_b_id = user_b.id  # UUID object
@@ -181,7 +201,7 @@ async def test_list_users_participated_success(
             )  # Invited only
             session.add_all([part2_me, part2_c])
 
-    response = await test_client.get(f"/users?participated_with=me")
+    response = await authenticated_client.get(f"/users?participated_with=me")
 
     assert response.status_code == 200
     tree = HTMLParser(response.text)

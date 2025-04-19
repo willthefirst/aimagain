@@ -26,6 +26,12 @@ class UserRepository(BaseRepository):
         result = await self.session.execute(stmt)
         return result.scalars().first()
 
+    async def get_user_by_email(self, email: str) -> User | None:
+        """Retrieves a user by their email address."""
+        stmt = select(User).filter(User.email == email)
+        result = await self.session.execute(stmt)
+        return result.scalars().first()
+
     async def list_users(
         self,
         *,

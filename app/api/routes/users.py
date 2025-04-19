@@ -13,6 +13,7 @@ from app.core.templating import templates
 from app.repositories.dependencies import get_user_repository  # Import repo dependency
 from app.repositories.user_repository import UserRepository  # Import repo type
 from app.models import User  # Keep User for type hint
+from app.users import current_active_user  # Import dependency
 
 router = APIRouter()
 
@@ -22,23 +23,26 @@ async def list_users(
     request: Request,
     # Inject repository
     user_repo: UserRepository = Depends(get_user_repository),
+    user: User = Depends(current_active_user),  # Require authentication
     # db: AsyncSession = Depends(get_db_session), # Remove direct session dependency
     participated_with: str | None = None,
 ):
     """Provides an HTML page listing registered users.
     Can be filtered to users participated with the current user.
+    Requires authentication.
     """
     # Placeholder for current user
     # TODO: Replace with actual authenticated user dependency
-    current_user = await user_repo.get_user_by_username("test-user-me")
+    # current_user = await user_repo.get_user_by_username("test-user-me") # REMOVED
+    current_user = user  # Use authenticated user
 
     filter_user = None
     if participated_with == "me":
-        if not current_user:
-            raise HTTPException(
-                status_code=403,
-                detail="Cannot filter by participation without auth (placeholder)",
-            )
+        # if not current_user: # Check no longer needed due to Depends
+        #     raise HTTPException(
+        #         status_code=403,
+        #         detail="Cannot filter by participation without auth (placeholder)",
+        #     )
         filter_user = current_user
     elif participated_with:
         # Silently ignore invalid filter values for now, or raise error

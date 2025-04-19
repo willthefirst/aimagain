@@ -14,6 +14,7 @@ from app.schemas.participant import (
     ParticipantResponse,
     ParticipantStatus,  # Import the Enum
 )  # Import schemas
+from app.users import current_active_user  # Import dependency
 
 # Remove unused datetime
 # from datetime import datetime, timezone
@@ -41,15 +42,17 @@ async def update_participant_status(
     user_repo: UserRepository = Depends(get_user_repository),
     part_repo: ParticipantRepository = Depends(get_participant_repository),
     conv_repo: ConversationRepository = Depends(get_conversation_repository),
+    user: User = Depends(current_active_user),  # Get authenticated user
     # db: AsyncSession = Depends(get_db_session), # Remove direct session
 ):
     """Updates the status of a participant record (e.g., accept/reject invitation)."""
 
     # --- Placeholder Auth ---
     # TODO: Replace with actual authenticated user dependency
-    current_user = await user_repo.get_user_by_username("test-user-me")
-    if not current_user:
-        raise HTTPException(status_code=403, detail="User not found (placeholder)")
+    # current_user = await user_repo.get_user_by_username("test-user-me") # REMOVED
+    current_user = user  # Use authenticated user
+    # if not current_user:
+    #     raise HTTPException(status_code=403, detail="User not found (placeholder)") # Handled by Depends
     # --- End Placeholder ---
 
     # --- Fetch Participant --- Use repository

@@ -12,6 +12,7 @@ from app.core.templating import templates
 # Remove direct db dependency
 # from app.db import get_db_session
 from app.models import User  # Keep User for type hint
+from app.users import current_active_user  # Import the dependency
 
 # Import repositories
 from app.repositories.dependencies import (
@@ -28,10 +29,12 @@ router = APIRouter(prefix="/users/me", tags=["me"])
 
 
 @router.get("/profile", response_class=HTMLResponse)
-async def get_my_profile(request: Request):
-    """Placeholder for the user's profile page."""
-    # TODO: Fetch actual user data later using UserRepository
-    user = {"username": "test-user-me", "email": "me@example.com"}
+async def get_my_profile(
+    request: Request,
+    user: User = Depends(current_active_user),  # Use authenticated user
+):
+    """Displays the current user's profile page."""
+    # user = {"username": "test-user-me", "email": "me@example.com"} # Removed placeholder
     return templates.TemplateResponse(
         "me/profile.html", {"request": request, "user": user}
     )
@@ -41,20 +44,21 @@ async def get_my_profile(request: Request):
 async def list_my_invitations(
     request: Request,
     # Inject repositories
-    user_repo: UserRepository = Depends(get_user_repository),
+    # user_repo: UserRepository = Depends(get_user_repository), # No longer needed
     part_repo: ParticipantRepository = Depends(get_participant_repository),
+    user: User = Depends(current_active_user),  # Use authenticated user
     # db: AsyncSession = Depends(get_db_session) # Remove direct session
 ):
     print("Listing my invitations")  # Keep existing print
     """Provides an HTML page listing the current user's pending invitations."""
     # TODO: Replace placeholder with actual authenticated user logic
-    current_user = await user_repo.get_user_by_username("test-user-me")
+    # current_user = await user_repo.get_user_by_username("test-user-me") # Removed placeholder
 
-    if not current_user:
-        raise HTTPException(status_code=403, detail="User not found (placeholder)")
+    # if not current_user:
+    #     raise HTTPException(status_code=403, detail="User not found (placeholder)") # No longer needed, handled by Depends
 
     # Use repository to get invitations
-    invitations = await part_repo.list_user_invitations(user=current_user)
+    invitations = await part_repo.list_user_invitations(user=user)
 
     return templates.TemplateResponse(
         "me/invitations.html",
@@ -66,19 +70,20 @@ async def list_my_invitations(
 async def list_my_conversations(
     request: Request,
     # Inject repositories
-    user_repo: UserRepository = Depends(get_user_repository),
+    # user_repo: UserRepository = Depends(get_user_repository), # No longer needed
     conv_repo: ConversationRepository = Depends(get_conversation_repository),
+    user: User = Depends(current_active_user),  # Use authenticated user
     # db: AsyncSession = Depends(get_db_session) # Remove direct session
 ):
     """Provides an HTML page listing conversations the current user is part of."""
     # TODO: Replace placeholder with actual authenticated user logic
-    current_user = await user_repo.get_user_by_username("test-user-me")
+    # current_user = await user_repo.get_user_by_username("test-user-me") # Removed placeholder
 
-    if not current_user:
-        raise HTTPException(status_code=403, detail="User not found (placeholder)")
+    # if not current_user:
+    #     raise HTTPException(status_code=403, detail="User not found (placeholder)") # No longer needed, handled by Depends
 
     # Use repository to get conversations
-    conversations = await conv_repo.list_user_conversations(user=current_user)
+    conversations = await conv_repo.list_user_conversations(user=user)
 
     return templates.TemplateResponse(
         "me/conversations.html",

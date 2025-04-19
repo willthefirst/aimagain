@@ -152,34 +152,39 @@ async def test_list_conversations_sorted(
 
 
 async def test_create_conversation_success(
-    test_client: AsyncClient,
+    authenticated_client: AsyncClient,  # Use authenticated client
+    # test_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],  # Inject manager
+    logged_in_user: User,  # Use logged-in user fixture
 ):
     """Test POST /conversations successfully creates resources."""
-    creator = create_test_user()
+    # creator = create_test_user() # Not needed if logged_in_user is creator
     invitee = create_test_user(username=f"invitee-{uuid.uuid4()}", is_online=True)
-    placeholder_user = create_test_user(username="test-user-me")
+    # placeholder_user = create_test_user(username="test-user-me") # Removed manual user creation
+    placeholder_user = logged_in_user  # Use the user from the fixture
 
     # Setup initial users
-    creator_id: Optional[UUID] = None
+    # creator_id: Optional[UUID] = None # Not needed
     invitee_id: Optional[UUID] = None
     placeholder_user_id: Optional[UUID] = None
     async with db_test_session_manager() as session:
         async with session.begin():
-            session.add_all([creator, invitee, placeholder_user])
+            session.add_all([invitee])  # Only add invitee, placeholder_user exists
             await session.flush()
-            creator_id = creator.id
+            # creator_id = creator.id # Not needed
             invitee_id = invitee.id
             placeholder_user_id = placeholder_user.id
 
-    assert creator_id and invitee_id, "Failed to get user IDs after flush"
+    assert invitee_id, "Failed to get invitee ID after flush"
     assert placeholder_user_id, "Failed to get placeholder user ID"
 
     request_data = ConversationCreateRequest(
         invitee_user_id=str(invitee_id), initial_message="Hello there!"
     )
 
-    response = await test_client.post(f"/conversations", json=request_data.model_dump())
+    response = await authenticated_client.post(
+        f"/conversations", json=request_data.model_dump()
+    )  # Use authenticated client
 
     assert (
         response.status_code == 201
@@ -235,17 +240,19 @@ async def test_create_conversation_success(
 
 
 async def test_create_conversation_invitee_not_found(
-    test_client: AsyncClient,
+    authenticated_client: AsyncClient,  # Use authenticated client
+    # test_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],  # Inject manager
+    logged_in_user: User,  # Use logged-in user fixture
 ):
     """Test POST /conversations returns 404 if invitee_user_id does not exist."""
-    creator = create_test_user()
-    placeholder_user = create_test_user(username="test-user-me")
+    # creator = create_test_user() # Not needed
+    # placeholder_user = create_test_user(username="test-user-me") # Removed
     # Setup creator
-    async with db_test_session_manager() as session:
-        async with session.begin():
-            session.add_all([creator, placeholder_user])
-            await session.flush()
+    # async with db_test_session_manager() as session:
+    #     async with session.begin():
+    #         session.add_all([creator, placeholder_user])
+    #         await session.flush()
 
     non_existent_user_id = uuid.uuid4()
 
@@ -253,7 +260,9 @@ async def test_create_conversation_invitee_not_found(
         invitee_user_id=str(non_existent_user_id), initial_message="Hello anyone?"
     )
 
-    response = await test_client.post(f"/conversations", json=request_data.model_dump())
+    response = await authenticated_client.post(
+        f"/conversations", json=request_data.model_dump()
+    )  # Use authenticated client
 
     assert response.status_code == 404, f"Expected 404, got {response.status_code}"
     assert "Invitee user not found" in response.json().get(
@@ -268,21 +277,23 @@ async def test_create_conversation_invitee_not_found(
 
 
 async def test_create_conversation_invitee_offline(
-    test_client: AsyncClient,
+    authenticated_client: AsyncClient,  # Use authenticated client
+    # test_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],  # Inject manager
+    logged_in_user: User,  # Use logged-in user fixture
 ):
     """Test POST /conversations returns 400 if invitee user is not online."""
-    creator = create_test_user(username=f"creator-{uuid.uuid4()}")
+    # creator = create_test_user(username=f"creator-{uuid.uuid4()}") # Not needed
     invitee = create_test_user(
         username=f"invitee-offline-{uuid.uuid4()}",
         is_online=False,
     )
-    placeholder_user = create_test_user(username="test-user-me")
+    # placeholder_user = create_test_user(username="test-user-me") # Removed
     # Setup users
     invitee_id: Optional[UUID] = None
     async with db_test_session_manager() as session:
         async with session.begin():
-            session.add_all([creator, invitee, placeholder_user])
+            session.add_all([invitee])  # Add invitee
             await session.flush()
             invitee_id = invitee.id
 
@@ -292,7 +303,9 @@ async def test_create_conversation_invitee_offline(
         invitee_user_id=str(invitee_id), initial_message="Are you there?"
     )
 
-    response = await test_client.post(f"/conversations", json=request_data.model_dump())
+    response = await authenticated_client.post(
+        f"/conversations", json=request_data.model_dump()
+    )  # Use authenticated client
 
     assert response.status_code == 400, f"Expected 400, got {response.status_code}"
     assert "Invitee user is not online" in response.json().get(
@@ -309,26 +322,35 @@ async def test_create_conversation_invitee_offline(
 # --- Tests for GET /conversations/{slug} ---
 
 
-async def test_get_conversation_not_found(test_client: AsyncClient):
+async def test_get_conversation_not_found(
+    authenticated_client: AsyncClient,  # Use authenticated client
+    # test_client: AsyncClient
+    logged_in_user: User,  # Need user for auth
+):
     """Test GET /conversations/{slug} returns 404 for a non-existent slug."""
     # Implicitly depends on db_test_session_manager via test_client
     non_existent_slug = f"convo-{uuid.uuid4()}"
-    response = await test_client.get(f"/conversations/{non_existent_slug}")
+    response = await authenticated_client.get(
+        f"/conversations/{non_existent_slug}"
+    )  # Use authenticated client
     assert response.status_code == 404
 
 
 async def test_get_conversation_forbidden_not_participant(
-    test_client: AsyncClient,
+    authenticated_client: AsyncClient,  # Use authenticated client
+    # test_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],  # Inject manager
+    logged_in_user: User,  # Use logged-in user fixture
 ):
     """Test GET /conversations/{slug} returns 403 if user is not a participant."""
     creator = create_test_user(username=f"creator-{uuid.uuid4()}")
-    me_user = create_test_user(username="test-user-me")
+    # me_user = create_test_user(username="test-user-me") # Removed
+    me_user = logged_in_user  # Use fixture user
 
     # Setup data
     async with db_test_session_manager() as session:
         async with session.begin():
-            session.add_all([creator, me_user])
+            session.add_all([creator])  # Add creator
             await session.flush()
 
             # Ensure conversation is created *within* the transaction
@@ -339,7 +361,9 @@ async def test_get_conversation_forbidden_not_participant(
             )
             session.add(conversation)
 
-    response = await test_client.get(f"/conversations/{conversation.slug}")
+    response = await authenticated_client.get(
+        f"/conversations/{conversation.slug}"
+    )  # Use authenticated client
 
     assert (
         response.status_code == 403
@@ -347,12 +371,15 @@ async def test_get_conversation_forbidden_not_participant(
 
 
 async def test_get_conversation_forbidden_invited(
-    test_client: AsyncClient,
+    authenticated_client: AsyncClient,  # Use authenticated client
+    # test_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],  # Inject manager
+    logged_in_user: User,  # Use logged-in user fixture
 ):
     """Test GET /conversations/{slug} returns 403 if user is participant but status is 'invited'."""
     inviter = create_test_user(username=f"inviter-{uuid.uuid4()}")
-    me_user = create_test_user(username="test-user-me")
+    # me_user = create_test_user(username="test-user-me") # Removed
+    me_user = logged_in_user  # Use fixture user
 
     conversation = Conversation(
         id=uuid.uuid4(),
@@ -371,7 +398,7 @@ async def test_get_conversation_forbidden_invited(
     # Setup data
     async with db_test_session_manager() as session:
         async with session.begin():
-            session.add_all([inviter, me_user])
+            session.add_all([inviter])  # Add inviter
             await session.flush()
 
             conversation.created_by_user_id = inviter.id
@@ -382,24 +409,29 @@ async def test_get_conversation_forbidden_invited(
             participant.conversation_id = conversation.id
             session.add(participant)
 
-    response = await test_client.get(f"/conversations/{conversation.slug}")
+    response = await authenticated_client.get(
+        f"/conversations/{conversation.slug}"
+    )  # Use authenticated client
 
     assert response.status_code == 403
 
 
 async def test_get_conversation_success_joined(
-    test_client: AsyncClient,
+    authenticated_client: AsyncClient,  # Use authenticated client
+    # test_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],  # Inject manager
+    logged_in_user: User,  # Use logged-in user fixture
 ):
     """Test GET /conversations/{slug} returns details for a joined user."""
     creator = create_test_user(username=f"creator-{uuid.uuid4()}")
-    me_user = create_test_user(username="test-user-me")
+    # me_user = create_test_user(username="test-user-me") # Removed
+    me_user = logged_in_user  # Use fixture user
     other_joined = create_test_user(username=f"other-{uuid.uuid4()}")
 
     # Setup data
     async with db_test_session_manager() as session:
         async with session.begin():
-            session.add_all([creator, me_user, other_joined])
+            session.add_all([creator, other_joined])  # Add others
             await session.flush()
 
             conversation = Conversation(
@@ -454,7 +486,9 @@ async def test_get_conversation_success_joined(
             )
             session.add_all([msg1, msg2, msg3, part_creator, part_me, part_other])
 
-    response = await test_client.get(f"/conversations/{conversation.slug}")
+    response = await authenticated_client.get(
+        f"/conversations/{conversation.slug}"
+    )  # Use authenticated client
 
     assert response.status_code == 200
     assert "text/html" in response.headers["content-type"]
@@ -487,11 +521,14 @@ async def test_get_conversation_success_joined(
 
 
 async def test_invite_participant_success(
-    test_client: AsyncClient,
+    authenticated_client: AsyncClient,  # Use authenticated client
+    # test_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],  # Inject manager
+    logged_in_user: User,  # Use logged-in user fixture
 ):
     """Test POST /conversations/{slug}/participants successfully invites a user."""
-    me_user = create_test_user(username="test-user-me")
+    # me_user = create_test_user(username="test-user-me") # Removed
+    me_user = logged_in_user  # Use fixture user
     invitee_user = create_test_user(username=f"invitee-{uuid.uuid4()}", is_online=True)
 
     me_user_id: Optional[UUID] = None
@@ -502,7 +539,7 @@ async def test_invite_participant_success(
     # Setup data
     async with db_test_session_manager() as session:
         async with session.begin():
-            session.add_all([me_user, invitee_user])
+            session.add_all([invitee_user])  # Add invitee
             await session.flush()
             me_user_id = me_user.id
             invitee_user_id = invitee_user.id
@@ -528,7 +565,7 @@ async def test_invite_participant_success(
 
     invite_data = {"invitee_user_id": str(invitee_user_id)}
 
-    response = await test_client.post(
+    response = await authenticated_client.post(  # Use authenticated client
         f"/conversations/{conversation_slug}/participants", json=invite_data
     )
 
@@ -559,11 +596,14 @@ async def test_invite_participant_success(
 
 
 async def test_invite_participant_forbidden_not_joined(
-    test_client: AsyncClient,
+    authenticated_client: AsyncClient,  # Use authenticated client
+    # test_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],  # Inject manager
+    logged_in_user: User,  # Use logged-in user fixture
 ):
     """Test POST invite returns 403 if requester is not joined."""
-    me_user = create_test_user(username="test-user-me")
+    # me_user = create_test_user(username="test-user-me") # Removed
+    me_user = logged_in_user  # Use fixture user
     invitee = create_test_user(username=f"invitee-{uuid.uuid4()}", is_online=True)
     creator = create_test_user(username=f"creator-{uuid.uuid4()}")
 
@@ -575,7 +615,7 @@ async def test_invite_participant_forbidden_not_joined(
     # Setup data
     async with db_test_session_manager() as session:
         async with session.begin():
-            session.add_all([me_user, invitee, creator])
+            session.add_all([invitee, creator])  # Add others
             await session.flush()
             invitee_id = invitee.id
             me_user_id = me_user.id
@@ -603,7 +643,7 @@ async def test_invite_participant_forbidden_not_joined(
 
     invite_data = {"invitee_user_id": str(invitee_id)}
 
-    response = await test_client.post(
+    response = await authenticated_client.post(  # Use authenticated client
         f"/conversations/{conversation_slug}/participants", json=invite_data
     )
 
@@ -611,11 +651,14 @@ async def test_invite_participant_forbidden_not_joined(
 
 
 async def test_invite_participant_conflict_already_participant(
-    test_client: AsyncClient,
+    authenticated_client: AsyncClient,  # Use authenticated client
+    # test_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],  # Inject manager
+    logged_in_user: User,  # Use logged-in user fixture
 ):
     """Test POST invite returns 409 if invitee is already a participant."""
-    me_user = create_test_user(username="test-user-me")
+    # me_user = create_test_user(username="test-user-me") # Removed
+    me_user = logged_in_user  # Use fixture user
     invitee = create_test_user(username=f"invitee-{uuid.uuid4()}", is_online=True)
 
     conversation_slug = f"invite-conflict-{uuid.uuid4()}"
@@ -626,7 +669,7 @@ async def test_invite_participant_conflict_already_participant(
     # Setup data
     async with db_test_session_manager() as session:
         async with session.begin():
-            session.add_all([me_user, invitee])
+            session.add_all([invitee])  # Add invitee
             await session.flush()
             me_user_id = me_user.id
             invitee_id = invitee.id
@@ -658,7 +701,7 @@ async def test_invite_participant_conflict_already_participant(
 
     invite_data = {"invitee_user_id": str(invitee_id)}
 
-    response = await test_client.post(
+    response = await authenticated_client.post(  # Use authenticated client
         f"/conversations/{conversation_slug}/participants", json=invite_data
     )
 
@@ -666,11 +709,14 @@ async def test_invite_participant_conflict_already_participant(
 
 
 async def test_invite_participant_bad_request_offline(
-    test_client: AsyncClient,
+    authenticated_client: AsyncClient,  # Use authenticated client
+    # test_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],  # Inject manager
+    logged_in_user: User,  # Use logged-in user fixture
 ):
     """Test POST invite returns 400 if invitee is offline."""
-    me_user = create_test_user(username="test-user-me")
+    # me_user = create_test_user(username="test-user-me") # Removed
+    me_user = logged_in_user  # Use fixture user
     invitee = create_test_user(username=f"invitee-{uuid.uuid4()}", is_online=False)
 
     conversation_slug = f"invite-offline-{uuid.uuid4()}"
@@ -681,7 +727,7 @@ async def test_invite_participant_bad_request_offline(
     # Setup data
     async with db_test_session_manager() as session:
         async with session.begin():
-            session.add_all([me_user, invitee])
+            session.add_all([invitee])  # Add invitee
             await session.flush()
             me_user_id = me_user.id
             invitee_id = invitee.id
@@ -707,7 +753,7 @@ async def test_invite_participant_bad_request_offline(
 
     invite_data = {"invitee_user_id": str(invitee_id)}
 
-    response = await test_client.post(
+    response = await authenticated_client.post(  # Use authenticated client
         f"/conversations/{conversation_slug}/participants", json=invite_data
     )
 
