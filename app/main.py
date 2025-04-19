@@ -36,6 +36,13 @@ app.include_router(
     tags=["auth"],
 )
 
+# Add the users router
+app.include_router(
+    fastapi_users.get_users_router(UserRead, UserUpdate),
+    prefix="/users",
+    tags=["users"],
+)
+
 # Include the v1 user router
 app.include_router(users.router, tags=["users"])
 
