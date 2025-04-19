@@ -2,6 +2,15 @@
 from pydantic import BaseModel, ConfigDict
 from datetime import datetime
 from typing import Literal
+import enum
+
+
+# Define Enum for Participant Status
+class ParticipantStatus(str, enum.Enum):
+    INVITED = "invited"
+    JOINED = "joined"
+    REJECTED = "rejected"
+    LEFT = "left"
 
 
 # Schema for inviting a user to a conversation
@@ -11,7 +20,7 @@ class ParticipantInviteRequest(BaseModel):
 
 # Schema for updating participant status
 class ParticipantUpdateRequest(BaseModel):
-    status: Literal["joined", "rejected"]
+    status: ParticipantStatus
 
 
 # Schema for participant response

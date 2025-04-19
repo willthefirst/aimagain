@@ -1,51 +1,57 @@
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
-from sqlalchemy.orm import selectinload
 
-# Updated db dependency import
-from app.db import get_db_session
-from app.models import Participant, User, Conversation  # Import models
+# Remove unused SQLAlchemy imports
+# from sqlalchemy.ext.asyncio import AsyncSession
+# from sqlalchemy import select
+# from sqlalchemy.orm import selectinload
+
+# Updated db dependency import -> No longer needed
+# from app.db import get_db_session
+from app.models import User  # Keep User for type hint
 from app.schemas.participant import (
     ParticipantUpdateRequest,
     ParticipantResponse,
+    ParticipantStatus,  # Import the Enum
 )  # Import schemas
-from datetime import datetime, timezone  # Added timezone
+
+# Remove unused datetime
+# from datetime import datetime, timezone
+
+# Import repositories
+from app.repositories.dependencies import (
+    get_user_repository,
+    get_participant_repository,
+    get_conversation_repository,
+)
+from app.repositories.user_repository import UserRepository
+from app.repositories.participant_repository import ParticipantRepository
+from app.repositories.conversation_repository import ConversationRepository
+
 
 router = APIRouter(prefix="/participants", tags=["participants"])
 
 
-@router.put(
-    "/{participant_id}", response_model=ParticipantResponse  # Use response schema
-)
-async def update_participant_status(  # Make async
+@router.put("/{participant_id}", response_model=ParticipantResponse)
+async def update_participant_status(
     participant_id: str,
     update_data: ParticipantUpdateRequest,
-    db: AsyncSession = Depends(get_db_session),  # Use get_db_session
+    # Inject repositories
+    user_repo: UserRepository = Depends(get_user_repository),
+    part_repo: ParticipantRepository = Depends(get_participant_repository),
+    conv_repo: ConversationRepository = Depends(get_conversation_repository),
+    # db: AsyncSession = Depends(get_db_session), # Remove direct session
 ):
     """Updates the status of a participant record (e.g., accept/reject invitation)."""
 
     # --- Placeholder Auth ---
-    # TODO: Replace with actual authenticated user
-    current_user_stmt = select(User).filter(
-        User.username == "test-user-me"
-    )  # Use select
-    current_user_result = await db.execute(current_user_stmt)  # Use await db.execute
-    current_user = current_user_result.scalars().first()
+    # TODO: Replace with actual authenticated user dependency
+    current_user = await user_repo.get_user_by_username("test-user-me")
     if not current_user:
         raise HTTPException(status_code=403, detail="User not found (placeholder)")
     # --- End Placeholder ---
 
-    # --- Fetch Participant --- Use select
-    participant_stmt = (
-        select(Participant)
-        .filter(Participant.id == participant_id)
-        .options(
-            selectinload(Participant.conversation)
-        )  # Load conversation for timestamp update
-    )
-    participant_result = await db.execute(participant_stmt)  # Use await db.execute
-    participant = participant_result.scalars().first()
+    # --- Fetch Participant --- Use repository
+    participant = await part_repo.get_participant_by_id(participant_id)
 
     if not participant:
         raise HTTPException(status_code=404, detail="Participant record not found")
@@ -56,55 +62,67 @@ async def update_participant_status(  # Make async
             status_code=403, detail="Cannot modify another user's participant record"
         )
 
-    # --- State Machine Logic ---
-    # Can only change status if current status is 'invited'
-    if participant.status != "invited":
-        raise HTTPException(
-            status_code=400,
-            detail=f"Cannot change status from '{participant.status}'",
-        )
-
-    # Target status must be 'joined' or 'rejected'
-    if update_data.status not in ["joined", "rejected"]:
+    # --- Validate Target Status --- (State machine logic moved to repo/service layer ideally)
+    try:
+        target_status_enum = ParticipantStatus(update_data.status)
+        if target_status_enum not in [
+            ParticipantStatus.JOINED,
+            ParticipantStatus.REJECTED,
+        ]:
+            raise ValueError  # Raise ValueError to be caught below
+    except ValueError:
         raise HTTPException(
             status_code=400,
             detail=f"Invalid target status '{update_data.status}'",
         )
 
-    # --- Update Participant --- Apply the new status
-    participant.status = update_data.status
-    now = datetime.now(timezone.utc)
-    participant.updated_at = now
-    if update_data.status == "joined":
-        participant.joined_at = now
-
-    db.add(participant)
-
-    # --- Update Conversation Timestamp (if joining) ---
-    if update_data.status == "joined":
-        conversation = participant.conversation
-        if conversation:
-            conversation.last_activity_at = now
-            conversation.updated_at = now
-            db.add(conversation)
-        else:
-            # This case should ideally not happen if FK constraints are set
-            await db.rollback()
-            raise HTTPException(
-                status_code=500, detail="Conversation not found for participant"
-            )
-
-    # --- Commit and Return --- Async commit and refresh
+    # --- Update Participant & Conversation (using Repositories) ---
     try:
-        await db.commit()
-        await db.refresh(participant)
-        if update_data.status == "joined" and conversation:
-            await db.refresh(conversation)
+        # Update participant status, ensuring current status is 'invited'
+        updated_participant = await part_repo.update_participant_status(
+            participant=participant,
+            new_status=target_status_enum,
+            expected_current_status=ParticipantStatus.INVITED,
+        )
+
+        # Update conversation timestamp if joining
+        if target_status_enum == ParticipantStatus.JOINED:
+            # Need to fetch conversation if not loaded, or ensure it's loaded
+            # For simplicity, fetch it again here if needed.
+            # A better approach might load it with the participant initially.
+            conversation = await conv_repo.get_conversation_by_id(
+                participant.conversation_id
+            )
+            if conversation:
+                await conv_repo.update_conversation_activity(conversation)
+            else:
+                # This state indicates a data integrity issue (participant exists w/o conversation)
+                print(
+                    f"Error: Conversation {participant.conversation_id} not found for participant {participant.id}"
+                )
+                raise HTTPException(
+                    status_code=500,
+                    detail="Internal server error: Conversation data missing",
+                )
+
+        # Commit transaction
+        await part_repo.session.commit()  # Commit via any repo using the same session
+
+    except ValueError as e:
+        # Raised by update_participant_status if current status wasn't 'invited'
+        await part_repo.session.rollback()
+        raise HTTPException(
+            status_code=400,
+            detail=str(e),
+        )
     except Exception as e:
-        await db.rollback()
-        # Log e
+        # Catch-all for other potential DB errors
+        await part_repo.session.rollback()
+        # TODO: Log e
+        print(f"Error updating participant {participant_id}: {e}")  # Temp print
         raise HTTPException(
             status_code=500, detail="Database error updating participant."
         )
+    # -------------------------------------------------------
 
-    return participant
+    return updated_participant

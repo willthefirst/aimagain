@@ -153,20 +153,24 @@ async def test_create_conversation_success(
     """Test POST /conversations successfully creates resources."""
     creator = create_test_user()
     invitee = create_test_user(username=f"invitee-{uuid.uuid4()}", is_online=True)
+    placeholder_user = create_test_user(username="test-user-me")
 
     # Setup initial users
     creator_id: str = ""
     invitee_id: str = ""
+    placeholder_user_id: str = ""
     async with db_test_session_manager() as session:
         async with session.begin():
-            session.add_all([creator, invitee])
+            session.add_all([creator, invitee, placeholder_user])
             # Must flush within the transaction to get IDs before commit
             await session.flush()
             creator_id = creator.id
             invitee_id = invitee.id
+            placeholder_user_id = placeholder_user.id
         # Session automatically commits here due to begin()
 
     assert creator_id and invitee_id, "Failed to get user IDs after flush"
+    assert placeholder_user_id, "Failed to get placeholder user ID"
 
     request_data = ConversationCreateRequest(
         invitee_user_id=invitee_id, initial_message="Hello there!"
@@ -181,7 +185,7 @@ async def test_create_conversation_success(
     response_data = response.json()
     assert "id" in response_data
     assert "slug" in response_data
-    assert response_data["created_by_user_id"] == creator_id
+    assert response_data["created_by_user_id"] == placeholder_user_id
     new_convo_id = response_data["id"]
     new_convo_slug = response_data["slug"]
 
@@ -193,14 +197,14 @@ async def test_create_conversation_success(
         db_convo = convo_result.scalars().first()
         assert db_convo is not None, "Conversation not found in database"
         assert db_convo.slug == new_convo_slug
-        assert db_convo.created_by_user_id == creator_id
+        assert db_convo.created_by_user_id == placeholder_user_id
 
         msg_stmt = select(Message).filter(Message.conversation_id == new_convo_id)
         msg_result = await session.execute(msg_stmt)
         db_message = msg_result.scalars().first()
         assert db_message is not None, "Initial message not found in database"
         assert db_message.content == request_data.initial_message
-        assert db_message.created_by_user_id == creator_id
+        assert db_message.created_by_user_id == placeholder_user_id
 
         part_stmt = select(Participant).filter(
             Participant.conversation_id == new_convo_id
@@ -209,19 +213,22 @@ async def test_create_conversation_success(
         db_participants = part_result.scalars().all()
         assert len(db_participants) == 2, "Expected two participants"
 
-        creator_part = next(
-            (p for p in db_participants if p.user_id == creator_id), None
+        # Verify the participant record for the user who acted as creator (placeholder)
+        creator_placeholder_part = next(
+            (p for p in db_participants if p.user_id == placeholder_user_id), None
         )
         invitee_part = next(
             (p for p in db_participants if p.user_id == invitee_id), None
         )
 
-        assert creator_part is not None, "Creator participant record not found"
-        assert creator_part.status == "joined"
+        assert (
+            creator_placeholder_part is not None
+        ), "Creator (placeholder) participant record not found"
+        assert creator_placeholder_part.status == "joined"
 
         assert invitee_part is not None, "Invitee participant record not found"
         assert invitee_part.status == "invited"
-        assert invitee_part.invited_by_user_id == creator_id
+        assert invitee_part.invited_by_user_id == placeholder_user_id
         assert invitee_part.initial_message_id == db_message.id
 
 
@@ -231,10 +238,13 @@ async def test_create_conversation_invitee_not_found(
 ):
     """Test POST /conversations returns 404 if invitee_user_id does not exist."""
     creator = create_test_user()
+    placeholder_user = create_test_user(username="test-user-me")
     # Setup creator
     async with db_test_session_manager() as session:
         async with session.begin():
             session.add(creator)
+            session.add(placeholder_user)
+            await session.flush()
 
     non_existent_user_id = f"user_{uuid.uuid4()}"
 
@@ -267,15 +277,16 @@ async def test_create_conversation_invitee_offline(
         username=f"invitee-offline-{uuid.uuid4()}",
         is_online=False,
     )
+    placeholder_user = create_test_user(username="test-user-me")
     # Setup users
     invitee_id: str = ""
     async with db_test_session_manager() as session:
         async with session.begin():
-            session.add_all([creator, invitee])
+            session.add_all([creator, invitee, placeholder_user])
             await session.flush()  # Flush to get ID
             invitee_id = invitee.id
 
-    assert invitee_id, "Failed to get invitee ID"
+    assert invitee_id
 
     request_data = ConversationCreateRequest(
         invitee_user_id=invitee_id, initial_message="Are you there?"

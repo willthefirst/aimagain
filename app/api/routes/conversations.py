@@ -2,19 +2,33 @@ from fastapi import APIRouter, Request, Depends, HTTPException, status
 from fastapi.responses import HTMLResponse
 
 # Use AsyncSession for async operations
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import joinedload, selectinload
+# Remove direct AsyncSession import if no longer needed directly in routes
+from sqlalchemy.ext.asyncio import AsyncSession  # Temporarily re-import
+
+# from sqlalchemy.orm import joinedload, selectinload # Keep if needed for other routes
 
 # Import select for modern query style
-from sqlalchemy import select  # Add select
+from sqlalchemy import select  # Keep if needed for other routes
 
 from app.core.templating import templates
-from app.db import get_db_session
 
-# Import ORM models
+# Remove direct db session dependency
+from app.db import get_db_session  # Add back for unrefactored routes
+from app.repositories.dependencies import (
+    get_conversation_repository,
+    get_user_repository,
+    get_participant_repository,
+)  # Import repository dependency
+from app.repositories.conversation_repository import (
+    ConversationRepository,
+)  # Import repository type
+from app.repositories.user_repository import UserRepository
+from app.repositories.participant_repository import ParticipantRepository
+
+# Import ORM models (keep as needed for type hints or other routes)
 from app.models import Conversation, Participant, User, Message  # Add Message
 
-# Import schemas
+# Import schemas (keep as needed)
 from app.schemas.conversation import ConversationCreateRequest, ConversationResponse
 from app.schemas.participant import (
     ParticipantInviteRequest,
@@ -28,21 +42,14 @@ router = APIRouter()
 
 @router.get("/conversations", response_class=HTMLResponse, tags=["conversations"])
 async def list_conversations(
-    request: Request, db: AsyncSession = Depends(get_db_session)
+    request: Request,
+    # Inject the repository instead of the session
+    conv_repo: ConversationRepository = Depends(get_conversation_repository),
 ):  # Use get_db_session
     """Provides an HTML page listing all public conversations using ORM."""
 
-    # Use select() for async query construction
-    stmt = (
-        select(Conversation).options(
-            selectinload(Conversation.participants).joinedload(Participant.user)
-        )
-        # Order by last activity, newest first (NULLs last)
-        .order_by(Conversation.last_activity_at.desc().nullslast())
-    )
-    # Execute the query asynchronously and fetch all results
-    result = await db.execute(stmt)
-    conversations = result.scalars().all()
+    # Use the repository method
+    conversations = await conv_repo.list_conversations()
 
     # Pass the raw ORM objects directly to the template
     return templates.TemplateResponse(
@@ -63,36 +70,40 @@ async def list_conversations(
 async def get_conversation(  # Async function
     slug: str,
     request: Request,  # Keep request for template context
-    db: AsyncSession = Depends(get_db_session),  # Use get_db_session
-    # TODO: Add auth dependency later
+    # Inject the repository
+    conv_repo: ConversationRepository = Depends(get_conversation_repository),
+    # Inject user and participant repos for auth check
+    user_repo: UserRepository = Depends(get_user_repository),
+    part_repo: ParticipantRepository = Depends(get_participant_repository),
+    # TODO: Replace placeholder auth with actual user dependency
 ):
     """Retrieves details for a specific conversation."""
-    # Async query for conversation
-    stmt = select(Conversation).filter(Conversation.slug == slug)
-    result = await db.execute(stmt)
-    conversation = result.scalars().first()
+    print(
+        f"--- [Route get_conversation] Finding conversation slug: {slug} ---"
+    )  # Added print
+    # Use repository method to get the conversation by slug
+    conversation = await conv_repo.get_conversation_by_slug(slug)
     if not conversation:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Conversation not found"
         )
 
-    # --- Authorization Check ---
-    # TODO: Replace placeholder with actual authenticated user
-    # Async query for user
-    user_stmt = select(User).filter(User.username == "test-user-me")
-    user_result = await db.execute(user_stmt)
-    current_user = user_result.scalars().first()
+    # --- Authorization Check (Refactored to use repositories) ---
+    # TODO: Replace placeholder with actual authenticated user dependency
+    print(
+        f"--- [Route get_conversation] Attempting to find user 'test-user-me' for auth check ---"
+    )  # Added print
+    current_user = await user_repo.get_user_by_username("test-user-me")  # Use repo
+    print(
+        f"--- [Route get_conversation] Found user for auth check: {current_user.username if current_user else 'None'} ---"
+    )  # Added print
     if not current_user:
         raise HTTPException(status_code=403, detail="Not authenticated (placeholder)")
 
-    # Check if the current user is a participant in this conversation
-    # Async query for participant
-    participant_stmt = select(Participant).filter(
-        Participant.conversation_id == conversation.id,
-        Participant.user_id == current_user.id,
+    # Check participation using participant repository
+    participant = await part_repo.get_participant_by_user_and_conversation(
+        user_id=current_user.id, conversation_id=conversation.id
     )
-    participant_result = await db.execute(participant_stmt)
-    participant = participant_result.scalars().first()
 
     if not participant:
         raise HTTPException(
@@ -100,7 +111,6 @@ async def get_conversation(  # Async function
             detail="User is not a participant in this conversation",
         )
 
-    # Check participant status (must be 'joined' to view)
     if participant.status != "joined":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -109,24 +119,15 @@ async def get_conversation(  # Async function
     # --------------------------
 
     # Authorization passed, user is joined.
-    # Fetch full conversation data with participants/users and messages/senders
-    # Using contains_eager helps load relationships based on the participant check we already did.
-    # Load messages separately with ordering.
-    # Async query for detailed conversation data
-    details_stmt = (
-        select(Conversation)
-        .filter(Conversation.id == conversation.id)
-        .options(
-            selectinload(Conversation.participants).joinedload(Participant.user),
-            selectinload(Conversation.messages).joinedload(Message.sender),
+    # Fetch full conversation data using the repository method
+    conversation_details = await conv_repo.get_conversation_details(conversation.id)
+
+    # If details couldn't be fetched (e.g., concurrent delete), handle it
+    if not conversation_details:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Conversation details not found",
         )
-    )
-    details_result = await db.execute(details_stmt)
-    # Use .one() appropriately if needed, or handle potential multiple results if structure allows
-    # Using .first() might be safer unless you are absolutely sure one result exists
-    conversation_details = (
-        details_result.scalars().one()
-    )  # Use one() assuming ID is unique
 
     # Sort messages by creation date (ascending) in Python
     sorted_messages = sorted(
@@ -152,98 +153,59 @@ async def get_conversation(  # Async function
 )
 async def create_conversation(  # Async function
     request_data: ConversationCreateRequest,  # Use the request schema
-    db: AsyncSession = Depends(get_db_session),  # Use get_db_session
-    # TODO: Add dependency for authenticated user later
+    # Inject repositories
+    conv_repo: ConversationRepository = Depends(get_conversation_repository),
+    user_repo: UserRepository = Depends(get_user_repository),
+    # TODO: Replace placeholder auth with actual user dependency
 ):
     """Creates a new conversation by inviting another user."""
-
-    # --- TODO: Implement user checks later (Story 1 requirements) ---
-    # 1. Get current authenticated user (replace with dependency)
-    # Async query for creator user
-    creator_stmt = select(User).limit(
-        1
-    )  # Placeholder - MUST BE REPLACED WITH AUTH USER
-    creator_result = await db.execute(creator_stmt)
-    creator_user = creator_result.scalars().first()
+    print(
+        f"--- [Route create_conversation] Attempting to find creator 'test-user-me' ---"
+    )  # Added print
+    # --- User Checks (Refactored) ---
+    # 1. Get creator (placeholder)
+    # TODO: Replace with actual authenticated user dependency
+    creator_user = await user_repo.get_user_by_username("test-user-me")  # Use repo
+    print(
+        f"--- [Route create_conversation] Found creator: {creator_user.username if creator_user else 'None'} ---"
+    )  # Added print
     if not creator_user:
         raise HTTPException(status_code=403, detail="Auth user not found - placeholder")
 
     # 2. Find invitee and check if online
-    # Async query for invitee user
-    invitee_stmt = select(User).filter(User.id == request_data.invitee_user_id)
-    invitee_result = await db.execute(invitee_stmt)
-    invitee_user = invitee_result.scalars().first()
+    invitee_user = await user_repo.get_user_by_id(
+        request_data.invitee_user_id
+    )  # Use repo
     if not invitee_user:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Invitee user not found"
         )
-    if not invitee_user.is_online:  # Check if invitee is online
+    if not invitee_user.is_online:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST, detail="Invitee user is not online"
         )
-    # ------------------------------------------------------------------
+    # --------------------------------
 
-    # Generate a unique slug (simple version for now)
-    slug = f"convo-{uuid.uuid4()}"
-    now = datetime.now(timezone.utc)
-
-    # Create Conversation
-    new_conversation = Conversation(
-        id=f"conv_{uuid.uuid4()}",
-        slug=slug,
-        created_by_user_id=creator_user.id,
-        last_activity_at=now,  # Initial activity
-    )
-    db.add(new_conversation)
-    await db.flush()  # Flush to get the conversation ID
-
-    # Create initial Message
-    initial_message = Message(
-        id=f"msg_{uuid.uuid4()}",
-        content=request_data.initial_message,
-        conversation_id=new_conversation.id,
-        created_by_user_id=creator_user.id,
-        created_at=now,  # Match conversation activity time
-    )
-    db.add(initial_message)
-    await db.flush()  # Flush to get the message ID
-
-    # Create Participant for creator
-    creator_participant = Participant(
-        id=f"part_{uuid.uuid4()}",
-        user_id=creator_user.id,
-        conversation_id=new_conversation.id,
-        status="joined",
-        joined_at=now,
-    )
-    db.add(creator_participant)
-
-    # Create Participant for invitee
-    invitee_participant = Participant(
-        id=f"part_{uuid.uuid4()}",
-        user_id=request_data.invitee_user_id,
-        conversation_id=new_conversation.id,
-        status="invited",
-        invited_by_user_id=creator_user.id,
-        initial_message_id=initial_message.id,  # Link to the first message
-    )
-    db.add(invitee_participant)
-
-    # Commit changes for this request
-    # In a real app, consider moving commit logic outside the route
-    # maybe using middleware or a different dependency pattern.
+    # --- Create Conversation via Repository ---
     try:
-        await db.commit()  # Async commit
-        await db.refresh(new_conversation)  # Async refresh
+        # Use the repository method to create conversation, message, and participants
+        new_conversation = await conv_repo.create_new_conversation(
+            creator_user=creator_user,
+            invitee_user=invitee_user,
+            initial_message_content=request_data.initial_message,
+        )
+        # Commit is handled outside the repository method (here, at end of request)
+        await conv_repo.session.commit()
     except Exception as e:
-        await db.rollback()  # Async rollback
-        # Log the error e
+        await conv_repo.session.rollback()  # Rollback on the session used by the repo
+        # TODO: Log the error e
+        print(f"Error creating conversation: {e}")  # Temporary print
         raise HTTPException(
             status_code=500, detail="Database error during conversation creation."
         )
+    # ----------------------------------------
 
-    # Return the created conversation data using the response schema
-    # Pydantic will automatically convert the ORM object
+    # Return the created conversation (Pydantic converts ORM object)
     return new_conversation
 
 
@@ -256,102 +218,96 @@ async def create_conversation(  # Async function
 async def invite_participant(  # Async function
     slug: str,
     request_data: ParticipantInviteRequest,  # Use request schema
-    db: AsyncSession = Depends(get_db_session),  # Use get_db_session
-    # TODO: Auth dependency
+    # Inject repositories
+    conv_repo: ConversationRepository = Depends(get_conversation_repository),
+    user_repo: UserRepository = Depends(get_user_repository),
+    part_repo: ParticipantRepository = Depends(get_participant_repository),
+    # TODO: Replace placeholder auth with actual user dependency
 ):
     """Invites another user to an existing conversation."""
-
-    # --- Get Conversation ---
-    # Async query for conversation
-    conv_stmt = select(Conversation).filter(Conversation.slug == slug)
-    conv_result = await db.execute(conv_stmt)
-    conversation = conv_result.scalars().first()
+    print(
+        f"--- [Route invite_participant] Finding conversation slug: {slug} ---"
+    )  # Added print
+    # --- Get Conversation (Refactored) ---
+    conversation = await conv_repo.get_conversation_by_slug(slug)
     if not conversation:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Conversation not found"
         )
 
-    # --- Authorize Requesting User ---
-    # TODO: Replace placeholder with actual authenticated user
-    # Async query for current user
-    user_stmt = select(User).filter(User.username == "test-user-me")
-    user_result = await db.execute(user_stmt)
-    current_user = user_result.scalars().first()
+    # --- Authorize Requesting User (Refactored) ---
+    # TODO: Replace placeholder with actual authenticated user dependency
+    current_user = await user_repo.get_user_by_username("test-user-me")  # Use repo
     if not current_user:
         raise HTTPException(status_code=403, detail="Not authenticated (placeholder)")
 
-    # Check if current user is already joined
-    # Async query for current participant
-    curr_part_stmt = select(Participant).filter(
-        Participant.conversation_id == conversation.id,
-        Participant.user_id == current_user.id,
-        Participant.status == "joined",
+    # Check if current user is joined using participant repository
+    is_joined = await part_repo.check_if_user_is_joined_participant(
+        user_id=current_user.id, conversation_id=conversation.id
     )
-    curr_part_result = await db.execute(curr_part_stmt)
-    current_participant = curr_part_result.scalars().first()
-    if not current_participant:
+    if not is_joined:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="User must be a joined participant to invite others",
         )
+    # -----------------------------------------
 
-    # --- Validate Invitee ---
-    # Async query for invitee user
-    invitee_stmt = select(User).filter(User.id == request_data.invitee_user_id)
-    invitee_result = await db.execute(invitee_stmt)
-    invitee_user = invitee_result.scalars().first()
+    # --- Validate Invitee (Refactored) ---
+    invitee_user = await user_repo.get_user_by_id(
+        request_data.invitee_user_id
+    )  # Use repo
     if not invitee_user:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Invitee user not found"
         )
 
-    # Check if invitee is online
     if not invitee_user.is_online:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST, detail="Invitee user is not online"
         )
 
-    # Check if invitee is already a participant
-    # Async query for existing invitee participant
-    exist_part_stmt = select(Participant).filter(
-        Participant.conversation_id == conversation.id,
-        Participant.user_id == invitee_user.id,
+    # Check if invitee is already a participant using participant repository
+    existing_invitee_participant = (
+        await part_repo.get_participant_by_user_and_conversation(
+            user_id=invitee_user.id, conversation_id=conversation.id
+        )
     )
-    exist_part_result = await db.execute(exist_part_stmt)
-    existing_invitee_participant = exist_part_result.scalars().first()
     if existing_invitee_participant:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="Invitee is already a participant",
         )
+    # ----------------------------------
 
-    # --- Create New Participant Record ---
-    now = datetime.now(timezone.utc)
-    new_participant = Participant(
-        id=f"part_{uuid.uuid4()}",
-        user_id=invitee_user.id,
-        conversation_id=conversation.id,
-        status="invited",
-        invited_by_user_id=current_user.id,
-        initial_message_id=None,  # No initial message for invites to existing convos
-    )
-    db.add(new_participant)
-
-    # --- Update Conversation Timestamp ---
-    conversation.last_activity_at = now
-    conversation.updated_at = now
-    db.add(conversation)
-
-    # --- Commit and Return ---
+    # --- Create Participant and Update Conversation (Refactored) ---
     try:
-        await db.commit()  # Async commit
-        await db.refresh(new_participant)  # Async refresh
-        await db.refresh(conversation)  # Async refresh
+        # Create participant record using participant repository
+        new_participant = await part_repo.create_participant(
+            user_id=invitee_user.id,
+            conversation_id=conversation.id,
+            status="invited",
+            invited_by_user_id=current_user.id,
+            # No initial message for invites to existing conversations
+        )
+
+        # Update conversation timestamps using conversation repository
+        await conv_repo.update_conversation_timestamps(conversation)
+
+        # Commit changes
+        # Note: Committing the session used by one repo commits changes made via other repos
+        # using the same session instance (which they do via Depends(get_db_session)).
+        await part_repo.session.commit()  # Can commit using any repo's session
+
+        # Refresh the new participant to ensure all fields are loaded
+        # (refresh is done within create_participant and update_conversation_timestamps methods)
+
     except Exception as e:
-        await db.rollback()  # Async rollback
-        # Log e
+        await part_repo.session.rollback()  # Rollback using any repo's session
+        # TODO: Log e
+        print(f"Error inviting participant: {e}")  # Temporary print
         raise HTTPException(
             status_code=500, detail="Database error inviting participant."
         )
+    # -------------------------------------------------------------
 
     return new_participant
