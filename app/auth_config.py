@@ -10,11 +10,12 @@ from fastapi_users.authentication import (
 )
 from fastapi_users.db import SQLAlchemyUserDatabase
 
+# Corrected import path for User model
 from app.models import User
 from app.db import get_user_db
 from app.core.config import settings
 
-# SECRET = "SECRET"
+# SECRET = "SECRET" # Keep commented out or remove if not needed
 
 
 class UserManager(UUIDIDMixin, BaseUserManager[User, uuid.UUID]):
@@ -45,8 +46,7 @@ bearer_transport = BearerTransport(tokenUrl="auth/jwt/login")
 def get_jwt_strategy() -> JWTStrategy:
     return JWTStrategy(
         secret=settings.SECRET,
-        lifetime_seconds=settings.ACCESS_TOKEN_EXPIRE_MINUTES
-        * 60,  # Convert minutes to seconds
+        lifetime_seconds=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
     )
 
 

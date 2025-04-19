@@ -22,7 +22,7 @@ from app.schemas.participant import (
     ParticipantResponse,
     ParticipantStatus,
 )
-from app.users import current_active_user
+from app.auth_config import current_active_user
 
 # Import ParticipantService dependency
 from app.services.dependencies import get_participant_service

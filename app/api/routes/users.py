@@ -13,7 +13,7 @@ from app.core.templating import templates
 from app.repositories.dependencies import get_user_repository  # Import repo dependency
 from app.repositories.user_repository import UserRepository  # Import repo type
 from app.models import User  # Keep User for type hint
-from app.users import current_active_user  # Import dependency
+from app.auth_config import current_active_user  # New import
 
 router = APIRouter()
 

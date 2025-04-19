@@ -6,7 +6,7 @@ from .api.routes import conversations
 from .api.routes import me
 from .api.routes import participants
 from app.schemas.user import UserCreate, UserRead, UserUpdate
-from app.users import auth_backend, current_active_user, fastapi_users
+from app.auth_config import auth_backend, current_active_user, fastapi_users
 
 
 app = FastAPI(title="Chat App")

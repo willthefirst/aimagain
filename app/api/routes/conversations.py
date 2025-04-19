@@ -8,7 +8,7 @@ import logging  # Use logging
 # from sqlalchemy import select
 
 from app.core.templating import templates
-from app.users import current_active_user
+from app.auth_config import current_active_user
 
 # Removed direct repository dependencies
 # from app.repositories.dependencies import (

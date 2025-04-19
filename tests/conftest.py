@@ -122,7 +122,7 @@ async def authenticated_client(
     db_test_session_manager: async_sessionmaker[AsyncSession],
     test_app: FastAPI,  # Need the app to get the dependency
 ) -> AsyncGenerator[AsyncClient, None]:
-    from app.users import get_user_manager  # Import here to avoid circular deps
+    from app.auth_config import get_user_manager  # New import
 
     user_data = UserCreate(
         email="testuser@example.com",

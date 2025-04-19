@@ -19,7 +19,7 @@ import logging
 
 from app.core.templating import templates
 from app.models import User
-from app.users import current_active_user
+from app.auth_config import current_active_user
 
 # Import UserService dependency
 from app.services.dependencies import get_user_service
