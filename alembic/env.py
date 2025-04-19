@@ -9,10 +9,11 @@ from alembic import context
 
 # Ensure the app directory is in the Python path
 # This allows us to import 'app.db' and 'app.models'
-sys.path.insert(0, os.path.realpath(os.path.join(os.path.dirname(__file__), '..')))
+sys.path.insert(0, os.path.realpath(os.path.join(os.path.dirname(__file__), "..")))
 
-# Import the Base object from your ORM models
-from app.models import Base # Import Base
+# Import the metadata object from your models package
+# from app.models import Base # Old import
+from app.models import metadata  # Correct import via __init__.py
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
@@ -30,8 +31,9 @@ if config.config_file_name is not None:
 
 # add your model's MetaData object here
 # for 'autogenerate' support
-# Use the metadata from the Base class
-target_metadata = Base.metadata
+# Use the imported metadata
+# target_metadata = Base.metadata # Old way
+target_metadata = metadata  # Corrected
 
 # other values from the config, defined by the needs of env.py,
 # can be acquired:
@@ -79,9 +81,7 @@ def run_migrations_online() -> None:
     )
 
     with connectable.connect() as connection:
-        context.configure(
-            connection=connection, target_metadata=target_metadata
-        )
+        context.configure(connection=connection, target_metadata=target_metadata)
 
         with context.begin_transaction():
             context.run_migrations()
