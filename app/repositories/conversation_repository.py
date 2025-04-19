@@ -3,10 +3,12 @@ from sqlalchemy import select
 from sqlalchemy.orm import selectinload, joinedload
 from sqlalchemy.ext.asyncio import AsyncSession
 import uuid
+from uuid import UUID
 from datetime import datetime, timezone
 
 from .base import BaseRepository
 from app.models import Conversation, Participant, User, Message
+from app.schemas.participant import ParticipantStatus
 
 
 class ConversationRepository(BaseRepository):
@@ -31,15 +33,16 @@ class ConversationRepository(BaseRepository):
         result = await self.session.execute(stmt)
         return result.scalars().first()
 
-    async def get_conversation_by_id(self, conversation_id: str) -> Conversation | None:
+    async def get_conversation_by_id(
+        self, conversation_id: UUID
+    ) -> Conversation | None:
         """Retrieves a specific conversation by its ID."""
         stmt = select(Conversation).filter(Conversation.id == conversation_id)
-        # Add options here if needed (e.g., participants) depending on usage
         result = await self.session.execute(stmt)
         return result.scalars().first()
 
     async def get_conversation_details(
-        self, conversation_id: str
+        self, conversation_id: UUID
     ) -> Conversation | None:
         """Retrieves full conversation details including participants and messages."""
         stmt = (
@@ -51,7 +54,6 @@ class ConversationRepository(BaseRepository):
             )
         )
         result = await self.session.execute(stmt)
-        # Assuming ID is unique and should return one result
         try:
             return result.scalars().one()
         except Exception:  # Handle case where conversation might not be found
@@ -64,52 +66,41 @@ class ConversationRepository(BaseRepository):
         now = datetime.now(timezone.utc)
         slug = f"convo-{uuid.uuid4()}"
 
-        # 1. Create Conversation
         new_conversation = Conversation(
-            id=f"conv_{uuid.uuid4()}",
             slug=slug,
             created_by_user_id=creator_user.id,
-            last_activity_at=now,  # Set initial activity time
-            # created_at/updated_at handled by defaults
+            last_activity_at=now,
         )
         self.session.add(new_conversation)
-        await self.session.flush()  # Need ID for message/participants
+        await self.session.flush()
 
-        # 2. Create initial Message
         initial_message = Message(
-            id=f"msg_{uuid.uuid4()}",
             content=initial_message_content,
             conversation_id=new_conversation.id,
             created_by_user_id=creator_user.id,
-            created_at=now,  # Match conversation activity time
+            created_at=now,
         )
         self.session.add(initial_message)
-        await self.session.flush()  # Need ID for invitee participant
+        await self.session.flush()
 
-        # 3. Create Participant for creator
         creator_participant = Participant(
-            id=f"part_{uuid.uuid4()}",
             user_id=creator_user.id,
             conversation_id=new_conversation.id,
-            status="joined",
+            status=ParticipantStatus.JOINED,
             joined_at=now,
         )
         self.session.add(creator_participant)
 
-        # 4. Create Participant for invitee
         invitee_participant = Participant(
-            id=f"part_{uuid.uuid4()}",
             user_id=invitee_user.id,
             conversation_id=new_conversation.id,
-            status="invited",
+            status=ParticipantStatus.INVITED,
             invited_by_user_id=creator_user.id,
             initial_message_id=initial_message.id,
         )
         self.session.add(invitee_participant)
 
-        # Flush to ensure all objects are persisted before potential refresh
         await self.session.flush()
-        # Refresh the conversation to load relationships if needed by caller
         await self.session.refresh(new_conversation)
 
         return new_conversation
@@ -117,9 +108,8 @@ class ConversationRepository(BaseRepository):
     async def update_conversation_timestamps(self, conversation: Conversation) -> None:
         """Updates the updated_at and last_activity_at timestamps for a conversation."""
         now = datetime.now(timezone.utc)
-        conversation.updated_at = now
         conversation.last_activity_at = now
-        self.session.add(conversation)  # Add to session to mark for update
+        self.session.add(conversation)
         await self.session.flush()
         await self.session.refresh(conversation)
 
@@ -130,17 +120,15 @@ class ConversationRepository(BaseRepository):
             .join(Participant, Conversation.id == Participant.conversation_id)
             .filter(
                 Participant.user_id == user.id,
-                Participant.status == "joined",
+                Participant.status == ParticipantStatus.JOINED,
             )
             .options(
-                # Eager load participants and their users
                 selectinload(Conversation.participants).joinedload(Participant.user),
             )
             .order_by(Conversation.last_activity_at.desc().nullslast())
-            .distinct()  # Ensure unique conversations if multiple joins occur (though unlikely here)
+            .distinct()
         )
         result = await self.session.execute(stmt)
-        # .unique() might be needed if relationships cause duplicates, but distinct() in SQL is better
         return result.scalars().all()
 
     async def update_conversation_activity(
@@ -149,7 +137,6 @@ class ConversationRepository(BaseRepository):
         """Updates the last_activity_at and updated_at timestamps of a conversation."""
         now = activity_time or datetime.now(timezone.utc)
         conversation.last_activity_at = now
-        conversation.updated_at = now
         self.session.add(conversation)
         await self.session.flush()
         await self.session.refresh(conversation)

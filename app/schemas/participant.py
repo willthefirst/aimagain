@@ -3,6 +3,7 @@ from pydantic import BaseModel, ConfigDict
 from datetime import datetime
 from typing import Literal
 import enum
+from uuid import UUID
 
 
 # Define Enum for Participant Status
@@ -25,12 +26,12 @@ class ParticipantUpdateRequest(BaseModel):
 
 # Schema for participant response
 class ParticipantResponse(BaseModel):
-    id: str
-    user_id: str
-    conversation_id: str
-    status: str
-    invited_by_user_id: str | None = None
-    initial_message_id: str | None = None
+    id: UUID
+    user_id: UUID
+    conversation_id: UUID
+    status: ParticipantStatus
+    invited_by_user_id: UUID | None = None
+    initial_message_id: UUID | None = None
     created_at: datetime
     updated_at: datetime
     joined_at: datetime | None = None

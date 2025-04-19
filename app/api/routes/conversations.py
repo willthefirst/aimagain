@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Request, Depends, HTTPException, status
 from fastapi.responses import HTMLResponse
+from uuid import UUID  # Import UUID
 
 # Use AsyncSession for async operations
 # Remove direct AsyncSession import if no longer needed directly in routes
@@ -173,8 +174,14 @@ async def create_conversation(  # Async function
         raise HTTPException(status_code=403, detail="Auth user not found - placeholder")
 
     # 2. Find invitee and check if online
+    try:
+        invitee_user_id_uuid = UUID(request_data.invitee_user_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid invitee user ID format")
+
     invitee_user = await user_repo.get_user_by_id(
-        request_data.invitee_user_id
+        # request_data.invitee_user_id
+        invitee_user_id_uuid  # Pass UUID object
     )  # Use repo
     if not invitee_user:
         raise HTTPException(
@@ -253,8 +260,14 @@ async def invite_participant(  # Async function
     # -----------------------------------------
 
     # --- Validate Invitee (Refactored) ---
+    try:
+        invitee_user_id_uuid = UUID(request_data.invitee_user_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid invitee user ID format")
+
     invitee_user = await user_repo.get_user_by_id(
-        request_data.invitee_user_id
+        # request_data.invitee_user_id
+        invitee_user_id_uuid  # Pass UUID object
     )  # Use repo
     if not invitee_user:
         raise HTTPException(

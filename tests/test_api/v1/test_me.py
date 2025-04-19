@@ -2,6 +2,7 @@ import pytest
 from httpx import AsyncClient
 import uuid
 from datetime import datetime, timezone, timedelta
+from uuid import UUID
 
 # Import session maker type for hinting
 from sqlalchemy.ext.asyncio import async_sessionmaker, AsyncSession
@@ -9,9 +10,11 @@ from selectolax.parser import HTMLParser
 
 # Import User model for setup (if needed, maybe not for empty case)
 from app.models import User, Conversation, Message, Participant
+from app.schemas.participant import ParticipantStatus
 
 # Import helper
 from tests.test_helpers import create_test_user
+from typing import Optional
 
 # Mark all tests in this module as async
 pytestmark = pytest.mark.asyncio
@@ -46,7 +49,7 @@ async def test_list_my_invitations_one_invitation(
     inviter = create_test_user(username=f"inviter-{uuid.uuid4()}")
     me_user = create_test_user(username="test-user-me")
 
-    my_invitation_id: str = ""
+    my_invitation_id: Optional[UUID] = None
     conversation_slug: str = f"test-invite-convo-{uuid.uuid4()}"
     initial_message_content = "Join my cool chat!"
 
@@ -59,7 +62,7 @@ async def test_list_my_invitations_one_invitation(
             me_user_id = me_user.id
 
             conversation = Conversation(
-                id=f"conv_{uuid.uuid4()}",
+                id=uuid.uuid4(),
                 slug=conversation_slug,
                 created_by_user_id=inviter_id,
             )
@@ -68,7 +71,7 @@ async def test_list_my_invitations_one_invitation(
             convo_id = conversation.id
 
             initial_message = Message(
-                id=f"msg_{uuid.uuid4()}",
+                id=uuid.uuid4(),
                 content=initial_message_content,
                 conversation_id=convo_id,
                 created_by_user_id=inviter_id,
@@ -78,10 +81,10 @@ async def test_list_my_invitations_one_invitation(
             initial_msg_id = initial_message.id
 
             my_invitation = Participant(
-                id=f"part_{uuid.uuid4()}",
+                id=uuid.uuid4(),
                 user_id=me_user_id,
                 conversation_id=convo_id,
-                status="invited",
+                status=ParticipantStatus.INVITED,
                 invited_by_user_id=inviter_id,
                 initial_message_id=initial_msg_id,
             )
@@ -107,7 +110,7 @@ async def test_list_my_invitations_one_invitation(
 
     form_node = invitation_items[0].css_first("form")
     assert form_node is not None, "Form for accept/reject not found"
-    assert my_invitation_id in form_node.attributes.get(
+    assert str(my_invitation_id) in form_node.attributes.get(
         "action", ""
     ), "Participant ID not found in form action"
 
@@ -156,7 +159,7 @@ async def test_list_my_conversations_one_joined(
             me_user_id = me_user.id
 
             conversation = Conversation(
-                id=f"conv_{uuid.uuid4()}",
+                id=uuid.uuid4(),
                 slug=conversation_slug,
                 name=conversation_name,
                 created_by_user_id=creator_id,
@@ -166,16 +169,16 @@ async def test_list_my_conversations_one_joined(
             convo_id = conversation.id
 
             participant = Participant(
-                id=f"part_{uuid.uuid4()}",
+                id=uuid.uuid4(),
                 user_id=me_user_id,
                 conversation_id=convo_id,
-                status="joined",
+                status=ParticipantStatus.JOINED,
             )
             part_creator = Participant(
-                id=f"part_c_{uuid.uuid4()}",
+                id=uuid.uuid4(),
                 user_id=creator_id,
                 conversation_id=convo_id,
-                status="joined",
+                status=ParticipantStatus.JOINED,
             )
             session.add_all([participant, part_creator])
 

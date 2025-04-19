@@ -35,7 +35,9 @@
     <h2>Participants</h2>
     <ul id="participants-list">
       {% for p in participants %}
-      <li>{{ p.user.username if p.user else 'Unknown' }} ({{ p.status }})</li>
+      <li>
+        {{ p.user.username if p.user else 'Unknown' }} ({{ p.status.value }})
+      </li>
       {% else %}
       <li>No participants found.</li>
       {% endfor %}

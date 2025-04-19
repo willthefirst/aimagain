@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, status
+from uuid import UUID  # Import UUID
 
 # Remove unused SQLAlchemy imports
 # from sqlalchemy.ext.asyncio import AsyncSession
@@ -33,7 +34,8 @@ router = APIRouter(prefix="/participants", tags=["participants"])
 
 @router.put("/{participant_id}", response_model=ParticipantResponse)
 async def update_participant_status(
-    participant_id: str,
+    # participant_id: str,
+    participant_id: UUID,  # Change type hint to UUID
     update_data: ParticipantUpdateRequest,
     # Inject repositories
     user_repo: UserRepository = Depends(get_user_repository),
@@ -51,6 +53,7 @@ async def update_participant_status(
     # --- End Placeholder ---
 
     # --- Fetch Participant --- Use repository
+    # participant_id is now a UUID object thanks to FastAPI
     participant = await part_repo.get_participant_by_id(participant_id)
 
     if not participant:

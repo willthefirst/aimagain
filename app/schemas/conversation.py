@@ -1,5 +1,6 @@
 from pydantic import BaseModel, ConfigDict
 from datetime import datetime
+from uuid import UUID
 
 
 # Schema for request body when creating a conversation
@@ -10,10 +11,10 @@ class ConversationCreateRequest(BaseModel):
 
 # Schema for the response when a conversation is created or retrieved
 class ConversationResponse(BaseModel):
-    id: str
+    id: UUID
+    created_by_user_id: UUID
     slug: str
     name: str | None = None
-    created_by_user_id: str
     created_at: datetime
     last_activity_at: datetime | None = None
 

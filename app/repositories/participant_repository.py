@@ -1,4 +1,5 @@
 import uuid
+from uuid import UUID
 from datetime import datetime, timezone
 from sqlalchemy import select, exists
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -21,17 +22,16 @@ class ParticipantRepository(BaseRepository):
 
     async def create_participant(
         self,
-        user_id: str,
-        conversation_id: str,
-        status: str,
+        user_id: UUID,
+        conversation_id: UUID,
+        status: ParticipantStatus,
         *,
         joined_at: datetime | None = None,
-        invited_by_user_id: str | None = None,
-        initial_message_id: str | None = None,
+        invited_by_user_id: UUID | None = None,
+        initial_message_id: UUID | None = None,
     ) -> Participant:
         """Creates a new participant record."""
         new_participant = Participant(
-            id=f"part_{uuid.uuid4()}",
             user_id=user_id,
             conversation_id=conversation_id,
             status=status,
@@ -45,7 +45,7 @@ class ParticipantRepository(BaseRepository):
         return new_participant
 
     async def get_participant_by_user_and_conversation(
-        self, user_id: str, conversation_id: str
+        self, user_id: UUID, conversation_id: UUID
     ) -> Participant | None:
         """Retrieves a participant record by user and conversation ID."""
         stmt = select(Participant).filter(
@@ -56,14 +56,14 @@ class ParticipantRepository(BaseRepository):
         return result.scalars().first()
 
     async def check_if_user_is_joined_participant(
-        self, user_id: str, conversation_id: str
+        self, user_id: UUID, conversation_id: UUID
     ) -> bool:
         """Checks if a user is a joined participant in a conversation."""
         stmt = select(
             exists().where(
                 Participant.user_id == user_id,
                 Participant.conversation_id == conversation_id,
-                Participant.status == "joined",
+                Participant.status == ParticipantStatus.JOINED,
             )
         )
         result = await self.session.execute(stmt)
@@ -75,7 +75,7 @@ class ParticipantRepository(BaseRepository):
             select(Participant)
             .where(
                 Participant.user_id == user.id,
-                Participant.status == "invited",
+                Participant.status == ParticipantStatus.INVITED,
             )
             .options(
                 # Eager load related data needed for display
@@ -90,7 +90,7 @@ class ParticipantRepository(BaseRepository):
         result = await self.session.execute(stmt)
         return result.scalars().all()
 
-    async def get_participant_by_id(self, participant_id: str) -> Participant | None:
+    async def get_participant_by_id(self, participant_id: UUID) -> Participant | None:
         """Retrieves a participant record by its ID, optionally loading relations."""
         stmt = select(Participant).filter(Participant.id == participant_id)
         # Optionally add options(...) here if conversation is always needed
@@ -119,17 +119,15 @@ class ParticipantRepository(BaseRepository):
         """
         if (
             expected_current_status is not None
-            and participant.status
-            != expected_current_status.value  # Compare with enum value
+            and participant.status != expected_current_status
         ):
             raise ValueError(
                 f"Cannot change status from '{participant.status}'. "
-                f"Expected '{expected_current_status.value}'."
+                f"Expected '{expected_current_status}'."
             )
 
         now = datetime.now(timezone.utc)
-        participant.status = new_status.value  # Assign enum value
-        participant.updated_at = now
+        participant.status = new_status
 
         if new_status == ParticipantStatus.JOINED:
             participant.joined_at = now

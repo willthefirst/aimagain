@@ -2,11 +2,13 @@ import pytest
 from httpx import AsyncClient
 import uuid
 from datetime import datetime, timedelta, timezone
+from uuid import UUID
 
 # Import the session maker type for hinting
 from sqlalchemy.ext.asyncio import async_sessionmaker, AsyncSession
 from sqlalchemy import func, select
 from app.models import User, Conversation, Participant, Message
+from app.schemas.participant import ParticipantStatus
 from selectolax.parser import HTMLParser
 from pydantic import BaseModel
 from app.schemas.participant import ParticipantResponse  # For type hint/validation
@@ -52,24 +54,27 @@ async def test_list_conversations_one_convo(
 ):
     """Test GET /conversations returns HTML listing one conversation when one exists."""
     user = create_test_user()
-    conversation = Conversation(
-        id=f"conv_{uuid.uuid4()}",
-        slug=f"test-convo-{uuid.uuid4()}",
-        created_by_user_id=user.id,
-        last_activity_at=datetime.now(timezone.utc),
-    )
-    participant = Participant(
-        id=f"part_{uuid.uuid4()}",
-        user_id=user.id,
-        conversation_id=conversation.id,
-        status="joined",
-    )
-
-    # Use the yielded session maker for setup
     async with db_test_session_manager() as session:
         async with session.begin():
-            session.add_all([user, conversation, participant])
-        # No explicit commit needed with session.begin()
+            session.add(user)
+            await session.flush()
+
+            conversation = Conversation(
+                id=uuid.uuid4(),
+                slug=f"test-convo-{uuid.uuid4()}",
+                created_by_user_id=user.id,
+                last_activity_at=datetime.now(timezone.utc),
+            )
+            session.add(conversation)
+            await session.flush()
+
+            participant = Participant(
+                id=uuid.uuid4(),
+                user_id=user.id,
+                conversation_id=conversation.id,
+                status=ParticipantStatus.JOINED,
+            )
+            session.add(participant)
 
     response = await test_client.get(f"/conversations")
 
@@ -99,29 +104,29 @@ async def test_list_conversations_sorted(
     user2 = create_test_user(username=f"user-newer-{uuid.uuid4()}")
 
     convo_older = Conversation(
-        id=f"conv_{uuid.uuid4()}",
+        id=uuid.uuid4(),
         slug=f"convo-older-{uuid.uuid4()}",
         created_by_user_id=user1.id,
         last_activity_at=now - timedelta(hours=1),
     )
     convo_newer = Conversation(
-        id=f"conv_{uuid.uuid4()}",
+        id=uuid.uuid4(),
         slug=f"convo-newer-{uuid.uuid4()}",
         created_by_user_id=user2.id,
         last_activity_at=now,
     )
 
     part_older = Participant(
-        id=f"part_{uuid.uuid4()}",
+        id=uuid.uuid4(),
         user_id=user1.id,
         conversation_id=convo_older.id,
-        status="joined",
+        status=ParticipantStatus.JOINED,
     )
     part_newer = Participant(
-        id=f"part_{uuid.uuid4()}",
+        id=uuid.uuid4(),
         user_id=user2.id,
         conversation_id=convo_newer.id,
-        status="joined",
+        status=ParticipantStatus.JOINED,
     )
 
     # Setup data
@@ -156,24 +161,22 @@ async def test_create_conversation_success(
     placeholder_user = create_test_user(username="test-user-me")
 
     # Setup initial users
-    creator_id: str = ""
-    invitee_id: str = ""
-    placeholder_user_id: str = ""
+    creator_id: Optional[UUID] = None
+    invitee_id: Optional[UUID] = None
+    placeholder_user_id: Optional[UUID] = None
     async with db_test_session_manager() as session:
         async with session.begin():
             session.add_all([creator, invitee, placeholder_user])
-            # Must flush within the transaction to get IDs before commit
             await session.flush()
             creator_id = creator.id
             invitee_id = invitee.id
             placeholder_user_id = placeholder_user.id
-        # Session automatically commits here due to begin()
 
     assert creator_id and invitee_id, "Failed to get user IDs after flush"
     assert placeholder_user_id, "Failed to get placeholder user ID"
 
     request_data = ConversationCreateRequest(
-        invitee_user_id=invitee_id, initial_message="Hello there!"
+        invitee_user_id=str(invitee_id), initial_message="Hello there!"
     )
 
     response = await test_client.post(f"/conversations", json=request_data.model_dump())
@@ -185,13 +188,12 @@ async def test_create_conversation_success(
     response_data = response.json()
     assert "id" in response_data
     assert "slug" in response_data
-    assert response_data["created_by_user_id"] == placeholder_user_id
-    new_convo_id = response_data["id"]
+    assert response_data["created_by_user_id"] == str(placeholder_user_id)
+    new_convo_id_str = response_data["id"]
     new_convo_slug = response_data["slug"]
+    new_convo_id = UUID(new_convo_id_str)
 
-    # Verify data in DB using the manager again
     async with db_test_session_manager() as session:
-        # Use a separate query block, no need for transaction here
         convo_stmt = select(Conversation).filter(Conversation.id == new_convo_id)
         convo_result = await session.execute(convo_stmt)
         db_convo = convo_result.scalars().first()
@@ -205,6 +207,7 @@ async def test_create_conversation_success(
         assert db_message is not None, "Initial message not found in database"
         assert db_message.content == request_data.initial_message
         assert db_message.created_by_user_id == placeholder_user_id
+        db_message_id = db_message.id
 
         part_stmt = select(Participant).filter(
             Participant.conversation_id == new_convo_id
@@ -213,7 +216,6 @@ async def test_create_conversation_success(
         db_participants = part_result.scalars().all()
         assert len(db_participants) == 2, "Expected two participants"
 
-        # Verify the participant record for the user who acted as creator (placeholder)
         creator_placeholder_part = next(
             (p for p in db_participants if p.user_id == placeholder_user_id), None
         )
@@ -224,12 +226,12 @@ async def test_create_conversation_success(
         assert (
             creator_placeholder_part is not None
         ), "Creator (placeholder) participant record not found"
-        assert creator_placeholder_part.status == "joined"
+        assert creator_placeholder_part.status == ParticipantStatus.JOINED
 
         assert invitee_part is not None, "Invitee participant record not found"
-        assert invitee_part.status == "invited"
+        assert invitee_part.status == ParticipantStatus.INVITED
         assert invitee_part.invited_by_user_id == placeholder_user_id
-        assert invitee_part.initial_message_id == db_message.id
+        assert invitee_part.initial_message_id == db_message_id
 
 
 async def test_create_conversation_invitee_not_found(
@@ -242,14 +244,13 @@ async def test_create_conversation_invitee_not_found(
     # Setup creator
     async with db_test_session_manager() as session:
         async with session.begin():
-            session.add(creator)
-            session.add(placeholder_user)
+            session.add_all([creator, placeholder_user])
             await session.flush()
 
-    non_existent_user_id = f"user_{uuid.uuid4()}"
+    non_existent_user_id = uuid.uuid4()
 
     request_data = ConversationCreateRequest(
-        invitee_user_id=non_existent_user_id, initial_message="Hello anyone?"
+        invitee_user_id=str(non_existent_user_id), initial_message="Hello anyone?"
     )
 
     response = await test_client.post(f"/conversations", json=request_data.model_dump())
@@ -259,7 +260,6 @@ async def test_create_conversation_invitee_not_found(
         "detail", ""
     ), "Error detail mismatch"
 
-    # Verify no conversation was created
     async with db_test_session_manager() as session:
         count_stmt = select(func.count(Conversation.id))
         count_result = await session.execute(count_stmt)
@@ -279,17 +279,17 @@ async def test_create_conversation_invitee_offline(
     )
     placeholder_user = create_test_user(username="test-user-me")
     # Setup users
-    invitee_id: str = ""
+    invitee_id: Optional[UUID] = None
     async with db_test_session_manager() as session:
         async with session.begin():
             session.add_all([creator, invitee, placeholder_user])
-            await session.flush()  # Flush to get ID
+            await session.flush()
             invitee_id = invitee.id
 
     assert invitee_id
 
     request_data = ConversationCreateRequest(
-        invitee_user_id=invitee_id, initial_message="Are you there?"
+        invitee_user_id=str(invitee_id), initial_message="Are you there?"
     )
 
     response = await test_client.post(f"/conversations", json=request_data.model_dump())
@@ -299,7 +299,6 @@ async def test_create_conversation_invitee_offline(
         "detail", ""
     ), "Error detail mismatch"
 
-    # Verify no conversation was created
     async with db_test_session_manager() as session:
         count_stmt = select(func.count(Conversation.id))
         count_result = await session.execute(count_stmt)
@@ -326,20 +325,19 @@ async def test_get_conversation_forbidden_not_participant(
     creator = create_test_user(username=f"creator-{uuid.uuid4()}")
     me_user = create_test_user(username="test-user-me")
 
-    conversation = Conversation(
-        id=f"conv_{uuid.uuid4()}",
-        slug=f"other-users-convo-{uuid.uuid4()}",
-        created_by_user_id=creator.id,
-    )
-
     # Setup data
     async with db_test_session_manager() as session:
         async with session.begin():
-            # Add creator first for FK
-            session.add(creator)
+            session.add_all([creator, me_user])
             await session.flush()
-            conversation.created_by_user_id = creator.id  # Assign ID
-            session.add_all([me_user, conversation])
+
+            # Ensure conversation is created *within* the transaction
+            conversation = Conversation(
+                id=uuid.uuid4(),
+                slug=f"other-users-convo-{uuid.uuid4()}",
+                created_by_user_id=creator.id,
+            )
+            session.add(conversation)
 
     response = await test_client.get(f"/conversations/{conversation.slug}")
 
@@ -357,16 +355,16 @@ async def test_get_conversation_forbidden_invited(
     me_user = create_test_user(username="test-user-me")
 
     conversation = Conversation(
-        id=f"conv_{uuid.uuid4()}",
+        id=uuid.uuid4(),
         slug=f"invited-status-convo-{uuid.uuid4()}",
         created_by_user_id=inviter.id,
     )
 
     participant = Participant(
-        id=f"part_{uuid.uuid4()}",
+        id=uuid.uuid4(),
         user_id=me_user.id,
         conversation_id=conversation.id,
-        status="invited",
+        status=ParticipantStatus.INVITED,
         invited_by_user_id=inviter.id,
     )
 
@@ -374,13 +372,13 @@ async def test_get_conversation_forbidden_invited(
     async with db_test_session_manager() as session:
         async with session.begin():
             session.add_all([inviter, me_user])
-            await session.flush()  # Get IDs
-            # Assign IDs before adding dependent objects
+            await session.flush()
+
             conversation.created_by_user_id = inviter.id
             participant.user_id = me_user.id
             participant.invited_by_user_id = inviter.id
             session.add(conversation)
-            await session.flush()  # Get conversation ID
+            await session.flush()
             participant.conversation_id = conversation.id
             session.add(participant)
 
@@ -401,36 +399,35 @@ async def test_get_conversation_success_joined(
     # Setup data
     async with db_test_session_manager() as session:
         async with session.begin():
-            # Add users first
             session.add_all([creator, me_user, other_joined])
-            await session.flush()  # Get user IDs
+            await session.flush()
 
             conversation = Conversation(
-                id=f"conv_{uuid.uuid4()}",
+                id=uuid.uuid4(),
                 name="Test Chat",
                 slug=f"joined-test-convo-{uuid.uuid4()}",
                 created_by_user_id=creator.id,
                 last_activity_at=datetime.now(timezone.utc) - timedelta(minutes=10),
             )
             session.add(conversation)
-            await session.flush()  # Get conversation ID
+            await session.flush()
 
             msg1 = Message(
-                id=f"msg1_{uuid.uuid4()}",
+                id=uuid.uuid4(),
                 content="First message",
                 conversation_id=conversation.id,
                 created_by_user_id=creator.id,
                 created_at=datetime.now(timezone.utc) - timedelta(minutes=9),
             )
             msg2 = Message(
-                id=f"msg2_{uuid.uuid4()}",
+                id=uuid.uuid4(),
                 content="Second message",
                 conversation_id=conversation.id,
                 created_by_user_id=me_user.id,
                 created_at=datetime.now(timezone.utc) - timedelta(minutes=5),
             )
             msg3 = Message(
-                id=f"msg3_{uuid.uuid4()}",
+                id=uuid.uuid4(),
                 content="Third message",
                 conversation_id=conversation.id,
                 created_by_user_id=other_joined.id,
@@ -438,22 +435,22 @@ async def test_get_conversation_success_joined(
             )
 
             part_creator = Participant(
-                id=f"part_c_{uuid.uuid4()}",
+                id=uuid.uuid4(),
                 user_id=creator.id,
                 conversation_id=conversation.id,
-                status="joined",
+                status=ParticipantStatus.JOINED,
             )
             part_me = Participant(
-                id=f"part_me_{uuid.uuid4()}",
+                id=uuid.uuid4(),
                 user_id=me_user.id,
                 conversation_id=conversation.id,
-                status="joined",
+                status=ParticipantStatus.JOINED,
             )
             part_other = Participant(
-                id=f"part_o_{uuid.uuid4()}",
+                id=uuid.uuid4(),
                 user_id=other_joined.id,
                 conversation_id=conversation.id,
-                status="joined",
+                status=ParticipantStatus.JOINED,
             )
             session.add_all([msg1, msg2, msg3, part_creator, part_me, part_other])
 
@@ -497,10 +494,9 @@ async def test_invite_participant_success(
     me_user = create_test_user(username="test-user-me")
     invitee_user = create_test_user(username=f"invitee-{uuid.uuid4()}", is_online=True)
 
-    # Variables to store IDs obtained after flush
-    me_user_id: str = ""
-    invitee_user_id: str = ""
-    convo_id: str = ""
+    me_user_id: Optional[UUID] = None
+    invitee_user_id: Optional[UUID] = None
+    convo_id: Optional[UUID] = None
     conversation_slug: str = f"invite-target-convo-{uuid.uuid4()}"
 
     # Setup data
@@ -512,7 +508,7 @@ async def test_invite_participant_success(
             invitee_user_id = invitee_user.id
 
             conversation = Conversation(
-                id=f"conv_{uuid.uuid4()}",
+                id=uuid.uuid4(),
                 slug=conversation_slug,
                 created_by_user_id=me_user_id,
             )
@@ -521,16 +517,16 @@ async def test_invite_participant_success(
             convo_id = conversation.id
 
             my_participation = Participant(
-                id=f"part_{uuid.uuid4()}",
+                id=uuid.uuid4(),
                 user_id=me_user_id,
                 conversation_id=convo_id,
-                status="joined",
+                status=ParticipantStatus.JOINED,
             )
             session.add(my_participation)
 
     assert me_user_id and invitee_user_id and convo_id
 
-    invite_data = {"invitee_user_id": invitee_user_id}
+    invite_data = {"invitee_user_id": str(invitee_user_id)}
 
     response = await test_client.post(
         f"/conversations/{conversation_slug}/participants", json=invite_data
@@ -541,12 +537,13 @@ async def test_invite_participant_success(
     ), f"Expected 201, got {response.status_code}, Response: {response.text}"
 
     response_data = response.json()
-    assert response_data["user_id"] == invitee_user_id
-    assert response_data["conversation_id"] == convo_id
-    assert response_data["status"] == "invited"
-    assert response_data["invited_by_user_id"] == me_user_id
+    assert response_data["user_id"] == str(invitee_user_id)
+    assert response_data["conversation_id"] == str(convo_id)
+    assert response_data["status"] == ParticipantStatus.INVITED.value
+    assert response_data["invited_by_user_id"] == str(me_user_id)
     assert response_data["initial_message_id"] is None
-    new_participant_id = response_data["id"]
+    new_participant_id_str = response_data["id"]
+    new_participant_id = UUID(new_participant_id_str)
 
     # Verify using async query
     async with db_test_session_manager() as session:
@@ -556,7 +553,7 @@ async def test_invite_participant_success(
         assert db_participant is not None
         assert db_participant.user_id == invitee_user_id
         assert db_participant.conversation_id == convo_id
-        assert db_participant.status == "invited"
+        assert db_participant.status == ParticipantStatus.INVITED
         assert db_participant.invited_by_user_id == me_user_id
         assert db_participant.initial_message_id is None
 
@@ -571,7 +568,9 @@ async def test_invite_participant_forbidden_not_joined(
     creator = create_test_user(username=f"creator-{uuid.uuid4()}")
 
     conversation_slug = f"invite-forbidden-{uuid.uuid4()}"
-    invitee_id: str = ""
+    invitee_id: Optional[UUID] = None
+    me_user_id: Optional[UUID] = None
+    convo_id: Optional[UUID] = None
 
     # Setup data
     async with db_test_session_manager() as session:
@@ -583,7 +582,7 @@ async def test_invite_participant_forbidden_not_joined(
             creator_id = creator.id
 
             conversation = Conversation(
-                id=f"conv_{uuid.uuid4()}",
+                id=uuid.uuid4(),
                 slug=conversation_slug,
                 created_by_user_id=creator_id,
             )
@@ -593,16 +592,16 @@ async def test_invite_participant_forbidden_not_joined(
 
             # Add 'me_user' as INVITED, not joined
             my_part = Participant(
-                id=f"part_me_{uuid.uuid4()}",
+                id=uuid.uuid4(),
                 user_id=me_user_id,
                 conversation_id=convo_id,
-                status="invited",  # Key part: requester is invited
+                status=ParticipantStatus.INVITED,
             )
             session.add(my_part)
 
     assert invitee_id
 
-    invite_data = {"invitee_user_id": invitee_id}
+    invite_data = {"invitee_user_id": str(invitee_id)}
 
     response = await test_client.post(
         f"/conversations/{conversation_slug}/participants", json=invite_data
@@ -620,7 +619,9 @@ async def test_invite_participant_conflict_already_participant(
     invitee = create_test_user(username=f"invitee-{uuid.uuid4()}", is_online=True)
 
     conversation_slug = f"invite-conflict-{uuid.uuid4()}"
-    invitee_id: str = ""
+    invitee_id: Optional[UUID] = None
+    me_user_id: Optional[UUID] = None
+    convo_id: Optional[UUID] = None
 
     # Setup data
     async with db_test_session_manager() as session:
@@ -631,7 +632,7 @@ async def test_invite_participant_conflict_already_participant(
             invitee_id = invitee.id
 
             conversation = Conversation(
-                id=f"conv_{uuid.uuid4()}",
+                id=uuid.uuid4(),
                 slug=conversation_slug,
                 created_by_user_id=me_user_id,
             )
@@ -640,22 +641,22 @@ async def test_invite_participant_conflict_already_participant(
             convo_id = conversation.id
 
             my_part = Participant(
-                id=f"part_me_{uuid.uuid4()}",
+                id=uuid.uuid4(),
                 user_id=me_user_id,
                 conversation_id=convo_id,
-                status="joined",
+                status=ParticipantStatus.JOINED,
             )
             invitee_part = Participant(
-                id=f"part_inv_{uuid.uuid4()}",
+                id=uuid.uuid4(),
                 user_id=invitee_id,
                 conversation_id=convo_id,
-                status="joined",  # Invitee already joined
+                status=ParticipantStatus.JOINED,
             )
             session.add_all([my_part, invitee_part])
 
     assert invitee_id
 
-    invite_data = {"invitee_user_id": invitee_id}
+    invite_data = {"invitee_user_id": str(invitee_id)}
 
     response = await test_client.post(
         f"/conversations/{conversation_slug}/participants", json=invite_data
@@ -670,12 +671,12 @@ async def test_invite_participant_bad_request_offline(
 ):
     """Test POST invite returns 400 if invitee is offline."""
     me_user = create_test_user(username="test-user-me")
-    invitee = create_test_user(
-        username=f"invitee-{uuid.uuid4()}", is_online=False  # Offline
-    )
+    invitee = create_test_user(username=f"invitee-{uuid.uuid4()}", is_online=False)
 
     conversation_slug = f"invite-offline-{uuid.uuid4()}"
-    invitee_id: str = ""
+    invitee_id: Optional[UUID] = None
+    me_user_id: Optional[UUID] = None
+    convo_id: Optional[UUID] = None
 
     # Setup data
     async with db_test_session_manager() as session:
@@ -686,7 +687,7 @@ async def test_invite_participant_bad_request_offline(
             invitee_id = invitee.id
 
             conversation = Conversation(
-                id=f"conv_{uuid.uuid4()}",
+                id=uuid.uuid4(),
                 slug=conversation_slug,
                 created_by_user_id=me_user_id,
             )
@@ -695,16 +696,16 @@ async def test_invite_participant_bad_request_offline(
             convo_id = conversation.id
 
             my_part = Participant(
-                id=f"part_me_{uuid.uuid4()}",
+                id=uuid.uuid4(),
                 user_id=me_user_id,
                 conversation_id=convo_id,
-                status="joined",
+                status=ParticipantStatus.JOINED,
             )
             session.add(my_part)
 
     assert invitee_id
 
-    invite_data = {"invitee_user_id": invitee_id}
+    invite_data = {"invitee_user_id": str(invitee_id)}
 
     response = await test_client.post(
         f"/conversations/{conversation_slug}/participants", json=invite_data

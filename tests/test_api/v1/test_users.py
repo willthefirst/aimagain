@@ -1,8 +1,10 @@
 import pytest
 from httpx import AsyncClient
 import uuid
+from uuid import UUID  # Import UUID
 
 from app.models import User, Conversation, Participant
+from app.schemas.participant import ParticipantStatus  # Import enum
 
 # Import session maker type for hinting
 from sqlalchemy.ext.asyncio import async_sessionmaker, AsyncSession
@@ -119,53 +121,63 @@ async def test_list_users_participated_success(
         async with session.begin():
             session.add_all([me_user, user_b, user_c])
             await session.flush()
-            me_user_id = me_user.id
-            user_b_id = user_b.id
-            user_c_id = user_c.id
+            me_user_id = me_user.id  # UUID object
+            user_b_id = user_b.id  # UUID object
+            user_c_id = user_c.id  # UUID object
 
             # Convo 1: me and user_b are joined
             convo1 = Conversation(
-                id=f"conv1_{uuid.uuid4()}",
+                # id=f"conv1_{uuid.uuid4()}",
+                id=uuid.uuid4(),  # Use UUID object
                 slug=f"convo1-{uuid.uuid4()}",
-                created_by_user_id=me_user_id,
+                created_by_user_id=me_user_id,  # Use UUID object
             )
             session.add(convo1)
             await session.flush()
-            convo1_id = convo1.id
+            convo1_id = convo1.id  # UUID object
             part1_me = Participant(
-                id=f"p1m_{uuid.uuid4()}",
-                user_id=me_user_id,
-                conversation_id=convo1_id,
-                status="joined",
+                # id=f"p1m_{uuid.uuid4()}",
+                id=uuid.uuid4(),  # Use UUID object
+                user_id=me_user_id,  # Use UUID object
+                conversation_id=convo1_id,  # Use UUID object
+                # status="joined",
+                status=ParticipantStatus.JOINED,  # Use Enum
             )
             part1_b = Participant(
-                id=f"p1b_{uuid.uuid4()}",
-                user_id=user_b_id,
-                conversation_id=convo1_id,
-                status="joined",
+                # id=f"p1b_{uuid.uuid4()}",
+                id=uuid.uuid4(),  # Use UUID object
+                user_id=user_b_id,  # Use UUID object
+                conversation_id=convo1_id,  # Use UUID object
+                # status="joined",
+                status=ParticipantStatus.JOINED,  # Use Enum
             )
             session.add_all([part1_me, part1_b])
 
             # Convo 2: me joined, user_c invited (should not count)
             convo2 = Conversation(
-                id=f"conv2_{uuid.uuid4()}",
+                # id=f"conv2_{uuid.uuid4()}",
+                id=uuid.uuid4(),  # Use UUID object
                 slug=f"convo2-{uuid.uuid4()}",
-                created_by_user_id=me_user_id,
+                created_by_user_id=me_user_id,  # Use UUID object
             )
             session.add(convo2)
             await session.flush()
-            convo2_id = convo2.id
+            convo2_id = convo2.id  # UUID object
             part2_me = Participant(
-                id=f"p2m_{uuid.uuid4()}",
-                user_id=me_user_id,
-                conversation_id=convo2_id,
-                status="joined",
+                # id=f"p2m_{uuid.uuid4()}",
+                id=uuid.uuid4(),  # Use UUID object
+                user_id=me_user_id,  # Use UUID object
+                conversation_id=convo2_id,  # Use UUID object
+                # status="joined",
+                status=ParticipantStatus.JOINED,  # Use Enum
             )
             part2_c = Participant(
-                id=f"p2c_{uuid.uuid4()}",
-                user_id=user_c_id,
-                conversation_id=convo2_id,
-                status="invited",
+                # id=f"p2c_{uuid.uuid4()}",
+                id=uuid.uuid4(),  # Use UUID object
+                user_id=user_c_id,  # Use UUID object
+                conversation_id=convo2_id,  # Use UUID object
+                # status="invited",
+                status=ParticipantStatus.INVITED,  # Use Enum
             )  # Invited only
             session.add_all([part2_me, part2_c])
 
