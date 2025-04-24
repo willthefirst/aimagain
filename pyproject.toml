@@ -23,7 +23,8 @@ dependencies = [
     "fastapi-users[sqlalchemy]",
     "aiosqlite",
     "pydantic-settings",
-    "asyncstdlib"
+    "asyncstdlib",
+    "pytest-playwright"
 ]
 
 [tool.setuptools.packages.find]
