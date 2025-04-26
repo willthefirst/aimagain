@@ -80,10 +80,12 @@ async def test_registration_form_submission(pact_mock, origin: str, page: Page):
         # Navigate to the registration page served by the fixture's test server
         # NOTE: This currently hits the live endpoint in the test server.
         # Future step per contract_testing.md is to serve static HTML.
+        print(f"Navigating to {origin}/auth/register")
         register_page_url = f"{origin}/auth/register"
         await page.goto(register_page_url)
         # Wait for form elements to be ready if necessary
         await page.wait_for_selector("#email")
+        print("Form elements ready")
 
         # Fill the form
         await page.locator("#email").fill("test.user@example.com")
@@ -92,8 +94,8 @@ async def test_registration_form_submission(pact_mock, origin: str, page: Page):
 
         # Submit the form - this triggers the intercepted POST request
         # Ensure the selector matches your actual submit button
-        await page.locator("button[type='submit']").click()
-
+        await page.locator("input[type='submit']").click()
+        print("Form submitted")
         # Add a small wait to ensure the network request is processed by Pact
         # Adjust time if needed, or use a more robust wait like waiting for
         # a specific network response or UI change if applicable.
