@@ -24,7 +24,7 @@ dependencies = [
     "aiosqlite",
     "pydantic-settings",
     "asyncstdlib",
-    "pytest-playwright"
+    "pytest-playwright-asyncio"
 ]
 
 [tool.setuptools.packages.find]
