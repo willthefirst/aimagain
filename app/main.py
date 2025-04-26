@@ -10,7 +10,7 @@ from app.auth_config import auth_backend, current_active_user, fastapi_users
 from .api.routes import auth_pages
 
 
-app = FastAPI(title="Chat App")
+app = FastAPI(title="AIM again")
 
 
 @app.get("/")
