@@ -3,9 +3,20 @@ import uvicorn
 import time
 import socket
 import multiprocessing
+import atexit  # Added for Pact cleanup
 from fastapi import FastAPI
 from playwright.async_api import async_playwright
 from app.api.routes import auth_pages
+from pact import Consumer, Provider  # Added for Pact
+
+# Define Pact Consumer and Provider
+pact = Consumer(
+    "RegistrationUI",
+).has_pact_with(
+    Provider("AuthService"),
+    # pact_dir specifies where to store the generated pact files
+    pact_dir="../pacts",  # Adjust path as needed relative to where tests run
+)
 
 
 def run_server(host: str, port: int):
@@ -70,3 +81,25 @@ async def page(browser):
     page = await browser.new_page()
     yield page
     await page.close()
+
+
+# --- New Pact Fixture ---
+@pytest.fixture(scope="session", autouse=True)
+def setup_pact_mock_server():
+    """Starts the Pact mock server before the session and stops it after."""
+    try:
+        pact.start_service()
+        # Ensure the service is stopped even if tests fail
+        atexit.register(pact.stop_service)
+        yield  # Control yields back to the test session
+    except Exception as e:
+        print(f"Pact mock server failed to start: {e}")
+        # Optional: re-raise or handle as needed
+        raise
+
+
+@pytest.fixture(scope="session")
+def pact_mock():
+    """Provides the configured Pact instance to tests."""
+    # The setup_pact_mock_server fixture ensures the service is running
+    return pact

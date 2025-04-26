@@ -1,48 +1,33 @@
-I, [2025-04-24T19:34:56.680288 #23426]  INFO -- : Cleared interactions
-I, [2025-04-24T19:34:56.682529 #23426]  INFO -- : Registered expected interaction POST /auth/register/
-D, [2025-04-24T19:34:56.682620 #23426] DEBUG -- : {
-  "description": "a request for to register a new user",
-  "providerState": "Somebody wants to register",
+I, [2025-04-26T12:05:48.636283 #79121]  INFO -- : Cleared interactions
+I, [2025-04-26T12:05:48.637924 #79121]  INFO -- : Registered expected interaction POST /auth/register
+D, [2025-04-26T12:05:48.637986 #79121] DEBUG -- : {
+  "description": "a request to register a new user via web form",
+  "providerState": "User test.user@example.com does not exist",
   "request": {
-    "method": "post",
-    "path": "/auth/register/"
+    "method": "POST",
+    "path": "/auth/register",
+    "headers": {
+      "Content-Type": "application/x-www-form-urlencoded"
+    },
+    "body": {
+      "email": {
+        "json_class": "Pact::SomethingLike",
+        "contents": "test.user@example.com"
+      },
+      "password": {
+        "json_class": "Pact::SomethingLike",
+        "contents": "securepassword123"
+      },
+      "username": {
+        "json_class": "Pact::SomethingLike",
+        "contents": "testuser"
+      }
+    }
   },
   "response": {
     "status": 201,
     "headers": {
-      "content-type": "application/json"
-    },
-    "body": {
-      "email": "test@test.com",
-      "is_active": true,
-      "is_superuser": false,
-      "is_verified": false
     }
   },
   "metadata": null
 }
-I, [2025-04-24T19:34:58.244395 #23426]  INFO -- : Received request GET /auth/register
-D, [2025-04-24T19:34:58.244459 #23426] DEBUG -- : {
-  "path": "/auth/register",
-  "query": "",
-  "method": "get",
-  "headers": {
-    "Host": "localhost:1234",
-    "Connection": "keep-alive",
-    "Sec-Ch-Ua": "\"Chromium\";v=\"134\", \"Not:A-Brand\";v=\"24\", \"HeadlessChrome\";v=\"134\"",
-    "Sec-Ch-Ua-Mobile": "?0",
-    "Sec-Ch-Ua-Platform": "\"macOS\"",
-    "Upgrade-Insecure-Requests": "1",
-    "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/134.0.6998.35 Safari/537.36",
-    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
-    "Sec-Fetch-Site": "none",
-    "Sec-Fetch-Mode": "navigate",
-    "Sec-Fetch-User": "?1",
-    "Sec-Fetch-Dest": "document",
-    "Accept-Encoding": "gzip, deflate, br, zstd",
-    "Version": "HTTP/1.1"
-  }
-}
-E, [2025-04-24T19:34:58.244520 #23426] ERROR -- : No matching interaction found for GET /auth/register
-E, [2025-04-24T19:34:58.244529 #23426] ERROR -- : Interaction diffs for that route:
-E, [2025-04-24T19:34:58.244537 #23426] ERROR -- : 
