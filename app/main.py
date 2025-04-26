@@ -36,30 +36,13 @@ app.include_router(
     prefix="/auth",
     tags=["auth"],
 )
-
-# Add the users router
 app.include_router(
     fastapi_users.get_users_router(UserRead, UserUpdate),
     prefix="/users",
     tags=["users"],
 )
-
-# Include the v1 user router
-app.include_router(users.router, tags=["users"])
-
-# Include the v1 conversations router
-app.include_router(conversations.router, tags=["conversations"])
-
-# Include the v1 me router
-app.include_router(me.router, tags=["me"])
-
-# Include the v1 participants router
-app.include_router(participants.router, tags=["participants"])
-
-# Include the auth_pages router
 app.include_router(auth_pages.router)
-
-
-@app.get("/authenticated-route")
-async def authenticated_route(user: User = Depends(current_active_user)):
-    return {"message": f"Hello {user.email}!"}
+app.include_router(users.router, tags=["users"])
+app.include_router(conversations.router, tags=["conversations"])
+app.include_router(me.router, tags=["me"])
+app.include_router(participants.router, tags=["participants"])
