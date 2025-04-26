@@ -1,65 +1,68 @@
-# Contract Testing for FastAPI HTML Forms with Playwright and Pact
+# Contract Testing Strategy: FastAPI UI (Playwright) + API (Pact)
 
-This document outlines a strategy for creating consumer-driven contract tests that verify the interaction between real HTML forms rendered by a FastAPI application and the backend API endpoints they submit to. We use Playwright to simulate user interaction in a real browser and Pact to define and verify the HTTP contracts.
+This document outlines the plan for creating consumer-driven contract tests for the FastAPI application, focusing initially on the user registration flow. The goal is to verify that the interactions initiated from the user interface (simulated by Playwright) conform to the API contracts defined and verified by Pact.
 
 ## Core Idea
 
-The goal is to ensure that the data structure sent by a specific HTML form (when filled and submitted via a browser) exactly matches the format expected by the corresponding backend API endpoint, as defined in a Pact contract.
+We aim to ensure that the data structure sent by specific HTML forms (when filled and submitted via a browser) matches the format expected by the corresponding backend API endpoint, as defined in a Pact contract. We will use pre-generated static HTML files served by a minimal test server to isolate the UI interaction for testing.
 
-## Key Components
+## Plan for Registration Form (`/auth/register`)
 
-1.  **FastAPI Test Server**:
+1.  **Target Flow**:
 
-    - Runs the _actual_ FastAPI application within the test environment using `uvicorn`.
-    - Its primary role in _consumer_ testing is to accurately render and serve the HTML pages containing the forms (e.g., using Jinja2 templates and `url_for`).
-    - For simple page rendering that doesn't require database lookups, this server instance does _not_ need a separate test database configured.
+    - User accesses the registration page (`GET /auth/register`).
+    - User fills in the registration form (email, password, etc.).
+    - User submits the form, triggering a `POST /auth/register` request.
 
-2.  **Pact Mock Server (`pact-python`)**:
+2.  **Key Components**:
 
-    - Acts as the stand-in for the real API during the consumer test.
-    - Test setup defines the _expected_ HTTP request (method, path, headers, body) that the form submission should generate.
-    - Test setup also defines the _expected_ HTTP response that the API should return upon receiving a valid request.
-    - Listens for the request coming from the Playwright-driven browser.
+    - **Static HTML**: Pre-generate `static/auth/register.html` using the application's Jinja templating (`app/core/templating.py`, template `auth/register.html`).
+    - **Minimal FastAPI Test Server**: A simple server (similar to `contrac_testing_example.py`) will serve the generated `static/auth/register.html` at a specific test route (e.g., `/test/register`). This server does _not_ need to connect to the full backend or database for this consumer test.
+    - **Pact Mock Server (`pact-python`)**:
+      - Define the _expected_ HTTP request for `POST /auth/register` (method, path, headers, body format - likely `application/x-www-form-urlencoded`).
+      - Define the _expected_ HTTP response (e.g., `200 OK` or `201 Created` with specific JSON body).
+      - Listen for the request redirected from Playwright.
+    - **Playwright**:
+      - Launch a browser instance.
+      - Navigate to the test server's registration page (`/test/register`).
+      - Fill the form fields.
+      - **Intercept** the `POST /auth/register` request triggered by the form submission.
+      - **Redirect** the intercepted request to the Pact Mock Server (`http://localhost:1234/auth/register`).
+    - **Pact Verification**:
+      - The Pact Mock Server compares the _actual_ request received from Playwright against the _expected_ request.
+      - If they match, the consumer test passes, and a Pact contract file (`.pact`) is generated.
 
-3.  **Playwright**:
+3.  **Implementation Steps**:
 
-    - Launches a real browser instance to interact with the HTML form.
-    - Navigates to the page served by the FastAPI Test Server.
-    - Fills form fields and triggers submission, simulating user actions.
-    - Uses request **interception** (`page.route`) to catch the form's HTTP submission _before_ it reaches the FastAPI Test Server's API endpoint handler.
-    - **Redirects** the intercepted request to the Pact Mock Server for verification.
+    - **A: Understand Jinja Setup**: Examine `app/core/templating.py` to see how the Jinja environment is configured (needed for static generation).
+    - **B: Static HTML Generation Function**: Create a Python function (e.g., `create_register_html()`) that uses the Jinja environment to render `auth/register.html` into `static/auth/register.html`. This function should be run before tests.
+    - **C: Test Server Fixture**: Adapt the `fastapi_server` fixture to serve the static `static/auth/register.html` file at `/test/register`.
+    - **D: Playwright/Pact Test**: Create the `test_registration_form_submission` async test function:
+      - Set up the `pact_mock` fixture.
+      - Define the expected `POST /auth/register` interaction in Pact.
+      - Implement Playwright `page.route` for interception/redirection.
+      - Add Playwright commands to navigate, fill the form (using correct element IDs/names from the template), and click submit.
+      - Call `pact_mock.verify()`.
 
-4.  **Pact Contract Verification**:
-    - The Pact Mock Server compares the _actual_ HTTP request (received via Playwright redirection) against the _expected_ request defined in the test.
-    - If they match, the consumer test passes, confirming the UI generates the correct request format.
-    - A Pact contract file (`.pact`) is generated, capturing the verified interaction. This file is later used for Provider Verification against the actual API.
+4.  **Next Steps (After Consumer Test)**:
+    - Use the generated `.pact` file to run a **Provider Verification** test against the _real_ FastAPI application (`app/main.py`) to ensure the actual `POST /auth/register` endpoint fulfills the contract. This will likely involve setting up provider states if needed (e.g., ensuring a user doesn't already exist).
 
-## Example Test Flow: Registration Form
+## Test File Structure (Example)
 
-Consider testing the `/auth/register` HTML form:
+```
+tests/
+├── contract/
+│   ├── __init__.py
+│   ├── test_auth_forms.py  # Contains the consumer test
+│   └── provider/           # Directory for provider verification tests
+│       └── __init__.py
+│       └── test_auth_provider.py
+├── conftest.py             # Fixtures (fastapi_server, pact_mock, page)
+static/                     # Generated static files for tests
+│   └── auth/
+│       └── register.html
+pacts/                      # Generated pact files
+└── profilepageui-profileapi.json # Example pact file
+```
 
-1.  **Setup**: Start the FastAPI Test Server and the Pact Mock Server. Define the Pact interaction for `POST /auth/register` (expecting `x-www-form-urlencoded` data with `email`, `username`, `password`) and the expected `201 Created` JSON response.
-2.  **Navigate**: Playwright navigates the browser to `http://<fastapi_test_server_address>/auth/register`.
-3.  **Intercept**: Playwright sets up interception to redirect any `POST` requests to `/auth/register` towards the Pact Mock Server's address (`http://localhost:1234/auth/register`).
-4.  **Interact**: Playwright fills the `#email`, `#username`, and `#password` input fields in the form.
-5.  **Submit**: Playwright clicks the "Register" button.
-6.  **Verify**: The browser sends the form data. Playwright intercepts it and sends it to the Pact Mock Server. The Mock Server validates that the request matches the expected format defined in step 1. If valid, it returns the predefined `201` response back to the browser (via Playwright). The test calls `pact.verify()`.
-7.  **Result**: If verification passes, a contract file is saved, proving the registration form correctly interacts with the expected API contract.
-
-## How To Use Example Implementation (`tests/test_contract/test_auth_forms.py`)
-
-1.  **Install Dependencies**:
-    ```bash
-    pip install fastapi uvicorn pytest pytest-asyncio playwright pact-python httpx sqlalchemy aiosqlite # Add others as needed
-    ```
-2.  **Initialize Playwright**:
-    ```bash
-    playwright install
-    ```
-3.  **Create Pact Directory**: Ensure a `./pacts` directory exists in your project root.
-4.  **Run Tests**:
-    ```bash
-    pytest -v tests/test_contract/test_auth_forms.py
-    ```
-
-This approach provides strong confidence that your rendered HTML forms correctly integrate with your FastAPI backend according to the defined API contracts.
+This plan focuses on creating a robust consumer test for the registration UI, ensuring it sends data in the correct format before moving on to provider verification.
