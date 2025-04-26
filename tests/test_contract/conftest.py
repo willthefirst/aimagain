@@ -83,23 +83,12 @@ async def page(browser):
     await page.close()
 
 
-# --- New Pact Fixture ---
-@pytest.fixture(scope="session", autouse=True)
-def setup_pact_mock_server():
-    """Starts the Pact mock server before the session and stops it after."""
-    try:
-        pact.start_service()
-        # Ensure the service is stopped even if tests fail
-        atexit.register(pact.stop_service)
-        yield  # Control yields back to the test session
-    except Exception as e:
-        print(f"Pact mock server failed to start: {e}")
-        # Optional: re-raise or handle as needed
-        raise
-
-
 @pytest.fixture(scope="session")
 def pact_mock():
     """Provides the configured Pact instance to tests."""
     # The setup_pact_mock_server fixture ensures the service is running
-    return pact
+    pact.start_service()
+    print("Pact mock server started")
+    yield pact
+    pact.stop_service()
+    print("Pact mock server stopped")

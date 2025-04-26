@@ -66,7 +66,13 @@ async def test_registration_form_submission(pact_mock, origin: str, page: Page):
             )
             # Redirect to the Pact mock server
             # Preserve original request data (method, headers, postData)
-            await route.continue_(url=full_mock_url)
+            # Explicitly forward details to ensure they reach the mock server correctly
+            await route.continue_(
+                url=full_mock_url,
+                method=route.request.method,
+                headers={**route.request.headers},  # Forward original headers
+                post_data=route.request.post_data,  # Forward original form data
+            )
         else:
             # Let other requests (e.g., GET for the page itself) pass through
             await route.continue_()
@@ -74,6 +80,7 @@ async def test_registration_form_submission(pact_mock, origin: str, page: Page):
     # Apply the handler to the specific API path
     # Using `**` ensures it matches the full URL containing the path
     await page.route(f"**{register_api_path}", handle_route)
+    page.on("request", lambda request: print(request.method, request.url))
 
     # --- 3. Execute Test with Pact Verification ---
     with pact:  # Start interaction context & enable verification on exit
@@ -96,6 +103,7 @@ async def test_registration_form_submission(pact_mock, origin: str, page: Page):
         # Ensure the selector matches your actual submit button
         await page.locator("input[type='submit']").click()
         print("Form submitted")
+
         # Add a small wait to ensure the network request is processed by Pact
         # Adjust time if needed, or use a more robust wait like waiting for
         # a specific network response or UI change if applicable.
