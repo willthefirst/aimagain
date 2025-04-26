@@ -15,7 +15,7 @@ from app.schemas.participant import (
 # Import session maker type for hinting
 from sqlalchemy.ext.asyncio import async_sessionmaker, AsyncSession
 from sqlalchemy import select
-from tests.test_helpers import create_test_user
+from test_helpers import create_test_user
 from typing import Optional
 
 # Mark all tests in this module as async

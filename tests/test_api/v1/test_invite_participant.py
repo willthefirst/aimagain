@@ -10,7 +10,7 @@ from app.models import User, Conversation, Participant
 from app.schemas.participant import ParticipantStatus, ParticipantResponse
 from typing import Optional
 
-from tests.test_helpers import create_test_user
+from test_helpers import create_test_user
 
 pytestmark = pytest.mark.asyncio
 

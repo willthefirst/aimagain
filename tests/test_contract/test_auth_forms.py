@@ -1,8 +1,7 @@
 # tests/contract/test_auth_forms.py
 import string
 import pytest
-import asyncio
-from playwright.async_api import TimeoutError as PlaywrightTimeoutError, Page
+from playwright.async_api import Page
 
 
 @pytest.mark.asyncio(loop_scope="session")

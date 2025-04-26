@@ -11,7 +11,7 @@ from app.schemas.participant import ParticipantStatus
 from pydantic import BaseModel
 from typing import Optional
 
-from tests.test_helpers import create_test_user
+from test_helpers import create_test_user
 
 
 # Helper Pydantic models for request/response validation

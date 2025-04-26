@@ -10,7 +10,7 @@ from app.schemas.participant import ParticipantStatus
 from selectolax.parser import HTMLParser
 from typing import Optional
 
-from tests.test_helpers import create_test_user
+from test_helpers import create_test_user
 
 pytestmark = pytest.mark.asyncio
 

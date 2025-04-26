@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from fastapi_users.db import SQLAlchemyUserDatabase
 
 from selectolax.parser import HTMLParser
-from tests.test_helpers import create_test_user
+from test_helpers import create_test_user
 
 from app.schemas.user import UserCreate
 from app.models import User

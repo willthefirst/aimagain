@@ -10,12 +10,10 @@ from app.api.routes import auth_pages
 
 def run_server(host: str, port: int):
     """Target function to run uvicorn in a separate process."""
-    # Need to create the app instance *inside* the new process
-    # because FastAPI app instances are not easily pickleable
     app = FastAPI(title="Test Server Process")
     app.include_router(auth_pages.router)
-    # Use a slightly less verbose log level for the server process
-    uvicorn.run(app, host=host, port=port, log_level="warning")  # Changed to warning
+
+    uvicorn.run(app, host=host, port=port, log_level="warning")
 
 
 def _find_available_port() -> int:
@@ -31,19 +29,16 @@ def _start_server_process(host: str, port: int) -> multiprocessing.Process:
         target=run_server, args=(host, port), daemon=True
     )
     server_process.start()
-    # Add a small delay to allow the server to initialize
     time.sleep(1)
     return server_process
 
 
 def _terminate_server_process(process: multiprocessing.Process, origin: str):
     """Terminates the server process."""
-
     process.terminate()
     process.join(timeout=3)
     if process.is_alive():
-
-        process.kill()  # Add kill back for robustness
+        process.kill()
 
 
 @pytest.fixture(scope="session")
@@ -55,22 +50,21 @@ def origin():
 
     server_process = _start_server_process(host, port)
 
-    yield origin  # Provide the base URL to tests
+    yield origin
 
     _terminate_server_process(server_process, origin)
 
 
-@pytest.fixture(scope="session")  # Session scope for browser efficiency
+@pytest.fixture(scope="session")
 async def browser():
     """Pytest fixture to launch a Playwright browser instance (headful)."""
     async with async_playwright() as p:
-        # Launch headful browser (remove headless=False to run headless)
-        browser = await p.chromium.launch()  # slow_mo helps visualization
+        browser = await p.chromium.launch()
         yield browser
         await browser.close()
 
 
-@pytest.fixture(scope="function")  # Function scope for isolated pages
+@pytest.fixture(scope="function")
 async def page(browser):
     """Pytest fixture to create a new browser page for each test."""
     page = await browser.new_page()
