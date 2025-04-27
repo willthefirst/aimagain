@@ -1,4 +1,4 @@
-# tests/contract/test_auth_routes_provider.py
+# tests/contract/test_provider_auth_api.py
 import pytest
 import os
 from unittest.mock import AsyncMock, MagicMock

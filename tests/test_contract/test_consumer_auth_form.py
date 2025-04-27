@@ -1,4 +1,4 @@
-# tests/contract/test_auth_forms.py
+# tests/contract/test_consumer_auth_form.py
 import string
 import pytest
 from playwright.async_api import Page, Route
@@ -24,10 +24,9 @@ async def test_consumer_registration_form_interaction(
     pact = pact_mock
     mock_server_uri = pact.uri
     register_page_url = f"{origin}{REGISTER_API_PATH}"
-    # register_api_path = "/auth/register"  # Defined as constant
     full_mock_url = f"{mock_server_uri}{REGISTER_API_PATH}"
 
-    # --- Define Pact Interaction ---
+    # Define Pact Interaction
     expected_request_headers = {"Content-Type": "application/json"}
     expected_request_body = {
         "email": Like(TEST_EMAIL),
@@ -47,10 +46,9 @@ async def test_consumer_registration_form_interaction(
         .will_respond_with(201)
     )
 
-    # --- Define Playwright Interception Logic ---
+    # Define Playwright Interception Logic
     async def handle_route(route: Route):
         if route.request.method == "POST" and REGISTER_API_PATH in route.request.url:
-            # print(f"Intercepted request to {route.request.url}") # Removed print
             await route.continue_(
                 url=full_mock_url,
                 headers={
@@ -64,20 +62,14 @@ async def test_consumer_registration_form_interaction(
 
     await page.route(f"**{REGISTER_API_PATH}", handle_route)
 
-    # --- Execute Test with Pact Verification ---
+    # Execute Test with Pact Verification
     with pact:
         await page.goto(register_page_url)
         await page.wait_for_selector("#email")
-
-        # Fill the form
         await page.locator("#email").fill(TEST_EMAIL)
         await page.locator("#password").fill(TEST_PASSWORD)
         await page.locator("#username").fill(TEST_USERNAME)
-
-        # Submit the form
         await page.locator("input[type='submit']").click()
-
-        # Wait for network request processing
         await page.wait_for_timeout(NETWORK_TIMEOUT_MS)
 
     # Pact verification happens automatically on context exit.
