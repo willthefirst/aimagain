@@ -86,3 +86,6 @@ dmypy.json
 # Application specific
 chat_app.db
 test_chat_app.db 
+
+# Any directories called log
+*/**/log

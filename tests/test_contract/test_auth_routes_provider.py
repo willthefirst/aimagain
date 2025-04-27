@@ -44,6 +44,7 @@ PROVIDER_STATE_SETUP_URL = str(PROVIDER_URL / PROVIDER_STATE_SETUP_PATH)
 PROVIDER_NAME = "backend-api"  # Must match consumer pact
 PACT_DIR = os.path.join(os.path.dirname(__file__), "pacts")
 PACT_FILE_AUTH = os.path.join(PACT_DIR, "registrationui-backend-api.json")
+PACT_LOG = os.path.join(os.path.dirname(__file__), "log")
 logging.basicConfig(level=logging.DEBUG)
 log = logging.getLogger(__name__)
 # --- Configuration End ---
@@ -161,16 +162,16 @@ def test_pact_verification_auth_routes(provider_server: URL):  # Use the server 
 
     log.info(f"Setting up verifier with {PROVIDER_NAME} at {provider_server}")
     # Initialize Verifier pointing to the running test server
+
     verifier = Verifier(
         provider=PROVIDER_NAME,
         provider_base_url=str(provider_server),  # URL from the fixture
         provider_states_setup_url=PROVIDER_STATE_SETUP_URL,  # Callback URL for states
-        # We don't need provider_app here
     )
 
     log.info("Running Verifier for Auth Routes...")
     # Pass the pact file path(s) directly to verify_pacts()
-    success, logs_dict = verifier.verify_pacts(PACT_FILE_AUTH)
+    success, logs_dict = verifier.verify_pacts(PACT_FILE_AUTH, log_dir=PACT_LOG)
 
     # Assertion remains the same
     if success != 0:

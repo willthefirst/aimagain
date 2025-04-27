@@ -1,0 +1,2 @@
+- Clean up magic strings in contract_testing, to do with logging directory etc.
+- Generally clean up and organize the whole contract set up.

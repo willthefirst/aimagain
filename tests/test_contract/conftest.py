@@ -13,11 +13,10 @@ from pact import Consumer, Provider  # Added for Pact
 
 
 # Define Pact Consumer and Provider
-pact = Consumer(
-    "RegistrationUI",
-).has_pact_with(
+pact = Consumer("RegistrationUI").has_pact_with(
     Provider("backend-api"),
     pact_dir="tests/test_contract/pacts",
+    log_dir="tests/test_contract/log",
 )
 
 
