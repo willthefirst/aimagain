@@ -63,6 +63,11 @@ mock_handler_return_value = UserRead(**dummy_user_data)
 mock_handler = AsyncMock(return_value=mock_handler_return_value)
 
 
+# Define a top-level function to return the mock handler
+def get_mock_handler():
+    return mock_handler
+
+
 # --- Provider State Handling ---
 # This endpoint will be added to the app temporarily by the fixture
 # to handle callbacks from the Pact Verifier.
@@ -88,9 +93,14 @@ def provider_states_handler(state_info: dict = Body(...)):
 
 
 # --- Test Server Management ---
-def run_server() -> None:
-    """Target for multiprocessing.Process to run the app."""
-    print("Running in heeeeayserver...")
+# Modify run_server to accept the dependency and mock factory
+def run_server(dependency_to_override, mock_factory) -> None:
+    """Target for multiprocessing.Process to run the app with overrides."""
+    # Apply override within the child process before starting the server
+    app.dependency_overrides[dependency_to_override] = mock_factory
+    log.info(
+        f"Applied dependency override for {dependency_to_override.__name__} in server process PID {os.getpid()}."
+    )  # Added PID for clarity
     # Ensure run_server also uses the fixed port directly if logic changes later
     uvicorn.run(app, host=PROVIDER_HOST, port=PROVIDER_PORT, log_level="debug")
 
@@ -99,20 +109,25 @@ def run_server() -> None:
 def provider_server() -> Generator[URL, Any, None]:
     """
     Fixture to:
-    1. Override the handle_registration dependency in the main app.
-    2. Start the FastAPI app (with override) in a separate process.
+    1. Define the mock factory for handle_registration.
+    2. Start the FastAPI app (with override applied in the child process) in a separate process.
     3. Yield the base URL of the running test server.
-    4. Terminate the server and clean up the override on teardown.
+    4. Terminate the server on teardown.
     """
     log.info("Setting up provider server fixture...")
 
-    # 1. Override dependency BEFORE starting server process
-    original_overrides = app.dependency_overrides.copy()
-    app.dependency_overrides[handle_registration] = lambda: mock_handler
-    log.info(f"Overrode handle_registration dependency.")
+    # 1. Define the mock factory lambda - REMOVED
+    # mock_factory = lambda: mock_handler
+    # Use the top-level factory function instead
+    mock_factory = get_mock_handler
+    log.info(f"Using mock factory: {mock_factory.__name__}")  # Log the factory name
 
-    # 2. Start server process
-    proc = multiprocessing.Process(target=run_server, daemon=True)
+    # 2. Start server process, passing the dependency and mock factory
+    proc = multiprocessing.Process(
+        target=run_server,
+        args=(handle_registration, mock_factory),  # Pass dependency and factory
+        daemon=True,
+    )
     proc.start()
     log.info(f"Started provider server process (PID: {proc.pid}) on {PROVIDER_URL}")
     time.sleep(2)  # Allow time for server to start
@@ -122,7 +137,7 @@ def provider_server() -> Generator[URL, Any, None]:
     # 3. Yield the URL
     yield PROVIDER_URL
 
-    # 4. Teardown: Terminate server and restore overrides
+    # 4. Teardown: Terminate server
     log.info(f"Tearing down provider server fixture (PID: {proc.pid})...")
     if proc.is_alive():
         proc.terminate()
@@ -131,8 +146,8 @@ def provider_server() -> Generator[URL, Any, None]:
         log.warning(f"Server process {proc.pid} did not terminate gracefully. Killing.")
         proc.kill()
         proc.join(timeout=1)
-    app.dependency_overrides = original_overrides
-    log.info("Provider server stopped and dependency overrides restored.")
+    # The override was applied in the child process, so no restoration needed here.
+    log.info("Provider server stopped.")
 
 
 # --- Pact Verification Test ---
