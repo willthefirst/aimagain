@@ -5,16 +5,26 @@ from unittest.mock import AsyncMock, MagicMock
 from uuid import uuid4
 import logging
 import time
-import socket
-import multiprocessing
+
+# import socket # No longer needed here
+# import multiprocessing # No longer needed here
 from typing import Generator, Any
 
-from fastapi import FastAPI, Body, Response, status
+# from fastapi import FastAPI, Body, Response, status # No longer needed directly here
 from pact import Verifier
-import uvicorn
+
+# import uvicorn # No longer needed here
 from yarl import URL  # Using yarl for URL manipulation
 
-from app.main import app  # Import the main FastAPI app instance
+# Import shared constants and provider URLs from conftest
+from tests.test_contract.conftest import (
+    CONSUMER_NAME,
+    PROVIDER_NAME,
+    PACT_DIR,
+    PACT_LOG_DIR,
+    PROVIDER_URL,  # Import base URL
+    PROVIDER_STATE_SETUP_URL,  # Import state setup URL
+)
 
 # Import the single handler dependency to mock
 from app.logic.auth_processing import handle_registration
@@ -22,168 +32,81 @@ from app.logic.auth_processing import handle_registration
 # Import the response schema for mock return value structure
 from app.schemas.user import UserRead
 
-
-# --- Test Server Configuration ---
-def _find_available_port() -> int:
-    # Temporarily disable dynamic port finding for debugging
-    # with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-    #     s.bind(("127.0.0.1", 0))
-    #     return s.getsockname()[1]
-    return 8999
-
-
-# Define host, find port, create URL
-PROVIDER_HOST = "127.0.0.1"
-PROVIDER_PORT = 8999  # Use fixed port
-PROVIDER_URL = URL(f"http://{PROVIDER_HOST}:{PROVIDER_PORT}")
-PROVIDER_STATE_SETUP_PATH = "_pact/provider_states"
-PROVIDER_STATE_SETUP_URL = str(PROVIDER_URL / PROVIDER_STATE_SETUP_PATH)
-
-
-# --- Pact Configuration ---
-PROVIDER_NAME = "backend-api"  # Must match consumer pact
-PACT_DIR = os.path.join(os.path.dirname(__file__), "pacts")
-PACT_FILE_AUTH = os.path.join(PACT_DIR, "registrationui-backend-api.json")
-PACT_LOG = os.path.join(os.path.dirname(__file__), "log")
-logging.basicConfig(level=logging.DEBUG)
+# Get logger
 log = logging.getLogger(__name__)
-# --- Configuration End ---
+logging.basicConfig(
+    level=logging.INFO
+)  # Use INFO level for less noise, DEBUG in conftest if needed
 
+# --- Pact File Configuration ---
+Pact_file_name = f"{CONSUMER_NAME.lower()}-{PROVIDER_NAME}.json"
+Pact_file_path = os.path.join(PACT_DIR, Pact_file_name)
 
-# --- Mock Handler Setup ---
-# We define the mock return value globally or within the fixture setup
-dummy_user_data = {
-    "id": uuid4(),
+# --- Mock Configuration --- (No longer a fixture, just config)
+dummy_user_data_config = {
+    "id": str(uuid4()),  # Use string UUID for pickling if necessary
     "email": "test.user@example.com",
     "username": "testuser",
     "is_active": True,
     "is_superuser": False,
     "is_verified": False,
 }
-mock_handler_return_value = UserRead(**dummy_user_data)
-mock_handler = AsyncMock(return_value=mock_handler_return_value)
 
-
-# Define a top-level function to return the mock handler
-def get_mock_handler():
-    return mock_handler
-
-
-# --- Provider State Handling ---
-# This endpoint will be added to the app temporarily by the fixture
-# to handle callbacks from the Pact Verifier.
-@app.post("/" + PROVIDER_STATE_SETUP_PATH)
-def provider_states_handler(state_info: dict = Body(...)):
-    """Endpoint to handle provider state setup requests from Verifier."""
-    state = state_info.get("state")
-    log.info(f"Provider state setup endpoint called for state: '{state}'")
-    # In a more complex scenario, you might adjust mocks or DB state here
-    # based on the 'state' value. For this test, the mock is pre-configured.
-    if state == "User test.user@example.com does not exist":
-        # Ensure the mock is configured for success (already done globally)
-        mock_handler.reset_mock()  # Reset call counts etc.
-        mock_handler.return_value = mock_handler_return_value  # Re-assign return value
-        mock_handler.side_effect = None  # Ensure no exception is set
-        log.info(f"Configured mock for state: '{state}'")
-    else:
-        log.warning(f"Unhandled provider state received: {state}")
-        # Optionally raise an error for unhandled states
-        # return Response(status_code=status.HTTP_501_NOT_IMPLEMENTED)
-
-    return Response(status_code=status.HTTP_200_OK)
-
-
-# --- Test Server Management ---
-# Modify run_server to accept the dependency and mock factory
-def run_server(dependency_to_override, mock_factory) -> None:
-    """Target for multiprocessing.Process to run the app with overrides."""
-    # Apply override within the child process before starting the server
-    app.dependency_overrides[dependency_to_override] = mock_factory
-    log.info(
-        f"Applied dependency override for {dependency_to_override.__name__} in server process PID {os.getpid()}."
-    )  # Added PID for clarity
-    # Ensure run_server also uses the fixed port directly if logic changes later
-    uvicorn.run(app, host=PROVIDER_HOST, port=PROVIDER_PORT, log_level="debug")
-
-
-@pytest.fixture(scope="module")
-def provider_server() -> Generator[URL, Any, None]:
-    """
-    Fixture to:
-    1. Define the mock factory for handle_registration.
-    2. Start the FastAPI app (with override applied in the child process) in a separate process.
-    3. Yield the base URL of the running test server.
-    4. Terminate the server on teardown.
-    """
-    log.info("Setting up provider server fixture...")
-
-    # 1. Define the mock factory lambda - REMOVED
-    # mock_factory = lambda: mock_handler
-    # Use the top-level factory function instead
-    mock_factory = get_mock_handler
-    log.info(f"Using mock factory: {mock_factory.__name__}")  # Log the factory name
-
-    # 2. Start server process, passing the dependency and mock factory
-    proc = multiprocessing.Process(
-        target=run_server,
-        args=(handle_registration, mock_factory),  # Pass dependency and factory
-        daemon=True,
-    )
-    proc.start()
-    log.info(f"Started provider server process (PID: {proc.pid}) on {PROVIDER_URL}")
-    time.sleep(2)  # Allow time for server to start
-    if not proc.is_alive():
-        pytest.fail("Provider server process failed to start.", pytrace=False)
-
-    # 3. Yield the URL
-    yield PROVIDER_URL
-
-    # 4. Teardown: Terminate server
-    log.info(f"Tearing down provider server fixture (PID: {proc.pid})...")
-    if proc.is_alive():
-        proc.terminate()
-        proc.join(timeout=3)
-    if proc.is_alive():
-        log.warning(f"Server process {proc.pid} did not terminate gracefully. Killing.")
-        proc.kill()
-        proc.join(timeout=1)
-    # The override was applied in the child process, so no restoration needed here.
-    log.info("Provider server stopped.")
+# --- Dependency Override Configuration for Parametrization ---
+# Define the parametrization for the test function
+# Pass picklable config: {target_path: config_for_mock}
+provider_server_override_config = pytest.mark.parametrize(
+    "provider_server",  # Target the provider_server fixture
+    [
+        {
+            "app.logic.auth_processing.handle_registration": {  # Dependency path as key
+                "return_value_config": dummy_user_data_config  # Picklable config
+            }
+        }
+    ],
+    indirect=True,  # Indicate this parameter indirectly parametrizes the provider_server fixture
+    scope="module",
+)
 
 
 # --- Pact Verification Test ---
-def test_pact_verification_auth_routes(provider_server: URL):  # Use the server fixture
-    """Verify the Auth Routes Pact contract against the running provider server."""
-    log.info(
-        f"Starting Pact verification for '{PROVIDER_NAME}' auth routes using '{PACT_FILE_AUTH}'"
-    )
-    if not os.path.exists(PACT_FILE_AUTH):
-        pytest.fail(f"Pact file not found: {PACT_FILE_AUTH}. Run consumer test first.")
+@provider_server_override_config  # Apply the parametrization marker to the test
+def test_pact_verification_auth_routes(
+    provider_server: URL,  # provider_server is now parametrized indirectly
+    # mock_registration_handler: AsyncMock # Mock created in subprocess, no longer injected here
+):
+    """Verify the Auth Routes Pact contract against the running provider server.
 
-    log.info(f"Setting up verifier with {PROVIDER_NAME} at {provider_server}")
-    # Initialize Verifier pointing to the running test server
+    Relies on the provider_server fixture (parametrized indirectly) to start
+    the server with the correct mock configuration created in the subprocess.
+    """
+    log.info(
+        f"Test function execution: Verifying Pact for '{PROVIDER_NAME}' against {provider_server}"
+    )
+
+    if not os.path.exists(Pact_file_path):
+        pytest.fail(f"Pact file not found: {Pact_file_path}. Run consumer test first.")
+
+    log.info(f"Setting up verifier for provider '{PROVIDER_NAME}' at {provider_server}")
+    log.info(f"Provider state setup URL: {PROVIDER_STATE_SETUP_URL}")
 
     verifier = Verifier(
         provider=PROVIDER_NAME,
-        provider_base_url=str(provider_server),  # URL from the fixture
-        provider_states_setup_url=PROVIDER_STATE_SETUP_URL,  # Callback URL for states
+        provider_base_url=str(provider_server),
+        provider_states_setup_url=PROVIDER_STATE_SETUP_URL,
     )
 
-    log.info("Running Verifier for Auth Routes...")
-    # Pass the pact file path(s) directly to verify_pacts()
-    success, logs_dict = verifier.verify_pacts(PACT_FILE_AUTH, log_dir=PACT_LOG)
+    log.info("Running Verifier...")
+    success, logs_dict = verifier.verify_pacts(Pact_file_path, log_dir=PACT_LOG_DIR)
 
-    # Assertion remains the same
     if success != 0:
-        log.error("Auth Routes Pact verification failed. Logs:")
-        import json
+        log.error("Pact verification failed. Logs:")
+        try:
+            import json
 
-        print(json.dumps(logs_dict, indent=4))  # Print logs for debugging
-    assert success == 0, f"Pact verification failed (exit code: {success}). Check logs."
-
-    log.info("Auth Routes Pact verification successful!")
-
-
-# Remove the old fixture if it exists (it was implicitly removed by replacing the file content)
-# @pytest.fixture(scope="module")
-# def app_override_auth_routes(): ...
+            print(json.dumps(logs_dict, indent=4))
+        except ImportError:
+            print(logs_dict)
+        pytest.fail(f"Pact verification failed (exit code: {success}). Check logs.")
+    else:
+        log.info("Pact verification successful!")
