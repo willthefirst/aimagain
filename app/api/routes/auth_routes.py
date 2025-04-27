@@ -79,6 +79,7 @@ async def register_request_handler(
     Ultra-thin route handler for user registration.
     Validates request body via UserCreate schema and delegates to handle_registration.
     """
+    print("Register request handler invoked.")
     logger.debug("Register request handler invoked.")
     # Call the handler, passing validated data and request
     # Exceptions raised by the handler will propagate and be handled by FastAPI

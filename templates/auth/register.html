@@ -2,11 +2,17 @@
 <html>
   <head>
     <title>Register</title>
+    <script
+      src="https://unpkg.com/htmx.org@2.0.4"
+      integrity="sha384-HGfztofotfshcF7+8n44JQL2oJmowVChPTg48S+jvZoztPfvwD79OC/LTtG6dMp+"
+      crossorigin="anonymous"></script>
+
+    <script src="https://unpkg.com/htmx.org/dist/ext/json-enc.js"></script>
   </head>
   <body>
     <h1>Register</h1>
-    <!-- Assuming the POST action is the default FastAPI Users endpoint -->
-    <form method="post" action="/auth/register">
+    <!-- Use htmx for JSON submission -->
+    <form hx-post="/auth/register" hx-ext="json-enc">
       <label for="email">Email:</label><br />
       <input type="email" id="email" name="email" required /><br />
       <label for="username">Username:</label><br />

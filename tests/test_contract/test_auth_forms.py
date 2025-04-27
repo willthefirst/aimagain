@@ -18,7 +18,7 @@ async def test_registration_form_fill_and_submit(pact_mock, origin: str, page: P
     full_mock_url = f"{mock_server_uri}{register_api_path}"
 
     # --- Define Pact Interaction ---
-    expected_request_headers = {"Content-Type": "application/x-www-form-urlencoded"}
+    expected_request_headers = {"Content-Type": "application/json"}
     expected_request_body = {
         "email": Like("test.user@example.com"),
         "password": Like("securepassword123"),
@@ -40,6 +40,7 @@ async def test_registration_form_fill_and_submit(pact_mock, origin: str, page: P
     # --- Define Playwright Interception Logic ---
     async def handle_route(route: Route):
         if route.request.method == "POST" and register_api_path in route.request.url:
+            print(f"Intercepted request to {route.request.url}")
             await route.continue_(
                 url=full_mock_url,
                 # Forward necessary headers, Content-Type is set by browser/form

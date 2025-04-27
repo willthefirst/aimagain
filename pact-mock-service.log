@@ -1,13 +1,13 @@
-I, [2025-04-27T12:56:48.539213 #91684]  INFO -- : Cleared interactions
-I, [2025-04-27T12:56:48.542134 #91684]  INFO -- : Registered expected interaction POST /auth/register
-D, [2025-04-27T12:56:48.542214 #91684] DEBUG -- : {
+I, [2025-04-27T14:53:05.022934 #1559]  INFO -- : Cleared interactions
+I, [2025-04-27T14:53:05.058508 #1559]  INFO -- : Registered expected interaction POST /auth/register
+D, [2025-04-27T14:53:05.058729 #1559] DEBUG -- : {
   "description": "a request to register a new user via web form",
   "providerState": "User test.user@example.com does not exist",
   "request": {
     "method": "POST",
     "path": "/auth/register",
     "headers": {
-      "Content-Type": "application/x-www-form-urlencoded"
+      "Content-Type": "application/json"
     },
     "body": {
       "email": {
@@ -31,40 +31,44 @@ D, [2025-04-27T12:56:48.542214 #91684] DEBUG -- : {
   },
   "metadata": null
 }
-I, [2025-04-27T12:56:48.678823 #91684]  INFO -- : Received request POST /auth/register
-D, [2025-04-27T12:56:48.678900 #91684] DEBUG -- : {
+I, [2025-04-27T14:53:05.576021 #1559]  INFO -- : Received request POST /auth/register
+D, [2025-04-27T14:53:05.576089 #1559] DEBUG -- : {
   "path": "/auth/register",
   "query": "",
   "method": "post",
-  "body": "email=test.user%40example.com&username=testuser&password=securepassword123",
+  "body": {
+    "email": "test.user@example.com",
+    "username": "testuser",
+    "password": "securepassword123"
+  },
   "headers": {
-    "Content-Length": "74",
-    "Content-Type": "application/x-www-form-urlencoded",
+    "Content-Length": "86",
+    "Content-Type": "application/json",
     "Host": "localhost:1234",
     "Connection": "keep-alive",
     "Pragma": "no-cache",
     "Cache-Control": "no-cache",
-    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
-    "Origin": "http://localhost:53616",
-    "Upgrade-Insecure-Requests": "1",
+    "Accept": "*/*",
+    "Hx-Current-Url": "http://localhost:58460/auth/register",
+    "Hx-Request": "true",
+    "Origin": "http://localhost:58460",
     "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/134.0.6998.35 Safari/537.36",
     "Sec-Ch-Ua": "\"Chromium\";v=\"134\", \"Not:A-Brand\";v=\"24\", \"HeadlessChrome\";v=\"134\"",
     "Sec-Ch-Ua-Mobile": "?0",
     "Sec-Ch-Ua-Platform": "\"macOS\"",
     "Sec-Fetch-Site": "same-site",
-    "Sec-Fetch-Mode": "navigate",
-    "Sec-Fetch-User": "?1",
-    "Sec-Fetch-Dest": "document",
-    "Referer": "http://localhost:53616/auth/register",
+    "Sec-Fetch-Mode": "cors",
+    "Sec-Fetch-Dest": "empty",
+    "Referer": "http://localhost:58460/auth/register",
     "Accept-Encoding": "gzip, deflate, br, zstd",
     "Version": "HTTP/1.1"
   }
 }
-I, [2025-04-27T12:56:48.679043 #91684]  INFO -- : Found matching response for POST /auth/register
-D, [2025-04-27T12:56:48.679066 #91684] DEBUG -- : {
+I, [2025-04-27T14:53:05.576191 #1559]  INFO -- : Found matching response for POST /auth/register
+D, [2025-04-27T14:53:05.576212 #1559] DEBUG -- : {
   "status": 201,
   "headers": {
   }
 }
-I, [2025-04-27T12:56:49.185388 #91684]  INFO -- : Verifying - interactions matched
-I, [2025-04-27T12:56:49.187155 #91684]  INFO -- : Writing pact for backend-api to pacts/frontend-pact-backend-api.json
+I, [2025-04-27T14:53:06.082112 #1559]  INFO -- : Verifying - interactions matched
+I, [2025-04-27T14:53:06.086999 #1559]  INFO -- : Writing pact for backend-api to tests/test_contract/pacts/registrationui-backend-api.json

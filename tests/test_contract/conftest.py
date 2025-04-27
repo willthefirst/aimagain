@@ -9,13 +9,15 @@ from playwright.async_api import async_playwright
 from app.api.routes import auth_pages
 from pact import Consumer, Provider  # Added for Pact
 
+# Get the absolute route of the /pacts directory in this direcotry
+
+
 # Define Pact Consumer and Provider
 pact = Consumer(
     "RegistrationUI",
 ).has_pact_with(
-    Provider("AuthService"),
-    # pact_dir specifies where to store the generated pact files
-    pact_dir="../pacts",  # Adjust path as needed relative to where tests run
+    Provider("backend-api"),
+    pact_dir="tests/test_contract/pacts",
 )
 
 

@@ -42,9 +42,9 @@ PROVIDER_STATE_SETUP_URL = str(PROVIDER_URL / PROVIDER_STATE_SETUP_PATH)
 
 # --- Pact Configuration ---
 PROVIDER_NAME = "backend-api"  # Must match consumer pact
-PACT_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "pacts")
-PACT_FILE_AUTH = os.path.join(PACT_DIR, "frontend-pact-backend-api.json")
-logging.basicConfig(level=logging.INFO)
+PACT_DIR = os.path.join(os.path.dirname(__file__), "pacts")
+PACT_FILE_AUTH = os.path.join(PACT_DIR, "registrationui-backend-api.json")
+logging.basicConfig(level=logging.DEBUG)
 log = logging.getLogger(__name__)
 # --- Configuration End ---
 
@@ -90,8 +90,9 @@ def provider_states_handler(state_info: dict = Body(...)):
 # --- Test Server Management ---
 def run_server() -> None:
     """Target for multiprocessing.Process to run the app."""
+    print("Running in heeeeayserver...")
     # Ensure run_server also uses the fixed port directly if logic changes later
-    uvicorn.run(app, host=PROVIDER_HOST, port=PROVIDER_PORT, log_level="info")
+    uvicorn.run(app, host=PROVIDER_HOST, port=PROVIDER_PORT, log_level="debug")
 
 
 @pytest.fixture(scope="module")
@@ -114,7 +115,7 @@ def provider_server() -> Generator[URL, Any, None]:
     proc = multiprocessing.Process(target=run_server, daemon=True)
     proc.start()
     log.info(f"Started provider server process (PID: {proc.pid}) on {PROVIDER_URL}")
-    time.sleep(5)  # Allow time for server to start
+    time.sleep(2)  # Allow time for server to start
     if not proc.is_alive():
         pytest.fail("Provider server process failed to start.", pytrace=False)
 
