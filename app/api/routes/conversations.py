@@ -1,5 +1,5 @@
-from fastapi import APIRouter, Request, Depends, HTTPException, status
-from fastapi.responses import HTMLResponse
+from fastapi import APIRouter, Request, Depends, HTTPException, status, Form
+from fastapi.responses import HTMLResponse, RedirectResponse
 from uuid import UUID
 import logging  # Use logging
 
@@ -17,7 +17,9 @@ from app.auth_config import current_active_user
 #     get_participant_repository,
 # )
 # from app.repositories.conversation_repository import ConversationRepository
-# from app.repositories.user_repository import UserRepository
+from app.repositories.user_repository import UserRepository
+from app.repositories.dependencies import get_user_repository
+
 # from app.repositories.participant_repository import ParticipantRepository
 
 # Import service dependency
@@ -83,6 +85,28 @@ async def list_conversations(
 
 
 @router.get(
+    "/conversations/new",
+    response_class=HTMLResponse,
+    name="get_new_conversation_form",
+    tags=["conversations"],
+)
+async def get_new_conversation_form(
+    request: Request,
+    user: User = Depends(current_active_user),  # Requires auth
+):
+    """Displays the form to create a new conversation."""
+    # TODO: Implement proper template rendering later
+    # For now, return a placeholder or reference the template name
+    return templates.TemplateResponse(
+        name="conversations/new.html",  # Placeholder template name
+        context={
+            "request": request,
+            # Add other context if needed later
+        },
+    )
+
+
+@router.get(
     "/conversations/{slug}",
     response_class=HTMLResponse,
     tags=["conversations"],
@@ -132,44 +156,70 @@ async def get_conversation(
 
 @router.post(
     "/conversations",
-    response_model=ConversationResponse,
-    status_code=status.HTTP_201_CREATED,
+    # Remove response_model for HTML form submission -> redirect
+    # response_model=ConversationResponse,
+    # Redirect status code
+    status_code=status.HTTP_303_SEE_OTHER,
+    name="create_conversation",  # Added name
     tags=["conversations"],
 )
 async def create_conversation(
-    request_data: ConversationCreateRequest,
+    # request: Request, # Add if needed for url_for in redirect, but slug is known
+    # Change parameters to accept Form data
+    invitee_username: str = Form(...),
+    initial_message: str = Form(...),
     user: User = Depends(current_active_user),  # Requires auth
-    # Depend on the service
     conv_service: ConversationService = Depends(get_conversation_service),
+    # We need UserRepository to find the user by username
+    user_repo: UserRepository = Depends(get_user_repository),  # Add user repo dep
 ):
-    """Creates a new conversation by inviting another user."""
+    """Handles the form submission to create a new conversation."""
     try:
-        # Validate UUID format early
-        try:
-            invitee_uuid = UUID(request_data.invitee_user_id)
-        except ValueError:
+        # 1. Find invitee user by username
+        invitee_user = await user_repo.get_user_by_username(invitee_username)
+        if not invitee_user:
+            # TODO: Improve error handling - display message on form page?
+            # For now, raise 404 matching UserNotFoundError from service
             raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Invalid invitee user ID format.",
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"User with username '{invitee_username}' not found.",
             )
 
-        # Delegate creation to the service
+        # Optional: Check if invitee is online (if business rule still applies)
+        # if not invitee_user.is_online:
+        #     raise HTTPException(
+        #         status_code=status.HTTP_400_BAD_REQUEST,
+        #         detail="Invitee user is not online",
+        #     )
+
+        # 2. Delegate creation to the service
         new_conversation = await conv_service.create_new_conversation(
             creator_user=user,
-            invitee_user_id=invitee_uuid,
-            initial_message_content=request_data.initial_message,
+            invitee_user_id=invitee_user.id,  # Use the found user ID
+            initial_message_content=initial_message,
         )
 
-        # Return Pydantic model (FastAPI handles conversion from ORM object)
-        return new_conversation
+        # 3. Redirect to the new conversation page
+        redirect_url = f"/conversations/{new_conversation.slug}"
+        # Alternatively using url_for if the get_conversation route has a name:
+        # redirect_url = request.url_for('get_conversation', slug=new_conversation.slug)
+        return RedirectResponse(url=redirect_url, status_code=status.HTTP_303_SEE_OTHER)
 
-    # Handle specific service errors
-    except (UserNotFoundError, BusinessRuleError, ConflictError, DatabaseError) as e:
-        handle_service_error(e)
+    # Handle potential service errors (UserNotFound should be caught above)
+    except (BusinessRuleError, ConflictError, DatabaseError) as e:
+        # TODO: Improve error handling - display message on form page?
+        handle_service_error(e)  # Reuse existing handler for now
     except ServiceError as e:
+        # TODO: Improve error handling
         handle_service_error(e)
+    except HTTPException as e:
+        # Re-raise HTTPExceptions raised manually (like the 404 above)
+        raise e
     except Exception as e:
-        logger.error(f"Unexpected error creating conversation: {e}", exc_info=True)
+        logger.error(
+            f"Unexpected error creating conversation via form: {e}", exc_info=True
+        )
+        # TODO: Improve error handling
         raise HTTPException(
             status_code=500, detail="An unexpected server error occurred."
         )

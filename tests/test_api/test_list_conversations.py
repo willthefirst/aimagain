@@ -14,9 +14,9 @@ from test_helpers import create_test_user
 pytestmark = pytest.mark.asyncio
 
 
-async def test_list_conversations_empty(test_client: AsyncClient):
+async def test_list_conversations_empty(authenticated_client: AsyncClient):
     """Test GET /conversations returns HTML with no conversations message when empty."""
-    response = await test_client.get(f"/conversations")
+    response = await authenticated_client.get(f"/conversations")
     assert response.status_code == 200
     assert "text/html" in response.headers["content-type"]
     tree = HTMLParser(response.text)
@@ -25,7 +25,7 @@ async def test_list_conversations_empty(test_client: AsyncClient):
 
 
 async def test_list_conversations_one_convo(
-    test_client: AsyncClient,
+    authenticated_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],
 ):
     """Test GET /conversations returns HTML listing one conversation when one exists."""
@@ -50,7 +50,7 @@ async def test_list_conversations_one_convo(
             )
             session.add(participant)
 
-    response = await test_client.get(f"/conversations")
+    response = await authenticated_client.get(f"/conversations")
     assert response.status_code == 200
     assert "text/html" in response.headers["content-type"]
     tree = HTMLParser(response.text)
@@ -66,7 +66,7 @@ async def test_list_conversations_one_convo(
 
 
 async def test_list_conversations_sorted(
-    test_client: AsyncClient,
+    authenticated_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],
 ):
     """Test GET /conversations returns conversations sorted by last_activity_at desc."""
@@ -103,7 +103,7 @@ async def test_list_conversations_sorted(
                 [user1, user2, convo_older, convo_newer, part_older, part_newer]
             )
 
-    response = await test_client.get(f"/conversations")
+    response = await authenticated_client.get(f"/conversations")
     assert response.status_code == 200
     assert "text/html" in response.headers["content-type"]
     tree = HTMLParser(response.text)
@@ -113,3 +113,18 @@ async def test_list_conversations_sorted(
     assert len(slugs_in_order) == 2, "Expected two conversation items"
     assert slugs_in_order[0] == convo_newer.slug, "Newer conversation slug not first"
     assert slugs_in_order[1] == convo_older.slug, "Older conversation slug not second"
+
+
+async def test_create_conversation_link_present(authenticated_client: AsyncClient):
+    """Test that the 'Create New Conversation' link is present on the list page."""
+    response = await authenticated_client.get("/conversations")
+    # print(f"Response Text for /conversations:\n{response.text[:500]}...") # Keep print commented out for now
+    assert response.status_code == 200
+    assert "text/html" in response.headers["content-type"]
+    tree = HTMLParser(response.text)
+    # Use ends-with selector for href
+    link_element = tree.css_first('a[href$="/conversations/new"]')
+    assert (
+        link_element is not None
+    ), "Link ending with href='/conversations/new' not found"
+    assert "Create New Conversation" in link_element.text(), "Link text is incorrect"

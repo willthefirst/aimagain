@@ -21,6 +21,7 @@ from app.db import get_db_session, get_user_db
 from app.models import User, metadata  # Assuming your models define metadata
 from fastapi_users.db import SQLAlchemyUserDatabase
 from app.schemas.user import UserCreate  # Import UserCreate schema
+from app.core.templating import templates  # Import the global templates object
 
 # Use an in-memory SQLite database for testing
 TEST_DATABASE_URL = "sqlite+aiosqlite:///:memory:"
@@ -70,9 +71,19 @@ def test_app(
 ) -> FastAPI:
     app.dependency_overrides[get_db_session] = override_get_db_session
     app.dependency_overrides[get_user_db] = override_get_user_db
+
+    # Add the app instance to Jinja globals so url_for can find it
+    original_app_global = templates.env.globals.get("app")
+    templates.env.globals["app"] = app
+
     yield app
     # Clean up overrides after test function finishes
     app.dependency_overrides.clear()
+    # Restore or remove the global modification
+    if original_app_global is not None:
+        templates.env.globals["app"] = original_app_global
+    elif "app" in templates.env.globals:
+        del templates.env.globals["app"]
 
 
 # Fixture for the async test client

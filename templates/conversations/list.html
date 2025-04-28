@@ -6,6 +6,12 @@
   <body>
     <h1>Public Conversations</h1>
 
+    <p>
+      <a href="{{ url_for('get_new_conversation_form') }}"
+        >Create New Conversation</a
+      >
+    </p>
+
     {% if conversations %}
     <ul>
       {# Now looping through Conversation ORM objects #} {% for convo in
