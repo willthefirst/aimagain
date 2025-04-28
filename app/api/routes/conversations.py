@@ -45,6 +45,10 @@ from app.schemas.participant import ParticipantInviteRequest, ParticipantRespons
 # Removed unused uuid and datetime imports if service handles them
 # Import shared error handling function
 from app.api.errors import handle_service_error
+from app.logic.conversation_processing import (
+    handle_create_conversation,
+    UserNotFoundError as LogicUserNotFoundError,  # Import custom exception
+)
 
 
 logger = logging.getLogger(__name__)  # Setup logger for route level
@@ -156,68 +160,50 @@ async def get_conversation(
 
 @router.post(
     "/conversations",
-    # Remove response_model for HTML form submission -> redirect
-    # response_model=ConversationResponse,
-    # Redirect status code
     status_code=status.HTTP_303_SEE_OTHER,
-    name="create_conversation",  # Added name
+    name="create_conversation",
     tags=["conversations"],
 )
 async def create_conversation(
-    # request: Request, # Add if needed for url_for in redirect, but slug is known
-    # Change parameters to accept Form data
     invitee_username: str = Form(...),
     initial_message: str = Form(...),
-    user: User = Depends(current_active_user),  # Requires auth
+    user: User = Depends(current_active_user),
     conv_service: ConversationService = Depends(get_conversation_service),
-    # We need UserRepository to find the user by username
-    user_repo: UserRepository = Depends(get_user_repository),  # Add user repo dep
+    user_repo: UserRepository = Depends(get_user_repository),
 ):
-    """Handles the form submission to create a new conversation."""
+    """Handles the form submission by calling the processing logic."""
     try:
-        # 1. Find invitee user by username
-        invitee_user = await user_repo.get_user_by_username(invitee_username)
-        if not invitee_user:
-            # TODO: Improve error handling - display message on form page?
-            # For now, raise 404 matching UserNotFoundError from service
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"User with username '{invitee_username}' not found.",
-            )
-
-        # Optional: Check if invitee is online (if business rule still applies)
-        # if not invitee_user.is_online:
-        #     raise HTTPException(
-        #         status_code=status.HTTP_400_BAD_REQUEST,
-        #         detail="Invitee user is not online",
-        #     )
-
-        # 2. Delegate creation to the service
-        new_conversation = await conv_service.create_new_conversation(
+        # Call the decoupled logic handler
+        new_slug = await handle_create_conversation(
+            invitee_username=invitee_username,
+            initial_message=initial_message,
             creator_user=user,
-            invitee_user_id=invitee_user.id,  # Use the found user ID
-            initial_message_content=initial_message,
+            conv_service=conv_service,
+            user_repo=user_repo,
         )
 
-        # 3. Redirect to the new conversation page
-        redirect_url = f"/conversations/{new_conversation.slug}"
-        # Alternatively using url_for if the get_conversation route has a name:
-        # redirect_url = request.url_for('get_conversation', slug=new_conversation.slug)
+        # Redirect on success
+        redirect_url = f"/conversations/{new_slug}"
         return RedirectResponse(url=redirect_url, status_code=status.HTTP_303_SEE_OTHER)
 
-    # Handle potential service errors (UserNotFound should be caught above)
+    # --- Exception Translation --- #
+    except LogicUserNotFoundError as e:
+        # Translate logic layer UserNotFound to HTTP 404
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
     except (BusinessRuleError, ConflictError, DatabaseError) as e:
-        # TODO: Improve error handling - display message on form page?
-        handle_service_error(e)  # Reuse existing handler for now
+        # Translate specific service errors using existing handler
+        # TODO: Improve error handling (e.g., flash messages on form)
+        handle_service_error(e)
     except ServiceError as e:
+        # Translate generic service errors
         # TODO: Improve error handling
         handle_service_error(e)
-    except HTTPException as e:
-        # Re-raise HTTPExceptions raised manually (like the 404 above)
-        raise e
+    # Removed catch for HTTPException as handler shouldn't raise it
+    # except HTTPException as e:
+    #     raise e
     except Exception as e:
         logger.error(
-            f"Unexpected error creating conversation via form: {e}", exc_info=True
+            f"Unexpected error in create_conversation route: {e}", exc_info=True
         )
         # TODO: Improve error handling
         raise HTTPException(
