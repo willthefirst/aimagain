@@ -55,7 +55,7 @@ AUTH_API_PROVIDER_CONFIG = pytest.mark.parametrize(
     "provider_server",
     [
         {
-            "app.logic.auth_processing.handle_registration": {  # Dependency path string
+            "app.api.routes.auth_routes.handle_registration": {  # Dependency path string
                 "return_value_config": {  # Inlined config
                     "id": str(uuid4()),
                     "email": "test.user@example.com",

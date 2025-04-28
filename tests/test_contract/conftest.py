@@ -13,6 +13,12 @@ from yarl import URL
 from typing import Generator, Any, Callable, Dict
 import importlib
 import uuid
+import asyncio
+from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
+from app.models import metadata  # Import the metadata
+from app.db import get_db_session  # Import the dependency function
+from typing import AsyncGenerator
+from unittest.mock import AsyncMock, patch
 
 # Pact Configuration
 CONSUMER_NAME = "RegistrationUI"
@@ -140,25 +146,44 @@ def _run_provider_server_process(  # Renamed function
 ) -> None:
     """Target function to run the main FastAPI app with overrides for provider testing."""
     # Imports required only within the subprocess
+    # import asyncio # No longer needed for DB setup
     from app.main import app
-    from unittest.mock import AsyncMock
+    from unittest.mock import AsyncMock, patch  # Import patch
     from app.schemas.user import UserRead
     import importlib
     import uuid
     import logging
+
+    # --- Database Setup for Provider Process --- REMOVED ---
+    # from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
+    # from app.models import metadata  # Import the metadata
+    # from app.db import get_db_session  # Import the dependency function
+    # from typing import AsyncGenerator
+    # TEST_DATABASE_URL = "sqlite+aiosqlite:///:memory:"  # Use in-memory DB
+    # provider_engine = create_async_engine(TEST_DATABASE_URL)
+    # provider_session_maker = async_sessionmaker(provider_engine, expire_on_commit=False)
+    # async def initialize_db():
+    #     async with provider_engine.begin() as conn:
+    #         await conn.run_sync(metadata.create_all)
+    # asyncio.run(initialize_db())
+    # async def override_get_db_session_provider() -> AsyncGenerator[AsyncSession, None]:
+    #     async with provider_session_maker() as session:
+    #         yield session
+    # app.dependency_overrides[get_db_session] = override_get_db_session_provider
+    # --- End Database Setup ---
 
     # Use the same logger name as the parent process for consistency
     log_provider_subprocess = logging.getLogger("pact_provider_test")
 
     app.post("/" + state_path)(state_handler)
 
-    if override_config:
-        for dep_path, mock_config in override_config.items():
-            try:
-                dep_module_path, dep_name = dep_path.rsplit(".", 1)
-                dep_module = importlib.import_module(dep_module_path)
-                dependency_to_override = getattr(dep_module, dep_name)
+    # Context manager for patches
+    patch_managers = []  # Use a list to manage multiple patches if needed
 
+    if override_config:
+        for patch_target_path, mock_config in override_config.items():
+            try:
+                # --- Create the AsyncMock --- #
                 if "return_value_config" in mock_config:
                     return_data = mock_config["return_value_config"]
                     if "id" in return_data:
@@ -166,28 +191,56 @@ def _run_provider_server_process(  # Renamed function
                             return_data["id"] = uuid.UUID(return_data["id"])
                         except (TypeError, ValueError):
                             pass  # Ignore conversion error, use string ID
-
                     mock_instance = AsyncMock(return_value=UserRead(**return_data))
                 else:
                     mock_instance = AsyncMock()
+                # --- End Create the AsyncMock --- #
 
-                mock_factory = lambda: mock_instance
-                app.dependency_overrides[dependency_to_override] = mock_factory
+                # --- Setup Patch --- #
+                # Instead of app.dependency_overrides, use unittest.mock.patch
+                # The patch_target_path comes from the override_config key
+                # (e.g., "app.api.routes.auth_routes.handle_registration")
+                patcher = patch(patch_target_path, new=mock_instance)
+                patch_managers.append(patcher)
+                # --- End Setup Patch --- #
 
-            except (ImportError, AttributeError, ValueError, KeyError) as e:
+            except (ValueError, KeyError, TypeError) as e:
                 log_provider_subprocess.error(
-                    f"Failed to setup override for '{dep_path}': {e}"
+                    f"Failed to setup mock/patch for '{patch_target_path}': {e}"
                 )
+                # Decide if we should raise an error or just log and continue
+                # Raising might be safer to prevent tests running with incorrect mocks
+                raise RuntimeError(
+                    f"Failed to setup mock/patch for '{patch_target_path}'"
+                ) from e
 
-    # Use debug level for provider process as it might be helpful for pact failures
-    uvicorn.run(app, host=host, port=port, log_level="debug")
+    # --- Run Server with Patches Applied --- #
+    try:
+        # Apply all patches
+        for patcher in patch_managers:
+            patcher.start()
+
+        # Run the Uvicorn server - any calls to patched targets will use the mock
+        uvicorn.run(app, host=host, port=port, log_level="debug")
+
+    finally:
+        # Stop all patches in reverse order
+        for patcher in reversed(patch_managers):
+            try:
+                patcher.stop()
+            except RuntimeError as e:
+                # Log error if stopping fails, but don't prevent other cleanup
+                log_provider_subprocess.error(
+                    f"Error stopping patcher for {patcher.attribute}: {e}"
+                )
+    # --- End Run Server --- #
 
 
 @pytest.fixture(scope="module")
 def provider_server(request) -> Generator[URL, Any, None]:
     """
     Starts the main FastAPI app in a separate process for Pact verification.
-    Dependency override configuration is passed via indirect parametrization.
+    Dependency override/patching configuration is passed via indirect parametrization.
     """
     override_config = getattr(request, "param", None)
     if not (override_config and isinstance(override_config, dict)):
@@ -212,8 +265,14 @@ def provider_server(request) -> Generator[URL, Any, None]:
     time.sleep(2)
     if not proc.is_alive():
         proc.join(timeout=1)
+        # No longer need to clear app.dependency_overrides here
+        # from app.main import app
+        # app.dependency_overrides.clear()
         pytest.fail("Provider server process failed to start.", pytrace=False)
 
     yield PROVIDER_URL
 
     _terminate_server_process(proc)
+    # No longer need to clear app.dependency_overrides here
+    # from app.main import app
+    # app.dependency_overrides.clear()

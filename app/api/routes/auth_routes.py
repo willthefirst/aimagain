@@ -2,6 +2,11 @@
 import logging
 from fastapi import APIRouter, Depends, status, Request
 
+# Import necessary components from fastapi-users and app config
+from fastapi_users import models
+from fastapi_users.manager import BaseUserManager
+from app.auth_config import get_user_manager
+
 # Import schemas used for request body validation and response model
 from app.schemas.user import UserCreate, UserRead
 
@@ -69,20 +74,24 @@ async def register_request_handler(
     # 1. FastAPI validates request body against UserCreate.
     #    Crucially, this expects application/json content type.
     request_data: UserCreate,
-    # 3. Pass the raw request object needed by the handler for context.
-    #    Moved before the argument with a default value.
+    # 2. Pass the raw request object needed by the handler for context.
     request: Request,
-    # 2. Depend ONLY on the handler function.
-    handler=Depends(handle_registration),
+    # 3. Inject the user_manager dependency here in the route handler.
+    user_manager: BaseUserManager[models.UP, models.ID] = Depends(get_user_manager),
+    # Removed the incorrect handler dependency previously:
+    # handler=Depends(handle_registration),
 ):
     """
     Ultra-thin route handler for user registration.
     Validates request body via UserCreate schema and delegates to handle_registration.
+    Injects the user_manager dependency needed by the handler.
     """
     print("Register request handler invoked.")
     logger.debug("Register request handler invoked.")
-    # Call the handler, passing validated data and request
-    # Exceptions raised by the handler will propagate and be handled by FastAPI
-    result = await handler(request_data=request_data, request=request)
+    # Call the handler function directly, passing the validated data, request,
+    # AND the explicitly resolved user_manager dependency.
+    result = await handle_registration(
+        request_data=request_data, request=request, user_manager=user_manager
+    )
     logger.debug("Register request handler returning result from handler.")
     return result
