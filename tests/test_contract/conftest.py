@@ -177,8 +177,11 @@ def _run_provider_server_process(  # Renamed function
 
     app.post("/" + state_path)(state_handler)
 
-    # Context manager for patches
-    patch_managers = []  # Use a list to manage multiple patches if needed
+    # Context manager for patches - REMOVED
+    # patch_managers = [] # Use a list to manage multiple patches if needed
+
+    # Use pytest's MonkeyPatch utility for managing patches
+    mp = pytest.MonkeyPatch()
 
     if override_config:
         for patch_target_path, mock_config in override_config.items():
@@ -196,43 +199,45 @@ def _run_provider_server_process(  # Renamed function
                     mock_instance = AsyncMock()
                 # --- End Create the AsyncMock --- #
 
-                # --- Setup Patch --- #
-                # Instead of app.dependency_overrides, use unittest.mock.patch
-                # The patch_target_path comes from the override_config key
-                # (e.g., "app.api.routes.auth_routes.handle_registration")
-                patcher = patch(patch_target_path, new=mock_instance)
-                patch_managers.append(patcher)
+                # --- Setup Patch using MonkeyPatch --- #
+                # Instead of unittest.mock.patch, use mp.setattr
+                mp.setattr(patch_target_path, mock_instance)
                 # --- End Setup Patch --- #
 
-            except (ValueError, KeyError, TypeError) as e:
+            except (
+                ValueError,
+                KeyError,
+                TypeError,
+                AttributeError,
+            ) as e:  # Added AttributeError
                 log_provider_subprocess.error(
                     f"Failed to setup mock/patch for '{patch_target_path}': {e}"
                 )
-                # Decide if we should raise an error or just log and continue
-                # Raising might be safer to prevent tests running with incorrect mocks
+                # Clean up any patches potentially applied before the error
+                mp.undo()
                 raise RuntimeError(
                     f"Failed to setup mock/patch for '{patch_target_path}'"
                 ) from e
 
     # --- Run Server with Patches Applied --- #
     try:
-        # Apply all patches
-        for patcher in patch_managers:
-            patcher.start()
+        # Apply all patches - REMOVED (MonkeyPatch applies immediately)
+        # for patcher in patch_managers:
+        #     patcher.start()
 
-        # Run the Uvicorn server - any calls to patched targets will use the mock
+        # Run the Uvicorn server - monkeypatch keeps patches active
         uvicorn.run(app, host=host, port=port, log_level="debug")
 
     finally:
-        # Stop all patches in reverse order
-        for patcher in reversed(patch_managers):
-            try:
-                patcher.stop()
-            except RuntimeError as e:
-                # Log error if stopping fails, but don't prevent other cleanup
-                log_provider_subprocess.error(
-                    f"Error stopping patcher for {patcher.attribute}: {e}"
-                )
+        # Stop all patches - MonkeyPatch handles undoing automatically
+        # for patcher in reversed(patch_managers):
+        #     try:
+        #         patcher.stop()
+        #     except RuntimeError as e:
+        #         log_provider_subprocess.error(f"Error stopping patcher for {patcher.attribute}: {e}")
+
+        # Explicitly undo patches applied by MonkeyPatch
+        mp.undo()
     # --- End Run Server --- #
 
 
