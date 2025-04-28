@@ -1,2 +1,2 @@
-- Clean up magic strings in contract_testing, to do with logging directory etc.
-- Generally clean up and organize the whole contract set up.
+- Let's get login response fixed to redirect the user somewhere useful.
+- Let's implement contract testing throughout the rest of the application.

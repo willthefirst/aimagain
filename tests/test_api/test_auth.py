@@ -83,15 +83,14 @@ async def test_login_success(test_client: AsyncClient, logged_in_user: User):
         "password": "password123",
     }
     response = await test_client.post("/auth/jwt/login", data=login_data)
-    assert response.status_code == 200
-    assert "application/json" in response.headers["content-type"]
-    token_data = response.json()
-    assert "access_token" in token_data
-    assert "token_type" in token_data
-    assert token_data["token_type"].lower() == "bearer"
+    assert response.status_code == 204
+    assert response.headers["Set-Cookie"] is not None
+    assert "fastapiusersauth=" in response.headers["Set-Cookie"]
+    access_token = response.headers["Set-Cookie"].split(";")[0].split("=")[1]
+    assert access_token is not None
 
     # Optional: Verify token works by accessing a protected route (like /users/me)
-    auth_header = {"Authorization": f"Bearer {token_data['access_token']}"}
+    auth_header = {"Cookie": f"fastapiusersauth={access_token}"}
     me_response = await test_client.get("/users/me", headers=auth_header)
     assert me_response.status_code == 200
     assert me_response.json()["email"] == logged_in_user.email

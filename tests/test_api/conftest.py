@@ -144,17 +144,19 @@ async def authenticated_client(
         "password": user_data.password,
     }
     res = await test_client.post("/auth/jwt/login", data=login_data)
-    res.raise_for_status()  # Ensure login was successful
-    token_data = res.json()
-    access_token = token_data["access_token"]
 
-    # Set the authorization header for the client
-    test_client.headers["Authorization"] = f"Bearer {access_token}"
+    # Get the cookie from the response
+    cookie = res.headers["Set-Cookie"]
+    # Extract the token from the cookie
+    access_token = cookie.split(";")[0].split("=")[1]
+
+    # Set the cookie header for the client
+    test_client.headers["Cookie"] = f"fastapiusersauth={access_token}"
 
     yield test_client
 
     # Clean up: remove the header after the test
-    del test_client.headers["Authorization"]
+    del test_client.headers["Cookie"]
 
     # Optional: Delete the user after test if needed, though DB drop handles it
     # async with db_test_session_manager() as session:
