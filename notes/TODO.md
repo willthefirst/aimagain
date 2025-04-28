@@ -1,2 +1,1 @@
-- Let's get login response fixed to redirect the user somewhere useful.
 - Let's implement contract testing throughout the rest of the application.
