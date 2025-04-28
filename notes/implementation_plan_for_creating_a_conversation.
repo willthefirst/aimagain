@@ -1,82 +1,69 @@
 
-Okay, let's refine the TDD plan, focusing on adding the UI link test and replacing the full UI flow test with consumer and provider contract tests.
+Okay, let's integrate the TDD workflow explicitly into each step, emphasizing the use of `pytest` to ensure continuous integration and prevent regressions.
 
-**Refined TDD Plan:**
+**Overall TDD Approach:**
 
-1.  **Test UI Link on List Page:**
-    *   **File:** `tests/test_api/test_list_conversations.py`
-    *   **Test:** `test_create_conversation_link_present`
-    *   **Action:** Authenticated client sends `GET /conversations`.
-    *   **Assertion:** Use `httpx` and `selectolax` to parse the HTML response. Assert that an anchor tag (`<a>`) exists with `href="/conversations/new"`.
-    *   *(Implementation Note: This test verifies the link exists on the server-rendered page before any client-side interaction.)*
+For each step below, the workflow is:
 
-2.  **Test New Form Endpoint (`GET /conversations/new`):**
-    *   **File:** `tests/test_api/test_conversation_routes.py` (or similar API test file)
-    *   **Test:** `test_get_new_conversation_form_success`
-    *   **Action:** Authenticated client sends `GET /conversations/new`.
-    *   **Assertions:**
-        *   Status code 200.
-        *   Content-Type is `text/html`.
-        *   HTML contains `<form action="/conversations" method="post">`.
-        *   HTML contains inputs named `invitee_username` and `initial_message`.
-    *   **Test:** `test_get_new_conversation_form_unauthenticated`
-    *   **Action:** Unauthenticated client sends `GET /conversations/new`.
-    *   **Assertion:** Status code 401 or redirect.
+1.  **Write Failing Test:** Add the test case described for the step using `pytest` conventions.
+2.  **Run `pytest`:** Execute `pytest` in your terminal. Confirm the *new* test fails with an expected error (e.g., `AssertionError`, `404 Not Found`, `KeyError`) and that all *other* tests still pass.
+3.  **Write Minimal Code:** Implement only the necessary application code (in routes, templates, services, etc.) to make the failing test pass.
+4.  **Run `pytest`:** Execute `pytest` again. Confirm the new test now passes, and all previously passing tests *still* pass.
+5.  **Refactor (Optional):** Improve the implementation code (e.g., clarity, efficiency) while ensuring all tests continue to pass by running `pytest` after refactoring.
 
-3.  **Test `POST /conversations` Logic (API Level):**
-    *   **File:** `tests/test_api/test_create_conversation.py`
-    *   **Existing/Adapted Tests:** Ensure tests cover:
-        *   `test_create_conversation_success_with_username`: Simulates form submission by sending `POST /conversations` with `invitee_username` and `initial_message`. Asserts 302/303 redirect, `Location` header, and correct DB state (creator joined, invitee invited, message created). *Requires endpoint to resolve username.*
-        *   `test_create_conversation_post_invalid_username`: Asserts 404.
-        *   `test_create_conversation_post_offline_user`: Asserts 400.
-        *   `test_create_conversation_post_missing_data`: Asserts 422.
-        *   `test_create_conversation_post_unauthenticated`: Asserts 401.
+---
 
-4.  **Refactor `POST /conversations` Route for Testability:**
-    *   **Goal:** Decouple the core conversation creation logic from the FastAPI route handler for easier mocking in provider tests.
-    *   **Action:**
-        *   Create a new handler function, e.g., `handle_create_conversation` (likely in a new file like `app/logic/conversation_processing.py` or within `app/services/conversation_service.py` if preferred).
-        *   This function will encapsulate the logic currently inside the `create_conversation` route: resolving the username, calling the service/repository to create DB entries, etc. It will accept necessary inputs like the `request_data` (or extracted username/message), the `creator_user`, and potentially the `ConversationService`.
-        *   Modify the `create_conversation` route function in `app/api/routes/conversations.py` to be a thin wrapper that primarily:
-            *   Extracts data from the request (`invitee_username`, `initial_message`).
-            *   **(Potentially)** Performs initial validation if not handled by Pydantic (though username resolution fits better in the handler).
-            *   Calls the `handle_create_conversation` function, passing the necessary arguments (including dependencies like `user` and `conv_service`).
-            *   Handles the return value from the handler (e.g., the new `Conversation` object or data needed for redirect) and constructs the appropriate HTTP response (likely a redirect). *Correction: The original API returns 201 with the conversation details. We need to decide if the form submission should also do this (less web-idiomatic) or perform a redirect.* Let's assume for now it should **redirect** upon success from the form. The handler function might need to return the slug. The route will then return a `RedirectResponse`.
+**Refined TDD Plan with Explicit Steps:**
 
-5.  **Consumer Contract Test (Simulating Form Interaction):**
-    *   **File:** `tests/test_contract/test_consumer_conversation_form.py`
-    *   **Framework:** Pact Python
-    *   **Consumer:** A component representing the browser/frontend interaction flow.
-    *   **Provider:** `aimagain-api`
-    *   **Interaction 1: Get Form**
-        *   **Provider State:** "User is authenticated" (or similar state defined in `conftest.py`)
-        *   **Request:** `GET /conversations/new` (with appropriate auth headers if needed)
-        *   **Response:** Status 200, `Content-Type: text/html`, body matching expected form structure (can be loose matching).
-    *   **Interaction 2: Submit Form (Success)**
-        *   **Provider State:** "User is authenticated and target user 'testuser' exists and is online"
-        *   **Request:** `POST /conversations`
-            *   Headers: `Content-Type: application/x-www-form-urlencoded` (standard for HTML forms)
-            *   Body: `invitee_username=testuser&initial_message=Hello+there`
-        *   **Response:** Status 302 or 303 (Redirect), `Location` header matching `/conversations/conv-*` (using Pact matchers for the slug).
-    *   *(Implementation Note: This test defines the HTTP interactions expected by the frontend flow, generating a pact file.)*
+1.  **Feature: Add "Create Conversation" Link to List Page**
+    *   **(Red)** Write Test: In `tests/test_api/test_list_conversations.py`, add a new test function `test_create_conversation_link_present`. Use `httpx` client (authenticated) to `GET /conversations`. Use `selectolax` to parse the response HTML. Assert that an element `a[href="/conversations/new"]` exists.
+    *   **(Run)** Run `pytest`. Verify `test_create_conversation_link_present` fails (e.g., `AssertionError: Expected element 'a[href="/conversations/new"]' not found`) and other tests pass.
+    *   **(Green)** Write Code: In `templates/conversations/list.html`, add the link: `<a href="{{ url_for('get_new_conversation_form') }}">Create New Conversation</a>`. (Ensure the route name `get_new_conversation_form` matches the one you'll define in the next step).
+    *   **(Run)** Run `pytest`. Verify `test_create_conversation_link_present` and all other tests pass.
+    *   **(Refactor)** Review the template change; refactoring is likely minimal here.
 
-6.  **Provider Contract Test (Verifying Form Submission Handling):**
-    *   **File:** `tests/test_contract/test_provider_conversation_api.py` (or enhance existing)
-    *   **Framework:** Pact Python Verifier, Pytest
-    *   **Setup:**
-        *   Configure provider state setup URLs/handlers in `conftest.py` for "User is authenticated" and "User is authenticated and target user 'testuser' exists and is online". These setup handlers will need to prepare the necessary database state (e.g., create the logged-in user, create the target user 'testuser' and mark as online).
-        *   Use `@pytest.mark.parametrize("provider_server", [...], indirect=True)` similar to `test_provider_auth_api.py`.
-        *   Inside the parametrization, define the dependency override for the *new* `handle_create_conversation` function created in Step 4.
-        *   Configure the mock for `handle_create_conversation`:
-            *   It should accept arguments matching the expected parameters (e.g., `invitee_username`, `initial_message`, `creator_user`).
-            *   For the success interaction ("Submit Form (Success)"), it should return a value that allows the route handler to generate the redirect, e.g., return the slug of the created conversation like `"conv-dummy-slug-from-mock"`.
-            *   *(Optional: For future failure interactions, configure the mock to raise specific exceptions like `UserNotFoundError`, `BusinessRuleError`, which the route handler would then turn into 4xx responses.)*
-    *   **Test Function:** `test_provider_conversation_api_pact_verification(provider_server)`
-    *   **Action:** Run the `Verifier` against the pact file generated in Step 5.
-    *   **Assertion:** `verifier.verify_pacts(...)` succeeds (returns 0).
-    *   *(Implementation Note: This test verifies that the running API provider, *with the core logic mocked*, correctly handles the HTTP requests defined by the consumer for getting and submitting the new conversation form, checking request structure and generating the expected redirect response based on the mock's return value.)*
+2.  **Feature: Create New Conversation Form Page (`GET /conversations/new`)**
+    *   **(Red)** Write Test (Success Case): In `tests/test_api/test_conversation_routes.py` (or similar), add `test_get_new_conversation_form_success`. Use an authenticated `httpx` client to `GET /conversations/new`. Assert status code 200, `Content-Type: text/html`, and presence of `<form action="/conversations" method="post">` and inputs named `invitee_username` and `initial_message` in the HTML response.
+    *   **(Run)** Run `pytest`. Verify `test_get_new_conversation_form_success` fails (likely 404).
+    *   **(Green)** Write Code (Route): In `app/api/routes/conversations.py`, add a new route `@router.get("/conversations/new", response_class=HTMLResponse, name="get_new_conversation_form")`. Define the async function `get_new_conversation_form(request: Request, user: User = Depends(current_active_user))`. Initially, have it return a placeholder `TemplateResponse` for `conversations/new.html`.
+    *   **(Run)** Run `pytest`. Test might now fail on content assertions.
+    *   **(Green)** Write Code (Template): Create `templates/conversations/new.html`. Add the basic HTML structure and the required form (`<form action="{{ url_for('create_conversation') }}" method="post">`), including `<input type="text" name="invitee_username">` and `<textarea name="initial_message"></textarea>`, plus a submit button. Update the route function to render this template correctly. (Ensure route name `create_conversation` matches the POST route).
+    *   **(Run)** Run `pytest`. Verify `test_get_new_conversation_form_success` passes.
+    *   **(Red)** Write Test (Auth): Add `test_get_new_conversation_form_unauthenticated`. Use an *unauthenticated* `httpx` client to `GET /conversations/new`. Assert status code is 401 (or redirect status code if your auth handles it that way).
+    *   **(Run)** Run `pytest`. Verify `test_get_new_conversation_form_unauthenticated` fails (likely gets 200 because auth isn't enforced yet).
+    *   **(Green)** Write Code: Ensure `user: User = Depends(current_active_user)` is present in the `get_new_conversation_form` route signature.
+    *   **(Run)** Run `pytest`. Verify `test_get_new_conversation_form_unauthenticated` and all other tests pass.
+    *   **(Refactor)** Review route and template code for clarity.
 
-This refined plan separates the UI testing into:
-*   A simple check for the *presence* of the link (`test_list_conversations.py`).
-*   Contract tests that verify the *HTTP interactions* generated by the UI flow (`test_consumer_conversation_form.py`) and the API's ability to *handle those specific HTTP requests* correctly at its boundary (`test_provider_conversation_api.py`).
-It also introduces the necessary refactoring step to make the provider testing feasible.
+3.  **Feature: Handle Form Submission (`POST /conversations`)**
+    *   **(Red)** Write Test (Success Case): In `tests/test_api/test_create_conversation.py`, add/adapt `test_create_conversation_success_with_username`. Use an authenticated `httpx` client. Send a `POST` request to `/conversations` with `Content-Type: application/x-www-form-urlencoded` and data like `{"invitee_username": "existing_online_user", "initial_message": "Test message"}`. Assert status code 302/303, a valid `Location` header like `/conversations/some-slug`, and perform DB checks (Conversation created, creator 'joined', invitee 'invited', Message created). Setup requires creating the users (creator and invitee) in the DB beforehand, ensuring the invitee is online.
+    *   **(Run)** Run `pytest`. Verify `test_create_conversation_success_with_username` fails (e.g., 422 if expecting JSON, or error in logic if trying to use username as ID).
+    *   **(Green)** Write Code: Modify the `create_conversation` route signature in `app/api/routes/conversations.py` to accept form data: `invitee_username: str = Form(...)`, `initial_message: str = Form(...)`. Update the route logic:
+        *   Use the `invitee_username` to query the database/service for the `invitee_user_id`. Handle `UserNotFound` or `UserOffline` errors appropriately (raising HTTPException 404 or 400).
+        *   Call the underlying service method (`conv_service.create_new_conversation`) passing the resolved `invitee_user_id`.
+        *   **(Change from API spec):** Instead of returning 201 JSON, return a `RedirectResponse(url=f"/conversations/{new_conversation.slug}", status_code=status.HTTP_303_SEE_OTHER)` on success.
+    *   **(Run)** Run `pytest`. Verify `test_create_conversation_success_with_username` passes.
+    *   **(Red->Green->Run Cycle for Failures):** Write tests for failure cases (`invalid_username`, `offline_user`, `missing_data`, `unauthenticated`) submitting *form data*. For each test: Write -> Run `pytest` (fail) -> Add code to handle the specific error in the route (e.g., check if user exists/is online, raise appropriate `HTTPException`) -> Run `pytest` (pass).
+    *   **(Refactor)** Clean up the route logic.
+
+4.  **Refactor: Decouple `POST /conversations` Logic**
+    *   **(Refactor Step 1 - Define Handler):** Create `handle_create_conversation(invitee_username: str, initial_message: str, creator_user: User, conv_service: ConversationService) -> str:` (returning the slug) probably within `app/services/conversation_service.py` or a new `app/logic/conversation_processing.py`.
+    *   **(Refactor Step 2 - Move Logic):** Cut the core logic (username lookup, service call) from the `create_conversation` route function and paste it into `handle_create_conversation`. Ensure the handler function raises the specific service exceptions (`UserNotFoundError`, `BusinessRuleError`, etc.) instead of `HTTPException`. It should return the `new_conversation.slug` on success.
+    *   **(Refactor Step 3 - Update Route):** Modify the `create_conversation` route function in `conversations.py`:
+        *   It should now call `handle_create_conversation`, passing the form data and dependencies (`user`, `conv_service`).
+        *   Wrap the call in a `try...except` block to catch the specific service exceptions raised by the handler and translate them into appropriate `HTTPException`s (similar to the `handle_service_error` pattern).
+        *   On successful return from the handler (getting the slug), create and return the `RedirectResponse`.
+    *   **(Run)** Run `pytest`. **Crucially, all API tests written in Step 3 must still pass.** If any fail, debug the refactoring until they all pass again. This confirms the refactoring didn't change behavior.
+
+5.  **Contract Test: Consumer (Frontend Simulation)**
+    *   **(Write/Run Consumer Test):** Write the `test_consumer_conversation_form.py` pact test defining the `GET /conversations/new` and `POST /conversations` (with form data) interactions. Run the pact consumer test script. This generates `consumer-aimagain-api.json` in your pacts directory. *This step is outside the `pytest` flow.*
+
+6.  **Contract Test: Provider (API Verification)**
+    *   **(Setup Provider States):** Implement the necessary provider state setup functions in `tests/test_contract/conftest.py` (e.g., `_setup_user_authenticated`, `_setup_user_authenticated_and_target_online`).
+    *   **(Red)** Write Test: Create `test_provider_conversation_api.py`. Add `test_provider_conversation_api_pact_verification`. Include the `pytest.mark.parametrize` setup to inject the `provider_server`. Inside the parametrization, specify the dependency override for the `handle_create_conversation` function (created in Step 4). Configure its mock return value for the "Submit Form (Success)" interaction to return a dummy slug (e.g., `"mock-slug"`).
+    *   **(Run)** Run `pytest --provider-test` (or however you tag/run provider tests). Verify the new provider test fails (Pact verification error).
+    *   **(Green)** Write Code: Ensure the provider state setup functions correctly prepare the DB state. Double-check that the `POST /conversations` route handler in `conversations.py` correctly translates the return value (the slug) from the (mocked) `handle_create_conversation` into a `RedirectResponse(status_code=303, url="/conversations/mock-slug")` which matches the expectation in the pact file.
+    *   **(Run)** Run `pytest --provider-test` again. Verify the provider test now passes.
+    *   **(Refactor)** Review provider state setup and mock configuration for clarity.
+
+This detailed plan provides a clear TDD path for each feature, using `pytest` as the feedback loop to ensure correctness and prevent regressions at each stage.
