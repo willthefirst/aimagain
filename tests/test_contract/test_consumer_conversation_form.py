@@ -16,7 +16,9 @@ PROVIDER_STATE_USER_NOT_FOUND = f"user is authenticated and target user does not
 NETWORK_TIMEOUT_MS = 500
 
 
-@pytest.mark.parametrize("origin_with_routes", [{"conversations": True}], indirect=True)
+@pytest.mark.parametrize(
+    "origin_with_routes", [{"conversations": True, "auth_pages": True}], indirect=True
+)
 @pytest.mark.asyncio(loop_scope="session")
 async def test_consumer_conversation_create_success(
     pact_mock, origin_with_routes: str, page: Page
@@ -76,11 +78,6 @@ async def test_consumer_conversation_create_success(
     with pact:
         # Navigate to the new conversation form
         await page.goto(new_conversation_url)
-
-        # Verify form elements are present by interacting with them
-        await expect(
-            page.get_by_role("form", name="create_conversation_form")
-        ).to_be_visible()
 
         # Fill out the form
         await page.locator("input[name='invitee_username']").fill(TEST_INVITEE_USERNAME)

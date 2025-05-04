@@ -58,7 +58,9 @@ CONSUMER_HOST = "127.0.0.1"
 CONSUMER_PORT = 8990
 
 
-def run_consumer_server_process(host: str, port: int, routes_config=None):
+def run_consumer_server_process(
+    host: str, port: int, routes_config=None, mock_auth=False
+):
     """Target function to run consumer test server uvicorn in a separate process.
 
     Args:
@@ -66,6 +68,10 @@ def run_consumer_server_process(host: str, port: int, routes_config=None):
         port: Port to bind to
         routes_config: Dict with keys as router modules and values as booleans to include/exclude
     """
+    from app.auth_config import current_active_user
+    from app.models import User
+    import uuid
+
     consumer_app = FastAPI(title="Consumer Test Server Process")
 
     # Default configuration includes both routers
@@ -82,16 +88,33 @@ def run_consumer_server_process(host: str, port: int, routes_config=None):
     if routes_config.get("conversations", False):
         consumer_app.include_router(conversations.router)
 
+    # Override authentication for contract tests
+    if mock_auth:
+        # Create a mock user that will be used for all endpoints requiring auth
+        mock_user = User(
+            id=uuid.uuid4(),
+            email="test@example.com",
+            username="contract_test_user",
+            is_active=True,
+            # Add other required User fields as needed
+        )
+
+        async def get_mock_current_user():
+            return mock_user
+
+        # Override the dependency
+        consumer_app.dependency_overrides[current_active_user] = get_mock_current_user
+
     uvicorn.run(consumer_app, host=host, port=port, log_level="warning")
 
 
 def _start_consumer_server_process(
-    host: str, port: int, routes_config=None
+    host: str, port: int, routes_config=None, mock_auth=False
 ) -> multiprocessing.Process:
     """Starts the consumer test FastAPI server in a separate process."""
     server_process = multiprocessing.Process(
         target=run_consumer_server_process,
-        args=(host, port, routes_config),
+        args=(host, port, routes_config, mock_auth),
         daemon=True,
     )
     server_process.start()
@@ -131,10 +154,17 @@ def origin_with_routes(request) -> str:
         "conversations": True,
     }
 
+    # Extract mock_auth from params or default to True
+    mock_auth = True
+    if isinstance(routes_config, dict) and "mock_auth" in routes_config:
+        mock_auth = routes_config.pop("mock_auth")
+
     host = CONSUMER_HOST
     port = CONSUMER_PORT
     origin_url = f"http://{host}:{port}"
-    server_process = _start_consumer_server_process(host, port, routes_config)
+    server_process = _start_consumer_server_process(
+        host, port, routes_config, mock_auth
+    )
     yield origin_url
     _terminate_server_process(server_process)
 
