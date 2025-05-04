@@ -98,14 +98,20 @@ async def test_consumer_conversation_create_success(
     # Pact verification happens automatically on context exit.
 
 
+@pytest.mark.parametrize(
+    "origin_with_routes", [{"conversations": True, "auth_pages": True}], indirect=True
+)
 @pytest.mark.asyncio(loop_scope="session")
 async def test_consumer_conversation_create_user_not_found(
-    pact_mock, origin: str, page: Page
+    pact_mock, origin_with_routes: str, page: Page
 ):
     """
     Test the conversation creation flow with a non-existent username,
     which should result in a 404 error.
     """
+    # Use origin_with_routes instead of origin
+    origin = origin_with_routes
+
     pact = pact_mock
     mock_server_uri = pact.uri
     new_conversation_url = f"{origin}{CONVERSATIONS_NEW_PATH}"
@@ -139,8 +145,7 @@ async def test_consumer_conversation_create_user_not_found(
     async def handle_route(route: Route):
         if (
             route.request.method == "POST"
-            and CONVERSATIONS_CREATE_PATH
-            == route.request.url.split("?")[0].split("#")[0]
+            and CONVERSATIONS_CREATE_PATH in route.request.url
         ):
             await route.continue_(
                 url=mock_submit_url,
@@ -153,6 +158,7 @@ async def test_consumer_conversation_create_user_not_found(
         else:
             await route.continue_()
 
+    # Use the same route pattern as the working test
     await page.route(f"**{CONVERSATIONS_CREATE_PATH}", handle_route)
 
     # Execute Test with Pact Verification
@@ -161,7 +167,9 @@ async def test_consumer_conversation_create_user_not_found(
         await page.goto(new_conversation_url)
 
         # Verify form elements are present by interacting with them
-        await page.get_by_role("button", name="Start Conversation")
+        await expect(
+            page.get_by_role("button", name="Start Conversation")
+        ).to_be_visible()
 
         # Fill out the form with non-existent username
         await page.locator("input[name='invitee_username']").fill(NONEXISTENT_USERNAME)
