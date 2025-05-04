@@ -59,7 +59,7 @@ CONSUMER_PORT = 8990
 
 
 def run_consumer_server_process(
-    host: str, port: int, routes_config=None, mock_auth=False
+    host: str, port: int, routes_config=None, mock_auth=True
 ):
     """Target function to run consumer test server uvicorn in a separate process.
 
@@ -109,7 +109,7 @@ def run_consumer_server_process(
 
 
 def _start_consumer_server_process(
-    host: str, port: int, routes_config=None, mock_auth=False
+    host: str, port: int, routes_config=None, mock_auth=True
 ) -> multiprocessing.Process:
     """Starts the consumer test FastAPI server in a separate process."""
     server_process = multiprocessing.Process(

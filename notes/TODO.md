@@ -1,1 +1,3 @@
-- Let's implement contract testing throughout the rest of the application.
+- [ ] Implement contract testing throughout the application
+- [ ] Refactor consumer tests
+- [ ] Add debugging tools
