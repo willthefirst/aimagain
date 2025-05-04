@@ -54,12 +54,25 @@ async def test_consumer_conversation_create_success(
         )
     )
 
+    (
+        pact.given(PROVIDER_STATE_USER_ONLINE)
+        .upon_receiving("a request to view the newly created conversation")
+        .with_request(
+            method="GET",
+            path=f"/conversations/{MOCK_CONVERSATION_SLUG}",
+        )
+        .will_respond_with(
+            status=200,
+            headers={"Content-Type": "text/html"},
+            body="<html>Conversation page</html>",  # Or whatever response format your API returns
+        )
+    )
+
     # Define Playwright Interception Logic
     async def handle_route(route: Route):
         if (
             route.request.method == "POST"
-            and CONVERSATIONS_CREATE_PATH
-            == route.request.url.split("?")[0].split("#")[0]
+            and CONVERSATIONS_CREATE_PATH in route.request.url
         ):
             await route.continue_(
                 url=mock_submit_url,
@@ -76,17 +89,10 @@ async def test_consumer_conversation_create_success(
 
     # Execute Test with Pact Verification
     with pact:
-        # Navigate to the new conversation form
         await page.goto(new_conversation_url)
-
-        # Fill out the form
         await page.locator("input[name='invitee_username']").fill(TEST_INVITEE_USERNAME)
         await page.locator("textarea[name='initial_message']").fill(TEST_MESSAGE)
-
-        # Submit the form
         await page.locator("button[type='submit']").click()
-
-        # Wait for the redirect (in a real test, we might verify we landed on the right page)
         await page.wait_for_timeout(NETWORK_TIMEOUT_MS)
 
     # Pact verification happens automatically on context exit.
