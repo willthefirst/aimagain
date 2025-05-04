@@ -21,11 +21,7 @@ sequenceDiagram
 
     User1->>Browser: Enters User2's username, initial message, Submits form
     Browser->>API: POST /conversations (Content-Type: form-urlencoded)
-    Note right of API: Find User2 by username,
-Create Conversation,
-Create initial Message,
-Create Participant (User1, status=JOINED),
-Create Participant (User2, status=INVITED)
+    Note right of API: Find User2 by username,<br/>Create Conversation,<br/>Create initial Message,<br/>Create Participant (User1, status=JOINED),<br/>Create Participant (User2, status=INVITED)
     API-->>Browser: Redirect to /conversations/{new_slug}
 
     Browser->>API: GET /conversations/{new_slug}
@@ -58,7 +54,6 @@ Create Participant (User2, status=INVITED)
     Browser->>API: POST /conversations/{slug}/messages (content=...)
     API-->>Browser: Return Message acknowledgment
     API->>User2: Deliver message via SSE
-
 ```
 
 ## How It Works
