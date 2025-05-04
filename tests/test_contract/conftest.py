@@ -169,20 +169,6 @@ def origin_with_routes(request) -> str:
     _terminate_server_process(server_process)
 
 
-# Keep the original fixture for backward compatibility
-@pytest.fixture(scope="session")
-def origin() -> str:
-    """Pytest fixture providing the origin URL for the running consumer test server with all routes."""
-    host = CONSUMER_HOST
-    port = CONSUMER_PORT
-    origin_url = f"http://{host}:{port}"
-    # Include both routers by default
-    routes_config = {"auth_pages": True, "conversations": True}
-    server_process = _start_consumer_server_process(host, port, routes_config)
-    yield origin_url
-    _terminate_server_process(server_process)
-
-
 # Playwright Fixtures
 @pytest.fixture(scope="session")
 async def browser():
