@@ -109,13 +109,11 @@ async def test_consumer_conversation_create_user_not_found(
     Test the conversation creation flow with a non-existent username,
     which should result in a 404 error.
     """
-    # Use origin_with_routes instead of origin
-    origin = origin_with_routes
 
     pact = pact_mock
     mock_server_uri = pact.uri
-    new_conversation_url = f"{origin}{CONVERSATIONS_NEW_PATH}"
-    form_submit_url = f"{origin}{CONVERSATIONS_CREATE_PATH}"
+    new_conversation_url = f"{origin_with_routes}{CONVERSATIONS_NEW_PATH}"
+    form_submit_url = f"{origin_with_routes}{CONVERSATIONS_CREATE_PATH}"
     mock_submit_url = f"{mock_server_uri}{CONVERSATIONS_CREATE_PATH}"
 
     # Define the non-existent username
