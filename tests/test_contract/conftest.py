@@ -6,7 +6,7 @@ import atexit
 import os
 from fastapi import FastAPI, Body, Response, status
 from playwright.async_api import async_playwright
-from app.api.routes import auth_pages
+from app.api.routes import auth_pages, conversations
 from pact import Consumer, Provider
 import logging
 from yarl import URL
@@ -58,21 +58,41 @@ CONSUMER_HOST = "127.0.0.1"
 CONSUMER_PORT = 8990
 
 
-def run_consumer_server_process(host: str, port: int):  # Renamed function
-    """Target function to run consumer test server uvicorn in a separate process."""
+def run_consumer_server_process(host: str, port: int, routes_config=None):
+    """Target function to run consumer test server uvicorn in a separate process.
+
+    Args:
+        host: Host address to bind to
+        port: Port to bind to
+        routes_config: Dict with keys as router modules and values as booleans to include/exclude
+    """
     consumer_app = FastAPI(title="Consumer Test Server Process")
-    consumer_app.include_router(auth_pages.router)
+
+    # Default configuration includes both routers
+    if routes_config is None:
+        routes_config = {
+            "auth_pages": True,
+            "conversations": True,
+        }
+
+    # Include routers based on configuration
+    if routes_config.get("auth_pages", False):
+        consumer_app.include_router(auth_pages.router)
+
+    if routes_config.get("conversations", False):
+        consumer_app.include_router(conversations.router)
+
     uvicorn.run(consumer_app, host=host, port=port, log_level="warning")
 
 
 def _start_consumer_server_process(
-    host: str, port: int
-) -> multiprocessing.Process:  # Renamed function
-    """Starts the consumer test FastAPI server in a separate process."""  # Clarified docstring
+    host: str, port: int, routes_config=None
+) -> multiprocessing.Process:
+    """Starts the consumer test FastAPI server in a separate process."""
     server_process = multiprocessing.Process(
         target=run_consumer_server_process,
-        args=(host, port),
-        daemon=True,  # Use renamed target
+        args=(host, port, routes_config),
+        daemon=True,
     )
     server_process.start()
     # TODO: Replace sleep with a proper readiness check
@@ -97,12 +117,38 @@ def _terminate_server_process(
 
 
 @pytest.fixture(scope="session")
-def origin() -> str:
-    """Pytest fixture providing the origin URL for the running consumer test server."""
+def origin_with_routes(request) -> str:
+    """Pytest fixture providing the origin URL for the running consumer test server
+    with specified routes.
+
+    Usage:
+        @pytest.mark.parametrize("origin_with_routes", [{"auth_pages": True}], indirect=True)
+        def test_auth_related(...):
+            ...
+    """
+    routes_config = getattr(request, "param", None) or {
+        "auth_pages": True,
+        "conversations": True,
+    }
+
     host = CONSUMER_HOST
     port = CONSUMER_PORT
     origin_url = f"http://{host}:{port}"
-    server_process = _start_consumer_server_process(host, port)  # Use renamed function
+    server_process = _start_consumer_server_process(host, port, routes_config)
+    yield origin_url
+    _terminate_server_process(server_process)
+
+
+# Keep the original fixture for backward compatibility
+@pytest.fixture(scope="session")
+def origin() -> str:
+    """Pytest fixture providing the origin URL for the running consumer test server with all routes."""
+    host = CONSUMER_HOST
+    port = CONSUMER_PORT
+    origin_url = f"http://{host}:{port}"
+    # Include both routers by default
+    routes_config = {"auth_pages": True, "conversations": True}
+    server_process = _start_consumer_server_process(host, port, routes_config)
     yield origin_url
     _terminate_server_process(server_process)
 
@@ -112,7 +158,7 @@ def origin() -> str:
 async def browser():
     """Pytest fixture to launch a Playwright browser instance."""
     async with async_playwright() as p:
-        browser = await p.chromium.launch()
+        browser = await p.chromium.launch(headless=False)
         yield browser
         await browser.close()
 

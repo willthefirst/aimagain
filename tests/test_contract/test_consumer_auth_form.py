@@ -13,9 +13,10 @@ REGISTER_API_PATH = "/auth/register"
 NETWORK_TIMEOUT_MS = 500
 
 
+@pytest.mark.parametrize("origin_with_routes", [{"auth_pages": True}], indirect=True)
 @pytest.mark.asyncio(loop_scope="session")
 async def test_consumer_registration_form_interaction(
-    pact_mock, origin: str, page: Page
+    pact_mock, origin_with_routes: str, page: Page
 ):
     """
     Test navigating to the registration page, filling the form,
@@ -23,7 +24,7 @@ async def test_consumer_registration_form_interaction(
     """
     pact = pact_mock
     mock_server_uri = pact.uri
-    register_page_url = f"{origin}{REGISTER_API_PATH}"
+    register_page_url = f"{origin_with_routes}{REGISTER_API_PATH}"
     full_mock_url = f"{mock_server_uri}{REGISTER_API_PATH}"
 
     # Define Pact Interaction

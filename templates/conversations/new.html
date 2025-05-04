@@ -6,7 +6,10 @@
   <body>
     <h1>Start a New Conversation</h1>
 
-    <form action="{{ url_for('create_conversation') }}" method="post">
+    <form
+      action="{{ url_for('create_conversation') }}"
+      method="post"
+      name="create_conversation_form">
       <div>
         <label for="invitee_username">Invite Username:</label>
         <input
