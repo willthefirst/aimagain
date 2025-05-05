@@ -21,7 +21,7 @@ from typing import AsyncGenerator
 from unittest.mock import AsyncMock, patch
 
 # Pact Configuration
-CONSUMER_NAME = "RegistrationUI"
+CONSUMER_NAME = "frontend-ui"
 PROVIDER_NAME = "backend-api"
 PACT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "pacts"))
 PACT_LOG_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "log"))

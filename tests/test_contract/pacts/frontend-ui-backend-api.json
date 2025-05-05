@@ -1,6 +1,6 @@
 {
   "consumer": {
-    "name": "RegistrationUI"
+    "name": "frontend-ui"
   },
   "provider": {
     "name": "backend-api"
