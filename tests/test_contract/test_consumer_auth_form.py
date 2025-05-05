@@ -4,6 +4,11 @@ import pytest
 from playwright.async_api import Page, Route
 from pact import Like
 
+from tests.test_contract.conftest import setup_pact
+
+CONSUMER_NAME = "registration-form"
+PROVIDER_NAME = "auth-api"
+
 # Test Constants
 TEST_EMAIL = "test.user@example.com"
 TEST_PASSWORD = "securepassword123"
@@ -16,13 +21,13 @@ NETWORK_TIMEOUT_MS = 500
 @pytest.mark.parametrize("origin_with_routes", [{"auth_pages": True}], indirect=True)
 @pytest.mark.asyncio(loop_scope="session")
 async def test_consumer_registration_form_interaction(
-    pact_mock, origin_with_routes: str, page: Page
+    origin_with_routes: str, page: Page
 ):
     """
     Test navigating to the registration page, filling the form,
     and submitting it correctly to the backend API (verified by Pact).
     """
-    pact = pact_mock
+    pact = setup_pact(CONSUMER_NAME, PROVIDER_NAME)
     mock_server_uri = pact.uri
     register_page_url = f"{origin_with_routes}{REGISTER_API_PATH}"
     full_mock_url = f"{mock_server_uri}{REGISTER_API_PATH}"

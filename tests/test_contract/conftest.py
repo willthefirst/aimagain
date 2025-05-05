@@ -20,20 +20,31 @@ from app.db import get_db_session  # Import the dependency function
 from typing import AsyncGenerator
 from unittest.mock import AsyncMock, patch
 
-# Pact Configuration
-CONSUMER_NAME = "frontend-ui"
-PROVIDER_NAME = "backend-api"
+# Import states from consumer test for clarity
+from tests.test_contract.test_consumer_conversation_form import (
+    PROVIDER_STATE_USER_ONLINE,
+    PROVIDER_STATE_USER_NOT_FOUND,
+)
+
 PACT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "pacts"))
 PACT_LOG_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "log"))
 
-os.makedirs(PACT_DIR, exist_ok=True)
-os.makedirs(PACT_LOG_DIR, exist_ok=True)
 
-pact = Consumer(CONSUMER_NAME).has_pact_with(
-    Provider(PROVIDER_NAME),
-    pact_dir=PACT_DIR,
-    log_dir=PACT_LOG_DIR,
-)
+def setup_pact(
+    consumer_name: str, provider_name: str
+) -> Generator[Consumer, None, None]:
+    os.makedirs(PACT_DIR, exist_ok=True)
+    os.makedirs(PACT_LOG_DIR, exist_ok=True)
+
+    pact = Consumer(consumer_name).has_pact_with(
+        Provider(provider_name),
+        pact_dir=PACT_DIR,
+        log_dir=PACT_LOG_DIR,
+    )
+
+    pact.start_service()
+    return pact
+
 
 # Provider State Handling & Server Config
 log_provider = logging.getLogger("pact_provider_test")  # Renamed logger
@@ -48,9 +59,34 @@ PROVIDER_STATE_SETUP_URL = str(PROVIDER_URL / PROVIDER_STATE_SETUP_PATH)
 def provider_states_handler(state_info: dict = Body(...)):
     """Endpoint handler logic for provider state setup requests from Verifier."""
     state = state_info.get("state")
-    if state != "User test.user@example.com does not exist":
+    consumer = state_info.get(
+        "consumer", "Unknown Consumer"
+    )  # Get consumer if available
+
+    log_provider.info(f"Received provider state '{state}' for consumer '{consumer}'")
+
+    # List of known states this provider setup can handle (even if passively)
+    known_states = [
+        "User test.user@example.com does not exist",  # From auth test
+        PROVIDER_STATE_USER_ONLINE,  # From conversation test
+        PROVIDER_STATE_USER_NOT_FOUND,  # From conversation test
+        # Add any other known states here
+    ]
+
+    if state in known_states:
+        # Currently, the mocks are configured via test parametrization,
+        # so the handler just needs to acknowledge the state is known.
+        # In more complex scenarios, this is where you might set up DB state,
+        # configure mocks dynamically, etc.
+        log_provider.info(f"Acknowledged known provider state: {state}")
+        return Response(status_code=status.HTTP_200_OK)
+    else:
+        # Log clearly if an unknown state is received
         log_provider.warning(f"Unhandled provider state received: {state}")
-    return Response(status_code=status.HTTP_200_OK)
+        # Optionally return an error, though Pact verification might proceed anyway
+        # return Response(content=f"Unknown state: {state}", status_code=status.HTTP_400_BAD_REQUEST)
+        # Returning OK allows verification to proceed, failures will happen at interaction level
+        return Response(status_code=status.HTTP_200_OK)
 
 
 # Consumer Test Server Config & Fixtures
@@ -185,17 +221,6 @@ async def page(browser):
     page = await browser.new_page()
     yield page
     await page.close()
-
-
-# Pact Consumer Fixture
-@pytest.fixture(scope="session")
-def pact_mock() -> Consumer:
-    """Provides the configured Pact Consumer instance and manages its mock service."""
-    try:
-        pact.start_service()
-        yield pact
-    finally:
-        pact.stop_service()
 
 
 # Pact Provider Fixtures

@@ -17,11 +17,8 @@ from yarl import URL  # Using yarl for URL manipulation
 
 # Import shared constants and provider URLs from conftest
 from tests.test_contract.conftest import (
-    CONSUMER_NAME,
-    PROVIDER_NAME,
     PACT_DIR,
     PACT_LOG_DIR,
-    PROVIDER_URL,  # Import base URL
     PROVIDER_STATE_SETUP_URL,  # Import state setup URL
 )
 
@@ -30,13 +27,14 @@ from tests.test_contract.conftest import (
 
 # Import the response schema for mock return value structure
 from app.schemas.user import UserRead
+from tests.test_contract.test_consumer_auth_form import CONSUMER_NAME, PROVIDER_NAME
 
 # Get logger (optional, keep if specific provider test logging needed)
 log = logging.getLogger(__name__)
 # logging.basicConfig(level=logging.INFO) # Removed, rely on conftest/pytest config
 
 # --- Pact File Configuration ---
-PACT_FILE_NAME = f"{CONSUMER_NAME.lower()}-{PROVIDER_NAME}.json"  # Uppercase
+PACT_FILE_NAME = f"{CONSUMER_NAME}-{PROVIDER_NAME}.json"
 Pact_file_path = os.path.join(PACT_DIR, PACT_FILE_NAME)  # Use renamed constant
 
 # --- Mock Configuration --- REMOVED (Inlined below)
