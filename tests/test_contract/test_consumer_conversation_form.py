@@ -140,7 +140,7 @@ async def test_consumer_conversation_create_user_not_found(
         .will_respond_with(
             status=404,
             headers={"Content-Type": "application/json"},
-            body={"detail": "User not found"},
+            body={"detail": "User with username 'nonexistentuser' not found."},
         )
     )
 
