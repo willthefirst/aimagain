@@ -307,7 +307,7 @@ def _run_provider_server_process(  # Renamed function
 
     app.post("/" + state_path)(state_handler)
 
-    # todo make this better and more refactorde with how we do stuff for conftest for test_api
+    # TODO: make this only applicable to the tests that depends on it with provider states
 
     # --- Mock Authentication Setup ---
     # Create a mock user that will be used for all endpoints requiring auth

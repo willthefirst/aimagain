@@ -7,24 +7,18 @@
   },
   "interactions": [
     {
-      "description": "a request to create a conversation with non-existent username",
-      "providerState": "user is authenticated and target user does not exist",
+      "description": "a request to view the newly created conversation",
+      "providerState": "user is authenticated and target user exists and is online",
       "request": {
-        "method": "POST",
-        "path": "/conversations",
-        "headers": {
-          "Content-Type": "application/x-www-form-urlencoded"
-        },
-        "body": "invitee_username=nonexistentuser&initial_message=Hello%20there!"
+        "method": "GET",
+        "path": "/conversations/mock-slug"
       },
       "response": {
-        "status": 404,
+        "status": 200,
         "headers": {
-          "Content-Type": "application/json"
+          "Content-Type": "text/html"
         },
-        "body": {
-          "detail": "User not found"
-        }
+        "body": "<html>Conversation page</html>"
       }
     }
   ],
