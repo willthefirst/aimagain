@@ -36,6 +36,78 @@ PROVIDER_URL = URL(f"http://{PROVIDER_HOST}:{PROVIDER_PORT}")
 PROVIDER_STATE_SETUP_URL = str(PROVIDER_URL / PROVIDER_STATE_SETUP_PATH)
 
 
+# below copied frog test_api/conftest.py, refactor so that we just reuse the same 'in memory test db'
+
+import asyncio
+from typing import AsyncGenerator, Any
+from collections.abc import AsyncGenerator as AsyncGeneratorABC
+from contextlib import asynccontextmanager
+from asyncstdlib import anext
+
+import pytest
+from fastapi import FastAPI
+from httpx import ASGITransport, AsyncClient
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+from fastapi import Depends
+
+# REMOVED Depends import as it's not used in fixture overrides this way
+# from fastapi import Depends
+
+# Assuming your FastAPI app instance is in app.main
+from app.main import app
+
+# Updated dependency imports from app.db
+from app.db import get_db_session, get_user_db
+from app.models import User, metadata  # Assuming your models define metadata
+from fastapi_users.db import SQLAlchemyUserDatabase
+from app.schemas.user import UserCreate  # Import UserCreate schema
+from app.core.templating import templates  # Import the global templates object
+
+# Use an in-memory SQLite database for testing
+TEST_DATABASE_URL = "sqlite+aiosqlite:///:memory:"
+
+test_engine = create_async_engine(TEST_DATABASE_URL)
+test_async_session_maker = async_sessionmaker(test_engine, expire_on_commit=False)
+
+
+# Master fixture to manage table creation/dropping and provide session maker
+@pytest.fixture(scope="function")
+async def db_test_session_manager() -> (
+    AsyncGenerator[async_sessionmaker[AsyncSession], None]
+):
+    # Create tables before test runsa
+    async with test_engine.begin() as conn:
+        await conn.run_sync(metadata.create_all)
+        log_provider.info("Created tables")
+
+    yield test_async_session_maker  # Provide the session maker to tests
+
+    # Drop tables after test finishes
+    async with test_engine.begin() as conn:
+        await conn.run_sync(metadata.drop_all)
+
+
+# Override for the raw AsyncSession dependency
+# Uses the globally defined test_async_session_maker
+# Table lifecycle managed by db_test_session_manager fixture
+async def override_get_db_session() -> AsyncGenerator[AsyncSession, None]:
+    async with test_async_session_maker() as session:
+        yield session
+
+
+# Override for the FastAPI Users DB adapter dependency
+async def override_get_user_db(
+    # Depend on the *original* app dependency name.
+    # FastAPI will provide the overridden version (override_get_db_session) here.
+    session: AsyncSession = Depends(get_db_session),
+) -> SQLAlchemyUserDatabase[User, Any]:
+    log_provider.info("Setting up user db overrides")
+    yield SQLAlchemyUserDatabase(session, User)
+
+
+# ^^^^^^^^^^^^^^^ copied frog test_api/conftest.py, refactor so that we just reuse the same 'in memory test db' ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+
 def provider_states_handler(state_info: dict = Body(...)):
     """Endpoint handler logic for provider state setup requests from Verifier."""
     state = state_info.get("state")
@@ -235,6 +307,8 @@ def _run_provider_server_process(  # Renamed function
 
     app.post("/" + state_path)(state_handler)
 
+    # todo make this better and more refactorde with how we do stuff for conftest for test_api
+
     # --- Mock Authentication Setup ---
     # Create a mock user that will be used for all endpoints requiring auth
     # This simulates an authenticated user for the provider tests.
@@ -259,6 +333,12 @@ def _run_provider_server_process(  # Renamed function
         f"Mocking current_active_user with user: {mock_user_instance.email}"
     )
     # --- End Mock Authentication Setup ---
+
+    # todo
+    # logger
+    log_provider_subprocess.info("Setting up db session and user db overrides")
+    app.dependency_overrides[get_db_session] = override_get_db_session
+    app.dependency_overrides[get_user_db] = override_get_user_db
 
     # Context manager for patches - REMOVED
     # patch_managers = [] # Use a list to manage multiple patches if needed
@@ -302,22 +382,38 @@ def _run_provider_server_process(  # Renamed function
                     f"Failed to setup mock/patch for '{patch_target_path}'"
                 ) from e
 
+    # Create DB tables before starting the server
+    # This ensures that the database schema is available for the provider app process
+    async def create_tables_for_provider():
+        async with test_engine.begin() as conn:
+            await conn.run_sync(metadata.create_all)
+        log_provider_subprocess.info(
+            "Database tables created for provider server process."
+        )
+
+    asyncio.run(create_tables_for_provider())
+
     # --- Run Server with Patches Applied --- #
     try:
-        # Apply all patches - REMOVED (MonkeyPatch applies immediately)
-        # for patcher in patch_managers:
-        #     patcher.start()
-
         # Run the Uvicorn server - monkeypatch keeps patches active
         uvicorn.run(app, host=host, port=port, log_level="debug")
 
     finally:
-        # Stop all patches - MonkeyPatch handles undoing automatically
-        # for patcher in reversed(patch_managers):
-        #     try:
-        #         patcher.stop()
-        #     except RuntimeError as e:
-        #         log_provider_subprocess.error(f"Error stopping patcher for {patcher.attribute}: {e}")
+        # Drop DB tables after the server stops
+        # This cleans up the database state for the provider app process
+        async def drop_tables_for_provider():
+            async with test_engine.begin() as conn:
+                await conn.run_sync(metadata.drop_all)
+            log_provider_subprocess.info(
+                "Database tables dropped for provider server process."
+            )
+
+        try:
+            asyncio.run(drop_tables_for_provider())
+        except Exception as e:
+            log_provider_subprocess.error(
+                f"Error dropping tables for provider server process: {e}"
+            )
 
         # Explicitly undo patches applied by MonkeyPatch
         mp.undo()
