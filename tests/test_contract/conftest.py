@@ -1,3 +1,4 @@
+from datetime import datetime, timezone
 import pytest
 import uvicorn
 import time
@@ -21,6 +22,8 @@ from typing import AsyncGenerator
 from unittest.mock import AsyncMock, patch
 
 # Import states from consumer test for clarity
+from app.models.conversation import Conversation
+from app.repositories.conversation_repository import ConversationRepository
 from tests.test_contract.test_consumer_conversation_form import (
     PROVIDER_STATE_USER_ONLINE,
     PROVIDER_STATE_USER_NOT_FOUND,
@@ -307,8 +310,6 @@ def _run_provider_server_process(  # Renamed function
 
     app.post("/" + state_path)(state_handler)
 
-    # TODO: make this only applicable to the tests that depends on it with provider states
-
     # --- Mock Authentication Setup ---
     # Create a mock user that will be used for all endpoints requiring auth
     # This simulates an authenticated user for the provider tests.
@@ -387,9 +388,41 @@ def _run_provider_server_process(  # Renamed function
     async def create_tables_for_provider():
         async with test_engine.begin() as conn:
             await conn.run_sync(metadata.create_all)
+
         log_provider_subprocess.info(
             "Database tables created for provider server process."
         )
+
+        # TODO: make this only applicable to the tests that depends on it with provider states
+
+        async with test_async_session_maker() as session:
+            async with session.begin():
+                conv_repo = ConversationRepository(session=session)
+
+                creator_user = User(
+                    id=uuid.uuid4(),
+                    email="creator.mock@example.com",
+                    username="creator_mock_user",
+                    is_active=True,
+                )
+
+                invitee_user = User(
+                    id=uuid.uuid4(),
+                    email="invitee.mock@example.com",
+                    username="invitee_mock_user",
+                    is_active=True,
+                )
+
+                initial_message_content = "Hello, world!"
+                now = datetime.now(timezone.utc)
+
+                new_conversation = Conversation(
+                    slug="mock-slug",
+                    created_by_user_id=creator_user.id,
+                    last_activity_at=now,
+                )
+                session.add(new_conversation)
+                await session.flush()
 
     asyncio.run(create_tables_for_provider())
 
