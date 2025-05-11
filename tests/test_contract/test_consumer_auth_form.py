@@ -4,7 +4,7 @@ import pytest
 from playwright.async_api import Page, Route
 from pact import Like
 
-from tests.test_contract.conftest import setup_pact
+from tests.test_contract.test_helpers import setup_pact
 
 CONSUMER_NAME = "registration-form"
 PROVIDER_NAME = "auth-api"

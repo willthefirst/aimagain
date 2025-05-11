@@ -17,8 +17,6 @@ from yarl import URL  # Using yarl for URL manipulation
 
 # Import shared constants and provider URLs from conftest
 from tests.test_contract.conftest import (
-    PACT_DIR,
-    PACT_LOG_DIR,
     PROVIDER_STATE_SETUP_URL,  # Import state setup URL
 )
 
@@ -28,6 +26,7 @@ from tests.test_contract.conftest import (
 # Import the response schema for mock return value structure
 from app.schemas.user import UserRead
 from tests.test_contract.test_consumer_auth_form import CONSUMER_NAME, PROVIDER_NAME
+from tests.test_contract.test_helpers import PACT_DIR, PACT_LOG_DIR
 
 # Get logger (optional, keep if specific provider test logging needed)
 log = logging.getLogger(__name__)
@@ -97,3 +96,6 @@ def test_provider_auth_api_pact_verification(
         except ImportError:
             print(logs_dict)
         pytest.fail(f"Pact verification failed (exit code: {success}). Check logs.")
+
+
+#

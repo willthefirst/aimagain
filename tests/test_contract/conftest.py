@@ -26,26 +26,6 @@ from tests.test_contract.test_consumer_conversation_form import (
     PROVIDER_STATE_USER_NOT_FOUND,
 )
 
-PACT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "pacts"))
-PACT_LOG_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "log"))
-
-
-def setup_pact(
-    consumer_name: str, provider_name: str
-) -> Generator[Consumer, None, None]:
-    os.makedirs(PACT_DIR, exist_ok=True)
-    os.makedirs(PACT_LOG_DIR, exist_ok=True)
-
-    pact = Consumer(consumer_name).has_pact_with(
-        Provider(provider_name),
-        pact_dir=PACT_DIR,
-        log_dir=PACT_LOG_DIR,
-    )
-
-    pact.start_service()
-    return pact
-
-
 # Provider State Handling & Server Config
 log_provider = logging.getLogger("pact_provider_test")  # Renamed logger
 
@@ -126,6 +106,8 @@ def run_consumer_server_process(
 
     # Override authentication for contract tests
     if mock_auth:
+        # Add log statement
+        log_provider.info("Adding mock auth for contract tests")
         # Create a mock user that will be used for all endpoints requiring auth
         mock_user = User(
             id=uuid.uuid4(),
