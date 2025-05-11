@@ -171,8 +171,6 @@ async def create_conversation(
     conv_service: ConversationService = Depends(get_conversation_service),
     user_repo: UserRepository = Depends(get_user_repository),
 ):
-    raise Exception("testeroo hey you did it")
-
     """Handles the form submission by calling the processing logic."""
     try:
         # Call the decoupled logic handler

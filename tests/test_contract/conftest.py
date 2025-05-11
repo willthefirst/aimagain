@@ -107,6 +107,7 @@ def run_consumer_server_process(
     # Override authentication for contract tests
     if mock_auth:
         # Add log statement
+        print
         log_provider.info("Adding mock auth for contract tests")
         # Create a mock user that will be used for all endpoints requiring auth
         mock_user = User(
@@ -223,28 +224,41 @@ def _run_provider_server_process(  # Renamed function
     import uuid
     import logging
 
-    # --- Database Setup for Provider Process --- REMOVED ---
-    # from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
-    # from app.models import metadata  # Import the metadata
-    # from app.db import get_db_session  # Import the dependency function
-    # from typing import AsyncGenerator
-    # TEST_DATABASE_URL = "sqlite+aiosqlite:///:memory:"  # Use in-memory DB
-    # provider_engine = create_async_engine(TEST_DATABASE_URL)
-    # provider_session_maker = async_sessionmaker(provider_engine, expire_on_commit=False)
-    # async def initialize_db():
-    #     async with provider_engine.begin() as conn:
-    #         await conn.run_sync(metadata.create_all)
-    # asyncio.run(initialize_db())
-    # async def override_get_db_session_provider() -> AsyncGenerator[AsyncSession, None]:
-    #     async with provider_session_maker() as session:
-    #         yield session
-    # app.dependency_overrides[get_db_session] = override_get_db_session_provider
-    # --- End Database Setup ---
+    # --- Added imports for mock user ---
+    from app.models import User  # Ensure this path is correct
+    from app.auth_config import current_active_user  # Ensure this path is correct
+
+    # --- End added imports ---
 
     # Use the same logger name as the parent process for consistency
     log_provider_subprocess = logging.getLogger("pact_provider_test")
 
     app.post("/" + state_path)(state_handler)
+
+    # --- Mock Authentication Setup ---
+    # Create a mock user that will be used for all endpoints requiring auth
+    # This simulates an authenticated user for the provider tests.
+    mock_user_instance = User(
+        id=uuid.uuid4(),
+        email="provider.mock@example.com",
+        username="provider_mock_user",
+        is_active=True,
+        # Add other required User fields if your User model has them (e.g., hashed_password)
+        # hashed_password="mock_hashed_password", # Example: if needed by User model
+        # is_superuser=False, # Example
+        # is_verified=True,  # Example
+    )
+
+    async def get_mock_provider_user():
+        return mock_user_instance
+
+    # Override the dependency for current_active_user
+    # This ensures that endpoints protected by current_active_user will receive the mock_user_instance
+    app.dependency_overrides[current_active_user] = get_mock_provider_user
+    log_provider_subprocess.info(
+        f"Mocking current_active_user with user: {mock_user_instance.email}"
+    )
+    # --- End Mock Authentication Setup ---
 
     # Context manager for patches - REMOVED
     # patch_managers = [] # Use a list to manage multiple patches if needed
@@ -307,6 +321,11 @@ def _run_provider_server_process(  # Renamed function
 
         # Explicitly undo patches applied by MonkeyPatch
         mp.undo()
+        # --- Clear dependency override ---
+        if current_active_user in app.dependency_overrides:
+            del app.dependency_overrides[current_active_user]
+            log_provider_subprocess.info("Cleared mock current_active_user override.")
+        # --- End Clear dependency override ---
     # --- End Run Server --- #
 
 
