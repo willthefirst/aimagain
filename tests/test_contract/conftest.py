@@ -422,6 +422,7 @@ def _run_provider_server_process(  # Renamed function
                     last_activity_at=now,
                 )
                 session.add(new_conversation)
+                session.add(creator_user)
                 await session.flush()
 
     asyncio.run(create_tables_for_provider())
