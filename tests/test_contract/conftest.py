@@ -26,7 +26,6 @@ from app.models.conversation import Conversation
 from app.repositories.conversation_repository import ConversationRepository
 from tests.test_contract.test_consumer_conversation_form import (
     PROVIDER_STATE_USER_ONLINE,
-    PROVIDER_STATE_USER_NOT_FOUND,
 )
 
 # Provider State Handling & Server Config
@@ -121,12 +120,7 @@ def provider_states_handler(state_info: dict = Body(...)):
     log_provider.info(f"Received provider state '{state}' for consumer '{consumer}'")
 
     # List of known states this provider setup can handle (even if passively)
-    known_states = [
-        "User test.user@example.com does not exist",  # From auth test
-        PROVIDER_STATE_USER_ONLINE,  # From conversation test
-        PROVIDER_STATE_USER_NOT_FOUND,  # From conversation test
-        # Add any other known states here
-    ]
+    known_states = ["User test.user@example.com does not exist"]
 
     if state in known_states:
         # Currently, the mocks are configured via test parametrization,
