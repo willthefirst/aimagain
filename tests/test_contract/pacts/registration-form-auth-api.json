@@ -3,7 +3,7 @@
     "name": "registration-form"
   },
   "provider": {
-    "name": "auth-jadasdasdjjapafi"
+    "name": "auth-api"
   },
   "interactions": [
     {
