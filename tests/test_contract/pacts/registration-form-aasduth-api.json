@@ -3,7 +3,7 @@
     "name": "registration-form"
   },
   "provider": {
-    "name": "auth-api"
+    "name": "aasduth-api"
   },
   "interactions": [
     {
@@ -35,27 +35,6 @@
       "response": {
         "status": 201,
         "headers": {
-        }
-      }
-    },
-    {
-      "description": "a request to create a conversation with non-existent username",
-      "providerState": "user is authenticated and target user does not exist",
-      "request": {
-        "method": "POST",
-        "path": "/conversations",
-        "headers": {
-          "Content-Type": "application/x-www-form-urlencoded"
-        },
-        "body": "invitee_username=nonexistentuser&initial_message=Hello%20there!"
-      },
-      "response": {
-        "status": 404,
-        "headers": {
-          "Content-Type": "application/json"
-        },
-        "body": {
-          "detail": "User not found"
         }
       }
     },
@@ -93,20 +72,23 @@
       }
     },
     {
-      "description": "a request to create a new conversation",
-      "providerState": "user is authenticated and target user exists and is online",
+      "description": "a request to create a conversation with non-existent username",
+      "providerState": "user is authenticated and target user does not exist",
       "request": {
         "method": "POST",
         "path": "/conversations",
         "headers": {
           "Content-Type": "application/x-www-form-urlencoded"
         },
-        "body": "invitee_username=testuser2&initial_message=Hello%20there!"
+        "body": "invitee_username=nonexistentuser&initial_message=Hello%20there!"
       },
       "response": {
-        "status": 303,
+        "status": 404,
         "headers": {
-          "Location": "/conversations/mock-slug"
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "detail": "User with username 'nonexistentuser' not found."
         }
       }
     }

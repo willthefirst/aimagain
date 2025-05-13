@@ -1,5 +1,5 @@
 # tests/contract/test_consumer_auth_form.py
-import string
+import atexit
 import pytest
 from playwright.async_api import Page, Route
 from pact import Like
@@ -7,7 +7,10 @@ from pact import Like
 from tests.test_contract.test_helpers import setup_pact
 
 CONSUMER_NAME = "registration-form"
-PROVIDER_NAME = "auth-api"
+PROVIDER_NAME = "auth-jadasdasdjjapafi"
+
+print("PROVIDER_NAME", PROVIDER_NAME)
+
 
 # Test Constants
 TEST_EMAIL = "test.user@example.com"

@@ -3,7 +3,6 @@ import pytest
 import uvicorn
 import time
 import multiprocessing
-import atexit
 import os
 from fastapi import FastAPI, Body, Response, status
 from playwright.async_api import async_playwright
@@ -262,7 +261,7 @@ def origin_with_routes(request) -> str:
 async def browser():
     """Pytest fixture to launch a Playwright browser instance."""
     async with async_playwright() as p:
-        browser = await p.chromium.launch(headless=False)
+        browser = await p.chromium.launch(headless=True)
         yield browser
         await browser.close()
 

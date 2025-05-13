@@ -1,4 +1,5 @@
 import atexit
+import atexit
 import os
 from pact import Consumer, Provider
 from typing import Generator
