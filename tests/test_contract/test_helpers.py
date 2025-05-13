@@ -1,3 +1,4 @@
+import atexit
 import os
 from pact import Consumer, Provider
 from typing import Generator
@@ -19,4 +20,5 @@ def setup_pact(
     )
 
     pact.start_service()
+    atexit.register(pact.stop_service)
     return pact
