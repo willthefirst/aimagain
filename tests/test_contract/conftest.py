@@ -301,7 +301,18 @@ def _run_provider_server_process(  # Renamed function
                             return_data["id"] = uuid.UUID(return_data["id"])
                         except (TypeError, ValueError):
                             pass  # Ignore conversion error, use string ID
-                    mock_instance = AsyncMock(return_value=UserRead(**return_data))
+
+                    # TODO this is really dumb, separate this out so we only patch what we need to for a given route
+                    if (
+                        patch_target_path
+                        == "app.api.routes.auth_routes.handle_registration"
+                    ):
+                        mock_instance = AsyncMock(return_value=UserRead(**return_data))
+                    if (
+                        patch_target_path
+                        == "app.api.routes.conversations.handle_create_conversation"
+                    ):
+                        mock_instance = AsyncMock(return_value=return_data)
                 else:
                     mock_instance = AsyncMock()
                 # --- End Create the AsyncMock --- #

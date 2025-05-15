@@ -47,7 +47,8 @@ from app.schemas.participant import ParticipantInviteRequest, ParticipantRespons
 from app.api.errors import handle_service_error
 from app.logic.conversation_processing import (
     handle_create_conversation,
-    UserNotFoundError as LogicUserNotFoundError,  # Import custom exception
+    UserNotFoundError as LogicUserNotFoundError,
+    handle_get_conversation,
 )
 
 
@@ -122,40 +123,21 @@ async def get_conversation(
     # Depend on the service
     conv_service: ConversationService = Depends(get_conversation_service),
 ):
-    """Retrieves details for a specific conversation if the user is authorized."""
-    try:
-        # Service method handles fetching and authorization
-        conversation_details = await conv_service.get_conversation_details(
-            slug=slug, requesting_user=user
-        )
+    conversation_details = await handle_get_conversation(
+        slug, request, user, conv_service
+    )
 
-        # Service already sorted messages if implemented that way
-        # sorted_messages = sorted(
-        #     conversation_details.messages, key=lambda msg: msg.created_at
-        # )
+    logger.info(f"Conversation details yolo: {conversation_details}")
 
-        return templates.TemplateResponse(
-            "conversations/detail.html",
-            {
-                "request": request,
-                "conversation": conversation_details,
-                "participants": conversation_details.participants,  # Assuming loaded by service/repo
-                "messages": conversation_details.messages,  # Assuming loaded and sorted
-            },
-        )
-    # Handle specific service errors
-    except (ConversationNotFoundError, NotAuthorizedError) as e:
-        handle_service_error(e)
-    except ServiceError as e:
-        # Catch-all for other potential service errors
-        handle_service_error(e)
-    except Exception as e:
-        logger.error(
-            f"Unexpected error getting conversation {slug}: {e}", exc_info=True
-        )
-        raise HTTPException(
-            status_code=500, detail="An unexpected server error occurred."
-        )
+    return templates.TemplateResponse(
+        "conversations/detail.html",
+        {
+            "request": request,
+            "conversation": conversation_details,
+            "participants": conversation_details.participants,  # Assuming loaded by service/repo
+            "messages": conversation_details.messages,  # Assuming loaded and sorted
+        },
+    )
 
 
 @router.post(

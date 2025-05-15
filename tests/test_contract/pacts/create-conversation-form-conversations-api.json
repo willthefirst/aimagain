@@ -1,0 +1,46 @@
+{
+  "consumer": {
+    "name": "create-conversation-form"
+  },
+  "provider": {
+    "name": "conversations-api"
+  },
+  "interactions": [
+    {
+      "description": "a request to create a new conversation with valid username",
+      "providerState": "user is authenticated and target user exists and is online",
+      "request": {
+        "method": "POST",
+        "path": "/conversations",
+        "headers": {
+          "Content-Type": "application/x-www-form-urlencoded"
+        },
+        "body": "invitee_username=testuser2&initial_message=Hello%20there!"
+      },
+      "response": {
+        "status": 303,
+        "headers": {
+          "Location": "/conversations/mock-slug"
+        }
+      }
+    },
+    {
+      "description": "a request to view the newly created conversation",
+      "providerState": "user is authenticated and target user exists and is online",
+      "request": {
+        "method": "GET",
+        "path": "/conversations/mock-slug"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+        }
+      }
+    }
+  ],
+  "metadata": {
+    "pactSpecification": {
+      "version": "2.0.0"
+    }
+  }
+}

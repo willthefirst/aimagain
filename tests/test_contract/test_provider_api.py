@@ -52,6 +52,7 @@ AUTH_API_PROVIDER_CONFIG = pytest.mark.parametrize(
     "provider_server",
     [
         {
+            # Mocks the handler for when a new users registers
             "app.api.routes.auth_routes.handle_registration": {  # Dependency path string
                 "return_value_config": {  # Inlined config
                     "id": str(uuid4()),
@@ -61,7 +62,24 @@ AUTH_API_PROVIDER_CONFIG = pytest.mark.parametrize(
                     "is_superuser": False,
                     "is_verified": False,
                 }
-            }
+            },
+            # TODO break this out so that it only mocks for the relebant test
+            # Mocks the handler for when user creates a conversation
+            "app.api.routes.conversations.handle_create_conversation": {  # Dependency path string
+                "return_value_config": "mock-slsfsdfug"
+            },
+            # Mocks the handler for when user gets a conversation
+            "app.api.routes.conversations.handle_get_conversation": {  # Dependency path string
+                "return_value_config": {
+                    "id": str(uuid4()),
+                    "name": "mock-name",
+                    "slug": "mock-slug",
+                    "created_by_user_id": str(uuid4()),
+                    "last_activity_at": "2021-01-01T00:00:00Z",
+                    "participants": [],
+                    "messages": [],
+                }
+            },
         }
     ],
     indirect=True,
