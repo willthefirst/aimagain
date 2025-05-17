@@ -53,7 +53,7 @@ async def handle_create_conversation(
     creator_user: User,
     conv_service: ConversationService,
     user_repo: UserRepository,
-) -> str:
+) -> Conversation:
     """
     Handles the core logic for creating a new conversation based on form input.
 
@@ -95,7 +95,7 @@ async def handle_create_conversation(
     )
 
     # 3. Return the slug on success
-    return new_conversation.slug
+    return new_conversation
 
 
 async def handle_get_conversation(

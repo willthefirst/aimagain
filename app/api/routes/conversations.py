@@ -134,8 +134,10 @@ async def get_conversation(
         {
             "request": request,
             "conversation": conversation_details,
-            "participants": conversation_details.participants,  # Assuming loaded by service/repo
-            "messages": conversation_details.messages,  # Assuming loaded and sorted
+            "participants": conversation_details[
+                "participants"
+            ],  # Assuming loaded by service/repo
+            "messages": conversation_details["messages"],  # Assuming loaded and sorted
         },
     )
 
@@ -156,7 +158,7 @@ async def create_conversation(
     """Handles the form submission by calling the processing logic."""
     try:
         # Call the decoupled logic handler
-        new_slug = await handle_create_conversation(
+        conversation = await handle_create_conversation(
             invitee_username=invitee_username,
             initial_message=initial_message,
             creator_user=user,
@@ -165,7 +167,7 @@ async def create_conversation(
         )
 
         # Redirect on success
-        redirect_url = f"/conversations/{new_slug}"
+        redirect_url = f"/conversations/{conversation['slug']}"
         return RedirectResponse(url=redirect_url, status_code=status.HTTP_303_SEE_OTHER)
 
     # --- Exception Translation --- #
