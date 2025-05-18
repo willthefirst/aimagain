@@ -101,39 +101,36 @@ async def handle_create_conversation(
 
 async def handle_get_conversation(
     slug: str,
-    request: Request,
-    user: User = Depends(current_active_user),  # Requires auth
-    # Depend on the service
-    conv_service: ConversationService = Depends(get_conversation_service),
+    # request: Request, # Removed as it's not used directly in the core logic
+    requesting_user: User,  # Pass user explicitly
+    conv_service: ConversationService,  # Pass service explicitly
 ):
     """Retrieves details for a specific conversation if the user is authorized."""
-    print(f"Getting conversation details for slug: {slug}")
+    logger.debug(
+        f"Handler: Getting conversation details for slug: {slug} by user {requesting_user.id}"
+    )
     try:
         # Service method handles fetching and authorization
+        # Service exceptions (ConversationNotFoundError, NotAuthorizedError, ServiceError) will propagate.
         conversation_details = await conv_service.get_conversation_details(
-            slug=slug, requesting_user=user
+            slug=slug, requesting_user=requesting_user
         )
 
-        logger.info(f"Conversation details in handle_get: {conversation_details}")
-
-        # Service already sorted messages if implemented that way
-        # sorted_messages = sorted(
-        #     conversation_details.messages, key=lambda msg: msg.created_at
-        # )
-
+        logger.info(
+            f"Handler: Conversation details retrieved: {conversation_details.id if conversation_details else 'None'}"
+        )
         return conversation_details
-    # Handle specific service errors
-    except (ConversationNotFoundError, NotAuthorizedError) as e:
-        handle_service_error(e)
-    except ServiceError as e:
-        # Catch-all for other potential service errors
-        handle_service_error(e)
+    # Handle specific service errors by re-raising them for the route to handle.
+    except (ConversationNotFoundError, NotAuthorizedError, ServiceError) as e:
+        logger.info(f"Handler: Service error getting conversation {slug}: {e}")
+        raise  # Re-raise for the route to handle
     except Exception as e:
         logger.error(
-            f"Unexpected error getting conversation {slug}: {e}", exc_info=True
+            f"Handler: Unexpected error getting conversation {slug}: {e}", exc_info=True
         )
-        raise HTTPException(
-            status_code=500, detail="An unexpected server error occurred."
+        # Wrap unexpected errors in a generic ServiceError for the route to handle consistently
+        raise ServiceError(
+            f"An unexpected error occurred while retrieving conversation {slug}."
         )
 
 

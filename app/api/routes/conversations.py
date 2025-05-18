@@ -142,22 +142,53 @@ async def get_conversation(
     slug: str,
     request: Request,
     user: User = Depends(current_active_user),  # Requires auth
-    # Depend on the service
     conv_service: ConversationService = Depends(get_conversation_service),
 ):
-    conversation = await handle_get_conversation(slug, request, user, conv_service)
+    """Retrieves and displays a specific conversation by calling the handler."""
+    try:
+        # Call the handler, passing dependencies explicitly
+        conversation = await handle_get_conversation(
+            slug=slug, requesting_user=user, conv_service=conv_service
+        )
 
-    logger.info(f"Conversation details yolo: {conversation}")
+        # Log a Yolo message (as per original, if still desired)
+        logger.info(
+            f"Conversation details yolo: {conversation.id if conversation else 'None'}"
+        )
 
-    return templates.TemplateResponse(
-        "conversations/detail.html",
-        {
-            "request": request,
-            "conversation": conversation,
-            "participants": conversation.participants,
-            "messages": conversation.messages,  # Assuming loaded and sorted
-        },
-    )
+        return templates.TemplateResponse(
+            "conversations/detail.html",
+            {
+                "request": request,
+                "conversation": conversation,
+                # Ensure participants and messages are accessed safely if conversation can be None
+                # However, ConversationNotFoundError should be caught below if no conversation
+                "participants": conversation.participants if conversation else [],
+                "messages": conversation.messages if conversation else [],
+            },
+        )
+    # Handle specific service errors propagated from the handler
+    except (ConversationNotFoundError, NotAuthorizedError) as e:
+        # These errors are often translated to specific HTTP status codes
+        # by handle_service_error (e.g., 404, 403)
+        handle_service_error(e)
+    except ServiceError as e:
+        # Handle other generic service errors
+        logger.error(
+            f"Service error in get_conversation route for slug {slug}: {e}",
+            exc_info=True,
+        )
+        handle_service_error(e)
+    except Exception as e:
+        # Catch any other unexpected errors
+        logger.error(
+            f"Unexpected error in get_conversation route for slug {slug}: {e}",
+            exc_info=True,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"An unexpected server error occurred while retrieving conversation {slug}.",
+        )
 
 
 @router.post(
