@@ -16,50 +16,66 @@ from tests.test_contract.test_helpers import PACT_DIR, PACT_LOG_DIR
 log = logging.getLogger(__name__)
 Pact_file_path = os.path.join(PACT_DIR, f"{CONSUMER_NAME}-{PROVIDER_NAME}.json")
 
-AUTH_API_PROVIDER_CONFIG = pytest.mark.parametrize(
+
+# Individual mock configurations for provider dependencies
+REGISTRATION_DEPENDENCY_CONFIG = {
+    # Mocks the handler for when a new user registers
+    "app.api.routes.auth_routes.handle_registration": {  # Dependency path string
+        "return_value_config": UserRead(
+            id=str(uuid4()),
+            email="test.user@example.com",
+            username="testuser",
+            is_active=True,
+            is_superuser=False,
+            is_verified=False,
+        )
+    }
+}
+
+CREATE_CONVERSATION_DEPENDENCY_CONFIG = {
+    # Mocks the handler for when a user creates a conversation
+    "app.api.routes.conversations.handle_create_conversation": {  # Dependency path string
+        "return_value_config": Conversation(
+            id=str(uuid4()),
+            slug="mock-slug",
+            created_by_user_id=str(uuid4()),
+            last_activity_at=datetime.now(timezone.utc).isoformat(),
+        )
+    }
+}
+
+GET_CONVERSATION_DEPENDENCY_CONFIG = {
+    # Mocks the handler for when a user gets a conversation
+    "app.api.routes.conversations.handle_get_conversation": {  # Dependency path string
+        "return_value_config": Conversation(
+            id=str(uuid4()),
+            name="mock-name",
+            slug="mock-slug",
+            created_by_user_id=str(uuid4()),
+            last_activity_at=datetime.now(timezone.utc).isoformat(),
+        )
+    }
+}
+
+# Combined mock configuration for the Pact verification test
+# This assumes the pact file verified by test_provider_auth_api_pact_verification
+# includes interactions requiring all these mocks.
+PACT_TEST_PROVIDER_MOCKS = {
+    **REGISTRATION_DEPENDENCY_CONFIG,
+    **CREATE_CONVERSATION_DEPENDENCY_CONFIG,
+    **GET_CONVERSATION_DEPENDENCY_CONFIG,
+}
+
+PACT_VERIFICATION_PROVIDER_CONFIG = pytest.mark.parametrize(
     "provider_server",
-    [
-        {
-            # Mocks the handler for when a new users registers
-            "app.api.routes.auth_routes.handle_registration": {  # Dependency path string
-                "return_value_config": UserRead(
-                    id=str(uuid4()),
-                    email="test.user@example.com",
-                    username="testuser",
-                    is_active=True,
-                    is_superuser=False,
-                    is_verified=False,
-                )
-            },
-            # TODO break this out so that it only mocks for the relebant test
-            # Mocks the handler for when user creates a conversation
-            "app.api.routes.conversations.handle_create_conversation": {  # Dependency path string
-                "return_value_config": Conversation(
-                    id=str(uuid4()),
-                    slug="mock-slug",
-                    created_by_user_id=str(uuid4()),
-                    last_activity_at=datetime.now(timezone.utc).isoformat(),
-                )
-            },
-            # Mocks the handler for when user gets a conversation
-            "app.api.routes.conversations.handle_get_conversation": {  # Dependency path string
-                "return_value_config": Conversation(
-                    id=str(uuid4()),
-                    name="mock-name",
-                    slug="mock-slug",
-                    created_by_user_id=str(uuid4()),
-                    last_activity_at=datetime.now(timezone.utc).isoformat(),
-                )
-            },
-        }
-    ],
+    [PACT_TEST_PROVIDER_MOCKS],
     indirect=True,
     scope="module",
-    ids=["with_mock_registration"],
+    ids=["with_pact_verification_mocks"],
 )
 
 
-@AUTH_API_PROVIDER_CONFIG
+@PACT_VERIFICATION_PROVIDER_CONFIG
 def test_provider_auth_api_pact_verification(
     provider_server: URL,
 ):
