@@ -36,7 +36,7 @@ async def test_consumer_conversation_create_success(
     # Use origin_with_routes instead of origin
     origin = origin_with_routes
 
-    pact = setup_pact(CONSUMER_NAME, PROVIDER_NAME)
+    pact = setup_pact(CONSUMER_NAME, PROVIDER_NAME, port=1235)
     mock_server_uri = pact.uri
     new_conversation_url = f"{origin}{CONVERSATIONS_NEW_PATH}"
     form_submit_url = f"{origin}{CONVERSATIONS_CREATE_PATH}"

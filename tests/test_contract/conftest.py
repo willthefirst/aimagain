@@ -19,6 +19,8 @@ from app.models import metadata  # Import the metadata
 from app.db import get_db_session  # Import the dependency function
 from typing import AsyncGenerator
 from unittest.mock import AsyncMock, patch
+import shutil
+from .test_helpers import PACT_DIR  # Assuming PACT_DIR is in test_helpers
 
 # Import states from consumer test for clarity
 from app.models.conversation import Conversation
@@ -301,17 +303,7 @@ def _run_provider_server_process(  # Renamed function
                             return_data["id"] = uuid.UUID(return_data["id"])
                         except (TypeError, ValueError):
                             pass  # Ignore conversion error, use string ID
-                    # TODO this is really dumb, separate this out so we only patch what we need to for a given route
-                    if (
-                        patch_target_path
-                        == "app.api.routes.auth_routes.handle_registration"
-                    ):
-                        mock_instance = AsyncMock(return_value=return_data)
-                    if (
-                        patch_target_path
-                        == "app.api.routes.conversations.handle_create_conversation"
-                    ):
-                        mock_instance = AsyncMock(return_value=return_data)
+                    mock_instance = AsyncMock(return_value=return_data)
                 else:
                     mock_instance = AsyncMock()
                 # --- End Create the AsyncMock --- #
@@ -392,3 +384,11 @@ def provider_server(request) -> Generator[URL, Any, None]:
     # No longer need to clear app.dependency_overrides here
     # from app.main import app
     # app.dependency_overrides.clear()
+
+
+@pytest.fixture(scope="session", autouse=True)
+def clean_pact_dir_before_session():
+    """Ensures the pacts directory is clean before the test session starts."""
+    if os.path.exists(PACT_DIR):
+        shutil.rmtree(PACT_DIR)
+    os.makedirs(PACT_DIR, exist_ok=True)

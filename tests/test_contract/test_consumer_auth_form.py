@@ -27,7 +27,7 @@ async def test_consumer_registration_form_interaction(
     Test navigating to the registration page, filling the form,
     and submitting it correctly to the backend API (verified by Pact).
     """
-    pact = setup_pact(CONSUMER_NAME, PROVIDER_NAME)
+    pact = setup_pact(CONSUMER_NAME, PROVIDER_NAME, port=1234)
     mock_server_uri = pact.uri
     register_page_url = f"{origin_with_routes}{REGISTER_API_PATH}"
     full_mock_url = f"{mock_server_uri}{REGISTER_API_PATH}"

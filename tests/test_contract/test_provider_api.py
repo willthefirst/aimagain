@@ -9,13 +9,22 @@ from yarl import URL
 from app.models.conversation import Conversation
 from tests.test_contract.conftest import PROVIDER_STATE_SETUP_URL
 from app.schemas.user import UserRead
-from tests.test_contract.test_consumer_auth_form import CONSUMER_NAME, PROVIDER_NAME
 from tests.test_contract.test_helpers import PACT_DIR, PACT_LOG_DIR
 
 
 log = logging.getLogger(__name__)
-Pact_file_path = os.path.join(PACT_DIR, f"{CONSUMER_NAME}-{PROVIDER_NAME}.json")
 
+# Provider names (as defined in consumer tests / pact files)
+AUTH_API_PROVIDER_NAME = "auth-api"
+CONVERSATIONS_API_PROVIDER_NAME = "conversations-api"
+
+# Pact file paths
+AUTH_API_PACT_FILE_PATH = os.path.join(
+    PACT_DIR, f"registration-form-{AUTH_API_PROVIDER_NAME}.json"
+)
+CONVERSATIONS_API_PACT_FILE_PATH = os.path.join(
+    PACT_DIR, f"create-conversation-form-{CONVERSATIONS_API_PROVIDER_NAME}.json"
+)
 
 # Individual mock configurations for provider dependencies
 REGISTRATION_DEPENDENCY_CONFIG = {
@@ -37,7 +46,7 @@ CREATE_CONVERSATION_DEPENDENCY_CONFIG = {
     "app.api.routes.conversations.handle_create_conversation": {  # Dependency path string
         "return_value_config": Conversation(
             id=str(uuid4()),
-            slug="mock-slug",
+            slug="mock-slug",  # Consumer expects this specific slug for the GET request
             created_by_user_id=str(uuid4()),
             last_activity_at=datetime.now(timezone.utc).isoformat(),
         )
@@ -57,46 +66,92 @@ GET_CONVERSATION_DEPENDENCY_CONFIG = {
     }
 }
 
-# Combined mock configuration for the Pact verification test
-# This assumes the pact file verified by test_provider_auth_api_pact_verification
-# includes interactions requiring all these mocks.
-PACT_TEST_PROVIDER_MOCKS = {
-    **REGISTRATION_DEPENDENCY_CONFIG,
+# Mock configurations for parametrization
+AUTH_API_MOCKS = REGISTRATION_DEPENDENCY_CONFIG
+CONVERSATIONS_API_MOCKS = {
     **CREATE_CONVERSATION_DEPENDENCY_CONFIG,
     **GET_CONVERSATION_DEPENDENCY_CONFIG,
 }
 
-PACT_VERIFICATION_PROVIDER_CONFIG = pytest.mark.parametrize(
+# Pytest parametrize decorators for provider_server fixture
+AUTH_API_PROVIDER_DECORATOR = pytest.mark.parametrize(
     "provider_server",
-    [PACT_TEST_PROVIDER_MOCKS],
+    [AUTH_API_MOCKS],
     indirect=True,
     scope="module",
-    ids=["with_pact_verification_mocks"],
+    ids=["with_auth_api_mocks"],
+)
+
+CONVERSATIONS_API_PROVIDER_DECORATOR = pytest.mark.parametrize(
+    "provider_server",
+    [CONVERSATIONS_API_MOCKS],
+    indirect=True,
+    scope="module",
+    ids=["with_conversations_api_mocks"],
 )
 
 
-@PACT_VERIFICATION_PROVIDER_CONFIG
+@AUTH_API_PROVIDER_DECORATOR
 def test_provider_auth_api_pact_verification(
     provider_server: URL,
 ):
-    """Verify the Auth Routes Pact contract against the running provider server."""
-    if not os.path.exists(Pact_file_path):
-        pytest.fail(f"Pact file not found: {Pact_file_path}. Run consumer test first.")
+    """Verify the Auth API Pact contract against the running provider server."""
+    if not os.path.exists(AUTH_API_PACT_FILE_PATH):
+        pytest.fail(
+            f"Pact file not found: {AUTH_API_PACT_FILE_PATH}. Run consumer test first."
+        )
 
     verifier = Verifier(
-        provider=PROVIDER_NAME,
+        provider=AUTH_API_PROVIDER_NAME,
         provider_base_url=str(provider_server),
         provider_states_setup_url=PROVIDER_STATE_SETUP_URL,
     )
 
-    success, logs_dict = verifier.verify_pacts(Pact_file_path, log_dir=PACT_LOG_DIR)
+    success, logs_dict = verifier.verify_pacts(
+        AUTH_API_PACT_FILE_PATH, log_dir=PACT_LOG_DIR
+    )
 
     if success != 0:
-        log.error("Pact verification failed. Logs:")
+        log.error("Auth API Pact verification failed. Logs:")
         try:
             import json
 
             print(json.dumps(logs_dict, indent=4))
         except ImportError:
             print(logs_dict)
-        pytest.fail(f"Pact verification failed (exit code: {success}). Check logs.")
+        pytest.fail(
+            f"Auth API Pact verification failed (exit code: {success}). Check logs."
+        )
+
+
+@CONVERSATIONS_API_PROVIDER_DECORATOR
+def test_provider_conversations_api_pact_verification(
+    provider_server: URL,
+):
+    """Verify the Conversations API Pact contract against the running provider server."""
+    if not os.path.exists(CONVERSATIONS_API_PACT_FILE_PATH):
+        pytest.fail(
+            f"Pact file not found: {CONVERSATIONS_API_PACT_FILE_PATH}. Run consumer test first."
+        )
+
+    verifier = Verifier(
+        provider=CONVERSATIONS_API_PROVIDER_NAME,
+        provider_base_url=str(provider_server),
+        provider_states_setup_url=PROVIDER_STATE_SETUP_URL,
+    )
+
+    success, logs_dict = verifier.verify_pacts(
+        CONVERSATIONS_API_PACT_FILE_PATH, log_dir=PACT_LOG_DIR
+    )
+
+    if success != 0:
+        log.error("Conversations API Pact verification failed. Logs:")
+        try:
+            import json
+
+            print(json.dumps(logs_dict, indent=4))
+        except ImportError:
+            print(logs_dict)
+        pytest.fail(
+            f"Conversations API Pact verification failed (exit code: {success}). Check logs."
+        )
