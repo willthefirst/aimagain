@@ -28,6 +28,7 @@ from app.repositories.conversation_repository import ConversationRepository
 from tests.test_contract.test_consumer_conversation_form import (
     PROVIDER_STATE_USER_ONLINE,
 )
+from app.models import User  # Ensure User is imported for the helper
 
 # Provider State Handling & Server Config
 log_provider = logging.getLogger("pact_provider_test")  # Renamed logger
@@ -66,6 +67,10 @@ from fastapi_users.db import SQLAlchemyUserDatabase
 from app.schemas.user import UserCreate  # Import UserCreate schema
 from app.core.templating import templates  # Import the global templates object
 
+# Add requests for health check polling
+import requests
+from requests.exceptions import ConnectionError
+
 
 def provider_states_handler(state_info: dict = Body(...)):
     """Endpoint handler logic for provider state setup requests from Verifier."""
@@ -100,6 +105,41 @@ CONSUMER_HOST = "127.0.0.1"
 CONSUMER_PORT = 8990
 
 
+def _create_mock_user(email: str, username: str, user_id: uuid.UUID = None) -> User:
+    """Helper function to create a mock User instance."""
+    return User(
+        id=user_id if user_id else uuid.uuid4(),
+        email=email,
+        username=username,
+        is_active=True,
+        # Add other required User fields if your User model has them (e.g., hashed_password)
+        # hashed_password="mock_hashed_password", # Example: if needed by User model
+        # is_superuser=False, # Example
+        # is_verified=True,  # Example
+    )
+
+
+def _poll_server_ready(url: str, retries: int = 10, delay: float = 0.5) -> bool:
+    """Polls a URL until it's responsive or retries are exhausted."""
+    for i in range(retries):
+        try:
+            response = requests.get(url, timeout=1)
+            if response.status_code == 200:
+                log_provider.info(f"Server at {url} is ready.")
+                return True
+        except ConnectionError:
+            log_provider.debug(
+                f"Server at {url} not ready yet (attempt {i+1}/{retries}). Retrying in {delay}s..."
+            )
+        except requests.Timeout:
+            log_provider.debug(
+                f"Server at {url} timed out (attempt {i+1}/{retries}). Retrying in {delay}s..."
+            )
+        time.sleep(delay)
+    log_provider.error(f"Server at {url} failed to start after {retries} retries.")
+    return False
+
+
 def run_consumer_server_process(
     host: str, port: int, routes_config=None, mock_auth=True
 ):
@@ -111,10 +151,15 @@ def run_consumer_server_process(
         routes_config: Dict with keys as router modules and values as booleans to include/exclude
     """
     from app.auth_config import current_active_user
-    from app.models import User
-    import uuid
+
+    # from app.models import User # No longer needed here, imported above
+    # import uuid # No longer needed here, imported above
 
     consumer_app = FastAPI(title="Consumer Test Server Process")
+
+    @consumer_app.get("/_health")
+    async def health_check():
+        return {"status": "ok"}
 
     # Default configuration includes both routers
     if routes_config is None:
@@ -136,12 +181,8 @@ def run_consumer_server_process(
         print
         log_provider.info("Adding mock auth for contract tests")
         # Create a mock user that will be used for all endpoints requiring auth
-        mock_user = User(
-            id=uuid.uuid4(),
-            email="test@example.com",
-            username="contract_test_user",
-            is_active=True,
-            # Add other required User fields as needed
+        mock_user = _create_mock_user(
+            email="test@example.com", username="contract_test_user"
         )
 
         async def get_mock_current_user():
@@ -164,7 +205,14 @@ def _start_consumer_server_process(
     )
     server_process.start()
     # TODO: Replace sleep with a proper readiness check
-    time.sleep(1)
+    # time.sleep(1) # Replaced with polling
+    health_check_url = f"http://{host}:{port}/_health"
+    if not _poll_server_ready(health_check_url):
+        # If server fails to start, terminate the process and raise an error
+        _terminate_server_process(server_process)
+        raise RuntimeError(
+            f"Consumer server process failed to start at {health_check_url}"
+        )
     return server_process
 
 
@@ -251,7 +299,7 @@ def _run_provider_server_process(  # Renamed function
     import logging
 
     # --- Added imports for mock user ---
-    from app.models import User  # Ensure this path is correct
+    # from app.models import User  # Ensure this path is correct
     from app.auth_config import current_active_user  # Ensure this path is correct
 
     # --- End added imports ---
@@ -259,20 +307,17 @@ def _run_provider_server_process(  # Renamed function
     # Use the same logger name as the parent process for consistency
     log_provider_subprocess = logging.getLogger("pact_provider_test")
 
+    @app.get("/_health")  # Add health check endpoint
+    async def health_check():
+        return {"status": "ok"}
+
     app.post("/" + state_path)(state_handler)
 
     # --- Mock Authentication Setup ---
     # Create a mock user that will be used for all endpoints requiring auth
     # This simulates an authenticated user for the provider tests.
-    mock_user_instance = User(
-        id=uuid.uuid4(),
-        email="provider.mock@example.com",
-        username="provider_mock_user",
-        is_active=True,
-        # Add other required User fields if your User model has them (e.g., hashed_password)
-        # hashed_password="mock_hashed_password", # Example: if needed by User model
-        # is_superuser=False, # Example
-        # is_verified=True,  # Example
+    mock_user_instance = _create_mock_user(
+        email="provider.mock@example.com", username="provider_mock_user"
     )
 
     async def get_mock_provider_user():
@@ -370,9 +415,12 @@ def provider_server(request) -> Generator[URL, Any, None]:
     proc.start()
 
     # TODO: Replace sleep with a proper readiness check (e.g., polling an endpoint)
-    time.sleep(2)
-    if not proc.is_alive():
-        proc.join(timeout=1)
+    # time.sleep(2)
+    health_check_url = f"{PROVIDER_URL}/_health"
+    if not _poll_server_ready(
+        health_check_url, retries=20, delay=0.5
+    ):  # Increased retries for provider
+        _terminate_server_process(proc)
         # No longer need to clear app.dependency_overrides here
         # from app.main import app
         # app.dependency_overrides.clear()

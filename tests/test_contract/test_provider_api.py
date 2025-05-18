@@ -14,11 +14,10 @@ from tests.test_contract.test_helpers import PACT_DIR, PACT_LOG_DIR
 
 log = logging.getLogger(__name__)
 
-# Provider names (as defined in consumer tests / pact files)
 AUTH_API_PROVIDER_NAME = "auth-api"
 CONVERSATIONS_API_PROVIDER_NAME = "conversations-api"
 
-# Pact file paths
+
 AUTH_API_PACT_FILE_PATH = os.path.join(
     PACT_DIR, f"registration-form-{AUTH_API_PROVIDER_NAME}.json"
 )
@@ -26,10 +25,9 @@ CONVERSATIONS_API_PACT_FILE_PATH = os.path.join(
     PACT_DIR, f"create-conversation-form-{CONVERSATIONS_API_PROVIDER_NAME}.json"
 )
 
-# Individual mock configurations for provider dependencies
+
 REGISTRATION_DEPENDENCY_CONFIG = {
-    # Mocks the handler for when a new user registers
-    "app.api.routes.auth_routes.handle_registration": {  # Dependency path string
+    "app.api.routes.auth_routes.handle_registration": {
         "return_value_config": UserRead(
             id=str(uuid4()),
             email="test.user@example.com",
@@ -42,11 +40,10 @@ REGISTRATION_DEPENDENCY_CONFIG = {
 }
 
 CREATE_CONVERSATION_DEPENDENCY_CONFIG = {
-    # Mocks the handler for when a user creates a conversation
-    "app.api.routes.conversations.handle_create_conversation": {  # Dependency path string
+    "app.api.routes.conversations.handle_create_conversation": {
         "return_value_config": Conversation(
             id=str(uuid4()),
-            slug="mock-slug",  # Consumer expects this specific slug for the GET request
+            slug="mock-slug",
             created_by_user_id=str(uuid4()),
             last_activity_at=datetime.now(timezone.utc).isoformat(),
         )
@@ -54,8 +51,7 @@ CREATE_CONVERSATION_DEPENDENCY_CONFIG = {
 }
 
 GET_CONVERSATION_DEPENDENCY_CONFIG = {
-    # Mocks the handler for when a user gets a conversation
-    "app.api.routes.conversations.handle_get_conversation": {  # Dependency path string
+    "app.api.routes.conversations.handle_get_conversation": {
         "return_value_config": Conversation(
             id=str(uuid4()),
             name="mock-name",
