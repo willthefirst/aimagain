@@ -5,12 +5,18 @@ from fastapi_users import exceptions, models
 from fastapi_users.manager import BaseUserManager
 from fastapi_users.router.common import ErrorCode, ErrorModel
 
-from app.api.common.exceptions import APIException, BadRequestError, InternalServerError
+from app.api.common import BaseRouter
 from app.auth_config import get_user_manager
 from app.logic.auth_processing import handle_registration
 from app.schemas.user import UserCreate, UserRead
 
-router = APIRouter()
+# router = APIRouter() # Old raw APIRouter
+# Standardized router initialization
+auth_api_router = APIRouter()  # Create standard APIRouter first
+router = BaseRouter(
+    router=auth_api_router, default_tags=["auth"]
+)  # Wrap with BaseRouter
+
 logger = logging.getLogger(__name__)
 
 register_responses = {
@@ -69,31 +75,11 @@ async def register_request_handler(
 ):
     """
     Handles the core logic for user registration, delegated from the route handler.
+    Relies on @handle_route_errors decorator (via BaseRouter) for exception handling.
     """
     logger.debug(f"Handling registration for email: {request_data.email}")
-    try:
-        result = await handle_registration(
-            request_data=request_data, request=request, user_manager=user_manager
-        )
-        logger.debug("Register request handler returning result from handler.")
-        return result
-    except exceptions.UserAlreadyExists:
-        logger.warning(
-            f"Registration failed: User already exists - {request_data.email}"
-        )
-        raise BadRequestError(detail=ErrorCode.REGISTER_USER_ALREADY_EXISTS)
-    except exceptions.InvalidPasswordException as e:
-        logger.warning(f"Registration failed: Invalid password - {request_data.email}")
-        raise BadRequestError(
-            detail={
-                "code": ErrorCode.REGISTER_INVALID_PASSWORD,
-                "reason": e.reason,
-            }
-        )
-    except Exception as e:
-        logger.error(
-            f"Unexpected error during registration handling: {e}", exc_info=True
-        )
-        raise InternalServerError(
-            detail="An unexpected error occurred during registration."
-        )
+    result = await handle_registration(
+        request_data=request_data, request=request, user_manager=user_manager
+    )
+    logger.debug("Register request handler returning result from handler.")
+    return result

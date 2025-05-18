@@ -19,7 +19,7 @@ app.include_router(
 )
 
 app.include_router(
-    auth_routes.router,
+    auth_routes.auth_api_router,
     prefix="/auth",
     tags=["auth"],
 )

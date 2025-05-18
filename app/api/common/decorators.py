@@ -2,6 +2,7 @@ import logging
 from functools import wraps
 
 from fastapi import HTTPException, status
+from fastapi_users import exceptions as fastapi_users_exceptions
 
 from app.api.common.exceptions import handle_service_error
 from app.services.exceptions import (
@@ -74,6 +75,11 @@ def handle_route_errors(func):
         except ServiceError as e:
             logger.error(
                 f"Generic service error in {func.__name__} route: {e}", exc_info=True
+            )
+            handle_service_error(e)
+        except fastapi_users_exceptions.FastAPIUsersException as e:
+            logger.warning(
+                f"FastAPIUsers exception in {func.__name__} route: {type(e).__name__} - {e}"
             )
             handle_service_error(e)
         except HTTPException as e:
