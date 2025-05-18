@@ -135,7 +135,7 @@ def run_consumer_server_process(
         consumer_app.include_router(conversations.conversations_router_instance)
 
     if routes_config.get("users_pages", False):
-        consumer_app.include_router(users.users_router_instance)
+        consumer_app.include_router(users.users_api_router)
 
     if routes_config.get("me_pages", False):
         consumer_app.include_router(me.me_router_instance)

@@ -40,7 +40,7 @@ app.include_router(
     tags=["users"],
 )
 app.include_router(auth_pages.auth_pages_api_router)
-app.include_router(users.users_router_instance, tags=["users"])
+app.include_router(users.users_api_router, tags=["users"])
 app.include_router(conversations.conversations_router_instance, tags=["conversations"])
 app.include_router(me.me_router_instance, tags=["me"])
 app.include_router(participants.participants_router_instance, tags=["participants"])

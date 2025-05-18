@@ -2,19 +2,19 @@ import logging
 
 from fastapi import APIRouter, Depends, Request
 
-from app.api.common import APIResponse, BaseRouter, InternalServerError
+from app.api.common import APIResponse, BaseRouter
 from app.auth_config import current_active_user
 from app.logic.user_processing import handle_list_users
 from app.models import User
 from app.repositories.dependencies import get_user_repository
 from app.repositories.user_repository import UserRepository
 
-users_router_instance = APIRouter()
-router = BaseRouter(router=users_router_instance, default_tags=["users"])
+users_api_router = APIRouter(prefix="/users")
+router = BaseRouter(router=users_api_router, default_tags=["users"])
 logger = logging.getLogger(__name__)
 
 
-@router.get("/users")
+@router.get("")
 async def list_users(
     request: Request,
     user_repo: UserRepository = Depends(get_user_repository),
@@ -32,15 +32,11 @@ async def list_users(
         requesting_user=user,
         participated_with_filter=participated_with,
     )
-    # Use APIResponse.html_response helper
-    # Ensure the context includes 'request' for TemplateResponse
-    if "request" not in context:
-        context["request"] = request
     return APIResponse.html_response(
         template_name="users/list.html", context=context, request=request
     )
 
 
-# In main.py or similar, you would import and include users_router_instance:
-# from app.api.routes.users import users_router_instance
-# app.include_router(users_router_instance) # Potentially with a prefix if not set on APIRouter directly
+# In main.py or similar, you would import and include users_api_router:
+# from app.api.routes.users import users_api_router
+# app.include_router(users_api_router) # Potentially with a prefix if not set on APIRouter directly
