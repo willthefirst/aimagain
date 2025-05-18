@@ -118,8 +118,6 @@ async def test_create_conversation_success_with_username(
     response = await authenticated_client.post(
         "/conversations",
         data=form_data,
-        # Explicitly setting Content-Type might not be needed if httpx handles data correctly
-        # headers={"Content-Type": "application/x-www-form-urlencoded"},
         follow_redirects=False,  # Important: We want to check the redirect itself
     )
 
