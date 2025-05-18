@@ -1,32 +1,15 @@
 from fastapi import APIRouter, Request, Depends, HTTPException, status, Form
 from fastapi.responses import HTMLResponse, RedirectResponse
 from uuid import UUID
-import logging  # Use logging
-
-# Removed unused SQLAlchemy imports
-# from sqlalchemy.ext.asyncio import AsyncSession
-# from sqlalchemy import select
-
+import logging
 from app.core.templating import templates
 from app.auth_config import current_active_user
-
-# Removed direct repository dependencies
-# from app.repositories.dependencies import (
-#     get_conversation_repository,
-#     get_user_repository,
-#     get_participant_repository,
-# )
-# from app.repositories.conversation_repository import ConversationRepository
 from app.repositories.user_repository import UserRepository
 from app.repositories.dependencies import get_user_repository
-
-# from app.repositories.participant_repository import ParticipantRepository
-
-# Import service dependency
 from app.services.dependencies import get_conversation_service
 from app.services.conversation_service import (
     ConversationService,
-    ServiceError,  # Base exception
+    ServiceError,
     ConversationNotFoundError,
     NotAuthorizedError,
     UserNotFoundError,
@@ -34,15 +17,9 @@ from app.services.conversation_service import (
     ConflictError,
     DatabaseError,
 )
-
-# Import ORM models (needed for type hints)
 from app.models import Conversation, Participant, User, Message
-
-# Import schemas
 from app.schemas.conversation import ConversationCreateRequest, ConversationResponse
 from app.schemas.participant import ParticipantInviteRequest, ParticipantResponse
-
-# Import shared error handling function
 from app.api.errors import handle_service_error
 from app.logic.conversation_processing import (
     handle_create_conversation,
@@ -54,8 +31,7 @@ from app.logic.conversation_processing import (
 )
 
 
-logger = logging.getLogger(__name__)  # Setup logger for route level
-
+logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
@@ -300,6 +276,3 @@ async def invite_participant(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="An unexpected server error occurred during the invitation process.",
         )
-
-
-# Any other conversation-related routes would be refactored similarly
