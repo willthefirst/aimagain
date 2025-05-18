@@ -21,55 +21,65 @@ from typing import AsyncGenerator
 from unittest.mock import AsyncMock, patch
 import shutil
 from .test_helpers import PACT_DIR  # Assuming PACT_DIR is in test_helpers
-
-# Import states from consumer test for clarity
+import requests
+from requests.exceptions import ConnectionError
 from app.models.conversation import Conversation
 from app.repositories.conversation_repository import ConversationRepository
 from tests.test_contract.test_consumer_conversation_form import (
     PROVIDER_STATE_USER_ONLINE,
 )
-from app.models import User  # Ensure User is imported for the helper
+from app.models import User
 
-# Provider State Handling & Server Config
-log_provider = logging.getLogger("pact_provider_test")  # Renamed logger
+# --- Server Configuration ---
+PACT_LOG_LEVEL = "warning"  # Or "debug" for more verbose pact logging
 
-PROVIDER_STATE_SETUP_PATH = "_pact/provider_states"
+# Provider Server Configuration
 PROVIDER_HOST = "127.0.0.1"
 PROVIDER_PORT = 8999
-PROVIDER_URL = URL(f"http://{PROVIDER_HOST}:{PROVIDER_PORT}")
-PROVIDER_STATE_SETUP_URL = str(PROVIDER_URL / PROVIDER_STATE_SETUP_PATH)
+PROVIDER_BASE_URL = URL(f"http://{PROVIDER_HOST}:{PROVIDER_PORT}")
+PROVIDER_STATE_SETUP_ENDPOINT_PATH = "_pact/provider_states"
+PROVIDER_STATE_SETUP_FULL_URL = str(
+    PROVIDER_BASE_URL / PROVIDER_STATE_SETUP_ENDPOINT_PATH
+)
 
+# Consumer Test Server Configuration
+CONSUMER_HOST = "127.0.0.1"
+CONSUMER_PORT = 8990
+CONSUMER_BASE_URL = URL(f"http://{CONSUMER_HOST}:{CONSUMER_PORT}")
+# --- End Server Configuration ---
+
+log_provider = logging.getLogger("pact_provider_test")
+
+# REMOVED OLD DEFINITIONS:
+# PROVIDER_STATE_SETUP_PATH = "_pact/provider_states"
+# PROVIDER_URL = URL(f"http://{PROVIDER_HOST}:{PROVIDER_PORT}")
+# PROVIDER_STATE_SETUP_URL = str(PROVIDER_URL / PROVIDER_STATE_SETUP_PATH)
 
 # below copied frog test_api/conftest.py, refactor so that we just reuse the same 'in memory test db'
 
-import asyncio
-from typing import AsyncGenerator, Any
-from collections.abc import AsyncGenerator as AsyncGeneratorABC
+# import asyncio # Already imported
+# from typing import AsyncGenerator, Any # Already imported
+from collections.abc import (
+    AsyncGenerator as AsyncGeneratorABC,
+)  # Keep this distinct import
 from contextlib import asynccontextmanager
 from asyncstdlib import anext
 
-import pytest
-from fastapi import FastAPI
+# import pytest # Already imported
+# from fastapi import FastAPI # Already imported
 from httpx import ASGITransport, AsyncClient
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
-from fastapi import Depends
 
-# REMOVED Depends import as it's not used in fixture overrides this way
-# from fastapi import Depends
+# from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine # Already imported
+from fastapi import Depends  # Keep this
 
-# Assuming your FastAPI app instance is in app.main
-from app.main import app
+from app.main import app  # Assuming your FastAPI app instance is in app.main
 
-# Updated dependency imports from app.db
-from app.db import get_db_session, get_user_db
-from app.models import User, metadata  # Assuming your models define metadata
+from app.db import get_db_session, get_user_db  # get_db_session already imported
+
+# from app.models import User, metadata # User, metadata already imported
 from fastapi_users.db import SQLAlchemyUserDatabase
-from app.schemas.user import UserCreate  # Import UserCreate schema
-from app.core.templating import templates  # Import the global templates object
-
-# Add requests for health check polling
-import requests
-from requests.exceptions import ConnectionError
+from app.schemas.user import UserCreate
+from app.core.templating import templates
 
 
 def provider_states_handler(state_info: dict = Body(...)):
@@ -81,8 +91,10 @@ def provider_states_handler(state_info: dict = Body(...)):
 
     log_provider.info(f"Received provider state '{state}' for consumer '{consumer}'")
 
-    # List of known states this provider setup can handle (even if passively)
-    known_states = ["User test.user@example.com does not exist"]
+    known_states = [
+        "User test.user@example.com does not exist",
+        PROVIDER_STATE_USER_ONLINE,
+    ]
 
     if state in known_states:
         # Currently, the mocks are configured via test parametrization,
@@ -98,11 +110,6 @@ def provider_states_handler(state_info: dict = Body(...)):
         # return Response(content=f"Unknown state: {state}", status_code=status.HTTP_400_BAD_REQUEST)
         # Returning OK allows verification to proceed, failures will happen at interaction level
         return Response(status_code=status.HTTP_200_OK)
-
-
-# Consumer Test Server Config & Fixtures
-CONSUMER_HOST = "127.0.0.1"
-CONSUMER_PORT = 8990
 
 
 def _create_mock_user(email: str, username: str, user_id: uuid.UUID = None) -> User:
@@ -252,11 +259,12 @@ def origin_with_routes(request) -> str:
     if isinstance(routes_config, dict) and "mock_auth" in routes_config:
         mock_auth = routes_config.pop("mock_auth")
 
-    host = CONSUMER_HOST
-    port = CONSUMER_PORT
-    origin_url = f"http://{host}:{port}"
+    # host = CONSUMER_HOST # Use new config
+    # port = CONSUMER_PORT # Use new config
+    # origin_url = f"http://{host}:{port}" # Use new config
+    origin_url = str(CONSUMER_BASE_URL)
     server_process = _start_consumer_server_process(
-        host, port, routes_config, mock_auth
+        CONSUMER_HOST, CONSUMER_PORT, routes_config, mock_auth
     )
     yield origin_url
     _terminate_server_process(server_process)
@@ -280,6 +288,90 @@ async def page(browser):
     await page.close()
 
 
+# --- Helper function for _run_provider_server_process ---
+def _setup_provider_app_routes(
+    app: FastAPI, state_path: str, state_handler: Callable, log: logging.Logger
+):
+    """Sets up health check and state handler routes for the provider app."""
+
+    @app.get("/_health")
+    async def health_check():
+        return {"status": "ok"}
+
+    log.info("Added /_health endpoint to provider app.")
+
+    app.post("/" + state_path)(state_handler)
+    log.info(f"Added state handler at /{state_path} to provider app.")
+
+
+def _setup_provider_mock_auth(app: FastAPI, log: logging.Logger):
+    """Sets up mock authentication for the provider app."""
+    from app.models import User  # Keep import local if only used here
+    from app.auth_config import current_active_user
+    import uuid  # Keep import local if only used here for mock user id
+
+    mock_user_instance = _create_mock_user(
+        email="provider.mock@example.com",
+        username="provider_mock_user",
+        user_id=uuid.uuid4(),  # Ensure a unique ID for the mock provider user
+    )
+
+    async def get_mock_provider_user():
+        return mock_user_instance
+
+    app.dependency_overrides[current_active_user] = get_mock_provider_user
+    log.info(f"Mocking current_active_user with user: {mock_user_instance.email}")
+    return current_active_user  # Return the key for cleanup
+
+
+def _apply_provider_patches(
+    mp: pytest.MonkeyPatch, override_config: Dict[str, Dict], log: logging.Logger
+):
+    """Applies patches based on override_config using MonkeyPatch."""
+    from unittest.mock import AsyncMock  # Keep import local
+    import uuid  # Keep import local for potential UUID conversion
+
+    if not override_config:
+        return
+
+    for patch_target_path, mock_config in override_config.items():
+        try:
+            if "return_value_config" in mock_config:
+                return_data = mock_config["return_value_config"]
+                if (
+                    isinstance(return_data, dict)
+                    and "id" in return_data
+                    and isinstance(return_data["id"], str)
+                ):
+                    try:
+                        # Attempt to convert string ID to UUID if it's a valid UUID string
+                        uuid_obj = uuid.UUID(return_data["id"])
+                        return_data["id"] = uuid_obj
+                    except ValueError:
+                        log.debug(
+                            f"Could not convert id '{return_data['id']}' to UUID for {patch_target_path}. Using string."
+                        )
+                        pass  # Keep as string if not a valid UUID
+                mock_instance = AsyncMock(return_value=return_data)
+            else:
+                mock_instance = AsyncMock()
+
+            mp.setattr(patch_target_path, mock_instance)
+            log.info(
+                f"Applied patch for '{patch_target_path}' with mock: {mock_instance}"
+            )
+        except (ValueError, KeyError, TypeError, AttributeError) as e:
+            log.error(f"Failed to setup mock/patch for '{patch_target_path}': {e}")
+            # MonkeyPatch handles its own undo, so direct mp.undo() here might be tricky
+            # if part of a loop. Raising ensures the test process stops.
+            raise RuntimeError(
+                f"Failed to setup mock/patch for '{patch_target_path}'"
+            ) from e
+
+
+# --- End Helper functions ---
+
+
 # Pact Provider Fixtures
 def _run_provider_server_process(  # Renamed function
     host: str,
@@ -289,104 +381,49 @@ def _run_provider_server_process(  # Renamed function
     override_config: Dict[str, Dict] | None,
 ) -> None:
     """Target function to run the main FastAPI app with overrides for provider testing."""
-    # Imports required only within the subprocess
-    # import asyncio # No longer needed for DB setup
-    from app.main import app
-    from unittest.mock import AsyncMock, patch  # Import patch
-    from app.schemas.user import UserRead
-    import importlib
-    import uuid
-    import logging
+    from app.main import app  # Main app import
+    import logging  # For subprocess logger
 
-    # --- Added imports for mock user ---
-    # from app.models import User  # Ensure this path is correct
-    from app.auth_config import current_active_user  # Ensure this path is correct
+    # Removed imports that are now in helper functions or not directly needed here
+    # from unittest.mock import AsyncMock, patch (now in _apply_provider_patches)
+    # from app.schemas.user import UserRead (not used)
+    # import importlib (not used)
+    # import uuid (now in _setup_provider_mock_auth & _apply_provider_patches)
+    # from app.models import User (now in _setup_provider_mock_auth)
+    # from app.auth_config import current_active_user (now in _setup_provider_mock_auth)
 
-    # --- End added imports ---
-
-    # Use the same logger name as the parent process for consistency
     log_provider_subprocess = logging.getLogger("pact_provider_test")
 
-    @app.get("/_health")  # Add health check endpoint
-    async def health_check():
-        return {"status": "ok"}
+    _setup_provider_app_routes(app, state_path, state_handler, log_provider_subprocess)
 
-    app.post("/" + state_path)(state_handler)
+    # Setup mock auth and keep track of the dependency key for cleanup
+    auth_dependency_key = _setup_provider_mock_auth(app, log_provider_subprocess)
 
-    # --- Mock Authentication Setup ---
-    # Create a mock user that will be used for all endpoints requiring auth
-    # This simulates an authenticated user for the provider tests.
-    mock_user_instance = _create_mock_user(
-        email="provider.mock@example.com", username="provider_mock_user"
-    )
-
-    async def get_mock_provider_user():
-        return mock_user_instance
-
-    # Override the dependency for current_active_user
-    # This ensures that endpoints protected by current_active_user will receive the mock_user_instance
-    app.dependency_overrides[current_active_user] = get_mock_provider_user
-    log_provider_subprocess.info(
-        f"Mocking current_active_user with user: {mock_user_instance.email}"
-    )
-    # --- End Mock Authentication Setup ---
-
-    # Context manager for patches - REMOVED
-    # patch_managers = [] # Use a list to manage multiple patches if needed
-
-    # Use pytest's MonkeyPatch utility for managing patches
     mp = pytest.MonkeyPatch()
-
-    if override_config:
-        for patch_target_path, mock_config in override_config.items():
-            try:
-                # --- Create the AsyncMock --- #
-                if "return_value_config" in mock_config:
-                    return_data = mock_config["return_value_config"]
-                    if isinstance(return_data, dict) and "id" in return_data:
-                        try:
-                            return_data["id"] = uuid.UUID(return_data["id"])
-                        except (TypeError, ValueError):
-                            pass  # Ignore conversion error, use string ID
-                    mock_instance = AsyncMock(return_value=return_data)
-                else:
-                    mock_instance = AsyncMock()
-                # --- End Create the AsyncMock --- #
-
-                # --- Setup Patch using MonkeyPatch --- #
-                # Instead of unittest.mock.patch, use mp.setattr
-                mp.setattr(patch_target_path, mock_instance)
-                # --- End Setup Patch --- #
-
-            except (
-                ValueError,
-                KeyError,
-                TypeError,
-                AttributeError,
-            ) as e:  # Added AttributeError
-                log_provider_subprocess.error(
-                    f"Failed to setup mock/patch for '{patch_target_path}': {e}"
-                )
-                # Clean up any patches potentially applied before the error
-                mp.undo()
-                raise RuntimeError(
-                    f"Failed to setup mock/patch for '{patch_target_path}'"
-                ) from e
-
-    # --- Run Server with Patches Applied --- #
     try:
+        _apply_provider_patches(mp, override_config, log_provider_subprocess)
+
         # Run the Uvicorn server - monkeypatch keeps patches active
-        uvicorn.run(app, host=host, port=port, log_level="debug")
+        # Note: uvicorn.run is blocking, so cleanup happens in finally
+        uvicorn.run(
+            app, host=host, port=port, log_level=PACT_LOG_LEVEL
+        )  # Use PACT_LOG_LEVEL
 
     finally:
         # Explicitly undo patches applied by MonkeyPatch
         mp.undo()
-        # --- Clear dependency override ---
-        if current_active_user in app.dependency_overrides:
-            del app.dependency_overrides[current_active_user]
-            log_provider_subprocess.info("Cleared mock current_active_user override.")
-        # --- End Clear dependency override ---
-    # --- End Run Server --- #
+        log_provider_subprocess.info("MonkeyPatch.undo() called for provider patches.")
+
+        # Clear dependency override for mock auth
+        if auth_dependency_key and auth_dependency_key in app.dependency_overrides:
+            del app.dependency_overrides[auth_dependency_key]
+            log_provider_subprocess.info(
+                f"Cleared mock override for {auth_dependency_key}."
+            )
+        else:
+            log_provider_subprocess.info(
+                "No auth dependency key to clear or key not found."
+            )
 
 
 @pytest.fixture(scope="module")
@@ -402,7 +439,7 @@ def provider_server(request) -> Generator[URL, Any, None]:
     process_args = (
         PROVIDER_HOST,
         PROVIDER_PORT,
-        PROVIDER_STATE_SETUP_PATH,
+        PROVIDER_STATE_SETUP_ENDPOINT_PATH,
         provider_states_handler,
         override_config,
     )
@@ -416,22 +453,14 @@ def provider_server(request) -> Generator[URL, Any, None]:
 
     # TODO: Replace sleep with a proper readiness check (e.g., polling an endpoint)
     # time.sleep(2)
-    health_check_url = f"{PROVIDER_URL}/_health"
-    if not _poll_server_ready(
-        health_check_url, retries=20, delay=0.5
-    ):  # Increased retries for provider
+    health_check_url = f"{PROVIDER_BASE_URL}/_health"
+    if not _poll_server_ready(health_check_url, retries=20, delay=0.5):
         _terminate_server_process(proc)
-        # No longer need to clear app.dependency_overrides here
-        # from app.main import app
-        # app.dependency_overrides.clear()
         pytest.fail("Provider server process failed to start.", pytrace=False)
 
-    yield PROVIDER_URL
+    yield PROVIDER_BASE_URL
 
     _terminate_server_process(proc)
-    # No longer need to clear app.dependency_overrides here
-    # from app.main import app
-    # app.dependency_overrides.clear()
 
 
 @pytest.fixture(scope="session", autouse=True)

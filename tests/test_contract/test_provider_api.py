@@ -7,7 +7,7 @@ from typing import Generator, Any
 from pact import Verifier
 from yarl import URL
 from app.models.conversation import Conversation
-from tests.test_contract.conftest import PROVIDER_STATE_SETUP_URL
+from tests.test_contract.conftest import PROVIDER_STATE_SETUP_FULL_URL
 from app.schemas.user import UserRead
 from tests.test_contract.test_helpers import PACT_DIR, PACT_LOG_DIR
 
@@ -100,7 +100,7 @@ def test_provider_auth_api_pact_verification(
     verifier = Verifier(
         provider=AUTH_API_PROVIDER_NAME,
         provider_base_url=str(provider_server),
-        provider_states_setup_url=PROVIDER_STATE_SETUP_URL,
+        provider_states_setup_url=PROVIDER_STATE_SETUP_FULL_URL,
     )
 
     success, logs_dict = verifier.verify_pacts(
@@ -133,7 +133,7 @@ def test_provider_conversations_api_pact_verification(
     verifier = Verifier(
         provider=CONVERSATIONS_API_PROVIDER_NAME,
         provider_base_url=str(provider_server),
-        provider_states_setup_url=PROVIDER_STATE_SETUP_URL,
+        provider_states_setup_url=PROVIDER_STATE_SETUP_FULL_URL,
     )
 
     success, logs_dict = verifier.verify_pacts(
