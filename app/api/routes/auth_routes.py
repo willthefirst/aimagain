@@ -81,5 +81,4 @@ async def register_request_handler(
     result = await handle_registration(
         request_data=request_data, request=request, user_manager=user_manager
     )
-    logger.debug("Register request handler returning result from handler.")
     return result
