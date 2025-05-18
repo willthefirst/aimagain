@@ -1,9 +1,8 @@
 from functools import wraps
 from typing import Any, Callable, List, Optional
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends
 
-# Assuming these decorators are now in app.api.common.decorators
 from app.api.common.decorators import handle_route_errors, log_route_call
 
 
@@ -24,8 +23,8 @@ class BaseRouter:
         self,
         path: str,
         endpoint: Callable[..., Any],
-        *,  # Keyword-only arguments below
-        methods: Optional[List[str]] = None,  # e.g. ["GET"], ["POST"]
+        *,
+        methods: Optional[List[str]] = None,
         tags: Optional[List[str]] = None,
         dependencies: Optional[List[Depends]] = None,
         apply_common_decorators: bool = True,
@@ -44,8 +43,6 @@ class BaseRouter:
 
         decorated_endpoint = endpoint
         if apply_common_decorators:
-            # Apply decorators in reverse order of execution desired
-            # handle_route_errors should wrap log_route_call
             decorated_endpoint = handle_route_errors(decorated_endpoint)
             decorated_endpoint = log_route_call(decorated_endpoint)
 
@@ -99,7 +96,7 @@ class BaseRouter:
                 apply_common_decorators=apply_common_decorators,
                 **kwargs,
             )
-            return endpoint  # Return the original endpoint as router.add_api_route handles it
+            return endpoint
 
         return decorator
 

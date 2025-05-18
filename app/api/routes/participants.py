@@ -16,9 +16,7 @@ from app.services.dependencies import get_participant_service
 from app.services.participant_service import ParticipantService
 
 logger = logging.getLogger(__name__)
-
 participants_router_instance = APIRouter(prefix="/participants")
-
 router = BaseRouter(router=participants_router_instance, default_tags=["participants"])
 
 

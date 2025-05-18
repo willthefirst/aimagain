@@ -1,18 +1,8 @@
 from fastapi import APIRouter, Request
 
-# Import common utilities
 from app.api.common import APIResponse, BaseRouter
 
-# from app.core.templating import templates # Will be called via APIResponse.html_response
-
-
-# 1. Create the APIRouter instance for FastAPI app inclusion.
 auth_pages_router_instance = APIRouter()
-
-# 2. Create BaseRouter helper.
-# Common decorators log_route_call and handle_route_errors will be applied by default.
-# These pages are simple template renders, so complex error handling might not be hit often,
-# but consistency is good. If errors occur, they'll be JSON by default.
 router = BaseRouter(router=auth_pages_router_instance, default_tags=["Auth Pages"])
 
 

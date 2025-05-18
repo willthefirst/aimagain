@@ -13,13 +13,7 @@ from app.services.dependencies import get_user_service
 from app.services.user_service import UserService
 
 logger = logging.getLogger(__name__)
-
-# 1. Create the APIRouter. This instance will be imported and included in the main FastAPI app.
-#    It defines the prefix for all routes in this file.
 me_router_instance = APIRouter(prefix="/users/me")
-
-# 2. Create a BaseRouter helper, passing it the actual APIRouter instance and default tags.
-#    Route definitions below will use this `router` helper.
 router = BaseRouter(router=me_router_instance, default_tags=["me"])
 
 

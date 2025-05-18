@@ -23,19 +23,12 @@ class APIResponse:
         return JSONResponse(status_code=status_code, content=content)
 
     @staticmethod
-    def html_response(
-        template_name: str, context: dict, request: Any  # Assuming Request type
-    ) -> Any:  # Assuming TemplateResponse type
+    def html_response(template_name: str, context: dict, request: Any) -> Any:
         """
         Helper for HTML responses using templates.
         Placeholder until templating engine is integrated.
         """
-        # This will need to be integrated with your actual templating engine
-        # For now, let's assume you have a global `templates` object like in FastAPI docs
-        # from app.core.templating import templates
-        # return templates.TemplateResponse(template_name, {"request": request, **context})
-        # Simplified for now, actual implementation will depend on your setup
-        from app.core.templating import templates  # Assuming this path
+        from app.core.templating import templates
 
         return templates.TemplateResponse(
             template_name, {"request": request, **context}

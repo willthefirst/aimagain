@@ -2,7 +2,6 @@ import logging
 
 from fastapi import APIRouter, Depends, Request
 
-# Import common utilities
 from app.api.common import APIResponse, BaseRouter, InternalServerError
 from app.auth_config import current_active_user
 from app.logic.user_processing import handle_list_users
@@ -10,13 +9,8 @@ from app.models import User
 from app.repositories.dependencies import get_user_repository
 from app.repositories.user_repository import UserRepository
 
-# Corrected instantiation pattern:
-# 1. Create the APIRouter. This instance will be imported and included in the main FastAPI app.
 users_router_instance = APIRouter()
-
-# 2. Create a BaseRouter helper, passing it the actual APIRouter instance and default tags.
 router = BaseRouter(router=users_router_instance, default_tags=["users"])
-
 logger = logging.getLogger(__name__)
 
 

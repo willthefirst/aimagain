@@ -2,7 +2,6 @@ import logging
 
 from fastapi import HTTPException, status
 
-# Assuming ServiceError and its subclasses are defined in app.services.exceptions
 from app.services.exceptions import BusinessRuleError  # Example, add others as needed
 from app.services.exceptions import (
     ConflictError,
@@ -82,21 +81,11 @@ def handle_service_error(e: ServiceError):
             status_code=status.HTTP_409_CONFLICT, detail=getattr(e, "message", str(e))
         )
     elif isinstance(e, DatabaseError):
-        # Potentially log more details for database errors, but don't expose them to the client
         logger.error(f"Database error: {e}", exc_info=True)
         raise InternalServerError(detail="A database error occurred.")
     elif isinstance(e, ServiceError):
-        # For generic ServiceErrors, use their proposed status code if available, or default
         status_code = getattr(e, "status_code", status.HTTP_500_INTERNAL_SERVER_ERROR)
         raise APIException(
             status_code=status_code,
             detail=getattr(e, "message", "A service error occurred."),
-        )
-    else:
-        # Fallback for unmapped errors, though @handle_route_errors should catch generic Exception
-        logger.error(
-            f"Unhandled service error type: {type(e).__name__} - {e}", exc_info=True
-        )
-        raise InternalServerError(
-            detail="An unexpected error occurred at the service layer."
         )
