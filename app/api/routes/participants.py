@@ -27,7 +27,24 @@ async def update_participant_status(
     user: User = Depends(current_active_user),
     part_service: ParticipantService = Depends(get_participant_service),
 ):
-    """Updates the status of the user's participant record (e.g., accept/reject invitation)."""
+    """Updates the status of the user's participant record (e.g., accept/reject invitation).
+
+    This endpoint allows a user to update their participation status for a conversation,
+    typically to accept or reject an invitation.
+
+    Args:
+        participant_id: The UUID of the participant record to update.
+        update_data: The request body containing the new status.
+        user: The currently authenticated user, who must own the participant record.
+        part_service: The participant service for handling business logic.
+
+    Returns:
+        ParticipantResponse: The updated participant record.
+
+    Raises:
+        BadRequestError: If the `update_data.status` value is not a valid `ParticipantStatus` enum member.
+                         Other service-level errors are handled by the BaseRouter's error handling decorator.
+    """
 
     try:
         target_status_enum = ParticipantStatus(update_data.status)
