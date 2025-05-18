@@ -3,7 +3,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends
 
-from app.api.common import APIResponse, BadRequestError, BaseRouter
+from app.api.common import BadRequestError, BaseRouter
 from app.auth_config import current_active_user
 from app.logic.participant_processing import handle_update_participant_status
 from app.models import User
