@@ -39,8 +39,8 @@ app.include_router(
     prefix="/users",
     tags=["users"],
 )
-app.include_router(auth_pages.router)
-app.include_router(users.router, tags=["users"])
-app.include_router(conversations.router, tags=["conversations"])
-app.include_router(me.router, tags=["me"])
-app.include_router(participants.router, tags=["participants"])
+app.include_router(auth_pages.auth_pages_router_instance)
+app.include_router(users.users_router_instance, tags=["users"])
+app.include_router(conversations.conversations_router_instance, tags=["conversations"])
+app.include_router(me.me_router_instance, tags=["me"])
+app.include_router(participants.participants_router_instance, tags=["participants"])

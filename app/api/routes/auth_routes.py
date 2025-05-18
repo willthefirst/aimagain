@@ -1,10 +1,11 @@
 import logging
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, Request, status
 from fastapi_users import exceptions, models
 from fastapi_users.manager import BaseUserManager
 from fastapi_users.router.common import ErrorCode, ErrorModel
 
+from app.api.common.exceptions import APIException, BadRequestError, InternalServerError
 from app.auth_config import get_user_manager
 from app.logic.auth_processing import handle_registration
 from app.schemas.user import UserCreate, UserRead
@@ -80,24 +81,19 @@ async def register_request_handler(
         logger.warning(
             f"Registration failed: User already exists - {request_data.email}"
         )
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=ErrorCode.REGISTER_USER_ALREADY_EXISTS,
-        )
+        raise BadRequestError(detail=ErrorCode.REGISTER_USER_ALREADY_EXISTS)
     except exceptions.InvalidPasswordException as e:
         logger.warning(f"Registration failed: Invalid password - {request_data.email}")
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
+        raise BadRequestError(
             detail={
                 "code": ErrorCode.REGISTER_INVALID_PASSWORD,
                 "reason": e.reason,
-            },
+            }
         )
     except Exception as e:
         logger.error(
             f"Unexpected error during registration handling: {e}", exc_info=True
         )
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="An unexpected error occurred during registration.",
+        raise InternalServerError(
+            detail="An unexpected error occurred during registration."
         )

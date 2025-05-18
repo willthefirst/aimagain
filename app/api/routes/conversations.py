@@ -1,14 +1,16 @@
 import logging
 
-from fastapi import APIRouter, Depends, Form, HTTPException, Request, status
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi import APIRouter, Depends, Form, Request, status
+from fastapi.responses import RedirectResponse
 
-from app.api.decorators import handle_route_errors
-from app.api.errors import handle_service_error
-from app.api.logging import log_route_call
-from app.api.responses import html_response
+from app.api.common import (
+    APIResponse,
+    BadRequestError,
+    BaseRouter,
+    InternalServerError,
+    NotFoundError,
+)
 from app.auth_config import current_active_user
-from app.core.templating import templates
 from app.logic.conversation_processing import (
     UserNotFoundError as LogicUserNotFoundError,
 )
@@ -36,55 +38,45 @@ from app.services.conversation_service import (
 from app.services.dependencies import get_conversation_service
 
 logger = logging.getLogger(__name__)
-router = APIRouter()
+
+conversations_router_instance = APIRouter()
+router = BaseRouter(router=conversations_router_instance)
 
 
-@router.get("/conversations", response_class=HTMLResponse, tags=["conversations"])
-@log_route_call
-@handle_route_errors
+@router.get("/conversations", tags=["conversations"])
 async def list_conversations(
     request: Request,
     conv_service: ConversationService = Depends(get_conversation_service),
 ):
     """Provides an HTML page listing all public conversations by calling the handler."""
     conversations = await handle_list_conversations(conv_service=conv_service)
-    return html_response(
+    return APIResponse.html_response(
         template_name="conversations/list.html",
-        context={
-            "request": request,
-            "conversations": conversations,
-        },
+        context={"conversations": conversations},
         request=request,
     )
 
 
 @router.get(
     "/conversations/new",
-    response_class=HTMLResponse,
     name="get_new_conversation_form",
     tags=["conversations"],
 )
-@log_route_call
-@handle_route_errors
 async def get_new_conversation_form(
     request: Request,
     user: User = Depends(current_active_user),
 ):
     """Displays the form to create a new conversation by calling the handler."""
     context = await handle_get_new_conversation_form(request=request)
-    return html_response(
-        template_name="conversations/new.html",
-        context=context,
+    return APIResponse.html_response(
+        template_name="conversations/new.html", context=context, request=request
     )
 
 
 @router.get(
     "/conversations/{slug}",
-    response_class=HTMLResponse,
     tags=["conversations"],
 )
-@log_route_call
-@handle_route_errors
 async def get_conversation(
     slug: str,
     request: Request,
@@ -96,7 +88,7 @@ async def get_conversation(
         slug=slug, requesting_user=user, conv_service=conv_service
     )
 
-    return html_response(
+    return APIResponse.html_response(
         template_name="conversations/detail.html",
         context={
             "conversation": conversation,
@@ -113,8 +105,6 @@ async def get_conversation(
     name="create_conversation",
     tags=["conversations"],
 )
-@log_route_call
-@handle_route_errors
 async def create_conversation(
     invitee_username: str = Form(...),
     initial_message: str = Form(...),
@@ -122,8 +112,8 @@ async def create_conversation(
     conv_service: ConversationService = Depends(get_conversation_service),
     user_repo: UserRepository = Depends(get_user_repository),
 ):
-    logger.info(f"Creating conversation with invitee: {invitee_username}")
     """Handles the form submission by calling the processing logic."""
+    logger.info(f"Creating conversation with invitee: {invitee_username}")
     try:
         conversation = await handle_create_conversation(
             invitee_username=invitee_username,
@@ -139,18 +129,7 @@ async def create_conversation(
         return RedirectResponse(url=redirect_url, status_code=status.HTTP_303_SEE_OTHER)
 
     except LogicUserNotFoundError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
-    except (BusinessRuleError, ConflictError, DatabaseError) as e:
-        handle_service_error(e)
-    except ServiceError as e:
-        handle_service_error(e)
-    except Exception as e:
-        logger.error(
-            f"Unexpected error in create_conversation route: {e}", exc_info=True
-        )
-        raise HTTPException(
-            status_code=500, detail="An unexpected server error occurred."
-        )
+        raise NotFoundError(detail=str(e))
 
 
 @router.post(
@@ -159,8 +138,6 @@ async def create_conversation(
     status_code=status.HTTP_201_CREATED,
     tags=["conversations", "participants"],
 )
-@log_route_call
-@handle_route_errors
 async def invite_participant(
     slug: str,
     request_data: ParticipantInviteRequest,
@@ -168,37 +145,10 @@ async def invite_participant(
     conv_service: ConversationService = Depends(get_conversation_service),
 ):
     """Invites another user to an existing conversation by calling the handler."""
-    try:
-        new_participant = await handle_invite_participant(
-            conversation_slug=slug,
-            invitee_user_id_str=request_data.invitee_user_id,
-            inviter_user=user,
-            conv_service=conv_service,
-        )
-        return new_participant
-    except BusinessRuleError as e:
-        if "Invalid invitee user ID format" in str(e):
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Invalid invitee user ID format.",
-            )
-        handle_service_error(e)
-    except (
-        ConversationNotFoundError,
-        NotAuthorizedError,
-        UserNotFoundError,
-        ConflictError,
-        DatabaseError,
-    ) as e:
-        handle_service_error(e)
-    except ServiceError as e:
-        handle_service_error(e)
-    except Exception as e:
-        logger.error(
-            f"Unexpected error inviting participant to {slug} in route: {e}",
-            exc_info=True,
-        )
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="An unexpected error occurred during the invitation process.",
-        )
+    new_participant = await handle_invite_participant(
+        conversation_slug=slug,
+        invitee_user_id_str=request_data.invitee_user_id,
+        inviter_user=user,
+        conv_service=conv_service,
+    )
+    return new_participant

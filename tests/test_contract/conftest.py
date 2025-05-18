@@ -16,7 +16,7 @@ from requests.exceptions import ConnectionError
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from yarl import URL
 
-from app.api.routes import auth_pages, conversations
+from app.api.routes import auth_pages, conversations, me, participants, users
 from app.db import get_db_session, get_user_db
 from app.models import User, metadata
 from tests.test_contract.test_consumer_conversation_form import (
@@ -123,13 +123,25 @@ def run_consumer_server_process(
         routes_config = {
             "auth_pages": True,
             "conversations": True,
+            "users_pages": False,
+            "me_pages": False,
+            "participants_pages": False,
         }
 
     if routes_config.get("auth_pages", False):
-        consumer_app.include_router(auth_pages.router)
+        consumer_app.include_router(auth_pages.auth_pages_router_instance)
 
     if routes_config.get("conversations", False):
-        consumer_app.include_router(conversations.router)
+        consumer_app.include_router(conversations.conversations_router_instance)
+
+    if routes_config.get("users_pages", False):
+        consumer_app.include_router(users.users_router_instance)
+
+    if routes_config.get("me_pages", False):
+        consumer_app.include_router(me.me_router_instance)
+
+    if routes_config.get("participants_pages", False):
+        consumer_app.include_router(participants.participants_router_instance)
 
     if mock_auth:
         print
