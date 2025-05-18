@@ -12,5 +12,10 @@
     "--remove-unused-variables",
     "--remove-all-unused-imports",
     "--expand-star-imports"
-  ]
+  ],
+  "python.testing.pytestEnabled": true,
+  "python.testing.unittestEnabled": false,
+  "python.testing.nosetestsEnabled": false,
+  "python.testing.pytestArgs": ["tests"],
+  "python.testing.autoTestDiscoverOnSaveEnabled": true
 }

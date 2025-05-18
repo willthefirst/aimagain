@@ -2,11 +2,23 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "Python: Debug Tests",
+      "name": "Python: Debug Current Test File",
       "type": "debugpy",
       "request": "launch",
-      "program": "${file}",
-      "purpose": ["debug-test"],
+      "module": "pytest",
+      "args": ["${file}", "-v"],
+      "console": "integratedTerminal",
+      "justMyCode": false,
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}"
+      }
+    },
+    {
+      "name": "Python: Debug All Tests",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "pytest",
+      "args": ["tests", "-v"],
       "console": "integratedTerminal",
       "justMyCode": false,
       "env": {
