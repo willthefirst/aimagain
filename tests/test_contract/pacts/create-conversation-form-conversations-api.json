@@ -15,7 +15,7 @@
         "headers": {
           "Content-Type": "application/x-www-form-urlencoded"
         },
-        "body": "invitee_username=testuser2&initial_message=Hello%20there!"
+        "body": "invitee_username=shared_testuser&initial_message=Hello+from+shared+data%21"
       },
       "response": {
         "status": 303,

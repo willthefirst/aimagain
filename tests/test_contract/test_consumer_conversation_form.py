@@ -7,13 +7,18 @@ from tests.test_contract.test_helpers import (
     setup_pact,
     setup_playwright_pact_interception,
 )
+from tests.shared_test_data import (
+    TEST_INVITEE_USERNAME,
+    TEST_INITIAL_MESSAGE,
+    get_form_encoded_creation_data,
+)
 
 CONSUMER_NAME = "create-conversation-form"
 PROVIDER_NAME = "conversations-api"
 
 # Test Constants
-TEST_INVITEE_USERNAME = "testuser2"
-TEST_MESSAGE = "Hello there!"
+# TEST_INVITEE_USERNAME = "testuser2" # Will be replaced by shared data
+# TEST_MESSAGE = "Hello there!" # Will be replaced by shared data
 CONVERSATIONS_NEW_PATH = "/conversations/new"
 CONVERSATIONS_CREATE_PATH = "/conversations"
 MOCK_CONVERSATION_SLUG = "mock-slug"
@@ -46,7 +51,9 @@ async def test_consumer_conversation_create_success(
     mock_submit_url = f"{mock_server_uri}{CONVERSATIONS_CREATE_PATH}"
 
     # Define Pact Interaction for successful form submission
-    expected_request_body = f"invitee_username={TEST_INVITEE_USERNAME}&initial_message={TEST_MESSAGE.replace(' ', '%20')}"
+    expected_request_body = (
+        get_form_encoded_creation_data()
+    )  # Use helper from shared data
     expected_request_headers = {"Content-Type": "application/x-www-form-urlencoded"}
 
     (
@@ -93,7 +100,9 @@ async def test_consumer_conversation_create_success(
     with pact:
         await page.goto(new_conversation_url)
         await page.locator("input[name='invitee_username']").fill(TEST_INVITEE_USERNAME)
-        await page.locator("textarea[name='initial_message']").fill(TEST_MESSAGE)
+        await page.locator("textarea[name='initial_message']").fill(
+            TEST_INITIAL_MESSAGE
+        )
         await page.locator("button[type='submit']").click()
         await page.wait_for_timeout(NETWORK_TIMEOUT_MS)
 
