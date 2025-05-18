@@ -296,12 +296,11 @@ def _run_provider_server_process(  # Renamed function
                 # --- Create the AsyncMock --- #
                 if "return_value_config" in mock_config:
                     return_data = mock_config["return_value_config"]
-                    if "id" in return_data:
+                    if isinstance(return_data, dict) and "id" in return_data:
                         try:
                             return_data["id"] = uuid.UUID(return_data["id"])
                         except (TypeError, ValueError):
                             pass  # Ignore conversion error, use string ID
-
                     # TODO this is really dumb, separate this out so we only patch what we need to for a given route
                     if (
                         patch_target_path

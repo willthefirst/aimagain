@@ -1,4 +1,5 @@
 # tests/contract/test_provider_auth_api.py
+from datetime import datetime, timezone
 import pytest
 import os
 from unittest.mock import AsyncMock, MagicMock
@@ -16,6 +17,7 @@ from pact import Verifier
 from yarl import URL  # Using yarl for URL manipulation
 
 # Import shared constants and provider URLs from conftest
+from app.models.conversation import Conversation
 from tests.test_contract.conftest import (
     PROVIDER_STATE_SETUP_URL,  # Import state setup URL
 )
@@ -66,15 +68,12 @@ AUTH_API_PROVIDER_CONFIG = pytest.mark.parametrize(
             # TODO break this out so that it only mocks for the relebant test
             # Mocks the handler for when user creates a conversation
             "app.api.routes.conversations.handle_create_conversation": {  # Dependency path string
-                "return_value_config": {
-                    "id": str(uuid4()),
-                    "name": "mock-name",
-                    "slug": "mock-slug",
-                    "created_by_user_id": str(uuid4()),
-                    "last_activity_at": "2021-01-01T00:00:00Z",
-                    "participants": [],
-                    "messages": [],
-                }
+                "return_value_config": Conversation(
+                    id=str(uuid4()),
+                    slug="mock-slug",
+                    created_by_user_id=str(uuid4()),
+                    last_activity_at=datetime.now(timezone.utc),
+                )
             },
             # Mocks the handler for when user gets a conversation
             "app.api.routes.conversations.handle_get_conversation": {  # Dependency path string

@@ -123,21 +123,17 @@ async def get_conversation(
     # Depend on the service
     conv_service: ConversationService = Depends(get_conversation_service),
 ):
-    conversation_details = await handle_get_conversation(
-        slug, request, user, conv_service
-    )
+    conversation = await handle_get_conversation(slug, request, user, conv_service)
 
-    logger.info(f"Conversation details yolo: {conversation_details}")
+    logger.info(f"Conversation details yolo: {conversation}")
 
     return templates.TemplateResponse(
         "conversations/detail.html",
         {
             "request": request,
-            "conversation": conversation_details,
-            "participants": conversation_details[
-                "participants"
-            ],  # Assuming loaded by service/repo
-            "messages": conversation_details["messages"],  # Assuming loaded and sorted
+            "conversation": conversation,
+            "participants": conversation.participants,
+            "messages": conversation.messages,  # Assuming loaded and sorted
         },
     )
 
@@ -155,6 +151,7 @@ async def create_conversation(
     conv_service: ConversationService = Depends(get_conversation_service),
     user_repo: UserRepository = Depends(get_user_repository),
 ):
+    logger.info(f"Creating conversation with invitee: {invitee_username}")
     """Handles the form submission by calling the processing logic."""
     try:
         # Call the decoupled logic handler
@@ -166,8 +163,10 @@ async def create_conversation(
             user_repo=user_repo,
         )
 
+        logger.info(f"Conversation created: {conversation}")
+
         # Redirect on success
-        redirect_url = f"/conversations/{conversation['slug']}"
+        redirect_url = f"/conversations/{conversation.slug}"
         return RedirectResponse(url=redirect_url, status_code=status.HTTP_303_SEE_OTHER)
 
     # --- Exception Translation --- #
