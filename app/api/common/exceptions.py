@@ -1,6 +1,8 @@
 import logging
 
 from fastapi import HTTPException, status
+from fastapi_users import exceptions as fastapi_users_exceptions
+from fastapi_users.router.common import ErrorCode
 
 from app.services.exceptions import BusinessRuleError  # Example, add others as needed
 from app.services.exceptions import (
@@ -68,6 +70,18 @@ def handle_service_error(e: ServiceError):
         or isinstance(e, UserNotFoundError)
     ):
         raise NotFoundError(detail=getattr(e, "message", str(e)))
+    elif isinstance(e, fastapi_users_exceptions.UserAlreadyExists):
+        raise APIException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=ErrorCode.REGISTER_USER_ALREADY_EXISTS,
+        )
+    elif isinstance(e, fastapi_users_exceptions.InvalidPasswordException):
+        raise BadRequestError(
+            detail={
+                "code": ErrorCode.REGISTER_INVALID_PASSWORD,
+                "reason": e.reason,
+            }
+        )
     elif isinstance(e, NotAuthorizedError):
         raise ForbiddenError(
             detail=getattr(e, "message", str(e))
