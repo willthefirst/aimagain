@@ -56,14 +56,14 @@ AUTH_API_PROVIDER_CONFIG = pytest.mark.parametrize(
         {
             # Mocks the handler for when a new users registers
             "app.api.routes.auth_routes.handle_registration": {  # Dependency path string
-                "return_value_config": {  # Inlined config
-                    "id": str(uuid4()),
-                    "email": "test.user@example.com",
-                    "username": "testuser",
-                    "is_active": True,
-                    "is_superuser": False,
-                    "is_verified": False,
-                }
+                "return_value_config": UserRead(
+                    id=str(uuid4()),
+                    email="test.user@example.com",
+                    username="testuser",
+                    is_active=True,
+                    is_superuser=False,
+                    is_verified=False,
+                )
             },
             # TODO break this out so that it only mocks for the relebant test
             # Mocks the handler for when user creates a conversation
@@ -72,20 +72,18 @@ AUTH_API_PROVIDER_CONFIG = pytest.mark.parametrize(
                     id=str(uuid4()),
                     slug="mock-slug",
                     created_by_user_id=str(uuid4()),
-                    last_activity_at=datetime.now(timezone.utc),
+                    last_activity_at="2021-01-01T00:00:00Z",
                 )
             },
             # Mocks the handler for when user gets a conversation
             "app.api.routes.conversations.handle_get_conversation": {  # Dependency path string
-                "return_value_config": {
-                    "id": str(uuid4()),
-                    "name": "mock-name",
-                    "slug": "mock-slug",
-                    "created_by_user_id": str(uuid4()),
-                    "last_activity_at": "2021-01-01T00:00:00Z",
-                    "participants": [],
-                    "messages": [],
-                }
+                "return_value_config": Conversation(
+                    id=str(uuid4()),
+                    name="mock-name",
+                    slug="mock-slug",
+                    created_by_user_id=str(uuid4()),
+                    last_activity_at="2021-01-01T00:00:00Z",
+                )
             },
         }
     ],

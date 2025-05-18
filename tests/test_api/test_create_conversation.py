@@ -39,12 +39,12 @@ async def test_create_conversation_invitee_not_found(
         invitee_username="nonexistent_user", initial_message="Hello there!"
     )
     response = await authenticated_client.post(
-        f"/conversations", json=request_data.model_dump()
+        f"/conversations", data=request_data.model_dump()
     )
     assert response.status_code == 404
     detail = response.json().get("detail", "")
     assert (
-        "Invitee user with ID" in detail and "not found" in detail
+        "User with username" in detail and "not found" in detail
     ), f"Expected detail containing 'Invitee user ... not found', got: {detail}"
 
     # Verify no conversation created
@@ -72,10 +72,10 @@ async def test_create_conversation_invitee_offline(
 
     assert invitee_id
     request_data = ConversationCreateRequest(
-        invitee_user_id=str(invitee_id), initial_message="Are you there?"
+        invitee_username=invitee.username, initial_message="Are you there?"
     )
     response = await authenticated_client.post(
-        f"/conversations", json=request_data.model_dump()
+        f"/conversations", data=request_data.model_dump()
     )
     assert response.status_code == 400
     assert "Invitee user is not online" in response.json().get("detail", "")

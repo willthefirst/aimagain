@@ -306,7 +306,7 @@ def _run_provider_server_process(  # Renamed function
                         patch_target_path
                         == "app.api.routes.auth_routes.handle_registration"
                     ):
-                        mock_instance = AsyncMock(return_value=UserRead(**return_data))
+                        mock_instance = AsyncMock(return_value=return_data)
                     if (
                         patch_target_path
                         == "app.api.routes.conversations.handle_create_conversation"
