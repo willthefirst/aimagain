@@ -42,13 +42,15 @@ from app.models import Conversation, Participant, User, Message
 from app.schemas.conversation import ConversationCreateRequest, ConversationResponse
 from app.schemas.participant import ParticipantInviteRequest, ParticipantResponse
 
-# Removed unused uuid and datetime imports if service handles them
 # Import shared error handling function
 from app.api.errors import handle_service_error
 from app.logic.conversation_processing import (
     handle_create_conversation,
     UserNotFoundError as LogicUserNotFoundError,
     handle_get_conversation,
+    handle_list_conversations,
+    handle_get_new_conversation_form,
+    handle_invite_participant,
 )
 
 
@@ -60,32 +62,38 @@ router = APIRouter()
 @router.get("/conversations", response_class=HTMLResponse, tags=["conversations"])
 async def list_conversations(
     request: Request,
-    # Depend on the service
     conv_service: ConversationService = Depends(get_conversation_service),
-    # Require authentication to view conversations list?
-    # user: User = Depends(current_active_user), # Add if needed
+    # user: User = Depends(current_active_user), # Add if needed by handler or template
 ):
-    """Provides an HTML page listing all public conversations."""
+    """Provides an HTML page listing all public conversations by calling the handler."""
     try:
-        conversations = await conv_service.get_conversations_for_listing()
+        # Call the decoupled logic handler
+        conversations = await handle_list_conversations(conv_service=conv_service)
         return templates.TemplateResponse(
             name="conversations/list.html",
             context={
                 "request": request,
-                "conversations": conversations,  # Pass ORM objects
+                "conversations": conversations,
             },
         )
     except DatabaseError as e:
-        # Specific handling for database errors if needed, or use generic handler
-        handle_service_error(e)
+        # Handle specific errors propagated from the handler
+        # Using existing handle_service_error or custom logic
+        logger.error(f"Database error in list_conversations route: {e}", exc_info=True)
+        # handle_service_error can translate it to an HTTP response
+        # Or raise a specific HTTPException for the UI
+        handle_service_error(e)  # Assuming this raises appropriate HTTPException
     except ServiceError as e:
-        # Catch-all for other service errors (though should be minimal here)
+        # Handle generic service errors propagated from the handler
+        logger.error(f"Service error in list_conversations route: {e}", exc_info=True)
         handle_service_error(e)
     except Exception as e:
-        # Catch unexpected errors
-        logger.error(f"Unexpected error listing conversations: {e}", exc_info=True)
+        logger.error(
+            f"Unexpected error listing conversations route: {e}", exc_info=True
+        )
         raise HTTPException(
-            status_code=500, detail="An unexpected server error occurred."
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="An unexpected server error occurred while trying to list conversations.",
         )
 
 
@@ -97,18 +105,32 @@ async def list_conversations(
 )
 async def get_new_conversation_form(
     request: Request,
-    user: User = Depends(current_active_user),  # Requires auth
+    user: User = Depends(
+        current_active_user
+    ),  # Required for auth, might be needed by handler
 ):
-    """Displays the form to create a new conversation."""
-    # TODO: Implement proper template rendering later
-    # For now, return a placeholder or reference the template name
-    return templates.TemplateResponse(
-        name="conversations/new.html",  # Placeholder template name
-        context={
-            "request": request,
-            # Add other context if needed later
-        },
-    )
+    """Displays the form to create a new conversation by calling the handler."""
+    try:
+        # Call the handler to get context for the template
+        # Pass user if handler signature includes it and needs it
+        context = await handle_get_new_conversation_form(request=request)
+        return templates.TemplateResponse(
+            name="conversations/new.html",
+            context=context,  # Use context returned by handler
+        )
+    except ServiceError as e:  # If handler could raise ServiceError
+        logger.error(
+            f"Service error in get_new_conversation_form route: {e}", exc_info=True
+        )
+        handle_service_error(e)
+    except Exception as e:
+        logger.error(
+            f"Unexpected error in get_new_conversation_form route: {e}", exc_info=True
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="An unexpected error occurred while preparing the new conversation form.",
+        )
 
 
 @router.get(
@@ -203,49 +225,49 @@ async def create_conversation(
 async def invite_participant(
     slug: str,
     request_data: ParticipantInviteRequest,
-    user: User = Depends(current_active_user),  # Requires auth
-    # Depend on the service
+    user: User = Depends(current_active_user),
     conv_service: ConversationService = Depends(get_conversation_service),
 ):
-    """Invites another user to an existing conversation."""
+    """Invites another user to an existing conversation by calling the handler."""
     try:
-        # Validate UUID format early
-        try:
-            invitee_uuid = UUID(request_data.invitee_user_id)
-        except ValueError:
+        # Call the decoupled logic handler
+        new_participant = await handle_invite_participant(
+            conversation_slug=slug,
+            invitee_user_id_str=request_data.invitee_user_id,  # Pass as string
+            inviter_user=user,
+            conv_service=conv_service,
+        )
+        # Return Pydantic model (handler now returns this directly)
+        return new_participant
+
+    # Handle specific service errors propagated from the handler
+    except BusinessRuleError as e:  # Example: Invalid UUID format from handler
+        # handle_service_error might translate this or you can be more specific
+        if "Invalid invitee user ID format" in str(e):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Invalid invitee user ID format.",
             )
-
-        # Delegate invitation to the service
-        new_participant = await conv_service.invite_user_to_conversation(
-            conversation_slug=slug,
-            invitee_user_id=invitee_uuid,
-            inviter_user=user,
-        )
-
-        # Return Pydantic model
-        return new_participant
-
-    # Handle specific service errors
+        handle_service_error(e)
     except (
         ConversationNotFoundError,
         NotAuthorizedError,
-        UserNotFoundError,
-        BusinessRuleError,
+        UserNotFoundError,  # This is ServiceUserNotFoundError from handler
         ConflictError,
         DatabaseError,
     ) as e:
         handle_service_error(e)
     except ServiceError as e:
+        # Handle generic service errors propagated from the handler
         handle_service_error(e)
     except Exception as e:
         logger.error(
-            f"Unexpected error inviting participant to {slug}: {e}", exc_info=True
+            f"Unexpected error inviting participant to {slug} in route: {e}",
+            exc_info=True,
         )
         raise HTTPException(
-            status_code=500, detail="An unexpected server error occurred."
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="An unexpected server error occurred during the invitation process.",
         )
 
 

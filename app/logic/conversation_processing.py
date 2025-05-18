@@ -33,6 +33,7 @@ from app.api.errors import handle_service_error
 
 from app.repositories.user_repository import UserRepository
 from app.services.dependencies import get_conversation_service
+from uuid import UUID  # Add UUID import
 
 
 logger = logging.getLogger(__name__)  # Setup logger for route level
@@ -133,4 +134,95 @@ async def handle_get_conversation(
         )
         raise HTTPException(
             status_code=500, detail="An unexpected server error occurred."
+        )
+
+
+async def handle_list_conversations(
+    conv_service: ConversationService,
+):
+    """Handles the core logic for listing all public conversations."""
+    try:
+        # Delegate to the service
+        conversations = await conv_service.get_conversations_for_listing()
+        return conversations
+    except DatabaseError as e:
+        # Propagate specific errors to be handled by the route
+        logger.error(f"Database error listing conversations: {e}", exc_info=True)
+        raise  # Re-raise for the route to handle
+    except ServiceError as e:
+        # Propagate generic service errors
+        logger.error(f"Service error listing conversations: {e}", exc_info=True)
+        raise  # Re-raise for the route to handle
+    except Exception as e:
+        # Catch unexpected errors within the handler
+        logger.error(
+            f"Unexpected error in handle_list_conversations: {e}", exc_info=True
+        )
+        # Wrap in a generic ServiceError or a new specific logic error
+        raise ServiceError("An unexpected error occurred while listing conversations.")
+
+
+async def handle_get_new_conversation_form(
+    request: Request,
+    # user: User, # Add if template context needs authenticated user details
+):
+    """
+    Handles the logic for displaying the new conversation form.
+    Currently, this is simple and primarily for pattern consistency.
+    """
+    # The primary responsibility is to gather any data needed by the template.
+    # For a simple form display, this might just be the request object.
+    # If the form needed, e.g., a list of suggested users, that logic would go here.
+    # For now, it doesn't do much beyond what the route could do directly,
+    # but it establishes the pattern.
+    return {"request": request}  # Context for the template
+
+
+async def handle_invite_participant(
+    conversation_slug: str,
+    invitee_user_id_str: str,
+    inviter_user: User,
+    conv_service: ConversationService,
+):
+    """Handles the core logic for inviting a user to a conversation."""
+    try:
+        # Validate UUID format
+        try:
+            invitee_uuid = UUID(invitee_user_id_str)
+        except ValueError:
+            # Raise a specific, catchable error for invalid ID format
+            # This could be a custom LogicError or re-use BusinessRuleError if appropriate
+            raise BusinessRuleError("Invalid invitee user ID format.")
+
+        # Delegate invitation to the service
+        new_participant = await conv_service.invite_user_to_conversation(
+            conversation_slug=conversation_slug,
+            invitee_user_id=invitee_uuid,
+            inviter_user=inviter_user,
+        )
+        return new_participant
+    except (
+        ConversationNotFoundError,
+        NotAuthorizedError,
+        ServiceUserNotFoundError,  # Use the aliased UserNotFoundError from service
+        BusinessRuleError,
+        ConflictError,
+        DatabaseError,
+    ) as e:
+        # Propagate known service errors for the route to handle
+        logger.info(
+            f"Service error during invitation: {e}"
+        )  # Info level for expected errors
+        raise
+    except ServiceError as e:
+        # Propagate generic service errors
+        logger.error(f"Generic service error during invitation: {e}", exc_info=True)
+        raise
+    except Exception as e:
+        # Catch unexpected errors
+        logger.error(
+            f"Unexpected error in handle_invite_participant: {e}", exc_info=True
+        )
+        raise ServiceError(
+            "An unexpected error occurred during the invitation process."
         )
