@@ -3,11 +3,8 @@ import logging
 from fastapi import APIRouter, Depends, Form, Request, status
 from fastapi.responses import RedirectResponse
 
-from app.api.common import APIResponse, BaseRouter, NotFoundError
+from app.api.common import APIResponse, BaseRouter
 from app.auth_config import current_active_user
-from app.logic.conversation_processing import (
-    UserNotFoundError as LogicUserNotFoundError,
-)
 from app.logic.conversation_processing import (
     handle_create_conversation,
     handle_get_conversation,
@@ -98,22 +95,18 @@ async def create_conversation(
 ):
     """Handles the form submission by calling the processing logic."""
     logger.info(f"Creating conversation with invitee: {invitee_username}")
-    try:
-        conversation = await handle_create_conversation(
-            invitee_username=invitee_username,
-            initial_message=initial_message,
-            creator_user=user,
-            conv_service=conv_service,
-            user_repo=user_repo,
-        )
+    conversation = await handle_create_conversation(
+        invitee_username=invitee_username,
+        initial_message=initial_message,
+        creator_user=user,
+        conv_service=conv_service,
+        user_repo=user_repo,
+    )
 
-        logger.info(f"Conversation created: {conversation}")
+    logger.info(f"Conversation created: {conversation}")
 
-        redirect_url = f"/conversations/{conversation.slug}"
-        return RedirectResponse(url=redirect_url, status_code=status.HTTP_303_SEE_OTHER)
-
-    except LogicUserNotFoundError as e:
-        raise NotFoundError(detail=str(e))
+    redirect_url = f"/conversations/{conversation.slug}"
+    return RedirectResponse(url=redirect_url, status_code=status.HTTP_303_SEE_OTHER)
 
 
 @router.post(

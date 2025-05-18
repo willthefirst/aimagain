@@ -15,16 +15,11 @@ from app.services.conversation_service import (
     NotAuthorizedError,
     ServiceError,
 )
-from app.services.conversation_service import UserNotFoundError
 from app.services.conversation_service import (
     UserNotFoundError as ServiceUserNotFoundError,
 )
 
 logger = logging.getLogger(__name__)
-
-
-class UserNotFoundError(Exception):
-    """Custom exception for user not found in this logic layer."""
 
 
 async def handle_create_conversation(
@@ -57,8 +52,9 @@ async def handle_create_conversation(
 
     invitee_user = await user_repo.get_user_by_username(invitee_username)
     if not invitee_user:
-
-        raise UserNotFoundError(f"User with username '{invitee_username}' not found.")
+        raise ServiceUserNotFoundError(
+            f"User with username '{invitee_username}' not found."
+        )
 
     new_conversation = await conv_service.create_new_conversation(
         creator_user=creator_user,
