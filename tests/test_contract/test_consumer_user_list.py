@@ -57,12 +57,10 @@ async def test_consumer_user_list_success(origin_with_routes: str, page: Page):
         .with_request(
             method="GET",
             path=USERS_LIST_PATH,
-            # headers={ "Accept": "text/html" } # Optional: if we want to be specific
         )
         .will_respond_with(
             status=200,
             headers={"Content-Type": "text/html; charset=utf-8"},
-            # body=Like("<html...>") # Usually not done for full HTML pages
         )
     )
 
@@ -103,9 +101,7 @@ async def test_consumer_user_list_success(origin_with_routes: str, page: Page):
         # to the provider (which Pact mock server emulates).
         # This is more of a contract *declaration* by the consumer (frontend).
 
-        await page.goto(
-            mock_list_users_url
-        )  # Navigate directly to the pact mock server URL
+        await page.goto(mock_list_users_url)
         # The pact mock server defined above will assert this call.
 
         # We expect the page to load successfully (status 200 from pact interaction)

@@ -40,7 +40,6 @@ async def test_consumer_conversation_create_success(
     Test the conversation creation flow - navigating to the form page,
     filling out the form, and submitting it with a valid username.
     """
-    # Use origin_with_routes instead of origin
     origin = origin_with_routes
 
     pact = setup_pact(CONSUMER_NAME, PROVIDER_NAME, port=1235)
@@ -49,10 +48,7 @@ async def test_consumer_conversation_create_success(
     f"{origin}{CONVERSATIONS_CREATE_PATH}"
     mock_submit_url = f"{mock_server_uri}{CONVERSATIONS_CREATE_PATH}"
 
-    # Define Pact Interaction for successful form submission
-    expected_request_body = (
-        get_form_encoded_creation_data()
-    )  # Use helper from shared data
+    expected_request_body = get_form_encoded_creation_data()
     expected_request_headers = {"Content-Type": "application/x-www-form-urlencoded"}
 
     (
@@ -79,11 +75,10 @@ async def test_consumer_conversation_create_success(
         .will_respond_with(status=200)
     )
 
-    # Define Playwright Interception Logic
     await setup_playwright_pact_interception(
         page=page,
         api_path_to_intercept=CONVERSATIONS_CREATE_PATH,
-        mock_pact_url=mock_submit_url,  # This is pact.uri + CONVERSATIONS_CREATE_PATH
+        mock_pact_url=mock_submit_url,
         http_method="POST",
     )
 
@@ -95,7 +90,6 @@ async def test_consumer_conversation_create_success(
         f"**{MOCK_CONVERSATION_GET_PATH}", handle_get_conversation_on_success_route
     )
 
-    # Execute Test with Pact Verification
     with pact:
         await page.goto(new_conversation_url)
         await page.locator("input[name='invitee_username']").fill(TEST_INVITEE_USERNAME)

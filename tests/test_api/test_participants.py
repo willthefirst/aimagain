@@ -5,8 +5,6 @@ from uuid import UUID
 import pytest
 from httpx import AsyncClient
 from sqlalchemy import select
-
-# Import session maker type for hinting
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from test_helpers import create_test_user
 
@@ -17,13 +15,7 @@ from app.schemas.participant import (
     ParticipantUpdateRequest,
 )
 
-# Mark all tests in this module as async
 pytestmark = pytest.mark.asyncio
-
-
-# Placeholder schema
-# class ParticipantUpdateRequest(BaseModel):
-#     status: str  # 'joined' or 'rejected'
 
 
 async def test_accept_invitation_success(

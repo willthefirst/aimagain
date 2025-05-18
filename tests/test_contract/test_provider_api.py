@@ -18,7 +18,6 @@ AUTH_API_PROVIDER_NAME = "auth-api"
 CONVERSATIONS_API_PROVIDER_NAME = "conversations-api"
 USERS_API_PROVIDER_NAME = "users-api"
 
-
 AUTH_API_PACT_FILE_PATH = os.path.join(
     PACT_DIR, f"registration-form-{AUTH_API_PROVIDER_NAME}.json"
 )
@@ -28,7 +27,6 @@ CONVERSATIONS_API_PACT_FILE_PATH = os.path.join(
 USERS_API_PACT_FILE_PATH = os.path.join(
     PACT_DIR, f"user-list-page-{USERS_API_PROVIDER_NAME}.json"
 )
-
 
 REGISTRATION_DEPENDENCY_CONFIG = {
     "app.api.routes.auth_routes.handle_registration": {
@@ -100,7 +98,6 @@ LIST_USERS_DEPENDENCY_CONFIG = {
     }
 }
 
-# Mock configurations for parametrization
 AUTH_API_MOCKS = REGISTRATION_DEPENDENCY_CONFIG
 CONVERSATIONS_API_MOCKS = {
     **CREATE_CONVERSATION_DEPENDENCY_CONFIG,
@@ -108,7 +105,6 @@ CONVERSATIONS_API_MOCKS = {
 }
 USERS_API_MOCKS = LIST_USERS_DEPENDENCY_CONFIG
 
-# Pytest parametrize decorators for provider_server fixture
 AUTH_API_PROVIDER_DECORATOR = pytest.mark.parametrize(
     "provider_server",
     [AUTH_API_MOCKS],
@@ -141,11 +137,11 @@ def _verify_pact_and_handle_result(success: int, logs_dict: dict, pact_name: str
             import json
 
             print(json.dumps(logs_dict, indent=4))
-        except ImportError:  # Should not happen if json is a standard library
+        except ImportError:
             print(logs_dict)
         except Exception as e:
             log.error(f"Error printing pact logs: {e}")
-            print(logs_dict)  # Fallback to raw print
+            print(logs_dict)
         pytest.fail(
             f"{pact_name} Pact verification failed (exit code: {success}). Check logs."
         )

@@ -1,5 +1,3 @@
-# tests/contract/test_consumer_auth_form.py
-
 import pytest
 from pact import Like
 from playwright.async_api import Page
@@ -12,7 +10,6 @@ from tests.test_contract.test_helpers import (
 CONSUMER_NAME = "registration-form"
 PROVIDER_NAME = "auth-api"
 
-# Test Constants
 TEST_EMAIL = "test.user@example.com"
 TEST_PASSWORD = "securepassword123"
 TEST_USERNAME = "testuser"
@@ -35,8 +32,7 @@ async def test_consumer_registration_form_interaction(
     register_page_url = f"{origin_with_routes}{REGISTER_API_PATH}"
     full_mock_url = f"{mock_server_uri}{REGISTER_API_PATH}"
 
-    # Define Pact Interaction
-    expected_request_headers = {"Content-Type": "application/json"}
+            expected_request_headers = {"Content-Type": "application/json"}
     expected_request_body = {
         "email": Like(TEST_EMAIL),
         "password": Like(TEST_PASSWORD),
@@ -55,8 +51,7 @@ async def test_consumer_registration_form_interaction(
         .will_respond_with(201)
     )
 
-    # Define Playwright Interception Logic
-    await setup_playwright_pact_interception(
+        await setup_playwright_pact_interception(
         page=page,
         api_path_to_intercept=REGISTER_API_PATH,
         mock_pact_url=full_mock_url,
