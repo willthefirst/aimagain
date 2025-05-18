@@ -1,5 +1,5 @@
 import uuid
-from typing import Optional, Union
+from typing import Optional
 from uuid import UUID  # Import UUID
 
 # Need ORM models

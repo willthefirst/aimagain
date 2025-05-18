@@ -1,14 +1,11 @@
 import logging  # Use logging
 from uuid import UUID  # Add UUID import
 
-from fastapi import APIRouter, Depends, Form, HTTPException, Request, status
+from fastapi import Request
 
-from app.api.errors import handle_service_error
 
 # Logic related to processing conversation actions, decoupled from API routes.
 # This helps in testing the core business logic independently.
-from app.auth_config import current_active_user
-from app.core.templating import templates
 from app.models import User
 from app.models.conversation import Conversation
 from app.repositories.user_repository import UserRepository
@@ -25,7 +22,6 @@ from app.services.conversation_service import UserNotFoundError
 from app.services.conversation_service import (
     UserNotFoundError as ServiceUserNotFoundError,  # Alias to avoid clash
 )
-from app.services.dependencies import get_conversation_service
 
 logger = logging.getLogger(__name__)  # Setup logger for route level
 
@@ -36,7 +32,6 @@ logger = logging.getLogger(__name__)  # Setup logger for route level
 class UserNotFoundError(Exception):
     """Custom exception for user not found in this logic layer."""
 
-    pass
 
 
 async def handle_create_conversation(

@@ -1,5 +1,4 @@
 import logging
-from uuid import UUID
 
 from fastapi import APIRouter, Depends, Form, HTTPException, Request, status
 from fastapi.responses import HTMLResponse, RedirectResponse
@@ -17,10 +16,9 @@ from app.logic.conversation_processing import (
     handle_invite_participant,
     handle_list_conversations,
 )
-from app.models import Conversation, Message, Participant, User
+from app.models import User
 from app.repositories.dependencies import get_user_repository
 from app.repositories.user_repository import UserRepository
-from app.schemas.conversation import ConversationCreateRequest, ConversationResponse
 from app.schemas.participant import ParticipantInviteRequest, ParticipantResponse
 from app.services.conversation_service import (
     BusinessRuleError,

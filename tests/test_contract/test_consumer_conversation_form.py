@@ -1,7 +1,6 @@
 # tests/test_contract/test_consumer_conversation_form.py
 import pytest
-from pact import Like
-from playwright.async_api import Page, Route, expect
+from playwright.async_api import Page, Route
 
 from tests.shared_test_data import (
     TEST_INITIAL_MESSAGE,
@@ -47,7 +46,7 @@ async def test_consumer_conversation_create_success(
     pact = setup_pact(CONSUMER_NAME, PROVIDER_NAME, port=1235)
     mock_server_uri = pact.uri
     new_conversation_url = f"{origin}{CONVERSATIONS_NEW_PATH}"
-    form_submit_url = f"{origin}{CONVERSATIONS_CREATE_PATH}"
+    f"{origin}{CONVERSATIONS_CREATE_PATH}"
     mock_submit_url = f"{mock_server_uri}{CONVERSATIONS_CREATE_PATH}"
 
     # Define Pact Interaction for successful form submission

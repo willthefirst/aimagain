@@ -1,4 +1,3 @@
-import uuid
 from datetime import datetime, timezone
 from typing import Sequence
 from uuid import UUID

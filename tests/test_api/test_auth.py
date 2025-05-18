@@ -1,17 +1,11 @@
-import uuid
 
 import pytest
 from fastapi_users.db import SQLAlchemyUserDatabase
 from httpx import AsyncClient
 from pydantic import BaseModel
-from selectolax.parser import HTMLParser
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
-from test_helpers import create_test_user
 
-from app.auth_config import get_user_manager
-from app.db import get_db_session, get_user_db
-from app.models import Conversation, Participant, User
-from app.schemas.user import UserCreate
+from app.models import User
 
 # Mark all tests in this module as async
 pytestmark = pytest.mark.asyncio

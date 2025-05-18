@@ -5,15 +5,12 @@ import os
 import shutil
 import time
 import uuid
-from datetime import datetime, timezone
 from typing import Any, AsyncGenerator, Callable, Dict, Generator
-from unittest.mock import AsyncMock, patch
 
 import pytest
 import requests
 import uvicorn
 from fastapi import Body, FastAPI, Response, status
-from pact import Consumer, Provider
 from playwright.async_api import async_playwright
 from requests.exceptions import ConnectionError
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
@@ -22,7 +19,6 @@ from yarl import URL
 from app.api.routes import auth_pages, conversations
 from app.db import get_db_session, get_user_db  # Import the dependency functions
 from app.models import User, metadata  # Import User and metadata
-from app.models.conversation import Conversation
 
 # from app.repositories.conversation_repository import ConversationRepository # Not used directly here
 from tests.test_contract.test_consumer_conversation_form import (
@@ -69,9 +65,7 @@ TEST_DATABASE_URL = "sqlite+aiosqlite:///:memory:"
 from collections.abc import (
     AsyncGenerator as AsyncGeneratorABC,  # Keep this distinct import
 )
-from contextlib import asynccontextmanager
 
-from asyncstdlib import anext
 
 # from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine # Already imported
 from fastapi import Depends
@@ -89,7 +83,6 @@ from httpx import (  # AsyncClient not used directly here, but often part of tes
 # from app.models import User, metadata # User, metadata already imported
 # from fastapi_users.db import SQLAlchemyUserDatabase # Already imported
 # from app.schemas.user import UserCreate # Already imported and commented
-from app.core.templating import templates
 from app.main import app  # Assuming your FastAPI app instance is in app.main
 
 # from app.schemas.user import UserCreate # Not used directly in this conftest for user creation logic
@@ -462,7 +455,7 @@ def _run_provider_server_process(  # Renamed function
 
         # Setup mock auth and keep track of the dependency key for cleanup
         # This might also need to be aware of the new override structure if it interacts with DB
-        auth_dependency_key = _setup_provider_mock_auth(app, log_provider_subprocess)
+        _setup_provider_mock_auth(app, log_provider_subprocess)
 
         mp = pytest.MonkeyPatch()  # Keep monkeypatching as is for other overrides
         try:

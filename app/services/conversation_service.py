@@ -1,5 +1,4 @@
 import logging  # Use logging instead of print
-import uuid
 from uuid import UUID
 
 from fastapi import (  # Keep for potential internal use or re-raising
@@ -8,7 +7,7 @@ from fastapi import (  # Keep for potential internal use or re-raising
 )
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 
-from app.models import Conversation, Message, Participant, User
+from app.models import Conversation, Participant, User
 from app.repositories.conversation_repository import ConversationRepository
 from app.repositories.message_repository import MessageRepository
 from app.repositories.participant_repository import ParticipantRepository

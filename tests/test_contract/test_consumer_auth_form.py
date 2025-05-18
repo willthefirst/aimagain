@@ -1,5 +1,4 @@
 # tests/contract/test_consumer_auth_form.py
-import atexit
 
 import pytest
 from pact import Like

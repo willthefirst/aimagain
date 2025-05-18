@@ -1,6 +1,5 @@
 import atexit
 import os
-from typing import Generator
 
 from pact import Consumer, Provider
 from playwright.async_api import Page, Route

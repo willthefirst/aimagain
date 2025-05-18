@@ -1,6 +1,3 @@
-import asyncio
-from collections.abc import AsyncGenerator as AsyncGeneratorABC
-from contextlib import asynccontextmanager
 from typing import Any, AsyncGenerator
 
 import pytest
@@ -149,7 +146,7 @@ async def authenticated_client(
 
     # Create the user directly using the user manager logic
     # We need a session to create the user manager
-    user = await create_test_user(db_test_session_manager, user_data, get_user_manager)
+    await create_test_user(db_test_session_manager, user_data, get_user_manager)
 
     # Log the user in
     login_data = {

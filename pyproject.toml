@@ -28,6 +28,7 @@ dependencies = [
     "pact-python",
     "isort",
     "black",
+    "autoflake",
 ]
 
 [tool.setuptools.packages.find]

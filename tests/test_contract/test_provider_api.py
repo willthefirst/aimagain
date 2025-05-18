@@ -1,7 +1,6 @@
 import logging
 import os
 from datetime import datetime, timezone
-from typing import Any, Generator
 from uuid import uuid4
 
 import pytest

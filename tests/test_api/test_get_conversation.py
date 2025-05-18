@@ -1,7 +1,6 @@
 # Tests for GET /conversations/{slug}
 import uuid
 from datetime import datetime, timedelta, timezone
-from typing import Optional
 
 import pytest
 from httpx import AsyncClient
@@ -32,7 +31,6 @@ async def test_get_conversation_forbidden_not_participant(
 ):
     """Test GET /conversations/{slug} returns 403 if user is not a participant."""
     creator = create_test_user(username=f"creator-{uuid.uuid4()}")
-    me_user = logged_in_user
 
     async with db_test_session_manager() as session:
         async with session.begin():

@@ -1,5 +1,4 @@
 from fastapi_users import schemas
-from sqlalchemy import String
 
 
 class UserRead(schemas.BaseUser):

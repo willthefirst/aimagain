@@ -1,4 +1,3 @@
-import uuid
 
 from sqlalchemy import Column, ForeignKey, Text
 from sqlalchemy.orm import relationship

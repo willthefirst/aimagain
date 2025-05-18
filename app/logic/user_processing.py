@@ -60,7 +60,6 @@ async def handle_list_users(
         # Optionally, you could raise a BusinessRuleError or similar here
         # if strict validation is required. For example:
         # raise BusinessRuleError(f"Invalid filter option: {participated_with_filter}")
-        pass
 
     try:
         users_list = await user_repo.list_users(

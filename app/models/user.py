@@ -2,9 +2,8 @@ import uuid
 
 import sqlalchemy
 from fastapi_users.db import SQLAlchemyBaseUserTable
-from sqlalchemy import Boolean, Column, ForeignKey, String, Text
+from sqlalchemy import Boolean, Column, Text
 from sqlalchemy.orm import relationship
-from sqlalchemy.types import Uuid
 
 from .base import BaseModel
 

@@ -1,10 +1,9 @@
 import logging
-import uuid
 from uuid import UUID
 
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 
-from app.models import Conversation, Participant, User
+from app.models import Participant, User
 from app.repositories.conversation_repository import ConversationRepository
 from app.repositories.participant_repository import ParticipantRepository
 from app.schemas.participant import ParticipantStatus

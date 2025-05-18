@@ -1,10 +1,9 @@
-from fastapi import Depends, FastAPI
+from fastapi import FastAPI
 
 # Import the new auth routes
 from app.api.routes import auth_routes
-from app.auth_config import auth_backend, current_active_user, fastapi_users
-from app.models import User
-from app.schemas.user import UserCreate, UserRead, UserUpdate
+from app.auth_config import auth_backend, fastapi_users
+from app.schemas.user import UserRead, UserUpdate
 
 from .api.routes import auth_pages, conversations, me, participants, users
 

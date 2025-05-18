@@ -107,7 +107,6 @@ async def test_list_users_participated_empty(
 ):
     """Test GET /users?participated_with=me returns empty when no shared convos."""
     # me_user = create_test_user(username="test-user-me") # Removed manual creation
-    me_user = logged_in_user
     other_user = create_test_user(username="other-user")
 
     # Setup data

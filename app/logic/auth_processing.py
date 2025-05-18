@@ -1,10 +1,10 @@
 # app/logic/auth_processing.py
 import logging
 
-from fastapi import Depends, HTTPException, Request, status
+from fastapi import Depends, Request
 
 # Import necessary components from fastapi-users and app config
-from fastapi_users import exceptions, models
+from fastapi_users import models
 from fastapi_users.manager import BaseUserManager, UserManagerDependency
 from fastapi_users.router.common import ErrorCode  # Error codes for responses
 

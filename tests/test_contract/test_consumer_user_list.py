@@ -47,7 +47,7 @@ async def test_consumer_user_list_success(origin_with_routes: str, page: Page):
 
     pact = setup_pact(CONSUMER_NAME, PROVIDER_NAME, port=1236)  # Different port
     mock_server_uri = pact.uri
-    list_users_url = f"{origin}{USERS_LIST_PATH}"
+    f"{origin}{USERS_LIST_PATH}"
     mock_list_users_url = f"{mock_server_uri}{USERS_LIST_PATH}"
 
     # Define Pact Interaction for successful user list page load

@@ -1,11 +1,9 @@
 import uuid
-from datetime import datetime, timedelta, timezone
 from typing import Optional
 from uuid import UUID
 
 import pytest
 from httpx import AsyncClient
-from pydantic import BaseModel
 from sqlalchemy import select
 
 # Import session maker type for hinting
@@ -171,7 +169,6 @@ async def test_update_participant_not_owned(
     """Test PUT /participants/{id} returns 403 if participant belongs to another user."""
     inviter = create_test_user(username=f"inviter-{uuid.uuid4()}")
     actual_owner = create_test_user(username=f"owner-{uuid.uuid4()}")
-    me_user = logged_in_user
 
     participant_id: Optional[UUID] = None
 
