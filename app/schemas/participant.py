@@ -1,4 +1,3 @@
-# app/schemas/participant.py
 import enum
 from datetime import datetime
 from uuid import UUID
@@ -6,7 +5,6 @@ from uuid import UUID
 from pydantic import BaseModel, ConfigDict
 
 
-# Define Enum for Participant Status
 class ParticipantStatus(str, enum.Enum):
     INVITED = "invited"
     JOINED = "joined"
@@ -14,17 +12,14 @@ class ParticipantStatus(str, enum.Enum):
     LEFT = "left"
 
 
-# Schema for inviting a user to a conversation
 class ParticipantInviteRequest(BaseModel):
     invitee_user_id: str
 
 
-# Schema for updating participant status
 class ParticipantUpdateRequest(BaseModel):
     status: ParticipantStatus
 
 
-# Schema for participant response
 class ParticipantResponse(BaseModel):
     id: UUID
     user_id: UUID

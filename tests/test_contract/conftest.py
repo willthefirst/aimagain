@@ -43,11 +43,9 @@ log_provider = logging.getLogger("pact_provider_test")
 
 TEST_DATABASE_URL = "sqlite+aiosqlite:///:memory:"
 
-from collections.abc import AsyncGenerator as AsyncGeneratorABC
 
 from fastapi import Depends
 from fastapi_users.db import SQLAlchemyUserDatabase
-from httpx import ASGITransport, AsyncClient
 
 from app.main import app
 
