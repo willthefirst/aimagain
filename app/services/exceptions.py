@@ -3,7 +3,6 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-# Define custom service-level exceptions
 class ServiceError(Exception):
     """Base class for service layer errors."""
 

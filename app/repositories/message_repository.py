@@ -16,14 +16,13 @@ class MessageRepository(BaseRepository):
     ) -> Message:
         """Creates and adds a new message to the session."""
         new_message = Message(
-            id=uuid.uuid4(),  # Let DB handle default? No, model defines default.
+            id=uuid.uuid4(),
             content=content,
             conversation_id=conversation_id,
             created_by_user_id=user_id,
         )
         self.session.add(new_message)
-        await self.session.flush()  # Flush to get potential DB defaults if needed, or ensure it's tracked
-        # await self.session.refresh(new_message) # Refresh if returning object with defaults/relationships needed immediately
+        await self.session.flush()
         return new_message
 
     async def get_messages_by_conversation(

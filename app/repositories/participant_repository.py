@@ -6,13 +6,8 @@ from sqlalchemy import exists, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.models import (  # Added User, Conversation, Message
-    Conversation,
-    Message,
-    Participant,
-    User,
-)
-from app.schemas.participant import ParticipantStatus  # Assuming you have this enum
+from app.models import Conversation, Message, Participant, User
+from app.schemas.participant import ParticipantStatus
 
 from .base import BaseRepository
 
@@ -79,7 +74,6 @@ class ParticipantRepository(BaseRepository):
                 Participant.status == ParticipantStatus.INVITED,
             )
             .options(
-                # Eager load related data needed for display
                 selectinload(Participant.conversation).selectinload(
                     Conversation.creator
                 ),
@@ -94,7 +88,6 @@ class ParticipantRepository(BaseRepository):
     async def get_participant_by_id(self, participant_id: UUID) -> Participant | None:
         """Retrieves a participant record by its ID, optionally loading relations."""
         stmt = select(Participant).filter(Participant.id == participant_id)
-        # Optionally add options(...) here if conversation is always needed
         result = await self.session.execute(stmt)
         return result.scalars().first()
 

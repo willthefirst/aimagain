@@ -1,10 +1,7 @@
-import logging  # Use logging instead of print
+import logging
 from uuid import UUID
 
-from fastapi import (  # Keep for potential internal use or re-raising
-    HTTPException,
-    status,
-)
+from fastapi import HTTPException, status
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 
 from app.models import Conversation, Participant, User
@@ -14,7 +11,6 @@ from app.repositories.participant_repository import ParticipantRepository
 from app.repositories.user_repository import UserRepository
 from app.schemas.participant import ParticipantStatus
 
-# Import shared service exceptions
 from .exceptions import (
     BusinessRuleError,
     ConflictError,
@@ -25,7 +21,6 @@ from .exceptions import (
     UserNotFoundError,
 )
 
-# Setup logger
 logger = logging.getLogger(__name__)
 
 
@@ -41,10 +36,7 @@ class ConversationService:
         self.part_repo = participant_repository
         self.msg_repo = message_repository
         self.user_repo = user_repository
-        # The session is implicitly shared via the repositories
-        self.session = (
-            conversation_repository.session
-        )  # Get session access for commit/rollback
+        self.session = conversation_repository.session
 
     async def get_conversations_for_listing(self) -> list[Conversation]:
         """Fetches conversations suitable for a public listing."""
@@ -67,7 +59,6 @@ class ConversationService:
                 f"Conversation with slug '{slug}' not found."
             )
 
-        # Authorization Check
         participant = await self.part_repo.get_participant_by_user_and_conversation(
             user_id=requesting_user.id, conversation_id=conversation.id
         )
@@ -78,16 +69,12 @@ class ConversationService:
         if participant.status != ParticipantStatus.JOINED:
             raise NotAuthorizedError("User has not joined this conversation.")
 
-        # Assuming get_conversation_details loads relations or we load them manually
-        # Let's assume the repo method loads them:
         details = await self.conv_repo.get_conversation_details(conversation.id)
         if not details:
-            # Should not happen if slug check passed, but handle defensively
             raise ConversationNotFoundError(
                 f"Could not fetch details for conversation id '{conversation.id}'."
             )
 
-        # Ensure messages are sorted (repo might do this, but good to confirm)
         details.messages.sort(key=lambda msg: msg.created_at)
 
         return details
@@ -113,8 +100,6 @@ class ConversationService:
         if creator_user.id == invitee_user.id:
             raise BusinessRuleError("Cannot create a conversation with yourself.")
 
-        # Assume conv_repo.create_new_conversation creates all objects and adds to session
-        # but does NOT commit.
         try:
             new_conversation = await self.conv_repo.create_new_conversation(
                 creator_user=creator_user,
@@ -122,19 +107,11 @@ class ConversationService:
                 initial_message_content=initial_message_content,
             )
 
-            # Commit the transaction for the entire operation
             await self.session.commit()
 
-            # Refresh to get DB-generated fields (like IDs, timestamps) and relations
-            # The repo method might return a refreshed object, or we do it here.
-            # Best practice: Refresh the main object and potentially key related ones needed by caller.
             await self.session.refresh(new_conversation)
-            # If the response schema needs participant/message details immediately, refresh them too.
-            # This depends on what `create_new_conversation` returns and what the API response model needs.
-            # Example: assuming relations are loaded by refresh or already populated:
-            # await self.session.refresh(new_conversation, attribute_names=['participants', 'messages'])
 
-        except IntegrityError as e:  # Catch potential unique constraint violations etc.
+        except IntegrityError as e:
             await self.session.rollback()
             logger.warning(f"Integrity error creating conversation: {e}", exc_info=True)
             raise ConflictError(
@@ -146,7 +123,7 @@ class ConversationService:
             raise DatabaseError(
                 "Failed to create conversation due to a database error."
             )
-        except Exception as e:  # Catch other potential errors from repo/logic
+        except Exception as e:
             await self.session.rollback()
             logger.error(f"Unexpected error creating conversation: {e}", exc_info=True)
             raise ServiceError(
@@ -168,7 +145,6 @@ class ConversationService:
                 f"Conversation with slug '{conversation_slug}' not found."
             )
 
-        # Authorization check for inviter
         is_joined = await self.part_repo.check_if_user_is_joined_participant(
             user_id=inviter_user.id, conversation_id=conversation.id
         )
@@ -177,7 +153,6 @@ class ConversationService:
                 "User must be a joined participant to invite others."
             )
 
-        # Invitee validation
         invitee_user = await self.user_repo.get_user_by_id(invitee_user_id)
         if not invitee_user:
             raise UserNotFoundError(
@@ -197,25 +172,18 @@ class ConversationService:
             raise ConflictError("Invitee is already a participant.")
 
         try:
-            # Create participant record using participant repository
             new_participant = await self.part_repo.create_participant(
                 user_id=invitee_user.id,
                 conversation_id=conversation.id,
                 status=ParticipantStatus.INVITED,
                 invited_by_user_id=inviter_user.id,
-                # No initial message for invites to existing conversations
             )
 
-            # Update conversation timestamps using conversation repository
             await self.conv_repo.update_conversation_timestamps(conversation)
 
-            # Commit changes for participant creation and timestamp update
             await self.session.commit()
 
-            # Refresh the new participant to ensure all fields are loaded post-commit
             await self.session.refresh(new_participant)
-            # Optionally refresh conversation if updated timestamps are needed by caller
-            # await self.session.refresh(conversation)
 
         except IntegrityError as e:
             await self.session.rollback()

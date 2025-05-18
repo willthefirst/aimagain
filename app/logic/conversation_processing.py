@@ -3,7 +3,6 @@ from uuid import UUID  # Add UUID import
 
 from fastapi import Request
 
-
 # Logic related to processing conversation actions, decoupled from API routes.
 # This helps in testing the core business logic independently.
 from app.models import User
@@ -31,7 +30,6 @@ logger = logging.getLogger(__name__)  # Setup logger for route level
 
 class UserNotFoundError(Exception):
     """Custom exception for user not found in this logic layer."""
-
 
 
 async def handle_create_conversation(

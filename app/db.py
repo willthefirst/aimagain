@@ -30,23 +30,3 @@ async def get_user_db(
     session: AsyncSession = Depends(get_db_session),
 ) -> SQLAlchemyUserDatabase[User, Any]:
     yield SQLAlchemyUserDatabase(session, User)
-
-
-# Removed the old get_db function which was causing confusion.
-# Table creation logic should ideally be handled separately (e.g., Alembic migrations or a startup event).
-# async def get_db(
-#     session: AsyncGenerator[SQLAlchemyUserDatabase[User, Any], Any] = Depends(
-#         get_async_session # Renamed to get_user_db
-#     ),
-# ):
-#     async with engine.begin() as conn:
-#         await conn.run_sync(metadata.create_all)
-
-#     try:
-#         yield session
-#     finally:
-#         await session.close() # Closing handled by context manager in get_user_db/get_db_session
-
-
-# async def get_user_db(session: AsyncSession = Depends(get_async_session)): # Old definition
-# yield SQLAlchemyUserDatabase(session, User)

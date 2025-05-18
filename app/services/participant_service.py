@@ -8,8 +8,7 @@ from app.repositories.conversation_repository import ConversationRepository
 from app.repositories.participant_repository import ParticipantRepository
 from app.schemas.participant import ParticipantStatus
 
-# Import shared service exceptions
-from .exceptions import (  # Removed ConversationNotFoundError import as it's not explicitly raised here; Import UserNotFoundError if needed for future methods
+from .exceptions import (
     BusinessRuleError,
     ConflictError,
     DatabaseError,
@@ -20,10 +19,6 @@ from .exceptions import (  # Removed ConversationNotFoundError import as it's no
 
 logger = logging.getLogger(__name__)
 
-# Removed local ParticipantNotFoundError definition
-# class ParticipantNotFoundError(ServiceError):
-#    ...
-
 
 class ParticipantService:
     def __init__(
@@ -33,7 +28,7 @@ class ParticipantService:
     ):
         self.part_repo = participant_repository
         self.conv_repo = conversation_repository
-        self.session = participant_repository.session  # Share session
+        self.session = participant_repository.session
 
     async def update_invitation_status(
         self, participant_id: UUID, target_status: ParticipantStatus, current_user: User
@@ -49,59 +44,44 @@ class ParticipantService:
                 f"Participant record '{participant_id}' not found."
             )
 
-        # Authorization: Ensure the user owns this participant record
         if participant.user_id != current_user.id:
             raise NotAuthorizedError("Cannot modify another user's participant record.")
 
-        # Business Rule: Can only transition from INVITED state via this method
         if participant.status != ParticipantStatus.INVITED:
             raise BusinessRuleError(
                 f"Cannot update status from '{participant.status.value}'. Expected 'invited'."
             )
 
-        # Business Rule: Target status must be JOINED or REJECTED
         if target_status not in [ParticipantStatus.JOINED, ParticipantStatus.REJECTED]:
             raise BusinessRuleError(
                 f"Invalid target status '{target_status.value}'. Must be 'joined' or 'rejected'."
             )
 
         try:
-            # Update participant status using repository method
-            # The repo method should enforce the expected_current_status implicitly or explicitly
             updated_participant = await self.part_repo.update_participant_status(
                 participant=participant,
                 new_status=target_status,
-                # Repository method might take expected_current_status, or we check above
                 expected_current_status=ParticipantStatus.INVITED,
             )
 
-            # If joining, update conversation activity timestamp
             if target_status == ParticipantStatus.JOINED:
-                # Fetch the conversation - participant.conversation might not be loaded
                 conversation = await self.conv_repo.get_conversation_by_id(
                     participant.conversation_id
                 )
                 if not conversation:
-                    # This indicates a data integrity issue
                     logger.error(
                         f"Data integrity issue: Conversation {participant.conversation_id} not found "
                         f"for participant {participant.id} during status update."
                     )
-                    # Raising DatabaseError as it's an internal data consistency problem
                     raise DatabaseError("Associated conversation data not found.")
 
                 await self.conv_repo.update_conversation_activity(conversation)
 
-            # Commit transaction
             await self.session.commit()
 
-            # Refresh participant to get updated fields (like joined_at if set by DB)
             await self.session.refresh(updated_participant)
-            # Optionally refresh conversation if its updated_at timestamp is needed
-            # if 'conversation' in locals(): await self.session.refresh(conversation)
 
         except ValueError as e:
-            # Catch potential error from repo if status precondition failed (if repo raises ValueError)
             await self.session.rollback()
             logger.warning(
                 f"Status update precondition failed for participant {participant_id}: {e}"

@@ -1,6 +1,5 @@
 from fastapi import FastAPI
 
-# Import the new auth routes
 from app.api.routes import auth_routes
 from app.auth_config import auth_backend, fastapi_users
 from app.schemas.user import UserRead, UserUpdate
@@ -15,26 +14,16 @@ def read_root():
     return {"message": "Welcome to the Chat App API"}
 
 
-# Include JWT login/logout routes from fastapi-users
 app.include_router(
     fastapi_users.get_auth_router(auth_backend), prefix="/auth/jwt", tags=["auth"]
 )
 
-# REMOVE the default fastapi-users registration router
-# app.include_router(
-#     fastapi_users.get_register_router(UserRead, UserCreate),
-#     prefix="/auth",
-#     tags=["auth"],
-# )
-
-# ADD the custom registration router
 app.include_router(
-    auth_routes.router,  # Use the router from auth_routes.py
-    prefix="/auth",  # Keep the same prefix
-    tags=["auth"],  # Keep the same tag
+    auth_routes.router,
+    prefix="/auth",
+    tags=["auth"],
 )
 
-# Keep other fastapi-users routers as needed
 app.include_router(
     fastapi_users.get_reset_password_router(),
     prefix="/auth",

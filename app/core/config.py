@@ -4,9 +4,9 @@ from pydantic_settings import BaseSettings
 
 class Settings(BaseSettings):
     SECRET: str
-    DATABASE_URL: str  # Add database URL setting
-    ALGORITHM: str = "HS256"  # Default algorithm for JWT
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 60  # 1 hour
+    DATABASE_URL: str
+    ALGORITHM: str = "HS256"
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
 
     model_config = ConfigDict(env_file=".env")
 

@@ -21,9 +21,7 @@ class UserRepository(BaseRepository):
         return result.scalars().first()
 
     async def get_user_by_username(self, username: str) -> User | None:
-        """Retrieves a user by their username.
-        Note: Used temporarily for placeholder auth checks.
-        """
+        """Retrieves a user by their username."""
         stmt = select(User).filter(User.username == username)
         result = await self.session.execute(stmt)
         return result.scalars().first()
@@ -50,7 +48,6 @@ class UserRepository(BaseRepository):
         stmt = select(User)
 
         if participated_with_user:
-            # Find conversations the target user is joined in
             joined_conv_subq = (
                 select(Participant.conversation_id)
                 .where(
@@ -59,7 +56,6 @@ class UserRepository(BaseRepository):
                 )
                 .scalar_subquery()
             )
-            # Find users who are also joined in those conversations (excluding the target user)
             participating_user_ids_stmt = (
                 select(Participant.user_id)
                 .where(

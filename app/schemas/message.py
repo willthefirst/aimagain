@@ -13,5 +13,4 @@ class MessageResponse(BaseModel):
     created_at: datetime
 
     class Config:
-        orm_mode = True  # Enable ORM mode renamed to from_attributes in Pydantic v2
-        from_attributes = True  # Pydantic V2 compatibility
+        from_attributes = True

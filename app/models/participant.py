@@ -1,17 +1,10 @@
-
-from sqlalchemy import (
-    Column,
-    DateTime,
-)
+from sqlalchemy import Column, DateTime
 from sqlalchemy import Enum as SQLAlchemyEnum
-from sqlalchemy import (
-    ForeignKey,
-    UniqueConstraint,
-)
+from sqlalchemy import ForeignKey, UniqueConstraint
 from sqlalchemy.orm import relationship
 from sqlalchemy.types import Uuid
 
-from app.schemas.participant import ParticipantStatus  # Import the Python Enum
+from app.schemas.participant import ParticipantStatus
 
 from .base import BaseModel
 
@@ -19,7 +12,6 @@ from .base import BaseModel
 class Participant(BaseModel):
     __tablename__ = "participants"
 
-    # id, created_at, updated_at, deleted_at inherited from BaseModel
     user_id = Column(Uuid(as_uuid=True), ForeignKey("users.id"), nullable=False)
     conversation_id = Column(
         Uuid(as_uuid=True), ForeignKey("conversations.id"), nullable=False
@@ -33,7 +25,6 @@ class Participant(BaseModel):
     )
     joined_at = Column(DateTime(timezone=True), nullable=True)
 
-    # Relationships (using strings for forward references)
     user = relationship("User", back_populates="participations", foreign_keys=[user_id])
     conversation = relationship(
         "Conversation", back_populates="participants", foreign_keys=[conversation_id]
@@ -47,7 +38,6 @@ class Participant(BaseModel):
         foreign_keys=[initial_message_id],
     )
 
-    # Constraints
     __table_args__ = (
         UniqueConstraint(
             "user_id", "conversation_id", name="uq_participant_user_conversation"

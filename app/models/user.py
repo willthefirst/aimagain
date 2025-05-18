@@ -8,13 +8,8 @@ from sqlalchemy.orm import relationship
 from .base import BaseModel
 
 
-# User model inherits from BaseModel and SQLAlchemyBaseUserTable
-# Note: SQLAlchemyBaseUserTable requires a specific type for the ID. Uuid works.
 class User(SQLAlchemyBaseUserTable[uuid.UUID], BaseModel):
     __tablename__ = "users"
-
-    # id, created_at, updated_at, deleted_at are inherited from BaseModel
-    # email, hashed_password, is_active, is_superuser, is_verified are from SQLAlchemyBaseUserTable
 
     username = Column(
         Text,
@@ -26,12 +21,10 @@ class User(SQLAlchemyBaseUserTable[uuid.UUID], BaseModel):
         Boolean, nullable=False, server_default=sqlalchemy.sql.expression.false()
     )
 
-    # Relationships
-    # Use string forward references for related models to avoid circular imports at module level
     created_conversations = relationship(
         "Conversation",
         back_populates="creator",
-        foreign_keys="Conversation.created_by_user_id",  # Simpler reference
+        foreign_keys="Conversation.created_by_user_id",
     )
     messages = relationship(
         "Message",

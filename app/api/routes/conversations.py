@@ -107,17 +107,15 @@ async def get_new_conversation_form(
 async def get_conversation(
     slug: str,
     request: Request,
-    user: User = Depends(current_active_user),  # Requires auth
+    user: User = Depends(current_active_user),
     conv_service: ConversationService = Depends(get_conversation_service),
 ):
     """Retrieves and displays a specific conversation by calling the handler."""
     try:
-        # Call the handler, passing dependencies explicitly
         conversation = await handle_get_conversation(
             slug=slug, requesting_user=user, conv_service=conv_service
         )
 
-        # Log a Yolo message (as per original, if still desired)
         logger.info(
             f"Conversation details yolo: {conversation.id if conversation else 'None'}"
         )
@@ -127,26 +125,19 @@ async def get_conversation(
             {
                 "request": request,
                 "conversation": conversation,
-                # Ensure participants and messages are accessed safely if conversation can be None
-                # However, ConversationNotFoundError should be caught below if no conversation
                 "participants": conversation.participants if conversation else [],
                 "messages": conversation.messages if conversation else [],
             },
         )
-    # Handle specific service errors propagated from the handler
     except (ConversationNotFoundError, NotAuthorizedError) as e:
-        # These errors are often translated to specific HTTP status codes
-        # by handle_service_error (e.g., 404, 403)
         handle_service_error(e)
     except ServiceError as e:
-        # Handle other generic service errors
         logger.error(
             f"Service error in get_conversation route for slug {slug}: {e}",
             exc_info=True,
         )
         handle_service_error(e)
     except Exception as e:
-        # Catch any other unexpected errors
         logger.error(
             f"Unexpected error in get_conversation route for slug {slug}: {e}",
             exc_info=True,
@@ -173,7 +164,6 @@ async def create_conversation(
     logger.info(f"Creating conversation with invitee: {invitee_username}")
     """Handles the form submission by calling the processing logic."""
     try:
-        # Call the decoupled logic handler
         conversation = await handle_create_conversation(
             invitee_username=invitee_username,
             initial_message=initial_message,
@@ -184,30 +174,19 @@ async def create_conversation(
 
         logger.info(f"Conversation created: {conversation}")
 
-        # Redirect on success
         redirect_url = f"/conversations/{conversation.slug}"
         return RedirectResponse(url=redirect_url, status_code=status.HTTP_303_SEE_OTHER)
 
-    # --- Exception Translation --- #
     except LogicUserNotFoundError as e:
-        # Translate logic layer UserNotFound to HTTP 404
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
     except (BusinessRuleError, ConflictError, DatabaseError) as e:
-        # Translate specific service errors using existing handler
-        # TODO: Improve error handling (e.g., flash messages on form)
         handle_service_error(e)
     except ServiceError as e:
-        # Translate generic service errors
-        # TODO: Improve error handling
         handle_service_error(e)
-    # Removed catch for HTTPException as handler shouldn't raise it
-    # except HTTPException as e:
-    #     raise e
     except Exception as e:
         logger.error(
             f"Unexpected error in create_conversation route: {e}", exc_info=True
         )
-        # TODO: Improve error handling
         raise HTTPException(
             status_code=500, detail="An unexpected server error occurred."
         )
@@ -229,7 +208,7 @@ async def invite_participant(
     try:
         new_participant = await handle_invite_participant(
             conversation_slug=slug,
-            invitee_user_id_str=request_data.invitee_user_id,  # Pass as string
+            invitee_user_id_str=request_data.invitee_user_id,
             inviter_user=user,
             conv_service=conv_service,
         )
@@ -258,5 +237,5 @@ async def invite_participant(
         )
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="An unexpected server error occurred during the invitation process.",
+            detail="An unexpected error occurred during the invitation process.",
         )

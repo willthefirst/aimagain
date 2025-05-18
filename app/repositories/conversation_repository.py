@@ -58,7 +58,7 @@ class ConversationRepository(BaseRepository):
         result = await self.session.execute(stmt)
         try:
             return result.scalars().one()
-        except Exception:  # Handle case where conversation might not be found
+        except Exception:
             return None
 
     async def create_new_conversation(

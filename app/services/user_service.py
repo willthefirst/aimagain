@@ -6,11 +6,7 @@ from app.models import Conversation, Participant, User
 from app.repositories.conversation_repository import ConversationRepository
 from app.repositories.participant_repository import ParticipantRepository
 
-# Import shared service exceptions
-from .exceptions import (  # Import others like UserNotFoundError if needed for future methods
-    DatabaseError,
-    ServiceError,
-)
+from .exceptions import DatabaseError, ServiceError
 
 logger = logging.getLogger(__name__)
 
@@ -20,15 +16,9 @@ class UserService:
         self,
         participant_repository: ParticipantRepository,
         conversation_repository: ConversationRepository,
-        # Note: We don't strictly need UserRepository for these specific methods
-        # as the User object is already provided by the auth dependency.
-        # Add it if other user-related service methods require it.
     ):
         self.part_repo = participant_repository
         self.conv_repo = conversation_repository
-        # No direct session needed if only doing reads via repos
-
-    # Profile data is just the User object from the dependency, no service method needed for that yet.
 
     async def get_user_invitations(self, user: User) -> list[Participant]:
         """Fetches pending invitations for the given user."""
