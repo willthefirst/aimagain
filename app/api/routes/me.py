@@ -8,6 +8,10 @@ from app.services.dependencies import get_user_service
 from app.services.user_service import UserService
 from app.services.exceptions import ServiceError, DatabaseError
 from app.api.errors import handle_service_error
+from app.logic.me_processing import (
+    handle_get_my_invitations,
+    handle_get_my_conversations,
+)
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/users/me", tags=["me"])
@@ -32,14 +36,24 @@ async def list_my_invitations(
 ):
     """Provides an HTML page listing the current user's pending invitations."""
     try:
-        invitations = await user_service.get_user_invitations(user=user)
+        invitations = await handle_get_my_invitations(
+            user=user, user_service=user_service
+        )
         return templates.TemplateResponse(
             "me/invitations.html",
             {"request": request, "invitations": invitations},
         )
     except DatabaseError as e:
+        logger.error(
+            f"Database error in list_my_invitations route for user {user.id}: {e}",
+            exc_info=True,
+        )
         handle_service_error(e)
     except ServiceError as e:
+        logger.error(
+            f"Service error in list_my_invitations route for user {user.id}: {e}",
+            exc_info=True,
+        )
         handle_service_error(e)
     except Exception as e:
         logger.error(
@@ -59,14 +73,24 @@ async def list_my_conversations(
 ):
     """Provides an HTML page listing conversations the current user is part of."""
     try:
-        conversations = await user_service.get_user_conversations(user=user)
+        conversations = await handle_get_my_conversations(
+            user=user, user_service=user_service
+        )
         return templates.TemplateResponse(
             "me/conversations.html",
             {"request": request, "conversations": conversations},
         )
     except DatabaseError as e:
+        logger.error(
+            f"Database error in list_my_conversations route for user {user.id}: {e}",
+            exc_info=True,
+        )
         handle_service_error(e)
     except ServiceError as e:
+        logger.error(
+            f"Service error in list_my_conversations route for user {user.id}: {e}",
+            exc_info=True,
+        )
         handle_service_error(e)
     except Exception as e:
         logger.error(
