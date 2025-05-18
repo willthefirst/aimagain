@@ -1,0 +1,29 @@
+{
+  "consumer": {
+    "name": "user-list-page"
+  },
+  "provider": {
+    "name": "users-api"
+  },
+  "interactions": [
+    {
+      "description": "a request to view the list of users",
+      "providerState": "users exist in the system and the requesting user is authenticated",
+      "request": {
+        "method": "GET",
+        "path": "/users"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": "text/html; charset=utf-8"
+        }
+      }
+    }
+  ],
+  "metadata": {
+    "pactSpecification": {
+      "version": "2.0.0"
+    }
+  }
+}

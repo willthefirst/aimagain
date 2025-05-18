@@ -16,6 +16,7 @@ log = logging.getLogger(__name__)
 
 AUTH_API_PROVIDER_NAME = "auth-api"
 CONVERSATIONS_API_PROVIDER_NAME = "conversations-api"
+USERS_API_PROVIDER_NAME = "users-api"
 
 
 AUTH_API_PACT_FILE_PATH = os.path.join(
@@ -23,6 +24,9 @@ AUTH_API_PACT_FILE_PATH = os.path.join(
 )
 CONVERSATIONS_API_PACT_FILE_PATH = os.path.join(
     PACT_DIR, f"create-conversation-form-{CONVERSATIONS_API_PROVIDER_NAME}.json"
+)
+USERS_API_PACT_FILE_PATH = os.path.join(
+    PACT_DIR, f"user-list-page-{USERS_API_PROVIDER_NAME}.json"
 )
 
 
@@ -62,12 +66,47 @@ GET_CONVERSATION_DEPENDENCY_CONFIG = {
     }
 }
 
+LIST_USERS_DEPENDENCY_CONFIG = {
+    "app.logic.user_processing.handle_list_users": {
+        "return_value_config": {
+            "request": {},
+            "users": [
+                UserRead(
+                    id=str(uuid4()),
+                    email="test1@example.com",
+                    username="testuser1",
+                    is_active=True,
+                    is_superuser=False,
+                    is_verified=True,
+                ),
+                UserRead(
+                    id=str(uuid4()),
+                    email="test2@example.com",
+                    username="testuser2",
+                    is_active=True,
+                    is_superuser=False,
+                    is_verified=True,
+                ),
+            ],
+            "current_user": UserRead(
+                id=str(uuid4()),
+                email="current@example.com",
+                username="currentuser",
+                is_active=True,
+                is_superuser=False,
+                is_verified=True,
+            ),
+        }
+    }
+}
+
 # Mock configurations for parametrization
 AUTH_API_MOCKS = REGISTRATION_DEPENDENCY_CONFIG
 CONVERSATIONS_API_MOCKS = {
     **CREATE_CONVERSATION_DEPENDENCY_CONFIG,
     **GET_CONVERSATION_DEPENDENCY_CONFIG,
 }
+USERS_API_MOCKS = LIST_USERS_DEPENDENCY_CONFIG
 
 # Pytest parametrize decorators for provider_server fixture
 AUTH_API_PROVIDER_DECORATOR = pytest.mark.parametrize(
@@ -84,6 +123,14 @@ CONVERSATIONS_API_PROVIDER_DECORATOR = pytest.mark.parametrize(
     indirect=True,
     scope="module",
     ids=["with_conversations_api_mocks"],
+)
+
+USERS_API_PROVIDER_DECORATOR = pytest.mark.parametrize(
+    "provider_server",
+    [USERS_API_MOCKS],
+    indirect=True,
+    scope="module",
+    ids=["with_users_api_mocks"],
 )
 
 
@@ -148,3 +195,26 @@ def test_provider_conversations_api_pact_verification(
     )
 
     _verify_pact_and_handle_result(success, logs_dict, "Conversations API")
+
+
+@USERS_API_PROVIDER_DECORATOR
+def test_provider_users_api_pact_verification(
+    provider_server: URL,
+):
+    """Verify the Users API Pact contract against the running provider server."""
+    if not os.path.exists(USERS_API_PACT_FILE_PATH):
+        pytest.fail(
+            f"Pact file not found: {USERS_API_PACT_FILE_PATH}. Run consumer test first."
+        )
+
+    verifier = Verifier(
+        provider=USERS_API_PROVIDER_NAME,
+        provider_base_url=str(provider_server),
+        provider_states_setup_url=PROVIDER_STATE_SETUP_FULL_URL,
+    )
+
+    success, logs_dict = verifier.verify_pacts(
+        USERS_API_PACT_FILE_PATH, log_dir=PACT_LOG_DIR
+    )
+
+    _verify_pact_and_handle_result(success, logs_dict, "Users API")
