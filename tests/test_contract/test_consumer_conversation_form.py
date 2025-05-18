@@ -1,16 +1,16 @@
 # tests/test_contract/test_consumer_conversation_form.py
 import pytest
-from playwright.async_api import Page, Route, expect
 from pact import Like
+from playwright.async_api import Page, Route, expect
 
+from tests.shared_test_data import (
+    TEST_INITIAL_MESSAGE,
+    TEST_INVITEE_USERNAME,
+    get_form_encoded_creation_data,
+)
 from tests.test_contract.test_helpers import (
     setup_pact,
     setup_playwright_pact_interception,
-)
-from tests.shared_test_data import (
-    TEST_INVITEE_USERNAME,
-    TEST_INITIAL_MESSAGE,
-    get_form_encoded_creation_data,
 )
 
 CONSUMER_NAME = "create-conversation-form"

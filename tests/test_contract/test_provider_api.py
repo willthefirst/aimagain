@@ -1,16 +1,17 @@
-from datetime import datetime, timezone
-import pytest
-import os
-from uuid import uuid4
 import logging
-from typing import Generator, Any
+import os
+from datetime import datetime, timezone
+from typing import Any, Generator
+from uuid import uuid4
+
+import pytest
 from pact import Verifier
 from yarl import URL
-from app.models.conversation import Conversation
-from tests.test_contract.conftest import PROVIDER_STATE_SETUP_FULL_URL
-from app.schemas.user import UserRead
-from tests.test_contract.test_helpers import PACT_DIR, PACT_LOG_DIR
 
+from app.models.conversation import Conversation
+from app.schemas.user import UserRead
+from tests.test_contract.conftest import PROVIDER_STATE_SETUP_FULL_URL
+from tests.test_contract.test_helpers import PACT_DIR, PACT_LOG_DIR
 
 log = logging.getLogger(__name__)
 

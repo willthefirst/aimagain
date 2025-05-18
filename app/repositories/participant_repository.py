@@ -1,19 +1,21 @@
 import uuid
-from uuid import UUID
 from datetime import datetime, timezone
-from sqlalchemy import select, exists
+from typing import Sequence
+from uuid import UUID
+
+from sqlalchemy import exists, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
-from typing import Sequence
 
-from .base import BaseRepository
-from app.models import (
-    Participant,
-    User,
+from app.models import (  # Added User, Conversation, Message
     Conversation,
     Message,
-)  # Added User, Conversation, Message
+    Participant,
+    User,
+)
 from app.schemas.participant import ParticipantStatus  # Assuming you have this enum
+
+from .base import BaseRepository
 
 
 class ParticipantRepository(BaseRepository):

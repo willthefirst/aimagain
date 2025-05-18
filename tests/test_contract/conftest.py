@@ -1,33 +1,35 @@
-from datetime import datetime, timezone
-import pytest
-import uvicorn
-import time
+import asyncio
+import logging
 import multiprocessing
 import os
-from fastapi import FastAPI, Body, Response, status
-from playwright.async_api import async_playwright
-from app.api.routes import auth_pages, conversations
-from pact import Consumer, Provider
-import logging
-from yarl import URL
-from typing import Generator, Any, Callable, Dict, AsyncGenerator
-import uuid
-import asyncio
-from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
-from app.models import metadata, User  # Import User and metadata
-from app.db import get_db_session, get_user_db  # Import the dependency functions
-from typing import AsyncGenerator
-from unittest.mock import AsyncMock, patch
 import shutil
-from .test_helpers import PACT_DIR
+import time
+import uuid
+from datetime import datetime, timezone
+from typing import Any, AsyncGenerator, Callable, Dict, Generator
+from unittest.mock import AsyncMock, patch
+
+import pytest
 import requests
+import uvicorn
+from fastapi import Body, FastAPI, Response, status
+from pact import Consumer, Provider
+from playwright.async_api import async_playwright
 from requests.exceptions import ConnectionError
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+from yarl import URL
+
+from app.api.routes import auth_pages, conversations
+from app.db import get_db_session, get_user_db  # Import the dependency functions
+from app.models import User, metadata  # Import User and metadata
 from app.models.conversation import Conversation
 
 # from app.repositories.conversation_repository import ConversationRepository # Not used directly here
 from tests.test_contract.test_consumer_conversation_form import (
     PROVIDER_STATE_USER_ONLINE,
 )
+
+from .test_helpers import PACT_DIR
 
 # Removed: from app.models import User - already imported
 
@@ -62,40 +64,45 @@ TEST_DATABASE_URL = "sqlite+aiosqlite:///:memory:"
 # The actual engine and sessionmaker will be created within _run_provider_server_process
 # to ensure they are in the correct process.
 
+# import asyncio # Already imported
+# from typing import AsyncGenerator, Any # Already imported
+from collections.abc import (
+    AsyncGenerator as AsyncGeneratorABC,  # Keep this distinct import
+)
+from contextlib import asynccontextmanager
+
+from asyncstdlib import anext
+
+# from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine # Already imported
+from fastapi import Depends
+
 # Imports for FastAPI Users, similar to test_api/conftest.py
 from fastapi_users.db import SQLAlchemyUserDatabase
+
+# import pytest # Already imported
+# from fastapi import FastAPI # Already imported
+from httpx import (  # AsyncClient not used directly here, but often part of test setups
+    ASGITransport,
+    AsyncClient,
+)
+
+# from app.models import User, metadata # User, metadata already imported
+# from fastapi_users.db import SQLAlchemyUserDatabase # Already imported
+# from app.schemas.user import UserCreate # Already imported and commented
+from app.core.templating import templates
+from app.main import app  # Assuming your FastAPI app instance is in app.main
 
 # from app.schemas.user import UserCreate # Not used directly in this conftest for user creation logic
 
 # below copied frog test_api/conftest.py, refactor so that we just reuse the same 'in memory test db'
 # This section is being addressed by the current refactoring.
 
-# import asyncio # Already imported
-# from typing import AsyncGenerator, Any # Already imported
-from collections.abc import (
-    AsyncGenerator as AsyncGeneratorABC,
-)  # Keep this distinct import
-from contextlib import asynccontextmanager
-from asyncstdlib import anext
 
-# import pytest # Already imported
-# from fastapi import FastAPI # Already imported
-from httpx import (
-    ASGITransport,
-    AsyncClient,
-)  # AsyncClient not used directly here, but often part of test setups
 
-# from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine # Already imported
-from fastapi import Depends
 
-from app.main import app  # Assuming your FastAPI app instance is in app.main
 
 # from app.db import get_db_session, get_user_db # get_db_session already imported
 
-# from app.models import User, metadata # User, metadata already imported
-# from fastapi_users.db import SQLAlchemyUserDatabase # Already imported
-# from app.schemas.user import UserCreate # Already imported and commented
-from app.core.templating import templates
 
 
 def provider_states_handler(state_info: dict = Body(...)):
@@ -322,9 +329,10 @@ def _setup_provider_app_routes(
 
 def _setup_provider_mock_auth(app: FastAPI, log: logging.Logger):
     """Sets up mock authentication for the provider app."""
-    from app.models import User  # Keep import local if only used here
-    from app.auth_config import current_active_user
     import uuid  # Keep import local if only used here for mock user id
+
+    from app.auth_config import current_active_user
+    from app.models import User  # Keep import local if only used here
 
     mock_user_instance = _create_mock_user(
         email="provider.mock@example.com",
@@ -344,8 +352,8 @@ def _apply_provider_patches(
     mp: pytest.MonkeyPatch, override_config: Dict[str, Dict], log: logging.Logger
 ):
     """Applies patches based on override_config using MonkeyPatch."""
-    from unittest.mock import AsyncMock  # Keep import local
     import uuid  # Keep import local for potential UUID conversion
+    from unittest.mock import AsyncMock  # Keep import local
 
     if not override_config:
         return

@@ -1,20 +1,21 @@
-import pytest
-from httpx import AsyncClient
 import uuid
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta, timezone
+from typing import Optional
 from uuid import UUID
 
-# Import session maker type for hinting
-from sqlalchemy.ext.asyncio import async_sessionmaker, AsyncSession
+import pytest
+from httpx import AsyncClient
 from selectolax.parser import HTMLParser
 
-# Import User model for setup (if needed, maybe not for empty case)
-from app.models import User, Conversation, Message, Participant
-from app.schemas.participant import ParticipantStatus
+# Import session maker type for hinting
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 # Import helper
 from test_helpers import create_test_user
-from typing import Optional
+
+# Import User model for setup (if needed, maybe not for empty case)
+from app.models import Conversation, Message, Participant, User
+from app.schemas.participant import ParticipantStatus
 
 # Mark all tests in this module as async
 pytestmark = pytest.mark.asyncio

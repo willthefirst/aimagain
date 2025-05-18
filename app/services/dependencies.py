@@ -1,17 +1,17 @@
 from fastapi import Depends
 
+# Import repository types (needed for service constructor type hints)
+from app.repositories.conversation_repository import ConversationRepository
+
 # Import repository dependencies
 from app.repositories.dependencies import (
     get_conversation_repository,
-    get_participant_repository,
     get_message_repository,
+    get_participant_repository,
     get_user_repository,
 )
-
-# Import repository types (needed for service constructor type hints)
-from app.repositories.conversation_repository import ConversationRepository
-from app.repositories.participant_repository import ParticipantRepository
 from app.repositories.message_repository import MessageRepository
+from app.repositories.participant_repository import ParticipantRepository
 from app.repositories.user_repository import UserRepository
 
 # Import the service class

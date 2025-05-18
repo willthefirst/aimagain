@@ -2,12 +2,13 @@ from fastapi import Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db import get_db_session
+
 from .conversation_repository import ConversationRepository
-from .user_repository import UserRepository
-from .participant_repository import ParticipantRepository
 
 # Import other repositories here as they are created
 from .message_repository import MessageRepository
+from .participant_repository import ParticipantRepository
+from .user_repository import UserRepository
 
 
 def get_conversation_repository(

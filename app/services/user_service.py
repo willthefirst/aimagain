@@ -1,15 +1,15 @@
 import logging
+
 from sqlalchemy.exc import SQLAlchemyError
 
-from app.models import User, Participant, Conversation
-from app.repositories.participant_repository import ParticipantRepository
+from app.models import Conversation, Participant, User
 from app.repositories.conversation_repository import ConversationRepository
+from app.repositories.participant_repository import ParticipantRepository
 
 # Import shared service exceptions
-from .exceptions import (
-    ServiceError,
+from .exceptions import (  # Import others like UserNotFoundError if needed for future methods
     DatabaseError,
-    # Import others like UserNotFoundError if needed for future methods
+    ServiceError,
 )
 
 logger = logging.getLogger(__name__)

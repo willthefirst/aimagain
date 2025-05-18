@@ -1,12 +1,14 @@
 import logging
-from fastapi import APIRouter, Request, Depends, HTTPException, status
+
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.responses import HTMLResponse
+
+from app.auth_config import current_active_user
 from app.core.templating import templates
+from app.logic.user_processing import handle_list_users
+from app.models import User
 from app.repositories.dependencies import get_user_repository
 from app.repositories.user_repository import UserRepository
-from app.models import User
-from app.auth_config import current_active_user
-from app.logic.user_processing import handle_list_users
 
 router = APIRouter()
 logger = logging.getLogger(__name__)

@@ -4,12 +4,12 @@ from uuid import UUID
 from app.models import User
 from app.schemas.participant import ParticipantStatus
 from app.services.participant_service import (
-    ParticipantService,
-    ParticipantNotFoundError,
-    NotAuthorizedError,
     BusinessRuleError,
     ConflictError,
     DatabaseError,
+    NotAuthorizedError,
+    ParticipantNotFoundError,
+    ParticipantService,
     ServiceError,
 )
 

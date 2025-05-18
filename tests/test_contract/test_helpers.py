@@ -1,7 +1,8 @@
 import atexit
 import os
-from pact import Consumer, Provider
 from typing import Generator
+
+from pact import Consumer, Provider
 from playwright.async_api import Page, Route
 
 PACT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "pacts"))

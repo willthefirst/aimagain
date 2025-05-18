@@ -1,15 +1,15 @@
 # tests/test_contract/test_consumer_user_list.py
-import pytest
-from playwright.async_api import (
-    Page,
-    expect,
-)  # Route might not be needed for simple GET
-from pact import Like  # Import Like
 import re
 
-from tests.test_contract.test_helpers import (
+import pytest
+from pact import Like  # Import Like
+from playwright.async_api import (  # Route might not be needed for simple GET
+    Page,
+    expect,
+)
+
+from tests.test_contract.test_helpers import (  # setup_playwright_pact_interception, # May not be needed for GET if no form submission
     setup_pact,
-    # setup_playwright_pact_interception, # May not be needed for GET if no form submission
 )
 
 # from tests.shared_test_data import ... # If shared data for users is available

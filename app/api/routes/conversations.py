@@ -1,34 +1,38 @@
-from fastapi import APIRouter, Request, Depends, HTTPException, status, Form
-from fastapi.responses import HTMLResponse, RedirectResponse
-from uuid import UUID
 import logging
-from app.core.templating import templates
-from app.auth_config import current_active_user
-from app.repositories.user_repository import UserRepository
-from app.repositories.dependencies import get_user_repository
-from app.services.dependencies import get_conversation_service
-from app.services.conversation_service import (
-    ConversationService,
-    ServiceError,
-    ConversationNotFoundError,
-    NotAuthorizedError,
-    UserNotFoundError,
-    BusinessRuleError,
-    ConflictError,
-    DatabaseError,
-)
-from app.models import Conversation, Participant, User, Message
-from app.schemas.conversation import ConversationCreateRequest, ConversationResponse
-from app.schemas.participant import ParticipantInviteRequest, ParticipantResponse
+from uuid import UUID
+
+from fastapi import APIRouter, Depends, Form, HTTPException, Request, status
+from fastapi.responses import HTMLResponse, RedirectResponse
+
 from app.api.errors import handle_service_error
+from app.auth_config import current_active_user
+from app.core.templating import templates
+from app.logic.conversation_processing import (
+    UserNotFoundError as LogicUserNotFoundError,
+)
 from app.logic.conversation_processing import (
     handle_create_conversation,
-    UserNotFoundError as LogicUserNotFoundError,
     handle_get_conversation,
-    handle_list_conversations,
     handle_get_new_conversation_form,
     handle_invite_participant,
+    handle_list_conversations,
 )
+from app.models import Conversation, Message, Participant, User
+from app.repositories.dependencies import get_user_repository
+from app.repositories.user_repository import UserRepository
+from app.schemas.conversation import ConversationCreateRequest, ConversationResponse
+from app.schemas.participant import ParticipantInviteRequest, ParticipantResponse
+from app.services.conversation_service import (
+    BusinessRuleError,
+    ConflictError,
+    ConversationNotFoundError,
+    ConversationService,
+    DatabaseError,
+    NotAuthorizedError,
+    ServiceError,
+    UserNotFoundError,
+)
+from app.services.dependencies import get_conversation_service
 
 logger = logging.getLogger(__name__)
 router = APIRouter()

@@ -1,17 +1,19 @@
-from fastapi import APIRouter, Request, Depends, HTTPException
-from fastapi.responses import HTMLResponse
 import logging
-from app.core.templating import templates
-from app.models import User
-from app.auth_config import current_active_user
-from app.services.dependencies import get_user_service
-from app.services.user_service import UserService
-from app.services.exceptions import ServiceError, DatabaseError
+
+from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi.responses import HTMLResponse
+
 from app.api.errors import handle_service_error
+from app.auth_config import current_active_user
+from app.core.templating import templates
 from app.logic.me_processing import (
-    handle_get_my_invitations,
     handle_get_my_conversations,
+    handle_get_my_invitations,
 )
+from app.models import User
+from app.services.dependencies import get_user_service
+from app.services.exceptions import DatabaseError, ServiceError
+from app.services.user_service import UserService
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/users/me", tags=["me"])

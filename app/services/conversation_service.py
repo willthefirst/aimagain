@@ -1,28 +1,29 @@
-import uuid
 import logging  # Use logging instead of print
+import uuid
 from uuid import UUID
-from fastapi import (
+
+from fastapi import (  # Keep for potential internal use or re-raising
     HTTPException,
     status,
-)  # Keep for potential internal use or re-raising
-from sqlalchemy.exc import SQLAlchemyError, IntegrityError
+)
+from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 
-from app.models import User, Conversation, Participant, Message
+from app.models import Conversation, Message, Participant, User
 from app.repositories.conversation_repository import ConversationRepository
-from app.repositories.participant_repository import ParticipantRepository
 from app.repositories.message_repository import MessageRepository
+from app.repositories.participant_repository import ParticipantRepository
 from app.repositories.user_repository import UserRepository
 from app.schemas.participant import ParticipantStatus
 
 # Import shared service exceptions
 from .exceptions import (
-    ServiceError,
-    ConversationNotFoundError,
-    UserNotFoundError,
-    NotAuthorizedError,
     BusinessRuleError,
     ConflictError,
+    ConversationNotFoundError,
     DatabaseError,
+    NotAuthorizedError,
+    ServiceError,
+    UserNotFoundError,
 )
 
 # Setup logger

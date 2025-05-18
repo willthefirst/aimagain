@@ -1,8 +1,9 @@
 # tests/contract/test_consumer_auth_form.py
 import atexit
+
 import pytest
-from playwright.async_api import Page
 from pact import Like
+from playwright.async_api import Page
 
 from tests.test_contract.test_helpers import (
     setup_pact,

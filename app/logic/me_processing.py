@@ -1,10 +1,11 @@
 import logging
+
 from app.models import User
-from app.services.user_service import UserService
-from app.services.exceptions import (
+from app.services.exceptions import (  # Ensure these are imported if raised
     DatabaseError,
     ServiceError,
-)  # Ensure these are imported if raised
+)
+from app.services.user_service import UserService
 
 logger = logging.getLogger(__name__)
 

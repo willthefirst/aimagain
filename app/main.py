@@ -1,17 +1,12 @@
 from fastapi import Depends, FastAPI
 
-from app.models import User
-from .api.routes import users
-from .api.routes import conversations
-from .api.routes import me
-from .api.routes import participants
-from app.schemas.user import UserCreate, UserRead, UserUpdate
-from app.auth_config import auth_backend, current_active_user, fastapi_users
-from .api.routes import auth_pages
-
 # Import the new auth routes
 from app.api.routes import auth_routes
+from app.auth_config import auth_backend, current_active_user, fastapi_users
+from app.models import User
+from app.schemas.user import UserCreate, UserRead, UserUpdate
 
+from .api.routes import auth_pages, conversations, me, participants, users
 
 app = FastAPI(title="AIM again")
 

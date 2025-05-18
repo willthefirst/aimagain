@@ -1,15 +1,19 @@
 import uuid
+
 from sqlalchemy import (
     Column,
-    ForeignKey,
     DateTime,
+)
+from sqlalchemy import Enum as SQLAlchemyEnum
+from sqlalchemy import (
+    ForeignKey,
     UniqueConstraint,
-    Enum as SQLAlchemyEnum,
 )
 from sqlalchemy.orm import relationship
 from sqlalchemy.types import Uuid
 
 from app.schemas.participant import ParticipantStatus  # Import the Python Enum
+
 from .base import BaseModel
 
 

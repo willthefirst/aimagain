@@ -1,11 +1,13 @@
 from typing import Sequence
-from sqlalchemy import select, exists, distinct
-from sqlalchemy.ext.asyncio import AsyncSession
 from uuid import UUID
 
-from .base import BaseRepository
-from app.models import User, Participant
+from sqlalchemy import distinct, exists, select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.models import Participant, User
 from app.schemas.participant import ParticipantStatus
+
+from .base import BaseRepository
 
 
 class UserRepository(BaseRepository):

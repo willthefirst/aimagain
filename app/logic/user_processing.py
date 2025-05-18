@@ -1,5 +1,7 @@
 import logging
+
 from fastapi import Request
+
 from app.models import User
 from app.repositories.user_repository import UserRepository
 

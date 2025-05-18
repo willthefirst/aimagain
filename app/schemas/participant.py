@@ -1,9 +1,10 @@
 # app/schemas/participant.py
-from pydantic import BaseModel, ConfigDict
+import enum
 from datetime import datetime
 from typing import Literal
-import enum
 from uuid import UUID
+
+from pydantic import BaseModel, ConfigDict
 
 
 # Define Enum for Participant Status

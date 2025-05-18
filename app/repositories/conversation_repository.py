@@ -1,14 +1,16 @@
-from typing import Sequence
-from sqlalchemy import select
-from sqlalchemy.orm import selectinload, joinedload
-from sqlalchemy.ext.asyncio import AsyncSession
 import uuid
-from uuid import UUID
 from datetime import datetime, timezone
+from typing import Sequence
+from uuid import UUID
+
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import joinedload, selectinload
+
+from app.models import Conversation, Message, Participant, User
+from app.schemas.participant import ParticipantStatus
 
 from .base import BaseRepository
-from app.models import Conversation, Participant, User, Message
-from app.schemas.participant import ParticipantStatus
 
 
 class ConversationRepository(BaseRepository):

@@ -1,6 +1,7 @@
-from pydantic import BaseModel, ConfigDict
 from datetime import datetime
 from uuid import UUID
+
+from pydantic import BaseModel, ConfigDict
 
 
 # Schema for request body when creating a conversation

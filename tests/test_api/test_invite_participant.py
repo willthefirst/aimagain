@@ -1,16 +1,16 @@
 # Tests for POST /conversations/{slug}/participants
-import pytest
-from httpx import AsyncClient
 import uuid
+from typing import Optional
 from uuid import UUID
 
-from sqlalchemy.ext.asyncio import async_sessionmaker, AsyncSession
+import pytest
+from httpx import AsyncClient
 from sqlalchemy import select
-from app.models import User, Conversation, Participant
-from app.schemas.participant import ParticipantStatus, ParticipantResponse
-from typing import Optional
-
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from test_helpers import create_test_user
+
+from app.models import Conversation, Participant, User
+from app.schemas.participant import ParticipantResponse, ParticipantStatus
 
 pytestmark = pytest.mark.asyncio
 

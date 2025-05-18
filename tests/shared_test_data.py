@@ -1,5 +1,6 @@
-from pydantic import BaseModel
 import urllib.parse
+
+from pydantic import BaseModel
 
 # Common data for creating conversations
 TEST_INVITEE_USERNAME = "shared_testuser"

@@ -1,15 +1,15 @@
 # Tests for GET /conversations
-import pytest
-from httpx import AsyncClient
 import uuid
 from datetime import datetime, timedelta, timezone
 
-from sqlalchemy.ext.asyncio import async_sessionmaker, AsyncSession
-from app.models import User, Conversation, Participant
-from app.schemas.participant import ParticipantStatus
+import pytest
+from httpx import AsyncClient
 from selectolax.parser import HTMLParser
-
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from test_helpers import create_test_user
+
+from app.models import Conversation, Participant, User
+from app.schemas.participant import ParticipantStatus
 
 pytestmark = pytest.mark.asyncio
 

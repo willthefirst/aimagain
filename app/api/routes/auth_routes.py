@@ -1,12 +1,13 @@
 import logging
-from fastapi import APIRouter, Depends, HTTPException, status, Request
-from fastapi_users import models
+
+from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi_users import exceptions, models
 from fastapi_users.manager import BaseUserManager
-from app.auth_config import get_user_manager
-from app.schemas.user import UserCreate, UserRead
-from app.logic.auth_processing import handle_registration
 from fastapi_users.router.common import ErrorCode, ErrorModel
-from fastapi_users import exceptions
+
+from app.auth_config import get_user_manager
+from app.logic.auth_processing import handle_registration
+from app.schemas.user import UserCreate, UserRead
 
 router = APIRouter()
 logger = logging.getLogger(__name__)

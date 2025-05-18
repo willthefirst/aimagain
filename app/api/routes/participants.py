@@ -1,25 +1,27 @@
-from fastapi import APIRouter, Depends, HTTPException, status
-from uuid import UUID
 import logging
+from uuid import UUID
+
+from fastapi import APIRouter, Depends, HTTPException, status
+
+from app.api.errors import handle_service_error
+from app.auth_config import current_active_user
+from app.logic.participant_processing import handle_update_participant_status
 from app.models import User
 from app.schemas.participant import (
-    ParticipantUpdateRequest,
     ParticipantResponse,
     ParticipantStatus,
+    ParticipantUpdateRequest,
 )
-from app.auth_config import current_active_user
 from app.services.dependencies import get_participant_service
 from app.services.participant_service import (
-    ParticipantService,
-    ParticipantNotFoundError,
-    ServiceError,
-    NotAuthorizedError,
     BusinessRuleError,
     ConflictError,
     DatabaseError,
+    NotAuthorizedError,
+    ParticipantNotFoundError,
+    ParticipantService,
+    ServiceError,
 )
-from app.logic.participant_processing import handle_update_participant_status
-from app.api.errors import handle_service_error
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/participants", tags=["participants"])

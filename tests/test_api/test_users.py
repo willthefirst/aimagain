@@ -1,16 +1,16 @@
-import pytest
-from httpx import AsyncClient
 import uuid
 from uuid import UUID  # Import UUID
 
-from app.models import User, Conversation, Participant
-from app.schemas.participant import ParticipantStatus  # Import enum
+import pytest
+from httpx import AsyncClient
+from selectolax.parser import HTMLParser
 
 # Import session maker type for hinting
-from sqlalchemy.ext.asyncio import async_sessionmaker, AsyncSession
-
-from selectolax.parser import HTMLParser
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from test_helpers import create_test_user
+
+from app.models import Conversation, Participant, User
+from app.schemas.participant import ParticipantStatus  # Import enum
 
 # Mark all tests in this module as async
 pytestmark = pytest.mark.asyncio

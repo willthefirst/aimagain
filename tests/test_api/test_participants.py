@@ -1,22 +1,23 @@
-from pydantic import BaseModel
-import pytest
-from httpx import AsyncClient
 import uuid
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta, timezone
+from typing import Optional
 from uuid import UUID
 
-from app.models import User, Conversation, Participant, Message
-from app.schemas.participant import (
-    ParticipantUpdateRequest,
-    ParticipantResponse,
-    ParticipantStatus,
-)
+import pytest
+from httpx import AsyncClient
+from pydantic import BaseModel
+from sqlalchemy import select
 
 # Import session maker type for hinting
-from sqlalchemy.ext.asyncio import async_sessionmaker, AsyncSession
-from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from test_helpers import create_test_user
-from typing import Optional
+
+from app.models import Conversation, Message, Participant, User
+from app.schemas.participant import (
+    ParticipantResponse,
+    ParticipantStatus,
+    ParticipantUpdateRequest,
+)
 
 # Mark all tests in this module as async
 pytestmark = pytest.mark.asyncio

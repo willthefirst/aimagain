@@ -1,17 +1,17 @@
 # Tests for POST /conversations
-import pytest
-from httpx import AsyncClient
 import uuid
+from typing import Optional
 from uuid import UUID
 
-from sqlalchemy.ext.asyncio import async_sessionmaker, AsyncSession
-from sqlalchemy import func, select
-from app.models import User, Conversation, Participant, Message
-from app.schemas.participant import ParticipantStatus
+import pytest
+from httpx import AsyncClient
 from pydantic import BaseModel
-from typing import Optional
-
+from sqlalchemy import func, select
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from test_helpers import create_test_user
+
+from app.models import Conversation, Message, Participant, User
+from app.schemas.participant import ParticipantStatus
 
 
 # Helper Pydantic models for request/response validation

@@ -25,10 +25,20 @@ dependencies = [
     "pydantic-settings",
     "asyncstdlib",
     "pytest-playwright-asyncio",
-    "pact-python"
+    "pact-python",
+    "isort",
+    "black",
 ]
 
 [tool.setuptools.packages.find]
 where = ["."] # Look in the root directory
 include = ["app*"] # Include only the 'app' directory and its subpackages
 exclude = ["tests*", "alembic*", "templates*"] # Explicitly exclude other top-level dirs
+
+[tool.black]
+line-length = 88
+target-version = ['py311']
+
+[tool.isort]
+profile = "black"
+line_length = 88

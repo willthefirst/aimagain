@@ -1,23 +1,22 @@
-import uuid
 import logging
+import uuid
 from uuid import UUID
-from sqlalchemy.exc import SQLAlchemyError, IntegrityError
 
-from app.models import User, Participant, Conversation
-from app.repositories.participant_repository import ParticipantRepository
+from sqlalchemy.exc import IntegrityError, SQLAlchemyError
+
+from app.models import Conversation, Participant, User
 from app.repositories.conversation_repository import ConversationRepository
+from app.repositories.participant_repository import ParticipantRepository
 from app.schemas.participant import ParticipantStatus
 
 # Import shared service exceptions
-from .exceptions import (
-    ServiceError,
-    NotAuthorizedError,
+from .exceptions import (  # Removed ConversationNotFoundError import as it's not explicitly raised here; Import UserNotFoundError if needed for future methods
+    BusinessRuleError,
     ConflictError,
     DatabaseError,
-    BusinessRuleError,
+    NotAuthorizedError,
     ParticipantNotFoundError,
-    # Removed ConversationNotFoundError import as it's not explicitly raised here
-    # Import UserNotFoundError if needed for future methods
+    ServiceError,
 )
 
 logger = logging.getLogger(__name__)

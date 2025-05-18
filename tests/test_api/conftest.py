@@ -1,27 +1,29 @@
 import asyncio
-from typing import AsyncGenerator, Any
 from collections.abc import AsyncGenerator as AsyncGeneratorABC
 from contextlib import asynccontextmanager
-from asyncstdlib import anext
+from typing import Any, AsyncGenerator
 
 import pytest
-from fastapi import FastAPI
+from asyncstdlib import anext
+from fastapi import Depends, FastAPI
+from fastapi_users.db import SQLAlchemyUserDatabase
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
-from fastapi import Depends
+
+from app.core.templating import templates  # Import the global templates object
+
+# Updated dependency imports from app.db
+from app.db import get_db_session, get_user_db
+
+# Assuming your FastAPI app instance is in app.main
+from app.main import app
+from app.models import User, metadata  # Assuming your models define metadata
+from app.schemas.user import UserCreate  # Import UserCreate schema
 
 # REMOVED Depends import as it's not used in fixture overrides this way
 # from fastapi import Depends
 
-# Assuming your FastAPI app instance is in app.main
-from app.main import app
 
-# Updated dependency imports from app.db
-from app.db import get_db_session, get_user_db
-from app.models import User, metadata  # Assuming your models define metadata
-from fastapi_users.db import SQLAlchemyUserDatabase
-from app.schemas.user import UserCreate  # Import UserCreate schema
-from app.core.templating import templates  # Import the global templates object
 
 # Use an in-memory SQLite database for testing
 TEST_DATABASE_URL = "sqlite+aiosqlite:///:memory:"

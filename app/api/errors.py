@@ -1,4 +1,5 @@
 import logging
+
 from fastapi import HTTPException
 
 # Import base ServiceError from the new location
