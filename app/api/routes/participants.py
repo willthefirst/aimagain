@@ -37,6 +37,9 @@ from app.services.participant_service import (
     DatabaseError,
 )
 
+# Import the new handler
+from app.logic.participant_processing import handle_update_participant_status
+
 # Import shared error handling function
 from app.api.errors import handle_service_error
 
@@ -60,18 +63,17 @@ async def update_participant_status(
         try:
             target_status_enum = ParticipantStatus(update_data.status)
         except ValueError:
-            # Use the specific BusinessRuleError or just raise HTTP 400 directly
-            # raise BusinessRuleError(f"Invalid target status '{update_data.status}'.")
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=f"Invalid target status value '{update_data.status}'. Must be 'joined' or 'rejected'.",
             )
 
-        # Delegate logic to the service
-        updated_participant = await part_service.update_invitation_status(
+        # Delegate logic to the handler
+        updated_participant = await handle_update_participant_status(
             participant_id=participant_id,
             target_status=target_status_enum,
             current_user=user,
+            part_service=part_service,
         )
 
         return updated_participant
