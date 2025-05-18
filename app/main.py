@@ -39,7 +39,7 @@ app.include_router(
     prefix="/users",
     tags=["users"],
 )
-app.include_router(auth_pages.auth_pages_router_instance)
+app.include_router(auth_pages.auth_pages_api_router)
 app.include_router(users.users_router_instance, tags=["users"])
 app.include_router(conversations.conversations_router_instance, tags=["conversations"])
 app.include_router(me.me_router_instance, tags=["me"])
