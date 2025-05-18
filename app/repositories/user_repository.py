@@ -73,5 +73,3 @@ class UserRepository(BaseRepository):
         stmt = stmt.order_by(User.username)
         result = await self.session.execute(stmt)
         return result.scalars().all()
-
-    # TODO: Add list_users method needed for users.py route

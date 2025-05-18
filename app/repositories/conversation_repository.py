@@ -142,5 +142,3 @@ class ConversationRepository(BaseRepository):
         self.session.add(conversation)
         await self.session.flush()
         await self.session.refresh(conversation)
-
-    # TODO: Add methods for create_conversation and invite_participant logic

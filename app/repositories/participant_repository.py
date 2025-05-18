@@ -130,6 +130,3 @@ class ParticipantRepository(BaseRepository):
         await self.session.flush()
         await self.session.refresh(participant)
         return participant
-
-    # TODO: Add methods for listing invitations/conversations (me.py) -> list_user_invitations done
-    # TODO: Add methods for updating status (participants.py) -> Done
