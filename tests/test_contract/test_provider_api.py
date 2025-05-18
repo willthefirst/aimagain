@@ -87,6 +87,23 @@ CONVERSATIONS_API_PROVIDER_DECORATOR = pytest.mark.parametrize(
 )
 
 
+def _verify_pact_and_handle_result(success: int, logs_dict: dict, pact_name: str):
+    if success != 0:
+        log.error(f"{pact_name} Pact verification failed. Logs:")
+        try:
+            import json
+
+            print(json.dumps(logs_dict, indent=4))
+        except ImportError:  # Should not happen if json is a standard library
+            print(logs_dict)
+        except Exception as e:
+            log.error(f"Error printing pact logs: {e}")
+            print(logs_dict)  # Fallback to raw print
+        pytest.fail(
+            f"{pact_name} Pact verification failed (exit code: {success}). Check logs."
+        )
+
+
 @AUTH_API_PROVIDER_DECORATOR
 def test_provider_auth_api_pact_verification(
     provider_server: URL,
@@ -107,17 +124,7 @@ def test_provider_auth_api_pact_verification(
         AUTH_API_PACT_FILE_PATH, log_dir=PACT_LOG_DIR
     )
 
-    if success != 0:
-        log.error("Auth API Pact verification failed. Logs:")
-        try:
-            import json
-
-            print(json.dumps(logs_dict, indent=4))
-        except ImportError:
-            print(logs_dict)
-        pytest.fail(
-            f"Auth API Pact verification failed (exit code: {success}). Check logs."
-        )
+    _verify_pact_and_handle_result(success, logs_dict, "Auth API")
 
 
 @CONVERSATIONS_API_PROVIDER_DECORATOR
@@ -140,14 +147,4 @@ def test_provider_conversations_api_pact_verification(
         CONVERSATIONS_API_PACT_FILE_PATH, log_dir=PACT_LOG_DIR
     )
 
-    if success != 0:
-        log.error("Conversations API Pact verification failed. Logs:")
-        try:
-            import json
-
-            print(json.dumps(logs_dict, indent=4))
-        except ImportError:
-            print(logs_dict)
-        pytest.fail(
-            f"Conversations API Pact verification failed (exit code: {success}). Check logs."
-        )
+    _verify_pact_and_handle_result(success, logs_dict, "Conversations API")

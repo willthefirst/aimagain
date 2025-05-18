@@ -10,25 +10,26 @@ from app.api.routes import auth_pages, conversations
 from pact import Consumer, Provider
 import logging
 from yarl import URL
-from typing import Generator, Any, Callable, Dict
-import importlib
+from typing import Generator, Any, Callable, Dict, AsyncGenerator
 import uuid
 import asyncio
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
-from app.models import metadata  # Import the metadata
-from app.db import get_db_session  # Import the dependency function
+from app.models import metadata, User  # Import User and metadata
+from app.db import get_db_session, get_user_db  # Import the dependency functions
 from typing import AsyncGenerator
 from unittest.mock import AsyncMock, patch
 import shutil
-from .test_helpers import PACT_DIR  # Assuming PACT_DIR is in test_helpers
+from .test_helpers import PACT_DIR
 import requests
 from requests.exceptions import ConnectionError
 from app.models.conversation import Conversation
-from app.repositories.conversation_repository import ConversationRepository
+
+# from app.repositories.conversation_repository import ConversationRepository # Not used directly here
 from tests.test_contract.test_consumer_conversation_form import (
     PROVIDER_STATE_USER_ONLINE,
 )
-from app.models import User
+
+# Removed: from app.models import User - already imported
 
 # --- Server Configuration ---
 PACT_LOG_LEVEL = "warning"  # Or "debug" for more verbose pact logging
@@ -55,7 +56,19 @@ log_provider = logging.getLogger("pact_provider_test")
 # PROVIDER_URL = URL(f"http://{PROVIDER_HOST}:{PROVIDER_PORT}")
 # PROVIDER_STATE_SETUP_URL = str(PROVIDER_URL / PROVIDER_STATE_SETUP_PATH)
 
+# Database setup for provider server (in-memory SQLite)
+TEST_DATABASE_URL = "sqlite+aiosqlite:///:memory:"
+
+# The actual engine and sessionmaker will be created within _run_provider_server_process
+# to ensure they are in the correct process.
+
+# Imports for FastAPI Users, similar to test_api/conftest.py
+from fastapi_users.db import SQLAlchemyUserDatabase
+
+# from app.schemas.user import UserCreate # Not used directly in this conftest for user creation logic
+
 # below copied frog test_api/conftest.py, refactor so that we just reuse the same 'in memory test db'
+# This section is being addressed by the current refactoring.
 
 # import asyncio # Already imported
 # from typing import AsyncGenerator, Any # Already imported
@@ -67,18 +80,21 @@ from asyncstdlib import anext
 
 # import pytest # Already imported
 # from fastapi import FastAPI # Already imported
-from httpx import ASGITransport, AsyncClient
+from httpx import (
+    ASGITransport,
+    AsyncClient,
+)  # AsyncClient not used directly here, but often part of test setups
 
 # from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine # Already imported
-from fastapi import Depends  # Keep this
+from fastapi import Depends
 
 from app.main import app  # Assuming your FastAPI app instance is in app.main
 
-from app.db import get_db_session, get_user_db  # get_db_session already imported
+# from app.db import get_db_session, get_user_db # get_db_session already imported
 
 # from app.models import User, metadata # User, metadata already imported
-from fastapi_users.db import SQLAlchemyUserDatabase
-from app.schemas.user import UserCreate
+# from fastapi_users.db import SQLAlchemyUserDatabase # Already imported
+# from app.schemas.user import UserCreate # Already imported and commented
 from app.core.templating import templates
 
 
@@ -381,49 +397,105 @@ def _run_provider_server_process(  # Renamed function
     override_config: Dict[str, Dict] | None,
 ) -> None:
     """Target function to run the main FastAPI app with overrides for provider testing."""
-    from app.main import app  # Main app import
-    import logging  # For subprocess logger
+    # Main app import is now global for the module
+    # from app.main import app
 
-    # Removed imports that are now in helper functions or not directly needed here
-    # from unittest.mock import AsyncMock, patch (now in _apply_provider_patches)
-    # from app.schemas.user import UserRead (not used)
-    # import importlib (not used)
-    # import uuid (now in _setup_provider_mock_auth & _apply_provider_patches)
-    # from app.models import User (now in _setup_provider_mock_auth)
-    # from app.auth_config import current_active_user (now in _setup_provider_mock_auth)
+    # SQLAlchemy engine and session for this process
+    # These are created here to ensure they exist in this separate process
+    provider_test_engine = create_async_engine(TEST_DATABASE_URL)
+    provider_test_async_session_maker = async_sessionmaker(
+        provider_test_engine, expire_on_commit=False
+    )
 
-    log_provider_subprocess = logging.getLogger("pact_provider_test")
+    # Define local provider_override_get_db_session that captures provider_test_async_session_maker
+    async def local_provider_override_get_db_session_impl() -> (
+        AsyncGenerator[AsyncSession, None]
+    ):
+        async with provider_test_async_session_maker() as session:
+            yield session
 
-    _setup_provider_app_routes(app, state_path, state_handler, log_provider_subprocess)
+    # Define local provider_override_get_user_db
+    async def local_provider_override_get_user_db_impl(
+        # Depends on the overridden version of get_db_session
+        session: AsyncSession = Depends(local_provider_override_get_db_session_impl),
+    ) -> SQLAlchemyUserDatabase[User, Any]:
+        yield SQLAlchemyUserDatabase(session, User)
 
-    # Setup mock auth and keep track of the dependency key for cleanup
-    auth_dependency_key = _setup_provider_mock_auth(app, log_provider_subprocess)
+    log_provider_subprocess = logging.getLogger(
+        "pact_provider_test_subprocess"
+    )  # Changed logger name slightly for clarity
 
-    mp = pytest.MonkeyPatch()
+    # Original dependency overrides from app instance
+    original_dependency_overrides = app.dependency_overrides.copy()
+
     try:
-        _apply_provider_patches(mp, override_config, log_provider_subprocess)
+        # Create tables
+        async def create_db_tables():
+            async with provider_test_engine.begin() as conn:
+                await conn.run_sync(metadata.create_all)
+            log_provider_subprocess.info(
+                "In-memory DB tables created for provider test."
+            )
 
-        # Run the Uvicorn server - monkeypatch keeps patches active
-        # Note: uvicorn.run is blocking, so cleanup happens in finally
-        uvicorn.run(
-            app, host=host, port=port, log_level=PACT_LOG_LEVEL
-        )  # Use PACT_LOG_LEVEL
+        asyncio.run(create_db_tables())
+
+        # Apply DB overrides
+        app.dependency_overrides[get_db_session] = (
+            local_provider_override_get_db_session_impl
+        )
+        app.dependency_overrides[get_user_db] = local_provider_override_get_user_db_impl
+        log_provider_subprocess.info(
+            "Applied DB dependency overrides for provider test."
+        )
+
+        _setup_provider_app_routes(
+            app, state_path, state_handler, log_provider_subprocess
+        )
+
+        # Setup mock auth and keep track of the dependency key for cleanup
+        # This might also need to be aware of the new override structure if it interacts with DB
+        auth_dependency_key = _setup_provider_mock_auth(app, log_provider_subprocess)
+
+        mp = pytest.MonkeyPatch()  # Keep monkeypatching as is for other overrides
+        try:
+            _apply_provider_patches(mp, override_config, log_provider_subprocess)
+
+            uvicorn.run(app, host=host, port=port, log_level=PACT_LOG_LEVEL)
+
+        finally:
+            mp.undo()
+            log_provider_subprocess.info(
+                "MonkeyPatch.undo() called for provider patches."
+            )
+            # Note: uvicorn.run is blocking. Code here runs after server stops.
 
     finally:
-        # Explicitly undo patches applied by MonkeyPatch
-        mp.undo()
-        log_provider_subprocess.info("MonkeyPatch.undo() called for provider patches.")
+        # This 'finally' block ensures cleanup even if uvicorn doesn't start or crashes early.
 
-        # Clear dependency override for mock auth
-        if auth_dependency_key and auth_dependency_key in app.dependency_overrides:
-            del app.dependency_overrides[auth_dependency_key]
+        # Drop tables
+        async def drop_db_tables():
+            async with provider_test_engine.begin() as conn:
+                await conn.run_sync(metadata.drop_all)
             log_provider_subprocess.info(
-                f"Cleared mock override for {auth_dependency_key}."
+                "In-memory DB tables dropped for provider test."
             )
-        else:
-            log_provider_subprocess.info(
-                "No auth dependency key to clear or key not found."
-            )
+
+        asyncio.run(drop_db_tables())
+
+        # Restore original dependency overrides
+        app.dependency_overrides = original_dependency_overrides
+        log_provider_subprocess.info(
+            "Restored original dependency overrides for provider app."
+        )
+
+        # The auth_dependency_key cleanup was inside the inner finally,
+        # it should be robust enough, but ensure app.dependency_overrides is the correct one.
+        # If _setup_provider_mock_auth modified the original_dependency_overrides copy, this is fine.
+        # If it modified app.dependency_overrides directly, it's already handled by restoring.
+        # For safety, let's ensure it's explicitly cleared from the live app.dependency_overrides
+        # *before* restoring the original ones, or just rely on the full restoration.
+        # The current logic in `_setup_provider_mock_auth` adds to app.dependency_overrides.
+        # The restoration to original_dependency_overrides will inherently clear it if it was added.
 
 
 @pytest.fixture(scope="module")

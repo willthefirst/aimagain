@@ -3,7 +3,10 @@ import pytest
 from playwright.async_api import Page, Route, expect
 from pact import Like
 
-from tests.test_contract.test_helpers import setup_pact
+from tests.test_contract.test_helpers import (
+    setup_pact,
+    setup_playwright_pact_interception,
+)
 
 CONSUMER_NAME = "create-conversation-form"
 PROVIDER_NAME = "conversations-api"
@@ -71,29 +74,17 @@ async def test_consumer_conversation_create_success(
     )
 
     # Define Playwright Interception Logic
-    async def handle_route(route: Route):
-        print(f"route.request.url: {route.request.url}")
-        if (
-            route.request.method == "POST"
-            and CONVERSATIONS_CREATE_PATH in route.request.url
-        ):
-            print("received the post, sending to mock submit url")
-            await route.continue_(
-                url=mock_submit_url,
-                headers={
-                    k: v
-                    for k, v in route.request.headers.items()
-                    if k.lower() != "content-length"
-                },
-            )
-        else:
-            await route.continue_()
+    await setup_playwright_pact_interception(
+        page=page,
+        api_path_to_intercept=CONVERSATIONS_CREATE_PATH,
+        mock_pact_url=mock_submit_url,  # This is pact.uri + CONVERSATIONS_CREATE_PATH
+        http_method="POST",
+    )
 
     async def handle_get_conversation_on_success_route(route: Route):
         print("received the get, aborting")
         await route.abort()
 
-    await page.route(f"**{CONVERSATIONS_CREATE_PATH}", handle_route)
     await page.route(
         f"**{MOCK_CONVERSATION_GET_PATH}", handle_get_conversation_on_success_route
     )

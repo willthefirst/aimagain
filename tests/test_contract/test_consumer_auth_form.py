@@ -1,10 +1,13 @@
 # tests/contract/test_consumer_auth_form.py
 import atexit
 import pytest
-from playwright.async_api import Page, Route
+from playwright.async_api import Page
 from pact import Like
 
-from tests.test_contract.test_helpers import setup_pact
+from tests.test_contract.test_helpers import (
+    setup_pact,
+    setup_playwright_pact_interception,
+)
 
 CONSUMER_NAME = "registration-form"
 PROVIDER_NAME = "auth-api"
@@ -53,20 +56,12 @@ async def test_consumer_registration_form_interaction(
     )
 
     # Define Playwright Interception Logic
-    async def handle_route(route: Route):
-        if route.request.method == "POST" and REGISTER_API_PATH in route.request.url:
-            await route.continue_(
-                url=full_mock_url,
-                headers={
-                    k: v
-                    for k, v in route.request.headers.items()
-                    if k.lower() != "content-length"
-                },
-            )
-        else:
-            await route.continue_()
-
-    await page.route(f"**{REGISTER_API_PATH}", handle_route)
+    await setup_playwright_pact_interception(
+        page=page,
+        api_path_to_intercept=REGISTER_API_PATH,
+        mock_pact_url=full_mock_url,
+        http_method="POST",
+    )
 
     # Execute Test with Pact Verification
     with pact:
