@@ -3,7 +3,10 @@ import logging
 from fastapi import APIRouter, Depends, Form, HTTPException, Request, status
 from fastapi.responses import HTMLResponse, RedirectResponse
 
+from app.api.decorators import handle_route_errors
 from app.api.errors import handle_service_error
+from app.api.logging import log_route_call
+from app.api.responses import html_response
 from app.auth_config import current_active_user
 from app.core.templating import templates
 from app.logic.conversation_processing import (
@@ -37,34 +40,22 @@ router = APIRouter()
 
 
 @router.get("/conversations", response_class=HTMLResponse, tags=["conversations"])
+@log_route_call
+@handle_route_errors
 async def list_conversations(
     request: Request,
     conv_service: ConversationService = Depends(get_conversation_service),
 ):
     """Provides an HTML page listing all public conversations by calling the handler."""
-    try:
-        conversations = await handle_list_conversations(conv_service=conv_service)
-        return templates.TemplateResponse(
-            name="conversations/list.html",
-            context={
-                "request": request,
-                "conversations": conversations,
-            },
-        )
-    except DatabaseError as e:
-        logger.error(f"Database error in list_conversations route: {e}", exc_info=True)
-        handle_service_error(e)
-    except ServiceError as e:
-        logger.error(f"Service error in list_conversations route: {e}", exc_info=True)
-        handle_service_error(e)
-    except Exception as e:
-        logger.error(
-            f"Unexpected error listing conversations route: {e}", exc_info=True
-        )
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="An unexpected server error occurred while trying to list conversations.",
-        )
+    conversations = await handle_list_conversations(conv_service=conv_service)
+    return html_response(
+        template_name="conversations/list.html",
+        context={
+            "request": request,
+            "conversations": conversations,
+        },
+        request=request,
+    )
 
 
 @router.get(
@@ -73,30 +64,18 @@ async def list_conversations(
     name="get_new_conversation_form",
     tags=["conversations"],
 )
+@log_route_call
+@handle_route_errors
 async def get_new_conversation_form(
     request: Request,
     user: User = Depends(current_active_user),
 ):
     """Displays the form to create a new conversation by calling the handler."""
-    try:
-        context = await handle_get_new_conversation_form(request=request)
-        return templates.TemplateResponse(
-            name="conversations/new.html",
-            context=context,
-        )
-    except ServiceError as e:
-        logger.error(
-            f"Service error in get_new_conversation_form route: {e}", exc_info=True
-        )
-        handle_service_error(e)
-    except Exception as e:
-        logger.error(
-            f"Unexpected error in get_new_conversation_form route: {e}", exc_info=True
-        )
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="An unexpected error occurred while preparing the new conversation form.",
-        )
+    context = await handle_get_new_conversation_form(request=request)
+    return html_response(
+        template_name="conversations/new.html",
+        context=context,
+    )
 
 
 @router.get(
@@ -104,6 +83,8 @@ async def get_new_conversation_form(
     response_class=HTMLResponse,
     tags=["conversations"],
 )
+@log_route_call
+@handle_route_errors
 async def get_conversation(
     slug: str,
     request: Request,
@@ -111,41 +92,19 @@ async def get_conversation(
     conv_service: ConversationService = Depends(get_conversation_service),
 ):
     """Retrieves and displays a specific conversation by calling the handler."""
-    try:
-        conversation = await handle_get_conversation(
-            slug=slug, requesting_user=user, conv_service=conv_service
-        )
+    conversation = await handle_get_conversation(
+        slug=slug, requesting_user=user, conv_service=conv_service
+    )
 
-        logger.info(
-            f"Conversation details yolo: {conversation.id if conversation else 'None'}"
-        )
-
-        return templates.TemplateResponse(
-            "conversations/detail.html",
-            {
-                "request": request,
-                "conversation": conversation,
-                "participants": conversation.participants if conversation else [],
-                "messages": conversation.messages if conversation else [],
-            },
-        )
-    except (ConversationNotFoundError, NotAuthorizedError) as e:
-        handle_service_error(e)
-    except ServiceError as e:
-        logger.error(
-            f"Service error in get_conversation route for slug {slug}: {e}",
-            exc_info=True,
-        )
-        handle_service_error(e)
-    except Exception as e:
-        logger.error(
-            f"Unexpected error in get_conversation route for slug {slug}: {e}",
-            exc_info=True,
-        )
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"An unexpected server error occurred while retrieving conversation {slug}.",
-        )
+    return html_response(
+        template_name="conversations/detail.html",
+        context={
+            "conversation": conversation,
+            "participants": conversation.participants if conversation else [],
+            "messages": conversation.messages if conversation else [],
+        },
+        request=request,
+    )
 
 
 @router.post(
@@ -154,6 +113,8 @@ async def get_conversation(
     name="create_conversation",
     tags=["conversations"],
 )
+@log_route_call
+@handle_route_errors
 async def create_conversation(
     invitee_username: str = Form(...),
     initial_message: str = Form(...),
@@ -198,6 +159,8 @@ async def create_conversation(
     status_code=status.HTTP_201_CREATED,
     tags=["conversations", "participants"],
 )
+@log_route_call
+@handle_route_errors
 async def invite_participant(
     slug: str,
     request_data: ParticipantInviteRequest,
