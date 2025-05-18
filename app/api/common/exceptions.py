@@ -4,8 +4,8 @@ from fastapi import HTTPException, status
 from fastapi_users import exceptions as fastapi_users_exceptions
 from fastapi_users.router.common import ErrorCode
 
-from app.services.exceptions import BusinessRuleError  # Example, add others as needed
 from app.services.exceptions import (
+    BusinessRuleError,
     ConflictError,
     ConversationNotFoundError,
     DatabaseError,
