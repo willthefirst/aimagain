@@ -156,6 +156,64 @@ def run_consumer_server_process(
 
         consumer_app.dependency_overrides[current_active_user] = get_mock_current_user
 
+    # Handle mock invitations if specified in routes_config
+    if routes_config.get("mock_invitations", False):
+        from app.models import Conversation, Message, Participant, User
+        from app.schemas.participant import ParticipantStatus
+        from app.services.dependencies import get_user_service
+
+        log_provider.info("Adding mock invitations for contract tests")
+
+        # Create mock invitation data
+        mock_inviter = User(
+            id=uuid.uuid4(),
+            email="inviter@example.com",
+            username="test_inviter",
+            is_active=True,
+        )
+
+        mock_conversation = Conversation(
+            id=uuid.uuid4(),
+            slug="test-conversation-slug",
+            created_by_user_id=mock_inviter.id,
+        )
+
+        mock_initial_message = Message(
+            id=uuid.uuid4(),
+            content="Hey, want to join our conversation?",
+            conversation_id=mock_conversation.id,
+            created_by_user_id=mock_inviter.id,
+        )
+
+        # Create mock Participant (invitation) with relationships
+        mock_invitation = Participant(
+            id=uuid.UUID("550e8400-e29b-41d4-a716-446655440000"),
+            user_id=uuid.uuid4(),  # Current user's ID
+            conversation_id=mock_conversation.id,
+            status=ParticipantStatus.INVITED,
+            invited_by_user_id=mock_inviter.id,
+            initial_message_id=mock_initial_message.id,
+        )
+
+        # Set up the relationships that the template accesses
+        mock_invitation.inviter = mock_inviter
+        mock_invitation.conversation = mock_conversation
+        mock_invitation.initial_message = mock_initial_message
+
+        mock_invitations = [mock_invitation]
+
+        class MockUserService:
+            async def get_user_invitations(self, user: User):
+                return mock_invitations
+
+            async def get_user_conversations(self, user: User):
+                return []
+
+        async def get_mock_user_service():
+            return MockUserService()
+
+        consumer_app.dependency_overrides[get_user_service] = get_mock_user_service
+
     uvicorn.run(consumer_app, host=host, port=port, log_level="warning")
 
 

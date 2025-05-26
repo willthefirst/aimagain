@@ -1,26 +1,7 @@
 # tests/test_contract/test_consumer_invitation_form.py
-import multiprocessing
-import uuid
-from typing import Any, Dict
-
 import pytest
-import uvicorn
-from fastapi import FastAPI
 from playwright.async_api import Page
 
-from app.api.routes import auth_pages, me
-from app.auth_config import current_active_user
-from app.models import Conversation, Message, Participant, User
-from app.schemas.participant import ParticipantStatus
-from app.services.user_service import UserService
-from tests.test_contract.conftest import (
-    CONSUMER_BASE_URL,
-    CONSUMER_HOST,
-    CONSUMER_PORT,
-    _create_mock_user,
-    _poll_server_ready,
-    _terminate_server_process,
-)
 from tests.test_contract.test_helpers import (
     setup_pact,
     setup_playwright_pact_interception,
@@ -38,112 +19,14 @@ PROVIDER_STATE_USER_HAS_INVITATIONS = "user has pending invitations"
 NETWORK_TIMEOUT_MS = 500
 
 
-def _create_mock_invitation_data():
-    """Creates mock invitation data that matches what the template expects."""
-    # Create mock User objects
-    mock_inviter = User(
-        id=uuid.uuid4(),
-        email="inviter@example.com",
-        username="test_inviter",
-        is_active=True,
-    )
-
-    mock_conversation = Conversation(
-        id=uuid.uuid4(),
-        slug="test-conversation-slug",
-        created_by_user_id=mock_inviter.id,
-    )
-
-    mock_initial_message = Message(
-        id=uuid.uuid4(),
-        content="Hey, want to join our conversation?",
-        conversation_id=mock_conversation.id,
-        created_by_user_id=mock_inviter.id,
-    )
-
-    # Create mock Participant (invitation) with relationships
-    mock_invitation = Participant(
-        id=uuid.UUID(MOCK_PARTICIPANT_ID),
-        user_id=uuid.uuid4(),  # Current user's ID
-        conversation_id=mock_conversation.id,
-        status=ParticipantStatus.INVITED,
-        invited_by_user_id=mock_inviter.id,
-        initial_message_id=mock_initial_message.id,
-    )
-
-    # Set up the relationships that the template accesses
-    mock_invitation.inviter = mock_inviter
-    mock_invitation.conversation = mock_conversation
-    mock_invitation.initial_message = mock_initial_message
-
-    return [mock_invitation]
-
-
-def run_consumer_server_with_mock_invitations(host: str, port: int):
-    """Runs consumer server with mocked invitations data."""
-    from app.services.dependencies import get_user_service
-
-    consumer_app = FastAPI(title="Consumer Test Server with Mock Invitations")
-
-    @consumer_app.get("/_health")
-    async def health_check():
-        return {"status": "ok"}
-
-    # Include the routes we need
-    consumer_app.include_router(auth_pages.auth_pages_api_router)
-    consumer_app.include_router(me.me_router_instance)
-
-    # Mock auth
-    mock_user = _create_mock_user(
-        email="test@example.com", username="contract_test_user"
-    )
-
-    async def get_mock_current_user():
-        return mock_user
-
-    consumer_app.dependency_overrides[current_active_user] = get_mock_current_user
-
-    # Mock user service to return our fake invitations
-    mock_invitations = _create_mock_invitation_data()
-
-    class MockUserService:
-        async def get_user_invitations(self, user: User):
-            return mock_invitations
-
-        async def get_user_conversations(self, user: User):
-            return []
-
-    async def get_mock_user_service():
-        return MockUserService()
-
-    consumer_app.dependency_overrides[get_user_service] = get_mock_user_service
-
-    uvicorn.run(consumer_app, host=host, port=port, log_level="warning")
-
-
-@pytest.fixture(scope="function")
-def consumer_server_with_mock_invitations():
-    """Starts a consumer server with mock invitations data."""
-    server_process = multiprocessing.Process(
-        target=run_consumer_server_with_mock_invitations,
-        args=(CONSUMER_HOST, CONSUMER_PORT),
-        daemon=True,
-    )
-    server_process.start()
-    health_check_url = f"http://{CONSUMER_HOST}:{CONSUMER_PORT}/_health"
-    if not _poll_server_ready(health_check_url):
-        _terminate_server_process(server_process)
-        raise RuntimeError(
-            f"Consumer server process failed to start at {health_check_url}"
-        )
-
-    yield str(CONSUMER_BASE_URL)
-    _terminate_server_process(server_process)
-
-
+@pytest.mark.parametrize(
+    "origin_with_routes",
+    [{"me_pages": True, "auth_pages": True, "mock_invitations": True}],
+    indirect=True,
+)
 @pytest.mark.asyncio(loop_scope="session")
 async def test_consumer_invitation_accept_method_mismatch(
-    consumer_server_with_mock_invitations: str, page: Page
+    origin_with_routes: str, page: Page
 ):
     """
     Test that reveals the method mismatch bug in invitation acceptance.
@@ -156,7 +39,7 @@ async def test_consumer_invitation_accept_method_mismatch(
 
     This test SHOULD FAIL, proving the contract mismatch exists.
     """
-    origin = consumer_server_with_mock_invitations
+    origin = origin_with_routes
 
     pact = setup_pact(CONSUMER_NAME, PROVIDER_NAME, port=1236)
     mock_server_uri = pact.uri
@@ -233,15 +116,20 @@ async def test_consumer_invitation_accept_method_mismatch(
     # - Result: Missing PUT request, revealing the 405 Method Not Allowed bug
 
 
+@pytest.mark.parametrize(
+    "origin_with_routes",
+    [{"me_pages": True, "auth_pages": True, "mock_invitations": True}],
+    indirect=True,
+)
 @pytest.mark.asyncio(loop_scope="session")
 async def test_consumer_invitation_reject_method_mismatch(
-    consumer_server_with_mock_invitations: str, page: Page
+    origin_with_routes: str, page: Page
 ):
     """
     Test that reveals the method mismatch bug in invitation rejection.
     Similar to accept test but for the reject flow.
     """
-    origin = consumer_server_with_mock_invitations
+    origin = origin_with_routes
 
     pact = setup_pact(CONSUMER_NAME, PROVIDER_NAME, port=1237)
     mock_server_uri = pact.uri
