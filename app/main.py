@@ -2,6 +2,7 @@ from fastapi import FastAPI
 
 from app.api.routes import auth_routes
 from app.auth_config import auth_backend, fastapi_users
+from app.db import get_db_session
 from app.middleware.presence import PresenceMiddleware
 from app.schemas.user import UserRead, UserUpdate
 
@@ -9,8 +10,8 @@ from .api.routes import auth_pages, conversations, me, participants, users
 
 app = FastAPI(title="AIM again")
 
-# Add presence middleware
-app.add_middleware(PresenceMiddleware)
+# Add presence middleware with session factory
+app.add_middleware(PresenceMiddleware, session_factory=get_db_session)
 
 
 @app.get("/")

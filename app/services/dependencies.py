@@ -13,6 +13,7 @@ from app.repositories.user_repository import UserRepository
 
 from .conversation_service import ConversationService
 from .participant_service import ParticipantService
+from .presence_service import PresenceService
 from .provider import ServiceProvider
 from .user_service import UserService
 
@@ -54,4 +55,14 @@ def get_user_service(
         UserService,
         participant_repository=part_repo,
         conversation_repository=conv_repo,
+    )
+
+
+def get_presence_service(
+    user_repo: UserRepository = Depends(get_user_repository),
+) -> PresenceService:
+    """Provides an instance of the PresenceService."""
+    return ServiceProvider.get_service(
+        PresenceService,
+        user_repository=user_repo,
     )

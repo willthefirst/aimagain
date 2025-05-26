@@ -216,7 +216,13 @@ async def test_update_all_users_online_status_handles_errors_gracefully(
         async with db_test_session_manager() as session:
             # Mock the session's execute method to fail
             with patch.object(session, "execute", side_effect=failing_execute):
-                with pytest.raises(Exception, match="Database operation failed"):
+                # The service catches the original exception and raises a ServiceError
+                from app.services.exceptions import ServiceError
+
+                with pytest.raises(
+                    ServiceError,
+                    match="An unexpected error occurred while updating all users online status",
+                ):
                     await update_all_users_online_status(session)
 
                 # Should have logged the error
