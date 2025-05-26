@@ -1,4 +1,3 @@
-
 import pytest
 from fastapi_users.db import SQLAlchemyUserDatabase
 from httpx import AsyncClient
@@ -32,8 +31,7 @@ async def test_register(
     register_data = {
         "email": email_to_test,
         "password": password_to_test,
-        # Add other required fields if your UserCreate schema needs them
-        "username": "testreguser",  # Assuming username is required based on conftest
+        "username": "testreguser",
     }
     response = await test_client.post("/auth/register", json=register_data)
     assert response.status_code == 201
