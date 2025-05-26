@@ -11,7 +11,7 @@ def create_test_user(
     username: Optional[str] = None,
     email: Optional[str] = None,
     hashed_password: Optional[str] = None,
-    is_online: bool = True,
+    is_online: bool = False,
     is_active: bool = True,  # Added fastapi-users default
     is_superuser: bool = False,  # Added fastapi-users default
     is_verified: bool = True,  # Added fastapi-users default

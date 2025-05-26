@@ -1,5 +1,5 @@
 import logging
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 import jwt
@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 
 
 class PresenceMiddleware(BaseHTTPMiddleware):
-    """Updates user last_active_at for all successful authenticated requests"""
+    """Updates user last_active_at and is_online for all successful authenticated requests"""
 
     async def dispatch(self, request: Request, call_next):
         # Process the request first
@@ -83,6 +83,7 @@ class PresenceMiddleware(BaseHTTPMiddleware):
 
             from sqlalchemy import update
 
+            from app.core.config import settings
             from app.db import get_db_session
             from app.models import User
 
@@ -96,14 +97,20 @@ class PresenceMiddleware(BaseHTTPMiddleware):
                 get_db_session, get_db_session
             )
 
+            # Calculate current time and online threshold
+            now = datetime.now(timezone.utc)
+
             # Get a database session
             async for session in db_session_func():
                 try:
-                    # Update the user's last_active_at timestamp
+                    # Update the user's last_active_at timestamp and is_online status
                     stmt = (
                         update(User)
                         .where(User.id == user_uuid)
-                        .values(last_active_at=datetime.now(timezone.utc))
+                        .values(
+                            last_active_at=now,
+                            is_online=True,  # User is definitely online since they just made a request
+                        )
                     )
                     result = await session.execute(stmt)
                     await session.commit()
@@ -125,3 +132,83 @@ async def update_user_presence(user_id: str):
     """Helper function to update user presence - used for testing"""
     middleware = PresenceMiddleware(None)
     await middleware._do_presence_update(user_id)
+
+
+async def update_all_users_online_status(session=None):
+    """Update is_online status for all users based on their last_active_at timestamp"""
+    try:
+        from sqlalchemy import update
+
+        from app.core.config import settings
+        from app.db import get_db_session
+        from app.main import app
+        from app.models import User
+
+        # Calculate the cutoff time for being considered online
+        now = datetime.now(timezone.utc)
+        online_cutoff = now - timedelta(minutes=settings.ONLINE_TIMEOUT_MINUTES)
+
+        # If session is provided (for testing), use it directly
+        if session:
+            # Update users to online if they were active within the timeout
+            online_stmt = (
+                update(User)
+                .where(User.last_active_at >= online_cutoff)
+                .values(is_online=True)
+            )
+            await session.execute(online_stmt)
+
+            # Update users to offline if they were not active within the timeout
+            # or have no last_active_at timestamp
+            offline_stmt = (
+                update(User)
+                .where(
+                    (User.last_active_at < online_cutoff)
+                    | (User.last_active_at.is_(None))
+                )
+                .values(is_online=False)
+            )
+            await session.execute(offline_stmt)
+
+            await session.commit()
+        else:
+            # Get the actual dependency function (respects overrides in tests)
+            db_session_func = app.dependency_overrides.get(
+                get_db_session, get_db_session
+            )
+
+            # Get a database session
+            async for session in db_session_func():
+                try:
+                    # Update users to online if they were active within the timeout
+                    online_stmt = (
+                        update(User)
+                        .where(User.last_active_at >= online_cutoff)
+                        .values(is_online=True)
+                    )
+                    await session.execute(online_stmt)
+
+                    # Update users to offline if they were not active within the timeout
+                    # or have no last_active_at timestamp
+                    offline_stmt = (
+                        update(User)
+                        .where(
+                            (User.last_active_at < online_cutoff)
+                            | (User.last_active_at.is_(None))
+                        )
+                        .values(is_online=False)
+                    )
+                    await session.execute(offline_stmt)
+
+                    await session.commit()
+                    break  # Exit the async generator loop
+                except Exception as e:
+                    await session.rollback()
+                    logger.warning(
+                        f"Database error updating all users online status: {e}"
+                    )
+                    raise
+
+    except Exception as e:
+        logger.warning(f"Failed to update all users online status: {e}")
+        raise

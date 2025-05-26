@@ -11,6 +11,9 @@ class Settings(BaseSettings):
     DATABASE_URL: str
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
+    ONLINE_TIMEOUT_MINUTES: int = (
+        10  # Users are considered online if active within this many minutes
+    )
 
     model_config = ConfigDict(env_file=".env")
 
