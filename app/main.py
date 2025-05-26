@@ -2,11 +2,15 @@ from fastapi import FastAPI
 
 from app.api.routes import auth_routes
 from app.auth_config import auth_backend, fastapi_users
+from app.middleware.presence import PresenceMiddleware
 from app.schemas.user import UserRead, UserUpdate
 
 from .api.routes import auth_pages, conversations, me, participants, users
 
 app = FastAPI(title="AIM again")
+
+# Add presence middleware
+app.add_middleware(PresenceMiddleware)
 
 
 @app.get("/")

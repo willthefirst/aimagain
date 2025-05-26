@@ -2,7 +2,7 @@ import uuid
 
 import sqlalchemy
 from fastapi_users.db import SQLAlchemyBaseUserTable
-from sqlalchemy import Boolean, Column, Text
+from sqlalchemy import Boolean, Column, DateTime, Text
 from sqlalchemy.orm import relationship
 
 from .base import BaseModel
@@ -20,6 +20,7 @@ class User(SQLAlchemyBaseUserTable[uuid.UUID], BaseModel):
     is_online = Column(
         Boolean, nullable=False, server_default=sqlalchemy.sql.expression.false()
     )
+    last_active_at = Column(DateTime(timezone=True), nullable=True)
 
     created_conversations = relationship(
         "Conversation",
