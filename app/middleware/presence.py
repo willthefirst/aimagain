@@ -11,17 +11,6 @@ from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
-# Global test session factory for testing
-_test_session_factory: Optional[Callable[[], AsyncGenerator[AsyncSession, None]]] = None
-
-
-def set_test_session_factory(
-    factory: Optional[Callable[[], AsyncGenerator[AsyncSession, None]]],
-):
-    """Set a test session factory for testing purposes"""
-    global _test_session_factory
-    _test_session_factory = factory
-
 
 class PresenceMiddleware(BaseHTTPMiddleware):
     """Updates user last_active_at and is_online for all successful authenticated requests"""
@@ -29,9 +18,7 @@ class PresenceMiddleware(BaseHTTPMiddleware):
     def __init__(
         self,
         app,
-        session_factory: Optional[
-            Callable[[], AsyncGenerator[AsyncSession, None]]
-        ] = None,
+        session_factory: Callable[[], AsyncGenerator[AsyncSession, None]],
     ):
         super().__init__(app)
         self.session_factory = session_factory
@@ -55,7 +42,7 @@ class PresenceMiddleware(BaseHTTPMiddleware):
                 return
 
             # Get presence service and update presence
-            await self._do_presence_update(user_id)
+            await self._do_presence_update(user_id, request)
 
         except Exception as e:
             # Never let presence updates break the main request
@@ -96,20 +83,25 @@ class PresenceMiddleware(BaseHTTPMiddleware):
             logger.debug(f"Could not extract user ID from request: {e}")
             return None
 
-    async def _do_presence_update(self, user_id: str):
+    async def _do_presence_update(self, user_id: str, request: Request):
         """Update presence using the service"""
         try:
             # Convert string user_id to UUID
             user_uuid = uuid.UUID(user_id)
 
-            # Get database session
-            session_factory = _test_session_factory or self.session_factory
-            if not session_factory:
-                # Fall back to default session factory
+            # Get the appropriate session factory
+            # Check if there are dependency overrides (for testing)
+            session_factory = self.session_factory
+            if hasattr(request.app, "dependency_overrides"):
                 from app.db import get_db_session
 
-                session_factory = get_db_session
+                overridden_factory = request.app.dependency_overrides.get(
+                    get_db_session
+                )
+                if overridden_factory:
+                    session_factory = overridden_factory
 
+            # Get database session using the session factory
             async for session in session_factory():
                 try:
                     # Create repository and service
@@ -129,13 +121,6 @@ class PresenceMiddleware(BaseHTTPMiddleware):
         except Exception as e:
             logger.warning(f"Failed to update presence for user {user_id}: {e}")
             # Don't re-raise - we don't want to break the main request
-
-
-# Helper function for testing
-async def update_user_presence(user_id: str):
-    """Helper function to update user presence - used for testing"""
-    middleware = PresenceMiddleware(None)
-    await middleware._do_presence_update(user_id)
 
 
 async def update_all_users_online_status(session=None):

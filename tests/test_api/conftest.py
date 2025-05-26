@@ -70,11 +70,6 @@ def test_app(
     app.dependency_overrides[get_db_session] = override_get_db_session
     app.dependency_overrides[get_user_db] = override_get_user_db
 
-    # Set the test session factory for the presence middleware
-    from app.middleware.presence import set_test_session_factory
-
-    set_test_session_factory(override_get_db_session)
-
     # Add the app instance to Jinja globals so url_for can find it
     original_app_global = templates.env.globals.get("app")
     templates.env.globals["app"] = app
@@ -82,8 +77,6 @@ def test_app(
     yield app
     # Clean up overrides after test function finishes
     app.dependency_overrides.clear()
-    # Clear the test session factory
-    set_test_session_factory(None)
     # Restore or remove the global modification
     if original_app_global is not None:
         templates.env.globals["app"] = original_app_global

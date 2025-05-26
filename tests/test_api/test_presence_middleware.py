@@ -71,7 +71,7 @@ async def test_middleware_handles_database_errors_gracefully(
 ):
     """Test middleware doesn't break app if presence update fails"""
     with patch(
-        "app.middleware.presence.update_user_presence",
+        "app.middleware.presence.PresenceMiddleware._do_presence_update",
         side_effect=Exception("DB Error"),
     ):
         # Request should still succeed even if presence update fails
