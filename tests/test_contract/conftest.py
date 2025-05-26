@@ -60,6 +60,7 @@ def provider_states_handler(state_info: dict = Body(...)):
     known_states = [
         "User test.user@example.com does not exist",
         PROVIDER_STATE_USER_ONLINE,
+        "user has pending invitations",
     ]
 
     if state in known_states:
