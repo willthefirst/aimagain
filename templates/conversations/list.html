@@ -1,43 +1,37 @@
-<!DOCTYPE html>
-<html>
-  <head>
-    <title>Public Conversations</title>
-  </head>
-  <body>
-    <h1>Public Conversations</h1>
+{% extends "base.html" %} {% block title %}Public Conversations{% endblock %} {%
+block content %}
+<h1>Public Conversations</h1>
 
-    <p>
-      <a href="{{ url_for('get_new_conversation_form') }}"
-        >Create New Conversation</a
-      >
-    </p>
+<p>
+  <a href="{{ url_for('get_new_conversation_form') }}"
+    >Create New Conversation</a
+  >
+</p>
 
-    {% if conversations %}
-    <ul>
-      {# Now looping through Conversation ORM objects #} {% for convo in
-      conversations %}
-      <li>
-        <strong>Slug:</strong> {{ convo.slug }} {% if convo.name %}
-        <br /><strong>Name:</strong> {{ convo.name }} {% endif %} <br /><strong
-          >Participants:</strong
-        >
-        {% set joined_participants = [] %} {% for p in convo.participants if
-        p.status == 'joined' and p.user %} {% set _ =
-        joined_participants.append(p.user.username) %} {% endfor %} {% if
-        joined_participants %} {{ joined_participants | join(', ') }} {% else %}
-        (None joined yet) {% endif %}
-        <br /><strong>Last Activity:</strong> {{ convo.last_activity_at |
-        default('N/A') }}
-      </li>
-      <br />
-      {% endfor %}
-    </ul>
-    {% else %}
-    <p>No conversations found.</p>
-    {% endif %}
+{% if conversations %}
+<ul>
+  {# Now looping through Conversation ORM objects #} {% for convo in
+  conversations %}
+  <li>
+    <strong>Slug:</strong> {{ convo.slug }} {% if convo.name %} <br /><strong
+      >Name:</strong
+    >
+    {{ convo.name }} {% endif %} <br /><strong>Participants:</strong>
+    {% set joined_participants = [] %} {% for p in convo.participants if
+    p.status == 'joined' and p.user %} {% set _ =
+    joined_participants.append(p.user.username) %} {% endfor %} {% if
+    joined_participants %} {{ joined_participants | join(', ') }} {% else %}
+    (None joined yet) {% endif %}
+    <br /><strong>Last Activity:</strong> {{ convo.last_activity_at |
+    default('N/A') }}
+  </li>
+  <br />
+  {% endfor %}
+</ul>
+{% else %}
+<p>No conversations found.</p>
+{% endif %}
 
-    <hr />
-    {# TODO: Add refresh link using url_for #} {# TODO: Link to create
-    conversation #}
-  </body>
-</html>
+<hr />
+{# TODO: Add refresh link using url_for #} {# TODO: Link to create conversation
+#} {% endblock %}

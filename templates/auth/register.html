@@ -1,33 +1,18 @@
-<!DOCTYPE html>
-<html>
-  <head>
-    <title>Register</title>
-    <script
-      src="https://unpkg.com/htmx.org@2.0.4"
-      integrity="sha384-HGfztofotfshcF7+8n44JQL2oJmowVChPTg48S+jvZoztPfvwD79OC/LTtG6dMp+"
-      crossorigin="anonymous"></script>
-
-    <script src="https://unpkg.com/htmx.org/dist/ext/json-enc.js"></script>
-  </head>
-  <body>
-    <h1>Register</h1>
-    <form hx-post="/auth/register" hx-ext="json-enc">
-      <label for="email">Email:</label><br />
-      <input type="email" id="email" name="email" required /><br />
-      <label for="username">Username:</label><br />
-      <input type="text" id="username" name="username" required /><br />
-      <label for="password">Password:</label><br />
-      <input
-        type="password"
-        id="password"
-        name="password"
-        required /><br /><br />
-      <input type="submit" value="Register" />
-    </form>
-    <hr />
-    <p>
-      Already have an account?
-      <a href="{{ url_for('auth_pages:login') }}">Login here</a>
-    </p>
-  </body>
-</html>
+{% extends "base.html" %} {% block title %}Register{% endblock %} {% block
+content %}
+<h1>Register</h1>
+<form hx-post="/auth/register" hx-ext="json-enc">
+  <label for="email">Email:</label><br />
+  <input type="email" id="email" name="email" required /><br />
+  <label for="username">Username:</label><br />
+  <input type="text" id="username" name="username" required /><br />
+  <label for="password">Password:</label><br />
+  <input type="password" id="password" name="password" required /><br /><br />
+  <input type="submit" value="Register" />
+</form>
+<hr />
+<p>
+  Already have an account?
+  <a href="{{ url_for('auth_pages:login') }}">Login here</a>
+</p>
+{% endblock %}

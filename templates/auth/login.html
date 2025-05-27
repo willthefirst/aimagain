@@ -1,31 +1,22 @@
-<!DOCTYPE html>
-<html>
-  <head>
-    <title>Login</title>
-  </head>
-  <body>
-    <h1>Login</h1>
-    <!-- Assuming the POST action is the default FastAPI Users JWT login endpoint -->
-    <!-- Note: FastAPI Users login expects 'username' (which is email) and 'password' as form data -->
-    <form method="post" action="/auth/jwt/login">
-      <label for="username">Email (as username):</label><br />
-      <input type="email" id="username" name="username" required /><br />
-      <label for="password">Password:</label><br />
-      <input
-        type="password"
-        id="password"
-        name="password"
-        required /><br /><br />
-      <input type="submit" value="Login" />
-    </form>
-    <hr />
-    <p>
-      Forgot your password?
-      <a href="{{ url_for('auth_pages:forgot_password') }}">Reset here</a>
-    </p>
-    <p>
-      Need an account?
-      <a href="{{ url_for('auth_pages:register') }}">Register here</a>
-    </p>
-  </body>
-</html>
+{% extends "base.html" %} {% block title %}Login{% endblock %} {% block content
+%}
+<h1>Login</h1>
+<!-- Assuming the POST action is the default FastAPI Users JWT login endpoint -->
+<!-- Note: FastAPI Users login expects 'username' (which is email) and 'password' as form data -->
+<form method="post" action="/auth/jwt/login">
+  <label for="username">Email (as username):</label><br />
+  <input type="email" id="username" name="username" required /><br />
+  <label for="password">Password:</label><br />
+  <input type="password" id="password" name="password" required /><br /><br />
+  <input type="submit" value="Login" />
+</form>
+<hr />
+<p>
+  Forgot your password?
+  <a href="{{ url_for('auth_pages:forgot_password') }}">Reset here</a>
+</p>
+<p>
+  Need an account?
+  <a href="{{ url_for('auth_pages:register') }}">Register here</a>
+</p>
+{% endblock %}
