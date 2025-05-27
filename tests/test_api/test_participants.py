@@ -70,11 +70,9 @@ async def test_accept_invitation_success(
 
     assert invitation_id
 
-    request_data = ParticipantUpdateRequest(status=ParticipantStatus.JOINED)
-
-    # Simulate PUT request
+    # Simulate PUT request with form data
     response = await authenticated_client.put(
-        f"/participants/{str(invitation_id)}", json=request_data.model_dump()
+        f"/participants/{str(invitation_id)}", data={"status": "joined"}
     )
 
     assert (
@@ -134,10 +132,8 @@ async def test_reject_invitation_success(
 
     assert invitation_id
 
-    request_data = ParticipantUpdateRequest(status=ParticipantStatus.REJECTED)
-
     response = await authenticated_client.put(
-        f"/participants/{str(invitation_id)}", json=request_data.model_dump()
+        f"/participants/{str(invitation_id)}", data={"status": "rejected"}
     )
 
     assert response.status_code == 200
@@ -195,10 +191,8 @@ async def test_update_participant_not_owned(
 
     assert participant_id
 
-    request_data = ParticipantUpdateRequest(status=ParticipantStatus.JOINED)
-
     response = await authenticated_client.put(
-        f"/participants/{str(participant_id)}", json=request_data.model_dump()
+        f"/participants/{str(participant_id)}", data={"status": "joined"}
     )
 
     assert response.status_code == 403, f"Expected 403, got {response.status_code}"
@@ -242,10 +236,8 @@ async def test_update_participant_invalid_current_status(
 
     assert participant_id
 
-    request_data = ParticipantUpdateRequest(status=ParticipantStatus.REJECTED)
-
     response = await authenticated_client.put(
-        f"/participants/{str(participant_id)}", json=request_data.model_dump()
+        f"/participants/{str(participant_id)}", data={"status": "rejected"}
     )
 
     assert response.status_code == 400, f"Expected 400, got {response.status_code}"
@@ -292,17 +284,16 @@ async def test_update_participant_invalid_target_status(
 
     assert invitation_id
 
-    # Attempt to set an invalid status
+    # Attempt to set an invalid status using form data
     response = await authenticated_client.put(
         f"/participants/{str(invitation_id)}",
-        json={"status": "maybe"},
+        data={"status": "maybe"},
     )
 
-    # The Pydantic model ParticipantUpdateRequest should cause a 422 error here
-    # before it even reaches the custom 400 check in the route.
+    # Our custom validation catches invalid status values and returns 400
     assert (
-        response.status_code == 422
-    ), "Expected 422 Unprocessable Entity for invalid Pydantic model input"
+        response.status_code == 400
+    ), "Expected 400 Bad Request for invalid status value"
 
 
 # Tests for rejecting invitation etc. will go here
