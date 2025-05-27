@@ -1,0 +1,6 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+When you make changes, you should run `pytest` to ensure that you haven't broken anything. When iterating, you can focus on only the relevant tests (so that you don't have to wait for all tests to pass), but before comitting, you should make sure the full test suite passes.
