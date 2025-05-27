@@ -6,9 +6,26 @@ head %}
     border: 1px solid #ccc;
     padding: 0.5em;
   }
-  form {
+  .invitation-button {
     display: inline;
     margin-left: 1em;
+    padding: 0.5em 1em;
+    border: 1px solid #ccc;
+    background-color: #f9f9f9;
+    cursor: pointer;
+  }
+  .invitation-button:hover {
+    background-color: #e9e9e9;
+  }
+  .accept-button {
+    background-color: #d4edda;
+    border-color: #c3e6cb;
+    color: #155724;
+  }
+  .reject-button {
+    background-color: #f8d7da;
+    border-color: #f5c6cb;
+    color: #721c24;
   }
 </style>
 {% endblock %} {% block content %}
@@ -26,24 +43,26 @@ head %}
     'Unknown Conversation' }}<br />
     {% if inv.initial_message %} Message Preview:
     <em>{{ inv.initial_message.content }}</em><br />
-    {% endif %} {# Forms for Accept/Reject - Target PUT /participants/{id} #}
-    <form
-      method="POST"
-      action="/participants/{{ inv.id }}?_method=PUT"
-      style="display: inline">
-      {# Note: Using query param _method=PUT for standard HTML form
-      compatibility #} {# Alternatively, use JavaScript for a proper PUT request
-      #}
-      <input type="hidden" name="status" value="joined" />
-      <button type="submit">Accept</button>
-    </form>
-    <form
-      method="POST"
-      action="/participants/{{ inv.id }}?_method=PUT"
-      style="display: inline">
-      <input type="hidden" name="status" value="rejected" />
-      <button type="submit">Reject</button>
-    </form>
+    {% endif %}
+
+    <button
+      class="invitation-button accept-button"
+      hx-put="/participants/{{ inv.id }}"
+      hx-vals='{"status": "joined"}'
+      hx-confirm="Are you sure you want to accept this invitation?"
+      hx-target="body"
+      hx-swap="outerHTML">
+      Accept
+    </button>
+    <button
+      class="invitation-button reject-button"
+      hx-put="/participants/{{ inv.id }}"
+      hx-vals='{"status": "rejected"}'
+      hx-confirm="Are you sure you want to reject this invitation?"
+      hx-target="body"
+      hx-swap="outerHTML">
+      Reject
+    </button>
   </li>
   {% endfor %}
 </ul>

@@ -113,11 +113,21 @@ async def test_list_my_invitations_one_invitation(
     assert conversation_slug in item_text, "Conversation slug not found"
     assert initial_message_content in item_text, "Initial message preview not found"
 
-    form_node = invitation_items[0].css_first("form")
-    assert form_node is not None, "Form for accept/reject not found"
-    assert str(my_invitation_id) in form_node.attributes.get(
-        "action", ""
-    ), "Participant ID not found in form action"
+    # Check for HTMX buttons instead of forms
+    accept_button = invitation_items[0].css_first("button.accept-button")
+    reject_button = invitation_items[0].css_first("button.reject-button")
+    assert accept_button is not None, "Accept button not found"
+    assert reject_button is not None, "Reject button not found"
+
+    # Check that the buttons have the correct HTMX attributes pointing to the participant ID
+    accept_hx_put = accept_button.attributes.get("hx-put", "")
+    reject_hx_put = reject_button.attributes.get("hx-put", "")
+    assert (
+        str(my_invitation_id) in accept_hx_put
+    ), "Participant ID not found in accept button hx-put"
+    assert (
+        str(my_invitation_id) in reject_hx_put
+    ), "Participant ID not found in reject button hx-put"
 
     assert "You have no pending invitations" not in tree.body.text()
 

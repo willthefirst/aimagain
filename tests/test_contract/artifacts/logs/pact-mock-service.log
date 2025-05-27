@@ -1,13 +1,13 @@
-I, [2025-05-26T17:53:15.799626 #48462]  INFO -- : Cleared interactions
-I, [2025-05-26T17:53:15.801821 #48462]  INFO -- : Registered expected interaction PUT /participants/550e8400-e29b-41d4-a716-446655440000
-D, [2025-05-26T17:53:15.801912 #48462] DEBUG -- : {
+I, [2025-05-26T18:14:05.419001 #53008]  INFO -- : Cleared interactions
+I, [2025-05-26T18:14:05.422025 #53008]  INFO -- : Registered expected interaction PUT /participants/550e8400-e29b-41d4-a716-446655440000
+D, [2025-05-26T18:14:05.422160 #53008] DEBUG -- : {
   "description": "a request to reject an invitation",
   "providerState": "user has pending invitations",
   "request": {
     "method": "PUT",
     "path": "/participants/550e8400-e29b-41d4-a716-446655440000",
     "headers": {
-      "Content-Type": "application/json"
+      "Content-Type": "application/x-www-form-urlencoded"
     },
     "body": {
       "status": "rejected"
@@ -32,14 +32,53 @@ D, [2025-05-26T17:53:15.801912 #48462] DEBUG -- : {
   },
   "metadata": null
 }
-W, [2025-05-26T17:53:16.517107 #48462]  WARN -- : Verifying - actual interactions do not match expected interactions. 
-Missing requests:
-	PUT /participants/550e8400-e29b-41d4-a716-446655440000
-
-
-
-W, [2025-05-26T17:53:16.517309 #48462]  WARN -- : Missing requests:
-	PUT /participants/550e8400-e29b-41d4-a716-446655440000
-
-
-
+I, [2025-05-26T18:14:05.645758 #53008]  INFO -- : Received request PUT /participants/550e8400-e29b-41d4-a716-446655440000
+D, [2025-05-26T18:14:05.645846 #53008] DEBUG -- : {
+  "path": "/participants/550e8400-e29b-41d4-a716-446655440000",
+  "query": "",
+  "method": "put",
+  "body": "status=rejected",
+  "headers": {
+    "Content-Length": "15",
+    "Content-Type": "application/x-www-form-urlencoded",
+    "Host": "localhost:1237",
+    "Connection": "keep-alive",
+    "Pragma": "no-cache",
+    "Cache-Control": "no-cache",
+    "Accept": "*/*",
+    "Hx-Current-Url": "http://127.0.0.1:8990/users/me/invitations",
+    "Hx-Request": "true",
+    "Origin": "http://127.0.0.1:8990",
+    "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/136.0.7103.25 Safari/537.36",
+    "Sec-Ch-Ua": "\"Chromium\";v=\"136\", \"HeadlessChrome\";v=\"136\", \"Not.A/Brand\";v=\"99\"",
+    "Sec-Ch-Ua-Mobile": "?0",
+    "Sec-Ch-Ua-Platform": "\"macOS\"",
+    "Sec-Fetch-Site": "cross-site",
+    "Sec-Fetch-Mode": "cors",
+    "Sec-Fetch-Dest": "empty",
+    "Sec-Fetch-Storage-Access": "active",
+    "Referer": "http://127.0.0.1:8990/users/me/invitations",
+    "Accept-Encoding": "gzip, deflate, br, zstd",
+    "Version": "HTTP/1.1"
+  }
+}
+I, [2025-05-26T18:14:05.646026 #53008]  INFO -- : Found matching response for PUT /participants/550e8400-e29b-41d4-a716-446655440000
+D, [2025-05-26T18:14:05.646064 #53008] DEBUG -- : {
+  "status": 200,
+  "headers": {
+    "Content-Type": "application/json"
+  },
+  "body": {
+    "id": "550e8400-e29b-41d4-a716-446655440000",
+    "user_id": "550e8400-e29b-41d4-a716-446655440001",
+    "conversation_id": "550e8400-e29b-41d4-a716-446655440002",
+    "status": "rejected",
+    "invited_by_user_id": "550e8400-e29b-41d4-a716-446655440003",
+    "initial_message_id": "550e8400-e29b-41d4-a716-446655440004",
+    "created_at": "2024-01-01T00:00:00Z",
+    "updated_at": "2024-01-01T00:00:00Z",
+    "joined_at": null
+  }
+}
+I, [2025-05-26T18:14:06.152399 #53008]  INFO -- : Verifying - interactions matched
+I, [2025-05-26T18:14:06.156542 #53008]  INFO -- : Writing pact for participants-api to /Users/willmoritz/Code/aimagain/tests/test_contract/artifacts/pacts/invitation-form-participants-api.json

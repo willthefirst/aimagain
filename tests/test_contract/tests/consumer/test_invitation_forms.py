@@ -31,15 +31,14 @@ async def test_consumer_invitation_accept_method_mismatch(
     origin_with_routes: str, page: Page
 ):
     """
-    Test that reveals the method mismatch bug in invitation acceptance.
+    Test that the HTMX-based invitation acceptance works correctly.
 
-    This test demonstrates the real bug users encounter:
-    1. The template renders forms that send POST with ?_method=PUT and form data
-    2. The API expects actual PUT requests with JSON body
-    3. Without method override middleware, POST+?_method=PUT never becomes PUT
-    4. Result: 405 Method Not Allowed errors for users
+    This test verifies that:
+    1. The template renders HTMX buttons that send proper PUT requests with JSON body
+    2. The API receives the expected PUT requests with JSON body
+    3. The contract between frontend and backend is satisfied
 
-    This test SHOULD FAIL, proving the contract mismatch exists.
+    This test should now PASS, proving the contract mismatch has been fixed.
     """
     origin = origin_with_routes
 
@@ -55,7 +54,7 @@ async def test_consumer_invitation_accept_method_mismatch(
     # Set up Pact expectation for what the API actually expects
     # (PUT request with JSON body)
     expected_request_body = {"status": "joined"}
-    expected_request_headers = {"Content-Type": "application/json"}
+    expected_request_headers = {"Content-Type": "application/x-www-form-urlencoded"}
 
     (
         pact.given(PROVIDER_STATE_USER_HAS_INVITATIONS)
@@ -83,12 +82,12 @@ async def test_consumer_invitation_accept_method_mismatch(
         )
     )
 
-    # Set up Playwright to intercept the form submission and redirect to mock server
+    # Set up Playwright to intercept the HTMX request and redirect to mock server
     await setup_playwright_pact_interception(
         page=page,
         api_path_to_intercept=f"{PARTICIPANTS_API_PATH}/{MOCK_PARTICIPANT_ID}",
         mock_pact_url=mock_api_url,
-        http_method="POST",  # The form actually sends POST, not PUT
+        http_method="PUT",  # HTMX now sends proper PUT requests
     )
 
     with pact:
@@ -108,22 +107,20 @@ async def test_consumer_invitation_accept_method_mismatch(
         )
 
         # Click the Accept button from the real template
-        # This will send: POST /participants/{id}?_method=PUT with form data
-        accept_button = (
-            page.locator("form")
-            .filter(has=page.locator("input[value='joined']"))
-            .locator("button:has-text('Accept')")
-        )
+        # This will send: PUT /participants/{id} with JSON body via HTMX
+        accept_button = page.locator("button.accept-button:has-text('Accept')")
+
+        # Handle the confirmation dialog
+        page.on("dialog", lambda dialog: dialog.accept())
         await accept_button.click()
 
         # Wait for the network request
         await page.wait_for_timeout(NETWORK_TIMEOUT_MS)
 
-    # TEST FAILURE EXPECTED HERE:
-    # - Real template sends: POST /participants/{id}?_method=PUT with form data
+    # TEST SUCCESS EXPECTED HERE:
+    # - HTMX template sends: PUT /participants/{id} with JSON body
     # - Pact expects: PUT /participants/{id} with JSON body
-    # - No method override middleware converts POST+_method=PUT → PUT
-    # - Result: Missing PUT request, revealing the 405 Method Not Allowed bug
+    # - Contract is satisfied, proving the method mismatch bug has been fixed
 
 
 @pytest.mark.parametrize(
@@ -138,7 +135,7 @@ async def test_consumer_invitation_reject_method_mismatch(
     origin_with_routes: str, page: Page
 ):
     """
-    Test that reveals the method mismatch bug in invitation rejection.
+    Test that the HTMX-based invitation rejection works correctly.
     Similar to accept test but for the reject flow.
     """
     origin = origin_with_routes
@@ -154,7 +151,7 @@ async def test_consumer_invitation_reject_method_mismatch(
 
     # Set up Pact expectation for rejection
     expected_request_body = {"status": "rejected"}
-    expected_request_headers = {"Content-Type": "application/json"}
+    expected_request_headers = {"Content-Type": "application/x-www-form-urlencoded"}
 
     (
         pact.given(PROVIDER_STATE_USER_HAS_INVITATIONS)
@@ -186,7 +183,7 @@ async def test_consumer_invitation_reject_method_mismatch(
         page=page,
         api_path_to_intercept=f"{PARTICIPANTS_API_PATH}/{MOCK_PARTICIPANT_ID}",
         mock_pact_url=mock_api_url,
-        http_method="POST",
+        http_method="PUT",  # HTMX now sends proper PUT requests
     )
 
     with pact:
@@ -194,11 +191,10 @@ async def test_consumer_invitation_reject_method_mismatch(
         await page.wait_for_selector("h1:has-text('My Pending Invitations')")
 
         # Click the Reject button from the real template
-        reject_button = (
-            page.locator("form")
-            .filter(has=page.locator("input[value='rejected']"))
-            .locator("button:has-text('Reject')")
-        )
+        reject_button = page.locator("button.reject-button:has-text('Reject')")
+
+        # Handle the confirmation dialog
+        page.on("dialog", lambda dialog: dialog.accept())
         await reject_button.click()
 
         await page.wait_for_timeout(NETWORK_TIMEOUT_MS)
