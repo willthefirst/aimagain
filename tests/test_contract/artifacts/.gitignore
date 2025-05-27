@@ -1,0 +1,14 @@
+# Test artifacts
+artifacts/pacts/*.json
+artifacts/logs/*.log
+artifacts/reports/*
+!artifacts/pacts/.gitkeep
+!artifacts/logs/.gitkeep
+!artifacts/reports/.gitkeep
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python

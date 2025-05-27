@@ -4,8 +4,12 @@ import os
 from pact import Consumer, Provider
 from playwright.async_api import Page, Route
 
-PACT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "pacts"))
-PACT_LOG_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "log"))
+PACT_DIR = os.path.abspath(
+    os.path.join(os.path.dirname(__file__), "..", "..", "artifacts", "pacts")
+)
+PACT_LOG_DIR = os.path.abspath(
+    os.path.join(os.path.dirname(__file__), "..", "..", "artifacts", "logs")
+)
 
 
 def setup_pact(consumer_name: str, provider_name: str, port: int) -> Consumer:

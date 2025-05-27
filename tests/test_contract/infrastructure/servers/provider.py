@@ -15,12 +15,12 @@ from app.db import get_db_session, get_user_db
 from app.main import app
 from app.models import User, metadata
 
-from .mock_utilities import (
+from ..utilities.mocks import (
     MockAuthManager,
     apply_patches_via_monkeypatch,
     create_mock_user,
 )
-from .server_management import ServerManager, setup_health_check_route
+from .base import ServerManager, setup_health_check_route
 
 TEST_DATABASE_URL = "sqlite+aiosqlite:///:memory:"
 

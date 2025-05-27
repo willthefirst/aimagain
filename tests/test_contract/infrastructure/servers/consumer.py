@@ -12,8 +12,12 @@ from app.auth_config import current_active_user
 from app.models import Conversation, Message, Participant, User
 from app.schemas.participant import ParticipantStatus
 
-from .mock_utilities import MockAuthManager, apply_patches_via_import, create_mock_user
-from .server_management import ServerManager, setup_health_check_route
+from ..utilities.mocks import (
+    MockAuthManager,
+    apply_patches_via_import,
+    create_mock_user,
+)
+from .base import ServerManager, setup_health_check_route
 
 
 class ConsumerServerConfig:

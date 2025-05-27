@@ -6,7 +6,7 @@ from yarl import URL
 
 # Pact configuration
 PACT_LOG_LEVEL = "warning"
-PACT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "pacts"))
+PACT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "artifacts", "pacts"))
 
 # Provider server configuration
 PROVIDER_HOST = "127.0.0.1"
@@ -31,3 +31,5 @@ KNOWN_PROVIDER_STATES = [
     "user has pending invitations",
     # Add more states as needed
 ]
+
+PACT_LOG_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "artifacts", "logs"))

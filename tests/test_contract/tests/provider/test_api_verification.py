@@ -9,8 +9,8 @@ from yarl import URL
 
 from app.models.conversation import Conversation
 from app.schemas.user import UserRead
-from tests.test_contract.config import PROVIDER_STATE_SETUP_FULL_URL
-from tests.test_contract.test_helpers import PACT_DIR, PACT_LOG_DIR
+from tests.test_contract.infrastructure.config import PROVIDER_STATE_SETUP_FULL_URL
+from tests.test_contract.tests.shared.helpers import PACT_DIR, PACT_LOG_DIR
 
 log = logging.getLogger(__name__)
 
@@ -148,6 +148,8 @@ def _verify_pact_and_handle_result(success: int, logs_dict: dict, pact_name: str
 
 
 @AUTH_API_PROVIDER_DECORATOR
+@pytest.mark.provider
+@pytest.mark.auth
 def test_provider_auth_api_pact_verification(
     provider_server: URL,
 ):
@@ -171,6 +173,8 @@ def test_provider_auth_api_pact_verification(
 
 
 @CONVERSATIONS_API_PROVIDER_DECORATOR
+@pytest.mark.provider
+@pytest.mark.conversations
 def test_provider_conversations_api_pact_verification(
     provider_server: URL,
 ):

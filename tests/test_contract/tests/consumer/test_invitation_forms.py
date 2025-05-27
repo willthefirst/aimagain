@@ -2,21 +2,21 @@
 import pytest
 from playwright.async_api import Page
 
-from tests.test_contract.test_helpers import (
+from tests.test_contract.constants import (
+    CONSUMER_NAME_INVITATION,
+    INVITATIONS_PATH,
+    MOCK_PARTICIPANT_ID,
+    NETWORK_TIMEOUT_MS,
+    PACT_PORT_INVITATION_ACCEPT,
+    PACT_PORT_INVITATION_REJECT,
+    PARTICIPANTS_API_PATH,
+    PROVIDER_NAME_PARTICIPANTS,
+    PROVIDER_STATE_USER_HAS_INVITATIONS,
+)
+from tests.test_contract.tests.shared.helpers import (
     setup_pact,
     setup_playwright_pact_interception,
 )
-
-CONSUMER_NAME = "invitation-form"
-PROVIDER_NAME = "participants-api"
-
-# Test Constants
-INVITATIONS_PATH = "/users/me/invitations"
-PARTICIPANTS_API_PATH = "/participants"
-MOCK_PARTICIPANT_ID = "550e8400-e29b-41d4-a716-446655440000"
-PROVIDER_STATE_USER_HAS_INVITATIONS = "user has pending invitations"
-
-NETWORK_TIMEOUT_MS = 500
 
 
 @pytest.mark.parametrize(
@@ -25,6 +25,8 @@ NETWORK_TIMEOUT_MS = 500
     indirect=True,
 )
 @pytest.mark.asyncio(loop_scope="session")
+@pytest.mark.consumer
+@pytest.mark.invitations
 async def test_consumer_invitation_accept_method_mismatch(
     origin_with_routes: str, page: Page
 ):
@@ -41,7 +43,11 @@ async def test_consumer_invitation_accept_method_mismatch(
     """
     origin = origin_with_routes
 
-    pact = setup_pact(CONSUMER_NAME, PROVIDER_NAME, port=1236)
+    pact = setup_pact(
+        CONSUMER_NAME_INVITATION,
+        PROVIDER_NAME_PARTICIPANTS,
+        port=PACT_PORT_INVITATION_ACCEPT,
+    )
     mock_server_uri = pact.uri
     invitations_url = f"{origin}{INVITATIONS_PATH}"
     mock_api_url = f"{mock_server_uri}{PARTICIPANTS_API_PATH}/{MOCK_PARTICIPANT_ID}"
@@ -126,6 +132,8 @@ async def test_consumer_invitation_accept_method_mismatch(
     indirect=True,
 )
 @pytest.mark.asyncio(loop_scope="session")
+@pytest.mark.consumer
+@pytest.mark.invitations
 async def test_consumer_invitation_reject_method_mismatch(
     origin_with_routes: str, page: Page
 ):
@@ -135,7 +143,11 @@ async def test_consumer_invitation_reject_method_mismatch(
     """
     origin = origin_with_routes
 
-    pact = setup_pact(CONSUMER_NAME, PROVIDER_NAME, port=1237)
+    pact = setup_pact(
+        CONSUMER_NAME_INVITATION,
+        PROVIDER_NAME_PARTICIPANTS,
+        port=PACT_PORT_INVITATION_REJECT,
+    )
     mock_server_uri = pact.uri
     invitations_url = f"{origin}{INVITATIONS_PATH}"
     mock_api_url = f"{mock_server_uri}{PARTICIPANTS_API_PATH}/{MOCK_PARTICIPANT_ID}"

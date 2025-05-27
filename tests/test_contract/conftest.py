@@ -8,11 +8,11 @@ import pytest
 from playwright.async_api import async_playwright
 from yarl import URL
 
-from tests.test_contract.test_consumer_conversation_form import (
+from tests.test_contract.tests.consumer.test_conversation_forms import (
     PROVIDER_STATE_USER_ONLINE,
 )
 
-from .config import (
+from .infrastructure.config import (
     CONSUMER_BASE_URL,
     CONSUMER_HOST,
     CONSUMER_PORT,
@@ -23,8 +23,8 @@ from .config import (
     PROVIDER_PORT,
     PROVIDER_STATE_SETUP_ENDPOINT_PATH,
 )
-from .consumer_server import ConsumerServerConfig, ConsumerServerManager
-from .provider_server import ProviderServerManager, ProviderStateHandler
+from .infrastructure.servers.consumer import ConsumerServerConfig, ConsumerServerManager
+from .infrastructure.servers.provider import ProviderServerManager, ProviderStateHandler
 
 # Add dynamic provider states
 KNOWN_PROVIDER_STATES.append(PROVIDER_STATE_USER_ONLINE)

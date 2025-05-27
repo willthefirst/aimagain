@@ -1,0 +1,22 @@
+# Test artifacts - generated files that shouldn't be committed
+pacts/*.json
+log/*.log
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Keep directory structure but ignore contents
+!pacts/.gitkeep
+!log/.gitkeep
+
+# Pytest cache
+.pytest_cache/
+
+# Coverage reports
+htmlcov/
+.coverage
+coverage.xml
+
+# Test reports
+reports/ 

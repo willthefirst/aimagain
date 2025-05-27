@@ -7,17 +7,18 @@ from tests.shared_test_data import (
     TEST_INVITEE_USERNAME,
     get_form_encoded_creation_data,
 )
-from tests.test_contract.test_helpers import (
+from tests.test_contract.constants import (
+    CONSUMER_NAME_CONVERSATION,
+    NETWORK_TIMEOUT_MS,
+    PACT_PORT_CONVERSATION,
+    PROVIDER_NAME_CONVERSATIONS,
+)
+from tests.test_contract.tests.shared.helpers import (
     setup_pact,
     setup_playwright_pact_interception,
 )
 
-CONSUMER_NAME = "create-conversation-form"
-PROVIDER_NAME = "conversations-api"
-
 # Test Constants
-# TEST_INVITEE_USERNAME = "testuser2" # Will be replaced by shared data
-# TEST_MESSAGE = "Hello there!" # Will be replaced by shared data
 CONVERSATIONS_NEW_PATH = "/conversations/new"
 CONVERSATIONS_CREATE_PATH = "/conversations"
 MOCK_CONVERSATION_SLUG = "mock-slug"
@@ -26,13 +27,13 @@ PROVIDER_STATE_USER_ONLINE = (
     f"user is authenticated and target user exists and is online"
 )
 
-NETWORK_TIMEOUT_MS = 500
-
 
 @pytest.mark.parametrize(
     "origin_with_routes", [{"conversations": True, "auth_pages": True}], indirect=True
 )
 @pytest.mark.asyncio(loop_scope="session")
+@pytest.mark.consumer
+@pytest.mark.conversations
 async def test_consumer_conversation_create_success(
     origin_with_routes: str, page: Page
 ):
@@ -42,7 +43,11 @@ async def test_consumer_conversation_create_success(
     """
     origin = origin_with_routes
 
-    pact = setup_pact(CONSUMER_NAME, PROVIDER_NAME, port=1235)
+    pact = setup_pact(
+        CONSUMER_NAME_CONVERSATION,
+        PROVIDER_NAME_CONVERSATIONS,
+        port=PACT_PORT_CONVERSATION,
+    )
     mock_server_uri = pact.uri
     new_conversation_url = f"{origin}{CONVERSATIONS_NEW_PATH}"
     f"{origin}{CONVERSATIONS_CREATE_PATH}"

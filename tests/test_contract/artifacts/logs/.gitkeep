@@ -1,0 +1,2 @@
+# This file ensures the log directory is preserved in git
+# Test execution logs will be placed here during test runs 
