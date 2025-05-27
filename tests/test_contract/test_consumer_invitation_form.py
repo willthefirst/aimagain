@@ -90,6 +90,10 @@ async def test_consumer_invitation_accept_method_mismatch(
         await page.goto(invitations_url)
         await page.wait_for_selector("h1:has-text('My Pending Invitations')")
 
+        # Debug: Check what's actually rendered
+        page_content = await page.content()
+        print(f"DEBUG: Page content:\n{page_content}")
+
         # Verify our mock invitation data appears in the real template
         await page.wait_for_selector("strong:has-text('test_inviter')")
         await page.wait_for_selector("text=test-conversation-slug")

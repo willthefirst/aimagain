@@ -102,6 +102,52 @@ def _poll_server_ready(url: str, retries: int = 10, delay: float = 0.5) -> bool:
     return False
 
 
+def _apply_consumer_patches(override_config: Dict[str, Dict], log: logging.Logger):
+    """Applies patches for consumer server based on override_config."""
+    import uuid
+    from unittest.mock import AsyncMock
+
+    if not override_config:
+        return
+
+    for patch_target_path, mock_config in override_config.items():
+        try:
+            if "return_value_config" in mock_config:
+                return_data = mock_config["return_value_config"]
+                if (
+                    isinstance(return_data, dict)
+                    and "id" in return_data
+                    and isinstance(return_data["id"], str)
+                ):
+                    try:
+                        uuid_obj = uuid.UUID(return_data["id"])
+                        return_data["id"] = uuid_obj
+                    except ValueError:
+                        log.debug(
+                            f"Could not convert id '{return_data['id']}' to UUID for {patch_target_path}. Using string."
+                        )
+                        pass
+                mock_instance = AsyncMock(return_value=return_data)
+            else:
+                mock_instance = AsyncMock()
+
+            # Apply the patch by modifying the module directly
+            module_path, function_name = patch_target_path.rsplit(".", 1)
+            module = __import__(module_path, fromlist=[function_name])
+            setattr(module, function_name, mock_instance)
+
+            log.info(
+                f"Applied consumer patch for '{patch_target_path}' with mock: {mock_instance}"
+            )
+        except (ValueError, KeyError, TypeError, AttributeError) as e:
+            log.error(
+                f"Failed to setup consumer mock/patch for '{patch_target_path}': {e}"
+            )
+            raise RuntimeError(
+                f"Failed to setup consumer mock/patch for '{patch_target_path}'"
+            ) from e
+
+
 def run_consumer_server_process(
     host: str, port: int, routes_config=None, mock_auth=True
 ):
@@ -129,38 +175,10 @@ def run_consumer_server_process(
             "participants_pages": False,
         }
 
-    if routes_config.get("auth_pages", False):
-        consumer_app.include_router(auth_pages.auth_pages_api_router)
-
-    if routes_config.get("conversations", False):
-        consumer_app.include_router(conversations.conversations_router_instance)
-
-    if routes_config.get("users_pages", False):
-        consumer_app.include_router(users.users_api_router)
-
-    if routes_config.get("me_pages", False):
-        consumer_app.include_router(me.me_router_instance)
-
-    if routes_config.get("participants_pages", False):
-        consumer_app.include_router(participants.participants_router_instance)
-
-    if mock_auth:
-        print
-        log_provider.info("Adding mock auth for contract tests")
-        mock_user = _create_mock_user(
-            email="test@example.com", username="contract_test_user"
-        )
-
-        async def get_mock_current_user():
-            return mock_user
-
-        consumer_app.dependency_overrides[current_active_user] = get_mock_current_user
-
-    # Handle mock invitations if specified in routes_config
+    # Apply consumer patches BEFORE including routers
     if routes_config.get("mock_invitations", False):
         from app.models import Conversation, Message, Participant, User
         from app.schemas.participant import ParticipantStatus
-        from app.services.dependencies import get_user_service
 
         log_provider.info("Adding mock invitations for contract tests")
 
@@ -202,17 +220,42 @@ def run_consumer_server_process(
 
         mock_invitations = [mock_invitation]
 
-        class MockUserService:
-            async def get_user_invitations(self, user: User):
-                return mock_invitations
+        # Apply consumer patches using our consumer-specific mechanism
+        mock_invitations_config = {
+            "app.api.routes.me.handle_get_my_invitations": {
+                "return_value_config": mock_invitations
+            }
+        }
 
-            async def get_user_conversations(self, user: User):
-                return []
+        _apply_consumer_patches(mock_invitations_config, log_provider)
 
-        async def get_mock_user_service():
-            return MockUserService()
+    # NOW include routers after patches are applied
+    if routes_config.get("auth_pages", False):
+        consumer_app.include_router(auth_pages.auth_pages_api_router)
 
-        consumer_app.dependency_overrides[get_user_service] = get_mock_user_service
+    if routes_config.get("conversations", False):
+        consumer_app.include_router(conversations.conversations_router_instance)
+
+    if routes_config.get("users_pages", False):
+        consumer_app.include_router(users.users_api_router)
+
+    if routes_config.get("me_pages", False):
+        consumer_app.include_router(me.me_router_instance)
+
+    if routes_config.get("participants_pages", False):
+        consumer_app.include_router(participants.participants_router_instance)
+
+    if mock_auth:
+        print
+        log_provider.info("Adding mock auth for contract tests")
+        mock_user = _create_mock_user(
+            email="test@example.com", username="contract_test_user"
+        )
+
+        async def get_mock_current_user():
+            return mock_user
+
+        consumer_app.dependency_overrides[current_active_user] = get_mock_current_user
 
     uvicorn.run(consumer_app, host=host, port=port, log_level="warning")
 
