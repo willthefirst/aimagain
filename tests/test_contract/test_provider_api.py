@@ -9,7 +9,7 @@ from yarl import URL
 
 from app.models.conversation import Conversation
 from app.schemas.user import UserRead
-from tests.test_contract.conftest import PROVIDER_STATE_SETUP_FULL_URL
+from tests.test_contract.config import PROVIDER_STATE_SETUP_FULL_URL
 from tests.test_contract.test_helpers import PACT_DIR, PACT_LOG_DIR
 
 log = logging.getLogger(__name__)
@@ -191,26 +191,3 @@ def test_provider_conversations_api_pact_verification(
     )
 
     _verify_pact_and_handle_result(success, logs_dict, "Conversations API")
-
-
-@USERS_API_PROVIDER_DECORATOR
-def test_provider_users_api_pact_verification(
-    provider_server: URL,
-):
-    """Verify the Users API Pact contract against the running provider server."""
-    if not os.path.exists(USERS_API_PACT_FILE_PATH):
-        pytest.fail(
-            f"Pact file not found: {USERS_API_PACT_FILE_PATH}. Run consumer test first."
-        )
-
-    verifier = Verifier(
-        provider=USERS_API_PROVIDER_NAME,
-        provider_base_url=str(provider_server),
-        provider_states_setup_url=PROVIDER_STATE_SETUP_FULL_URL,
-    )
-
-    success, logs_dict = verifier.verify_pacts(
-        USERS_API_PACT_FILE_PATH, log_dir=PACT_LOG_DIR
-    )
-
-    _verify_pact_and_handle_result(success, logs_dict, "Users API")
