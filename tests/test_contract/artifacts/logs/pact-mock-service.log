@@ -1,6 +1,6 @@
-I, [2025-05-26T18:28:04.908600 #55893]  INFO -- : Cleared interactions
-I, [2025-05-26T18:28:04.911461 #55893]  INFO -- : Registered expected interaction PUT /participants/550e8400-e29b-41d4-a716-446655440000
-D, [2025-05-26T18:28:04.911590 #55893] DEBUG -- : {
+I, [2025-05-26T18:35:12.274321 #58182]  INFO -- : Cleared interactions
+I, [2025-05-26T18:35:12.277316 #58182]  INFO -- : Registered expected interaction PUT /participants/550e8400-e29b-41d4-a716-446655440000
+D, [2025-05-26T18:35:12.277464 #58182] DEBUG -- : {
   "description": "a request to reject an invitation",
   "providerState": "user has pending invitations",
   "request": {
@@ -32,8 +32,8 @@ D, [2025-05-26T18:28:04.911590 #55893] DEBUG -- : {
   },
   "metadata": null
 }
-I, [2025-05-26T18:28:05.110859 #55893]  INFO -- : Received request PUT /participants/550e8400-e29b-41d4-a716-446655440000
-D, [2025-05-26T18:28:05.110972 #55893] DEBUG -- : {
+I, [2025-05-26T18:35:12.467773 #58182]  INFO -- : Received request PUT /participants/550e8400-e29b-41d4-a716-446655440000
+D, [2025-05-26T18:35:12.467849 #58182] DEBUG -- : {
   "path": "/participants/550e8400-e29b-41d4-a716-446655440000",
   "query": "",
   "method": "put",
@@ -62,8 +62,8 @@ D, [2025-05-26T18:28:05.110972 #55893] DEBUG -- : {
     "Version": "HTTP/1.1"
   }
 }
-I, [2025-05-26T18:28:05.111168 #55893]  INFO -- : Found matching response for PUT /participants/550e8400-e29b-41d4-a716-446655440000
-D, [2025-05-26T18:28:05.111204 #55893] DEBUG -- : {
+I, [2025-05-26T18:35:12.468011 #58182]  INFO -- : Found matching response for PUT /participants/550e8400-e29b-41d4-a716-446655440000
+D, [2025-05-26T18:35:12.468046 #58182] DEBUG -- : {
   "status": 200,
   "headers": {
     "Content-Type": "application/json"
@@ -80,5 +80,5 @@ D, [2025-05-26T18:28:05.111204 #55893] DEBUG -- : {
     "joined_at": null
   }
 }
-I, [2025-05-26T18:28:05.614463 #55893]  INFO -- : Verifying - interactions matched
-I, [2025-05-26T18:28:05.616493 #55893]  INFO -- : Writing pact for participants-api to /Users/willmoritz/Code/aimagain/tests/test_contract/artifacts/pacts/invitation-form-participants-api.json
+I, [2025-05-26T18:35:12.974874 #58182]  INFO -- : Verifying - interactions matched
+I, [2025-05-26T18:35:12.979386 #58182]  INFO -- : Writing pact for participants-api to /Users/willmoritz/Code/aimagain/tests/test_contract/artifacts/pacts/invitation-form-participants-api.json

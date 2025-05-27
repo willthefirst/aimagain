@@ -70,42 +70,8 @@ GET_CONVERSATION_DEPENDENCY_CONFIG = {
     }
 }
 
-LIST_USERS_DEPENDENCY_CONFIG = {
-    "app.logic.user_processing.handle_list_users": {
-        "return_value_config": {
-            "request": {},
-            "users": [
-                UserRead(
-                    id=str(uuid4()),
-                    email="test1@example.com",
-                    username="testuser1",
-                    is_active=True,
-                    is_superuser=False,
-                    is_verified=True,
-                ),
-                UserRead(
-                    id=str(uuid4()),
-                    email="test2@example.com",
-                    username="testuser2",
-                    is_active=True,
-                    is_superuser=False,
-                    is_verified=True,
-                ),
-            ],
-            "current_user": UserRead(
-                id=str(uuid4()),
-                email="current@example.com",
-                username="currentuser",
-                is_active=True,
-                is_superuser=False,
-                is_verified=True,
-            ),
-        }
-    }
-}
-
 UPDATE_PARTICIPANT_STATUS_DEPENDENCY_CONFIG = {
-    "app.logic.participant_processing.handle_update_participant_status": {
+    "app.api.routes.participants.handle_update_participant_status": {
         "return_value_config": Participant(
             id="550e8400-e29b-41d4-a716-446655440000",
             user_id="550e8400-e29b-41d4-a716-446655440001",
@@ -125,7 +91,6 @@ CONVERSATIONS_API_MOCKS = {
     **CREATE_CONVERSATION_DEPENDENCY_CONFIG,
     **GET_CONVERSATION_DEPENDENCY_CONFIG,
 }
-USERS_API_MOCKS = LIST_USERS_DEPENDENCY_CONFIG
 PARTICIPANTS_API_MOCKS = UPDATE_PARTICIPANT_STATUS_DEPENDENCY_CONFIG
 
 AUTH_API_PROVIDER_DECORATOR = pytest.mark.parametrize(
@@ -144,13 +109,6 @@ CONVERSATIONS_API_PROVIDER_DECORATOR = pytest.mark.parametrize(
     ids=["with_conversations_api_mocks"],
 )
 
-USERS_API_PROVIDER_DECORATOR = pytest.mark.parametrize(
-    "provider_server",
-    [USERS_API_MOCKS],
-    indirect=True,
-    scope="module",
-    ids=["with_users_api_mocks"],
-)
 
 PARTICIPANTS_API_PROVIDER_DECORATOR = pytest.mark.parametrize(
     "provider_server",
