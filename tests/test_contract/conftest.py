@@ -8,7 +8,7 @@ import pytest
 from playwright.async_api import async_playwright
 from yarl import URL
 
-from tests.test_contract.tests.consumer.test_conversation_forms import (
+from tests.test_contract.tests.consumer.test_conversation_form import (
     PROVIDER_STATE_USER_ONLINE,
 )
 

@@ -8,8 +8,8 @@ from tests.test_contract.tests.shared.provider_verification_base import (
 )
 
 
-class AuthApiVerification(BaseProviderVerification):
-    """Auth API provider verification."""
+class AuthVerification(BaseProviderVerification):
+    """Auth provider verification."""
 
     @property
     def provider_name(self) -> str:
@@ -28,7 +28,7 @@ class AuthApiVerification(BaseProviderVerification):
         return [pytest.mark.provider, pytest.mark.auth]
 
 
-auth_verification = AuthApiVerification()
+auth_verification = AuthVerification()
 
 
 @create_provider_test_decorator(
@@ -36,6 +36,6 @@ auth_verification = AuthApiVerification()
 )
 @pytest.mark.provider
 @pytest.mark.auth
-def test_provider_auth_api_pact_verification(provider_server: URL):
-    """Verify the Auth API Pact contract against the running provider server."""
+def test_provider_auth_pact_verification(provider_server: URL):
+    """Verify the Auth Pact contract against the running provider server."""
     auth_verification.verify_pact(provider_server)

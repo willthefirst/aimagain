@@ -8,8 +8,8 @@ from tests.test_contract.tests.shared.provider_verification_base import (
 )
 
 
-class ConversationsApiVerification(BaseProviderVerification):
-    """Conversations API provider verification."""
+class ConversationsVerification(BaseProviderVerification):
+    """Conversations provider verification."""
 
     @property
     def provider_name(self) -> str:
@@ -37,7 +37,7 @@ class ConversationsApiVerification(BaseProviderVerification):
         return [pytest.mark.provider, pytest.mark.conversations]
 
 
-conversations_verification = ConversationsApiVerification()
+conversations_verification = ConversationsVerification()
 
 
 @create_provider_test_decorator(
@@ -45,6 +45,6 @@ conversations_verification = ConversationsApiVerification()
 )
 @pytest.mark.provider
 @pytest.mark.conversations
-def test_provider_conversations_api_pact_verification(provider_server: URL):
-    """Verify the Conversations API Pact contract against the running provider server."""
+def test_provider_conversations_pact_verification(provider_server: URL):
+    """Verify the Conversations Pact contract against the running provider server."""
     conversations_verification.verify_pact(provider_server)

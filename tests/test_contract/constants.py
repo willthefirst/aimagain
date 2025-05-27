@@ -4,6 +4,8 @@
 TEST_EMAIL = "test.user@example.com"
 TEST_PASSWORD = "securepassword123"
 TEST_USERNAME = "testuser"
+TEST_INVITEE_USERNAME = "shared_testuser"
+TEST_INITIAL_MESSAGE = "Hello from shared data!"
 
 # API paths
 REGISTER_API_PATH = "/auth/register"

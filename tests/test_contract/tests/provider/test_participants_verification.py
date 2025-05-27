@@ -8,8 +8,8 @@ from tests.test_contract.tests.shared.provider_verification_base import (
 )
 
 
-class ParticipantsApiVerification(BaseProviderVerification):
-    """Participants API provider verification."""
+class ParticipantsVerification(BaseProviderVerification):
+    """Participants provider verification."""
 
     @property
     def provider_name(self) -> str:
@@ -28,7 +28,7 @@ class ParticipantsApiVerification(BaseProviderVerification):
         return [pytest.mark.provider, pytest.mark.participants]
 
 
-participants_verification = ParticipantsApiVerification()
+participants_verification = ParticipantsVerification()
 
 
 @create_provider_test_decorator(
@@ -36,6 +36,6 @@ participants_verification = ParticipantsApiVerification()
 )
 @pytest.mark.provider
 @pytest.mark.participants
-def test_provider_participants_api_pact_verification(provider_server: URL):
-    """Verify the Participants API Pact contract against the running provider server."""
+def test_provider_participants_pact_verification(provider_server: URL):
+    """Verify the Participants Pact contract against the running provider server."""
     participants_verification.verify_pact(provider_server)

@@ -2,8 +2,7 @@ import urllib.parse
 
 from pydantic import BaseModel
 
-TEST_INVITEE_USERNAME = "shared_testuser"
-TEST_INITIAL_MESSAGE = "Hello from shared data!"
+from tests.test_contract.constants import TEST_INITIAL_MESSAGE, TEST_INVITEE_USERNAME
 
 
 class ConversationCreateRequestData(BaseModel):
