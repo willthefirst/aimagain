@@ -1,0 +1,208 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# Documentation Standards & Proactive README Maintenance
+
+## 📋 Core Documentation Philosophy
+
+Follow the **"LLM-Optimized Documentation"** approach established in `tests/test_contract/README.md`:
+
+### 🎯 **Structure for Maximum LLM Parseability**
+1. **Visual Hierarchy**: Use emojis (🎯, 🏗️, 📋, ✅, ❌) as section anchors
+2. **Clear Boundaries**: Explicit "What We Do" vs "What We Don't Do" sections
+3. **Concrete Examples**: Always include actual code snippets and practical examples
+4. **Quick Reference**: Tables, matrices, and bullet points for fast scanning
+5. **Implementation Patterns**: Step-by-step guides with complete code examples
+
+### 📝 **Required Documentation Elements**
+
+Every README should include:
+- **Philosophy/Purpose**: Why this approach/pattern exists
+- **Implementation Patterns**: How to use/extend the code
+- **Boundaries**: What it does vs what it doesn't do
+- **Quick Reference**: Commands, markers, configuration
+- **Troubleshooting**: Common issues and solutions
+- **Examples**: Complete, runnable code examples
+
+## 🔄 **Proactive README Maintenance Rules**
+
+### **ALWAYS Update Documentation When:**
+
+1. **Adding New Patterns/Approaches**
+   - ✅ Add to "Implementation Patterns" section
+   - ✅ Update "Quick Reference" tables/lists
+   - ✅ Add concrete examples with code snippets
+   - ✅ Update directory structure if files added
+
+2. **Changing Existing Functionality**
+   - ✅ Update affected code examples
+   - ✅ Revise "What We Do/Don't Do" boundaries if changed
+   - ✅ Update troubleshooting if new issues possible
+   - ✅ Revise configuration sections
+
+3. **Refactoring Code Organization**
+   - ✅ Update directory structure diagrams
+   - ✅ Update file path references in examples
+   - ✅ Revise "Adding New X" step-by-step guides
+   - ✅ Update import statements in code examples
+
+4. **Adding New Test Categories/Markers**
+   - ✅ Update pytest markers section
+   - ✅ Add to test categories table
+   - ✅ Update running tests commands
+   - ✅ Add examples of new test types
+
+### **Documentation Update Process:**
+
+1. **Identify Impact**: Determine which READMEs are affected by your changes
+2. **Update Immediately**: Don't wait - update docs as part of the same change
+3. **Verify Examples**: Ensure all code examples still work and are accurate
+4. **Check Cross-References**: Update any references between documentation files
+
+## 📁 **Documentation Locations & Responsibilities**
+
+### **Root README.md**
+- Project overview and getting started
+- High-level architecture decisions
+- Development workflow and contribution guidelines
+
+### **Module/Package READMEs**
+- Specific to that module's functionality
+- Implementation patterns for that domain
+- Examples relevant to that module
+
+### **Test Directory READMEs**
+- Testing philosophy and approach
+- How to run and write tests
+- Test organization and patterns
+
+### **Notes Directory**
+- Design decisions and architectural choices
+- Implementation examples and tutorials
+- Cross-cutting concerns and patterns
+
+## 🎨 **Style Conventions**
+
+### **Formatting Standards:**
+```markdown
+# Main Title: Descriptive with Context
+
+## 🎯 Section with Emoji Anchor
+### Subsection
+#### Detail Level
+
+**Bold for Emphasis**
+`code snippets`
+```code blocks```
+
+✅ Do this
+❌ Don't do this
+→ Result/consequence
+```
+
+### **Code Example Format:**
+```markdown
+### Pattern Name
+Description of what this pattern does and when to use it.
+
+```python
+# path/to/file.py
+@decorator
+def example_function():
+    """Clear docstring explaining purpose."""
+    # Implementation with comments
+    return result
+```
+
+**Key Points:**
+- Bullet point explanations
+- When to use this pattern
+- Common gotchas or considerations
+```
+
+### **Table Format:**
+```markdown
+| Column 1 | Column 2 | Column 3 |
+|----------|----------|----------|
+| **Bold** | Regular  | `code`   |
+```
+
+### **Reference Links:**
+```markdown
+## 📚 References
+- [Internal Doc](mdc:relative/path/to/doc.md)
+- [External Resource](mdc:https:/example.com)
+```
+
+## 🚨 **Mandatory Actions for Code Changes**
+
+### **When Adding New Files/Modules:**
+1. **Check if README exists** in that directory
+2. **If no README**: Create one following the established pattern
+3. **If README exists**: Update it with new file/functionality
+4. **Update parent directory README** if structure changed
+
+### **When Changing Existing Code:**
+1. **Scan for affected documentation** (use grep/search for file names, function names)
+2. **Update all code examples** that reference changed code
+3. **Verify all file paths** and import statements are still correct
+4. **Update any "How to" guides** that might be affected
+
+### **When Refactoring:**
+1. **Update directory structure diagrams** in affected READMEs
+2. **Update all relative path references**
+3. **Revise step-by-step guides** that reference moved/renamed files
+4. **Check cross-references** between documentation files
+
+## 🔍 **Documentation Quality Checklist**
+
+Before considering any change complete, verify:
+
+- [ ] **All code examples are accurate** and runnable
+- [ ] **File paths and imports are correct**
+- [ ] **Step-by-step guides work** from start to finish
+- [ ] **Tables and lists are up-to-date**
+- [ ] **Cross-references are valid**
+- [ ] **New functionality is documented** with examples
+- [ ] **Changed functionality is updated** everywhere it's mentioned
+- [ ] **Troubleshooting section covers** new potential issues
+
+## 🎯 **LLM Optimization Guidelines**
+
+### **Make Documentation Scannable:**
+- Use consistent emoji anchors for major sections
+- Include "What/Why/How" structure
+- Provide concrete examples over abstract descriptions
+- Use tables and matrices for quick reference
+
+### **Include Context:**
+- Explain the reasoning behind patterns
+- Show what problems the approach solves
+- Provide boundaries (what it does/doesn't do)
+- Include troubleshooting for common issues
+
+### **Maintain Consistency:**
+- Use the same formatting patterns across all READMEs
+- Follow the same section ordering where applicable
+- Use consistent terminology and naming
+- Keep the same level of detail and examples
+
+## 🔄 **Continuous Improvement**
+
+### **Regular Documentation Reviews:**
+- When adding major features, review all related documentation
+- When changing architectural patterns, update philosophy sections
+- When adding new tools/dependencies, update getting started guides
+- When changing workflows, update process documentation
+
+### **Documentation Debt Prevention:**
+- Never commit code changes without updating related documentation
+- Treat documentation updates as part of the feature implementation
+- Include documentation review in code review process
+- Keep examples simple but complete and accurate
+
+---
+
+**Remember**: Documentation is code. It should be maintained with the same rigor and attention to detail as the implementation itself. Future LLMs (and humans) depend on accurate, up-to-date documentation to understand and extend the codebase effectively.
