@@ -90,7 +90,7 @@ from fastapi import Depends, HTTPException, status, Request
 
 from app.models import User
 from app.schemas.conversation import ConversationCreateRequest, ConversationResponse
-# Dependencies needed for the actual work are imported and used HERE
+# Dependencies needed for the actual work are imported and used here
 from app.auth_config import current_active_user
 from app.services.conversation_service import (
     get_conversation_service, ConversationService,
@@ -143,7 +143,7 @@ async def handle_conversation_creation(
         raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, "Handling failed")
 ```
 
-### 3. Provider contract test (`tests/contract/test_conversation_routes_provider.py`)
+### 3. provider contract test (`tests/contract/test_conversation_routes_provider.py`)
 
 ```python
 # tests/contract/test_conversation_routes_provider.py
@@ -157,18 +157,18 @@ from fastapi import FastAPI
 from pact import Verifier
 
 from app.main import app # Assuming app includes conversation_routes.router
-# Import the single dependency TO MOCK from the route handler
+# Import the single dependency to mock from the route handler
 from app.logic.conversation_processing import handle_conversation_creation
 # Import the final response schema for structuring the mock's return value
 from app.schemas.conversation import ConversationResponse
 
-# --- Pact Configuration ---
+# --- Pact configuration ---
 PROVIDER_NAME = "backend-api"
 PACT_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "pacts")
 PACT_FILE_CONVERSATIONS = os.path.join(PACT_DIR, "frontend-pact-conversations-backend-api.json") # Example name
 logging.basicConfig(level=logging.INFO)
 log = logging.getLogger(__name__)
-# --- Configuration End ---
+# --- configuration end ---
 
 @pytest.fixture(scope="module")
 def app_override_conversation_routes():
@@ -207,13 +207,13 @@ def app_override_conversation_routes():
     app.dependency_overrides = original_overrides
 
 
-# --- Provider State Setup --- (Likely minimal or no-op)
+# --- provider state setup --- (likely minimal or no-op)
 def provider_state_setup_conversation_routes(state: str, **params):
     log.info(f"Setting up provider state for Conversation Routes: '{state}'")
     pass # Mock is configured in fixture
 
 
-# --- Pact Verification Test ---
+# --- Pact verification test ---
 def test_pact_verification_conversation_routes(app_override_conversation_routes: FastAPI):
     """Verify the Conversation Routes Pact contract."""
     log.info(f"Starting Pact verification for '{PROVIDER_NAME}' conv routes using '{PACT_FILE_CONVERSATIONS}'")

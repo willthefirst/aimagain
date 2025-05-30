@@ -4,7 +4,7 @@
 
 This analogy helps clarify what contract tests should and shouldn't verify.
 
-### Testing the waiter (Contract tests)
+### Testing the waiter (contract tests)
 
 - Verifies the waiter can take orders correctly
 - Ensures the waiter understands the menu
@@ -20,7 +20,7 @@ The waiter test doesn't care if the food is good - it only cares that the order 
   - The order is formatted properly for the kitchen
   - The waiter knows how to handle special requests
 
-### Testing the chef (Functional tests)
+### Testing the chef (functional tests)
 
 - Verifies the food is prepared correctly
 - Ensures ingredients are fresh

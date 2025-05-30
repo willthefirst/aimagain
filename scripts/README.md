@@ -24,7 +24,7 @@ python scripts/title_case_check.py templates/
 python scripts/title_case_check.py README.md notes/
 ```
 
-#### 🏗️ **Supported file types**
+#### 🏗️ **supported file types**
 
 - **Markdown files** (`.md`, `.markdown`): Headers (`# Title`, `## Subtitle`)
 - **HTML files** (`.html`, `.htm`): Headers (`<h1>`, `<h2>`, etc.) and `<title>` tags
@@ -39,6 +39,6 @@ python scripts/title_case_check.py README.md notes/
 ```
 
 ```html
-<h1>API Documentation</h1>
+<h1>API documentation</h1>
 <!-- title-case-ignore -->
 ```

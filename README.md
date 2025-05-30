@@ -2,7 +2,7 @@
 
 This is a simple chat application built with FastAPI and SQLite.
 
-## Core Technical choices
+## Core technical choices
 
 - **Frontend:** Plain HTML and JavaScript.
   - Adherence to hypermedia principles.

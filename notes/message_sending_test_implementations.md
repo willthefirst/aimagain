@@ -11,7 +11,7 @@ This document provides the complete test implementations for the message sending
 ### **File: `tests/test_api/test_send_message.py`**
 
 ```python
-# Tests for POST /conversations/{slug}/messages
+# Tests for post /conversations/{slug}/messages
 import uuid
 from datetime import datetime, timezone
 

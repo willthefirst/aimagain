@@ -4,7 +4,7 @@ This directory contains contract tests using the Pact framework to ensure API co
 
 ## 🎯 Core philosophy: The restaurant analogy
 
-### Testing the waiter (Contract tests) ✅ What we do
+### Testing the waiter (contract tests) ✅ what we do
 
 - **Request Format Validation**: Verifies client sends data in correct format (`application/x-www-form-urlencoded` vs `application/json`)
 - **Required Fields**: Ensures all mandatory fields are present (`invitee_username`, `initial_message`)
@@ -20,7 +20,7 @@ This directory contains contract tests using the Pact framework to ensure API co
 ✅ Verifies: API can parse the request without errors
 ```
 
-### Testing the chef (Functional tests) ❌ What we don't do
+### Testing the chef (functional tests) ❌ what we don't do
 
 - **Business Logic**: Whether user exists, permissions, validation rules
 - **Data Processing**: How data is transformed, stored, or retrieved
@@ -237,7 +237,7 @@ class MockDataFactory:
 
 ## 🚀 Running tests
 
-### Consumer tests (Generate pact files)
+### Consumer tests (generate Pact files)
 
 ```bash
 # Run all consumer tests
@@ -249,7 +249,7 @@ pytest tests/consumer/ -m conversations
 pytest tests/consumer/ -m invitations
 ```
 
-### Provider tests (Verify against pact files)
+### Provider tests (verify against Pact files)
 
 ```bash
 # Run all provider verification tests
@@ -355,7 +355,7 @@ def create_feature(cls, **overrides):
 ## 🎯 Test categories & markers
 
 ```python
-# Pytest markers for organizing tests
+# pytest markers for organizing tests
 pytest.mark.consumer      # Consumer contract tests
 pytest.mark.provider      # Provider contract tests
 pytest.mark.auth          # Authentication-related tests

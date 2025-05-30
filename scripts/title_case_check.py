@@ -16,7 +16,7 @@ import argparse
 import re
 import sys
 from pathlib import Path
-from typing import Dict, List, Set, Tuple, Union
+from typing import Dict, List, Union
 
 
 class TitleCaseChecker:
@@ -86,6 +86,7 @@ class TitleCaseChecker:
         "Python",
         "JavaScript",
         "TypeScript",
+        "Pact",  # Contract testing framework
     }
 
     # Exception patterns (regex patterns to ignore)
@@ -119,8 +120,38 @@ class TitleCaseChecker:
                         return True
         return False
 
+    def is_colon_pattern(self, text: str) -> bool:
+        """Check if text follows 'Something: This thing' or 'Something - This thing' pattern which should be exempt."""
+        # Remove HTML tags for checking
+        clean_text = re.sub(r"<[^>]+>", "", text).strip()
+
+        # Check if it contains a colon or dash with text on both sides
+        for separator in [":", " - "]:
+            if separator in clean_text:
+                parts = clean_text.split(separator, 1)
+                if len(parts) == 2:
+                    before_sep = parts[0].strip()
+                    after_sep = parts[1].strip()
+                    # If both parts have content, this is a separator pattern
+                    if before_sep and after_sep:
+                        return True
+        return False
+
+    def remove_leading_emojis(self, text: str) -> str:
+        """Remove leading emojis from text for sentence case checking."""
+        # Emoji regex pattern - matches most common emoji ranges
+        emoji_pattern = r"^[\U0001F600-\U0001F64F\U0001F300-\U0001F5FF\U0001F680-\U0001F6FF\U0001F1E0-\U0001F1FF\U00002600-\U000027BF\U0001F900-\U0001F9FF\U0001F018-\U0001F270\U0001F000-\U0001F02F\U0001F0A0-\U0001F0FF\U0001F100-\U0001F64F\U0001F170-\U0001F251\U0001F300-\U0001F5FF\U0001F600-\U0001F64F\U0001F680-\U0001F6FF\U0001F700-\U0001F77F\U0001F780-\U0001F7FF\U0001F800-\U0001F8FF\U0001F900-\U0001F9FF\U0001FA00-\U0001FA6F\U0001FA70-\U0001FAFF\U00002600-\U000027BF\U0001F018-\U0001F270\U0001F000-\U0001F02F\U0001F0A0-\U0001F0FF\U0001F100-\U0001F64F\U0001F170-\U0001F251]+\s*"
+
+        # Remove leading emojis and whitespace
+        cleaned = re.sub(emoji_pattern, "", text)
+        return cleaned
+
     def convert_to_sentence_case(self, text: str) -> str:
         """Convert text to sentence case, preserving proper nouns and acronyms."""
+        # Check if this is a colon pattern that should be exempt
+        if self.is_colon_pattern(text):
+            return text
+
         # Remove HTML tags for processing
         clean_text = re.sub(r"<[^>]+>", "", text).strip()
 
@@ -128,7 +159,15 @@ class TitleCaseChecker:
         if not clean_text:
             return text
 
-        words = clean_text.split()
+        # Handle emojis at the beginning
+        original_clean = clean_text
+        clean_text_no_emoji = self.remove_leading_emojis(clean_text)
+        emoji_prefix = original_clean[: len(original_clean) - len(clean_text_no_emoji)]
+
+        # Create a lookup map for proper capitalization
+        capitalize_map = {word.upper(): word for word in self.ALWAYS_CAPITALIZE}
+
+        words = clean_text_no_emoji.split()
         if not words:
             return text
 
@@ -139,8 +178,9 @@ class TitleCaseChecker:
 
             if i == 0:
                 # First word: capitalize first letter only, unless it's a special word
-                if clean_word.upper() in self.ALWAYS_CAPITALIZE:
-                    result_words.append(word.replace(clean_word, clean_word.upper()))
+                if clean_word.upper() in capitalize_map:
+                    proper_case = capitalize_map[clean_word.upper()]
+                    result_words.append(word.replace(clean_word, proper_case))
                 else:
                     # Capitalize only first letter
                     if clean_word:
@@ -152,17 +192,18 @@ class TitleCaseChecker:
                         result_words.append(word)
             else:
                 # Other words: only capitalize if in ALWAYS_CAPITALIZE
-                if clean_word.upper() in self.ALWAYS_CAPITALIZE:
-                    result_words.append(word.replace(clean_word, clean_word.upper()))
+                if clean_word.upper() in capitalize_map:
+                    proper_case = capitalize_map[clean_word.upper()]
+                    result_words.append(word.replace(clean_word, proper_case))
                 else:
                     result_words.append(word.replace(clean_word, clean_word.lower()))
 
-        sentence_case = " ".join(result_words)
+        sentence_case = emoji_prefix + " ".join(result_words)
 
         # If original had HTML tags, try to preserve them
         if "<" in text and ">" in text:
             # Simple approach: replace the clean text in the original
-            return text.replace(clean_text, sentence_case)
+            return text.replace(original_clean, sentence_case)
 
         return sentence_case
 
@@ -335,7 +376,7 @@ def main():
         epilog="""
 Examples:
   python scripts/title_case_check.py                    # Check all files
-  python scripts/title_case_check.py --fix              # Auto-fix violations  
+  python scripts/title_case_check.py --fix              # Auto-fix violations
   python scripts/title_case_check.py templates/         # Check specific directory
   python scripts/title_case_check.py README.md notes/   # Check specific files/dirs
 

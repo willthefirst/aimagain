@@ -48,7 +48,7 @@ Expected: Test fails (form elements not found)
 
 ```html
 <hr />
-<h2>Send a Message</h2>
+<h2>Send a message</h2>
 <form
   action="{{ url_for('send_message', slug=conversation.slug) }}"
   method="post"
