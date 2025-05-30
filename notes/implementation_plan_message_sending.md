@@ -50,7 +50,7 @@ Expected: Test fails (form elements not found)
 <hr />
 <h2>Send a message</h2>
 <form
-  action="{{ url_for('send_message', slug=conversation.slug) }}"
+  action="{{ url_for('create_message', slug=conversation.slug) }}"
   method="post"
   name="send-message-form">
   <div>
@@ -79,14 +79,14 @@ Expected: Test passes
 
 ---
 
-### **Step 2: Create message sending route**
+### **Step 2: Create message creation route**
 
 **Goal:** Implement `POST /conversations/{slug}/messages` endpoint.
 
 #### **Red phase - Write failing test**
 
-- **File:** `tests/test_api/test_send_message.py` (new file)
-- **Test:** `test_send_message_success`
+- **File:** `tests/test_api/test_create_message.py` (new file)
+- **Test:** `test_create_message_success`
 - **Logic:**
   - Setup: Create conversation with authenticated user as JOINED participant
   - Send POST to `/conversations/{slug}/messages` with form data `{"message_content": "Test message"}`
@@ -97,7 +97,7 @@ Expected: Test passes
 #### **Run pytest**
 
 ```bash
-pytest tests/test_api/test_send_message.py::test_send_message_success -v
+pytest tests/test_api/test_create_message.py::test_create_message_success -v
 ```
 
 Expected: Test fails (404 - route doesn't exist)
@@ -111,16 +111,16 @@ Expected: Test fails (404 - route doesn't exist)
 @router.post(
     "/conversations/{slug}/messages",
     status_code=status.HTTP_303_SEE_OTHER,
-    name="send_message",
+    name="create_message",
     tags=["conversations", "messages"],
 )
-async def send_message(
+async def create_message(
     slug: str,
     message_content: str = Form(...),
     user: User = Depends(current_active_user),
     conv_service: ConversationService = Depends(get_conversation_service),
 ):
-    """Handles sending a new message to a conversation."""
+    """Handles creating a new message in a conversation."""
     # Minimal implementation to pass test
     # TODO: Add proper logic in next steps
     redirect_url = f"/conversations/{slug}"
@@ -130,30 +130,30 @@ async def send_message(
 #### **Run pytest**
 
 ```bash
-pytest tests/test_api/test_send_message.py::test_send_message_success -v
+pytest tests/test_api/test_create_message.py::test_create_message_success -v
 ```
 
 Expected: Test fails (message not created in database)
 
 ---
 
-### **Step 3: Implement service layer message sending**
+### **Step 3: Implement service layer message creation**
 
-**Goal:** Add message sending logic to `ConversationService`.
+**Goal:** Add message creation logic to `ConversationService`.
 
 #### **Red phase - Write additional tests**
 
-- **File:** `tests/test_api/test_send_message.py`
+- **File:** `tests/test_api/test_create_message.py`
 - **Tests:** Add authorization and validation tests:
-  - `test_send_message_conversation_not_found` (403)
-  - `test_send_message_not_participant` (403)
-  - `test_send_message_invited_status` (403)
-  - `test_send_message_empty_content` (400)
+  - `test_create_message_conversation_not_found` (403)
+  - `test_create_message_not_participant` (403)
+  - `test_create_message_invited_status` (403)
+  - `test_create_message_empty_content` (400)
 
 #### **Run pytest**
 
 ```bash
-pytest tests/test_api/test_send_message.py -v
+pytest tests/test_api/test_create_message.py -v
 ```
 
 Expected: All new tests fail
@@ -161,16 +161,16 @@ Expected: All new tests fail
 #### **Green phase - Write code**
 
 - **File:** `app/services/conversation_service.py`
-- **Changes:** Add `send_message_to_conversation` method:
+- **Changes:** Add `create_message_in_conversation` method:
 
 ```python
-async def send_message_to_conversation(
+async def create_message_in_conversation(
     self,
     conversation_slug: str,
     message_content: str,
     sender_user: User,
 ) -> Message:
-    """Sends a new message to an existing conversation."""
+    """Creates a new message in an existing conversation."""
     # Validate conversation exists
     conversation = await self.conv_repo.get_conversation_by_slug(conversation_slug)
     if not conversation:
@@ -184,7 +184,7 @@ async def send_message_to_conversation(
         raise NotAuthorizedError("User is not a participant in this conversation.")
 
     if participant.status != ParticipantStatus.JOINED:
-        raise NotAuthorizedError("Only joined participants can send messages.")
+        raise NotAuthorizedError("Only joined participants can create messages.")
 
     # Validate content
     if not message_content or not message_content.strip():
@@ -209,22 +209,22 @@ async def send_message_to_conversation(
 
     except IntegrityError as e:
         await self.session.rollback()
-        logger.warning(f"Integrity error sending message: {e}", exc_info=True)
-        raise ConflictError("Could not send message due to a data conflict.")
+        logger.warning(f"Integrity error creating message: {e}", exc_info=True)
+        raise ConflictError("Could not create message due to a data conflict.")
     except SQLAlchemyError as e:
         await self.session.rollback()
-        logger.error(f"Database error sending message: {e}", exc_info=True)
-        raise DatabaseError("Failed to send message due to a database error.")
+        logger.error(f"Database error creating message: {e}", exc_info=True)
+        raise DatabaseError("Failed to create message due to a database error.")
     except Exception as e:
         await self.session.rollback()
-        logger.error(f"Unexpected error sending message: {e}", exc_info=True)
-        raise ServiceError("An unexpected error occurred while sending the message.")
+        logger.error(f"Unexpected error creating message: {e}", exc_info=True)
+        raise ServiceError("An unexpected error occurred while creating the message.")
 ```
 
 #### **Run pytest**
 
 ```bash
-pytest tests/test_api/test_send_message.py -v
+pytest tests/test_api/test_create_message.py -v
 ```
 
 Expected: Tests still fail (route doesn't call service)
@@ -238,20 +238,20 @@ Expected: Tests still fail (route doesn't call service)
 #### **Green phase - Write code**
 
 - **File:** `app/api/routes/conversations.py`
-- **Changes:** Update `send_message` route:
+- **Changes:** Update `create_message` route:
 
 ```python
-async def send_message(
+async def create_message(
     slug: str,
     message_content: str = Form(...),
     user: User = Depends(current_active_user),
     conv_service: ConversationService = Depends(get_conversation_service),
 ):
-    """Handles sending a new message to a conversation."""
-    logger.info(f"Sending message to conversation {slug} by user {user.id}")
+    """Handles creating a new message in a conversation."""
+    logger.info(f"Creating message in conversation {slug} by user {user.id}")
 
     try:
-        await conv_service.send_message_to_conversation(
+        await conv_service.create_message_in_conversation(
             conversation_slug=slug,
             message_content=message_content,
             sender_user=user,
@@ -272,7 +272,7 @@ async def send_message(
 #### **Run pytest**
 
 ```bash
-pytest tests/test_api/test_send_message.py -v
+pytest tests/test_api/test_create_message.py -v
 ```
 
 Expected: All tests pass
@@ -286,33 +286,33 @@ Expected: All tests pass
 #### **Refactor phase - Create handler**
 
 - **File:** `app/logic/conversation_processing.py`
-- **Changes:** Add `handle_send_message` function:
+- **Changes:** Add `handle_create_message` function:
 
 ```python
-async def handle_send_message(
+async def handle_create_message(
     conversation_slug: str,
     message_content: str,
     sender_user: User,
     conv_service: ConversationService,
 ) -> Message:
-    """Handles the core logic for sending a message to a conversation."""
+    """Handles the core logic for creating a message in a conversation."""
     try:
-        new_message = await conv_service.send_message_to_conversation(
+        new_message = await conv_service.create_message_in_conversation(
             conversation_slug=conversation_slug,
             message_content=message_content,
             sender_user=sender_user,
         )
 
-        logger.info(f"Message sent by user {sender_user.id} to conversation {conversation_slug}")
+        logger.info(f"Message created by user {sender_user.id} in conversation {conversation_slug}")
         return new_message
 
     except (ConversationNotFoundError, NotAuthorizedError, BusinessRuleError,
             ConflictError, DatabaseError, ServiceError) as e:
-        logger.info(f"Service error sending message: {e}")
+        logger.info(f"Service error creating message: {e}")
         raise
     except Exception as e:
-        logger.error(f"Unexpected error in handle_send_message: {e}", exc_info=True)
-        raise ServiceError("An unexpected error occurred while sending the message.")
+        logger.error(f"Unexpected error in handle_create_message: {e}", exc_info=True)
+        raise ServiceError("An unexpected error occurred while creating the message.")
 ```
 
 #### **Refactor phase - Update route**
@@ -321,15 +321,15 @@ async def handle_send_message(
 - **Changes:** Simplify route to use handler:
 
 ```python
-async def send_message(
+async def create_message(
     slug: str,
     message_content: str = Form(...),
     user: User = Depends(current_active_user),
     conv_service: ConversationService = Depends(get_conversation_service),
 ):
-    """Handles sending a new message to a conversation."""
+    """Handles creating a new message in a conversation."""
     try:
-        await handle_send_message(
+        await handle_create_message(
             conversation_slug=slug,
             message_content=message_content,
             sender_user=user,
@@ -350,7 +350,7 @@ async def send_message(
 #### **Run pytest**
 
 ```bash
-pytest tests/test_api/test_send_message.py -v
+pytest tests/test_api/test_create_message.py -v
 ```
 
 Expected: All tests still pass (refactoring doesn't change behavior)
@@ -359,12 +359,12 @@ Expected: All tests still pass (refactoring doesn't change behavior)
 
 ### **Step 6: Contract tests - Consumer**
 
-**Goal:** Create consumer contract tests for message sending form interaction.
+**Goal:** Create consumer contract tests for message creation form interaction.
 
 #### **Write consumer test**
 
 - **File:** `tests/test_contract/tests/consumer/test_message_form.py` (new file)
-- **Test:** `test_consumer_send_message_success`
+- **Test:** `test_consumer_create_message_success`
 - **Logic:**
   - Setup Pact expectation for POST `/conversations/{slug}/messages`
   - Use Playwright to interact with message form
@@ -374,12 +374,12 @@ Expected: All tests still pass (refactoring doesn't change behavior)
 ```python
 @pytest.mark.consumer
 @pytest.mark.messages
-async def test_consumer_send_message_success(page: Page):
+async def test_consumer_create_message_success(page: Page):
     """Test message form submission creates correct Pact contract."""
 
-    pact = setup_pact("send-message-form", "conversations-api")
+    pact = setup_pact("create-message-form", "conversations-api")
     pact.given("user is joined participant in conversation")
-        .upon_receiving("a request to send a message")
+        .upon_receiving("a request to create a message")
         .with_request(
             method="POST",
             path=matchers.like("/conversations/test-slug/messages"),
@@ -408,7 +408,7 @@ pytest tests/test_contract/tests/consumer/test_message_form.py -v
 
 ### **Step 7: Contract tests - Provider**
 
-**Goal:** Create provider verification tests for message sending API.
+**Goal:** Create provider verification tests for message creation API.
 
 #### **Red phase - Write provider test**
 
@@ -424,7 +424,7 @@ pytest tests/test_contract/tests/consumer/test_message_form.py -v
 @classmethod
 def create_message_dependency_config(cls):
     return {
-        "app.logic.conversation_processing.handle_send_message": {
+        "app.logic.conversation_processing.handle_create_message": {
             "return_value_config": cls.create_message()
         }
     }
@@ -450,7 +450,7 @@ class MessagesVerification(BaseProviderVerification):
 
     @property
     def consumer_name(self) -> str:
-        return "send-message-form"
+        return "create-message-form"
 
     @property
     def dependency_config(self):
@@ -486,18 +486,18 @@ pytest
 
 # Run specific test categories
 pytest -m messages                    # All message-related tests
-pytest tests/test_api/test_send_message.py  # API integration tests
+pytest tests/test_api/test_create_message.py  # API integration tests
 pytest tests/test_contract/ -m messages     # Contract tests only
 ```
 
 ### **Test coverage summary**
 
-| Test Type             | File                            | Purpose                                  |
-| --------------------- | ------------------------------- | ---------------------------------------- |
-| **API Integration**   | `test_send_message.py`          | End-to-end message sending functionality |
-| **API Integration**   | `test_get_conversation.py`      | Message form presence in UI              |
-| **Contract Consumer** | `test_message_form.py`          | Form submission format verification      |
-| **Contract Provider** | `test_messages_verification.py` | API request handling verification        |
+| Test Type             | File                            | Purpose                                   |
+| --------------------- | ------------------------------- | ----------------------------------------- |
+| **API Integration**   | `test_create_message.py`        | End-to-end message creation functionality |
+| **API Integration**   | `test_get_conversation.py`      | Message form presence in UI               |
+| **Contract Consumer** | `test_message_form.py`          | Form submission format verification       |
+| **Contract Provider** | `test_messages_verification.py` | API request handling verification         |
 
 ---
 
@@ -505,8 +505,8 @@ pytest tests/test_contract/ -m messages     # Contract tests only
 
 After completing all steps:
 
-1. **Functionality:** Users can send messages to conversations they've joined
-2. **Authorization:** Only joined participants can send messages
+1. **Functionality:** Users can create messages in conversations they've joined
+2. **Authorization:** Only joined participants can create messages
 3. **Validation:** Empty messages are rejected
 4. **UI:** Message form appears on conversation detail page
 5. **API:** Proper HTTP responses and redirects

@@ -1,17 +1,17 @@
-# Message sending: Test implementations
+# Message creation: Test implementations
 
 ## 🧪 Complete test code examples
 
-This document provides the complete test implementations for the message sending feature, following the TDD workflow outlined in the implementation plan.
+This document provides the complete test implementations for the message creation feature, following the TDD workflow outlined in the implementation plan.
 
 ---
 
 ## 📋 API integration tests
 
-### **File: `tests/test_api/test_send_message.py`**
+### **File: `tests/test_api/test_create_message.py`**
 
 ```python
-# Tests for post /conversations/{slug}/messages
+# Tests for POST /conversations/{slug}/messages
 import uuid
 from datetime import datetime, timezone
 
@@ -27,7 +27,7 @@ from app.schemas.participant import ParticipantStatus
 pytestmark = pytest.mark.asyncio
 
 
-async def test_send_message_conversation_not_found(
+async def test_create_message_conversation_not_found(
     authenticated_client: AsyncClient,
     logged_in_user: User,
 ):
@@ -42,7 +42,7 @@ async def test_send_message_conversation_not_found(
     assert response.status_code == 403
 
 
-async def test_send_message_not_participant(
+async def test_create_message_not_participant(
     authenticated_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user: User,
@@ -71,7 +71,7 @@ async def test_send_message_not_participant(
     assert response.status_code == 403
 
 
-async def test_send_message_invited_status(
+async def test_create_message_invited_status(
     authenticated_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user: User,
@@ -110,7 +110,7 @@ async def test_send_message_invited_status(
     assert response.status_code == 403
 
 
-async def test_send_message_success(
+async def test_create_message_success(
     authenticated_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user: User,
@@ -172,7 +172,7 @@ async def test_send_message_success(
 
 
 @pytest.mark.parametrize("invalid_content", ["", "   ", "\n\t  "])
-async def test_send_message_invalid_content(
+async def test_create_message_invalid_content(
     authenticated_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user: User,
@@ -224,7 +224,7 @@ async def test_send_message_invalid_content(
         assert count == 0
 
 
-async def test_send_message_form_missing_data(
+async def test_create_message_form_missing_data(
     authenticated_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user: User,
@@ -349,14 +349,14 @@ from tests.test_contract.tests.shared.mock_data_factory import MockDataFactory
 
 @pytest.mark.consumer
 @pytest.mark.messages
-async def test_consumer_send_message_success(page: Page):
+async def test_consumer_create_message_success(page: Page):
     """Test message form submission creates correct Pact contract."""
 
-    pact = setup_pact("send-message-form", "conversations-api")
+    pact = setup_pact("create-message-form", "conversations-api")
 
     # Define the expected interaction
     pact.given("user is joined participant in conversation") \
-        .upon_receiving("a request to send a message") \
+        .upon_receiving("a request to create a message") \
         .with_request(
             method="POST",
             path="/conversations/test-slug/messages",
@@ -380,13 +380,13 @@ async def test_consumer_send_message_success(page: Page):
 
 @pytest.mark.consumer
 @pytest.mark.messages
-async def test_consumer_send_message_empty_content(page: Page):
+async def test_consumer_create_message_empty_content(page: Page):
     """Test message form submission with empty content."""
 
-    pact = setup_pact("send-message-form", "conversations-api")
+    pact = setup_pact("create-message-form", "conversations-api")
 
     pact.given("user is joined participant in conversation") \
-        .upon_receiving("a request to send an empty message") \
+        .upon_receiving("a request to create an empty message") \
         .with_request(
             method="POST",
             path="/conversations/test-slug/messages",
@@ -427,7 +427,7 @@ class MessagesVerification(BaseProviderVerification):
 
     @property
     def consumer_name(self) -> str:
-        return "send-message-form"
+        return "create-message-form"
 
     @property
     def dependency_config(self):
@@ -449,7 +449,7 @@ messages_verification = MessagesVerification()
 @pytest.mark.provider
 @pytest.mark.messages
 def test_provider_messages_pact_verification(provider_server: URL):
-    """Verify API can handle consumer's message sending requests."""
+    """Verify API can handle consumer's message creation requests."""
     messages_verification.verify_pact(provider_server)
 ```
 
@@ -460,7 +460,7 @@ def test_provider_messages_pact_verification(provider_server: URL):
 def create_message_dependency_config(cls):
     """Create mock config for message endpoints."""
     return {
-        "app.logic.conversation_processing.handle_send_message": {
+        "app.logic.conversation_processing.handle_create_message": {
             "return_value_config": cls.create_message()
         }
     }
@@ -488,12 +488,12 @@ def create_message(cls, **overrides):
 
 ```bash
 # Run specific API tests
-pytest tests/test_api/test_send_message.py::test_send_message_success -v
-pytest tests/test_api/test_send_message.py::test_send_message_not_participant -v
+pytest tests/test_api/test_create_message.py::test_create_message_success -v
+pytest tests/test_api/test_create_message.py::test_create_message_not_participant -v
 pytest tests/test_api/test_get_conversation.py::test_get_conversation_has_message_form -v
 
-# Run all message sending API tests
-pytest tests/test_api/test_send_message.py -v
+# Run all message creation API tests
+pytest tests/test_api/test_create_message.py -v
 
 # Run contract consumer tests
 pytest tests/test_contract/tests/consumer/test_message_form.py -v
@@ -525,16 +525,16 @@ pytest
 pytest tests/test_api/test_get_conversation.py::test_get_conversation_has_message_form -v
 
 # Step 2: Test basic route functionality
-pytest tests/test_api/test_send_message.py::test_send_message_success -v
+pytest tests/test_api/test_create_message.py::test_create_message_success -v
 
 # Step 3: Test authorization scenarios
-pytest tests/test_api/test_send_message.py -k "not_participant or invited_status or conversation_not_found" -v
+pytest tests/test_api/test_create_message.py -k "not_participant or invited_status or conversation_not_found" -v
 
 # Step 4: Test validation scenarios
-pytest tests/test_api/test_send_message.py -k "invalid_content or missing_data" -v
+pytest tests/test_api/test_create_message.py -k "invalid_content or missing_data" -v
 
 # Step 5: Verify refactoring didn't break anything
-pytest tests/test_api/test_send_message.py -v
+pytest tests/test_api/test_create_message.py -v
 
 # Step 6-7: Contract tests
 pytest tests/test_contract/ -m messages -v
@@ -544,14 +544,14 @@ pytest tests/test_contract/ -m messages -v
 
 ## 📊 Test coverage matrix
 
-| Scenario                   | API Test                                      | Contract Test                                 | Status Code | Database Check  |
-| -------------------------- | --------------------------------------------- | --------------------------------------------- | ----------- | --------------- |
-| **Success**                | ✅ `test_send_message_success`                | ✅ `test_consumer_send_message_success`       | 303         | Message created |
-| **Not Participant**        | ✅ `test_send_message_not_participant`        | ❌                                            | 403         | No message      |
-| **Invited Status**         | ✅ `test_send_message_invited_status`         | ❌                                            | 403         | No message      |
-| **Conversation Not Found** | ✅ `test_send_message_conversation_not_found` | ❌                                            | 403         | No message      |
-| **Empty Content**          | ✅ `test_send_message_invalid_content`        | ✅ `test_consumer_send_message_empty_content` | 400         | No message      |
-| **Missing Data**           | ✅ `test_send_message_form_missing_data`      | ❌                                            | 422         | No message      |
-| **Form Presence**          | ✅ `test_get_conversation_has_message_form`   | ❌                                            | 200         | N/A             |
+| Scenario                   | API Test                                        | Contract Test                                   | Status Code | Database Check  |
+| -------------------------- | ----------------------------------------------- | ----------------------------------------------- | ----------- | --------------- |
+| **Success**                | ✅ `test_create_message_success`                | ✅ `test_consumer_create_message_success`       | 303         | Message created |
+| **Not Participant**        | ✅ `test_create_message_not_participant`        | ❌                                              | 403         | No message      |
+| **Invited Status**         | ✅ `test_create_message_invited_status`         | ❌                                              | 403         | No message      |
+| **Conversation Not Found** | ✅ `test_create_message_conversation_not_found` | ❌                                              | 403         | No message      |
+| **Empty Content**          | ✅ `test_create_message_invalid_content`        | ✅ `test_consumer_create_message_empty_content` | 400         | No message      |
+| **Missing Data**           | ✅ `test_create_message_form_missing_data`      | ❌                                              | 422         | No message      |
+| **Form Presence**          | ✅ `test_get_conversation_has_message_form`     | ❌                                              | 200         | N/A             |
 
-This comprehensive test suite ensures the message sending feature is thoroughly tested at both the API integration level and the contract level, following the established patterns in the codebase.
+This comprehensive test suite ensures the message creation feature is thoroughly tested at both the API integration level and the contract level, following the established patterns in the codebase.
