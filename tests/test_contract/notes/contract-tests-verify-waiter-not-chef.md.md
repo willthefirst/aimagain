@@ -1,10 +1,10 @@
 # Contract tests test the waiter, not the chef
 
-## The Restaurant Analogy
+## The restaurant analogy
 
-Imagine you're testing a restaurant's ordering system. There are two distinct roles to test:
+This analogy helps clarify what contract tests should and shouldn't verify.
 
-### Testing the Waiter (Contract Tests)
+### Testing the waiter (Contract tests)
 
 - Verifies the waiter can take orders correctly
 - Ensures the waiter understands the menu
@@ -20,7 +20,7 @@ The waiter test doesn't care if the food is good - it only cares that the order 
   - The order is formatted properly for the kitchen
   - The waiter knows how to handle special requests
 
-### Testing the Chef (Functional Tests)
+### Testing the chef (Functional tests)
 
 - Verifies the food is prepared correctly
 - Ensures ingredients are fresh
@@ -101,7 +101,7 @@ For example, what if the PROVIDER team decides they want to change the error cod
 
 The contract test really just tests 'the thing that comes from the consumer is in the right shape for the provider'. As far as what the provider then does, how it responds, that's beyond the scope of the contract test.,
 
-## Key Takeaways
+## Key takeaways
 
 1. **Separation of Concerns**
 

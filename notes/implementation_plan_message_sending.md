@@ -1,10 +1,10 @@
-# Implementation Plan: Message Sending Feature
+# Implementation plan: Message sending feature
 
 ## 🎯 Overview
 
 This plan implements the ability for users to send messages to conversations they have joined. The implementation follows the established TDD workflow and focuses on two testing layers: **Contract Tests** and **API Integration Tests**.
 
-## 🏗️ TDD Workflow
+## 🏗️ TDD workflow
 
 For each step below, the workflow is:
 
@@ -16,13 +16,13 @@ For each step below, the workflow is:
 
 ---
 
-## 📋 Step-by-Step Implementation Plan
+## 📋 Step-by-step implementation plan
 
-### **Step 1: Add Message Form to Conversation Detail Page**
+### **Step 1: Add message form to conversation detail page**
 
 **Goal:** Add a form to `templates/conversations/detail.html` that allows users to send messages.
 
-#### **Red Phase - Write Failing Test**
+#### **Red phase - Write failing test**
 
 - **File:** `tests/test_api/test_get_conversation.py`
 - **Test:** Add `test_get_conversation_has_message_form`
@@ -41,7 +41,7 @@ pytest tests/test_api/test_get_conversation.py::test_get_conversation_has_messag
 
 Expected: Test fails (form elements not found)
 
-#### **Green Phase - Write Code**
+#### **Green phase - Write code**
 
 - **File:** `templates/conversations/detail.html`
 - **Changes:** Add message form after the messages list:
@@ -79,11 +79,11 @@ Expected: Test passes
 
 ---
 
-### **Step 2: Create Message Sending Route**
+### **Step 2: Create message sending route**
 
 **Goal:** Implement `POST /conversations/{slug}/messages` endpoint.
 
-#### **Red Phase - Write Failing Test**
+#### **Red phase - Write failing test**
 
 - **File:** `tests/test_api/test_send_message.py` (new file)
 - **Test:** `test_send_message_success`
@@ -102,7 +102,7 @@ pytest tests/test_api/test_send_message.py::test_send_message_success -v
 
 Expected: Test fails (404 - route doesn't exist)
 
-#### **Green Phase - Write Code**
+#### **Green phase - Write code**
 
 - **File:** `app/api/routes/conversations.py`
 - **Changes:** Add new route:
@@ -137,11 +137,11 @@ Expected: Test fails (message not created in database)
 
 ---
 
-### **Step 3: Implement Service Layer Message Sending**
+### **Step 3: Implement service layer message sending**
 
 **Goal:** Add message sending logic to `ConversationService`.
 
-#### **Red Phase - Write Additional Tests**
+#### **Red phase - Write additional tests**
 
 - **File:** `tests/test_api/test_send_message.py`
 - **Tests:** Add authorization and validation tests:
@@ -158,7 +158,7 @@ pytest tests/test_api/test_send_message.py -v
 
 Expected: All new tests fail
 
-#### **Green Phase - Write Code**
+#### **Green phase - Write code**
 
 - **File:** `app/services/conversation_service.py`
 - **Changes:** Add `send_message_to_conversation` method:
@@ -231,11 +231,11 @@ Expected: Tests still fail (route doesn't call service)
 
 ---
 
-### **Step 4: Connect Route to Service Layer**
+### **Step 4: Connect route to service layer**
 
 **Goal:** Update the route to call the service and handle errors properly.
 
-#### **Green Phase - Write Code**
+#### **Green phase - Write code**
 
 - **File:** `app/api/routes/conversations.py`
 - **Changes:** Update `send_message` route:
@@ -279,11 +279,11 @@ Expected: All tests pass
 
 ---
 
-### **Step 5: Refactor with Processing Handler**
+### **Step 5: Refactor with processing handler**
 
 **Goal:** Extract business logic into a processing handler for better separation of concerns.
 
-#### **Refactor Phase - Create Handler**
+#### **Refactor phase - Create handler**
 
 - **File:** `app/logic/conversation_processing.py`
 - **Changes:** Add `handle_send_message` function:
@@ -315,7 +315,7 @@ async def handle_send_message(
         raise ServiceError("An unexpected error occurred while sending the message.")
 ```
 
-#### **Refactor Phase - Update Route**
+#### **Refactor phase - Update route**
 
 - **File:** `app/api/routes/conversations.py`
 - **Changes:** Simplify route to use handler:
@@ -357,11 +357,11 @@ Expected: All tests still pass (refactoring doesn't change behavior)
 
 ---
 
-### **Step 6: Contract Tests - Consumer**
+### **Step 6: Contract tests - Consumer**
 
 **Goal:** Create consumer contract tests for message sending form interaction.
 
-#### **Write Consumer Test**
+#### **Write consumer test**
 
 - **File:** `tests/test_contract/tests/consumer/test_message_form.py` (new file)
 - **Test:** `test_consumer_send_message_success`
@@ -397,7 +397,7 @@ async def test_consumer_send_message_success(page: Page):
         await page.locator("button[type='submit']").click()
 ```
 
-#### **Run Consumer Test**
+#### **Run consumer test**
 
 ```bash
 # Run consumer test (generates Pact file)
@@ -406,16 +406,16 @@ pytest tests/test_contract/tests/consumer/test_message_form.py -v
 
 ---
 
-### **Step 7: Contract Tests - Provider**
+### **Step 7: Contract tests - Provider**
 
 **Goal:** Create provider verification tests for message sending API.
 
-#### **Red Phase - Write Provider Test**
+#### **Red phase - Write provider test**
 
 - **File:** `tests/test_contract/tests/provider/test_messages_verification.py` (new file)
 - **Test:** `test_provider_messages_pact_verification`
 
-#### **Green Phase - Setup Mock Data Factory**
+#### **Green phase - Setup mock data factory**
 
 - **File:** `tests/test_contract/tests/shared/mock_data_factory.py`
 - **Changes:** Add message-related mock methods:
@@ -440,7 +440,7 @@ def create_message(cls, **overrides):
     )
 ```
 
-#### **Green Phase - Write Provider Verification**
+#### **Green phase - Write provider verification**
 
 ```python
 class MessagesVerification(BaseProviderVerification):
@@ -466,7 +466,7 @@ def test_provider_messages_pact_verification(provider_server: URL):
     messages_verification.verify_pact(provider_server)
 ```
 
-#### **Run Provider Test**
+#### **Run provider test**
 
 ```bash
 pytest tests/test_contract/tests/provider/test_messages_verification.py -v
@@ -476,9 +476,9 @@ Expected: Test passes (verifies API can handle consumer's request format)
 
 ---
 
-## 🧪 Complete Test Suite
+## 🧪 Complete test suite
 
-### **Run All Tests**
+### **Run all tests**
 
 ```bash
 # Run all tests to ensure no regressions
@@ -490,7 +490,7 @@ pytest tests/test_api/test_send_message.py  # API integration tests
 pytest tests/test_contract/ -m messages     # Contract tests only
 ```
 
-### **Test Coverage Summary**
+### **Test coverage summary**
 
 | Test Type             | File                            | Purpose                                  |
 | --------------------- | ------------------------------- | ---------------------------------------- |
@@ -501,7 +501,7 @@ pytest tests/test_contract/ -m messages     # Contract tests only
 
 ---
 
-## ✅ Success Criteria
+## ✅ Success criteria
 
 After completing all steps:
 

@@ -1,4 +1,4 @@
-# Echobot Implementation Plan
+# Echobot implementation plan
 
 ## Purpose
 
@@ -15,7 +15,7 @@ To facilitate easier manual and potentially automated testing of conversation fe
     - This requires monitoring new messages (perhaps via SSE internally or another mechanism) and triggering a response. Care must be taken to avoid infinite loops if two echobots were in a conversation (e.g., by ignoring messages sent _by_ `echobot`).
 5.  **Distinct Username:** The username should clearly identify it, e.g., `echobot`.
 
-## Implementation Considerations
+## Implementation considerations
 
 - **Seeding:** How will the initial `echobot` user be created reliably in different environments (dev, test, prod)? A data migration using Alembic is a good option.
 - **Auto-Join Mechanism:** A background task or modifying the participant update logic seems most robust. Directly adding logic to the invite endpoint might tightly couple concerns.

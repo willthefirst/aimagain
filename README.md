@@ -1,6 +1,6 @@
 # Chat app project
 
-This document outlines the initial technical preferences and MVP scope for building this chat application.
+This is a simple chat application built with FastAPI and SQLite.
 
 ## Core technical choices
 
@@ -11,8 +11,17 @@ This document outlines the initial technical preferences and MVP scope for build
 - **Database:** SQLite.
 - **Real-time updates:** Server-Sent Events (SSE).
 - **Development process:** Test-Driven Development (TDD).
+- **FastAPI** for the web framework
+- **SQLite** for the database (with SQLAlchemy ORM)
+- **Alembic** for database migrations
+- **Jinja2** for HTML templating
+- **HTMX** for dynamic frontend interactions
+- **pytest** for testing
+- **Pydantic** for data validation
 
 ## MVP scope
+
+The MVP focuses on basic conversation functionality with user invitations.
 
 **Note on authentication:** For the initial implementation of the following user stories, we will use placeholder logic (e.g., querying the first user) to represent the "authenticated user". Proper authentication (as described in the Authentication section below) will be implemented as a separate step across all relevant endpoints once the core features are functional.
 

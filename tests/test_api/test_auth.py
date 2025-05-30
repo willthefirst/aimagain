@@ -230,7 +230,7 @@ async def test_get_forgot_password_page(test_client: AsyncClient):
     response = await test_client.get("/auth/forgot-password")
     assert response.status_code == 200
     assert "text/html" in response.headers["content-type"]
-    assert "<h1>Forgot Password</h1>" in response.text  # Basic check
+    assert "<h1>Forgot password</h1>" in response.text  # Basic check
 
 
 async def test_get_reset_password_page(test_client: AsyncClient):
@@ -240,7 +240,7 @@ async def test_get_reset_password_page(test_client: AsyncClient):
     response = await test_client.get(f"/auth/reset-password/{reset_token}")
     assert response.status_code == 200
     assert "text/html" in response.headers["content-type"]
-    assert "<h1>Reset Password</h1>" in response.text  # Basic check
+    assert "<h1>Reset password</h1>" in response.text  # Basic check
     # Check if token is potentially embedded in the form/page for use by JS/form submission
     assert (
         f'value="{reset_token}"' in response.text

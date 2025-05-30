@@ -1,10 +1,10 @@
-# How to Participate in Conversations
+# How to participate in conversations
 
 ## Overview
 
 This document describes the typical flow for creating, joining, and participating in conversations in our chat application using the web interface.
 
-## Conversation Participation Flow
+## Conversation participation flow
 
 ```mermaid
 sequenceDiagram
@@ -56,7 +56,7 @@ sequenceDiagram
     API->>User2: Deliver message via SSE
 ```
 
-## How It Works
+## How it works
 
 1.  **Initiating a Conversation (UI Flow)**:
 
@@ -78,6 +78,6 @@ sequenceDiagram
     - An invited user can reject an invitation by updating their participant status to `REJECTED` (e.g., `PUT /participants/{participant_id}` with `status='rejected'`).
     - A joined user can leave by updating their status to `LEFT`.
 
-## Important Note
+## Important note
 
 **Only participants with a `JOINED` status can invite _additional_ users to an existing conversation (via `POST /conversations/{slug}/participants`).** The initial creation `POST /conversations` handles the first invitation implicitly based on the submitted username.

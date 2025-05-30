@@ -1,10 +1,10 @@
-# Contract Tests: Testing the Waiter, Not the Chef
+# Contract tests: Testing the waiter, not the chef
 
 This directory contains contract tests using the Pact framework to ensure API compatibility between consumers and providers. Our approach follows the "waiter vs chef" testing philosophy - **contract tests verify that systems can communicate correctly, while functional tests verify they communicate meaningfully**.
 
-## 🎯 Core Philosophy: The Restaurant Analogy
+## 🎯 Core philosophy: The restaurant analogy
 
-### Testing the Waiter (Contract Tests) ✅ What We Do
+### Testing the waiter (Contract tests) ✅ What we do
 
 - **Request Format Validation**: Verifies client sends data in correct format (`application/x-www-form-urlencoded` vs `application/json`)
 - **Required Fields**: Ensures all mandatory fields are present (`invitee_username`, `initial_message`)
@@ -20,7 +20,7 @@ This directory contains contract tests using the Pact framework to ensure API co
 ✅ Verifies: API can parse the request without errors
 ```
 
-### Testing the Chef (Functional Tests) ❌ What We Don't Do
+### Testing the chef (Functional tests) ❌ What we don't do
 
 - **Business Logic**: Whether user exists, permissions, validation rules
 - **Data Processing**: How data is transformed, stored, or retrieved
@@ -36,11 +36,11 @@ This directory contains contract tests using the Pact framework to ensure API co
 ❌ Don't Test: Complex validation logic or business rules
 ```
 
-## 🏗️ Architecture: Ultra-Thin Layer Approach
+## 🏗️ Architecture: Ultra-thin layer approach
 
 We separate API contract verification from business logic using a two-layer architecture:
 
-### Layer 1: Route Handlers (Ultra-Thin)
+### Layer 1: Route handlers (Ultra-thin)
 
 ```python
 @router.post("/conversations", response_model=ConversationResponse)
@@ -55,7 +55,7 @@ async def conversation_request_handler(
 
 **Responsibilities**: Request parsing, response formatting, dependency injection
 
-### Layer 2: Business Logic Handlers (Full Logic)
+### Layer 2: Business logic handlers (Full logic)
 
 ```python
 async def handle_create_conversation(
@@ -70,7 +70,7 @@ async def handle_create_conversation(
 
 **Responsibilities**: Business logic, validation, service integration, error handling
 
-### Contract Test Mocking Strategy
+### Contract test mocking strategy
 
 Provider tests mock **only** the business logic handler, keeping the route layer intact:
 
@@ -83,7 +83,7 @@ dependency_config = {
 }
 ```
 
-## 📋 Test Responsibilities Matrix
+## 📋 Test responsibilities matrix
 
 | Test Type                       | Purpose                       | What It Verifies                     | What It Mocks                | Speed  |
 | ------------------------------- | ----------------------------- | ------------------------------------ | ---------------------------- | ------ |
@@ -93,7 +93,7 @@ dependency_config = {
 | **Functional (Business Logic)** | Business rules work correctly | Authentication, validation, services | External dependencies        | Medium |
 | **Integration**                 | End-to-end functionality      | Complete user workflows              | Nothing (real dependencies)  | Slow   |
 
-## 📁 Directory Structure
+## 📁 Directory structure
 
 ```
 tests/test_contract/
@@ -133,9 +133,9 @@ tests/test_contract/
     └── reports/                      # Test reports
 ```
 
-## 🔧 Implementation Patterns
+## 🔧 Implementation patterns
 
-### Consumer Test Pattern
+### Consumer test pattern
 
 Consumer tests use Playwright to interact with real web forms:
 
@@ -168,7 +168,7 @@ async def test_consumer_conversation_create_success(page: Page):
         await page.locator("button[type='submit']").click()
 ```
 
-### Provider Test Pattern
+### Provider test pattern
 
 Provider tests use the `BaseProviderVerification` pattern:
 
@@ -202,7 +202,7 @@ def test_provider_conversations_pact_verification(provider_server: URL):
     conversations_verification.verify_pact(provider_server)
 ```
 
-### Mock Data Factory Pattern
+### Mock data factory pattern
 
 Centralized, consistent mock data creation:
 
@@ -235,9 +235,9 @@ class MockDataFactory:
         )
 ```
 
-## 🚀 Running Tests
+## 🚀 Running tests
 
-### Consumer Tests (Generate Pact Files)
+### Consumer tests (Generate pact files)
 
 ```bash
 # Run all consumer tests
@@ -249,7 +249,7 @@ pytest tests/consumer/ -m conversations
 pytest tests/consumer/ -m invitations
 ```
 
-### Provider Tests (Verify Against Pact Files)
+### Provider tests (Verify against pact files)
 
 ```bash
 # Run all provider verification tests
@@ -260,7 +260,7 @@ pytest tests/provider/ -m auth
 pytest tests/provider/ -m conversations
 ```
 
-### All Contract Tests
+### All contract tests
 
 ```bash
 # Run complete contract test suite
@@ -273,9 +273,9 @@ pytest tests/ -v
 pytest tests/consumer/test_conversation_form.py::test_consumer_conversation_create_success
 ```
 
-## ➕ Adding New Contract Tests
+## ➕ Adding new contract tests
 
-### Step 1: Consumer Test
+### Step 1: Consumer test
 
 ```python
 # tests/consumer/test_new_feature_form.py
@@ -304,7 +304,7 @@ async def test_consumer_new_feature_success(page: Page):
         await page.click("button[type='submit']")
 ```
 
-### Step 2: Provider Test
+### Step 2: Provider test
 
 ```python
 # tests/provider/test_features_verification.py
@@ -331,7 +331,7 @@ def test_provider_features_pact_verification(provider_server: URL):
     features_verification.verify_pact(provider_server)
 ```
 
-### Step 3: Mock Data Factory
+### Step 3: Mock data factory
 
 ```python
 # Add to tests/shared/mock_data_factory.py
@@ -352,7 +352,7 @@ def create_feature(cls, **overrides):
     )
 ```
 
-## 🎯 Test Categories & Markers
+## 🎯 Test categories & markers
 
 ```python
 # Pytest markers for organizing tests
@@ -365,9 +365,9 @@ pytest.mark.participants  # Participant-related tests
 pytest.mark.slow          # Slow running tests (>5 seconds)
 ```
 
-## ✅ What Contract Tests Protect Against
+## ✅ What contract tests protect against
 
-### Format Mismatches
+### Format mismatches
 
 ```
 ❌ Consumer sends: {"invitee_username": "test"}  (JSON)
@@ -375,7 +375,7 @@ pytest.mark.slow          # Slow running tests (>5 seconds)
 → Contract test catches this mismatch
 ```
 
-### Missing Required Fields
+### Missing required fields
 
 ```
 ❌ Consumer sends: initial_message=hello
@@ -383,7 +383,7 @@ pytest.mark.slow          # Slow running tests (>5 seconds)
 → Contract test catches missing field
 ```
 
-### Wrong HTTP Methods
+### Wrong HTTP methods
 
 ```
 ❌ Consumer sends: GET /conversations
@@ -391,7 +391,7 @@ pytest.mark.slow          # Slow running tests (>5 seconds)
 → Contract test catches method mismatch
 ```
 
-### Response Format Changes
+### Response format changes
 
 ```
 ❌ Provider returns: 200 OK with JSON body
@@ -399,9 +399,9 @@ pytest.mark.slow          # Slow running tests (>5 seconds)
 → Contract test catches response mismatch
 ```
 
-## ❌ What Contract Tests DON'T Protect Against
+## ❌ What contract tests DON'T protect against
 
-### Business Logic Issues
+### Business logic issues
 
 ```
 ✅ Contract: Request format is correct
@@ -409,7 +409,7 @@ pytest.mark.slow          # Slow running tests (>5 seconds)
 → Functional tests handle business logic
 ```
 
-### Data Validation
+### Data validation
 
 ```
 ✅ Contract: Email field is present
@@ -417,7 +417,7 @@ pytest.mark.slow          # Slow running tests (>5 seconds)
 → Functional tests handle validation
 ```
 
-### Service Integration
+### Service integration
 
 ```
 ✅ Contract: API accepts request
@@ -436,14 +436,14 @@ Key configuration files:
 
 ## 🐛 Troubleshooting
 
-### Common Issues
+### Common issues
 
 1. **Pact file not found**: Run consumer tests first to generate Pact files
 2. **Provider verification fails**: Check mock configuration matches expected response
 3. **Form submission fails**: Verify form field names match Pact request body
 4. **Server startup issues**: Check port conflicts and dependency overrides
 
-### Debug Commands
+### Debug commands
 
 ```bash
 # Run with verbose output
