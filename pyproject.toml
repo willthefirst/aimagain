@@ -29,6 +29,7 @@ dependencies = [
     "isort",
     "black",
     "autoflake",
+    "pre-commit",  # Add pre-commit for git hooks
 ]
 
 [tool.setuptools.packages.find]
@@ -43,3 +44,25 @@ target-version = ['py311']
 [tool.isort]
 profile = "black"
 line_length = 88
+
+# Title case checking configuration
+[tool.title-case-check]
+# Files and patterns to ignore
+ignore_files = [
+    "*.log",
+    "*.tmp",
+    ".git/**",
+    "venv/**",
+    "node_modules/**",
+    "build/**",
+    "dist/**",
+    "__pycache__/**",
+]
+
+# Words that should always be capitalized
+always_capitalize = [
+    "API", "APIs", "URL", "URLs", "HTTP", "HTTPS", "JSON", "XML", "HTML", "CSS", "JS",
+    "SQL", "REST", "RESTful", "FastAPI", "SQLAlchemy", "Jinja2", "pytest", "GitHub",
+    "OAuth", "JWT", "UUID", "UUIDs", "CRUD", "TDD", "LLM", "LLMs", "AI", "MVP",
+    "PostgreSQL", "SQLite", "Docker", "Python", "JavaScript", "TypeScript",
+]

@@ -1,0 +1,37 @@
+# Pre-commit configuration for code quality checks
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.4.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-added-large-files
+      - id: check-merge-conflict
+
+  - repo: https://github.com/psf/black
+    rev: 23.1.0
+    hooks:
+      - id: black
+        language_version: python3.11
+
+  - repo: https://github.com/pycqa/isort
+    rev: 5.12.0
+    hooks:
+      - id: isort
+
+  - repo: https://github.com/PyCQA/autoflake
+    rev: v2.0.1
+    hooks:
+      - id: autoflake
+        args: [--remove-all-unused-imports, --in-place]
+
+  - repo: local
+    hooks:
+      - id: title-case-check
+        name: Check title case
+        entry: python scripts/title_case_check.py
+        language: python
+        files: \.(md|html|jinja|jinja2)$
+        pass_filenames: true
+        args: [--check-only]

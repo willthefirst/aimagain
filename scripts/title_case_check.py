@@ -1,0 +1,376 @@
+#!/usr/bin/env python3
+"""
+Title case checker for enforcing sentence case in documentation and templates.
+
+This script checks for titles that should be in sentence case and reports violations.
+It supports multiple file formats and allows for flexible exception handling.
+
+Usage:
+    python scripts/title_case_check.py                    # Check all files
+    python scripts/title_case_check.py --fix              # Auto-fix violations
+    python scripts/title_case_check.py --check-only       # Only report, don't fix
+    python scripts/title_case_check.py templates/         # Check specific directory
+"""
+
+import argparse
+import re
+import sys
+from pathlib import Path
+from typing import Dict, List, Set, Tuple, Union
+
+
+class TitleCaseChecker:
+    """Check and optionally fix title case violations."""
+
+    # Patterns for different file types
+    PATTERNS = {
+        "markdown": [
+            (r"^(#{1,6})\s+(.+)$", "markdown_header"),
+            (r"<h([1-6]).*?>(.*?)</h\1>", "html_header_in_md"),
+        ],
+        "html": [
+            (r"<h([1-6])[^>]*>(.*?)</h\1>", "html_header"),
+            (r"<title[^>]*>(.*?)</title>", "html_title"),
+        ],
+        "jinja": [
+            (r"<h([1-6])[^>]*>(.*?)</h\1>", "html_header"),
+            (r"<title[^>]*>(.*?)</title>", "html_title"),
+            (r"{%\s*block\s+title\s*%}(.*?){%\s*endblock\s*%}", "jinja_title_block"),
+        ],
+    }
+
+    # File extensions to check
+    FILE_EXTENSIONS = {
+        ".md": "markdown",
+        ".markdown": "markdown",
+        ".html": "html",
+        ".htm": "html",
+        ".jinja": "jinja",
+        ".jinja2": "jinja",
+    }
+
+    # Words that should remain capitalized (proper nouns, acronyms, etc.)
+    ALWAYS_CAPITALIZE = {
+        "API",
+        "APIs",
+        "URL",
+        "URLs",
+        "HTTP",
+        "HTTPS",
+        "JSON",
+        "XML",
+        "HTML",
+        "CSS",
+        "JS",
+        "SQL",
+        "REST",
+        "RESTful",
+        "FastAPI",
+        "SQLAlchemy",
+        "Jinja2",
+        "pytest",
+        "GitHub",
+        "OAuth",
+        "JWT",
+        "UUID",
+        "UUIDs",
+        "CRUD",
+        "TDD",
+        "LLM",
+        "LLMs",
+        "AI",
+        "MVP",
+        "PostgreSQL",
+        "SQLite",
+        "Docker",
+        "Python",
+        "JavaScript",
+        "TypeScript",
+    }
+
+    # Exception patterns (regex patterns to ignore)
+    IGNORE_PATTERNS = [
+        r"title-case-ignore",  # Comment containing this phrase
+        r"<!-- title-case-ignore -->",  # HTML comment
+        r"{# title-case-ignore #}",  # Jinja comment
+        r"# title-case-ignore",  # Markdown comment
+    ]
+
+    def __init__(self, fix_mode: bool = False):
+        self.fix_mode = fix_mode
+        self.violations: List[Dict] = []
+
+    def should_ignore_line(self, line: str) -> bool:
+        """Check if a line should be ignored based on exception patterns."""
+        for pattern in self.IGNORE_PATTERNS:
+            if re.search(pattern, line, re.IGNORECASE):
+                return True
+        return False
+
+    def should_ignore_file(self, file_path: Path) -> bool:
+        """Check if entire file should be ignored based on .titleignore file."""
+        ignore_file = file_path.parent / ".titleignore"
+        if ignore_file.exists():
+            patterns = ignore_file.read_text().strip().split("\n")
+            for pattern in patterns:
+                pattern = pattern.strip()
+                if pattern and not pattern.startswith("#"):
+                    if file_path.match(pattern) or str(file_path).endswith(pattern):
+                        return True
+        return False
+
+    def convert_to_sentence_case(self, text: str) -> str:
+        """Convert text to sentence case, preserving proper nouns and acronyms."""
+        # Remove HTML tags for processing
+        clean_text = re.sub(r"<[^>]+>", "", text).strip()
+
+        # If empty after cleaning, return original
+        if not clean_text:
+            return text
+
+        words = clean_text.split()
+        if not words:
+            return text
+
+        result_words = []
+        for i, word in enumerate(words):
+            # Remove punctuation for checking
+            clean_word = re.sub(r"[^\w]", "", word)
+
+            if i == 0:
+                # First word: capitalize first letter only, unless it's a special word
+                if clean_word.upper() in self.ALWAYS_CAPITALIZE:
+                    result_words.append(word.replace(clean_word, clean_word.upper()))
+                else:
+                    # Capitalize only first letter
+                    if clean_word:
+                        new_word = word.replace(
+                            clean_word, clean_word[0].upper() + clean_word[1:].lower()
+                        )
+                        result_words.append(new_word)
+                    else:
+                        result_words.append(word)
+            else:
+                # Other words: only capitalize if in ALWAYS_CAPITALIZE
+                if clean_word.upper() in self.ALWAYS_CAPITALIZE:
+                    result_words.append(word.replace(clean_word, clean_word.upper()))
+                else:
+                    result_words.append(word.replace(clean_word, clean_word.lower()))
+
+        sentence_case = " ".join(result_words)
+
+        # If original had HTML tags, try to preserve them
+        if "<" in text and ">" in text:
+            # Simple approach: replace the clean text in the original
+            return text.replace(clean_text, sentence_case)
+
+        return sentence_case
+
+    def is_sentence_case(self, text: str) -> bool:
+        """Check if text follows sentence case rules."""
+        expected = self.convert_to_sentence_case(text)
+        return text == expected
+
+    def check_file(self, file_path: Path) -> List[Dict]:
+        """Check a single file for title case violations."""
+        if self.should_ignore_file(file_path):
+            return []
+
+        extension = file_path.suffix.lower()
+        if extension not in self.FILE_EXTENSIONS:
+            return []
+
+        file_type = self.FILE_EXTENSIONS[extension]
+        patterns = self.PATTERNS[file_type]
+
+        violations = []
+
+        try:
+            content = file_path.read_text(encoding="utf-8")
+            lines = content.split("\n")
+
+            for line_num, line in enumerate(lines, 1):
+                if self.should_ignore_line(line):
+                    continue
+
+                for pattern, pattern_type in patterns:
+                    matches = re.finditer(pattern, line, re.IGNORECASE | re.DOTALL)
+                    for match in matches:
+                        if pattern_type == "markdown_header":
+                            title_text = match.group(2).strip()
+                            header_level = match.group(1)
+                        elif pattern_type in ["html_header", "html_header_in_md"]:
+                            title_text = match.group(2).strip()
+                            header_level = f"h{match.group(1)}"
+                        elif pattern_type in ["html_title", "jinja_title_block"]:
+                            title_text = match.group(1).strip()
+                            header_level = "title"
+                        else:
+                            continue
+
+                        if title_text and not self.is_sentence_case(title_text):
+                            violation = {
+                                "file": file_path,
+                                "line": line_num,
+                                "original": title_text,
+                                "suggested": self.convert_to_sentence_case(title_text),
+                                "pattern_type": pattern_type,
+                                "header_level": header_level,
+                                "full_line": line,
+                            }
+                            violations.append(violation)
+
+        except Exception as e:
+            print(f"Error reading {file_path}: {e}", file=sys.stderr)
+
+        return violations
+
+    def fix_file(self, file_path: Path, violations: List[Dict]) -> bool:
+        """Fix title case violations in a file."""
+        if not violations:
+            return False
+
+        try:
+            content = file_path.read_text(encoding="utf-8")
+
+            # Sort violations by line number in reverse order to maintain line positions
+            sorted_violations = sorted(
+                violations, key=lambda v: v["line"], reverse=True
+            )
+
+            lines = content.split("\n")
+            for violation in sorted_violations:
+                line_idx = violation["line"] - 1
+                if 0 <= line_idx < len(lines):
+                    lines[line_idx] = lines[line_idx].replace(
+                        violation["original"], violation["suggested"]
+                    )
+
+            file_path.write_text("\n".join(lines), encoding="utf-8")
+            return True
+
+        except Exception as e:
+            print(f"Error fixing {file_path}: {e}", file=sys.stderr)
+            return False
+
+    def check_directory(self, directory: Path, recursive: bool = True) -> List[Dict]:
+        """Check all files in a directory."""
+        all_violations = []
+
+        if recursive:
+            pattern = "**/*"
+        else:
+            pattern = "*"
+
+        for file_path in directory.glob(pattern):
+            if file_path.is_file():
+                violations = self.check_file(file_path)
+                all_violations.extend(violations)
+
+        return all_violations
+
+    def run(self, paths: List[Union[str, Path]]) -> int:
+        """Run the checker on the given paths."""
+        all_violations = []
+
+        for path_str in paths:
+            path = Path(path_str)
+            if path.is_file():
+                violations = self.check_file(path)
+                all_violations.extend(violations)
+            elif path.is_dir():
+                violations = self.check_directory(path)
+                all_violations.extend(violations)
+            else:
+                print(f"Warning: {path} does not exist", file=sys.stderr)
+
+        if not all_violations:
+            print("✅ No title case violations found!")
+            return 0
+
+        # Group violations by file
+        by_file = {}
+        for violation in all_violations:
+            file_path = violation["file"]
+            if file_path not in by_file:
+                by_file[file_path] = []
+            by_file[file_path].append(violation)
+
+        # Report violations
+        total_violations = len(all_violations)
+        print(
+            f"❌ Found {total_violations} title case violation(s) in {len(by_file)} file(s):"
+        )
+        print()
+
+        for file_path, violations in by_file.items():
+            print(f"📄 {file_path}")
+            for violation in violations:
+                print(f"  Line {violation['line']:3d}: {violation['header_level']}")
+                print(f"    Current:   '{violation['original']}'")
+                print(f"    Suggested: '{violation['suggested']}'")
+                print()
+
+        if self.fix_mode:
+            print("🔧 Fixing violations...")
+            fixed_count = 0
+            for file_path, violations in by_file.items():
+                if self.fix_file(file_path, violations):
+                    fixed_count += len(violations)
+                    print(f"✅ Fixed {len(violations)} violation(s) in {file_path}")
+
+            print(f"\n✅ Fixed {fixed_count} out of {total_violations} violations")
+            return 0 if fixed_count == total_violations else 1
+        else:
+            print("💡 Run with --fix to automatically correct these violations")
+            print("💡 Add 'title-case-ignore' comment to ignore specific lines")
+            print("💡 Create .titleignore file to ignore specific files/patterns")
+            return 1
+
+
+def main():
+    parser = argparse.ArgumentParser(
+        description="Check and fix title case violations",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  python scripts/title_case_check.py                    # Check all files
+  python scripts/title_case_check.py --fix              # Auto-fix violations  
+  python scripts/title_case_check.py templates/         # Check specific directory
+  python scripts/title_case_check.py README.md notes/   # Check specific files/dirs
+
+Exception handling:
+  - Add 'title-case-ignore' in a comment to ignore specific lines
+  - Create .titleignore file with glob patterns to ignore files
+  - Use --check-only to report without fixing
+        """,
+    )
+
+    parser.add_argument(
+        "paths",
+        nargs="*",
+        default=["."],
+        help="Files or directories to check (default: current directory)",
+    )
+
+    parser.add_argument(
+        "--fix", action="store_true", help="Automatically fix title case violations"
+    )
+
+    parser.add_argument(
+        "--check-only",
+        action="store_true",
+        help="Only check for violations, do not fix",
+    )
+
+    args = parser.parse_args()
+
+    # --check-only overrides --fix
+    fix_mode = args.fix and not args.check_only
+
+    checker = TitleCaseChecker(fix_mode=fix_mode)
+    return checker.run(args.paths)
+
+
+if __name__ == "__main__":
+    sys.exit(main())
