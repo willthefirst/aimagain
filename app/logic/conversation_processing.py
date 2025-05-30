@@ -75,7 +75,6 @@ async def handle_get_conversation(
         f"Handler: Getting conversation details for slug: {slug} by user {requesting_user.id}"
     )
     try:
-
         conversation_details = await conv_service.get_conversation_details(
             slug=slug, requesting_user=requesting_user
         )
@@ -103,19 +102,15 @@ async def handle_list_conversations(
 ):
     """Handles the core logic for listing all public conversations."""
     try:
-
         conversations = await conv_service.get_conversations_for_listing()
         return conversations
     except DatabaseError as e:
-
         logger.error(f"Database error listing conversations: {e}", exc_info=True)
         raise
     except ServiceError as e:
-
         logger.error(f"Service error listing conversations: {e}", exc_info=True)
         raise
     except Exception as e:
-
         logger.error(
             f"Unexpected error in handle_list_conversations: {e}", exc_info=True
         )
@@ -161,18 +156,48 @@ async def handle_invite_participant(
         ConflictError,
         DatabaseError,
     ) as e:
-
         logger.info(f"Service error during invitation: {e}")
         raise
     except ServiceError as e:
-
         logger.error(f"Generic service error during invitation: {e}", exc_info=True)
         raise
     except Exception as e:
-
         logger.error(
             f"Unexpected error in handle_invite_participant: {e}", exc_info=True
         )
         raise ServiceError(
             "An unexpected error occurred during the invitation process."
+        )
+
+
+async def handle_create_message(
+    conversation_slug: str,
+    message_content: str,
+    sender_user: User,
+    conv_service: ConversationService,
+) -> None:
+    """Handles the core logic for creating a new message in a conversation."""
+    try:
+        await conv_service.create_message_in_conversation(
+            conversation_slug=conversation_slug,
+            message_content=message_content,
+            sender_user=sender_user,
+        )
+    except (
+        ConversationNotFoundError,
+        NotAuthorizedError,
+        ConflictError,
+        DatabaseError,
+    ) as e:
+        logger.info(f"Service error during message creation: {e}")
+        raise
+    except ServiceError as e:
+        logger.error(
+            f"Generic service error during message creation: {e}", exc_info=True
+        )
+        raise
+    except Exception as e:
+        logger.error(f"Unexpected error in handle_create_message: {e}", exc_info=True)
+        raise ServiceError(
+            "An unexpected error occurred during the message creation process."
         )

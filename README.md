@@ -61,7 +61,7 @@ The MVP focuses on basic conversation functionality with user invitations.
     - User B does _not_ receive real-time updates.
     - The `Conversation.last_activity_at` timestamp is updated.
 
-**3. Access control for invited users**
+**3. Access control for invited users** ✅
 
 - **As an** invited user (status='invited'),
 - **I want** my access to the conversation to be restricted,
@@ -73,7 +73,7 @@ The MVP focuses on basic conversation functionality with user invitations.
   - User B cannot send messages to Conversation C (e.g., `POST /conversations/conv-slug/messages` returns 403).
   - User B does not receive SSE updates for new messages in Conversation C.
 
-**4. Access control for joined users**
+**4. Access control for joined users** ✅
 
 - **As a** joined user (status='joined'),
 - **I want** full access to the conversation,

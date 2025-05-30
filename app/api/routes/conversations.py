@@ -7,6 +7,7 @@ from app.api.common import APIResponse, BaseRouter
 from app.auth_config import current_active_user
 from app.logic.conversation_processing import (
     handle_create_conversation,
+    handle_create_message,
     handle_get_conversation,
     handle_get_new_conversation_form,
     handle_invite_participant,
@@ -129,3 +130,26 @@ async def invite_participant(
         conv_service=conv_service,
     )
     return new_participant
+
+
+@router.post(
+    "/conversations/{slug}/messages",
+    status_code=status.HTTP_303_SEE_OTHER,
+    name="create_message",
+    tags=["conversations", "messages"],
+)
+async def create_message(
+    slug: str,
+    message_content: str = Form(...),
+    user: User = Depends(current_active_user),
+    conv_service: ConversationService = Depends(get_conversation_service),
+):
+    """Handles creating a new message in a conversation."""
+    await handle_create_message(
+        conversation_slug=slug,
+        message_content=message_content,
+        sender_user=user,
+        conv_service=conv_service,
+    )
+    redirect_url = f"/conversations/{slug}"
+    return RedirectResponse(url=redirect_url, status_code=status.HTTP_303_SEE_OTHER)

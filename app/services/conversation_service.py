@@ -1,7 +1,6 @@
 import logging
 from uuid import UUID
 
-from fastapi import HTTPException, status
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 
 from app.models import Conversation, Participant, User
@@ -199,3 +198,51 @@ class ConversationService:
             raise ServiceError(f"An unexpected error occurred during invitation.")
 
         return new_participant
+
+    async def create_message_in_conversation(
+        self,
+        conversation_slug: str,
+        message_content: str,
+        sender_user: User,
+    ) -> None:
+        """Creates a new message in a conversation and updates the conversation timestamp."""
+        conversation = await self.conv_repo.get_conversation_by_slug(conversation_slug)
+        if not conversation:
+            raise ConversationNotFoundError(
+                f"Conversation with slug '{conversation_slug}' not found."
+            )
+
+        # Check if user is a joined participant
+        is_joined = await self.part_repo.check_if_user_is_joined_participant(
+            user_id=sender_user.id, conversation_id=conversation.id
+        )
+        if not is_joined:
+            raise NotAuthorizedError(
+                "User must be a joined participant to send messages."
+            )
+
+        try:
+            # Create the message
+            await self.msg_repo.create_message(
+                content=message_content,
+                conversation_id=conversation.id,
+                user_id=sender_user.id,
+            )
+
+            # Update conversation timestamp
+            await self.conv_repo.update_conversation_timestamps(conversation)
+
+            await self.session.commit()
+
+        except IntegrityError as e:
+            await self.session.rollback()
+            logger.warning(f"Integrity error creating message: {e}", exc_info=True)
+            raise ConflictError("Could not create message due to a data conflict.")
+        except SQLAlchemyError as e:
+            await self.session.rollback()
+            logger.error(f"Database error creating message: {e}", exc_info=True)
+            raise DatabaseError("Failed to create message due to a database error.")
+        except Exception as e:
+            await self.session.rollback()
+            logger.error(f"Unexpected error creating message: {e}", exc_info=True)
+            raise ServiceError(f"An unexpected error occurred during message creation.")

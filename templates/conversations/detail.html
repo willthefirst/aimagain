@@ -52,6 +52,27 @@ conversation.slug }}{% endblock %} {% block head %}
 </ul>
 
 <hr />
+<h2>Send a message</h2>
+<form
+  action="{{ url_for('create_message', slug=conversation.slug) }}"
+  method="post"
+  name="send-message-form">
+  <div>
+    <label for="message_content">Your message:</label>
+    <textarea
+      id="message_content"
+      name="message_content"
+      rows="3"
+      cols="50"
+      placeholder="Type your message here..."
+      required>
+    </textarea>
+  </div>
+  <br />
+  <button type="submit">Send Message</button>
+</form>
+
+<hr />
 {# TODO: Add form to send new message #}
 <a href="{{ url_for('list_conversations') }}">Back to Conversations</a>
 {% endblock %}

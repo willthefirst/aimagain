@@ -179,3 +179,64 @@ async def test_get_conversation_success_joined(
     assert creator.username in messages_text
     assert me_user.username in messages_text
     assert other_joined.username in messages_text
+
+
+async def test_get_conversation_has_message_form(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user: User,
+):
+    """Test GET /conversations/{slug} includes message form for joined participants."""
+    creator = create_test_user(username=f"creator-{uuid.uuid4()}")
+    me_user = logged_in_user
+    conversation_slug = f"form-test-convo-{uuid.uuid4()}"
+    conversation_name = "Test Chat"
+
+    # Setup data
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            session.add(creator)
+            await session.flush()
+            conversation = Conversation(
+                id=uuid.uuid4(),
+                name=conversation_name,
+                slug=conversation_slug,
+                created_by_user_id=creator.id,
+            )
+            session.add(conversation)
+            await session.flush()
+
+            part_me = Participant(
+                id=uuid.uuid4(),
+                user_id=me_user.id,
+                conversation_id=conversation.id,
+                status=ParticipantStatus.JOINED,
+            )
+            session.add(part_me)
+
+    response = await authenticated_client.get(f"/conversations/{conversation_slug}")
+    assert response.status_code == 200
+    assert "text/html" in response.headers["content-type"]
+
+    tree = HTMLParser(response.text)
+
+    # Check for message form
+    message_form = tree.css_first("form[name='send-message-form']")
+    assert message_form is not None, "Message form not found"
+
+    # Check form action
+    form_action = message_form.attributes.get("action", "")
+    assert f"/conversations/{conversation_slug}/messages" in form_action
+
+    # Check form method
+    assert message_form.attributes.get("method", "").lower() == "post"
+
+    # Check for textarea
+    textarea = tree.css_first("textarea[name='message_content']")
+    assert textarea is not None, "Message content textarea not found"
+
+    # Check for submit button
+    submit_button = tree.css_first(
+        "form[name='send-message-form'] button[type='submit']"
+    )
+    assert submit_button is not None, "Submit button not found"
