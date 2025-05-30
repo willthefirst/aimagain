@@ -1,7 +1,7 @@
 ---
 description: 
 globs: 
-alwaysApply: false
+alwaysApply: true
 ---
 # Documentation Standards & Proactive README Maintenance
 
@@ -84,6 +84,9 @@ Every README should include:
 - Cross-cutting concerns and patterns
 
 ## 🎨 **Style Conventions**
+
+### **Sentence case for titles
+None of this capital case nonsense.
 
 ### **Formatting Standards:**
 ```markdown
