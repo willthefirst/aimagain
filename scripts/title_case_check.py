@@ -86,6 +86,15 @@ class TitleCaseChecker:
         "Python",
         "JavaScript",
         "TypeScript",
+        "POST",
+        "GET",
+        "PUT",
+        "DELETE",
+        "PATCH",
+        "HEAD",
+        "OPTIONS",
+        "TRACE",
+        "CONNECT",
         "Pact",  # Contract testing framework
     }
 
