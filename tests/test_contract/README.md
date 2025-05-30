@@ -106,7 +106,8 @@ tests/test_contract/
 │   ├── consumer/                      # Consumer contract tests (client-side)
 │   │   ├── test_auth_form.py         # Authentication form tests
 │   │   ├── test_conversation_form.py  # Conversation creation form tests
-│   │   └── test_invitation_form.py    # Invitation handling form tests
+│   │   ├── test_invitation_form.py    # Invitation handling form tests
+│   │   └── test_message_form.py       # Message sending form tests
 │   │
 │   ├── provider/                      # Provider contract tests (API-side)
 │   │   ├── test_auth_verification.py      # Auth API verification
@@ -247,6 +248,7 @@ pytest tests/consumer/
 pytest tests/consumer/ -m auth
 pytest tests/consumer/ -m conversations
 pytest tests/consumer/ -m invitations
+pytest tests/consumer/ -m messages
 ```
 
 ### Provider tests (verify against Pact files)
@@ -362,6 +364,7 @@ pytest.mark.auth          # Authentication-related tests
 pytest.mark.conversations # Conversation-related tests
 pytest.mark.invitations   # Invitation-related tests
 pytest.mark.participants  # Participant-related tests
+pytest.mark.messages      # Message-related tests
 pytest.mark.slow          # Slow running tests (>5 seconds)
 ```
 
