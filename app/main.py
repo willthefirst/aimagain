@@ -1,4 +1,5 @@
 from fastapi import FastAPI
+from fastapi.responses import RedirectResponse
 
 from app.api.routes import auth_routes
 from app.auth_config import auth_backend, fastapi_users
@@ -16,7 +17,7 @@ app.add_middleware(PresenceMiddleware, session_factory=get_db_session)
 
 @app.get("/")
 def read_root():
-    return {"message": "Welcome to the Chat App API"}
+    return RedirectResponse(url="/users/me/conversations", status_code=302)
 
 
 app.include_router(

@@ -1,5 +1,5 @@
 from datetime import datetime, timedelta, timezone
-from unittest.mock import AsyncMock, patch
+from unittest.mock import patch
 
 import pytest
 from httpx import AsyncClient
@@ -63,7 +63,7 @@ async def test_middleware_ignores_unauthenticated_requests(test_client: AsyncCli
     """Test middleware doesn't affect unauthenticated requests"""
     # This should not raise any errors and should work normally
     response = await test_client.get("/")
-    assert response.status_code == 200
+    assert response.status_code == 302
 
 
 async def test_middleware_handles_database_errors_gracefully(
