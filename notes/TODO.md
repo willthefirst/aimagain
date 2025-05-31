@@ -1,0 +1,4 @@
+- I want a smoother pre-commit hook experience. Goal: make it so that pre-commit hooks that are autofixable get autofixed and added to commit, without requiring one failed commit and then another one after fix is applied.
+- I want to know the command to skip precommit hooks.
+- For all the typical command line commands, I'd like see a nice list of commands to be used in the repo, maybe even a CLI, but we don't have to go crazy.
+- Now that we've successfully added the create_message functionality, I think I'd like to rig up the repo with READMEs and Cursor rules that help the agent add the feature itself in the future. Goal: can we provide the agent with sufficient docs and prompt to help it gracefully add these features on it's own?
