@@ -40,6 +40,7 @@ def origin_with_routes(request) -> str:
         def test_auth_related(...):
             ...
     """
+    print(f"origsdfsdfin_with_routes: {request}")
     # Parse configuration from request parameters
     routes_config_dict = getattr(request, "param", None) or {
         "auth_pages": True,

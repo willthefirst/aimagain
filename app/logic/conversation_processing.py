@@ -74,6 +74,7 @@ async def handle_get_conversation(
     logger.debug(
         f"Handler: Getting conversation details for slug: {slug} by user {requesting_user.id}"
     )
+    logger.warning(f"requesting_user: {requesting_user}")
     try:
         conversation_details = await conv_service.get_conversation_details(
             slug=slug, requesting_user=requesting_user

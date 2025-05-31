@@ -52,6 +52,7 @@ class ConversationService:
         Fetches detailed conversation data, including participants and messages,
         performing authorization checks.
         """
+        logger.warning(f"asdasdsad: {requesting_user}")
         conversation = await self.conv_repo.get_conversation_by_slug(slug)
         if not conversation:
             raise ConversationNotFoundError(
@@ -205,6 +206,10 @@ class ConversationService:
         message_content: str,
         sender_user: User,
     ) -> None:
+        logger.warning(f"conversation_slug: {conversation_slug}")
+        logger.warning(f"message_content: {message_content}")
+        logger.warning(f"sender_user: {sender_user}")
+        logger.warning(f"self.weeeeee")
         """Creates a new message in a conversation and updates the conversation timestamp."""
         conversation = await self.conv_repo.get_conversation_by_slug(conversation_slug)
         if not conversation:

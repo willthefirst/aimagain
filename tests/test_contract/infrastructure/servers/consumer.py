@@ -2,7 +2,7 @@
 
 import logging
 import uuid
-from typing import Dict, Optional
+from typing import Optional
 
 import uvicorn
 from fastapi import FastAPI
@@ -32,6 +32,7 @@ class ConsumerServerConfig:
         participants_pages: bool = False,
         mock_invitations: bool = False,
         mock_auth: bool = True,
+        mock_conversation_details: bool = False,
     ):
         self.auth_pages = auth_pages
         self.conversations = conversations
@@ -40,6 +41,7 @@ class ConsumerServerConfig:
         self.participants_pages = participants_pages
         self.mock_invitations = mock_invitations
         self.mock_auth = mock_auth
+        self.mock_conversation_details = mock_conversation_details
 
 
 def create_mock_invitation_data() -> list:
@@ -81,6 +83,73 @@ def create_mock_invitation_data() -> list:
     return [mock_invitation]
 
 
+def create_mock_conversation_data() -> Conversation:
+    """Create mock conversation data with participants and messages for testing."""
+    # Create mock users
+    creator_user = User(
+        id=uuid.uuid4(),
+        email="creator@example.com",
+        username="conversation_creator",
+        is_active=True,
+    )
+
+    participant_user = User(
+        id=uuid.uuid4(),
+        email="participant@example.com",
+        username="conversation_participant",
+        is_active=True,
+    )
+
+    # Create mock conversation
+    mock_conversation = Conversation(
+        id=uuid.uuid4(),
+        slug="test-conversation-slug",
+        name="Test Conversation",
+        created_by_user_id=creator_user.id,
+        last_activity_at=None,
+    )
+
+    # Create mock messages
+    message1 = Message(
+        id=uuid.uuid4(),
+        content="Hello! This is the first message.",
+        conversation_id=mock_conversation.id,
+        created_by_user_id=creator_user.id,
+    )
+    message1.sender = creator_user
+
+    message2 = Message(
+        id=uuid.uuid4(),
+        content="Hi there! Thanks for starting this conversation.",
+        conversation_id=mock_conversation.id,
+        created_by_user_id=participant_user.id,
+    )
+    message2.sender = participant_user
+
+    # Create mock participants
+    creator_participant = Participant(
+        id=uuid.uuid4(),
+        user_id=creator_user.id,
+        conversation_id=mock_conversation.id,
+        status=ParticipantStatus.JOINED,
+    )
+    creator_participant.user = creator_user
+
+    participant_participant = Participant(
+        id=uuid.uuid4(),
+        user_id=participant_user.id,
+        conversation_id=mock_conversation.id,
+        status=ParticipantStatus.JOINED,
+    )
+    participant_participant.user = participant_user
+
+    # Set up relationships
+    mock_conversation.messages = [message1, message2]
+    mock_conversation.participants = [creator_participant, participant_participant]
+
+    return mock_conversation
+
+
 def setup_consumer_app_routes(app: FastAPI, config: ConsumerServerConfig) -> None:
     """Set up routes on the consumer app based on configuration."""
     if config.auth_pages:
@@ -111,6 +180,17 @@ def setup_consumer_mocks(config: ConsumerServerConfig, logger: logging.Logger) -
             }
         }
         apply_patches_via_import(mock_invitations_config, logger)
+
+    if config.mock_conversation_details:
+        logger.info("Adding mock conversation details for contract tests")
+        mock_conversation = create_mock_conversation_data()
+
+        mock_conversation_config = {
+            "app.api.routes.conversations.handle_get_conversation": {
+                "return_value_config": mock_conversation
+            }
+        }
+        apply_patches_via_import(mock_conversation_config, logger)
 
 
 def run_consumer_server_process(
