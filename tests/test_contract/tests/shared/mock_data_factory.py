@@ -5,6 +5,7 @@ from typing import Any, Dict
 from uuid import uuid4
 
 from app.models.conversation import Conversation
+from app.models.message import Message
 from app.models.participant import Participant
 from app.schemas.participant import ParticipantStatus
 from app.schemas.user import UserRead
@@ -158,5 +159,25 @@ class MockDataFactory:
         return {
             "app.api.routes.participants.handle_update_participant_status": {
                 "return_value_config": participant
+            }
+        }
+
+    @classmethod
+    def create_message(cls, **overrides) -> Message:
+        """Create a Message instance with default or provided values."""
+        return Message(
+            id=overrides.get("id", cls.MOCK_MESSAGE_ID),
+            content=overrides.get("content", "Test message"),
+            conversation_id=overrides.get("conversation_id", cls.MOCK_CONVERSATION_ID),
+            created_by_user_id=overrides.get("created_by_user_id", cls.MOCK_USER_ID),
+            created_at=overrides.get("created_at", datetime.now(timezone.utc)),
+        )
+
+    @classmethod
+    def create_message_dependency_config(cls) -> Dict[str, Any]:
+        """Create mock config for message endpoints."""
+        return {
+            "app.api.routes.conversations.handle_create_message": {
+                "return_value_config": None  # handle_create_message returns None
             }
         }
