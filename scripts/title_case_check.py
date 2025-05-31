@@ -423,19 +423,55 @@ class TitleCaseChecker:
             return False
 
     def check_directory(self, directory: Path, recursive: bool = True) -> List[Dict]:
-        """Check all files in a directory."""
+        """Check all files in a directory, skipping hidden directories."""
         all_violations = []
 
-        if recursive:
-            pattern = "**/*"
-        else:
-            pattern = "*"
+        def should_skip_directory(dir_path: Path) -> bool:
+            """Check if a directory should be skipped entirely."""
+            # Skip hidden directories (starting with '.')
+            if dir_path.name.startswith("."):
+                return True
 
-        for file_path in directory.glob(pattern):
-            if file_path.is_file():
-                violations = self.check_file(file_path)
-                all_violations.extend(violations)
+            # Skip common build/cache directories
+            skip_dirs = {
+                "__pycache__",
+                "node_modules",
+                ".pytest_cache",
+                ".mypy_cache",
+                ".tox",
+                "venv",
+                ".venv",
+                "env",
+                ".env",
+                "build",
+                "dist",
+                ".coverage",
+            }
+            if dir_path.name in skip_dirs:
+                return True
 
+            return False
+
+        def scan_directory(current_dir: Path, is_recursive: bool = True):
+            """Recursively scan directory, skipping hidden directories."""
+            try:
+                for item in current_dir.iterdir():
+                    if item.is_file():
+                        # Check if file should be processed
+                        if not self.should_ignore_file(item):
+                            violations = self.check_file(item)
+                            all_violations.extend(violations)
+                    elif item.is_dir() and is_recursive:
+                        # Skip hidden and unwanted directories
+                        if not should_skip_directory(item):
+                            scan_directory(item, is_recursive)
+            except PermissionError:
+                # Skip directories we don't have permission to read
+                pass
+            except Exception as e:
+                print(f"Warning: Error scanning {current_dir}: {e}", file=sys.stderr)
+
+        scan_directory(directory, recursive)
         return all_violations
 
     def run(self, paths: List[Union[str, Path]]) -> int:
