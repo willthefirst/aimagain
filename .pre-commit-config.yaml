@@ -34,4 +34,4 @@ repos:
         language: python
         files: \.(md|html|jinja|jinja2)$
         pass_filenames: true
-        args: [--check-only]
+        args: [--fix]
