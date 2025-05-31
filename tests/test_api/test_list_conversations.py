@@ -116,7 +116,7 @@ async def test_list_conversations_sorted(
 
 
 async def test_create_conversation_link_present(authenticated_client: AsyncClient):
-    """Test that the 'Create New Conversation' link is present on the list page."""
+    """Test that the 'Create new conversation' link is present on the list page."""
     response = await authenticated_client.get("/conversations")
     # print(f"Response Text for /conversations:\n{response.text[:500]}...") # Keep print commented out for now
     assert response.status_code == 200
@@ -127,4 +127,4 @@ async def test_create_conversation_link_present(authenticated_client: AsyncClien
     assert (
         link_element is not None
     ), "Link ending with href='/conversations/new' not found"
-    assert "Create New Conversation" in link_element.text(), "Link text is incorrect"
+    assert "Create new conversation" in link_element.text(), "Link text is incorrect"
