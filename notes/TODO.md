@@ -1,3 +1,1 @@
-- I also see that the title case checker is missing some things
-- For all the typical command line commands, I'd like see a nice list of commands to be used in the repo, maybe even a CLI, but we don't have to go crazy.
 - Now that we've successfully added the create_message functionality, I think I'd like to rig up the repo with READMEs and Cursor rules that help the agent add the feature itself in the future. Goal: can we provide the agent with sufficient docs and prompt to help it gracefully add these features on it's own?
