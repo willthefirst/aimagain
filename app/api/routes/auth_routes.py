@@ -1,7 +1,7 @@
 import logging
 
 from fastapi import APIRouter, Depends, Request, status
-from fastapi_users import exceptions, models
+from fastapi_users import models
 from fastapi_users.manager import BaseUserManager
 from fastapi_users.router.common import ErrorCode, ErrorModel
 
@@ -19,6 +19,7 @@ router = BaseRouter(
 
 logger = logging.getLogger(__name__)
 
+# TODO: let's get this pattern to either be standard everywhere or not. unify how routes do responses.
 register_responses = {
     status.HTTP_400_BAD_REQUEST: {
         "model": ErrorModel,

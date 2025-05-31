@@ -1,5 +1,5 @@
-from fastapi import FastAPI
-from fastapi.responses import RedirectResponse
+from fastapi import FastAPI, HTTPException, Request, status
+from fastapi.responses import JSONResponse, RedirectResponse
 
 from app.api.routes import auth_routes
 from app.auth_config import auth_backend, fastapi_users
@@ -13,6 +13,23 @@ app = FastAPI(title="AIM again")
 
 # Add presence middleware with session factory
 app.add_middleware(PresenceMiddleware, session_factory=get_db_session)
+
+
+@app.exception_handler(HTTPException)
+async def unauthorized_exception_handler(request: Request, exc: HTTPException):
+    """
+    Custom exception handler for 401 Unauthorized errors.
+    Redirects to login page for browser requests, returns JSON for API requests.
+    """
+    if exc.status_code == status.HTTP_401_UNAUTHORIZED:
+        # Check if the request accepts HTML (browser request)
+        accept_header = request.headers.get("accept", "")
+        if "text/html" in accept_header:
+            # Redirect to login page for browser requests
+            return RedirectResponse(url="/auth/login", status_code=302)
+
+    # For API requests or other status codes, return the original JSON response
+    return JSONResponse(status_code=exc.status_code, content={"detail": exc.detail})
 
 
 @app.get("/")
