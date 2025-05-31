@@ -104,6 +104,17 @@ async def test_consumer_message_create_success(origin_with_routes: str, page: Pa
         .will_respond_with(status=303, headers={"Location": CONVERSATION_DETAIL_PATH})
     )
 
+    (
+        pact.upon_receiving(
+            "the redirect to the conversation detail page after message creation"
+        )
+        .with_request(
+            method="GET",
+            path=CONVERSATION_DETAIL_PATH,
+        )
+        .will_respond_with(status=200)
+    )
+
     # Set up Playwright interception to redirect form submission to Pact mock
     await setup_playwright_pact_interception(
         page=page,
@@ -111,13 +122,6 @@ async def test_consumer_message_create_success(origin_with_routes: str, page: Pa
         mock_pact_url=mock_submit_url,
         http_method="POST",
     )
-
-    # Handle the redirect response by aborting (we only care about the contract)
-    async def handle_redirect_route(route: Route):
-        print("Received redirect response, aborting to complete test")
-        await route.abort()
-
-    await page.route(f"**{CONVERSATION_DETAIL_PATH}", handle_redirect_route)
 
     with pact:
         # Navigate to the actual conversation detail page (which will render the real template)
