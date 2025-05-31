@@ -36,11 +36,17 @@ class TitleCaseChecker:
         "html": [
             (r"<h([1-6])[^>]*>(.*?)</h\1>", "html_header"),
             (r"<title[^>]*>(.*?)</title>", "html_title"),
+            (r"<label[^>]*>(.*?)</label>", "html_label"),
+            (r"<button[^>]*>(.*?)</button>", "html_button"),
+            (r"<a[^>]*>(.*?)</a>", "html_link"),
         ],
         "jinja": [
             (r"<h([1-6])[^>]*>(.*?)</h\1>", "html_header"),
             (r"<title[^>]*>(.*?)</title>", "html_title"),
             (r"{%\s*block\s+title\s*%}(.*?){%\s*endblock\s*%}", "jinja_title_block"),
+            (r"<label[^>]*>(.*?)</label>", "html_label"),
+            (r"<button[^>]*>(.*?)</button>", "html_button"),
+            (r"<a[^>]*>(.*?)</a>", "html_link"),
         ],
     }
 
@@ -294,57 +300,97 @@ class TitleCaseChecker:
         expected = self.convert_to_sentence_case(text)
         return text == expected
 
+    def _detect_jinja_syntax(self, content: str) -> bool:
+        """Detect if content contains Jinja template syntax."""
+        jinja_patterns = [
+            r"{%.*?%}",  # Jinja blocks like {% block %}, {% for %}, etc.
+            r"{{.*?}}",  # Jinja variables like {{ variable }}
+            r"{#.*?#}",  # Jinja comments like {# comment #}
+        ]
+
+        for pattern in jinja_patterns:
+            if re.search(pattern, content, re.DOTALL):
+                return True
+        return False
+
+    def _get_file_type(self, file_path: Path, content: str = None) -> str:
+        """Determine the file type, with special handling for HTML files that contain Jinja syntax."""
+        extension = file_path.suffix.lower()
+        if extension not in self.FILE_EXTENSIONS:
+            return None
+
+        base_type = self.FILE_EXTENSIONS[extension]
+
+        # If it's an HTML file, check if it contains Jinja syntax
+        if base_type == "html":
+            if content is None:
+                try:
+                    content = file_path.read_text(encoding="utf-8")
+                except Exception:
+                    return base_type
+
+            # Check if the file contains Jinja syntax or is in a templates directory
+            if (
+                self._detect_jinja_syntax(content)
+                or "template" in str(file_path).lower()
+            ):
+                return "jinja"
+
+        return base_type
+
     def check_file(self, file_path: Path) -> List[Dict]:
         """Check a single file for title case violations."""
         if self.should_ignore_file(file_path):
             return []
 
-        extension = file_path.suffix.lower()
-        if extension not in self.FILE_EXTENSIONS:
-            return []
-
-        file_type = self.FILE_EXTENSIONS[extension]
-        patterns = self.PATTERNS[file_type]
-
-        violations = []
-
         try:
             content = file_path.read_text(encoding="utf-8")
-            lines = content.split("\n")
-
-            for line_num, line in enumerate(lines, 1):
-                if self.should_ignore_line(line):
-                    continue
-
-                for pattern, pattern_type in patterns:
-                    matches = re.finditer(pattern, line, re.IGNORECASE | re.DOTALL)
-                    for match in matches:
-                        if pattern_type == "markdown_header":
-                            title_text = match.group(2).strip()
-                            header_level = match.group(1)
-                        elif pattern_type in ["html_header", "html_header_in_md"]:
-                            title_text = match.group(2).strip()
-                            header_level = f"h{match.group(1)}"
-                        elif pattern_type in ["html_title", "jinja_title_block"]:
-                            title_text = match.group(1).strip()
-                            header_level = "title"
-                        else:
-                            continue
-
-                        if title_text and not self.is_sentence_case(title_text):
-                            violation = {
-                                "file": file_path,
-                                "line": line_num,
-                                "original": title_text,
-                                "suggested": self.convert_to_sentence_case(title_text),
-                                "pattern_type": pattern_type,
-                                "header_level": header_level,
-                                "full_line": line,
-                            }
-                            violations.append(violation)
-
         except Exception as e:
             print(f"Error reading {file_path}: {e}", file=sys.stderr)
+            return []
+
+        file_type = self._get_file_type(file_path, content)
+        if file_type is None:
+            return []
+
+        patterns = self.PATTERNS[file_type]
+        violations = []
+
+        lines = content.split("\n")
+
+        for line_num, line in enumerate(lines, 1):
+            if self.should_ignore_line(line):
+                continue
+
+            for pattern, pattern_type in patterns:
+                matches = re.finditer(pattern, line, re.IGNORECASE | re.DOTALL)
+                for match in matches:
+                    if pattern_type == "markdown_header":
+                        title_text = match.group(2).strip()
+                        header_level = match.group(1)
+                    elif pattern_type in ["html_header", "html_header_in_md"]:
+                        title_text = match.group(2).strip()
+                        header_level = f"h{match.group(1)}"
+                    elif pattern_type in ["html_title", "jinja_title_block"]:
+                        title_text = match.group(1).strip()
+                        header_level = "title"
+                    elif pattern_type in ["html_label", "html_button", "html_link"]:
+                        title_text = match.group(1).strip()
+                        header_level = pattern_type.replace("html_", "")
+                    else:
+                        continue
+
+                    if title_text and not self.is_sentence_case(title_text):
+                        violation = {
+                            "file": file_path,
+                            "line": line_num,
+                            "original": title_text,
+                            "suggested": self.convert_to_sentence_case(title_text),
+                            "pattern_type": pattern_type,
+                            "header_level": header_level,
+                            "full_line": line,
+                        }
+                        violations.append(violation)
 
         return violations
 
