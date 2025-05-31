@@ -18,6 +18,11 @@ import sys
 from pathlib import Path
 from typing import Dict, List, Union
 
+try:
+    import pathspec
+except ImportError:
+    pathspec = None
+
 
 class TitleCaseChecker:
     """Check and optionally fix title case violations."""
@@ -106,9 +111,72 @@ class TitleCaseChecker:
         r"# title-case-ignore",  # Markdown comment
     ]
 
-    def __init__(self, fix_mode: bool = False):
+    def __init__(self, fix_mode: bool = False, respect_gitignore: bool = True):
         self.fix_mode = fix_mode
+        self.respect_gitignore = respect_gitignore
         self.violations: List[Dict] = []
+        self.gitignore_spec = None
+        self.git_root = None
+
+        if self.respect_gitignore:
+            self._load_gitignore()
+
+    def _find_git_root(self, start_path: Path = None) -> Path:
+        """Find the root of the git repository."""
+        if start_path is None:
+            start_path = Path.cwd()
+
+        current = start_path.resolve()
+        while current != current.parent:
+            if (current / ".git").exists():
+                return current
+            current = current.parent
+
+        # If no .git found, return the starting directory
+        return start_path.resolve()
+
+    def _load_gitignore(self):
+        """Load gitignore patterns from .gitignore file."""
+        if pathspec is None:
+            print(
+                "Warning: pathspec library not available. Install with: pip install pathspec",
+                file=sys.stderr,
+            )
+            print("Continuing without gitignore support...", file=sys.stderr)
+            return
+
+        self.git_root = self._find_git_root()
+        gitignore_path = self.git_root / ".gitignore"
+
+        if not gitignore_path.exists():
+            return
+
+        try:
+            with open(gitignore_path, "r", encoding="utf-8") as f:
+                gitignore_content = f.read()
+
+            self.gitignore_spec = pathspec.PathSpec.from_lines(
+                "gitwildmatch", gitignore_content.splitlines()
+            )
+        except Exception as e:
+            print(f"Warning: Could not load .gitignore: {e}", file=sys.stderr)
+
+    def _is_gitignored(self, file_path: Path) -> bool:
+        """Check if a file is ignored by gitignore."""
+        if (
+            not self.respect_gitignore
+            or self.gitignore_spec is None
+            or self.git_root is None
+        ):
+            return False
+
+        try:
+            # Get relative path from git root
+            relative_path = file_path.resolve().relative_to(self.git_root)
+            return self.gitignore_spec.match_file(str(relative_path))
+        except (ValueError, OSError):
+            # File is outside git repository or other error
+            return False
 
     def should_ignore_line(self, line: str) -> bool:
         """Check if a line should be ignored based on exception patterns."""
@@ -118,7 +186,12 @@ class TitleCaseChecker:
         return False
 
     def should_ignore_file(self, file_path: Path) -> bool:
-        """Check if entire file should be ignored based on .titleignore file."""
+        """Check if entire file should be ignored based on .titleignore file or gitignore."""
+        # Check gitignore first
+        if self._is_gitignored(file_path):
+            return True
+
+        # Check .titleignore file
         ignore_file = file_path.parent / ".titleignore"
         if ignore_file.exists():
             patterns = ignore_file.read_text().strip().split("\n")
@@ -393,6 +466,7 @@ Exception handling:
   - Add 'title-case-ignore' in a comment to ignore specific lines
   - Create .titleignore file with glob patterns to ignore files
   - Use --check-only to report without fixing
+  - Use --no-gitignore to disable automatic gitignore support
         """,
     )
 
@@ -413,12 +487,19 @@ Exception handling:
         help="Only check for violations, do not fix",
     )
 
+    parser.add_argument(
+        "--no-gitignore",
+        action="store_true",
+        help="Disable automatic gitignore support (check all files)",
+    )
+
     args = parser.parse_args()
 
     # --check-only overrides --fix
     fix_mode = args.fix and not args.check_only
+    respect_gitignore = not args.no_gitignore
 
-    checker = TitleCaseChecker(fix_mode=fix_mode)
+    checker = TitleCaseChecker(fix_mode=fix_mode, respect_gitignore=respect_gitignore)
     return checker.run(args.paths)
 
 

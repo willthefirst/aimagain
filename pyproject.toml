@@ -30,6 +30,7 @@ dependencies = [
     "black",
     "autoflake",
     "pre-commit",  # Add pre-commit for git hooks
+    "pathspec",  # For gitignore support in title case checker
 ]
 
 [tool.setuptools.packages.find]
