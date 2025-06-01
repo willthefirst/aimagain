@@ -24,7 +24,7 @@ block head %}
     empty #} {% if conversation.participants %} {{ conversation.participants |
     map(attribute='user.username') | join(', ') }} {% else %} (N/A) {% endif %}
     {# TODO: Add My Status if needed #} {# <br />My Status: {{ ??? }} #}
-    <br />Last Activity: {{ conversation.last_activity_at | default('N/A') }}
+    <br />Last activity: {{ conversation.last_activity_at | default('N/A') }}
   </li>
   {% endfor %}
 </ul>

@@ -39,6 +39,10 @@ class TitleCaseChecker:
             (r"<label[^>]*>(.*?)</label>", "html_label"),
             (r"<button[^>]*>(.*?)</button>", "html_button"),
             (r"<a[^>]*>(.*?)</a>", "html_link"),
+            (r"<strong[^>]*>(.*?)</strong>", "html_strong"),
+            (r"<b[^>]*>(.*?)</b>", "html_bold"),
+            # Standalone text patterns that look like labels (word/phrase followed by colon)
+            (r"\b([A-Z][a-zA-Z\s]+):\s*", "standalone_label"),
         ],
         "jinja": [
             (r"<h([1-6])[^>]*>(.*?)</h\1>", "html_header"),
@@ -47,6 +51,10 @@ class TitleCaseChecker:
             (r"<label[^>]*>(.*?)</label>", "html_label"),
             (r"<button[^>]*>(.*?)</button>", "html_button"),
             (r"<a[^>]*>(.*?)</a>", "html_link"),
+            (r"<strong[^>]*>(.*?)</strong>", "html_strong"),
+            (r"<b[^>]*>(.*?)</b>", "html_bold"),
+            # Standalone text patterns that look like labels (word/phrase followed by colon)
+            (r"\b([A-Z][a-zA-Z\s]+):\s*", "standalone_label"),
         ],
     }
 
@@ -189,6 +197,15 @@ class TitleCaseChecker:
         for pattern in self.IGNORE_PATTERNS:
             if re.search(pattern, line, re.IGNORECASE):
                 return True
+
+        # Ignore lines that are inside CSS style blocks
+        if re.search(r"^\s*[a-z-]+\s*:\s*[^;]+;?\s*$", line.strip()):
+            return True
+
+        # Ignore lines that are Jinja comments
+        if re.search(r"^\s*{#.*#}\s*$", line.strip()):
+            return True
+
         return False
 
     def should_ignore_file(self, file_path: Path) -> bool:
@@ -209,7 +226,14 @@ class TitleCaseChecker:
         return False
 
     def is_colon_pattern(self, text: str) -> bool:
-        """Check if text follows 'Something: This thing' or 'Something - This thing' pattern which should be exempt."""
+        """Check if text follows patterns that should be exempt from sentence case rules.
+
+        Exempt patterns:
+        - Document titles like "Something: A detailed explanation"
+        - Section headers like "Chapter 1: Introduction"
+        - Step-by-step instructions like "Step 1: Consumer test"
+        - But NOT simple field labels like "Name:", "Last Activity:", etc.
+        """
         # Remove HTML tags for checking
         clean_text = re.sub(r"<[^>]+>", "", text).strip()
 
@@ -220,9 +244,27 @@ class TitleCaseChecker:
                 if len(parts) == 2:
                     before_sep = parts[0].strip()
                     after_sep = parts[1].strip()
-                    # If both parts have content, this is a separator pattern
+
+                    # If both parts have content, check if this looks like a title pattern
                     if before_sep and after_sep:
-                        return True
+                        # Exempt if the part after the separator is substantial (more than just a few words)
+                        # This catches "Chapter 1: Introduction to the topic" but not "Name: John"
+                        after_words = after_sep.split()
+                        if len(after_words) >= 3:  # At least 3 words after separator
+                            return True
+
+                        # Also exempt if the before part looks like a chapter/section number
+                        if re.match(
+                            r"^(Chapter|Section|Part|Book)\s+\d+$",
+                            before_sep,
+                            re.IGNORECASE,
+                        ):
+                            return True
+
+                        # Exempt step-by-step instruction patterns like "Step 1: Consumer test"
+                        if re.match(r"^Step\s+\d+$", before_sep, re.IGNORECASE):
+                            return True
+
         return False
 
     def remove_leading_emojis(self, text: str) -> str:
@@ -357,8 +399,26 @@ class TitleCaseChecker:
         violations = []
 
         lines = content.split("\n")
+        in_style_block = False
+        in_script_block = False
 
         for line_num, line in enumerate(lines, 1):
+            # Track context
+            if "<style" in line.lower():
+                in_style_block = True
+            elif "</style>" in line.lower():
+                in_style_block = False
+                continue  # Skip the closing style tag line
+            elif "<script" in line.lower():
+                in_script_block = True
+            elif "</script>" in line.lower():
+                in_script_block = False
+                continue  # Skip the closing script tag line
+
+            # Skip lines in style or script blocks
+            if in_style_block or in_script_block:
+                continue
+
             if self.should_ignore_line(line):
                 continue
 
@@ -377,6 +437,20 @@ class TitleCaseChecker:
                     elif pattern_type in ["html_label", "html_button", "html_link"]:
                         title_text = match.group(1).strip()
                         header_level = pattern_type.replace("html_", "")
+                    elif pattern_type in ["html_strong", "html_bold"]:
+                        title_text = match.group(1).strip()
+                        header_level = pattern_type.replace("html_", "")
+                        # Skip if this contains Jinja template expressions
+                        if self._contains_jinja_expression(title_text):
+                            continue
+                    elif pattern_type in ["standalone_label"]:
+                        title_text = match.group(1).strip()
+                        header_level = "label"
+                        # Additional filtering for standalone labels
+                        if self._is_likely_css_property(
+                            title_text
+                        ) or self._is_in_comment_context(line):
+                            continue
                     else:
                         continue
 
@@ -393,6 +467,69 @@ class TitleCaseChecker:
                         violations.append(violation)
 
         return violations
+
+    def _is_likely_css_property(self, text: str) -> bool:
+        """Check if text looks like a CSS property name."""
+        css_properties = {
+            "margin",
+            "padding",
+            "border",
+            "background",
+            "color",
+            "font",
+            "text",
+            "display",
+            "position",
+            "top",
+            "bottom",
+            "left",
+            "right",
+            "width",
+            "height",
+            "max-width",
+            "max-height",
+            "min-width",
+            "min-height",
+            "overflow",
+            "float",
+            "clear",
+            "z-index",
+            "opacity",
+            "visibility",
+            "cursor",
+            "outline",
+            "box-shadow",
+            "border-radius",
+            "transform",
+            "transition",
+            "animation",
+            "flex",
+            "grid",
+        }
+        return text.lower().replace("-", "").replace(" ", "") in css_properties
+
+    def _is_in_comment_context(self, line: str) -> bool:
+        """Check if the line appears to be in a comment context."""
+        stripped = line.strip()
+        return (
+            stripped.startswith("{#")
+            or stripped.startswith("<!--")
+            or "{#" in line
+            and "#}" in line
+        )
+
+    def _contains_jinja_expression(self, text: str) -> bool:
+        """Check if text contains Jinja template expressions."""
+        jinja_patterns = [
+            r"{%.*?%}",  # Jinja blocks like {% block %}, {% for %}, etc.
+            r"{{.*?}}",  # Jinja variables like {{ variable }}
+            r"{#.*?#}",  # Jinja comments like {# comment #}
+        ]
+
+        for pattern in jinja_patterns:
+            if re.search(pattern, text, re.DOTALL):
+                return True
+        return False
 
     def fix_file(self, file_path: Path, violations: List[Dict]) -> bool:
         """Fix title case violations in a file."""

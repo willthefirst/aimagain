@@ -27,7 +27,7 @@ conversation.slug }}{% endblock %} {% block head %}
 {% endblock %} {% block content %}
 <h1>Conversation: {{ conversation.name or conversation.slug }}</h1>
 <p>Slug: {{ conversation.slug }}</p>
-<p>Last Activity: {{ conversation.last_activity_at | default('N/A') }}</p>
+<p>Last activity: {{ conversation.last_activity_at | default('N/A') }}</p>
 
 <h2>Participants</h2>
 <ul id="participants-list">

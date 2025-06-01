@@ -22,7 +22,7 @@ block content %}
     joined_participants.append(p.user.username) %} {% endfor %} {% if
     joined_participants %} {{ joined_participants | join(', ') }} {% else %}
     (None joined yet) {% endif %}
-    <br /><strong>Last Activity:</strong> {{ convo.last_activity_at |
+    <br /><strong>Last activity:</strong> {{ convo.last_activity_at |
     default('N/A') }}
   </li>
   <br />

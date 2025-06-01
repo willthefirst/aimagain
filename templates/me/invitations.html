@@ -39,9 +39,9 @@ head %}
     <strong
       >{{ inv.inviter.username if inv.inviter else 'Unknown User' }}</strong
     ><br />
-    Conversation Slug: {{ inv.conversation.slug if inv.conversation else
+    Conversation slug: {{ inv.conversation.slug if inv.conversation else
     'Unknown Conversation' }}<br />
-    {% if inv.initial_message %} Message Preview:
+    {% if inv.initial_message %} Message preview:
     <em>{{ inv.initial_message.content }}</em><br />
     {% endif %}
 
