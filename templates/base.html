@@ -10,6 +10,23 @@
     {% block head %}{% endblock %}
   </head>
   <body>
-    {% block content %}{% endblock %}
+    <nav>
+      <ul>
+        <li>
+          <a href="{{ url_for('list_my_conversations') }}">My Conversations</a>
+        </li>
+        <li>
+          <a href="{{ url_for('list_my_invitations') }}">My Invitations</a>
+        </li>
+        <li>
+          <a href="{{ url_for('list_conversations') }}">Public Conversations</a>
+        </li>
+        <li>
+          <a href="{{ url_for('get_new_conversation_form') }}">Create New</a>
+        </li>
+      </ul>
+    </nav>
+
+    <main>{% block content %}{% endblock %}</main>
   </body>
 </html>
