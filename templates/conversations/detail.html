@@ -1,15 +1,11 @@
 {% extends "base.html" %} {% block title %}{{ conversation.name or
 conversation.slug }}{% endblock %} {% block head %}
 <style>
-  body {
-    font-family: sans-serif;
-  }
   #participants-list,
   #messages-list {
     list-style: none;
     padding: 0;
   }
-  #participants-list li,
   #messages-list li {
     margin-bottom: 0.5em;
     padding: 0.5em;
