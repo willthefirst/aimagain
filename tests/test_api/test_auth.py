@@ -73,7 +73,7 @@ async def test_login_success(test_client: AsyncClient, logged_in_user: User):
         "password": "password123",
     }
     response = await test_client.post("/auth/jwt/login", data=login_data)
-    assert response.status_code == 204
+    assert response.status_code == 302
     assert response.headers["Set-Cookie"] is not None
     assert "fastapiusersauth=" in response.headers["Set-Cookie"]
     access_token = response.headers["Set-Cookie"].split(";")[0].split("=")[1]
