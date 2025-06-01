@@ -42,8 +42,12 @@ class UserManager(UUIDIDMixin, BaseUserManager[User, uuid.UUID]):
         redirect_url = "/users/me/conversations"
         next_url = request.query_params.get("next")
         if next_url:
+            # Security check: only allow relative URLs that start with "/"
+            # and don't start with "//" (which could be protocol-relative URLs to external sites)
             if next_url.startswith("/") and not next_url.startswith("//"):
-                redirect_url = next_url
+                # Additional security: ensure it doesn't contain any protocol schemes
+                if "://" not in next_url:
+                    redirect_url = next_url
         response.status_code = 302
         response.headers["Location"] = redirect_url
 

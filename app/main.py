@@ -25,8 +25,11 @@ async def unauthorized_exception_handler(request: Request, exc: HTTPException):
         # Check if the request accepts HTML (browser request)
         accept_header = request.headers.get("accept", "")
         if "text/html" in accept_header:
-            # Redirect to login page for browser requests
-            return RedirectResponse(url="/auth/login", status_code=302)
+            # Redirect to login page for browser requests with original URL as 'next' parameter
+            original_url = request.url.path
+            return RedirectResponse(
+                url=f"/auth/login?next={original_url}", status_code=302
+            )
 
     # For API requests or other status codes, return the original JSON response
     return JSONResponse(status_code=exc.status_code, content={"detail": exc.detail})

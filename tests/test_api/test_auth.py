@@ -251,12 +251,12 @@ async def test_get_reset_password_page(test_client: AsyncClient):
 async def test_unauthorized_redirect_for_browser_requests(test_client: AsyncClient):
     """Test that browser requests (HTML accept header) get redirected to login page when unauthorized."""
     response = await test_client.get(
-        "/users/me/conversations",
+        "/users/me/invitations",
         headers={"Accept": "text/html"},
         follow_redirects=False,
     )
     assert response.status_code == 302
-    assert response.headers["location"] == "/auth/login"
+    assert response.headers["location"] == "/auth/login?next=/users/me/invitations"
 
 
 async def test_unauthorized_json_response_for_api_requests(test_client: AsyncClient):

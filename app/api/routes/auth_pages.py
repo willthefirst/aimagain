@@ -30,8 +30,10 @@ async def get_login_page(request: Request):
     Returns:
         TemplateResponse: The rendered HTML page.
     """
+    # Extract the 'next' parameter from query string for redirect after login
+    next_url = request.query_params.get("next", "")
     return APIResponse.html_response(
-        template_name="auth/login.html", context={}, request=request
+        template_name="auth/login.html", context={"next_url": next_url}, request=request
     )
 
 
