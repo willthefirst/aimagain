@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from fastapi import FastAPI, HTTPException, Request, status
 from fastapi.responses import JSONResponse, RedirectResponse
 
@@ -70,3 +72,9 @@ app.include_router(users.users_api_router, tags=["users"])
 app.include_router(conversations.conversations_router_instance, tags=["conversations"])
 app.include_router(me.me_router_instance, tags=["me"])
 app.include_router(participants.participants_router_instance, tags=["participants"])
+
+
+@app.get("/health")
+async def health_check():
+    """Health check endpoint for Docker and load balancers."""
+    return {"status": "healthy", "timestamp": datetime.utcnow().isoformat()}
