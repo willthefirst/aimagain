@@ -12,10 +12,6 @@ env:
 jobs:
   test:
     runs-on: ubuntu-latest
-
-    services:
-      # Add any additional services if needed
-
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
