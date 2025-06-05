@@ -38,10 +38,45 @@ jobs:
           python -m pip install --upgrade pip
           pip install -e .
 
-      - name: Create test database
+      - name: Create test environment and database
         run: |
-          cp .env.example .env
+          # Create environment file for testing
+          echo "DATABASE_URL=sqlite+aiosqlite:///./test_chat_app.db" > .env
+
+          # Verify alembic can connect and run migrations
+          echo "Testing database migrations..."
           alembic upgrade head
+
+          # Verify database was created and has expected structure
+          echo "Verifying database structure..."
+          python -c "
+          import sqlite3
+          import sys
+
+          # Check if database file exists and has tables
+          try:
+              conn = sqlite3.connect('test_chat_app.db')
+              cursor = conn.cursor()
+
+              # Get list of tables
+              cursor.execute(\"SELECT name FROM sqlite_master WHERE type='table';\")
+              tables = cursor.fetchall()
+              print(f'Found tables: {[table[0] for table in tables]}')
+
+              # Verify we have expected tables (adjust based on your models)
+              expected_tables = ['user', 'conversation', 'message', 'participant', 'alembic_version']
+              for table in expected_tables:
+                  cursor.execute(f\"SELECT name FROM sqlite_master WHERE type='table' AND name='{table}';\")
+                  if not cursor.fetchone():
+                      print(f'Missing expected table: {table}')
+                      sys.exit(1)
+
+              print('✅ Database structure verification passed')
+              conn.close()
+          except Exception as e:
+              print(f'❌ Database verification failed: {e}')
+              sys.exit(1)
+          "
 
       - name: Run linting
         run: |
@@ -87,29 +122,55 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      - name: Test Docker image
+      - name: Test Docker image with database migrations
         run: |
-          # Create test environment file
-          echo "DATABASE_URL=sqlite:///./test.db" > .env.test
+          # Create test environment file for Docker
+          echo "DATABASE_URL=sqlite+aiosqlite:///./docker_test.db" > .env.docker
 
           # Run container in background
           docker run -d \
             --name chat-app-test \
-            --env-file .env.test \
+            --env-file .env.docker \
             -p 8000:8000 \
             chat-app:test
 
-          # Wait for container to be ready
-          sleep 10
+          # Wait for container to be ready (migrations should run automatically)
+          echo "Waiting for container startup and migrations..."
+          sleep 15
+
+          # Check container logs for migration success
+          echo "Checking container logs for migration status..."
+          docker logs chat-app-test 2>&1 | grep -E "(Running database migrations|Starting application)" || (
+            echo "❌ Migration logs not found. Container logs:"
+            docker logs chat-app-test
+            exit 1
+          )
 
           # Test health endpoint
-          curl -f http://localhost:8000/health || (docker logs chat-app-test && exit 1)
+          echo "Testing health endpoint..."
+          curl -f http://localhost:8000/health || (
+            echo "❌ Health check failed. Container logs:"
+            docker logs chat-app-test
+            exit 1
+          )
 
-          # Run migrations
-          docker exec chat-app-test alembic upgrade head
+          # Test that database was created inside container
+          echo "Verifying database was created in container..."
+          docker exec chat-app-test ls -la docker_test.db || (
+            echo "❌ Database file not found in container"
+            docker logs chat-app-test
+            exit 1
+          )
 
           # Test main page (adjust based on your routes)
-          curl -f http://localhost:8000/ || (docker logs chat-app-test && exit 1)
+          echo "Testing main application endpoint..."
+          curl -f http://localhost:8000/ || (
+            echo "❌ Main endpoint test failed. Container logs:"
+            docker logs chat-app-test
+            exit 1
+          )
+
+          echo "✅ Docker container tests passed"
 
           # Clean up
           docker stop chat-app-test
