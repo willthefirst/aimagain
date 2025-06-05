@@ -13,6 +13,8 @@ jobs:
   test:
     runs-on: ubuntu-latest
     env:
+      # Database Configuration - using aiosqlite for async SQLite
+      DATABASE_URL: sqlite+aiosqlite:///./test.db
       # Security Configuration
       SECRET: test-secret-key-for-ci-only
       # JWT Configuration
