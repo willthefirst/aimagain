@@ -4,7 +4,7 @@ FROM python:3.11-slim as base
 # Set environment variables
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
-    PYTHONPATH=/app \
+    PYTHONPATH=/app
 
 # Install system dependencies
 RUN apt-get update && apt-get install -y \
