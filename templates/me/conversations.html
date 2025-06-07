@@ -1,5 +1,13 @@
 {% extends "base.html" %} {% block title %}My conversations{% endblock %} {%
-block head %} {% endblock %} {% block content %}
+block head %}
+<style>
+  li {
+    margin-bottom: 1em;
+    border: 1px solid #ccc;
+    padding: 0.5em;
+  }
+</style>
+{% endblock %} {% block content %}
 <h1>My conversations</h1>
 
 {% if conversations %}
