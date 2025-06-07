@@ -13,6 +13,16 @@ from .models import User, metadata
 
 load_dotenv()
 
+
+def get_sync_database_url(async_url: str) -> str:
+    """Convert async database URL to sync URL for Alembic migrations."""
+    if "sqlite+aiosqlite://" in async_url:
+        return async_url.replace("sqlite+aiosqlite://", "sqlite://")
+    # Add other async driver conversions here if needed in the future
+    # e.g., postgresql+asyncpg -> postgresql
+    return async_url
+
+
 DATABASE_URL = os.getenv("DATABASE_URL")
 if not DATABASE_URL:
     raise ValueError("DATABASE_URL environment variable is not set")

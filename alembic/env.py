@@ -10,6 +10,8 @@ from alembic import context
 # This allows us to import 'app.db' and 'app.models'
 sys.path.insert(0, os.path.realpath(os.path.join(os.path.dirname(__file__), "..")))
 
+from app.db import get_sync_database_url
+
 # Import the metadata object from your models package
 # from app.models import Base # Old import
 from app.models import metadata  # Correct import via __init__.py
@@ -26,10 +28,9 @@ if config.config_file_name is not None:
 # Get DATABASE_URL from environment and convert aiosqlite to sqlite for alembic
 DATABASE_URL = os.getenv("DATABASE_URL")
 if DATABASE_URL:
-    # Convert aiosqlite URL to regular sqlite URL for alembic compatibility
-    if "sqlite+aiosqlite://" in DATABASE_URL:
-        DATABASE_URL = DATABASE_URL.replace("sqlite+aiosqlite://", "sqlite://")
-    config.set_main_option("sqlalchemy.url", DATABASE_URL)
+    # Convert async database URL to sync URL for alembic compatibility
+    sync_url = get_sync_database_url(DATABASE_URL)
+    config.set_main_option("sqlalchemy.url", sync_url)
 
 
 # add your model's MetaData object here
