@@ -108,4 +108,4 @@ app.include_router(participants.participants_router_instance, tags=["participant
 @app.get("/health")
 async def health_check():
     """Health check endpoint for Docker and load balancers."""
-    return {"status": "healthy", "timestamp": datetime.now(datetime.UTC).isoformat()}
+    return {"status": "healthy", "timestamp": datetime.utcnow().isoformat()}
