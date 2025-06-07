@@ -43,6 +43,18 @@ jobs:
           python -m pip install --upgrade pip
           pip install -e .
 
+      - name: Cache Playwright browsers
+        uses: actions/cache@v3
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ hashFiles('pyproject.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-playwright-
+
+      - name: Install Playwright browsers
+        run: |
+          playwright install --with-deps
+
       - name: Create test database
         run: |
           alembic upgrade head
