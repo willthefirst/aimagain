@@ -105,10 +105,15 @@ def run_provider_server_process(
     override_config: Optional[Dict[str, Dict]] = None,
 ) -> None:
     """Target function to run the main FastAPI app with overrides for provider testing."""
+    import os
+
     logger = logging.getLogger("provider_server")
 
     # Store original dependency overrides
     original_dependency_overrides = app.dependency_overrides.copy()
+
+    # Set environment variable to indicate we're in a provider test
+    os.environ["PROVIDER_TEST_MODE"] = "true"
 
     try:
         # Set up database
@@ -146,6 +151,8 @@ def run_provider_server_process(
     finally:
         # Restore original dependency overrides
         app.dependency_overrides = original_dependency_overrides
+        # Clean up environment variable
+        os.environ.pop("PROVIDER_TEST_MODE", None)
         logger.info("Restored original dependency overrides for provider app.")
 
 

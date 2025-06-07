@@ -1,3 +1,5 @@
+import logging
+from contextlib import asynccontextmanager
 from datetime import datetime
 
 from fastapi import FastAPI, HTTPException, Request, status
@@ -5,13 +7,42 @@ from fastapi.responses import JSONResponse, RedirectResponse
 
 from app.api.routes import auth_routes
 from app.auth_config import auth_backend, fastapi_users
-from app.db import get_db_session
+from app.db import check_database_health, get_db_session
 from app.middleware.presence import PresenceMiddleware
 from app.schemas.user import UserRead, UserUpdate
 
 from .api.routes import auth_pages, conversations, me, participants, users
 
-app = FastAPI(title="AIM again")
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Application lifespan manager for startup and shutdown events."""
+    import os
+
+    # Startup
+    logger.info("Starting application...")
+    try:
+        # In provider test mode, skip table check since tables are managed separately
+        skip_table_check = os.getenv("PROVIDER_TEST_MODE") == "true"
+        await check_database_health(skip_table_check=skip_table_check)
+        logger.info("Database health check passed - application ready")
+    except Exception as e:
+        logger.error(f"Database health check failed: {e}")
+        logger.error("Application startup aborted due to database issues")
+        raise
+
+    yield
+
+    # Shutdown (if needed in future)
+    logger.info("Application shutting down...")
+
+
+app = FastAPI(title="AIM again", lifespan=lifespan)
+
 
 # Add presence middleware with session factory
 app.add_middleware(PresenceMiddleware, session_factory=get_db_session)

@@ -23,9 +23,13 @@ config = context.config
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
-# ---> DATABASE_URL is no longer needed here
-# ---> The URL should be set via the Config object (e.g., from alembic.ini or conftest.py)
-# config.set_main_option('sqlalchemy.url', DATABASE_URL)
+# Get DATABASE_URL from environment and convert aiosqlite to sqlite for alembic
+DATABASE_URL = os.getenv("DATABASE_URL")
+if DATABASE_URL:
+    # Convert aiosqlite URL to regular sqlite URL for alembic compatibility
+    if "sqlite+aiosqlite://" in DATABASE_URL:
+        DATABASE_URL = DATABASE_URL.replace("sqlite+aiosqlite://", "sqlite://")
+    config.set_main_option("sqlalchemy.url", DATABASE_URL)
 
 
 # add your model's MetaData object here
