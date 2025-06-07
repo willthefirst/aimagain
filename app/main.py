@@ -21,10 +21,14 @@ logger = logging.getLogger(__name__)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application lifespan manager for startup and shutdown events."""
+    import os
+
     # Startup
     logger.info("Starting application...")
     try:
-        await check_database_health()
+        # In provider test mode, skip table check since tables are managed separately
+        skip_table_check = os.getenv("PROVIDER_TEST_MODE") == "true"
+        await check_database_health(skip_table_check=skip_table_check)
         logger.info("Database health check passed - application ready")
     except Exception as e:
         logger.error(f"Database health check failed: {e}")

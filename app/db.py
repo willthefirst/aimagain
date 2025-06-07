@@ -34,7 +34,7 @@ async def get_user_db(
     yield SQLAlchemyUserDatabase(session, User)
 
 
-async def check_database_health() -> bool:
+async def check_database_health(skip_table_check=False) -> bool:
     """
     Check if the database connection is working and all required tables exist.
     Returns True if healthy, raises an exception if not.
@@ -46,6 +46,11 @@ async def check_database_health() -> bool:
             # Test basic connection
             await session.execute(text("SELECT 1"))
             logger.info("Database connection successful")
+
+            # Skip table check if requested (for tests)
+            if skip_table_check:
+                logger.info("Skipping table existence check")
+                return True
 
             # Check if all required tables exist
             expected_tables = set(metadata.tables.keys())
