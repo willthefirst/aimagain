@@ -73,9 +73,9 @@ def setup_provider_database_overrides(app: FastAPI, logger: logging.Logger) -> t
     ) -> SQLAlchemyUserDatabase[User, Any]:
         yield SQLAlchemyUserDatabase(session, User)
 
-    app.dependency_overrides[
-        get_db_session
-    ] = local_provider_override_get_db_session_impl
+    app.dependency_overrides[get_db_session] = (
+        local_provider_override_get_db_session_impl
+    )
     app.dependency_overrides[get_user_db] = local_provider_override_get_user_db_impl
 
     logger.info("Applied DB dependency overrides for provider test.")
