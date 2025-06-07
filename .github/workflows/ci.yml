@@ -105,33 +105,25 @@ jobs:
 
       - name: Test Docker image
         run: |
-          # Create test environment file for Docker
-          cat > .env.test << EOF
-          DATABASE_URL=sqlite+aiosqlite:///./test.db
-          SECRET=test-secret-key-for-docker-ci-only
-          ALGORITHM=HS256
-          ACCESS_TOKEN_EXPIRE_MINUTES=60
-          ONLINE_TIMEOUT_MINUTES=10
-          EOF
-
-          # Run container in background
+          # Run container using the exact same command as Dockerfile
+          # This tests: alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000
           docker run -d \
             --name chat-app-test \
-            --env-file .env.test \
             -p 8000:8000 \
             chat-app:test
 
-          # Wait for container to be ready
-          sleep 10
+          # Wait for app to start and migrations to complete
+          sleep 15
 
-          # Test health endpoint
+          # Test health endpoint to verify the app is running
           curl -f http://localhost:8000/health || (docker logs chat-app-test && exit 1)
 
-          # Run migrations
-          docker exec chat-app-test alembic upgrade head
+          # Test API docs endpoint to verify the app is responding
+          curl -f http://localhost:8000/docs || (docker logs chat-app-test && exit 1)
 
-          # Test main page (adjust based on your routes)
-          curl -f http://localhost:8000/ || (docker logs chat-app-test && exit 1)
+          # Show logs for debugging if needed
+          echo "Container logs:"
+          docker logs chat-app-test
 
           # Clean up
           docker stop chat-app-test
