@@ -5,8 +5,6 @@ FROM python:3.11-slim as base
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PYTHONPATH=/app \
-    DATABASE_URL=sqlite:///./data/chat_app.db \
-    SECRET=change_this_in_production
 
 # Install system dependencies
 RUN apt-get update && apt-get install -y \
