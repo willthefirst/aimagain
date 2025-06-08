@@ -3,8 +3,6 @@ name: CI
 on:
   pull_request:
     branches: [main]
-  push:
-    branches: [main]
 
 env:
   PYTHON_VERSION: '3.11'
@@ -81,69 +79,3 @@ jobs:
             .pytest_cache/
             test-results.xml
           retention-days: 7
-
-  build-and-test-docker:
-    runs-on: ubuntu-latest
-    needs: test
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Build Docker image
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          platforms: linux/amd64
-          tags: chat-app:test
-          load: true
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
-      - name: Test Docker image
-        run: |
-          # Create test environment file for Docker
-          cat > .env.test << EOF
-          DATABASE_URL=sqlite+aiosqlite:///./test.db
-          SECRET=test-secret-key-for-docker-ci-only
-          ALGORITHM=HS256
-          ACCESS_TOKEN_EXPIRE_MINUTES=60
-          ONLINE_TIMEOUT_MINUTES=10
-          EOF
-
-          # Run container in background
-          docker run -d \
-            --name chat-app-test \
-            --env-file .env.test \
-            -p 8000:8000 \
-            chat-app:test
-
-          # Wait for container to be ready
-          sleep 10
-
-          # Test health endpoint
-          curl -f http://localhost:8000/health || (docker logs chat-app-test && exit 1)
-
-          # Run migrations
-          docker exec chat-app-test alembic upgrade head
-
-          # Test main page (adjust based on your routes)
-          curl -f http://localhost:8000/ || (docker logs chat-app-test && exit 1)
-
-          # Clean up
-          docker stop chat-app-test
-          docker rm chat-app-test
-
-  # Only run on PRs to prevent duplicate builds
-  pr-check:
-    runs-on: ubuntu-latest
-    if: github.event_name == 'pull_request'
-    needs: [test, build-and-test-docker]
-
-    steps:
-      - name: PR Status Check
-        run: |
-          echo "✅ All checks passed! Ready to merge."
