@@ -21,9 +21,6 @@ RUN pip install --no-cache-dir -e .
 # Copy application code
 COPY . .
 
-# Create data directory for SQLite database volume
-RUN mkdir -p /app/data
-
 # Create non-root user
 RUN adduser --disabled-password --gecos '' appuser && \
     chown -R appuser:appuser /app
