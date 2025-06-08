@@ -16,7 +16,7 @@ block head %}
   conversation in conversations %}
   <li>
     <strong>Slug:</strong>
-    <a href="{{ url_for('get_conversation', slug=conversation.slug) }}"
+    <a href="{{ secure_url_for(request, 'get_conversation', slug=conversation.slug) }}"
       >{{ conversation.slug }}</a
     >
     {% if conversation.name %}<br />Name: {{ conversation.name }}{% endif %}
@@ -33,5 +33,5 @@ block head %}
 {% endif %}
 
 <hr />
-<a href="{{ url_for('list_conversations') }}">View public conversations</a>
+<a href="{{ secure_url_for(request, 'list_conversations') }}">View public conversations</a>
 {% endblock %}

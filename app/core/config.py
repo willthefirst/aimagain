@@ -14,6 +14,7 @@ class Settings(BaseSettings):
     ONLINE_TIMEOUT_MINUTES: int = (
         10  # Users are considered online if active within this many minutes
     )
+    FORCE_HTTPS: bool = True  # Force HTTPS URLs in production
 
     model_config = ConfigDict(env_file=".env", env_file_encoding="utf-8")
 

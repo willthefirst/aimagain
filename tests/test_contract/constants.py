@@ -24,6 +24,7 @@ CONSUMER_NAME_REGISTRATION = "registration-form"
 CONSUMER_NAME_INVITATION = "invitation-form"
 CONSUMER_NAME_CONVERSATION = "create-conversation-form"
 CONSUMER_NAME_MESSAGE = "send-message-form"
+CONSUMER_NAME_HTTPS = "https-enforcement"
 
 # Provider names
 PROVIDER_NAME_AUTH = "auth-api"
