@@ -33,7 +33,7 @@ The MVP focuses on basic conversation functionality with user invitations.
 - **I want to** `POST` to `/conversations`, providing the target _online_ user's ID and an initial message,
 - **So that** a new conversation is created between us, and they receive an invitation to join.
 - **Acceptance criteria:**
-  - Given User A is authenticated and User B is online, when User A `POST /conversations` with `{ "invitee_user_id": "user_...", "initial_message": "..." }` in body:
+  - If User A is authenticated and User B is online, when User A `POST /conversations` with `{ "invitee_user_id": "user_...", "initial_message": "..." }` in body:
   - A new `Conversation` record is created, linked to User A (`created_by`), including a unique `slug` and `last_activity_at` timestamp.
   - A new `Message` record is created with User A's initial message, linked to the new conversation and User A.
   - A `Participant` record is created for User A, linked to the new conversation, with `status='joined'` and `joined_at` set.
