@@ -24,10 +24,6 @@ CONSUMER_HOST = "127.0.0.1"
 CONSUMER_PORT = 8990
 CONSUMER_BASE_URL = URL(f"http://{CONSUMER_HOST}:{CONSUMER_PORT}")
 
-# HTTPS-enabled URLs for testing HTTPS enforcement
-CONSUMER_BASE_URL_HTTPS = URL(f"https://{CONSUMER_HOST}:{CONSUMER_PORT}")
-PROVIDER_BASE_URL_HTTPS = URL(f"https://{PROVIDER_HOST}:{PROVIDER_PORT}")
-
 # Database configuration
 TEST_DATABASE_URL = "sqlite+aiosqlite:///:memory:"
 

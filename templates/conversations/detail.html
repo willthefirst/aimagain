@@ -50,7 +50,7 @@ conversation.slug }}{% endblock %} {% block head %}
 <hr />
 <h2>Send a message</h2>
 <form
-  action="{{ secure_url_for(request, 'create_message', slug=conversation.slug) }}"
+  action="{{ url_for('create_message', slug=conversation.slug) }}"
   method="post"
   name="send-message-form">
   <div>
@@ -70,5 +70,5 @@ conversation.slug }}{% endblock %} {% block head %}
 
 <hr />
 {# TODO: Add form to send new message #}
-<a href="{{ secure_url_for(request, 'list_conversations') }}">Back to conversations</a>
+<a href="{{ url_for('list_conversations') }}">Back to conversations</a>
 {% endblock %}
