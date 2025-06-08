@@ -2,10 +2,7 @@
 {% block content %}
 <h1>Start a new conversation</h1>
 
-<form
-  action="{{ url_for('create_conversation') }}"
-  method="post"
-  name="create-conversation-form">
+<form action="/conversations" method="post" name="create-conversation-form">
   <div>
     <label for="invitee_username">Invite username:</label>
     <input type="text" id="invitee_username" name="invitee_username" required />
@@ -25,6 +22,6 @@
 </form>
 
 <p>
-  <a href="{{ url_for('list_conversations') }}">Back to conversations</a>
+  <a href="/conversations">Back to conversations</a>
 </p>
 {% endblock %}

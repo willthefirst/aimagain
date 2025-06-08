@@ -16,9 +16,7 @@ block head %}
   conversation in conversations %}
   <li>
     <strong>Slug:</strong>
-    <a href="{{ url_for('get_conversation', slug=conversation.slug) }}"
-      >{{ conversation.slug }}</a
-    >
+    <a href="/conversations/{{ conversation.slug }}">{{ conversation.slug }}</a>
     {% if conversation.name %}<br />Name: {{ conversation.name }}{% endif %}
     <br />Participants: {# Check if participants relationship is loaded and not
     empty #} {% if conversation.participants %} {{ conversation.participants |
@@ -33,5 +31,5 @@ block head %}
 {% endif %}
 
 <hr />
-<a href="{{ url_for('list_conversations') }}">View public conversations</a>
+<a href="/conversations">View public conversations</a>
 {% endblock %}
