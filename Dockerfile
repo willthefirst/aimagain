@@ -11,8 +11,9 @@ RUN apt-get update && apt-get install -y \
     gcc \
     && rm -rf /var/lib/apt/lists/*
 
-# Create app directory
+# Create app directory and data directory for database
 WORKDIR /app
+RUN mkdir -p /app/data
 
 # Copy requirements first for better caching
 COPY pyproject.toml ./
@@ -29,8 +30,8 @@ USER appuser
 # Expose port
 EXPOSE 8000
 
-# Run migrations and start the app
-CMD ["sh", "-c", "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000"]
+# Start the app (migrations run separately via Railway deploy hooks)
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
