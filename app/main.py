@@ -3,6 +3,7 @@ from contextlib import asynccontextmanager
 from datetime import datetime
 
 from fastapi import FastAPI, HTTPException, Request, status
+from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from fastapi.responses import JSONResponse, RedirectResponse
 
 from app.api.routes import auth_routes
@@ -43,6 +44,8 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="AIM again", lifespan=lifespan)
 
+# Configure middleware for reverse proxy support
+app.add_middleware(TrustedHostMiddleware, allowed_hosts=["*"])
 
 # Add presence middleware with session factory
 app.add_middleware(PresenceMiddleware, session_factory=get_db_session)

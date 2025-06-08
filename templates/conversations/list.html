@@ -3,7 +3,7 @@ block content %}
 <h1>Public conversations</h1>
 
 <p>
-  <a href="{{ url_for('get_new_conversation_form') }}"
+  <a href="{{ secure_url_for(request, 'get_new_conversation_form') }}"
     >Create new conversation</a
   >
 </p>

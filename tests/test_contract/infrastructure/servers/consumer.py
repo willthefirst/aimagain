@@ -1,6 +1,7 @@
 """Consumer server management for contract tests."""
 
 import logging
+import os
 import uuid
 from typing import Optional
 
@@ -201,6 +202,9 @@ def run_consumer_server_process(
 
     if config is None:
         config = ConsumerServerConfig()
+
+    # Set environment variable to force HTTPS for testing
+    os.environ["FORCE_HTTPS"] = "true"
 
     consumer_app = FastAPI(title="Consumer Test Server Process")
     setup_health_check_route(consumer_app)
