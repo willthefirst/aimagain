@@ -3,9 +3,7 @@ block content %}
 <h1>Public conversations</h1>
 
 <p>
-  <a href="{{ secure_url_for(request, 'get_new_conversation_form') }}"
-    >Create new conversation</a
-  >
+  <a href="/conversations/new">Create new conversation</a>
 </p>
 
 {% if conversations %}
@@ -33,5 +31,5 @@ block content %}
 {% endif %}
 
 <hr />
-{# TODO: Add refresh link using url_for #} {# TODO: Link to create conversation
-#} {% endblock %}
+<a href="/conversations">Refresh</a>
+{% endblock %}

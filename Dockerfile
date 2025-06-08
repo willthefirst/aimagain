@@ -29,6 +29,9 @@ RUN adduser --disabled-password --gecos '' appuser && \
     chown -R appuser:appuser /app
 USER appuser
 
+# Create volume mount point for database
+VOLUME ["/app/data"]
+
 # Expose port
 EXPOSE 8000
 
