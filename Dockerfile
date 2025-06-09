@@ -5,6 +5,7 @@ FROM python:3.11-slim as base
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PYTHONPATH=/app
+    DATABASE_URL=sqlite:////app/data/chat_app.db
 
 # Install system dependencies
 RUN apt-get update && apt-get install -y \
@@ -13,7 +14,6 @@ RUN apt-get update && apt-get install -y \
 
 # Create app directory and data directory for database
 WORKDIR /app
-RUN mkdir -p /app/data
 
 # Copy requirements first for better caching
 COPY pyproject.toml ./
