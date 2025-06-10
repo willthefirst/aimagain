@@ -31,17 +31,7 @@ if DATABASE_URL:
         DATABASE_URL = DATABASE_URL.replace("sqlite+aiosqlite://", "sqlite://")
     config.set_main_option("sqlalchemy.url", DATABASE_URL)
 
-
-# add your model's MetaData object here
-# for 'autogenerate' support
-# Use the imported metadata
-# target_metadata = Base.metadata # Old way
-target_metadata = metadata  # Corrected
-
-# other values from the config, defined by the needs of env.py,
-# can be acquired:
-# my_important_option = config.get_main_option("my_important_option")
-# ... etc.
+target_metadata = metadata
 
 
 def run_migrations_offline() -> None:
