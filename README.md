@@ -252,7 +252,7 @@ Follow these steps to set up the project locally:
 3.  **Install dependencies:**
 
     ```bash
-    # Installl the project and its dependencies defined in pyproject.toml
+    # Install the project and its dependencies defined in pyproject.toml
     pip install .
     # For development, you might prefer editable mode:
     # pip install -e .
