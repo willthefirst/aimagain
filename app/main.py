@@ -10,37 +10,13 @@ from app.auth_config import auth_backend, fastapi_users
 from app.db import check_database_health, get_db_session
 from app.middleware.presence import PresenceMiddleware
 from app.schemas.user import UserRead, UserUpdate
+from app.services.migration_service import run_migrations
 
 from .api.routes import auth_pages, conversations, me, participants, users
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-
-
-async def run_migrations():
-    """Run database migrations using alembic programmatically."""
-    import subprocess
-    import sys
-
-    try:
-        logger.info("Running database migrations...")
-        result = subprocess.run(
-            [sys.executable, "-m", "alembic", "upgrade", "head"],
-            capture_output=True,
-            text=True,
-            check=True,
-        )
-        logger.info("Migrations completed successfully")
-        if result.stdout:
-            logger.info(f"Migration output: {result.stdout}")
-    except subprocess.CalledProcessError as e:
-        logger.error(f"Migration failed: {e}")
-        if e.stdout:
-            logger.error(f"Migration stdout: {e.stdout}")
-        if e.stderr:
-            logger.error(f"Migration stderr: {e.stderr}")
-        raise RuntimeError("Database migration failed") from e
 
 
 @asynccontextmanager
