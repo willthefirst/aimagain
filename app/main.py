@@ -10,6 +10,7 @@ from app.auth_config import auth_backend, fastapi_users
 from app.db import check_database_health, get_db_session
 from app.middleware.presence import PresenceMiddleware
 from app.schemas.user import UserRead, UserUpdate
+from app.services.migration_service import run_migrations
 
 from .api.routes import auth_pages, conversations, me, participants, users
 
