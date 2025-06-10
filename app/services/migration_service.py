@@ -32,11 +32,30 @@ async def run_migrations():
                 db_dir.mkdir(parents=True, exist_ok=True)
 
         # Run alembic upgrade
+        # First try to find alembic executable
+        alembic_cmd = None
+        try:
+            # Try using alembic directly
+            result = subprocess.run(
+                ["alembic", "--version"],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            alembic_cmd = ["alembic"]
+        except (subprocess.CalledProcessError, FileNotFoundError):
+            # Fall back to python -m alembic
+            alembic_cmd = [sys.executable, "-m", "alembic"]
+
+        # Set working directory to project root where alembic.ini is located
+        project_root = Path(__file__).parent.parent.parent
+
         result = subprocess.run(
-            [sys.executable, "-m", "alembic", "upgrade", "head"],
+            alembic_cmd + ["upgrade", "head"],
             check=True,
             capture_output=True,
             text=True,
+            cwd=str(project_root),
         )
         logger.info("Migrations completed successfully")
         if result.stdout:
