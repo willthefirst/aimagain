@@ -19,18 +19,28 @@ logger = logging.getLogger(__name__)
 
 
 async def run_migrations():
-    """Run database migrations at startup."""
-    try:
-        from alembic import command
-        from alembic.config import Config
+    """Run database migrations using alembic programmatically."""
+    import subprocess
+    import sys
 
+    try:
         logger.info("Running database migrations...")
-        alembic_cfg = Config("alembic.ini")
-        command.upgrade(alembic_cfg, "head")
-        logger.info("Database migrations completed successfully")
-    except Exception as e:
-        logger.error(f"Database migration failed: {e}")
-        raise
+        result = subprocess.run(
+            [sys.executable, "-m", "alembic", "upgrade", "head"],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        logger.info("Migrations completed successfully")
+        if result.stdout:
+            logger.info(f"Migration output: {result.stdout}")
+    except subprocess.CalledProcessError as e:
+        logger.error(f"Migration failed: {e}")
+        if e.stdout:
+            logger.error(f"Migration stdout: {e.stdout}")
+        if e.stderr:
+            logger.error(f"Migration stderr: {e.stderr}")
+        raise RuntimeError("Database migration failed") from e
 
 
 @asynccontextmanager
