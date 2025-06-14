@@ -13,7 +13,7 @@ The deployment setup includes:
 - **Health checks** and monitoring
 - **Local development** environment with Docker Compose
 
-## 🏗️ Architecture
+## 🏗️ architecture
 
 ```
 ┌─────────────────┐    ┌──────────────────┐    ┌─────────────────┐
@@ -83,14 +83,14 @@ The GitHub Actions workflow provides automated build and deployment:
 
 ### Workflow stages:
 
-#### 1. Build and Push
+#### 1. build and push
 
 - **Trigger**: Push to main branch or manual dispatch
 - **Registry**: GitHub Container Registry (ghcr.io)
 - **Tags**: `latest`, commit SHA, branch name
 - **Features**: Multi-platform build, layer caching, metadata extraction
 
-#### 2. Deploy to VPS
+#### 2. deploy to vps
 
 - **Dependency**: Successful build completion
 - **Method**: SSH connection to VPS server
@@ -103,7 +103,7 @@ The GitHub Actions workflow provides automated build and deployment:
 - `USERNAME`: SSH username for VPS access
 - `SSH_KEY`: Private SSH key for authentication
 
-## 🖥️ VPS deployment script (deploy.sh)
+## 🖥️ vps deployment script (deploy.sh)
 
 The deployment script automates the complete deployment process on the VPS:
 
@@ -118,7 +118,7 @@ The deployment script automates the complete deployment process on the VPS:
 7. **Cleanup**: Remove old images to save disk space
 8. **Status report**: Display deployment status and useful commands
 
-### Configuration options:
+### Configuration OPTIONS:
 
 ```bash
 # Environment variables for customization
@@ -148,7 +148,7 @@ Docker Compose provides a complete local development environment:
 
 ## 📋 Setup instructions
 
-### 1. Local development setup
+### 1. local development setup
 
 ```bash
 # Clone the repository
@@ -183,7 +183,7 @@ open http://localhost:8000
 3. **Configure repository access**:
    - Ensure repository is public or configure GHCR access for private repos
 
-### 3. VPS server setup
+### 3. vps server setup
 
 1. **Install Docker**:
 
@@ -251,11 +251,11 @@ docker cp chat-app:/app/data/chat_app.db ./backup-$(date +%Y%m%d).db
 docker exec -it chat-app alembic current
 ```
 
-## 🛠️ Troubleshooting
+## 🛠️ troubleshooting
 
 ### Common issues and solutions:
 
-#### 1. Build failures
+#### 1. build failures
 
 ```bash
 # Check Docker build logs
@@ -265,10 +265,10 @@ docker build --no-cache .
 pip install -e .
 ```
 
-#### 2. Deployment failures
+#### 2. deployment failures
 
 ```bash
-# Check VPS Docker status
+# Check vps Docker status
 docker info
 
 # Verify image accessibility
@@ -278,7 +278,7 @@ docker pull ghcr.io/YOUR_USERNAME/YOUR_REPO:latest
 docker logs chat-app
 ```
 
-#### 3. Database issues
+#### 3. database issues
 
 ```bash
 # Check database file permissions
@@ -292,7 +292,7 @@ docker exec -it chat-app rm /app/data/chat_app.db
 docker restart chat-app
 ```
 
-#### 4. Network connectivity
+#### 4. network connectivity
 
 ```bash
 # Test application health
@@ -319,7 +319,7 @@ Push changes to the main branch, and GitHub Actions will automatically:
 ### Manual updates
 
 ```bash
-# On VPS server
+# On vps server
 cd /opt/chat-app
 ./deploy.sh
 ```
