@@ -28,7 +28,7 @@ async def lifespan(app: FastAPI):
     logger.info("Starting application...")
     try:
         # Run migrations first
-        await run_migrations()
+        # await run_migrations()
 
         # In provider test mode, skip table check since tables are managed separately
         skip_table_check = os.getenv("PROVIDER_TEST_MODE") == "true"
