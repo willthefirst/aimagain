@@ -1,0 +1,148 @@
+name: Build and Deploy to VPS
+
+# Trigger workflow on push to main branch
+on:
+  push:
+    branches:
+      - main
+  # Allow manual workflow dispatch for testing
+  workflow_dispatch:
+
+# Set environment variables for the workflow
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  # Job 1: Build and push Docker image
+  build-and-push:
+    name: Build and Push Docker Image
+    runs-on: ubuntu-latest
+    
+    # Required permissions for GHCR
+    permissions:
+      contents: read
+      packages: write
+      
+    outputs:
+      image-digest: ${{ steps.build.outputs.digest }}
+      image-tag: ${{ steps.meta.outputs.tags }}
+      
+    steps:
+      # Checkout repository code
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        
+      # Set up Docker Buildx for advanced features
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+        
+      # Login to GitHub Container Registry
+      - name: Login to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+          
+      # Extract metadata for tags and labels
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            # Tag with 'latest' for main branch
+            type=raw,value=latest,enable={{is_default_branch}}
+            # Tag with commit SHA for traceability
+            type=sha,prefix={{branch}}-
+            # Tag with branch name
+            type=ref,event=branch
+            # Tag with PR number for pull requests
+            type=ref,event=pr
+            
+      # Build and push Docker image
+      - name: Build and push Docker image
+        id: build
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          platforms: linux/amd64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          # Use cache for faster builds
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          
+      # Output image information for debugging
+      - name: Image digest
+        run: echo "Image digest:" ${{ steps.build.outputs.digest }}
+
+  # Job 2: Deploy to VPS server
+  deploy:
+    name: Deploy to VPS
+    runs-on: ubuntu-latest
+    needs: build-and-push
+    
+    # Only run deployment for main branch
+    if: github.ref == 'refs/heads/main'
+    
+    steps:
+      # Deploy to VPS using SSH
+      - name: Deploy to VPS
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: ${{ secrets.HOST }}
+          username: ${{ secrets.USERNAME }}
+          key: ${{ secrets.SSH_KEY }}
+          port: 22
+          # Commands to run on the VPS server
+          script: |
+            echo "=== Starting deployment at $(date) ==="
+            
+            # Navigate to deployment directory
+            cd /opt/chat-app || {
+              echo "Creating deployment directory..."
+              sudo mkdir -p /opt/chat-app
+              sudo chown $USER:$USER /opt/chat-app
+              cd /opt/chat-app
+            }
+            
+            # Download deployment script if it doesn't exist
+            if [ ! -f "deploy.sh" ]; then
+              echo "Downloading deployment script..."
+              curl -fsSL https://raw.githubusercontent.com/${{ github.repository }}/main/deploy.sh -o deploy.sh
+              chmod +x deploy.sh
+            fi
+            
+            # Set environment variables for deployment
+            export IMAGE_NAME="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}"
+            export IMAGE_TAG="latest"
+            export CONTAINER_NAME="chat-app"
+            
+            # Run deployment script
+            echo "Running deployment script..."
+            ./deploy.sh
+            
+            # Verify deployment
+            echo "Verifying deployment..."
+            sleep 10
+            if curl -f http://localhost:8000/health; then
+              echo "✅ Deployment successful!"
+            else
+              echo "❌ Deployment verification failed"
+              exit 1
+            fi
+            
+            echo "=== Deployment completed at $(date) ==="
+            
+      # Notify deployment status
+      - name: Deployment notification
+        if: always()
+        run: |
+          if [ "${{ job.status }}" == "success" ]; then
+            echo "🚀 Deployment to VPS completed successfully!"
+          else
+            echo "❌ Deployment to VPS failed!"
+          fi 

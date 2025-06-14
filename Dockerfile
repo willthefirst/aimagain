@@ -1,37 +1,46 @@
-# Use Python 3.11 slim image
+# Use Python 3.11 slim base image for smaller footprint
 FROM python:3.11-slim as base
 
-# Set environment variables
+# Set environment variables for Python optimization
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
-    PYTHONPATH=/app
+    PYTHONPATH=/app \
+    PIP_NO_CACHE_DIR=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1
 
-# Install system dependencies
+# Install system dependencies needed for SQLite and compilation
 RUN apt-get update && apt-get install -y \
+    sqlite3 \
     gcc \
+    curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Create app directory
+# Create app directory and data directory for SQLite persistence
 WORKDIR /app
+RUN mkdir -p /app/data
 
-# Copy requirements first for better caching
+# Copy and install Python dependencies first for better Docker layer caching
 COPY pyproject.toml ./
 RUN pip install --no-cache-dir -e .
 
 # Copy application code
 COPY . .
 
-# Create non-root user
+# Copy startup script and make it executable
+COPY start.sh /app/start.sh
+RUN chmod +x /app/start.sh
+
+# Create non-root user for security
 RUN adduser --disabled-password --gecos '' appuser && \
     chown -R appuser:appuser /app
 USER appuser
 
-# Expose port
+# Expose port 8000
 EXPOSE 8000
 
-# Start the app (migrations run separately via Railway deploy hooks)
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
-
-# Health check
-HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
+# Health check to ensure the application is running
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD curl -f http://localhost:8000/health || exit 1
+
+# Use startup script that runs migrations before starting FastAPI
+CMD ["/app/start.sh"]
