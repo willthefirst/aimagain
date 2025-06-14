@@ -54,7 +54,7 @@ class Settings(BaseSettings):
                         f"\nMissing variables: {fields_str}"
                         f"\n\nFor local development, create a .env file with:"
                         f"\n{example_env}"
-                        f"\n\nFor production, set these as environment variables in Railway."
+                        f"\n\nFor production, set these as environment variables in the server."
                     )
                 else:
                     error_msg = (
