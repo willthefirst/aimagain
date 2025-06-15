@@ -1,5 +1,5 @@
 # Use Python 3.11 slim base image for smaller footprint
-FROM python:3.11-slim as base
+FROM python:3.11-slim AS base
 
 # Set environment variables for Python optimization
 ENV PYTHONDONTWRITEBYTECODE=1 \
