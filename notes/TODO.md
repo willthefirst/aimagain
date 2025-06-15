@@ -1,1 +1,2 @@
-- Now that we've successfully added the create_message functionality, I think I'd like to rig up the repo with READMEs and Cursor rules that help the agent add the feature itself in the future. Goal: can we provide the agent with sufficient docs and prompt to help it gracefully add these features on it's own?
+- finish CI/CD work with docker deploys.
+- update readme to explain local dev setup since we're going to run it with docker now.
