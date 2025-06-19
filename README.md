@@ -29,7 +29,7 @@ The MVP focuses on basic conversation functionality with user invitations.
 
 **1. Initiate a new conversation** ✅
 
-- **As an** authenticated user,
+- **As ann** authenticated user,
 - **I want to** `POST` to `/conversations`, providing the target _online_ user's ID and an initial message,
 - **So that** a new conversation is created between us, and they receive an invitation to join.
 - **Acceptance criteria:**
