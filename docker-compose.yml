@@ -1,7 +1,7 @@
 # Docker Compose configuration for local development
 # This file provides a complete development environment for the FastAPI chat application
 
-version: "3.8"
+version: '3.8'
 
 services:
   # FastAPI application service
@@ -16,7 +16,7 @@ services:
 
     # Port mapping: host:container
     ports:
-      - "8000:8000"
+      - '8000:8000'
 
     # Volume mounts for development
     volumes:
@@ -41,22 +41,25 @@ services:
       - DEBUG=true
 
       # Database configuration
-      - DATABASE_URL=sqlite:////app/data/chat_app.db
+      - DATABASE_URL=sqlite+aiosqlite:////app/data/chat_app.db
 
       # FastAPI configuration
       - HOST=0.0.0.0
       - PORT=8000
 
-      # Optional: Add other environment variables as needed
-      # - SECRET_KEY=your-secret-key-for-development
-      # - ALLOWED_HOSTS=localhost,127.0.0.1
+      # Auth configuration
+      - ACCESS_TOKEN_EXPIRE_MINUTES=60
+      - SECRET=your-secret-key-for-development
+
+      # App configuration
+      - ONLINE_TIMEOUT_MINUTES=10
 
     # Restart policy
     restart: unless-stopped
 
     # Health check configuration
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      test: ['CMD', 'curl', '-f', 'http://localhost:8000/health']
       interval: 30s
       timeout: 10s
       retries: 3
