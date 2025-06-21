@@ -1,0 +1,35 @@
+version: '3.8'
+services:
+  aimagain-blue:
+    image: ghcr.io/willthefirst/aimagain:latest
+    container_name: aimagain-blue
+    restart: unless-stopped
+    ports:
+      - '8001:8000'
+    volumes:
+      - ./data:/app/data
+    env_file:
+      - config/.env
+    healthcheck:
+      test: ['CMD', 'curl', '-f', 'http://localhost:8000/health']
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  aimagain-green:
+    image: ghcr.io/willthefirst/aimagain:latest
+    container_name: aimagain-green
+    restart: unless-stopped
+    ports:
+      - '8002:8000'
+    volumes:
+      - ./data:/app/data
+    env_file:
+      - config/.env
+    healthcheck:
+      test: ['CMD', 'curl', '-f', 'http://localhost:8000/health']
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
