@@ -268,7 +268,7 @@ Follow these steps to set up the project locally:
     The `.env` file is ignored by git and contains environment-specific settings like database URLs. The application (`app/db.py`) and Alembic (`alembic/env.py`) are configured to read this file.
 
 5.  **Apply database migrations:**
-    This command creates the database file (e.g., `chat_app.db` specified in `.env`) and applies all schema migrations.
+    This command creates the database file (e.g., `aimagain.db` specified in `.env`) and applies all schema migrations.
 
     ```bash
     alembic upgrade head

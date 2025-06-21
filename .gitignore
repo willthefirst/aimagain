@@ -87,8 +87,8 @@ dmypy.json
 *.sqlite3
 
 # Application specific
-chat_app.db
-test_chat_app.db
+aimagain.db
+test_aimagain.db
 
 */**/log
 */**/artifacts
