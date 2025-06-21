@@ -60,7 +60,7 @@ jobs:
           host: ${{ secrets.DROPLET_HOST }}
           username: ${{ secrets.DROPLET_USERNAME }}
           key: ${{ secrets.DROPLET_SSH_KEY }}
-          source: 'deployment/droplet-files/*'
+          source: 'deployment/droplet-files'
           target: '/opt/aimagain/deployment'
           strip_components: 2
 
