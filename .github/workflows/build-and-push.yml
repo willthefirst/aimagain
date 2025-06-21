@@ -59,4 +59,4 @@ jobs:
           key: ${{ secrets.DROPLET_SSH_KEY }}
           script: |
             cd /opt/aimagain
-            ./deploy-zero-downtime.sh
+            ./deploy.sh
