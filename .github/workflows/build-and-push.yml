@@ -54,15 +54,22 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Copy deployment files to droplet
-        uses: appleboy/scp-action@v0.1.7
-        with:
-          host: ${{ secrets.DROPLET_HOST }}
-          username: ${{ secrets.DROPLET_USERNAME }}
-          key: ${{ secrets.DROPLET_SSH_KEY }}
-          source: 'deployment/droplet-files'
-          target: '/opt/aimagain/deployment'
-          strip_components: 2
+      - name: Copy deployment files to droplet (manual SCP)
+        run: |
+          # Create temporary SSH key file from secret
+          echo "${{ secrets.DROPLET_SSH_KEY }}" > /tmp/droplet_ssh_key
+          chmod 600 /tmp/droplet_ssh_key
+
+          # Set environment variables for the script
+          export DROPLET_HOST="${{ secrets.DROPLET_HOST }}"
+          export DROPLET_USERNAME="${{ secrets.DROPLET_USERNAME }}"
+          export DROPLET_SSH_KEY_PATH="/tmp/droplet_ssh_key"
+
+          # Run the manual copy script
+          ./deployment/scripts/deploy-copy-files.sh
+
+          # Clean up temporary key file
+          rm -f /tmp/droplet_ssh_key
 
       - name: Run deployment
         uses: appleboy/ssh-action@v1.0.3
