@@ -55,13 +55,13 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Copy deployment files to droplet
-        uses: appleboy/scp-action@v0.1.7
+        uses: appleboy/scp-action@v1
         with:
           host: ${{ secrets.DROPLET_HOST }}
           username: ${{ secrets.DROPLET_USERNAME }}
           key: ${{ secrets.DROPLET_SSH_KEY }}
           source: 'deployment/droplet-files/*'
-          target: '/opt/aimagain/'
+          target: '/opt/aimagain/deployment'
           strip_components: 2
 
       - name: Run deployment
@@ -71,6 +71,6 @@ jobs:
           username: ${{ secrets.DROPLET_USERNAME }}
           key: ${{ secrets.DROPLET_SSH_KEY }}
           script: |
-            cd /opt/aimagain
+            cd /opt/aimagain/deployment
             chmod +x deploy.sh cleanup-docker.sh
             ./deploy.sh
