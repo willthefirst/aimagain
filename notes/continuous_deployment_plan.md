@@ -114,7 +114,7 @@ Add to GitHub Secrets:
 - `DROPLET_USERNAME`: Username (root/user)
 - `DROPLET_SSH_KEY`: Content of `~/.ssh/github_actions_key`
 
-#### Step 2.2: Update GitHub Actions Workflow
+#### Step 2.2: Update GitHub Actions Workflow ✅
 
 Update `.github/workflows/build-and-push.yml`:
 
