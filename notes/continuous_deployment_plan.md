@@ -192,7 +192,7 @@ sudo systemctl enable nginx
 sudo systemctl start nginx
 ```
 
-**Test**: Access app through Nginx (port 80) instead of direct port 8000
+**Test**: ✅ Access app through Nginx (HTTPS) - WORKING
 **Rollback**: App still accessible on port 8000
 
 #### Step 3.2: Prepare Blue-Green Infrastructure
