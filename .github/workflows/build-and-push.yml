@@ -51,7 +51,20 @@ jobs:
     if: github.ref == 'refs/heads/main'
 
     steps:
-      - name: Deploy to DigitalOcean Droplet
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Copy deployment files to droplet
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.DROPLET_HOST }}
+          username: ${{ secrets.DROPLET_USERNAME }}
+          key: ${{ secrets.DROPLET_SSH_KEY }}
+          source: 'deployment/droplet-files/*'
+          target: '/opt/aimagain/'
+          strip_components: 2
+
+      - name: Run deployment
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.DROPLET_HOST }}
@@ -59,4 +72,5 @@ jobs:
           key: ${{ secrets.DROPLET_SSH_KEY }}
           script: |
             cd /opt/aimagain
+            chmod +x deploy.sh cleanup-docker.sh
             ./deploy.sh
