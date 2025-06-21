@@ -151,11 +151,13 @@ name: Build and Deploy
 **Risk**: Low - App still accessible on port 8000 if Nginx fails
 **Time**: 1-2 hours
 
-#### Step 3.1: Install and Configure Nginx
+#### Step 3.1: Install and Configure Nginx ✅ **ALREADY DONE**
+
+**Note**: Nginx already installed with SSL/HTTPS working for aimagain.art domain!
+**Enhancement**: Add upstream block for blue-green switching capability
 
 ```bash
-# Install nginx
-sudo apt update && sudo apt install nginx
+# Nginx already installed and working
 
 # Create configuration
 sudo tee /etc/nginx/sites-available/aimagain << 'EOF'
