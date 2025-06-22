@@ -44,7 +44,7 @@ jobs:
           playwright install --with-deps
       - name: Create test database
         run: |
-          alembic upgrade head
+          alembic -c config/alembic.ini upgrade head
 
       - name: Run pytest
         run: pytest -v --tb=short
