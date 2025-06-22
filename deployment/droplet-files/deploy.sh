@@ -102,7 +102,7 @@ server {
 EOF
 
     # Test nginx configuration before reloading
-    if sudo nginx -t; then
+    if run_cmd sudo nginx -t; then
         sudo nginx -s reload
         success "Nginx configuration updated and reloaded successfully"
     else
