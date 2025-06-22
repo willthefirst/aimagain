@@ -11,9 +11,9 @@ from fastapi import Body, Depends, FastAPI, Response, status
 from fastapi_users.db import SQLAlchemyUserDatabase
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
-from app.db import get_db_session, get_user_db
-from app.main import app
-from app.models import User, metadata
+from src.db import get_db_session, get_user_db
+from src.main import app
+from src.models import User, metadata
 
 from ..utilities.mocks import (
     MockAuthManager,
@@ -73,9 +73,9 @@ def setup_provider_database_overrides(app: FastAPI, logger: logging.Logger) -> t
     ) -> SQLAlchemyUserDatabase[User, Any]:
         yield SQLAlchemyUserDatabase(session, User)
 
-    app.dependency_overrides[get_db_session] = (
-        local_provider_override_get_db_session_impl
-    )
+    app.dependency_overrides[
+        get_db_session
+    ] = local_provider_override_get_db_session_impl
     app.dependency_overrides[get_user_db] = local_provider_override_get_user_db_impl
 
     logger.info("Applied DB dependency overrides for provider test.")
@@ -131,7 +131,7 @@ def run_provider_server_process(
             user_id=uuid.uuid4(),
         )
 
-        from app.auth_config import current_active_user
+        from src.auth_config import current_active_user
 
         MockAuthManager.setup_mock_auth(app, mock_user, current_active_user)
         logger.info(f"Mocking current_active_user with user: {mock_user.email}")

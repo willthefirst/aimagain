@@ -3,7 +3,7 @@ from typing import Optional
 from uuid import UUID  # Import UUID
 
 # Need ORM models
-from app.models import User
+from src.models import User
 
 
 def create_test_user(

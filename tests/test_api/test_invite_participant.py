@@ -8,8 +8,8 @@ from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from test_helpers import create_test_user
 
-from app.models import Conversation, Participant, User
-from app.schemas.participant import ParticipantResponse, ParticipantStatus
+from src.models import Conversation, Participant, User
+from src.schemas.participant import ParticipantResponse, ParticipantStatus
 
 pytestmark = pytest.mark.asyncio
 

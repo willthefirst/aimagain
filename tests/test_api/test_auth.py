@@ -4,7 +4,7 @@ from httpx import AsyncClient
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from app.models import User
+from src.models import User
 
 # Mark all tests in this module as async
 pytestmark = pytest.mark.asyncio

@@ -39,10 +39,10 @@ The "ultra-thin layer" approach addresses this by introducing:
 
 ## Code implementation
 
-### 1. Ultra-thin route handler (`app/api/routes/conversation_routes.py`)
+### 1. Ultra-thin route handler (`src/api/routes/conversation_routes.py`)
 
 ```python
-# app/api/routes/conversation_routes.py
+# src/api/routes/conversation_routes.py
 import logging
 from fastapi import APIRouter, Depends, status, Request
 
@@ -80,10 +80,10 @@ async def conversation_request_handler(
     return result
 ```
 
-### 2. Logic/handling layer (`app/logic/conversation_processing.py`)
+### 2. Logic/handling layer (`src/logic/conversation_processing.py`)
 
 ```python
-# app/logic/conversation_processing.py
+# src/logic/conversation_processing.py
 import logging
 from uuid import UUID
 from fastapi import Depends, HTTPException, status, Request

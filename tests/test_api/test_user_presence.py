@@ -1,10 +1,7 @@
 from datetime import datetime, timezone
 
-import pytest
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from test_helpers import create_test_user
-
-from app.models import User
 
 
 async def test_user_has_last_active_at_field(

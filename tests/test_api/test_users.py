@@ -9,8 +9,8 @@ from selectolax.parser import HTMLParser
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from test_helpers import create_test_user
 
-from app.models import Conversation, Participant, User
-from app.schemas.participant import ParticipantStatus  # Import enum
+from src.models import Conversation, Participant, User
+from src.schemas.participant import ParticipantStatus  # Import enum
 
 # Mark all tests in this module as async
 pytestmark = pytest.mark.asyncio

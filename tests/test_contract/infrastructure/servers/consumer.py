@@ -7,10 +7,10 @@ from typing import Optional
 import uvicorn
 from fastapi import FastAPI
 
-from app.api.routes import auth_pages, conversations, me, participants, users
-from app.auth_config import current_active_user
-from app.models import Conversation, Message, Participant, User
-from app.schemas.participant import ParticipantStatus
+from src.api.routes import auth_pages, conversations, me, participants, users
+from src.auth_config import current_active_user
+from src.models import Conversation, Message, Participant, User
+from src.schemas.participant import ParticipantStatus
 
 from ..utilities.mocks import (
     MockAuthManager,
@@ -175,7 +175,7 @@ def setup_consumer_mocks(config: ConsumerServerConfig, logger: logging.Logger) -
         mock_invitations = create_mock_invitation_data()
 
         mock_invitations_config = {
-            "app.api.routes.me.handle_get_my_invitations": {
+            "src.api.routes.me.handle_get_my_invitations": {
                 "return_value_config": mock_invitations
             }
         }
@@ -186,7 +186,7 @@ def setup_consumer_mocks(config: ConsumerServerConfig, logger: logging.Logger) -
         mock_conversation = create_mock_conversation_data()
 
         mock_conversation_config = {
-            "app.api.routes.conversations.handle_get_conversation": {
+            "src.api.routes.conversations.handle_get_conversation": {
                 "return_value_config": mock_conversation
             }
         }

@@ -35,7 +35,7 @@ dependencies = [
 
 [tool.setuptools.packages.find]
 where = ["."] # Look in the root directory
-include = ["app*"] # Include only the 'app' directory and its subpackages
+include = ["src*"] # Include only the 'src' directory and its subpackages
 exclude = ["tests*", "alembic*", "templates*"] # Explicitly exclude other top-level dirs
 
 [tool.black]

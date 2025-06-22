@@ -265,7 +265,7 @@ Follow these steps to set up the project locally:
     cp .env.example .env
     ```
 
-    The `.env` file is ignored by git and contains environment-specific settings like database URLs. The application (`app/db.py`) and Alembic (`alembic/env.py`) are configured to read this file.
+    The `.env` file is ignored by git and contains environment-specific settings like database URLs. The application (`src/db.py`) and Alembic (`alembic/env.py`) are configured to read this file.
 
 5.  **Apply database migrations:**
     This command creates the database file (e.g., `aimagain.db` specified in `.env`) and applies all schema migrations.
@@ -274,7 +274,7 @@ Follow these steps to set up the project locally:
     alembic upgrade head
     ```
 
-    If you make changes to the models in `app/models.py`, you'll need to generate a new migration:
+    If you make changes to the models in `src/models.py`, you'll need to generate a new migration:
 
     ```bash
     alembic revision --autogenerate -m "Your descriptive message"
@@ -290,7 +290,7 @@ Follow these steps to set up the project locally:
     This starts the FastAPI application using the Uvicorn server.
 
     ```bash
-    uvicorn app.main:app --reload
+    uvicorn src.main:app --reload
     ```
 
     The API will typically be available at `http://127.0.0.1:8000`. You can access the interactive API documentation (Swagger UI) at `http://127.0.0.1:8000/docs`.

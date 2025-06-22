@@ -8,8 +8,8 @@ from selectolax.parser import HTMLParser
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from test_helpers import create_test_user
 
-from app.models import Conversation, Participant
-from app.schemas.participant import ParticipantStatus
+from src.models import Conversation, Participant
+from src.schemas.participant import ParticipantStatus
 
 pytestmark = pytest.mark.asyncio
 

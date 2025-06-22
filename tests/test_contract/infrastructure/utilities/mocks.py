@@ -7,7 +7,7 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from app.models import User
+from src.models import User
 
 
 def create_mock_user(email: str, username: str, user_id: uuid.UUID = None) -> User:

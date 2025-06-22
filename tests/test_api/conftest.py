@@ -7,15 +7,15 @@ from fastapi_users.db import SQLAlchemyUserDatabase
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
-from app.core.templating import templates  # Import the global templates object
+from src.core.templating import templates  # Import the global templates object
 
-# Updated dependency imports from app.db
-from app.db import get_db_session, get_user_db
+# Updated dependency imports from src.db
+from src.db import get_db_session, get_user_db
 
-# Assuming your FastAPI app instance is in app.main
-from app.main import app
-from app.models import User, metadata  # Assuming your models define metadata
-from app.schemas.user import UserCreate  # Import UserCreate schema
+# Assuming your FastAPI app instance is in src.main
+from src.main import app
+from src.models import User, metadata  # Assuming your models define metadata
+from src.schemas.user import UserCreate  # Import UserCreate schema
 
 # REMOVED Depends import as it's not used in fixture overrides this way
 # from fastapi import Depends
@@ -131,7 +131,7 @@ async def authenticated_client(
     db_test_session_manager: async_sessionmaker[AsyncSession],
     test_app: FastAPI,  # Need the app to get the dependency
 ) -> AsyncGenerator[AsyncClient, None]:
-    from app.auth_config import get_user_manager  # New import
+    from src.auth_config import get_user_manager  # New import
 
     user_data = UserCreate(
         email="testuser@example.com",
@@ -183,7 +183,7 @@ async def logged_in_user(
     # The user was created in authenticated_client fixture
     # Fetch the user from the DB based on the known test email
     async with db_test_session_manager() as session:
-        from app.repositories.user_repository import UserRepository
+        from src.repositories.user_repository import UserRepository
 
         user_repo = UserRepository(session)
         user = await user_repo.get_user_by_email("testuser@example.com")

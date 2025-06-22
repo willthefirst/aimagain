@@ -6,8 +6,8 @@ from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from test_helpers import create_test_user
 
-from app.middleware.presence import update_all_users_online_status
-from app.models import User
+from src.middleware.presence import update_all_users_online_status
+from src.models import User
 
 
 async def test_middleware_updates_presence_for_authenticated_user(
@@ -71,7 +71,7 @@ async def test_middleware_handles_database_errors_gracefully(
 ):
     """Test middleware doesn't break app if presence update fails"""
     with patch(
-        "app.middleware.presence.PresenceMiddleware._do_presence_update",
+        "src.middleware.presence.PresenceMiddleware._do_presence_update",
         side_effect=Exception("DB Error"),
     ):
         # Request should still succeed even if presence update fails
@@ -170,7 +170,7 @@ async def test_update_all_users_online_status_respects_timeout_config(
     db_test_session_manager: async_sessionmaker[AsyncSession],
 ):
     """Test that the online status update respects the configured timeout"""
-    from app.core.config import settings
+    from src.core.config import settings
 
     # Create a user with activity exactly at the timeout boundary
     async with db_test_session_manager() as session:
@@ -208,7 +208,7 @@ async def test_update_all_users_online_status_handles_errors_gracefully(
 ):
     """Test that update_all_users_online_status handles database errors gracefully"""
     # Test with a real database error scenario
-    with patch("app.middleware.presence.logger") as mock_logger:
+    with patch("src.middleware.presence.logger") as mock_logger:
         # Create a scenario where the database operation fails
         async def failing_execute(*args, **kwargs):
             raise Exception("Database operation failed")
@@ -217,7 +217,7 @@ async def test_update_all_users_online_status_handles_errors_gracefully(
             # Mock the session's execute method to fail
             with patch.object(session, "execute", side_effect=failing_execute):
                 # The service catches the original exception and raises a ServiceError
-                from app.services.exceptions import ServiceError
+                from src.services.exceptions import ServiceError
 
                 with pytest.raises(
                     ServiceError,

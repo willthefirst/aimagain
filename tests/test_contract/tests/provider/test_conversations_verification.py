@@ -24,7 +24,7 @@ class ConversationsVerification(BaseProviderVerification):
         # Combine both create and get conversation configs
         create_config = MockDataFactory.create_conversation_dependency_config()
         get_config = {
-            "app.api.routes.conversations.handle_get_conversation": {
+            "src.api.routes.conversations.handle_get_conversation": {
                 "return_value_config": MockDataFactory.create_conversation(
                     name="mock-name"
                 )
@@ -52,7 +52,7 @@ class MessagesVerification(BaseProviderVerification):
     def dependency_config(self):
         create_message_config = MockDataFactory.create_message_dependency_config()
         get_conversation_config = {
-            "app.api.routes.conversations.handle_get_conversation": {
+            "src.api.routes.conversations.handle_get_conversation": {
                 "return_value_config": MockDataFactory.create_conversation(
                     name="mock-name"
                 )

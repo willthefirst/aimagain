@@ -4,11 +4,11 @@ from datetime import datetime, timezone
 from typing import Any, Dict
 from uuid import uuid4
 
-from app.models.conversation import Conversation
-from app.models.message import Message
-from app.models.participant import Participant
-from app.schemas.participant import ParticipantStatus
-from app.schemas.user import UserRead
+from src.models.conversation import Conversation
+from src.models.message import Message
+from src.models.participant import Participant
+from src.schemas.participant import ParticipantStatus
+from src.schemas.user import UserRead
 
 
 class MockDataFactory:
@@ -129,7 +129,7 @@ class MockDataFactory:
             user_read = self.create_user_read()
 
         return {
-            "app.api.routes.auth_routes.handle_registration": {
+            "src.api.routes.auth_routes.handle_registration": {
                 "return_value_config": user_read
             }
         }
@@ -143,7 +143,7 @@ class MockDataFactory:
             conversation = self.create_conversation()
 
         return {
-            "app.api.routes.conversations.handle_create_conversation": {
+            "src.api.routes.conversations.handle_create_conversation": {
                 "return_value_config": conversation
             }
         }
@@ -157,7 +157,7 @@ class MockDataFactory:
             participant = self.create_participant()
 
         return {
-            "app.api.routes.participants.handle_update_participant_status": {
+            "src.api.routes.participants.handle_update_participant_status": {
                 "return_value_config": participant
             }
         }
@@ -177,7 +177,7 @@ class MockDataFactory:
     def create_message_dependency_config(cls) -> Dict[str, Any]:
         """Create mock config for message endpoints."""
         return {
-            "app.api.routes.conversations.handle_create_message": {
+            "src.api.routes.conversations.handle_create_message": {
                 "return_value_config": None  # handle_create_message returns None
             }
         }

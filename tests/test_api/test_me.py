@@ -13,8 +13,8 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from test_helpers import create_test_user
 
 # Import User model for setup (if needed, maybe not for empty case)
-from app.models import Conversation, Message, Participant, User
-from app.schemas.participant import ParticipantStatus
+from src.models import Conversation, Message, Participant, User
+from src.schemas.participant import ParticipantStatus
 
 # Mark all tests in this module as async
 pytestmark = pytest.mark.asyncio

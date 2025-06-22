@@ -6,13 +6,13 @@ from sqlalchemy import engine_from_config, pool
 
 from alembic import context
 
-# Ensure the app directory is in the Python path
-# This allows us to import 'app.db' and 'app.models'
+# Ensure the src directory is in the Python path
+# This allows us to import 'src.db' and 'src.models'
 sys.path.insert(0, os.path.realpath(os.path.join(os.path.dirname(__file__), "..")))
 
 # Import the metadata object from your models package
-# from app.models import Base # Old import
-from app.models import metadata  # Correct import via __init__.py
+# from src.models import Base # Old import
+from src.models import metadata  # Correct import via __init__.py
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
