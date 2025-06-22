@@ -1,2 +1,1 @@
-- ✅ Remove venv/ directory - not needed with Docker-first development
-- update readme to explain local dev setup since we're going to run it with docker now.
+- Update readme to explain local dev setup since we're going to run it with docker now.
