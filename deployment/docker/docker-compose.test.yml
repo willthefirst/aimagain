@@ -1,0 +1,21 @@
+services:
+  aimagain-test:
+    image: test-image
+    container_name: aimagain-test
+    restart: 'no' # Don't restart in CI
+    ports:
+      - '8000:8000'
+    environment:
+      - SECRET=${SECRET}
+      - ACCESS_TOKEN_EXPIRE_MINUTES=${ACCESS_TOKEN_EXPIRE_MINUTES}
+      - ONLINE_TIMEOUT_MINUTES=${ONLINE_TIMEOUT_MINUTES}
+      - DATABASE_URL=${DATABASE_URL}
+      - ALGORITHM=${ALGORITHM}
+    volumes:
+      - ./test-data:/app/data # Use local test data directory
+    healthcheck:
+      test: ['CMD', 'curl', '-f', 'http://localhost:8000/health']
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 20s

@@ -83,21 +83,38 @@ jobs:
         run: |
           docker build -f ./deployment/docker/Dockerfile -t test-image .
 
-      - name: Test Docker image health
+      - name: Create test data directory
         run: |
-          # Start container in background
-          docker run -d --name test-container -p 8000:8000 \
-            -e SECRET=test-secret \
-            -e ACCESS_TOKEN_EXPIRE_MINUTES=30 \
-            -e ONLINE_TIMEOUT_MINUTES=5 \
-            test-image
+          mkdir -p ./test-data
 
-          # Wait for container to start
-          sleep 10
+      - name: Start application with docker-compose
+        run: |
+          docker compose -f deployment/docker/docker-compose.test.yml up -d
+        env:
+          SECRET: ${{ env.SECRET }}
+          ACCESS_TOKEN_EXPIRE_MINUTES: ${{ env.ACCESS_TOKEN_EXPIRE_MINUTES }}
+          ONLINE_TIMEOUT_MINUTES: ${{ env.ONLINE_TIMEOUT_MINUTES }}
+          DATABASE_URL: ${{ env.DATABASE_URL }}
+          ALGORITHM: ${{ env.ALGORITHM }}
 
-          # Health check - verify the app responds
+      - name: Wait for application to be healthy
+        run: |
+          timeout 60 bash -c 'until docker compose -f deployment/docker/docker-compose.test.yml ps | grep -q healthy; do echo "Waiting for health check..."; sleep 2; done'
+
+      - name: Test application endpoints
+        run: |
+          # Test the health endpoint
+          curl -f http://localhost:8000/health || exit 1
+          # Test the docs endpoint
           curl -f http://localhost:8000/docs/ || exit 1
 
-          # Cleanup
-          docker stop test-container
-          docker rm test-container
+      - name: Show container logs on failure
+        if: failure()
+        run: |
+          docker compose -f deployment/docker/docker-compose.test.yml logs
+
+      - name: Cleanup
+        if: always()
+        run: |
+          docker compose -f deployment/docker/docker-compose.test.yml down
+          docker rmi test-image || true
