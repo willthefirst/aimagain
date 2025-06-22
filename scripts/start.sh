@@ -39,7 +39,7 @@ run_migrations() {
     fi
 
     # Run migrations with error handling
-    if alembic upgrade head; then
+    if alembic -c config/alembic.ini upgrade head; then
         echo "✅ Database migrations completed successfully"
     else
         echo "❌ ERROR: Database migrations failed"
