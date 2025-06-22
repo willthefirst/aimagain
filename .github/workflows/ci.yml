@@ -63,7 +63,7 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install pathspec  # For title case checker
+          pip install pathspec black isort
 
       - name: Run linting
         run: |
