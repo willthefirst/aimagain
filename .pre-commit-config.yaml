@@ -30,7 +30,7 @@ repos:
     hooks:
       - id: title-case-check
         name: Check title case
-        entry: python scripts/title_case_check.py
+        entry: python scripts/dev/title_case_check.py
         language: python
         files: \.(md|html|jinja|jinja2)$
         pass_filenames: true

@@ -27,7 +27,7 @@ RUN pip install --no-cache-dir -e .
 COPY . .
 
 # Copy startup script and make it executable
-COPY scripts/start.sh /app/start.sh
+COPY scripts/runtime/start.sh /app/start.sh
 RUN chmod +x /app/start.sh
 
 # Create non-root user for security

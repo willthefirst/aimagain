@@ -1,12 +1,29 @@
-# 🔧 Development scripts
+# 🔧 Scripts directory
 
-This directory contains scripts for maintaining code quality and consistency.
+This directory contains scripts organized by purpose for better maintainability.
+
+## 📁 Directory structure
+
+```
+scripts/
+├── dev/                     # Development utilities
+│   └── title_case_check.py # Code quality enforcement
+├── runtime/                 # Application runtime scripts
+│   └── start.sh           # Application startup script
+└── README.md              # This documentation
+```
+
+**Related scripts in other locations:**
+
+- `deployment/scripts/` - Deployment-specific scripts
 
 ## 📋 Available scripts
 
 ### `deploy-copy-files.sh`
 
 Manual SCP script to copy deployment files to a droplet server. This replaces the GitHub Actions `appleboy/scp-action` when the action isn't working properly.
+
+**Location**: `deployment/scripts/deploy-copy-files.sh`
 
 #### 🎯 **Quick usage**
 
@@ -15,13 +32,13 @@ Manual SCP script to copy deployment files to a droplet server. This replaces th
 export DROPLET_HOST="your.server.ip"
 export DROPLET_USERNAME="deploy_user"
 export DROPLET_SSH_KEY_PATH="~/.ssh/deploy_key"
-./scripts/deploy-copy-files.sh
+./deployment/scripts/deploy-copy-files.sh
 
 # Using command line flags
-./scripts/deploy-copy-files.sh --host your.server.ip --username deploy_user --key-path ~/.ssh/deploy_key
+./deployment/scripts/deploy-copy-files.sh --host your.server.ip --username deploy_user --key-path ~/.ssh/deploy_key
 
 # Show help
-./scripts/deploy-copy-files.sh --help
+./deployment/scripts/deploy-copy-files.sh --help
 ```
 
 #### 🏗️ **what it does**
@@ -55,16 +72,16 @@ Enforces sentence case for titles across the codebase, following the project's d
 
 ```bash
 # Check all files for title case violations
-python scripts/title_case_check.py
+python scripts/dev/title_case_check.py
 
 # Auto-fix violations
-python scripts/title_case_check.py --fix
+python scripts/dev/title_case_check.py --fix
 
 # Check specific directory
-python scripts/title_case_check.py templates/
+python scripts/dev/title_case_check.py templates/
 
 # Check specific files
-python scripts/title_case_check.py README.md notes/
+python scripts/dev/title_case_check.py README.md notes/
 ```
 
 #### 🏗️ **supported file types**
@@ -85,3 +102,21 @@ python scripts/title_case_check.py README.md notes/
 <h1>API documentation</h1>
 <!-- title-case-ignore -->
 ```
+
+### `start.sh`
+
+Application startup script used by Docker containers.
+
+**Location**: `scripts/runtime/start.sh`
+
+#### 🎯 **Purpose**
+
+- Runs database migrations before starting the application
+- Starts the FastAPI application with uvicorn
+- Used as the CMD in Docker containers
+
+#### 🏗️ **what it does**
+
+1. **Migration check**: Runs Alembic migrations to ensure database is up to date
+2. **Application startup**: Starts FastAPI with uvicorn on port 8000
+3. **Health check compatibility**: Configures application for container health checks

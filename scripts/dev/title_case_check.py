@@ -6,10 +6,10 @@ This script checks for titles that should be in sentence case and reports violat
 It supports multiple file formats and allows for flexible exception handling.
 
 Usage:
-    python scripts/title_case_check.py                    # Check all files
-    python scripts/title_case_check.py --fix              # Auto-fix violations
-    python scripts/title_case_check.py --check-only       # Only report, don't fix
-    python scripts/title_case_check.py templates/         # Check specific directory
+    python scripts/dev/title_case_check.py                    # Check all files
+python scripts/dev/title_case_check.py --fix              # Auto-fix violations
+python scripts/dev/title_case_check.py --check-only       # Only report, don't fix
+python scripts/dev/title_case_check.py templates/         # Check specific directory
 """
 
 import argparse
@@ -676,10 +676,10 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  python scripts/title_case_check.py                    # Check all files
-  python scripts/title_case_check.py --fix              # Auto-fix violations
-  python scripts/title_case_check.py templates/         # Check specific directory
-  python scripts/title_case_check.py README.md notes/   # Check specific files/dirs
+      python scripts/dev/title_case_check.py                    # Check all files
+    python scripts/dev/title_case_check.py --fix              # Auto-fix violations
+    python scripts/dev/title_case_check.py templates/         # Check specific directory
+    python scripts/dev/title_case_check.py README.md notes/   # Check specific files/dirs
 
 Exception handling:
   - Add 'title-case-ignore' in a comment to ignore specific lines
