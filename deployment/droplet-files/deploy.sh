@@ -27,6 +27,11 @@ warning() {
     echo -e "${YELLOW}[WARNING]${NC} $1"
 }
 
+# Function to run commands with stderr redirected to stdout
+run_cmd() {
+    "$@" 2>&1
+}
+
 # Function to clean up containers
 cleanup_containers() {
     local service_name=$1
@@ -35,19 +40,19 @@ cleanup_containers() {
     # Stop any running containers with this name
     if docker ps -q --filter "name=$service_name" | grep -q .; then
         log "Stopping running $service_name containers..."
-        docker stop $(docker ps -q --filter "name=$service_name") || true
+        run_cmd docker stop $(docker ps -q --filter "name=$service_name") || true
     fi
 
     # Remove any containers with this name
     if docker ps -aq --filter "name=$service_name" | grep -q .; then
         log "Removing $service_name containers..."
-        docker rm -f $(docker ps -aq --filter "name=$service_name") || true
+        run_cmd docker rm -f $(docker ps -aq --filter "name=$service_name") || true
     fi
 
     # Clean up any orphaned containers that might conflict
     if docker ps -aq --filter "name=.*$service_name" | grep -q .; then
         log "Removing any orphaned containers matching $service_name pattern..."
-        docker rm -f $(docker ps -aq --filter "name=.*$service_name") || true
+        run_cmd docker rm -f $(docker ps -aq --filter "name=.*$service_name") || true
     fi
 }
 
@@ -184,7 +189,7 @@ cleanup_containers "aimagain-$NEW"
 
 # Pull latest image
 log "Pulling latest Docker image..."
-if docker pull ghcr.io/willthefirst/aimagain:latest; then
+if run_cmd docker pull ghcr.io/willthefirst/aimagain:latest; then
     success "Docker image pulled successfully"
 else
     error "Failed to pull Docker image"
@@ -193,7 +198,7 @@ fi
 
 # Start new instance
 log "Starting new $NEW instance..."
-if docker-compose -f docker-compose.blue-green.yml up -d aimagain-$NEW; then
+if run_cmd docker-compose -f docker-compose.blue-green.yml up -d aimagain-$NEW; then
     success "Started aimagain-$NEW container"
 else
     error "Failed to start aimagain-$NEW container"
@@ -214,8 +219,8 @@ if check_health $NEW_PORT; then
             # Only stop old instance if there was one
             if [ "$CURRENT" != "none" ]; then
                 log "Stopping old $CURRENT instance..."
-                docker-compose -f docker-compose.blue-green.yml stop aimagain-$CURRENT || true
-                docker-compose -f docker-compose.blue-green.yml rm -f aimagain-$CURRENT || true
+                run_cmd docker-compose -f docker-compose.blue-green.yml stop aimagain-$CURRENT || true
+                run_cmd docker-compose -f docker-compose.blue-green.yml rm -f aimagain-$CURRENT || true
                 success "Old $CURRENT instance stopped and removed"
             fi
 
