@@ -6,9 +6,9 @@ services:
     ports:
       - '8001:8000'
     volumes:
-      - ./data:/app/data
+      - /opt/aimagain/data:/app/data
     env_file:
-      - config/.env
+      - /opt/aimagain/config/.env
     healthcheck:
       test: ['CMD', 'curl', '-f', 'http://localhost:8000/health']
       interval: 30s
@@ -23,9 +23,9 @@ services:
     ports:
       - '8002:8000'
     volumes:
-      - ./data:/app/data
+      - /opt/aimagain/data:/app/data
     env_file:
-      - config/.env
+      - /opt/aimagain/config/.env
     healthcheck:
       test: ['CMD', 'curl', '-f', 'http://localhost:8000/health']
       interval: 30s
