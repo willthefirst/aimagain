@@ -1,4 +1,4 @@
-name: Build and Deploy
+name: CD - Deploy to Production
 
 on:
   push:
