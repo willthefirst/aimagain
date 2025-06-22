@@ -56,7 +56,7 @@ update_nginx_upstream() {
     local port=$1
     log "Updating nginx configuration to point to port $port..."
 
-    sudo tee /etc/nginx/sites-available/aimagain.art << EOF
+    sudo tee /etc/nginx/sites-available/aimagain.art > /dev/null << EOF
 upstream aimagain_backend {
     server 127.0.0.1:$port;
 }
@@ -147,20 +147,29 @@ rollback() {
     error "Rollback completed. System is running on port $old_port"
 }
 
-# Determine current and new instances
-if docker ps --format "table {{.Names}}\t{{.Ports}}" | grep -q "aimagain-blue.*8001"; then
+get_current_port() {
+    if [ -f /etc/nginx/sites-available/aimagain.art ]; then
+        grep "server 127.0.0.1:" /etc/nginx/sites-available/aimagain.art | sed 's/.*127.0.0.1:\([0-9]*\);.*/\1/' || echo "none"
+    else
+        echo "none"
+    fi
+}
+
+# Determine current and new instances based on nginx configuration
+CURRENT_PORT=$(get_current_port)
+log "Nginx is currently configured for port: $CURRENT_PORT"
+
+if [ "$CURRENT_PORT" = "8001" ]; then
     CURRENT="blue"
     NEW="green"
-    CURRENT_PORT="8001"
     NEW_PORT="8002"
-elif docker ps --format "table {{.Names}}\t{{.Ports}}" | grep -q "aimagain-green.*8002"; then
+elif [ "$CURRENT_PORT" = "8002" ]; then
     CURRENT="green"
     NEW="blue"
-    CURRENT_PORT="8002"
     NEW_PORT="8001"
 else
-    # No current instance running, default to blue
-    warning "No current instance detected. Starting with blue instance."
+    # No current instance configured, default to blue
+    warning "No current nginx configuration detected. Starting with blue instance."
     CURRENT="none"
     NEW="blue"
     CURRENT_PORT="none"
