@@ -1,4 +1,4 @@
-name: CD - Deploy to Production
+name: CD - Deploy to production
 
 on:
   push:

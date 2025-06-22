@@ -1,4 +1,4 @@
-name: CI
+name: CI - Test and lnt
 
 on:
   pull_request:
