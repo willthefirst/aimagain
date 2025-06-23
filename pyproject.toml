@@ -110,3 +110,7 @@ always_capitalize = [
     "OAuth", "JWT", "UUID", "UUIDs", "CRUD", "TDD", "LLM", "LLMs", "AI", "MVP",
     "PostgreSQL", "SQLite", "Docker", "Python", "JavaScript", "TypeScript",
 ]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["scripts*", "src*"]
