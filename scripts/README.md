@@ -11,6 +11,8 @@ scripts/
 ├── runtime/                 # Application runtime scripts
 │   ├── start.sh            # Production startup script
 │   └── start-dev.sh        # Development startup script with hot reloading
+├── dev_cli.py              # Development CLI for common tasks
+├── __init__.py             # Python package initialization
 └── README.md              # This documentation
 ```
 
@@ -64,6 +66,57 @@ export DROPLET_SSH_KEY_PATH="~/.ssh/deploy_key"
 - `--username, -u`: SSH username (overrides env var)
 - `--key-path, -k`: SSH key path (overrides env var)
 - `--help`: Show usage information
+
+### `dev_cli.py`
+
+Development CLI for common development tasks, including managing the Docker Compose development environment.
+
+#### 🎯 **Quick usage**
+
+```bash
+# Start development environment (equivalent to: docker compose -f docker-compose.dev.yml up --build)
+python3 scripts/dev_cli.py dev up --build
+
+# Or run directly as executable
+./scripts/dev_cli.py dev up --build
+
+# Stop development environment
+./scripts/dev_cli.py dev down
+
+# Follow development logs
+./scripts/dev_cli.py dev logs -f
+
+# Run tests
+./scripts/dev_cli.py test
+
+# Run specific test markers
+./scripts/dev_cli.py test -m api
+
+# Show help
+./scripts/dev_cli.py --help
+```
+
+#### 🏗️ **available commands**
+
+**Development environment:**
+
+- `dev up [--build] [-d]` - Start development environment with optional build and detach
+- `dev down [--volumes]` - Stop development environment with optional volume removal
+- `dev logs [-f] [service]` - Show logs with optional follow and service filtering
+- `dev restart [service]` - Restart development environment or specific service
+
+**Testing:**
+
+- `test [-v] [-m markers] [path]` - Run tests with optional verbose, markers, and path filtering
+
+#### 🔧 **Installation as console script**
+
+The CLI is also available as a console script entry point. After installing the project in development mode:
+
+```bash
+pip install -e .
+dev --help  # Available as 'dev' command
+```
 
 ### `title_case_check.py`
 

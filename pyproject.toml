@@ -34,9 +34,12 @@ dependencies = [
     "livereload",  # For client-side hot reloading in development
 ]
 
+[project.scripts]
+aim = "scripts.dev_cli:main"
+
 [tool.setuptools.packages.find]
 where = ["."] # Look in the root directory
-include = ["src*"] # Include only the 'src' directory and its subpackages
+include = ["src*", "scripts*"] # Include 'src' and 'scripts' directories
 exclude = ["tests*", "alembic*", "templates*"] # Explicitly exclude other top-level dirs
 
 [tool.black]

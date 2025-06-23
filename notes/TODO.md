@@ -1,1 +1,0 @@
-- Update readme to explain local dev setup since we're going to run it with docker now.
