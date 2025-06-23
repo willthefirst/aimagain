@@ -9,7 +9,14 @@ description = "A simple chat application."
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
-    # Core runtime dependencies
+    # Minimal dependencies needed for the aim CLI
+    "python-dotenv",  # For environment configuration
+    "pathspec",       # For gitignore support in dev tools
+]
+
+[project.optional-dependencies]
+# Application runtime dependencies (for actual app deployment)
+app = [
     "fastapi",
     "uvicorn[standard]",
     "sqlalchemy",
@@ -24,8 +31,7 @@ dependencies = [
     "asyncstdlib",
 ]
 
-[project.optional-dependencies]
-# Development dependencies
+# Development dependencies (for local development workflow)
 dev = [
     "livereload",  # For client-side hot reloading in development
     "pathspec",   # For gitignore support in title case checker
@@ -48,7 +54,12 @@ lint = [
     "pre-commit",
 ]
 
-# All development dependencies combined
+# Full application with all runtime dependencies
+full = [
+    "chat-app[app,dev,test,lint]",
+]
+
+# All development dependencies (for contributors)
 all = [
     "chat-app[dev,test,lint]",
 ]
@@ -76,6 +87,11 @@ markers = [
     "consumer: Consumer contract tests",
     "provider: Provider contract tests",
     "slow: Tests that take more than 5 seconds",
+    "auth: Authentication tests",
+    "conversations: Conversation tests",
+    "messages: Message tests",
+    "invitations: Invitation tests",
+    "participants: Participant tests",
 ]
 filterwarnings = [
     "ignore::DeprecationWarning:starlette",
