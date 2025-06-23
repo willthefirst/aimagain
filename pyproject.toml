@@ -9,39 +9,54 @@ description = "A simple chat application."
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
+    # Core runtime dependencies
     "fastapi",
     "uvicorn[standard]",
     "sqlalchemy",
     "alembic",
-    "pytest",
-    "httpx",
     "python-dotenv",
     "async-lru",
-    "pytest-asyncio",
     "Jinja2",
     "selectolax",
     "fastapi-users[sqlalchemy]",
     "aiosqlite",
     "pydantic-settings",
     "asyncstdlib",
-    "pytest-playwright-asyncio",
-    "pact-python",
-    "isort",
-    "black",
-    "autoflake",
-    "pre-commit",  # Add pre-commit for git hooks
-    "pathspec",  # For gitignore support in title case checker
+]
+
+[project.optional-dependencies]
+# Development dependencies
+dev = [
     "livereload",  # For client-side hot reloading in development
+    "pathspec",   # For gitignore support in title case checker
+]
+
+# Testing dependencies
+test = [
+    "pytest",
+    "pytest-asyncio",
+    "pytest-playwright-asyncio",
+    "httpx",  # For API testing
+    "pact-python",  # For contract testing
+]
+
+# Code quality and formatting
+lint = [
+    "black",
+    "isort",
+    "autoflake",
+    "pre-commit",
+]
+
+# All development dependencies combined
+all = [
+    "chat-app[dev,test,lint]",
 ]
 
 [project.scripts]
 aim = "scripts.dev_cli:main"
 
-[tool.setuptools.packages.find]
-where = ["."] # Look in the root directory
-include = ["src*", "scripts*"] # Include 'src' and 'scripts' directories
-exclude = ["tests*", "alembic*", "templates*"] # Explicitly exclude other top-level dirs
-
+# Tool configurations
 [tool.black]
 line-length = 88
 target-version = ['py311']
@@ -50,52 +65,32 @@ target-version = ['py311']
 profile = "black"
 line_length = 88
 
-# Title case checking configuration
-[tool.title-case-check]
-# Files and patterns to ignore
-ignore_files = [
-    "*.log",
-    "*.tmp",
-    ".git/**",
-    "venv/**",
-    "node_modules/**",
-    "build/**",
-    "dist/**",
-    "__pycache__/**",
-]
-
-# Words that should always be capitalized
-always_capitalize = [
-    "API", "APIs", "URL", "URLs", "HTTP", "HTTPS", "JSON", "XML", "HTML", "CSS", "JS",
-    "SQL", "REST", "RESTful", "FastAPI", "SQLAlchemy", "Jinja2", "pytest", "GitHub",
-    "OAuth", "JWT", "UUID", "UUIDs", "CRUD", "TDD", "LLM", "LLMs", "AI", "MVP",
-    "PostgreSQL", "SQLite", "Docker", "Python", "JavaScript", "TypeScript",
-]
-
 [tool.pytest.ini_options]
-pythonpath = ["."]
 asyncio_mode = "auto"
-asyncio_default_fixture_loop_scope = "session"
-addopts = "-v --asyncio-mode=auto"
+addopts = "-v"
 testpaths = ["tests"]
-python_files = ["test_*.py"]
-python_classes = ["Test*"]
-python_functions = ["test_*"]
 markers = [
     "api: API tests",
-    "integration: Integration tests",
     "unit: Unit tests",
-    "consumer: Consumer contract tests (frontend/client tests)",
-    "provider: Provider contract tests (API verification tests)",
-    "auth: Authentication-related tests",
-    "messages: Message-related tests",
-    "conversations: Conversation-related tests",
-    "invitations: Invitation-related tests",
-    "participants: Participant-related tests",
-    "slow: Slow running tests that take more than 5 seconds",
+    "integration: Integration tests",
+    "consumer: Consumer contract tests",
+    "provider: Provider contract tests",
+    "slow: Tests that take more than 5 seconds",
 ]
 filterwarnings = [
     "ignore::DeprecationWarning:starlette",
     "ignore::PendingDeprecationWarning:starlette",
     "ignore:.*will be deprecated Pact Python v3:PendingDeprecationWarning",
+]
+
+[tool.title-case-check]
+ignore_files = [
+    "*.log", "*.tmp", ".git/**", "venv/**", "node_modules/**",
+    "build/**", "dist/**", "__pycache__/**"
+]
+always_capitalize = [
+    "API", "APIs", "URL", "URLs", "HTTP", "HTTPS", "JSON", "XML", "HTML", "CSS", "JS",
+    "SQL", "REST", "RESTful", "FastAPI", "SQLAlchemy", "Jinja2", "pytest", "GitHub",
+    "OAuth", "JWT", "UUID", "UUIDs", "CRUD", "TDD", "LLM", "LLMs", "AI", "MVP",
+    "PostgreSQL", "SQLite", "Docker", "Python", "JavaScript", "TypeScript",
 ]
