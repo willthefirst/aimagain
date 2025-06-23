@@ -107,6 +107,87 @@ def cmd_test(args):
     return run_command(cmd)
 
 
+def cmd_setup(args):
+    """Set up the development environment."""
+    print("🔧 Setting up development environment...")
+
+    project_root = get_project_root()
+
+    # Check if Docker is installed
+    try:
+        result = subprocess.run(["docker", "--version"], capture_output=True, text=True)
+        if result.returncode != 0:
+            print("❌ Docker is not installed or not accessible")
+            print(
+                "Please install Docker Desktop: https://www.docker.com/products/docker-desktop"
+            )
+            return 1
+        else:
+            print(f"✅ Docker found: {result.stdout.strip()}")
+    except FileNotFoundError:
+        print("❌ Docker is not installed or not accessible")
+        print(
+            "Please install Docker Desktop: https://www.docker.com/products/docker-desktop"
+        )
+        return 1
+
+    # Check if Docker Compose is available
+    try:
+        result = subprocess.run(
+            ["docker", "compose", "version"], capture_output=True, text=True
+        )
+        if result.returncode != 0:
+            print("❌ Docker Compose is not available")
+            return 1
+        else:
+            print(f"✅ Docker Compose found: {result.stdout.strip()}")
+    except FileNotFoundError:
+        print("❌ Docker Compose is not available")
+        return 1
+
+    # Check if docker-compose.dev.yml exists
+    dev_compose_file = project_root / "docker-compose.dev.yml"
+    if not dev_compose_file.exists():
+        print(f"❌ Development compose file not found: {dev_compose_file}")
+        return 1
+    else:
+        print(f"✅ Development compose file found: {dev_compose_file}")
+
+    # Check if .env file exists, create a template if it doesn't
+    env_file = project_root / ".env"
+    if not env_file.exists():
+        print("📝 Creating .env template...")
+        env_template = """# Development environment variables
+# Copy this file to .env and customize as needed
+
+# Database
+DATABASE_URL=sqlite+aiosqlite:///./data/app.db
+
+# Application
+DEBUG=true
+SECRET_KEY=dev-secret-key-change-in-production
+
+# Development
+DEVELOPMENT=true
+"""
+        try:
+            env_file.write_text(env_template)
+            print(f"✅ Created .env template: {env_file}")
+            print("   Please review and customize the values as needed")
+        except Exception as e:
+            print(f"❌ Failed to create .env file: {e}")
+            return 1
+    else:
+        print(f"✅ Environment file found: {env_file}")
+
+    print("\n🎉 Setup complete! You can now run:")
+    print("   aim dev up        # Start development environment")
+    print("   aim dev logs -f    # Follow logs")
+    print("   aim test           # Run tests")
+
+    return 0
+
+
 def main():
     """Main CLI entry point."""
     parser = argparse.ArgumentParser(
@@ -114,6 +195,7 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
+  %(prog)s setup             # Set up development environment
   %(prog)s dev up --build    # Start development environment with rebuild
   %(prog)s dev down          # Stop development environment
   %(prog)s dev logs -f       # Follow development logs
@@ -174,6 +256,10 @@ Examples:
     test_parser.add_argument("-m", "--markers", help="Run tests with specific markers")
     test_parser.add_argument("path", nargs="?", help="Test path or file")
     test_parser.set_defaults(func=cmd_test)
+
+    # Setup command
+    setup_parser = subparsers.add_parser("setup", help="Set up development environment")
+    setup_parser.set_defaults(func=cmd_setup)
 
     # Parse arguments
     args = parser.parse_args()
