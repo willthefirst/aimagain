@@ -8,7 +8,18 @@
       crossorigin="anonymous"></script>
     <script src="https://unpkg.com/htmx.org/dist/ext/json-enc.js"></script>
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    {% block head %}{% endblock %}
+    {% block head %}{% endblock %} {% if is_development %}
+    <!-- LiveReload script for development hot reloading -->
+    <script>
+      ;(function () {
+        var script = document.createElement('script')
+        script.src =
+          'http://localhost:{{ livereload_port }}/livereload.js?snipver=1'
+        script.async = true
+        document.head.appendChild(script)
+      })()
+    </script>
+    {% endif %}
   </head>
   <body>
     {% block content %}{% endblock %}

@@ -31,6 +31,7 @@ dependencies = [
     "autoflake",
     "pre-commit",  # Add pre-commit for git hooks
     "pathspec",  # For gitignore support in title case checker
+    "livereload",  # For client-side hot reloading in development
 ]
 
 [tool.setuptools.packages.find]
