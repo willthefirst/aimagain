@@ -1,0 +1,28 @@
+services:
+  aimagain-dev:
+    build:
+      context: .
+      dockerfile: deployment/docker/Dockerfile
+    container_name: aimagain-dev
+    restart: unless-stopped
+    ports:
+      - '8000:8000'
+      - '35729:35729' # LiveReload server port for development hot reloading
+    environment:
+      - SECRET=${SECRET}
+      - DATABASE_URL=${DATABASE_URL:-sqlite+aiosqlite:///./data/aimagain.db}
+      - ACCESS_TOKEN_EXPIRE_MINUTES=${ACCESS_TOKEN_EXPIRE_MINUTES:-60}
+      - ONLINE_TIMEOUT_MINUTES=${ONLINE_TIMEOUT_MINUTES:-10}
+      - ALGORITHM=${ALGORITHM:-HS256}
+      - ENVIRONMENT=development # Enable template auto-reload
+    volumes:
+      - ./data:/app/data
+      - ./src:/app/src
+      - ./scripts:/app/scripts # Mount scripts for development startup
+    command: ['/app/scripts/runtime/start-dev.sh'] # Override with dev startup script
+    healthcheck:
+      test: ['CMD', 'curl', '-f', 'http://localhost:8000/health']
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s

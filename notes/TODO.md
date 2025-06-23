@@ -1,6 +1,1 @@
-- finish CI/CD work with docker deploys.
-  - ✅ DONE: the double /app directory is confusing, get rid of that (renamed to src/)
-  - determine a suitable CI approach given that it would be good to test out built images before merging to main? or at least confirm that images that are on main are runnable , some kind of 'this image passes tests' when on main.
-    - need to bring back tests step as well for ci
-- update readme to explain local dev setup since we're going to run it with docker now.
-- do we need a venv anymore given that we are doing things with docker now?
+- Update readme to explain local dev setup since we're going to run it with docker now.

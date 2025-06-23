@@ -26,10 +26,12 @@ class APIResponse:
     def html_response(template_name: str, context: dict, request: Any) -> Any:
         """
         Helper for HTML responses using templates.
-        Placeholder until templating engine is integrated.
+        Includes global template context for development features.
         """
-        from src.core.templating import templates
+        from src.core.templating import get_template_context, templates
 
-        return templates.TemplateResponse(
-            template_name, {"request": request, **context}
-        )
+        # Merge the provided context with global template context
+        global_context = get_template_context()
+        merged_context = {"request": request, **global_context, **context}
+
+        return templates.TemplateResponse(template_name, merged_context)

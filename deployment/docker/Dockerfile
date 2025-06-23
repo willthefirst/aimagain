@@ -26,9 +26,10 @@ RUN pip install --no-cache-dir -e .
 # Copy application code
 COPY . .
 
-# Copy startup script and make it executable
+# Copy startup scripts and make them executable
 COPY scripts/runtime/start.sh /app/start.sh
-RUN chmod +x /app/start.sh
+COPY scripts/runtime/start-dev.sh /app/start-dev.sh
+RUN chmod +x /app/start.sh /app/start-dev.sh
 
 # Create non-root user for security
 RUN adduser --disabled-password --gecos '' appuser && \
