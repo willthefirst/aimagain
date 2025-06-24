@@ -81,19 +81,7 @@ testpaths = ["tests"]
 python_files = ["test_*.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
-markers = [
-    "api: API tests",
-    "unit: Unit tests",
-    "integration: Integration tests",
-    "consumer: Consumer contract tests",
-    "provider: Provider contract tests",
-    "slow: Tests that take more than 5 seconds",
-    "auth: Authentication tests",
-    "conversations: Conversation tests",
-    "messages: Message tests",
-    "invitations: Invitation tests",
-    "participants: Participant tests",
-]
+
 filterwarnings = [
     "ignore::DeprecationWarning:starlette",
     "ignore::PendingDeprecationWarning:starlette",

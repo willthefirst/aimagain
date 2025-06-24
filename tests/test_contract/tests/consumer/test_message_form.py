@@ -29,8 +29,6 @@ PROVIDER_STATE_USER_AUTHENTICATED = (
     indirect=True,
 )
 @pytest.mark.asyncio(loop_scope="session")
-@pytest.mark.consumer
-@pytest.mark.messages
 async def test_consumer_message_page_loads(origin_with_routes: str, page: Page):
     """
     Simple test to check if the conversation detail page loads with mock data.
@@ -64,8 +62,6 @@ async def test_consumer_message_page_loads(origin_with_routes: str, page: Page):
     indirect=True,
 )
 @pytest.mark.asyncio(loop_scope="session")
-@pytest.mark.consumer
-@pytest.mark.messages
 async def test_consumer_message_create_success(origin_with_routes: str, page: Page):
     """
     Test the message creation flow using the actual detail.html template.

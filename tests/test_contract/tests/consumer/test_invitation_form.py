@@ -25,8 +25,6 @@ from tests.test_contract.tests.shared.helpers import (
     indirect=True,
 )
 @pytest.mark.asyncio(loop_scope="session")
-@pytest.mark.consumer
-@pytest.mark.invitations
 async def test_consumer_invitation_accept_method_mismatch(
     origin_with_routes: str, page: Page
 ):
@@ -129,8 +127,6 @@ async def test_consumer_invitation_accept_method_mismatch(
     indirect=True,
 )
 @pytest.mark.asyncio(loop_scope="session")
-@pytest.mark.consumer
-@pytest.mark.invitations
 async def test_consumer_invitation_reject_method_mismatch(
     origin_with_routes: str, page: Page
 ):

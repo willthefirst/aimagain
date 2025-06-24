@@ -142,8 +142,6 @@ Consumer tests use Playwright to interact with real web forms:
 
 ```python
 # tests/consumer/test_conversation_form.py
-@pytest.mark.consumer
-@pytest.mark.conversations
 async def test_consumer_conversation_create_success(page: Page):
     """Test form submission creates correct Pact contract."""
 
@@ -196,8 +194,6 @@ class ConversationsVerification(BaseProviderVerification):
     conversations_verification.dependency_config,
     "with_conversations_api_mocks"
 )
-@pytest.mark.provider
-@pytest.mark.conversations
 def test_provider_conversations_pact_verification(provider_server: URL):
     """Verify API can handle consumer's request format."""
     conversations_verification.verify_pact(provider_server)
@@ -281,8 +277,6 @@ pytest tests/consumer/test_conversation_form.py::test_consumer_conversation_crea
 
 ```python
 # tests/consumer/test_new_feature_form.py
-@pytest.mark.consumer
-@pytest.mark.new_feature
 async def test_consumer_new_feature_success(page: Page):
     """Test new feature form submission."""
 
@@ -327,8 +321,6 @@ class FeaturesVerification(BaseProviderVerification):
     features_verification.dependency_config,
     "with_features_api_mocks"
 )
-@pytest.mark.provider
-@pytest.mark.new_feature
 def test_provider_features_pact_verification(provider_server: URL):
     features_verification.verify_pact(provider_server)
 ```

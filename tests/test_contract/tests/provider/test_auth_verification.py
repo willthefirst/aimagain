@@ -34,8 +34,6 @@ auth_verification = AuthVerification()
 @create_provider_test_decorator(
     auth_verification.dependency_config, "with_auth_api_mocks"
 )
-@pytest.mark.provider
-@pytest.mark.auth
 def test_provider_auth_pact_verification(provider_server: URL):
     """Verify the Auth Pact contract against the running provider server."""
     auth_verification.verify_pact(provider_server)

@@ -32,8 +32,6 @@ PROVIDER_STATE_USER_ONLINE = (
     "origin_with_routes", [{"conversations": True, "auth_pages": True}], indirect=True
 )
 @pytest.mark.asyncio(loop_scope="session")
-@pytest.mark.consumer
-@pytest.mark.conversations
 async def test_consumer_conversation_create_success(
     origin_with_routes: str, page: Page
 ):

@@ -34,8 +34,6 @@ participants_verification = ParticipantsVerification()
 @create_provider_test_decorator(
     participants_verification.dependency_config, "with_participants_api_mocks"
 )
-@pytest.mark.provider
-@pytest.mark.participants
 def test_provider_participants_pact_verification(provider_server: URL):
     """Verify the Participants Pact contract against the running provider server."""
     participants_verification.verify_pact(provider_server)

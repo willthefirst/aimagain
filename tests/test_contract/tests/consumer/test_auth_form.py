@@ -21,8 +21,6 @@ from tests.test_contract.tests.shared.helpers import (
 
 @pytest.mark.parametrize("origin_with_routes", [{"auth_pages": True}], indirect=True)
 @pytest.mark.asyncio(loop_scope="session")
-@pytest.mark.consumer
-@pytest.mark.auth
 async def test_consumer_registration_form_interaction(
     origin_with_routes: str, page: Page
 ):
