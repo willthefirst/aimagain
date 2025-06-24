@@ -1,1 +1,1 @@
-- Update readme to explain local dev setup since we're going to run it with docker now.
+- break out playwright tests from api tests to run concurrently in ci.yml, no reason to have the api tests wait for the playwright tests to run.

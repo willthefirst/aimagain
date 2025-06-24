@@ -9,36 +9,61 @@ description = "A simple chat application."
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
+    "python-dotenv",
+    "pathspec",
+]
+
+[project.optional-dependencies]
+app = [
     "fastapi",
     "uvicorn[standard]",
     "sqlalchemy",
     "alembic",
-    "pytest",
-    "httpx",
     "python-dotenv",
     "async-lru",
-    "pytest-asyncio",
     "Jinja2",
     "selectolax",
     "fastapi-users[sqlalchemy]",
     "aiosqlite",
     "pydantic-settings",
-    "asyncstdlib",
-    "pytest-playwright-asyncio",
-    "pact-python",
-    "isort",
-    "black",
-    "autoflake",
-    "pre-commit",  # Add pre-commit for git hooks
-    "pathspec",  # For gitignore support in title case checker
-    "livereload",  # For client-side hot reloading in development
+    "asyncstdlib"
 ]
 
-[tool.setuptools.packages.find]
-where = ["."] # Look in the root directory
-include = ["src*"] # Include only the 'src' directory and its subpackages
-exclude = ["tests*", "alembic*", "templates*"] # Explicitly exclude other top-level dirs
+dev = [
+    "livereload",
+    "pathspec",
+]
 
+test = [
+    "pytest",
+    "pytest-asyncio",
+    "httpx",
+    "pact-python",
+    "pytest-playwright-asyncio"
+]
+
+# Code quality and formatting
+lint = [
+    "black",
+    "isort",
+    "autoflake",
+    "pre-commit",
+]
+
+# Full application with all runtime dependencies
+full = [
+    "chat-app[app,dev,test,lint]",
+]
+
+# All development dependencies (for contributors)
+all = [
+    "chat-app[dev,test,lint]",
+]
+
+[project.scripts]
+aim = "scripts.dev_cli:main"
+
+# Tool configurations
 [tool.black]
 line-length = 88
 target-version = ['py311']
@@ -46,28 +71,6 @@ target-version = ['py311']
 [tool.isort]
 profile = "black"
 line_length = 88
-
-# Title case checking configuration
-[tool.title-case-check]
-# Files and patterns to ignore
-ignore_files = [
-    "*.log",
-    "*.tmp",
-    ".git/**",
-    "venv/**",
-    "node_modules/**",
-    "build/**",
-    "dist/**",
-    "__pycache__/**",
-]
-
-# Words that should always be capitalized
-always_capitalize = [
-    "API", "APIs", "URL", "URLs", "HTTP", "HTTPS", "JSON", "XML", "HTML", "CSS", "JS",
-    "SQL", "REST", "RESTful", "FastAPI", "SQLAlchemy", "Jinja2", "pytest", "GitHub",
-    "OAuth", "JWT", "UUID", "UUIDs", "CRUD", "TDD", "LLM", "LLMs", "AI", "MVP",
-    "PostgreSQL", "SQLite", "Docker", "Python", "JavaScript", "TypeScript",
-]
 
 [tool.pytest.ini_options]
 pythonpath = ["."]
@@ -78,21 +81,25 @@ testpaths = ["tests"]
 python_files = ["test_*.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
-markers = [
-    "api: API tests",
-    "integration: Integration tests",
-    "unit: Unit tests",
-    "consumer: Consumer contract tests (frontend/client tests)",
-    "provider: Provider contract tests (API verification tests)",
-    "auth: Authentication-related tests",
-    "messages: Message-related tests",
-    "conversations: Conversation-related tests",
-    "invitations: Invitation-related tests",
-    "participants: Participant-related tests",
-    "slow: Slow running tests that take more than 5 seconds",
-]
+
 filterwarnings = [
     "ignore::DeprecationWarning:starlette",
     "ignore::PendingDeprecationWarning:starlette",
     "ignore:.*will be deprecated Pact Python v3:PendingDeprecationWarning",
 ]
+
+[tool.title-case-check]
+ignore_files = [
+    "*.log", "*.tmp", ".git/**", "venv/**", "node_modules/**",
+    "build/**", "dist/**", "__pycache__/**"
+]
+always_capitalize = [
+    "API", "APIs", "URL", "URLs", "HTTP", "HTTPS", "JSON", "XML", "HTML", "CSS", "JS",
+    "SQL", "REST", "RESTful", "FastAPI", "SQLAlchemy", "Jinja2", "pytest", "GitHub",
+    "OAuth", "JWT", "UUID", "UUIDs", "CRUD", "TDD", "LLM", "LLMs", "AI", "MVP",
+    "PostgreSQL", "SQLite", "Docker", "Python", "JavaScript", "TypeScript",
+]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["scripts*", "src*"]

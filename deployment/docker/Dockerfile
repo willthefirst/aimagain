@@ -20,8 +20,9 @@ WORKDIR /app
 RUN mkdir -p /app/data
 
 # Copy and install Python dependencies first for better Docker layer caching
+# Install only the app runtime dependencies, not dev dependencies
 COPY pyproject.toml ./
-RUN pip install --no-cache-dir -e .
+RUN pip install --no-cache-dir -e .[app]
 
 # Copy application code
 COPY . .

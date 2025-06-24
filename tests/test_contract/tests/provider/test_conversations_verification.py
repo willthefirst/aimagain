@@ -73,8 +73,6 @@ messages_verification = MessagesVerification()
 @create_provider_test_decorator(
     conversations_verification.dependency_config, "with_conversations_api_mocks"
 )
-@pytest.mark.provider
-@pytest.mark.conversations
 def test_provider_conversations_pact_verification(provider_server: URL):
     """Verify the Conversations Pact contract against the running provider server."""
     conversations_verification.verify_pact(provider_server)
@@ -83,8 +81,6 @@ def test_provider_conversations_pact_verification(provider_server: URL):
 @create_provider_test_decorator(
     messages_verification.dependency_config, "with_messages_api_mocks"
 )
-@pytest.mark.provider
-@pytest.mark.messages
 def test_provider_messages_pact_verification(provider_server: URL):
     """Verify the Messages Pact contract against the running provider server."""
     messages_verification.verify_pact(provider_server)

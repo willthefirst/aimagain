@@ -16,7 +16,7 @@ env:
   ONLINE_TIMEOUT_MINUTES: 10
 
 jobs:
-  tests:
+  api-tests:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -30,7 +30,44 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -e .
+          pip install -e .[full]
+
+      - name: Create test database
+        run: |
+          alembic -c config/alembic.ini upgrade head
+
+      - name: Show database setup help on failure
+        if: failure()
+        run: |
+          echo "❌ Database setup failed!"
+          echo "💡 To reproduce this locally, run: alembic -c config/alembic.ini upgrade head"
+          echo "   Or use the development CLI: aim dev up"
+
+      - name: Run API tests
+        run: aim test -k test_api --tb short -v
+
+      - name: Show API test failure help
+        if: failure()
+        run: |
+          echo "❌ API tests failed!"
+          echo "💡 To reproduce this locally, run: aim test -k test_api --tb short -v"
+          echo "   Or run specific API tests with: aim test tests/test_api/"
+
+  contract-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e .[full]
 
       - name: Cache Playwright browsers
         uses: actions/cache@v3
@@ -39,15 +76,31 @@ jobs:
           key: ${{ runner.os }}-playwright-${{ hashFiles('pyproject.toml') }}
           restore-keys: |
             ${{ runner.os }}-playwright-
+
       - name: Install Playwright browsers
         run: |
           playwright install --with-deps
+
       - name: Create test database
         run: |
           alembic -c config/alembic.ini upgrade head
 
-      - name: Run pytest
-        run: pytest -v --tb=short
+      - name: Show database setup help on failure
+        if: failure()
+        run: |
+          echo "❌ Database setup failed!"
+          echo "💡 To reproduce this locally, run: alembic -c config/alembic.ini upgrade head"
+          echo "   Or use the development CLI: aim dev up"
+
+      - name: Run contract tests
+        run: aim test -k test_contract --tb short -v
+
+      - name: Show contract test failure help
+        if: failure()
+        run: |
+          echo "❌ Contract tests failed!"
+          echo "💡 To reproduce this locally, run: aim test -k test_contract --tb short -v"
+          echo "   Or run specific contract tests with: aim test tests/test_contract/"
 
   linting:
     runs-on: ubuntu-latest
@@ -63,15 +116,20 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install pathspec black isort
+          pip install -e .[full]
 
       - name: Run linting
-        run: |
-          black --check .
-          isort --check-only .
+        run: aim lint
 
-      - name: Run title case check
-        run: python scripts/dev/title_case_check.py --check-only
+      - name: Show linting failure help
+        if: failure()
+        run: |
+          echo "❌ Linting checks failed!"
+          echo "💡 To reproduce this locally, run: aim lint"
+          echo "   This runs black, isort, and title case checks"
+          echo "   To fix formatting issues, you can run:"
+          echo "     black .           # Fix code formatting"
+          echo "     isort .           # Fix import ordering"
 
   docker-health-check:
     runs-on: ubuntu-latest
