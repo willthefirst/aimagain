@@ -9,9 +9,8 @@ description = "A simple chat application."
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
-    # Minimal dependencies needed for the aim CLI
-    "python-dotenv",  # For environment configuration
-    "pathspec",       # For gitignore support in dev tools
+    "python-dotenv",
+    "pathspec",
 ]
 
 [project.optional-dependencies]
@@ -31,18 +30,17 @@ app = [
     "asyncstdlib"
 ]
 
-# Development dependencies (for local development workflow)
 dev = [
-    "livereload",  # For client-side hot reloading in development
-    "pathspec",   # For gitignore support in title case checker
+    "livereload",
+    "pathspec",
 ]
 
 # Testing dependencies
 test = [
     "pytest",
     "pytest-asyncio",
-    "httpx",  # For API testing
-    "pact-python",  # For contract testing
+    "httpx",
+    "pact-python",
     "pytest-playwright-asyncio"
 ]
 
