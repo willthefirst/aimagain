@@ -14,7 +14,6 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-# Application runtime dependencies (for actual app deployment)
 app = [
     "fastapi",
     "uvicorn[standard]",
@@ -35,7 +34,6 @@ dev = [
     "pathspec",
 ]
 
-# Testing dependencies
 test = [
     "pytest",
     "pytest-asyncio",
@@ -75,9 +73,14 @@ profile = "black"
 line_length = 88
 
 [tool.pytest.ini_options]
+pythonpath = ["."]
 asyncio_mode = "auto"
-addopts = "-v"
+asyncio_default_fixture_loop_scope = "session"
+addopts = "-v --asyncio-mode=auto"
 testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
 markers = [
     "api: API tests",
     "unit: Unit tests",
