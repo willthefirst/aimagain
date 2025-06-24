@@ -12,6 +12,7 @@ dependencies = [
     # Minimal dependencies needed for the aim CLI
     "python-dotenv",  # For environment configuration
     "pathspec",       # For gitignore support in dev tools
+    "pytest-playwright-asyncio",
 ]
 
 [project.optional-dependencies]
@@ -28,9 +29,8 @@ app = [
     "fastapi-users[sqlalchemy]",
     "aiosqlite",
     "pydantic-settings",
-    "asyncstdlib",
-    "pytest-playwright-asyncio"
-]
+    "asyncstdlib"
+    ]
 
 # Development dependencies (for local development workflow)
 dev = [
