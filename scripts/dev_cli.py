@@ -98,6 +98,9 @@ def cmd_test(args):
     if args.verbose:
         cmd.append("-v")
 
+    if args.tb:
+        cmd.extend(["--tb", args.tb])
+
     if args.markers:
         cmd.extend(["-m", args.markers])
 
@@ -105,6 +108,78 @@ def cmd_test(args):
         cmd.append(args.path)
 
     return run_command(cmd)
+
+
+def cmd_lint(args):
+    """Run code linting and formatting checks."""
+    print("🔍 Running linting checks...")
+
+    exit_code = 0
+
+    # Run black check
+    print("📝 Checking code formatting with black...")
+    result = run_command(["black", "--check", "."])
+    if result != 0:
+        exit_code = result
+
+    # Run isort check
+    print("🔤 Checking import ordering with isort...")
+    result = run_command(["isort", "--check-only", "."])
+    if result != 0:
+        exit_code = result
+
+    # Run title case check
+    print("🏷️ Checking title case...")
+    result = run_command(["python", "scripts/dev/title_case_check.py", "--check-only"])
+    if result != 0:
+        exit_code = result
+
+    if exit_code == 0:
+        print("✅ All linting checks passed!")
+    else:
+        print("❌ Some linting checks failed!")
+
+    return exit_code
+
+
+def cmd_db_setup(args):
+    """Set up the database for testing or development."""
+    print("🗄️ Setting up database...")
+
+    return run_command(["alembic", "-c", "config/alembic.ini", "upgrade", "head"])
+
+
+def cmd_ci(args):
+    """Run CI checks locally."""
+    print("🚀 Running CI checks locally...")
+
+    exit_code = 0
+
+    # Run database setup
+    print("\n🗄️ Setting up database...")
+    result = run_command(["alembic", "-c", "config/alembic.ini", "upgrade", "head"])
+    if result != 0:
+        exit_code = result
+
+    # Run tests
+    print("\n🧪 Running tests...")
+    test_cmd = ["pytest", "-v", "--tb=short"]
+    result = run_command(test_cmd)
+    if result != 0:
+        exit_code = result
+
+    # Run linting
+    print("\n🔍 Running linting checks...")
+    result = cmd_lint(args)
+    if result != 0:
+        exit_code = result
+
+    if exit_code == 0:
+        print("\n✅ All CI checks passed!")
+    else:
+        print("\n❌ Some CI checks failed!")
+
+    return exit_code
 
 
 def cmd_setup(args):
@@ -200,7 +275,11 @@ Examples:
   %(prog)s dev down          # Stop development environment
   %(prog)s dev logs -f       # Follow development logs
   %(prog)s test -m api       # Run API tests only
+  %(prog)s test --tb short   # Run tests with short traceback
   %(prog)s test tests/       # Run specific test directory
+  %(prog)s lint              # Run all linting checks
+  %(prog)s db-setup          # Set up database
+  %(prog)s ci                # Run all CI checks locally
         """,
     )
 
@@ -253,9 +332,26 @@ Examples:
     test_parser.add_argument(
         "-v", "--verbose", action="store_true", help="Verbose output"
     )
+    test_parser.add_argument(
+        "--tb",
+        choices=["short", "long", "line", "native", "no"],
+        help="Traceback print mode",
+    )
     test_parser.add_argument("-m", "--markers", help="Run tests with specific markers")
     test_parser.add_argument("path", nargs="?", help="Test path or file")
     test_parser.set_defaults(func=cmd_test)
+
+    # Lint commands
+    lint_parser = subparsers.add_parser("lint", help="Run linting checks")
+    lint_parser.set_defaults(func=cmd_lint)
+
+    # Database setup commands
+    db_parser = subparsers.add_parser("db-setup", help="Set up database")
+    db_parser.set_defaults(func=cmd_db_setup)
+
+    # CI commands
+    ci_parser = subparsers.add_parser("ci", help="Run CI checks locally")
+    ci_parser.set_defaults(func=cmd_ci)
 
     # Setup command
     setup_parser = subparsers.add_parser("setup", help="Set up development environment")
