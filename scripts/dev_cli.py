@@ -249,7 +249,7 @@ Examples:
     # Development commands
     dev_parser = subparsers.add_parser("dev", help="Development environment commands")
     dev_subparsers = dev_parser.add_subparsers(
-        dest="dev_command", heaimlp="Development commands"
+        dest="dev_command", help="Development commands"
     )
 
     # dev up
