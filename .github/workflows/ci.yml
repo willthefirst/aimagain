@@ -34,14 +34,14 @@ jobs:
 
       - name: Create test database
         run: |
-          aim db-setup
+          alembic -c config/alembic.ini upgrade head
 
       - name: Show database setup help on failure
         if: failure()
         run: |
           echo "❌ Database setup failed!"
-          echo "💡 To reproduce this locally, run: aim db-setup"
-          echo "   You can also run the full CI suite with: aim ci"
+          echo "💡 To reproduce this locally, run: alembic -c config/alembic.ini upgrade head"
+          echo "   Or use the development CLI: aim dev up"
 
       - name: Run API tests
         run: aim test -k test_api --tb short -v
@@ -52,7 +52,6 @@ jobs:
           echo "❌ API tests failed!"
           echo "💡 To reproduce this locally, run: aim test -k test_api --tb short -v"
           echo "   Or run specific API tests with: aim test tests/test_api/"
-          echo "   You can also run the full CI suite with: aim ci"
 
   contract-tests:
     runs-on: ubuntu-latest
@@ -84,14 +83,14 @@ jobs:
 
       - name: Create test database
         run: |
-          aim db-setup
+          alembic -c config/alembic.ini upgrade head
 
       - name: Show database setup help on failure
         if: failure()
         run: |
           echo "❌ Database setup failed!"
-          echo "💡 To reproduce this locally, run: aim db-setup"
-          echo "   You can also run the full CI suite with: aim ci"
+          echo "💡 To reproduce this locally, run: alembic -c config/alembic.ini upgrade head"
+          echo "   Or use the development CLI: aim dev up"
 
       - name: Run contract tests
         run: aim test -k test_contract --tb short -v
@@ -102,7 +101,6 @@ jobs:
           echo "❌ Contract tests failed!"
           echo "💡 To reproduce this locally, run: aim test -k test_contract --tb short -v"
           echo "   Or run specific contract tests with: aim test tests/test_contract/"
-          echo "   You can also run the full CI suite with: aim ci"
 
   linting:
     runs-on: ubuntu-latest
@@ -132,7 +130,6 @@ jobs:
           echo "   To fix formatting issues, you can run:"
           echo "     black .           # Fix code formatting"
           echo "     isort .           # Fix import ordering"
-          echo "   You can also run the full CI suite with: aim ci"
 
   docker-health-check:
     runs-on: ubuntu-latest

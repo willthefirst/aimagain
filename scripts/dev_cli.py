@@ -133,7 +133,7 @@ def cmd_lint(args):
 
     # Run title case check
     print("🏷️ Checking title case...")
-    result = run_command(["python", "scripts/dev/title_case_check.py", "--check-only"])
+    result = run_command(["python3", "scripts/dev/title_case_check.py", "--check-only"])
     if result != 0:
         exit_code = result
 
@@ -141,46 +141,6 @@ def cmd_lint(args):
         print("✅ All linting checks passed!")
     else:
         print("❌ Some linting checks failed!")
-
-    return exit_code
-
-
-def cmd_db_setup(args):
-    """Set up the database for testing or development."""
-    print("🗄️ Setting up database...")
-
-    return run_command(["alembic", "-c", "config/alembic.ini", "upgrade", "head"])
-
-
-def cmd_ci(args):
-    """Run CI checks locally."""
-    print("🚀 Running CI checks locally...")
-
-    exit_code = 0
-
-    # Run database setup
-    print("\n🗄️ Setting up database...")
-    result = run_command(["alembic", "-c", "config/alembic.ini", "upgrade", "head"])
-    if result != 0:
-        exit_code = result
-
-    # Run tests
-    print("\n🧪 Running tests...")
-    test_cmd = ["pytest", "-v", "--tb=short"]
-    result = run_command(test_cmd)
-    if result != 0:
-        exit_code = result
-
-    # Run linting
-    print("\n🔍 Running linting checks...")
-    result = cmd_lint(args)
-    if result != 0:
-        exit_code = result
-
-    if exit_code == 0:
-        print("\n✅ All CI checks passed!")
-    else:
-        print("\n❌ Some CI checks failed!")
 
     return exit_code
 
@@ -281,8 +241,6 @@ Examples:
   %(prog)s test --tb short   # Run tests with short traceback
   %(prog)s test tests/       # Run specific test directory
   %(prog)s lint              # Run all linting checks
-  %(prog)s db-setup          # Set up database
-  %(prog)s ci                # Run all CI checks locally
         """,
     )
 
@@ -291,7 +249,7 @@ Examples:
     # Development commands
     dev_parser = subparsers.add_parser("dev", help="Development environment commands")
     dev_subparsers = dev_parser.add_subparsers(
-        dest="dev_command", help="Development commands"
+        dest="dev_command", heaimlp="Development commands"
     )
 
     # dev up
@@ -350,14 +308,6 @@ Examples:
     # Lint commands
     lint_parser = subparsers.add_parser("lint", help="Run linting checks")
     lint_parser.set_defaults(func=cmd_lint)
-
-    # Database setup commands
-    db_parser = subparsers.add_parser("db-setup", help="Set up database")
-    db_parser.set_defaults(func=cmd_db_setup)
-
-    # CI commands
-    ci_parser = subparsers.add_parser("ci", help="Run CI checks locally")
-    ci_parser.set_defaults(func=cmd_ci)
 
     # Setup command
     setup_parser = subparsers.add_parser("setup", help="Set up development environment")
