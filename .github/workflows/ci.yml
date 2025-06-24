@@ -16,7 +16,45 @@ env:
   ONLINE_TIMEOUT_MINUTES: 10
 
 jobs:
-  tests:
+  api_tests:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e .[full]
+
+      - name: Create test database
+        run: |
+          aim db-setup
+
+      - name: Show database setup help on failure
+        if: failure()
+        run: |
+          echo "❌ Database setup failed!"
+          echo "💡 To reproduce this locally, run: aim db-setup"
+          echo "   You can also run the full CI suite with: aim ci"
+
+      - name: Run API tests
+        run: aim test -k test_api --tb short -v
+
+      - name: Show API test failure help
+        if: failure()
+        run: |
+          echo "❌ API tests failed!"
+          echo "💡 To reproduce this locally, run: aim test -k test_api --tb short -v"
+          echo "   Or run specific API tests with: aim test tests/test_api/"
+          echo "   You can also run the full CI suite with: aim ci"
+
+  contract_tests:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -39,9 +77,11 @@ jobs:
           key: ${{ runner.os }}-playwright-${{ hashFiles('pyproject.toml') }}
           restore-keys: |
             ${{ runner.os }}-playwright-
+
       - name: Install Playwright browsers
         run: |
           playwright install --with-deps
+
       - name: Create test database
         run: |
           aim db-setup
@@ -53,15 +93,15 @@ jobs:
           echo "💡 To reproduce this locally, run: aim db-setup"
           echo "   You can also run the full CI suite with: aim ci"
 
-      - name: Run pytest
-        run: aim test --tb short -v
+      - name: Run contract tests
+        run: aim test -k test_contract --tb short -v
 
-      - name: Show test failure help
+      - name: Show contract test failure help
         if: failure()
         run: |
-          echo "❌ Tests failed!"
-          echo "💡 To reproduce this locally, run: aim test --tb short -v"
-          echo "   Or run specific tests with: aim test -m <marker> or aim test <path>"
+          echo "❌ Contract tests failed!"
+          echo "💡 To reproduce this locally, run: aim test -k test_contract --tb short -v"
+          echo "   Or run specific contract tests with: aim test tests/test_contract/"
           echo "   You can also run the full CI suite with: aim ci"
 
   linting:

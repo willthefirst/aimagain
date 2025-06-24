@@ -104,6 +104,9 @@ def cmd_test(args):
     if args.markers:
         cmd.extend(["-m", args.markers])
 
+    if args.keywords:
+        cmd.extend(["-k", args.keywords])
+
     if args.path:
         cmd.append(args.path)
 
@@ -338,6 +341,9 @@ Examples:
         help="Traceback print mode",
     )
     test_parser.add_argument("-m", "--markers", help="Run tests with specific markers")
+    test_parser.add_argument(
+        "-k", "--keywords", help="Run tests matching keyword expressions"
+    )
     test_parser.add_argument("path", nargs="?", help="Test path or file")
     test_parser.set_defaults(func=cmd_test)
 
