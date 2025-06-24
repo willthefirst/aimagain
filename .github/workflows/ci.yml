@@ -16,7 +16,7 @@ env:
   ONLINE_TIMEOUT_MINUTES: 10
 
 jobs:
-  api_tests:
+  api-tests:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -54,7 +54,7 @@ jobs:
           echo "   Or run specific API tests with: aim test tests/test_api/"
           echo "   You can also run the full CI suite with: aim ci"
 
-  contract_tests:
+  contract-tests:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
