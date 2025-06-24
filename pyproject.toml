@@ -12,7 +12,6 @@ dependencies = [
     # Minimal dependencies needed for the aim CLI
     "python-dotenv",  # For environment configuration
     "pathspec",       # For gitignore support in dev tools
-    "pytest-playwright-asyncio",
 ]
 
 [project.optional-dependencies]
@@ -30,7 +29,7 @@ app = [
     "aiosqlite",
     "pydantic-settings",
     "asyncstdlib"
-    ]
+]
 
 # Development dependencies (for local development workflow)
 dev = [
@@ -44,6 +43,7 @@ test = [
     "pytest-asyncio",
     "httpx",  # For API testing
     "pact-python",  # For contract testing
+    "pytest-playwright-asyncio"
 ]
 
 # Code quality and formatting
