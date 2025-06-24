@@ -29,6 +29,7 @@ app = [
     "aiosqlite",
     "pydantic-settings",
     "asyncstdlib",
+    "pytest-playwright-asyncio"
 ]
 
 # Development dependencies (for local development workflow)
@@ -41,7 +42,6 @@ dev = [
 test = [
     "pytest",
     "pytest-asyncio",
-    "pytest-playwright-asyncio",
     "httpx",  # For API testing
     "pact-python",  # For contract testing
 ]
