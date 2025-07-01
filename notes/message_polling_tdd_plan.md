@@ -283,178 +283,223 @@ pytest -m contract tests/test_contract/tests/consumer/test_message_polling.py -v
 # Expected: FAIL - endpoint doesn't exist yet
 ```
 
-### **Phase 2: API Tests - HTTP Endpoint Behavior**
+### **Phase 2: API Tests - Route Handler Behavior**
 
-**Objective**: Define the exact behavior of the polling endpoint with real HTTP requests.
+**Objective**: Test the ultra-thin route handler layer to ensure it correctly delegates to business logic handlers and formats responses properly.
 
-#### Step 2.1: Write Failing API Tests
+#### Step 2.1: Write Route Handler Tests
 
 Create `tests/test_api/test_message_polling.py`:
 
 ```python
+import pytest
+from datetime import datetime
+from unittest.mock import AsyncMock, patch
+
+from fastapi import status
+from fastapi.testclient import TestClient
+
+from src.models.message import Message
+from src.models.conversation import Conversation
+from tests.shared_test_data import create_test_user, create_test_conversation
+
+
 @pytest.mark.api
-async def test_message_polling_endpoint_exists(
-    authenticated_client: AsyncClient,
-    conversation_with_messages: Conversation
+@pytest.mark.messages
+async def test_message_polling_route_delegates_correctly(
+    client: TestClient,
+    auth_headers: dict
 ):
-    """Test polling endpoint returns 200 for valid conversation."""
-    response = await authenticated_client.get(
-        f"/conversations/{conversation_with_messages.slug}/messages/updates"
-    )
+    """Test route handler delegates to business logic handler with correct parameters."""
 
-    assert response.status_code == 200
-    assert "text/html" in response.headers["content-type"]
+    # Mock the business logic handler (not the route)
+    with patch("src.api.routes.conversations.handle_get_message_updates") as mock_handler:
+        mock_handler.return_value = {
+            "html_content": "<li>Mock message</li>",
+            "etag": "test-etag",
+            "last_modified": "Mon, 01 Jan 2024 15:30:00 GMT",
+            "has_updates": True
+        }
+
+        # Act: Call the route
+        response = client.get(
+            "/conversations/test-slug/messages/updates",
+            headers={
+                **auth_headers,
+                "If-Modified-Since": "Wed, 21 Oct 2015 07:28:00 GMT"
+            }
+        )
+
+        # Assert: Route handler called business logic correctly
+        assert response.status_code == 200
+        assert response.headers["content-type"] == "text/html; charset=utf-8"
+        assert response.headers["etag"] == "test-etag"
+        assert response.headers["last-modified"] == "Mon, 01 Jan 2024 15:30:00 GMT"
+
+        # Verify handler was called with right parameters
+        mock_handler.assert_called_once()
+        call_args = mock_handler.call_args
+        assert call_args[1]["slug"] == "test-slug"
+        assert "If-Modified-Since" in str(call_args)
 
 @pytest.mark.api
-async def test_message_polling_returns_304_when_no_updates(
-    authenticated_client: AsyncClient,
-    conversation_with_messages: Conversation
+@pytest.mark.messages
+async def test_message_polling_route_handles_no_updates(
+    client: TestClient,
+    auth_headers: dict
 ):
-    """Test 304 Not Modified when client has latest messages."""
-    # Get the latest message timestamp
-    latest_message = max(conversation_with_messages.messages, key=lambda m: m.created_at)
-    timestamp_header = format_http_date(latest_message.created_at)
+    """Test route handler returns 304 when business logic indicates no updates."""
 
-    response = await authenticated_client.get(
-        f"/conversations/{conversation_with_messages.slug}/messages/updates",
-        headers={"If-Modified-Since": timestamp_header}
-    )
+    with patch("src.api.routes.conversations.handle_get_message_updates") as mock_handler:
+        mock_handler.return_value = {
+            "has_updates": False,
+            "etag": "current-etag",
+            "last_modified": "Mon, 01 Jan 2024 15:30:00 GMT"
+        }
 
-    assert response.status_code == 304
-    assert "ETag" in response.headers
-    assert response.content == b""  # No body for 304
+        response = client.get(
+            "/conversations/test-slug/messages/updates",
+            headers={
+                **auth_headers,
+                "If-Modified-Since": "Mon, 01 Jan 2024 15:30:00 GMT"
+            }
+        )
 
-@pytest.mark.api
-async def test_message_polling_returns_new_messages_html(
-    authenticated_client: AsyncClient,
-    conversation_with_messages: Conversation,
-    db_test_session_manager: async_sessionmaker[AsyncSession]
-):
-    """Test returns HTML fragment when new messages exist."""
-    # Get timestamp before adding new message
-    old_timestamp = format_http_date(datetime.now() - timedelta(minutes=1))
-
-    # Add a new message to the conversation
-    new_message = await add_message_to_conversation(
-        conversation_with_messages.id,
-        "This is a new message"
-    )
-
-    response = await authenticated_client.get(
-        f"/conversations/{conversation_with_messages.slug}/messages/updates",
-        headers={"If-Modified-Since": old_timestamp}
-    )
-
-    assert response.status_code == 200
-    assert "text/html" in response.headers["content-type"]
-    assert "This is a new message" in response.text
-    assert '<li class="message"' in response.text
-    assert "Last-Modified" in response.headers
-    assert "ETag" in response.headers
+        assert response.status_code == 304
+        assert response.text == ""
+        assert response.headers["etag"] == "current-etag"
 
 @pytest.mark.api
-async def test_message_polling_requires_authentication(test_client: AsyncClient):
-    """Test polling endpoint requires authentication."""
-    response = await test_client.get("/conversations/test-slug/messages/updates")
+@pytest.mark.messages
+async def test_message_polling_route_requires_authentication(client: TestClient):
+    """Test route handler properly enforces authentication."""
+
+    response = client.get("/conversations/test-slug/messages/updates")
     assert response.status_code == 401
 
 @pytest.mark.api
-async def test_message_polling_requires_participant_access(
-    authenticated_client: AsyncClient,
-    conversation_user_not_participant: Conversation
+@pytest.mark.messages
+async def test_message_polling_route_handles_exceptions(
+    client: TestClient,
+    auth_headers: dict
 ):
-    """Test user must be conversation participant to poll."""
-    response = await authenticated_client.get(
-        f"/conversations/{conversation_user_not_participant.slug}/messages/updates"
-    )
-    assert response.status_code == 403
+    """Test route handler properly handles business logic exceptions."""
 
-@pytest.mark.api
-async def test_message_polling_conversation_not_found(authenticated_client: AsyncClient):
-    """Test 404 for non-existent conversation."""
-    response = await authenticated_client.get("/conversations/nonexistent/messages/updates")
-    assert response.status_code == 404
+    with patch("src.api.routes.conversations.handle_get_message_updates") as mock_handler:
+        mock_handler.side_effect = Exception("Business logic error")
+
+        response = client.get(
+            "/conversations/test-slug/messages/updates",
+            headers=auth_headers
+        )
+
+        # Route should handle exception gracefully
+        assert response.status_code == 500
 ```
 
-#### Step 2.2: Create Test Fixtures
+#### Step 2.2: Write Business Logic Handler Tests
 
-Add to `tests/test_api/conftest.py`:
+Create `tests/test_logic/test_message_polling_processing.py`:
 
 ```python
-@pytest.fixture
-async def conversation_with_messages(
-    db_test_session_manager: async_sessionmaker[AsyncSession],
-    logged_in_user: User
-) -> Conversation:
-    """Fixture providing a conversation with test messages."""
-    async with db_test_session_manager() as session:
-        async with session.begin():
-            # Create conversation with logged_in_user as participant
-            conversation = create_test_conversation(
-                slug="test-conversation-with-messages",
-                creator=logged_in_user
-            )
-            session.add(conversation)
-            await session.flush()
+import pytest
+from datetime import datetime, timezone
+from unittest.mock import AsyncMock, Mock
 
-            # Add test messages
-            message1 = create_test_message(
-                conversation_id=conversation.id,
-                sender_id=logged_in_user.id,
-                content="First message",
-                created_at=datetime.now() - timedelta(minutes=5)
-            )
-            message2 = create_test_message(
-                conversation_id=conversation.id,
-                sender_id=logged_in_user.id,
-                content="Second message",
-                created_at=datetime.now() - timedelta(minutes=3)
-            )
-            session.add_all([message1, message2])
+from src.logic.conversation_processing import handle_get_message_updates
+from src.models.conversation import Conversation
+from src.models.message import Message
+from tests.shared_test_data import create_test_user, create_test_conversation
 
-            # Add participant relationship
-            participant = create_test_participant(
-                user_id=logged_in_user.id,
-                conversation_id=conversation.id,
-                status=ParticipantStatus.JOINED
-            )
-            session.add(participant)
 
-    return conversation
+@pytest.mark.logic
+@pytest.mark.messages
+async def test_handle_get_message_updates_with_new_messages():
+    """Test business logic handler processes new messages correctly."""
 
-@pytest.fixture
-async def conversation_user_not_participant(
-    db_test_session_manager: async_sessionmaker[AsyncSession]
-) -> Conversation:
-    """Fixture providing conversation where logged_in_user is NOT a participant."""
-    async with db_test_session_manager() as session:
-        async with session.begin():
-            other_user = create_test_user(username="other-user")
-            session.add(other_user)
-            await session.flush()
+    # Mock dependencies
+    mock_user = create_test_user()
+    mock_conversation = create_test_conversation()
+    mock_service = AsyncMock()
+    mock_service.get_messages_since.return_value = [
+        Message(
+            id="msg-1",
+            content="New message",
+            created_at=datetime.now(timezone.utc),
+            sender=create_test_user(username="sender")
+        )
+    ]
 
-            conversation = create_test_conversation(
-                slug="conversation-no-access",
-                creator=other_user
-            )
-            session.add(conversation)
+    # Act
+    result = await handle_get_message_updates(
+        slug="test-slug",
+        if_modified_since="Wed, 21 Oct 2015 07:28:00 GMT",
+        user=mock_user,
+        conversation_service=mock_service
+    )
 
-    return conversation
+    # Assert business logic
+    assert result["has_updates"] is True
+    assert "<li class=\"message\"" in result["html_content"]
+    assert "etag" in result
+    assert "last_modified" in result
 
-def format_http_date(dt: datetime) -> str:
-    """Format datetime as HTTP date string."""
-    from email.utils import formatdate
-    return formatdate(dt.timestamp(), usegmt=True)
+    # Verify service was called correctly
+    mock_service.get_messages_since.assert_called_once()
 
-async def add_message_to_conversation(conversation_id: UUID, content: str) -> Message:
-    """Helper to add message to conversation during test."""
-    # Implementation details for adding message in test
-    pass
+@pytest.mark.logic
+@pytest.mark.messages
+async def test_handle_get_message_updates_no_new_messages():
+    """Test business logic handler when no new messages."""
+
+    mock_user = create_test_user()
+    mock_service = AsyncMock()
+    mock_service.get_messages_since.return_value = []
+
+    result = await handle_get_message_updates(
+        slug="test-slug",
+        if_modified_since="Mon, 01 Jan 2024 15:30:00 GMT",
+        user=mock_user,
+        conversation_service=mock_service
+    )
+
+    assert result["has_updates"] is False
+    assert "etag" in result
+    assert "last_modified" in result
+
+@pytest.mark.logic
+@pytest.mark.messages
+async def test_handle_get_message_updates_permission_check():
+    """Test business logic enforces conversation permissions."""
+
+    mock_user = create_test_user()
+    mock_service = AsyncMock()
+    mock_service.get_messages_since.side_effect = PermissionError("Not authorized")
+
+    with pytest.raises(PermissionError):
+        await handle_get_message_updates(
+            slug="test-slug",
+            if_modified_since="Wed, 21 Oct 2015 07:28:00 GMT",
+            user=mock_user,
+            conversation_service=mock_service
+        )
 ```
 
-### **Phase 3: Implementation - Make API Tests Pass**
+#### Step 2.3: Run API Tests (Should Fail)
 
-#### Step 3.1: Add Polling Endpoint to Router
+```bash
+pytest -m api tests/test_api/test_message_polling.py -v
+# Expected: FAIL - route handler doesn't exist
+
+pytest -m logic tests/test_logic/test_message_polling_processing.py -v
+# Expected: FAIL - business logic handler doesn't exist
+```
+
+### **Phase 3: Implementation - Ultra-Thin Route Handler**
+
+**Objective**: Implement the ultra-thin route handler that delegates to business logic, following the established architecture pattern.
+
+#### Step 3.1: Add Ultra-Thin Route Handler
 
 Add to `src/api/routes/conversations.py`:
 
@@ -462,9 +507,7 @@ Add to `src/api/routes/conversations.py`:
 # Add imports
 from fastapi import Header
 from fastapi.responses import Response
-from datetime import datetime, timedelta
 from typing import Optional
-from email.utils import parsedate_to_datetime, formatdate
 
 @router.get(
     "/conversations/{slug}/messages/updates",
@@ -473,100 +516,201 @@ from email.utils import parsedate_to_datetime, formatdate
 async def get_message_updates(
     slug: str,
     request: Request,
-    user: User = Depends(current_active_user),
-    conv_service: ConversationService = Depends(get_conversation_service),
     if_modified_since: Optional[str] = Header(None, alias="If-Modified-Since"),
+    handler = Depends(handle_get_message_updates),  # Single dependency
 ):
     """
-    Smart polling endpoint for conversation message updates.
-    Returns 304 Not Modified if no new messages, or HTML fragment with new messages.
+    Ultra-thin route handler for message polling.
+    Only handles request/response format - all logic delegated to handler.
     """
-    conversation = await handle_get_conversation(
-        slug=slug, requesting_user=user, conv_service=conv_service
+    result = await handler(
+        slug=slug,
+        if_modified_since=if_modified_since,
+        request=request
     )
 
-    if not conversation:
-        return Response(status_code=404)
-
-    # Get the latest message timestamp for ETag generation
-    latest_message_time = None
-    if conversation.messages:
-        latest_message_time = max(msg.created_at for msg in conversation.messages)
-
-    # Create ETag based on latest message timestamp + count
-    message_count = len(conversation.messages)
-    etag_value = f"{latest_message_time.isoformat() if latest_message_time else 'empty'}-{message_count}"
-    etag = f'"{etag_value}"'
-
-    # Parse client's timestamp from If-Modified-Since header
-    client_last_seen = None
-    if if_modified_since:
-        try:
-            client_last_seen = parsedate_to_datetime(if_modified_since)
-        except (ValueError, TypeError):
-            pass
-
-    # Determine if client has the latest version
-    if client_last_seen and latest_message_time:
-        if latest_message_time <= client_last_seen:
-            return Response(
-                status_code=304,
-                headers={
-                    "ETag": etag,
-                    "Cache-Control": "no-cache, must-revalidate"
-                }
-            )
-
-    # Determine which messages to return
-    if client_last_seen:
-        new_messages = [
-            msg for msg in conversation.messages
-            if msg.created_at > client_last_seen
-        ]
-    else:
-        new_messages = conversation.messages
-
-    # If no new messages, return 304
-    if not new_messages:
+    # Format response based on business logic result
+    if result["has_updates"]:
         return Response(
-            status_code=304,
+            content=result["html_content"],
+            status_code=200,
             headers={
-                "ETag": etag,
+                "Content-Type": "text/html; charset=utf-8",
+                "ETag": result["etag"],
+                "Last-Modified": result["last_modified"],
                 "Cache-Control": "no-cache, must-revalidate"
             }
         )
+    else:
+        return Response(
+            status_code=304,
+            headers={
+                "ETag": result["etag"],
+                "Last-Modified": result["last_modified"],
+                "Cache-Control": "no-cache, must-revalidate"
+            }
+        )
+```
 
-    # Return HTML fragment with new messages
-    response_headers = {
-        "ETag": etag,
-        "Cache-Control": "no-cache, must-revalidate"
-    }
+#### Step 3.2: Create Business Logic Handler
 
-    if latest_message_time:
-        response_headers["Last-Modified"] = formatdate(
-            latest_message_time.timestamp(), usegmt=True
+Create `src/logic/conversation_processing.py` function:
+
+```python
+# Add imports
+from datetime import datetime, timezone
+from email.utils import parsedate_to_datetime, formatdate
+from typing import Optional, Dict, Any
+
+from fastapi import Depends, Request, HTTPException
+from jinja2 import Environment
+
+from src.models.user import User
+from src.services.conversation_service import ConversationService
+from src.services.dependencies import get_conversation_service
+from src.middleware.presence import current_active_user
+from src.core.templating import get_jinja_env
+
+
+async def handle_get_message_updates(
+    slug: str,
+    if_modified_since: Optional[str],
+    request: Request,
+    user: User = Depends(current_active_user),
+    conversation_service: ConversationService = Depends(get_conversation_service),
+    jinja_env: Environment = Depends(get_jinja_env),
+) -> Dict[str, Any]:
+    """
+    Business logic handler for message polling.
+    Contains all authentication, authorization, validation, service calls.
+    """
+    try:
+        # 1. Get conversation and verify access
+        conversation = await conversation_service.get_conversation_by_slug(slug)
+        if not conversation:
+            raise HTTPException(status_code=404, detail="Conversation not found")
+
+        # 2. Verify user is participant
+        if not await conversation_service.is_user_participant(conversation.id, user.id):
+            raise HTTPException(status_code=403, detail="Access denied")
+
+        # 3. Parse client's timestamp
+        client_timestamp = None
+        if if_modified_since:
+            try:
+                client_timestamp = parsedate_to_datetime(if_modified_since)
+            except (ValueError, TypeError):
+                # Invalid timestamp format, treat as no timestamp
+                pass
+
+        # 4. Get messages since client timestamp
+        messages = await conversation_service.get_messages_since(
+            conversation.id,
+            since=client_timestamp
         )
 
-    return APIResponse.html_response(
-        template_name="conversations/messages_fragment.html",
-        context={"messages": new_messages},
-        request=request,
-        headers=response_headers
+        # 5. Generate ETag and Last-Modified based on latest message
+        latest_message_time = conversation.last_activity_at
+        if messages:
+            latest_message_time = max(msg.created_at for msg in messages)
+
+        etag = f'"{latest_message_time.isoformat()}"'
+        last_modified = formatdate(latest_message_time.timestamp(), usegmt=True)
+
+        # 6. Check if client has latest version
+        if client_timestamp and client_timestamp >= latest_message_time:
+            return {
+                "has_updates": False,
+                "etag": etag,
+                "last_modified": last_modified
+            }
+
+        # 7. Render new messages as HTML fragments
+        template = jinja_env.get_template("conversations/_message_list.html")
+        html_content = template.render(
+            messages=messages,
+            current_user=user,
+            request=request
+        )
+
+        return {
+            "has_updates": True,
+            "html_content": html_content,
+            "etag": etag,
+            "last_modified": last_modified
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        # Log the error in production
+        raise HTTPException(status_code=500, detail="Internal server error")
+```
+
+#### Step 3.3: Add Service Method
+
+Add to `src/services/conversation_service.py`:
+
+```python
+async def get_messages_since(
+    self,
+    conversation_id: UUID,
+    since: Optional[datetime] = None
+) -> List[Message]:
+    """Get messages from conversation since specified timestamp."""
+    return await self.message_repository.get_messages_since(
+        conversation_id=conversation_id,
+        since=since
     )
 ```
 
-#### Step 3.2: Create Message Fragment Template
+Add to `src/repositories/message_repository.py`:
 
-Create `src/templates/conversations/messages_fragment.html`:
+```python
+async def get_messages_since(
+    self,
+    conversation_id: UUID,
+    since: Optional[datetime] = None
+) -> List[Message]:
+    """Get messages from conversation since specified timestamp."""
+    query = (
+        select(Message)
+        .options(selectinload(Message.sender))
+        .where(Message.conversation_id == conversation_id)
+        .order_by(Message.created_at.desc())
+    )
+
+    if since:
+        query = query.where(Message.created_at > since)
+
+    result = await self.session.execute(query)
+    return result.scalars().all()
+```
+
+#### Step 3.4: Create Message List Template
+
+Create `src/templates/conversations/_message_list.html`:
 
 ```html
-{% for msg in messages %}
-<li class="message" data-message-id="{{ msg.id }}">
-  <strong>{{ msg.sender.username if msg.sender else 'Unknown' }}:</strong>
-  {{ msg.content }}
-  <span class="message-meta">({{ msg.created_at }})</span>
+{% for message in messages %}
+<li class="message" data-message-id="{{ message.id }}">
+  <div class="message-header">
+    <strong class="sender">{{ message.sender.username }}</strong>
+    <span class="timestamp">{{ message.created_at.strftime('%I:%M %p') }}</span>
+  </div>
+  <div class="message-content">{{ message.content }}</div>
 </li>
 {% endfor %}
+```
+
+#### Step 3.5: Run Implementation Tests
+
+```bash
+pytest -m api tests/test_api/test_message_polling.py -v
+# Expected: PASS - route handler delegates correctly
+
+pytest -m logic tests/test_logic/test_message_polling_processing.py -v
+# Expected: PASS - business logic works correctly
 ```
 
 ### **Phase 4: frontend integration**
@@ -730,25 +874,49 @@ pytest tests/ --cov=src --cov-report=html --cov-fail-under=85
 
 ## 🚀 Implementation execution order
 
-1. **Write failing contract tests** → Understand API requirements
-2. **Write failing API tests** → Define exact endpoint behavior
-3. **Implement minimal endpoint** → Make API tests pass
-4. **Update frontend templates** → Enable polling in UI
-5. **Run full test suite** → Verify complete feature
+Following the "Testing the Waiter, Not the Chef" philosophy:
+
+1. **Write failing contract tests** → Define API communication format (testing the waiter)
+2. **Write failing API route tests** → Test ultra-thin route handler delegation
+3. **Write failing business logic tests** → Test actual functionality (testing the chef)
+4. **Implement ultra-thin route handler** → Just formats requests/responses
+5. **Implement business logic handler** → Contains all authentication, validation, services
+6. **Update frontend templates** → Enable htmx polling
+7. **Run contract verification** → Ensure API can parse client requests
+8. **Run full test suite** → Verify complete feature
 
 ## 📋 Success criteria
 
 **Feature complete when**:
 
-- All test layers pass consistently
-- Test coverage > 85% for new code
-- Manual testing shows 2-3 second message latency
-- No performance degradation in existing functionality
+**Contract Tests**:
+
+- ✅ htmx client sends correct request format
+- ✅ API returns proper response format and headers
+- ✅ Provider can parse consumer's requests
+
+**API Tests**:
+
+- ✅ Route handler delegates to business logic correctly
+- ✅ Route handler formats responses properly
+- ✅ Authentication/authorization enforced at route level
+
+**Business Logic Tests**:
+
+- ✅ Permissions and validation work correctly
+- ✅ Service methods return expected data
+- ✅ Error handling works as designed
+
+**Integration**:
+
+- ✅ Manual testing shows 2-3 second message latency
+- ✅ No performance degradation in existing functionality
+- ✅ Test coverage > 85% for new code
 
 This TDD approach ensures:
 
-- ✅ **Clear requirements** defined by tests first
-- ✅ **Minimal implementation** that meets exact needs
-- ✅ **High confidence** through comprehensive test coverage
-- ✅ **Fast feedback loops** during development
-- ✅ **Regression protection** for future changes
+- ✅ **Communication verified** before implementation (contract tests)
+- ✅ **Clean separation** between request handling and business logic
+- ✅ **Fast feedback loops** through focused, layered testing
+- ✅ **Regression protection** for both API format and business logic
+- ✅ **Clear boundaries** between what each layer is responsible for
