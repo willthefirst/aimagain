@@ -19,70 +19,264 @@ This document outlines the **Test-Driven Development** implementation plan for a
 
 ## 📋 TDD implementation phases
 
-### **Phase 1: Contract Tests - API Communication Format**
+### **Phase 1: Contract Tests - Testing the Waiter, Not the Chef**
 
-**Objective**: Ensure the polling endpoint has the correct request/response format for htmx integration.
+**Objective**: Following the "waiter vs chef" philosophy, verify that htmx clients can communicate correctly with the polling endpoint - focusing on request/response format, headers, and protocol compliance.
 
-#### Step 1.1: Write Failing Contract Tests
+#### Step 1.1: Add Constants for Message Polling
+
+Add to `tests/test_contract/constants.py`:
+
+```python
+# Message polling constants
+CONSUMER_NAME_MESSAGE_POLLING = "message-polling-htmx"
+PROVIDER_NAME_MESSAGE_POLLING = "message-polling-api"
+PACT_PORT_MESSAGE_POLLING = 1241
+MESSAGE_POLLING_PATH = "/conversations/{slug}/messages/updates"
+TEST_CONVERSATION_SLUG = "test-conversation-slug"
+TEST_HTTP_DATE = "Wed, 21 Oct 2015 07:28:00 GMT"
+
+# Provider states for message polling
+PROVIDER_STATE_USER_AUTH_CONVERSATION_EXISTS = "user authenticated and conversation exists"
+PROVIDER_STATE_USER_AUTH_NO_NEW_MESSAGES = "user authenticated and no new messages since timestamp"
+PROVIDER_STATE_USER_AUTH_NEW_MESSAGES_EXIST = "user authenticated and new messages exist since timestamp"
+```
+
+#### Step 1.2: Write Consumer Contract Test (Testing the Waiter)
 
 Create `tests/test_contract/tests/consumer/test_message_polling.py`:
 
 ```python
+import pytest
+from playwright.async_api import Page
+
+from tests.test_contract.constants import (
+    CONSUMER_NAME_MESSAGE_POLLING,
+    PROVIDER_NAME_MESSAGE_POLLING,
+    PACT_PORT_MESSAGE_POLLING,
+    TEST_CONVERSATION_SLUG,
+    TEST_HTTP_DATE,
+    NETWORK_TIMEOUT_MS,
+    PROVIDER_STATE_USER_AUTH_CONVERSATION_EXISTS,
+    PROVIDER_STATE_USER_AUTH_NO_NEW_MESSAGES,
+    PROVIDER_STATE_USER_AUTH_NEW_MESSAGES_EXIST,
+)
+from tests.test_contract.tests.shared.helpers import (
+    setup_pact,
+    setup_playwright_pact_interception,
+)
+
+# Test constants
+CONVERSATION_PAGE_PATH = f"/conversations/{TEST_CONVERSATION_SLUG}"
+MESSAGE_UPDATES_PATH = f"/conversations/{TEST_CONVERSATION_SLUG}/messages/updates"
+MOCK_MESSAGE_HTML = '<li class="message" data-message-id="123"><strong>testuser:</strong> New message</li>'
+
 @pytest.mark.contract
-async def test_message_polling_endpoint_contract(page: Page):
-    """Contract test: htmx client can poll for message updates."""
-    await setup_pact_interaction(
-        pact.given("user authenticated and conversation exists with messages")
-        .upon_receiving("message polling request")
+@pytest.mark.messages
+@pytest.mark.parametrize(
+    "origin_with_routes", [{"conversations": True, "auth_pages": True}], indirect=True
+)
+@pytest.mark.asyncio(loop_scope="session")
+async def test_consumer_message_polling_with_new_messages(
+    origin_with_routes: str, page: Page
+):
+    """Contract test: htmx polling request format with new messages response."""
+    origin = origin_with_routes
+
+    pact = setup_pact(
+        CONSUMER_NAME_MESSAGE_POLLING,
+        PROVIDER_NAME_MESSAGE_POLLING,
+        port=PACT_PORT_MESSAGE_POLLING,
+    )
+    mock_server_uri = pact.uri
+    conversation_url = f"{origin}{CONVERSATION_PAGE_PATH}"
+    mock_polling_url = f"{mock_server_uri}{MESSAGE_UPDATES_PATH}"
+
+    # Define what we expect the htmx client to send (testing the waiter)
+    expected_request_headers = {
+        "Accept": "text/html, */*",
+        "If-Modified-Since": TEST_HTTP_DATE
+    }
+
+    # Define what the API should respond with (testing format, not content)
+    (
+        pact.given(PROVIDER_STATE_USER_AUTH_NEW_MESSAGES_EXIST)
+        .upon_receiving("htmx polling request for message updates")
         .with_request(
             method="GET",
-            path="/conversations/test-slug/messages/updates",
-            headers={
-                "Accept": "text/html",
-                "If-Modified-Since": "Wed, 21 Oct 2015 07:28:00 GMT"
-            }
+            path=MESSAGE_UPDATES_PATH,
+            headers=expected_request_headers,
         )
         .will_respond_with(
             status=200,
-            headers={"Content-Type": "text/html; charset=utf-8"},
-            body="<li class=\"message\">New message content</li>"
+            headers={
+                "Content-Type": "text/html; charset=utf-8",
+                "ETag": '"2024-01-01T10:30:00-5"',
+                "Last-Modified": "Mon, 01 Jan 2024 15:30:00 GMT",
+                "Cache-Control": "no-cache, must-revalidate"
+            },
+            body=MOCK_MESSAGE_HTML
         )
     )
 
-    # Simulate htmx polling request
-    await page.goto("/conversations/test-slug")
+    await setup_playwright_pact_interception(
+        page=page,
+        api_path_to_intercept=MESSAGE_UPDATES_PATH,
+        mock_pact_url=mock_polling_url,
+        http_method="GET",
+    )
 
-    # Verify the endpoint gets called correctly
-    await expect_pact_request_made()
+    # Simulate htmx polling (testing the waiter's communication)
+    with pact:
+        await page.goto(conversation_url)
+        # Add htmx attributes to trigger polling
+        await page.evaluate(f'''
+            const poller = document.createElement('div');
+            poller.setAttribute('hx-get', '{MESSAGE_UPDATES_PATH}');
+            poller.setAttribute('hx-trigger', 'load');
+            poller.setAttribute('hx-headers', '{{"If-Modified-Since": "{TEST_HTTP_DATE}"}}');
+            document.body.appendChild(poller);
+            htmx.process(poller);
+            htmx.trigger(poller, 'load');
+        ''')
+        await page.wait_for_timeout(NETWORK_TIMEOUT_MS)
 
 @pytest.mark.contract
-async def test_message_polling_no_updates_contract(page: Page):
-    """Contract test: 304 Not Modified when no new messages."""
-    await setup_pact_interaction(
-        pact.given("user authenticated and no new messages")
-        .upon_receiving("message polling request with current timestamp")
+@pytest.mark.messages
+@pytest.mark.parametrize(
+    "origin_with_routes", [{"conversations": True, "auth_pages": True}], indirect=True
+)
+@pytest.mark.asyncio(loop_scope="session")
+async def test_consumer_message_polling_no_updates(
+    origin_with_routes: str, page: Page
+):
+    """Contract test: 304 Not Modified response format."""
+    origin = origin_with_routes
+
+    pact = setup_pact(
+        CONSUMER_NAME_MESSAGE_POLLING,
+        PROVIDER_NAME_MESSAGE_POLLING,
+        port=PACT_PORT_MESSAGE_POLLING,
+    )
+    mock_server_uri = pact.uri
+    conversation_url = f"{origin}{CONVERSATION_PAGE_PATH}"
+    mock_polling_url = f"{mock_server_uri}{MESSAGE_UPDATES_PATH}"
+
+    # Test 304 response format (testing the waiter understands "no changes")
+    (
+        pact.given(PROVIDER_STATE_USER_AUTH_NO_NEW_MESSAGES)
+        .upon_receiving("htmx polling request with current timestamp")
         .with_request(
             method="GET",
-            path="/conversations/test-slug/messages/updates",
-            headers={"If-Modified-Since": "Wed, 21 Oct 2015 07:28:00 GMT"}
+            path=MESSAGE_UPDATES_PATH,
+            headers={"If-Modified-Since": TEST_HTTP_DATE},
         )
-        .will_respond_with(status=304)  # No body for 304
+        .will_respond_with(
+            status=304,
+            headers={
+                "ETag": '"2024-01-01T10:30:00-5"',
+                "Cache-Control": "no-cache, must-revalidate"
+            }
+            # No body for 304 responses
+        )
     )
+
+    await setup_playwright_pact_interception(
+        page=page,
+        api_path_to_intercept=MESSAGE_UPDATES_PATH,
+        mock_pact_url=mock_polling_url,
+        http_method="GET",
+    )
+
+    with pact:
+        await page.goto(conversation_url)
+        await page.evaluate(f'''
+            const poller = document.createElement('div');
+            poller.setAttribute('hx-get', '{MESSAGE_UPDATES_PATH}');
+            poller.setAttribute('hx-trigger', 'load');
+            poller.setAttribute('hx-headers', '{{"If-Modified-Since": "{TEST_HTTP_DATE}"}}');
+            document.body.appendChild(poller);
+            htmx.process(poller);
+            htmx.trigger(poller, 'load');
+        ''')
+        await page.wait_for_timeout(NETWORK_TIMEOUT_MS)
 ```
+
+#### Step 1.3: Write Provider Contract Test (Testing API Can Parse)
 
 Create `tests/test_contract/tests/provider/test_message_polling_verification.py`:
 
 ```python
-@pytest.mark.contract
-def test_message_polling_provider_contract(provider_server):
-    """Provider verification: API correctly handles polling requests."""
-    verification.verify_pact(
-        provider_server,
-        pact_file="message_polling_consumer-conversations_provider.json"
-    )
+import pytest
+from yarl import URL
+
+from tests.test_contract.tests.shared.mock_data_factory import MockDataFactory
+from tests.test_contract.tests.shared.provider_verification_base import (
+    BaseProviderVerification,
+    create_provider_test_decorator,
+)
+
+class MessagePollingVerification(BaseProviderVerification):
+    """Message polling provider verification following standard pattern."""
+
+    @property
+    def provider_name(self) -> str:
+        return "message-polling-api"
+
+    @property
+    def consumer_name(self) -> str:
+        return "message-polling-htmx"
+
+    @property
+    def dependency_config(self):
+        """Mock only the business logic handler, keep route layer intact."""
+        return {
+            "src.logic.conversation_processing.handle_get_conversation": {
+                "return_value_config": MockDataFactory.create_conversation_with_messages()
+            }
+        }
+
+    @property
+    def pytest_marks(self) -> list:
+        return [pytest.mark.contract, pytest.mark.provider, pytest.mark.messages]
+
+# Create instance for use in tests
+message_polling_verification = MessagePollingVerification()
+
+@create_provider_test_decorator(
+    message_polling_verification.dependency_config,
+    "with_message_polling_api_mocks"
+)
+def test_provider_message_polling_pact_verification(provider_server: URL):
+    """Verify API can parse htmx polling requests correctly."""
+    message_polling_verification.verify_pact(provider_server)
 ```
 
-#### Step 1.2: Run Contract Tests (Should Fail)
+#### Step 1.4: Add Mock Data to Factory
+
+Add to `tests/test_contract/tests/shared/mock_data_factory.py`:
+
+```python
+@classmethod
+def create_conversation_with_messages(cls, **overrides):
+    """Create conversation mock with messages for polling tests."""
+    conversation = cls.create_conversation(**overrides)
+
+    # Add mock messages
+    mock_message = Message(
+        id=cls.MOCK_MESSAGE_ID,
+        content="Test message content",
+        conversation_id=conversation.id,
+        created_by_user_id=cls.MOCK_USER_ID,
+        created_at=datetime(2024, 1, 1, 10, 30, 0, tzinfo=timezone.utc),
+    )
+    mock_message.sender = cls.create_user_read(username="testuser")
+    conversation.messages = [mock_message]
+
+    return conversation
+```
+
+#### Step 1.5: Run Contract Tests (Should Fail)
 
 ```bash
 pytest -m contract tests/test_contract/tests/consumer/test_message_polling.py -v
