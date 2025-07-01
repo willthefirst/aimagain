@@ -77,7 +77,7 @@ Provider tests mock **only** the business logic handler, keeping the route layer
 ```python
 # Mock configuration - only mock the business logic layer
 dependency_config = {
-    "app.api.routes.conversations.handle_create_conversation": {
+    "src.api.routes.conversations.handle_create_conversation": {
         "return_value_config": MockDataFactory.create_conversation()
     }
 }
@@ -104,6 +104,7 @@ tests/test_contract/
 │
 ├── tests/                             # All test implementations
 │   ├── consumer/                      # Consumer contract tests (client-side)
+│   │   ├── pytest.ini                # Consumer-specific pytest config
 │   │   ├── test_auth_form.py         # Authentication form tests
 │   │   ├── test_conversation_form.py  # Conversation creation form tests
 │   │   ├── test_invitation_form.py    # Invitation handling form tests
@@ -115,9 +116,10 @@ tests/test_contract/
 │   │   └── test_participants_verification.py  # Participants API verification
 │   │
 │   └── shared/                        # Shared utilities and patterns
+│       ├── consumer_test_base.py      # Base class for consumer tests
+│       ├── provider_verification_base.py # Base class for provider tests
 │       ├── helpers.py                 # Test helper functions
-│       ├── mock_data_factory.py       # Consistent mock data creation
-│       └── provider_verification_base.py # Base class for provider tests
+│       └── mock_data_factory.py       # Consistent mock data creation
 │
 ├── infrastructure/                    # Test infrastructure
 │   ├── config.py                     # Configuration management
@@ -138,41 +140,107 @@ tests/test_contract/
 
 ### Consumer test pattern
 
-Consumer tests use Playwright to interact with real web forms:
+Consumer tests use Playwright to interact with real web forms, using constants and helpers:
 
 ```python
 # tests/consumer/test_conversation_form.py
-async def test_consumer_conversation_create_success(page: Page):
-    """Test form submission creates correct Pact contract."""
+import pytest
+from playwright.async_api import Page
 
-    # Setup Pact expectation
-    pact.given("user is authenticated and target user exists")
-        .upon_receiving("a request to create a new conversation")
+from tests.shared_test_data import (
+    TEST_INITIAL_MESSAGE,
+    TEST_INVITEE_USERNAME,
+    get_form_encoded_creation_data,
+)
+from tests.test_contract.constants import (
+    CONSUMER_NAME_CONVERSATION,
+    NETWORK_TIMEOUT_MS,
+    PACT_PORT_CONVERSATION,
+    PROVIDER_NAME_CONVERSATIONS,
+)
+from tests.test_contract.tests.shared.helpers import (
+    setup_pact,
+    setup_playwright_pact_interception,
+)
+
+# Test constants
+CONVERSATIONS_NEW_PATH = "/conversations/new"
+CONVERSATIONS_CREATE_PATH = "/conversations"
+MOCK_CONVERSATION_SLUG = "mock-slug"
+PROVIDER_STATE_USER_ONLINE = "user is authenticated and target user exists and is online"
+
+@pytest.mark.parametrize(
+    "origin_with_routes", [{"conversations": True, "auth_pages": True}], indirect=True
+)
+@pytest.mark.asyncio(loop_scope="session")
+async def test_consumer_conversation_create_success(
+    origin_with_routes: str, page: Page
+):
+    """Test form submission creates correct Pact contract."""
+    origin = origin_with_routes
+
+    # Setup Pact using helper function
+    pact = setup_pact(
+        CONSUMER_NAME_CONVERSATION,
+        PROVIDER_NAME_CONVERSATIONS,
+        port=PACT_PORT_CONVERSATION,
+    )
+    mock_server_uri = pact.uri
+    new_conversation_url = f"{origin}{CONVERSATIONS_NEW_PATH}"
+    mock_submit_url = f"{mock_server_uri}{CONVERSATIONS_CREATE_PATH}"
+
+    # Use shared data functions
+    expected_request_body = get_form_encoded_creation_data()
+    expected_request_headers = {"Content-Type": "application/x-www-form-urlencoded"}
+
+    # Define Pact expectation using constants
+    (
+        pact.given(PROVIDER_STATE_USER_ONLINE)
+        .upon_receiving("a request to create a new conversation with valid username")
         .with_request(
             method="POST",
-            path="/conversations",
-            headers={"Content-Type": "application/x-www-form-urlencoded"},
-            body="invitee_username=testuser&initial_message=Hello..."
+            path=CONVERSATIONS_CREATE_PATH,
+            headers=expected_request_headers,
+            body=expected_request_body,
         )
         .will_respond_with(
             status=303,
-            headers={"Location": "/conversations/mock-slug"}
+            headers={"Location": f"/conversations/{MOCK_CONVERSATION_SLUG}"}
         )
+    )
 
-    # Interact with real form
+    # Setup interception using helper
+    await setup_playwright_pact_interception(
+        page=page,
+        api_path_to_intercept=CONVERSATIONS_CREATE_PATH,
+        mock_pact_url=mock_submit_url,
+        http_method="POST",
+    )
+
+    # Interact with real form using constants
     with pact:
-        await page.goto("/conversations/new")
-        await page.locator("input[name='invitee_username']").fill("testuser")
-        await page.locator("textarea[name='initial_message']").fill("Hello...")
+        await page.goto(new_conversation_url)
+        await page.locator("input[name='invitee_username']").fill(TEST_INVITEE_USERNAME)
+        await page.locator("textarea[name='initial_message']").fill(TEST_INITIAL_MESSAGE)
         await page.locator("button[type='submit']").click()
+        await page.wait_for_timeout(NETWORK_TIMEOUT_MS)
 ```
 
 ### Provider test pattern
 
-Provider tests use the `BaseProviderVerification` pattern:
+Provider tests use the `BaseProviderVerification` pattern with the decorator:
 
 ```python
 # tests/provider/test_conversations_verification.py
+import pytest
+from yarl import URL
+
+from tests.test_contract.tests.shared.mock_data_factory import MockDataFactory
+from tests.test_contract.tests.shared.provider_verification_base import (
+    BaseProviderVerification,
+    create_provider_test_decorator,
+)
+
 class ConversationsVerification(BaseProviderVerification):
     """Conversations provider verification following standard pattern."""
 
@@ -186,10 +254,26 @@ class ConversationsVerification(BaseProviderVerification):
 
     @property
     def dependency_config(self):
-        """Mock only the business logic handler."""
-        return MockDataFactory.create_conversation_dependency_config()
+        """Mock only the business logic handler using factory."""
+        # Combine multiple configs if needed
+        create_config = MockDataFactory.create_conversation_dependency_config()
+        get_config = {
+            "src.api.routes.conversations.handle_get_conversation": {
+                "return_value_config": MockDataFactory.create_conversation(
+                    name="mock-name"
+                )
+            }
+        }
+        return {**create_config, **get_config}
 
-# Standard test implementation
+    @property
+    def pytest_marks(self) -> list:
+        return [pytest.mark.provider, pytest.mark.conversations]
+
+# Create instance for use in tests
+conversations_verification = ConversationsVerification()
+
+# Standard test implementation using decorator
 @create_provider_test_decorator(
     conversations_verification.dependency_config,
     "with_conversations_api_mocks"
@@ -201,34 +285,94 @@ def test_provider_conversations_pact_verification(provider_server: URL):
 
 ### Mock data factory pattern
 
-Centralized, consistent mock data creation:
+Centralized, consistent mock data creation with proper constants:
 
 ```python
 # tests/shared/mock_data_factory.py
+from datetime import datetime, timezone
+from typing import Any, Dict
+from uuid import uuid4
+
+from src.models.conversation import Conversation
+from src.schemas.participant import ParticipantStatus
+from src.schemas.user import UserRead
+
 class MockDataFactory:
     """Factory for creating consistent mock data across all contract tests."""
 
-    # Standard test constants
+    # Standard test IDs for consistency - these are used across all tests
     MOCK_USER_ID = "550e8400-e29b-41d4-a716-446655440001"
+    MOCK_CONVERSATION_ID = "550e8400-e29b-41d4-a716-446655440002"
+    MOCK_PARTICIPANT_ID = "550e8400-e29b-41d4-a716-446655440000"
+    MOCK_INVITER_ID = "550e8400-e29b-41d4-a716-446655440003"
+    MOCK_MESSAGE_ID = "550e8400-e29b-41d4-a716-446655440004"
+
+    # Standard test data
+    TEST_EMAIL = "test.user@example.com"
     TEST_USERNAME = "testuser"
+    TEST_PASSWORD = "securepassword123"
+    TEST_CONVERSATION_SLUG = "mock-slug"
+    TEST_CONVERSATION_NAME = "mock-name"
 
     @classmethod
-    def create_conversation_dependency_config(cls):
+    def create_conversation_dependency_config(cls) -> Dict[str, Any]:
         """Create mock config for conversation endpoints."""
         return {
-            "app.api.routes.conversations.handle_create_conversation": {
+            "src.api.routes.conversations.handle_create_conversation": {
                 "return_value_config": cls.create_conversation()
             }
         }
 
     @classmethod
-    def create_conversation(cls, **overrides):
+    def create_conversation(cls, **overrides) -> Conversation:
         """Create consistent conversation mock data."""
         return Conversation(
             id=overrides.get('id', str(uuid4())),
-            slug=overrides.get('slug', 'mock-slug'),
-            name=overrides.get('name', 'Test Conversation'),
-            # ... other fields
+            slug=overrides.get('slug', cls.TEST_CONVERSATION_SLUG),
+            name=overrides.get('name', cls.TEST_CONVERSATION_NAME),
+            created_by_user_id=overrides.get('created_by_user_id', str(uuid4())),
+            last_activity_at=overrides.get(
+                'last_activity_at',
+                datetime.now(timezone.utc).isoformat()
+            ),
+        )
+
+    @classmethod
+    def create_user_read(cls, **overrides) -> UserRead:
+        """Create a UserRead instance with default or provided values."""
+        return UserRead(
+            id=overrides.get('id', str(uuid4())),
+            email=overrides.get('email', cls.TEST_EMAIL),
+            username=overrides.get('username', cls.TEST_USERNAME),
+            is_active=overrides.get('is_active', True),
+            is_superuser=overrides.get('is_superuser', False),
+            is_verified=overrides.get('is_verified', False),
+        )
+
+    @classmethod
+    def create_participant_dependency_config(cls) -> Dict[str, Any]:
+        """Create dependency config for participant endpoints."""
+        return {
+            "src.api.routes.participants.handle_update_participant_status": {
+                "return_value_config": cls.create_participant()
+            }
+        }
+
+    @classmethod
+    def create_participant(cls, **overrides):
+        """Create consistent participant mock data."""
+        default_datetime = datetime(2024, 1, 1, 0, 0, 0, tzinfo=timezone.utc)
+
+        return Participant(
+            id=overrides.get('id', cls.MOCK_PARTICIPANT_ID),
+            user_id=overrides.get('user_id', cls.MOCK_USER_ID),
+            conversation_id=overrides.get('conversation_id', cls.MOCK_CONVERSATION_ID),
+            status=overrides.get('status', ParticipantStatus.REJECTED),
+            invited_by_user_id=overrides.get('invited_by_user_id', cls.MOCK_INVITER_ID),
+            initial_message_id=overrides.get('initial_message_id', cls.MOCK_MESSAGE_ID),
+            created_at=overrides.get('created_at', default_datetime),
+            updated_at=overrides.get('updated_at', default_datetime),
+            joined_at=overrides.get('joined_at', None),
         )
 ```
 
@@ -240,11 +384,14 @@ class MockDataFactory:
 # Run all consumer tests
 pytest tests/consumer/
 
-# Run by category
+# Run by category using pytest marks
 pytest tests/consumer/ -m auth
 pytest tests/consumer/ -m conversations
 pytest tests/consumer/ -m invitations
 pytest tests/consumer/ -m messages
+
+# Run specific test file
+pytest tests/consumer/test_conversation_form.py::test_consumer_conversation_create_success -v
 ```
 
 ### Provider tests (verify against Pact files)
@@ -256,6 +403,9 @@ pytest tests/provider/
 # Run by category
 pytest tests/provider/ -m auth
 pytest tests/provider/ -m conversations
+
+# Run with verbose output
+pytest tests/provider/ -v
 ```
 
 ### All contract tests
@@ -264,46 +414,115 @@ pytest tests/provider/ -m conversations
 # Run complete contract test suite
 pytest tests/
 
-# Run with verbose output
-pytest tests/ -v
+# Run with verbose output and show slow tests
+pytest tests/ -v --durations=10
 
-# Run specific test file
-pytest tests/consumer/test_conversation_form.py::test_consumer_conversation_create_success
+# Run specific test patterns
+pytest tests/ -k "conversation"
 ```
 
 ## ➕ Adding new contract tests
 
-### Step 1: Consumer test
+### Step 1: Add constants
+
+Add to `tests/test_contract/constants.py`:
 
 ```python
-# tests/consumer/test_new_feature_form.py
-async def test_consumer_new_feature_success(page: Page):
-    """Test new feature form submission."""
+# New feature constants
+TEST_FEATURE_NAME = "test-feature"
+CONSUMER_NAME_FEATURE = "feature-form"
+PROVIDER_NAME_FEATURES = "features-api"
+PACT_PORT_FEATURES = 1240
+FEATURES_PATH = "/features"
+```
 
-    # Define Pact contract
-    pact = setup_pact("new-feature-form", "features-api")
-    pact.given("user is authenticated")
+### Step 2: Consumer test
+
+```python
+# tests/consumer/test_feature_form.py
+import pytest
+from playwright.async_api import Page
+
+from tests.test_contract.constants import (
+    CONSUMER_NAME_FEATURE,
+    NETWORK_TIMEOUT_MS,
+    PACT_PORT_FEATURES,
+    PROVIDER_NAME_FEATURES,
+    TEST_FEATURE_NAME,
+    FEATURES_PATH,
+)
+from tests.test_contract.tests.shared.helpers import (
+    setup_pact,
+    setup_playwright_pact_interception,
+)
+
+PROVIDER_STATE_USER_AUTHENTICATED = "user is authenticated"
+
+@pytest.mark.parametrize(
+    "origin_with_routes", [{"features": True, "auth_pages": True}], indirect=True
+)
+@pytest.mark.asyncio(loop_scope="session")
+async def test_consumer_feature_create_success(
+    origin_with_routes: str, page: Page
+):
+    """Test new feature form submission."""
+    origin = origin_with_routes
+
+    pact = setup_pact(
+        CONSUMER_NAME_FEATURE,
+        PROVIDER_NAME_FEATURES,
+        port=PACT_PORT_FEATURES,
+    )
+    mock_server_uri = pact.uri
+    feature_form_url = f"{origin}/features/new"
+    mock_submit_url = f"{mock_server_uri}{FEATURES_PATH}"
+
+    expected_request_body = f"feature_name={TEST_FEATURE_NAME}&description=test+description"
+    expected_request_headers = {"Content-Type": "application/x-www-form-urlencoded"}
+
+    (
+        pact.given(PROVIDER_STATE_USER_AUTHENTICATED)
         .upon_receiving("a request to create new feature")
         .with_request(
             method="POST",
-            path="/features",
-            headers={"Content-Type": "application/x-www-form-urlencoded"},
-            body="feature_name=test&description=test+description"
+            path=FEATURES_PATH,
+            headers=expected_request_headers,
+            body=expected_request_body,
         )
-        .will_respond_with(status=201, body={"id": "mock-id"})
+        .will_respond_with(
+            status=201,
+            body={"id": "mock-feature-id"}
+        )
+    )
 
-    # Test form interaction
+    await setup_playwright_pact_interception(
+        page=page,
+        api_path_to_intercept=FEATURES_PATH,
+        mock_pact_url=mock_submit_url,
+        http_method="POST",
+    )
+
     with pact:
-        await page.goto("/features/new")
-        await page.fill("input[name='feature_name']", "test")
+        await page.goto(feature_form_url)
+        await page.fill("input[name='feature_name']", TEST_FEATURE_NAME)
         await page.fill("textarea[name='description']", "test description")
         await page.click("button[type='submit']")
+        await page.wait_for_timeout(NETWORK_TIMEOUT_MS)
 ```
 
-### Step 2: Provider test
+### Step 3: Provider test
 
 ```python
 # tests/provider/test_features_verification.py
+import pytest
+from yarl import URL
+
+from tests.test_contract.tests.shared.mock_data_factory import MockDataFactory
+from tests.test_contract.tests.shared.provider_verification_base import (
+    BaseProviderVerification,
+    create_provider_test_decorator,
+)
+
 class FeaturesVerification(BaseProviderVerification):
     @property
     def provider_name(self) -> str:
@@ -311,11 +530,17 @@ class FeaturesVerification(BaseProviderVerification):
 
     @property
     def consumer_name(self) -> str:
-        return "new-feature-form"
+        return "feature-form"
 
     @property
     def dependency_config(self):
         return MockDataFactory.create_feature_dependency_config()
+
+    @property
+    def pytest_marks(self) -> list:
+        return [pytest.mark.provider, pytest.mark.features]
+
+features_verification = FeaturesVerification()
 
 @create_provider_test_decorator(
     features_verification.dependency_config,
@@ -325,20 +550,23 @@ def test_provider_features_pact_verification(provider_server: URL):
     features_verification.verify_pact(provider_server)
 ```
 
-### Step 3: Mock data factory
+### Step 4: Mock data factory
+
+Add to `tests/shared/mock_data_factory.py`:
 
 ```python
-# Add to tests/shared/mock_data_factory.py
 @classmethod
-def create_feature_dependency_config(cls):
+def create_feature_dependency_config(cls) -> Dict[str, Any]:
+    """Create dependency config for feature endpoints."""
     return {
-        "app.api.routes.features.handle_create_feature": {
+        "src.api.routes.features.handle_create_feature": {
             "return_value_config": cls.create_feature()
         }
     }
 
 @classmethod
 def create_feature(cls, **overrides):
+    """Create consistent feature mock data."""
     return Feature(
         id=overrides.get('id', 'mock-feature-id'),
         name=overrides.get('name', 'Test Feature'),
@@ -348,8 +576,9 @@ def create_feature(cls, **overrides):
 
 ## 🎯 Test categories & markers
 
+Test markers are defined in `tests/consumer/pytest.ini`:
+
 ```python
-# pytest markers for organizing tests
 pytest.mark.consumer      # Consumer contract tests
 pytest.mark.provider      # Provider contract tests
 pytest.mark.auth          # Authentication-related tests
@@ -422,33 +651,57 @@ pytest.mark.slow          # Slow running tests (>5 seconds)
 
 ## 🔧 Configuration
 
-Key configuration files:
+Key configuration files and their purposes:
 
-- `conftest.py` - Test fixtures and setup
-- `constants.py` - Shared test constants
-- `pytest.ini` - Pytest configuration and markers
+- `conftest.py` - Test fixtures and setup with origin_with_routes parametrization
+- `constants.py` - Shared test constants (ports, names, paths, test data)
+- `tests/consumer/pytest.ini` - Consumer-specific pytest configuration and asyncio settings
 - `infrastructure/config.py` - Server and database configuration
+- `tests/shared/helpers.py` - Pact setup and Playwright interception utilities
 
 ## 🐛 Troubleshooting
 
 ### Common issues
 
 1. **Pact file not found**: Run consumer tests first to generate Pact files
+
+   ```bash
+   pytest tests/consumer/test_conversation_form.py -v
+   ```
+
 2. **Provider verification fails**: Check mock configuration matches expected response
-3. **Form submission fails**: Verify form field names match Pact request body
-4. **Server startup issues**: Check port conflicts and dependency overrides
+
+   ```bash
+   # Check the generated pact file
+   cat artifacts/pacts/create-conversation-form-conversations-api.json
+   ```
+
+3. **Form submission fails**: Verify form field names match Pact request body in constants
+4. **Server startup issues**: Check port conflicts in constants.py (PACT*PORT*\* values)
+5. **Asyncio loop errors**: Ensure `@pytest.mark.asyncio(loop_scope="session")` is used
 
 ### Debug commands
 
 ```bash
-# Run with verbose output
-pytest tests/ -v -s
+# Run with verbose output and show setup/teardown
+pytest tests/consumer/ -v -s --setup-show
 
 # Run single test with debugging
 pytest tests/consumer/test_conversation_form.py::test_consumer_conversation_create_success -v -s
 
 # Check generated Pact files
-cat artifacts/pacts/create-conversation-form-conversations-api.json
+find artifacts/pacts/ -name "*.json" -exec cat {} \;
+
+# Run with timeout debugging
+pytest tests/consumer/ -v --timeout=300
+```
+
+### Checking constants usage
+
+```bash
+# Verify constants are being used consistently
+grep -r "CONSUMER_NAME_" tests/test_contract/tests/
+grep -r "MOCK_" tests/test_contract/tests/shared/mock_data_factory.py
 ```
 
 ## 📚 References
@@ -460,4 +713,4 @@ cat artifacts/pacts/create-conversation-form-conversations-api.json
 
 ---
 
-**Remember**: Contract tests verify communication format, functional tests verify communication content. Keep them separate and focused on their specific responsibilities.
+**Remember**: Contract tests verify communication format, functional tests verify communication content. Keep them separate and focused on their specific responsibilities. Always use constants from `constants.py` and the `MockDataFactory` for consistency across all tests.
