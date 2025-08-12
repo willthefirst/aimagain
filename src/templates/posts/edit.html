@@ -1,0 +1,42 @@
+{% extends "base.html" %} {% block title %}Edit Post - {{ post.title }}{%
+endblock %} {% block content %}
+<h1>Edit POST</h1>
+
+<form hx-put="/posts/{{ post.id }}" hx-target="body">
+  <div>
+    <label for="title">Title:</label><br />
+    <input
+      type="text"
+      id="title"
+      name="title"
+      value="{{ post.title }}"
+      required
+      style="width: 100%; max-width: 500px" />
+  </div>
+  <br />
+
+  <div>
+    <p>
+      <strong>POST type:</strong> {{ post.post_type.value.title() }} (cannot be
+      changed)
+    </p>
+  </div>
+  <br />
+
+  <div>
+    <label for="content">Content:</label><br />
+    <textarea
+      id="content"
+      name="content"
+      required
+      rows="10"
+      style="width: 100%; max-width: 500px">
+{{ post.content }}</textarea
+    >
+  </div>
+  <br />
+
+  <input type="submit" value="Update Post" />
+  <a href="/posts/{{ post.id }}">Cancel</a>
+</form>
+{% endblock %}

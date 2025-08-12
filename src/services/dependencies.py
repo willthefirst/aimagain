@@ -5,14 +5,17 @@ from src.repositories.dependencies import (
     get_conversation_repository,
     get_message_repository,
     get_participant_repository,
+    get_post_repository,
     get_user_repository,
 )
 from src.repositories.message_repository import MessageRepository
 from src.repositories.participant_repository import ParticipantRepository
+from src.repositories.post_repository import PostRepository
 from src.repositories.user_repository import UserRepository
 
 from .conversation_service import ConversationService
 from .participant_service import ParticipantService
+from .post_service import PostService
 from .presence_service import PresenceService
 from .provider import ServiceProvider
 from .user_service import UserService
@@ -65,4 +68,14 @@ def get_presence_service(
     return ServiceProvider.get_service(
         PresenceService,
         user_repository=user_repo,
+    )
+
+
+def get_post_service(
+    post_repo: PostRepository = Depends(get_post_repository),
+) -> PostService:
+    """Provides an instance of the PostService."""
+    return ServiceProvider.get_service(
+        PostService,
+        post_repository=post_repo,
     )

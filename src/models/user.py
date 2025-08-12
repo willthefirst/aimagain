@@ -42,3 +42,8 @@ class User(SQLAlchemyBaseUserTable[uuid.UUID], BaseModel):
         back_populates="inviter",
         foreign_keys="Participant.invited_by_user_id",
     )
+    created_posts = relationship(
+        "Post",
+        back_populates="creator",
+        foreign_keys="Post.created_by_user_id",
+    )

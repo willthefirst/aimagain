@@ -7,11 +7,10 @@ from fastapi.responses import JSONResponse, RedirectResponse
 
 from src.api.routes import auth_routes
 from src.auth_config import auth_backend, fastapi_users
-from src.db import check_database_health, get_db_session
-from src.middleware.presence import PresenceMiddleware
+from src.db import check_database_health
 from src.schemas.user import UserRead, UserUpdate
 
-from .api.routes import auth_pages, conversations, me, participants, users
+from .api.routes import auth_pages, me, posts, users
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -70,7 +69,7 @@ async def unauthorized_exception_handler(request: Request, exc: HTTPException):
 
 @app.get("/")
 def read_root():
-    return RedirectResponse(url="/users/me/conversations", status_code=302)
+    return RedirectResponse(url="/posts", status_code=302)
 
 
 app.include_router(
@@ -100,9 +99,10 @@ app.include_router(
 )
 app.include_router(auth_pages.auth_pages_api_router)
 app.include_router(users.users_api_router, tags=["users"])
-app.include_router(conversations.conversations_router_instance, tags=["conversations"])
+# app.include_router(conversations.conversations_router_instance, tags=["conversations"])
 app.include_router(me.me_router_instance, tags=["me"])
-app.include_router(participants.participants_router_instance, tags=["participants"])
+# app.include_router(participants.participants_router_instance, tags=["participants"])
+app.include_router(posts.posts_router_instance, tags=["posts"])
 
 
 @app.get("/health")

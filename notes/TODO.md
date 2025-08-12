@@ -1,1 +1,2 @@
 - Add migration tool to CLI bc we ran into config issues when trying to create a new model and have migrations run correctly
+- Consider whether there's a way do codify the handle\_\* processing approach, eg. making a class that compels route to abide by a default implementation pattern (eg. where they just call their handler or error)

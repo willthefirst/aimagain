@@ -1,0 +1,42 @@
+{% extends "base.html" %} {% block title %}Posts{% endblock %} {% block content
+%}
+<h1>Posts</h1>
+
+<p>
+  <a href="/posts/new">Create new POST</a>
+</p>
+
+<!-- Filter by post type -->
+<div>
+  <strong>Filter by type:</strong>
+  <a href="/posts">All</a> | <a href="/posts?post_type=referral">Referrals</a> |
+  <a href="/posts?post_type=availability">Availability</a>
+</div>
+
+{% if posts %}
+<div>
+  {% for post in posts %}
+  <div style="border: 1px solid #ccc; margin: 10px 0; padding: 10px">
+    <h3><a href="/posts/{{ post.id }}">{{ post.title }}</a></h3>
+    <p><strong>Type:</strong> {{ post.post_type.value.title() }}</p>
+    <p>
+      {{ post.content[:200] }}{% if post.content|length > 200 %}...{% endif %}
+    </p>
+    <p>
+      <small>
+        Posted {{ post.created_at.strftime('%Y-%m-%d %H:%M') }} {% if
+        post.created_by_user_id == current_user.id %} |
+        <a href="/posts/{{ post.id }}/edit">Edit</a>
+        {% endif %}
+      </small>
+    </p>
+  </div>
+  {% endfor %}
+</div>
+{% else %}
+<p>No posts found.</p>
+{% endif %}
+
+<hr />
+<a href="/posts">Refresh</a>
+{% endblock %}

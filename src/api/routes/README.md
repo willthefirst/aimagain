@@ -81,6 +81,7 @@ Routes are organized by domain with consistent delegation patterns.
 | -------------------- | ----------------------- | -------------------------------------- | --------------------- | ------------------------------------- |
 | **conversations.py** | Conversation management | CRUD, messaging, participant flow      | `/conversations/*`    | ConversationService, processing logic |
 | **participants.py**  | Participation workflow  | Invitations, status updates            | `/participants/*`     | ParticipantService                    |
+| **posts.py**         | Post management         | CRUD for posts, content filtering      | `/posts/*`            | PostService, processing logic         |
 | **users.py**         | User data aggregation   | User listings, profiles                | `/users/*`            | UserService                           |
 | **auth_routes.py**   | Authentication API      | Login, register, password reset (JSON) | `/auth/*`             | Authentication logic                  |
 | **auth_pages.py**    | Authentication UI       | Login, register forms (HTML)           | `/login`, `/register` | Authentication logic                  |
@@ -92,6 +93,7 @@ Routes are organized by domain with consistent delegation patterns.
 
 - `conversations.py` - Conversation CRUD, messaging, and participant management
 - `participants.py` - Participant invitation and status management
+- `posts.py` - Post CRUD, content management, and filtering
 - `users.py` - User listing and profile access
 - `me.py` - Current user's data and actions
 
@@ -209,6 +211,41 @@ async def create_conversation(
     # HTTP response formatting
     redirect_url = f"/conversations/{conversation.slug}"
     return RedirectResponse(url=redirect_url)
+```
+
+### RESTful API design with htmx
+
+Posts routes demonstrate clean RESTful endpoints using HTMX for HTML forms:
+
+```python
+# Clean RESTful endpoints
+@router.put("/posts/{post_id}")
+async def update_post(post_id: UUID, ...):
+    """Updates a post via PUT method."""
+    return await handle_update_post(...)
+
+@router.delete("/posts/{post_id}")
+async def delete_post(post_id: UUID, ...):
+    """Deletes a post via DELETE method."""
+    return await handle_delete_post(...)
+```
+
+**HTMX Templates:**
+
+```html
+<!-- Update form using HTMX PUT -->
+<form hx-put="/posts/{{ post.id }}" hx-target="body">
+  <!-- form fields -->
+  <input type="submit" value="Update Post" />
+</form>
+
+<!-- Delete form using HTMX DELETE -->
+<form
+  hx-delete="/posts/{{ post.id }}"
+  hx-target="body"
+  hx-confirm="Are you sure?">
+  <input type="submit" value="Delete" />
+</form>
 ```
 
 ### Response formatting patterns
@@ -344,13 +381,13 @@ app.include_router(me.me_router_instance, prefix="/me", tags=["me"])
 [domain]_router_instance = APIRouter()
 router = BaseRouter(router=[domain]_router_instance)
 
-# Consistent endpoint naming
-@router.get("/[domain]")           # List
-@router.get("/[domain]/new")       # New form
-@router.get("/[domain]/{id}")      # Detail
-@router.post("/[domain]")          # Create
-@router.put("/[domain]/{id}")      # Update
-@router.delete("/[domain]/{id}")   # Delete
+# Clean RESTful endpoint naming with htmx support
+@router.get("/[domain]")           # List resources
+@router.get("/[domain]/new")       # New resource form (HTML)
+@router.get("/[domain]/{id}")      # Get single resource
+@router.post("/[domain]")          # Create resource
+@router.put("/[domain]/{id}")      # Update resource (RESTful)
+@router.delete("/[domain]/{id}")   # Delete resource (RESTful)
 ```
 
 ## 📚 Related documentation

@@ -6,6 +6,7 @@ from src.db import get_db_session
 from .conversation_repository import ConversationRepository
 from .message_repository import MessageRepository
 from .participant_repository import ParticipantRepository
+from .post_repository import PostRepository
 from .user_repository import UserRepository
 
 
@@ -34,3 +35,10 @@ def get_message_repository(
 ) -> MessageRepository:
     """Dependency provider for MessageRepository."""
     return MessageRepository(session)
+
+
+def get_post_repository(
+    session: AsyncSession = Depends(get_db_session),
+) -> PostRepository:
+    """Dependency provider for PostRepository."""
+    return PostRepository(session)

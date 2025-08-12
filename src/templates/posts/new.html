@@ -1,0 +1,41 @@
+{% extends "base.html" %} {% block title %}Create new POST{% endblock %} {%
+block content %}
+<h1>Create new POST</h1>
+
+<form method="post" action="/posts">
+  <div>
+    <label for="title">Title:</label><br />
+    <input
+      type="text"
+      id="title"
+      name="title"
+      required
+      style="width: 100%; max-width: 500px" />
+  </div>
+  <br />
+
+  <div>
+    <label for="post_type">POST type:</label><br />
+    <select id="post_type" name="post_type" required>
+      <option value="">-- Select Type --</option>
+      <option value="referral">Referral</option>
+      <option value="availability">Availability</option>
+    </select>
+  </div>
+  <br />
+
+  <div>
+    <label for="content">Content:</label><br />
+    <textarea
+      id="content"
+      name="content"
+      required
+      rows="10"
+      style="width: 100%; max-width: 500px"></textarea>
+  </div>
+  <br />
+
+  <input type="submit" value="Create Post" />
+  <a href="/posts">Cancel</a>
+</form>
+{% endblock %}
