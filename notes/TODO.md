@@ -1,0 +1,1 @@
+- Add migration tool to CLI bc we ran into config issues when trying to create a new model and have migrations run correctly

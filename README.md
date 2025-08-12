@@ -58,32 +58,8 @@ Aimagain demonstrates **modern web application architecture** with:
 
 1. **Install CLI**: `pip install -e .`
 2. **Setup environment**: `aim setup`
-3. **Start development**: `aim dev up`
+3. **Start development**: `aim dev-up`
 4. **Run tests**: `aim test`
-
-### 📋 Quick commands
-
-```bash
-# Development
-aim dev up              # Start development server with hot reload
-aim dev down            # Stop development environment
-aim dev logs            # View development logs
-
-# Testing
-aim test                # Run all tests
-aim test unit           # Run unit tests only
-aim test integration    # Run integration tests only
-aim test contract       # Run contract tests only
-
-# Database
-aim db migrate          # Run database migrations
-aim db reset            # Reset database to clean state
-aim db seed             # Add sample data for development
-
-# Production
-aim deploy              # Deploy to production
-aim status              # Check deployment status
-```
 
 ## 📚 Documentation architecture
 
@@ -149,7 +125,7 @@ aim setup
 4. **Start development server**:
 
 ```bash
-aim dev up
+aim dev-up
 # Starts server with hot reload at http://localhost:8000
 ```
 
@@ -158,22 +134,6 @@ aim dev up
 ```bash
 aim test
 # Ensures everything is working correctly
-```
-
-### Production deployment
-
-1. **Prepare for deployment**:
-
-```bash
-aim deploy prepare
-# Validates configuration and builds production assets
-```
-
-2. **Deploy to production**:
-
-```bash
-aim deploy
-# Deploys using configured deployment method
 ```
 
 For detailed deployment instructions, see [deployment/README.md](deployment/README.md).

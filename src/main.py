@@ -45,7 +45,7 @@ app = FastAPI(title="AIM again", lifespan=lifespan)
 
 
 # Add presence middleware with session factory
-app.add_middleware(PresenceMiddleware, session_factory=get_db_session)
+# app.add_middleware(PresenceMiddleware, session_factory=get_db_session)
 
 
 @app.exception_handler(HTTPException)

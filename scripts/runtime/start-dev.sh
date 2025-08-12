@@ -63,8 +63,8 @@ start_livereload_server() {
 
     # Check if python is available for LiveReload
     if ! command -v python &> /dev/null; then
-        echo "WARNING: Python command not found, skipping LiveReload server"
-        return 0
+        echo "ERROR: Python command not found, cannot start LiveReload server"
+        exit 1
     fi
 
     # Set LiveReload port (default: 35729)
@@ -75,19 +75,24 @@ start_livereload_server() {
     python -c "
 import time
 import threading
+import sys
 from livereload import Server
 
 def start_server():
-    server = Server()
-    # Watch template files
-    server.watch('src/templates/', delay=0.5)
-    # Watch source files for template changes
-    server.watch('src/', delay=0.5)
-    # Watch static files if they exist
-    server.watch('static/', delay=0.5)
+    try:
+        server = Server()
+        # Watch template files
+        server.watch('src/templates/', delay=0.5)
+        # Watch source files for template changes
+        server.watch('src/', delay=0.5)
+        # Watch static files if they exist
+        server.watch('static/', delay=0.5)
 
-    print(f'🔥 LiveReload server starting on port ${LIVERELOAD_PORT}')
-    server.serve(port=${LIVERELOAD_PORT}, host='0.0.0.0', debug=False)
+        print(f'🔥 LiveReload server starting on port ${LIVERELOAD_PORT}')
+        server.serve(port=${LIVERELOAD_PORT}, host='0.0.0.0', debug=False)
+    except Exception as e:
+        print(f'ERROR: Failed to start LiveReload server: {e}')
+        sys.exit(1)
 
 # Run server
 start_server()
@@ -96,8 +101,14 @@ start_server()
     LIVERELOAD_PID=$!
     echo "🔥 LiveReload server started (PID: $LIVERELOAD_PID) on port $LIVERELOAD_PORT"
 
-    # Give LiveReload server a moment to start
+    # Give LiveReload server a moment to start and check if it's still running
     sleep 2
+
+    # Check if the LiveReload process is still running
+    if ! kill -0 "$LIVERELOAD_PID" 2>/dev/null; then
+        echo "ERROR: LiveReload server failed to start or crashed immediately"
+        exit 1
+    fi
 }
 
 # Function to start FastAPI server with hot reloading
