@@ -22,11 +22,8 @@ RUN mkdir -p /app/data
 # Copy pyproject.toml for dependency installation
 COPY pyproject.toml ./
 
-# === PRODUCTION STAGE ===
-FROM base AS production
-
-# Install only production dependencies
-RUN pip install --no-cache-dir -e .[app]
+# === SHARED APP SETUP STAGE ===
+FROM base AS app-setup
 
 # Copy application code
 COPY . .
@@ -35,6 +32,12 @@ COPY . .
 COPY scripts/runtime/start.sh /app/start.sh
 COPY scripts/runtime/start-dev.sh /app/start-dev.sh
 RUN chmod +x /app/start.sh /app/start-dev.sh
+
+# === PRODUCTION STAGE ===
+FROM app-setup AS production
+
+# Install only production dependencies
+RUN pip install --no-cache-dir -e .[app]
 
 # Create non-root user for security
 RUN adduser --disabled-password --gecos '' appuser && \
@@ -52,18 +55,10 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
 CMD ["/app/start.sh"]
 
 # === DEVELOPMENT STAGE ===
-FROM base AS development
+FROM app-setup AS development
 
 # Install production + development dependencies (includes livereload)
 RUN pip install --no-cache-dir -e .[app,dev]
-
-# Copy application code
-COPY . .
-
-# Copy startup scripts and make them executable
-COPY scripts/runtime/start.sh /app/start.sh
-COPY scripts/runtime/start-dev.sh /app/start-dev.sh
-RUN chmod +x /app/start.sh /app/start-dev.sh
 
 # Create non-root user for security
 RUN adduser --disabled-password --gecos '' appuser && \
