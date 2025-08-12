@@ -19,9 +19,13 @@ RUN apt-get update && apt-get install -y \
 WORKDIR /app
 RUN mkdir -p /app/data
 
-# Copy and install Python dependencies first for better Docker layer caching
-# Install only the app runtime dependencies, not dev dependencies
+# Copy pyproject.toml for dependency installation
 COPY pyproject.toml ./
+
+# === PRODUCTION STAGE ===
+FROM base AS production
+
+# Install only production dependencies
 RUN pip install --no-cache-dir -e .[app]
 
 # Copy application code
@@ -46,3 +50,32 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
 
 # Use startup script that runs migrations before starting FastAPI
 CMD ["/app/start.sh"]
+
+# === DEVELOPMENT STAGE ===
+FROM base AS development
+
+# Install production + development dependencies (includes livereload)
+RUN pip install --no-cache-dir -e .[app,dev]
+
+# Copy application code
+COPY . .
+
+# Copy startup scripts and make them executable
+COPY scripts/runtime/start.sh /app/start.sh
+COPY scripts/runtime/start-dev.sh /app/start-dev.sh
+RUN chmod +x /app/start.sh /app/start-dev.sh
+
+# Create non-root user for security
+RUN adduser --disabled-password --gecos '' appuser && \
+    chown -R appuser:appuser /app
+USER appuser
+
+# Expose port 8000 and LiveReload port
+EXPOSE 8000 35729
+
+# Health check to ensure the application is running
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost:8000/health || exit 1
+
+# Use development startup script
+CMD ["/app/start-dev.sh"]

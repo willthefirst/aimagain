@@ -3,6 +3,7 @@ services:
     build:
       context: .
       dockerfile: deployment/docker/Dockerfile
+      target: development
     container_name: aimagain-dev
     restart: unless-stopped
     ports:
