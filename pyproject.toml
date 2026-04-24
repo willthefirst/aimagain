@@ -3,9 +3,9 @@ requires = ["setuptools>=61.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "chat-app"
+name = "aimagain"
 version = "0.1.0"
-description = "A simple chat application."
+description = "A FastAPI web application skeleton with authentication and layered architecture."
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
@@ -38,7 +38,6 @@ test = [
     "pytest",
     "pytest-asyncio",
     "httpx",
-    "pact-python",
     "pytest-playwright-asyncio"
 ]
 
@@ -52,12 +51,12 @@ lint = [
 
 # Full application with all runtime dependencies
 full = [
-    "chat-app[app,dev,test,lint]",
+    "aimagain[app,dev,test,lint]",
 ]
 
 # All development dependencies (for contributors)
 all = [
-    "chat-app[dev,test,lint]",
+    "aimagain[dev,test,lint]",
 ]
 
 [project.scripts]
