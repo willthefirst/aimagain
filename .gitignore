@@ -87,8 +87,8 @@ dmypy.json
 *.sqlite3
 
 # Application specific
-aimagain.db
-test_aimagain.db
+bedlam-connect.db
+test_bedlam-connect.db
 
 */**/log
 */**/artifacts

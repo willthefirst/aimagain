@@ -46,7 +46,7 @@ export DROPLET_SSH_KEY_PATH="~/.ssh/deploy_key"
 
 #### 🏗️ **what it does**
 
-- Copies all files from `deployment/droplet-files/` to `/opt/aimagain/deployment` on the remote server
+- Copies all files from `deployment/droplet-files/` to `/opt/bedlam-connect/deployment` on the remote server
 - Equivalent to the GitHub Actions `appleboy/scp-action` with `strip_components: 2`
 - Creates target directory if it doesn't exist
 - Validates SSH key permissions and fixes them if needed

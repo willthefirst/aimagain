@@ -3,9 +3,9 @@ requires = ["setuptools>=61.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "aimagain"
+name = "bedlam-connect"
 version = "0.1.0"
-description = "A FastAPI web application skeleton with authentication and layered architecture."
+description = "A FastAPI web application with authentication and layered architecture."
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
@@ -51,12 +51,12 @@ lint = [
 
 # Full application with all runtime dependencies
 full = [
-    "aimagain[app,dev,test,lint]",
+    "bedlam-connect[app,dev,test,lint]",
 ]
 
 # All development dependencies (for contributors)
 all = [
-    "aimagain[dev,test,lint]",
+    "bedlam-connect[dev,test,lint]",
 ]
 
 [project.scripts]

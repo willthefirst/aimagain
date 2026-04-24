@@ -1,7 +1,7 @@
 services:
-  aimagain-test:
+  bedlam-connect-test:
     image: test-image
-    container_name: aimagain-test
+    container_name: bedlam-connect-test
     restart: 'no' # Don't restart in CI
     ports:
       - '8000:8000'

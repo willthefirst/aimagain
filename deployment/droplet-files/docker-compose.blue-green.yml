@@ -1,14 +1,14 @@
 services:
-  aimagain-blue:
-    image: ghcr.io/willthefirst/aimagain:latest
-    container_name: aimagain-blue
+  bedlam-connect-blue:
+    image: ghcr.io/willthefirst/bedlam-connect:latest
+    container_name: bedlam-connect-blue
     restart: unless-stopped
     ports:
       - '8001:8000'
     volumes:
-      - /opt/aimagain/data:/app/data
+      - /opt/bedlam-connect/data:/app/data
     env_file:
-      - /opt/aimagain/config/.env
+      - /opt/bedlam-connect/config/.env
     healthcheck:
       test: ['CMD', 'curl', '-f', 'http://localhost:8000/health']
       interval: 30s
@@ -16,16 +16,16 @@ services:
       retries: 3
       start_period: 40s
 
-  aimagain-green:
-    image: ghcr.io/willthefirst/aimagain:latest
-    container_name: aimagain-green
+  bedlam-connect-green:
+    image: ghcr.io/willthefirst/bedlam-connect:latest
+    container_name: bedlam-connect-green
     restart: unless-stopped
     ports:
       - '8002:8000'
     volumes:
-      - /opt/aimagain/data:/app/data
+      - /opt/bedlam-connect/data:/app/data
     env_file:
-      - /opt/aimagain/config/.env
+      - /opt/bedlam-connect/config/.env
     healthcheck:
       test: ['CMD', 'curl', '-f', 'http://localhost:8000/health']
       interval: 30s

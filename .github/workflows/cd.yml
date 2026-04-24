@@ -79,6 +79,6 @@ jobs:
           username: ${{ secrets.DROPLET_USERNAME }}
           key: ${{ secrets.DROPLET_SSH_KEY }}
           script: |
-            cd /opt/aimagain/deployment
+            cd /opt/bedlam-connect/deployment
             chmod +x deploy.sh cleanup-docker.sh
             ./deploy.sh

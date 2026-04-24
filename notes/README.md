@@ -1,6 +1,6 @@
 # Notes: Development documentation and planning
 
-The `notes/` directory contains **development documentation**, architectural decision records, and planning documents that capture the reasoning behind design choices and future development directions for the Aimagain project.
+The `notes/` directory contains **development documentation**, architectural decision records, and planning documents that capture the reasoning behind design choices and future development directions for the Bedlam Connect project.
 
 ## 🎯 Core philosophy: documented decision-making
 
@@ -325,7 +325,7 @@ Update documentation when:
 ## Database setup
 
 1. Install PostgreSQL 14
-2. Create database: `createdb aimagain`
+2. Create database: `createdb bedlam-connect`
 3. Run migrations: `alembic upgrade head`
 
 <!-- ✅ Correct - architectural decisions in planning -->

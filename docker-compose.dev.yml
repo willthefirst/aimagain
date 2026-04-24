@@ -1,17 +1,17 @@
 services:
-  aimagain-dev:
+  bedlam-connect-dev:
     build:
       context: .
       dockerfile: deployment/docker/Dockerfile
       target: development
-    container_name: aimagain-dev
+    container_name: bedlam-connect-dev
     restart: unless-stopped
     ports:
       - '8000:8000'
       - '35729:35729' # LiveReload server port for development hot reloading
     environment:
       - SECRET=${SECRET}
-      - DATABASE_URL=${DATABASE_URL:-sqlite+aiosqlite:///./data/aimagain.db}
+      - DATABASE_URL=${DATABASE_URL:-sqlite+aiosqlite:///./data/bedlam-connect.db}
       - ACCESS_TOKEN_EXPIRE_MINUTES=${ACCESS_TOKEN_EXPIRE_MINUTES:-60}
       - ALGORITHM=${ALGORITHM:-HS256}
       - ENVIRONMENT=development # Enable template auto-reload

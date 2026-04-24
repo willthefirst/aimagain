@@ -1,6 +1,6 @@
 # Tests: API testing for auth and user functionality
 
-The `tests/` directory contains **API-level tests** for the Aimagain application, verifying authentication workflows and user functionality through FastAPI test client integration tests.
+The `tests/` directory contains **API-level tests** for the Bedlam Connect application, verifying authentication workflows and user functionality through FastAPI test client integration tests.
 
 ## Core philosophy: Focused API testing
 

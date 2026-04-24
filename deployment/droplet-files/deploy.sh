@@ -147,7 +147,7 @@ rollback() {
     fi
 
     # Clean up failed instance
-    cleanup_containers "aimagain-$failed_service"
+    cleanup_containers "bedlam-connect-$failed_service"
 
     error "Rollback completed. System is running on port $old_port"
 }
@@ -185,11 +185,11 @@ log "Current: $CURRENT (port $CURRENT_PORT)"
 log "Deploying: $NEW (port $NEW_PORT)"
 
 # Clean up any existing containers for the new instance
-cleanup_containers "aimagain-$NEW"
+cleanup_containers "bedlam-connect-$NEW"
 
 # Pull latest image
 log "Pulling latest Docker image..."
-if run_cmd docker pull ghcr.io/willthefirst/aimagain:latest; then
+if run_cmd docker pull ghcr.io/willthefirst/bedlam-connect:latest; then
     success "Docker image pulled successfully"
 else
     error "Failed to pull Docker image"
@@ -198,10 +198,10 @@ fi
 
 # Start new instance
 log "Starting new $NEW instance..."
-if run_cmd docker-compose -f docker-compose.blue-green.yml up -d aimagain-$NEW; then
-    success "Started aimagain-$NEW container"
+if run_cmd docker-compose -f docker-compose.blue-green.yml up -d bedlam-connect-$NEW; then
+    success "Started bedlam-connect-$NEW container"
 else
-    error "Failed to start aimagain-$NEW container"
+    error "Failed to start bedlam-connect-$NEW container"
     exit 1
 fi
 
@@ -219,8 +219,8 @@ if check_health $NEW_PORT; then
             # Only stop old instance if there was one
             if [ "$CURRENT" != "none" ]; then
                 log "Stopping old $CURRENT instance..."
-                run_cmd docker-compose -f docker-compose.blue-green.yml stop aimagain-$CURRENT || true
-                run_cmd docker-compose -f docker-compose.blue-green.yml rm -f aimagain-$CURRENT || true
+                run_cmd docker-compose -f docker-compose.blue-green.yml stop bedlam-connect-$CURRENT || true
+                run_cmd docker-compose -f docker-compose.blue-green.yml rm -f bedlam-connect-$CURRENT || true
                 success "Old $CURRENT instance stopped and removed"
             fi
 
@@ -237,11 +237,11 @@ if check_health $NEW_PORT; then
         fi
     else
         error "Failed to update nginx configuration"
-        cleanup_containers "aimagain-$NEW"
+        cleanup_containers "bedlam-connect-$NEW"
         exit 1
     fi
 else
     error "New instance failed health check, aborting deployment"
-    cleanup_containers "aimagain-$NEW"
+    cleanup_containers "bedlam-connect-$NEW"
     exit 1
 fi

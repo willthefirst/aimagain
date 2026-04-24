@@ -1,4 +1,4 @@
-# 📚 Aimagain codebase documentation plan
+# 📚 Bedlam CONNECT codebase documentation plan
 
 ## 🎯 Objective: LLM-optimized documentation at every level
 

@@ -2,7 +2,7 @@
 
 ## 🎯 Overview
 
-This directory contains all files and documentation related to deploying the aimagain application to the DigitalOcean droplet using automated blue-green deployment.
+This directory contains all files and documentation related to deploying the Bedlam Connect application to the DigitalOcean droplet using automated blue-green deployment.
 
 **Key Features:**
 
@@ -16,7 +16,7 @@ This directory contains all files and documentation related to deploying the aim
 ```
 deployment/
 ├── README.md                     # This documentation
-├── droplet-files/               # Files deployed to /opt/aimagain/ on droplet
+├── droplet-files/               # Files deployed to /opt/bedlam-connect/ on droplet
 │   ├── deploy.sh               # Main deployment script (blue-green)
 │   ├── docker-compose.blue-green.yml  # Docker Compose configuration
 │   └── cleanup-docker.sh       # Docker cleanup utility
@@ -43,14 +43,14 @@ The GitHub Actions workflow (`.github/workflows/build-and-push.yml`) includes:
     username: ${{ secrets.DROPLET_USERNAME }}
     key: ${{ secrets.DROPLET_SSH_KEY }}
     source: 'deployment/droplet-files/*'
-    target: '/opt/aimagain/'
+    target: '/opt/bedlam-connect/'
     strip_components: 2
 ```
 
 **Key Points:**
 
 - `strip_components: 2` removes `deployment/droplet-files/` from the path
-- Files end up directly in `/opt/aimagain/` on the droplet
+- Files end up directly in `/opt/bedlam-connect/` on the droplet
 - No more manual SCP required!
 
 ## 🏗️ Blue-Green deployment process
@@ -77,14 +77,14 @@ If GitHub Actions fails, you can deploy manually:
 
 ```bash
 ssh user@your-droplet-ip
-cd /opt/aimagain
+cd /opt/bedlam-connect
 ```
 
 ### 2. update files (if needed)
 
 ```bash
 # Copy files from your local machine
-scp deployment/droplet-files/* user@droplet-ip:/opt/aimagain/
+scp deployment/droplet-files/* user@droplet-ip:/opt/bedlam-connect/
 ```
 
 ### 3. run deployment
@@ -137,15 +137,15 @@ curl -f https://aimagain.art/health
 ssh -i ~/.ssh/your-key user@droplet-ip
 
 # Verify target directory exists
-ls -la /opt/aimagain/
+ls -la /opt/bedlam-connect/
 ```
 
 ### Deployment script fails
 
 ```bash
 # Check logs
-docker logs aimagain-blue  # or aimagain-green
-docker logs aimagain-green
+docker logs bedlam-connect-blue  # or bedlam-connect-green
+docker logs bedlam-connect-green
 
 # Check nginx
 sudo nginx -t
@@ -163,8 +163,8 @@ curl -v http://localhost:8001/health
 curl -v http://localhost:8002/health
 
 # Check application logs
-docker logs aimagain-blue
-docker logs aimagain-green
+docker logs bedlam-connect-blue
+docker logs bedlam-connect-green
 ```
 
 ### Clean up everything
@@ -174,8 +174,8 @@ docker logs aimagain-green
 ./cleanup-docker.sh
 
 # Or manual cleanup
-docker stop $(docker ps -q --filter "name=aimagain")
-docker rm -f $(docker ps -aq --filter "name=aimagain")
+docker stop $(docker ps -q --filter "name=bedlam-connect")
+docker rm -f $(docker ps -aq --filter "name=bedlam-connect")
 docker system prune -f
 ```
 

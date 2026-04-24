@@ -12,7 +12,7 @@ DROPLET_SSH_KEY_PATH="${DROPLET_SSH_KEY_PATH:-}"
 
 # Source and target paths
 SOURCE_DIR="deployment/droplet-files"
-TARGET_DIR="/opt/aimagain/deployment"
+TARGET_DIR="/opt/bedlam-connect/deployment"
 
 # Colors for output
 RED='\033[0;31m'

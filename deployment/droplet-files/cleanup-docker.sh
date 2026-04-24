@@ -37,18 +37,18 @@ show_docker_state() {
 cleanup_docker() {
     log "Starting Docker cleanup..."
 
-    # Stop all aimagain containers
-    if docker ps -q --filter "name=aimagain" | grep -q .; then
-        log "Stopping all aimagain containers..."
-        docker stop $(docker ps -q --filter "name=aimagain") || true
-        success "Stopped aimagain containers"
+    # Stop all bedlam-connect containers
+    if docker ps -q --filter "name=bedlam-connect" | grep -q .; then
+        log "Stopping all bedlam-connect containers..."
+        docker stop $(docker ps -q --filter "name=bedlam-connect") || true
+        success "Stopped bedlam-connect containers"
     fi
 
-    # Remove all aimagain containers
-    if docker ps -aq --filter "name=aimagain" | grep -q .; then
-        log "Removing all aimagain containers..."
-        docker rm -f $(docker ps -aq --filter "name=aimagain") || true
-        success "Removed aimagain containers"
+    # Remove all bedlam-connect containers
+    if docker ps -aq --filter "name=bedlam-connect" | grep -q .; then
+        log "Removing all bedlam-connect containers..."
+        docker rm -f $(docker ps -aq --filter "name=bedlam-connect") || true
+        success "Removed bedlam-connect containers"
     fi
 
     # Remove dangling images

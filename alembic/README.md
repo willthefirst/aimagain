@@ -1,6 +1,6 @@
 # Alembic: Database migration management
 
-The `alembic/` directory contains **database migration scripts** and configuration for managing schema changes in the Aimagain application, providing version control for the database schema through incremental migration files.
+The `alembic/` directory contains **database migration scripts** and configuration for managing schema changes in the Bedlam Connect application, providing version control for the database schema through incremental migration files.
 
 ## 🎯 Core philosophy: Version-controlled database evolution
 

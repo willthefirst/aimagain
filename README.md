@@ -1,10 +1,10 @@
-# Aimagain
+# Bedlam CONNECT
 
 A **FastAPI skeleton/boilerplate** with server-side rendering, providing a clean architectural foundation for building web applications with user authentication, layered architecture, and modern development tooling.
 
 ## Project overview
 
-Aimagain provides a **production-ready project skeleton** with:
+Bedlam Connect provides a **production-ready project skeleton** with:
 
 - **Server-side rendering** with HTMX for progressive enhancement
 - **Clean architecture** with clear separation of concerns (Routes, Logic, Services, Repositories)
@@ -121,8 +121,8 @@ This project follows **LLM-optimized documentation** standards with comprehensiv
 1. **Clone the repository**:
 
 ```bash
-git clone https://github.com/your-org/aimagain.git
-cd aimagain
+git clone https://github.com/your-org/bedlam-connect.git
+cd bedlam-connect
 ```
 
 2. **Install the development CLI**:
@@ -172,7 +172,7 @@ For detailed deployment instructions, see [deployment/README.md](deployment/READ
 
 ## Testing strategy
 
-Aimagain uses API-level tests to verify authentication and user functionality:
+Bedlam Connect uses API-level tests to verify authentication and user functionality:
 
 ### Test structure
 

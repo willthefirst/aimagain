@@ -30,10 +30,10 @@ setup_database() {
     mkdir -p /app/data
 
     # Check if database file exists, if not it will be created by migrations
-    if [ ! -f "/app/data/aimagain.db" ]; then
+    if [ ! -f "/app/data/bedlam-connect.db" ]; then
         echo "Database file does not exist, will be created during migration"
     else
-        echo "Database file found at /app/data/aimagain.db"
+        echo "Database file found at /app/data/bedlam-connect.db"
     fi
 }
 

@@ -69,7 +69,7 @@
     username: ${{ secrets.DROPLET_USERNAME }}
     key: ${{ secrets.DROPLET_SSH_KEY }}
     source: 'deployment/droplet-files/*'
-    target: '/opt/aimagain/'
+    target: '/opt/bedlam-connect/'
     strip_components: 2
 
 - name: Run deployment
@@ -79,7 +79,7 @@
     username: ${{ secrets.DROPLET_USERNAME }}
     key: ${{ secrets.DROPLET_SSH_KEY }}
     script: |
-      cd /opt/aimagain
+      cd /opt/bedlam-connect
       chmod +x deploy.sh cleanup-docker.sh
       ./deploy.sh
 ```
@@ -178,7 +178,7 @@ Once all phases complete, verify the entire system:
 │ └── build-and-push.yml # Updated with SCP step
 ├── deployment/
 │ ├── README.md # New: Deployment documentation
-│ └── droplet-files/ # New: Files that go to /opt/aimagain/
+│ └── droplet-files/ # New: Files that go to /opt/bedlam-connect/
 │ ├── deploy.sh # Moved from root
 │ ├── docker-compose.blue-green.yml # Moved from root
 │ └── cleanup-docker.sh # Moved from root

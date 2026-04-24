@@ -17,14 +17,14 @@ Evolution from manual Docker deployment to zero-downtime continuous deployment o
 
 #### Step 1.1: Create Docker Compose File ✅
 
-Create `/opt/aimagain/docker-compose.yml`:
+Create `/opt/bedlam-connect/docker-compose.yml`:
 
 ```yaml
 version: '3.8'
 services:
-  aimagain:
-    image: ghcr.io/willthefirst/aimagain:latest
-    container_name: aimagain-app
+  bedlam-connect:
+    image: ghcr.io/willthefirst/bedlam-connect:latest
+    container_name: bedlam-connect-app
     restart: unless-stopped
     ports:
       - '8000:8000'
@@ -45,7 +45,7 @@ services:
 
 #### Step 1.2: Create Basic Deployment Script ✅
 
-Create `/opt/aimagain/deploy.sh`:
+Create `/opt/bedlam-connect/deploy.sh`:
 
 ```bash
 #!/bin/bash
@@ -73,7 +73,7 @@ check_health() {
 }
 
 # Automated version of manual process
-docker pull ghcr.io/willthefirst/aimagain:latest
+docker pull ghcr.io/willthefirst/bedlam-connect:latest
 docker-compose down
 docker-compose up -d
 
@@ -136,7 +136,7 @@ name: Build and Deploy
           username: ${{ secrets.DROPLET_USERNAME }}
           key: ${{ secrets.DROPLET_SSH_KEY }}
           script: |
-            cd /opt/aimagain
+            cd /opt/bedlam-connect
             ./deploy.sh
 ```
 
@@ -160,8 +160,8 @@ name: Build and Deploy
 # Nginx already installed and working
 
 # Create configuration
-sudo tee /etc/nginx/sites-available/aimagain << 'EOF'
-upstream aimagain_backend {
+sudo tee /etc/nginx/sites-available/bedlam-connect << 'EOF'
+upstream bedlam_connect_backend {
     server 127.0.0.1:8000;
 }
 
@@ -170,7 +170,7 @@ server {
     server_name your-domain.com;  # Replace with domain/IP
 
     location / {
-        proxy_pass http://aimagain_backend;
+        proxy_pass http://bedlam_connect_backend;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
@@ -186,7 +186,7 @@ server {
 EOF
 
 # Enable the site
-sudo ln -s /etc/nginx/sites-available/aimagain /etc/nginx/sites-enabled/
+sudo ln -s /etc/nginx/sites-available/bedlam-connect /etc/nginx/sites-enabled/
 sudo nginx -t
 sudo systemctl enable nginx
 sudo systemctl start nginx
@@ -197,14 +197,14 @@ sudo systemctl start nginx
 
 #### Step 3.2: Prepare Blue-Green Infrastructure ✅
 
-Create `/opt/aimagain/docker-compose.blue-green.yml`:
+Create `/opt/bedlam-connect/docker-compose.blue-green.yml`:
 
 ```yaml
 version: '3.8'
 services:
-  aimagain-blue:
-    image: ghcr.io/willthefirst/aimagain:latest
-    container_name: aimagain-blue
+  bedlam-connect-blue:
+    image: ghcr.io/willthefirst/bedlam-connect:latest
+    container_name: bedlam-connect-blue
     restart: unless-stopped
     ports:
       - '8001:8000'
@@ -219,9 +219,9 @@ services:
       retries: 3
       start_period: 40s
 
-  aimagain-green:
-    image: ghcr.io/willthefirst/aimagain:latest
-    container_name: aimagain-green
+  bedlam-connect-green:
+    image: ghcr.io/willthefirst/bedlam-connect:latest
+    container_name: bedlam-connect-green
     restart: unless-stopped
     ports:
       - '8002:8000'
@@ -250,7 +250,7 @@ services:
 
 #### Step 4.1: Create Zero-Downtime Deployment Script ✅
 
-Create `/opt/aimagain/deploy-zero-downtime.sh`:
+Create `/opt/bedlam-connect/deploy-zero-downtime.sh`:
 
 ```bash
 #!/bin/bash
@@ -261,8 +261,8 @@ echo "🚀 Starting zero-downtime deployment..."
 # Function to update nginx upstream
 update_nginx_upstream() {
     local port=$1
-    sudo tee /etc/nginx/sites-available/aimagain << EOF
-upstream aimagain_backend {
+    sudo tee /etc/nginx/sites-available/bedlam-connect << EOF
+upstream bedlam_connect_backend {
     server 127.0.0.1:$port;
 }
 
@@ -271,7 +271,7 @@ server {
     server_name your-domain.com;
 
     location / {
-        proxy_pass http://aimagain_backend;
+        proxy_pass http://bedlam_connect_backend;
         proxy_set_header Host \$host;
         proxy_set_header X-Real-IP \$remote_addr;
         proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
@@ -307,7 +307,7 @@ check_health() {
 }
 
 # Determine current and new instances
-if docker ps | grep -q "aimagain-blue.*8001"; then
+if docker ps | grep -q "bedlam-connect-blue.*8001"; then
     CURRENT="blue"
     NEW="green"
     CURRENT_PORT="8001"
@@ -323,10 +323,10 @@ echo "📊 Current: $CURRENT (port $CURRENT_PORT)"
 echo "🎯 Deploying: $NEW (port $NEW_PORT)"
 
 # Pull latest image
-docker pull ghcr.io/willthefirst/aimagain:latest
+docker pull ghcr.io/willthefirst/bedlam-connect:latest
 
 # Start new instance
-docker-compose -f docker-compose.blue-green.yml up -d aimagain-$NEW
+docker-compose -f docker-compose.blue-green.yml up -d bedlam-connect-$NEW
 
 # Wait for new instance to be healthy
 if check_health $NEW_PORT; then
@@ -339,20 +339,20 @@ if check_health $NEW_PORT; then
     # Verify the switch worked
     if check_health $NEW_PORT; then
         echo "🛑 Stopping old instance..."
-        docker-compose -f docker-compose.blue-green.yml stop aimagain-$CURRENT
-        docker-compose -f docker-compose.blue-green.yml rm -f aimagain-$CURRENT
+        docker-compose -f docker-compose.blue-green.yml stop bedlam-connect-$CURRENT
+        docker-compose -f docker-compose.blue-green.yml rm -f bedlam-connect-$CURRENT
         echo "🎉 Zero-downtime deployment completed!"
     else
         echo "🚨 New instance failed after traffic switch, rolling back..."
         update_nginx_upstream $CURRENT_PORT
-        docker-compose -f docker-compose.blue-green.yml stop aimagain-$NEW
-        docker-compose -f docker-compose.blue-green.yml rm -f aimagain-$NEW
+        docker-compose -f docker-compose.blue-green.yml stop bedlam-connect-$NEW
+        docker-compose -f docker-compose.blue-green.yml rm -f bedlam-connect-$NEW
         exit 1
     fi
 else
     echo "🚨 New instance failed health check, aborting..."
-    docker-compose -f docker-compose.blue-green.yml stop aimagain-$NEW
-    docker-compose -f docker-compose.blue-green.yml rm -f aimagain-$NEW
+    docker-compose -f docker-compose.blue-green.yml stop bedlam-connect-$NEW
+    docker-compose -f docker-compose.blue-green.yml rm -f bedlam-connect-$NEW
     exit 1
 fi
 ```
@@ -364,7 +364,7 @@ fi
 docker-compose down
 
 # Start blue instance
-docker-compose -f docker-compose.blue-green.yml up -d aimagain-blue
+docker-compose -f docker-compose.blue-green.yml up -d bedlam-connect-blue
 
 # Update nginx to point to port 8001
 ```
@@ -375,7 +375,7 @@ Change deployment script in workflow:
 
 ```yaml
 script: |
-  cd /opt/aimagain
+  cd /opt/bedlam-connect
   ./deploy-zero-downtime.sh
 ```
 
@@ -405,7 +405,7 @@ script: |
 
 1. Code pushed to `main` branch
 2. GitHub Actions builds Docker image
-3. Image pushed to `ghcr.io/willthefirst/aimagain:latest`
+3. Image pushed to `ghcr.io/willthefirst/bedlam-connect:latest`
 4. SSH to droplet and run zero-downtime script
 5. Script starts new instance, switches traffic, stops old instance
 6. **Zero downtime** - users never see interruption
@@ -424,14 +424,14 @@ script: |
 If anything goes wrong at any phase:
 
 ```bash
-cd /opt/aimagain
+cd /opt/bedlam-connect
 
 # Stop all containers
 docker-compose down
 docker-compose -f docker-compose.blue-green.yml down
 
 # Go back to manual process
-docker run --env-file config/.env -v ./data:/app/data -p 8000:8000 ghcr.io/willthefirst/aimagain:latest
+docker run --env-file config/.env -v ./data:/app/data -p 8000:8000 ghcr.io/willthefirst/bedlam-connect:latest
 ```
 
 ## 📊 **Monitoring during transition**
