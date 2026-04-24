@@ -251,18 +251,18 @@ async def test_get_reset_password_page(test_client: AsyncClient):
 async def test_unauthorized_redirect_for_browser_requests(test_client: AsyncClient):
     """Test that browser requests (HTML accept header) get redirected to login page when unauthorized."""
     response = await test_client.get(
-        "/users/me/invitations",
+        "/users/me/profile",
         headers={"Accept": "text/html"},
         follow_redirects=False,
     )
     assert response.status_code == 302
-    assert response.headers["location"] == "/auth/login?next=/users/me/invitations"
+    assert response.headers["location"] == "/auth/login?next=/users/me/profile"
 
 
 async def test_unauthorized_json_response_for_api_requests(test_client: AsyncClient):
     """Test that API requests (JSON accept header) get JSON error response when unauthorized."""
     response = await test_client.get(
-        "/users/me/conversations", headers={"Accept": "application/json"}
+        "/users/me/profile", headers={"Accept": "application/json"}
     )
     assert response.status_code == 401
     assert response.json() == {"detail": "Unauthorized"}
@@ -270,7 +270,7 @@ async def test_unauthorized_json_response_for_api_requests(test_client: AsyncCli
 
 async def test_unauthorized_default_behavior(test_client: AsyncClient):
     """Test that requests without explicit Accept header get JSON response (API default)."""
-    response = await test_client.get("/users/me/conversations")
+    response = await test_client.get("/users/me/profile")
     assert response.status_code == 401
     assert response.json() == {"detail": "Unauthorized"}
 
@@ -278,7 +278,7 @@ async def test_unauthorized_default_behavior(test_client: AsyncClient):
 async def test_unauthorized_redirect_follows_to_login_page(test_client: AsyncClient):
     """Test that following the redirect leads to the login page."""
     response = await test_client.get(
-        "/users/me/conversations",
+        "/users/me/profile",
         headers={"Accept": "text/html"},
         follow_redirects=True,
     )

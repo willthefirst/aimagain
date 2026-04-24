@@ -65,7 +65,7 @@ async def unauthorized_exception_handler(request: Request, exc: HTTPException):
 
 @app.get("/")
 def read_root():
-    return RedirectResponse(url="/users/me/conversations", status_code=302)
+    return RedirectResponse(url="/users", status_code=302)
 
 
 app.include_router(
