@@ -7,8 +7,7 @@ from fastapi.responses import JSONResponse, RedirectResponse
 
 from src.api.routes import auth_routes
 from src.auth_config import auth_backend, fastapi_users
-from src.db import check_database_health, get_db_session
-from src.middleware.presence import PresenceMiddleware
+from src.db import check_database_health
 from src.schemas.user import UserRead, UserUpdate
 
 from .api.routes import auth_pages, conversations, me, participants, users
@@ -42,10 +41,6 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="AIM again", lifespan=lifespan)
-
-
-# Add presence middleware with session factory
-app.add_middleware(PresenceMiddleware, session_factory=get_db_session)
 
 
 @app.exception_handler(HTTPException)

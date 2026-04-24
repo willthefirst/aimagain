@@ -42,7 +42,7 @@ async def test_list_users_one_user(
 ):
     """Test GET /users returns HTML listing one other user."""
     test_username = f"test-user-{uuid.uuid4()}"
-    other_user = create_test_user(username=test_username, is_online=False)
+    other_user = create_test_user(username=test_username)
 
     # Setup data
     async with db_test_session_manager() as session:
@@ -73,8 +73,8 @@ async def test_list_users_multiple_users(
     logged_in_user: User,  # Need user for exclusion
 ):
     """Test GET /users returns HTML listing multiple other users."""
-    user1 = create_test_user(username=f"test-user-one-{uuid.uuid4()}", is_online=False)
-    user2 = create_test_user(username=f"test-user-two-{uuid.uuid4()}", is_online=True)
+    user1 = create_test_user(username=f"test-user-one-{uuid.uuid4()}")
+    user2 = create_test_user(username=f"test-user-two-{uuid.uuid4()}")
 
     # Setup data
     async with db_test_session_manager() as session:

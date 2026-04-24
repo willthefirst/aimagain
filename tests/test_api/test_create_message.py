@@ -205,18 +205,7 @@ async def test_create_message_empty_content(
         follow_redirects=False,
     )
 
-    # Current behavior: empty messages are allowed and redirect succeeds
-    assert response.status_code == 303
-    assert "Location" in response.headers
-    assert response.headers["Location"] == f"/conversations/{conversation_slug}"
-
-    # Verify empty message was created in database
-    async with db_test_session_manager() as session:
-        msg_stmt = select(Message).filter(Message.conversation_id == conversation.id)
-        db_message = (await session.execute(msg_stmt)).scalars().first()
-        assert db_message is not None
-        assert db_message.content == ""
-        assert db_message.created_by_user_id == me_user.id
+    assert response.status_code == 422
 
 
 async def test_message_sending_integration(
