@@ -12,16 +12,6 @@ class ServiceError(Exception):
         super().__init__(self.message)
 
 
-class ConversationNotFoundError(ServiceError):
-    def __init__(self, message="Conversation not found."):
-        super().__init__(message, status_code=404)
-
-
-class ParticipantNotFoundError(ServiceError):
-    def __init__(self, message="Participant record not found."):
-        super().__init__(message, status_code=404)
-
-
 class UserNotFoundError(ServiceError):
     def __init__(self, message="User not found."):
         super().__init__(message, status_code=404)

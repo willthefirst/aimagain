@@ -12,16 +12,14 @@ async def handle_list_users(
     request: Request,
     user_repo: UserRepository,
     requesting_user: User,
-    participated_with_filter: str | None = None,
 ):
     """
-    Handles the core logic for listing users, applying filters as specified.
+    Handles the core logic for listing users.
 
     Args:
         request: The FastAPI request object.
         user_repo: The user repository dependency.
         requesting_user: The currently authenticated user.
-        participated_with_filter: Optional filter string (e.g., "me").
 
     Returns:
         A dictionary containing the context for the template.
@@ -29,22 +27,11 @@ async def handle_list_users(
     Raises:
         Exception: Propagates exceptions from the repository layer.
     """
-    logger.debug(
-        f"Handler: Listing users for user {requesting_user.id}. Filter: {participated_with_filter}"
-    )
-
-    filter_user_for_participation = None
-    if participated_with_filter == "me":
-        filter_user_for_participation = requesting_user
-    elif participated_with_filter:
-        logger.warning(
-            f"Invalid 'participated_with' filter value received: {participated_with_filter}"
-        )
+    logger.debug(f"Handler: Listing users for user {requesting_user.id}.")
 
     try:
         users_list = await user_repo.list_users(
             exclude_user=requesting_user,
-            participated_with_user=filter_user_for_participation,
         )
     except Exception as e:
         logger.error(

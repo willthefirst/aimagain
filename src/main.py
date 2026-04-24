@@ -10,7 +10,7 @@ from src.auth_config import auth_backend, fastapi_users
 from src.db import check_database_health
 from src.schemas.user import UserRead, UserUpdate
 
-from .api.routes import auth_pages, conversations, me, participants, users
+from .api.routes import auth_pages, me, users
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -95,9 +95,7 @@ app.include_router(
 )
 app.include_router(auth_pages.auth_pages_api_router)
 app.include_router(users.users_api_router, tags=["users"])
-app.include_router(conversations.conversations_router_instance, tags=["conversations"])
 app.include_router(me.me_router_instance, tags=["me"])
-app.include_router(participants.participants_router_instance, tags=["participants"])
 
 
 @app.get("/health")

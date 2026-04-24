@@ -7,10 +7,8 @@ from fastapi_users.router.common import ErrorCode
 from src.services.exceptions import (
     BusinessRuleError,
     ConflictError,
-    ConversationNotFoundError,
     DatabaseError,
     NotAuthorizedError,
-    ParticipantNotFoundError,
     ServiceError,
     UserNotFoundError,
 )
@@ -64,11 +62,7 @@ def handle_service_error(e: ServiceError):
         f"Handling service error: {e.__class__.__name__} - {getattr(e, 'message', str(e))}"
     )
 
-    if (
-        isinstance(e, ConversationNotFoundError)
-        or isinstance(e, ParticipantNotFoundError)
-        or isinstance(e, UserNotFoundError)
-    ):
+    if isinstance(e, UserNotFoundError):
         raise NotFoundError(detail=getattr(e, "message", str(e)))
     elif isinstance(e, fastapi_users_exceptions.UserAlreadyExists):
         raise APIException(

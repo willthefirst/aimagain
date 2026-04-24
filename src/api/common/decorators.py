@@ -8,10 +8,8 @@ from src.api.common.exceptions import handle_service_error
 from src.services.exceptions import (
     BusinessRuleError,
     ConflictError,
-    ConversationNotFoundError,
     DatabaseError,
     NotAuthorizedError,
-    ParticipantNotFoundError,
     ServiceError,
     UserNotFoundError,
 )
@@ -64,10 +62,8 @@ def handle_route_errors(func):
         except (
             BusinessRuleError,
             ConflictError,
-            ConversationNotFoundError,
             DatabaseError,
             NotAuthorizedError,
-            ParticipantNotFoundError,
             UserNotFoundError,
         ) as e:
             logger.error(f"Service error in {func.__name__} route: {e}", exc_info=False)
