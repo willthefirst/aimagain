@@ -57,32 +57,32 @@ Aimagain demonstrates **modern web application architecture** with:
 ## 🔧 Development workflow
 
 1. **Install CLI**: `pip install -e .`
-2. **Setup environment**: `aim setup`
-3. **Start development**: `aim dev up`
-4. **Run tests**: `aim test`
+2. **Setup environment**: `dev setup`
+3. **Start development**: `dev dev up`
+4. **Run tests**: `dev test`
 
 ### 📋 Quick commands
 
 ```bash
 # Development
-aim dev up              # Start development server with hot reload
-aim dev down            # Stop development environment
-aim dev logs            # View development logs
+dev dev up              # Start development server with hot reload
+dev dev down            # Stop development environment
+dev dev logs            # View development logs
 
 # Testing
-aim test                # Run all tests
-aim test unit           # Run unit tests only
-aim test integration    # Run integration tests only
-aim test contract       # Run contract tests only
+dev test                # Run all tests
+dev test unit           # Run unit tests only
+dev test integration    # Run integration tests only
+dev test contract       # Run contract tests only
 
 # Database
-aim db migrate          # Run database migrations
-aim db reset            # Reset database to clean state
-aim db seed             # Add sample data for development
+dev db migrate          # Run database migrations
+dev db reset            # Reset database to clean state
+dev db seed             # Add sample data for development
 
 # Production
-aim deploy              # Deploy to production
-aim status              # Check deployment status
+dev deploy              # Deploy to production
+dev status              # Check deployment status
 ```
 
 ## 📚 Documentation architecture
@@ -142,21 +142,21 @@ pip install -e .
 3. **Setup your environment**:
 
 ```bash
-aim setup
+dev setup
 # This creates .env file and sets up local database
 ```
 
 4. **Start development server**:
 
 ```bash
-aim dev up
+dev dev up
 # Starts server with hot reload at http://localhost:8000
 ```
 
 5. **Run the test suite**:
 
 ```bash
-aim test
+dev test
 # Ensures everything is working correctly
 ```
 
@@ -165,14 +165,14 @@ aim test
 1. **Prepare for deployment**:
 
 ```bash
-aim deploy prepare
+dev deploy prepare
 # Validates configuration and builds production assets
 ```
 
 2. **Deploy to production**:
 
 ```bash
-aim deploy
+dev deploy
 # Deploys using configured deployment method
 ```
 
@@ -192,19 +192,19 @@ Aimagain uses a **comprehensive testing approach** with multiple layers:
 
 ```bash
 # All tests
-aim test
+dev test
 
 # Specific test categories
-aim test unit
-aim test integration
-aim test contract
+dev test unit
+dev test integration
+dev test contract
 
 # Specific test files
-aim test tests/test_api/test_conversations.py
-aim test tests/test_contract/tests/consumer/test_conversation_form.py
+dev test tests/test_api/test_conversations.py
+dev test tests/test_contract/tests/consumer/test_conversation_form.py
 
 # With coverage
-aim test --coverage
+dev test --coverage
 ```
 
 For detailed testing documentation, see [tests/README.md](tests/README.md).
@@ -283,7 +283,7 @@ For detailed patterns and examples, see the module-specific documentation.
 2. **Follow the architecture** - Respect the established patterns and boundaries
 3. **Write tests** - All changes should include appropriate test coverage
 4. **Update documentation** - Keep READMEs current with your changes
-5. **Use the CLI tools** - Leverage `aim` commands for development workflow
+5. **Use the CLI tools** - Leverage `dev` commands for development workflow
 
 ### Code style
 

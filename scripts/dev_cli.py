@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Development CLI for the aimagain app.
+Development CLI.
 
 This CLI provides convenient commands for common development tasks.
 """
@@ -245,14 +245,14 @@ class SetupCommands:
             print(f"✅ Environment file found: {env_file}")
 
         print("\n🎉 Setup complete! You can now run:")
-        print("   aim dev-up        # Start development environment")
-        print("   aim dev-logs -f   # Follow logs")
-        print("   aim test          # Run tests")
+        print("   dev dev-up        # Start development environment")
+        print("   dev dev-logs -f   # Follow logs")
+        print("   dev test          # Run tests")
 
         return 0
 
 
-class AimCLI:
+class DevCLI:
     """Main CLI application."""
 
     def __init__(self):
@@ -265,7 +265,7 @@ class AimCLI:
     def create_parser(self) -> argparse.ArgumentParser:
         """Create the argument parser with all commands."""
         parser = argparse.ArgumentParser(
-            description="Development CLI for the aimagain app",
+            description="Development CLI",
             formatter_class=argparse.RawDescriptionHelpFormatter,
             epilog="""
 Examples:
@@ -375,7 +375,7 @@ Examples:
 
 def main() -> int:
     """Main entry point."""
-    cli = AimCLI()
+    cli = DevCLI()
     return cli.run()
 
 

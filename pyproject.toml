@@ -61,7 +61,7 @@ all = [
 ]
 
 [project.scripts]
-aim = "scripts.dev_cli:main"
+dev = "scripts.dev_cli:main"
 
 # Tool configurations
 [tool.black]
