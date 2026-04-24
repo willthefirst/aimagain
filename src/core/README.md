@@ -1,12 +1,12 @@
 # Core: Application configuration and foundation utilities
 
-The `core/` directory contains **fundamental configuration** and utility modules that provide the foundation for the entire Aimagain application, including environment-based settings, template configuration, and shared utilities used across all layers.
+The `core/` directory contains **fundamental configuration** and utility modules that provide the foundation for the entire application, including environment-based settings, template configuration, and shared utilities used across all layers.
 
-## 🎯 Core philosophy: Centralized configuration with environment awareness
+## Core philosophy: Centralized configuration with environment awareness
 
 Core modules provide **single source of truth** for application configuration, ensuring consistent behavior across development, testing, and production environments while providing developer-friendly error messages and validation.
 
-### What we do ✅
+### What we do
 
 - **Environment configuration**: Centralized settings management with validation
 - **Template system setup**: Global template configuration and context
@@ -21,7 +21,6 @@ class Settings(BaseSettings):
     SECRET: str
     DATABASE_URL: str
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
-    ONLINE_TIMEOUT_MINUTES: int = 10
 
     model_config = ConfigDict(env_file=".env", env_file_encoding="utf-8")
 
@@ -35,7 +34,7 @@ class Settings(BaseSettings):
             raise
 ```
 
-### What we don't do ❌
+### What we don't do
 
 - **Business logic**: Business rules belong in services, not configuration
 - **Data models**: Data structures belong in models, not core utilities
@@ -45,37 +44,37 @@ class Settings(BaseSettings):
 **Example**: Don't put business logic in configuration:
 
 ```python
-# ❌ Wrong - business logic in core config
+# Bad - business logic in core config
 class Settings(BaseSettings):
-    MAX_CONVERSATIONS_PER_USER: int = 10
+    MAX_ITEMS_PER_USER: int = 10
 
-    def can_user_create_conversation(self, user):
-        return user.conversation_count < self.MAX_CONVERSATIONS_PER_USER
+    def can_user_create_item(self, user):
+        return user.item_count < self.MAX_ITEMS_PER_USER
 
-# ✅ Correct - configuration values only in core
+# Good - configuration values only in core
 class Settings(BaseSettings):
-    MAX_CONVERSATIONS_PER_USER: int = 10
+    MAX_ITEMS_PER_USER: int = 10
 
 # Business logic belongs in services:
-class ConversationService:
-    def can_create_conversation(self, user: User) -> bool:
-        return user.conversation_count < settings.MAX_CONVERSATIONS_PER_USER
+class [Entity]Service:
+    def can_create_item(self, user: User) -> bool:
+        return user.item_count < settings.MAX_ITEMS_PER_USER
 ```
 
-## 🏗️ Architecture: Foundation layer for entire application
+## Architecture: Foundation layer for entire application
 
-**Core → Services → API Routes → HTTP Responses**
+**Core -> Services -> API Routes -> HTTP Responses**
 
 Core modules are imported and used throughout the application stack.
 
-## 📋 Core module responsibility matrix
+## Core module responsibility matrix
 
 | Module            | Purpose                             | Key Functionality                                 |
 | ----------------- | ----------------------------------- | ------------------------------------------------- |
 | **config.py**     | Application settings and validation | Environment variables, validation, error handling |
 | **templating.py** | Template system configuration       | Jinja2 setup, global context, auto-reload         |
 
-## 📁 Directory structure
+## Directory structure
 
 ```
 core/
@@ -84,7 +83,7 @@ core/
 └── __init__.py     # Package exports
 ```
 
-## 🔧 Implementation patterns
+## Implementation patterns
 
 ### Environment-based configuration pattern
 
@@ -101,7 +100,6 @@ class Settings(BaseSettings):
 
     # Optional settings with defaults
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
-    ONLINE_TIMEOUT_MINUTES: int = 10
     ENVIRONMENT: str = "development"
 
     # Pydantic configuration
@@ -206,16 +204,13 @@ from src.core.config import settings
 
 # Use configuration values
 async def some_service_function():
-    # Access configuration through the global settings object
-    if user.last_active_at < datetime.now() - timedelta(
-        minutes=settings.ONLINE_TIMEOUT_MINUTES
-    ):
-        user.is_online = False
+    token_expiry = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+    # ... use token_expiry
 
 # For testing, override settings
 def test_with_custom_config():
     with patch('src.core.config.settings') as mock_settings:
-        mock_settings.ONLINE_TIMEOUT_MINUTES = 5
+        mock_settings.ACCESS_TOKEN_EXPIRE_MINUTES = 5
         # Test with custom timeout value
 ```
 
@@ -254,7 +249,7 @@ def get_template_context():
     return base_context
 ```
 
-## 🚨 Common configuration issues and solutions
+## Common configuration issues and solutions
 
 ### Issue: Configuration scattered across modules
 
@@ -262,17 +257,17 @@ def get_template_context():
 **Solution**: Centralize all configuration in core/config.py
 
 ```python
-# ❌ Wrong - settings scattered across modules
-# In services/conversation_service.py
-MAX_CONVERSATIONS = 10
+# Bad - settings scattered across modules
+# In services/some_service.py
+MAX_ITEMS = 10
 
 # In api/routes/auth.py
 TOKEN_EXPIRE_MINUTES = 60
 
-# ✅ Correct - centralized configuration
+# Good - centralized configuration
 # In core/config.py
 class Settings(BaseSettings):
-    MAX_CONVERSATIONS_PER_USER: int = 10
+    MAX_ITEMS_PER_USER: int = 10
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
 
 # Use throughout application
@@ -285,11 +280,11 @@ from src.core.config import settings
 **Solution**: Validate configuration at startup with helpful messages
 
 ```python
-# ❌ Wrong - no validation, fails at runtime
+# Bad - no validation, fails at runtime
 DATABASE_URL = os.getenv("DATABASE_URL")  # Could be None
 engine = create_engine(DATABASE_URL)     # Fails with cryptic error
 
-# ✅ Correct - validation with helpful error
+# Good - validation with helpful error
 class Settings(BaseSettings):
     DATABASE_URL: str  # Required, will validate at startup
 
@@ -303,52 +298,24 @@ class Settings(BaseSettings):
             )
 ```
 
-### Issue: Configuration not testable
-
-**Problem**: Hard-coded values make testing difficult
-**Solution**: Use dependency injection for testable configuration
-
-```python
-# ❌ Wrong - hard to test
-def check_user_online():
-    timeout = 10  # Hard-coded value
-    return user.last_active_at > datetime.now() - timedelta(minutes=timeout)
-
-# ✅ Correct - configurable and testable
-def check_user_online(timeout_minutes: int = None):
-    timeout = timeout_minutes or settings.ONLINE_TIMEOUT_MINUTES
-    return user.last_active_at > datetime.now() - timedelta(minutes=timeout)
-
-# Easy to test with different values
-def test_user_online_status():
-    assert check_user_online(timeout_minutes=5) == True
-```
-
 ### Issue: Template configuration inconsistency
 
 **Problem**: Template features work differently in development vs production
 **Solution**: Environment-aware template configuration
 
 ```python
-# ❌ Wrong - inconsistent template behavior
+# Bad - inconsistent template behavior
 templates = Jinja2Templates(directory="src/templates", auto_reload=True)  # Always auto-reload
 
-# ✅ Correct - environment-aware template setup
+# Good - environment-aware template setup
 auto_reload = settings.ENVIRONMENT == "development"
 templates = Jinja2Templates(
     directory="src/templates",
     auto_reload=auto_reload
 )
-
-# Consistent global context
-def get_template_context():
-    return {
-        "is_development": settings.ENVIRONMENT == "development",
-        "livereload_port": settings.LIVERELOAD_PORT if settings.ENVIRONMENT == "development" else None,
-    }
 ```
 
-## 🔧 Usage patterns across the application
+## Usage patterns across the application
 
 ### In services
 
@@ -356,11 +323,8 @@ def get_template_context():
 from src.core.config import settings
 
 class UserService:
-    def is_user_online(self, user: User) -> bool:
-        cutoff = datetime.now() - timedelta(
-            minutes=settings.ONLINE_TIMEOUT_MINUTES
-        )
-        return user.last_active_at > cutoff
+    def get_token_expiry(self) -> timedelta:
+        return timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
 ```
 
 ### In routes
@@ -374,7 +338,6 @@ async def login_page(request: Request):
     context = {
         "request": request,
         **get_template_context(),
-        "token_expire_minutes": settings.ACCESS_TOKEN_EXPIRE_MINUTES,
     }
     return templates.TemplateResponse("auth/login.html", context)
 ```
@@ -386,15 +349,14 @@ import pytest
 from unittest.mock import patch
 from src.core.config import settings
 
-def test_with_custom_timeout():
-    with patch.object(settings, 'ONLINE_TIMEOUT_MINUTES', 5):
+def test_with_custom_config():
+    with patch.object(settings, 'ACCESS_TOKEN_EXPIRE_MINUTES', 5):
         # Test with custom timeout value
-        assert service.check_timeout() == expected_result
+        assert service.get_token_expiry() == timedelta(minutes=5)
 ```
 
-## 📚 Related documentation
+## Related documentation
 
-- [../README.md](../README.md) - Application architecture that uses these core modules
-- [../services/README.md](../services/README.md) - Services that consume configuration
-- [../templates/README.md](../templates/README.md) - Template system configured by core/templating.py
-- [../../deployment/README.md](../../deployment/README.md) - Environment setup for configuration
+- [Main Architecture](../README.md) - Application architecture that uses these core modules
+- [Services Layer](../services/README.md) - Services that consume configuration
+- [Templates Layer](../templates/README.md) - Template system configured by core/templating.py

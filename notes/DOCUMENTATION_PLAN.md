@@ -2,7 +2,7 @@
 
 ## 🎯 Objective: LLM-optimized documentation at every level
 
-Apply the established **"LLM-Optimized Documentation"** standards from `tests/test_contract/README.md` systematically across the entire codebase to make it interpretable by both developers and LLM agents.
+Apply the established **"LLM-Optimized Documentation"** standards systematically across the entire codebase to make it interpretable by both developers and LLM agents.
 
 ## 📋 Documentation standards checklist
 
@@ -45,7 +45,7 @@ Each README must include:
 
 ## 📐 Template structure for each readme
 
-Based on the excellent `tests/test_contract/README.md` pattern:
+Based on the established documentation pattern:
 
 ```markdown
 # [Module name]: [brief description]

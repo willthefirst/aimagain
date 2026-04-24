@@ -8,13 +8,13 @@ alwaysApply: false
 
 The `api/` directory contains all HTTP-related code, organized around **domain-driven routing** with consistent patterns for error handling, logging, and response formatting.
 
-## 🎯 Core philosophy: Thin routes with standardized patterns
+## Core philosophy: Thin routes with standardized patterns
 
 API routes are **thin wrappers** that delegate business logic to services while providing consistent HTTP concerns like validation, error handling, and response formatting.
 
-### What we do ✅
+### What we do
 
-- **Domain-organized routes**: Routes grouped by business domain (conversations, users, auth)
+- **Domain-organized routes**: Routes grouped by business domain (users, auth)
 - **Standardized router patterns**: BaseRouter provides consistent decorators and error handling
 - **Delegated business logic**: Routes call processing logic, not implement it
 - **Consistent response formats**: APIResponse class standardizes JSON and HTML responses
@@ -23,23 +23,24 @@ API routes are **thin wrappers** that delegate business logic to services while 
 **Example**: Clean route that delegates to processing logic:
 
 ```python
-@router.post("/conversations")
-async def create_conversation(
-    invitee_username: str = Form(...),
-    initial_message: str = Form(...),
+@router.get("/users")
+async def list_users(
+    request: Request,
     user: User = Depends(current_active_user),
-    conv_service: ConversationService = Depends(get_conversation_service),
+    user_repo: UserRepository = Depends(get_user_repository),
 ):
-    conversation = await handle_create_conversation(
-        invitee_username=invitee_username,
-        initial_message=initial_message,
-        creator_user=user,
-        conv_service=conv_service,
+    result = await handle_list_users(
+        user_repo=user_repo,
+        requesting_user=user,
     )
-    return RedirectResponse(url=f"/conversations/{conversation.slug}")
+    return APIResponse.html_response(
+        template_name="users/list.html",
+        context=result,
+        request=request,
+    )
 ```
 
-### What we don't do ❌
+### What we don't do
 
 - **Business logic in routes**: Complex validation and processing stays in services/logic layers
 - **Direct database access**: Routes never touch repositories or sessions directly
@@ -49,53 +50,49 @@ async def create_conversation(
 **Example**: Don't implement business logic in routes:
 
 ```python
-# ❌ Wrong - business logic in route
-@router.post("/conversations")
-async def create_conversation(data: dict, session: AsyncSession = Depends()):
-    # Complex validation here
-    if not data.get("title"):
-        raise HTTPException(400, "Title required")
-    # Database operations here
-    conv = Conversation(**data)
-    session.add(conv)
+# Bad - business logic in route
+@router.post("/[entities]")
+async def create_entity(data: dict, session: AsyncSession = Depends()):
+    if not data.get("name"):
+        raise HTTPException(400, "Name required")
+    entity = [Entity](**data)
+    session.add(entity)
     await session.commit()
-    return conv
+    return entity
 
-# ✅ Correct - delegate to processing layer
-@router.post("/conversations")
-async def create_conversation(
-    data: ConversationCreate,
-    conv_service: ConversationService = Depends()
+# Good - delegate to processing layer
+@router.post("/[entities]")
+async def create_entity(
+    data: [Entity]Create,
+    service: [Entity]Service = Depends()
 ):
-    return await handle_create_conversation(data, conv_service)
+    return await handle_create_entity(data, service)
 ```
 
-## 🏗️ architecture: Domain-driven routing
+## Architecture: Domain-driven routing
 
-**HTTP Request → Route → Processing Logic → Service → Response**
+**HTTP Request -> Route -> Processing Logic -> Service -> Response**
 
 Routes are organized by domain and use consistent patterns for common concerns.
 
-## 📋 API organization matrix
+## API organization matrix
 
 | Component      | Purpose                         | Example Files              | Dependencies               |
 | -------------- | ------------------------------- | -------------------------- | -------------------------- |
-| **Routes**     | HTTP endpoints by domain        | `routes/conversations.py`  | Processing logic, Services |
+| **Routes**     | HTTP endpoints by domain        | `routes/users.py`          | Processing logic, Services |
 | **Common**     | Shared utilities and patterns   | `common/base_router.py`    | FastAPI, Decorators        |
 | **Processing** | Request/response transformation | `../logic/*_processing.py` | Services, Schemas          |
 | **Responses**  | Standardized response formats   | `common/responses.py`      | Templates, JSON            |
 
-## 📁 Directory structure
+## Directory structure
 
 **Core API files:**
 
 - `routes/` - Domain-organized HTTP endpoints
-  - `conversations.py` - Conversation management endpoints
   - `users.py` - User-related endpoints
+  - `me.py` - Current user profile endpoints
   - `auth_routes.py` - Authentication API endpoints
   - `auth_pages.py` - Authentication web pages
-  - `participants.py` - Participant management
-  - `me.py` - Current user endpoints
 
 **Common utilities:**
 
@@ -105,7 +102,7 @@ Routes are organized by domain and use consistent patterns for common concerns.
   - `exceptions.py` - Exception to HTTP status mapping
   - `responses.py` - Standardized response formats
 
-## 🔧 Implementation patterns
+## Implementation patterns
 
 ### Creating a new route file
 
@@ -128,14 +125,14 @@ router = BaseRouter(router=[domain]_api_router, default_tags=["[domain]"])
 async def list_[domain](
     service: [Domain]Service = Depends(get_[domain]_service)
 ):
-    return await handle_list_[domain](mdc:service)
+    return await handle_list_[domain](service)
 
 @router.post("/[domain]")
 async def create_[domain](
     data: [Domain]Create,
     service: [Domain]Service = Depends(get_[domain]_service)
 ):
-    return await handle_create_[domain](mdc:data, service)
+    return await handle_create_[domain](data, service)
 ```
 
 3. **Register in main.py**:
@@ -199,18 +196,18 @@ Errors are handled automatically by decorators:
 
 ```python
 # Service exceptions are automatically caught and converted to HTTP responses
-@router.post("/conversations")
-async def create_conversation(
-    data: ConversationCreate,
-    service: ConversationService = Depends()
+@router.post("/[entities]")
+async def create_entity(
+    data: [Entity]Create,
+    service: [Entity]Service = Depends()
 ):
-    # If service raises ConversationNotFoundError -> 404
+    # If service raises NotFoundError -> 404
     # If service raises NotAuthorizedError -> 403
     # If service raises BusinessRuleError -> 400
-    return await service.create_conversation(data)
+    return await service.create_entity(data)
 ```
 
-## 🚨 Common issues and solutions
+## Common issues and solutions
 
 ### Issue: Business logic creeping into routes
 
@@ -218,23 +215,22 @@ async def create_conversation(
 **Solution**: Keep routes thin - delegate to processing logic in `../logic/` directory
 
 ```python
-# ❌ Wrong - complex logic in route
-@router.post("/conversations")
-async def create_conversation(title: str, user: User = Depends()):
-    if len(title) < 3:
-        raise HTTPException(400, "Title too short")
-    if await conversation_exists(title):
-        raise HTTPException(409, "Conversation exists")
-    # ... more logic
+# Bad - complex logic in route
+@router.post("/[entities]")
+async def create_entity(name: str, user: User = Depends()):
+    if len(name) < 3:
+        raise HTTPException(400, "Name too short")
+    if await entity_exists(name):
+        raise HTTPException(409, "Entity exists")
 
-# ✅ Correct - delegate to processing logic
-@router.post("/conversations")
-async def create_conversation(
-    data: ConversationCreate,
+# Good - delegate to processing logic
+@router.post("/[entities]")
+async def create_entity(
+    data: [Entity]Create,
     user: User = Depends(),
-    service: ConversationService = Depends()
+    service: [Entity]Service = Depends()
 ):
-    return await handle_create_conversation(data, user, service)
+    return await handle_create_entity(data, user, service)
 ```
 
 ### Issue: Inconsistent error handling
@@ -243,7 +239,7 @@ async def create_conversation(
 **Solution**: Always use BaseRouter which applies standard error decorators
 
 ```python
-# ❌ Wrong - manual error handling
+# Bad - manual error handling
 @APIRouter().post("/endpoint")
 async def endpoint():
     try:
@@ -252,7 +248,7 @@ async def endpoint():
     except SomeError as e:
         raise HTTPException(400, str(e))
 
-# ✅ Correct - automatic error handling via BaseRouter
+# Good - automatic error handling via BaseRouter
 @router.post("/endpoint")  # router is BaseRouter instance
 async def endpoint(service: Service = Depends()):
     return await service.do_something()  # Errors automatically handled
@@ -264,7 +260,7 @@ async def endpoint(service: Service = Depends()):
 **Solution**: Use APIResponse class for consistent formatting
 
 ```python
-# ❌ Wrong - inconsistent response formats
+# Bad - inconsistent response formats
 @router.get("/data")
 async def get_data():
     return {"result": data}  # Raw dict
@@ -273,7 +269,7 @@ async def get_data():
 async def get_other():
     return JSONResponse({"status": "ok", "data": data})  # Different format
 
-# ✅ Correct - consistent response format
+# Good - consistent response format
 @router.get("/data")
 async def get_data():
     return APIResponse.success(data, "Data retrieved")
@@ -283,9 +279,9 @@ async def get_other():
     return APIResponse.success(data, "Other data retrieved")
 ```
 
-## 📚 Related documentation
+## Related documentation
 
-- [Services Layer Documentation](services/README.md) - Business logic called by routes
+- [Services Layer Documentation](../services/README.md) - Business logic called by routes
 - [Processing Logic Documentation](../logic/README.md) - Request/response transformation
 - [Schemas Documentation](../schemas/README.md) - Request/response validation
 - [Main Architecture](../README.md) - How API fits in overall architecture

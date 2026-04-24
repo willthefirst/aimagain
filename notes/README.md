@@ -57,7 +57,7 @@ Clear statement of what we're trying to achieve and why.
 ## Database schema
 
 ```sql
-CREATE TABLE conversations (
+CREATE TABLE users (
     id UUID PRIMARY KEY,
     ...
 );
@@ -68,13 +68,13 @@ CREATE TABLE conversations (
 
 ## Database design decisions
 
-We chose UUID primary keys for conversations because:
+We chose UUID primary keys because:
 
 - Enables distributed systems compatibility
 - Prevents enumeration attacks
 - Allows offline ID generation
 
-See `/src/models/conversation.py` for implementation.
+See `/src/models/` for implementation.
 
 ```
 
@@ -91,8 +91,6 @@ Notes bridge the gap between initial planning and final implementation.
 | **DOCUMENTATION_PLAN.md**            | Documentation strategy and standards | Developers, future maintainers |
 | **deployment_reorganization_plan.md** | Infrastructure and deployment strategy| DevOps, developers          |
 | **continuous_deployment_plan.md**     | CI/CD implementation roadmap         | DevOps, project leads       |
-| **echobot_plan.md**                   | AI integration feature planning      | Developers, product team    |
-| **how_to_participate_in_conversations.md** | User flow and feature documentation | Developers, UX team     |
 
 ## 📁 Directory structure
 
@@ -102,8 +100,6 @@ notes/
 ├── DOCUMENTATION_PLAN.md # Meta: Documentation strategy for entire project
 ├── deployment_reorganization_plan.md # Infrastructure: Deployment architecture decisions
 ├── continuous_deployment_plan.md # DevOps: CI/CD implementation roadmap
-├── echobot_plan.md # Feature: AI integration planning
-├── how_to_participate_in_conversations.md # UX: User interaction flow documentation
 └── TODO.md # Development: Task tracking and priorities
 
 ````

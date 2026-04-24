@@ -1,50 +1,28 @@
 # Models layer: Database schema and domain entities
 
-The `models/` directory contains **SQLAlchemy data models** that define the database schema, relationships, and constraints for the Aimagain chat application, implementing a **relational domain model** with clear entity boundaries and relationships.
+The `models/` directory contains **SQLAlchemy data models** that define the database schema and constraints for the application, implementing a **relational domain model** with clear entity boundaries.
 
-## �� Core philosophy: Domain-driven data modeling
+## Core philosophy: Domain-driven data modeling
 
-Models represent **business entities** with clear relationships, enforcing data integrity through database constraints while supporting the application's conversation-centric domain.
+Models represent **business entities** with clear relationships, enforcing data integrity through database constraints.
 
-### What we do ✅
+### What we do
 
-- **Domain entity modeling**: Each model represents a clear business concept (User, Conversation, Message, Participant)
-- **Relationship management**: Explicit foreign keys and SQLAlchemy relationships for data integrity
+- **Domain entity modeling**: Each model represents a clear business concept (currently just User)
 - **Audit trail support**: Automatic timestamps (created_at, updated_at) and soft deletion (deleted_at)
 - **UUID primary keys**: Secure, non-guessable identifiers for all entities
 - **Database constraint enforcement**: Unique constraints and foreign key relationships
 
-**Example**: Complete model with relationships and constraints:
+**Example**: A model with constraints:
 
 ```python
-class Participant(BaseModel):
-    __tablename__ = "participants"
+class User(BaseModel):
+    __tablename__ = "users"
 
-    # Foreign key relationships
-    user_id = Column(Uuid(as_uuid=True), ForeignKey("users.id"), nullable=False)
-    conversation_id = Column(Uuid(as_uuid=True), ForeignKey("conversations.id"), nullable=False)
-
-    # Enum for controlled status values
-    status = Column(SQLAlchemyEnum(ParticipantStatus), nullable=False)
-
-    # Optional foreign keys for business logic
-    invited_by_user_id = Column(Uuid(as_uuid=True), ForeignKey("users.id"), nullable=True)
-    initial_message_id = Column(Uuid(as_uuid=True), ForeignKey("messages.id"), nullable=True)
-
-    # Business-specific timestamps
-    joined_at = Column(DateTime(timezone=True), nullable=True)
-
-    # SQLAlchemy relationships
-    user = relationship("User", back_populates="participations", foreign_keys=[user_id])
-    conversation = relationship("Conversation", back_populates="participants", foreign_keys=[conversation_id])
-
-    # Database constraint
-    __table_args__ = (
-        UniqueConstraint("user_id", "conversation_id", name="uq_participant_user_conversation"),
-    )
+    username = Column(Text, unique=True, nullable=False)
 ```
 
-### What we don't do ❌
+### What we don't do
 
 - **Business logic in models**: Models only contain data structure and relationships, no business rules
 - **Computed properties with side effects**: Properties should be simple data access, not complex calculations
@@ -54,60 +32,41 @@ class Participant(BaseModel):
 **Example**: Keep models focused on data structure:
 
 ```python
-# ❌ Wrong - business logic in model
-class Conversation(BaseModel):
-    def can_user_join(self, user: User) -> bool:  # Business logic
-        if not user.is_online:
-            return False
-        # ... more business logic
+# Bad - business logic in model
+class User(BaseModel):
+    def can_perform_action(self, action: str) -> bool:  # Business logic
+        # ... complex business logic
 
-    def send_message(self, content: str, user: User):  # Service operation
-        # ... complex business operation
-
-# ✅ Correct - data structure only
-class Conversation(BaseModel):
-    __tablename__ = "conversations"
-
-    name = Column(Text, nullable=True)
-    slug = Column(Text, unique=True, nullable=False)
-    created_by_user_id = Column(Uuid(as_uuid=True), ForeignKey("users.id"), nullable=False)
-    last_activity_at = Column(DateTime(timezone=True), nullable=True)
-
-    # Relationships for data access
-    creator = relationship("User", back_populates="created_conversations")
-    messages = relationship("Message", back_populates="conversation", cascade="all, delete-orphan")
+# Good - data structure only
+class User(BaseModel):
+    __tablename__ = "users"
+    username = Column(Text, unique=True, nullable=False)
 ```
 
-## 🏗️ Architecture: Relational domain model
+## Architecture: Relational domain model
 
-**Models → Relationships → Database Schema**
+**Models -> Relationships -> Database Schema**
 
 Each model maps to a database table with explicit relationships managed by SQLAlchemy.
 
-## 📋 Domain entity matrix
+## Domain entity matrix
 
-| Model          | Primary Purpose               | Key Relationships                    | Unique Constraints              |
-| -------------- | ----------------------------- | ------------------------------------ | ------------------------------- |
-| **User**       | Authentication and identity   | Created conversations, messages, participations | username, email                 |
-| **Conversation** | Chat room/thread container   | Creator, participants, messages      | slug                            |
-| **Message**    | Individual chat messages      | Sender, conversation, initial invitations | none                            |
-| **Participant** | User membership in conversations | User, conversation, inviter        | (user_id, conversation_id)      |
+| Model    | Primary Purpose             | Key Fields | Unique Constraints |
+| -------- | --------------------------- | ---------- | ------------------ |
+| **User** | Authentication and identity | username   | username, email    |
 
-## 📁 Directory structure
+## Directory structure
 
 **Core model files:**
 
 - `user.py` - User authentication and profile (extends FastAPI Users)
-- `conversation.py` - Chat conversation/room definition
-- `message.py` - Individual chat messages
-- `participant.py` - User participation in conversations with status tracking
 
 **Infrastructure:**
 
 - `base.py` - BaseModel with common fields (id, timestamps, soft deletion)
 - `__init__.py` - Model exports and package configuration
 
-## 🔧 Implementation patterns
+## Implementation patterns
 
 ### Creating a new model
 
@@ -147,9 +106,6 @@ __all__ = [
     "BaseModel",
     "metadata",
     "User",
-    "Conversation",
-    "Message",
-    "Participant",
     "NewEntity",  # Add new model
 ]
 ```
@@ -190,39 +146,25 @@ class BaseModel(declarative_base()):
 
 ### Relationship definition pattern
 
-Use explicit foreign_keys and back_populates for clarity:
+When adding relationships between models, use explicit foreign_keys and back_populates for clarity:
 
 ```python
 class User(BaseModel):
-    # One-to-many: User creates many conversations
-    created_conversations = relationship(
-        "Conversation",
-        back_populates="creator",
-        foreign_keys="Conversation.created_by_user_id"
+    # One-to-many: User owns many entities
+    owned_entities = relationship(
+        "NewEntity",
+        back_populates="owner",
+        foreign_keys="NewEntity.owner_id"
     )
 
-    # One-to-many: User has many participations
-    participations = relationship(
-        "Participant",
-        back_populates="user",
-        foreign_keys="Participant.user_id"
-    )
+class NewEntity(BaseModel):
+    owner_id = Column(Uuid(as_uuid=True), ForeignKey("users.id"), nullable=False)
 
-class Conversation(BaseModel):
-    created_by_user_id = Column(Uuid(as_uuid=True), ForeignKey("users.id"), nullable=False)
-
-    # Many-to-one: Conversation belongs to one creator
-    creator = relationship(
+    # Many-to-one: Entity belongs to one owner
+    owner = relationship(
         "User",
-        back_populates="created_conversations",
-        foreign_keys=[created_by_user_id]
-    )
-
-    # One-to-many: Conversation has many participants
-    participants = relationship(
-        "Participant",
-        back_populates="conversation",
-        cascade="all, delete-orphan"
+        back_populates="owned_entities",
+        foreign_keys=[owner_id]
     )
 ```
 
@@ -231,25 +173,21 @@ class Conversation(BaseModel):
 Use SQLAlchemy constraints for data integrity:
 
 ```python
-class Participant(BaseModel):
-    # Ensure one participant record per user per conversation
+class NewEntity(BaseModel):
+    # Ensure unique name per owner
     __table_args__ = (
         UniqueConstraint(
-            "user_id", "conversation_id",
-            name="uq_participant_user_conversation"
+            "name", "owner_id",
+            name="uq_entity_name_per_owner"
         ),
     )
-
-class Conversation(BaseModel):
-    # Ensure unique conversation slugs
-    slug = Column(Text, unique=True, nullable=False)
 
 class User(BaseModel):
     # Ensure unique usernames
     username = Column(Text, unique=True, nullable=False)
 ```
 
-## 🚨 Common issues and solutions
+## Common issues and solutions
 
 ### Issue: Circular import dependencies
 
@@ -258,17 +196,15 @@ class User(BaseModel):
 **Solution**: Use string references in relationships and type annotations:
 
 ```python
-# ❌ Wrong - direct imports cause circular dependencies
+# Bad - direct imports cause circular dependencies
 from .user import User
-from .conversation import Conversation
 
-class Participant(BaseModel):
+class NewEntity(BaseModel):
     user: User = relationship("User", ...)  # Import required
 
-# ✅ Correct - string references avoid imports
-class Participant(BaseModel):
-    user = relationship("User", back_populates="participations")  # String reference
-    conversation = relationship("Conversation", back_populates="participants")
+# Good - string references avoid imports
+class NewEntity(BaseModel):
+    user = relationship("User", back_populates="entities")  # String reference
 ```
 
 ### Issue: Missing cascade deletes
@@ -278,47 +214,16 @@ class Participant(BaseModel):
 **Solution**: Use appropriate cascade options on relationships:
 
 ```python
-# ❌ Wrong - no cascade, orphaned records remain
-class Conversation(BaseModel):
-    messages = relationship("Message", back_populates="conversation")
+# Bad - no cascade, orphaned records remain
+class User(BaseModel):
+    entities = relationship("NewEntity", back_populates="owner")
 
-# ✅ Correct - cascade deletes child records
-class Conversation(BaseModel):
-    messages = relationship(
-        "Message",
-        back_populates="conversation",
-        cascade="all, delete-orphan"  # Delete messages when conversation deleted
-    )
-    participants = relationship(
-        "Participant",
-        back_populates="conversation",
-        cascade="all, delete-orphan"  # Delete participations when conversation deleted
-    )
-```
-
-### Issue: Missing database constraints
-
-**Problem**: Data integrity issues because constraints only enforced in application code
-
-**Solution**: Add database-level constraints:
-
-```python
-# ❌ Wrong - only application validation
-class Participant(BaseModel):
-    user_id = Column(Uuid(as_uuid=True), ForeignKey("users.id"))
-    conversation_id = Column(Uuid(as_uuid=True), ForeignKey("conversations.id"))
-    # No database constraint preventing duplicate participation
-
-# ✅ Correct - database constraint prevents duplicates
-class Participant(BaseModel):
-    user_id = Column(Uuid(as_uuid=True), ForeignKey("users.id"), nullable=False)
-    conversation_id = Column(Uuid(as_uuid=True), ForeignKey("conversations.id"), nullable=False)
-
-    __table_args__ = (
-        UniqueConstraint(
-            "user_id", "conversation_id",
-            name="uq_participant_user_conversation"
-        ),
+# Good - cascade deletes child records
+class User(BaseModel):
+    entities = relationship(
+        "NewEntity",
+        back_populates="owner",
+        cascade="all, delete-orphan"
     )
 ```
 
@@ -329,18 +234,18 @@ class Participant(BaseModel):
 **Solution**: Always use timezone-aware datetime columns:
 
 ```python
-# ❌ Wrong - timezone-naive datetime
-class Message(BaseModel):
-    sent_at = Column(DateTime, nullable=False)  # No timezone
+# Bad - timezone-naive datetime
+class NewEntity(BaseModel):
+    happened_at = Column(DateTime, nullable=False)  # No timezone
 
-# ✅ Correct - timezone-aware datetime
-class Message(BaseModel):
-    sent_at = Column(DateTime(timezone=True), nullable=False)  # With timezone
+# Good - timezone-aware datetime
+class NewEntity(BaseModel):
+    happened_at = Column(DateTime(timezone=True), nullable=False)  # With timezone
 ```
 
-## 📚 Related documentation
+## Related documentation
 
-- [Repository Layer](mdc:../repositories/README.md) - Data access patterns that work with these models
-- [Services Layer](mdc:../services/README.md) - Business logic that operates on these domain entities
-- [Schemas Layer](mdc:../schemas/README.md) - Request/response validation for these models
-- [Main Architecture](mdc:../README.md) - How models fit into the overall application architecture
+- [Repository Layer](../repositories/README.md) - Data access patterns that work with these models
+- [Services Layer](../services/README.md) - Business logic that operates on these domain entities
+- [Schemas Layer](../schemas/README.md) - Request/response validation for these models
+- [Main Architecture](../README.md) - How models fit into the overall application architecture

@@ -40,7 +40,7 @@ async def lifespan(app: FastAPI):
     logger.info("Application shutting down...")
 
 
-app = FastAPI(title="AIM again", lifespan=lifespan)
+app = FastAPI(title="Aimagain", lifespan=lifespan)
 
 
 @app.exception_handler(HTTPException)

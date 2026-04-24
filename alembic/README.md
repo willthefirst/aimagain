@@ -18,7 +18,7 @@ Alembic provides **database schema version control**, ensuring all environments 
 
 ```bash
 # Generate new migration from model changes
-alembic revision --autogenerate -m "add user last_active_at column"
+alembic revision --autogenerate -m "add user email_verified column"
 
 # Apply migrations to current environment
 alembic upgrade head
@@ -80,7 +80,8 @@ alembic/
 ├── env.py                    # Migration environment setup and configuration
 ├── script.py.mako           # Template for generating new migration files
 ├── versions/                # Directory containing all migration files
-│   └── 615021cc5b23_first_migration.py  # Example migration file
+│   ├── 615021cc5b23_first_migration.py          # Initial schema (users table)
+│   └── b2dbe3136387_drop_chat_tables_and_columns.py  # Remove chat features
 └── ../config/alembic.ini    # Alembic configuration (in config/ directory)
 ```
 
@@ -121,7 +122,7 @@ target_metadata = metadata
 
 ```bash
 # Generate migration from model changes
-alembic revision --autogenerate -m "add conversation slug index"
+alembic revision --autogenerate -m "add user profile fields"
 
 # Review generated migration file before applying
 # Edit if needed (alembic isn't perfect at detection)
@@ -130,10 +131,10 @@ alembic revision --autogenerate -m "add conversation slug index"
 3. **Review and edit** the generated migration:
 
 ```python
-"""add conversation slug index
+"""add user profile fields
 
 Revision ID: abc123def456
-Revises: 615021cc5b23
+Revises: b2dbe3136387
 Create Date: 2024-01-15 10:30:00.123456
 
 """
@@ -142,17 +143,17 @@ import sqlalchemy as sa
 
 # Revision identifiers
 revision = 'abc123def456'
-down_revision = '615021cc5b23'
+down_revision = 'b2dbe3136387'
 branch_labels = None
 depends_on = None
 
 def upgrade():
-    # Add index for conversation slug lookups
-    op.create_index('ix_conversations_slug', 'conversations', ['slug'])
+    # Add profile fields to users table
+    op.add_column('users', sa.Column('bio', sa.Text(), nullable=True))
 
 def downgrade():
-    # Remove the index
-    op.drop_index('ix_conversations_slug', table_name='conversations')
+    # Remove profile fields
+    op.drop_column('users', 'bio')
 ```
 
 4. **Apply migration** to database:
@@ -369,10 +370,10 @@ def test_migrations_apply_cleanly():
 Use descriptive migration messages:
 
 ```bash
-# ✅ Good migration names
+# Good migration names
 alembic revision --autogenerate -m "add user email verification fields"
-alembic revision --autogenerate -m "create conversation participants table"
-alembic revision --autogenerate -m "add index on conversation slug"
+alembic revision --autogenerate -m "add index on users username"
+alembic revision --autogenerate -m "add user profile bio column"
 
 # ❌ Poor migration names
 alembic revision --autogenerate -m "changes"

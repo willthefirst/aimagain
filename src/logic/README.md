@@ -2,11 +2,11 @@
 
 The `logic/` directory contains **processing functions** that handle the orchestration of business operations, serving as the coordination layer between API routes and services while managing error handling, validation, and data transformation for specific use cases.
 
-## 🎯 Core philosophy: Business operation orchestration
+## Core philosophy: Business operation orchestration
 
 Logic modules handle **complex business workflows** that require coordination between multiple services, proper error handling, and data transformation, providing a clean separation between HTTP concerns (routes) and pure business logic (services).
 
-### What we do ✅
+### What we do
 
 - **Operation orchestration**: Coordinate complex workflows involving multiple services
 - **Error translation**: Convert service exceptions into appropriate route-level responses
@@ -14,34 +14,19 @@ Logic modules handle **complex business workflows** that require coordination be
 - **Business rule validation**: Apply operation-specific business rules and constraints
 - **Logging and monitoring**: Provide detailed logging for business operations
 
-**Example**: Conversation creation orchestration with error handling:
+**Example**: User listing orchestration with error handling:
 
 ```python
-async def handle_create_conversation(
-    invitee_username: str,
-    initial_message: str,
-    creator_user: User,
-    conv_service: ConversationService,
+async def handle_list_users(
     user_repo: UserRepository,
-) -> Conversation:
-    """Orchestrates conversation creation with proper error handling"""
-
-    # Step 1: Resolve invitee by username
-    invitee_user = await user_repo.get_user_by_username(invitee_username)
-    if not invitee_user:
-        raise ServiceUserNotFoundError(f"User with username '{invitee_username}' not found.")
-
-    # Step 2: Create conversation through service
-    new_conversation = await conv_service.create_new_conversation(
-        creator_user=creator_user,
-        invitee_user_id=invitee_user.id,
-        initial_message_content=initial_message,
-    )
-
-    return new_conversation
+    requesting_user: User,
+) -> dict:
+    """Orchestrate user listing."""
+    users_list = await user_repo.list_users(exclude_user=requesting_user)
+    return {"users": users_list, "current_user": requesting_user}
 ```
 
-### What we don't do ❌
+### What we don't do
 
 - **Direct database access**: Database operations stay in repositories/services
 - **HTTP response creation**: Routes handle HTTP-specific response formatting
@@ -51,61 +36,48 @@ async def handle_create_conversation(
 **Example**: Don't put repository or HTTP logic in processing functions:
 
 ```python
-# ❌ Wrong - direct database access in logic
+# Bad - direct database access in logic
 async def handle_list_users(session: AsyncSession, user_id: UUID):
     users = await session.execute(select(User).where(User.id != user_id))
     return users.scalars().all()
 
-# ❌ Wrong - HTTP response creation in logic
-async def handle_get_conversation(slug: str) -> JSONResponse:
-    conversation = await service.get_conversation(slug)
-    return JSONResponse({"conversation": conversation})
+# Bad - HTTP response creation in logic
+async def handle_get_entity(slug: str) -> JSONResponse:
+    entity = await service.get_entity(slug)
+    return JSONResponse({"entity": entity})
 
-# ✅ Correct - orchestration with proper separation
+# Good - orchestration with proper separation
 async def handle_list_users(
     user_repo: UserRepository,
     requesting_user: User,
-    participated_with_filter: str | None = None,
 ):
     """Orchestrate user listing with filtering logic"""
-    filter_user = requesting_user if participated_with_filter == "me" else None
-
-    users_list = await user_repo.list_users(
-        exclude_user=requesting_user,
-        participated_with_user=filter_user,
-    )
-
+    users_list = await user_repo.list_users(exclude_user=requesting_user)
     return {"users": users_list, "current_user": requesting_user}
 ```
 
-## 🏗️ Architecture: Orchestration layer between routes and services
+## Architecture: Orchestration layer between routes and services
 
-**Routes → Logic → Services → Repositories → Database**
+**Routes -> Logic -> Services -> Repositories -> Database**
 
 Logic functions coordinate business operations without handling HTTP or database concerns.
 
-## 📋 Processing responsibility matrix
+## Processing responsibility matrix
 
-| Module                         | Purpose                              | Key Functions                                |
-| ------------------------------ | ------------------------------------ | -------------------------------------------- |
-| **conversation_processing.py** | Conversation workflow orchestration  | create, get details, list, invite, messaging |
-| **user_processing.py**         | User operation coordination          | list users with filtering                    |
-| **participant_processing.py**  | Participant workflow management      | invitation handling, participant operations  |
-| **auth_processing.py**         | Authentication workflow coordination | user registration processing                 |
-| **me_processing.py**           | User profile and personal data       | personal conversation/invitation management  |
+| Module                    | Purpose                              | Key Functions                  |
+| ------------------------- | ------------------------------------ | ------------------------------ |
+| **user_processing.py**    | User operation coordination          | list users with filtering      |
+| **auth_processing.py**    | Authentication workflow coordination | user registration processing   |
 
-## 📁 Directory structure
+## Directory structure
 
 ```
 logic/
-├── conversation_processing.py  # Conversation workflow orchestration
 ├── user_processing.py          # User operation coordination
-├── participant_processing.py   # Participant management workflows
-├── auth_processing.py          # Authentication process coordination
-└── me_processing.py            # Personal/profile operation processing
+└── auth_processing.py          # Authentication process coordination
 ```
 
-## 🔧 Implementation patterns
+## Implementation patterns
 
 ### Standard processing function structure
 
@@ -116,16 +88,16 @@ import logging
 from typing import Dict, Any
 
 from src.models import User
-from src.services.some_service import SomeService, ServiceError
-from src.repositories.some_repository import SomeRepository
+from src.services.[domain]_service import [Domain]Service, ServiceError
+from src.repositories.[domain]_repository import [Domain]Repository
 
 logger = logging.getLogger(__name__)
 
 async def handle_some_operation(
     input_param: str,
     user: User,
-    service: SomeService,
-    repository: SomeRepository,
+    service: [Domain]Service,
+    repository: [Domain]Repository,
 ) -> Dict[str, Any]:
     """
     Handle [operation description] orchestration.
@@ -169,7 +141,7 @@ Consistent error handling across all processing functions:
 
 ```python
 async def handle_operation_with_error_handling(
-    service: SomeService,
+    service: [Domain]Service,
 ) -> Any:
     """Handle operation with comprehensive error management."""
     try:
@@ -191,45 +163,6 @@ async def handle_operation_with_error_handling(
         raise ServiceError("An unexpected error occurred during operation")
 ```
 
-### Multi-service orchestration pattern
-
-When coordinating multiple services:
-
-```python
-async def handle_complex_workflow(
-    user: User,
-    primary_service: PrimaryService,
-    secondary_service: SecondaryService,
-    repository: SomeRepository,
-) -> Dict[str, Any]:
-    """Orchestrate workflow involving multiple services."""
-
-    # Step 1: Validate with repository
-    entity = await repository.get_entity_by_criteria(user.id)
-    if not entity:
-        raise NotFoundError("Required entity not found")
-
-    # Step 2: Primary service operation
-    primary_result = await primary_service.perform_primary_operation(entity, user)
-
-    # Step 3: Secondary service operation (dependent on primary)
-    try:
-        secondary_result = await secondary_service.perform_secondary_operation(
-            primary_result.id, user
-        )
-    except SecondaryServiceError:
-        # Handle partial failure - may need rollback
-        logger.warning("Secondary operation failed, continuing with primary result")
-        secondary_result = None
-
-    # Step 4: Combine results for route
-    return {
-        "primary": primary_result,
-        "secondary": secondary_result,
-        "user": user,
-    }
-```
-
 ### Template context preparation pattern
 
 For routes that render templates:
@@ -238,20 +171,18 @@ For routes that render templates:
 async def handle_template_rendering_operation(
     request: Request,
     user: User,
-    service: SomeService,
+    service: [Domain]Service,
 ) -> Dict[str, Any]:
     """Prepare context for template rendering."""
 
     # Gather all data needed for template
     primary_data = await service.get_primary_data(user)
-    secondary_data = await service.get_secondary_data(user)
 
     # Prepare template context
     context = {
         "request": request,           # Required for FastAPI templates
         "user": user,                 # Current user context
         "primary_data": primary_data, # Main template data
-        "secondary_data": secondary_data, # Supporting data
         "metadata": {                 # Additional context
             "page_title": "Operation Page",
             "active_section": "operations",
@@ -261,7 +192,7 @@ async def handle_template_rendering_operation(
     return context
 ```
 
-## 🚨 Common issues and solutions
+## Common issues and solutions
 
 ### Issue: Logic functions becoming too complex
 
@@ -269,23 +200,19 @@ async def handle_template_rendering_operation(
 **Solution**: Move business rules to services, keep orchestration only
 
 ```python
-# ❌ Wrong - business logic in processing function
-async def handle_create_conversation(creator_user: User, invitee_username: str):
-    # Don't implement business rules here
-    if creator_user.conversation_count >= MAX_CONVERSATIONS:
-        raise BusinessRuleError("Too many conversations")
+# Bad - business logic in processing function
+async def handle_create_entity(creator_user: User, name: str):
+    if creator_user.entity_count >= MAX_ENTITIES:
+        raise BusinessRuleError("Too many entities")
 
-    if invitee_username == creator_user.username:
-        raise BusinessRuleError("Cannot invite yourself")
-
-# ✅ Correct - delegate business logic to service
-async def handle_create_conversation(
+# Good - delegate business logic to service
+async def handle_create_entity(
     creator_user: User,
-    invitee_username: str,
-    conv_service: ConversationService,
+    name: str,
+    service: [Entity]Service,
 ):
     # Service handles all business rules
-    return await conv_service.create_conversation(creator_user, invitee_username)
+    return await service.create_entity(creator_user, name)
 ```
 
 ### Issue: Inconsistent error handling
@@ -294,7 +221,7 @@ async def handle_create_conversation(
 **Solution**: Follow standard error handling pattern
 
 ```python
-# ❌ Wrong - inconsistent error handling
+# Bad - inconsistent error handling
 async def handle_operation_bad():
     try:
         result = await service.do_something()
@@ -302,7 +229,7 @@ async def handle_operation_bad():
     except Exception:
         return None  # Swallowing errors
 
-# ✅ Correct - consistent error handling
+# Good - consistent error handling
 async def handle_operation_good():
     try:
         return await service.do_something()
@@ -320,20 +247,20 @@ async def handle_operation_good():
 **Solution**: Keep HTTP concerns in routes, business orchestration in logic
 
 ```python
-# ❌ Wrong - HTTP concerns in logic
+# Bad - HTTP concerns in logic
 async def handle_get_users(request: Request) -> JSONResponse:
     users = await service.get_users()
     return JSONResponse({"users": [user.dict() for user in users]})
 
-# ✅ Correct - return data for route to handle
+# Good - return data for route to handle
 async def handle_get_users(user_repo: UserRepository, requesting_user: User):
     users = await user_repo.list_users(exclude_user=requesting_user)
     return {"users": users, "current_user": requesting_user}
 ```
 
-## 📚 Related documentation
+## Related documentation
 
-- [../api/routes/README.md](../api/routes/README.md) - Route layer that calls processing functions
-- [../services/README.md](../services/README.md) - Service layer orchestrated by processing functions
-- [../repositories/README.md](../repositories/README.md) - Repository layer accessed through services
-- [../api/common/README.md](../api/common/README.md) - Common utilities used in processing functions
+- [API Routes](../api/routes/README.md) - Route layer that calls processing functions
+- [Services Layer](../services/README.md) - Service layer orchestrated by processing functions
+- [Repositories Layer](../repositories/README.md) - Repository layer accessed through services
+- [API Common](../api/common/README.md) - Common utilities used in processing functions

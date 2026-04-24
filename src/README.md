@@ -1,12 +1,12 @@
 # Source code: Core application architecture
 
-The `src/` directory contains the complete implementation of the Aimagain chat application, organized using a **layered architecture** pattern that separates concerns across API, business logic, data access, and presentation layers.
+The `src/` directory contains the complete implementation of the application, organized using a **layered architecture** pattern that separates concerns across API, business logic, data access, and presentation layers. Currently this is a bare-bones skeleton with user authentication and basic user routes, ready to be extended with new features.
 
-## 🎯 Core philosophy: Clean layered architecture
+## Core philosophy: Clean layered architecture
 
 This codebase follows a **clean architecture** approach where dependencies flow inward toward the core business logic, making the application maintainable, testable, and easy to understand.
 
-### What we do ✅
+### What we do
 
 - **Layer separation**: Clear boundaries between API, services, repositories, and models
 - **Dependency injection**: Services and repositories are injected rather than directly instantiated
@@ -38,7 +38,7 @@ async def create_new_feature(data: NewFeatureSchema, service: NewFeatureService 
     return await service.create(data)
 ```
 
-### What we don't do ❌
+### What we don't do
 
 - **Direct database access from routes**: All database operations go through repositories
 - **Business logic in API routes**: Routes only handle HTTP concerns, business logic stays in services
@@ -48,24 +48,24 @@ async def create_new_feature(data: NewFeatureSchema, service: NewFeatureService 
 **Example**: Don't put business logic directly in routes:
 
 ```python
-# ❌ Wrong - business logic in route
-@router.post("/conversations")
-async def create_conversation(data: dict, session: AsyncSession = Depends(get_db_session)):
+# Bad - business logic in route
+@router.post("/[entities]")
+async def create_entity(data: dict, session: AsyncSession = Depends(get_db_session)):
     # Complex validation and business logic here
-    new_conv = Conversation(**data)
-    session.add(new_conv)
+    new_entity = Entity(**data)
+    session.add(new_entity)
     # ... more business logic
-    return new_conv
+    return new_entity
 
-# ✅ Correct - delegate to service layer
-@router.post("/conversations")
-async def create_conversation(data: ConversationCreate, service: ConversationService = Depends()):
-    return await conversation_service.create_conversation(data)
+# Good - delegate to service layer
+@router.post("/[entities]")
+async def create_entity(data: EntityCreate, service: EntityService = Depends()):
+    return await service.create_entity(data)
 ```
 
-## 🏗️ Architecture: Simple layered design
+## Architecture: Simple layered design
 
-**API → Services → Repositories → Database**
+**API -> Services -> Repositories -> Database**
 
 - **API** handles HTTP requests and responses
 - **Services** contain business logic
@@ -74,7 +74,7 @@ async def create_conversation(data: ConversationCreate, service: ConversationSer
 
 Everything else (schemas, models, templates) supports these main layers.
 
-## 📋 Layer responsibilities matrix
+## Layer responsibilities matrix
 
 | Layer            | Responsibility                     | Example Files       | Dependencies         |
 | ---------------- | ---------------------------------- | ------------------- | -------------------- |
@@ -87,13 +87,13 @@ Everything else (schemas, models, templates) supports these main layers.
 | **Middleware**   | Cross-cutting concerns             | `middleware/*.py`   | FastAPI              |
 | **Core**         | Configuration, utilities           | `core/*.py`         | None                 |
 
-## 📁 Directory structure
+## Directory structure
 
 **Core files:**
 
 - `main.py` - FastAPI application entry point
 - `db.py` - Database configuration and sessions
-- `auth_config.py` - Authentication setup
+- `auth_config.py` - Authentication setup (FastAPI-Users with JWT cookies)
 
 **Main layers:**
 
@@ -101,24 +101,24 @@ Everything else (schemas, models, templates) supports these main layers.
   - `routes/` - Route definitions by domain
   - `common/` - Shared utilities and decorators
 - `services/` - Business logic layer
-  - `conversation_service.py`, `user_service.py`, etc.
+  - `user_service.py` - User-related business logic
   - `dependencies.py` - Service dependency injection
 - `repositories/` - Data access layer
-  - `conversation_repository.py`, `user_repository.py`, etc.
+  - `user_repository.py` - User data access
   - `base.py` - Common repository patterns
 - `models/` - Database models
-  - `user.py`, `conversation.py`, `message.py`, etc.
-  - `base.py` - Common model fields
+  - `user.py` - User model (with `username` field)
+  - `base.py` - Common model fields (UUID, timestamps, soft delete)
 
 **Supporting components:**
 
 - `schemas/` - Request/response validation (Pydantic)
-- `templates/` - HTML templates for web interface
-- `middleware/` - Cross-cutting concerns (presence tracking)
+- `templates/` - HTML templates for web interface (Jinja2 + HTMX)
+- `middleware/` - Cross-cutting concerns (currently empty)
 - `logic/` - Data processing utilities
 - `core/` - Configuration and utilities
 
-## 🔧 Implementation patterns
+## Implementation patterns
 
 ### Adding a new domain entity
 
@@ -180,21 +180,20 @@ All services and repositories use dependency injection through FastAPI's `Depend
 
 ```python
 # In services/dependencies.py
-async def get_conversation_service(
-    repo: ConversationRepository = Depends(get_conversation_repository)
-) -> ConversationService:
-    return ConversationService(repo)
+async def get_user_service(
+    repo: UserRepository = Depends(get_user_repository)
+) -> UserService:
+    return UserService(repo)
 
 # In API routes
-@router.post("/conversations")
-async def create_conversation(
-    data: ConversationCreate,
-    service: ConversationService = Depends(get_conversation_service)
+@router.get("/users")
+async def list_users(
+    service: UserService = Depends(get_user_service)
 ):
-    return await service.create_conversation(data)
+    return await service.list_users()
 ```
 
-## 🚨 Common issues and solutions
+## Common issues and solutions
 
 ### Issue: Circular imports between layers
 
@@ -202,10 +201,10 @@ async def create_conversation(
 **Solution**: Always import from lower layers only. Use dependency injection for higher-layer dependencies.
 
 ```python
-# ❌ Wrong - importing from higher layer
+# Bad - importing from higher layer
 from ..services.user_service import UserService  # In a repository
 
-# ✅ Correct - inject dependency
+# Good - inject dependency
 class UserRepository:
     def __init__(self, session: AsyncSession):
         self.session = session
@@ -217,20 +216,20 @@ class UserRepository:
 **Solution**: Move all business logic to service layer, keep routes thin
 
 ```python
-# ❌ Wrong - business logic in route
-@router.post("/conversations")
-async def create_conversation(data: dict, session: AsyncSession = Depends()):
-    if not data.get("title"):
-        raise HTTPException(400, "Title required")
+# Bad - business logic in route
+@router.post("/[entities]")
+async def create_entity(data: dict, session: AsyncSession = Depends()):
+    if not data.get("name"):
+        raise HTTPException(400, "Name required")
     # ... more business logic
 
-# ✅ Correct - delegate to service
-@router.post("/conversations")
-async def create_conversation(
-    data: ConversationCreate,  # Schema handles validation
-    service: ConversationService = Depends()
+# Good - delegate to service
+@router.post("/[entities]")
+async def create_entity(
+    data: EntityCreate,  # Schema handles validation
+    service: EntityService = Depends()
 ):
-    return await service.create_conversation(data)  # Service handles business logic
+    return await service.create_entity(data)  # Service handles business logic
 ```
 
 ### Issue: Direct database access from routes
@@ -239,13 +238,13 @@ async def create_conversation(
 **Solution**: Always go through repository layer for data access
 
 ```python
-# ❌ Wrong - direct database access
+# Bad - direct database access
 @router.get("/users/{user_id}")
 async def get_user(user_id: int, session: AsyncSession = Depends()):
     user = await session.get(User, user_id)
     return user
 
-# ✅ Correct - use repository
+# Good - use repository
 @router.get("/users/{user_id}")
 async def get_user(
     user_id: int,
@@ -254,7 +253,7 @@ async def get_user(
     return await service.get_user(user_id)
 ```
 
-## 📚 Related documentation
+## Related documentation
 
 - [API Layer Documentation](api/README.md) - HTTP routes and validation patterns
 - [Services Layer Documentation](services/README.md) - Business logic organization

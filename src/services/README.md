@@ -1,56 +1,45 @@
 # Services layer: Business logic and transaction coordination
 
-The `services/` directory contains the **business logic layer** of the Aimagain application, implementing domain-specific operations, transaction management, and coordination between repositories while enforcing business rules and authorization.
+The `services/` directory contains the **business logic layer** of the application, implementing domain-specific operations, transaction management, and coordination between repositories while enforcing business rules and authorization.
 
-## 🎯 Core philosophy: Domain-driven business logic
+## Core philosophy: Domain-driven business logic
 
 Services encapsulate **business rules and workflows**, coordinating multiple repositories within transactions while maintaining clean separation from HTTP concerns and data access details.
 
-### What we do ✅
+### What we do
 
-- **Business rule enforcement**: Validate business constraints like "users must be online to be invited"
+- **Business rule enforcement**: Validate business constraints before performing operations
 - **Transaction coordination**: Orchestrate multiple repository operations within database transactions
 - **Authorization logic**: Ensure users can only perform actions they're authorized for
 - **Error handling with context**: Convert database/repository errors to domain-specific exceptions
-- **Cross-domain operations**: Coordinate between multiple entities (conversations, participants, messages)
 
-**Example**: Creating a conversation with business rules and transaction handling:
+**Example**: A service method with business rules and transaction handling:
 
 ```python
-class ConversationService:
-    async def create_new_conversation(
+class [Entity]Service:
+    async def create_[entity](
         self,
         creator_user: User,
-        invitee_user_id: UUID,
-        initial_message_content: str,
-    ) -> Conversation:
+        data: [Entity]Create,
+    ) -> [Entity]:
         # 1. Business rule validation
-        invitee_user = await self.user_repo.get_user_by_id(invitee_user_id)
-        if not invitee_user:
-            raise UserNotFoundError(f"Invitee user with ID '{invitee_user_id}' not found.")
-        if not invitee_user.is_online:
-            raise BusinessRuleError("Invitee user is not online.")
-        if creator_user.id == invitee_user.id:
-            raise BusinessRuleError("Cannot create a conversation with yourself.")
+        if not self._validate_rules(data, creator_user):
+            raise BusinessRuleError("Validation failed.")
 
         try:
-            # 2. Coordinated repository operations
-            new_conversation = await self.conv_repo.create_new_conversation(
-                creator_user=creator_user,
-                invitee_user=invitee_user,
-                initial_message_content=initial_message_content,
-            )
+            # 2. Repository operations
+            new_entity = await self.[entity]_repo.create(data)
             # 3. Transaction management
             await self.session.commit()
-            await self.session.refresh(new_conversation)
+            await self.session.refresh(new_entity)
         except IntegrityError as e:
             await self.session.rollback()
-            raise ConflictError("Could not create conversation due to a data conflict.")
+            raise ConflictError("Could not create entity due to a data conflict.")
 
-        return new_conversation
+        return new_entity
 ```
 
-### What we don't do ❌
+### What we don't do
 
 - **HTTP handling**: Services never deal with requests, responses, or HTTP status codes
 - **Direct database queries**: All data access goes through repository interfaces
@@ -60,47 +49,39 @@ class ConversationService:
 **Example**: Don't mix HTTP concerns with business logic:
 
 ```python
-# ❌ Wrong - HTTP logic in service
-class ConversationService:
-    async def create_conversation(self, request: Request) -> Response:
+# Bad - HTTP logic in service
+class [Entity]Service:
+    async def create_entity(self, request: Request) -> Response:
         data = await request.json()  # HTTP parsing
-        conversation = await self.repo.create(data)
-        return JSONResponse({"conversation": conversation})  # HTTP response
+        entity = await self.repo.create(data)
+        return JSONResponse({"entity": entity})  # HTTP response
 
-# ✅ Correct - pure business logic
-class ConversationService:
-    async def create_new_conversation(
-        self, creator_user: User, invitee_user_id: UUID, initial_message: str
-    ) -> Conversation:
+# Good - pure business logic
+class [Entity]Service:
+    async def create_entity(
+        self, data: [Entity]Create, user: User
+    ) -> [Entity]:
         # Business validation and logic only
-        return await self.conv_repo.create_new_conversation(...)
+        return await self.[entity]_repo.create(data)
 ```
 
-## 🏗️ Architecture: Service provider pattern with dependency injection
+## Architecture: Service provider pattern with dependency injection
 
-**API → Processing Logic → Services → Repositories → Database**
+**API -> Processing Logic -> Services -> Repositories -> Database**
 
 Services coordinate business operations while repositories handle data access.
 
-## 📋 Service responsibility matrix
+## Service responsibility matrix
 
-| Service                 | Primary Domain          | Key Responsibilities                       | Dependencies                |
-| ----------------------- | ----------------------- | ------------------------------------------ | --------------------------- |
-| **ConversationService** | Conversation management | Create, invite, message coordination       | Conv, Part, Msg, User repos |
-| **ParticipantService**  | Participation workflow  | Status updates, invitation handling        | Part, Conv repos            |
-| **UserService**         | User data aggregation   | Fetch user conversations and invitations   | Part, Conv repos            |
-| **PresenceService**     | User presence tracking  | Update activity timestamps, online status  | User repo                   |
-| **MigrationService**    | Data migration          | Handle data transformations and migrations | Multiple repos              |
+| Service         | Primary Domain        | Key Responsibilities             | Dependencies |
+| --------------- | --------------------- | -------------------------------- | ------------ |
+| **UserService** | User data aggregation | Fetch user data, user operations | User repo    |
 
-## 📁 Directory structure
+## Directory structure
 
 **Core service files:**
 
-- `conversation_service.py` - Complete conversation lifecycle management
-- `participant_service.py` - Participant status and invitation workflows
-- `user_service.py` - User-centric data aggregation
-- `presence_service.py` - User activity and presence tracking
-- `migration_service.py` - Data migration and transformation utilities
+- `user_service.py` - User-related business logic
 
 **Supporting infrastructure:**
 
@@ -109,7 +90,7 @@ Services coordinate business operations while repositories handle data access.
 - `exceptions.py` - Domain-specific exception hierarchy
 - `__init__.py` - Package initialization
 
-## 🔧 Implementation patterns
+## Implementation patterns
 
 ### Creating a new service class
 
@@ -165,7 +146,6 @@ class [Domain]Service:
 ```python
 def get_[domain]_service(
     [domain]_repo: [Domain]Repository = Depends(get_[domain]_repository),
-    # ... other repository dependencies
 ) -> [Domain]Service:
     """Provides an instance of the [Domain]Service."""
     return ServiceProvider.get_service(
@@ -202,17 +182,11 @@ class ServiceProvider:
         return cls._instances[service_class]
 
 # Dependency functions provide configured service instances
-def get_conversation_service(
-    conv_repo: ConversationRepository = Depends(get_conversation_repository),
-    part_repo: ParticipantRepository = Depends(get_participant_repository),
-    msg_repo: MessageRepository = Depends(get_message_repository),
+def get_user_service(
     user_repo: UserRepository = Depends(get_user_repository),
-) -> ConversationService:
+) -> UserService:
     return ServiceProvider.get_service(
-        ConversationService,
-        conversation_repository=conv_repo,
-        participant_repository=part_repo,
-        message_repository=msg_repo,
+        UserService,
         user_repository=user_repo,
     )
 ```
@@ -278,7 +252,7 @@ class ConflictError(ServiceError):
         super().__init__(message, status_code=409)
 ```
 
-## 🚨 Common issues and solutions
+## Common issues and solutions
 
 ### Issue: Circular service dependencies
 
@@ -287,25 +261,20 @@ class ConflictError(ServiceError):
 **Solution**: Use repository composition instead of service composition:
 
 ```python
-# ❌ Wrong - circular service dependencies
-class ConversationService:
-    def __init__(self, participant_service: ParticipantService):
-        self.participant_service = participant_service
+# Bad - circular service dependencies
+class ServiceA:
+    def __init__(self, service_b: ServiceB):
+        self.service_b = service_b
 
-class ParticipantService:
-    def __init__(self, conversation_service: ConversationService):
-        self.conversation_service = conversation_service
+class ServiceB:
+    def __init__(self, service_a: ServiceA):
+        self.service_a = service_a
 
-# ✅ Correct - compose repositories, not services
-class ConversationService:
-    def __init__(self, conv_repo: ConversationRepository, part_repo: ParticipantRepository):
-        self.conv_repo = conv_repo
-        self.part_repo = part_repo  # Use repositories directly
-
-class ParticipantService:
-    def __init__(self, part_repo: ParticipantRepository, conv_repo: ConversationRepository):
-        self.part_repo = part_repo
-        self.conv_repo = conv_repo  # Same repositories, different service focus
+# Good - compose repositories, not services
+class ServiceA:
+    def __init__(self, repo_a: RepoA, repo_b: RepoB):
+        self.repo_a = repo_a
+        self.repo_b = repo_b  # Use repositories directly
 ```
 
 ### Issue: Transaction management across service boundaries
@@ -315,20 +284,18 @@ class ParticipantService:
 **Solution**: Keep transactions within single service methods:
 
 ```python
-# ❌ Wrong - transactions spanning services
-async def create_conversation_workflow():
+# Bad - transactions spanning services
+async def create_workflow():
     async with transaction():
-        conv = await conversation_service.create_conversation(data)
-        await participant_service.add_participant(conv.id, user_id)
+        result1 = await service_a.create(data)
+        await service_b.process(result1.id)
 
-# ✅ Correct - single service manages entire transaction
-class ConversationService:
-    async def create_new_conversation(self, creator: User, invitee_id: UUID, message: str):
+# Good - single service manages entire transaction
+class WorkflowService:
+    async def create_workflow(self, data):
         try:
-            # All operations in one transaction
-            conv = await self.conv_repo.create_conversation(creator, message)
-            await self.part_repo.create_participant(creator.id, conv.id, "joined")
-            await self.part_repo.create_participant(invitee_id, conv.id, "invited")
+            result1 = await self.repo_a.create(data)
+            await self.repo_b.process(result1.id)
             await self.session.commit()
         except Exception:
             await self.session.rollback()
@@ -342,26 +309,23 @@ class ConversationService:
 **Solution**: Keep repositories simple, business logic in services:
 
 ```python
-# ❌ Wrong - business logic in repository
-class ConversationRepository:
-    async def create_conversation(self, creator: User, invitee: User, message: str):
-        if not invitee.is_online:  # Business rule in repository
-            raise BusinessRuleError("Invitee must be online")
-        # ... create logic
+# Bad - business logic in repository
+class [Entity]Repository:
+    async def create_entity(self, data, user: User):
+        if not self._check_permission(user):  # Business rule in repository
+            raise BusinessRuleError("Not allowed")
 
-# ✅ Correct - business logic in service
-class ConversationService:
-    async def create_new_conversation(self, creator: User, invitee_id: UUID, message: str):
-        invitee = await self.user_repo.get_user_by_id(invitee_id)
-        if not invitee.is_online:  # Business rule in service
-            raise BusinessRuleError("Invitee user is not online")
-
-        return await self.conv_repo.create_conversation(creator, invitee, message)
+# Good - business logic in service
+class [Entity]Service:
+    async def create_entity(self, data, user: User):
+        if not self._check_permission(user):  # Business rule in service
+            raise BusinessRuleError("Not allowed")
+        return await self.[entity]_repo.create_entity(data)
 ```
 
-## 📚 Related documentation
+## Related documentation
 
-- [API Layer](mdc:../api/README.md) - How services are consumed by HTTP routes
-- [Repository Layer](mdc:../repositories/README.md) - Data access patterns used by services
-- [Models Layer](mdc:../models/README.md) - Domain entities manipulated by services
-- [Main Architecture](mdc:../README.md) - Overall application architecture and layer relationships
+- [API Layer](../api/README.md) - How services are consumed by HTTP routes
+- [Repository Layer](../repositories/README.md) - Data access patterns used by services
+- [Models Layer](../models/README.md) - Domain entities manipulated by services
+- [Main Architecture](../README.md) - Overall application architecture and layer relationships

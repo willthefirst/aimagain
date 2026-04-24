@@ -1,41 +1,31 @@
 # Repositories layer: Data access and database operations
 
-The `repositories/` directory contains the **data access layer** of the Aimagain application, implementing the **repository pattern** to encapsulate database operations, provide clean abstractions over SQLAlchemy queries, and maintain separation between business logic and data persistence.
+The `repositories/` directory contains the **data access layer** of the application, implementing the **repository pattern** to encapsulate database operations, provide clean abstractions over SQLAlchemy queries, and maintain separation between business logic and data persistence.
 
-## 🎯 Core philosophy: Clean data access abstraction
+## Core philosophy: Clean data access abstraction
 
 Repositories provide **focused, domain-specific data access** methods that encapsulate complex SQLAlchemy queries while maintaining transaction boundaries and providing type-safe interfaces for the service layer.
 
-### What we do ✅
+### What we do
 
 - **Query encapsulation**: Complex SQLAlchemy queries wrapped in meaningful method names
 - **Relationship loading**: Explicit control over eager/lazy loading using `selectinload` and `joinedload`
 - **Transaction management**: Coordinate database operations within service-controlled transactions
 - **Type safety**: Return proper domain models with full type annotations
-- **Domain-specific methods**: Business-relevant query methods like `list_user_conversations()`
+- **Domain-specific methods**: Business-relevant query methods like `list_users()`
 
-**Example**: Repository method with proper relationship loading and business logic:
+**Example**: Repository method with proper query structure:
 
 ```python
-class ConversationRepository(BaseRepository):
-    async def get_conversation_details(self, conversation_id: UUID) -> Conversation | None:
-        """Retrieves full conversation details including participants and messages."""
-        stmt = (
-            select(Conversation)
-            .filter(Conversation.id == conversation_id)
-            .options(
-                selectinload(Conversation.participants).joinedload(Participant.user),
-                selectinload(Conversation.messages).joinedload(Message.sender),
-            )
-        )
+class UserRepository(BaseRepository):
+    async def get_user_by_username(self, username: str) -> User | None:
+        """Retrieves a user by their username."""
+        stmt = select(User).filter(User.username == username)
         result = await self.session.execute(stmt)
-        try:
-            return result.scalars().one()
-        except Exception:
-            return None
+        return result.scalars().first()
 ```
 
-### What we don't do ❌
+### What we don't do
 
 - **Business logic**: Repositories only handle data access, no business rule enforcement
 - **Transaction control**: Services manage transaction boundaries (commit/rollback)
@@ -45,55 +35,46 @@ class ConversationRepository(BaseRepository):
 **Example**: Don't implement business logic in repositories:
 
 ```python
-# ❌ Wrong - business logic in repository
-class ConversationRepository:
-    async def create_conversation_if_allowed(self, creator: User, invitee: User):
-        if not invitee.is_online:  # Business rule checking
-            raise BusinessError("User not online")
-        # ... validation logic
+# Bad - business logic in repository
+class [Entity]Repository:
+    async def create_entity_if_allowed(self, data, user: User):
+        if not self._check_permission(user):  # Business rule checking
+            raise BusinessError("Not allowed")
 
-# ✅ Correct - pure data access
-class ConversationRepository:
-    async def create_new_conversation(
-        self, creator_user: User, invitee_user: User, initial_message_content: str
-    ) -> Conversation:
+# Good - pure data access
+class [Entity]Repository:
+    async def create_entity(self, **kwargs) -> [Entity]:
         # Only data persistence operations
-        new_conversation = Conversation(slug=f"convo-{uuid.uuid4()}", ...)
-        self.session.add(new_conversation)
+        new_entity = [Entity](**kwargs)
+        self.session.add(new_entity)
         await self.session.flush()
-        return new_conversation
+        return new_entity
 ```
 
-## 🏗️ Architecture: Repository pattern with dependency injection
+## Architecture: Repository pattern with dependency injection
 
-**Services → Repositories → SQLAlchemy → Database**
+**Services -> Repositories -> SQLAlchemy -> Database**
 
 Each repository manages one primary domain entity with related data access operations.
 
-## 📋 Repository responsibility matrix
+## Repository responsibility matrix
 
-| Repository                 | Primary Entity | Key Responsibilities                       | Related Entities       |
-| -------------------------- | -------------- | ------------------------------------------ | ---------------------- |
-| **ConversationRepository** | Conversation   | CRUD, user conversations, activity updates | Participants, Messages |
-| **UserRepository**         | User           | User lookup, online status, authentication | Participants           |
-| **ParticipantRepository**  | Participant    | Membership status, invitations, joining    | Users, Conversations   |
-| **MessageRepository**      | Message        | Message creation, conversation history     | Users, Conversations   |
+| Repository         | Primary Entity | Key Responsibilities                   |
+| ------------------ | -------------- | -------------------------------------- |
+| **UserRepository** | User           | User lookup, listing, authentication   |
 
-## 📁 Directory structure
+## Directory structure
 
 **Core repository files:**
 
-- `conversation_repository.py` - Conversation data access and relationship management
-- `user_repository.py` - User authentication, lookup, and status management
-- `participant_repository.py` - Participation status and membership operations
-- `message_repository.py` - Message creation and conversation history
+- `user_repository.py` - User data access and lookup
 
 **Infrastructure:**
 
 - `base.py` - BaseRepository with common session management
 - `dependencies.py` - FastAPI dependency injection for all repositories
 
-## 🔧 Implementation patterns
+## Implementation patterns
 
 ### Creating a new repository
 
@@ -159,19 +140,18 @@ Control eager/lazy loading explicitly for performance:
 
 ```python
 # Basic query - minimal data
-async def get_conversation_by_id(self, conversation_id: UUID) -> Conversation | None:
-    stmt = select(Conversation).filter(Conversation.id == conversation_id)
+async def get_entity_by_id(self, entity_id: UUID) -> [Entity] | None:
+    stmt = select([Entity]).filter([Entity].id == entity_id)
     result = await self.session.execute(stmt)
     return result.scalars().first()
 
-# Detailed query - with relationships
-async def get_conversation_details(self, conversation_id: UUID) -> Conversation | None:
+# Detailed query - with relationships loaded
+async def get_entity_details(self, entity_id: UUID) -> [Entity] | None:
     stmt = (
-        select(Conversation)
-        .filter(Conversation.id == conversation_id)
+        select([Entity])
+        .filter([Entity].id == entity_id)
         .options(
-            selectinload(Conversation.participants).joinedload(Participant.user),
-            selectinload(Conversation.messages).joinedload(Message.sender),
+            selectinload([Entity].related_items).joinedload(RelatedItem.owner),
         )
     )
     result = await self.session.execute(stmt)
@@ -188,25 +168,25 @@ class BaseRepository:
         self.session = session
 
 # Repository operations don't commit
-async def create_conversation(self, **data) -> Conversation:
-    conversation = Conversation(**data)
-    self.session.add(conversation)
+async def create_entity(self, **data) -> [Entity]:
+    entity = [Entity](**data)
+    self.session.add(entity)
     await self.session.flush()  # Make available in transaction
-    return conversation
+    return entity
 
 # Services control commit/rollback
-class ConversationService:
-    async def create_conversation(self, data):
+class [Entity]Service:
+    async def create_entity(self, data):
         try:
-            conversation = await self.repo.create_conversation(**data)
+            entity = await self.repo.create_entity(**data)
             await self.session.commit()  # Service commits
-            return conversation
+            return entity
         except Exception:
             await self.session.rollback()  # Service handles errors
             raise
 ```
 
-## 🚨 Common issues and solutions
+## Common issues and solutions
 
 ### Issue: N+1 query problems
 
@@ -214,17 +194,17 @@ class ConversationService:
 **Solution**: Use explicit relationship loading in repository methods
 
 ```python
-# ❌ Wrong - causes N+1 queries
-conversations = await repo.list_conversations()
-for conv in conversations:
-    print(conv.participants)  # Each access hits database
+# Bad - causes N+1 queries
+entities = await repo.list_entities()
+for entity in entities:
+    print(entity.related_items)  # Each access hits database
 
-# ✅ Correct - eager load relationships
-async def list_conversations(self) -> Sequence[Conversation]:
+# Good - eager load relationships
+async def list_entities(self) -> Sequence[[Entity]]:
     stmt = (
-        select(Conversation)
-        .options(selectinload(Conversation.participants))
-        .order_by(Conversation.last_activity_at.desc())
+        select([Entity])
+        .options(selectinload([Entity].related_items))
+        .order_by([Entity].created_at.desc())
     )
     result = await self.session.execute(stmt)
     return result.scalars().all()
@@ -236,14 +216,14 @@ async def list_conversations(self) -> Sequence[Conversation]:
 **Solution**: Let services control transaction boundaries
 
 ```python
-# ❌ Wrong - repository committing
+# Bad - repository committing
 async def create_user(self, data):
     user = User(**data)
     self.session.add(user)
     await self.session.commit()  # Repository shouldn't commit
     return user
 
-# ✅ Correct - repository only persists
+# Good - repository only persists
 async def create_user(self, data):
     user = User(**data)
     self.session.add(user)
@@ -257,28 +237,27 @@ async def create_user(self, data):
 **Solution**: Keep repositories focused on data operations, move business logic to services
 
 ```python
-# ❌ Wrong - business logic in repository
-async def get_conversations_user_can_join(self, user: User):
-    if not user.is_online:  # Business rule
+# Bad - business logic in repository
+async def get_entities_for_user(self, user: User):
+    if not self._check_permission(user):  # Business rule
         return []
-    # Complex business logic mixed with query
 
-# ✅ Correct - simple data access in repository
-async def list_conversations(self) -> Sequence[Conversation]:
-    stmt = select(Conversation).order_by(Conversation.created_at.desc())
+# Good - simple data access in repository
+async def list_entities(self) -> Sequence[[Entity]]:
+    stmt = select([Entity]).order_by([Entity].created_at.desc())
     result = await self.session.execute(stmt)
     return result.scalars().all()
 
 # Business logic in service
-class ConversationService:
-    async def get_joinable_conversations(self, user: User):
-        if not user.is_online:  # Business logic in service
+class [Entity]Service:
+    async def get_entities_for_user(self, user: User):
+        if not self._check_permission(user):  # Business logic in service
             return []
-        return await self.repo.list_conversations()
+        return await self.repo.list_entities()
 ```
 
-## 📚 Related documentation
+## Related documentation
 
-- ../models/README.md](../models/README.md) - Database models and relationships
-- ../services/README.md](../services/README.md) - Business logic layer that uses repositories
-- ../README.md](../README.md) - Overall application architecture
+- [Models Layer](../models/README.md) - Database models and relationships
+- [Services Layer](../services/README.md) - Business logic layer that uses repositories
+- [Main Architecture](../README.md) - Overall application architecture
