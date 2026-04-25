@@ -32,6 +32,6 @@ class APIResponse:
 
         # Merge the provided context with global template context
         global_context = get_template_context()
-        merged_context = {"request": request, **global_context, **context}
+        merged_context = {**global_context, **context}
 
-        return templates.TemplateResponse(template_name, merged_context)
+        return templates.TemplateResponse(request, template_name, merged_context)

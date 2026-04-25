@@ -1,11 +1,17 @@
 import os
 
 from fastapi.templating import Jinja2Templates
+from jinja2 import Environment, FileSystemLoader, select_autoescape
 
-# Enable auto-reload for templates in development mode
 auto_reload = os.getenv("ENVIRONMENT", "development") == "development"
 
-templates = Jinja2Templates(directory="src/templates", auto_reload=auto_reload)
+_env = Environment(
+    loader=FileSystemLoader("src/templates"),
+    autoescape=select_autoescape(["html", "xml"]),
+    auto_reload=auto_reload,
+)
+
+templates = Jinja2Templates(env=_env)
 
 
 # Add global template variables for development features
