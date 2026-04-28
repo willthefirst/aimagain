@@ -50,9 +50,16 @@ import time
 import threading
 from livereload import Server
 
-# Silence per-connection / file-watch chatter from livereload + tornado
+# Silence per-connection / file-watch chatter from livereload + tornado.
+# Use a filter (not setLevel) because livereload.serve() resets the level
+# to INFO at startup, which would clobber a setLevel call.
+class _DropBelowWarning(logging.Filter):
+    def filter(self, record):
+        return record.levelno >= logging.WARNING
+
+_drop = _DropBelowWarning()
 for name in ('livereload', 'tornado.access', 'tornado.application', 'tornado.general'):
-    logging.getLogger(name).setLevel(logging.WARNING)
+    logging.getLogger(name).addFilter(_drop)
 
 def start_server():
     server = Server()
