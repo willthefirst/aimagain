@@ -123,7 +123,7 @@ start_fastapi_dev() {
         --port 8000 \
         --reload \
         --reload-include="*.html" \
-        --log-level debug \
+        --log-level info \
         --access-log \
         --use-colors
 }
