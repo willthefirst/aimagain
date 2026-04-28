@@ -21,7 +21,8 @@ DATABASE_URL=sqlite+aiosqlite:///./data/app.db
 
 # Application
 DEBUG=true
-SECRET_KEY=dev-secret-key-change-in-production
+# 32+ bytes required so JWT HMAC keys meet the SHA256 minimum
+SECRET=dev-only-do-not-use-in-prod-aaaaaaaa
 
 # Development
 DEVELOPMENT=true
