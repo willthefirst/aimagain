@@ -27,15 +27,10 @@ def log_route_call(func):
     async def wrapper(*args, **kwargs):
         route_logger = logging.getLogger(func.__module__)
 
-        logged_args = [repr(a) for a in args]
-        logged_kwargs = {k: repr(v) for k, v in kwargs.items()}
-
-        route_logger.info(
-            f"Entering route: {func.__name__} (args: {logged_args}, kwargs: {logged_kwargs})"
-        )
+        route_logger.debug(f"Entering route: {func.__name__}")
         try:
             result = await func(*args, **kwargs)
-            route_logger.info(f"Successfully exited route: {func.__name__}")
+            route_logger.debug(f"Successfully exited route: {func.__name__}")
             return result
         except Exception as e:
             route_logger.error(
