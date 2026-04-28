@@ -15,210 +15,76 @@ Bedlam Connect provides a **production-ready project skeleton** with:
 
 - **User authentication** with JWT cookie-based session management
 - **User profiles** with username support
-- **Progressive enhancement** - works without JavaScript, enhanced with HTMX
+- **Progressive enhancement** — works without JavaScript, enhanced with HTMX
 - **Responsive design** that works on desktop and mobile
 
-### Technical architecture
-
-```
-┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│   Templates     │    │   API Routes    │    │   Services      │
-│                 │    │                 │    │                 │
-│ • Jinja2 HTML   │◄───┤ • FastAPI       │◄───┤ • Business      │
-│ • HTMX forms    │    │ • Route logic   │    │   logic         │
-│ • Progressive   │    │ • Auth handling │    │ • Data          │
-│   enhancement   │    │                 │    │   coordination  │
-└─────────────────┘    └─────────────────┘    └─────────────────┘
-                                │                        │
-                                ▼                        ▼
-                       ┌─────────────────┐    ┌─────────────────┐
-                       │   Logic Layer   │    │  Repositories   │
-                       │                 │    │                 │
-                       │ • Processing    │    │ • Data access   │
-                       │ • Coordination  │    │ • Database      │
-                       │ • Error         │    │   operations    │
-                       │   handling      │    │                 │
-                       └─────────────────┘    └─────────────────┘
-                                                        │
-                                                        ▼
-                                            ┌─────────────────┐
-                                            │    Database     │
-                                            │                 │
-                                            │ • PostgreSQL    │
-                                            │ • SQLAlchemy    │
-                                            │ • Alembic       │
-                                            │   migrations    │
-                                            └─────────────────┘
-```
-
-## Development workflow
-
-1. **Install CLI**: `pip install -e .`
-2. **Setup environment**: `dev setup`
-3. **Start development**: `dev dev up`
-4. **Run tests**: `dev test`
-
-### Quick commands
-
-```bash
-# Development
-dev dev up              # Start development server with hot reload
-dev dev down            # Stop development environment
-dev dev logs            # View development logs
-
-# Testing
-dev test                # Run all tests
-
-# Database
-dev db migrate          # Run database migrations
-dev db reset            # Reset database to clean state
-
-# Production
-dev deploy              # Deploy to production
-dev status              # Check deployment status
-```
-
-## Documentation architecture
-
-This project follows **LLM-optimized documentation** standards with comprehensive READMEs at every level:
-
-### Core architecture documentation
-
-- **[src/README.md](src/README.md)** - Application architecture overview
-- **[src/api/README.md](src/api/README.md)** - API layer design and patterns
-- **[src/services/README.md](src/services/README.md)** - Business logic organization
-- **[src/models/README.md](src/models/README.md)** - Data model design principles
-- **[src/repositories/README.md](src/repositories/README.md)** - Data access patterns
-
-### Specialized documentation
-
-- **[src/api/routes/README.md](src/api/routes/README.md)** - Route organization and patterns
-- **[src/api/common/README.md](src/api/common/README.md)** - Shared API utilities
-- **[src/schemas/README.md](src/schemas/README.md)** - Request/response schemas
-- **[src/middleware/README.md](src/middleware/README.md)** - Middleware patterns
-- **[src/logic/README.md](src/logic/README.md)** - Processing logic organization
-- **[src/templates/README.md](src/templates/README.md)** - Template structure and patterns
-
-### Supporting documentation
-
-- **[tests/README.md](tests/README.md)** - Testing strategy and organization
-- **[notes/README.md](notes/README.md)** - Development notes and planning
-- **[src/core/README.md](src/core/README.md)** - Core configuration and utilities
-- **[alembic/README.md](alembic/README.md)** - Database migration processes
-- **[deployment/README.md](deployment/README.md)** - Deployment procedures
-
-## Getting started
-
-### Prerequisites
-
-- **Python 3.11+**
-- **Node.js 18+** (for development tools)
-- **PostgreSQL 14+** (or SQLite for development)
-- **Docker** (for containerized deployment)
-
-### Local development setup
-
-1. **Clone the repository**:
+## Quick start
 
 ```bash
 git clone https://github.com/your-org/bedlam-connect.git
 cd bedlam-connect
+pip install -e .          # installs the project + the `dev` CLI
+dev setup                 # creates .env and the local database
+dev up                    # starts the dev server at http://localhost:8000
+dev test                  # runs the test suite
 ```
 
-2. **Install the development CLI**:
+For the full list of `dev` commands and their flags, see [`scripts/README.md`](scripts/README.md).
 
-```bash
-pip install -e .
-```
+## Documentation
 
-3. **Setup your environment**:
+This project follows a **single-source-of-truth** documentation convention: each fact lives in the README closest to the code it describes, and other docs link to it rather than restating it. See [`CLAUDE.md`](CLAUDE.md) for the contract.
 
-```bash
-dev setup
-# This creates .env file and sets up local database
-```
+### Where to start
 
-4. **Start development server**:
+- **[`CLAUDE.md`](CLAUDE.md)** — the agent/contributor contract: definition of done, doc/test/code coupling, where to look for what
+- **[`src/README.md`](src/README.md)** — application architecture and layer responsibilities
+- **[`scripts/README.md`](scripts/README.md)** — the `dev` CLI command reference
+- **[`tests/README.md`](tests/README.md)** — testing conventions and shared fixtures
 
-```bash
-dev dev up
-# Starts server with hot reload at http://localhost:8000
-```
+### Module-level documentation
 
-5. **Run the test suite**:
+Every `src/<module>/` has its own README describing what it does, what it doesn't do, and its tests:
 
-```bash
-dev test
-# Ensures everything is working correctly
-```
+- [`src/api/README.md`](src/api/README.md) — API layer
+  - [`src/api/routes/README.md`](src/api/routes/README.md) — route organization
+  - [`src/api/common/README.md`](src/api/common/README.md) — shared API utilities
+- [`src/services/README.md`](src/services/README.md) — business logic
+- [`src/repositories/README.md`](src/repositories/README.md) — data access
+- [`src/models/README.md`](src/models/README.md) — SQLAlchemy models
+- [`src/schemas/README.md`](src/schemas/README.md) — Pydantic request/response
+- [`src/logic/README.md`](src/logic/README.md) — processing functions
+- [`src/middleware/README.md`](src/middleware/README.md) — middleware
+- [`src/core/README.md`](src/core/README.md) — config + templating
+- [`src/templates/README.md`](src/templates/README.md) — Jinja2 + HTMX templates
 
-### Production deployment
+### Supporting documentation
 
-1. **Prepare for deployment**:
+- [`alembic/README.md`](alembic/README.md) — database migrations
+- [`deployment/README.md`](deployment/README.md) — deployment procedures
+- [`notes/README.md`](notes/README.md) — development notes and planning
 
-```bash
-dev deploy prepare
-# Validates configuration and builds production assets
-```
+## Prerequisites
 
-2. **Deploy to production**:
+- **Python 3.11+**
+- **Docker** (for the Docker Compose dev environment and production builds)
 
-```bash
-dev deploy
-# Deploys using configured deployment method
-```
-
-For detailed deployment instructions, see [deployment/README.md](deployment/README.md).
-
-## Testing strategy
-
-Tests are **colocated next to the source they cover**. For example, route tests live alongside route handlers under `src/api/routes/`. Shared fixtures and cross-module integration tests live under `tests/`.
-
-### Current test files
-
-- **`src/api/routes/test_auth_routes.py`** — authentication: registration, login, logout, password reset, session protection.
-- **`src/api/routes/test_users.py`** — user listing endpoint behavior.
-- **`tests/fixtures.py`** — shared pytest fixtures (loaded globally via the repo-root `conftest.py`).
-- **`tests/helpers.py`** — non-fixture test utilities.
-
-### Running tests
-
-```bash
-# All tests
-dev test
-
-# A single test file
-dev test src/api/routes/test_auth_routes.py
-
-# Match by keyword
-dev test -k login
-```
-
-For detailed testing documentation and conventions, see [tests/README.md](tests/README.md). For the doc/test/code coupling contract, see [CLAUDE.md](CLAUDE.md).
-
-## Security considerations
-
-- **Authentication** using FastAPI-Users with JWT cookie-based sessions
-- **CSRF protection** built into form handling
-- **SQL injection prevention** through SQLAlchemy ORM
-- **Input validation** using Pydantic schemas
-- **Environment-based configuration** for secrets management
+The project uses SQLite for local development and Postgres in production; you don't need Postgres installed locally.
 
 ## Architecture decisions
 
 ### Why server-side rendering?
 
-- **SEO friendly** - Content is rendered on the server
-- **Fast initial load** - No client-side rendering wait time
-- **Progressive enhancement** - Works without JavaScript
-- **Reduced complexity** - Less client-side state management
+- **SEO friendly** — content is rendered on the server
+- **Fast initial load** — no client-side rendering wait time
+- **Progressive enhancement** — works without JavaScript
+- **Reduced complexity** — less client-side state management
 
 ### Why htmx?
 
 - **Minimal JavaScript** while maintaining interactivity
 - **Server-side control** of UI updates and validation
-- **Progressive enhancement** - degrades gracefully
-- **Simple mental model** - HTML attributes drive behavior
+- **Simple mental model** — HTML attributes drive behavior
 
 ### Why FastAPI?
 
@@ -227,74 +93,38 @@ For detailed testing documentation and conventions, see [tests/README.md](tests/
 - **Type safety** with Pydantic integration
 - **High performance** comparable to Node.js and Go
 
-### Why this architecture?
+### Why a layered architecture?
 
 - **Clear separation of concerns** makes the codebase maintainable
 - **Testable components** enable confident refactoring
 - **Documentation-driven** approach aids onboarding and maintenance
-- **Production-ready** with proper error handling and monitoring
 
-## Development workflow details
+For the layer responsibilities and dependency rules, see [`src/README.md`](src/README.md).
 
-### Code organization principles
+## Security considerations
 
-1. **Dependency direction**: Dependencies flow inward (Routes → Logic → Services → Repositories → Database)
-2. **Single responsibility**: Each module has a clear, focused purpose
-3. **Interface segregation**: Small, focused interfaces between layers
-4. **Dependency injection**: Services receive dependencies rather than creating them
-
-### Development practices
-
-- **Test-driven development** for core business logic
-- **Documentation-first** for new features and modules
-- **Code review** for all changes with testing requirements
-- **Continuous integration** with automated testing and deployment
-
-### Adding new features
-
-1. **Plan** in `notes/` directory with architectural decisions
-2. **Models** - Add data models if needed (`src/models/`)
-3. **Repositories** - Add data access patterns (`src/repositories/`)
-4. **Services** - Implement business logic (`src/services/`)
-5. **Schemas** - Define API contracts (`src/schemas/`)
-6. **Routes** - Add HTTP endpoints (`src/api/routes/`)
-7. **Templates** - Create user interface (`src/templates/`)
-8. **Tests** - Add comprehensive test coverage
-9. **Documentation** - Update relevant READMEs
-
-For detailed patterns and examples, see the module-specific documentation.
+- **Authentication** via FastAPI-Users with JWT cookie-based sessions
+- **CSRF protection** built into form handling
+- **SQL injection prevention** through SQLAlchemy ORM
+- **Input validation** through Pydantic schemas
+- **Environment-based configuration** for secrets
 
 ## Contributing
 
-1. **Read the documentation** - Start with this README and relevant module docs
-2. **Follow the architecture** - Respect the established patterns and boundaries
-3. **Write tests** - All changes should include appropriate test coverage
-4. **Update documentation** - Keep READMEs current with your changes
-5. **Use the CLI tools** - Leverage `dev` commands for development workflow
-
-### Code style
-
-- **Type hints** - Use Python type hints throughout
-- **Docstrings** - Document all public functions and classes
-- **Error handling** - Provide clear error messages and proper exception handling
-- **Logging** - Use structured logging for debugging and monitoring
+1. Read [`CLAUDE.md`](CLAUDE.md) — it documents the doc/test/code coupling contract that every change must satisfy.
+2. Follow the established architecture (see [`src/README.md`](src/README.md)).
+3. Use `dev lint` and `dev test` before committing; pre-commit runs the same checks.
 
 ## Project status
 
 - **Current version**: Development (skeleton)
 - **Python version**: 3.11+
-- **Framework**: FastAPI 0.104+
-- **Database**: PostgreSQL 14+ (SQLite for development)
-- **Testing**: pytest with auth and user test coverage
-- **Deployment**: Docker with Railway/DigitalOcean support
+- **Framework**: FastAPI
+- **Database**: PostgreSQL in production, SQLite for development
+- **Deployment**: Docker, with DigitalOcean blue-green deployment
 
 ## Support
 
-- **Documentation**: Start with module-specific READMEs
-- **Issues**: Use GitHub issues for bug reports and feature requests
-- **Discussions**: Use GitHub discussions for questions and ideas
-- **Development**: See [notes/README.md](notes/README.md) for development planning
-
----
-
-**Next steps**: Start with [src/README.md](src/README.md) for application architecture overview, then explore the specific modules you need to work with.
+- **Issues**: GitHub issues for bug reports and feature requests
+- **Discussions**: GitHub discussions for questions and ideas
+- **Development planning**: [`notes/README.md`](notes/README.md)

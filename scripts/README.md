@@ -67,56 +67,37 @@ export DROPLET_SSH_KEY_PATH="~/.ssh/deploy_key"
 - `--key-path, -k`: SSH key path (overrides env var)
 - `--help`: Show usage information
 
-### `dev_cli.py`
+### `dev_cli.py` — the `dev` command
 
-Development CLI for common development tasks, including managing the Docker Compose development environment.
+Single source of truth for the project's developer commands. Installed as the `dev` console script entry point via `pip install -e .` (see `pyproject.toml`).
 
-#### 🎯 **Quick usage**
+This is the canonical reference for `dev` commands. **All other docs should link here, not restate the command list** (see [`../CLAUDE.md`](../CLAUDE.md) for the rule).
 
-```bash
-# Start development environment (equivalent to: docker compose -f docker-compose.dev.yml up --build)
-python3 scripts/dev_cli.py dev up --build
+#### Available commands
 
-# Or run directly as executable
-./scripts/dev_cli.py dev up --build
+Run `dev --help` for the live, authoritative list. As of this writing:
 
-# Stop development environment
-./scripts/dev_cli.py dev down
+| Command | What it does |
+| --- | --- |
+| `dev setup` | First-time setup: creates `.env`, initializes the local database. |
+| `dev up [--build] [-d]` | Start the Docker Compose development environment (optionally rebuild images, optionally detach). |
+| `dev down [--volumes]` | Stop the development environment (optionally drop volumes). |
+| `dev logs [-f] [service]` | Show logs from the dev environment, optionally following or scoped to one service. |
+| `dev restart [service]` | Restart the whole dev environment or a single service. |
+| `dev test [-v] [--tb MODE] [-m MARKERS] [-k KEYWORDS] [path]` | Run pytest. `path` can be a directory, a file, or a `file::testname` selector. |
+| `dev lint` | Run black, isort, autoflake, and the title-case checker. Pre-commit runs the same checks automatically. |
+| `dev seed` | Seed the dev database with fixture users for manual testing. |
 
-# Follow development logs
-./scripts/dev_cli.py dev logs -f
+For per-command flag details, run `dev <command> --help`.
 
-# Run tests
-./scripts/dev_cli.py test
-
-# Run specific test markers
-./scripts/dev_cli.py test -m api
-
-# Show help
-./scripts/dev_cli.py --help
-```
-
-#### 🏗️ **available commands**
-
-**Development environment:**
-
-- `dev up [--build] [-d]` - Start development environment with optional build and detach
-- `dev down [--volumes]` - Stop development environment with optional volume removal
-- `dev logs [-f] [service]` - Show logs with optional follow and service filtering
-- `dev restart [service]` - Restart development environment or specific service
-
-**Testing:**
-
-- `test [-v] [-m markers] [path]` - Run tests with optional verbose, markers, and path filtering
-
-#### 🔧 **Installation as console script**
-
-The CLI is also available as a console script entry point. After installing the project in development mode:
+#### Installation
 
 ```bash
 pip install -e .
-dev --help  # Available as 'dev' command
+dev --help
 ```
+
+Without `pip install -e .`, the CLI is also runnable directly: `python3 scripts/dev_cli.py <command>` or `./scripts/dev_cli.py <command>`.
 
 ### `title_case_check.py`
 
