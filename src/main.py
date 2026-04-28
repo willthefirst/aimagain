@@ -17,6 +17,17 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
+class _HealthAccessFilter(logging.Filter):
+    """Drop uvicorn access log lines for the /health probe."""
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        message = record.getMessage()
+        return "GET /health " not in message
+
+
+logging.getLogger("uvicorn.access").addFilter(_HealthAccessFilter())
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application lifespan manager for startup and shutdown events."""
