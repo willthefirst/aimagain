@@ -3,7 +3,7 @@
 Seed the database with fixture users for development.
 
 Idempotent: re-running skips users that already exist (matched by email).
-All fixture users share the password `devpass123`.
+All fixture users share the password `password`.
 """
 
 import asyncio
@@ -19,7 +19,7 @@ from src.db import async_session_maker
 from src.models import User
 from src.schemas.user import UserCreate
 
-SHARED_PASSWORD = "devpass123"
+SHARED_PASSWORD = "password"
 
 
 class FixtureUser(TypedDict):
