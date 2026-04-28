@@ -6,9 +6,9 @@ from selectolax.parser import HTMLParser
 
 # Import session maker type for hinting
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
-from test_helpers import create_test_user
 
 from src.models import User
+from tests.helpers import create_test_user
 
 # Mark all tests in this module as async
 pytestmark = pytest.mark.asyncio
