@@ -245,9 +245,9 @@ class SetupCommands:
             print(f"✅ Environment file found: {env_file}")
 
         print("\n🎉 Setup complete! You can now run:")
-        print("   dev dev-up        # Start development environment")
-        print("   dev dev-logs -f   # Follow logs")
-        print("   dev test          # Run tests")
+        print("   dev up        # Start development environment")
+        print("   dev logs -f   # Follow logs")
+        print("   dev test      # Run tests")
 
         return 0
 
@@ -270,9 +270,9 @@ class DevCLI:
             epilog="""
 Examples:
   %(prog)s setup               # Set up development environment
-  %(prog)s dev-up --build      # Start development environment with rebuild
-  %(prog)s dev-down            # Stop development environment
-  %(prog)s dev-logs -f         # Follow development logs
+  %(prog)s up --build          # Start development environment with rebuild
+  %(prog)s down                # Stop development environment
+  %(prog)s logs -f             # Follow development logs
   %(prog)s test -m api         # Run API tests only
   %(prog)s test --tb short     # Run tests with short traceback
   %(prog)s lint                # Run all linting checks
@@ -282,10 +282,10 @@ Examples:
         subparsers = parser.add_subparsers(dest="command", help="Available commands")
 
         # Development commands (flattened for simplicity)
-        self._add_dev_up_parser(subparsers)
-        self._add_dev_down_parser(subparsers)
-        self._add_dev_logs_parser(subparsers)
-        self._add_dev_restart_parser(subparsers)
+        self._add_up_parser(subparsers)
+        self._add_down_parser(subparsers)
+        self._add_logs_parser(subparsers)
+        self._add_restart_parser(subparsers)
 
         # Other commands
         self._add_test_parser(subparsers)
@@ -294,8 +294,8 @@ Examples:
 
         return parser
 
-    def _add_dev_up_parser(self, subparsers):
-        parser = subparsers.add_parser("dev-up", help="Start development environment")
+    def _add_up_parser(self, subparsers):
+        parser = subparsers.add_parser("up", help="Start development environment")
         parser.add_argument(
             "--build", action="store_true", help="Build images before starting"
         )
@@ -304,26 +304,24 @@ Examples:
         )
         parser.set_defaults(func=lambda args: self.dev.up(args.build, args.detach))
 
-    def _add_dev_down_parser(self, subparsers):
-        parser = subparsers.add_parser("dev-down", help="Stop development environment")
+    def _add_down_parser(self, subparsers):
+        parser = subparsers.add_parser("down", help="Stop development environment")
         parser.add_argument(
             "--volumes", action="store_true", help="Remove volumes as well"
         )
         parser.set_defaults(func=lambda args: self.dev.down(args.volumes))
 
-    def _add_dev_logs_parser(self, subparsers):
-        parser = subparsers.add_parser(
-            "dev-logs", help="Show development environment logs"
-        )
+    def _add_logs_parser(self, subparsers):
+        parser = subparsers.add_parser("logs", help="Show development environment logs")
         parser.add_argument(
             "-f", "--follow", action="store_true", help="Follow log output"
         )
         parser.add_argument("service", nargs="?", help="Show logs for specific service")
         parser.set_defaults(func=lambda args: self.dev.logs(args.follow, args.service))
 
-    def _add_dev_restart_parser(self, subparsers):
+    def _add_restart_parser(self, subparsers):
         parser = subparsers.add_parser(
-            "dev-restart", help="Restart development environment"
+            "restart", help="Restart development environment"
         )
         parser.add_argument("service", nargs="?", help="Restart specific service")
         parser.set_defaults(func=lambda args: self.dev.restart(args.service))
