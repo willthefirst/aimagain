@@ -2,6 +2,8 @@
 
 The `api/routes/` directory contains **domain-specific route handlers** that define HTTP endpoints for the application, organized by business domain with consistent patterns for request handling, delegation to business logic, and response formatting.
 
+> **Resource design contract — read first.** URL shape, lifecycle states, subresource conventions, and the rules for when to introduce one are defined in [`RESOURCE_GRAMMAR.md`](RESOURCE_GRAMMAR.md). Every resource in this codebase MUST conform to that grammar. This README describes *how routes are organized and wired*; the grammar describes *what URLs and lifecycles a resource MUST present*.
+
 ## Core philosophy: Thin routes with domain organization
 
 Routes are **ultra-thin HTTP adapters** that handle request parsing, delegate to processing logic, and format responses while being organized by business domains for maintainability.
@@ -270,15 +272,9 @@ app.include_router(me.me_router_instance, prefix="/users/me", tags=["me"])
 # Consistent naming pattern
 [domain]_router_instance = APIRouter()
 router = BaseRouter(router=[domain]_router_instance)
-
-# Consistent endpoint naming
-@router.get("/[domain]")           # List
-@router.get("/[domain]/new")       # New form
-@router.get("/[domain]/{id}")      # Detail
-@router.post("/[domain]")          # Create
-@router.put("/[domain]/{id}")      # Update
-@router.delete("/[domain]/{id}")   # Delete
 ```
+
+The URL shape, HTTP method, and form-page conventions for every resource are defined in [`RESOURCE_GRAMMAR.md`](RESOURCE_GRAMMAR.md). Do not invent endpoint shapes here — follow the grammar.
 
 ## Tests
 

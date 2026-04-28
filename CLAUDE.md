@@ -35,6 +35,7 @@ If you find a fact stated in two places, **one of them is wrong** — even if bo
 | Topic | Where it lives |
 | --- | --- |
 | Architecture, layer responsibilities, dependency rules | [`src/README.md`](src/README.md) |
+| Resource URL grammar, lifecycle, subresource conventions | [`src/api/routes/RESOURCE_GRAMMAR.md`](src/api/routes/RESOURCE_GRAMMAR.md) |
 | CLI commands (`dev ...`) | [`scripts/README.md`](scripts/README.md) |
 | Testing conventions, fixtures | [`tests/README.md`](tests/README.md) |
 | Database migrations | [`alembic/README.md`](alembic/README.md) |
@@ -48,3 +49,4 @@ Pre-commit hooks run lint automatically — don't bypass with `--no-verify`.
 1. Read [`src/README.md`](src/README.md) for layer responsibilities and what may import what.
 2. Read the README of the layer you're changing, plus the layers it depends on.
 3. If a single change forces edits across most layers (model + schema + repo + service + route), follow the entity checklist in [`src/README.md`](src/README.md#adding-a-new-domain-entity) — that's expected for new entities, not a smell.
+4. **Before adding or modifying a resource type** (new entity, new endpoint, new lifecycle behavior, new permission rule), read [`src/api/routes/RESOURCE_GRAMMAR.md`](src/api/routes/RESOURCE_GRAMMAR.md) first. That document is the prescriptive contract for URL shape, lifecycle states, and subresource conventions; every resource conforms to it.
