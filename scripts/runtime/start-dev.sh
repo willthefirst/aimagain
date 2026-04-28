@@ -6,62 +6,34 @@
 
 set -e  # Exit on any error
 
-echo "=== FastAPI Development Server Startup ==="
-echo "Starting at: $(date)"
-
 # Function to handle cleanup on exit
 cleanup() {
-    echo "=== Development Server Shutdown ==="
-    echo "Killing background processes..."
-
-    # Kill LiveReload server if it's running
     if [[ -n "$LIVERELOAD_PID" ]]; then
         kill "$LIVERELOAD_PID" 2>/dev/null || true
-        echo "LiveReload server stopped"
     fi
-
-    echo "Stopped at: $(date)"
 }
 trap cleanup EXIT
 
 # Function to check if database directory exists and create if needed
 setup_database() {
-    echo "Setting up database directory..."
     mkdir -p /app/data
-
-    # Check if database file exists, if not it will be created by migrations
-    if [ ! -f "/app/data/bedlam-connect.db" ]; then
-        echo "Database file does not exist, will be created during migration"
-    else
-        echo "Database file found at /app/data/bedlam-connect.db"
-    fi
 }
 
 # Function to run Alembic migrations
 run_migrations() {
-    echo "Running Alembic migrations..."
-
-    # Check if alembic command is available
     if ! command -v alembic &> /dev/null; then
         echo "ERROR: Alembic command not found"
         exit 1
     fi
 
-    # Run migrations with error handling
-    if alembic -c config/alembic.ini upgrade head; then
-        echo "✅ Database migrations completed successfully"
-    else
+    if ! alembic -c config/alembic.ini upgrade head; then
         echo "❌ ERROR: Database migrations failed"
-        echo "Check your database connection and migration files"
         exit 1
     fi
 }
 
 # Function to start LiveReload server for client-side hot reloading
 start_livereload_server() {
-    echo "Starting LiveReload server for client-side hot reloading..."
-
-    # Check if python is available for LiveReload
     if ! command -v python &> /dev/null; then
         echo "WARNING: Python command not found, skipping LiveReload server"
         return 0
@@ -98,7 +70,6 @@ start_server()
 " &
 
     LIVERELOAD_PID=$!
-    echo "🔥 LiveReload server started (PID: $LIVERELOAD_PID) on port $LIVERELOAD_PORT"
 
     # Give LiveReload server a moment to start
     sleep 2
@@ -106,12 +77,6 @@ start_server()
 
 # Function to start FastAPI server with hot reloading
 start_fastapi_dev() {
-    echo "Starting FastAPI development server with hot reloading..."
-    echo "🔥 Hot reloading enabled for both API and templates"
-    echo "🔥 Client-side LiveReload enabled for browser auto-refresh"
-    echo "Server will be available at http://0.0.0.0:8000"
-
-    # Check if uvicorn is available
     if ! command -v uvicorn &> /dev/null; then
         echo "ERROR: Uvicorn command not found"
         exit 1
@@ -134,18 +99,10 @@ start_fastapi_dev() {
 
 # Main execution flow
 main() {
-    echo "🚀 Initializing development server startup sequence..."
-
-    # Step 1: Setup database directory
     setup_database
-
-    # Step 2: Run database migrations
     run_migrations
-
-    # Step 3: Start LiveReload server for client-side hot reloading
     start_livereload_server
-
-    # Step 4: Start FastAPI development server with hot reloading
+    echo "🔥 Dev server: http://0.0.0.0:8000 (hot reload + LiveReload on :$LIVERELOAD_PORT)"
     start_fastapi_dev
 }
 
