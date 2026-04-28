@@ -209,6 +209,62 @@ class QualityCommands:
         return exit_code
 
 
+class SeedCommands:
+    """Database seeding commands."""
+
+    SERVICE_NAME = "bedlam-connect-dev"
+
+    def __init__(self, runner: CLIRunner):
+        self.runner = runner
+
+    def _is_dev_container_running(self) -> bool:
+        result = subprocess.run(
+            [
+                "docker",
+                "compose",
+                "-f",
+                DOCKER_COMPOSE_DEV_FILE,
+                "ps",
+                "-q",
+                self.SERVICE_NAME,
+            ],
+            capture_output=True,
+            text=True,
+            cwd=self.runner.project_root,
+        )
+        return bool(result.stdout.strip())
+
+    def seed(self) -> int:
+        """Seed the dev database with fixture users."""
+        print("🌱 Seeding fixture users...")
+
+        seed_cmd = ["python", "scripts/dev/seed.py"]
+        if self._is_dev_container_running():
+            cmd = [
+                "docker",
+                "compose",
+                "-f",
+                DOCKER_COMPOSE_DEV_FILE,
+                "exec",
+                self.SERVICE_NAME,
+                *seed_cmd,
+            ]
+        else:
+            print("ℹ️  Dev container not running — using one-off `docker compose run`")
+            cmd = [
+                "docker",
+                "compose",
+                "-f",
+                DOCKER_COMPOSE_DEV_FILE,
+                "run",
+                "--rm",
+                "--no-deps",
+                self.SERVICE_NAME,
+                *seed_cmd,
+            ]
+        return self.runner.run_command(cmd)
+
+
 class SetupCommands:
     """Environment setup commands."""
 
@@ -261,6 +317,7 @@ class DevCLI:
         self.test = TestCommands(self.runner)
         self.quality = QualityCommands(self.runner)
         self.setup = SetupCommands(self.runner)
+        self.seed_cmd = SeedCommands(self.runner)
 
     def create_parser(self) -> argparse.ArgumentParser:
         """Create the argument parser with all commands."""
@@ -291,6 +348,7 @@ Examples:
         self._add_test_parser(subparsers)
         self._add_lint_parser(subparsers)
         self._add_setup_parser(subparsers)
+        self._add_seed_parser(subparsers)
 
         return parser
 
@@ -354,6 +412,12 @@ Examples:
     def _add_setup_parser(self, subparsers):
         parser = subparsers.add_parser("setup", help="Set up development environment")
         parser.set_defaults(func=lambda args: self.setup.setup())
+
+    def _add_seed_parser(self, subparsers):
+        parser = subparsers.add_parser(
+            "seed", help="Seed the dev database with fixture users"
+        )
+        parser.set_defaults(func=lambda args: self.seed_cmd.seed())
 
     def run(self) -> int:
         """Run the CLI application."""
