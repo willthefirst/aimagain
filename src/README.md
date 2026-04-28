@@ -76,6 +76,8 @@ Everything else (schemas, models, templates) supports these main layers.
 
 ## Layer responsibilities matrix
 
+**Rule:** each layer may only import from layers listed in its `Dependencies` column. Crossing the table upward (e.g. a repository importing a service) is a layering violation — fix the design, don't add the import.
+
 | Layer            | Responsibility                     | Example Files       | Dependencies         |
 | ---------------- | ---------------------------------- | ------------------- | -------------------- |
 | **API**          | HTTP handling, routing, validation | `api/routes/*.py`   | Services, Schemas    |
