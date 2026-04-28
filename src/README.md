@@ -122,57 +122,15 @@ Everything else (schemas, models, templates) supports these main layers.
 
 ### Adding a new domain entity
 
-1. **Create the model** in `models/[entity].py`:
+This is the cross-module checklist. The detailed step-by-step (with code snippets) for each layer lives in that layer's own README — follow the links so the recipe stays a single source of truth (see [`../CLAUDE.md`](../CLAUDE.md)). For each step, also add or extend the colocated `test_*.py` and update the README in that directory.
 
-```python
-from .base import Base
-
-class NewEntity(Base):
-    __tablename__ = "new_entities"
-    name: str = Column(String(100), nullable=False)
-    # ... other fields
-```
-
-2. **Create the repository** in `repositories/[entity]_repository.py`:
-
-```python
-from .base import BaseRepository
-from ..models.new_entity import NewEntity
-
-class NewEntityRepository(BaseRepository[NewEntity]):
-    def __init__(self, session: AsyncSession):
-        super().__init__(session, NewEntity)
-
-    async def find_by_name(self, name: str) -> Optional[NewEntity]:
-        # Custom query methods here
-```
-
-3. **Create the service** in `services/[entity]_service.py`:
-
-```python
-class NewEntityService:
-    def __init__(self, repo: NewEntityRepository):
-        self.repo = repo
-
-    async def create_entity(self, data: NewEntityCreate) -> NewEntity:
-        # Business logic here
-        return await self.repo.create(data.dict())
-```
-
-4. **Add API routes** in `api/routes/[entity].py`:
-
-```python
-from ...services.new_entity_service import NewEntityService
-
-router = APIRouter()
-
-@router.post("/new-entities")
-async def create_new_entity(
-    data: NewEntityCreate,
-    service: NewEntityService = Depends(get_new_entity_service)
-):
-    return await service.create_entity(data)
-```
+1. **Model** — define the SQLAlchemy class. See [`models/README.md`](models/README.md#implementation-patterns).
+2. **Migration** — generate and run an Alembic migration for the new table. See [`../alembic/README.md`](../alembic/README.md).
+3. **Schema** — add Pydantic request/response shapes. See [`schemas/README.md`](schemas/README.md#implementation-patterns).
+4. **Repository** — add data-access methods. See [`repositories/README.md`](repositories/README.md#implementation-patterns).
+5. **Service** — implement business logic and authorization. See [`services/README.md`](services/README.md#implementation-patterns).
+6. **Route** — wire up the HTTP endpoint that delegates to the service. See [`api/routes/README.md`](api/routes/README.md#implementation-patterns).
+7. **Template (if rendering HTML)** — add the Jinja2 template. See [`templates/README.md`](templates/README.md).
 
 ### Dependency injection pattern
 
