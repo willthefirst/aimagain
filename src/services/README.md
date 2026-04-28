@@ -323,6 +323,10 @@ class [Entity]Service:
         return await self.[entity]_repo.create_entity(data)
 ```
 
+## Tests
+
+**TODO** — no colocated tests yet. When adding or changing a service, create `src/services/test_<service_name>.py` next to it. Use the shared `db_test_session_manager` fixture (from [`tests/fixtures.py`](../../tests/fixtures.py)) for tests that need a real session; mock the repository when testing pure business logic.
+
 ## Related documentation
 
 - [API Layer](../api/README.md) - How services are consumed by HTTP routes

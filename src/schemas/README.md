@@ -232,6 +232,10 @@ UserUpdate
 [Entity]Status  # Enum
 ```
 
+## Tests
+
+**TODO** — no colocated tests yet. Schema validation is implicitly exercised by route tests. Add `src/schemas/test_<schema_name>.py` when a schema has non-trivial validators or computed fields whose behavior isn't obvious from the field definitions.
+
 ## Related documentation
 
 - [API Routes](../api/routes/README.md) - API routes that use these schemas for validation

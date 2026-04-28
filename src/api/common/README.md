@@ -301,6 +301,10 @@ InternalServerError(detail) # 500
 handle_service_error(service_exception) -> HTTPException
 ```
 
+## Tests
+
+**TODO** — no colocated tests yet. Add `test_*.py` here when modifying utilities in this directory (e.g. response helpers, error mapping). The route-level tests under `../routes/` exercise some of this behavior indirectly but should not be relied on as the only coverage.
+
 ## Related documentation
 
 - [Routes Layer](../routes/README.md) - Route organization and patterns using common utilities

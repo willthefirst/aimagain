@@ -279,6 +279,10 @@ async def get_other():
     return APIResponse.success(data, "Other data retrieved")
 ```
 
+## Tests
+
+API behavior is exercised by route-level tests colocated under [`routes/`](routes/) (e.g. `routes/test_auth_routes.py`, `routes/test_users.py`). There is no test file at this directory level — tests live next to the specific routes they cover.
+
 ## Related documentation
 
 - [Services Layer Documentation](../services/README.md) - Business logic called by routes

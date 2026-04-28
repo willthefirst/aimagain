@@ -256,6 +256,10 @@ class [Entity]Service:
         return await self.repo.list_entities()
 ```
 
+## Tests
+
+**TODO** — no colocated tests yet. When adding a repository method, create `src/repositories/test_<repo_name>.py` and exercise it against the in-memory test database via the `db_test_session_manager` fixture (from [`tests/fixtures.py`](../../tests/fixtures.py)).
+
 ## Related documentation
 
 - [Models Layer](../models/README.md) - Database models and relationships

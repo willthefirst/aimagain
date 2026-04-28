@@ -258,6 +258,10 @@ async def handle_get_users(user_repo: UserRepository, requesting_user: User):
     return {"users": users, "current_user": requesting_user}
 ```
 
+## Tests
+
+**TODO** — no colocated tests yet. When adding or changing a processing function, create `src/logic/test_<file>.py` next to it. Most processing functions can be unit-tested directly with mocks for the repositories/services they depend on.
+
 ## Related documentation
 
 - [API Routes](../api/routes/README.md) - Route layer that calls processing functions

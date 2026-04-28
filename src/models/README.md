@@ -243,6 +243,12 @@ class NewEntity(BaseModel):
     happened_at = Column(DateTime(timezone=True), nullable=False)  # With timezone
 ```
 
+## Tests
+
+**TODO** — no colocated tests yet. Most model behavior is exercised indirectly through repository and route tests. Add `src/models/test_<model_name>.py` when a model carries non-trivial logic (computed fields, validators, custom `__init__`, etc.) that warrants direct coverage.
+
+When changing a model's schema, generate an Alembic migration as part of the same change — see [`../../CLAUDE.md`](../../CLAUDE.md).
+
 ## Related documentation
 
 - [Repository Layer](../repositories/README.md) - Data access patterns that work with these models

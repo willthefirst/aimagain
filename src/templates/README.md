@@ -245,6 +245,10 @@ async def test_user_list_template(client: AsyncClient, authenticated_user):
     assert "Users" in response.text
 ```
 
+## Tests
+
+Templates are exercised indirectly by the route tests under [`../api/routes/`](../api/routes/) — they assert on the rendered HTML using `selectolax`. There is no separate test file at this directory level. When adding a new template, extend the relevant route test (or add one) to cover its rendering.
+
 ## Related documentation
 
 - [API Routes](../api/routes/README.md) - Routes that render these templates

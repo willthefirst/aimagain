@@ -280,6 +280,15 @@ router = BaseRouter(router=[domain]_router_instance)
 @router.delete("/[domain]/{id}")   # Delete
 ```
 
+## Tests
+
+Colocated alongside the routes:
+
+- `test_auth_routes.py` — registration, login, logout, password reset, session protection (covers `auth_routes.py` and `auth_pages.py`).
+- `test_users.py` — `GET /users` listing behavior (covers `users.py`).
+
+When adding a new route, add (or extend) a `test_*.py` file in this same directory. Shared fixtures (`test_client`, `authenticated_client`, `db_test_session_manager`, `logged_in_user`) come from [`tests/fixtures.py`](../../../tests/fixtures.py); user-construction helpers from [`tests/helpers.py`](../../../tests/helpers.py).
+
 ## Related documentation
 
 - [API Common](../common/README.md) - Shared API utilities and BaseRouter

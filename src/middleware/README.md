@@ -164,6 +164,10 @@ async def _update_something(self):
             raise
 ```
 
+## Tests
+
+**TODO** — no colocated tests yet (and no middleware implemented yet). When adding a middleware, create `src/middleware/test_<name>.py` and exercise it through the FastAPI test client (request/response transformations) using the shared `test_client` fixture.
+
 ## Related documentation
 
 - [API Layer](../api/README.md) - API layer that middleware wraps

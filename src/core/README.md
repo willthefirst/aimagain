@@ -355,6 +355,10 @@ def test_with_custom_config():
         assert service.get_token_expiry() == timedelta(minutes=5)
 ```
 
+## Tests
+
+**TODO** — no colocated tests yet. When changing config loading or templating utilities, add `src/core/test_<file>.py`. Config tests should cover env var precedence and validation error messages; templating tests should cover URL building and any Jinja globals/filters.
+
 ## Related documentation
 
 - [Main Architecture](../README.md) - Application architecture that uses these core modules

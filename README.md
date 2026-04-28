@@ -172,12 +172,14 @@ For detailed deployment instructions, see [deployment/README.md](deployment/READ
 
 ## Testing strategy
 
-Bedlam Connect uses API-level tests to verify authentication and user functionality:
+Tests are **colocated next to the source they cover**. For example, route tests live alongside route handlers under `src/api/routes/`. Shared fixtures and cross-module integration tests live under `tests/`.
 
-### Test structure
+### Current test files
 
-- **`tests/test_api/test_auth.py`** - Authentication tests (18 tests covering registration, login, logout, session management)
-- **`tests/test_api/test_users.py`** - User functionality tests (3 tests covering profile and user operations)
+- **`src/api/routes/test_auth_routes.py`** — authentication: registration, login, logout, password reset, session protection.
+- **`src/api/routes/test_users.py`** — user listing endpoint behavior.
+- **`tests/fixtures.py`** — shared pytest fixtures (loaded globally via the repo-root `conftest.py`).
+- **`tests/helpers.py`** — non-fixture test utilities.
 
 ### Running tests
 
@@ -185,15 +187,14 @@ Bedlam Connect uses API-level tests to verify authentication and user functional
 # All tests
 dev test
 
-# Specific test files
-dev test tests/test_api/test_auth.py
-dev test tests/test_api/test_users.py
+# A single test file
+dev test src/api/routes/test_auth_routes.py
 
-# With coverage
-dev test --coverage
+# Match by keyword
+dev test -k login
 ```
 
-For detailed testing documentation, see [tests/README.md](tests/README.md).
+For detailed testing documentation and conventions, see [tests/README.md](tests/README.md). For the doc/test/code coupling contract, see [CLAUDE.md](CLAUDE.md).
 
 ## Security considerations
 
