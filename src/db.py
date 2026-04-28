@@ -45,11 +45,11 @@ async def check_database_health(skip_table_check=False) -> bool:
         async with async_session_maker() as session:
             # Test basic connection
             await session.execute(text("SELECT 1"))
-            logger.info("Database connection successful")
+            logger.debug("Database connection successful")
 
             # Skip table check if requested (for tests)
             if skip_table_check:
-                logger.info("Skipping table existence check")
+                logger.debug("Skipping table existence check")
                 return True
 
             # Check if all required tables exist
@@ -69,7 +69,7 @@ async def check_database_health(skip_table_check=False) -> bool:
                     f"Database migration required. Missing tables: {missing_tables}"
                 )
 
-            logger.info(f"All required tables present: {expected_tables}")
+            logger.debug(f"All required tables present: {expected_tables}")
             return True
 
     except Exception as e:

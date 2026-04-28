@@ -34,21 +34,16 @@ async def lifespan(app: FastAPI):
     import os
 
     # Startup
-    logger.info("Starting application...")
     try:
         # In provider test mode, skip table check since tables are managed separately
         skip_table_check = os.getenv("PROVIDER_TEST_MODE") == "true"
         await check_database_health(skip_table_check=skip_table_check)
-        logger.info("Database health check passed - application ready")
     except Exception as e:
         logger.error(f"Database health check failed: {e}")
         logger.error("Application startup aborted due to database issues")
         raise
 
     yield
-
-    # Shutdown (if needed in future)
-    logger.info("Application shutting down...")
 
 
 app = FastAPI(title="Bedlam Connect", lifespan=lifespan)

@@ -39,7 +39,7 @@ async def handle_list_users(
         )
         raise
 
-    logger.info(
+    logger.debug(
         f"Handler: Successfully retrieved {len(users_list)} users for user {requesting_user.id}."
     )
 
