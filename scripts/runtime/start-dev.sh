@@ -73,9 +73,14 @@ start_livereload_server() {
     # Start LiveReload server in background
     # Watch templates, static files, and source files for changes
     python -c "
+import logging
 import time
 import threading
 from livereload import Server
+
+# Silence per-connection / file-watch chatter from livereload + tornado
+for name in ('livereload', 'tornado.access', 'tornado.application', 'tornado.general'):
+    logging.getLogger(name).setLevel(logging.WARNING)
 
 def start_server():
     server = Server()
@@ -86,7 +91,6 @@ def start_server():
     # Watch static files if they exist
     server.watch('static/', delay=0.5)
 
-    print(f'🔥 LiveReload server starting on port ${LIVERELOAD_PORT}')
     server.serve(port=${LIVERELOAD_PORT}, host='0.0.0.0', debug=False)
 
 # Run server
