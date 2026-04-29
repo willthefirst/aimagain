@@ -6,23 +6,13 @@ guarantees are load-bearing — a typo would silently mint a ghost admin
 without them, and re-running the bootstrap should be safe.
 """
 
-import importlib.util
-from pathlib import Path
-
 import pytest
 from sqlalchemy import select
 
+from scripts.dev import promote_admin
 from src.models import User
 from tests.fixtures import async_test_sessionmaker
 from tests.helpers import create_test_user
-
-# Load the script as a module without needing scripts/dev on PYTHONPATH.
-_SCRIPT = (
-    Path(__file__).resolve().parent.parent / "scripts" / "dev" / "promote_admin.py"
-)
-_spec = importlib.util.spec_from_file_location("promote_admin", _SCRIPT)
-promote_admin = importlib.util.module_from_spec(_spec)
-_spec.loader.exec_module(promote_admin)
 
 
 @pytest.fixture(autouse=True)

@@ -7,18 +7,10 @@ mistaken for level-1 headings, which causes spurious lint failures and was
 the source of recurring friction during agent-driven doc edits.
 """
 
-import importlib.util
 import textwrap
 from pathlib import Path
 
-# Load the script as a module without depending on it being on PYTHONPATH.
-_SCRIPT = (
-    Path(__file__).resolve().parent.parent / "scripts" / "dev" / "title_case_check.py"
-)
-_spec = importlib.util.spec_from_file_location("title_case_check", _SCRIPT)
-_module = importlib.util.module_from_spec(_spec)
-_spec.loader.exec_module(_module)
-TitleCaseChecker = _module.TitleCaseChecker
+from scripts.dev.title_case_check import TitleCaseChecker
 
 
 def _write_md(tmp_path: Path, body: str) -> Path:
