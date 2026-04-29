@@ -11,5 +11,11 @@
 {% if current_user and (current_user.id == post.owner_id or current_user.is_superuser) %}
 <span class="owner-actions" data-post-id="{{ post.id }}">
   <a href="/posts/{{ post.id }}/form">Edit</a>
+  <button
+    type="button"
+    hx-delete="/posts/{{ post.id }}"
+    hx-confirm="Permanently delete this post? This cannot be undone.">
+    Delete
+  </button>
 </span>
 {% endif %}
