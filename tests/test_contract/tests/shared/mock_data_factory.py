@@ -116,3 +116,23 @@ class MockDataFactory:
                 "return_value_config": post_read
             }
         }
+
+    @classmethod
+    def create_post_edit_dependency_config(
+        cls, post_read: PostRead = None
+    ) -> Dict[str, Any]:
+        """Mock for `handle_update_post`.
+
+        The route under test (`PATCH /posts/{id}`) reads `id`, `title`, and
+        `body` off the handler's return value and packs them into the JSON
+        response, so a `PostRead` (or any object exposing those attributes) is
+        sufficient.
+        """
+        if post_read is None:
+            post_read = cls.create_post_read(title="patched title", body="patched body")
+
+        return {
+            "src.api.routes.posts.handle_update_post": {
+                "return_value_config": post_read
+            }
+        }

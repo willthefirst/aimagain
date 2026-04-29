@@ -2,7 +2,7 @@
 
 Pact-based contract tests verify that the **shape of the conversation** between an HTML form (consumer) and the API endpoint it posts to (provider) stays in sync. They do **not** verify business behavior — that's what the colocated unit tests under `src/<layer>/test_*.py` are for.
 
-> **Status:** auth (registration), users (admin actions), and posts (create form) currently have contract test pairs. Add a pair for any new HTML form per the conventions below.
+> **Status:** auth (registration), users (admin actions), and posts (create + edit forms) currently have contract test pairs. Add a pair for any new HTML form per the conventions below.
 
 ## Why this directory exists outside the colocated convention
 
@@ -52,11 +52,12 @@ tests/test_contract/
     ├── consumer/
     │   ├── test_auth_form.py          # Registration form contract
     │   ├── test_user_admin_actions.py # Admin-actions partial contract
-    │   └── test_post_form.py          # New-post form contract
+    │   ├── test_post_form.py          # New-post form contract
+    │   └── test_post_edit_form.py     # Edit-post form contract
     ├── provider/
     │   ├── test_auth_verification.py
     │   ├── test_user_admin_actions_verification.py
-    │   └── test_posts_verification.py
+    │   └── test_posts_verification.py # Verifies BOTH post create and edit pacts
     └── shared/
         ├── consumer_test_base.py      # BaseConsumerTest abstract class
         ├── helpers.py                 # Pact + Playwright glue

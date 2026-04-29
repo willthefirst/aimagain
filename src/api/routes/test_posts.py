@@ -550,3 +550,145 @@ async def test_list_page_links_to_create_form(
     link = tree.css_first('a[href="/posts/form"]')
     assert link is not None
     assert "New post" in link.text()
+
+
+# --- Edit form page (GET /posts/{id}/form) -------------------------------
+
+
+async def test_owner_can_open_edit_form(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user: User,
+):
+    """The owner sees the edit form pre-filled with current values."""
+    post = Post(title="orig title", body="orig body", owner_id=logged_in_user.id)
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            session.add(post)
+
+    response = await authenticated_client.get(f"/posts/{post.id}/form")
+    assert response.status_code == 200
+    tree = HTMLParser(response.text)
+    form = tree.css_first("form")
+    assert form is not None
+    assert form.attributes.get("hx-patch") == f"/posts/{post.id}"
+    assert form.attributes.get("hx-ext") == "json-enc"
+    title_input = tree.css_first("input#title")
+    assert title_input is not None
+    assert title_input.attributes.get("value") == "orig title"
+    body_textarea = tree.css_first("textarea#body")
+    assert body_textarea is not None
+    assert "orig body" in body_textarea.text()
+
+
+async def test_admin_can_open_edit_form_for_any_post(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user: User,
+):
+    await _promote_to_admin(db_test_session_manager, logged_in_user.email)
+    other = create_test_user(username=f"other-{uuid.uuid4()}")
+    post = Post(title="t", body="b", owner_id=other.id)
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            session.add(other)
+            session.add(post)
+
+    response = await authenticated_client.get(f"/posts/{post.id}/form")
+    assert response.status_code == 200
+
+
+async def test_non_owner_cannot_open_edit_form(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user: User,
+):
+    other = create_test_user(username=f"other-{uuid.uuid4()}")
+    post = Post(title="t", body="b", owner_id=other.id)
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            session.add(other)
+            session.add(post)
+
+    response = await authenticated_client.get(f"/posts/{post.id}/form")
+    assert response.status_code == 403
+
+
+async def test_edit_form_404_for_unknown_post(
+    authenticated_client: AsyncClient,
+    logged_in_user: User,
+):
+    response = await authenticated_client.get(f"/posts/{uuid.uuid4()}/form")
+    assert response.status_code == 404
+
+
+async def test_edit_form_unauthenticated_redirects(
+    test_client: AsyncClient,
+):
+    response = await test_client.get(
+        f"/posts/{uuid.uuid4()}/form",
+        headers={"accept": "text/html"},
+        follow_redirects=False,
+    )
+    assert response.status_code == 302
+    assert "/auth/login" in response.headers["location"]
+
+
+# --- Owner-actions partial visibility on detail page ---------------------
+
+
+async def test_detail_page_shows_edit_link_for_owner(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user: User,
+):
+    post = Post(title="t", body="b", owner_id=logged_in_user.id)
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            session.add(post)
+
+    response = await authenticated_client.get(f"/posts/{post.id}")
+    assert response.status_code == 200
+    tree = HTMLParser(response.text)
+    actions = tree.css_first("span.owner-actions")
+    assert actions is not None
+    edit_link = actions.css_first("a")
+    assert edit_link is not None
+    assert edit_link.attributes.get("href") == f"/posts/{post.id}/form"
+
+
+async def test_detail_page_shows_edit_link_for_admin(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user: User,
+):
+    await _promote_to_admin(db_test_session_manager, logged_in_user.email)
+    other = create_test_user(username=f"other-{uuid.uuid4()}")
+    post = Post(title="t", body="b", owner_id=other.id)
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            session.add(other)
+            session.add(post)
+
+    response = await authenticated_client.get(f"/posts/{post.id}")
+    assert response.status_code == 200
+    tree = HTMLParser(response.text)
+    assert tree.css_first("span.owner-actions") is not None
+
+
+async def test_detail_page_hides_edit_link_for_stranger(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user: User,
+):
+    other = create_test_user(username=f"other-{uuid.uuid4()}")
+    post = Post(title="t", body="b", owner_id=other.id)
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            session.add(other)
+            session.add(post)
+
+    response = await authenticated_client.get(f"/posts/{post.id}")
+    assert response.status_code == 200
+    tree = HTMLParser(response.text)
+    assert tree.css_first("span.owner-actions") is None

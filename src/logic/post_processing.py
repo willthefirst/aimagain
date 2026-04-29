@@ -43,6 +43,24 @@ async def handle_get_post_form(
     return {"request": request, "current_user": requesting_user}
 
 
+async def handle_get_post_edit_form(
+    request: Request,
+    post_id: UUID,
+    post_repo: PostRepository,
+    requesting_user: User,
+):
+    """Loads a post for the edit-form page. 404 if missing, 403 if the
+    requester is neither owner nor admin (mirrors `handle_update_post`)."""
+    post = await post_repo.get_post_by_id(post_id)
+    if post is None:
+        raise NotFoundError(detail="Post not found")
+
+    if post.owner_id != requesting_user.id and not requesting_user.is_superuser:
+        raise ForbiddenError(detail="Only the owner or an admin can edit this post")
+
+    return {"request": request, "post": post, "current_user": requesting_user}
+
+
 async def handle_create_post(
     payload: PostCreate,
     post_repo: PostRepository,

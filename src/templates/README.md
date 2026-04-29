@@ -66,7 +66,7 @@ Templates use inheritance for consistent layout and feature-specific customizati
 | **/**      | Base layout and shared | `base.html` - Foundation template                                      |
 | **auth/**  | Authentication pages   | login, register, forgot/reset password                                 |
 | **users/** | User management        | list, detail, `_admin_actions.html` partial (shared by list & detail)  |
-| **posts/** | Posts                  | list, detail, `new.html` (create form)                                 |
+| **posts/** | Posts                  | list, detail, `new.html` + `edit.html` (forms), `_owner_actions.html` partial (shared by detail) |
 | **me/**    | Personal/profile pages | user profile                                                           |
 
 ### Reusable partial convention
@@ -91,8 +91,10 @@ templates/
 │   └── _admin_actions.html     # Reusable admin-actions partial
 ├── posts/                      # Post templates
 │   ├── list.html               # Post listing
-│   ├── detail.html             # Post detail
-│   └── new.html                # Create-post form (HTMX json-enc → POST /posts)
+│   ├── detail.html             # Post detail (includes _owner_actions.html)
+│   ├── new.html                # Create-post form (HTMX json-enc → POST /posts)
+│   ├── edit.html               # Edit-post form (HTMX json-enc → PATCH /posts/{id})
+│   └── _owner_actions.html     # Reusable owner-actions partial (Edit link)
 └── me/                         # Personal user pages
     └── profile.html            # User's profile page
 ```
