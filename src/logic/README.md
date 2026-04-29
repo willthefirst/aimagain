@@ -84,7 +84,7 @@ When a real service exists for an entity, move the commit there and update the l
 | Module                    | Purpose                              | Key Functions                  |
 | ------------------------- | ------------------------------------ | ------------------------------ |
 | **user_processing.py**    | User operation coordination          | list users with filtering, set activation (writes audit row, commits), delete user (audit row recorded before the delete fires; commits) |
-| **post_processing.py**    | Post operation coordination          | list posts, get post detail, create post (server-sets owner_id, writes audit row, commits), update post (owner-or-admin guard, before/after audit snapshot, commits), build create- and edit-form contexts |
+| **post_processing.py**    | Post operation coordination          | list posts, get post detail, create post (server-sets owner_id, writes audit row, commits), update post (owner-or-admin guard, before/after audit snapshot, commits), delete post (owner-or-admin guard, audit row recorded before the delete fires with `after=None`, commits), build create- and edit-form contexts |
 | **audit.py**              | Audit-log helper                     | `record_audit(...)` — append-only mutation row per `RESOURCE_GRAMMAR.md:135`; flushes inside the caller's transaction so the audit lands atomically with the mutation. Wired into all current mutation handlers (posts, users, auth registration). |
 | **auth_processing.py**    | Authentication workflow coordination | user registration processing (writes a `register` audit row with `actor_id=None`; best-effort atomicity since fastapi-users commits internally) |
 

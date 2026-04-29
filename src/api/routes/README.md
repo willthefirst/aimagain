@@ -73,7 +73,7 @@ Routes are organized by domain with consistent delegation patterns.
 | Route File         | Domain               | Primary Responsibilities         | Main Endpoints                                                                                                                  | Dependencies          |
 | ------------------ | -------------------- | -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- | --------------------- |
 | **users.py**       | User data            | User listing, detail, admin actions | `GET /users`, `GET /users/{id}`, `PUT /users/{id}/activation` (admin), `DELETE /users/{id}` (admin)                          | UserRepository        |
-| **posts.py**       | Posts                | Post listing, detail, create, partial update, and create/edit form pages | `GET /posts`, `GET /posts/form`, `GET /posts/{id}`, `GET /posts/{id}/form`, `POST /posts`, `PATCH /posts/{id}`                                                                              | PostRepository        |
+| **posts.py**       | Posts                | Post listing, detail, create, partial update, hard delete, and create/edit form pages | `GET /posts`, `GET /posts/form`, `GET /posts/{id}`, `GET /posts/{id}/form`, `POST /posts`, `PATCH /posts/{id}`, `DELETE /posts/{id}`                                                                              | PostRepository        |
 | **me.py**          | Current user context | User profile, current-user JSON  | `GET /users/me`, `GET /users/me/profile`                                                                                        | Auth                  |
 | **auth_routes.py** | Authentication API   | Login, register, password reset  | `/auth/*`                                                                                                                       | Authentication logic  |
 | **auth_pages.py**  | Authentication UI    | Login, register forms            | `/login`, `/register`                                                                                                           | Authentication logic  |
@@ -83,7 +83,7 @@ Routes are organized by domain with consistent delegation patterns.
 **Domain route files:**
 
 - `users.py` - User listing and access
-- `posts.py` - Post listing, detail, create, partial update, and both HTML form pages (`GET /posts/form`, `GET /posts/{id}/form`)
+- `posts.py` - Post listing, detail, create, partial update, hard delete, and both HTML form pages (`GET /posts/form`, `GET /posts/{id}/form`)
 - `me.py` - Current user's profile
 
 **Authentication routes:**
@@ -285,7 +285,7 @@ Colocated alongside the routes:
 
 - `test_auth_routes.py` — registration, login, logout, password reset, session protection (covers `auth_routes.py` and `auth_pages.py`).
 - `test_users.py` — `GET /users` listing behavior (covers `users.py`).
-- `test_posts.py` — `GET /posts`, `GET /posts/{id}`, `POST /posts`, `PATCH /posts/{id}`, `GET /posts/form`, and `GET /posts/{id}/form` (covers `posts.py`). Includes owner-only authorization, admin override, the `extra="forbid"` scrub of `owner_id`, route-ordering checks, and `_owner_actions.html` partial visibility on the detail page. Pact contract pairs for both forms live under [`tests/test_contract/`](../../../tests/test_contract/README.md).
+- `test_posts.py` — `GET /posts`, `GET /posts/{id}`, `POST /posts`, `PATCH /posts/{id}`, `DELETE /posts/{id}`, `GET /posts/form`, and `GET /posts/{id}/form` (covers `posts.py`). Includes owner-or-admin authorization on PATCH and DELETE, the `extra="forbid"` scrub of `owner_id`, route-ordering checks, audit-row before/after assertions for create/update/delete, and `_owner_actions.html` partial visibility on the detail page. Pact contract pairs for both forms live under [`tests/test_contract/`](../../../tests/test_contract/README.md).
 
 When adding a new route, add (or extend) a `test_*.py` file in this same directory. Shared fixtures (`test_client`, `authenticated_client`, `db_test_session_manager`, `logged_in_user`) come from [`tests/fixtures.py`](../../../tests/fixtures.py); user-construction helpers from [`tests/helpers.py`](../../../tests/helpers.py).
 
