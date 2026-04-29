@@ -283,6 +283,7 @@ async def handle_get_users(user_repo: UserRepository, requesting_user: User):
 Colocated tests live alongside the logic modules:
 
 - `test_audit.py` — exercises the `record_audit(...)` helper: round-trip via the repo, no commit (handler owns commit), null-actor support.
+- `test_audit_discipline.py` — static AST check that fails if any `handle_*` in `*_processing.py` calls `.commit()` without `record_audit(...)`. Enforces `RESOURCE_GRAMMAR.md:135` so a future contributor can't silently skip the audit row. Opt out with `audit-discipline-ignore: <reason>` in the handler's docstring.
 
 When adding or changing a processing function, create `src/logic/test_<file>.py` next to it. Most processing functions can be unit-tested directly with mocks or with the in-memory `db_test_session_manager` fixture for the repositories they depend on.
 

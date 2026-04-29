@@ -10,7 +10,11 @@ repos:
       - id: check-merge-conflict
 
   - repo: https://github.com/psf/black
-    rev: 25.1.0
+    # Keep in sync with the black version installed via pyproject.toml so
+    # pre-commit and `dev lint`/CI agree on style. Version drift caused one
+    # CI flap on PR #73 — pre-commit's older black approved a file that
+    # CI's newer black rejected.
+    rev: 26.3.1
     hooks:
       - id: black
         language_version: python3.11
