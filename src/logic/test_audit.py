@@ -11,7 +11,7 @@ import uuid
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from src.logic.audit import record_audit
+from src.logic.audit import AuditAction, record_audit
 from src.repositories.audit_repository import AuditRepository
 from tests.helpers import create_test_user
 
@@ -36,7 +36,7 @@ async def test_record_audit_round_trips_through_repo(
             actor_id=actor.id,
             resource_type="post",
             resource_id=resource_id,
-            action="create_post",
+            action=AuditAction.CREATE_POST,
             before=None,
             after={"title": "x"},
         )
@@ -44,7 +44,7 @@ async def test_record_audit_round_trips_through_repo(
 
         fetched = await repo.get_by_id(row.id)
         assert fetched is not None
-        assert fetched.action == "create_post"
+        assert fetched.action == AuditAction.CREATE_POST
         assert fetched.before is None
         assert fetched.after == {"title": "x"}
 
@@ -69,7 +69,7 @@ async def test_record_audit_does_not_commit(
             actor_id=actor.id,
             resource_type="post",
             resource_id=resource_id,
-            action="create_post",
+            action=AuditAction.CREATE_POST,
             after={"title": "x"},
         )
         await session.rollback()
@@ -96,7 +96,7 @@ async def test_record_audit_accepts_null_actor(
             actor_id=None,
             resource_type="user",
             resource_id=resource_id,
-            action="register",
+            action=AuditAction.REGISTER,
             after={"email": "new@example.com"},
         )
         await session.commit()

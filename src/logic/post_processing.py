@@ -4,7 +4,7 @@ from uuid import UUID
 from fastapi import Request
 
 from src.api.common.exceptions import ForbiddenError, NotFoundError
-from src.logic.audit import record_audit
+from src.logic.audit import AuditAction, record_audit
 from src.models import Post, User
 from src.repositories.audit_repository import AuditRepository
 from src.repositories.post_repository import PostRepository
@@ -91,7 +91,7 @@ async def handle_create_post(
         actor_id=requesting_user.id,
         resource_type="post",
         resource_id=created.id,
-        action="create_post",
+        action=AuditAction.CREATE_POST,
         before=None,
         after=_snapshot_post(created),
     )
@@ -127,7 +127,7 @@ async def handle_update_post(
         actor_id=requesting_user.id,
         resource_type="post",
         resource_id=updated.id,
-        action="update_post",
+        action=AuditAction.UPDATE_POST,
         before=before,
         after=_snapshot_post(updated),
     )
