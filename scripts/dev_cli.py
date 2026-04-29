@@ -53,6 +53,55 @@ class CLIRunner:
             print(f"❌ Error running command: {e}")
             return 1
 
+    def is_dev_container_running(self, service_name: str) -> bool:
+        """Check if a docker compose service has any running containers."""
+        result = subprocess.run(
+            [
+                "docker",
+                "compose",
+                "-f",
+                DOCKER_COMPOSE_DEV_FILE,
+                "ps",
+                "-q",
+                service_name,
+            ],
+            capture_output=True,
+            text=True,
+            cwd=self.project_root,
+        )
+        return bool(result.stdout.strip())
+
+    def wrap_for_compose(
+        self, service_name: str, container_cmd: List[str]
+    ) -> List[str]:
+        """Wrap a command to run inside the dev container.
+
+        Uses `docker compose exec` if the service is already running, otherwise
+        falls back to `docker compose run --rm --no-deps` for one-off invocations.
+        """
+        if self.is_dev_container_running(service_name):
+            return [
+                "docker",
+                "compose",
+                "-f",
+                DOCKER_COMPOSE_DEV_FILE,
+                "exec",
+                service_name,
+                *container_cmd,
+            ]
+        print("ℹ️  Dev container not running — using one-off `docker compose run`")
+        return [
+            "docker",
+            "compose",
+            "-f",
+            DOCKER_COMPOSE_DEV_FILE,
+            "run",
+            "--rm",
+            "--no-deps",
+            service_name,
+            *container_cmd,
+        ]
+
     def check_docker_installation(self) -> bool:
         """Check if Docker and Docker Compose are available."""
         # Check Docker
@@ -218,47 +267,6 @@ class SeedCommands:
     def __init__(self, runner: CLIRunner):
         self.runner = runner
 
-    def _is_dev_container_running(self) -> bool:
-        result = subprocess.run(
-            [
-                "docker",
-                "compose",
-                "-f",
-                DOCKER_COMPOSE_DEV_FILE,
-                "ps",
-                "-q",
-                self.SERVICE_NAME,
-            ],
-            capture_output=True,
-            text=True,
-            cwd=self.runner.project_root,
-        )
-        return bool(result.stdout.strip())
-
-    def _wrap_for_compose(self, container_cmd: List[str]) -> List[str]:
-        if self._is_dev_container_running():
-            return [
-                "docker",
-                "compose",
-                "-f",
-                DOCKER_COMPOSE_DEV_FILE,
-                "exec",
-                self.SERVICE_NAME,
-                *container_cmd,
-            ]
-        print("ℹ️  Dev container not running — using one-off `docker compose run`")
-        return [
-            "docker",
-            "compose",
-            "-f",
-            DOCKER_COMPOSE_DEV_FILE,
-            "run",
-            "--rm",
-            "--no-deps",
-            self.SERVICE_NAME,
-            *container_cmd,
-        ]
-
     def seed(self) -> int:
         """Seed the dev database with fixture users."""
         # `dev seed` runs in a one-off `docker compose run --no-deps` container
@@ -266,8 +274,9 @@ class SeedCommands:
         # here — otherwise a freshly added revision crashes seed against a
         # stale schema with a raw OperationalError.
         print("🧱 Applying migrations before seeding...")
-        migrate_cmd = self._wrap_for_compose(
-            ["alembic", "-c", "config/alembic.ini", "upgrade", "head"]
+        migrate_cmd = self.runner.wrap_for_compose(
+            self.SERVICE_NAME,
+            ["alembic", "-c", "config/alembic.ini", "upgrade", "head"],
         )
         rc = self.runner.run_command(migrate_cmd)
         if rc != 0:
@@ -275,8 +284,26 @@ class SeedCommands:
             return rc
 
         print("🌱 Seeding fixture users...")
-        seed_cmd = self._wrap_for_compose(["python", "scripts/dev/seed.py"])
+        seed_cmd = self.runner.wrap_for_compose(
+            self.SERVICE_NAME, ["python", "scripts/dev/seed.py"]
+        )
         return self.runner.run_command(seed_cmd)
+
+
+class PromoteAdminCommands:
+    """Promote / revoke admin status by email."""
+
+    SERVICE_NAME = "bedlam-connect-dev"
+
+    def __init__(self, runner: CLIRunner):
+        self.runner = runner
+
+    def run(self, email: str, revoke: bool) -> int:
+        container_cmd = ["python", "scripts/dev/promote_admin.py", email]
+        if revoke:
+            container_cmd.append("--revoke")
+        cmd = self.runner.wrap_for_compose(self.SERVICE_NAME, container_cmd)
+        return self.runner.run_command(cmd)
 
 
 class RoutesCommands:
@@ -411,6 +438,7 @@ class DevCLI:
         self.setup = SetupCommands(self.runner)
         self.seed_cmd = SeedCommands(self.runner)
         self.routes_cmd = RoutesCommands(self.runner)
+        self.promote_admin_cmd = PromoteAdminCommands(self.runner)
 
     def create_parser(self) -> argparse.ArgumentParser:
         """Create the argument parser with all commands."""
@@ -443,6 +471,7 @@ Examples:
         self._add_setup_parser(subparsers)
         self._add_seed_parser(subparsers)
         self._add_routes_parser(subparsers)
+        self._add_promote_admin_parser(subparsers)
 
         return parser
 
@@ -524,6 +553,21 @@ Examples:
             help="Filter by path prefix (e.g. /users)",
         )
         parser.set_defaults(func=lambda args: self.routes_cmd.list_routes(args.prefix))
+
+    def _add_promote_admin_parser(self, subparsers):
+        parser = subparsers.add_parser(
+            "promote-admin",
+            help="Grant or revoke admin (is_superuser) status for a user by email",
+        )
+        parser.add_argument("email", help="Email address of the user to (de)promote")
+        parser.add_argument(
+            "--revoke",
+            action="store_true",
+            help="Revoke admin status instead of granting it",
+        )
+        parser.set_defaults(
+            func=lambda args: self.promote_admin_cmd.run(args.email, args.revoke)
+        )
 
     def run(self) -> int:
         """Run the CLI application."""

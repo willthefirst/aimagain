@@ -88,6 +88,7 @@ Run `dev --help` for the live, authoritative list. As of this writing:
 | `dev lint` | Run black, isort, autoflake, and the title-case checker. Pre-commit runs the same checks automatically. |
 | `dev seed` | Apply any pending Alembic migrations, then seed the dev database with fixture users for manual testing. Migrations run first so a freshly added revision doesn't cause the seed to crash against a stale schema. |
 | `dev routes [prefix]` | Print every HTTP route registered on `src.main:app` grouped by path prefix. Surfaces router shadowing — two `include_router` calls registering handlers on overlapping paths — without spinning up the server. |
+| `dev promote-admin <email> [--revoke]` | Grant or revoke admin (`is_superuser`) status for a user matched by email. Idempotent. Errors if no user matches. Runs inside the dev container. For the prod equivalent see [`deployment/README.md`](../deployment/README.md#bootstrapping-an-admin). |
 
 For per-command flag details, run `dev <command> --help`.
 
@@ -99,6 +100,12 @@ dev --help
 ```
 
 Without `pip install -e .`, the CLI is also runnable directly: `python3 scripts/dev_cli.py <command>` or `./scripts/dev_cli.py <command>`.
+
+### `dev/promote_admin.py`
+
+Async script that flips `is_superuser` on a user matched by email. Used by `dev promote-admin` (local) and `deployment/droplet-files/promote-admin.sh` (production). Idempotent — re-running with the same target value is a no-op. Refuses to auto-create users on a typo (would silently mint a ghost admin).
+
+Tests: [`../tests/test_promote_admin.py`](../tests/test_promote_admin.py).
 
 ### `title_case_check.py`
 
