@@ -10,13 +10,19 @@ import pytest
 from src.models import User
 
 
-def create_mock_user(email: str, username: str, user_id: uuid.UUID = None) -> User:
+def create_mock_user(
+    email: str,
+    username: str,
+    user_id: uuid.UUID = None,
+    is_superuser: bool = False,
+) -> User:
     """Helper function to create a mock User instance."""
     return User(
         id=user_id if user_id else uuid.uuid4(),
         email=email,
         username=username,
         is_active=True,
+        is_superuser=is_superuser,
     )
 
 
@@ -104,8 +110,13 @@ class MockAuthManager:
         return get_mock_current_user
 
     @staticmethod
-    def setup_mock_auth(app, user: User, dependency_to_override):
-        """Set up mock authentication on a FastAPI app."""
+    def setup_mock_auth(app, user: User, *dependencies_to_override):
+        """Override one or more auth dependencies on a FastAPI app with the
+        same mock user. Pass `current_active_user` for plain auth, or both
+        `current_active_user` and `current_admin_user` when the route under
+        test requires admin privileges.
+        """
         mock_dependency = MockAuthManager.create_mock_user_dependency(user)
-        app.dependency_overrides[dependency_to_override] = mock_dependency
+        for dep in dependencies_to_override:
+            app.dependency_overrides[dep] = mock_dependency
         return mock_dependency

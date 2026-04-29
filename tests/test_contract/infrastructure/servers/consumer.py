@@ -7,16 +7,22 @@ service. Anything that talks to a real database or service is out of scope.
 """
 
 import logging
+import uuid
 from typing import Optional
 
 import uvicorn
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 
+from src.api.common import APIResponse
 from src.api.routes import auth_pages
-from src.auth_config import current_active_user
+from src.auth_config import current_active_user, current_admin_user
 
 from ..utilities.mocks import MockAuthManager, create_mock_user
 from .base import ServerManager, setup_health_check_route
+
+# Stable UUID used by the admin-actions stub page so consumer tests can build
+# the pact path against a known target id without round-tripping a database.
+STUB_TARGET_USER_ID = uuid.UUID("11111111-1111-1111-1111-111111111111")
 
 
 class ConsumerServerConfig:
@@ -30,15 +36,56 @@ class ConsumerServerConfig:
     def __init__(
         self,
         auth_pages: bool = True,
+        users_admin_actions: bool = False,
         mock_auth: bool = True,
     ):
         self.auth_pages = auth_pages
+        self.users_admin_actions = users_admin_actions
         self.mock_auth = mock_auth
+
+
+def _setup_users_admin_actions_stub(app: FastAPI) -> None:
+    """Mount a stub page that renders the real `users/detail.html` template
+    with hardcoded admin and target user objects, so the admin-actions partial
+    is exercised without needing a database. The contract surface is the
+    HTMX-decorated buttons inside the partial; what we render here is the same
+    partial production code paths render.
+    """
+
+    class _StubUser:
+        def __init__(self, **kwargs):
+            self.__dict__.update(kwargs)
+
+    @app.get("/users/{target_user_id}")
+    async def admin_actions_stub_page(request: Request, target_user_id: uuid.UUID):
+        target_user = _StubUser(
+            id=target_user_id,
+            username="target_user",
+            email="target@example.com",
+            is_active=True,
+            is_superuser=False,
+            is_verified=True,
+        )
+        # The page route relies on `current_user` being set in context; the
+        # mocked `current_active_user` dependency above places it on
+        # request.state via fastapi-users, but for the stub we pass it directly.
+        current_user = _StubUser(
+            id=uuid.UUID("00000000-0000-0000-0000-000000000001"),
+            username="admin_user",
+            is_superuser=True,
+        )
+        return APIResponse.html_response(
+            template_name="users/detail.html",
+            context={"target_user": target_user, "current_user": current_user},
+            request=request,
+        )
 
 
 def setup_consumer_app_routes(app: FastAPI, config: ConsumerServerConfig) -> None:
     if config.auth_pages:
         app.include_router(auth_pages.auth_pages_api_router)
+    if config.users_admin_actions:
+        _setup_users_admin_actions_stub(app)
 
 
 def run_consumer_server_process(
@@ -56,10 +103,17 @@ def run_consumer_server_process(
 
     if config.mock_auth:
         logger.info("Adding mock auth for contract tests")
+        # When the admin-actions stub is mounted, the mock user must be a
+        # superuser so the partial's `{% if current_user.is_superuser %}`
+        # guard renders the buttons.
         mock_user = create_mock_user(
-            email="test@example.com", username="contract_test_user"
+            email="test@example.com",
+            username="contract_test_user",
+            is_superuser=config.users_admin_actions,
         )
-        MockAuthManager.setup_mock_auth(consumer_app, mock_user, current_active_user)
+        MockAuthManager.setup_mock_auth(
+            consumer_app, mock_user, current_active_user, current_admin_user
+        )
 
     uvicorn.run(consumer_app, host=host, port=port, log_level="warning")
 
