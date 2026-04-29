@@ -37,10 +37,12 @@ class ConsumerServerConfig:
         self,
         auth_pages: bool = True,
         users_admin_actions: bool = False,
+        posts_pages: bool = False,
         mock_auth: bool = True,
     ):
         self.auth_pages = auth_pages
         self.users_admin_actions = users_admin_actions
+        self.posts_pages = posts_pages
         self.mock_auth = mock_auth
 
 
@@ -81,11 +83,27 @@ def _setup_users_admin_actions_stub(app: FastAPI) -> None:
         )
 
 
+def _setup_posts_form_stub(app: FastAPI) -> None:
+    """Mount a stub `GET /posts/form` that renders the real `posts/new.html`
+    template. The contract surface is the form's HTMX-decorated submission;
+    the create POST is intercepted by Playwright before it leaves the browser,
+    so no database is needed.
+    """
+
+    @app.get("/posts/form")
+    async def posts_form_stub_page(request: Request):
+        return APIResponse.html_response(
+            template_name="posts/new.html", context={}, request=request
+        )
+
+
 def setup_consumer_app_routes(app: FastAPI, config: ConsumerServerConfig) -> None:
     if config.auth_pages:
         app.include_router(auth_pages.auth_pages_api_router)
     if config.users_admin_actions:
         _setup_users_admin_actions_stub(app)
+    if config.posts_pages:
+        _setup_posts_form_stub(app)
 
 
 def run_consumer_server_process(

@@ -487,3 +487,66 @@ async def test_patch_unauthenticated_redirects(
     )
     assert response.status_code == 302
     assert "/auth/login" in response.headers["location"]
+
+
+# --- Create form page (GET /posts/form) ----------------------------------
+
+
+async def test_get_post_form_renders(
+    authenticated_client: AsyncClient,
+    logged_in_user: User,
+):
+    """GET /posts/form renders the form for an authenticated user."""
+    response = await authenticated_client.get("/posts/form")
+
+    assert response.status_code == 200
+    assert "text/html" in response.headers["content-type"]
+
+    tree = HTMLParser(response.text)
+    form = tree.css_first("form")
+    assert form is not None
+    assert form.attributes.get("hx-post") == "/posts"
+    assert form.attributes.get("hx-ext") == "json-enc"
+    assert tree.css_first("input#title") is not None
+    assert tree.css_first("textarea#body") is not None
+
+
+async def test_get_post_form_unauthenticated_redirects(
+    test_client: AsyncClient,
+):
+    response = await test_client.get(
+        "/posts/form",
+        headers={"accept": "text/html"},
+        follow_redirects=False,
+    )
+    assert response.status_code == 302
+    assert "/auth/login" in response.headers["location"]
+    assert "next=/posts/form" in response.headers["location"]
+
+
+async def test_form_route_does_not_shadow_detail_route(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user: User,
+):
+    """Sanity check the /posts/form ordering — a real UUID still hits the detail route."""
+    post = Post(title="t", body="b", owner_id=logged_in_user.id)
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            session.add(post)
+
+    response = await authenticated_client.get(f"/posts/{post.id}")
+    assert response.status_code == 200
+    assert "t" in response.text
+
+
+async def test_list_page_links_to_create_form(
+    authenticated_client: AsyncClient,
+    logged_in_user: User,
+):
+    response = await authenticated_client.get("/posts")
+    assert response.status_code == 200
+    tree = HTMLParser(response.text)
+    link = tree.css_first('a[href="/posts/form"]')
+    assert link is not None
+    assert "New post" in link.text()
