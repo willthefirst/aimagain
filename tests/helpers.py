@@ -2,6 +2,9 @@ import uuid
 from typing import Optional
 from uuid import UUID  # Import UUID
 
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
+
 # Need ORM models
 from src.models import User
 
@@ -26,3 +29,23 @@ def create_test_user(
         is_superuser=is_superuser,
         is_verified=is_verified,
     )
+
+
+async def promote_to_admin(
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    user_email: str,
+) -> None:
+    """Mutate a fixture-created user to is_superuser=True.
+
+    Used by colocated tests that need an admin actor — the standard
+    `authenticated_client` fixture creates a non-admin user, so tests that
+    exercise admin-gated routes flip the bit on the existing user instead of
+    reauthenticating as a different one.
+    """
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            stmt = select(User).filter(User.email == user_email)
+            result = await session.execute(stmt)
+            user = result.scalars().first()
+            assert user is not None, f"Test user {user_email} not found"
+            user.is_superuser = True

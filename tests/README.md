@@ -11,7 +11,7 @@ See [`../CLAUDE.md`](../CLAUDE.md) for the full definition-of-done contract that
 ## What lives here
 
 - **`fixtures.py`** — shared pytest fixtures (`test_client`, `authenticated_client`, `db_test_session_manager`, `logged_in_user`, etc.). Loaded globally via `pytest_plugins = ["tests.fixtures"]` in the repo-root `conftest.py`, so colocated tests anywhere under `src/` can use them.
-- **`helpers.py`** — non-fixture test utilities (e.g. `create_test_user(...)` for building User instances). Import as `from tests.helpers import create_test_user`.
+- **`helpers.py`** — non-fixture test utilities. Currently exports `create_test_user(...)` for building User instances and `promote_to_admin(...)` for flipping `is_superuser=True` on a fixture-created user (used by tests that exercise admin-gated routes). Import as `from tests.helpers import create_test_user, promote_to_admin`.
 - **`README.md`** — this file.
 - **(future) cross-module integration tests** — tests that span multiple layers and don't have a single owning module belong here, not under `src/`.
 
@@ -24,7 +24,8 @@ See [`../CLAUDE.md`](../CLAUDE.md) for the full definition-of-done contract that
 
 | Module | Tests |
 | --- | --- |
-| `src/api/routes/` | `test_auth_routes.py`, `test_users.py` |
+| `src/api/routes/` | `test_auth_routes.py`, `test_users.py`, `test_posts.py` |
+| `src/schemas/` | `test_post.py` |
 | `src/services/` | none yet — gap |
 | `src/repositories/` | none yet — gap |
 | `src/logic/` | none yet — gap |

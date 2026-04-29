@@ -9,24 +9,10 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from src.models import User
-from tests.helpers import create_test_user
+from tests.helpers import create_test_user, promote_to_admin
 
 # Mark all tests in this module as async
 pytestmark = pytest.mark.asyncio
-
-
-async def _promote_to_admin(
-    db_test_session_manager: async_sessionmaker[AsyncSession],
-    user_email: str,
-) -> None:
-    """Mutate a fixture-created user to is_superuser=True."""
-    async with db_test_session_manager() as session:
-        async with session.begin():
-            stmt = select(User).filter(User.email == user_email)
-            result = await session.execute(stmt)
-            user = result.scalars().first()
-            assert user is not None, f"Test user {user_email} not found"
-            user.is_superuser = True
 
 
 # --- Listing -------------------------------------------------------------
@@ -140,7 +126,7 @@ async def test_list_shows_admin_actions_for_admin(
     logged_in_user: User,
 ):
     """Admin viewers see deactivate + delete buttons on each non-self row."""
-    await _promote_to_admin(db_test_session_manager, logged_in_user.email)
+    await promote_to_admin(db_test_session_manager, logged_in_user.email)
     other = create_test_user(username=f"target-{uuid.uuid4()}")
     async with db_test_session_manager() as session:
         async with session.begin():
@@ -162,7 +148,7 @@ async def test_list_shows_reactivate_for_deactivated_user(
     logged_in_user: User,
 ):
     """A deactivated user shows 'Reactivate' rather than 'Deactivate'."""
-    await _promote_to_admin(db_test_session_manager, logged_in_user.email)
+    await promote_to_admin(db_test_session_manager, logged_in_user.email)
     other = create_test_user(username=f"target-{uuid.uuid4()}", is_active=False)
     async with db_test_session_manager() as session:
         async with session.begin():
@@ -211,7 +197,7 @@ async def test_detail_shows_admin_actions_for_admin(
     logged_in_user: User,
 ):
     """Admin viewing another user's detail page sees the actions partial."""
-    await _promote_to_admin(db_test_session_manager, logged_in_user.email)
+    await promote_to_admin(db_test_session_manager, logged_in_user.email)
     target = create_test_user(username=f"target-{uuid.uuid4()}")
     async with db_test_session_manager() as session:
         async with session.begin():
@@ -246,7 +232,7 @@ async def test_admin_can_deactivate_user(
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user: User,
 ):
-    await _promote_to_admin(db_test_session_manager, logged_in_user.email)
+    await promote_to_admin(db_test_session_manager, logged_in_user.email)
     target = create_test_user(username=f"target-{uuid.uuid4()}", is_active=True)
     async with db_test_session_manager() as session:
         async with session.begin():
@@ -273,7 +259,7 @@ async def test_admin_can_reactivate_user(
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user: User,
 ):
-    await _promote_to_admin(db_test_session_manager, logged_in_user.email)
+    await promote_to_admin(db_test_session_manager, logged_in_user.email)
     target = create_test_user(username=f"target-{uuid.uuid4()}", is_active=False)
     async with db_test_session_manager() as session:
         async with session.begin():
@@ -311,7 +297,7 @@ async def test_admin_cannot_deactivate_self(
     logged_in_user: User,
 ):
     """Self-guard: admin acting on their own id is rejected at the logic layer."""
-    await _promote_to_admin(db_test_session_manager, logged_in_user.email)
+    await promote_to_admin(db_test_session_manager, logged_in_user.email)
 
     response = await authenticated_client.put(
         f"/users/{logged_in_user.id}/activation",
@@ -325,7 +311,7 @@ async def test_activation_404_for_unknown_user(
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user: User,
 ):
-    await _promote_to_admin(db_test_session_manager, logged_in_user.email)
+    await promote_to_admin(db_test_session_manager, logged_in_user.email)
     response = await authenticated_client.put(
         f"/users/{uuid.uuid4()}/activation",
         json={"state": "deactivated"},
@@ -341,7 +327,7 @@ async def test_admin_can_delete_user(
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user: User,
 ):
-    await _promote_to_admin(db_test_session_manager, logged_in_user.email)
+    await promote_to_admin(db_test_session_manager, logged_in_user.email)
     target = create_test_user(username=f"target-{uuid.uuid4()}")
     async with db_test_session_manager() as session:
         async with session.begin():
@@ -380,7 +366,7 @@ async def test_admin_cannot_delete_self(
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user: User,
 ):
-    await _promote_to_admin(db_test_session_manager, logged_in_user.email)
+    await promote_to_admin(db_test_session_manager, logged_in_user.email)
     response = await authenticated_client.delete(f"/users/{logged_in_user.id}")
     assert response.status_code == 403
 
@@ -390,6 +376,6 @@ async def test_delete_404_for_unknown_user(
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user: User,
 ):
-    await _promote_to_admin(db_test_session_manager, logged_in_user.email)
+    await promote_to_admin(db_test_session_manager, logged_in_user.email)
     response = await authenticated_client.delete(f"/users/{uuid.uuid4()}")
     assert response.status_code == 404
