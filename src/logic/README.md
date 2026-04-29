@@ -84,7 +84,7 @@ When a real service exists for an entity, move the commit there and update the l
 | Module                    | Purpose                              | Key Functions                  |
 | ------------------------- | ------------------------------------ | ------------------------------ |
 | **user_processing.py**    | User operation coordination          | list users with filtering      |
-| **post_processing.py**    | Post operation coordination          | list posts, get post detail, create post (server-sets owner_id, commits), update post (owner-or-admin guard, commits), build create-form context |
+| **post_processing.py**    | Post operation coordination          | list posts, get post detail, create post (server-sets owner_id, commits), update post (owner-or-admin guard, commits), build create- and edit-form contexts (edit form runs the same owner-or-admin guard) |
 | **auth_processing.py**    | Authentication workflow coordination | user registration processing   |
 
 ## Directory structure

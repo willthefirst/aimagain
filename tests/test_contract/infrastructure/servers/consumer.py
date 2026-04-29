@@ -24,6 +24,10 @@ from .base import ServerManager, setup_health_check_route
 # the pact path against a known target id without round-tripping a database.
 STUB_TARGET_USER_ID = uuid.UUID("11111111-1111-1111-1111-111111111111")
 
+# Stable UUID used by the post-edit stub page; matches `STUB_POST_ID` in
+# `tests/test_contract/constants.py`.
+STUB_POST_ID = uuid.UUID("22222222-2222-2222-2222-222222222222")
+
 
 class ConsumerServerConfig:
     """Toggles for which page routes the consumer server should mount.
@@ -84,16 +88,31 @@ def _setup_users_admin_actions_stub(app: FastAPI) -> None:
 
 
 def _setup_posts_form_stub(app: FastAPI) -> None:
-    """Mount a stub `GET /posts/form` that renders the real `posts/new.html`
-    template. The contract surface is the form's HTMX-decorated submission;
-    the create POST is intercepted by Playwright before it leaves the browser,
-    so no database is needed.
+    """Mount stub pages that render the real `posts/new.html` and
+    `posts/edit.html` templates. The contract surface is the forms'
+    HTMX-decorated submissions; the create POST and edit PATCH are intercepted
+    by Playwright before they leave the browser, so no database is needed.
     """
+
+    class _StubPost:
+        def __init__(self, **kwargs):
+            self.__dict__.update(kwargs)
 
     @app.get("/posts/form")
     async def posts_form_stub_page(request: Request):
         return APIResponse.html_response(
             template_name="posts/new.html", context={}, request=request
+        )
+
+    @app.get("/posts/{post_id}/form")
+    async def posts_edit_form_stub_page(request: Request, post_id: uuid.UUID):
+        post = _StubPost(
+            id=post_id,
+            title="Stub title",
+            body="Stub body",
+        )
+        return APIResponse.html_response(
+            template_name="posts/edit.html", context={"post": post}, request=request
         )
 
 

@@ -9,6 +9,7 @@ from src.auth_config import current_active_user
 from src.logic.post_processing import (
     handle_create_post,
     handle_get_post_detail,
+    handle_get_post_edit_form,
     handle_get_post_form,
     handle_list_posts,
     handle_update_post,
@@ -54,6 +55,27 @@ async def get_post_form(
     context = await handle_get_post_form(request=request, requesting_user=user)
     return APIResponse.html_response(
         template_name="posts/new.html", context=context, request=request
+    )
+
+
+@router.get("/{post_id}/form")
+async def get_post_edit_form(
+    post_id: UUID,
+    request: Request,
+    post_repo: PostRepository = Depends(get_post_repository),
+    user: User = Depends(current_active_user),
+):
+    """Provides an HTML page with the edit-post form. Owner-only; admins may
+    edit any post. 404 if missing, 403 if not authorized.
+    """
+    context = await handle_get_post_edit_form(
+        request=request,
+        post_id=post_id,
+        post_repo=post_repo,
+        requesting_user=user,
+    )
+    return APIResponse.html_response(
+        template_name="posts/edit.html", context=context, request=request
     )
 
 
