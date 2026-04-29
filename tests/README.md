@@ -110,6 +110,10 @@ async def test_with_extra_user(authenticated_client, db_test_session_manager):
     # ...
 ```
 
+## Testing scripts under `scripts/dev/`
+
+`scripts/` and `scripts/dev/` are regular Python packages (each has an `__init__.py`), so test files can import script modules with a normal `from scripts.dev import promote_admin` rather than loading them via `importlib.util.spec_from_file_location`. The scripts remain runnable as standalone files (e.g. `python scripts/dev/seed.py`) — the package marker doesn't change that.
+
 ## Related documentation
 
 - [`../CLAUDE.md`](../CLAUDE.md) — the doc/test/code coupling contract
