@@ -61,8 +61,8 @@ Schemas act as the data contract layer between HTTP and business logic.
 
 | Schema File | Domain    | Responsibilities                             | Schema Types                                             |
 | ----------- | --------- | -------------------------------------------- | -------------------------------------------------------- |
-| **user.py** | User data | User CRUD plus activation state-axis subresource (extends FastAPI Users) | UserRead, UserCreate, UserUpdate, UserActivationUpdate   |
-| **post.py** | Posts     | Post read + create + partial-update validation (`extra="forbid"` rejects `owner_id` and other server-managed fields; whitespace-only `title`/`body` rejected; `PostUpdate` requires at least one field) | PostRead, PostCreate, PostUpdate |
+| **user.py** | User data | User CRUD plus activation state-axis subresource (extends FastAPI Users) and audit snapshots | UserRead, UserCreate, UserUpdate, UserActivationUpdate, UserAuditSnapshot, UserActivationAuditSnapshot |
+| **post.py** | Posts     | Post read + create + partial-update validation + audit snapshot (`extra="forbid"` rejects `owner_id` and other server-managed fields; whitespace-only `title`/`body` rejected; `PostUpdate` requires at least one field) | PostRead, PostCreate, PostUpdate, PostAuditSnapshot |
 
 ## Directory structure
 

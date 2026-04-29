@@ -9,7 +9,7 @@ from src.auth_config import get_user_manager
 from src.logic.audit import AuditAction, record_audit
 from src.repositories.audit_repository import AuditRepository
 from src.repositories.dependencies import get_audit_repository
-from src.schemas.user import UserCreate, UserRead
+from src.schemas.user import UserAuditSnapshot, UserCreate, UserRead
 
 logger = logging.getLogger(__name__)
 
@@ -41,10 +41,7 @@ async def handle_registration(
         resource_id=created_user.id,
         action=AuditAction.REGISTER,
         before=None,
-        after={
-            "username": created_user.username,
-            "email": created_user.email,
-        },
+        after=UserAuditSnapshot.model_validate(created_user).model_dump(mode="json"),
     )
     await audit_repo.session.commit()
     return created_user

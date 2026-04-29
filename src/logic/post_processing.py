@@ -8,18 +8,18 @@ from src.logic.audit import AuditAction, record_audit
 from src.models import Post, User
 from src.repositories.audit_repository import AuditRepository
 from src.repositories.post_repository import PostRepository
-from src.schemas.post import PostCreate, PostUpdate
+from src.schemas.post import PostAuditSnapshot, PostCreate, PostUpdate
 
 logger = logging.getLogger(__name__)
 
 
 def _snapshot_post(post: Post) -> dict:
-    """Capture the user-meaningful fields of a post for audit before/after."""
-    return {
-        "title": post.title,
-        "body": post.body,
-        "owner_id": str(post.owner_id),
-    }
+    """Capture the user-meaningful fields of a post for audit before/after.
+
+    Field set is defined by `PostAuditSnapshot` — adding a relevant field
+    to that schema flows here automatically.
+    """
+    return PostAuditSnapshot.model_validate(post).model_dump(mode="json")
 
 
 async def handle_list_posts(
