@@ -97,6 +97,8 @@ GET /<resource>/{id}/<sub>/form        edit page for a subresource
 
 A form page MAY host multiple `<form>` HTML tags posting to different action endpoints. **One `/form` per page, not per HTML form tag.** When a flow needs its own page (e.g. password change with re-auth), it gets its own subresource and `/form`.
 
+**Every form-bearing resource MUST have a contract test pair** in [`tests/test_contract/`](../../../tests/test_contract/README.md). One consumer test (browser drives the form, asserts the request shape via Pact) and one provider test (running provider verified against the pact). Contract tests catch template ↔ route drift that no single colocated test can — adding them is part of the definition of done for any new HTML form.
+
 ### 4. revisions
 
 When edits to a `published` resource must not be destructive (audit, review, autosave):
@@ -201,7 +203,7 @@ Stop at any step where the answer is "not needed yet" — subresources are added
 4. **Decide if revisions are needed.** Only meaningful for lifecycle resources where destructive edits are unacceptable. Default: edit-in-place.
 5. **Wire the parent CRUD** per the grammar. Use the [adding a new domain entity](../../README.md#adding-a-new-domain-entity) cross-layer checklist.
 6. **Wire each subresource.** One file under `src/api/routes/`; own schema, service method, authz, audit hook, colocated test.
-7. **Wire the form pages** as needed.
+7. **Wire the form pages** as needed. **Each `/form` gets a contract test pair** in `tests/test_contract/`.
 8. **Verify the disciplines.** Universal disciplines on every mutation. If lifecycle-adopting, also: visibility filter, schema split, `POST` forces draft, `DELETE` routes to archived.
 
 ## Checklist: modifying an existing resource

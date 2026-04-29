@@ -30,6 +30,18 @@ See [`../CLAUDE.md`](../CLAUDE.md) for the full definition-of-done contract that
 | `src/logic/` | none yet — gap |
 | `src/models/` | none yet — gap |
 
+## Cross-layer tests: the documented exception
+
+Some tests genuinely span two layers and can't sit on either. The only such case today is **contract tests**, which assert that an HTML form (template + page route) and the API endpoint it submits to agree on request/response shape. They live in [`test_contract/`](test_contract/README.md) and are the **single documented exception** to the colocation rule. Don't introduce new top-level test directories without a similar two-layer justification.
+
+Contract tests are excluded from default `dev test` runs (they bind ports and need a Playwright browser). Run them explicitly:
+
+```bash
+dev test tests/test_contract
+```
+
+Per [`../src/api/routes/RESOURCE_GRAMMAR.md`](../src/api/routes/RESOURCE_GRAMMAR.md), every resource that exposes an HTML form gets a contract test pair.
+
 ## Running tests
 
 ```bash
