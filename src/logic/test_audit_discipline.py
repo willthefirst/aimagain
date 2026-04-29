@@ -127,34 +127,29 @@ def _parse_handler(source: str) -> ast.AsyncFunctionDef:
 
 def test_check_flags_handler_that_commits_without_audit() -> None:
     """A regression in the check itself shows up here, not in production."""
-    bad = _parse_handler(
-        """
+    bad = _parse_handler("""
 async def handle_bad(repo, user):
     await repo.do_thing()
     await repo.session.commit()
     return None
-"""
-    )
+""")
     assert _has_call_named(bad, "commit")
     assert not _has_call_named(bad, "record_audit")
 
 
 def test_check_approves_handler_that_audits_then_commits() -> None:
-    good = _parse_handler(
-        """
+    good = _parse_handler("""
 async def handle_good(repo, audit_repo, user):
     await record_audit(audit_repo, action=AuditAction.X)
     await repo.session.commit()
     return None
-"""
-    )
+""")
     assert _has_call_named(good, "commit")
     assert _has_call_named(good, "record_audit")
 
 
 def test_check_skips_handler_with_opt_out_in_docstring() -> None:
-    opted_out = _parse_handler(
-        '''
+    opted_out = _parse_handler('''
 async def handle_special(repo):
     """Read-only consistency commit.
 
@@ -163,6 +158,5 @@ async def handle_special(repo):
     """
     await repo.session.commit()
     return None
-'''
-    )
+''')
     assert _is_opted_out(opted_out)
