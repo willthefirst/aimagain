@@ -27,8 +27,8 @@ See [`../CLAUDE.md`](../CLAUDE.md) for the full definition-of-done contract that
 | `src/api/routes/` | `test_auth_routes.py`, `test_users.py`, `test_posts.py` |
 | `src/schemas/` | `test_post.py` |
 | `src/services/` | none yet — gap |
-| `src/repositories/` | none yet — gap |
-| `src/logic/` | none yet — gap |
+| `src/repositories/` | `test_audit_repository.py` |
+| `src/logic/` | `test_audit.py` |
 | `src/models/` | none yet — gap |
 
 ## Cross-layer tests: the documented exception

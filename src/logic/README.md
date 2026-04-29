@@ -85,6 +85,7 @@ When a real service exists for an entity, move the commit there and update the l
 | ------------------------- | ------------------------------------ | ------------------------------ |
 | **user_processing.py**    | User operation coordination          | list users with filtering      |
 | **post_processing.py**    | Post operation coordination          | list posts, get post detail, create post (server-sets owner_id, commits), update post (owner-or-admin guard, commits), build create- and edit-form contexts (edit form runs the same owner-or-admin guard) |
+| **audit.py**              | Audit-log helper                     | `record_audit(...)` — append-only mutation row per `RESOURCE_GRAMMAR.md:135`; flushes inside the caller's transaction so the audit lands atomically with the mutation. PRs B/C/D wire the existing handlers to call this. |
 | **auth_processing.py**    | Authentication workflow coordination | user registration processing   |
 
 ## Directory structure
@@ -279,7 +280,11 @@ async def handle_get_users(user_repo: UserRepository, requesting_user: User):
 
 ## Tests
 
-**TODO** — no colocated tests yet. When adding or changing a processing function, create `src/logic/test_<file>.py` next to it. Most processing functions can be unit-tested directly with mocks for the repositories/services they depend on.
+Colocated tests live alongside the logic modules:
+
+- `test_audit.py` — exercises the `record_audit(...)` helper: round-trip via the repo, no commit (handler owns commit), null-actor support.
+
+When adding or changing a processing function, create `src/logic/test_<file>.py` next to it. Most processing functions can be unit-tested directly with mocks or with the in-memory `db_test_session_manager` fixture for the repositories they depend on.
 
 ## Related documentation
 

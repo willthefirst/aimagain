@@ -51,10 +51,11 @@ Each model maps to a database table with explicit relationships managed by SQLAl
 
 ## Domain entity matrix
 
-| Model    | Primary Purpose             | Key Fields                  | Unique Constraints |
-| -------- | --------------------------- | --------------------------- | ------------------ |
-| **User** | Authentication and identity | username                    | username, email    |
-| **Post** | User-authored content       | title, body, owner_id (FK)  | —                  |
+| Model        | Primary Purpose                                  | Key Fields                                                          | Unique Constraints |
+| ------------ | ------------------------------------------------ | ------------------------------------------------------------------- | ------------------ |
+| **User**     | Authentication and identity                      | username                                                            | username, email    |
+| **Post**     | User-authored content                            | title, body, owner_id (FK)                                          | —                  |
+| **AuditLog** | Append-only mutation record (RESOURCE_GRAMMAR.md:135) | actor_id (FK, SET NULL), resource_type, resource_id, action, before/after (JSON) | —                  |
 
 ## Directory structure
 
