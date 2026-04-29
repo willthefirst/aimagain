@@ -1,7 +1,7 @@
 {% extends "base.html" %}
-{% block title %}Edit post: {{ post.title }}{% endblock %} {# title-case-ignore: "post" is the noun, not the HTTP method #}
+{% block title %}Edit post: {{ post.title }}{% endblock %}
 {% block content %}
-<h1>Edit post</h1> {# title-case-ignore: "post" is the noun, not the HTTP method #}
+<h1>Edit post</h1>
 <form hx-patch="/posts/{{ post.id }}" hx-ext="json-enc">
   <label for="title">Title:</label><br />
   <input type="text" id="title" name="title" value="{{ post.title }}" required /><br />

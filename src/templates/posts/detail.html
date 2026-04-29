@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Post: {{ post.title }}{% endblock %} {# title-case-ignore: "Post" is the noun, not the HTTP method #}
+{% block title %}Post: {{ post.title }}{% endblock %}
 {% block content %}
 <h1>{{ post.title }}</h1>
 <p>by <a href="/users/{{ post.owner_id }}">{{ post.owner.username }}</a></p>

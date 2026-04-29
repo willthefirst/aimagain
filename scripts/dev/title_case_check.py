@@ -105,6 +105,16 @@ class TitleCaseChecker:
         "Python",
         "JavaScript",
         "TypeScript",
+        "Pact",  # Contract testing framework
+    }
+
+    # HTTP methods are ambiguous: they overlap with common English words
+    # ("post", "get", "put", "delete", "head", "options", "patch", "trace",
+    # "connect"). Treating them like ALWAYS_CAPITALIZE causes false positives
+    # in template prose ("New post" → "New POST"). We preserve uppercase when
+    # the source already wrote it that way (e.g. docs: "POST /users") but
+    # leave lowercase occurrences alone to be normalized as ordinary words.
+    HTTP_METHODS = {
         "POST",
         "GET",
         "PUT",
@@ -114,7 +124,6 @@ class TitleCaseChecker:
         "OPTIONS",
         "TRACE",
         "CONNECT",
-        "Pact",  # Contract testing framework
     }
 
     # Exception patterns (regex patterns to ignore)
@@ -306,9 +315,16 @@ class TitleCaseChecker:
             # Remove punctuation for checking
             clean_word = re.sub(r"[^\w]", "", word)
 
+            # HTTP methods: preserve when source is uppercase (doc style),
+            # otherwise treat as a regular English word.
+            is_http_method = clean_word.upper() in self.HTTP_METHODS
+            if is_http_method and clean_word.isupper():
+                result_words.append(word)
+                continue
+
             if i == 0:
                 # First word: capitalize first letter only, unless it's a special word
-                if clean_word.upper() in capitalize_map:
+                if not is_http_method and clean_word.upper() in capitalize_map:
                     proper_case = capitalize_map[clean_word.upper()]
                     result_words.append(word.replace(clean_word, proper_case))
                 else:
@@ -322,7 +338,7 @@ class TitleCaseChecker:
                         result_words.append(word)
             else:
                 # Other words: only capitalize if in ALWAYS_CAPITALIZE
-                if clean_word.upper() in capitalize_map:
+                if not is_http_method and clean_word.upper() in capitalize_map:
                     proper_case = capitalize_map[clean_word.upper()]
                     result_words.append(word.replace(clean_word, proper_case))
                 else:
