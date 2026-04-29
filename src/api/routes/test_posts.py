@@ -682,6 +682,52 @@ async def test_detail_page_hides_edit_link_for_stranger(
     assert tree.css_first("span.owner-actions") is None
 
 
+async def test_detail_page_delete_button_for_owner(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user: User,
+):
+    """The owner sees a Delete button wired to DELETE /posts/{id} with a
+    confirmation prompt."""
+    post = Post(title="t", body="b", owner_id=logged_in_user.id)
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            session.add(post)
+
+    response = await authenticated_client.get(f"/posts/{post.id}")
+    assert response.status_code == 200
+    tree = HTMLParser(response.text)
+    actions = tree.css_first("span.owner-actions")
+    assert actions is not None
+    button = actions.css_first("button")
+    assert button is not None
+    assert button.text().strip() == "Delete"
+    assert button.attributes.get("hx-delete") == f"/posts/{post.id}"
+    assert button.attributes.get("hx-confirm")
+
+
+async def test_detail_page_delete_button_for_admin(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user: User,
+):
+    """An admin viewing another user's post sees the Delete button too."""
+    await promote_to_admin(db_test_session_manager, logged_in_user.email)
+    other = create_test_user(username=f"other-{uuid.uuid4()}")
+    post = Post(title="t", body="b", owner_id=other.id)
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            session.add(other)
+            session.add(post)
+
+    response = await authenticated_client.get(f"/posts/{post.id}")
+    assert response.status_code == 200
+    tree = HTMLParser(response.text)
+    button = tree.css_first("span.owner-actions button")
+    assert button is not None
+    assert button.attributes.get("hx-delete") == f"/posts/{post.id}"
+
+
 # --- Audit log -----------------------------------------------------------
 
 
