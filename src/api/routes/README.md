@@ -70,12 +70,12 @@ Routes are organized by domain with consistent delegation patterns.
 
 ## Domain route organization matrix
 
-| Route File         | Domain               | Primary Responsibilities         | Main Endpoints        | Dependencies          |
-| ------------------ | -------------------- | -------------------------------- | --------------------- | --------------------- |
-| **users.py**       | User data            | User listings                    | `/users`              | UserRepository        |
-| **me.py**          | Current user context | User profile                     | `/users/me/profile`   | Auth                  |
-| **auth_routes.py** | Authentication API   | Login, register, password reset  | `/auth/*`             | Authentication logic  |
-| **auth_pages.py**  | Authentication UI    | Login, register forms            | `/login`, `/register` | Authentication logic  |
+| Route File         | Domain               | Primary Responsibilities         | Main Endpoints                                                                                                                  | Dependencies          |
+| ------------------ | -------------------- | -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- | --------------------- |
+| **users.py**       | User data            | User listing, detail, admin actions | `GET /users`, `GET /users/{id}`, `PUT /users/{id}/activation` (admin), `DELETE /users/{id}` (admin)                          | UserRepository        |
+| **me.py**          | Current user context | User profile, current-user JSON  | `GET /users/me`, `GET /users/me/profile`                                                                                        | Auth                  |
+| **auth_routes.py** | Authentication API   | Login, register, password reset  | `/auth/*`                                                                                                                       | Authentication logic  |
+| **auth_pages.py**  | Authentication UI    | Login, register forms            | `/login`, `/register`                                                                                                           | Authentication logic  |
 
 ## Directory structure
 
@@ -251,6 +251,8 @@ async def create_entity():
 
 ### Main application route registration
 
+The `me` router MUST be registered **before** the `users` router so that requests to `/users/me` match the literal `me` handler instead of being parsed as a UUID by the `/users/{user_id}` parametric route.
+
 ```python
 # In main.py
 from src.api.routes import (
@@ -260,10 +262,9 @@ from src.api.routes import (
     me,
 )
 
-app.include_router(users.users_router_instance, tags=["users"])
-app.include_router(auth_routes.auth_api_router_instance, prefix="/auth", tags=["auth-api"])
-app.include_router(auth_pages.auth_pages_router_instance, tags=["auth-pages"])
-app.include_router(me.me_router_instance, prefix="/users/me", tags=["me"])
+app.include_router(auth_pages.auth_pages_api_router)
+app.include_router(me.me_router_instance, tags=["me"])
+app.include_router(users.users_api_router, tags=["users"])
 ```
 
 ### Route naming and organization

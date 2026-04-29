@@ -61,12 +61,18 @@ Templates use inheritance for consistent layout and feature-specific customizati
 
 ## Template organization matrix
 
-| Directory  | Purpose                | Templates                              |
-| ---------- | ---------------------- | -------------------------------------- |
-| **/**      | Base layout and shared | `base.html` - Foundation template      |
-| **auth/**  | Authentication pages   | login, register, forgot/reset password |
-| **users/** | User management        | user listing                           |
-| **me/**    | Personal/profile pages | user profile                           |
+| Directory  | Purpose                | Templates                                                              |
+| ---------- | ---------------------- | ---------------------------------------------------------------------- |
+| **/**      | Base layout and shared | `base.html` - Foundation template                                      |
+| **auth/**  | Authentication pages   | login, register, forgot/reset password                                 |
+| **users/** | User management        | list, detail, `_admin_actions.html` partial (shared by list & detail)  |
+| **me/**    | Personal/profile pages | user profile                                                           |
+
+### Reusable partial convention
+
+Files prefixed with `_` (e.g. `_admin_actions.html`) are **shared partials** intended to be `{% include %}`d from multiple full pages. They are not rendered directly by routes. The convention exists so that, e.g., adding a new admin button to `users/_admin_actions.html` automatically appears on both the user list and the user detail page without per-page edits.
+
+A partial documents its required context at the top in a `{# ... #}` comment, and is responsible for its own access guards (`{% if current_user.is_superuser %}` etc). Backend authorization is enforced separately in the logic layer — the template guard is presentation only.
 
 ## Directory structure
 

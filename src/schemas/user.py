@@ -1,4 +1,7 @@
+from typing import Literal
+
 from fastapi_users import schemas
+from pydantic import BaseModel
 
 
 class UserRead(schemas.BaseUser):
@@ -11,3 +14,9 @@ class UserCreate(schemas.BaseUserCreate):
 
 class UserUpdate(schemas.BaseUserUpdate):
     username: str
+
+
+class UserActivationUpdate(BaseModel):
+    """Body for `PUT /users/{id}/activation` — sets the user's activation state."""
+
+    state: Literal["active", "deactivated"]

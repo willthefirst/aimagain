@@ -59,9 +59,9 @@ Each repository manages one primary domain entity with related data access opera
 
 ## Repository responsibility matrix
 
-| Repository         | Primary Entity | Key Responsibilities                   |
-| ------------------ | -------------- | -------------------------------------- |
-| **UserRepository** | User           | User lookup, listing, authentication   |
+| Repository         | Primary Entity | Key Responsibilities                                                          |
+| ------------------ | -------------- | ----------------------------------------------------------------------------- |
+| **UserRepository** | User           | User lookup, listing, activation toggle, hard delete                          |
 
 ## Directory structure
 

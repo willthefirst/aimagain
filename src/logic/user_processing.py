@@ -1,9 +1,12 @@
 import logging
+from uuid import UUID
 
 from fastapi import Request
 
+from src.api.common.exceptions import ForbiddenError, NotFoundError
 from src.models import User
 from src.repositories.user_repository import UserRepository
+from src.schemas.user import UserActivationUpdate
 
 logger = logging.getLogger(__name__)
 
@@ -44,3 +47,69 @@ async def handle_list_users(
     )
 
     return {"request": request, "users": users_list, "current_user": requesting_user}
+
+
+async def handle_get_user_detail(
+    request: Request,
+    user_id: UUID,
+    user_repo: UserRepository,
+    requesting_user: User,
+):
+    """Loads a single user for the detail page; 404s if missing."""
+    target = await user_repo.get_user_by_id(user_id)
+    if target is None:
+        raise NotFoundError(detail="User not found")
+
+    return {
+        "request": request,
+        "target_user": target,
+        "current_user": requesting_user,
+    }
+
+
+async def handle_set_user_activation(
+    user_id: UUID,
+    payload: UserActivationUpdate,
+    user_repo: UserRepository,
+    requesting_user: User,
+) -> User:
+    """Admin-only: set a user's activation state.
+
+    Self-guard lives here so direct API calls can't bypass the template's
+    `{% if %}` hide. The route's `current_admin_user` dep blocks non-admins.
+    """
+    target = await user_repo.get_user_by_id(user_id)
+    if target is None:
+        raise NotFoundError(detail="User not found")
+    if target.id == requesting_user.id:
+        raise ForbiddenError(
+            detail="Admins cannot change their own activation state here"
+        )
+
+    is_active = payload.state == "active"
+    logger.info(
+        f"Handler: admin {requesting_user.id} setting activation={payload.state} on user {target.id}"
+    )
+    updated = await user_repo.set_user_activation(target, is_active=is_active)
+    await user_repo.session.commit()
+    return updated
+
+
+async def handle_delete_user(
+    user_id: UUID,
+    user_repo: UserRepository,
+    requesting_user: User,
+) -> None:
+    """Admin-only: hard-delete a user row.
+
+    Self-guard mirrors `handle_set_user_activation`; the route dep blocks non-admins.
+    """
+    target = await user_repo.get_user_by_id(user_id)
+    if target is None:
+        raise NotFoundError(detail="User not found")
+    if target.id == requesting_user.id:
+        raise ForbiddenError(detail="Admins cannot delete their own account here")
+
+    logger.info(f"Handler: admin {requesting_user.id} hard-deleting user {target.id}")
+    await user_repo.delete_user(target)
+    await user_repo.session.commit()

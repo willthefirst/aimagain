@@ -1,12 +1,18 @@
-{% extends "base.html" %} {% block title %}Users{% endblock %} {% block content
-%}
+{% extends "base.html" %}
+{% block title %}Users{% endblock %}
+{% block content %}
 <h1>Users</h1>
 
-{# Jinja2 block to handle user list #} {% if users %}
+{% if users %}
 <ul>
-  {% for user in users %} {# Assuming the user object returned from DB has a
-  .username attribute #}
-  <li>{{ user.username }}</li>
+  {% for user in users %}
+  <li{% if not user.is_active %} class="deactivated"{% endif %}>
+    <a href="/users/{{ user.id }}">{{ user.username }}</a>
+    {% if not user.is_active %} <em>(deactivated)</em>{% endif %}
+    {% with target_user = user %}
+      {% include "users/_admin_actions.html" %}
+    {% endwith %}
+  </li>
   {% endfor %}
 </ul>
 {% else %}
@@ -15,5 +21,4 @@
 
 <hr />
 <a href="/users">Refresh list</a>
-<!-- Placeholder for future actions -->
 {% endblock %}
