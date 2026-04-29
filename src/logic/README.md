@@ -84,6 +84,7 @@ When a real service exists for an entity, move the commit there and update the l
 | Module                    | Purpose                              | Key Functions                  |
 | ------------------------- | ------------------------------------ | ------------------------------ |
 | **user_processing.py**    | User operation coordination          | list users with filtering      |
+| **post_processing.py**    | Post operation coordination          | list posts, get post detail    |
 | **auth_processing.py**    | Authentication workflow coordination | user registration processing   |
 
 ## Directory structure
@@ -91,6 +92,7 @@ When a real service exists for an entity, move the commit there and update the l
 ```
 logic/
 ├── user_processing.py          # User operation coordination
+├── post_processing.py          # Post operation coordination
 └── auth_processing.py          # Authentication process coordination
 ```
 

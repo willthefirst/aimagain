@@ -10,7 +10,7 @@ from src.auth_config import auth_backend, fastapi_users
 from src.db import check_database_health
 from src.schemas.user import UserRead
 
-from .api.routes import auth_pages, me, users
+from .api.routes import auth_pages, me, posts, users
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -100,6 +100,7 @@ app.include_router(auth_pages.auth_pages_api_router)
 # interpreted as a UUID and 422-ing.
 app.include_router(me.me_router_instance, tags=["me"])
 app.include_router(users.users_api_router, tags=["users"])
+app.include_router(posts.posts_api_router, tags=["posts"])
 
 
 @app.get("/health")
