@@ -13,7 +13,7 @@ import pytest
 from sqlalchemy import select
 
 from src.models import User
-from tests.fixtures import test_async_session_maker as session_maker
+from tests.fixtures import async_test_sessionmaker
 from tests.helpers import create_test_user
 
 # Load the script as a module without needing scripts/dev on PYTHONPATH.
@@ -28,17 +28,17 @@ _spec.loader.exec_module(promote_admin)
 @pytest.fixture(autouse=True)
 def patch_session_maker(monkeypatch):
     """Point the script at the in-memory test database."""
-    monkeypatch.setattr(promote_admin, "async_session_maker", session_maker)
+    monkeypatch.setattr(promote_admin, "async_session_maker", async_test_sessionmaker)
 
 
 async def _insert_user(email: str, is_superuser: bool) -> None:
-    async with session_maker() as session:
+    async with async_test_sessionmaker() as session:
         async with session.begin():
             session.add(create_test_user(email=email, is_superuser=is_superuser))
 
 
 async def _is_superuser(email: str) -> bool:
-    async with session_maker() as session:
+    async with async_test_sessionmaker() as session:
         result = await session.execute(select(User).where(User.email == email))
         return result.scalar_one().is_superuser
 
