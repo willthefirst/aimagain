@@ -67,18 +67,19 @@ tests/test_contract/
 
 ## Running
 
-Contract tests are not collected by default `dev test` runs in this layout — they're invoked by their own selector in CI. Locally:
+Contract tests are excluded from default `dev test` runs (`addopts` in `pyproject.toml` carries `--ignore=tests/test_contract`). Invoke them by passing the directory explicitly — pytest collects consumer tests first (alphabetical), then provider, in one session:
 
 ```bash
-# Run all contract tests (consumer first, then provider)
-dev test tests/test_contract -m consumer
-dev test tests/test_contract -m provider
+# Run all contract tests in one session (consumer + provider)
+dev test tests/test_contract
 
 # Or by file
 dev test tests/test_contract/tests/consumer/test_auth_form.py
 ```
 
-Consumer tests must run before provider tests in any single session — the consumer run *generates* the pact JSON files in `artifacts/pacts/` that the provider run *verifies against*.
+Consumer tests must run before provider tests in any single session — the consumer run *generates* the pact JSON files in `artifacts/pacts/` that the provider run *verifies against*. Running both with one invocation (above) handles this ordering automatically.
+
+Provider tests carry `pytest.mark.provider` (set via `BaseProviderVerification.pytest_marks`), so `-m provider` works to filter those. Consumer tests are not currently marked, so there is no symmetric `-m consumer` filter.
 
 ## Adding a contract test pair
 
