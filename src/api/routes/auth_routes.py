@@ -8,6 +8,8 @@ from fastapi_users.router.common import ErrorCode, ErrorModel
 from src.api.common import BaseRouter
 from src.auth_config import get_user_manager
 from src.logic.auth_processing import handle_registration
+from src.repositories.audit_repository import AuditRepository
+from src.repositories.dependencies import get_audit_repository
 from src.schemas.user import UserCreate, UserRead
 
 # router = APIRouter() # Old raw APIRouter
@@ -73,6 +75,7 @@ async def register_request_handler(
     request_data: UserCreate,
     request: Request,
     user_manager: BaseUserManager[models.UP, models.ID] = Depends(get_user_manager),
+    audit_repo: AuditRepository = Depends(get_audit_repository),
 ):
     """
     Handles the core logic for user registration, delegated from the route handler.
@@ -80,6 +83,9 @@ async def register_request_handler(
     """
     logger.debug(f"Handling registration for email: {request_data.email}")
     result = await handle_registration(
-        request_data=request_data, request=request, user_manager=user_manager
+        request_data=request_data,
+        request=request,
+        user_manager=user_manager,
+        audit_repo=audit_repo,
     )
     return result
