@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block title %}User: {{ target_user.username }}{% endblock %}
+{% block content %}
+<h1>{{ target_user.username }}</h1>
+
+<dl>
+  <dt>Email</dt><dd>{{ target_user.email }}</dd>
+  <dt>Active</dt><dd>{{ "yes" if target_user.is_active else "no" }}</dd>
+  <dt>Verified</dt><dd>{{ "yes" if target_user.is_verified else "no" }}</dd>
+</dl>
+
+{% include "users/_admin_actions.html" %}
+
+<hr />
+<a href="/users">Back to users</a>
+{% endblock %}

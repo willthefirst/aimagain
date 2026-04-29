@@ -61,7 +61,7 @@ Schemas act as the data contract layer between HTTP and business logic.
 
 | Schema File | Domain    | Responsibilities                             | Schema Types                                             |
 | ----------- | --------- | -------------------------------------------- | -------------------------------------------------------- |
-| **user.py** | User data | User CRUD operations (extends FastAPI Users)  | UserRead, UserCreate, UserUpdate                         |
+| **user.py** | User data | User CRUD plus activation state-axis subresource (extends FastAPI Users) | UserRead, UserCreate, UserUpdate, UserActivationUpdate   |
 
 ## Directory structure
 

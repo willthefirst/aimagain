@@ -53,3 +53,23 @@ class MockDataFactory:
                 "return_value_config": user_read
             }
         }
+
+    @classmethod
+    def create_user_activation_dependency_config(
+        cls, user_read: UserRead = None
+    ) -> Dict[str, Any]:
+        """Mock for `handle_set_user_activation`.
+
+        The route under test (`PUT /users/{id}/activation`) reads `id`,
+        `username`, and `is_active` off the handler's return value and packs
+        them into the JSON response, so a `UserRead` (or any object exposing
+        those attributes) is sufficient.
+        """
+        if user_read is None:
+            user_read = cls.create_user_read(is_active=False)
+
+        return {
+            "src.api.routes.users.handle_set_user_activation": {
+                "return_value_config": user_read
+            }
+        }

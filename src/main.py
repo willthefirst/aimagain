@@ -8,7 +8,7 @@ from fastapi.responses import JSONResponse, RedirectResponse
 from src.api.routes import auth_routes
 from src.auth_config import auth_backend, fastapi_users
 from src.db import check_database_health
-from src.schemas.user import UserRead, UserUpdate
+from src.schemas.user import UserRead
 
 from .api.routes import auth_pages, me, users
 
@@ -94,14 +94,12 @@ app.include_router(
     prefix="/auth",
     tags=["auth"],
 )
-app.include_router(
-    fastapi_users.get_users_router(UserRead, UserUpdate),
-    prefix="/users",
-    tags=["users"],
-)
 app.include_router(auth_pages.auth_pages_api_router)
-app.include_router(users.users_api_router, tags=["users"])
+# `me` router is registered BEFORE the parametric `/users/{user_id}` routes
+# so that `/users/me` matches the literal `me` handler instead of being
+# interpreted as a UUID and 422-ing.
 app.include_router(me.me_router_instance, tags=["me"])
+app.include_router(users.users_api_router, tags=["users"])
 
 
 @app.get("/health")

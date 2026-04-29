@@ -1,0 +1,42 @@
+{# Reusable admin actions for a user.
+
+   Required context:
+     target_user  — the user being acted on
+     current_user — the requesting user (admin gate + self-guard)
+
+   Renders nothing unless current_user is a superuser AND target_user is
+   not current_user. To add a new admin action, append a button below;
+   every view that includes this partial picks it up automatically.
+
+   Backend self-guards live in src/logic/user_processing.py — this
+   `{% if %}` is presentation only.
+#}
+{% if current_user and current_user.is_superuser and target_user.id != current_user.id %}
+<span class="admin-actions" data-user-id="{{ target_user.id }}">
+  {% if target_user.is_active %}
+  <button
+    type="button"
+    hx-put="/users/{{ target_user.id }}/activation"
+    hx-ext="json-enc"
+    hx-vals='{"state": "deactivated"}'
+    hx-confirm="Deactivate {{ target_user.username }}? They will be unable to log in until reactivated.">
+    Deactivate
+  </button>
+  {% else %}
+  <button
+    type="button"
+    hx-put="/users/{{ target_user.id }}/activation"
+    hx-ext="json-enc"
+    hx-vals='{"state": "active"}'
+    hx-confirm="Reactivate {{ target_user.username }}?">
+    Reactivate
+  </button>
+  {% endif %}
+  <button
+    type="button"
+    hx-delete="/users/{{ target_user.id }}"
+    hx-confirm="Permanently delete {{ target_user.username }}? This cannot be undone.">
+    Delete
+  </button>
+</span>
+{% endif %}

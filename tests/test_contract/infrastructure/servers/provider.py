@@ -124,17 +124,22 @@ def run_provider_server_process(
         setup_health_check_route(app)
         setup_provider_state_route(app, state_path, state_handler, logger)
 
-        # Set up mock auth
+        # Set up mock auth. `is_superuser=True` so admin-gated routes (e.g.
+        # `PUT /users/{id}/activation`) accept the mock; non-admin routes are
+        # unaffected because they only check `is_active`.
         mock_user = create_mock_user(
             email="provider.mock@example.com",
             username="provider_mock_user",
             user_id=uuid.uuid4(),
+            is_superuser=True,
         )
 
-        from src.auth_config import current_active_user
+        from src.auth_config import current_active_user, current_admin_user
 
-        MockAuthManager.setup_mock_auth(app, mock_user, current_active_user)
-        logger.info(f"Mocking current_active_user with user: {mock_user.email}")
+        MockAuthManager.setup_mock_auth(
+            app, mock_user, current_active_user, current_admin_user
+        )
+        logger.info(f"Mocking auth deps with user: {mock_user.email}")
 
         # Apply patches
         mp = pytest.MonkeyPatch()
