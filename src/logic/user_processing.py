@@ -4,7 +4,7 @@ from uuid import UUID
 from fastapi import Request
 
 from src.api.common.exceptions import ForbiddenError, NotFoundError
-from src.logic.audit import record_audit
+from src.logic.audit import AuditAction, record_audit
 from src.models import User
 from src.repositories.audit_repository import AuditRepository
 from src.repositories.user_repository import UserRepository
@@ -116,7 +116,7 @@ async def handle_set_user_activation(
         actor_id=requesting_user.id,
         resource_type="user",
         resource_id=updated.id,
-        action="set_user_activation",
+        action=AuditAction.SET_USER_ACTIVATION,
         before=before,
         after=_snapshot_user_activation(updated),
     )
@@ -150,7 +150,7 @@ async def handle_delete_user(
         actor_id=requesting_user.id,
         resource_type="user",
         resource_id=target_id,
-        action="delete_user",
+        action=AuditAction.DELETE_USER,
         before=before,
         after=None,
     )

@@ -6,7 +6,7 @@ from fastapi_users import models
 from fastapi_users.manager import BaseUserManager, UserManagerDependency
 
 from src.auth_config import get_user_manager
-from src.logic.audit import record_audit
+from src.logic.audit import AuditAction, record_audit
 from src.repositories.audit_repository import AuditRepository
 from src.repositories.dependencies import get_audit_repository
 from src.schemas.user import UserCreate, UserRead
@@ -39,7 +39,7 @@ async def handle_registration(
         actor_id=None,  # self-signup has no authenticated actor
         resource_type="user",
         resource_id=created_user.id,
-        action="register",
+        action=AuditAction.REGISTER,
         before=None,
         after={
             "username": created_user.username,
