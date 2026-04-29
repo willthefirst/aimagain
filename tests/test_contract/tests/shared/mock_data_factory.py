@@ -136,3 +136,15 @@ class MockDataFactory:
                 "return_value_config": post_read
             }
         }
+
+    @classmethod
+    def create_post_delete_dependency_config(cls) -> Dict[str, Any]:
+        """Mock for `handle_delete_post`.
+
+        The route under test (`DELETE /posts/{id}`) discards the handler
+        return value and emits a 204 with `HX-Redirect: /posts`, so `None`
+        is a valid mock return.
+        """
+        return {
+            "src.api.routes.posts.handle_delete_post": {"return_value_config": None}
+        }

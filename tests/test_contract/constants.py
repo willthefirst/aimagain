@@ -19,10 +19,12 @@ USER_ACTIVATION_API_PATH = f"/users/{TARGET_USER_ID}/activation"
 
 # Stable post id returned by the post-create handler mock so the consumer can
 # match the response shape and the redirect headers without round-tripping a DB.
-# Also used as the path id for the edit-form pact.
+# Also used as the path id for the edit-form and owner-actions pacts.
 STUB_POST_ID = uuid.UUID("22222222-2222-2222-2222-222222222222")
 POST_EDIT_API_PATH = f"/posts/{STUB_POST_ID}"
 POST_EDIT_PAGE_PATH = f"/posts/{STUB_POST_ID}/form"
+POST_DELETE_API_PATH = f"/posts/{STUB_POST_ID}"
+POST_DETAIL_PAGE_PATH = f"/posts/{STUB_POST_ID}"
 
 # Test post data for the create-form contract.
 TEST_POST_TITLE = "Hello from contract test"
@@ -47,6 +49,7 @@ PROVIDER_NAME_USERS = "users-api"
 
 CONSUMER_NAME_POST_CREATE = "post-create-form"
 CONSUMER_NAME_POST_EDIT = "post-edit-form"
+CONSUMER_NAME_POST_OWNER_ACTIONS = "post-owner-actions"
 PROVIDER_NAME_POSTS = "posts-api"
 
 # Timeouts
@@ -57,3 +60,4 @@ PACT_PORT_AUTH = 1234
 PACT_PORT_USER_ACTIVATION = 1235
 PACT_PORT_POST_CREATE = 1236
 PACT_PORT_POST_EDIT = 1237
+PACT_PORT_POST_DELETE = 1238

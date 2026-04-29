@@ -42,11 +42,13 @@ class ConsumerServerConfig:
         auth_pages: bool = True,
         users_admin_actions: bool = False,
         posts_pages: bool = False,
+        posts_owner_actions: bool = False,
         mock_auth: bool = True,
     ):
         self.auth_pages = auth_pages
         self.users_admin_actions = users_admin_actions
         self.posts_pages = posts_pages
+        self.posts_owner_actions = posts_owner_actions
         self.mock_auth = mock_auth
 
 
@@ -116,6 +118,47 @@ def _setup_posts_form_stub(app: FastAPI) -> None:
         )
 
 
+def _setup_post_owner_actions_stub(app: FastAPI) -> None:
+    """Mount a stub page that renders the real `posts/detail.html` template
+    with hardcoded post + current_user, so the `_owner_actions.html` partial
+    is exercised without needing a database. The contract surface is the
+    HTMX-decorated Delete button inside the partial; what we render here is
+    the same partial production code paths render.
+    """
+
+    class _StubUser:
+        def __init__(self, **kwargs):
+            self.__dict__.update(kwargs)
+
+    class _StubPost:
+        def __init__(self, **kwargs):
+            self.__dict__.update(kwargs)
+
+    @app.get("/posts/{post_id}")
+    async def post_owner_actions_stub_page(request: Request, post_id: uuid.UUID):
+        owner = _StubUser(id=post_id, username="post_owner")
+        post = _StubPost(
+            id=post_id,
+            title="Stub title",
+            body="Stub body",
+            owner_id=owner.id,
+            owner=owner,
+        )
+        # The mock auth in `run_consumer_server_process` makes current_user a
+        # superuser when `posts_owner_actions=True`, so the partial's
+        # owner-or-admin gate renders the buttons regardless of post.owner_id.
+        current_user = _StubUser(
+            id=uuid.UUID("00000000-0000-0000-0000-000000000002"),
+            username="admin_user",
+            is_superuser=True,
+        )
+        return APIResponse.html_response(
+            template_name="posts/detail.html",
+            context={"post": post, "current_user": current_user},
+            request=request,
+        )
+
+
 def setup_consumer_app_routes(app: FastAPI, config: ConsumerServerConfig) -> None:
     if config.auth_pages:
         app.include_router(auth_pages.auth_pages_api_router)
@@ -123,6 +166,8 @@ def setup_consumer_app_routes(app: FastAPI, config: ConsumerServerConfig) -> Non
         _setup_users_admin_actions_stub(app)
     if config.posts_pages:
         _setup_posts_form_stub(app)
+    if config.posts_owner_actions:
+        _setup_post_owner_actions_stub(app)
 
 
 def run_consumer_server_process(
@@ -140,13 +185,13 @@ def run_consumer_server_process(
 
     if config.mock_auth:
         logger.info("Adding mock auth for contract tests")
-        # When the admin-actions stub is mounted, the mock user must be a
-        # superuser so the partial's `{% if current_user.is_superuser %}`
-        # guard renders the buttons.
+        # When an admin/owner-actions stub is mounted, the mock user must be
+        # a superuser so the partial's `is_superuser` (or owner-or-admin)
+        # gate renders the buttons.
         mock_user = create_mock_user(
             email="test@example.com",
             username="contract_test_user",
-            is_superuser=config.users_admin_actions,
+            is_superuser=config.users_admin_actions or config.posts_owner_actions,
         )
         MockAuthManager.setup_mock_auth(
             consumer_app, mock_user, current_active_user, current_admin_user

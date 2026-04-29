@@ -285,7 +285,7 @@ Colocated alongside the routes:
 
 - `test_auth_routes.py` — registration, login, logout, password reset, session protection (covers `auth_routes.py` and `auth_pages.py`).
 - `test_users.py` — `GET /users` listing behavior (covers `users.py`).
-- `test_posts.py` — `GET /posts`, `GET /posts/{id}`, `POST /posts`, `PATCH /posts/{id}`, `DELETE /posts/{id}`, `GET /posts/form`, and `GET /posts/{id}/form` (covers `posts.py`). Includes owner-or-admin authorization on PATCH and DELETE, the `extra="forbid"` scrub of `owner_id`, route-ordering checks, audit-row before/after assertions for create/update/delete, and `_owner_actions.html` partial visibility on the detail page. Pact contract pairs for both forms live under [`tests/test_contract/`](../../../tests/test_contract/README.md).
+- `test_posts.py` — `GET /posts`, `GET /posts/{id}`, `POST /posts`, `PATCH /posts/{id}`, `DELETE /posts/{id}`, `GET /posts/form`, and `GET /posts/{id}/form` (covers `posts.py`). Includes owner-or-admin authorization on PATCH and DELETE, the `extra="forbid"` scrub of `owner_id`, route-ordering checks, audit-row before/after assertions for create/update/delete, and `_owner_actions.html` partial visibility on the detail page. Pact contract pairs for both forms and the owner-actions Delete button live under [`tests/test_contract/`](../../../tests/test_contract/README.md).
 
 When adding a new route, add (or extend) a `test_*.py` file in this same directory. Shared fixtures (`test_client`, `authenticated_client`, `db_test_session_manager`, `logged_in_user`) come from [`tests/fixtures.py`](../../../tests/fixtures.py); user-construction helpers from [`tests/helpers.py`](../../../tests/helpers.py).
 
