@@ -202,7 +202,7 @@ class TestCommands:
         tb: Optional[str] = None,
         markers: Optional[str] = None,
         keywords: Optional[str] = None,
-        path: Optional[str] = None,
+        paths: Optional[List[str]] = None,
     ) -> int:
         """Run tests with specified options."""
         print("🧪 Running tests...")
@@ -216,8 +216,8 @@ class TestCommands:
             cmd.extend(["-m", markers])
         if keywords:
             cmd.extend(["-k", keywords])
-        if path:
-            cmd.append(path)
+        if paths:
+            cmd.extend(paths)
 
         return self.runner.run_command(cmd)
 
@@ -545,10 +545,14 @@ Examples:
         parser.add_argument(
             "-k", "--keywords", help="Run tests matching keyword expressions"
         )
-        parser.add_argument("path", nargs="?", help="Test path or file")
+        parser.add_argument(
+            "paths",
+            nargs="*",
+            help="One or more test paths or files (forwarded to pytest)",
+        )
         parser.set_defaults(
             func=lambda args: self.test.run_tests(
-                args.verbose, args.tb, args.markers, args.keywords, args.path
+                args.verbose, args.tb, args.markers, args.keywords, args.paths
             )
         )
 
