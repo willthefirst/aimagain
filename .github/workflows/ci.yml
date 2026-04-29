@@ -52,6 +52,52 @@ jobs:
           echo "💡 To reproduce this locally, run: dev test -k test_api --tb short -v"
           echo "   Or run specific API tests with: dev test tests/test_api/"
 
+  contract-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e .[full]
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@v3
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ hashFiles('pyproject.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-playwright-
+
+      - name: Install Playwright browsers
+        run: |
+          playwright install --with-deps chromium
+
+      - name: Create test database
+        run: |
+          alembic -c config/alembic.ini upgrade head
+
+      - name: Run contract tests
+        run: dev test tests/test_contract --tb short -v
+
+      - name: Show contract test failure help
+        if: failure()
+        run: |
+          echo "❌ Contract tests failed!"
+          echo "💡 To reproduce this locally:"
+          echo "     pip install -e .[full]"
+          echo "     playwright install chromium"
+          echo "     dev test tests/test_contract --tb short -v"
+          echo "   Contract tests are excluded from default 'dev test' runs;"
+          echo "   they must be invoked with the explicit path above."
+
   linting:
     runs-on: ubuntu-latest
     steps:
