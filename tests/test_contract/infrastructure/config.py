@@ -35,4 +35,5 @@ TEST_DATABASE_URL = "sqlite+aiosqlite:///:memory:"
 KNOWN_PROVIDER_STATES = [
     "User test.user@example.com does not exist",
     "User 11111111-1111-1111-1111-111111111111 exists and is active",
+    "Posts API accepts a create request",
 ]

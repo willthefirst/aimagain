@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block title %}New post{% endblock %} {# title-case-ignore: "post" is the noun, not the HTTP method #}
+{% block content %}
+<h1>New post</h1> {# title-case-ignore: "post" is the noun, not the HTTP method #}
+<form hx-post="/posts" hx-ext="json-enc">
+  <label for="title">Title:</label><br />
+  <input type="text" id="title" name="title" required /><br />
+  <label for="body">Body:</label><br />
+  <textarea id="body" name="body" required></textarea><br /><br />
+  <input type="submit" value="Create post" />
+</form>
+
+<hr />
+<a href="/posts">Back to posts</a>
+{% endblock %}

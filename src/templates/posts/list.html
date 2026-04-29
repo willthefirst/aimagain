@@ -3,6 +3,8 @@
 {% block content %}
 <h1>Posts</h1>
 
+<p><a href="/posts/form">New post</a></p> {# title-case-ignore: "post" is the noun, not the HTTP method #}
+
 {% if posts %}
 <ul>
   {% for post in posts %}

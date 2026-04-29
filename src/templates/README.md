@@ -66,6 +66,7 @@ Templates use inheritance for consistent layout and feature-specific customizati
 | **/**      | Base layout and shared | `base.html` - Foundation template                                      |
 | **auth/**  | Authentication pages   | login, register, forgot/reset password                                 |
 | **users/** | User management        | list, detail, `_admin_actions.html` partial (shared by list & detail)  |
+| **posts/** | Posts                  | list, detail, `new.html` (create form)                                 |
 | **me/**    | Personal/profile pages | user profile                                                           |
 
 ### Reusable partial convention
@@ -85,7 +86,13 @@ templates/
 │   ├── forgot_password.html    # Password reset request
 │   └── reset_password.html     # Password reset form
 ├── users/                      # User management templates
-│   └── list.html              # User directory listing
+│   ├── list.html               # User directory listing
+│   ├── detail.html             # User detail page
+│   └── _admin_actions.html     # Reusable admin-actions partial
+├── posts/                      # Post templates
+│   ├── list.html               # Post listing
+│   ├── detail.html             # Post detail
+│   └── new.html                # Create-post form (HTMX json-enc → POST /posts)
 └── me/                         # Personal user pages
     └── profile.html            # User's profile page
 ```

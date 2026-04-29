@@ -7,9 +7,11 @@ monkey-patch business-logic handlers, so Pact verification exercises only the
 route layer.
 """
 
+from datetime import datetime, timezone
 from typing import Any, Dict
-from uuid import uuid4
+from uuid import UUID, uuid4
 
+from src.schemas.post import PostRead
 from src.schemas.user import UserRead
 
 
@@ -71,5 +73,46 @@ class MockDataFactory:
         return {
             "src.api.routes.users.handle_set_user_activation": {
                 "return_value_config": user_read
+            }
+        }
+
+    # Stable post id matching `STUB_POST_ID` in `tests/test_contract/constants.py`.
+    MOCK_POST_ID = UUID("22222222-2222-2222-2222-222222222222")
+    MOCK_POST_OWNER_ID = UUID(MOCK_USER_ID)
+
+    @classmethod
+    def create_post_read(
+        cls,
+        post_id: UUID = None,
+        title: str = "stub title",
+        body: str = "stub body",
+        owner_id: UUID = None,
+    ) -> PostRead:
+        now = datetime.now(timezone.utc)
+        return PostRead(
+            id=post_id or cls.MOCK_POST_ID,
+            title=title,
+            body=body,
+            owner_id=owner_id or cls.MOCK_POST_OWNER_ID,
+            created_at=now,
+            updated_at=now,
+        )
+
+    @classmethod
+    def create_post_create_dependency_config(
+        cls, post_read: PostRead = None
+    ) -> Dict[str, Any]:
+        """Mock for `handle_create_post`.
+
+        The route under test (`POST /posts`) reads `id` off the handler's
+        return value to populate the response body and the `Location` /
+        `HX-Redirect` headers. A `PostRead` (or any object with `.id`) suffices.
+        """
+        if post_read is None:
+            post_read = cls.create_post_read()
+
+        return {
+            "src.api.routes.posts.handle_create_post": {
+                "return_value_config": post_read
             }
         }

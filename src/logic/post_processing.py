@@ -35,6 +35,14 @@ async def handle_get_post_detail(
     return {"request": request, "post": post, "current_user": requesting_user}
 
 
+async def handle_get_post_form(
+    request: Request,
+    requesting_user: User,
+):
+    """Builds the template context for the create-post form."""
+    return {"request": request, "current_user": requesting_user}
+
+
 async def handle_create_post(
     payload: PostCreate,
     post_repo: PostRepository,

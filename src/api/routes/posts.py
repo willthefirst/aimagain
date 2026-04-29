@@ -9,6 +9,7 @@ from src.auth_config import current_active_user
 from src.logic.post_processing import (
     handle_create_post,
     handle_get_post_detail,
+    handle_get_post_form,
     handle_list_posts,
     handle_update_post,
 )
@@ -38,6 +39,21 @@ async def list_posts(
     )
     return APIResponse.html_response(
         template_name="posts/list.html", context=context, request=request
+    )
+
+
+@router.get("/form")
+async def get_post_form(
+    request: Request,
+    user: User = Depends(current_active_user),
+):
+    """Provides an HTML page with the create-post form.
+
+    Registered before `/{post_id}` so the literal `form` is not parsed as a UUID.
+    """
+    context = await handle_get_post_form(request=request, requesting_user=user)
+    return APIResponse.html_response(
+        template_name="posts/new.html", context=context, request=request
     )
 
 
