@@ -258,6 +258,29 @@ class QualityCommands:
 
         return exit_code
 
+    def fmt(self) -> int:
+        """Auto-fix formatting by running black and isort in write mode."""
+        print("🎨 Applying formatters...")
+
+        steps = [
+            ("📝 Formatting code with black...", ["black", "."]),
+            ("🔤 Sorting imports with isort...", ["isort", "."]),
+        ]
+
+        exit_code = 0
+        for description, cmd in steps:
+            print(description)
+            result = self.runner.run_command(cmd)
+            if result != 0:
+                exit_code = result
+
+        if exit_code == 0:
+            print("✅ Formatting applied")
+        else:
+            print("❌ Formatting failed")
+
+        return exit_code
+
 
 class SeedCommands:
     """Database seeding commands."""
@@ -468,6 +491,7 @@ Examples:
         # Other commands
         self._add_test_parser(subparsers)
         self._add_lint_parser(subparsers)
+        self._add_fmt_parser(subparsers)
         self._add_setup_parser(subparsers)
         self._add_seed_parser(subparsers)
         self._add_routes_parser(subparsers)
@@ -531,6 +555,12 @@ Examples:
     def _add_lint_parser(self, subparsers):
         parser = subparsers.add_parser("lint", help="Run linting checks")
         parser.set_defaults(func=lambda args: self.quality.lint())
+
+    def _add_fmt_parser(self, subparsers):
+        parser = subparsers.add_parser(
+            "fmt", help="Auto-fix formatting (runs black and isort in write mode)"
+        )
+        parser.set_defaults(func=lambda args: self.quality.fmt())
 
     def _add_setup_parser(self, subparsers):
         parser = subparsers.add_parser("setup", help="Set up development environment")

@@ -86,11 +86,14 @@ Run `dev --help` for the live, authoritative list. As of this writing:
 | `dev restart [service]` | Restart the whole dev environment or a single service. |
 | `dev test [-v] [--tb MODE] [-m MARKERS] [-k KEYWORDS] [path]` | Run pytest. `path` can be a directory, a file, or a `file::testname` selector. |
 | `dev lint` | Run black, isort, autoflake, and the title-case checker. Pre-commit runs the same checks automatically. |
+| `dev fmt` | Auto-fix formatting in place by running `black .` and `isort .` in write mode. The natural pre-commit companion to `dev lint`. |
 | `dev seed` | Apply any pending Alembic migrations, then seed the dev database with fixture users for manual testing. Migrations run first so a freshly added revision doesn't cause the seed to crash against a stale schema. |
 | `dev routes [prefix]` | Print every HTTP route registered on `src.main:app` grouped by path prefix. Surfaces router shadowing — two `include_router` calls registering handlers on overlapping paths — without spinning up the server. |
 | `dev promote-admin <email> [--revoke]` | Grant or revoke admin (`is_superuser`) status for a user matched by email. Idempotent. Errors if no user matches. Runs inside the dev container. For the prod equivalent see [`deployment/README.md`](../deployment/README.md#bootstrapping-an-admin). |
 
 For per-command flag details, run `dev <command> --help`.
+
+Recommended local workflow: write code → `dev fmt` → `dev test`.
 
 #### Installation
 
