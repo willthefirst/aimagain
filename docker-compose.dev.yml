@@ -19,6 +19,7 @@ services:
       - ./data:/app/data
       - ./src:/app/src
       - ./scripts:/app/scripts # Mount scripts for development startup
+      - ./alembic:/app/alembic # Mount migrations so new revisions don't need an image rebuild
     command: ['/app/scripts/runtime/start-dev.sh'] # Override with dev startup script
     healthcheck:
       test: ['CMD', 'curl', '-f', 'http://localhost:8000/health']
