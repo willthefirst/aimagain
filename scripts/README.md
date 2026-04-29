@@ -84,7 +84,7 @@ Run `dev --help` for the live, authoritative list. As of this writing:
 | `dev down [--volumes]` | Stop the development environment (optionally drop volumes). |
 | `dev logs [-f] [service]` | Show logs from the dev environment, optionally following or scoped to one service. |
 | `dev restart [service]` | Restart the whole dev environment or a single service. |
-| `dev test [-v] [--tb MODE] [-m MARKERS] [-k KEYWORDS] [path]` | Run pytest. `path` can be a directory, a file, or a `file::testname` selector. |
+| `dev test [-v] [--tb MODE] [-m MARKERS] [-k KEYWORDS] [path ...]` | Run pytest. Each `path` can be a directory, a file, or a `file::testname` selector; pass several to run unrelated targets in one invocation. |
 | `dev lint` | Run black, isort, autoflake, and the title-case checker. Pre-commit runs the same checks automatically. |
 | `dev fmt` | Auto-fix formatting in place by running `black .` and `isort .` in write mode. The natural pre-commit companion to `dev lint`. |
 | `dev seed` | Apply any pending Alembic migrations, then seed the dev database with fixture users for manual testing. Migrations run first so a freshly added revision doesn't cause the seed to crash against a stale schema. |
