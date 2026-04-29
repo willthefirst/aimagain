@@ -134,3 +134,39 @@ async def handle_update_post(
     await post_repo.session.commit()
     logger.info(f"Handler: user {requesting_user.id} updated post {updated.id}")
     return updated
+
+
+async def handle_delete_post(
+    post_id: UUID,
+    post_repo: PostRepository,
+    audit_repo: AuditRepository,
+    requesting_user: User,
+) -> None:
+    """Hard-deletes a post owned by the requesting user (or any post, if the
+    requester is a superuser). Writes an audit row capturing the pre-delete
+    state in `before` (with `after=None`) in the same transaction; commits
+    on success.
+
+    404 if missing, 403 if not authorized.
+    """
+    post = await post_repo.get_post_by_id(post_id)
+    if post is None:
+        raise NotFoundError(detail="Post not found")
+
+    if post.owner_id != requesting_user.id and not requesting_user.is_superuser:
+        raise ForbiddenError(detail="Only the owner or an admin can delete this post")
+
+    before = _snapshot_post(post)
+    target_id = post.id
+    await record_audit(
+        audit_repo,
+        actor_id=requesting_user.id,
+        resource_type="post",
+        resource_id=target_id,
+        action=AuditAction.DELETE_POST,
+        before=before,
+        after=None,
+    )
+    await post_repo.delete_post(post)
+    await post_repo.session.commit()
+    logger.info(f"Handler: user {requesting_user.id} deleted post {target_id}")

@@ -1,13 +1,14 @@
 import logging
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Request, status
+from fastapi import APIRouter, Depends, Request, Response, status
 from fastapi.responses import JSONResponse
 
 from src.api.common import APIResponse, BaseRouter
 from src.auth_config import current_active_user
 from src.logic.post_processing import (
     handle_create_post,
+    handle_delete_post,
     handle_get_post_detail,
     handle_get_post_edit_form,
     handle_get_post_form,
@@ -149,4 +150,26 @@ async def patch_post(
     return JSONResponse(
         content={"id": str(updated.id), "title": updated.title, "body": updated.body},
         headers={"HX-Refresh": "true"},
+    )
+
+
+@router.delete("/{post_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_post(
+    post_id: UUID,
+    post_repo: PostRepository = Depends(get_post_repository),
+    audit_repo: AuditRepository = Depends(get_audit_repository),
+    user: User = Depends(current_active_user),
+):
+    """Hard-deletes a post. Owner-only; admins may delete any post.
+    404 if missing, 403 if not authorized.
+    """
+    await handle_delete_post(
+        post_id=post_id,
+        post_repo=post_repo,
+        audit_repo=audit_repo,
+        requesting_user=user,
+    )
+    return Response(
+        status_code=status.HTTP_204_NO_CONTENT,
+        headers={"HX-Redirect": "/posts"},
     )

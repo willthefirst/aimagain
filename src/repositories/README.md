@@ -62,7 +62,7 @@ Each repository manages one primary domain entity with related data access opera
 | Repository         | Primary Entity | Key Responsibilities                                                          |
 | ------------------ | -------------- | ----------------------------------------------------------------------------- |
 | **UserRepository** | User           | User lookup, listing, activation toggle, hard delete                          |
-| **PostRepository** | Post           | Post lookup by id, list all posts (newest first), persist a new post, partial update (caller commits) |
+| **PostRepository** | Post           | Post lookup by id, list all posts (newest first), persist a new post, partial update, hard delete (caller commits) |
 | **AuditRepository** | AuditLog | Append-only writes (`record(...)`), single-row read, list-by-resource. No update or delete methods — audit rows are immutable. |
 
 ## Directory structure

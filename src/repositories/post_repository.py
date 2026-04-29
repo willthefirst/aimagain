@@ -48,3 +48,8 @@ class PostRepository(BaseRepository):
         await self.session.flush()
         await self.session.refresh(post)
         return post
+
+    async def delete_post(self, post: Post) -> None:
+        """Deletes a post and flushes; the caller commits."""
+        await self.session.delete(post)
+        await self.session.flush()
