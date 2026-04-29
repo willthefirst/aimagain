@@ -126,7 +126,7 @@ Everything else (schemas, models, templates) supports these main layers.
 
 This is the cross-module checklist. The detailed step-by-step (with code snippets) for each layer lives in that layer's own README — follow the links so the recipe stays a single source of truth (see [`../CLAUDE.md`](../CLAUDE.md)). For each step, also add or extend the colocated `test_*.py` and update the README in that directory.
 
-0. **Read [`api/routes/RESOURCE_GRAMMAR.md`](api/routes/RESOURCE_GRAMMAR.md) first.** It dictates the URL shape, lifecycle states (`draft | published | archived`), and subresource conventions every resource MUST follow. Identify state axes, field clusters, and any subresources you'll need before touching the layers below.
+0. **Read [`api/routes/RESOURCE_GRAMMAR.md`](api/routes/RESOURCE_GRAMMAR.md) first.** It dictates the URL shape, the PUT-vs-PATCH rule, the optional publication-lifecycle pattern, and the subresource conventions every resource MUST follow. Decide whether the resource adopts the publication lifecycle, then identify state axes, field clusters, and any subresources you'll need before touching the layers below.
 1. **Model** — define the SQLAlchemy class. See [`models/README.md`](models/README.md#implementation-patterns).
 2. **Migration** — generate and run an Alembic migration for the new table. See [`../alembic/README.md`](../alembic/README.md).
 3. **Schema** — add Pydantic request/response shapes. See [`schemas/README.md`](schemas/README.md#implementation-patterns).
