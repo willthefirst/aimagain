@@ -43,14 +43,14 @@ jobs:
           echo "   Or use the development CLI: dev dev up"
 
       - name: Run API tests
-        run: dev test -k test_api --tb short -v
+        run: dev test src/api --tb short -v
 
       - name: Show API test failure help
         if: failure()
         run: |
           echo "❌ API tests failed!"
-          echo "💡 To reproduce this locally, run: dev test -k test_api --tb short -v"
-          echo "   Or run specific API tests with: dev test tests/test_api/"
+          echo "💡 To reproduce this locally, run: dev test src/api --tb short -v"
+          echo "   API tests are colocated under src/api/ (see tests/README.md)"
 
   contract-tests:
     runs-on: ubuntu-latest

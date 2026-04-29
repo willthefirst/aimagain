@@ -20,6 +20,7 @@ The diff considered is `git diff HEAD` — i.e. all uncommitted changes,
 staged or not. If HEAD is unreachable (fresh repo), falls back to
 `git diff --cached`.
 """
+
 from __future__ import annotations
 
 import os

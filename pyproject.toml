@@ -39,7 +39,7 @@ test = [
     "pytest-asyncio",
     "httpx",
     "pytest-playwright-asyncio",
-    "pact-python",
+    "pact-python<3",
     "yarl",
     "requests",
 ]
