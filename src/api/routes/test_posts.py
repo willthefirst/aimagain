@@ -6,7 +6,8 @@ from selectolax.parser import HTMLParser
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from src.models import Post, User
+from src.models import AuditLog, Post, User
+from src.repositories.audit_repository import AuditRepository
 from tests.helpers import create_test_user, promote_to_admin
 
 # Mark all tests in this module as async
@@ -679,3 +680,146 @@ async def test_detail_page_hides_edit_link_for_stranger(
     assert response.status_code == 200
     tree = HTMLParser(response.text)
     assert tree.css_first("span.owner-actions") is None
+
+
+# --- Audit log -----------------------------------------------------------
+
+
+async def test_create_post_writes_audit_row(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user: User,
+):
+    """Each successful POST /posts writes exactly one audit row."""
+    title = f"audited-{uuid.uuid4()}"
+    body = f"body-{uuid.uuid4()}"
+
+    response = await authenticated_client.post(
+        "/posts", json={"title": title, "body": body}
+    )
+    assert response.status_code == 201
+    new_id = uuid.UUID(response.json()["id"])
+
+    async with db_test_session_manager() as session:
+        repo = AuditRepository(session)
+        rows = await repo.list_for_resource(resource_type="post", resource_id=new_id)
+        assert len(rows) == 1
+        row = rows[0]
+        assert row.actor_id == logged_in_user.id
+        assert row.action == "create_post"
+        assert row.before is None
+        assert row.after == {
+            "title": title,
+            "body": body,
+            "owner_id": str(logged_in_user.id),
+        }
+
+
+async def test_patch_post_writes_audit_row_with_before_and_after(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user: User,
+):
+    """Each successful PATCH /posts/{id} writes one audit row capturing
+    pre- and post-mutation snapshots."""
+    post = Post(title="orig title", body="orig body", owner_id=logged_in_user.id)
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            session.add(post)
+
+    response = await authenticated_client.patch(
+        f"/posts/{post.id}", json={"title": "new title"}
+    )
+    assert response.status_code == 200
+
+    async with db_test_session_manager() as session:
+        repo = AuditRepository(session)
+        rows = await repo.list_for_resource(resource_type="post", resource_id=post.id)
+        assert len(rows) == 1
+        row = rows[0]
+        assert row.actor_id == logged_in_user.id
+        assert row.action == "update_post"
+        assert row.before == {
+            "title": "orig title",
+            "body": "orig body",
+            "owner_id": str(logged_in_user.id),
+        }
+        assert row.after == {
+            "title": "new title",
+            "body": "orig body",
+            "owner_id": str(logged_in_user.id),
+        }
+
+
+async def test_failed_create_writes_no_audit_row(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user: User,
+):
+    """A 422 (schema rejection) must not leak an audit row — the discipline
+    requires audit lands iff the mutation does."""
+    response = await authenticated_client.post(
+        "/posts", json={"title": "t", "body": "b", "evil": True}
+    )
+    assert response.status_code == 422
+
+    async with db_test_session_manager() as session:
+        # No specific resource_id to query — assert the post-typed audit
+        # table is empty.
+        result = await session.execute(
+            select(AuditLog).filter(AuditLog.resource_type == "post")
+        )
+        assert result.scalars().first() is None
+
+
+async def test_unauthorized_patch_writes_no_audit_row(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user: User,
+):
+    """A 403 must not leak an audit row."""
+    other = create_test_user(username=f"other-{uuid.uuid4()}")
+    post = Post(title="t", body="b", owner_id=other.id)
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            session.add(other)
+            session.add(post)
+
+    response = await authenticated_client.patch(
+        f"/posts/{post.id}", json={"title": "hijack"}
+    )
+    assert response.status_code == 403
+
+    async with db_test_session_manager() as session:
+        repo = AuditRepository(session)
+        rows = await repo.list_for_resource(resource_type="post", resource_id=post.id)
+        assert rows == []
+
+
+async def test_admin_patch_audit_actor_is_admin_not_owner(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user: User,
+):
+    """When an admin edits another user's post, the audit row's actor is
+    the admin (the requester), not the post owner."""
+    await promote_to_admin(db_test_session_manager, logged_in_user.email)
+    other = create_test_user(username=f"other-{uuid.uuid4()}")
+    post = Post(title="t", body="b", owner_id=other.id)
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            session.add(other)
+            session.add(post)
+
+    response = await authenticated_client.patch(
+        f"/posts/{post.id}", json={"title": "moderated"}
+    )
+    assert response.status_code == 200
+
+    async with db_test_session_manager() as session:
+        repo = AuditRepository(session)
+        rows = await repo.list_for_resource(resource_type="post", resource_id=post.id)
+        assert len(rows) == 1
+        assert rows[0].actor_id == logged_in_user.id  # admin, not other
+        assert rows[0].after["title"] == "moderated"
+        assert rows[0].after["owner_id"] == str(other.id)
