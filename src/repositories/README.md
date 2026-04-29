@@ -62,12 +62,14 @@ Each repository manages one primary domain entity with related data access opera
 | Repository         | Primary Entity | Key Responsibilities                                                          |
 | ------------------ | -------------- | ----------------------------------------------------------------------------- |
 | **UserRepository** | User           | User lookup, listing, activation toggle, hard delete                          |
+| **PostRepository** | Post           | Post lookup by id, list all posts (newest first)                              |
 
 ## Directory structure
 
 **Core repository files:**
 
 - `user_repository.py` - User data access and lookup
+- `post_repository.py` - Post data access and lookup
 
 **Infrastructure:**
 

@@ -8,7 +8,7 @@ Models represent **business entities** with clear relationships, enforcing data 
 
 ### What we do
 
-- **Domain entity modeling**: Each model represents a clear business concept (currently just User)
+- **Domain entity modeling**: Each model represents a clear business concept (User, Post)
 - **Audit trail support**: Automatic timestamps (created_at, updated_at) and soft deletion (deleted_at)
 - **UUID primary keys**: Secure, non-guessable identifiers for all entities
 - **Database constraint enforcement**: Unique constraints and foreign key relationships
@@ -51,15 +51,17 @@ Each model maps to a database table with explicit relationships managed by SQLAl
 
 ## Domain entity matrix
 
-| Model    | Primary Purpose             | Key Fields | Unique Constraints |
-| -------- | --------------------------- | ---------- | ------------------ |
-| **User** | Authentication and identity | username   | username, email    |
+| Model    | Primary Purpose             | Key Fields                  | Unique Constraints |
+| -------- | --------------------------- | --------------------------- | ------------------ |
+| **User** | Authentication and identity | username                    | username, email    |
+| **Post** | User-authored content       | title, body, owner_id (FK)  | —                  |
 
 ## Directory structure
 
 **Core model files:**
 
 - `user.py` - User authentication and profile (extends FastAPI Users)
+- `post.py` - User-authored posts (title + body, owner FK to users)
 
 **Infrastructure:**
 
