@@ -62,7 +62,7 @@ Each repository manages one primary domain entity with related data access opera
 | Repository         | Primary Entity | Key Responsibilities                                                          |
 | ------------------ | -------------- | ----------------------------------------------------------------------------- |
 | **UserRepository** | User           | User lookup, listing, activation toggle, hard delete                          |
-| **PostRepository** | Post           | Post lookup by id, list all posts (newest first)                              |
+| **PostRepository** | Post           | Post lookup by id, list all posts (newest first), persist a new post (caller commits) |
 
 ## Directory structure
 
