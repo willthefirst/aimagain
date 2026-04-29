@@ -277,3 +277,213 @@ async def test_create_post_unauthenticated_redirects(
     )
     assert response.status_code == 302
     assert "/auth/login" in response.headers["location"]
+
+
+# --- Update (PATCH) ------------------------------------------------------
+
+
+async def _promote_to_admin(
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    user_email: str,
+) -> None:
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            stmt = select(User).filter(User.email == user_email)
+            result = await session.execute(stmt)
+            user = result.scalars().first()
+            assert user is not None, f"Test user {user_email} not found"
+            user.is_superuser = True
+
+
+async def test_owner_can_patch_title_only(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user: User,
+):
+    """PATCH with only `title` updates title and leaves body untouched."""
+    original_body = f"body-{uuid.uuid4()}"
+    post = Post(title="orig", body=original_body, owner_id=logged_in_user.id)
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            session.add(post)
+
+    new_title = f"new-{uuid.uuid4()}"
+    response = await authenticated_client.patch(
+        f"/posts/{post.id}", json={"title": new_title}
+    )
+
+    assert response.status_code == 200
+    assert response.headers.get("HX-Refresh") == "true"
+    body = response.json()
+    assert body["title"] == new_title
+    assert body["body"] == original_body
+
+    async with db_test_session_manager() as session:
+        result = await session.execute(select(Post).filter(Post.id == post.id))
+        refreshed = result.scalars().first()
+        assert refreshed.title == new_title
+        assert refreshed.body == original_body
+
+
+async def test_owner_can_patch_body_only(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user: User,
+):
+    original_title = f"title-{uuid.uuid4()}"
+    post = Post(title=original_title, body="orig", owner_id=logged_in_user.id)
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            session.add(post)
+
+    response = await authenticated_client.patch(
+        f"/posts/{post.id}", json={"body": "fresh"}
+    )
+    assert response.status_code == 200
+    assert response.json()["title"] == original_title
+    assert response.json()["body"] == "fresh"
+
+
+async def test_owner_can_patch_both_fields(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user: User,
+):
+    post = Post(title="t", body="b", owner_id=logged_in_user.id)
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            session.add(post)
+
+    response = await authenticated_client.patch(
+        f"/posts/{post.id}", json={"title": "T2", "body": "B2"}
+    )
+    assert response.status_code == 200
+    assert response.json()["title"] == "T2"
+    assert response.json()["body"] == "B2"
+
+
+async def test_non_owner_cannot_patch_post(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user: User,
+):
+    """A non-owner non-admin gets 403 and the post is not mutated."""
+    other = create_test_user(username=f"other-{uuid.uuid4()}")
+    post = Post(title="orig", body="orig", owner_id=other.id)
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            session.add(other)
+            session.add(post)
+
+    response = await authenticated_client.patch(
+        f"/posts/{post.id}", json={"title": "hijack"}
+    )
+    assert response.status_code == 403
+
+    async with db_test_session_manager() as session:
+        result = await session.execute(select(Post).filter(Post.id == post.id))
+        refreshed = result.scalars().first()
+        assert refreshed.title == "orig"
+
+
+async def test_admin_can_patch_anyone_post(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user: User,
+):
+    await _promote_to_admin(db_test_session_manager, logged_in_user.email)
+    other = create_test_user(username=f"other-{uuid.uuid4()}")
+    post = Post(title="orig", body="orig", owner_id=other.id)
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            session.add(other)
+            session.add(post)
+
+    response = await authenticated_client.patch(
+        f"/posts/{post.id}", json={"title": "moderated"}
+    )
+    assert response.status_code == 200
+    assert response.json()["title"] == "moderated"
+
+
+async def test_patch_404_for_unknown_post(
+    authenticated_client: AsyncClient,
+    logged_in_user: User,
+):
+    response = await authenticated_client.patch(
+        f"/posts/{uuid.uuid4()}", json={"title": "x"}
+    )
+    assert response.status_code == 404
+
+
+async def test_patch_rejects_owner_id_in_payload(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user: User,
+):
+    """Even the owner cannot reassign owner_id via PATCH (server-managed)."""
+    other = create_test_user(username=f"other-{uuid.uuid4()}")
+    post = Post(title="t", body="b", owner_id=logged_in_user.id)
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            session.add(other)
+            session.add(post)
+
+    response = await authenticated_client.patch(
+        f"/posts/{post.id}",
+        json={"title": "t2", "owner_id": str(other.id)},
+    )
+    assert response.status_code == 422
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        {},
+        {"title": None, "body": None},
+        {"title": "   "},
+        {"body": ""},
+    ],
+)
+async def test_patch_invalid_body_422(
+    payload,
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user: User,
+):
+    post = Post(title="t", body="b", owner_id=logged_in_user.id)
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            session.add(post)
+
+    response = await authenticated_client.patch(f"/posts/{post.id}", json=payload)
+    assert response.status_code == 422
+
+
+async def test_patch_rejects_unknown_field(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user: User,
+):
+    post = Post(title="t", body="b", owner_id=logged_in_user.id)
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            session.add(post)
+
+    response = await authenticated_client.patch(
+        f"/posts/{post.id}", json={"title": "x", "evil": True}
+    )
+    assert response.status_code == 422
+
+
+async def test_patch_unauthenticated_redirects(
+    test_client: AsyncClient,
+):
+    response = await test_client.patch(
+        f"/posts/{uuid.uuid4()}",
+        json={"title": "t"},
+        headers={"accept": "text/html"},
+        follow_redirects=False,
+    )
+    assert response.status_code == 302
+    assert "/auth/login" in response.headers["location"]

@@ -31,3 +31,20 @@ class PostRepository(BaseRepository):
         await self.session.flush()
         await self.session.refresh(post)
         return post
+
+    async def update_post(
+        self,
+        post: Post,
+        *,
+        title: str | None = None,
+        body: str | None = None,
+    ) -> Post:
+        """Mutates only the fields that were provided and flushes; the caller commits."""
+        if title is not None:
+            post.title = title
+        if body is not None:
+            post.body = body
+        self.session.add(post)
+        await self.session.flush()
+        await self.session.refresh(post)
+        return post
