@@ -7,7 +7,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from src.models import Post, User
-from tests.helpers import create_test_user
+from tests.helpers import create_test_user, promote_to_admin
 
 # Mark all tests in this module as async
 pytestmark = pytest.mark.asyncio
@@ -282,19 +282,6 @@ async def test_create_post_unauthenticated_redirects(
 # --- Update (PATCH) ------------------------------------------------------
 
 
-async def _promote_to_admin(
-    db_test_session_manager: async_sessionmaker[AsyncSession],
-    user_email: str,
-) -> None:
-    async with db_test_session_manager() as session:
-        async with session.begin():
-            stmt = select(User).filter(User.email == user_email)
-            result = await session.execute(stmt)
-            user = result.scalars().first()
-            assert user is not None, f"Test user {user_email} not found"
-            user.is_superuser = True
-
-
 async def test_owner_can_patch_title_only(
     authenticated_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],
@@ -391,7 +378,7 @@ async def test_admin_can_patch_anyone_post(
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user: User,
 ):
-    await _promote_to_admin(db_test_session_manager, logged_in_user.email)
+    await promote_to_admin(db_test_session_manager, logged_in_user.email)
     other = create_test_user(username=f"other-{uuid.uuid4()}")
     post = Post(title="orig", body="orig", owner_id=other.id)
     async with db_test_session_manager() as session:
@@ -586,7 +573,7 @@ async def test_admin_can_open_edit_form_for_any_post(
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user: User,
 ):
-    await _promote_to_admin(db_test_session_manager, logged_in_user.email)
+    await promote_to_admin(db_test_session_manager, logged_in_user.email)
     other = create_test_user(username=f"other-{uuid.uuid4()}")
     post = Post(title="t", body="b", owner_id=other.id)
     async with db_test_session_manager() as session:
@@ -662,7 +649,7 @@ async def test_detail_page_shows_edit_link_for_admin(
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user: User,
 ):
-    await _promote_to_admin(db_test_session_manager, logged_in_user.email)
+    await promote_to_admin(db_test_session_manager, logged_in_user.email)
     other = create_test_user(username=f"other-{uuid.uuid4()}")
     post = Post(title="t", body="b", owner_id=other.id)
     async with db_test_session_manager() as session:
