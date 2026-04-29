@@ -322,6 +322,8 @@ async def test_register_writes_audit_row(
         assert row.after == {
             "username": "audittarget",
             "email": "audit-target@example.com",
+            "is_active": True,
+            "is_superuser": False,
         }
 
 

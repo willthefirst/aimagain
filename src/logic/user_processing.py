@@ -8,24 +8,29 @@ from src.logic.audit import AuditAction, record_audit
 from src.models import User
 from src.repositories.audit_repository import AuditRepository
 from src.repositories.user_repository import UserRepository
-from src.schemas.user import UserActivationUpdate
+from src.schemas.user import (
+    UserActivationAuditSnapshot,
+    UserActivationUpdate,
+    UserAuditSnapshot,
+)
 
 logger = logging.getLogger(__name__)
 
 
 def _snapshot_user_activation(user: User) -> dict:
-    """Capture just the activation axis for audit before/after."""
-    return {"is_active": user.is_active}
+    """Capture just the activation axis for audit before/after.
+
+    Field set is defined by `UserActivationAuditSnapshot`.
+    """
+    return UserActivationAuditSnapshot.model_validate(user).model_dump(mode="json")
 
 
 def _snapshot_user(user: User) -> dict:
-    """Capture user-meaningful fields for `delete_user` audit `before`."""
-    return {
-        "username": user.username,
-        "email": user.email,
-        "is_active": user.is_active,
-        "is_superuser": user.is_superuser,
-    }
+    """Capture user-meaningful fields for `delete_user` audit `before`.
+
+    Field set is defined by `UserAuditSnapshot`.
+    """
+    return UserAuditSnapshot.model_validate(user).model_dump(mode="json")
 
 
 async def handle_list_users(
