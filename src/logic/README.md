@@ -62,6 +62,23 @@ async def handle_list_users(
 
 Logic functions coordinate business operations without handling HTTP or database concerns.
 
+### Transactions: logic owns the commit
+
+`get_db_session` (in [`src/db.py`](../db.py)) yields a session and does **not** auto-commit. Repositories deliberately don't commit either — they `flush()` so the result is visible inside the open transaction, but they leave commit/rollback to the caller (see [`../repositories/README.md`](../repositories/README.md)).
+
+In this codebase the *services* layer is mostly empty stubs, so the *logic* layer is the de-facto service layer and is where the commit goes:
+
+```python
+async def handle_set_user_activation(user_id, payload, user_repo, requesting_user):
+    target = await user_repo.get_user_by_id(user_id)
+    ...
+    updated = await user_repo.set_user_activation(target, is_active=...)
+    await user_repo.session.commit()   # logic commits because there is no service
+    return updated
+```
+
+When a real service exists for an entity, move the commit there and update the layer matrix in [`../README.md`](../README.md) so the doc matches reality.
+
 ## Processing responsibility matrix
 
 | Module                    | Purpose                              | Key Functions                  |

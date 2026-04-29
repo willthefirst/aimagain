@@ -87,6 +87,7 @@ Run `dev --help` for the live, authoritative list. As of this writing:
 | `dev test [-v] [--tb MODE] [-m MARKERS] [-k KEYWORDS] [path]` | Run pytest. `path` can be a directory, a file, or a `file::testname` selector. |
 | `dev lint` | Run black, isort, autoflake, and the title-case checker. Pre-commit runs the same checks automatically. |
 | `dev seed` | Seed the dev database with fixture users for manual testing. |
+| `dev routes [prefix]` | Print every HTTP route registered on `src.main:app` grouped by path prefix. Surfaces router shadowing — two `include_router` calls registering handlers on overlapping paths — without spinning up the server. |
 
 For per-command flag details, run `dev <command> --help`.
 

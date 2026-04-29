@@ -266,6 +266,84 @@ class SeedCommands:
         return self.runner.run_command(cmd)
 
 
+class RoutesCommands:
+    """Route inspection commands."""
+
+    def __init__(self, runner: CLIRunner):
+        self.runner = runner
+
+    def list_routes(self, prefix: Optional[str] = None) -> int:
+        """Print every HTTP route registered on `src.main:app`.
+
+        Useful for spotting router shadowing — when two `include_router`
+        calls register handlers for the same path and the second one is
+        silently ignored. Without this, the only way to discover a conflict
+        is by failing tests at runtime.
+
+        Output groups routes by their path prefix (first segment) and prints
+        each as `METHOD /path  →  module.handler`.
+        """
+        # Importing the FastAPI app evaluates all decorators, so DATABASE_URL
+        # must be set. Use a local sqlite default to keep `dev routes`
+        # runnable in a fresh checkout.
+        import os
+        import sys
+
+        os.environ.setdefault(
+            "DATABASE_URL", "sqlite+aiosqlite:///./data/dev_routes.db"
+        )
+        os.environ.setdefault("SECRET", "dev-routes-listing-only-aaaaaaaa")
+
+        # `pip install -e .` exposes the `dev` console script but doesn't put
+        # the project root on `sys.path` for arbitrary `from src...` imports.
+        project_root = str(self.runner.project_root)
+        if project_root not in sys.path:
+            sys.path.insert(0, project_root)
+
+        try:
+            from src.main import app
+        except Exception as exc:
+            print(f"❌ Failed to import src.main: {exc}")
+            return 1
+
+        rows: list[tuple[str, str, str]] = []
+        for route in app.routes:
+            methods = getattr(route, "methods", None)
+            path = getattr(route, "path", None)
+            endpoint = getattr(route, "endpoint", None)
+            if not path or endpoint is None:
+                continue
+            if prefix and not path.startswith(prefix):
+                continue
+            method_str = ",".join(sorted(methods)) if methods else "?"
+            handler = f"{endpoint.__module__}.{endpoint.__qualname__}"
+            rows.append((path, method_str, handler))
+
+        if not rows:
+            scope = f" matching prefix '{prefix}'" if prefix else ""
+            print(f"No routes found{scope}.")
+            return 0
+
+        # Group by first path segment.
+        from collections import defaultdict
+
+        by_prefix: dict[str, list[tuple[str, str, str]]] = defaultdict(list)
+        for path, method, handler in rows:
+            segs = [s for s in path.split("/") if s]
+            group = "/" + (segs[0] if segs else "")
+            by_prefix[group].append((path, method, handler))
+
+        method_w = max(len(r[1]) for r in rows)
+        path_w = max(len(r[0]) for r in rows)
+        for group in sorted(by_prefix):
+            print(f"\n{group}")
+            for path, method, handler in sorted(by_prefix[group]):
+                print(f"  {method:<{method_w}}  {path:<{path_w}}  →  {handler}")
+
+        print(f"\n{len(rows)} routes total.")
+        return 0
+
+
 class SetupCommands:
     """Environment setup commands."""
 
@@ -319,6 +397,7 @@ class DevCLI:
         self.quality = QualityCommands(self.runner)
         self.setup = SetupCommands(self.runner)
         self.seed_cmd = SeedCommands(self.runner)
+        self.routes_cmd = RoutesCommands(self.runner)
 
     def create_parser(self) -> argparse.ArgumentParser:
         """Create the argument parser with all commands."""
@@ -350,6 +429,7 @@ Examples:
         self._add_lint_parser(subparsers)
         self._add_setup_parser(subparsers)
         self._add_seed_parser(subparsers)
+        self._add_routes_parser(subparsers)
 
         return parser
 
@@ -419,6 +499,18 @@ Examples:
             "seed", help="Seed the dev database with fixture users"
         )
         parser.set_defaults(func=lambda args: self.seed_cmd.seed())
+
+    def _add_routes_parser(self, subparsers):
+        parser = subparsers.add_parser(
+            "routes",
+            help="List every HTTP route registered on the app (catches shadowing)",
+        )
+        parser.add_argument(
+            "prefix",
+            nargs="?",
+            help="Filter by path prefix (e.g. /users)",
+        )
+        parser.set_defaults(func=lambda args: self.routes_cmd.list_routes(args.prefix))
 
     def run(self) -> int:
         """Run the CLI application."""

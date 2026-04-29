@@ -49,4 +49,24 @@ Pre-commit hooks run lint automatically — don't bypass with `--no-verify`.
 1. Read [`src/README.md`](src/README.md) for layer responsibilities and what may import what.
 2. Read the README of the layer you're changing, plus the layers it depends on.
 3. If a single change forces edits across most layers (model + schema + repo + service + route), follow the entity checklist in [`src/README.md`](src/README.md#adding-a-new-domain-entity) — that's expected for new entities, not a smell.
-4. **Before adding or modifying a resource type** (new entity, new endpoint, new lifecycle behavior, new permission rule), read [`src/api/routes/RESOURCE_GRAMMAR.md`](src/api/routes/RESOURCE_GRAMMAR.md) first. That document is the prescriptive contract for URL shape, lifecycle states, and subresource conventions; every resource conforms to it.
+4. **Before adding or modifying a resource type**, read [`src/api/routes/RESOURCE_GRAMMAR.md`](src/api/routes/RESOURCE_GRAMMAR.md) first. It's the prescriptive contract for URL shape, lifecycle states, and subresource conventions.
+5. **Before adding or moving a route**, run `dev routes [prefix]` to see every handler currently mounted. Catches router shadowing before tests do. Full CLI list: [`scripts/README.md`](scripts/README.md).
+
+## Plan mode
+
+Use `/plan` when a change touches multiple layers or introduces new resources/routes — the Explore + Plan overhead pays off when a wrong direction is expensive. Skip it for typo fixes, single-file refactors, README polish, and anything you can describe in one sentence.
+
+## Per-PR retrospective
+
+Before declaring a PR complete (after the final commit, before push), run a retro on the session and ship it as the final message — separately from the PR description. The user decides which entries become issues; this is how friction gets filed instead of re-discovered next session.
+
+Each entry should be issue-shaped:
+
+```
+### <one-line title>
+**Friction:** what slowed me down, with a concrete example.
+**Fix:** the specific change that would prevent it (file, command, config).
+**Effort:** small / medium / large.
+```
+
+Cover the single biggest time sink, any missing/misleading tool or doc, and anything that worked unexpectedly well (so it gets repeated).

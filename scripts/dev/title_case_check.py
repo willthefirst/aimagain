@@ -401,8 +401,22 @@ class TitleCaseChecker:
         lines = content.split("\n")
         in_style_block = False
         in_script_block = False
+        in_fenced_code_block = False
 
         for line_num, line in enumerate(lines, 1):
+            # Track Markdown fenced code blocks (``` or ~~~). Anything inside
+            # them is source code, not prose — `#` and `<h1>` patterns there
+            # are syntax, not headings, and must not be flagged.
+            stripped = line.lstrip()
+            if file_type == "markdown" and (
+                stripped.startswith("```") or stripped.startswith("~~~")
+            ):
+                in_fenced_code_block = not in_fenced_code_block
+                continue
+
+            if in_fenced_code_block:
+                continue
+
             # Track context
             if "<style" in line.lower():
                 in_style_block = True
