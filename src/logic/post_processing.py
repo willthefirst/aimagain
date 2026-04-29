@@ -4,8 +4,9 @@ from uuid import UUID
 from fastapi import Request
 
 from src.api.common.exceptions import NotFoundError
-from src.models import User
+from src.models import Post, User
 from src.repositories.post_repository import PostRepository
+from src.schemas.post import PostCreate
 
 logger = logging.getLogger(__name__)
 
@@ -32,3 +33,20 @@ async def handle_get_post_detail(
         raise NotFoundError(detail="Post not found")
 
     return {"request": request, "post": post, "current_user": requesting_user}
+
+
+async def handle_create_post(
+    payload: PostCreate,
+    post_repo: PostRepository,
+    requesting_user: User,
+) -> Post:
+    """Creates a post owned by the requesting user; commits on success."""
+    post = Post(
+        title=payload.title,
+        body=payload.body,
+        owner_id=requesting_user.id,
+    )
+    created = await post_repo.create_post(post)
+    await post_repo.session.commit()
+    logger.info(f"Handler: user {requesting_user.id} created post {created.id}")
+    return created

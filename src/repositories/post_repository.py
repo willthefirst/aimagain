@@ -24,3 +24,10 @@ class PostRepository(BaseRepository):
         stmt = select(Post).order_by(Post.created_at.desc())
         result = await self.session.execute(stmt)
         return result.scalars().all()
+
+    async def create_post(self, post: Post) -> Post:
+        """Persists a new post and flushes; the caller commits."""
+        self.session.add(post)
+        await self.session.flush()
+        await self.session.refresh(post)
+        return post

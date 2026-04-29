@@ -1,14 +1,20 @@
 import logging
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, Request, status
+from fastapi.responses import JSONResponse
 
 from src.api.common import APIResponse, BaseRouter
 from src.auth_config import current_active_user
-from src.logic.post_processing import handle_get_post_detail, handle_list_posts
+from src.logic.post_processing import (
+    handle_create_post,
+    handle_get_post_detail,
+    handle_list_posts,
+)
 from src.models import User
 from src.repositories.dependencies import get_post_repository
 from src.repositories.post_repository import PostRepository
+from src.schemas.post import PostCreate
 
 posts_api_router = APIRouter(prefix="/posts")
 router = BaseRouter(router=posts_api_router, default_tags=["posts"])
@@ -50,4 +56,28 @@ async def get_post(
     )
     return APIResponse.html_response(
         template_name="posts/detail.html", context=context, request=request
+    )
+
+
+@router.post("", status_code=status.HTTP_201_CREATED)
+async def create_post(
+    payload: PostCreate,
+    post_repo: PostRepository = Depends(get_post_repository),
+    user: User = Depends(current_active_user),
+):
+    """Creates a post owned by the authenticated user.
+
+    `owner_id` is server-set from the session; clients sending it (or any
+    other unknown field) are rejected with 422 by the schema.
+    """
+    created = await handle_create_post(
+        payload=payload,
+        post_repo=post_repo,
+        requesting_user=user,
+    )
+    location = f"/posts/{created.id}"
+    return JSONResponse(
+        status_code=status.HTTP_201_CREATED,
+        content={"id": str(created.id)},
+        headers={"Location": location, "HX-Redirect": location},
     )

@@ -3,6 +3,7 @@ import uuid
 import pytest
 from httpx import AsyncClient
 from selectolax.parser import HTMLParser
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from src.models import Post, User
@@ -154,3 +155,125 @@ async def test_get_post_detail_malformed_uuid_422(
     """GET /posts/{not-a-uuid} returns 422 (FastAPI path validation)."""
     response = await authenticated_client.get("/posts/not-a-uuid")
     assert response.status_code == 422
+
+
+# --- Create --------------------------------------------------------------
+
+
+async def test_create_post_happy_path(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user: User,
+):
+    """POST /posts persists the post owned by the session user and returns 201
+    with Location + HX-Redirect headers."""
+    title = f"new-{uuid.uuid4()}"
+    body = f"body-{uuid.uuid4()}"
+
+    response = await authenticated_client.post(
+        "/posts", json={"title": title, "body": body}
+    )
+
+    assert response.status_code == 201
+    payload = response.json()
+    assert "id" in payload
+    new_id = uuid.UUID(payload["id"])
+    expected_location = f"/posts/{new_id}"
+    assert response.headers.get("Location") == expected_location
+    assert response.headers.get("HX-Redirect") == expected_location
+
+    # Persisted, owned by the logged-in user
+    async with db_test_session_manager() as session:
+        result = await session.execute(select(Post).filter(Post.id == new_id))
+        persisted = result.scalars().first()
+        assert persisted is not None
+        assert persisted.title == title
+        assert persisted.body == body
+        assert persisted.owner_id == logged_in_user.id
+
+
+async def test_create_post_strips_whitespace(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user: User,
+):
+    """Title and body are trimmed before persistence."""
+    response = await authenticated_client.post(
+        "/posts", json={"title": "  hello  ", "body": "  world  "}
+    )
+    assert response.status_code == 201
+    new_id = uuid.UUID(response.json()["id"])
+
+    async with db_test_session_manager() as session:
+        result = await session.execute(select(Post).filter(Post.id == new_id))
+        persisted = result.scalars().first()
+        assert persisted.title == "hello"
+        assert persisted.body == "world"
+
+
+async def test_create_post_rejects_owner_id_in_payload(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user: User,
+):
+    """A client sending owner_id is rejected with 422 (extra='forbid'); no
+    post is persisted."""
+    other = create_test_user(username=f"other-{uuid.uuid4()}")
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            session.add(other)
+
+    response = await authenticated_client.post(
+        "/posts",
+        json={"title": "t", "body": "b", "owner_id": str(other.id)},
+    )
+    assert response.status_code == 422
+
+    # Nothing persisted
+    async with db_test_session_manager() as session:
+        result = await session.execute(select(Post))
+        assert result.scalars().first() is None
+
+
+async def test_create_post_rejects_unknown_field(
+    authenticated_client: AsyncClient,
+    logged_in_user: User,
+):
+    """Unknown fields are rejected with 422."""
+    response = await authenticated_client.post(
+        "/posts", json={"title": "t", "body": "b", "evil": True}
+    )
+    assert response.status_code == 422
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        {"body": "no title"},
+        {"title": "no body"},
+        {},
+        {"title": "", "body": "b"},
+        {"title": "t", "body": "   "},
+    ],
+)
+async def test_create_post_missing_or_empty_fields_422(
+    payload,
+    authenticated_client: AsyncClient,
+    logged_in_user: User,
+):
+    response = await authenticated_client.post("/posts", json=payload)
+    assert response.status_code == 422
+
+
+async def test_create_post_unauthenticated_redirects(
+    test_client: AsyncClient,
+):
+    """Anonymous request to POST /posts is redirected to login (HTML auth flow)."""
+    response = await test_client.post(
+        "/posts",
+        json={"title": "t", "body": "b"},
+        headers={"accept": "text/html"},
+        follow_redirects=False,
+    )
+    assert response.status_code == 302
+    assert "/auth/login" in response.headers["location"]

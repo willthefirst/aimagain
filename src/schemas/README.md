@@ -62,14 +62,14 @@ Schemas act as the data contract layer between HTTP and business logic.
 | Schema File | Domain    | Responsibilities                             | Schema Types                                             |
 | ----------- | --------- | -------------------------------------------- | -------------------------------------------------------- |
 | **user.py** | User data | User CRUD plus activation state-axis subresource (extends FastAPI Users) | UserRead, UserCreate, UserUpdate, UserActivationUpdate   |
-| **post.py** | Posts     | Post read serialization (read-only endpoints for now; create/update added with write endpoints) | PostRead |
+| **post.py** | Posts     | Post read + create validation (`extra="forbid"` rejects `owner_id` and other server-managed fields; whitespace-only `title`/`body` rejected) | PostRead, PostCreate |
 
 ## Directory structure
 
 **Domain schema files:**
 
 - `user.py` - User schemas extending FastAPI Users base schemas
-- `post.py` - Post response schema (`PostRead`)
+- `post.py` - Post schemas: `PostRead` (response) and `PostCreate` (request, `extra="forbid"`)
 
 ## Implementation patterns
 
@@ -236,7 +236,11 @@ UserUpdate
 
 ## Tests
 
-**TODO** — no colocated tests yet. Schema validation is implicitly exercised by route tests. Add `src/schemas/test_<schema_name>.py` when a schema has non-trivial validators or computed fields whose behavior isn't obvious from the field definitions.
+Colocated tests live alongside the schema modules:
+
+- `test_post.py` — exercises `PostCreate` validators and the `extra="forbid"` boundary (rejects `owner_id`, unknown fields, empty/whitespace `title`/`body`).
+
+Add `src/schemas/test_<schema_name>.py` when a schema has non-trivial validators or computed fields whose behavior isn't obvious from the field definitions.
 
 ## Related documentation
 

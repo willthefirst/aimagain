@@ -73,7 +73,7 @@ Routes are organized by domain with consistent delegation patterns.
 | Route File         | Domain               | Primary Responsibilities         | Main Endpoints                                                                                                                  | Dependencies          |
 | ------------------ | -------------------- | -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- | --------------------- |
 | **users.py**       | User data            | User listing, detail, admin actions | `GET /users`, `GET /users/{id}`, `PUT /users/{id}/activation` (admin), `DELETE /users/{id}` (admin)                          | UserRepository        |
-| **posts.py**       | Posts                | Post listing and detail (READ only — write endpoints to come) | `GET /posts`, `GET /posts/{id}`                                                                                              | PostRepository        |
+| **posts.py**       | Posts                | Post listing, detail, and create (PATCH/edit-form to come) | `GET /posts`, `GET /posts/{id}`, `POST /posts`                                                                              | PostRepository        |
 | **me.py**          | Current user context | User profile, current-user JSON  | `GET /users/me`, `GET /users/me/profile`                                                                                        | Auth                  |
 | **auth_routes.py** | Authentication API   | Login, register, password reset  | `/auth/*`                                                                                                                       | Authentication logic  |
 | **auth_pages.py**  | Authentication UI    | Login, register forms            | `/login`, `/register`                                                                                                           | Authentication logic  |
@@ -83,7 +83,7 @@ Routes are organized by domain with consistent delegation patterns.
 **Domain route files:**
 
 - `users.py` - User listing and access
-- `posts.py` - Post listing and detail (read-only; write endpoints come later)
+- `posts.py` - Post listing, detail, and create (`POST /posts` is JSON-only for now; the HTML create form and PATCH come in follow-up PRs)
 - `me.py` - Current user's profile
 
 **Authentication routes:**
@@ -285,7 +285,7 @@ Colocated alongside the routes:
 
 - `test_auth_routes.py` — registration, login, logout, password reset, session protection (covers `auth_routes.py` and `auth_pages.py`).
 - `test_users.py` — `GET /users` listing behavior (covers `users.py`).
-- `test_posts.py` — `GET /posts` and `GET /posts/{id}` (covers `posts.py`).
+- `test_posts.py` — `GET /posts`, `GET /posts/{id}`, and `POST /posts` including the `extra="forbid"` scrub of `owner_id` (covers `posts.py`).
 
 When adding a new route, add (or extend) a `test_*.py` file in this same directory. Shared fixtures (`test_client`, `authenticated_client`, `db_test_session_manager`, `logged_in_user`) come from [`tests/fixtures.py`](../../../tests/fixtures.py); user-construction helpers from [`tests/helpers.py`](../../../tests/helpers.py).
 
