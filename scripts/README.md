@@ -86,7 +86,7 @@ Run `dev --help` for the live, authoritative list. As of this writing:
 | `dev restart [service]` | Restart the whole dev environment or a single service. |
 | `dev test [-v] [--tb MODE] [-m MARKERS] [-k KEYWORDS] [path]` | Run pytest. `path` can be a directory, a file, or a `file::testname` selector. |
 | `dev lint` | Run black, isort, autoflake, and the title-case checker. Pre-commit runs the same checks automatically. |
-| `dev seed` | Seed the dev database with fixture users for manual testing. |
+| `dev seed` | Apply any pending Alembic migrations, then seed the dev database with fixture users for manual testing. Migrations run first so a freshly added revision doesn't cause the seed to crash against a stale schema. |
 | `dev routes [prefix]` | Print every HTTP route registered on `src.main:app` grouped by path prefix. Surfaces router shadowing — two `include_router` calls registering handlers on overlapping paths — without spinning up the server. |
 
 For per-command flag details, run `dev <command> --help`.
