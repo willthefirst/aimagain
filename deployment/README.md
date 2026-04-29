@@ -19,7 +19,8 @@ deployment/
 ├── droplet-files/               # Files deployed to /opt/bedlam-connect/ on droplet
 │   ├── deploy.sh               # Main deployment script (blue-green)
 │   ├── docker-compose.blue-green.yml  # Docker Compose configuration
-│   └── cleanup-docker.sh       # Docker cleanup utility
+│   ├── cleanup-docker.sh       # Docker cleanup utility
+│   └── promote-admin.sh        # Bootstrap/manage admin users on prod
 └── scripts/                    # Helper scripts (future use)
 ```
 
@@ -68,6 +69,23 @@ The `deploy.sh` script implements zero-downtime deployment:
 - Blue instance: `localhost:8001`
 - Green instance: `localhost:8002`
 - Nginx proxies `aimagain.art` to the active instance
+
+## 🔑 Bootstrapping an admin
+
+The app has no admin user out of the box, and admin actions (delete user, deactivate user) require `is_superuser=True`. Promote an existing registered user to admin via the wrapper script that ships with deployment files:
+
+```bash
+ssh user@your-droplet-ip
+cd /opt/bedlam-connect
+./promote-admin you@example.com           # grant
+./promote-admin you@example.com --revoke  # revoke
+```
+
+The wrapper auto-detects the running blue/green container and execs the promotion script inside it — no `docker exec` incantation to remember. It's idempotent (safe to re-run) and refuses on a missing user (won't auto-create from a typo).
+
+**First-run note:** if the wrapper isn't executable after SCP, run `chmod +x promote-admin.sh` once. The script is sourced from [`droplet-files/promote-admin.sh`](droplet-files/promote-admin.sh) and deployed automatically alongside `deploy.sh` and the compose file.
+
+Locally, the equivalent is `dev promote-admin <email>` — see [`../scripts/README.md`](../scripts/README.md).
 
 ## 🚨 Manual deployment (emergency)
 

@@ -61,7 +61,7 @@ Every `src/<module>/` has its own README describing what it does, what it doesn'
 ### Supporting documentation
 
 - [`alembic/README.md`](alembic/README.md) — database migrations
-- [`deployment/README.md`](deployment/README.md) — deployment procedures
+- [`deployment/README.md`](deployment/README.md) — deployment procedures, including [bootstrapping the first admin user](deployment/README.md#bootstrapping-an-admin)
 - [`notes/README.md`](notes/README.md) — development notes and planning
 
 ## Prerequisites
