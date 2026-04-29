@@ -235,35 +235,48 @@ class SeedCommands:
         )
         return bool(result.stdout.strip())
 
-    def seed(self) -> int:
-        """Seed the dev database with fixture users."""
-        print("🌱 Seeding fixture users...")
-
-        seed_cmd = ["python", "scripts/dev/seed.py"]
+    def _wrap_for_compose(self, container_cmd: List[str]) -> List[str]:
         if self._is_dev_container_running():
-            cmd = [
+            return [
                 "docker",
                 "compose",
                 "-f",
                 DOCKER_COMPOSE_DEV_FILE,
                 "exec",
                 self.SERVICE_NAME,
-                *seed_cmd,
+                *container_cmd,
             ]
-        else:
-            print("ℹ️  Dev container not running — using one-off `docker compose run`")
-            cmd = [
-                "docker",
-                "compose",
-                "-f",
-                DOCKER_COMPOSE_DEV_FILE,
-                "run",
-                "--rm",
-                "--no-deps",
-                self.SERVICE_NAME,
-                *seed_cmd,
-            ]
-        return self.runner.run_command(cmd)
+        print("ℹ️  Dev container not running — using one-off `docker compose run`")
+        return [
+            "docker",
+            "compose",
+            "-f",
+            DOCKER_COMPOSE_DEV_FILE,
+            "run",
+            "--rm",
+            "--no-deps",
+            self.SERVICE_NAME,
+            *container_cmd,
+        ]
+
+    def seed(self) -> int:
+        """Seed the dev database with fixture users."""
+        # `dev seed` runs in a one-off `docker compose run --no-deps` container
+        # that bypasses start-dev.sh, so migrations must be applied explicitly
+        # here — otherwise a freshly added revision crashes seed against a
+        # stale schema with a raw OperationalError.
+        print("🧱 Applying migrations before seeding...")
+        migrate_cmd = self._wrap_for_compose(
+            ["alembic", "-c", "config/alembic.ini", "upgrade", "head"]
+        )
+        rc = self.runner.run_command(migrate_cmd)
+        if rc != 0:
+            print("❌ Migrations failed — aborting seed.")
+            return rc
+
+        print("🌱 Seeding fixture users...")
+        seed_cmd = self._wrap_for_compose(["python", "scripts/dev/seed.py"])
+        return self.runner.run_command(seed_cmd)
 
 
 class RoutesCommands:
