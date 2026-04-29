@@ -13,7 +13,8 @@ from src.logic.user_processing import (
     handle_set_user_activation,
 )
 from src.models import User
-from src.repositories.dependencies import get_user_repository
+from src.repositories.audit_repository import AuditRepository
+from src.repositories.dependencies import get_audit_repository, get_user_repository
 from src.repositories.user_repository import UserRepository
 from src.schemas.user import UserActivationUpdate
 
@@ -66,6 +67,7 @@ async def set_user_activation(
     user_id: UUID,
     payload: UserActivationUpdate,
     user_repo: UserRepository = Depends(get_user_repository),
+    audit_repo: AuditRepository = Depends(get_audit_repository),
     admin: User = Depends(current_admin_user),
 ):
     """Admin-only: activate or deactivate a user."""
@@ -73,6 +75,7 @@ async def set_user_activation(
         user_id=user_id,
         payload=payload,
         user_repo=user_repo,
+        audit_repo=audit_repo,
         requesting_user=admin,
     )
     return JSONResponse(
@@ -89,12 +92,14 @@ async def set_user_activation(
 async def delete_user(
     user_id: UUID,
     user_repo: UserRepository = Depends(get_user_repository),
+    audit_repo: AuditRepository = Depends(get_audit_repository),
     admin: User = Depends(current_admin_user),
 ):
     """Admin-only: hard-delete a user."""
     await handle_delete_user(
         user_id=user_id,
         user_repo=user_repo,
+        audit_repo=audit_repo,
         requesting_user=admin,
     )
     return Response(

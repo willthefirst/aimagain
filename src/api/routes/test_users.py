@@ -8,7 +8,8 @@ from sqlalchemy import select
 # Import session maker type for hinting
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from src.models import User
+from src.models import AuditLog, User
+from src.repositories.audit_repository import AuditRepository
 from tests.helpers import create_test_user, promote_to_admin
 
 # Mark all tests in this module as async
@@ -379,3 +380,124 @@ async def test_delete_404_for_unknown_user(
     await promote_to_admin(db_test_session_manager, logged_in_user.email)
     response = await authenticated_client.delete(f"/users/{uuid.uuid4()}")
     assert response.status_code == 404
+
+
+# --- Audit log -----------------------------------------------------------
+
+
+async def test_set_user_activation_writes_audit_row(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user: User,
+):
+    """Each successful PUT /users/{id}/activation writes one audit row
+    capturing before/after activation state, with the admin as actor."""
+    await promote_to_admin(db_test_session_manager, logged_in_user.email)
+    target = create_test_user(username=f"target-{uuid.uuid4()}", is_active=True)
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            session.add(target)
+
+    response = await authenticated_client.put(
+        f"/users/{target.id}/activation",
+        json={"state": "deactivated"},
+    )
+    assert response.status_code == 200
+
+    async with db_test_session_manager() as session:
+        repo = AuditRepository(session)
+        rows = await repo.list_for_resource(resource_type="user", resource_id=target.id)
+        assert len(rows) == 1
+        row = rows[0]
+        assert row.actor_id == logged_in_user.id
+        assert row.action == "set_user_activation"
+        assert row.before == {"is_active": True}
+        assert row.after == {"is_active": False}
+
+
+async def test_failed_activation_writes_no_audit_row(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user: User,
+):
+    """A 403 (admin self-guard) leaves no audit trail."""
+    await promote_to_admin(db_test_session_manager, logged_in_user.email)
+
+    response = await authenticated_client.put(
+        f"/users/{logged_in_user.id}/activation",
+        json={"state": "deactivated"},
+    )
+    assert response.status_code == 403
+
+    async with db_test_session_manager() as session:
+        repo = AuditRepository(session)
+        rows = await repo.list_for_resource(
+            resource_type="user", resource_id=logged_in_user.id
+        )
+        assert rows == []
+
+
+async def test_delete_user_writes_audit_row(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user: User,
+):
+    """Each successful DELETE /users/{id} writes one audit row capturing
+    the user's pre-delete state in `before`, with `after=None`."""
+    await promote_to_admin(db_test_session_manager, logged_in_user.email)
+    target_username = f"target-{uuid.uuid4()}"
+    target = create_test_user(
+        username=target_username, is_active=True, is_superuser=False
+    )
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            session.add(target)
+    target_id = target.id
+    target_email = target.email
+
+    response = await authenticated_client.delete(f"/users/{target_id}")
+    assert response.status_code == 204
+
+    async with db_test_session_manager() as session:
+        # User row gone
+        result = await session.execute(select(User).filter(User.id == target_id))
+        assert result.scalars().first() is None
+
+        # Audit row preserved with the admin as actor
+        result = await session.execute(
+            select(AuditLog).filter(
+                AuditLog.resource_type == "user",
+                AuditLog.resource_id == target_id,
+            )
+        )
+        rows = result.scalars().all()
+        assert len(rows) == 1
+        row = rows[0]
+        assert row.actor_id == logged_in_user.id
+        assert row.action == "delete_user"
+        assert row.before == {
+            "username": target_username,
+            "email": target_email,
+            "is_active": True,
+            "is_superuser": False,
+        }
+        assert row.after is None
+
+
+async def test_failed_delete_writes_no_audit_row(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user: User,
+):
+    """Self-delete attempts get 403; no audit row written."""
+    await promote_to_admin(db_test_session_manager, logged_in_user.email)
+
+    response = await authenticated_client.delete(f"/users/{logged_in_user.id}")
+    assert response.status_code == 403
+
+    async with db_test_session_manager() as session:
+        repo = AuditRepository(session)
+        rows = await repo.list_for_resource(
+            resource_type="user", resource_id=logged_in_user.id
+        )
+        assert rows == []
