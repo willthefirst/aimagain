@@ -10,11 +10,12 @@ from src.logic.post_processing import (
     handle_create_post,
     handle_get_post_detail,
     handle_list_posts,
+    handle_update_post,
 )
 from src.models import User
 from src.repositories.dependencies import get_post_repository
 from src.repositories.post_repository import PostRepository
-from src.schemas.post import PostCreate
+from src.schemas.post import PostCreate, PostUpdate
 
 posts_api_router = APIRouter(prefix="/posts")
 router = BaseRouter(router=posts_api_router, default_tags=["posts"])
@@ -80,4 +81,29 @@ async def create_post(
         status_code=status.HTTP_201_CREATED,
         content={"id": str(created.id)},
         headers={"Location": location, "HX-Redirect": location},
+    )
+
+
+@router.patch("/{post_id}")
+async def patch_post(
+    post_id: UUID,
+    payload: PostUpdate,
+    post_repo: PostRepository = Depends(get_post_repository),
+    user: User = Depends(current_active_user),
+):
+    """Partially updates a post. Owner-only; admins may edit any post.
+
+    Server-managed fields (`id`, `owner_id`, `created_at`, `updated_at`) are
+    rejected by the schema's `extra="forbid"`. The body must include at least
+    one of `title`/`body`.
+    """
+    updated = await handle_update_post(
+        post_id=post_id,
+        payload=payload,
+        post_repo=post_repo,
+        requesting_user=user,
+    )
+    return JSONResponse(
+        content={"id": str(updated.id), "title": updated.title, "body": updated.body},
+        headers={"HX-Refresh": "true"},
     )
