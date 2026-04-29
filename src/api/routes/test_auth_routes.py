@@ -2,9 +2,11 @@ import pytest
 from fastapi_users.db import SQLAlchemyUserDatabase
 from httpx import AsyncClient
 from pydantic import BaseModel
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from src.models import User
+from src.models import AuditLog, User
+from src.repositories.audit_repository import AuditRepository
 
 # Mark all tests in this module as async
 pytestmark = pytest.mark.asyncio
@@ -285,3 +287,66 @@ async def test_unauthorized_redirect_follows_to_login_page(test_client: AsyncCli
     assert response.status_code == 200
     assert "text/html" in response.headers["content-type"]
     assert "<h1>Login</h1>" in response.text
+
+
+# --- Audit log -----------------------------------------------------------
+
+
+async def test_register_writes_audit_row(
+    test_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+):
+    """Each successful POST /auth/register writes one audit row with
+    actor_id=None (self-signup has no authenticated actor)."""
+    register_data = {
+        "email": "audit-target@example.com",
+        "password": "password123",
+        "username": "audittarget",
+    }
+    response = await test_client.post("/auth/register", json=register_data)
+    assert response.status_code == 201
+    new_user_id = response.json()["id"]
+
+    async with db_test_session_manager() as session:
+        repo = AuditRepository(session)
+        from uuid import UUID
+
+        rows = await repo.list_for_resource(
+            resource_type="user", resource_id=UUID(new_user_id)
+        )
+        assert len(rows) == 1
+        row = rows[0]
+        assert row.actor_id is None  # self-signup
+        assert row.action == "register"
+        assert row.before is None
+        assert row.after == {
+            "username": "audittarget",
+            "email": "audit-target@example.com",
+        }
+
+
+async def test_failed_register_writes_no_audit_row(
+    test_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user: User,
+):
+    """A 400 (duplicate email) must not leak an audit row."""
+    register_data = {
+        "email": logged_in_user.email,  # already exists via logged_in_user fixture
+        "password": "newpassword",
+        "username": "duplicate",
+    }
+    response = await test_client.post("/auth/register", json=register_data)
+    assert response.status_code == 400
+
+    async with db_test_session_manager() as session:
+        result = await session.execute(
+            select(AuditLog)
+            .filter(AuditLog.action == "register")
+            .filter(AuditLog.after["email"].as_string() == logged_in_user.email)
+        )
+        rows = result.scalars().all()
+        # The original logged_in_user was created via the test fixture, not
+        # the /auth/register route, so no audit row exists for that email.
+        # The duplicate attempt likewise must not have written one.
+        assert rows == []
