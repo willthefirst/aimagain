@@ -15,7 +15,8 @@ from src.logic.post_processing import (
     handle_update_post,
 )
 from src.models import User
-from src.repositories.dependencies import get_post_repository
+from src.repositories.audit_repository import AuditRepository
+from src.repositories.dependencies import get_audit_repository, get_post_repository
 from src.repositories.post_repository import PostRepository
 from src.schemas.post import PostCreate, PostUpdate
 
@@ -102,6 +103,7 @@ async def get_post(
 async def create_post(
     payload: PostCreate,
     post_repo: PostRepository = Depends(get_post_repository),
+    audit_repo: AuditRepository = Depends(get_audit_repository),
     user: User = Depends(current_active_user),
 ):
     """Creates a post owned by the authenticated user.
@@ -112,6 +114,7 @@ async def create_post(
     created = await handle_create_post(
         payload=payload,
         post_repo=post_repo,
+        audit_repo=audit_repo,
         requesting_user=user,
     )
     location = f"/posts/{created.id}"
@@ -127,6 +130,7 @@ async def patch_post(
     post_id: UUID,
     payload: PostUpdate,
     post_repo: PostRepository = Depends(get_post_repository),
+    audit_repo: AuditRepository = Depends(get_audit_repository),
     user: User = Depends(current_active_user),
 ):
     """Partially updates a post. Owner-only; admins may edit any post.
@@ -139,6 +143,7 @@ async def patch_post(
         post_id=post_id,
         payload=payload,
         post_repo=post_repo,
+        audit_repo=audit_repo,
         requesting_user=user,
     )
     return JSONResponse(
