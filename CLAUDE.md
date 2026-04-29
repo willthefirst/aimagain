@@ -49,37 +49,24 @@ Pre-commit hooks run lint automatically — don't bypass with `--no-verify`.
 1. Read [`src/README.md`](src/README.md) for layer responsibilities and what may import what.
 2. Read the README of the layer you're changing, plus the layers it depends on.
 3. If a single change forces edits across most layers (model + schema + repo + service + route), follow the entity checklist in [`src/README.md`](src/README.md#adding-a-new-domain-entity) — that's expected for new entities, not a smell.
-4. **Before adding or modifying a resource type** (new entity, new endpoint, new lifecycle behavior, new permission rule), read [`src/api/routes/RESOURCE_GRAMMAR.md`](src/api/routes/RESOURCE_GRAMMAR.md) first. That document is the prescriptive contract for URL shape, lifecycle states, and subresource conventions; every resource conforms to it.
-5. **Before adding or moving a route**, run `dev routes` (optionally with a path prefix, e.g. `dev routes /users`) to see every handler currently mounted. Catches router shadowing — when two `include_router` calls register handlers for overlapping paths and the second is silently ignored — before tests do.
+4. **Before adding or modifying a resource type**, read [`src/api/routes/RESOURCE_GRAMMAR.md`](src/api/routes/RESOURCE_GRAMMAR.md) first. It's the prescriptive contract for URL shape, lifecycle states, and subresource conventions.
+5. **Before adding or moving a route**, run `dev routes [prefix]` to see every handler currently mounted. Catches router shadowing before tests do. Full CLI list: [`scripts/README.md`](scripts/README.md).
 
-## Implementation notes that aren't obvious from the code
+## Plan mode
 
-- **Sessions are not auto-committed.** `get_db_session` (in `src/db.py`) yields a session that the caller must `await session.commit()` after writes. Currently the *logic* layer holds that responsibility because the *services* layer is mostly empty stubs; if you populate a service, move the commit there and update [`src/README.md`](src/README.md) so the layer matrix matches reality.
-- **`fastapi-users` does not own `/users/{id}`.** The built-in users router was removed; `src/api/routes/users.py` and `src/api/routes/me.py` together own the `/users/*` surface. `me` MUST be registered before `users` in `src/main.py` so `/users/me` matches the literal handler before being interpreted as a UUID.
-
-## When to use plan mode
-
-- **Use** `/plan` for changes that span multiple layers, introduce new resources/routes, change lifecycle, or otherwise need a written-down design. The Explore + Plan workflow earns its overhead when the cost of a wrong direction is high.
-- **Skip** `/plan` for typo fixes, log-message tweaks, single-file refactors, README polish, dependency bumps. Just do the change. Plan-mode overhead on small changes wastes a turn.
-- When in doubt: if you can describe the change in one sentence and it touches one file, skip plan mode.
+Use `/plan` when a change touches multiple layers or introduces new resources/routes — the Explore + Plan overhead pays off when a wrong direction is expensive. Skip it for typo fixes, single-file refactors, README polish, and anything you can describe in one sentence.
 
 ## Per-PR retrospective
 
-Before declaring a PR complete (after the final commit but before pushing or summarizing), run a retrospective on the session that produced it. The goal is to surface friction the next agent should not have to re-discover — and, eventually, to feed a queue of GitHub issues that agents themselves can resolve.
+Before declaring a PR complete (after the final commit, before push), run a retro on the session and ship it as the final message — separately from the PR description. The user decides which entries become issues; this is how friction gets filed instead of re-discovered next session.
 
-For each pain point, write a short structured entry suitable for becoming a GitHub issue:
+Each entry should be issue-shaped:
 
 ```
-### <one-line title — issue title>
-**Friction:** what slowed me down or caused rework, with a concrete example.
-**Fix:** the specific change that would prevent it next time (file, command, config).
+### <one-line title>
+**Friction:** what slowed me down, with a concrete example.
+**Fix:** the specific change that would prevent it (file, command, config).
 **Effort:** small / medium / large.
 ```
 
-Cover at least:
-
-- The single biggest time sink in the session and its root cause.
-- Any tool, doc, or convention that was missing or misleading (often the cause of the time sink).
-- Anything that worked unexpectedly well and should be made explicit so it gets repeated.
-
-Ship the retro back to the user as the final message of the session, separately from the PR description. They decide which entries get filed as issues.
+Cover the single biggest time sink, any missing/misleading tool or doc, and anything that worked unexpectedly well (so it gets repeated).
