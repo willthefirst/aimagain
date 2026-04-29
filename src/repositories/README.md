@@ -63,6 +63,7 @@ Each repository manages one primary domain entity with related data access opera
 | ------------------ | -------------- | ----------------------------------------------------------------------------- |
 | **UserRepository** | User           | User lookup, listing, activation toggle, hard delete                          |
 | **PostRepository** | Post           | Post lookup by id, list all posts (newest first), persist a new post, partial update (caller commits) |
+| **AuditRepository** | AuditLog | Append-only writes (`record(...)`), single-row read, list-by-resource. No update or delete methods — audit rows are immutable. |
 
 ## Directory structure
 
@@ -70,6 +71,7 @@ Each repository manages one primary domain entity with related data access opera
 
 - `user_repository.py` - User data access and lookup
 - `post_repository.py` - Post data access and lookup
+- `audit_repository.py` - Append-only audit log writes and reads
 
 **Infrastructure:**
 
@@ -260,7 +262,11 @@ class [Entity]Service:
 
 ## Tests
 
-**TODO** — no colocated tests yet. When adding a repository method, create `src/repositories/test_<repo_name>.py` and exercise it against the in-memory test database via the `db_test_session_manager` fixture (from [`tests/fixtures.py`](../../tests/fixtures.py)).
+Colocated tests live alongside the repositories:
+
+- `test_audit_repository.py` — exercises append-only writes, FK `SET NULL` on actor delete, and list-by-resource ordering against the in-memory test DB.
+
+When adding a new repository method, extend (or create) `src/repositories/test_<repo_name>.py` and exercise it via the `db_test_session_manager` fixture from [`tests/fixtures.py`](../../tests/fixtures.py).
 
 ## Related documentation
 
