@@ -25,7 +25,7 @@ from src.schemas.user import UserCreate  # Import UserCreate schema
 TEST_DATABASE_URL = "sqlite+aiosqlite:///:memory:"
 
 test_engine = create_async_engine(TEST_DATABASE_URL)
-test_async_session_maker = async_sessionmaker(test_engine, expire_on_commit=False)
+async_test_sessionmaker = async_sessionmaker(test_engine, expire_on_commit=False)
 
 
 # Master fixture to manage table creation/dropping and provide session maker
@@ -37,7 +37,7 @@ async def db_test_session_manager() -> (
     async with test_engine.begin() as conn:
         await conn.run_sync(metadata.create_all)
 
-    yield test_async_session_maker  # Provide the session maker to tests
+    yield async_test_sessionmaker  # Provide the session maker to tests
 
     # Drop tables after test finishes
     async with test_engine.begin() as conn:
@@ -45,10 +45,10 @@ async def db_test_session_manager() -> (
 
 
 # Override for the raw AsyncSession dependency
-# Uses the globally defined test_async_session_maker
+# Uses the globally defined async_test_sessionmaker
 # Table lifecycle managed by db_test_session_manager fixture
 async def override_get_db_session() -> AsyncGenerator[AsyncSession, None]:
-    async with test_async_session_maker() as session:
+    async with async_test_sessionmaker() as session:
         yield session
 
 
