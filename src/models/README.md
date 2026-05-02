@@ -54,7 +54,9 @@ Each model maps to a database table with explicit relationships managed by SQLAl
 | Model        | Primary Purpose                                  | Key Fields                                                          | Unique Constraints |
 | ------------ | ------------------------------------------------ | ------------------------------------------------------------------- | ------------------ |
 | **User**     | Authentication and identity                      | username                                                            | username, email    |
-| **Post**     | User-authored content                            | title, body, owner_id (FK)                                          | —                  |
+| **Post**     | Polymorphic base for kind-discriminated posts (joined-table inheritance) | owner_id (FK), kind (`client_referral` \| `provider_availability`, CHECK-constrained) | —                  |
+| **ClientReferral**       | Per-kind child table for `Post.kind == 'client_referral'` (no PII; per-kind fields land later) | id (PK + FK to `posts.id`, cascade delete) | —                  |
+| **ProviderAvailability** | Per-kind child table for `Post.kind == 'provider_availability'` (per-kind fields land later) | id (PK + FK to `posts.id`, cascade delete) | —                  |
 | **AuditLog** | Append-only mutation record (RESOURCE_GRAMMAR.md:135) | actor_id (FK, SET NULL), resource_type, resource_id, action, before/after (JSON) | —                  |
 
 ## Directory structure
@@ -62,7 +64,7 @@ Each model maps to a database table with explicit relationships managed by SQLAl
 **Core model files:**
 
 - `user.py` - User authentication and profile (extends FastAPI Users)
-- `post.py` - User-authored posts (title + body, owner FK to users)
+- `post.py` - Polymorphic `Post` base + `ClientReferral` and `ProviderAvailability` JTI subclasses. `Post` holds the shared header (owner, timestamps, `kind` discriminator, `posts_kind_check` CHECK constraint); each subclass owns a child table keyed by `id` FK to `posts.id` with `ON DELETE CASCADE`. Adding a new kind = a new subclass + child table + an entry in `POST_KINDS` (the CHECK constraint reads it).
 
 **Infrastructure:**
 

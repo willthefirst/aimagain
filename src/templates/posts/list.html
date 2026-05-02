@@ -9,7 +9,8 @@
 <ul>
   {% for post in posts %}
   <li>
-    <a href="/posts/{{ post.id }}">{{ post.title }}</a>
+    <span class="post-kind" data-kind="{{ post.kind }}">[{{ post.kind }}]</span>
+    <a href="/posts/{{ post.id }}">{{ post.id }}</a>
     by <a href="/users/{{ post.owner_id }}">{{ post.owner.username }}</a>
   </li>
   {% endfor %}

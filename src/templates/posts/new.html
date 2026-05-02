@@ -2,11 +2,24 @@
 {% block title %}New post{% endblock %}
 {% block content %}
 <h1>New post</h1>
+<p class="hint">
+  Posts are public to other authenticated users. Never include personally
+  identifying information about clients.
+</p>
+
 <form hx-post="/posts" hx-ext="json-enc">
-  <label for="title">Title:</label><br />
-  <input type="text" id="title" name="title" required /><br />
-  <label for="body">Body:</label><br />
-  <textarea id="body" name="body" required></textarea><br /><br />
+  <fieldset>
+    <legend>Kind</legend>
+    <label>
+      <input type="radio" name="kind" value="client_referral" checked />
+      Client referral
+    </label>
+    <label>
+      <input type="radio" name="kind" value="provider_availability" />
+      Provider availability
+    </label>
+  </fieldset>
+  <br />
   <input type="submit" value="Create post" />
 </form>
 

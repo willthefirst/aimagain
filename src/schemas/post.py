@@ -1,13 +1,55 @@
+"""Request/response schemas for `/posts` (kind-discriminated).
+
+`Post` is polymorphic on `kind` (joined-table inheritance — see
+`src/models/post.py`). Pydantic mirrors that with discriminated unions:
+each kind has its own `*Create` and `*Read` schema, and `PostCreate` /
+`PostRead` are `Annotated[Union[...], Field(discriminator="kind")]`. This
+gives FastAPI a 422 with a clear pointer when an unknown `kind` arrives,
+and lets each kind grow its own field set independently.
+
+`kind` itself is server-set on creation (it's the discriminator), so it's
+honored on the inbound payload but never accepted on a future PATCH —
+identity, not state. There is no `*Update` schema in this PR because the
+kinds carry no editable fields yet; PATCH and the edit form return when
+the first per-kind fields land.
+"""
+
 import uuid
 from datetime import datetime
+from typing import Annotated, Literal, Union
 
-from pydantic import BaseModel, ConfigDict, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field
+
+# --- Create --------------------------------------------------------------
 
 
-class PostRead(BaseModel):
+class _PostCreateBase(BaseModel):
+    """Shared config for per-kind create payloads."""
+
+    model_config = ConfigDict(extra="forbid")
+
+
+class ClientReferralCreate(_PostCreateBase):
+    kind: Literal["client_referral"]
+
+
+class ProviderAvailabilityCreate(_PostCreateBase):
+    kind: Literal["provider_availability"]
+
+
+PostCreate = Annotated[
+    Union[ClientReferralCreate, ProviderAvailabilityCreate],
+    Field(discriminator="kind"),
+]
+
+
+# --- Read ----------------------------------------------------------------
+
+
+class _PostReadBase(BaseModel):
+    """Shared fields that surface on every kind."""
+
     id: uuid.UUID
-    title: str
-    body: str
     owner_id: uuid.UUID
     created_at: datetime
     updated_at: datetime
@@ -15,55 +57,43 @@ class PostRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
-class PostCreate(BaseModel):
-    title: str
-    body: str
-
-    model_config = ConfigDict(extra="forbid")
-
-    @field_validator("title", "body")
-    @classmethod
-    def _strip_and_require_non_empty(cls, v: str) -> str:
-        v = v.strip()
-        if not v:
-            raise ValueError("must not be empty")
-        return v
+class ClientReferralRead(_PostReadBase):
+    kind: Literal["client_referral"]
 
 
-class PostUpdate(BaseModel):
-    title: str | None = None
-    body: str | None = None
+class ProviderAvailabilityRead(_PostReadBase):
+    kind: Literal["provider_availability"]
 
-    model_config = ConfigDict(extra="forbid")
 
-    @field_validator("title", "body")
-    @classmethod
-    def _strip_and_require_non_empty(cls, v: str | None) -> str | None:
-        if v is None:
-            return None
-        v = v.strip()
-        if not v:
-            raise ValueError("must not be empty")
-        return v
+PostRead = Annotated[
+    Union[ClientReferralRead, ProviderAvailabilityRead],
+    Field(discriminator="kind"),
+]
 
-    @model_validator(mode="after")
-    def _at_least_one_field(self) -> "PostUpdate":
-        if self.title is None and self.body is None:
-            raise ValueError("at least one of title, body must be provided")
-        return self
+
+# --- Audit ---------------------------------------------------------------
 
 
 class PostAuditSnapshot(BaseModel):
     """Audit `before`/`after` projection for posts.
 
-    Captures the user-meaningful fields that mutations to a `Post` can
-    change. The id lives in `audit_log.resource_id` already, so it's not
-    duplicated here. Adding a field requires updating this class — the
-    handler picks it up automatically via `model_dump`.
+    Captures the user-meaningful, kind-agnostic fields a `Post` mutation can
+    change. Per-kind fields will be added as they land — adding a field to
+    this class flows through `_snapshot_post` automatically via `model_dump`.
     """
 
-    title: str
-    body: str
+    kind: str
     owner_id: uuid.UUID
 
     model_config = ConfigDict(from_attributes=True)
+
+
+__all__ = [
+    "ClientReferralCreate",
+    "ClientReferralRead",
+    "PostAuditSnapshot",
+    "PostCreate",
+    "PostRead",
+    "ProviderAvailabilityCreate",
+    "ProviderAvailabilityRead",
+]

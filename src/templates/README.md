@@ -89,12 +89,11 @@ templates/
 │   ├── list.html               # User directory listing
 │   ├── detail.html             # User detail page
 │   └── _admin_actions.html     # Reusable admin-actions partial
-├── posts/                      # Post templates
-│   ├── list.html               # Post listing
-│   ├── detail.html             # Post detail (includes _owner_actions.html)
-│   ├── new.html                # Create-post form (HTMX json-enc → POST /posts)
-│   ├── edit.html               # Edit-post form (HTMX json-enc → PATCH /posts/{id})
-│   └── _owner_actions.html     # Reusable owner-actions partial (Edit link)
+├── posts/                      # Post templates (kind-discriminated; unified timeline)
+│   ├── list.html               # Post listing — every kind, with kind label per row
+│   ├── detail.html             # Post detail — surfaces kind; per-kind body when fields land
+│   ├── new.html                # Create-post form: kind selector → POST /posts (HTMX json-enc)
+│   └── _owner_actions.html     # Reusable owner-actions partial (Delete only — no edit yet)
 └── me/                         # Personal user pages
     └── profile.html            # User's profile page
 ```

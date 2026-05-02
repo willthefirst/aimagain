@@ -1,10 +1,13 @@
 {% extends "base.html" %}
-{% block title %}Post: {{ post.title }}{% endblock %}
+{% block title %}Post: {{ post.id }}{% endblock %}
 {% block content %}
-<h1>{{ post.title }}</h1>
+<h1>
+  <span class="post-kind" data-kind="{{ post.kind }}">[{{ post.kind }}]</span>
+  {{ post.id }}
+</h1>
 <p>by <a href="/users/{{ post.owner_id }}">{{ post.owner.username }}</a></p>
 
-<div class="post-body">{{ post.body }}</div>
+{# Per-kind body fields will render here once kinds carry editable content. #}
 
 {% include "posts/_owner_actions.html" %}
 
