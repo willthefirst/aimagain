@@ -13,6 +13,8 @@
     <a href="/posts/{{ post.id }}">
       {% if post.kind == "client_referral" %}
         {{ post.summary }}
+      {% elif post.kind == "provider_availability" %}
+        {{ post.specialty }}
       {% else %}
         {{ post.id }}
       {% endif %}

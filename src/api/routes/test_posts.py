@@ -1,17 +1,16 @@
 """Route-layer tests for the kind-discriminated `/posts` API.
 
-`Post` is polymorphic on `kind`: `client_referral` (with summary/urgency/region)
-and `provider_availability` (no fields yet) each have their own child table
-(joined-table inheritance — see `src/models/post.py`). These tests confirm:
+`Post` is polymorphic on `kind`: `client_referral` (summary/urgency/region)
+and `provider_availability` (specialty/region/accepting_new_clients) each
+have their own child table (joined-table inheritance — see
+`src/models/post.py`). These tests confirm:
 
-- both kinds round-trip through POST/GET/DELETE
+- both kinds round-trip through POST/GET/PATCH/DELETE
 - the unified GET /posts timeline returns rows of every kind
-- the schema's discriminated union rejects unknown / missing kinds and
-  enforces per-kind required fields
-- `client_referral` PATCH + edit-form work end-to-end
-- `provider_availability` PATCH/edit-form 422/404 because no Update variant
-  exists yet for that kind
-- audit rows snapshot kind + fields alongside the owner
+- the schema's discriminated unions reject unknown / missing kinds and
+  enforce per-kind required fields
+- both kinds have working PATCH + edit-form flows
+- audit rows snapshot kind + per-kind fields alongside the owner
 """
 
 import uuid
@@ -45,8 +44,20 @@ def _make_client_referral(
     )
 
 
-def _make_provider_availability(owner: User) -> ProviderAvailability:
-    return ProviderAvailability(kind="provider_availability", owner_id=owner.id)
+def _make_provider_availability(
+    owner: User,
+    *,
+    specialty: str = "psychiatry",
+    region: str = "boston metro",
+    accepting_new_clients: bool = True,
+) -> ProviderAvailability:
+    return ProviderAvailability(
+        kind="provider_availability",
+        owner_id=owner.id,
+        specialty=specialty,
+        region=region,
+        accepting_new_clients=accepting_new_clients,
+    )
 
 
 _VALID_CLIENT_REFERRAL_PAYLOAD = {
@@ -54,6 +65,13 @@ _VALID_CLIENT_REFERRAL_PAYLOAD = {
     "summary": "needs day-program placement",
     "urgency": "medium",
     "region": "western mass",
+}
+
+_VALID_PROVIDER_AVAILABILITY_PAYLOAD = {
+    "kind": "provider_availability",
+    "specialty": "psychiatry",
+    "region": "boston metro",
+    "accepting_new_clients": True,
 }
 
 
@@ -162,13 +180,18 @@ async def test_detail_renders_client_referral_fields(
     assert tree.css_first(".post-region").text(strip=True) == "northeast"
 
 
-async def test_detail_renders_provider_availability_placeholder(
+async def test_detail_renders_provider_availability_fields(
     authenticated_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user: User,
 ):
     author = create_test_user(username=f"author-{uuid.uuid4()}")
-    post = _make_provider_availability(author)
+    post = _make_provider_availability(
+        author,
+        specialty="psychiatry",
+        region="boston metro",
+        accepting_new_clients=False,
+    )
     async with db_test_session_manager() as session:
         async with session.begin():
             session.add(author)
@@ -176,8 +199,13 @@ async def test_detail_renders_provider_availability_placeholder(
 
     response = await authenticated_client.get(f"/posts/{post.id}")
     assert response.status_code == 200
+    tree = HTMLParser(response.text)
     assert "provider_availability" in response.text
-    assert "No fields yet" in response.text
+    assert tree.css_first(".post-specialty").text(strip=True) == "psychiatry"
+    assert tree.css_first(".post-region").text(strip=True) == "boston metro"
+    accepting = tree.css_first(".post-accepting-new-clients")
+    assert accepting.attributes.get("data-accepting-new-clients") == "false"
+    assert accepting.text(strip=True) == "no"
 
 
 async def test_get_post_detail_404(
@@ -230,7 +258,7 @@ async def test_create_provider_availability_happy_path(
     logged_in_user: User,
 ):
     response = await authenticated_client.post(
-        "/posts", json={"kind": "provider_availability"}
+        "/posts", json=_VALID_PROVIDER_AVAILABILITY_PAYLOAD
     )
     assert response.status_code == 201
     new_id = uuid.UUID(response.json()["id"])
@@ -243,6 +271,9 @@ async def test_create_provider_availability_happy_path(
         assert persisted is not None
         assert persisted.kind == "provider_availability"
         assert persisted.owner_id == logged_in_user.id
+        assert persisted.specialty == "psychiatry"
+        assert persisted.region == "boston metro"
+        assert persisted.accepting_new_clients is True
 
 
 async def test_create_post_strips_whitespace(
@@ -483,23 +514,39 @@ async def test_patch_kind_mismatch_returns_400(
     assert response.status_code == 400
 
 
-async def test_patch_provider_availability_returns_422(
+async def test_owner_can_patch_provider_availability(
     authenticated_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user: User,
 ):
-    """No Update variant exists for provider_availability yet — Pydantic
-    rejects the discriminator before the handler sees it."""
-    post = _make_provider_availability(logged_in_user)
+    post = _make_provider_availability(
+        logged_in_user,
+        specialty="orig",
+        region="orig-region",
+        accepting_new_clients=True,
+    )
     async with db_test_session_manager() as session:
         async with session.begin():
             session.add(post)
 
     response = await authenticated_client.patch(
         f"/posts/{post.id}",
-        json={"kind": "provider_availability"},
+        json={
+            "kind": "provider_availability",
+            "specialty": "S2",
+            "accepting_new_clients": False,
+        },
     )
-    assert response.status_code == 422
+    assert response.status_code == 200
+
+    async with db_test_session_manager() as session:
+        result = await session.execute(
+            select(ProviderAvailability).filter(ProviderAvailability.id == post.id)
+        )
+        refreshed = result.scalars().first()
+        assert refreshed.specialty == "S2"
+        assert refreshed.region == "orig-region"  # untouched
+        assert refreshed.accepting_new_clients is False
 
 
 async def test_patch_rejects_owner_id_in_payload(
@@ -707,20 +754,41 @@ async def test_edit_form_404_for_unknown_post(
     assert response.status_code == 404
 
 
-async def test_edit_form_404_for_provider_availability(
+async def test_owner_can_open_provider_availability_edit_form(
     authenticated_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user: User,
 ):
-    """No edit page exists for provider_availability — it has no editable
-    fields yet."""
-    post = _make_provider_availability(logged_in_user)
+    post = _make_provider_availability(
+        logged_in_user,
+        specialty="orig-specialty",
+        region="orig-region",
+        accepting_new_clients=False,
+    )
     async with db_test_session_manager() as session:
         async with session.begin():
             session.add(post)
 
     response = await authenticated_client.get(f"/posts/{post.id}/form")
-    assert response.status_code == 404
+    assert response.status_code == 200
+    tree = HTMLParser(response.text)
+    form = tree.css_first("form")
+    assert form is not None
+    assert form.attributes.get("hx-patch") == f"/posts/{post.id}"
+
+    discriminator = tree.css_first('input[type="hidden"][name="kind"]')
+    assert discriminator.attributes.get("value") == "provider_availability"
+    assert (
+        tree.css_first('input[name="specialty"]').attributes.get("value")
+        == "orig-specialty"
+    )
+    assert (
+        tree.css_first('input[name="region"]').attributes.get("value") == "orig-region"
+    )
+    accepting_no = tree.css_first(
+        'input[type="radio"][name="accepting_new_clients"][value="false"][checked]'
+    )
+    assert accepting_no is not None
 
 
 async def test_edit_form_unauthenticated_redirects(test_client: AsyncClient):
@@ -754,7 +822,7 @@ async def test_detail_shows_edit_link_for_client_referral_owner(
     assert actions.css_first(f'a[href="/posts/{post.id}/form"]') is not None
 
 
-async def test_detail_hides_edit_link_for_provider_availability(
+async def test_detail_shows_edit_link_for_provider_availability_owner(
     authenticated_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user: User,
@@ -768,8 +836,8 @@ async def test_detail_hides_edit_link_for_provider_availability(
     assert response.status_code == 200
     tree = HTMLParser(response.text)
     actions = tree.css_first("span.owner-actions")
-    assert actions is not None  # still shows Delete
-    assert actions.css_first("a") is None
+    assert actions is not None
+    assert actions.css_first(f'a[href="/posts/{post.id}/form"]') is not None
 
 
 async def test_detail_hides_owner_actions_for_stranger(
@@ -838,18 +906,20 @@ async def test_create_client_referral_writes_audit_row(
             "summary": "needs day-program placement",
             "urgency": "medium",
             "region": "western mass",
+            "specialty": None,
+            "accepting_new_clients": None,
         }
 
 
-async def test_create_provider_availability_audit_omits_client_referral_fields(
+async def test_create_provider_availability_audit_includes_kind_fields(
     authenticated_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user: User,
 ):
-    """The audit snapshot is shape-uniform across kinds: client_referral fields
-    are `None` on a provider_availability row."""
+    """The audit snapshot is shape-uniform across kinds: each kind's fields
+    fill in the snapshot, the rest stay None."""
     response = await authenticated_client.post(
-        "/posts", json={"kind": "provider_availability"}
+        "/posts", json=_VALID_PROVIDER_AVAILABILITY_PAYLOAD
     )
     assert response.status_code == 201
     new_id = uuid.UUID(response.json()["id"])
@@ -863,7 +933,9 @@ async def test_create_provider_availability_audit_omits_client_referral_fields(
             "owner_id": str(logged_in_user.id),
             "summary": None,
             "urgency": None,
-            "region": None,
+            "region": "boston metro",
+            "specialty": "psychiatry",
+            "accepting_new_clients": True,
         }
 
 
@@ -897,6 +969,8 @@ async def test_patch_writes_audit_row_with_before_and_after(
             "summary": "orig",
             "urgency": "low",
             "region": "orig-region",
+            "specialty": None,
+            "accepting_new_clients": None,
         }
         assert row.after == {
             "kind": "client_referral",
@@ -904,6 +978,8 @@ async def test_patch_writes_audit_row_with_before_and_after(
             "summary": "new",
             "urgency": "high",
             "region": "orig-region",
+            "specialty": None,
+            "accepting_new_clients": None,
         }
 
 
@@ -1052,5 +1128,7 @@ async def test_delete_post_writes_audit_row(
             "summary": "doomed",
             "urgency": "high",
             "region": "r",
+            "specialty": None,
+            "accepting_new_clients": None,
         }
         assert row.after is None

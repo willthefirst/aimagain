@@ -16,8 +16,19 @@
   <dt>region</dt>
   <dd class="post-region">{{ post.region }}</dd>
 </dl>
-{% else %}
-<p>No fields yet for this kind.</p>
+{% elif post.kind == "provider_availability" %}
+<dl class="post-fields">
+  <dt>specialty</dt>
+  <dd class="post-specialty">{{ post.specialty }}</dd>
+  <dt>region</dt>
+  <dd class="post-region">{{ post.region }}</dd>
+  <dt>accepting new clients</dt>
+  <dd
+    class="post-accepting-new-clients"
+    data-accepting-new-clients="{{ 'true' if post.accepting_new_clients else 'false' }}">
+    {{ 'yes' if post.accepting_new_clients else 'no' }}
+  </dd>
+</dl>
 {% endif %}
 
 {% include "posts/_owner_actions.html" %}

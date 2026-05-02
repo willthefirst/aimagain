@@ -1,9 +1,11 @@
 """Schema tests for the kind-discriminated `/posts` payloads.
 
 Pydantic validates `PostCreate` and `PostUpdate` as discriminated unions on
-`kind`. These tests cover both kinds end-to-end on create, the new
-`client_referral` field set (summary/urgency/region), and the partial-update
-shape — including the at-least-one-field rule and `extra="forbid"`.
+`kind`. These tests cover both kinds end-to-end on create and update,
+their per-kind field sets (`client_referral`: summary/urgency/region;
+`provider_availability`: specialty/region/accepting_new_clients), and the
+partial-update shape — including the at-least-one-field rule and
+`extra="forbid"`.
 """
 
 import uuid
@@ -17,6 +19,7 @@ from src.schemas.post import (
     PostCreate,
     PostUpdate,
     ProviderAvailabilityCreate,
+    ProviderAvailabilityUpdate,
 )
 
 _post_create = TypeAdapter(PostCreate)
@@ -42,8 +45,18 @@ def test_post_create_dispatches_client_referral():
 
 
 def test_post_create_dispatches_provider_availability():
-    parsed = _post_create.validate_python({"kind": "provider_availability"})
+    parsed = _post_create.validate_python(
+        {
+            "kind": "provider_availability",
+            "specialty": "psychiatry",
+            "region": "boston metro",
+            "accepting_new_clients": True,
+        }
+    )
     assert isinstance(parsed, ProviderAvailabilityCreate)
+    assert parsed.specialty == "psychiatry"
+    assert parsed.region == "boston metro"
+    assert parsed.accepting_new_clients is True
 
 
 def test_post_create_rejects_missing_kind():
@@ -167,9 +180,8 @@ def test_client_referral_update_requires_at_least_one_field():
 
 
 def test_client_referral_update_rejects_unknown_kind():
-    """`provider_availability` has no Update variant yet."""
     with pytest.raises(ValidationError):
-        _post_update.validate_python({"kind": "provider_availability"})
+        _post_update.validate_python({"kind": "not_a_real_kind"})
 
 
 def test_client_referral_update_rejects_extra_fields():
@@ -193,3 +205,99 @@ def test_client_referral_update_rejects_owner_id():
 def test_client_referral_update_rejects_whitespace_summary():
     with pytest.raises(ValidationError):
         _post_update.validate_python({"kind": "client_referral", "summary": "   "})
+
+
+# --- provider_availability create / update -------------------------------
+
+
+@pytest.mark.parametrize("missing", ["specialty", "region", "accepting_new_clients"])
+def test_provider_availability_create_requires_field(missing):
+    payload = {
+        "kind": "provider_availability",
+        "specialty": "psych",
+        "region": "boston",
+        "accepting_new_clients": True,
+    }
+    payload.pop(missing)
+    with pytest.raises(ValidationError):
+        _post_create.validate_python(payload)
+
+
+@pytest.mark.parametrize("field", ["specialty", "region"])
+def test_provider_availability_create_rejects_whitespace(field):
+    payload = {
+        "kind": "provider_availability",
+        "specialty": "s",
+        "region": "r",
+        "accepting_new_clients": True,
+        field: "   ",
+    }
+    with pytest.raises(ValidationError):
+        _post_create.validate_python(payload)
+
+
+def test_provider_availability_create_strips_whitespace():
+    parsed = _post_create.validate_python(
+        {
+            "kind": "provider_availability",
+            "specialty": "  s  ",
+            "region": "  r  ",
+            "accepting_new_clients": True,
+        }
+    )
+    assert isinstance(parsed, ProviderAvailabilityCreate)
+    assert parsed.specialty == "s"
+    assert parsed.region == "r"
+
+
+@pytest.mark.parametrize(
+    "raw,expected",
+    [
+        ("true", True),
+        ("false", False),
+        (True, True),
+        (False, False),
+    ],
+)
+def test_provider_availability_create_coerces_accepting_bool(raw, expected):
+    """Form payloads carry strings; Pydantic coerces them to bool."""
+    parsed = _post_create.validate_python(
+        {
+            "kind": "provider_availability",
+            "specialty": "s",
+            "region": "r",
+            "accepting_new_clients": raw,
+        }
+    )
+    assert parsed.accepting_new_clients is expected
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        {"kind": "provider_availability", "specialty": "new"},
+        {"kind": "provider_availability", "region": "new"},
+        {"kind": "provider_availability", "accepting_new_clients": False},
+        {
+            "kind": "provider_availability",
+            "specialty": "s",
+            "region": "r",
+            "accepting_new_clients": True,
+        },
+    ],
+)
+def test_provider_availability_update_accepts_partial(payload):
+    parsed = _post_update.validate_python(payload)
+    assert isinstance(parsed, ProviderAvailabilityUpdate)
+
+
+def test_provider_availability_update_requires_at_least_one_field():
+    with pytest.raises(ValidationError):
+        _post_update.validate_python({"kind": "provider_availability"})
+
+
+def test_provider_availability_update_rejects_extra_fields():
+    with pytest.raises(ValidationError):
+        _post_update.validate_python(
+            {"kind": "provider_availability", "specialty": "s", "evil": True}
+        )

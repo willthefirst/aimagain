@@ -91,9 +91,7 @@ async def handle_get_post_edit_form(
     """Loads a post for the edit-form page. 404 if missing, 403 if the
     requester is neither owner nor admin (mirrors `handle_update_post`).
 
-    The route only exposes an edit form for kinds that actually have
-    editable fields — provider_availability has none yet, so its edit form
-    404s rather than rendering an empty form.
+    Per-kind template selection happens in the route layer.
     """
     post = await post_repo.get_post_by_id(post_id)
     if post is None:
@@ -101,9 +99,6 @@ async def handle_get_post_edit_form(
 
     if post.owner_id != requesting_user.id and not requesting_user.is_superuser:
         raise ForbiddenError(detail="Only the owner or an admin can edit this post")
-
-    if post.kind != POST_KIND_CLIENT_REFERRAL:
-        raise NotFoundError(detail="This post kind has no editable fields yet")
 
     return {"request": request, "post": post, "current_user": requesting_user}
 

@@ -1,6 +1,6 @@
 import uuid
 
-from sqlalchemy import CheckConstraint, Column, ForeignKey, Text
+from sqlalchemy import Boolean, CheckConstraint, Column, ForeignKey, Text
 from sqlalchemy.orm import relationship
 from sqlalchemy.types import Uuid
 
@@ -81,7 +81,10 @@ class ClientReferral(Post):
 
 
 class ProviderAvailability(Post):
-    """A provider listing their availability / open slots."""
+    """A provider listing their availability / open slots.
+
+    Carries general availability metadata only — no client info.
+    """
 
     __tablename__ = "provider_availabilities"
     __mapper_args__ = {"polymorphic_identity": POST_KIND_PROVIDER_AVAILABILITY}
@@ -92,3 +95,6 @@ class ProviderAvailability(Post):
         primary_key=True,
         default=uuid.uuid4,
     )
+    specialty = Column(Text, nullable=False)
+    region = Column(Text, nullable=False)
+    accepting_new_clients = Column(Boolean, nullable=False)
