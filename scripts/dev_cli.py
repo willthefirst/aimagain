@@ -296,12 +296,15 @@ class SeedCommands:
         # that bypasses start-dev.sh, so migrations must be applied explicitly
         # here — otherwise a freshly added revision crashes seed against a
         # stale schema with a raw OperationalError.
+        from scripts.dev.migrate import run_alembic
+
         print("🧱 Applying migrations before seeding...")
-        migrate_cmd = self.runner.wrap_for_compose(
-            self.SERVICE_NAME,
-            ["alembic", "-c", "config/alembic.ini", "upgrade", "head"],
+        rc = run_alembic(
+            self.runner,
+            ["upgrade", "head"],
+            mode="compose",
+            service_name=self.SERVICE_NAME,
         )
-        rc = self.runner.run_command(migrate_cmd)
         if rc != 0:
             print("❌ Migrations failed — aborting seed.")
             return rc
