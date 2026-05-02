@@ -29,11 +29,19 @@ DEVELOPMENT=true
 """
 
 
+def _resolve_project_root() -> Path:
+    cwd = Path.cwd().resolve()
+    for candidate in [cwd, *cwd.parents]:
+        if (candidate / "pyproject.toml").is_file():
+            return candidate
+    return Path(__file__).resolve().parent.parent
+
+
 class CLIRunner:
     """Handles command execution and common utilities."""
 
     def __init__(self):
-        self.project_root = Path(__file__).parent.parent
+        self.project_root = _resolve_project_root()
 
     def run_command(self, cmd: List[str], cwd: Optional[Path] = None) -> int:
         """Run a command and return its exit code."""
