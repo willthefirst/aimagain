@@ -91,9 +91,10 @@ templates/
 │   └── _admin_actions.html     # Reusable admin-actions partial
 ├── posts/                      # Post templates (kind-discriminated; unified timeline)
 │   ├── list.html               # Post listing — every kind, with kind label per row
-│   ├── detail.html             # Post detail — surfaces kind; per-kind body when fields land
-│   ├── new.html                # Create-post form: kind selector → POST /posts (HTMX json-enc)
-│   └── _owner_actions.html     # Reusable owner-actions partial (Delete only — no edit yet)
+│   ├── detail.html             # Post detail — kind label + per-kind field block (client_referral renders summary/urgency/region; provider_availability shows a placeholder)
+│   ├── new.html                # Create-post form: kind selector + per-kind field clusters (script toggles which one is enabled) → POST /posts
+│   ├── edit_client_referral.html  # Edit form for client_referral → PATCH /posts/{id}
+│   └── _owner_actions.html     # Reusable owner-actions partial (Delete always; Edit link only for kinds with an edit page)
 └── me/                         # Personal user pages
     └── profile.html            # User's profile page
 ```

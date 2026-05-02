@@ -62,14 +62,14 @@ Schemas act as the data contract layer between HTTP and business logic.
 | Schema File | Domain    | Responsibilities                             | Schema Types                                             |
 | ----------- | --------- | -------------------------------------------- | -------------------------------------------------------- |
 | **user.py** | User data | User CRUD plus activation state-axis subresource (extends FastAPI Users) and audit snapshots | UserRead, UserCreate, UserUpdate, UserActivationUpdate, UserAuditSnapshot, UserActivationAuditSnapshot |
-| **post.py** | Posts     | Kind-discriminated read/create unions + audit snapshot. `PostCreate` and `PostRead` are `Annotated[Union[..., ...], Field(discriminator="kind")]` over per-kind schemas (`ClientReferralCreate`, `ProviderAvailabilityCreate`, etc). Each per-kind schema sets `extra="forbid"` so unknown / server-managed fields (e.g. `owner_id`) are rejected with 422. No `*Update` schema yet — kinds carry no editable fields in this PR. | PostCreate, PostRead, ClientReferralCreate, ClientReferralRead, ProviderAvailabilityCreate, ProviderAvailabilityRead, PostAuditSnapshot |
+| **post.py** | Posts     | Kind-discriminated read/create/update unions + audit snapshot. `PostCreate`, `PostRead`, and `PostUpdate` are `Annotated[Union[..., ...], Field(discriminator="kind")]` over per-kind schemas. `client_referral` carries `summary` / `urgency` (`low`/`medium`/`high`) / `region`; `provider_availability` carries no editable fields yet (so the `PostUpdate` union is single-variant for now — extend it when that kind grows fields). Each per-kind schema sets `extra="forbid"`; the Update variant rejects no-op PATCHes via a model validator. | PostCreate, PostRead, PostUpdate, ClientReferralCreate, ClientReferralRead, ClientReferralUpdate, ProviderAvailabilityCreate, ProviderAvailabilityRead, PostAuditSnapshot |
 
 ## Directory structure
 
 **Domain schema files:**
 
 - `user.py` - User schemas extending FastAPI Users base schemas
-- `post.py` - Post schemas: discriminated unions (`PostCreate`, `PostRead`) over per-kind schemas (`ClientReferralCreate`/`Read`, `ProviderAvailabilityCreate`/`Read`), plus `PostAuditSnapshot`. `kind` is the discriminator; per-kind schemas set `extra="forbid"`. Adding a new post kind = a new pair of per-kind schemas plus an entry in each Union.
+- `post.py` - Post schemas: discriminated unions (`PostCreate`, `PostRead`, `PostUpdate`) over per-kind schemas (`ClientReferralCreate`/`Read`/`Update`, `ProviderAvailabilityCreate`/`Read`), plus `PostAuditSnapshot`. `kind` is the discriminator; per-kind schemas set `extra="forbid"`. Adding a new post kind = new per-kind schemas plus an entry in each Union (the Update union may stay narrower than the Create union if a kind has no editable fields).
 
 ## Implementation patterns
 
@@ -238,7 +238,7 @@ UserUpdate
 
 Colocated tests live alongside the schema modules:
 
-- `test_post.py` — exercises the kind-discriminated `PostCreate` union: dispatch on `kind`, rejection of missing/unknown `kind`, and the `extra="forbid"` boundary on each per-kind schema (rejects `owner_id`, the old `title`/`body` shape, and any other unknown field).
+- `test_post.py` — exercises the kind-discriminated `PostCreate` and `PostUpdate` unions: dispatch on `kind`, rejection of missing/unknown `kind`, per-kind required fields and validators (`summary`/`urgency`/`region` on `client_referral`, with whitespace stripping and an urgency enum), at-least-one-field on Update, and the `extra="forbid"` boundary on each per-kind schema.
 
 Add `src/schemas/test_<schema_name>.py` when a schema has non-trivial validators or computed fields whose behavior isn't obvious from the field definitions.
 

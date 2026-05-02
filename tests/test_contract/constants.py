@@ -19,15 +19,23 @@ USER_ACTIVATION_API_PATH = f"/users/{TARGET_USER_ID}/activation"
 
 # Stable post id returned by the post-create handler mock so the consumer can
 # match the response shape and the redirect headers without round-tripping a DB.
-# Also used as the path id for the owner-actions pact.
+# Also used as the path id for the edit-form and owner-actions pacts.
 STUB_POST_ID = uuid.UUID("22222222-2222-2222-2222-222222222222")
+POST_EDIT_API_PATH = f"/posts/{STUB_POST_ID}"
+POST_EDIT_PAGE_PATH = f"/posts/{STUB_POST_ID}/form"
 POST_DELETE_API_PATH = f"/posts/{STUB_POST_ID}"
 POST_DETAIL_PAGE_PATH = f"/posts/{STUB_POST_ID}"
 
-# Test post data for the create-form contract. Posts are kind-discriminated
-# now (no title/body); the create form's kind selector picks one of the
-# valid `kind` values, which is the only field on the wire.
+# Test post data for the create / edit-form contracts. Posts are
+# kind-discriminated; the create form's kind selector + per-kind field
+# cluster carry these into the JSON payload.
 TEST_POST_KIND = "client_referral"
+TEST_CLIENT_REFERRAL_SUMMARY = "Hello from contract test"
+TEST_CLIENT_REFERRAL_URGENCY = "medium"
+TEST_CLIENT_REFERRAL_REGION = "western mass"
+EDITED_CLIENT_REFERRAL_SUMMARY = "Edited summary"
+EDITED_CLIENT_REFERRAL_URGENCY = "high"
+EDITED_CLIENT_REFERRAL_REGION = "Edited region"
 
 # Provider states
 PROVIDER_STATE_USER_DOES_NOT_EXIST = f"User {TEST_EMAIL} does not exist"
@@ -45,6 +53,7 @@ CONSUMER_NAME_USER_ADMIN_ACTIONS = "user-admin-actions"
 PROVIDER_NAME_USERS = "users-api"
 
 CONSUMER_NAME_POST_CREATE = "post-create-form"
+CONSUMER_NAME_POST_EDIT = "post-edit-form"
 CONSUMER_NAME_POST_OWNER_ACTIONS = "post-owner-actions"
 PROVIDER_NAME_POSTS = "posts-api"
 
@@ -55,4 +64,5 @@ NETWORK_TIMEOUT_MS = 500
 PACT_PORT_AUTH = 1234
 PACT_PORT_USER_ACTIVATION = 1235
 PACT_PORT_POST_CREATE = 1236
+PACT_PORT_POST_EDIT = 1237
 PACT_PORT_POST_DELETE = 1238

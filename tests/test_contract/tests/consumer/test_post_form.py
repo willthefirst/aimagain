@@ -2,9 +2,9 @@
 
 Verifies that the form rendered by `templates/posts/new.html` (mounted via
 the `posts_pages` flag on the consumer server) issues `POST /posts` with a
-JSON body matching `PostCreate` (kind discriminator only — per-kind fields
-land in a follow-up PR). The contract surface is the form template and
-the route's request shape.
+JSON body matching `ClientReferralCreate` (kind + summary + urgency +
+region). The contract surface is the form template — including its
+per-kind field cluster — and the route's request shape.
 """
 
 import pytest
@@ -20,6 +20,9 @@ from tests.test_contract.constants import (
     PROVIDER_NAME_POSTS,
     PROVIDER_STATE_POSTS_ACCEPTS_CREATE,
     STUB_POST_ID,
+    TEST_CLIENT_REFERRAL_REGION,
+    TEST_CLIENT_REFERRAL_SUMMARY,
+    TEST_CLIENT_REFERRAL_URGENCY,
     TEST_POST_KIND,
 )
 from tests.test_contract.tests.shared.helpers import (
@@ -37,8 +40,9 @@ from tests.test_contract.tests.shared.helpers import (
 async def test_consumer_post_create_form_interaction(
     origin_with_routes: str, page: Page
 ):
-    """Submit the new-post form; assert the intercepted request matches the
-    contracted shape (POST /posts with JSON `{kind: ...}`)."""
+    """Submit the new-post form (client_referral kind selected); assert the
+    intercepted request matches the contracted shape (POST /posts with JSON
+    `{kind, summary, urgency, region}`)."""
     pact = setup_pact(
         CONSUMER_NAME_POST_CREATE,
         PROVIDER_NAME_POSTS,
@@ -49,7 +53,12 @@ async def test_consumer_post_create_form_interaction(
     full_mock_url = f"{mock_server_uri}{POSTS_API_PATH}"
 
     expected_request_headers = {"Content-Type": "application/json"}
-    expected_request_body = {"kind": Like(TEST_POST_KIND)}
+    expected_request_body = {
+        "kind": Like(TEST_POST_KIND),
+        "summary": Like(TEST_CLIENT_REFERRAL_SUMMARY),
+        "urgency": Like(TEST_CLIENT_REFERRAL_URGENCY),
+        "region": Like(TEST_CLIENT_REFERRAL_REGION),
+    }
     expected_response_body = {"id": Like(str(STUB_POST_ID))}
 
     (
@@ -77,13 +86,12 @@ async def test_consumer_post_create_form_interaction(
 
     with pact:
         await page.goto(form_page_url)
-        # The form pre-checks the client_referral radio; a default submit
-        # exercises the discriminator path without per-kind fields.
         await page.wait_for_selector('input[type="radio"][name="kind"]')
         await page.locator(
             f'input[type="radio"][name="kind"][value="{TEST_POST_KIND}"]'
         ).check()
+        await page.locator("#cr-summary").fill(TEST_CLIENT_REFERRAL_SUMMARY)
+        await page.locator("#cr-urgency").select_option(TEST_CLIENT_REFERRAL_URGENCY)
+        await page.locator("#cr-region").fill(TEST_CLIENT_REFERRAL_REGION)
         await page.locator("input[type='submit']").click()
         await page.wait_for_timeout(NETWORK_TIMEOUT_MS)
-
-    # Pact verification happens automatically on context exit.

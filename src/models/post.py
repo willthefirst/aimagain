@@ -10,6 +10,15 @@ POST_KIND_CLIENT_REFERRAL = "client_referral"
 POST_KIND_PROVIDER_AVAILABILITY = "provider_availability"
 POST_KINDS = (POST_KIND_CLIENT_REFERRAL, POST_KIND_PROVIDER_AVAILABILITY)
 
+CLIENT_REFERRAL_URGENCY_LOW = "low"
+CLIENT_REFERRAL_URGENCY_MEDIUM = "medium"
+CLIENT_REFERRAL_URGENCY_HIGH = "high"
+CLIENT_REFERRAL_URGENCIES = (
+    CLIENT_REFERRAL_URGENCY_LOW,
+    CLIENT_REFERRAL_URGENCY_MEDIUM,
+    CLIENT_REFERRAL_URGENCY_HIGH,
+)
+
 
 class Post(BaseModel):
     """Polymorphic base for all post kinds (joined-table inheritance).
@@ -46,8 +55,8 @@ class Post(BaseModel):
 class ClientReferral(Post):
     """A request from a clinician for client placement / referral support.
 
-    Carries no PII — the form will reflect that constraint to users when fields
-    land in a follow-up PR.
+    Carries **no PII** — fields describe what's needed in general terms only;
+    the create form reminds users of this rule.
     """
 
     __tablename__ = "client_referrals"
@@ -58,6 +67,16 @@ class ClientReferral(Post):
         ForeignKey("posts.id", ondelete="CASCADE"),
         primary_key=True,
         default=uuid.uuid4,
+    )
+    summary = Column(Text, nullable=False)
+    urgency = Column(Text, nullable=False)
+    region = Column(Text, nullable=False)
+
+    __table_args__ = (
+        CheckConstraint(
+            "urgency IN ('{}')".format("','".join(CLIENT_REFERRAL_URGENCIES)),
+            name="client_referrals_urgency_check",
+        ),
     )
 
 

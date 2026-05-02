@@ -42,6 +42,23 @@ class PostRepository(BaseRepository):
         await self.session.refresh(post)
         return post
 
+    async def apply_post_update(self, post: Post, **fields) -> Post:
+        """Apply a partial-update field map to a post and flush; the caller
+        commits.
+
+        Only `None`-omitted fields are written, which mirrors the PATCH
+        semantics. Per-kind fields are validated by the schema before reaching
+        here, so this method trusts the caller to pass keys that exist on the
+        target subclass.
+        """
+        for name, value in fields.items():
+            if value is not None:
+                setattr(post, name, value)
+        self.session.add(post)
+        await self.session.flush()
+        await self.session.refresh(post)
+        return post
+
     async def delete_post(self, post: Post) -> None:
         """Deletes a post and flushes; the caller commits.
 
