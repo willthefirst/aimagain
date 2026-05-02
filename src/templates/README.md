@@ -66,7 +66,7 @@ Templates use inheritance for consistent layout and feature-specific customizati
 | **/**      | Base layout and shared | `base.html` - Foundation template                                      |
 | **auth/**  | Authentication pages   | login, register, forgot/reset password                                 |
 | **users/** | User management        | list, detail, `_admin_actions.html` partial (shared by list & detail)  |
-| **posts/** | Posts                  | list, detail, `new.html` + `edit.html` (forms), `_owner_actions.html` partial (shared by detail) |
+| **posts/** | Posts                  | list, detail, `new.html` + per-kind `edit_*.html` forms, `_client_referral_fields.html` partial (multi-section intake form, shared by `new.html` + `edit_client_referral.html`), `_owner_actions.html` partial (shared by detail) |
 | **me/**    | Personal/profile pages | user profile                                                           |
 
 ### Reusable partial convention
@@ -93,8 +93,9 @@ templates/
 │   ├── list.html               # Post listing — every kind, with kind label per row
 │   ├── detail.html             # Post detail — kind label + per-kind field block
 │   ├── new.html                # Create-post form: kind selector + per-kind field clusters (script toggles which one is enabled) → POST /posts
-│   ├── edit_client_referral.html       # Edit form for client_referral → PATCH /posts/{id}
+│   ├── edit_client_referral.html       # Edit form for client_referral → PATCH /posts/{id} (delegates to `_client_referral_fields.html`)
 │   ├── edit_provider_availability.html # Edit form for provider_availability → PATCH /posts/{id}
+│   ├── _client_referral_fields.html    # Multi-section intake-form partial (Client Location / Demographics / Description / Services / Insurance — 21-cell desired-time grid + 5-checkbox services list). Optional `post` context prefills inputs.
 │   └── _owner_actions.html     # Reusable owner-actions partial (Edit + Delete; route layer picks the right edit template per kind)
 └── me/                         # Personal user pages
     └── profile.html            # User's profile page

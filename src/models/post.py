@@ -1,6 +1,6 @@
 import uuid
 
-from sqlalchemy import Boolean, CheckConstraint, Column, ForeignKey, Text
+from sqlalchemy import JSON, Boolean, CheckConstraint, Column, ForeignKey, Text
 from sqlalchemy.orm import relationship
 from sqlalchemy.types import Uuid
 
@@ -10,14 +10,102 @@ POST_KIND_CLIENT_REFERRAL = "client_referral"
 POST_KIND_PROVIDER_AVAILABILITY = "provider_availability"
 POST_KINDS = (POST_KIND_CLIENT_REFERRAL, POST_KIND_PROVIDER_AVAILABILITY)
 
-CLIENT_REFERRAL_URGENCY_LOW = "low"
-CLIENT_REFERRAL_URGENCY_MEDIUM = "medium"
-CLIENT_REFERRAL_URGENCY_HIGH = "high"
-CLIENT_REFERRAL_URGENCIES = (
-    CLIENT_REFERRAL_URGENCY_LOW,
-    CLIENT_REFERRAL_URGENCY_MEDIUM,
-    CLIENT_REFERRAL_URGENCY_HIGH,
+# 50 states + District of Columbia (51 total).
+US_STATES = (
+    "AL",
+    "AK",
+    "AZ",
+    "AR",
+    "CA",
+    "CO",
+    "CT",
+    "DE",
+    "DC",
+    "FL",
+    "GA",
+    "HI",
+    "ID",
+    "IL",
+    "IN",
+    "IA",
+    "KS",
+    "KY",
+    "LA",
+    "ME",
+    "MD",
+    "MA",
+    "MI",
+    "MN",
+    "MS",
+    "MO",
+    "MT",
+    "NE",
+    "NV",
+    "NH",
+    "NJ",
+    "NM",
+    "NY",
+    "NC",
+    "ND",
+    "OH",
+    "OK",
+    "OR",
+    "PA",
+    "RI",
+    "SC",
+    "SD",
+    "TN",
+    "TX",
+    "UT",
+    "VT",
+    "VA",
+    "WA",
+    "WV",
+    "WI",
+    "WY",
 )
+
+LOCATION_AVAILABILITY_YES = "yes"
+LOCATION_AVAILABILITY_NO = "no"
+LOCATION_AVAILABILITY_PLEASE_CONTACT = "please_contact"
+LOCATION_AVAILABILITY_OPTIONS = (
+    LOCATION_AVAILABILITY_YES,
+    LOCATION_AVAILABILITY_NO,
+    LOCATION_AVAILABILITY_PLEASE_CONTACT,
+)
+
+CLIENT_AGE_GROUPS = (
+    "children_0_5",
+    "children_6_10",
+    "preteens_11_13",
+    "adolescents_14_18",
+    "young_adults_19_24",
+    "adults_25_64",
+    "older_adults_65_plus",
+)
+
+LANGUAGE_PREFERRED_OPTIONS = ("no", "yes")
+
+CLIENT_REFERRAL_SERVICES = (
+    "evaluation",
+    "medication_management",
+    "psychotherapy",
+    "case_management",
+    "allied_health",
+)
+
+INSURANCE_OPTIONS = (
+    "in_network",
+    "out_of_network",
+    "in_and_out_of_network",
+)
+
+# 7 days × 3 time-of-day slots = 21 valid `day_slot` strings. The form is a
+# multi-select grid; selected slots are persisted as a JSON list of these
+# tokens. Order in this tuple is the order rendered by the form.
+_DAYS = ("monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday")
+_TIME_SLOTS = ("morning", "afternoon", "evening")
+DESIRED_TIME_SLOTS = tuple(f"{d}_{s}" for d in _DAYS for s in _TIME_SLOTS)
 
 
 class Post(BaseModel):
@@ -56,7 +144,9 @@ class ClientReferral(Post):
     """A request from a clinician for client placement / referral support.
 
     Carries **no PII** — fields describe what's needed in general terms only;
-    the create form reminds users of this rule.
+    the create form reminds users of this rule. Mirrors the multi-section
+    intake form (Client Location, Demographics, Description, Services,
+    Insurance) — the column groupings below match those sections.
     """
 
     __tablename__ = "client_referrals"
@@ -68,14 +158,65 @@ class ClientReferral(Post):
         primary_key=True,
         default=uuid.uuid4,
     )
-    summary = Column(Text, nullable=False)
-    urgency = Column(Text, nullable=False)
-    region = Column(Text, nullable=False)
+
+    # --- Section 1: Client Location ---
+    location_city = Column(Text, nullable=False)
+    location_state = Column(Text, nullable=False)
+    location_zip = Column(Text, nullable=False)
+    location_in_person = Column(Text, nullable=False)
+    location_virtual = Column(Text, nullable=False)
+    # JSON list of `<day>_<slot>` tokens drawn from `DESIRED_TIME_SLOTS`.
+    # Empty list is allowed (nothing selected); membership/uniqueness is
+    # enforced at the schema layer.
+    desired_times = Column(JSON, nullable=False)
+
+    # --- Section 2: Demographics ---
+    client_dem_ages = Column(Text, nullable=False)
+    language_preferred = Column(Text, nullable=False)
+
+    # --- Section 3: Description ---
+    description = Column(Text, nullable=False)
+
+    # --- Section 4: Services ---
+    # JSON list of service tokens drawn from `CLIENT_REFERRAL_SERVICES`.
+    services = Column(JSON, nullable=False)
+    # Free-text modality (e.g. "DBT") — only meaningful when `psychotherapy`
+    # is one of the selected services; not enforced at the DB.
+    services_psychotherapy_modality = Column(Text, nullable=True)
+
+    # --- Section 5: Insurance ---
+    insurance = Column(Text, nullable=False)
 
     __table_args__ = (
         CheckConstraint(
-            "urgency IN ('{}')".format("','".join(CLIENT_REFERRAL_URGENCIES)),
-            name="client_referrals_urgency_check",
+            "location_state IN ('{}')".format("','".join(US_STATES)),
+            name="client_referrals_location_state_check",
+        ),
+        CheckConstraint(
+            "location_in_person IN ('{}')".format(
+                "','".join(LOCATION_AVAILABILITY_OPTIONS)
+            ),
+            name="client_referrals_location_in_person_check",
+        ),
+        CheckConstraint(
+            "location_virtual IN ('{}')".format(
+                "','".join(LOCATION_AVAILABILITY_OPTIONS)
+            ),
+            name="client_referrals_location_virtual_check",
+        ),
+        CheckConstraint(
+            "client_dem_ages IN ('{}')".format("','".join(CLIENT_AGE_GROUPS)),
+            name="client_referrals_client_dem_ages_check",
+        ),
+        CheckConstraint(
+            "language_preferred IN ('{}')".format(
+                "','".join(LANGUAGE_PREFERRED_OPTIONS)
+            ),
+            name="client_referrals_language_preferred_check",
+        ),
+        CheckConstraint(
+            "insurance IN ('{}')".format("','".join(INSURANCE_OPTIONS)),
+            name="client_referrals_insurance_check",
         ),
     )
 

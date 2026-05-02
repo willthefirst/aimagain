@@ -9,12 +9,77 @@
 
 {% if post.kind == "client_referral" %}
 <dl class="post-fields">
-  <dt>summary</dt>
-  <dd class="post-summary">{{ post.summary }}</dd>
-  <dt>urgency</dt>
-  <dd class="post-urgency" data-urgency="{{ post.urgency }}">{{ post.urgency }}</dd>
-  <dt>region</dt>
-  <dd class="post-region">{{ post.region }}</dd>
+  <dt>description</dt>
+  <dd class="post-description">{{ post.description }}</dd>
+
+  <dt>city</dt>
+  <dd class="post-location-city">{{ post.location_city }}</dd>
+  <dt>state</dt>
+  <dd class="post-location-state">{{ post.location_state }}</dd>
+  <dt>zip</dt>
+  <dd class="post-location-zip">{{ post.location_zip }}</dd>
+
+  <dt>in-person sessions</dt>
+  <dd
+    class="post-location-in-person"
+    data-location-in-person="{{ post.location_in_person }}">
+    {{ post.location_in_person|replace('_', ' ') }}
+  </dd>
+  <dt>virtual sessions</dt>
+  <dd
+    class="post-location-virtual"
+    data-location-virtual="{{ post.location_virtual }}">
+    {{ post.location_virtual|replace('_', ' ') }}
+  </dd>
+
+  <dt>desired times</dt>
+  <dd class="post-desired-times">
+    {% if post.desired_times %}
+    <ul>
+      {% for slot in post.desired_times %}
+      <li data-time-slot="{{ slot }}">{{ slot|replace('_', ' ') }}</li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <em>none specified</em>
+    {% endif %}
+  </dd>
+
+  <dt>age group</dt>
+  <dd
+    class="post-client-dem-ages"
+    data-client-dem-ages="{{ post.client_dem_ages }}">
+    {{ post.client_dem_ages|replace('_', ' ') }}
+  </dd>
+  <dt>language other than english</dt>
+  <dd
+    class="post-language-preferred"
+    data-language-preferred="{{ post.language_preferred }}">
+    {{ post.language_preferred }}
+  </dd>
+
+  <dt>services</dt>
+  <dd class="post-services">
+    {% if post.services %}
+    <ul>
+      {% for svc in post.services %}
+      <li data-service="{{ svc }}">{{ svc|replace('_', ' ') }}</li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <em>none specified</em>
+    {% endif %}
+  </dd>
+
+  {% if post.services_psychotherapy_modality %}
+  <dt>psychotherapy modality</dt>
+  <dd class="post-services-psychotherapy-modality">{{ post.services_psychotherapy_modality }}</dd>
+  {% endif %}
+
+  <dt>insurance</dt>
+  <dd class="post-insurance" data-insurance="{{ post.insurance }}">
+    {{ post.insurance|replace('_', ' ') }}
+  </dd>
 </dl>
 {% elif post.kind == "provider_availability" %}
 <dl class="post-fields">

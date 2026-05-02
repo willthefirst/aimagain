@@ -85,9 +85,7 @@ class MockDataFactory:
         cls,
         post_id: UUID = None,
         owner_id: UUID = None,
-        summary: str = "stub summary",
-        urgency: str = "medium",
-        region: str = "stub region",
+        description: str = "stub description",
     ) -> ClientReferralRead:
         """Returns a `client_referral` read schema. The routes under test only
         read `.id` off the return, so a single kind suffices for both create
@@ -97,9 +95,18 @@ class MockDataFactory:
             id=post_id or cls.MOCK_POST_ID,
             kind="client_referral",
             owner_id=owner_id or cls.MOCK_POST_OWNER_ID,
-            summary=summary,
-            urgency=urgency,
-            region=region,
+            location_city="Northampton",
+            location_state="MA",
+            location_zip="01060",
+            location_in_person="yes",
+            location_virtual="please_contact",
+            desired_times=["monday_morning"],
+            client_dem_ages="adults_25_64",
+            language_preferred="no",
+            description=description,
+            services=["psychotherapy"],
+            services_psychotherapy_modality="DBT",
+            insurance="in_network",
             created_at=now,
             updated_at=now,
         )
@@ -134,9 +141,7 @@ class MockDataFactory:
         exposing `.id` is sufficient.
         """
         if post_read is None:
-            post_read = cls.create_post_read(
-                summary="patched summary", urgency="high", region="patched region"
-            )
+            post_read = cls.create_post_read(description="patched description")
 
         return {
             "src.api.routes.posts.handle_update_post": {

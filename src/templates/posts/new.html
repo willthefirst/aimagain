@@ -3,8 +3,8 @@
 {% block content %}
 <h1>New post</h1>
 <p class="hint">
-  Posts are public to other authenticated users. Never include personally
-  identifying information about clients.
+  Please be careful to preserve client confidentiality by not sharing any
+  personally identifying information when creating each post.
 </p>
 
 <form hx-post="/posts" hx-ext="json-enc">
@@ -33,19 +33,9 @@
      a tiny inline script toggles the matching cluster on change so only the
      selected kind's inputs are submitted with the form. Server validates
      `extra="forbid"` per kind, so any stray field is rejected with 422. #}
-  <fieldset data-kind-fields="client_referral">
-    <legend>Client referral details</legend>
-    <label for="cr-summary">Summary (no PII):</label><br /> {# title-case-ignore #}
-    <textarea id="cr-summary" name="summary" required></textarea><br />
-    <label for="cr-urgency">Urgency:</label><br />
-    <select id="cr-urgency" name="urgency" required>
-      <option value="low">Low</option>
-      <option value="medium" selected>Medium</option>
-      <option value="high">High</option>
-    </select><br />
-    <label for="cr-region">Region:</label><br />
-    <input type="text" id="cr-region" name="region" required /><br />
-  </fieldset>
+  <div data-kind-fields="client_referral">
+    {% include "posts/_client_referral_fields.html" %}
+  </div>
 
   <fieldset data-kind-fields="provider_availability" hidden>
     <legend>Provider availability details</legend>
