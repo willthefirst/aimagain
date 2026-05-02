@@ -112,9 +112,18 @@ def _setup_posts_form_stub(app: FastAPI) -> None:
         post = _StubPost(
             id=post_id,
             kind="client_referral",
-            summary="Stub summary",
-            urgency="medium",
-            region="Stub region",
+            location_city="Northampton",
+            location_state="MA",
+            location_zip="01060",
+            location_in_person="yes",
+            location_virtual="please_contact",
+            desired_times=["monday_morning"],
+            client_dem_ages="adults_25_64",
+            language_preferred="no",
+            description="Stub description",
+            services=["psychotherapy"],
+            services_psychotherapy_modality="DBT",
+            insurance="in_network",
         )
         return APIResponse.html_response(
             template_name="posts/edit_client_referral.html",
@@ -147,6 +156,18 @@ def _setup_post_owner_actions_stub(app: FastAPI) -> None:
             kind="client_referral",
             owner_id=owner.id,
             owner=owner,
+            location_city="Northampton",
+            location_state="MA",
+            location_zip="01060",
+            location_in_person="yes",
+            location_virtual="please_contact",
+            desired_times=["monday_morning"],
+            client_dem_ages="adults_25_64",
+            language_preferred="no",
+            description="Stub description",
+            services=["psychotherapy"],
+            services_psychotherapy_modality="DBT",
+            insurance="in_network",
         )
         # The mock auth in `run_consumer_server_process` makes current_user a
         # superuser when `posts_owner_actions=True`, so the partial's

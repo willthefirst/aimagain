@@ -1,6 +1,7 @@
 """Route-layer tests for the kind-discriminated `/posts` API.
 
-`Post` is polymorphic on `kind`: `client_referral` (summary/urgency/region)
+`Post` is polymorphic on `kind`: `client_referral` (multi-section intake
+form: Client Location / Demographics / Description / Services / Insurance)
 and `provider_availability` (specialty/region/accepting_new_clients) each
 have their own child table (joined-table inheritance — see
 `src/models/post.py`). These tests confirm:
@@ -28,19 +29,43 @@ from tests.helpers import create_test_user, promote_to_admin
 pytestmark = pytest.mark.asyncio
 
 
+_DEFAULT_DESIRED_TIMES = ["monday_morning", "wednesday_evening"]
+_DEFAULT_SERVICES = ["psychotherapy", "case_management"]
+
+
 def _make_client_referral(
     owner: User,
     *,
-    summary: str = "needs placement",
-    urgency: str = "medium",
-    region: str = "western mass",
+    location_city: str = "Northampton",
+    location_state: str = "MA",
+    location_zip: str = "01060",
+    location_in_person: str = "yes",
+    location_virtual: str = "please_contact",
+    desired_times: list[str] | None = None,
+    client_dem_ages: str = "adults_25_64",
+    language_preferred: str = "no",
+    description: str = "needs placement",
+    services: list[str] | None = None,
+    services_psychotherapy_modality: str | None = "DBT",
+    insurance: str = "in_network",
 ) -> ClientReferral:
     return ClientReferral(
         kind="client_referral",
         owner_id=owner.id,
-        summary=summary,
-        urgency=urgency,
-        region=region,
+        location_city=location_city,
+        location_state=location_state,
+        location_zip=location_zip,
+        location_in_person=location_in_person,
+        location_virtual=location_virtual,
+        desired_times=(
+            desired_times if desired_times is not None else list(_DEFAULT_DESIRED_TIMES)
+        ),
+        client_dem_ages=client_dem_ages,
+        language_preferred=language_preferred,
+        description=description,
+        services=services if services is not None else list(_DEFAULT_SERVICES),
+        services_psychotherapy_modality=services_psychotherapy_modality,
+        insurance=insurance,
     )
 
 
@@ -62,9 +87,18 @@ def _make_provider_availability(
 
 _VALID_CLIENT_REFERRAL_PAYLOAD = {
     "kind": "client_referral",
-    "summary": "needs day-program placement",
-    "urgency": "medium",
-    "region": "western mass",
+    "location_city": "Northampton",
+    "location_state": "MA",
+    "location_zip": "01060",
+    "location_in_person": "yes",
+    "location_virtual": "please_contact",
+    "desired_times": list(_DEFAULT_DESIRED_TIMES),
+    "client_dem_ages": "adults_25_64",
+    "language_preferred": "no",
+    "description": "looking for outpatient placement",
+    "services": list(_DEFAULT_SERVICES),
+    "services_psychotherapy_modality": "DBT",
+    "insurance": "in_network",
 }
 
 _VALID_PROVIDER_AVAILABILITY_PAYLOAD = {
@@ -73,6 +107,49 @@ _VALID_PROVIDER_AVAILABILITY_PAYLOAD = {
     "region": "boston metro",
     "accepting_new_clients": True,
 }
+
+
+def _client_referral_audit_snapshot(
+    owner_id: uuid.UUID,
+    *,
+    location_city: str = "Northampton",
+    location_state: str = "MA",
+    location_zip: str = "01060",
+    location_in_person: str = "yes",
+    location_virtual: str = "please_contact",
+    desired_times: list[str] | None = None,
+    client_dem_ages: str = "adults_25_64",
+    language_preferred: str = "no",
+    description: str = "needs placement",
+    services: list[str] | None = None,
+    services_psychotherapy_modality: str | None = "DBT",
+    insurance: str = "in_network",
+) -> dict:
+    """Build the expected `before`/`after` audit dict for a client_referral.
+
+    Mirrors `PostAuditSnapshot`; provider_availability fields stay None.
+    """
+    return {
+        "kind": "client_referral",
+        "owner_id": str(owner_id),
+        "location_city": location_city,
+        "location_state": location_state,
+        "location_zip": location_zip,
+        "location_in_person": location_in_person,
+        "location_virtual": location_virtual,
+        "desired_times": (
+            desired_times if desired_times is not None else list(_DEFAULT_DESIRED_TIMES)
+        ),
+        "client_dem_ages": client_dem_ages,
+        "language_preferred": language_preferred,
+        "description": description,
+        "services": services if services is not None else list(_DEFAULT_SERVICES),
+        "services_psychotherapy_modality": services_psychotherapy_modality,
+        "insurance": insurance,
+        "specialty": None,
+        "region": None,
+        "accepting_new_clients": None,
+    }
 
 
 # --- Listing -------------------------------------------------------------
@@ -98,7 +175,9 @@ async def test_list_posts_shows_both_kinds(
     async with db_test_session_manager() as session:
         async with session.begin():
             session.add(other)
-            session.add(_make_client_referral(other, summary="referral-summary"))
+            session.add(
+                _make_client_referral(other, description="referral-description")
+            )
             session.add(_make_provider_availability(other))
 
     response = await authenticated_client.get("/posts")
@@ -110,8 +189,8 @@ async def test_list_posts_shows_both_kinds(
         node.attributes.get("data-kind") for node in tree.css("span.post-kind")
     }
     assert kinds_in_dom == {"client_referral", "provider_availability"}
-    # The client_referral row's link text uses its summary.
-    assert "referral-summary" in tree.body.text()
+    # The client_referral row's link text uses its description.
+    assert "referral-description" in tree.body.text()
 
 
 async def test_list_posts_orders_newest_first(
@@ -162,7 +241,13 @@ async def test_detail_renders_client_referral_fields(
 ):
     author = create_test_user(username=f"author-{uuid.uuid4()}")
     post = _make_client_referral(
-        author, summary="placement", urgency="high", region="northeast"
+        author,
+        description="placement",
+        location_city="Boston",
+        location_state="NY",
+        insurance="out_of_network",
+        desired_times=["tuesday_afternoon", "friday_evening"],
+        services=["evaluation"],
     )
     async with db_test_session_manager() as session:
         async with session.begin():
@@ -173,11 +258,23 @@ async def test_detail_renders_client_referral_fields(
     assert response.status_code == 200
     tree = HTMLParser(response.text)
     assert "client_referral" in response.text
-    assert tree.css_first(".post-summary").text(strip=True) == "placement"
-    urgency = tree.css_first(".post-urgency")
-    assert urgency.text(strip=True) == "high"
-    assert urgency.attributes.get("data-urgency") == "high"
-    assert tree.css_first(".post-region").text(strip=True) == "northeast"
+    assert tree.css_first(".post-description").text(strip=True) == "placement"
+    assert tree.css_first(".post-location-city").text(strip=True) == "Boston"
+    assert tree.css_first(".post-location-state").text(strip=True) == "NY"
+
+    insurance = tree.css_first(".post-insurance")
+    assert insurance.attributes.get("data-insurance") == "out_of_network"
+
+    time_slots = {
+        node.attributes.get("data-time-slot")
+        for node in tree.css(".post-desired-times li")
+    }
+    assert time_slots == {"tuesday_afternoon", "friday_evening"}
+
+    services = {
+        node.attributes.get("data-service") for node in tree.css(".post-services li")
+    }
+    assert services == {"evaluation"}
 
 
 async def test_detail_renders_provider_availability_fields(
@@ -247,9 +344,44 @@ async def test_create_client_referral_happy_path(
         assert persisted is not None
         assert persisted.kind == "client_referral"
         assert persisted.owner_id == logged_in_user.id
-        assert persisted.summary == "needs day-program placement"
-        assert persisted.urgency == "medium"
-        assert persisted.region == "western mass"
+        assert persisted.location_city == "Northampton"
+        assert persisted.location_state == "MA"
+        assert persisted.location_zip == "01060"
+        assert persisted.location_in_person == "yes"
+        assert persisted.location_virtual == "please_contact"
+        assert persisted.desired_times == _DEFAULT_DESIRED_TIMES
+        assert persisted.client_dem_ages == "adults_25_64"
+        assert persisted.language_preferred == "no"
+        assert persisted.description == "looking for outpatient placement"
+        assert persisted.services == _DEFAULT_SERVICES
+        assert persisted.services_psychotherapy_modality == "DBT"
+        assert persisted.insurance == "in_network"
+
+
+async def test_create_client_referral_allows_empty_multiselects(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user: User,
+):
+    """Form-submitted payloads omit `desired_times` / `services` when no
+    checkbox is ticked — schema defaults both to `[]`."""
+    payload = {**_VALID_CLIENT_REFERRAL_PAYLOAD}
+    payload.pop("desired_times")
+    payload.pop("services")
+    payload.pop("services_psychotherapy_modality")
+
+    response = await authenticated_client.post("/posts", json=payload)
+    assert response.status_code == 201
+    new_id = uuid.UUID(response.json()["id"])
+
+    async with db_test_session_manager() as session:
+        result = await session.execute(
+            select(ClientReferral).filter(ClientReferral.id == new_id)
+        )
+        persisted = result.scalars().first()
+        assert persisted.desired_times == []
+        assert persisted.services == []
+        assert persisted.services_psychotherapy_modality is None
 
 
 async def test_create_provider_availability_happy_path(
@@ -281,15 +413,12 @@ async def test_create_post_strips_whitespace(
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user: User,
 ):
-    response = await authenticated_client.post(
-        "/posts",
-        json={
-            "kind": "client_referral",
-            "summary": "  s  ",
-            "urgency": "low",
-            "region": "  r  ",
-        },
-    )
+    payload = {
+        **_VALID_CLIENT_REFERRAL_PAYLOAD,
+        "location_city": "  Boston  ",
+        "description": "  needs help  ",
+    }
+    response = await authenticated_client.post("/posts", json=payload)
     assert response.status_code == 201
     new_id = uuid.UUID(response.json()["id"])
 
@@ -298,8 +427,8 @@ async def test_create_post_strips_whitespace(
             select(ClientReferral).filter(ClientReferral.id == new_id)
         )
         persisted = result.scalars().first()
-        assert persisted.summary == "s"
-        assert persisted.region == "r"
+        assert persisted.location_city == "Boston"
+        assert persisted.description == "needs help"
 
 
 async def test_create_post_rejects_owner_id_in_payload(
@@ -328,7 +457,7 @@ async def test_create_post_rejects_unknown_field(
     logged_in_user: User,
 ):
     response = await authenticated_client.post(
-        "/posts", json={**_VALID_CLIENT_REFERRAL_PAYLOAD, "title": "old"}
+        "/posts", json={**_VALID_CLIENT_REFERRAL_PAYLOAD, "summary": "old"}
     )
     assert response.status_code == 422
 
@@ -340,22 +469,16 @@ async def test_create_post_rejects_unknown_field(
         {"kind": "not_a_real_kind"},
         # client_referral missing required fields
         {"kind": "client_referral"},
-        {"kind": "client_referral", "summary": "s", "urgency": "low"},
-        {"kind": "client_referral", "summary": "s", "region": "r"},
-        # bad urgency value
-        {
-            "kind": "client_referral",
-            "summary": "s",
-            "urgency": "EXTREME",
-            "region": "r",
-        },
+        # bad enum values
+        {**_VALID_CLIENT_REFERRAL_PAYLOAD, "location_state": "ZZ"},
+        {**_VALID_CLIENT_REFERRAL_PAYLOAD, "insurance": "self_pay"},
+        {**_VALID_CLIENT_REFERRAL_PAYLOAD, "client_dem_ages": "EVERYONE"},
+        # bad zip
+        {**_VALID_CLIENT_REFERRAL_PAYLOAD, "location_zip": "1234"},
         # whitespace-only required fields
-        {
-            "kind": "client_referral",
-            "summary": "  ",
-            "urgency": "low",
-            "region": "r",
-        },
+        {**_VALID_CLIENT_REFERRAL_PAYLOAD, "description": "   "},
+        # bad multiselect element
+        {**_VALID_CLIENT_REFERRAL_PAYLOAD, "services": ["telepathy"]},
     ],
 )
 async def test_create_post_rejects_invalid_payload(
@@ -381,19 +504,21 @@ async def test_create_post_unauthenticated_redirects(test_client: AsyncClient):
 # --- Update (PATCH) ------------------------------------------------------
 
 
-async def test_owner_can_patch_summary_only(
+async def test_owner_can_patch_description_only(
     authenticated_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user: User,
 ):
-    post = _make_client_referral(logged_in_user, summary="orig", region="orig-region")
+    post = _make_client_referral(
+        logged_in_user, description="orig", location_city="orig-city"
+    )
     async with db_test_session_manager() as session:
         async with session.begin():
             session.add(post)
 
     response = await authenticated_client.patch(
         f"/posts/{post.id}",
-        json={"kind": "client_referral", "summary": "new"},
+        json={"kind": "client_referral", "description": "new"},
     )
     assert response.status_code == 200
     assert response.headers.get("HX-Refresh") == "true"
@@ -403,11 +528,11 @@ async def test_owner_can_patch_summary_only(
             select(ClientReferral).filter(ClientReferral.id == post.id)
         )
         refreshed = result.scalars().first()
-        assert refreshed.summary == "new"
-        assert refreshed.region == "orig-region"  # untouched
+        assert refreshed.description == "new"
+        assert refreshed.location_city == "orig-city"  # untouched
 
 
-async def test_owner_can_patch_all_fields(
+async def test_owner_can_patch_multiple_fields(
     authenticated_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user: User,
@@ -421,9 +546,10 @@ async def test_owner_can_patch_all_fields(
         f"/posts/{post.id}",
         json={
             "kind": "client_referral",
-            "summary": "S2",
-            "urgency": "high",
-            "region": "R2",
+            "description": "D2",
+            "insurance": "out_of_network",
+            "location_state": "NY",
+            "services": ["evaluation"],
         },
     )
     assert response.status_code == 200
@@ -433,9 +559,10 @@ async def test_owner_can_patch_all_fields(
             select(ClientReferral).filter(ClientReferral.id == post.id)
         )
         refreshed = result.scalars().first()
-        assert refreshed.summary == "S2"
-        assert refreshed.urgency == "high"
-        assert refreshed.region == "R2"
+        assert refreshed.description == "D2"
+        assert refreshed.insurance == "out_of_network"
+        assert refreshed.location_state == "NY"
+        assert refreshed.services == ["evaluation"]
 
 
 async def test_non_owner_cannot_patch_post(
@@ -444,7 +571,7 @@ async def test_non_owner_cannot_patch_post(
     logged_in_user: User,
 ):
     other = create_test_user(username=f"other-{uuid.uuid4()}")
-    post = _make_client_referral(other, summary="orig")
+    post = _make_client_referral(other, description="orig")
     async with db_test_session_manager() as session:
         async with session.begin():
             session.add(other)
@@ -452,7 +579,7 @@ async def test_non_owner_cannot_patch_post(
 
     response = await authenticated_client.patch(
         f"/posts/{post.id}",
-        json={"kind": "client_referral", "summary": "hijack"},
+        json={"kind": "client_referral", "description": "hijack"},
     )
     assert response.status_code == 403
 
@@ -461,7 +588,7 @@ async def test_non_owner_cannot_patch_post(
             select(ClientReferral).filter(ClientReferral.id == post.id)
         )
         refreshed = result.scalars().first()
-        assert refreshed.summary == "orig"
+        assert refreshed.description == "orig"
 
 
 async def test_admin_can_patch_anyone_post(
@@ -471,7 +598,7 @@ async def test_admin_can_patch_anyone_post(
 ):
     await promote_to_admin(db_test_session_manager, logged_in_user.email)
     other = create_test_user(username=f"other-{uuid.uuid4()}")
-    post = _make_client_referral(other, summary="orig")
+    post = _make_client_referral(other, description="orig")
     async with db_test_session_manager() as session:
         async with session.begin():
             session.add(other)
@@ -479,7 +606,7 @@ async def test_admin_can_patch_anyone_post(
 
     response = await authenticated_client.patch(
         f"/posts/{post.id}",
-        json={"kind": "client_referral", "summary": "moderated"},
+        json={"kind": "client_referral", "description": "moderated"},
     )
     assert response.status_code == 200
 
@@ -490,7 +617,7 @@ async def test_patch_404_for_unknown_post(
 ):
     response = await authenticated_client.patch(
         f"/posts/{uuid.uuid4()}",
-        json={"kind": "client_referral", "summary": "x"},
+        json={"kind": "client_referral", "description": "x"},
     )
     assert response.status_code == 404
 
@@ -509,7 +636,7 @@ async def test_patch_kind_mismatch_returns_400(
 
     response = await authenticated_client.patch(
         f"/posts/{post.id}",
-        json={"kind": "client_referral", "summary": "x"},
+        json={"kind": "client_referral", "description": "x"},
     )
     assert response.status_code == 400
 
@@ -565,7 +692,7 @@ async def test_patch_rejects_owner_id_in_payload(
         f"/posts/{post.id}",
         json={
             "kind": "client_referral",
-            "summary": "s",
+            "description": "d",
             "owner_id": str(other.id),
         },
     )
@@ -573,17 +700,23 @@ async def test_patch_rejects_owner_id_in_payload(
 
 
 @pytest.mark.parametrize(
-    "payload",
+    "patch_body",
     [
         {},
         {"kind": "client_referral"},
-        {"kind": "client_referral", "summary": "   "},
-        {"kind": "client_referral", "summary": None, "urgency": None, "region": None},
-        {"kind": "client_referral", "urgency": "EXTREME"},
+        {"kind": "client_referral", "description": "   "},
+        {
+            "kind": "client_referral",
+            "description": None,
+            "insurance": None,
+            "location_state": None,
+        },
+        {"kind": "client_referral", "insurance": "self_pay"},
+        {"kind": "client_referral", "location_zip": "12"},
     ],
 )
 async def test_patch_invalid_body_422(
-    payload,
+    patch_body,
     authenticated_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user: User,
@@ -593,14 +726,14 @@ async def test_patch_invalid_body_422(
         async with session.begin():
             session.add(post)
 
-    response = await authenticated_client.patch(f"/posts/{post.id}", json=payload)
+    response = await authenticated_client.patch(f"/posts/{post.id}", json=patch_body)
     assert response.status_code == 422
 
 
 async def test_patch_unauthenticated_redirects(test_client: AsyncClient):
     response = await test_client.patch(
         f"/posts/{uuid.uuid4()}",
-        json={"kind": "client_referral", "summary": "x"},
+        json={"kind": "client_referral", "description": "x"},
         headers={"accept": "text/html"},
         follow_redirects=False,
     )
@@ -629,10 +762,23 @@ async def test_get_post_form_renders_kind_and_field_clusters(
     }
     assert kinds_offered == {"client_referral", "provider_availability"}
 
-    # client_referral cluster has all three inputs.
-    assert tree.css_first('textarea[name="summary"]') is not None
-    assert tree.css_first('select[name="urgency"]') is not None
-    assert tree.css_first('input[name="region"]') is not None
+    # client_referral cluster has all five sections.
+    assert tree.css_first('input[name="location_city"]') is not None
+    assert tree.css_first('select[name="location_state"]') is not None
+    assert tree.css_first('input[name="location_zip"]') is not None
+    assert tree.css_first('select[name="location_in_person"]') is not None
+    assert tree.css_first('select[name="location_virtual"]') is not None
+    # 21 desired_times checkboxes
+    desired = tree.css('input[type="checkbox"][name="desired_times"]')
+    assert len(desired) == 21
+    assert tree.css_first('select[name="client_dem_ages"]') is not None
+    assert tree.css_first('select[name="language_preferred"]') is not None
+    assert tree.css_first('textarea[name="description"]') is not None
+    # 5 service checkboxes
+    services = tree.css('input[type="checkbox"][name="services"]')
+    assert len(services) == 5
+    assert tree.css_first('input[name="services_psychotherapy_modality"]') is not None
+    assert tree.css_first('select[name="insurance"]') is not None
 
 
 async def test_get_post_form_unauthenticated_redirects(test_client: AsyncClient):
@@ -682,7 +828,13 @@ async def test_owner_can_open_client_referral_edit_form(
     logged_in_user: User,
 ):
     post = _make_client_referral(
-        logged_in_user, summary="orig", urgency="low", region="orig-region"
+        logged_in_user,
+        description="orig description",
+        location_city="orig-city",
+        location_state="NY",
+        insurance="out_of_network",
+        desired_times=["thursday_morning"],
+        services=["evaluation"],
     )
     async with db_test_session_manager() as session:
         async with session.begin():
@@ -695,17 +847,35 @@ async def test_owner_can_open_client_referral_edit_form(
     assert form is not None
     assert form.attributes.get("hx-patch") == f"/posts/{post.id}"
 
-    summary = tree.css_first('textarea[name="summary"]')
-    assert summary is not None
-    assert "orig" in summary.text()
+    description = tree.css_first('textarea[name="description"]')
+    assert description is not None
+    assert "orig description" in description.text()
 
-    urgency = tree.css_first('select[name="urgency"] option[selected]')
-    assert urgency is not None
-    assert urgency.attributes.get("value") == "low"
+    state = tree.css_first('select[name="location_state"] option[selected]')
+    assert state is not None
+    assert state.attributes.get("value") == "NY"
 
-    region = tree.css_first('input[name="region"]')
-    assert region is not None
-    assert region.attributes.get("value") == "orig-region"
+    insurance = tree.css_first('select[name="insurance"] option[selected]')
+    assert insurance is not None
+    assert insurance.attributes.get("value") == "out_of_network"
+
+    city = tree.css_first('input[name="location_city"]')
+    assert city is not None
+    assert city.attributes.get("value") == "orig-city"
+
+    checked_times = {
+        node.attributes.get("value")
+        for node in tree.css('input[type="checkbox"][name="desired_times"]')
+        if "checked" in node.attributes
+    }
+    assert checked_times == {"thursday_morning"}
+
+    checked_services = {
+        node.attributes.get("value")
+        for node in tree.css('input[type="checkbox"][name="services"]')
+        if "checked" in node.attributes
+    }
+    assert checked_services == {"evaluation"}
 
     # Hidden discriminator so the PATCH body carries the right `kind`.
     discriminator = tree.css_first('input[type="hidden"][name="kind"]')
@@ -900,15 +1070,10 @@ async def test_create_client_referral_writes_audit_row(
         assert row.actor_id == logged_in_user.id
         assert row.action == "create_post"
         assert row.before is None
-        assert row.after == {
-            "kind": "client_referral",
-            "owner_id": str(logged_in_user.id),
-            "summary": "needs day-program placement",
-            "urgency": "medium",
-            "region": "western mass",
-            "specialty": None,
-            "accepting_new_clients": None,
-        }
+        assert row.after == _client_referral_audit_snapshot(
+            logged_in_user.id,
+            description="looking for outpatient placement",
+        )
 
 
 async def test_create_provider_availability_audit_includes_kind_fields(
@@ -928,15 +1093,28 @@ async def test_create_provider_availability_audit_includes_kind_fields(
         repo = AuditRepository(session)
         rows = await repo.list_for_resource(resource_type="post", resource_id=new_id)
         assert len(rows) == 1
-        assert rows[0].after == {
-            "kind": "provider_availability",
-            "owner_id": str(logged_in_user.id),
-            "summary": None,
-            "urgency": None,
-            "region": "boston metro",
-            "specialty": "psychiatry",
-            "accepting_new_clients": True,
-        }
+        snapshot = rows[0].after
+        assert snapshot["kind"] == "provider_availability"
+        assert snapshot["owner_id"] == str(logged_in_user.id)
+        assert snapshot["specialty"] == "psychiatry"
+        assert snapshot["region"] == "boston metro"
+        assert snapshot["accepting_new_clients"] is True
+        # client_referral fields stay None on a provider_availability snapshot.
+        for field in (
+            "location_city",
+            "location_state",
+            "location_zip",
+            "location_in_person",
+            "location_virtual",
+            "desired_times",
+            "client_dem_ages",
+            "language_preferred",
+            "description",
+            "services",
+            "services_psychotherapy_modality",
+            "insurance",
+        ):
+            assert snapshot[field] is None
 
 
 async def test_patch_writes_audit_row_with_before_and_after(
@@ -945,7 +1123,7 @@ async def test_patch_writes_audit_row_with_before_and_after(
     logged_in_user: User,
 ):
     post = _make_client_referral(
-        logged_in_user, summary="orig", urgency="low", region="orig-region"
+        logged_in_user, description="orig", insurance="in_network"
     )
     async with db_test_session_manager() as session:
         async with session.begin():
@@ -953,7 +1131,11 @@ async def test_patch_writes_audit_row_with_before_and_after(
 
     response = await authenticated_client.patch(
         f"/posts/{post.id}",
-        json={"kind": "client_referral", "summary": "new", "urgency": "high"},
+        json={
+            "kind": "client_referral",
+            "description": "new",
+            "insurance": "out_of_network",
+        },
     )
     assert response.status_code == 200
 
@@ -963,24 +1145,12 @@ async def test_patch_writes_audit_row_with_before_and_after(
         assert len(rows) == 1
         row = rows[0]
         assert row.action == "update_post"
-        assert row.before == {
-            "kind": "client_referral",
-            "owner_id": str(logged_in_user.id),
-            "summary": "orig",
-            "urgency": "low",
-            "region": "orig-region",
-            "specialty": None,
-            "accepting_new_clients": None,
-        }
-        assert row.after == {
-            "kind": "client_referral",
-            "owner_id": str(logged_in_user.id),
-            "summary": "new",
-            "urgency": "high",
-            "region": "orig-region",
-            "specialty": None,
-            "accepting_new_clients": None,
-        }
+        assert row.before == _client_referral_audit_snapshot(
+            logged_in_user.id, description="orig", insurance="in_network"
+        )
+        assert row.after == _client_referral_audit_snapshot(
+            logged_in_user.id, description="new", insurance="out_of_network"
+        )
 
 
 async def test_failed_create_writes_no_audit_row(
@@ -1012,7 +1182,7 @@ async def test_unauthorized_patch_writes_no_audit_row(
 
     response = await authenticated_client.patch(
         f"/posts/{post.id}",
-        json={"kind": "client_referral", "summary": "hijack"},
+        json={"kind": "client_referral", "description": "hijack"},
     )
     assert response.status_code == 403
 
@@ -1106,7 +1276,7 @@ async def test_delete_post_writes_audit_row(
     logged_in_user: User,
 ):
     post = _make_client_referral(
-        logged_in_user, summary="doomed", urgency="high", region="r"
+        logged_in_user, description="doomed", insurance="in_network"
     )
     async with db_test_session_manager() as session:
         async with session.begin():
@@ -1122,13 +1292,7 @@ async def test_delete_post_writes_audit_row(
         assert len(rows) == 1
         row = rows[0]
         assert row.action == "delete_post"
-        assert row.before == {
-            "kind": "client_referral",
-            "owner_id": str(logged_in_user.id),
-            "summary": "doomed",
-            "urgency": "high",
-            "region": "r",
-            "specialty": None,
-            "accepting_new_clients": None,
-        }
+        assert row.before == _client_referral_audit_snapshot(
+            logged_in_user.id, description="doomed", insurance="in_network"
+        )
         assert row.after is None

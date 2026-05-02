@@ -2,9 +2,9 @@
 
 Verifies that the form rendered by `templates/posts/edit_client_referral.html`
 (mounted via the `posts_pages` flag on the consumer server) issues
-`PATCH /posts/{id}` with a JSON body matching `ClientReferralUpdate`
-(kind + summary + urgency + region). The contract surface is the edit
-template and the route's PATCH request shape.
+`PATCH /posts/{id}` with a JSON body matching `ClientReferralUpdate` for
+the multi-section intake form. The contract surface is the edit template
+and the route's PATCH request shape.
 
 Only `client_referral` has an edit page (provider_availability has no
 editable fields yet) — extend this pair when that changes.
@@ -16,9 +16,9 @@ from playwright.async_api import Page
 
 from tests.test_contract.constants import (
     CONSUMER_NAME_POST_EDIT,
-    EDITED_CLIENT_REFERRAL_REGION,
-    EDITED_CLIENT_REFERRAL_SUMMARY,
-    EDITED_CLIENT_REFERRAL_URGENCY,
+    EDITED_CLIENT_REFERRAL_DESCRIPTION,
+    EDITED_CLIENT_REFERRAL_INSURANCE,
+    EDITED_CLIENT_REFERRAL_LOCATION_CITY,
     NETWORK_TIMEOUT_MS,
     PACT_PORT_POST_EDIT,
     POST_EDIT_API_PATH,
@@ -51,11 +51,21 @@ async def test_consumer_post_edit_form_interaction(origin_with_routes: str, page
     full_mock_url = f"{mock_server_uri}{POST_EDIT_API_PATH}"
 
     expected_request_headers = {"Content-Type": "application/json"}
+    # The edit form submits *every* field (the entire client_referral cluster
+    # is rendered with current values); pact `Like` matchers keep the
+    # contract focused on the shape rather than specific values.
     expected_request_body = {
         "kind": Like(TEST_POST_KIND),
-        "summary": Like(EDITED_CLIENT_REFERRAL_SUMMARY),
-        "urgency": Like(EDITED_CLIENT_REFERRAL_URGENCY),
-        "region": Like(EDITED_CLIENT_REFERRAL_REGION),
+        "location_city": Like(EDITED_CLIENT_REFERRAL_LOCATION_CITY),
+        "location_state": Like("MA"),
+        "location_zip": Like("01060"),
+        "location_in_person": Like("yes"),
+        "location_virtual": Like("please_contact"),
+        "client_dem_ages": Like("adults_25_64"),
+        "language_preferred": Like("no"),
+        "description": Like(EDITED_CLIENT_REFERRAL_DESCRIPTION),
+        "services_psychotherapy_modality": Like("DBT"),
+        "insurance": Like(EDITED_CLIENT_REFERRAL_INSURANCE),
     }
     expected_response_body = {"id": Like(str(STUB_POST_ID))}
 
@@ -86,9 +96,13 @@ async def test_consumer_post_edit_form_interaction(origin_with_routes: str, page
 
     with pact:
         await page.goto(edit_page_url)
-        await page.wait_for_selector("#cr-summary")
-        await page.locator("#cr-summary").fill(EDITED_CLIENT_REFERRAL_SUMMARY)
-        await page.locator("#cr-urgency").select_option(EDITED_CLIENT_REFERRAL_URGENCY)
-        await page.locator("#cr-region").fill(EDITED_CLIENT_REFERRAL_REGION)
+        await page.wait_for_selector("#cr-description")
+        await page.locator("#cr-location-city").fill(
+            EDITED_CLIENT_REFERRAL_LOCATION_CITY
+        )
+        await page.locator("#cr-description").fill(EDITED_CLIENT_REFERRAL_DESCRIPTION)
+        await page.locator("#cr-insurance").select_option(
+            EDITED_CLIENT_REFERRAL_INSURANCE
+        )
         await page.locator("input[type='submit']").click()
         await page.wait_for_timeout(NETWORK_TIMEOUT_MS)

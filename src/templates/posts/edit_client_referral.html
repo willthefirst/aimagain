@@ -3,8 +3,8 @@
 {% block content %}
 <h1>Edit client referral</h1>
 <p class="hint">
-  Posts are public to other authenticated users. Never include personally
-  identifying information about clients.
+  Please be careful to preserve client confidentiality by not sharing any
+  personally identifying information when creating each post.
 </p>
 
 <form hx-patch="/posts/{{ post.id }}" hx-ext="json-enc">
@@ -13,18 +13,7 @@
      post's kind. Submitting the form means "edit this client_referral". #}
   <input type="hidden" name="kind" value="client_referral" />
 
-  <label for="cr-summary">Summary (no PII):</label><br /> {# title-case-ignore #}
-  <textarea id="cr-summary" name="summary" required>{{ post.summary }}</textarea><br />
-
-  <label for="cr-urgency">Urgency:</label><br />
-  <select id="cr-urgency" name="urgency" required>
-    <option value="low" {% if post.urgency == "low" %}selected{% endif %}>Low</option>
-    <option value="medium" {% if post.urgency == "medium" %}selected{% endif %}>Medium</option>
-    <option value="high" {% if post.urgency == "high" %}selected{% endif %}>High</option>
-  </select><br />
-
-  <label for="cr-region">Region:</label><br />
-  <input type="text" id="cr-region" name="region" value="{{ post.region }}" required /><br />
+  {% include "posts/_client_referral_fields.html" %}
 
   <br />
   <input type="submit" value="Save changes" />

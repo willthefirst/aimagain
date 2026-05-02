@@ -12,7 +12,7 @@
     <span class="post-kind" data-kind="{{ post.kind }}">[{{ post.kind }}]</span>
     <a href="/posts/{{ post.id }}">
       {% if post.kind == "client_referral" %}
-        {{ post.summary }}
+        {{ post.description }}
       {% elif post.kind == "provider_availability" %}
         {{ post.specialty }}
       {% else %}

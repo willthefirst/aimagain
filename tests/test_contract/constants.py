@@ -28,14 +28,37 @@ POST_DETAIL_PAGE_PATH = f"/posts/{STUB_POST_ID}"
 
 # Test post data for the create / edit-form contracts. Posts are
 # kind-discriminated; the create form's kind selector + per-kind field
-# cluster carry these into the JSON payload.
+# cluster carry these into the JSON payload. `client_referral` mirrors
+# the multi-section intake form (Client Location / Demographics /
+# Description / Services / Insurance — see `src/templates/posts/new.html`).
 TEST_POST_KIND = "client_referral"
-TEST_CLIENT_REFERRAL_SUMMARY = "Hello from contract test"
-TEST_CLIENT_REFERRAL_URGENCY = "medium"
-TEST_CLIENT_REFERRAL_REGION = "western mass"
-EDITED_CLIENT_REFERRAL_SUMMARY = "Edited summary"
-EDITED_CLIENT_REFERRAL_URGENCY = "high"
-EDITED_CLIENT_REFERRAL_REGION = "Edited region"
+
+# Section 1: Client Location
+TEST_CLIENT_REFERRAL_LOCATION_CITY = "Northampton"
+TEST_CLIENT_REFERRAL_LOCATION_STATE = "MA"
+TEST_CLIENT_REFERRAL_LOCATION_ZIP = "01060"
+TEST_CLIENT_REFERRAL_LOCATION_IN_PERSON = "yes"
+TEST_CLIENT_REFERRAL_LOCATION_VIRTUAL = "please_contact"
+TEST_CLIENT_REFERRAL_DESIRED_TIME_SLOT = "monday_morning"
+
+# Section 2: Demographics
+TEST_CLIENT_REFERRAL_AGE_GROUP = "adults_25_64"
+TEST_CLIENT_REFERRAL_LANGUAGE_PREFERRED = "no"
+
+# Section 3: Description
+TEST_CLIENT_REFERRAL_DESCRIPTION = "Hello from contract test"
+
+# Section 4: Services
+TEST_CLIENT_REFERRAL_SERVICE = "psychotherapy"
+TEST_CLIENT_REFERRAL_PSYCHOTHERAPY_MODALITY = "DBT"
+
+# Section 5: Insurance
+TEST_CLIENT_REFERRAL_INSURANCE = "in_network"
+
+# Edited values for the edit-form contract.
+EDITED_CLIENT_REFERRAL_DESCRIPTION = "Edited description"
+EDITED_CLIENT_REFERRAL_LOCATION_CITY = "Boston"
+EDITED_CLIENT_REFERRAL_INSURANCE = "out_of_network"
 
 # Provider states
 PROVIDER_STATE_USER_DOES_NOT_EXIST = f"User {TEST_EMAIL} does not exist"
