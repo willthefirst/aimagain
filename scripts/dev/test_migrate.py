@@ -121,6 +121,31 @@ def test_generate_creates_revision_file(runner: CLIRunner, temp_db: Path):
     assert "test_step_b_revision" in next(iter(new_files))
 
 
+def test_generate_hints_when_db_behind_head(runner: CLIRunner, temp_db: Path, capsys):
+    # Fresh DB, never upgraded — should bail with a hint, not call alembic revision.
+    before = {p.name for p in VERSIONS_DIR.iterdir() if p.is_file()}
+    rc = migrate.generate(runner, "behind_head_test")
+    assert rc != 0
+    captured = capsys.readouterr()
+    assert "behind head" in captured.err
+    after = {p.name for p in VERSIONS_DIR.iterdir() if p.is_file()}
+    assert (
+        after == before
+    ), f"no new revision file should be created, got {after - before}"
+
+
+def test_generate_succeeds_when_db_at_head(runner: CLIRunner, temp_db: Path):
+    assert migrate.up(runner) == 0
+
+    before = {p.name for p in VERSIONS_DIR.iterdir() if p.is_file()}
+    rc = migrate.generate(runner, "at_head_succeeds")
+    assert rc == 0
+    after = {p.name for p in VERSIONS_DIR.iterdir() if p.is_file()}
+    new_files = after - before
+    assert len(new_files) == 1, f"expected one new revision file, got {new_files}"
+    assert "at_head_succeeds" in next(iter(new_files))
+
+
 def test_roundtrip_uses_explicit_scratch(runner: CLIRunner, tmp_path: Path):
     scratch = tmp_path / "scratch.db"
     dev_db = PROJECT_ROOT / "data" / "aimagain.db"
