@@ -7,10 +7,12 @@
    Renders nothing unless current_user is the owner OR a superuser.
    Backend authz lives in src/logic/post_processing.py — this `{% if %}`
    is presentation only.
+
+   No edit link: there are no editable fields yet (PATCH/edit-form are
+   reintroduced when per-kind fields land).
 #}
 {% if current_user and (current_user.id == post.owner_id or current_user.is_superuser) %}
 <span class="owner-actions" data-post-id="{{ post.id }}">
-  <a href="/posts/{{ post.id }}/form">Edit</a>
   <button
     type="button"
     hx-delete="/posts/{{ post.id }}"

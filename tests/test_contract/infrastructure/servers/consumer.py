@@ -90,31 +90,16 @@ def _setup_users_admin_actions_stub(app: FastAPI) -> None:
 
 
 def _setup_posts_form_stub(app: FastAPI) -> None:
-    """Mount stub pages that render the real `posts/new.html` and
-    `posts/edit.html` templates. The contract surface is the forms'
-    HTMX-decorated submissions; the create POST and edit PATCH are intercepted
-    by Playwright before they leave the browser, so no database is needed.
+    """Mount a stub page that renders the real `posts/new.html` template. The
+    contract surface is the form's HTMX-decorated submission; the POST is
+    intercepted by Playwright before it leaves the browser, so no database
+    is needed.
     """
-
-    class _StubPost:
-        def __init__(self, **kwargs):
-            self.__dict__.update(kwargs)
 
     @app.get("/posts/form")
     async def posts_form_stub_page(request: Request):
         return APIResponse.html_response(
             template_name="posts/new.html", context={}, request=request
-        )
-
-    @app.get("/posts/{post_id}/form")
-    async def posts_edit_form_stub_page(request: Request, post_id: uuid.UUID):
-        post = _StubPost(
-            id=post_id,
-            title="Stub title",
-            body="Stub body",
-        )
-        return APIResponse.html_response(
-            template_name="posts/edit.html", context={"post": post}, request=request
         )
 
 
@@ -139,8 +124,7 @@ def _setup_post_owner_actions_stub(app: FastAPI) -> None:
         owner = _StubUser(id=post_id, username="post_owner")
         post = _StubPost(
             id=post_id,
-            title="Stub title",
-            body="Stub body",
+            kind="client_referral",
             owner_id=owner.id,
             owner=owner,
         )

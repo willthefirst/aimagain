@@ -2,8 +2,9 @@
 
 Verifies that the form rendered by `templates/posts/new.html` (mounted via
 the `posts_pages` flag on the consumer server) issues `POST /posts` with a
-JSON body matching `PostCreate` (title + body, no `owner_id`). The contract
-surface is the form template and the route's request shape.
+JSON body matching `PostCreate` (kind discriminator only — per-kind fields
+land in a follow-up PR). The contract surface is the form template and
+the route's request shape.
 """
 
 import pytest
@@ -19,8 +20,7 @@ from tests.test_contract.constants import (
     PROVIDER_NAME_POSTS,
     PROVIDER_STATE_POSTS_ACCEPTS_CREATE,
     STUB_POST_ID,
-    TEST_POST_BODY,
-    TEST_POST_TITLE,
+    TEST_POST_KIND,
 )
 from tests.test_contract.tests.shared.helpers import (
     setup_pact,
@@ -38,7 +38,7 @@ async def test_consumer_post_create_form_interaction(
     origin_with_routes: str, page: Page
 ):
     """Submit the new-post form; assert the intercepted request matches the
-    contracted shape (POST /posts with JSON title + body)."""
+    contracted shape (POST /posts with JSON `{kind: ...}`)."""
     pact = setup_pact(
         CONSUMER_NAME_POST_CREATE,
         PROVIDER_NAME_POSTS,
@@ -49,10 +49,7 @@ async def test_consumer_post_create_form_interaction(
     full_mock_url = f"{mock_server_uri}{POSTS_API_PATH}"
 
     expected_request_headers = {"Content-Type": "application/json"}
-    expected_request_body = {
-        "title": Like(TEST_POST_TITLE),
-        "body": Like(TEST_POST_BODY),
-    }
+    expected_request_body = {"kind": Like(TEST_POST_KIND)}
     expected_response_body = {"id": Like(str(STUB_POST_ID))}
 
     (
@@ -80,9 +77,12 @@ async def test_consumer_post_create_form_interaction(
 
     with pact:
         await page.goto(form_page_url)
-        await page.wait_for_selector("#title")
-        await page.locator("#title").fill(TEST_POST_TITLE)
-        await page.locator("#body").fill(TEST_POST_BODY)
+        # The form pre-checks the client_referral radio; a default submit
+        # exercises the discriminator path without per-kind fields.
+        await page.wait_for_selector('input[type="radio"][name="kind"]')
+        await page.locator(
+            f'input[type="radio"][name="kind"][value="{TEST_POST_KIND}"]'
+        ).check()
         await page.locator("input[type='submit']").click()
         await page.wait_for_timeout(NETWORK_TIMEOUT_MS)
 
