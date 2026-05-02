@@ -40,7 +40,7 @@ jobs:
         run: |
           echo "❌ Database setup failed!"
           echo "💡 To reproduce this locally, run: alembic -c config/alembic.ini upgrade head"
-          echo "   Or use the development CLI: dev dev up"
+          echo "   Or use the development CLI: dev migrate up"
 
       - name: Run API tests
         run: dev test src/api --tb short -v
