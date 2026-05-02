@@ -8,11 +8,15 @@
    Backend authz lives in src/logic/post_processing.py — this `{% if %}`
    is presentation only.
 
-   No edit link: there are no editable fields yet (PATCH/edit-form are
-   reintroduced when per-kind fields land).
+   The Edit link only renders for kinds that have an edit page wired up.
+   provider_availability has no editable fields yet, so its Edit link is
+   omitted; the handler 404s on `GET /posts/{id}/form` for that kind too.
 #}
 {% if current_user and (current_user.id == post.owner_id or current_user.is_superuser) %}
 <span class="owner-actions" data-post-id="{{ post.id }}">
+  {% if post.kind == "client_referral" %}
+  <a href="/posts/{{ post.id }}/form">Edit</a>
+  {% endif %}
   <button
     type="button"
     hx-delete="/posts/{{ post.id }}"

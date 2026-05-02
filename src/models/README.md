@@ -55,7 +55,7 @@ Each model maps to a database table with explicit relationships managed by SQLAl
 | ------------ | ------------------------------------------------ | ------------------------------------------------------------------- | ------------------ |
 | **User**     | Authentication and identity                      | username                                                            | username, email    |
 | **Post**     | Polymorphic base for kind-discriminated posts (joined-table inheritance) | owner_id (FK), kind (`client_referral` \| `provider_availability`, CHECK-constrained) | —                  |
-| **ClientReferral**       | Per-kind child table for `Post.kind == 'client_referral'` (no PII; per-kind fields land later) | id (PK + FK to `posts.id`, cascade delete) | —                  |
+| **ClientReferral**       | Per-kind child table for `Post.kind == 'client_referral'` (no PII) | id (PK + FK to `posts.id`, cascade delete), summary (TEXT NOT NULL), urgency (TEXT NOT NULL, CHECK in `low`/`medium`/`high`), region (TEXT NOT NULL) | —                  |
 | **ProviderAvailability** | Per-kind child table for `Post.kind == 'provider_availability'` (per-kind fields land later) | id (PK + FK to `posts.id`, cascade delete) | —                  |
 | **AuditLog** | Append-only mutation record (RESOURCE_GRAMMAR.md:135) | actor_id (FK, SET NULL), resource_type, resource_id, action, before/after (JSON) | —                  |
 

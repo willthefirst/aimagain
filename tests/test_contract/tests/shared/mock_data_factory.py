@@ -84,16 +84,22 @@ class MockDataFactory:
     def create_post_read(
         cls,
         post_id: UUID = None,
-        kind: str = "client_referral",
         owner_id: UUID = None,
+        summary: str = "stub summary",
+        urgency: str = "medium",
+        region: str = "stub region",
     ) -> ClientReferralRead:
-        """Returns a kind-specific read schema. The route under test only
-        reads `.id` off the return, so any kind suffices for the create mock."""
+        """Returns a `client_referral` read schema. The routes under test only
+        read `.id` off the return, so a single kind suffices for both create
+        and edit mocks."""
         now = datetime.now(timezone.utc)
         return ClientReferralRead(
             id=post_id or cls.MOCK_POST_ID,
-            kind=kind,
+            kind="client_referral",
             owner_id=owner_id or cls.MOCK_POST_OWNER_ID,
+            summary=summary,
+            urgency=urgency,
+            region=region,
             created_at=now,
             updated_at=now,
         )
@@ -113,6 +119,27 @@ class MockDataFactory:
 
         return {
             "src.api.routes.posts.handle_create_post": {
+                "return_value_config": post_read
+            }
+        }
+
+    @classmethod
+    def create_post_edit_dependency_config(
+        cls, post_read: ClientReferralRead = None
+    ) -> Dict[str, Any]:
+        """Mock for `handle_update_post`.
+
+        The route under test (`PATCH /posts/{id}`) reads `id` off the handler's
+        return value and packs it into the JSON response, so any object
+        exposing `.id` is sufficient.
+        """
+        if post_read is None:
+            post_read = cls.create_post_read(
+                summary="patched summary", urgency="high", region="patched region"
+            )
+
+        return {
+            "src.api.routes.posts.handle_update_post": {
                 "return_value_config": post_read
             }
         }

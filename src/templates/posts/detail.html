@@ -7,7 +7,18 @@
 </h1>
 <p>by <a href="/users/{{ post.owner_id }}">{{ post.owner.username }}</a></p>
 
-{# Per-kind body fields will render here once kinds carry editable content. #}
+{% if post.kind == "client_referral" %}
+<dl class="post-fields">
+  <dt>summary</dt>
+  <dd class="post-summary">{{ post.summary }}</dd>
+  <dt>urgency</dt>
+  <dd class="post-urgency" data-urgency="{{ post.urgency }}">{{ post.urgency }}</dd>
+  <dt>region</dt>
+  <dd class="post-region">{{ post.region }}</dd>
+</dl>
+{% else %}
+<p>No fields yet for this kind.</p>
+{% endif %}
 
 {% include "posts/_owner_actions.html" %}
 

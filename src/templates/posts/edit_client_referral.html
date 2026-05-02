@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block title %}Edit client referral: {{ post.id }}{% endblock %}
+{% block content %}
+<h1>Edit client referral</h1>
+<p class="hint">
+  Posts are public to other authenticated users. Never include personally
+  identifying information about clients.
+</p>
+
+<form hx-patch="/posts/{{ post.id }}" hx-ext="json-enc">
+  {# Discriminator field: the schema's PATCH union dispatches on `kind`,
+     and the handler also rejects a kind that doesn't match the persisted
+     post's kind. Submitting the form means "edit this client_referral". #}
+  <input type="hidden" name="kind" value="client_referral" />
+
+  <label for="cr-summary">Summary (no PII):</label><br /> {# title-case-ignore #}
+  <textarea id="cr-summary" name="summary" required>{{ post.summary }}</textarea><br />
+
+  <label for="cr-urgency">Urgency:</label><br />
+  <select id="cr-urgency" name="urgency" required>
+    <option value="low" {% if post.urgency == "low" %}selected{% endif %}>Low</option>
+    <option value="medium" {% if post.urgency == "medium" %}selected{% endif %}>Medium</option>
+    <option value="high" {% if post.urgency == "high" %}selected{% endif %}>High</option>
+  </select><br />
+
+  <label for="cr-region">Region:</label><br />
+  <input type="text" id="cr-region" name="region" value="{{ post.region }}" required /><br />
+
+  <br />
+  <input type="submit" value="Save changes" />
+</form>
+
+<hr />
+<a href="/posts/{{ post.id }}">Cancel</a>
+{% endblock %}

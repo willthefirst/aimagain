@@ -11,17 +11,72 @@
   <fieldset>
     <legend>Kind</legend>
     <label>
-      <input type="radio" name="kind" value="client_referral" checked />
+      <input
+        type="radio"
+        name="kind"
+        value="client_referral"
+        data-kind-radio
+        checked />
       Client referral
     </label>
     <label>
-      <input type="radio" name="kind" value="provider_availability" />
+      <input
+        type="radio"
+        name="kind"
+        value="provider_availability"
+        data-kind-radio />
       Provider availability
     </label>
   </fieldset>
+
+  {# Per-kind field clusters. Visibility is driven by the kind radio above —
+     a tiny inline script toggles the matching cluster on change so only the
+     selected kind's inputs are submitted with the form. Server validates
+     `extra="forbid"` per kind, so any stray field is rejected with 422. #}
+  <fieldset data-kind-fields="client_referral">
+    <legend>Client referral details</legend>
+    <label for="cr-summary">Summary (no PII):</label><br /> {# title-case-ignore #}
+    <textarea id="cr-summary" name="summary" required></textarea><br />
+    <label for="cr-urgency">Urgency:</label><br />
+    <select id="cr-urgency" name="urgency" required>
+      <option value="low">Low</option>
+      <option value="medium" selected>Medium</option>
+      <option value="high">High</option>
+    </select><br />
+    <label for="cr-region">Region:</label><br />
+    <input type="text" id="cr-region" name="region" required /><br />
+  </fieldset>
+
+  <fieldset data-kind-fields="provider_availability" hidden>
+    <legend>Provider availability details</legend>
+    <p class="hint">No fields yet.</p>
+  </fieldset>
+
   <br />
   <input type="submit" value="Create post" />
 </form>
+
+<script>
+  (function () {
+    const radios = document.querySelectorAll('[data-kind-radio]');
+    const clusters = document.querySelectorAll('[data-kind-fields]');
+    function update() {
+      const selected = document.querySelector(
+        '[data-kind-radio]:checked'
+      );
+      const kind = selected ? selected.value : null;
+      clusters.forEach((c) => {
+        const matches = c.dataset.kindFields === kind;
+        c.hidden = !matches;
+        c.querySelectorAll('input, select, textarea').forEach((el) => {
+          el.disabled = !matches;
+        });
+      });
+    }
+    radios.forEach((r) => r.addEventListener('change', update));
+    update();
+  })();
+</script>
 
 <hr />
 <a href="/posts">Back to posts</a>

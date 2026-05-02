@@ -10,7 +10,13 @@
   {% for post in posts %}
   <li>
     <span class="post-kind" data-kind="{{ post.kind }}">[{{ post.kind }}]</span>
-    <a href="/posts/{{ post.id }}">{{ post.id }}</a>
+    <a href="/posts/{{ post.id }}">
+      {% if post.kind == "client_referral" %}
+        {{ post.summary }}
+      {% else %}
+        {{ post.id }}
+      {% endif %}
+    </a>
     by <a href="/users/{{ post.owner_id }}">{{ post.owner.username }}</a>
   </li>
   {% endfor %}

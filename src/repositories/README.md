@@ -62,7 +62,7 @@ Each repository manages one primary domain entity with related data access opera
 | Repository         | Primary Entity | Key Responsibilities                                                          |
 | ------------------ | -------------- | ----------------------------------------------------------------------------- |
 | **UserRepository** | User           | User lookup, listing, activation toggle, hard delete                          |
-| **PostRepository** | Post (polymorphic — JTI) | Post lookup by id (returns the kind-specific subclass via `with_polymorphic`), list all posts newest first across kinds, persist a new post (any subclass), hard delete (cascades to the kind's child table; caller commits). No `update_post` — kinds carry no editable fields yet. |
+| **PostRepository** | Post (polymorphic — JTI) | Post lookup by id (returns the kind-specific subclass via `with_polymorphic`), list all posts newest first across kinds, persist a new post (any subclass), `apply_post_update(post, **fields)` — partial-update setattr loop that skips `None`-omitted keys (kind-agnostic; the schema gates which keys are valid per kind), hard delete (cascades to the kind's child table; caller commits). |
 | **AuditRepository** | AuditLog | Append-only writes (`record(...)`), single-row read, list-by-resource. No update or delete methods — audit rows are immutable. |
 
 ## Directory structure
