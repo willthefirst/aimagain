@@ -108,9 +108,11 @@ dev --help
 
 Without `pip install -e .`, the CLI is also runnable directly: `python3 scripts/dev_cli.py <command>` or `./scripts/dev_cli.py <command>`.
 
+The `dev` CLI auto-detects the current project root by walking up from the caller's cwd looking for a `pyproject.toml`, so it operates on the worktree you're sitting in rather than the install-time checkout.
+
 #### Tests <!-- title-case-ignore -->
 
-Tests for `scripts/dev/*` live colocated as `scripts/dev/test_*.py`, matching the `src/<layer>/test_*.py` pattern in [`../CLAUDE.md`](../CLAUDE.md). Pytest discovers them via the `scripts` entry in `pyproject.toml`'s `testpaths`. Run only the dev CLI tests with `dev test scripts/dev`.
+Tests for `scripts/dev/*` live colocated as `scripts/dev/test_*.py`, matching the `src/<layer>/test_*.py` pattern in [`../CLAUDE.md`](../CLAUDE.md). Tests for `scripts/dev_cli.py` itself live as `scripts/test_dev_cli.py`. Pytest discovers them via the `scripts` entry in `pyproject.toml`'s `testpaths`. Run only the dev CLI tests with `dev test scripts/`.
 
 ### `dev/promote_admin.py`
 
