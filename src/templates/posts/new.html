@@ -7,7 +7,10 @@
   personally identifying information when creating each post.
 </p>
 
-<form hx-post="/posts" hx-ext="json-enc">
+<form
+  hx-post="/posts"
+  hx-ext="json-enc-arrays"
+  data-json-enc-array-fields="desired_times services">
   <fieldset>
     <legend>Kind</legend>
     <label>

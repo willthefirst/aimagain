@@ -54,6 +54,9 @@ async def test_consumer_post_edit_form_interaction(origin_with_routes: str, page
     # The edit form submits *every* field (the entire client_referral cluster
     # is rendered with current values); pact `Like` matchers keep the
     # contract focused on the shape rather than specific values.
+    # The stub seeds two desired_times and two services so HTMX `json-enc`
+    # serializes both as JSON arrays; with one selection it would send a
+    # bare string instead.
     expected_request_body = {
         "kind": Like(TEST_POST_KIND),
         "location_city": Like(EDITED_CLIENT_REFERRAL_LOCATION_CITY),
@@ -61,9 +64,11 @@ async def test_consumer_post_edit_form_interaction(origin_with_routes: str, page
         "location_zip": Like("01060"),
         "location_in_person": Like("yes"),
         "location_virtual": Like("please_contact"),
+        "desired_times": [Like("monday_morning"), Like("wednesday_evening")],
         "client_dem_ages": Like("adults_25_64"),
         "language_preferred": Like("no"),
         "description": Like(EDITED_CLIENT_REFERRAL_DESCRIPTION),
+        "services": [Like("psychotherapy"), Like("case_management")],
         "services_psychotherapy_modality": Like("DBT"),
         "insurance": Like(EDITED_CLIENT_REFERRAL_INSURANCE),
     }

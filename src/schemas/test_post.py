@@ -210,6 +210,30 @@ def test_client_referral_create_modality_empty_becomes_none():
 
 
 @pytest.mark.parametrize(
+    "field,raw,expected",
+    [
+        ("desired_times", "monday_morning", ["monday_morning"]),
+        ("services", "psychotherapy", ["psychotherapy"]),
+    ],
+)
+def test_client_referral_create_coerces_single_string_to_list(field, raw, expected):
+    """HTMX `json-enc` sends a bare string when only one checkbox is ticked
+    and an array when 2+ are ticked. The schema's BeforeValidator coerces
+    the single-string case into a 1-element list."""
+    payload = {**_VALID_CLIENT_REFERRAL, field: raw}
+    parsed = _post_create.validate_python(payload)
+    assert getattr(parsed, field) == expected
+
+
+def test_client_referral_update_coerces_single_string_to_list():
+    parsed = _post_update.validate_python(
+        {"kind": "client_referral", "desired_times": "friday_evening"}
+    )
+    assert isinstance(parsed, ClientReferralUpdate)
+    assert parsed.desired_times == ["friday_evening"]
+
+
+@pytest.mark.parametrize(
     "field,bad_value",
     [
         ("desired_times", ["monday_zenith"]),

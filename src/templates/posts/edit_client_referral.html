@@ -7,7 +7,10 @@
   personally identifying information when creating each post.
 </p>
 
-<form hx-patch="/posts/{{ post.id }}" hx-ext="json-enc">
+<form
+  hx-patch="/posts/{{ post.id }}"
+  hx-ext="json-enc-arrays"
+  data-json-enc-array-fields="desired_times services">
   {# Discriminator field: the schema's PATCH union dispatches on `kind`,
      and the handler also rejects a kind that doesn't match the persisted
      post's kind. Submitting the form means "edit this client_referral". #}

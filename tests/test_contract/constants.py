@@ -40,6 +40,10 @@ TEST_CLIENT_REFERRAL_LOCATION_ZIP = "01060"
 TEST_CLIENT_REFERRAL_LOCATION_IN_PERSON = "yes"
 TEST_CLIENT_REFERRAL_LOCATION_VIRTUAL = "please_contact"
 TEST_CLIENT_REFERRAL_DESIRED_TIME_SLOT = "monday_morning"
+# A second slot ticked alongside the first. HTMX `json-enc` only emits a
+# JSON array when 2+ checkboxes share the name (single-checkbox payloads
+# arrive as bare strings); the contract describes the array form.
+TEST_CLIENT_REFERRAL_DESIRED_TIME_SLOT_2 = "wednesday_evening"
 
 # Section 2: Demographics
 TEST_CLIENT_REFERRAL_AGE_GROUP = "adults_25_64"
@@ -50,6 +54,8 @@ TEST_CLIENT_REFERRAL_DESCRIPTION = "Hello from contract test"
 
 # Section 4: Services
 TEST_CLIENT_REFERRAL_SERVICE = "psychotherapy"
+# A second service ticked alongside the first; see the time-slot note above.
+TEST_CLIENT_REFERRAL_SERVICE_2 = "case_management"
 TEST_CLIENT_REFERRAL_PSYCHOTHERAPY_MODALITY = "DBT"
 
 # Section 5: Insurance

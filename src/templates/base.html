@@ -7,6 +7,48 @@
       integrity="sha384-HGfztofotfshcF7+8n44JQL2oJmowVChPTg48S+jvZoztPfvwD79OC/LTtG6dMp+"
       crossorigin="anonymous"></script>
     <script src="https://unpkg.com/htmx.org/dist/ext/json-enc.js"></script>
+    <script>
+      // `json-enc-arrays`: drop-in HTMX extension that handles repeated
+      // form-field names correctly. The bundled `json-enc` overwrites on
+      // collision (so two checked checkboxes with the same `name` serialize
+      // as a single string instead of an array). Forms that need
+      // multi-value fields opt in via `hx-ext="json-enc-arrays"` and
+      // declare always-array fields via
+      // `data-json-enc-array-fields="field_a field_b"`. Listed fields are
+      // coerced to a JSON array even when the user picks 0 or 1 values, so
+      // the wire shape stays canonical.
+      htmx.defineExtension('json-enc-arrays', {
+        onEvent: function (name, evt) {
+          if (name === 'htmx:configRequest') {
+            evt.detail.headers['Content-Type'] = 'application/json'
+          }
+        },
+        encodeParameters: function (xhr, parameters, elt) {
+          xhr.overrideMimeType('text/json')
+          var object = {}
+          parameters.forEach(function (value, key) {
+            if (object[key] === undefined) {
+              object[key] = value
+            } else if (Array.isArray(object[key])) {
+              object[key].push(value)
+            } else {
+              object[key] = [object[key], value]
+            }
+          })
+          var arrayFields = (elt.dataset.jsonEncArrayFields || '')
+            .split(/\s+/)
+            .filter(Boolean)
+          arrayFields.forEach(function (f) {
+            if (object[f] === undefined) {
+              object[f] = []
+            } else if (!Array.isArray(object[f])) {
+              object[f] = [object[f]]
+            }
+          })
+          return JSON.stringify(object)
+        },
+      })
+    </script>
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     {% block head %}{% endblock %} {% if is_development %}
     <!-- LiveReload script for development hot reloading -->
