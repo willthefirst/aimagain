@@ -146,6 +146,39 @@ def test_generate_succeeds_when_db_at_head(runner: CLIRunner, temp_db: Path):
     assert "at_head_succeeds" in next(iter(new_files))
 
 
+def test_post_write_hooks_format_generated_revision(runner: CLIRunner, temp_db: Path):
+    # Autogenerate requires the DB to be at head before running.
+    assert migrate.up(runner) == 0
+
+    before = {p.name for p in VERSIONS_DIR.iterdir() if p.is_file()}
+    rc = migrate.generate(runner, "test_post_write_hooks_step_c")
+    assert rc == 0
+    after = {p.name for p in VERSIONS_DIR.iterdir() if p.is_file()}
+    new_files = after - before
+    assert len(new_files) == 1, f"expected one new revision file, got {new_files}"
+    new_file = VERSIONS_DIR / next(iter(new_files))
+
+    black_check = subprocess.run(
+        ["black", "--check", str(new_file)],
+        check=False,
+        capture_output=True,
+    )
+    assert black_check.returncode == 0, (
+        "post_write_hook 'black' did not format the generated revision: "
+        f"{black_check.stderr.decode()}"
+    )
+
+    isort_check = subprocess.run(
+        ["isort", "--check-only", "--profile", "black", str(new_file)],
+        check=False,
+        capture_output=True,
+    )
+    assert isort_check.returncode == 0, (
+        "post_write_hook 'isort' did not format the generated revision: "
+        f"{isort_check.stderr.decode()}"
+    )
+
+
 def test_roundtrip_uses_explicit_scratch(runner: CLIRunner, tmp_path: Path):
     scratch = tmp_path / "scratch.db"
     dev_db = PROJECT_ROOT / "data" / "aimagain.db"
