@@ -190,6 +190,16 @@ def _validate_unique_list(values: list[str], field_name: str) -> list[str]:
     return values
 
 
+def _coerce_str_to_list(v):
+    """HTMX `json-enc` serializes a single checked checkbox as a bare string
+    (e.g. `"monday_morning"`) and 2+ checkboxes as an array. Coerce the
+    single-string case to a 1-element list so the form's edge case
+    round-trips into `list[Literal[...]]` cleanly."""
+    if isinstance(v, str):
+        return [v]
+    return v
+
+
 class ClientReferralCreate(_PostCreateBase):
     """Create payload for a client referral.
 
@@ -237,6 +247,16 @@ class ClientReferralCreate(_PostCreateBase):
     @classmethod
     def _strip_modality(cls, v: str | None) -> str | None:
         return _strip_optional(v)
+
+    @field_validator("desired_times", mode="before")
+    @classmethod
+    def _coerce_desired_times(cls, v):
+        return _coerce_str_to_list(v)
+
+    @field_validator("services", mode="before")
+    @classmethod
+    def _coerce_services(cls, v):
+        return _coerce_str_to_list(v)
 
     @field_validator("desired_times")
     @classmethod
@@ -333,6 +353,20 @@ class ClientReferralUpdate(_PostUpdateBase):
     @classmethod
     def _strip_modality(cls, v: str | None) -> str | None:
         return _strip_optional(v)
+
+    @field_validator("desired_times", mode="before")
+    @classmethod
+    def _coerce_desired_times(cls, v):
+        if v is None:
+            return None
+        return _coerce_str_to_list(v)
+
+    @field_validator("services", mode="before")
+    @classmethod
+    def _coerce_services(cls, v):
+        if v is None:
+            return None
+        return _coerce_str_to_list(v)
 
     @field_validator("desired_times")
     @classmethod
