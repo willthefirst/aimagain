@@ -68,6 +68,13 @@ class TitleCaseChecker:
         ".jinja2": "jinja",
     }
 
+    # Binary file extensions to silently skip without attempting to read
+    BINARY_EXTENSIONS = {
+        ".db",
+        ".sqlite",
+        ".sqlite3",
+    }
+
     # Words that should remain capitalized (proper nouns, acronyms, etc.)
     ALWAYS_CAPITALIZE = {
         "API",
@@ -219,6 +226,20 @@ class TitleCaseChecker:
 
     def should_ignore_file(self, file_path: Path) -> bool:
         """Check if entire file should be ignored based on .titleignore file or gitignore."""
+        # Skip known binary extensions silently — these are never text content
+        # we'd want to title-case-check, and reading them produces utf-8 noise.
+        if file_path.suffix.lower() in self.BINARY_EXTENSIONS:
+            return True
+
+        # Skip anything under a top-level data/ directory — these are runtime
+        # artifacts (sqlite DBs, fixtures), not source files.
+        try:
+            parts = file_path.resolve().parts
+        except OSError:
+            parts = file_path.parts
+        if "data" in parts:
+            return True
+
         # Check gitignore first
         if self._is_gitignored(file_path):
             return True
@@ -403,8 +424,8 @@ class TitleCaseChecker:
 
         try:
             content = file_path.read_text(encoding="utf-8")
-        except Exception as e:
-            print(f"Error reading {file_path}: {e}", file=sys.stderr)
+        except (UnicodeDecodeError, OSError):
+            # Binary or unreadable file — silently skip, no diagnostic noise.
             return []
 
         file_type = self._get_file_type(file_path, content)
