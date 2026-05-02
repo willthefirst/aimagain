@@ -4,7 +4,9 @@ Verifies that the form rendered by `templates/posts/new.html` (mounted via
 the `posts_pages` flag on the consumer server) issues `POST /posts` with a
 JSON body matching `ClientReferralCreate` (kind + summary + urgency +
 region). The contract surface is the form template — including its
-per-kind field cluster — and the route's request shape.
+per-kind field cluster — and the route's request shape. The
+provider_availability cluster has its own pact pair; this test stays
+focused on the client_referral path.
 """
 
 import pytest

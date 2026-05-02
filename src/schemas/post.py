@@ -13,10 +13,6 @@ update the body must echo the same `kind` (the discriminator selects
 which Update variant runs); the handler also enforces that the body's
 `kind` matches the persisted post's kind, so a client can't repurpose a
 post's identity via PATCH.
-
-`provider_availability` carries no editable fields yet; only the create
-variant exists. Once it grows fields, add a `ProviderAvailabilityUpdate`
-to the `PostUpdate` union.
 """
 
 import uuid
@@ -58,6 +54,14 @@ class ClientReferralCreate(_PostCreateBase):
 
 class ProviderAvailabilityCreate(_PostCreateBase):
     kind: Literal["provider_availability"]
+    specialty: str
+    region: str
+    accepting_new_clients: bool
+
+    @field_validator("specialty", "region")
+    @classmethod
+    def _strip(cls, v: str) -> str:
+        return _strip_required(v)
 
 
 PostCreate = Annotated[
@@ -102,10 +106,37 @@ class ClientReferralUpdate(_PostUpdateBase):
         return self
 
 
+class ProviderAvailabilityUpdate(_PostUpdateBase):
+    """Partial update for a provider_availability. All editable fields
+    optional, but the schema rejects a no-op (no editable field set) at
+    validation time."""
+
+    kind: Literal["provider_availability"]
+    specialty: str | None = None
+    region: str | None = None
+    accepting_new_clients: bool | None = None
+
+    @field_validator("specialty", "region")
+    @classmethod
+    def _strip(cls, v: str | None) -> str | None:
+        if v is None:
+            return None
+        return _strip_required(v)
+
+    @model_validator(mode="after")
+    def _at_least_one_field(self) -> "ProviderAvailabilityUpdate":
+        if all(
+            getattr(self, name) is None
+            for name in ("specialty", "region", "accepting_new_clients")
+        ):
+            raise ValueError(
+                "at least one of specialty, region, accepting_new_clients must be provided"
+            )
+        return self
+
+
 PostUpdate = Annotated[
-    # Single-variant union for now; extend with `ProviderAvailabilityUpdate`
-    # when that kind grows editable fields.
-    Union[ClientReferralUpdate],
+    Union[ClientReferralUpdate, ProviderAvailabilityUpdate],
     Field(discriminator="kind"),
 ]
 
@@ -133,6 +164,9 @@ class ClientReferralRead(_PostReadBase):
 
 class ProviderAvailabilityRead(_PostReadBase):
     kind: Literal["provider_availability"]
+    specialty: str
+    region: str
+    accepting_new_clients: bool
 
 
 PostRead = Annotated[
@@ -148,16 +182,23 @@ class PostAuditSnapshot(BaseModel):
     """Audit `before`/`after` projection for posts.
 
     Captures the user-meaningful fields a `Post` mutation can change. Per-kind
-    fields default to `None` for kinds that don't carry them, so a single
-    snapshot shape covers every kind. Adding a field to this class flows
-    through `_snapshot_post` automatically via `model_dump`.
+    fields default to `None` so a single snapshot shape covers every kind —
+    Pydantic's `from_attributes` falls back to the default when a kind's
+    instance doesn't expose a given attribute. Adding a field to this class
+    flows through `_snapshot_post` automatically via `model_dump`.
     """
 
     kind: str
     owner_id: uuid.UUID
+    # client_referral fields
     summary: str | None = None
     urgency: str | None = None
+    # shared / per-kind region (`client_referral` and `provider_availability`
+    # both have one — different child-table columns, same name)
     region: str | None = None
+    # provider_availability fields
+    specialty: str | None = None
+    accepting_new_clients: bool | None = None
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -172,4 +213,5 @@ __all__ = [
     "PostUpdate",
     "ProviderAvailabilityCreate",
     "ProviderAvailabilityRead",
+    "ProviderAvailabilityUpdate",
 ]
