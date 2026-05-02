@@ -316,6 +316,33 @@ class SeedCommands:
         return self.runner.run_command(seed_cmd)
 
 
+class MigrateCommands:
+    """Database migration commands (host mode)."""
+
+    def __init__(self, runner: CLIRunner):
+        self.runner = runner
+
+    def generate(self, message: str) -> int:
+        from scripts.dev.migrate import generate
+
+        return generate(self.runner, message)
+
+    def up(self) -> int:
+        from scripts.dev.migrate import up
+
+        return up(self.runner)
+
+    def down(self, steps: int) -> int:
+        from scripts.dev.migrate import down
+
+        return down(self.runner, steps)
+
+    def roundtrip(self, scratch: Optional[str]) -> int:
+        from scripts.dev.migrate import roundtrip
+
+        return roundtrip(self.runner, scratch)
+
+
 class PromoteAdminCommands:
     """Promote / revoke admin status by email."""
 
@@ -465,6 +492,7 @@ class DevCLI:
         self.seed_cmd = SeedCommands(self.runner)
         self.routes_cmd = RoutesCommands(self.runner)
         self.promote_admin_cmd = PromoteAdminCommands(self.runner)
+        self.migrate_cmd = MigrateCommands(self.runner)
 
     def create_parser(self) -> argparse.ArgumentParser:
         """Create the argument parser with all commands."""
@@ -499,6 +527,7 @@ Examples:
         self._add_seed_parser(subparsers)
         self._add_routes_parser(subparsers)
         self._add_promote_admin_parser(subparsers)
+        self._add_migrate_parser(subparsers)
 
         return parser
 
@@ -605,6 +634,49 @@ Examples:
         parser.set_defaults(
             func=lambda args: self.promote_admin_cmd.run(args.email, args.revoke)
         )
+
+    def _add_migrate_parser(self, subparsers):
+        parser = subparsers.add_parser(
+            "migrate",
+            help="Author and apply Alembic migrations against the host DB",
+        )
+        sub = parser.add_subparsers(dest="migrate_cmd")
+
+        gen = sub.add_parser(
+            "generate", help="alembic revision --autogenerate -m <message>"
+        )
+        gen.add_argument("message", help="Revision message (required)")
+        gen.set_defaults(func=lambda args: self.migrate_cmd.generate(args.message))
+
+        up = sub.add_parser("up", help="alembic upgrade head")
+        up.set_defaults(func=lambda args: self.migrate_cmd.up())
+
+        down = sub.add_parser("down", help="alembic downgrade -<N> (default N=1)")
+        down.add_argument(
+            "steps",
+            nargs="?",
+            type=int,
+            default=1,
+            help="Number of revisions to reverse (default 1)",
+        )
+        down.set_defaults(func=lambda args: self.migrate_cmd.down(args.steps))
+
+        rt = sub.add_parser(
+            "roundtrip",
+            help="upgrade head → downgrade -1 → upgrade head against a scratch DB",
+        )
+        rt.add_argument(
+            "--scratch",
+            default=None,
+            help="Override scratch DB path (default /tmp/bedlam-migrate-roundtrip.db)",
+        )
+        rt.set_defaults(func=lambda args: self.migrate_cmd.roundtrip(args.scratch))
+
+        def _print_help(_args):
+            parser.print_help()
+            return 1
+
+        parser.set_defaults(func=_print_help)
 
     def run(self) -> int:
         """Run the CLI application."""

@@ -79,7 +79,7 @@ pythonpath = ["."]
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "session"
 addopts = "-v --asyncio-mode=auto --ignore=tests/test_contract"
-testpaths = ["tests", "src"]
+testpaths = ["tests", "src", "scripts"]
 python_files = ["test_*.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]

@@ -14,21 +14,23 @@ Alembic provides **database schema version control**, ensuring all environments 
 - **Rollback capability**: Revert database changes when needed
 - **Model synchronization**: Generate migrations automatically from SQLAlchemy model changes
 
-**Example**: Generating and applying a migration:
+**Example**: Generating and applying a migration. Day-to-day, use the [`dev migrate`](../scripts/README.md#available-commands) wrappers — they handle the `DATABASE_URL` and config-path boilerplate for you:
 
 ```bash
 # Generate new migration from model changes
-alembic revision --autogenerate -m "add user email_verified column"
+dev migrate generate "add user email_verified column"
 
-# Apply migrations to current environment
-alembic upgrade head
+# Apply migrations to the host DB
+dev migrate up
 
-# Check current migration status
-alembic current
+# Roll back the last migration
+dev migrate down
 
-# Rollback to previous version
-alembic downgrade -1
+# Sanity-check upgrade ↔ downgrade against a throwaway sqlite DB
+dev migrate roundtrip
 ```
+
+Raw `alembic` is still available for introspection commands that don't have a `dev migrate` wrapper (e.g. `alembic -c config/alembic.ini current`, `alembic ... history`).
 
 ### What we don't do ❌
 
@@ -118,15 +120,13 @@ target_metadata = metadata
 ### Migration generation workflow
 
 1. **Make model changes** in `/src/models/`
-2. **Generate migration** with descriptive message:
+2. **Generate migration** with a descriptive message via [`dev migrate generate`](../scripts/README.md#available-commands):
 
 ```bash
-# Generate migration from model changes
-alembic revision --autogenerate -m "add user profile fields"
-
-# Review generated migration file before applying
-# Edit if needed (alembic isn't perfect at detection)
+dev migrate generate "add user profile fields"
 ```
+
+   Always review the generated file before applying — alembic's autogenerate isn't perfect at detection.
 
 3. **Review and edit** the generated migration:
 
@@ -156,10 +156,10 @@ def downgrade():
     op.drop_column('users', 'bio')
 ```
 
-4. **Apply migration** to database:
+4. **Apply migration** to the host DB via [`dev migrate up`](../scripts/README.md#available-commands):
 
 ```bash
-alembic upgrade head
+dev migrate up
 ```
 
 ### Migration file structure pattern
@@ -306,24 +306,25 @@ alembic stamp head
 ### Local development workflow
 
 1. **Make model changes** in your development environment
-2. **Generate migration** with descriptive name:
+2. **Generate migration** with a descriptive name (see [`scripts/README.md`](../scripts/README.md#available-commands) for the full `dev migrate` reference):
 
 ```bash
-alembic revision --autogenerate -m "add user profile fields"
+dev migrate generate "add user profile fields"
 ```
 
 3. **Review generated file** in `alembic/versions/`
-4. **Test migration** locally:
+4. **Test migration** locally — `dev migrate roundtrip` does the upgrade/downgrade/upgrade cycle in one step against a throwaway sqlite DB:
 
 ```bash
-# Apply migration
-alembic upgrade head
+dev migrate roundtrip
+```
 
-# Test rollback
-alembic downgrade -1
+   Or step through manually:
 
-# Reapply to confirm
-alembic upgrade head
+```bash
+dev migrate up      # apply
+dev migrate down    # roll back one revision
+dev migrate up      # reapply to confirm
 ```
 
 5. **Commit migration file** with your code changes
@@ -371,14 +372,14 @@ Use descriptive migration messages:
 
 ```bash
 # Good migration names
-alembic revision --autogenerate -m "add user email verification fields"
-alembic revision --autogenerate -m "add index on users username"
-alembic revision --autogenerate -m "add user profile bio column"
+dev migrate generate "add user email verification fields"
+dev migrate generate "add index on users username"
+dev migrate generate "add user profile bio column"
 
 # ❌ Poor migration names
-alembic revision --autogenerate -m "changes"
-alembic revision --autogenerate -m "fix"
-alembic revision --autogenerate -m "update"
+dev migrate generate "changes"
+dev migrate generate "fix"
+dev migrate generate "update"
 ```
 
 ### Data migration strategy
