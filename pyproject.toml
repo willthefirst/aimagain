@@ -50,6 +50,7 @@ lint = [
     "isort",
     "autoflake",
     "pre-commit",
+    "pathspec",
 ]
 
 # Full application with all runtime dependencies

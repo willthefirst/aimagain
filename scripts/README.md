@@ -144,6 +144,8 @@ python scripts/dev/title_case_check.py README.md notes/
 - **HTML files** (`.html`, `.htm`): Headers (`<h1>`, `<h2>`, etc.) and `<title>` tags
 - **Jinja templates** (`.jinja`, `.jinja2`): HTML headers and `{% block title %}` blocks
 
+Files under `data/` and binary extensions (`.db`, `.sqlite`, `.sqlite3`) are silently skipped, as is anything that fails a utf-8 read.
+
 #### 📝 **Exception handling**
 
 **Line-level exceptions:**
