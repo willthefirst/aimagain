@@ -114,6 +114,12 @@ if DATABASE_URL:
         DATABASE_URL = DATABASE_URL.replace("sqlite+aiosqlite://", "sqlite://")
     config.set_main_option("sqlalchemy.url", DATABASE_URL)
 
+if DATABASE_URL is None and not config.get_main_option("sqlalchemy.url"):
+    raise RuntimeError(
+        "DATABASE_URL is not set. For local development, run `dev setup` "
+        "to create a .env file, or export DATABASE_URL directly."
+    )
+
 target_metadata = metadata
 ```
 

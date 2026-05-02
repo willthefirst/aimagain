@@ -177,6 +177,19 @@ def test_roundtrip_default_scratch(runner: CLIRunner):
             default_path.unlink()
 
 
+def test_alembic_env_raises_clear_error_when_database_url_unset():
+    env = {k: v for k, v in os.environ.items() if k != "DATABASE_URL"}
+    result = subprocess.run(
+        ["alembic", "-c", "config/alembic.ini", "current"],
+        cwd=PROJECT_ROOT,
+        env=env,
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode != 0
+    assert "DATABASE_URL is not set" in result.stderr
+
+
 def test_roundtrip_restores_database_url(runner: CLIRunner, tmp_path: Path):
     """roundtrip must restore the prior DATABASE_URL even on failure."""
     scratch = tmp_path / "scratch.db"
