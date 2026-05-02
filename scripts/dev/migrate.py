@@ -11,6 +11,8 @@ read DATABASE_URL from the environment.
 from __future__ import annotations
 
 import os
+import subprocess
+import sys
 from typing import TYPE_CHECKING, Literal, Optional
 
 if TYPE_CHECKING:
@@ -48,8 +50,52 @@ def run_alembic(
     return runner.run_command(cmd)
 
 
+def _db_is_at_head() -> bool:
+    """Return True iff `alembic current` matches `alembic heads` (host mode).
+
+    Loads `.env` so DATABASE_URL is populated the same way `run_alembic`
+    sees it. Returns False when the alembic_version table doesn't exist
+    yet (fresh DB) — that DB is "behind" head.
+    """
+    from dotenv import load_dotenv
+
+    load_dotenv()
+
+    def _first_token(stdout: str) -> str:
+        for line in stdout.splitlines():
+            stripped = line.strip()
+            if stripped:
+                return stripped.split()[0]
+        return ""
+
+    current = subprocess.run(
+        ["alembic", "-c", ALEMBIC_CONFIG, "current"],
+        capture_output=True,
+        text=True,
+    )
+    heads = subprocess.run(
+        ["alembic", "-c", ALEMBIC_CONFIG, "heads"],
+        capture_output=True,
+        text=True,
+    )
+    if current.returncode != 0 or heads.returncode != 0:
+        return False
+    current_token = _first_token(current.stdout)
+    heads_token = _first_token(heads.stdout)
+    if not current_token or not heads_token:
+        return False
+    return current_token == heads_token
+
+
 def generate(runner: "CLIRunner", message: str) -> int:
     """`alembic revision --autogenerate -m <message>` against the host DB."""
+    if not _db_is_at_head():
+        print(
+            "ℹ️ Database is behind head. Run `dev migrate up` first, "
+            "then re-run generate.",
+            file=sys.stderr,
+        )
+        return 1
     return run_alembic(
         runner, ["revision", "--autogenerate", "-m", message], mode="host"
     )
