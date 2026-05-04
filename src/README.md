@@ -8,9 +8,9 @@ This codebase follows a **clean architecture** approach where dependencies flow 
 
 ### What we do
 
-- **Layer separation**: Clear boundaries between API, services, repositories, and models
-- **Dependency injection**: Services and repositories are injected rather than directly instantiated
-- **Domain-driven design**: Business logic is encapsulated in service classes
+- **Layer separation**: Clear boundaries between API, logic, repositories, and models
+- **Dependency injection**: Repositories are injected rather than directly instantiated
+- **Domain-driven design**: Business logic is encapsulated in `logic/<entity>_processing.py` `handle_*` functions
 - **Schema validation**: All API inputs/outputs are validated using Pydantic schemas
 - **Database abstraction**: Repository pattern abstracts database operations
 
@@ -26,16 +26,24 @@ class NewFeature(Base):
 class NewFeatureRepository(BaseRepository[NewFeature]):
     # ... data access methods
 
-# 3. implement business logic in service
-class NewFeatureService:
-    def __init__(self, repo: NewFeatureRepository):
-        self.repo = repo
-    # ... business logic
+# 3. implement business logic as a handler in logic/
+async def handle_create_new_feature(
+    data: NewFeatureCreate,
+    user: User,
+    repo: NewFeatureRepository,
+) -> NewFeature:
+    feature = await repo.create(data, owner_id=user.id)
+    await repo.session.commit()  # logic owns the commit
+    return feature
 
 # 4. add API routes
 @router.post("/new-features")
-async def create_new_feature(data: NewFeatureSchema, service: NewFeatureService = Depends()):
-    return await service.create(data)
+async def create_new_feature(
+    data: NewFeatureCreate,
+    user: User = Depends(current_active_user),
+    repo: NewFeatureRepository = Depends(get_new_feature_repository),
+):
+    return await handle_create_new_feature(data, user, repo)
 ```
 
 ### What we don't do
@@ -65,29 +73,37 @@ async def create_entity(data: EntityCreate, service: EntityService = Depends()):
 
 ## Architecture: Simple layered design
 
-**API -> Services -> Repositories -> Database**
+**API -> Logic -> Repositories -> Database**
 
 - **API** handles HTTP requests and responses
-- **Services** contain business logic
+- **Logic** contains business logic, orchestration, and owns the transaction commit
 - **Repositories** handle database operations
 - **Database** stores the data
 
-Everything else (schemas, models, templates) supports these main layers.
+Everything else (schemas, models, templates) supports these main layers. The `services/` layer is reserved for entities with cross-cutting business rules — see [Services vs. Logic](#services-vs-logic-de-facto-convention) below.
 
 ## Layer responsibilities matrix
 
-**Rule:** each layer may only import from layers listed in its `Dependencies` column. Crossing the table upward (e.g. a repository importing a service) is a layering violation — fix the design, don't add the import.
+**Rule:** each layer may only import from layers listed in its `Dependencies` column. Crossing the table upward (e.g. a repository importing a logic module) is a layering violation — fix the design, don't add the import.
 
-| Layer            | Responsibility                     | Example Files       | Dependencies         |
-| ---------------- | ---------------------------------- | ------------------- | -------------------- |
-| **API**          | HTTP handling, routing, validation | `api/routes/*.py`   | Services, Schemas    |
-| **Services**     | Business logic, coordination       | `services/*.py`     | Repositories, Models |
-| **Repositories** | Data access, queries               | `repositories/*.py` | Models, Database     |
-| **Models**       | Database schema, relationships     | `models/*.py`       | SQLAlchemy           |
-| **Schemas**      | Request/response validation        | `schemas/*.py`      | Pydantic             |
-| **Logic**        | Data transformation, processing    | `logic/*.py`        | Services, Schemas    |
-| **Middleware**   | Cross-cutting concerns             | `middleware/*.py`   | FastAPI              |
-| **Core**         | Configuration, utilities           | `core/*.py`         | None                 |
+| Layer            | Status                            | Responsibility                                              | Example Files       | Dependencies                          |
+| ---------------- | --------------------------------- | ----------------------------------------------------------- | ------------------- | ------------------------------------- |
+| **API**          | active                            | HTTP handling, routing, validation                          | `api/routes/*.py`   | Logic, Repositories, Schemas          |
+| **Logic**        | active (de-facto service layer)   | Business logic, orchestration, transaction commit           | `logic/*.py`        | Repositories, Schemas, Models         |
+| **Services**     | exception hierarchy only          | Holds the `ServiceError` hierarchy that the API layer maps to HTTP responses; reserved for a real service if an entity ever grows cross-cutting business rules | `services/exceptions.py` | Repositories, Models                  |
+| **Repositories** | active                            | Data access, queries                                        | `repositories/*.py` | Models, Database                      |
+| **Models**       | active                            | Database schema, relationships                              | `models/*.py`       | SQLAlchemy                            |
+| **Schemas**      | active                            | Request/response validation                                 | `schemas/*.py`      | Pydantic                              |
+| **Middleware**   | empty                             | Cross-cutting concerns                                      | `middleware/*.py`   | FastAPI                               |
+| **Core**         | active                            | Configuration, utilities                                    | `core/*.py`         | None                                  |
+
+### Services vs. logic (de-facto convention)
+
+The `services/` layer holds **only the `ServiceError` exception hierarchy** today (in `services/exceptions.py`) — the API layer catches those exceptions and maps them to HTTP responses. Earlier stub files (`user_service.py`, `dependencies.py`, `provider.py`) had zero importers and were deleted in the cleanup that closed issue #103.
+
+Business logic for every current entity lives in `logic/<entity>_processing.py` as `handle_*` functions, and that is also **where the transaction commit goes** (see [`logic/README.md`](logic/README.md#transactions-logic-owns-the-commit)). Routes call into `logic/` directly; they do not go through `services/`.
+
+Treat `services/` as a reserved slot for the day an entity grows business rules that genuinely don't fit a single handler (e.g. multi-repo coordination, cross-cutting authorization). Until then, **plans and PRs should target `logic/`, not a fictional `<Entity>Service`**. If you do introduce a real service, move the commit into it and update this matrix so the docs match reality.
 
 ## Directory structure
 
@@ -131,39 +147,40 @@ This is the cross-module checklist. The detailed step-by-step (with code snippet
 2. **Migration** — generate and run an Alembic migration for the new table. See [`../alembic/README.md`](../alembic/README.md).
 3. **Schema** — add Pydantic request/response shapes. See [`schemas/README.md`](schemas/README.md#implementation-patterns).
 4. **Repository** — add data-access methods. See [`repositories/README.md`](repositories/README.md#implementation-patterns).
-5. **Service** — implement business logic and authorization. See [`services/README.md`](services/README.md#implementation-patterns).
-6. **Route** — wire up the HTTP endpoint that delegates to the service. See [`api/routes/README.md`](api/routes/README.md#implementation-patterns).
+5. **Logic** — implement business logic, authorization, and the transaction commit as `handle_*` functions in `src/logic/<entity>_processing.py`. See [`logic/README.md`](logic/README.md#implementation-patterns). Only introduce a `<Entity>Service` under `services/` if the entity has cross-cutting rules that don't fit a single handler — see [Services vs. Logic](#services-vs-logic-de-facto-convention).
+6. **Route** — wire up the HTTP endpoint that delegates to the logic handler (or service, if one exists). See [`api/routes/README.md`](api/routes/README.md#implementation-patterns).
 7. **Template (if rendering HTML)** — add the Jinja2 template. See [`templates/README.md`](templates/README.md).
 
 ### Dependency injection pattern
 
-All services and repositories use dependency injection through FastAPI's `Depends()`:
+Repositories use dependency injection through FastAPI's `Depends()`. Routes inject the repository, then call the logic handler — there is no service layer in between for current entities.
 
 ```python
-# In services/dependencies.py
-async def get_user_service(
-    repo: UserRepository = Depends(get_user_repository)
-) -> UserService:
-    return UserService(repo)
+# In repositories/dependencies.py
+async def get_user_repository(
+    session: AsyncSession = Depends(get_db_session),
+) -> UserRepository:
+    return UserRepository(session)
 
-# In API routes
+# In API routes — route injects the repo and calls the logic handler
 @router.get("/users")
 async def list_users(
-    service: UserService = Depends(get_user_service)
+    user: User = Depends(current_active_user),
+    user_repo: UserRepository = Depends(get_user_repository),
 ):
-    return await service.list_users()
+    return await handle_list_users(user_repo, requesting_user=user)
 ```
 
 ## Common issues and solutions
 
 ### Issue: Circular imports between layers
 
-**Problem**: Trying to import services in repositories or models in API routes
+**Problem**: Trying to import logic from repositories, or models from API routes the wrong way.
 **Solution**: Always import from lower layers only. Use dependency injection for higher-layer dependencies.
 
 ```python
 # Bad - importing from higher layer
-from ..services.user_service import UserService  # In a repository
+from ..logic.user_processing import handle_list_users  # In a repository
 
 # Good - inject dependency
 class UserRepository:
@@ -174,7 +191,7 @@ class UserRepository:
 ### Issue: Business logic in API routes
 
 **Problem**: Complex validation or business rules directly in route handlers
-**Solution**: Move all business logic to service layer, keep routes thin
+**Solution**: Move all business logic to a `handle_*` function in `logic/`, keep routes thin
 
 ```python
 # Bad - business logic in route
@@ -184,19 +201,20 @@ async def create_entity(data: dict, session: AsyncSession = Depends()):
         raise HTTPException(400, "Name required")
     # ... more business logic
 
-# Good - delegate to service
+# Good - delegate to logic handler
 @router.post("/[entities]")
 async def create_entity(
     data: EntityCreate,  # Schema handles validation
-    service: EntityService = Depends()
+    user: User = Depends(current_active_user),
+    repo: EntityRepository = Depends(get_entity_repository),
 ):
-    return await service.create_entity(data)  # Service handles business logic
+    return await handle_create_entity(data, user, repo)  # logic handler owns the commit
 ```
 
 ### Issue: Direct database access from routes
 
 **Problem**: Using database session directly in API routes
-**Solution**: Always go through repository layer for data access
+**Solution**: Always go through the repository layer for data access; routes call into `logic/` for anything beyond a trivial fetch.
 
 ```python
 # Bad - direct database access
@@ -205,19 +223,20 @@ async def get_user(user_id: int, session: AsyncSession = Depends()):
     user = await session.get(User, user_id)
     return user
 
-# Good - use repository
+# Good - use repository (and logic if there is real orchestration)
 @router.get("/users/{user_id}")
 async def get_user(
-    user_id: int,
-    service: UserService = Depends()
+    user_id: UUID,
+    user_repo: UserRepository = Depends(get_user_repository),
 ):
-    return await service.get_user(user_id)
+    return await user_repo.get_user_by_id(user_id)
 ```
 
 ## Related documentation
 
 - [API Layer Documentation](api/README.md) - HTTP routes and validation patterns
-- [Services Layer Documentation](services/README.md) - Business logic organization
+- [Logic Layer Documentation](logic/README.md) - Business logic, orchestration, transaction commits
+- [Services Layer Documentation](services/README.md) - Reserved layer; only the exception hierarchy is in active use
 - [Models Documentation](models/README.md) - Database schema and relationships
 - [Repository Pattern Documentation](repositories/README.md) - Data access patterns
 - [Testing Strategy](../tests/README.md) - How to test each layer
