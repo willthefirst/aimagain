@@ -181,7 +181,7 @@ def test_post_write_hooks_format_generated_revision(runner: CLIRunner, temp_db: 
 
 def test_roundtrip_uses_explicit_scratch(runner: CLIRunner, tmp_path: Path):
     scratch = tmp_path / "scratch.db"
-    dev_db = PROJECT_ROOT / "data" / "aimagain.db"
+    dev_db = PROJECT_ROOT / "data" / "bedlam-connect.db"
     dev_mtime = dev_db.stat().st_mtime if dev_db.exists() else None
 
     rc = migrate.roundtrip(runner, scratch_path=str(scratch))
@@ -191,7 +191,7 @@ def test_roundtrip_uses_explicit_scratch(runner: CLIRunner, tmp_path: Path):
     if dev_mtime is not None:
         assert (
             dev_db.stat().st_mtime == dev_mtime
-        ), "roundtrip must not touch data/aimagain.db"
+        ), "roundtrip must not touch data/bedlam-connect.db"
 
 
 def test_roundtrip_default_scratch(runner: CLIRunner):
