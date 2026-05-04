@@ -42,7 +42,7 @@ async def list_users(
 
 ### What we don't do
 
-- **Business logic in routes**: Complex validation and processing stays in services/logic layers
+- **Business logic in routes**: Complex validation and processing stays in the `logic/` layer
 - **Direct database access**: Routes never touch repositories or sessions directly
 - **Inconsistent error handling**: All routes use standardized error decorators
 - **Raw APIRouter usage**: Always wrap with BaseRouter for consistent patterns
@@ -60,18 +60,19 @@ async def create_entity(data: dict, session: AsyncSession = Depends()):
     await session.commit()
     return entity
 
-# Good - delegate to processing layer
+# Good - delegate to logic handler
 @router.post("/[entities]")
 async def create_entity(
     data: [Entity]Create,
-    service: [Entity]Service = Depends()
+    user: User = Depends(current_active_user),
+    repo: [Entity]Repository = Depends(get_[entity]_repository),
 ):
-    return await handle_create_entity(data, service)
+    return await handle_create_entity(data, user, repo)
 ```
 
 ## Architecture: Domain-driven routing
 
-**HTTP Request -> Route -> Processing Logic -> Service -> Response**
+**HTTP Request -> Route -> Logic Handler -> Repository -> Response**
 
 Routes are organized by domain and use consistent patterns for common concerns.
 
@@ -79,9 +80,9 @@ Routes are organized by domain and use consistent patterns for common concerns.
 
 | Component      | Purpose                         | Example Files              | Dependencies               |
 | -------------- | ------------------------------- | -------------------------- | -------------------------- |
-| **Routes**     | HTTP endpoints by domain        | `routes/users.py`          | Processing logic, Services |
+| **Routes**     | HTTP endpoints by domain        | `routes/users.py`          | Logic handlers, Repositories, Schemas |
 | **Common**     | Shared utilities and patterns   | `common/base_router.py`    | FastAPI, Decorators        |
-| **Processing** | Request/response transformation | `../logic/*_processing.py` | Services, Schemas          |
+| **Logic**      | Business logic + commit         | `../logic/*_processing.py` | Repositories, Schemas, API exceptions |
 | **Responses**  | Standardized response formats   | `common/responses.py`      | Templates, JSON            |
 
 ## Directory structure
@@ -99,7 +100,7 @@ Routes are organized by domain and use consistent patterns for common concerns.
 - `common/` - Shared API patterns and utilities
   - `base_router.py` - Router wrapper with standard decorators
   - `decorators.py` - Error handling and logging decorators
-  - `exceptions.py` - Exception to HTTP status mapping
+  - `exceptions.py` - `APIException` subclasses raised by logic; fastapi-users translator
   - `responses.py` - Standardized response formats
 
 ## Implementation patterns
@@ -110,10 +111,15 @@ Routes are organized by domain and use consistent patterns for common concerns.
 
 ```python
 from fastapi import APIRouter, Depends
-from src.api.common import BaseRouter
-from src.services.dependencies import get_[domain]_service
 
-# Create standard apirouter and wrap with baserouter
+from src.api.common import BaseRouter
+from src.auth_config import current_active_user
+from src.logic.[domain]_processing import handle_create_[domain], handle_list_[domain]
+from src.models import User
+from src.repositories.dependencies import get_[domain]_repository
+from src.repositories.[domain]_repository import [Domain]Repository
+
+# Create standard APIRouter and wrap with BaseRouter
 [domain]_api_router = APIRouter()
 router = BaseRouter(router=[domain]_api_router, default_tags=["[domain]"])
 ```
@@ -123,16 +129,18 @@ router = BaseRouter(router=[domain]_api_router, default_tags=["[domain]"])
 ```python
 @router.get("/[domain]")
 async def list_[domain](
-    service: [Domain]Service = Depends(get_[domain]_service)
+    user: User = Depends(current_active_user),
+    repo: [Domain]Repository = Depends(get_[domain]_repository),
 ):
-    return await handle_list_[domain](service)
+    return await handle_list_[domain](repo, requesting_user=user)
 
 @router.post("/[domain]")
 async def create_[domain](
     data: [Domain]Create,
-    service: [Domain]Service = Depends(get_[domain]_service)
+    user: User = Depends(current_active_user),
+    repo: [Domain]Repository = Depends(get_[domain]_repository),
 ):
-    return await handle_create_[domain](data, service)
+    return await handle_create_[domain](data, user, repo)
 ```
 
 3. **Register in main.py**:
@@ -192,19 +200,21 @@ async def get_data_page(request: Request):
 
 ### Error handling pattern
 
-Errors are handled automatically by decorators:
+Logic handlers raise the API exception classes directly; the decorator passes them through to FastAPI:
 
 ```python
-# Service exceptions are automatically caught and converted to HTTP responses
+# logic/<entity>_processing.py raises APIException subclasses directly.
 @router.post("/[entities]")
 async def create_entity(
     data: [Entity]Create,
-    service: [Entity]Service = Depends()
+    user: User = Depends(current_active_user),
+    repo: [Entity]Repository = Depends(get_[entity]_repository),
 ):
-    # If service raises NotFoundError -> 404
-    # If service raises NotAuthorizedError -> 403
-    # If service raises BusinessRuleError -> 400
-    return await service.create_entity(data)
+    # Inside handle_create_entity:
+    #   raise NotFoundError(...)   → 404
+    #   raise ForbiddenError(...)  → 403
+    #   raise BadRequestError(...) → 400
+    return await handle_create_entity(data, user, repo)
 ```
 
 ## Common issues and solutions
@@ -223,14 +233,14 @@ async def create_entity(name: str, user: User = Depends()):
     if await entity_exists(name):
         raise HTTPException(409, "Entity exists")
 
-# Good - delegate to processing logic
+# Good - delegate to logic handler
 @router.post("/[entities]")
 async def create_entity(
     data: [Entity]Create,
-    user: User = Depends(),
-    service: [Entity]Service = Depends()
+    user: User = Depends(current_active_user),
+    repo: [Entity]Repository = Depends(get_[entity]_repository),
 ):
-    return await handle_create_entity(data, user, service)
+    return await handle_create_entity(data, user, repo)
 ```
 
 ### Issue: Inconsistent error handling
@@ -285,7 +295,6 @@ API behavior is exercised by route-level tests colocated under [`routes/`](route
 
 ## Related documentation
 
-- [Services Layer Documentation](../services/README.md) - Business logic called by routes
-- [Processing Logic Documentation](../logic/README.md) - Request/response transformation
+- [Logic Layer Documentation](../logic/README.md) - Business logic, orchestration, transaction commits
 - [Schemas Documentation](../schemas/README.md) - Request/response validation
 - [Main Architecture](../README.md) - How API fits in overall architecture

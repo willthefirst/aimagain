@@ -55,15 +55,16 @@ class Settings(BaseSettings):
 class Settings(BaseSettings):
     MAX_ITEMS_PER_USER: int = 10
 
-# Business logic belongs in services:
-class [Entity]Service:
-    def can_create_item(self, user: User) -> bool:
-        return user.item_count < settings.MAX_ITEMS_PER_USER
+# Business logic belongs in logic handlers:
+async def handle_create_entity(user: User, ...):
+    if user.item_count >= settings.MAX_ITEMS_PER_USER:
+        raise BadRequestError(detail="Item limit reached")
+    ...
 ```
 
 ## Architecture: Foundation layer for entire application
 
-**Core -> Services -> API Routes -> HTTP Responses**
+**Core -> Logic -> API Routes -> HTTP Responses**
 
 Core modules are imported and used throughout the application stack.
 
@@ -258,7 +259,7 @@ def get_template_context():
 
 ```python
 # Bad - settings scattered across modules
-# In services/some_service.py
+# In logic/some_processing.py
 MAX_ITEMS = 10
 
 # In api/routes/auth.py
@@ -317,14 +318,16 @@ templates = Jinja2Templates(
 
 ## Usage patterns across the application
 
-### In services
+### In logic handlers
 
 ```python
+from datetime import timedelta
+
 from src.core.config import settings
 
-class UserService:
-    def get_token_expiry(self) -> timedelta:
-        return timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+
+def get_token_expiry() -> timedelta:
+    return timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
 ```
 
 ### In routes
@@ -362,5 +365,5 @@ def test_with_custom_config():
 ## Related documentation
 
 - [Main Architecture](../README.md) - Application architecture that uses these core modules
-- [Services Layer](../services/README.md) - Services that consume configuration
+- [Logic Layer](../logic/README.md) - Logic handlers that consume configuration
 - [Templates Layer](../templates/README.md) - Template system configured by core/templating.py

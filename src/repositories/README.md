@@ -129,13 +129,15 @@ def get_[entity]_repository(
     return [Entity]Repository(session)
 ```
 
-3. **Use in services**:
+3. **Use in logic handlers**:
 
 ```python
-class [Entity]Service:
-    def __init__(self, [entity]_repository: [Entity]Repository):
-        self.[entity]_repo = [entity]_repository
-        self.session = [entity]_repository.session
+async def handle_list_[entity](
+    repo: [Entity]Repository,
+    requesting_user: User,
+):
+    items = await repo.list_[entity](exclude_user=requesting_user)
+    return {"items": items, "current_user": requesting_user}
 ```
 
 ### Relationship loading patterns
@@ -164,7 +166,7 @@ async def get_entity_details(self, entity_id: UUID) -> [Entity] | None:
 
 ### Session and transaction patterns
 
-Repositories receive sessions from services (transaction boundary control):
+Repositories receive sessions via dependency injection. Logic handlers control the commit:
 
 ```python
 class BaseRepository:
@@ -178,16 +180,11 @@ async def create_entity(self, **data) -> [Entity]:
     await self.session.flush()  # Make available in transaction
     return entity
 
-# Services control commit/rollback
-class [Entity]Service:
-    async def create_entity(self, data):
-        try:
-            entity = await self.repo.create_entity(**data)
-            await self.session.commit()  # Service commits
-            return entity
-        except Exception:
-            await self.session.rollback()  # Service handles errors
-            raise
+# Logic handlers commit (or let exceptions abort the transaction)
+async def handle_create_entity(data, user, repo: [Entity]Repository):
+    entity = await repo.create_entity(**data.model_dump(), owner_id=user.id)
+    await repo.session.commit()  # logic owns the commit
+    return entity
 ```
 
 ## Common issues and solutions
@@ -252,12 +249,11 @@ async def list_entities(self) -> Sequence[[Entity]]:
     result = await self.session.execute(stmt)
     return result.scalars().all()
 
-# Business logic in service
-class [Entity]Service:
-    async def get_entities_for_user(self, user: User):
-        if not self._check_permission(user):  # Business logic in service
-            return []
-        return await self.repo.list_entities()
+# Business logic in the logic handler
+async def handle_list_entities_for_user(user: User, repo: [Entity]Repository):
+    if not _check_permission(user):  # Business logic in the handler
+        raise ForbiddenError(detail="Not allowed")
+    return await repo.list_entities()
 ```
 
 ## Tests
@@ -272,5 +268,5 @@ When adding a new repository method, extend (or create) `src/repositories/test_<
 ## Related documentation
 
 - [Models Layer](../models/README.md) - Database models and relationships
-- [Services Layer](../services/README.md) - Business logic layer that uses repositories
+- [Logic Layer](../logic/README.md) - Business logic layer that uses repositories
 - [Main Architecture](../README.md) - Overall application architecture

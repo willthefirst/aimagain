@@ -171,5 +171,5 @@ async def _update_something(self):
 ## Related documentation
 
 - [API Layer](../api/README.md) - API layer that middleware wraps
-- [Services Layer](../services/README.md) - Services used by middleware for business operations
+- [Logic Layer](../logic/README.md) - Business logic invoked downstream of middleware
 - [Core Layer](../core/README.md) - Configuration and utilities used by middleware

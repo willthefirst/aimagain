@@ -66,18 +66,16 @@ Logic functions coordinate business operations without handling HTTP or database
 
 `get_db_session` (in [`src/db.py`](../db.py)) yields a session and does **not** auto-commit. Repositories deliberately don't commit either — they `flush()` so the result is visible inside the open transaction, but they leave commit/rollback to the caller (see [`../repositories/README.md`](../repositories/README.md)).
 
-In this codebase the *services* layer is mostly empty stubs (only `services/exceptions.py` is in active use), so the *logic* layer is the de-facto service layer and is where the commit goes. See [Services vs. Logic](../README.md#services-vs-logic-de-facto-convention) for the full convention.
+There is no separate service layer — `logic/` owns the transaction commit:
 
 ```python
 async def handle_set_user_activation(user_id, payload, user_repo, requesting_user):
     target = await user_repo.get_user_by_id(user_id)
     ...
     updated = await user_repo.set_user_activation(target, is_active=...)
-    await user_repo.session.commit()   # logic commits because there is no service
+    await user_repo.session.commit()   # logic owns the commit
     return updated
 ```
-
-When a real service is introduced for an entity, move the commit there and update the layer matrix in [`../README.md`](../README.md) so the doc matches reality.
 
 ## Processing responsibility matrix
 
@@ -105,83 +103,53 @@ All processing functions follow this pattern for consistency:
 
 ```python
 import logging
-from typing import Dict, Any
+from typing import Any, Dict
+from uuid import UUID
 
+from src.api.common.exceptions import ForbiddenError, NotFoundError
 from src.models import User
-from src.services.[domain]_service import [Domain]Service, ServiceError
 from src.repositories.[domain]_repository import [Domain]Repository
 
 logger = logging.getLogger(__name__)
 
+
 async def handle_some_operation(
-    input_param: str,
+    target_id: UUID,
     user: User,
-    service: [Domain]Service,
-    repository: [Domain]Repository,
+    repo: [Domain]Repository,
 ) -> Dict[str, Any]:
     """
     Handle [operation description] orchestration.
 
-    Args:
-        input_param: Description of input parameter
-        user: The requesting user
-        service: Service dependency for business logic
-        repository: Repository dependency for data access
-
-    Returns:
-        Dictionary containing processed results
-
-    Raises:
-        SpecificError: When specific condition occurs
-        ServiceError: For generic service-level errors
+    Raises NotFoundError / ForbiddenError directly — these are HTTPException
+    subclasses, so the @handle_route_errors decorator passes them through.
     """
     logger.debug(f"Processing [operation] for user {user.id}")
 
-    try:
-        # Step 1: Validate and transform input
-        processed_input = _validate_and_transform_input(input_param)
+    target = await repo.get_by_id(target_id)
+    if target is None:
+        raise NotFoundError(detail="[Entity] not found")
+    if target.owner_id != user.id and not user.is_admin:
+        raise ForbiddenError(detail="Only the owner or an admin can do this")
 
-        # Step 2: Coordinate service operations
-        result = await service.perform_operation(processed_input, user)
-
-        # Step 3: Transform for route consumption
-        return _transform_for_route(result, user)
-
-    except SpecificError as e:
-        logger.info(f"Business rule violation: {e}")
-        raise
-    except Exception as e:
-        logger.error(f"Unexpected error in handle_some_operation: {e}", exc_info=True)
-        raise ServiceError("An unexpected error occurred during operation")
+    result = await repo.do_the_thing(target)
+    await repo.session.commit()
+    return result
 ```
 
 ### Error handling pattern
 
-Consistent error handling across all processing functions:
+Logic handlers raise the API exception classes from `src.api.common.exceptions` directly — there is no separate domain-error hierarchy. The `@handle_route_errors` decorator (applied automatically by `BaseRouter`) lets `HTTPException` subclasses pass through, translates fastapi-users exceptions, and converts anything else into a generic 500.
 
 ```python
-async def handle_operation_with_error_handling(
-    service: [Domain]Service,
-) -> Any:
-    """Handle operation with comprehensive error management."""
-    try:
-        return await service.perform_operation()
-
-    except (BusinessRuleError, ConflictError, NotFoundError) as e:
-        # Re-raise known business errors for route handling
-        logger.info(f"Business error in operation: {e}")
-        raise
-
-    except ServiceError as e:
-        # Log and re-raise service errors
-        logger.error(f"Service error in operation: {e}", exc_info=True)
-        raise
-
-    except Exception as e:
-        # Convert unexpected errors to service errors
-        logger.error(f"Unexpected error in operation: {e}", exc_info=True)
-        raise ServiceError("An unexpected error occurred during operation")
+async def handle_get_post_detail(post_id: UUID, post_repo: PostRepository):
+    post = await post_repo.get_post_with_detail(post_id)
+    if post is None:
+        raise NotFoundError(detail="Post not found")  # → 404
+    return post
 ```
+
+There is no try/except boilerplate around repository calls. If a `SQLAlchemyError` escapes, the decorator's bare-`Exception` arm logs it and returns 500, which is the right outcome.
 
 ### Template context preparation pattern
 
@@ -191,12 +159,12 @@ For routes that render templates:
 async def handle_template_rendering_operation(
     request: Request,
     user: User,
-    service: [Domain]Service,
+    repo: [Domain]Repository,
 ) -> Dict[str, Any]:
     """Prepare context for template rendering."""
 
     # Gather all data needed for template
-    primary_data = await service.get_primary_data(user)
+    primary_data = await repo.get_primary_data(user)
 
     # Prepare template context
     context = {
@@ -216,50 +184,13 @@ async def handle_template_rendering_operation(
 
 ### Issue: Logic functions becoming too complex
 
-**Problem**: Processing functions contain too much business logic
-**Solution**: Move business rules to services, keep orchestration only
+**Problem**: A `handle_*` function grows past ~30 lines of validation, fetches, and branching.
+**Solution**: Extract private helpers (`_check_can_edit_post`, `_build_audit_snapshot`) in the same module. Don't push the work into a hypothetical service layer — there isn't one.
 
-```python
-# Bad - business logic in processing function
-async def handle_create_entity(creator_user: User, name: str):
-    if creator_user.entity_count >= MAX_ENTITIES:
-        raise BusinessRuleError("Too many entities")
+### Issue: swallowing errors
 
-# Good - delegate business logic to service
-async def handle_create_entity(
-    creator_user: User,
-    name: str,
-    service: [Entity]Service,
-):
-    # Service handles all business rules
-    return await service.create_entity(creator_user, name)
-```
-
-### Issue: Inconsistent error handling
-
-**Problem**: Different processing functions handle errors differently
-**Solution**: Follow standard error handling pattern
-
-```python
-# Bad - inconsistent error handling
-async def handle_operation_bad():
-    try:
-        result = await service.do_something()
-        return result
-    except Exception:
-        return None  # Swallowing errors
-
-# Good - consistent error handling
-async def handle_operation_good():
-    try:
-        return await service.do_something()
-    except BusinessError as e:
-        logger.info(f"Business error: {e}")
-        raise  # Re-raise for route handling
-    except Exception as e:
-        logger.error(f"Unexpected error: {e}", exc_info=True)
-        raise ServiceError("Unexpected error occurred")
-```
+**Problem**: A handler catches `Exception` and returns `None` (or a default), so the route silently 200s on failure.
+**Solution**: Don't catch. The decorator's bare-`Exception` arm logs and returns 500 — that's the right outcome. Only catch when you have something specific to do (e.g. translate `IntegrityError` into a `BadRequestError` with a useful message).
 
 ### Issue: Mixing HTTP concerns with business logic
 
@@ -269,7 +200,7 @@ async def handle_operation_good():
 ```python
 # Bad - HTTP concerns in logic
 async def handle_get_users(request: Request) -> JSONResponse:
-    users = await service.get_users()
+    users = await user_repo.list_users()
     return JSONResponse({"users": [user.dict() for user in users]})
 
 # Good - return data for route to handle
@@ -290,6 +221,5 @@ When adding or changing a processing function, create `src/logic/test_<file>.py`
 ## Related documentation
 
 - [API Routes](../api/routes/README.md) - Route layer that calls processing functions
-- [Services Layer](../services/README.md) - Service layer orchestrated by processing functions
-- [Repositories Layer](../repositories/README.md) - Repository layer accessed through services
-- [API Common](../api/common/README.md) - Common utilities used in processing functions
+- [Repositories Layer](../repositories/README.md) - Repository layer accessed by handlers
+- [API Common](../api/common/README.md) - Decorators + the API exception classes handlers raise

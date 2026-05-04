@@ -53,18 +53,19 @@ async def create_entity(data: dict, session: AsyncSession = Depends()):
         raise HTTPException(400, "Name required")
     entity = await session.execute(select([Entity]).filter(...))
 
-# Good - delegate to processing layer
+# Good - delegate to logic handler
 @router.post("/[entities]")
 async def create_entity(
     data: [Entity]Create,
-    service: [Entity]Service = Depends()
+    user: User = Depends(current_active_user),
+    repo: [Entity]Repository = Depends(get_[entity]_repository),
 ):
-    return await handle_create_entity(data, service)
+    return await handle_create_entity(data, user, repo)
 ```
 
 ## Architecture: Domain-driven route organization
 
-**HTTP Request -> Route Handler -> Processing Logic -> Service Layer -> Response**
+**HTTP Request -> Route Handler -> Logic Handler -> Repository -> Response**
 
 Routes are organized by domain with consistent delegation patterns.
 
@@ -103,15 +104,19 @@ Routes are organized by domain with consistent delegation patterns.
 
 ```python
 import logging
+
 from fastapi import APIRouter, Depends, Request
+
 from src.api.common import APIResponse, BaseRouter
 from src.auth_config import current_active_user
-from src.logic.[domain]_processing import handle_[action]
-from src.services.dependencies import get_[domain]_service
+from src.logic.[domain]_processing import handle_create_[domain], handle_list_[domain]
+from src.models import User
+from src.repositories.dependencies import get_[domain]_repository
+from src.repositories.[domain]_repository import [Domain]Repository
 
 logger = logging.getLogger(__name__)
 
-# Create apirouter instance and wrap with baserouter
+# Create APIRouter instance and wrap with BaseRouter
 [domain]_router_instance = APIRouter()
 router = BaseRouter(router=[domain]_router_instance)
 ```
@@ -122,10 +127,11 @@ router = BaseRouter(router=[domain]_router_instance)
 @router.get("/[domain]")
 async def list_[domain](
     request: Request,
-    service: [Domain]Service = Depends(get_[domain]_service),
+    user: User = Depends(current_active_user),
+    repo: [Domain]Repository = Depends(get_[domain]_repository),
 ):
-    """Lists [domain] items by calling the processing handler."""
-    items = await handle_list_[domain](service=service)
+    """Lists [domain] items by calling the logic handler."""
+    items = await handle_list_[domain](repo, requesting_user=user)
     return APIResponse.html_response(
         template_name="[domain]/list.html",
         context={"items": items},
@@ -136,15 +142,10 @@ async def list_[domain](
 async def create_[domain](
     data: [Domain]Create,
     user: User = Depends(current_active_user),
-    service: [Domain]Service = Depends(get_[domain]_service),
+    repo: [Domain]Repository = Depends(get_[domain]_repository),
 ):
-    """Creates [domain] item by calling the processing handler."""
-    item = await handle_create_[domain](
-        data=data,
-        user=user,
-        service=service,
-    )
-    return item
+    """Creates [domain] item by calling the logic handler."""
+    return await handle_create_[domain](data, user, repo)
 ```
 
 3. **Register the routes** in main application:

@@ -48,12 +48,11 @@ Every `src/<module>/` has its own README describing what it does, what it doesn'
 
 - [`src/api/README.md`](src/api/README.md) — API layer
   - [`src/api/routes/README.md`](src/api/routes/README.md) — route organization
-  - [`src/api/common/README.md`](src/api/common/README.md) — shared API utilities
-- [`src/services/README.md`](src/services/README.md) — business logic
+  - [`src/api/common/README.md`](src/api/common/README.md) — shared API utilities and the API exception classes
+- [`src/logic/README.md`](src/logic/README.md) — business logic, orchestration, transaction commits
 - [`src/repositories/README.md`](src/repositories/README.md) — data access
 - [`src/models/README.md`](src/models/README.md) — SQLAlchemy models
 - [`src/schemas/README.md`](src/schemas/README.md) — Pydantic request/response
-- [`src/logic/README.md`](src/logic/README.md) — processing functions
 - [`src/middleware/README.md`](src/middleware/README.md) — middleware
 - [`src/core/README.md`](src/core/README.md) — config + templating
 - [`src/templates/README.md`](src/templates/README.md) — Jinja2 + HTMX templates
