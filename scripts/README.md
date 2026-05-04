@@ -93,7 +93,7 @@ Run `dev --help` for the live, authoritative list. As of this writing:
 | `dev migrate generate "<message>"` | Generate a new Alembic revision via `--autogenerate` (host mode, requires `DATABASE_URL`). Review the generated file under `alembic/versions/` before applying. |
 | `dev migrate up` | Apply all pending Alembic migrations against the host DB (`alembic upgrade head`). |
 | `dev migrate down [N]` | Reverse `N` migrations against the host DB. `N` defaults to 1. |
-| `dev migrate roundtrip [--scratch <path>]` | Sanity-check a migration end-to-end against a throwaway sqlite DB at `/tmp/bedlam-migrate-roundtrip.db` (override with `--scratch`): upgrade head → downgrade -1 → upgrade head. Removes the scratch file on success; leaves it on failure for inspection. Never touches `data/aimagain.db`. |
+| `dev migrate roundtrip [--scratch <path>]` | Sanity-check a migration end-to-end against a throwaway sqlite DB at `/tmp/bedlam-migrate-roundtrip.db` (override with `--scratch`): upgrade head → downgrade -1 → upgrade head. Removes the scratch file on success; leaves it on failure for inspection. Never touches `data/bedlam-connect.db`. |
 
 For per-command flag details, run `dev <command> --help`.
 
