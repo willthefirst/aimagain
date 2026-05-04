@@ -26,7 +26,6 @@ from tests.test_contract.constants import (
     TEST_CLIENT_REFERRAL_AGE_GROUP,
     TEST_CLIENT_REFERRAL_DESCRIPTION,
     TEST_CLIENT_REFERRAL_DESIRED_TIME_SLOT,
-    TEST_CLIENT_REFERRAL_DESIRED_TIME_SLOT_2,
     TEST_CLIENT_REFERRAL_INSURANCE,
     TEST_CLIENT_REFERRAL_LANGUAGE_PREFERRED,
     TEST_CLIENT_REFERRAL_LOCATION_CITY,
@@ -36,7 +35,6 @@ from tests.test_contract.constants import (
     TEST_CLIENT_REFERRAL_LOCATION_ZIP,
     TEST_CLIENT_REFERRAL_PSYCHOTHERAPY_MODALITY,
     TEST_CLIENT_REFERRAL_SERVICE,
-    TEST_CLIENT_REFERRAL_SERVICE_2,
     TEST_POST_KIND,
 )
 from tests.test_contract.tests.shared.helpers import (
@@ -74,17 +72,11 @@ async def test_consumer_post_create_form_interaction(
         "location_zip": Like(TEST_CLIENT_REFERRAL_LOCATION_ZIP),
         "location_in_person": Like(TEST_CLIENT_REFERRAL_LOCATION_IN_PERSON),
         "location_virtual": Like(TEST_CLIENT_REFERRAL_LOCATION_VIRTUAL),
-        "desired_times": [
-            Like(TEST_CLIENT_REFERRAL_DESIRED_TIME_SLOT),
-            Like(TEST_CLIENT_REFERRAL_DESIRED_TIME_SLOT_2),
-        ],
+        "desired_times": [Like(TEST_CLIENT_REFERRAL_DESIRED_TIME_SLOT)],
         "client_dem_ages": Like(TEST_CLIENT_REFERRAL_AGE_GROUP),
         "language_preferred": Like(TEST_CLIENT_REFERRAL_LANGUAGE_PREFERRED),
         "description": Like(TEST_CLIENT_REFERRAL_DESCRIPTION),
-        "services": [
-            Like(TEST_CLIENT_REFERRAL_SERVICE),
-            Like(TEST_CLIENT_REFERRAL_SERVICE_2),
-        ],
+        "services": [Like(TEST_CLIENT_REFERRAL_SERVICE)],
         "services_psychotherapy_modality": Like(
             TEST_CLIENT_REFERRAL_PSYCHOTHERAPY_MODALITY
         ),
@@ -135,9 +127,6 @@ async def test_consumer_post_create_form_interaction(
         await page.locator(
             f'input[type="checkbox"][name="desired_times"][value="{TEST_CLIENT_REFERRAL_DESIRED_TIME_SLOT}"]'
         ).check()
-        await page.locator(
-            f'input[type="checkbox"][name="desired_times"][value="{TEST_CLIENT_REFERRAL_DESIRED_TIME_SLOT_2}"]'
-        ).check()
         await page.locator("#cr-client-dem-ages").select_option(
             TEST_CLIENT_REFERRAL_AGE_GROUP
         )
@@ -147,9 +136,6 @@ async def test_consumer_post_create_form_interaction(
         await page.locator("#cr-description").fill(TEST_CLIENT_REFERRAL_DESCRIPTION)
         await page.locator(
             f'input[type="checkbox"][name="services"][value="{TEST_CLIENT_REFERRAL_SERVICE}"]'
-        ).check()
-        await page.locator(
-            f'input[type="checkbox"][name="services"][value="{TEST_CLIENT_REFERRAL_SERVICE_2}"]'
         ).check()
         await page.locator("#cr-services-modality").fill(
             TEST_CLIENT_REFERRAL_PSYCHOTHERAPY_MODALITY

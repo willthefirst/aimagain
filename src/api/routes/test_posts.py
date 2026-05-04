@@ -754,8 +754,7 @@ async def test_get_post_form_renders_kind_and_field_clusters(
     form = tree.css_first("form")
     assert form is not None
     assert form.attributes.get("hx-post") == "/posts"
-    assert form.attributes.get("hx-ext") == "json-enc-arrays"
-    assert form.attributes.get("data-json-enc-array-fields") == "desired_times services"
+    assert form.attributes.get("hx-ext") == "json-enc"
 
     kinds_offered = {
         node.attributes.get("value")
