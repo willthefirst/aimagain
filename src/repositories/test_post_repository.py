@@ -8,8 +8,9 @@ detail row (not the parent), delete cascades the detail via the FK.
 import uuid
 
 import pytest
-from sqlalchemy import select
+from sqlalchemy import bindparam, select, text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
+from sqlalchemy.types import Uuid
 
 from src.models import NoteDetail, Post
 from src.repositories.post_repository import PostRepository
@@ -132,4 +133,42 @@ async def test_delete_post_cascades_detail(
             .first()
         )
         assert post_row is None
+        assert detail_row is None
+
+
+async def test_raw_sql_delete_post_cascades_via_fk(
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+):
+    """A raw-SQL DELETE bypasses the ORM cascade — only the FK CASCADE can
+    remove the detail row. Proves `PRAGMA foreign_keys = ON` is in effect."""
+    owner = await _seed_owner(db_test_session_manager)
+
+    async with db_test_session_manager() as session:
+        repo = PostRepository(session)
+        created = await repo.create_post(
+            Post(kind="note", owner_id=owner.id),
+            NoteDetail(title="t", body="b"),
+        )
+        await session.commit()
+        post_id = created.id
+
+    async with db_test_session_manager() as session:
+        await session.execute(
+            text("DELETE FROM posts WHERE id = :pid").bindparams(
+                bindparam("pid", type_=Uuid(as_uuid=True))
+            ),
+            {"pid": post_id},
+        )
+        await session.commit()
+
+    async with db_test_session_manager() as session:
+        detail_row = (
+            (
+                await session.execute(
+                    select(NoteDetail).filter(NoteDetail.post_id == post_id)
+                )
+            )
+            .scalars()
+            .first()
+        )
         assert detail_row is None
