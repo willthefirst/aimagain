@@ -4,15 +4,6 @@ from fastapi import HTTPException, status
 from fastapi_users import exceptions as fastapi_users_exceptions
 from fastapi_users.router.common import ErrorCode
 
-from src.services.exceptions import (
-    BusinessRuleError,
-    ConflictError,
-    DatabaseError,
-    NotAuthorizedError,
-    ServiceError,
-    UserNotFoundError,
-)
-
 logger = logging.getLogger(__name__)
 
 
@@ -52,19 +43,19 @@ class InternalServerError(APIException):
         )
 
 
-def handle_service_error(e: ServiceError):
+def handle_fastapi_users_error(e: fastapi_users_exceptions.FastAPIUsersException):
     """
-    Maps ServiceError subclasses to appropriate APIException or HTTPException.
-    This function is expected to be called by the @handle_route_errors decorator.
-    It standardizes how service layer errors are translated into HTTP responses.
-    """
-    logger.warning(
-        f"Handling service error: {e.__class__.__name__} - {getattr(e, 'message', str(e))}"
-    )
+    Maps fastapi-users exceptions to APIException responses.
 
-    if isinstance(e, UserNotFoundError):
-        raise NotFoundError(detail=getattr(e, "message", str(e)))
-    elif isinstance(e, fastapi_users_exceptions.UserAlreadyExists):
+    Called by the @handle_route_errors decorator. fastapi-users raises its
+    own exception types from the registration/auth flow; this maps the two
+    we care about to the API response shapes the frontend expects. Other
+    FastAPIUsersException subclasses fall through and the caller re-raises
+    them as a generic 500.
+    """
+    logger.warning(f"Handling fastapi-users error: {e.__class__.__name__} - {e}")
+
+    if isinstance(e, fastapi_users_exceptions.UserAlreadyExists):
         raise APIException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=ErrorCode.REGISTER_USER_ALREADY_EXISTS,
@@ -75,25 +66,4 @@ def handle_service_error(e: ServiceError):
                 "code": ErrorCode.REGISTER_INVALID_PASSWORD,
                 "reason": e.reason,
             }
-        )
-    elif isinstance(e, NotAuthorizedError):
-        raise ForbiddenError(
-            detail=getattr(e, "message", str(e))
-        )  # Or UnauthorizedError depending on specific meaning
-    elif isinstance(e, BusinessRuleError):
-        raise BadRequestError(
-            detail=getattr(e, "message", str(e))
-        )  # Or a 422 if it's a validation rule
-    elif isinstance(e, ConflictError):
-        raise APIException(
-            status_code=status.HTTP_409_CONFLICT, detail=getattr(e, "message", str(e))
-        )
-    elif isinstance(e, DatabaseError):
-        logger.error(f"Database error: {e}", exc_info=True)
-        raise InternalServerError(detail="A database error occurred.")
-    elif isinstance(e, ServiceError):
-        status_code = getattr(e, "status_code", status.HTTP_500_INTERNAL_SERVER_ERROR)
-        raise APIException(
-            status_code=status_code,
-            detail=getattr(e, "message", "A service error occurred."),
         )

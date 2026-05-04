@@ -8,11 +8,11 @@ Common utilities provide **consistent behavior** across all API routes through d
 
 ### What we do
 
-- **Standardized error handling**: Convert service exceptions to appropriate HTTP responses
+- **Standardized error handling**: Pass through `HTTPException` subclasses raised by logic handlers; translate fastapi-users exceptions; convert anything unexpected into a 500
 - **Automatic logging**: Structured logging for all route calls with entry/exit/error tracking
 - **Response formatting**: Consistent JSON and HTML response structures
 - **BaseRouter wrapper**: Automatic application of common decorators and configurations
-- **Exception mapping**: Clean mapping from business exceptions to HTTP status codes
+- **API exception classes**: Reusable `APIException` subclasses (`NotFoundError`, `ForbiddenError`, etc.) that logic handlers raise directly
 
 **Example**: BaseRouter automatically applies error handling and logging:
 
@@ -57,18 +57,18 @@ class APIResponse:
 
 ## Architecture: Cross-cutting concerns layer
 
-**Routes -> Common Utilities -> Service Layer**
+**Routes -> Common Utilities -> Logic Layer**
 
 Common utilities handle concerns that span multiple routes and domains.
 
 ## Common utilities responsibility matrix
 
-| Utility         | Purpose                | Responsibilities                      | Used By                  |
-| --------------- | ---------------------- | ------------------------------------- | ------------------------ |
-| **BaseRouter**  | Route standardization  | Apply decorators, manage dependencies | All route files          |
-| **APIResponse** | Response formatting    | JSON/HTML responses, template context | All route handlers       |
-| **Decorators**  | Cross-cutting concerns | Error handling, logging               | BaseRouter (automatic)   |
-| **Exceptions**  | Error mapping          | Service -> HTTP exception translation | Error handling decorator |
+| Utility         | Purpose                | Responsibilities                                                | Used By                  |
+| --------------- | ---------------------- | --------------------------------------------------------------- | ------------------------ |
+| **BaseRouter**  | Route standardization  | Apply decorators, manage dependencies                           | All route files          |
+| **APIResponse** | Response formatting    | JSON/HTML responses, template context                           | All route handlers       |
+| **Decorators**  | Cross-cutting concerns | Error handling, logging                                         | BaseRouter (automatic)   |
+| **Exceptions**  | Error vocabulary       | API exception classes raised by logic; fastapi-users translator | Logic handlers, decorator |
 
 ## Directory structure
 
@@ -77,7 +77,7 @@ Common utilities handle concerns that span multiple routes and domains.
 - `base_router.py` - Router wrapper that applies common decorators and configurations
 - `responses.py` - Standardized response formatting for JSON and HTML
 - `decorators.py` - Error handling and logging decorators applied to all routes
-- `exceptions.py` - Service exception to HTTP exception mapping
+- `exceptions.py` - `APIException` subclasses (`NotFoundError`, `ForbiddenError`, ...) raised by logic, plus the fastapi-users → HTTP translator
 
 **Package infrastructure:**
 
@@ -150,29 +150,29 @@ return APIResponse.error(
 
 ### Error handling pattern
 
-Service exceptions are automatically mapped to HTTP responses:
+Logic-layer `handle_*` functions raise the API exception classes directly. They're `HTTPException` subclasses, so the `@handle_route_errors` decorator passes them through to FastAPI unchanged. There is **no separate domain-error hierarchy** — see [Error handling](../../README.md#error-handling) in the parent `src/README.md`.
 
 ```python
-# Service layer throws business exceptions
-class [Entity]Service:
-    async def create_entity(self, data):
-        if not valid:
-            raise BusinessRuleError("Validation failed")  # Business exception
+# logic/post_processing.py
+from src.api.common.exceptions import ForbiddenError, NotFoundError
 
-# Route layer - exceptions automatically handled
-@router.post("/[entities]")
-async def create_entity(data: [Entity]Create):
-    return await service.create_entity(data)
-    # BusinessRuleError automatically becomes HTTP 400 Bad Request
+async def handle_update_post(post_id, payload, post_repo, requesting_user):
+    post = await post_repo.get_post_with_detail(post_id)
+    if post is None:
+        raise NotFoundError(detail="Post not found")          # → 404
+    if post.owner_id != requesting_user.id and not requesting_user.is_admin:
+        raise ForbiddenError(detail="Only the owner or an admin can edit this post")  # → 403
+    ...
+    await post_repo.session.commit()
+    return post
 
-# Exception mapping in exceptions.py
-def handle_service_error(e: ServiceError):
-    if isinstance(e, BusinessRuleError):
-        raise BadRequestError(detail=e.message)  # HTTP 400
-    elif isinstance(e, NotFoundError):
-        raise NotFoundError(detail=e.message)    # HTTP 404
-    # ... more mappings
+# api/routes/posts.py
+@router.put("/posts/{post_id}")
+async def update_post(post_id: UUID, payload: PostUpdate, ...):
+    return await handle_update_post(post_id, payload, post_repo, current_user)
 ```
+
+The decorator's only active translation is for `fastapi_users_exceptions.FastAPIUsersException` (registration/auth flow): `UserAlreadyExists` → 400 with the standard error code, `InvalidPasswordException` → 400 with the reason. Anything else that escapes a handler becomes a generic 500.
 
 ### Logging pattern
 
@@ -199,19 +199,19 @@ async def list_users():
 ```python
 # Bad - manual error handling
 @router.get("/users")
-async def list_users():
+async def list_users(user_repo: UserRepository = Depends(get_user_repository)):
     try:
-        return await service.list_users()
-    except BusinessRuleError as e:
-        return {"error": str(e)}  # Inconsistent format
+        return await handle_list_users(user_repo)
+    except NotFoundError as e:
+        return {"error": str(e)}  # Inconsistent format, swallows the HTTPException
 
-# Good - automatic error handling
+# Good - let the HTTPException propagate
 router = BaseRouter(router=APIRouter())
 
 @router.get("/users")
-async def list_users():
-    return await service.list_users()
-    # Errors automatically formatted consistently
+async def list_users(user_repo: UserRepository = Depends(get_user_repository)):
+    return await handle_list_users(user_repo)
+    # NotFoundError raised inside handle_list_users → 404 via FastAPI
 ```
 
 ### Issue: Missing logging for debugging
@@ -222,10 +222,10 @@ async def list_users():
 ```python
 # Bad - manual logging
 @router.get("/users")
-async def list_users():
+async def list_users(user_repo: UserRepository = Depends(get_user_repository)):
     logger.info("Listing users")
     try:
-        result = await service.list_users()
+        result = await handle_list_users(user_repo)
         logger.info("Users listed successfully")
         return result
     except Exception as e:
@@ -236,8 +236,8 @@ async def list_users():
 router = BaseRouter(router=APIRouter())
 
 @router.get("/users")  # Logging automatic
-async def list_users():
-    return await service.list_users()
+async def list_users(user_repo: UserRepository = Depends(get_user_repository)):
+    return await handle_list_users(user_repo)
 ```
 
 ### Issue: Mixed response formats
@@ -248,8 +248,8 @@ async def list_users():
 ```python
 # Bad - mixed response formats
 @router.get("/users")
-async def list_users():
-    return users  # Raw data
+async def list_users(user_repo: UserRepository = Depends(get_user_repository)):
+    return await handle_list_users(user_repo)  # Raw data
 
 @router.get("/data")
 async def get_data():
@@ -257,13 +257,13 @@ async def get_data():
 
 # Good - consistent response format
 @router.get("/users")
-async def list_users():
-    users = await get_users()
+async def list_users(user_repo: UserRepository = Depends(get_user_repository)):
+    users = await handle_list_users(user_repo)
     return APIResponse.success(data=users)
 
 @router.get("/data")
 async def get_data():
-    data = await get_data()
+    data = await fetch_data()
     return APIResponse.success(data=data)
 ```
 
@@ -273,7 +273,7 @@ async def get_data():
 
 ```python
 @log_route_call        # Logs entry, exit, and errors
-@handle_route_errors   # Maps service exceptions to HTTP responses
+@handle_route_errors   # Passes HTTPException through; translates fastapi-users; 500 for the rest
 ```
 
 ### Response utilities
@@ -290,15 +290,15 @@ APIResponse.html_response(template_name, context, request)
 ### Exception classes
 
 ```python
-# HTTP exception classes
-NotFoundError(detail)      # 404
-BadRequestError(detail)    # 400
-UnauthorizedError(detail)  # 401
-ForbiddenError(detail)     # 403
+# APIException subclasses raised directly by logic handlers
+NotFoundError(detail)       # 404
+BadRequestError(detail)     # 400
+UnauthorizedError(detail)   # 401
+ForbiddenError(detail)      # 403
 InternalServerError(detail) # 500
 
-# Service exception mapping
-handle_service_error(service_exception) -> HTTPException
+# fastapi-users exception translator (called by the decorator)
+handle_fastapi_users_error(fastapi_users_exception) -> APIException
 ```
 
 ## Tests
@@ -308,5 +308,5 @@ handle_service_error(service_exception) -> HTTPException
 ## Related documentation
 
 - [Routes Layer](../routes/README.md) - Route organization and patterns using common utilities
-- [Services Layer](../../services/README.md) - Service layer exceptions that get mapped to HTTP responses
+- [Logic Layer](../../logic/README.md) - Where the API exceptions in this package get raised
 - [API Layer](../README.md) - Overall API layer architecture

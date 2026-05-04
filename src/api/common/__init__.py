@@ -9,7 +9,7 @@ from .exceptions import (
     InternalServerError,
     NotFoundError,
     UnauthorizedError,
-    handle_service_error,
+    handle_fastapi_users_error,
 )
 from .responses import APIResponse
 
@@ -23,6 +23,6 @@ __all__ = [
     "UnauthorizedError",
     "ForbiddenError",
     "InternalServerError",
-    "handle_service_error",
+    "handle_fastapi_users_error",
     "BaseRouter",
 ]

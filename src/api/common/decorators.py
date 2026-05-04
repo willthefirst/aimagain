@@ -4,15 +4,7 @@ from functools import wraps
 from fastapi import HTTPException, status
 from fastapi_users import exceptions as fastapi_users_exceptions
 
-from src.api.common.exceptions import handle_service_error
-from src.services.exceptions import (
-    BusinessRuleError,
-    ConflictError,
-    DatabaseError,
-    NotAuthorizedError,
-    ServiceError,
-    UserNotFoundError,
-)
+from src.api.common.exceptions import handle_fastapi_users_error
 
 logger = logging.getLogger(__name__)
 
@@ -45,35 +37,24 @@ def log_route_call(func):
 def handle_route_errors(func):
     """
     A decorator to standardize error handling in API routes.
-    It catches common service-layer exceptions and a generic Exception,
-    logs them, and then either calls a specific handler (handle_service_error)
-    or raises an appropriate HTTPException.
+
+    Logic-layer ``handle_*`` functions raise APIException subclasses (e.g.
+    ``NotFoundError``, ``ForbiddenError``) directly; those are HTTPException
+    subclasses and pass through unchanged. fastapi-users raises its own
+    exception types during registration/auth — those get translated by
+    ``handle_fastapi_users_error``. Anything else becomes a 500.
     """
 
     @wraps(func)
     async def wrapper(*args, **kwargs):
         try:
             return await func(*args, **kwargs)
-        except (
-            BusinessRuleError,
-            ConflictError,
-            DatabaseError,
-            NotAuthorizedError,
-            UserNotFoundError,
-        ) as e:
-            logger.error(f"Service error in {func.__name__} route: {e}", exc_info=False)
-            handle_service_error(e)
-        except ServiceError as e:
-            logger.error(
-                f"Generic service error in {func.__name__} route: {e}", exc_info=True
-            )
-            handle_service_error(e)
         except fastapi_users_exceptions.FastAPIUsersException as e:
             logger.warning(
                 f"FastAPIUsers exception in {func.__name__} route: {type(e).__name__} - {e}"
             )
-            handle_service_error(e)
-        except HTTPException as e:
+            handle_fastapi_users_error(e)
+        except HTTPException:
             raise
         except Exception as e:
             logger.error(

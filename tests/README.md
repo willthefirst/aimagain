@@ -26,7 +26,6 @@ See [`../CLAUDE.md`](../CLAUDE.md) for the full definition-of-done contract that
 | --- | --- |
 | `src/api/routes/` | `test_auth_routes.py`, `test_users.py`, `test_posts.py` |
 | `src/schemas/` | `test_post.py` |
-| `src/services/` | none yet — gap |
 | `src/repositories/` | `test_audit_repository.py` |
 | `src/logic/` | `test_audit.py` |
 | `src/models/` | none yet — gap |
@@ -76,7 +75,7 @@ Any fixture defined at module level in `tests/fixtures.py` is then available to 
 
 ## Adding a new test
 
-1. **Find the module the code lives in.** If it's `src/services/foo_service.py`, the test goes at `src/services/test_foo_service.py`.
+1. **Find the module the code lives in.** If it's `src/logic/foo_processing.py`, the test goes at `src/logic/test_foo_processing.py`.
 2. **Use the shared fixtures** by adding them as parameters: `async def test_x(test_client, authenticated_client, db_test_session_manager): ...`
 3. **For helpers**, import from `tests.helpers`.
 4. **For module-specific helpers**, define them in the test file itself, or in a sibling `conftest.py` if multiple test files in that module need them.

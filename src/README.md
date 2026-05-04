@@ -80,30 +80,27 @@ async def create_entity(data: EntityCreate, service: EntityService = Depends()):
 - **Repositories** handle database operations
 - **Database** stores the data
 
-Everything else (schemas, models, templates) supports these main layers. The `services/` layer is reserved for entities with cross-cutting business rules — see [Services vs. Logic](#services-vs-logic-de-facto-convention) below.
+Everything else (schemas, models, templates) supports these main layers. There is no `services/` layer — see [Error handling](#error-handling) below for how domain errors flow.
 
 ## Layer responsibilities matrix
 
 **Rule:** each layer may only import from layers listed in its `Dependencies` column. Crossing the table upward (e.g. a repository importing a logic module) is a layering violation — fix the design, don't add the import.
 
-| Layer            | Status                            | Responsibility                                              | Example Files       | Dependencies                          |
-| ---------------- | --------------------------------- | ----------------------------------------------------------- | ------------------- | ------------------------------------- |
-| **API**          | active                            | HTTP handling, routing, validation                          | `api/routes/*.py`   | Logic, Repositories, Schemas          |
-| **Logic**        | active (de-facto service layer)   | Business logic, orchestration, transaction commit           | `logic/*.py`        | Repositories, Schemas, Models         |
-| **Services**     | exception hierarchy only          | Holds the `ServiceError` hierarchy that the API layer maps to HTTP responses; reserved for a real service if an entity ever grows cross-cutting business rules | `services/exceptions.py` | Repositories, Models                  |
-| **Repositories** | active                            | Data access, queries                                        | `repositories/*.py` | Models, Database                      |
-| **Models**       | active                            | Database schema, relationships                              | `models/*.py`       | SQLAlchemy                            |
-| **Schemas**      | active                            | Request/response validation                                 | `schemas/*.py`      | Pydantic                              |
-| **Middleware**   | empty                             | Cross-cutting concerns                                      | `middleware/*.py`   | FastAPI                               |
-| **Core**         | active                            | Configuration, utilities                                    | `core/*.py`         | None                                  |
+| Layer            | Status   | Responsibility                                              | Example Files       | Dependencies                          |
+| ---------------- | -------- | ----------------------------------------------------------- | ------------------- | ------------------------------------- |
+| **API**          | active   | HTTP handling, routing, validation                          | `api/routes/*.py`   | Logic, Repositories, Schemas          |
+| **Logic**        | active   | Business logic, orchestration, transaction commit           | `logic/*.py`        | Repositories, Schemas, Models, API common exceptions |
+| **Repositories** | active   | Data access, queries                                        | `repositories/*.py` | Models, Database                      |
+| **Models**       | active   | Database schema, relationships                              | `models/*.py`       | SQLAlchemy                            |
+| **Schemas**      | active   | Request/response validation                                 | `schemas/*.py`      | Pydantic                              |
+| **Middleware**   | empty    | Cross-cutting concerns                                      | `middleware/*.py`   | FastAPI                               |
+| **Core**         | active   | Configuration, utilities                                    | `core/*.py`         | None                                  |
 
-### Services vs. logic (de-facto convention)
+### Error handling
 
-The `services/` layer holds **only the `ServiceError` exception hierarchy** today (in `services/exceptions.py`) — the API layer catches those exceptions and maps them to HTTP responses. Earlier stub files (`user_service.py`, `dependencies.py`, `provider.py`) had zero importers and were deleted in the cleanup that closed issue #103.
+Logic-layer `handle_*` functions raise the API exception subclasses directly — `NotFoundError`, `ForbiddenError`, `BadRequestError`, etc. from [`src/api/common/exceptions.py`](api/common/exceptions.py). Those are `HTTPException` subclasses, so the `@handle_route_errors` decorator passes them through unchanged. fastapi-users exceptions raised during registration/auth get translated by `handle_fastapi_users_error`. Everything else becomes a generic 500.
 
-Business logic for every current entity lives in `logic/<entity>_processing.py` as `handle_*` functions, and that is also **where the transaction commit goes** (see [`logic/README.md`](logic/README.md#transactions-logic-owns-the-commit)). Routes call into `logic/` directly; they do not go through `services/`.
-
-Treat `services/` as a reserved slot for the day an entity grows business rules that genuinely don't fit a single handler (e.g. multi-repo coordination, cross-cutting authorization). Until then, **plans and PRs should target `logic/`, not a fictional `<Entity>Service`**. If you do introduce a real service, move the commit into it and update this matrix so the docs match reality.
+There is no separate domain-error hierarchy (e.g. `ServiceError`, `BusinessRuleError`). An earlier scaffold of that pattern lived under `src/services/exceptions.py` but was never raised by any logic handler — it was deleted in the cleanup that closed issue #107. If a future entity needs a domain-error type that isn't a 1:1 fit for the existing API exceptions, add it next to where it's raised; don't reintroduce a top-level hierarchy.
 
 ## Directory structure
 
@@ -117,10 +114,10 @@ Treat `services/` as a reserved slot for the day an entity grows business rules 
 
 - `api/` - HTTP API layer
   - `routes/` - Route definitions by domain
-  - `common/` - Shared utilities and decorators
-- `services/` - Business logic layer
-  - `user_service.py` - User-related business logic
-  - `dependencies.py` - Service dependency injection
+  - `common/` - Shared utilities, decorators, and the API exception classes
+- `logic/` - Business logic, orchestration, and the transaction commit
+  - `<entity>_processing.py` - `handle_*` functions per entity
+  - `audit.py` - Audit-log helper used by mutation handlers
 - `repositories/` - Data access layer
   - `user_repository.py` - User data access
   - `base.py` - Common repository patterns
@@ -133,7 +130,6 @@ Treat `services/` as a reserved slot for the day an entity grows business rules 
 - `schemas/` - Request/response validation (Pydantic)
 - `templates/` - HTML templates for web interface (Jinja2 + HTMX)
 - `middleware/` - Cross-cutting concerns (currently empty)
-- `logic/` - Data processing utilities
 - `core/` - Configuration and utilities
 
 ## Implementation patterns
@@ -147,8 +143,8 @@ This is the cross-module checklist. The detailed step-by-step (with code snippet
 2. **Migration** — generate and run an Alembic migration for the new table. See [`../alembic/README.md`](../alembic/README.md).
 3. **Schema** — add Pydantic request/response shapes. See [`schemas/README.md`](schemas/README.md#implementation-patterns).
 4. **Repository** — add data-access methods. See [`repositories/README.md`](repositories/README.md#implementation-patterns).
-5. **Logic** — implement business logic, authorization, and the transaction commit as `handle_*` functions in `src/logic/<entity>_processing.py`. See [`logic/README.md`](logic/README.md#implementation-patterns). Only introduce a `<Entity>Service` under `services/` if the entity has cross-cutting rules that don't fit a single handler — see [Services vs. Logic](#services-vs-logic-de-facto-convention).
-6. **Route** — wire up the HTTP endpoint that delegates to the logic handler (or service, if one exists). See [`api/routes/README.md`](api/routes/README.md#implementation-patterns).
+5. **Logic** — implement business logic, authorization, and the transaction commit as `handle_*` functions in `src/logic/<entity>_processing.py`. See [`logic/README.md`](logic/README.md#implementation-patterns). Raise the API exceptions from [`src/api/common/exceptions.py`](api/common/exceptions.py) directly (`NotFoundError`, `ForbiddenError`, etc.) — see [Error handling](#error-handling).
+6. **Route** — wire up the HTTP endpoint that delegates to the logic handler. See [`api/routes/README.md`](api/routes/README.md#implementation-patterns).
 7. **Template (if rendering HTML)** — add the Jinja2 template. See [`templates/README.md`](templates/README.md).
 
 ### Dependency injection pattern
@@ -236,7 +232,6 @@ async def get_user(
 
 - [API Layer Documentation](api/README.md) - HTTP routes and validation patterns
 - [Logic Layer Documentation](logic/README.md) - Business logic, orchestration, transaction commits
-- [Services Layer Documentation](services/README.md) - Reserved layer; only the exception hierarchy is in active use
 - [Models Documentation](models/README.md) - Database schema and relationships
 - [Repository Pattern Documentation](repositories/README.md) - Data access patterns
 - [Testing Strategy](../tests/README.md) - How to test each layer

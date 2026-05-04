@@ -263,6 +263,6 @@ When changing a model's schema, generate an Alembic migration as part of the sam
 ## Related documentation
 
 - [Repository Layer](../repositories/README.md) - Data access patterns that work with these models
-- [Services Layer](../services/README.md) - Business logic that operates on these domain entities
+- [Logic Layer](../logic/README.md) - Business logic that operates on these domain entities
 - [Schemas Layer](../schemas/README.md) - Request/response validation for these models
 - [Main Architecture](../README.md) - How models fit into the overall application architecture
