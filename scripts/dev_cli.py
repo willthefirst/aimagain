@@ -201,6 +201,12 @@ class DevCommands:
 class TestCommands:
     """Test-related commands."""
 
+    # Shortcut aliases for test paths. `dev test contract` expands to the full
+    # path because `tests/test_contract` is excluded from default `pytest`
+    # collection (`addopts` in `pyproject.toml`) and a regression in #100
+    # showed the path is easy to forget.
+    PATH_ALIASES = {"contract": "tests/test_contract"}
+
     def __init__(self, runner: CLIRunner):
         self.runner = runner
 
@@ -225,7 +231,7 @@ class TestCommands:
         if keywords:
             cmd.extend(["-k", keywords])
         if paths:
-            cmd.extend(paths)
+            cmd.extend(self.PATH_ALIASES.get(p, p) for p in paths)
 
         return self.runner.run_command(cmd)
 

@@ -19,6 +19,8 @@ If a layer has no README or no test file yet, **create them as part of the chang
 
 A Stop hook checks the diff at end-of-turn and surfaces a reminder when source files change without their README/test. The hook is a soft prompt, not a hard block — but ignoring it should be a deliberate decision (e.g. typo fix, log message tweak), not an oversight.
 
+**Contract tests are not run by default.** `tests/test_contract` is excluded from the default `dev test` collection (see [`tests/test_contract/README.md`](tests/test_contract/README.md)). If you change templates, route response shapes, or anything mock data factories in `tests/test_contract` assume, also run `dev test contract` before pushing — otherwise CI is the first place the breakage surfaces.
+
 ## One source of truth — link, don't copy
 
 Each fact has exactly **one home**: the README closest to the code or config that the fact describes. Other docs link to it; they never restate it.
