@@ -3,12 +3,18 @@ from uuid import UUID
 
 from fastapi import Request
 
-from src.api.common.exceptions import ForbiddenError, NotFoundError
+from src.api.common.exceptions import BadRequestError, ForbiddenError, NotFoundError
 from src.logic.audit import AuditAction, record_audit
-from src.models import NoteDetail, Post, User
+from src.models import ClientReferralDetail, NoteDetail, Post, User
 from src.repositories.audit_repository import AuditRepository
 from src.repositories.post_repository import PostRepository
-from src.schemas.post import PostAuditSnapshot, PostCreate, PostUpdate
+from src.schemas.post import (
+    ClientReferralCreate,
+    ClientReferralUpdate,
+    NoteCreate,
+    NoteUpdate,
+    post_audit_snapshot,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -16,10 +22,11 @@ logger = logging.getLogger(__name__)
 def _snapshot_post(post: Post) -> dict:
     """Capture the user-meaningful fields of a post for audit before/after.
 
-    Field set is defined by `PostAuditSnapshot` — adding a relevant field
-    to that schema flows here automatically.
+    The kind-specific projection lives in `src/schemas/post.py`; this is
+    a thin alias so callers don't reach into the schemas layer for an
+    audit-only helper.
     """
-    return PostAuditSnapshot.model_validate(post).model_dump(mode="json")
+    return post_audit_snapshot(post)
 
 
 async def handle_list_posts(
@@ -73,7 +80,7 @@ async def handle_get_post_edit_form(
 
 
 async def handle_create_post(
-    payload: PostCreate,
+    payload: NoteCreate | ClientReferralCreate,
     post_repo: PostRepository,
     audit_repo: AuditRepository,
     requesting_user: User,
@@ -81,12 +88,19 @@ async def handle_create_post(
     """Creates a post owned by the requesting user; writes an audit row in
     the same transaction; commits on success.
 
-    Today the only kind is `'note'`; `kind` is server-set here so clients
-    don't need to know about the parent/detail split (PR 2 will surface
-    `kind` on the wire when there's actually something to discriminate).
+    Dispatches on `payload.kind` (set by the discriminated union in
+    `src/schemas/post.py`) to build the right per-kind detail row. New
+    kinds add a branch here.
     """
-    post = Post(kind="note", owner_id=requesting_user.id)
-    detail = NoteDetail(title=payload.title, body=payload.body)
+    if isinstance(payload, NoteCreate):
+        post = Post(kind="note", owner_id=requesting_user.id)
+        detail = NoteDetail(title=payload.title, body=payload.body)
+    elif isinstance(payload, ClientReferralCreate):
+        post = Post(kind="client_referral", owner_id=requesting_user.id)
+        detail = ClientReferralDetail(description=payload.description)
+    else:  # pragma: no cover — schema discriminator should make this unreachable
+        raise BadRequestError(detail=f"unsupported post kind: {payload.kind!r}")
+
     created = await post_repo.create_post(post, detail)
     await record_audit(
         audit_repo,
@@ -104,7 +118,7 @@ async def handle_create_post(
 
 async def handle_update_post(
     post_id: UUID,
-    payload: PostUpdate,
+    payload: NoteUpdate | ClientReferralUpdate,
     post_repo: PostRepository,
     audit_repo: AuditRepository,
     requesting_user: User,
@@ -113,7 +127,10 @@ async def handle_update_post(
     requester is a superuser). Writes an audit row capturing before/after
     snapshots in the same transaction; commits on success.
 
-    404 if missing, 403 if not authorized.
+    The payload's `kind` must match the persisted post's `kind` — `kind`
+    is part of the resource identity once created and cannot be migrated
+    via PATCH. 404 if missing, 403 if not authorized, 400 on kind
+    mismatch.
     """
     post = await post_repo.get_post_by_id(post_id)
     if post is None:
@@ -122,8 +139,21 @@ async def handle_update_post(
     if post.owner_id != requesting_user.id and not requesting_user.is_superuser:
         raise ForbiddenError(detail="Only the owner or an admin can edit this post")
 
+    if payload.kind != post.kind:
+        raise BadRequestError(
+            detail=(
+                f"payload kind {payload.kind!r} does not match post kind "
+                f"{post.kind!r}; kind cannot be changed via PATCH"
+            )
+        )
+
     before = _snapshot_post(post)
-    updated = await post_repo.update_post(post, title=payload.title, body=payload.body)
+    if isinstance(payload, NoteUpdate):
+        updated = await post_repo.update_post(
+            post, title=payload.title, body=payload.body
+        )
+    else:
+        updated = await post_repo.update_post(post, description=payload.description)
     await record_audit(
         audit_repo,
         actor_id=requesting_user.id,

@@ -8,10 +8,10 @@ route layer.
 """
 
 from datetime import datetime, timezone
+from types import SimpleNamespace
 from typing import Any, Dict
 from uuid import UUID, uuid4
 
-from src.schemas.post import PostRead
 from src.schemas.user import UserRead
 
 
@@ -87,27 +87,36 @@ class MockDataFactory:
         title: str = "stub title",
         body: str = "stub body",
         owner_id: UUID = None,
-    ) -> PostRead:
+    ) -> SimpleNamespace:
+        """Build a Post-shaped mock for `kind='note'` consumed by the
+        route layer.
+
+        The route reads `.id`, `.kind`, `.note_detail.title`, and
+        `.note_detail.body` off the handler return value to build the
+        PATCH/POST response. A `SimpleNamespace` mimics the shape without
+        requiring a SQLAlchemy session, which contract tests don't have.
+        """
         now = datetime.now(timezone.utc)
-        return PostRead(
+        return SimpleNamespace(
             id=post_id or cls.MOCK_POST_ID,
             kind="note",
-            title=title,
-            body=body,
             owner_id=owner_id or cls.MOCK_POST_OWNER_ID,
+            note_detail=SimpleNamespace(title=title, body=body),
+            client_referral_detail=None,
             created_at=now,
             updated_at=now,
         )
 
     @classmethod
     def create_post_create_dependency_config(
-        cls, post_read: PostRead = None
+        cls, post_read: SimpleNamespace = None
     ) -> Dict[str, Any]:
         """Mock for `handle_create_post`.
 
-        The route under test (`POST /posts`) reads `id` off the handler's
+        The route under test (`POST /posts`) reads `.id` off the handler's
         return value to populate the response body and the `Location` /
-        `HX-Redirect` headers. A `PostRead` (or any object with `.id`) suffices.
+        `HX-Redirect` headers. A post-shaped `SimpleNamespace` (from
+        `create_post_read`) suffices.
         """
         if post_read is None:
             post_read = cls.create_post_read()
@@ -120,14 +129,14 @@ class MockDataFactory:
 
     @classmethod
     def create_post_edit_dependency_config(
-        cls, post_read: PostRead = None
+        cls, post_read: SimpleNamespace = None
     ) -> Dict[str, Any]:
         """Mock for `handle_update_post`.
 
-        The route under test (`PATCH /posts/{id}`) reads `id`, `title`, and
-        `body` off the handler's return value and packs them into the JSON
-        response, so a `PostRead` (or any object exposing those attributes) is
-        sufficient.
+        The route under test (`PATCH /posts/{id}`) reads `.id`, `.kind`,
+        and the per-kind detail relationship off the handler's return
+        value to build the JSON response. A post-shaped `SimpleNamespace`
+        (from `create_post_read`) covers that surface.
         """
         if post_read is None:
             post_read = cls.create_post_read(title="patched title", body="patched body")

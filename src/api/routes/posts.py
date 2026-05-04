@@ -1,7 +1,8 @@
 import logging
+from typing import Literal
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Request, Response, status
+from fastapi import APIRouter, Depends, Query, Request, Response, status
 from fastapi.responses import JSONResponse
 
 from src.api.common import APIResponse, BaseRouter
@@ -19,11 +20,44 @@ from src.models import User
 from src.repositories.audit_repository import AuditRepository
 from src.repositories.dependencies import get_audit_repository, get_post_repository
 from src.repositories.post_repository import PostRepository
-from src.schemas.post import PostCreate, PostRead, PostUpdate
+from src.schemas.post import PostCreate, PostUpdate
 
 posts_api_router = APIRouter(prefix="/posts")
 router = BaseRouter(router=posts_api_router, default_tags=["posts"])
 logger = logging.getLogger(__name__)
+
+
+# Per-kind create-form templates. The list is closed: a `kind` query
+# value not in here yields a 422 from FastAPI's Literal validator,
+# avoiding any chance of arbitrary template selection from the URL.
+_CREATE_FORM_TEMPLATES: dict[str, str] = {
+    "note": "posts/new.html",
+    "client_referral": "posts/new_client_referral.html",
+}
+_EDIT_FORM_TEMPLATES: dict[str, str] = {
+    "note": "posts/edit.html",
+    "client_referral": "posts/edit_client_referral.html",
+}
+
+
+def _patch_response_body(post) -> dict:
+    """Per-kind flat response body for `PATCH /posts/{id}`. The wire
+    shape mirrors the POST/GET projection's flat fields so HTMX clients
+    don't have to know about parent/detail."""
+    if post.kind == "note":
+        return {
+            "id": str(post.id),
+            "kind": "note",
+            "title": post.note_detail.title,
+            "body": post.note_detail.body,
+        }
+    if post.kind == "client_referral":
+        return {
+            "id": str(post.id),
+            "kind": "client_referral",
+            "description": post.client_referral_detail.description,
+        }
+    raise ValueError(f"unsupported post kind: {post.kind!r}")
 
 
 @router.get("")
@@ -48,15 +82,19 @@ async def list_posts(
 @router.get("/form")
 async def get_post_form(
     request: Request,
+    kind: Literal["note", "client_referral"] = Query("note"),
     user: User = Depends(current_active_user),
 ):
-    """Provides an HTML page with the create-post form.
+    """Provides an HTML page with the create-post form for the given
+    `kind` (default `'note'`). Unsupported kinds 422 via FastAPI's
+    Literal validator.
 
-    Registered before `/{post_id}` so the literal `form` is not parsed as a UUID.
+    Registered before `/{post_id}` so the literal `form` is not parsed
+    as a UUID.
     """
     context = await handle_get_post_form(request=request, requesting_user=user)
     return APIResponse.html_response(
-        template_name="posts/new.html", context=context, request=request
+        template_name=_CREATE_FORM_TEMPLATES[kind], context=context, request=request
     )
 
 
@@ -68,7 +106,9 @@ async def get_post_edit_form(
     user: User = Depends(current_active_user),
 ):
     """Provides an HTML page with the edit-post form. Owner-only; admins may
-    edit any post. 404 if missing, 403 if not authorized.
+    edit any post. The template is selected from the post's `kind`, so
+    each kind's edit form lives in its own file. 404 if missing, 403 if
+    not authorized.
     """
     context = await handle_get_post_edit_form(
         request=request,
@@ -76,8 +116,11 @@ async def get_post_edit_form(
         post_repo=post_repo,
         requesting_user=user,
     )
+    post_kind = context["post"].kind
     return APIResponse.html_response(
-        template_name="posts/edit.html", context=context, request=request
+        template_name=_EDIT_FORM_TEMPLATES[post_kind],
+        context=context,
+        request=request,
     )
 
 
@@ -88,7 +131,8 @@ async def get_post(
     post_repo: PostRepository = Depends(get_post_repository),
     user: User = Depends(current_active_user),
 ):
-    """Provides an HTML detail page for a single post."""
+    """Provides an HTML detail page for a single post. The template
+    branches on `post.kind` to render the right per-kind body."""
     context = await handle_get_post_detail(
         request=request,
         post_id=post_id,
@@ -109,8 +153,11 @@ async def create_post(
 ):
     """Creates a post owned by the authenticated user.
 
-    `owner_id` is server-set from the session; clients sending it (or any
-    other unknown field) are rejected with 422 by the schema.
+    The body is a discriminated union on `kind`: pre-existing note
+    payloads (`{title, body}`) keep working without sending the field;
+    `client_referral` payloads must include `kind: "client_referral"`.
+    `owner_id` is server-set from the session; clients sending it (or
+    any other unknown field) are rejected with 422 by the schema.
     """
     created = await handle_create_post(
         payload=payload,
@@ -136,9 +183,10 @@ async def patch_post(
 ):
     """Partially updates a post. Owner-only; admins may edit any post.
 
-    Server-managed fields (`id`, `owner_id`, `created_at`, `updated_at`) are
-    rejected by the schema's `extra="forbid"`. The body must include at least
-    one of `title`/`body`.
+    Server-managed fields (`id`, `owner_id`, `created_at`, `updated_at`)
+    are rejected by the schema's `extra="forbid"`. The body must include
+    at least one mutable field for the post's kind. `kind` cannot be
+    changed via PATCH; mismatches are rejected with 400.
     """
     updated = await handle_update_post(
         post_id=post_id,
@@ -147,13 +195,8 @@ async def patch_post(
         audit_repo=audit_repo,
         requesting_user=user,
     )
-    view = PostRead.model_validate(updated)
     return JSONResponse(
-        content={
-            "id": str(view.id),
-            "title": view.title,
-            "body": view.body,
-        },
+        content=_patch_response_body(updated),
         headers={"HX-Refresh": "true"},
     )
 

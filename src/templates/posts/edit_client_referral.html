@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block title %}Edit client referral{% endblock %}
+{% block content %}
+<h1>Edit client referral</h1>
+<form hx-patch="/posts/{{ post.id }}" hx-ext="json-enc">
+  <input type="hidden" name="kind" value="client_referral" />
+  <label for="description">Description:</label><br />
+  <textarea id="description" name="description" required>{{ post.client_referral_detail.description }}</textarea><br /><br />
+  <input type="submit" value="Save changes" />
+</form>
+
+<hr />
+<a href="/posts/{{ post.id }}">Cancel</a>
+{% endblock %}
