@@ -19,7 +19,7 @@ from src.models import User
 from src.repositories.audit_repository import AuditRepository
 from src.repositories.dependencies import get_audit_repository, get_post_repository
 from src.repositories.post_repository import PostRepository
-from src.schemas.post import PostCreate, PostUpdate
+from src.schemas.post import PostCreate, PostRead, PostUpdate
 
 posts_api_router = APIRouter(prefix="/posts")
 router = BaseRouter(router=posts_api_router, default_tags=["posts"])
@@ -147,11 +147,12 @@ async def patch_post(
         audit_repo=audit_repo,
         requesting_user=user,
     )
+    view = PostRead.model_validate(updated)
     return JSONResponse(
         content={
-            "id": str(updated.id),
-            "title": updated.note_detail.title,
-            "body": updated.note_detail.body,
+            "id": str(view.id),
+            "title": view.title,
+            "body": view.body,
         },
         headers={"HX-Refresh": "true"},
     )

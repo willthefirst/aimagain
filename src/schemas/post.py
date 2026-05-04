@@ -5,6 +5,15 @@ from pydantic import BaseModel, ConfigDict, field_validator, model_validator
 
 
 class PostRead(BaseModel):
+    """Flat read projection of a `Post` + its kind-specific detail row.
+
+    The wire shape stays flat (`title`, `body` at the top level) while the
+    storage shape is parent + per-kind detail. The `model_validator` below
+    flattens through `post.note_detail` when given a SQLAlchemy `Post`, so
+    callers can do `PostRead.model_validate(post)` without knowing the
+    parent/detail split.
+    """
+
     id: uuid.UUID
     title: str
     body: str
@@ -13,6 +22,20 @@ class PostRead(BaseModel):
     updated_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
+
+    @model_validator(mode="before")
+    @classmethod
+    def _flatten_post(cls, data):
+        if hasattr(data, "note_detail") and data.note_detail is not None:
+            return {
+                "id": data.id,
+                "title": data.note_detail.title,
+                "body": data.note_detail.body,
+                "owner_id": data.owner_id,
+                "created_at": data.created_at,
+                "updated_at": data.updated_at,
+            }
+        return data
 
 
 class PostCreate(BaseModel):

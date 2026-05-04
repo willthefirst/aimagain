@@ -96,7 +96,7 @@ def _setup_posts_form_stub(app: FastAPI) -> None:
     by Playwright before they leave the browser, so no database is needed.
     """
 
-    class _StubPost:
+    class _StubAttrs:
         def __init__(self, **kwargs):
             self.__dict__.update(kwargs)
 
@@ -108,10 +108,12 @@ def _setup_posts_form_stub(app: FastAPI) -> None:
 
     @app.get("/posts/{post_id}/form")
     async def posts_edit_form_stub_page(request: Request, post_id: uuid.UUID):
-        post = _StubPost(
+        # `posts/edit.html` reads `post.note_detail.title/body` after the
+        # parent/detail split — mirror that shape here so the template renders.
+        post = _StubAttrs(
             id=post_id,
-            title="Stub title",
-            body="Stub body",
+            kind="note",
+            note_detail=_StubAttrs(title="Stub title", body="Stub body"),
         )
         return APIResponse.html_response(
             template_name="posts/edit.html", context={"post": post}, request=request
@@ -126,28 +128,26 @@ def _setup_post_owner_actions_stub(app: FastAPI) -> None:
     the same partial production code paths render.
     """
 
-    class _StubUser:
-        def __init__(self, **kwargs):
-            self.__dict__.update(kwargs)
-
-    class _StubPost:
+    class _StubAttrs:
         def __init__(self, **kwargs):
             self.__dict__.update(kwargs)
 
     @app.get("/posts/{post_id}")
     async def post_owner_actions_stub_page(request: Request, post_id: uuid.UUID):
-        owner = _StubUser(id=post_id, username="post_owner")
-        post = _StubPost(
+        owner = _StubAttrs(id=post_id, username="post_owner")
+        # `posts/detail.html` reads `post.note_detail.title/body` after the
+        # parent/detail split — mirror that shape so the template renders.
+        post = _StubAttrs(
             id=post_id,
-            title="Stub title",
-            body="Stub body",
+            kind="note",
+            note_detail=_StubAttrs(title="Stub title", body="Stub body"),
             owner_id=owner.id,
             owner=owner,
         )
         # The mock auth in `run_consumer_server_process` makes current_user a
         # superuser when `posts_owner_actions=True`, so the partial's
         # owner-or-admin gate renders the buttons regardless of post.owner_id.
-        current_user = _StubUser(
+        current_user = _StubAttrs(
             id=uuid.UUID("00000000-0000-0000-0000-000000000002"),
             username="admin_user",
             is_superuser=True,
