@@ -11,7 +11,7 @@ from datetime import datetime, timezone
 from typing import Any, Dict
 from uuid import UUID, uuid4
 
-from src.schemas.post import ClientReferralRead
+from src.schemas.post import PostRead
 from src.schemas.user import UserRead
 
 
@@ -84,15 +84,15 @@ class MockDataFactory:
     def create_post_read(
         cls,
         post_id: UUID = None,
-        kind: str = "client_referral",
+        title: str = "stub title",
+        body: str = "stub body",
         owner_id: UUID = None,
-    ) -> ClientReferralRead:
-        """Returns a kind-specific read schema. The route under test only
-        reads `.id` off the return, so any kind suffices for the create mock."""
+    ) -> PostRead:
         now = datetime.now(timezone.utc)
-        return ClientReferralRead(
+        return PostRead(
             id=post_id or cls.MOCK_POST_ID,
-            kind=kind,
+            title=title,
+            body=body,
             owner_id=owner_id or cls.MOCK_POST_OWNER_ID,
             created_at=now,
             updated_at=now,
@@ -100,19 +100,39 @@ class MockDataFactory:
 
     @classmethod
     def create_post_create_dependency_config(
-        cls, post_read: ClientReferralRead = None
+        cls, post_read: PostRead = None
     ) -> Dict[str, Any]:
         """Mock for `handle_create_post`.
 
         The route under test (`POST /posts`) reads `id` off the handler's
         return value to populate the response body and the `Location` /
-        `HX-Redirect` headers. Any object exposing `.id` suffices.
+        `HX-Redirect` headers. A `PostRead` (or any object with `.id`) suffices.
         """
         if post_read is None:
             post_read = cls.create_post_read()
 
         return {
             "src.api.routes.posts.handle_create_post": {
+                "return_value_config": post_read
+            }
+        }
+
+    @classmethod
+    def create_post_edit_dependency_config(
+        cls, post_read: PostRead = None
+    ) -> Dict[str, Any]:
+        """Mock for `handle_update_post`.
+
+        The route under test (`PATCH /posts/{id}`) reads `id`, `title`, and
+        `body` off the handler's return value and packs them into the JSON
+        response, so a `PostRead` (or any object exposing those attributes) is
+        sufficient.
+        """
+        if post_read is None:
+            post_read = cls.create_post_read(title="patched title", body="patched body")
+
+        return {
+            "src.api.routes.posts.handle_update_post": {
                 "return_value_config": post_read
             }
         }

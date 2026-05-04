@@ -10,14 +10,16 @@ from src.logic.post_processing import (
     handle_create_post,
     handle_delete_post,
     handle_get_post_detail,
+    handle_get_post_edit_form,
     handle_get_post_form,
     handle_list_posts,
+    handle_update_post,
 )
 from src.models import User
 from src.repositories.audit_repository import AuditRepository
 from src.repositories.dependencies import get_audit_repository, get_post_repository
 from src.repositories.post_repository import PostRepository
-from src.schemas.post import PostCreate
+from src.schemas.post import PostCreate, PostUpdate
 
 posts_api_router = APIRouter(prefix="/posts")
 router = BaseRouter(router=posts_api_router, default_tags=["posts"])
@@ -30,7 +32,7 @@ async def list_posts(
     post_repo: PostRepository = Depends(get_post_repository),
     user: User = Depends(current_active_user),
 ):
-    """Provides an HTML page listing all posts (newest first, every kind).
+    """Provides an HTML page listing all posts (newest first).
     Requires authentication.
     """
     context = await handle_list_posts(
@@ -48,13 +50,34 @@ async def get_post_form(
     request: Request,
     user: User = Depends(current_active_user),
 ):
-    """Provides an HTML page with the create-post form (kind selector).
+    """Provides an HTML page with the create-post form.
 
     Registered before `/{post_id}` so the literal `form` is not parsed as a UUID.
     """
     context = await handle_get_post_form(request=request, requesting_user=user)
     return APIResponse.html_response(
         template_name="posts/new.html", context=context, request=request
+    )
+
+
+@router.get("/{post_id}/form")
+async def get_post_edit_form(
+    post_id: UUID,
+    request: Request,
+    post_repo: PostRepository = Depends(get_post_repository),
+    user: User = Depends(current_active_user),
+):
+    """Provides an HTML page with the edit-post form. Owner-only; admins may
+    edit any post. 404 if missing, 403 if not authorized.
+    """
+    context = await handle_get_post_edit_form(
+        request=request,
+        post_id=post_id,
+        post_repo=post_repo,
+        requesting_user=user,
+    )
+    return APIResponse.html_response(
+        template_name="posts/edit.html", context=context, request=request
     )
 
 
@@ -65,7 +88,7 @@ async def get_post(
     post_repo: PostRepository = Depends(get_post_repository),
     user: User = Depends(current_active_user),
 ):
-    """Provides an HTML detail page for a single post (kind-aware)."""
+    """Provides an HTML detail page for a single post."""
     context = await handle_get_post_detail(
         request=request,
         post_id=post_id,
@@ -86,11 +109,8 @@ async def create_post(
 ):
     """Creates a post owned by the authenticated user.
 
-    Body is the kind-discriminated `PostCreate` union; the `kind` field
-    selects the subclass and is server-trusted only as a discriminator (the
-    union rejects unknown kinds with 422). `owner_id` is server-set from the
-    session; clients sending it (or any other unknown field) are rejected
-    with 422 by the per-kind schema's `extra="forbid"`.
+    `owner_id` is server-set from the session; clients sending it (or any
+    other unknown field) are rejected with 422 by the schema.
     """
     created = await handle_create_post(
         payload=payload,
@@ -103,6 +123,33 @@ async def create_post(
         status_code=status.HTTP_201_CREATED,
         content={"id": str(created.id)},
         headers={"Location": location, "HX-Redirect": location},
+    )
+
+
+@router.patch("/{post_id}")
+async def patch_post(
+    post_id: UUID,
+    payload: PostUpdate,
+    post_repo: PostRepository = Depends(get_post_repository),
+    audit_repo: AuditRepository = Depends(get_audit_repository),
+    user: User = Depends(current_active_user),
+):
+    """Partially updates a post. Owner-only; admins may edit any post.
+
+    Server-managed fields (`id`, `owner_id`, `created_at`, `updated_at`) are
+    rejected by the schema's `extra="forbid"`. The body must include at least
+    one of `title`/`body`.
+    """
+    updated = await handle_update_post(
+        post_id=post_id,
+        payload=payload,
+        post_repo=post_repo,
+        audit_repo=audit_repo,
+        requesting_user=user,
+    )
+    return JSONResponse(
+        content={"id": str(updated.id), "title": updated.title, "body": updated.body},
+        headers={"HX-Refresh": "true"},
     )
 
 
