@@ -1,5 +1,6 @@
 import uuid
 from datetime import datetime
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, field_validator, model_validator
 
@@ -8,13 +9,17 @@ class PostRead(BaseModel):
     """Flat read projection of a `Post` + its kind-specific detail row.
 
     The wire shape stays flat (`title`, `body` at the top level) while the
-    storage shape is parent + per-kind detail. The `model_validator` below
-    flattens through `post.note_detail` when given a SQLAlchemy `Post`, so
-    callers can do `PostRead.model_validate(post)` without knowing the
-    parent/detail split.
+    storage shape is parent + per-kind detail. `kind` is the discriminator
+    field every post-shaped resource carries — today the only allowed
+    value is `'note'`; the next PR widens it as additional kinds are
+    introduced. The `model_validator` below flattens through
+    `post.note_detail` when given a SQLAlchemy `Post`, so callers can do
+    `PostRead.model_validate(post)` without knowing the parent/detail
+    split.
     """
 
     id: uuid.UUID
+    kind: Literal["note"]
     title: str
     body: str
     owner_id: uuid.UUID
@@ -29,6 +34,7 @@ class PostRead(BaseModel):
         if hasattr(data, "note_detail") and data.note_detail is not None:
             return {
                 "id": data.id,
+                "kind": data.kind,
                 "title": data.note_detail.title,
                 "body": data.note_detail.body,
                 "owner_id": data.owner_id,
@@ -39,6 +45,16 @@ class PostRead(BaseModel):
 
 
 class PostCreate(BaseModel):
+    """Create-post payload.
+
+    `kind` is the discriminator the wire format carries forward to
+    distinguish post-shaped resources. Today the only accepted value is
+    `'note'`; making the field required (rather than defaulting it
+    server-side) is the prep step before adding a second kind — every
+    client must announce which kind it's submitting.
+    """
+
+    kind: Literal["note"]
     title: str
     body: str
 
@@ -54,6 +70,14 @@ class PostCreate(BaseModel):
 
 
 class PostUpdate(BaseModel):
+    """Partial-update payload.
+
+    `kind` is required so the server can verify the client's view of the
+    resource matches the persisted kind (a future PR uses this to reject
+    cross-kind PATCHes). Today the only accepted value is `'note'`.
+    """
+
+    kind: Literal["note"]
     title: str | None = None
     body: str | None = None
 
@@ -90,7 +114,7 @@ class PostAuditSnapshot(BaseModel):
     if it lives on a detail row, the validator below.
     """
 
-    kind: str
+    kind: Literal["note"]
     title: str
     body: str
     owner_id: uuid.UUID

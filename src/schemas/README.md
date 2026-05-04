@@ -62,7 +62,7 @@ Schemas act as the data contract layer between HTTP and business logic.
 | Schema File | Domain    | Responsibilities                             | Schema Types                                             |
 | ----------- | --------- | -------------------------------------------- | -------------------------------------------------------- |
 | **user.py** | User data | User CRUD plus activation state-axis subresource (extends FastAPI Users) and audit snapshots | UserRead, UserCreate, UserUpdate, UserActivationUpdate, UserAuditSnapshot, UserActivationAuditSnapshot |
-| **post.py** | Posts     | Post read + create + partial-update validation + audit snapshot (`extra="forbid"` rejects `owner_id` and other server-managed fields; whitespace-only `title`/`body` rejected; `PostUpdate` requires at least one field). `PostAuditSnapshot` dereferences `title`/`body` through `Post.note_detail` (the `kind='note'` detail row) and includes `kind` so audit before/after stays a complete projection of mutable fields. | PostRead, PostCreate, PostUpdate, PostAuditSnapshot |
+| **post.py** | Posts     | Post read + create + partial-update validation + audit snapshot. `kind` is required on every wire payload (`Literal["note"]` today; the only accepted value, prep for adding more kinds). `extra="forbid"` rejects `owner_id` and other server-managed fields; whitespace-only `title`/`body` rejected; `PostUpdate` requires `kind` plus at least one mutable field. `PostAuditSnapshot` dereferences `title`/`body` through `Post.note_detail` and includes `kind` so audit before/after stays a complete projection. | PostRead, PostCreate, PostUpdate, PostAuditSnapshot |
 
 ## Directory structure
 

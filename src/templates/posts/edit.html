@@ -3,6 +3,7 @@
 {% block content %}
 <h1>Edit post</h1>
 <form hx-patch="/posts/{{ post.id }}" hx-ext="json-enc">
+  <input type="hidden" name="kind" value="note" />
   <label for="title">Title:</label><br />
   <input type="text" id="title" name="title" value="{{ post.note_detail.title }}" required /><br />
   <label for="body">Body:</label><br />

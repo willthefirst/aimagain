@@ -2,8 +2,9 @@
 
 Verifies that the form rendered by `templates/posts/edit.html` (mounted via
 the `posts_pages` flag on the consumer server) issues `PATCH /posts/{id}`
-with a JSON body matching `PostUpdate` (title + body, no `owner_id`). The
-contract surface is the form template and the route's request shape.
+with a JSON body matching `PostUpdate` (kind + title + body, no
+`owner_id`). The hidden `<input name="kind" value="note">` in the form
+template is what gets the discriminator into the body.
 """
 
 import pytest
@@ -48,6 +49,7 @@ async def test_consumer_post_edit_form_interaction(origin_with_routes: str, page
 
     expected_request_headers = {"Content-Type": "application/json"}
     expected_request_body = {
+        "kind": Like("note"),
         "title": Like(EDITED_POST_TITLE),
         "body": Like(EDITED_POST_BODY),
     }
