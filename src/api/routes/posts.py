@@ -32,7 +32,6 @@ def _edit_template_for(kind: str) -> str:
     `src/templates/posts/edit_<kind>.html`."""
     return {
         "client_referral": "posts/edit_client_referral.html",
-        "provider_availability": "posts/edit_provider_availability.html",
     }[kind]
 
 
