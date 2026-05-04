@@ -5,6 +5,7 @@ from asyncstdlib import anext
 from fastapi import Depends, FastAPI
 from fastapi_users.db import SQLAlchemyUserDatabase
 from httpx import ASGITransport, AsyncClient
+from sqlalchemy import event
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from src.core.templating import templates  # Import the global templates object
@@ -26,6 +27,17 @@ TEST_DATABASE_URL = "sqlite+aiosqlite:///:memory:"
 
 test_engine = create_async_engine(TEST_DATABASE_URL)
 async_test_sessionmaker = async_sessionmaker(test_engine, expire_on_commit=False)
+
+
+@event.listens_for(test_engine.sync_engine, "connect")
+def _enable_sqlite_foreign_keys(dbapi_connection, connection_record):
+    """Mirror src/db.py — FK enforcement must be on for tests to catch the
+    same constraint violations as production."""
+    if test_engine.dialect.name != "sqlite":
+        return
+    cursor = dbapi_connection.cursor()
+    cursor.execute("PRAGMA foreign_keys = ON")
+    cursor.close()
 
 
 # Master fixture to manage table creation/dropping and provide session maker

@@ -233,9 +233,7 @@ async def test_actor_set_null_when_user_deleted(
         )
         await session.commit()
 
-    # Delete the actor with FK enforcement enabled (SQLite needs the pragma).
     async with db_test_session_manager() as session:
-        await session.execute(__import__("sqlalchemy").text("PRAGMA foreign_keys = ON"))
         target = await session.get(User, actor.id)
         await session.delete(target)
         await session.commit()

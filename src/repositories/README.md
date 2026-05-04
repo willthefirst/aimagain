@@ -265,6 +265,7 @@ class [Entity]Service:
 Colocated tests live alongside the repositories:
 
 - `test_audit_repository.py` — exercises append-only writes, FK `SET NULL` on actor delete, and list-by-resource ordering against the in-memory test DB.
+- `test_post_repository.py` — exercises parent + detail create/update/delete, including a raw-SQL DELETE that proves the FK CASCADE fires (not just the ORM cascade). Relies on `PRAGMA foreign_keys = ON` being set globally by the test engine fixture.
 
 When adding a new repository method, extend (or create) `src/repositories/test_<repo_name>.py` and exercise it via the `db_test_session_manager` fixture from [`tests/fixtures.py`](../../tests/fixtures.py).
 

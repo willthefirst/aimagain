@@ -87,6 +87,8 @@ Any fixture defined at module level in `tests/fixtures.py` is then available to 
 
 The `db_test_session_manager` fixture (in `tests/fixtures.py`) creates an in-memory SQLite database, runs `metadata.create_all()` before each test, and drops everything after. Each test starts with a clean schema.
 
+The test engine registers a `connect` listener that runs `PRAGMA foreign_keys = ON` on every new SQLite connection — same as the production engine in `src/db.py`. Without it, FK constraints (e.g. `ON DELETE CASCADE`, `ON DELETE SET NULL`) are defined but silently un-enforced, and tests that depend on them would pass for the wrong reason.
+
 ### Authenticated requests
 
 Use `authenticated_client` to make requests as a pre-created test user. Use `logged_in_user` to get the corresponding `User` ORM object.

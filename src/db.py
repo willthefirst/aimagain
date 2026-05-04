@@ -6,7 +6,7 @@ from typing import Any
 from dotenv import load_dotenv
 from fastapi import Depends
 from fastapi_users.db import SQLAlchemyUserDatabase
-from sqlalchemy import text
+from sqlalchemy import event, text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from .models import User, metadata
@@ -19,6 +19,17 @@ if not DATABASE_URL:
 
 engine = create_async_engine(DATABASE_URL)
 async_session_maker = async_sessionmaker(engine, expire_on_commit=False)
+
+
+@event.listens_for(engine.sync_engine, "connect")
+def _enable_sqlite_foreign_keys(dbapi_connection, connection_record):
+    """SQLite ships with FK enforcement off by default; turn it on for every
+    new connection. No-op for non-SQLite engines (e.g. future Postgres)."""
+    if engine.dialect.name != "sqlite":
+        return
+    cursor = dbapi_connection.cursor()
+    cursor.execute("PRAGMA foreign_keys = ON")
+    cursor.close()
 
 
 # Dependency to get the raw SQLAlchemy AsyncSession
