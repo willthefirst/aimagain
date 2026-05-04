@@ -2,9 +2,8 @@
 
 Verifies that the form rendered by `templates/posts/new.html` (mounted via
 the `posts_pages` flag on the consumer server) issues `POST /posts` with a
-JSON body matching `ClientReferralCreate` for the multi-section intake
-form (Client Location / Demographics / Description / Services /
-Insurance). The contract surface is the form template — including its
+JSON body matching `ClientReferralCreate` (kind + summary + urgency +
+region). The contract surface is the form template — including its
 per-kind field cluster — and the route's request shape. The
 provider_availability cluster has its own pact pair; this test stays
 focused on the client_referral path.
@@ -23,18 +22,9 @@ from tests.test_contract.constants import (
     PROVIDER_NAME_POSTS,
     PROVIDER_STATE_POSTS_ACCEPTS_CREATE,
     STUB_POST_ID,
-    TEST_CLIENT_REFERRAL_AGE_GROUP,
-    TEST_CLIENT_REFERRAL_DESCRIPTION,
-    TEST_CLIENT_REFERRAL_DESIRED_TIME_SLOT,
-    TEST_CLIENT_REFERRAL_INSURANCE,
-    TEST_CLIENT_REFERRAL_LANGUAGE_PREFERRED,
-    TEST_CLIENT_REFERRAL_LOCATION_CITY,
-    TEST_CLIENT_REFERRAL_LOCATION_IN_PERSON,
-    TEST_CLIENT_REFERRAL_LOCATION_STATE,
-    TEST_CLIENT_REFERRAL_LOCATION_VIRTUAL,
-    TEST_CLIENT_REFERRAL_LOCATION_ZIP,
-    TEST_CLIENT_REFERRAL_PSYCHOTHERAPY_MODALITY,
-    TEST_CLIENT_REFERRAL_SERVICE,
+    TEST_CLIENT_REFERRAL_REGION,
+    TEST_CLIENT_REFERRAL_SUMMARY,
+    TEST_CLIENT_REFERRAL_URGENCY,
     TEST_POST_KIND,
 )
 from tests.test_contract.tests.shared.helpers import (
@@ -53,8 +43,8 @@ async def test_consumer_post_create_form_interaction(
     origin_with_routes: str, page: Page
 ):
     """Submit the new-post form (client_referral kind selected); assert the
-    intercepted request matches the contracted shape (POST /posts with the
-    full multi-section intake-form JSON body)."""
+    intercepted request matches the contracted shape (POST /posts with JSON
+    `{kind, summary, urgency, region}`)."""
     pact = setup_pact(
         CONSUMER_NAME_POST_CREATE,
         PROVIDER_NAME_POSTS,
@@ -67,20 +57,9 @@ async def test_consumer_post_create_form_interaction(
     expected_request_headers = {"Content-Type": "application/json"}
     expected_request_body = {
         "kind": Like(TEST_POST_KIND),
-        "location_city": Like(TEST_CLIENT_REFERRAL_LOCATION_CITY),
-        "location_state": Like(TEST_CLIENT_REFERRAL_LOCATION_STATE),
-        "location_zip": Like(TEST_CLIENT_REFERRAL_LOCATION_ZIP),
-        "location_in_person": Like(TEST_CLIENT_REFERRAL_LOCATION_IN_PERSON),
-        "location_virtual": Like(TEST_CLIENT_REFERRAL_LOCATION_VIRTUAL),
-        "desired_times": [Like(TEST_CLIENT_REFERRAL_DESIRED_TIME_SLOT)],
-        "client_dem_ages": Like(TEST_CLIENT_REFERRAL_AGE_GROUP),
-        "language_preferred": Like(TEST_CLIENT_REFERRAL_LANGUAGE_PREFERRED),
-        "description": Like(TEST_CLIENT_REFERRAL_DESCRIPTION),
-        "services": [Like(TEST_CLIENT_REFERRAL_SERVICE)],
-        "services_psychotherapy_modality": Like(
-            TEST_CLIENT_REFERRAL_PSYCHOTHERAPY_MODALITY
-        ),
-        "insurance": Like(TEST_CLIENT_REFERRAL_INSURANCE),
+        "summary": Like(TEST_CLIENT_REFERRAL_SUMMARY),
+        "urgency": Like(TEST_CLIENT_REFERRAL_URGENCY),
+        "region": Like(TEST_CLIENT_REFERRAL_REGION),
     }
     expected_response_body = {"id": Like(str(STUB_POST_ID))}
 
@@ -113,35 +92,8 @@ async def test_consumer_post_create_form_interaction(
         await page.locator(
             f'input[type="radio"][name="kind"][value="{TEST_POST_KIND}"]'
         ).check()
-        await page.locator("#cr-location-city").fill(TEST_CLIENT_REFERRAL_LOCATION_CITY)
-        await page.locator("#cr-location-state").select_option(
-            TEST_CLIENT_REFERRAL_LOCATION_STATE
-        )
-        await page.locator("#cr-location-zip").fill(TEST_CLIENT_REFERRAL_LOCATION_ZIP)
-        await page.locator("#cr-location-in-person").select_option(
-            TEST_CLIENT_REFERRAL_LOCATION_IN_PERSON
-        )
-        await page.locator("#cr-location-virtual").select_option(
-            TEST_CLIENT_REFERRAL_LOCATION_VIRTUAL
-        )
-        await page.locator(
-            f'input[type="checkbox"][name="desired_times"][value="{TEST_CLIENT_REFERRAL_DESIRED_TIME_SLOT}"]'
-        ).check()
-        await page.locator("#cr-client-dem-ages").select_option(
-            TEST_CLIENT_REFERRAL_AGE_GROUP
-        )
-        await page.locator("#cr-language-preferred").select_option(
-            TEST_CLIENT_REFERRAL_LANGUAGE_PREFERRED
-        )
-        await page.locator("#cr-description").fill(TEST_CLIENT_REFERRAL_DESCRIPTION)
-        await page.locator(
-            f'input[type="checkbox"][name="services"][value="{TEST_CLIENT_REFERRAL_SERVICE}"]'
-        ).check()
-        await page.locator("#cr-services-modality").fill(
-            TEST_CLIENT_REFERRAL_PSYCHOTHERAPY_MODALITY
-        )
-        await page.locator("#cr-insurance").select_option(
-            TEST_CLIENT_REFERRAL_INSURANCE
-        )
+        await page.locator("#cr-summary").fill(TEST_CLIENT_REFERRAL_SUMMARY)
+        await page.locator("#cr-urgency").select_option(TEST_CLIENT_REFERRAL_URGENCY)
+        await page.locator("#cr-region").fill(TEST_CLIENT_REFERRAL_REGION)
         await page.locator("input[type='submit']").click()
         await page.wait_for_timeout(NETWORK_TIMEOUT_MS)
