@@ -53,6 +53,26 @@ Pre-commit hooks run lint automatically — don't bypass with `--no-verify`.
 3. If a single change forces edits across most layers (model + schema + repo + service + route), follow the entity checklist in [`src/README.md`](src/README.md#adding-a-new-domain-entity) — that's expected for new entities, not a smell.
 4. **Before adding or modifying a resource type**, read [`src/api/routes/RESOURCE_GRAMMAR.md`](src/api/routes/RESOURCE_GRAMMAR.md) first. It's the prescriptive contract for URL shape, lifecycle states, and subresource conventions.
 5. **Before adding or moving a route**, run `dev routes [prefix]` to see every handler currently mounted. Catches router shadowing before tests do. Full CLI list: [`scripts/README.md`](scripts/README.md).
+6. **Before changing a wire or storage contract**, do the contract-surface check below. The layer matrix tells you *which layers* a change touches; this tells you *which contracts* it touches.
+
+## Before implementing a multi-layer change: contract-surface check
+
+Layer-by-layer planning catches "did I update every file?" — it does *not* catch "did I just break every existing client?" That second question is what this section is for.
+
+Before writing code on any change that modifies a schema, route, template, or persisted format, write a short pre-implementation note that answers three questions. Five minutes; no plan-mode session needed.
+
+1. **Which contract surfaces does this touch?** For each, classify as **compatible** (existing producers/consumers keep working) or **breaking** (someone has to change). Surfaces include:
+   - HTTP request body shape (route schemas)
+   - HTTP response body shape (route schemas, template-context dicts consumed by HTMX)
+   - URL shape (added paths, renamed paths, new query parameters that change selection)
+   - Persisted JSON shape (`audit_log.before`/`after`, settings blobs, anything stored as JSON)
+   - Database CHECK/UNIQUE constraints whose universe of valid values is shrinking
+
+2. **Is there a strictly smaller PR you could ship first?** Specifically: a 1-file or 1-layer change that makes the main PR's diff smaller, more reversible, or stop introducing two concepts at once. The canonical example: when adding a discriminator-based feature, ship "make the discriminator field required on the wire (single value allowed)" first, then "add a second value" as a separate PR. The prep PR is a no-op functionally; the feature PR is then a textbook discriminated union.
+
+3. **For each breaking surface, who decides?** If the breakage is scoped (only internal callers, only your tests) you can absorb it. If it leaks past your boundary (HTML forms, external API consumers, persisted data already in production) **surface the choice to the user explicitly** before implementing — *"this changes X for existing clients; OK, or do you want me to prep first?"* Don't decide silently inside the implementation.
+
+The cost of skipping this check is one end-of-PR realization that you took the wrong shape — by which point unwinding is more work than the prep PR would have been.
 
 ## Plan mode
 
