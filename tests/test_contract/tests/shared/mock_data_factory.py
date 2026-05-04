@@ -11,7 +11,7 @@ from datetime import datetime, timezone
 from typing import Any, Dict
 from uuid import UUID, uuid4
 
-from src.schemas.post import ClientReferralRead
+from src.schemas.post import PostRead
 from src.schemas.user import UserRead
 
 
@@ -84,42 +84,29 @@ class MockDataFactory:
     def create_post_read(
         cls,
         post_id: UUID = None,
+        title: str = "stub title",
+        body: str = "stub body",
         owner_id: UUID = None,
-        description: str = "stub description",
-    ) -> ClientReferralRead:
-        """Returns a `client_referral` read schema. The routes under test only
-        read `.id` off the return, so a single kind suffices for both create
-        and edit mocks."""
+    ) -> PostRead:
         now = datetime.now(timezone.utc)
-        return ClientReferralRead(
+        return PostRead(
             id=post_id or cls.MOCK_POST_ID,
-            kind="client_referral",
+            title=title,
+            body=body,
             owner_id=owner_id or cls.MOCK_POST_OWNER_ID,
-            location_city="Northampton",
-            location_state="MA",
-            location_zip="01060",
-            location_in_person="yes",
-            location_virtual="please_contact",
-            desired_times=["monday_morning"],
-            client_dem_ages="adults_25_64",
-            language_preferred="no",
-            description=description,
-            services=["psychotherapy"],
-            services_psychotherapy_modality="DBT",
-            insurance="in_network",
             created_at=now,
             updated_at=now,
         )
 
     @classmethod
     def create_post_create_dependency_config(
-        cls, post_read: ClientReferralRead = None
+        cls, post_read: PostRead = None
     ) -> Dict[str, Any]:
         """Mock for `handle_create_post`.
 
         The route under test (`POST /posts`) reads `id` off the handler's
         return value to populate the response body and the `Location` /
-        `HX-Redirect` headers. Any object exposing `.id` suffices.
+        `HX-Redirect` headers. A `PostRead` (or any object with `.id`) suffices.
         """
         if post_read is None:
             post_read = cls.create_post_read()
@@ -132,16 +119,17 @@ class MockDataFactory:
 
     @classmethod
     def create_post_edit_dependency_config(
-        cls, post_read: ClientReferralRead = None
+        cls, post_read: PostRead = None
     ) -> Dict[str, Any]:
         """Mock for `handle_update_post`.
 
-        The route under test (`PATCH /posts/{id}`) reads `id` off the handler's
-        return value and packs it into the JSON response, so any object
-        exposing `.id` is sufficient.
+        The route under test (`PATCH /posts/{id}`) reads `id`, `title`, and
+        `body` off the handler's return value and packs them into the JSON
+        response, so a `PostRead` (or any object exposing those attributes) is
+        sufficient.
         """
         if post_read is None:
-            post_read = cls.create_post_read(description="patched description")
+            post_read = cls.create_post_read(title="patched title", body="patched body")
 
         return {
             "src.api.routes.posts.handle_update_post": {

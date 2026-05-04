@@ -8,9 +8,6 @@ and `handle_delete_post` are monkey-patched out via the combined dependency
 config so this test exercises only the route layer (the "waiter, not chef"
 split).
 
-Only `client_referral` is exercised on PATCH — `provider_availability` has
-no editable fields yet, so there is no Update variant for that kind.
-
 One module-scoped provider server with all three mocks applied — every pact
 file verifies against the same server.
 """

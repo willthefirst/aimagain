@@ -7,9 +7,6 @@
    Renders nothing unless current_user is the owner OR a superuser.
    Backend authz lives in src/logic/post_processing.py — this `{% if %}`
    is presentation only.
-
-   Both kinds now have edit pages, so the Edit link renders for any
-   owner-or-admin viewer.
 #}
 {% if current_user and (current_user.id == post.owner_id or current_user.is_superuser) %}
 <span class="owner-actions" data-post-id="{{ post.id }}">

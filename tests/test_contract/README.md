@@ -2,7 +2,7 @@
 
 Pact-based contract tests verify that the **shape of the conversation** between an HTML form (consumer) and the API endpoint it posts to (provider) stays in sync. They do **not** verify business behavior — that's what the colocated unit tests under `src/<layer>/test_*.py` are for.
 
-> **Status:** auth (registration), users (admin actions), and posts (create form — client_referral payload; client_referral edit form; owner actions) currently have contract test pairs. The `provider_availability` create payload and edit form (`edit_provider_availability.html`) do not yet have their own pacts — colocated tests cover their wire shape end-to-end; add per-kind pacts when stricter contract enforcement is needed. Add a pair for any new HTML form (or htmx-driven action partial) per the conventions below.
+> **Status:** auth (registration), users (admin actions), and posts (create + edit forms, owner actions) currently have contract test pairs. Add a pair for any new HTML form (or htmx-driven action partial) per the conventions below.
 
 ## Why this directory exists outside the colocated convention
 
@@ -53,12 +53,12 @@ tests/test_contract/
     │   ├── test_auth_form.py            # Registration form contract
     │   ├── test_user_admin_actions.py   # Admin-actions partial contract
     │   ├── test_post_form.py            # New-post form contract
-    │   ├── test_post_edit_form.py       # Edit-post form contract (client_referral)
+    │   ├── test_post_edit_form.py       # Edit-post form contract
     │   └── test_post_owner_actions.py   # Owner-actions partial contract (Delete)
     ├── provider/
     │   ├── test_auth_verification.py
     │   ├── test_user_admin_actions_verification.py
-    │   └── test_posts_verification.py   # Verifies post create + edit + owner-actions pacts
+    │   └── test_posts_verification.py   # Verifies post create, edit, and owner-actions pacts
     └── shared/
         ├── consumer_test_base.py      # BaseConsumerTest abstract class
         ├── helpers.py                 # Pact + Playwright glue
