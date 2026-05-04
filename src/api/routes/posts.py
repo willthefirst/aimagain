@@ -148,7 +148,11 @@ async def patch_post(
         requesting_user=user,
     )
     return JSONResponse(
-        content={"id": str(updated.id), "title": updated.title, "body": updated.body},
+        content={
+            "id": str(updated.id),
+            "title": updated.note_detail.title,
+            "body": updated.note_detail.body,
+        },
         headers={"HX-Refresh": "true"},
     )
 

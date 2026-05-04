@@ -9,7 +9,7 @@
 <ul>
   {% for post in posts %}
   <li>
-    <a href="/posts/{{ post.id }}">{{ post.title }}</a>
+    <a href="/posts/{{ post.id }}">{{ post.note_detail.title }}</a>
     by <a href="/users/{{ post.owner_id }}">{{ post.owner.username }}</a>
   </li>
   {% endfor %}

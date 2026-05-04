@@ -58,12 +58,30 @@ class PostAuditSnapshot(BaseModel):
 
     Captures the user-meaningful fields that mutations to a `Post` can
     change. The id lives in `audit_log.resource_id` already, so it's not
-    duplicated here. Adding a field requires updating this class — the
-    handler picks it up automatically via `model_dump`.
+    duplicated here.
+
+    `title`/`body` live on `Post.note_detail` (the `kind='note'` detail
+    row); the model-validator dereferences through the relationship so
+    callers can pass a `Post` directly and don't have to know about the
+    parent/detail split. Adding a field requires updating this class and,
+    if it lives on a detail row, the validator below.
     """
 
+    kind: str
     title: str
     body: str
     owner_id: uuid.UUID
 
     model_config = ConfigDict(from_attributes=True)
+
+    @model_validator(mode="before")
+    @classmethod
+    def _flatten_post(cls, data):
+        if hasattr(data, "note_detail") and data.note_detail is not None:
+            return {
+                "kind": data.kind,
+                "title": data.note_detail.title,
+                "body": data.note_detail.body,
+                "owner_id": data.owner_id,
+            }
+        return data
