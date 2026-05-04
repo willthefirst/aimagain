@@ -181,7 +181,7 @@ async def test_create_post_happy_path(
     body = f"body-{uuid.uuid4()}"
 
     response = await authenticated_client.post(
-        "/posts", json={"title": title, "body": body}
+        "/posts", json={"kind": "note", "title": title, "body": body}
     )
 
     assert response.status_code == 201
@@ -210,7 +210,8 @@ async def test_create_post_strips_whitespace(
 ):
     """Title and body are trimmed before persistence."""
     response = await authenticated_client.post(
-        "/posts", json={"title": "  hello  ", "body": "  world  "}
+        "/posts",
+        json={"kind": "note", "title": "  hello  ", "body": "  world  "},
     )
     assert response.status_code == 201
     new_id = uuid.UUID(response.json()["id"])
@@ -236,7 +237,7 @@ async def test_create_post_rejects_owner_id_in_payload(
 
     response = await authenticated_client.post(
         "/posts",
-        json={"title": "t", "body": "b", "owner_id": str(other.id)},
+        json={"kind": "note", "title": "t", "body": "b", "owner_id": str(other.id)},
     )
     assert response.status_code == 422
 
@@ -252,7 +253,7 @@ async def test_create_post_rejects_unknown_field(
 ):
     """Unknown fields are rejected with 422."""
     response = await authenticated_client.post(
-        "/posts", json={"title": "t", "body": "b", "evil": True}
+        "/posts", json={"kind": "note", "title": "t", "body": "b", "evil": True}
     )
     assert response.status_code == 422
 
@@ -260,11 +261,13 @@ async def test_create_post_rejects_unknown_field(
 @pytest.mark.parametrize(
     "payload",
     [
-        {"body": "no title"},
-        {"title": "no body"},
-        {},
-        {"title": "", "body": "b"},
-        {"title": "t", "body": "   "},
+        {"kind": "note", "body": "no title"},
+        {"kind": "note", "title": "no body"},
+        {"kind": "note"},
+        {"kind": "note", "title": "", "body": "b"},
+        {"kind": "note", "title": "t", "body": "   "},
+        {"title": "t", "body": "b"},  # missing kind
+        {"kind": "not_a_kind", "title": "t", "body": "b"},  # invalid kind
     ],
 )
 async def test_create_post_missing_or_empty_fields_422(
@@ -282,7 +285,7 @@ async def test_create_post_unauthenticated_redirects(
     """Anonymous request to POST /posts is redirected to login (HTML auth flow)."""
     response = await test_client.post(
         "/posts",
-        json={"title": "t", "body": "b"},
+        json={"kind": "note", "title": "t", "body": "b"},
         headers={"accept": "text/html"},
         follow_redirects=False,
     )
@@ -307,7 +310,7 @@ async def test_owner_can_patch_title_only(
 
     new_title = f"new-{uuid.uuid4()}"
     response = await authenticated_client.patch(
-        f"/posts/{post.id}", json={"title": new_title}
+        f"/posts/{post.id}", json={"kind": "note", "title": new_title}
     )
 
     assert response.status_code == 200
@@ -335,7 +338,7 @@ async def test_owner_can_patch_body_only(
             session.add(post)
 
     response = await authenticated_client.patch(
-        f"/posts/{post.id}", json={"body": "fresh"}
+        f"/posts/{post.id}", json={"kind": "note", "body": "fresh"}
     )
     assert response.status_code == 200
     assert response.json()["title"] == original_title
@@ -353,7 +356,7 @@ async def test_owner_can_patch_both_fields(
             session.add(post)
 
     response = await authenticated_client.patch(
-        f"/posts/{post.id}", json={"title": "T2", "body": "B2"}
+        f"/posts/{post.id}", json={"kind": "note", "title": "T2", "body": "B2"}
     )
     assert response.status_code == 200
     assert response.json()["title"] == "T2"
@@ -374,7 +377,7 @@ async def test_non_owner_cannot_patch_post(
             session.add(post)
 
     response = await authenticated_client.patch(
-        f"/posts/{post.id}", json={"title": "hijack"}
+        f"/posts/{post.id}", json={"kind": "note", "title": "hijack"}
     )
     assert response.status_code == 403
 
@@ -398,7 +401,7 @@ async def test_admin_can_patch_anyone_post(
             session.add(post)
 
     response = await authenticated_client.patch(
-        f"/posts/{post.id}", json={"title": "moderated"}
+        f"/posts/{post.id}", json={"kind": "note", "title": "moderated"}
     )
     assert response.status_code == 200
     assert response.json()["title"] == "moderated"
@@ -409,7 +412,7 @@ async def test_patch_404_for_unknown_post(
     logged_in_user: User,
 ):
     response = await authenticated_client.patch(
-        f"/posts/{uuid.uuid4()}", json={"title": "x"}
+        f"/posts/{uuid.uuid4()}", json={"kind": "note", "title": "x"}
     )
     assert response.status_code == 404
 
@@ -429,7 +432,7 @@ async def test_patch_rejects_owner_id_in_payload(
 
     response = await authenticated_client.patch(
         f"/posts/{post.id}",
-        json={"title": "t2", "owner_id": str(other.id)},
+        json={"kind": "note", "title": "t2", "owner_id": str(other.id)},
     )
     assert response.status_code == 422
 
@@ -437,10 +440,12 @@ async def test_patch_rejects_owner_id_in_payload(
 @pytest.mark.parametrize(
     "payload",
     [
-        {},
-        {"title": None, "body": None},
-        {"title": "   "},
-        {"body": ""},
+        {"kind": "note"},
+        {"kind": "note", "title": None, "body": None},
+        {"kind": "note", "title": "   "},
+        {"kind": "note", "body": ""},
+        {"title": "x"},  # missing kind
+        {"kind": "not_a_kind", "title": "x"},  # invalid kind
     ],
 )
 async def test_patch_invalid_body_422(
@@ -469,7 +474,7 @@ async def test_patch_rejects_unknown_field(
             session.add(post)
 
     response = await authenticated_client.patch(
-        f"/posts/{post.id}", json={"title": "x", "evil": True}
+        f"/posts/{post.id}", json={"kind": "note", "title": "x", "evil": True}
     )
     assert response.status_code == 422
 
@@ -479,7 +484,7 @@ async def test_patch_unauthenticated_redirects(
 ):
     response = await test_client.patch(
         f"/posts/{uuid.uuid4()}",
-        json={"title": "t"},
+        json={"kind": "note", "title": "t"},
         headers={"accept": "text/html"},
         follow_redirects=False,
     )
@@ -751,7 +756,7 @@ async def test_create_post_writes_audit_row(
     body = f"body-{uuid.uuid4()}"
 
     response = await authenticated_client.post(
-        "/posts", json={"title": title, "body": body}
+        "/posts", json={"kind": "note", "title": title, "body": body}
     )
     assert response.status_code == 201
     new_id = uuid.UUID(response.json()["id"])
@@ -785,7 +790,7 @@ async def test_patch_post_writes_audit_row_with_before_and_after(
             session.add(post)
 
     response = await authenticated_client.patch(
-        f"/posts/{post.id}", json={"title": "new title"}
+        f"/posts/{post.id}", json={"kind": "note", "title": "new title"}
     )
     assert response.status_code == 200
 
@@ -818,7 +823,7 @@ async def test_failed_create_writes_no_audit_row(
     """A 422 (schema rejection) must not leak an audit row — the discipline
     requires audit lands iff the mutation does."""
     response = await authenticated_client.post(
-        "/posts", json={"title": "t", "body": "b", "evil": True}
+        "/posts", json={"kind": "note", "title": "t", "body": "b", "evil": True}
     )
     assert response.status_code == 422
 
@@ -845,7 +850,7 @@ async def test_unauthorized_patch_writes_no_audit_row(
             session.add(post)
 
     response = await authenticated_client.patch(
-        f"/posts/{post.id}", json={"title": "hijack"}
+        f"/posts/{post.id}", json={"kind": "note", "title": "hijack"}
     )
     assert response.status_code == 403
 
@@ -871,7 +876,7 @@ async def test_admin_patch_audit_actor_is_admin_not_owner(
             session.add(post)
 
     response = await authenticated_client.patch(
-        f"/posts/{post.id}", json={"title": "moderated"}
+        f"/posts/{post.id}", json={"kind": "note", "title": "moderated"}
     )
     assert response.status_code == 200
 

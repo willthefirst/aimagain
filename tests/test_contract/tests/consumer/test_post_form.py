@@ -2,8 +2,9 @@
 
 Verifies that the form rendered by `templates/posts/new.html` (mounted via
 the `posts_pages` flag on the consumer server) issues `POST /posts` with a
-JSON body matching `PostCreate` (title + body, no `owner_id`). The contract
-surface is the form template and the route's request shape.
+JSON body matching `PostCreate` (kind + title + body, no `owner_id`). The
+hidden `<input name="kind" value="note">` in the form template is what
+gets the discriminator into the body.
 """
 
 import pytest
@@ -50,6 +51,7 @@ async def test_consumer_post_create_form_interaction(
 
     expected_request_headers = {"Content-Type": "application/json"}
     expected_request_body = {
+        "kind": Like("note"),
         "title": Like(TEST_POST_TITLE),
         "body": Like(TEST_POST_BODY),
     }

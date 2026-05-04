@@ -3,6 +3,7 @@
 {% block content %}
 <h1>New post</h1>
 <form hx-post="/posts" hx-ext="json-enc">
+  <input type="hidden" name="kind" value="note" />
   <label for="title">Title:</label><br />
   <input type="text" id="title" name="title" required /><br />
   <label for="body">Body:</label><br />

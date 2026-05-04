@@ -91,6 +91,7 @@ class MockDataFactory:
         now = datetime.now(timezone.utc)
         return PostRead(
             id=post_id or cls.MOCK_POST_ID,
+            kind="note",
             title=title,
             body=body,
             owner_id=owner_id or cls.MOCK_POST_OWNER_ID,
