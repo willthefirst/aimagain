@@ -5,7 +5,7 @@ from fastapi import Request
 
 from src.api.common.exceptions import ForbiddenError, NotFoundError
 from src.logic.audit import AuditAction, record_audit
-from src.models import Post, User
+from src.models import NoteDetail, Post, User
 from src.repositories.audit_repository import AuditRepository
 from src.repositories.post_repository import PostRepository
 from src.schemas.post import PostAuditSnapshot, PostCreate, PostUpdate
@@ -79,13 +79,15 @@ async def handle_create_post(
     requesting_user: User,
 ) -> Post:
     """Creates a post owned by the requesting user; writes an audit row in
-    the same transaction; commits on success."""
-    post = Post(
-        title=payload.title,
-        body=payload.body,
-        owner_id=requesting_user.id,
-    )
-    created = await post_repo.create_post(post)
+    the same transaction; commits on success.
+
+    Today the only kind is `'note'`; `kind` is server-set here so clients
+    don't need to know about the parent/detail split (PR 2 will surface
+    `kind` on the wire when there's actually something to discriminate).
+    """
+    post = Post(kind="note", owner_id=requesting_user.id)
+    detail = NoteDetail(title=payload.title, body=payload.body)
+    created = await post_repo.create_post(post, detail)
     await record_audit(
         audit_repo,
         actor_id=requesting_user.id,

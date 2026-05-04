@@ -6,7 +6,7 @@ from selectolax.parser import HTMLParser
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from src.models import AuditLog, Post, User
+from src.models import AuditLog, NoteDetail, Post, User
 from src.repositories.audit_repository import AuditRepository
 from tests.helpers import create_test_user, promote_to_admin
 
@@ -14,10 +14,19 @@ from tests.helpers import create_test_user, promote_to_admin
 pytestmark = pytest.mark.asyncio
 
 
+def _post(*, title: str, body: str, owner_id) -> Post:
+    """Build a Post + its NoteDetail in the parent/detail shape that the
+    storage layer expects. Keeps the old `title=`, `body=`, `owner_id=`
+    keyword surface so tests stay readable."""
+    post = Post(kind="note", owner_id=owner_id)
+    post.note_detail = NoteDetail(title=title, body=body)
+    return post
+
+
 def _make_test_post(
     owner: User, *, title: str | None = None, body: str = "body"
 ) -> Post:
-    return Post(
+    return _post(
         title=title or f"post-{uuid.uuid4()}",
         body=body,
         owner_id=owner.id,
@@ -97,8 +106,8 @@ async def test_list_posts_orders_newest_first(
     tree = HTMLParser(response.text)
     items = tree.css("ul > li")
     assert len(items) == 2
-    assert newer.title in items[0].text()
-    assert older.title in items[1].text()
+    assert newer.note_detail.title in items[0].text()
+    assert older.note_detail.title in items[1].text()
 
 
 async def test_list_posts_unauthenticated_redirects(
@@ -125,7 +134,7 @@ async def test_get_post_detail_renders(
     author = create_test_user(username=f"author-{uuid.uuid4()}")
     title = f"detail-{uuid.uuid4()}"
     body = f"body-{uuid.uuid4()}"
-    post = Post(title=title, body=body, owner_id=author.id)
+    post = _post(title=title, body=body, owner_id=author.id)
 
     async with db_test_session_manager() as session:
         async with session.begin():
@@ -188,8 +197,9 @@ async def test_create_post_happy_path(
         result = await session.execute(select(Post).filter(Post.id == new_id))
         persisted = result.scalars().first()
         assert persisted is not None
-        assert persisted.title == title
-        assert persisted.body == body
+        assert persisted.kind == "note"
+        assert persisted.note_detail.title == title
+        assert persisted.note_detail.body == body
         assert persisted.owner_id == logged_in_user.id
 
 
@@ -208,8 +218,8 @@ async def test_create_post_strips_whitespace(
     async with db_test_session_manager() as session:
         result = await session.execute(select(Post).filter(Post.id == new_id))
         persisted = result.scalars().first()
-        assert persisted.title == "hello"
-        assert persisted.body == "world"
+        assert persisted.note_detail.title == "hello"
+        assert persisted.note_detail.body == "world"
 
 
 async def test_create_post_rejects_owner_id_in_payload(
@@ -290,7 +300,7 @@ async def test_owner_can_patch_title_only(
 ):
     """PATCH with only `title` updates title and leaves body untouched."""
     original_body = f"body-{uuid.uuid4()}"
-    post = Post(title="orig", body=original_body, owner_id=logged_in_user.id)
+    post = _post(title="orig", body=original_body, owner_id=logged_in_user.id)
     async with db_test_session_manager() as session:
         async with session.begin():
             session.add(post)
@@ -309,8 +319,8 @@ async def test_owner_can_patch_title_only(
     async with db_test_session_manager() as session:
         result = await session.execute(select(Post).filter(Post.id == post.id))
         refreshed = result.scalars().first()
-        assert refreshed.title == new_title
-        assert refreshed.body == original_body
+        assert refreshed.note_detail.title == new_title
+        assert refreshed.note_detail.body == original_body
 
 
 async def test_owner_can_patch_body_only(
@@ -319,7 +329,7 @@ async def test_owner_can_patch_body_only(
     logged_in_user: User,
 ):
     original_title = f"title-{uuid.uuid4()}"
-    post = Post(title=original_title, body="orig", owner_id=logged_in_user.id)
+    post = _post(title=original_title, body="orig", owner_id=logged_in_user.id)
     async with db_test_session_manager() as session:
         async with session.begin():
             session.add(post)
@@ -337,7 +347,7 @@ async def test_owner_can_patch_both_fields(
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user: User,
 ):
-    post = Post(title="t", body="b", owner_id=logged_in_user.id)
+    post = _post(title="t", body="b", owner_id=logged_in_user.id)
     async with db_test_session_manager() as session:
         async with session.begin():
             session.add(post)
@@ -357,7 +367,7 @@ async def test_non_owner_cannot_patch_post(
 ):
     """A non-owner non-admin gets 403 and the post is not mutated."""
     other = create_test_user(username=f"other-{uuid.uuid4()}")
-    post = Post(title="orig", body="orig", owner_id=other.id)
+    post = _post(title="orig", body="orig", owner_id=other.id)
     async with db_test_session_manager() as session:
         async with session.begin():
             session.add(other)
@@ -371,7 +381,7 @@ async def test_non_owner_cannot_patch_post(
     async with db_test_session_manager() as session:
         result = await session.execute(select(Post).filter(Post.id == post.id))
         refreshed = result.scalars().first()
-        assert refreshed.title == "orig"
+        assert refreshed.note_detail.title == "orig"
 
 
 async def test_admin_can_patch_anyone_post(
@@ -381,7 +391,7 @@ async def test_admin_can_patch_anyone_post(
 ):
     await promote_to_admin(db_test_session_manager, logged_in_user.email)
     other = create_test_user(username=f"other-{uuid.uuid4()}")
-    post = Post(title="orig", body="orig", owner_id=other.id)
+    post = _post(title="orig", body="orig", owner_id=other.id)
     async with db_test_session_manager() as session:
         async with session.begin():
             session.add(other)
@@ -411,7 +421,7 @@ async def test_patch_rejects_owner_id_in_payload(
 ):
     """Even the owner cannot reassign owner_id via PATCH (server-managed)."""
     other = create_test_user(username=f"other-{uuid.uuid4()}")
-    post = Post(title="t", body="b", owner_id=logged_in_user.id)
+    post = _post(title="t", body="b", owner_id=logged_in_user.id)
     async with db_test_session_manager() as session:
         async with session.begin():
             session.add(other)
@@ -439,7 +449,7 @@ async def test_patch_invalid_body_422(
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user: User,
 ):
-    post = Post(title="t", body="b", owner_id=logged_in_user.id)
+    post = _post(title="t", body="b", owner_id=logged_in_user.id)
     async with db_test_session_manager() as session:
         async with session.begin():
             session.add(post)
@@ -453,7 +463,7 @@ async def test_patch_rejects_unknown_field(
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user: User,
 ):
-    post = Post(title="t", body="b", owner_id=logged_in_user.id)
+    post = _post(title="t", body="b", owner_id=logged_in_user.id)
     async with db_test_session_manager() as session:
         async with session.begin():
             session.add(post)
@@ -518,7 +528,7 @@ async def test_form_route_does_not_shadow_detail_route(
     logged_in_user: User,
 ):
     """Sanity check the /posts/form ordering — a real UUID still hits the detail route."""
-    post = Post(title="t", body="b", owner_id=logged_in_user.id)
+    post = _post(title="t", body="b", owner_id=logged_in_user.id)
     async with db_test_session_manager() as session:
         async with session.begin():
             session.add(post)
@@ -549,7 +559,7 @@ async def test_owner_can_open_edit_form(
     logged_in_user: User,
 ):
     """The owner sees the edit form pre-filled with current values."""
-    post = Post(title="orig title", body="orig body", owner_id=logged_in_user.id)
+    post = _post(title="orig title", body="orig body", owner_id=logged_in_user.id)
     async with db_test_session_manager() as session:
         async with session.begin():
             session.add(post)
@@ -576,7 +586,7 @@ async def test_admin_can_open_edit_form_for_any_post(
 ):
     await promote_to_admin(db_test_session_manager, logged_in_user.email)
     other = create_test_user(username=f"other-{uuid.uuid4()}")
-    post = Post(title="t", body="b", owner_id=other.id)
+    post = _post(title="t", body="b", owner_id=other.id)
     async with db_test_session_manager() as session:
         async with session.begin():
             session.add(other)
@@ -592,7 +602,7 @@ async def test_non_owner_cannot_open_edit_form(
     logged_in_user: User,
 ):
     other = create_test_user(username=f"other-{uuid.uuid4()}")
-    post = Post(title="t", body="b", owner_id=other.id)
+    post = _post(title="t", body="b", owner_id=other.id)
     async with db_test_session_manager() as session:
         async with session.begin():
             session.add(other)
@@ -630,7 +640,7 @@ async def test_detail_page_shows_edit_link_for_owner(
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user: User,
 ):
-    post = Post(title="t", body="b", owner_id=logged_in_user.id)
+    post = _post(title="t", body="b", owner_id=logged_in_user.id)
     async with db_test_session_manager() as session:
         async with session.begin():
             session.add(post)
@@ -652,7 +662,7 @@ async def test_detail_page_shows_edit_link_for_admin(
 ):
     await promote_to_admin(db_test_session_manager, logged_in_user.email)
     other = create_test_user(username=f"other-{uuid.uuid4()}")
-    post = Post(title="t", body="b", owner_id=other.id)
+    post = _post(title="t", body="b", owner_id=other.id)
     async with db_test_session_manager() as session:
         async with session.begin():
             session.add(other)
@@ -670,7 +680,7 @@ async def test_detail_page_hides_edit_link_for_stranger(
     logged_in_user: User,
 ):
     other = create_test_user(username=f"other-{uuid.uuid4()}")
-    post = Post(title="t", body="b", owner_id=other.id)
+    post = _post(title="t", body="b", owner_id=other.id)
     async with db_test_session_manager() as session:
         async with session.begin():
             session.add(other)
@@ -689,7 +699,7 @@ async def test_detail_page_delete_button_for_owner(
 ):
     """The owner sees a Delete button wired to DELETE /posts/{id} with a
     confirmation prompt."""
-    post = Post(title="t", body="b", owner_id=logged_in_user.id)
+    post = _post(title="t", body="b", owner_id=logged_in_user.id)
     async with db_test_session_manager() as session:
         async with session.begin():
             session.add(post)
@@ -714,7 +724,7 @@ async def test_detail_page_delete_button_for_admin(
     """An admin viewing another user's post sees the Delete button too."""
     await promote_to_admin(db_test_session_manager, logged_in_user.email)
     other = create_test_user(username=f"other-{uuid.uuid4()}")
-    post = Post(title="t", body="b", owner_id=other.id)
+    post = _post(title="t", body="b", owner_id=other.id)
     async with db_test_session_manager() as session:
         async with session.begin():
             session.add(other)
@@ -755,6 +765,7 @@ async def test_create_post_writes_audit_row(
         assert row.action == "create_post"
         assert row.before is None
         assert row.after == {
+            "kind": "note",
             "title": title,
             "body": body,
             "owner_id": str(logged_in_user.id),
@@ -768,7 +779,7 @@ async def test_patch_post_writes_audit_row_with_before_and_after(
 ):
     """Each successful PATCH /posts/{id} writes one audit row capturing
     pre- and post-mutation snapshots."""
-    post = Post(title="orig title", body="orig body", owner_id=logged_in_user.id)
+    post = _post(title="orig title", body="orig body", owner_id=logged_in_user.id)
     async with db_test_session_manager() as session:
         async with session.begin():
             session.add(post)
@@ -786,11 +797,13 @@ async def test_patch_post_writes_audit_row_with_before_and_after(
         assert row.actor_id == logged_in_user.id
         assert row.action == "update_post"
         assert row.before == {
+            "kind": "note",
             "title": "orig title",
             "body": "orig body",
             "owner_id": str(logged_in_user.id),
         }
         assert row.after == {
+            "kind": "note",
             "title": "new title",
             "body": "orig body",
             "owner_id": str(logged_in_user.id),
@@ -825,7 +838,7 @@ async def test_unauthorized_patch_writes_no_audit_row(
 ):
     """A 403 must not leak an audit row."""
     other = create_test_user(username=f"other-{uuid.uuid4()}")
-    post = Post(title="t", body="b", owner_id=other.id)
+    post = _post(title="t", body="b", owner_id=other.id)
     async with db_test_session_manager() as session:
         async with session.begin():
             session.add(other)
@@ -851,7 +864,7 @@ async def test_admin_patch_audit_actor_is_admin_not_owner(
     the admin (the requester), not the post owner."""
     await promote_to_admin(db_test_session_manager, logged_in_user.email)
     other = create_test_user(username=f"other-{uuid.uuid4()}")
-    post = Post(title="t", body="b", owner_id=other.id)
+    post = _post(title="t", body="b", owner_id=other.id)
     async with db_test_session_manager() as session:
         async with session.begin():
             session.add(other)
@@ -880,7 +893,7 @@ async def test_owner_can_delete_own_post(
     logged_in_user: User,
 ):
     """DELETE by the owner returns 204, removes the row, and sets HX-Redirect."""
-    post = Post(title="t", body="b", owner_id=logged_in_user.id)
+    post = _post(title="t", body="b", owner_id=logged_in_user.id)
     async with db_test_session_manager() as session:
         async with session.begin():
             session.add(post)
@@ -894,6 +907,41 @@ async def test_owner_can_delete_own_post(
         assert result.scalars().first() is None
 
 
+async def test_delete_post_cascades_note_detail(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user: User,
+):
+    """Deleting a post must remove its note_detail row too — the FK has
+    ON DELETE CASCADE so no orphan rows are left behind."""
+    post = _post(title="doomed", body="b", owner_id=logged_in_user.id)
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            session.add(post)
+    post_id = post.id
+
+    response = await authenticated_client.delete(f"/posts/{post_id}")
+    assert response.status_code == 204
+
+    async with db_test_session_manager() as session:
+        post_row = (
+            (await session.execute(select(Post).filter(Post.id == post_id)))
+            .scalars()
+            .first()
+        )
+        detail_row = (
+            (
+                await session.execute(
+                    select(NoteDetail).filter(NoteDetail.post_id == post_id)
+                )
+            )
+            .scalars()
+            .first()
+        )
+        assert post_row is None
+        assert detail_row is None
+
+
 async def test_admin_can_delete_anyone_post(
     authenticated_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],
@@ -902,7 +950,7 @@ async def test_admin_can_delete_anyone_post(
     """An admin can hard-delete a post owned by another user."""
     await promote_to_admin(db_test_session_manager, logged_in_user.email)
     other = create_test_user(username=f"other-{uuid.uuid4()}")
-    post = Post(title="t", body="b", owner_id=other.id)
+    post = _post(title="t", body="b", owner_id=other.id)
     async with db_test_session_manager() as session:
         async with session.begin():
             session.add(other)
@@ -923,7 +971,7 @@ async def test_non_owner_cannot_delete_post(
 ):
     """A non-owner non-admin gets 403 and the post is preserved."""
     other = create_test_user(username=f"other-{uuid.uuid4()}")
-    post = Post(title="orig", body="orig", owner_id=other.id)
+    post = _post(title="orig", body="orig", owner_id=other.id)
     async with db_test_session_manager() as session:
         async with session.begin():
             session.add(other)
@@ -936,7 +984,7 @@ async def test_non_owner_cannot_delete_post(
         result = await session.execute(select(Post).filter(Post.id == post.id))
         refreshed = result.scalars().first()
         assert refreshed is not None
-        assert refreshed.title == "orig"
+        assert refreshed.note_detail.title == "orig"
 
 
 async def test_delete_404_for_unknown_post(
@@ -968,7 +1016,7 @@ async def test_delete_post_writes_audit_row(
     state in `before`, with `after=None`."""
     title = f"doomed-{uuid.uuid4()}"
     body = f"body-{uuid.uuid4()}"
-    post = Post(title=title, body=body, owner_id=logged_in_user.id)
+    post = _post(title=title, body=body, owner_id=logged_in_user.id)
     async with db_test_session_manager() as session:
         async with session.begin():
             session.add(post)
@@ -985,6 +1033,7 @@ async def test_delete_post_writes_audit_row(
         assert row.actor_id == logged_in_user.id
         assert row.action == "delete_post"
         assert row.before == {
+            "kind": "note",
             "title": title,
             "body": body,
             "owner_id": str(logged_in_user.id),
@@ -999,7 +1048,7 @@ async def test_unauthorized_delete_writes_no_audit_row(
 ):
     """A 403 on DELETE must not leak an audit row."""
     other = create_test_user(username=f"other-{uuid.uuid4()}")
-    post = Post(title="t", body="b", owner_id=other.id)
+    post = _post(title="t", body="b", owner_id=other.id)
     async with db_test_session_manager() as session:
         async with session.begin():
             session.add(other)
@@ -1023,7 +1072,7 @@ async def test_admin_delete_audit_actor_is_admin_not_owner(
     the admin (the requester), not the post owner."""
     await promote_to_admin(db_test_session_manager, logged_in_user.email)
     other = create_test_user(username=f"other-{uuid.uuid4()}")
-    post = Post(title="t", body="b", owner_id=other.id)
+    post = _post(title="t", body="b", owner_id=other.id)
     async with db_test_session_manager() as session:
         async with session.begin():
             session.add(other)

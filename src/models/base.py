@@ -4,8 +4,10 @@ from sqlalchemy import Column, DateTime, func
 from sqlalchemy.orm import declarative_base, declared_attr
 from sqlalchemy.types import Uuid
 
+Base = declarative_base()
 
-class BaseModel(declarative_base()):
+
+class BaseModel(Base):
     __abstract__ = True
 
     id = Column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
@@ -30,4 +32,4 @@ class BaseModel(declarative_base()):
         return Column(DateTime(timezone=True), nullable=True)
 
 
-metadata = BaseModel.metadata
+metadata = Base.metadata
