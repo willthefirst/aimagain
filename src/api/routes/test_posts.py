@@ -6,7 +6,7 @@ from selectolax.parser import HTMLParser
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from src.models import AuditLog, NoteDetail, Post, User
+from src.models import AuditLog, ClientReferralDetail, NoteDetail, Post, User
 from src.repositories.audit_repository import AuditRepository
 from tests.helpers import create_test_user, promote_to_admin
 
@@ -20,6 +20,13 @@ def _post(*, title: str, body: str, owner_id) -> Post:
     keyword surface so tests stay readable."""
     post = Post(kind="note", owner_id=owner_id)
     post.note_detail = NoteDetail(title=title, body=body)
+    return post
+
+
+def _client_referral_post(*, description: str, owner_id) -> Post:
+    """Build a `kind='client_referral'` Post + its detail."""
+    post = Post(kind="client_referral", owner_id=owner_id)
+    post.client_referral_detail = ClientReferralDetail(description=description)
     return post
 
 
@@ -552,7 +559,9 @@ async def test_list_page_links_to_create_form(
     tree = HTMLParser(response.text)
     link = tree.css_first('a[href="/posts/form"]')
     assert link is not None
-    assert "New post" in link.text()
+    assert "New note" in link.text()
+    cr_link = tree.css_first('a[href="/posts/form?kind=client_referral"]')
+    assert cr_link is not None
 
 
 # --- Edit form page (GET /posts/{id}/form) -------------------------------
@@ -1093,4 +1102,353 @@ async def test_admin_delete_audit_actor_is_admin_not_owner(
         assert len(rows) == 1
         assert rows[0].actor_id == logged_in_user.id  # admin, not other
         assert rows[0].before["owner_id"] == str(other.id)
+        assert rows[0].after is None
+
+
+# --- Client referral kind: end-to-end ------------------------------------
+
+
+async def test_create_client_referral_happy_path(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user: User,
+):
+    """`POST /posts` with `kind='client_referral'` persists a
+    client_referral with the right detail row and audit row."""
+    description = f"needs-{uuid.uuid4()}"
+
+    response = await authenticated_client.post(
+        "/posts",
+        json={"kind": "client_referral", "description": description},
+    )
+
+    assert response.status_code == 201
+    new_id = uuid.UUID(response.json()["id"])
+
+    async with db_test_session_manager() as session:
+        result = await session.execute(select(Post).filter(Post.id == new_id))
+        persisted = result.scalars().first()
+        assert persisted is not None
+        assert persisted.kind == "client_referral"
+        assert persisted.client_referral_detail.description == description
+        assert persisted.note_detail is None
+        assert persisted.owner_id == logged_in_user.id
+
+    async with db_test_session_manager() as session:
+        repo = AuditRepository(session)
+        rows = await repo.list_for_resource(resource_type="post", resource_id=new_id)
+        assert len(rows) == 1
+        assert rows[0].action == "create_post"
+        assert rows[0].before is None
+        assert rows[0].after == {
+            "kind": "client_referral",
+            "description": description,
+            "owner_id": str(logged_in_user.id),
+        }
+
+
+async def test_create_client_referral_strips_whitespace(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user: User,
+):
+    response = await authenticated_client.post(
+        "/posts",
+        json={"kind": "client_referral", "description": "  needs help  "},
+    )
+    assert response.status_code == 201
+    new_id = uuid.UUID(response.json()["id"])
+
+    async with db_test_session_manager() as session:
+        result = await session.execute(select(Post).filter(Post.id == new_id))
+        persisted = result.scalars().first()
+        assert persisted.client_referral_detail.description == "needs help"
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        {"kind": "client_referral"},  # missing description
+        {"kind": "client_referral", "description": ""},
+        {"kind": "client_referral", "description": "   "},
+        {"kind": "client_referral", "description": "ok", "title": "bleed"},
+        {"kind": "client_referral", "description": "ok", "evil": True},
+        {"kind": "unknown_kind", "description": "ok"},
+    ],
+)
+async def test_create_client_referral_rejects_invalid_payload(
+    payload,
+    authenticated_client: AsyncClient,
+    logged_in_user: User,
+):
+    response = await authenticated_client.post("/posts", json=payload)
+    assert response.status_code == 422
+
+
+async def test_get_client_referral_form_renders(
+    authenticated_client: AsyncClient,
+    logged_in_user: User,
+):
+    """`GET /posts/form?kind=client_referral` renders the kind-specific
+    create form."""
+    response = await authenticated_client.get("/posts/form?kind=client_referral")
+    assert response.status_code == 200
+    tree = HTMLParser(response.text)
+    form = tree.css_first("form")
+    assert form is not None
+    assert form.attributes.get("hx-post") == "/posts"
+    assert form.attributes.get("hx-ext") == "json-enc"
+    assert tree.css_first("textarea#description") is not None
+    # Hidden kind input is what tells the discriminator which member to pick.
+    kind_input = tree.css_first('input[name="kind"]')
+    assert kind_input is not None
+    assert kind_input.attributes.get("value") == "client_referral"
+
+
+async def test_get_post_form_unknown_kind_422(
+    authenticated_client: AsyncClient,
+    logged_in_user: User,
+):
+    """`?kind=…` is constrained by a `Literal` — unknown values 422."""
+    response = await authenticated_client.get("/posts/form?kind=not_a_kind")
+    assert response.status_code == 422
+
+
+async def test_list_renders_client_referral_row(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user: User,
+):
+    """`GET /posts` lists a client_referral with a kind label."""
+    author = create_test_user(username=f"author-{uuid.uuid4()}")
+    description = f"crsummary-{uuid.uuid4()}"
+    post = _client_referral_post(description=description, owner_id=author.id)
+
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            session.add(author)
+            session.add(post)
+
+    response = await authenticated_client.get("/posts")
+    assert response.status_code == 200
+    page = response.text
+    assert description in page
+    assert "client referral" in page.lower()
+
+
+async def test_get_client_referral_detail_renders(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user: User,
+):
+    author = create_test_user(username=f"author-{uuid.uuid4()}")
+    description = f"detail-{uuid.uuid4()}"
+    post = _client_referral_post(description=description, owner_id=author.id)
+
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            session.add(author)
+            session.add(post)
+
+    response = await authenticated_client.get(f"/posts/{post.id}")
+    assert response.status_code == 200
+    page = response.text
+    assert description in page
+    assert author.username in page
+
+
+async def test_owner_can_open_client_referral_edit_form(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user: User,
+):
+    """The owner of a client_referral sees the kind-specific edit form
+    pre-filled with the current description."""
+    description = f"edit-{uuid.uuid4()}"
+    post = _client_referral_post(description=description, owner_id=logged_in_user.id)
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            session.add(post)
+
+    response = await authenticated_client.get(f"/posts/{post.id}/form")
+    assert response.status_code == 200
+    tree = HTMLParser(response.text)
+    form = tree.css_first("form")
+    assert form is not None
+    assert form.attributes.get("hx-patch") == f"/posts/{post.id}"
+    description_input = tree.css_first("textarea#description")
+    assert description_input is not None
+    assert description in description_input.text()
+    kind_input = tree.css_first('input[name="kind"]')
+    assert kind_input is not None
+    assert kind_input.attributes.get("value") == "client_referral"
+
+
+async def test_owner_can_patch_client_referral_description(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user: User,
+):
+    """`PATCH /posts/{id}` with `kind='client_referral'` updates the
+    description and returns a per-kind flat body."""
+    post = _client_referral_post(description="orig", owner_id=logged_in_user.id)
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            session.add(post)
+
+    new_description = f"updated-{uuid.uuid4()}"
+    response = await authenticated_client.patch(
+        f"/posts/{post.id}",
+        json={"kind": "client_referral", "description": new_description},
+    )
+    assert response.status_code == 200
+    assert response.headers.get("HX-Refresh") == "true"
+    body = response.json()
+    assert body["kind"] == "client_referral"
+    assert body["description"] == new_description
+    assert "title" not in body and "body" not in body
+
+    async with db_test_session_manager() as session:
+        result = await session.execute(select(Post).filter(Post.id == post.id))
+        refreshed = result.scalars().first()
+        assert refreshed.client_referral_detail.description == new_description
+
+
+async def test_patch_note_with_client_referral_payload_does_not_mutate(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user: User,
+):
+    """A note post can't be patched with a client_referral payload — kind
+    is part of the resource identity. The 400 must fire before any
+    mutation, and no audit row may be written."""
+    original_title = f"orig-{uuid.uuid4()}"
+    original_body = f"body-{uuid.uuid4()}"
+    post = _post(title=original_title, body=original_body, owner_id=logged_in_user.id)
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            session.add(post)
+    post_id = post.id
+
+    response = await authenticated_client.patch(
+        f"/posts/{post_id}",
+        json={"kind": "client_referral", "description": "hijack"},
+    )
+    assert response.status_code == 400
+
+    # Post is unmodified: kind, detail row, and the orphan detail table
+    # for the rejected kind must all be untouched.
+    async with db_test_session_manager() as session:
+        result = await session.execute(select(Post).filter(Post.id == post_id))
+        refreshed = result.scalars().first()
+        assert refreshed.kind == "note"
+        assert refreshed.note_detail.title == original_title
+        assert refreshed.note_detail.body == original_body
+        assert refreshed.client_referral_detail is None
+
+    # No audit row leaked.
+    async with db_test_session_manager() as session:
+        repo = AuditRepository(session)
+        rows = await repo.list_for_resource(resource_type="post", resource_id=post_id)
+        assert rows == []
+
+
+async def test_patch_client_referral_with_note_payload_does_not_mutate(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user: User,
+):
+    """Reverse direction: a client_referral can't be patched with a note
+    payload either. Same invariant — kind is fixed once set."""
+    original_description = f"orig-{uuid.uuid4()}"
+    post = _client_referral_post(
+        description=original_description, owner_id=logged_in_user.id
+    )
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            session.add(post)
+    post_id = post.id
+
+    response = await authenticated_client.patch(
+        f"/posts/{post_id}",
+        json={"kind": "note", "title": "hijack", "body": "hijack"},
+    )
+    assert response.status_code == 400
+
+    async with db_test_session_manager() as session:
+        result = await session.execute(select(Post).filter(Post.id == post_id))
+        refreshed = result.scalars().first()
+        assert refreshed.kind == "client_referral"
+        assert refreshed.client_referral_detail.description == original_description
+        assert refreshed.note_detail is None
+
+    async with db_test_session_manager() as session:
+        repo = AuditRepository(session)
+        rows = await repo.list_for_resource(resource_type="post", resource_id=post_id)
+        assert rows == []
+
+
+async def test_owner_can_delete_client_referral(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user: User,
+):
+    """`DELETE /posts/{id}` works for client_referral; cascades the detail."""
+    post = _client_referral_post(description="doomed", owner_id=logged_in_user.id)
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            session.add(post)
+    post_id = post.id
+
+    response = await authenticated_client.delete(f"/posts/{post_id}")
+    assert response.status_code == 204
+
+    async with db_test_session_manager() as session:
+        post_row = (
+            (await session.execute(select(Post).filter(Post.id == post_id)))
+            .scalars()
+            .first()
+        )
+        detail_row = (
+            (
+                await session.execute(
+                    select(ClientReferralDetail).filter(
+                        ClientReferralDetail.post_id == post_id
+                    )
+                )
+            )
+            .scalars()
+            .first()
+        )
+        assert post_row is None
+        assert detail_row is None
+
+
+async def test_delete_client_referral_writes_audit_row(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user: User,
+):
+    """Audit before-snapshot for a client_referral delete uses the
+    kind-specific snapshot shape."""
+    description = f"doomed-{uuid.uuid4()}"
+    post = _client_referral_post(description=description, owner_id=logged_in_user.id)
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            session.add(post)
+    post_id = post.id
+
+    response = await authenticated_client.delete(f"/posts/{post_id}")
+    assert response.status_code == 204
+
+    async with db_test_session_manager() as session:
+        repo = AuditRepository(session)
+        rows = await repo.list_for_resource(resource_type="post", resource_id=post_id)
+        assert len(rows) == 1
+        assert rows[0].action == "delete_post"
+        assert rows[0].before == {
+            "kind": "client_referral",
+            "description": description,
+            "owner_id": str(logged_in_user.id),
+        }
         assert rows[0].after is None

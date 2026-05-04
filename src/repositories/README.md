@@ -62,7 +62,7 @@ Each repository manages one primary domain entity with related data access opera
 | Repository         | Primary Entity | Key Responsibilities                                                          |
 | ------------------ | -------------- | ----------------------------------------------------------------------------- |
 | **UserRepository** | User           | User lookup, listing, activation toggle, hard delete                          |
-| **PostRepository** | Post (parent + per-kind detail) | Post lookup by id, list all posts (newest first), persist a new post + its detail row in one flush, partial update (writes title/body to `post.note_detail`), hard delete (CASCADE removes the detail; caller commits) |
+| **PostRepository** | Post (parent + per-kind detail) | Post lookup by id, list all posts (newest first), persist a new post + its detail row in one flush (the detail's type — `NoteDetail` or `ClientReferralDetail` — picks the relationship to attach), partial update (per-kind fields on the matching `*_detail` row), hard delete (CASCADE removes the detail; caller commits) |
 | **AuditRepository** | AuditLog | Append-only writes (`record(...)`), single-row read, list-by-resource. No update or delete methods — audit rows are immutable. |
 
 ## Directory structure
@@ -261,7 +261,7 @@ async def handle_list_entities_for_user(user: User, repo: [Entity]Repository):
 Colocated tests live alongside the repositories:
 
 - `test_audit_repository.py` — exercises append-only writes, FK `SET NULL` on actor delete, and list-by-resource ordering against the in-memory test DB.
-- `test_post_repository.py` — exercises parent + detail create/update/delete, including a raw-SQL DELETE that proves the FK CASCADE fires (not just the ORM cascade). Relies on `PRAGMA foreign_keys = ON` being set globally by the test engine fixture.
+- `test_post_repository.py` — exercises parent + detail create/update/delete for both `kind='note'` and `kind='client_referral'`, including a raw-SQL DELETE that proves the FK CASCADE fires (not just the ORM cascade). Also covers the `posts.kind` CHECK constraint rejecting unregistered kinds. Relies on `PRAGMA foreign_keys = ON` being set globally by the test engine fixture.
 
 When adding a new repository method, extend (or create) `src/repositories/test_<repo_name>.py` and exercise it via the `db_test_session_manager` fixture from [`tests/fixtures.py`](../../tests/fixtures.py).
 
