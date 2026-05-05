@@ -74,7 +74,7 @@ Routes are organized by domain with consistent delegation patterns.
 | Route File         | Domain               | Primary Responsibilities         | Main Endpoints                                                                                                                  | Dependencies          |
 | ------------------ | -------------------- | -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- | --------------------- |
 | **users.py**       | User data            | User listing, detail, admin actions | `GET /users`, `GET /users/{id}`, `PUT /users/{id}/activation` (admin), `DELETE /users/{id}` (admin)                          | UserRepository        |
-| **posts.py**       | Posts                | Post listing, detail, create, partial update, hard delete, and per-kind create/edit form pages | `GET /posts`, `GET /posts/form?kind={note,client_referral,provider_availability}`, `GET /posts/{id}`, `GET /posts/{id}/form`, `POST /posts`, `PATCH /posts/{id}`, `DELETE /posts/{id}` | PostRepository        |
+| **posts.py**       | Posts                | Post listing, detail, create, partial update, hard delete, and per-kind create/edit form pages | `GET /posts`, `GET /posts/form?kind=…` (kinds from `REGISTERED_KINDS`), `GET /posts/{id}`, `GET /posts/{id}/form`, `POST /posts`, `PATCH /posts/{id}`, `DELETE /posts/{id}` | PostRepository        |
 | **me.py**          | Current user context | User profile, current-user JSON  | `GET /users/me`, `GET /users/me/profile`                                                                                        | Auth                  |
 | **auth_routes.py** | Authentication API   | Login, register, password reset  | `/auth/*`                                                                                                                       | Authentication logic  |
 | **auth_pages.py**  | Authentication UI    | Login, register forms            | `/login`, `/register`                                                                                                           | Authentication logic  |
@@ -84,7 +84,7 @@ Routes are organized by domain with consistent delegation patterns.
 **Domain route files:**
 
 - `users.py` - User listing and access
-- `posts.py` - Post listing, detail, create, partial update, hard delete, and per-kind HTML form pages. `GET /posts/form?kind={note,client_referral,provider_availability}` selects the create-form template (`Literal` validator → 422 on unknown kinds); `GET /posts/{id}/form` selects the edit-form template from the persisted `post.kind`. `POST /posts` accepts a kind-discriminated body (`kind` required); `PATCH /posts/{id}` rejects payloads whose `kind` doesn't match the persisted post.
+- `posts.py` - Post listing, detail, create, partial update, hard delete, and per-kind HTML form pages. `GET /posts/form?kind=…` selects the create-form template (`Literal[*KIND_NAMES]` from [`src/models/post_kinds.py`](../../models/post_kinds.py) → 422 on unknown kinds); `GET /posts/{id}/form` reads `spec.edit_template` from the same registry given the persisted `post.kind`. `POST /posts` accepts a kind-discriminated body (`kind` required); `PATCH /posts/{id}` rejects payloads whose `kind` doesn't match the persisted post. The `_patch_response_body` flatten reads the per-kind detail relationship + fields from `REGISTERED_KINDS`.
 - `me.py` - Current user's profile
 
 **Authentication routes:**

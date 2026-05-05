@@ -4,11 +4,10 @@
 <h1>Posts</h1>
 
 <p>
-  <a href="/posts/form">New note</a>
-  ·
-  <a href="/posts/form?kind=client_referral">New client referral</a>
-  ·
-  <a href="/posts/form?kind=provider_availability">New provider availability</a>
+{%- for spec in post_kinds -%}
+{%- if not loop.first %} · {% endif -%}
+<a href="/posts/form?kind={{ spec.name }}">New {{ spec.list_label }}</a>
+{%- endfor %}
 </p>
 
 {% if posts %}

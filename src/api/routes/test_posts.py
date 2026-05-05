@@ -573,7 +573,7 @@ async def test_list_page_links_to_create_form(
     response = await authenticated_client.get("/posts")
     assert response.status_code == 200
     tree = HTMLParser(response.text)
-    link = tree.css_first('a[href="/posts/form"]')
+    link = tree.css_first('a[href="/posts/form?kind=note"]')
     assert link is not None
     assert "New note" in link.text()
     cr_link = tree.css_first('a[href="/posts/form?kind=client_referral"]')

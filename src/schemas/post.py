@@ -3,19 +3,17 @@
 `Post` is a parent row with a `kind` discriminator and a per-kind detail
 table. The wire surface mirrors that shape: `PostCreate` / `PostUpdate`
 / `PostRead` / `PostAuditSnapshot` are kind-discriminated unions on the
-(required) `kind` field. `kind` is required on every payload — the prep
-PR (`require-kind-on-wire`) made that the contract before this PR added
-a second kind.
+(required) `kind` field.
 
 `post_audit_snapshot(post)` validates a SQLAlchemy `Post` against the
 union and returns a JSON-mode dump for the audit row.
 
-`_KIND_DETAILS` is the single registry mapping each `kind` to its detail
-relationship and detail-row fields. Adding a new kind means: (a) register
-it here, (b) add the four schema variants (Read, Create, Update,
-AuditSnapshot) and the discriminated unions below, (c) add a relationship
-+ CHECK widening in `src/models/post.py`. The four variants share one
-`_flatten_post_to_dict` helper so per-kind validators are 2 lines each.
+The per-kind detail relationship + fields live in
+[`src/models/post_kinds.py`](../models/post_kinds.py) — this module's
+`_flatten_post_to_dict` reads from that registry. Adding a kind here
+means the four Pydantic variant classes (Read/Create/Update/
+AuditSnapshot) plus their entry in the discriminated unions; everything
+else flows from the registry.
 """
 
 import uuid
@@ -31,17 +29,9 @@ from pydantic import (
     model_validator,
 )
 
-# --- Per-kind detail registry & shared flatten helper --------------------
+from src.models import REGISTERED_KINDS
 
-
-_KIND_DETAILS: dict[str, tuple[str, tuple[str, ...]]] = {
-    "note": ("note_detail", ("title", "body")),
-    "client_referral": ("client_referral_detail", ("description",)),
-    "provider_availability": (
-        "provider_availability_detail",
-        ("practice_name",),
-    ),
-}
+# --- Shared flatten helper ----------------------------------------------
 
 
 def _flatten_post_to_dict(post) -> dict | None:
@@ -54,13 +44,13 @@ def _flatten_post_to_dict(post) -> dict | None:
     audit-snapshot variants share this helper; Pydantic silently drops
     fields that aren't declared on a given variant (neither Read nor
     AuditSnapshot uses `extra="forbid"`), so the same flat dict feeds
-    both shapes.
+    both shapes. Per-kind metadata comes from `REGISTERED_KINDS`.
     """
     kind = getattr(post, "kind", None)
-    if kind not in _KIND_DETAILS:
+    spec = REGISTERED_KINDS.get(kind)
+    if spec is None:
         return None
-    detail_attr, detail_fields = _KIND_DETAILS[kind]
-    detail = getattr(post, detail_attr, None)
+    detail = getattr(post, spec.detail_relationship, None)
     if detail is None:
         return None
     return {
@@ -69,7 +59,7 @@ def _flatten_post_to_dict(post) -> dict | None:
         "owner_id": getattr(post, "owner_id", None),
         "created_at": getattr(post, "created_at", None),
         "updated_at": getattr(post, "updated_at", None),
-        **{f: getattr(detail, f) for f in detail_fields},
+        **{f: getattr(detail, f) for f in spec.detail_fields},
     }
 
 

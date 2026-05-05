@@ -4,7 +4,7 @@ Jinja templates for the post CRUD flows. HTMX-driven; forms submit JSON via `hx-
 
 ## Files
 
-- `list.html` — listing page (`GET /posts`). Shows newest-first; branches on `post.kind` to render a kind-appropriate row label. Links to every per-kind create form (`/posts/form`, `/posts/form?kind=client_referral`, `/posts/form?kind=provider_availability`).
+- `list.html` — listing page (`GET /posts`). Shows newest-first; branches on `post.kind` to render a kind-appropriate row label. The "New X" links at the top are rendered from `post_kinds` (a list of `KindSpec` from [`src/models/post_kinds.py`](../../models/post_kinds.py), passed in by `handle_list_posts`), so adding a registered kind automatically adds its create-form link.
 - `detail.html` — single-post read view (`GET /posts/{id}`). Branches on `post.kind` to render the right detail block. Includes `_owner_actions.html`.
 - `new.html` — create form for `kind='note'` (`GET /posts/form` → `POST /posts`).
 - `new_client_referral.html` — create form for `kind='client_referral'`. Submits a hidden `kind` field.
@@ -22,6 +22,5 @@ Templates dereference through the right relationship per branch: `{{ post.note_d
 
 When a new kind ships:
 
-1. Add `posts/new_<kind>.html` and register it in `_CREATE_FORM_TEMPLATES` in [`src/api/routes/posts.py`](../../api/routes/posts.py).
-2. Add `posts/edit_<kind>.html` and register it in `_EDIT_FORM_TEMPLATES`.
-3. Add a `{% elif post.kind == "<kind>" %}` branch in `list.html` and `detail.html`.
+1. Add `posts/new_<kind>.html` and `posts/edit_<kind>.html`. Register their paths on the kind's `KindSpec` in [`src/models/post_kinds.py`](../../models/post_kinds.py); the route layer reads `spec.create_template` / `spec.edit_template` from there.
+2. Add a `{% elif post.kind == "<kind>" %}` branch in `list.html` and `detail.html` for the per-kind body rendering. (The "New X" link in `list.html` follows automatically via the registry-driven loop.)
