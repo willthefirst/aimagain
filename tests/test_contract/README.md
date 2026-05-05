@@ -89,7 +89,7 @@ When you add a new HTML form (per [`src/api/routes/RESOURCE_GRAMMAR.md`](../../s
 1. **Add a flag** to `ConsumerServerConfig` in `infrastructure/servers/consumer.py` and a corresponding `app.include_router(...)` call so the consumer server can mount your form's page route.
 2. **Add constants** for the API path, provider state, consumer/provider Pact names, and a unique Pact port to `constants.py`. Append the provider state string to `KNOWN_PROVIDER_STATES` in `infrastructure/config.py`.
 3. **Write the consumer test** (`tests/consumer/test_<resource>_form.py`) — drive the form with Playwright and assert the intercepted request matches a Pact expectation.
-4. **Add a `MockDataFactory.create_<resource>_dependency_config()`** mapping the route's business-logic handler import path (the one used by `from ... import` inside the route module) to a mock return value.
+4. **Add a `MockDataFactory.create_<resource>_dependency_config()`** mapping the route's business-logic handler import path (the one used by `from ... import` inside the route module) to a mock return value. For Post-shaped stubs, use `make_post_stub(kind, **field_overrides)` from `tests/shared/mock_data_factory.py` — it reads the per-kind detail relationship and field tuple from `REGISTERED_KINDS` in [`src/models/post_kinds.py`](../../src/models/post_kinds.py), so adding/renaming a kind's fields doesn't require touching contract test code.
 5. **Write the provider test** (`tests/provider/test_<resource>_verification.py`) — subclass `BaseProviderVerification` and call `verify_pact(provider_server)` under the dependency-override decorator.
 
 ## Related documentation
