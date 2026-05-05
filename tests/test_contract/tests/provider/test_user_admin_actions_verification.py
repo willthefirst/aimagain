@@ -1,48 +1,29 @@
-"""Provider verification: PUT /users/{id}/activation accepts the documented
-shape and returns the documented response.
+"""Provider verification: every `users-api` pair in the manifest.
 
-The route's `current_admin_user` dependency is overridden by the consumer
-server fixture (auth-mocked). `handle_set_user_activation` is monkey-patched
-out via `MockDataFactory.create_user_activation_dependency_config` so this
-test exercises only the route layer.
+The route's `current_admin_user` dependency is overridden by the
+provider server fixture; `handle_set_user_activation` is monkey-patched
+out via `MockDataFactory.create_user_activation_dependency_config` so
+this verification covers route shape only.
 """
 
 import pytest
 from yarl import URL
 
-from tests.test_contract.tests.shared.mock_data_factory import MockDataFactory
+from tests.test_contract.manifest import combined_handler_mocks, pairs_for_provider
 from tests.test_contract.tests.shared.provider_verification_base import (
-    BaseProviderVerification,
     create_provider_test_decorator,
+    verify_pair,
 )
 
-
-class UserAdminActionsVerification(BaseProviderVerification):
-    """Provider verification for the user admin-actions API."""
-
-    @property
-    def provider_name(self) -> str:
-        return "users-api"
-
-    @property
-    def consumer_name(self) -> str:
-        return "user-admin-actions"
-
-    @property
-    def dependency_config(self):
-        return MockDataFactory.create_user_activation_dependency_config()
-
-    @property
-    def pytest_marks(self) -> list:
-        return [pytest.mark.provider, pytest.mark.users]
+_PROVIDER = "users-api"
+_PAIRS = pairs_for_provider(_PROVIDER)
+_DEPENDENCY_CONFIG = combined_handler_mocks(_PROVIDER)
 
 
-user_admin_actions_verification = UserAdminActionsVerification()
-
-
-@create_provider_test_decorator(
-    user_admin_actions_verification.dependency_config, "with_users_api_mocks"
-)
-def test_provider_user_admin_actions_pact_verification(provider_server: URL):
-    """Verify the user-admin-actions Pact contract against the running provider server."""
-    user_admin_actions_verification.verify_pact(provider_server)
+@pytest.mark.provider
+@pytest.mark.users
+@create_provider_test_decorator(_DEPENDENCY_CONFIG, "with_users_api_mocks")
+@pytest.mark.parametrize("pair", _PAIRS, ids=lambda p: p.consumer_name)
+def test_provider_users_pact_verification(pair, provider_server: URL):
+    """Verify every `users-api` Pact contract against the running provider server."""
+    verify_pair(pair, provider_server)
