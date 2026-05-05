@@ -84,7 +84,7 @@ Routes are organized by domain with consistent delegation patterns.
 **Domain route files:**
 
 - `users.py` - User listing and access
-- `posts.py` - Post listing, detail, create, partial update, hard delete, and per-kind HTML form pages. `GET /posts/form?kind={client_referral,provider_availability}` selects the create-form template (`Literal` validator → 422 on unknown kinds); `GET /posts/{id}/form` selects the edit-form template from the persisted `post.kind`. `POST /posts` accepts a kind-discriminated body (`kind` required); `PATCH /posts/{id}` rejects payloads whose `kind` doesn't match the persisted post.
+- `posts.py` - Post listing, detail, create, partial update, hard delete, and per-kind HTML form pages. `GET /posts/form?kind=…` selects the create-form template (`Literal[*KIND_NAMES]` from [`src/models/post_kinds.py`](../../models/post_kinds.py) → 422 on unknown kinds); `GET /posts/{id}/form` reads `spec.edit_template` from the same registry given the persisted `post.kind`. `POST /posts` accepts a kind-discriminated body (`kind` required); `PATCH /posts/{id}` rejects payloads whose `kind` doesn't match the persisted post. The `_patch_response_body` flatten reads the per-kind detail relationship + fields from `REGISTERED_KINDS`.
 - `me.py` - Current user's profile
 
 **Authentication routes:**

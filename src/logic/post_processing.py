@@ -5,12 +5,7 @@ from fastapi import Request
 
 from src.api.common.exceptions import BadRequestError, ForbiddenError, NotFoundError
 from src.logic.audit import AuditAction, record_audit
-from src.models import (
-    ClientReferralDetail,
-    Post,
-    ProviderAvailabilityDetail,
-    User,
-)
+from src.models import REGISTERED_KINDS, Post, User
 from src.repositories.audit_repository import AuditRepository
 from src.repositories.post_repository import PostRepository
 from src.schemas.post import (
@@ -22,6 +17,9 @@ from src.schemas.post import (
 )
 
 logger = logging.getLogger(__name__)
+
+PostCreatePayload = ClientReferralCreate | ProviderAvailabilityCreate
+PostUpdatePayload = ClientReferralUpdate | ProviderAvailabilityUpdate
 
 
 def _snapshot_post(post: Post) -> dict:
@@ -39,9 +37,18 @@ async def handle_list_posts(
     post_repo: PostRepository,
     requesting_user: User,
 ):
-    """Loads all posts (newest first) and returns the template context."""
+    """Loads all posts (newest first) and returns the template context.
+
+    Includes the registered post kinds in the context so the list page
+    can render its per-kind "New X" links from a single source of truth.
+    """
     posts = await post_repo.list_posts()
-    return {"request": request, "posts": posts, "current_user": requesting_user}
+    return {
+        "request": request,
+        "posts": posts,
+        "current_user": requesting_user,
+        "post_kinds": list(REGISTERED_KINDS.values()),
+    }
 
 
 async def handle_get_post_detail(
@@ -85,7 +92,7 @@ async def handle_get_post_edit_form(
 
 
 async def handle_create_post(
-    payload: ClientReferralCreate | ProviderAvailabilityCreate,
+    payload: PostCreatePayload,
     post_repo: PostRepository,
     audit_repo: AuditRepository,
     requesting_user: User,
@@ -93,18 +100,14 @@ async def handle_create_post(
     """Creates a post owned by the requesting user; writes an audit row in
     the same transaction; commits on success.
 
-    Dispatches on `payload.kind` (set by the discriminated union in
-    `src/schemas/post.py`) to build the right per-kind detail row. New
-    kinds add a branch here.
+    Dispatches via the `REGISTERED_KINDS` registry: the `kind` discriminator
+    on the payload picks the spec, and the spec's `detail_model` +
+    `detail_fields` build the right detail row. Adding a new kind means
+    a registry entry — no edits here.
     """
-    if isinstance(payload, ClientReferralCreate):
-        post = Post(kind="client_referral", owner_id=requesting_user.id)
-        detail = ClientReferralDetail(description=payload.description)
-    elif isinstance(payload, ProviderAvailabilityCreate):
-        post = Post(kind="provider_availability", owner_id=requesting_user.id)
-        detail = ProviderAvailabilityDetail(practice_name=payload.practice_name)
-    else:  # pragma: no cover — schema discriminator should make this unreachable
-        raise BadRequestError(detail=f"unsupported post kind: {payload.kind!r}")
+    spec = REGISTERED_KINDS[payload.kind]
+    post = Post(kind=payload.kind, owner_id=requesting_user.id)
+    detail = spec.detail_model(**{f: getattr(payload, f) for f in spec.detail_fields})
 
     created = await post_repo.create_post(post, detail)
     await record_audit(
@@ -123,7 +126,7 @@ async def handle_create_post(
 
 async def handle_update_post(
     post_id: UUID,
-    payload: ClientReferralUpdate | ProviderAvailabilityUpdate,
+    payload: PostUpdatePayload,
     post_repo: PostRepository,
     audit_repo: AuditRepository,
     requesting_user: User,
@@ -135,7 +138,7 @@ async def handle_update_post(
     The payload's `kind` must match the persisted post's `kind` — `kind`
     is part of the resource identity once created and cannot be migrated
     via PATCH. 404 if missing, 403 if not authorized, 400 on kind
-    mismatch.
+    mismatch. Per-kind field set comes from `REGISTERED_KINDS`.
     """
     post = await post_repo.get_post_by_id(post_id)
     if post is None:
@@ -152,11 +155,12 @@ async def handle_update_post(
             )
         )
 
+    spec = REGISTERED_KINDS[payload.kind]
     before = _snapshot_post(post)
-    if isinstance(payload, ClientReferralUpdate):
-        updated = await post_repo.update_post(post, description=payload.description)
-    else:  # ProviderAvailabilityUpdate
-        updated = await post_repo.update_post(post, practice_name=payload.practice_name)
+    updated = await post_repo.update_post(
+        post,
+        **{f: getattr(payload, f) for f in spec.detail_fields},
+    )
     await record_audit(
         audit_repo,
         actor_id=requesting_user.id,

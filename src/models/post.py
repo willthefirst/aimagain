@@ -3,6 +3,7 @@ from sqlalchemy.orm import relationship
 from sqlalchemy.types import Uuid
 
 from .base import BaseModel
+from .post_kinds import kind_check_sql
 
 
 class Post(BaseModel):
@@ -10,19 +11,15 @@ class Post(BaseModel):
 
     Carries identity, ownership, timestamps, and the `kind` discriminator.
     Kind-specific fields live in a per-kind detail table joined on
-    `post_id`. Kinds today: `'client_referral'` (→ `ClientReferralDetail`),
-    `'provider_availability'` (→ `ProviderAvailabilityDetail`). Adding a
-    kind means widening the CHECK here, adding a detail table, and adding
-    a `relationship(...)` below.
+    `post_id`. The set of allowed kinds — and the per-kind detail
+    relationship + field metadata used across the codebase — lives in
+    [`post_kinds.py`](post_kinds.py); the CHECK constraint here is
+    derived from it via `kind_check_sql()`. Adding a kind means adding
+    a registry entry there and a `relationship(...)` line below.
     """
 
     __tablename__ = "posts"
-    __table_args__ = (
-        CheckConstraint(
-            "kind IN ('client_referral', 'provider_availability')",
-            name="ck_posts_kind",
-        ),
-    )
+    __table_args__ = (CheckConstraint(kind_check_sql(), name="ck_posts_kind"),)
 
     kind = Column(Text, nullable=False)
     owner_id = Column(
