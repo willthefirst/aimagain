@@ -62,7 +62,7 @@ Each repository manages one primary domain entity with related data access opera
 | Repository         | Primary Entity | Key Responsibilities                                                          |
 | ------------------ | -------------- | ----------------------------------------------------------------------------- |
 | **UserRepository** | User           | User lookup, listing, activation toggle, hard delete                          |
-| **PostRepository** | Post (parent + per-kind detail) | Post lookup by id, list all posts (newest first), persist a new post + its detail row in one flush (the detail's type — `NoteDetail` or `ClientReferralDetail` — picks the relationship to attach), partial update (per-kind fields on the matching `*_detail` row), hard delete (CASCADE removes the detail; caller commits) |
+| **PostRepository** | Post (parent + per-kind detail) | Post lookup by id, list all posts (newest first), persist a new post + its detail row in one flush (the detail's type — `ClientReferralDetail` or `ProviderAvailabilityDetail` — picks the relationship via `KIND_BY_DETAIL_MODEL`), partial update (per-kind fields on the matching `*_detail` row, dispatched via `REGISTERED_KINDS[post.kind]`), hard delete (CASCADE removes the detail; caller commits) |
 | **AuditRepository** | AuditLog | Append-only writes (`record(...)`), single-row read, list-by-resource. No update or delete methods — audit rows are immutable. |
 
 ## Directory structure

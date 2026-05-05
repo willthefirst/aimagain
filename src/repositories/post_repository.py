@@ -8,14 +8,13 @@ from src.models import (
     KIND_BY_DETAIL_MODEL,
     REGISTERED_KINDS,
     ClientReferralDetail,
-    NoteDetail,
     Post,
     ProviderAvailabilityDetail,
 )
 
 from .base import BaseRepository
 
-PostDetail = NoteDetail | ClientReferralDetail | ProviderAvailabilityDetail
+PostDetail = ClientReferralDetail | ProviderAvailabilityDetail
 
 
 def _attach_detail(post: Post, detail: PostDetail) -> None:

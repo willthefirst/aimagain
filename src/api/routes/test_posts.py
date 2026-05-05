@@ -9,7 +9,6 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from src.models import (
     AuditLog,
     ClientReferralDetail,
-    NoteDetail,
     Post,
     ProviderAvailabilityDetail,
     User,
@@ -19,15 +18,6 @@ from tests.helpers import create_test_user, promote_to_admin
 
 # Mark all tests in this module as async
 pytestmark = pytest.mark.asyncio
-
-
-def _post(*, title: str, body: str, owner_id) -> Post:
-    """Build a Post + its NoteDetail in the parent/detail shape that the
-    storage layer expects. Keeps the old `title=`, `body=`, `owner_id=`
-    keyword surface so tests stay readable."""
-    post = Post(kind="note", owner_id=owner_id)
-    post.note_detail = NoteDetail(title=title, body=body)
-    return post
 
 
 def _client_referral_post(*, description: str, owner_id) -> Post:
@@ -46,12 +36,9 @@ def _provider_availability_post(*, practice_name: str, owner_id) -> Post:
     return post
 
 
-def _make_test_post(
-    owner: User, *, title: str | None = None, body: str = "body"
-) -> Post:
-    return _post(
-        title=title or f"post-{uuid.uuid4()}",
-        body=body,
+def _make_test_post(owner: User, *, description: str | None = None) -> Post:
+    return _client_referral_post(
+        description=description or f"post-{uuid.uuid4()}",
         owner_id=owner.id,
     )
 
@@ -80,12 +67,12 @@ async def test_list_posts_one_post(
 ):
     """GET /posts lists a single post belonging to another user."""
     other = create_test_user(username=f"author-{uuid.uuid4()}")
-    title = f"post-{uuid.uuid4()}"
+    description = f"post-{uuid.uuid4()}"
 
     async with db_test_session_manager() as session:
         async with session.begin():
             session.add(other)
-            session.add(_make_test_post(other, title=title))
+            session.add(_make_test_post(other, description=description))
 
     response = await authenticated_client.get("/posts")
 
@@ -94,7 +81,7 @@ async def test_list_posts_one_post(
     items = tree.css("ul > li")
     assert len(items) == 1
     item_text = items[0].text()
-    assert title in item_text
+    assert description in item_text
     assert other.username in item_text
     assert "No posts found" not in tree.body.text()
 
@@ -108,8 +95,8 @@ async def test_list_posts_orders_newest_first(
     from datetime import datetime, timedelta, timezone
 
     author = create_test_user(username=f"author-{uuid.uuid4()}")
-    older = _make_test_post(author, title=f"older-{uuid.uuid4()}")
-    newer = _make_test_post(author, title=f"newer-{uuid.uuid4()}")
+    older = _make_test_post(author, description=f"older-{uuid.uuid4()}")
+    newer = _make_test_post(author, description=f"newer-{uuid.uuid4()}")
 
     # Force created_at so the ordering check is deterministic regardless of
     # how fast successive inserts get the same default timestamp.
@@ -129,8 +116,8 @@ async def test_list_posts_orders_newest_first(
     tree = HTMLParser(response.text)
     items = tree.css("ul > li")
     assert len(items) == 2
-    assert newer.note_detail.title in items[0].text()
-    assert older.note_detail.title in items[1].text()
+    assert newer.client_referral_detail.description in items[0].text()
+    assert older.client_referral_detail.description in items[1].text()
 
 
 async def test_list_posts_unauthenticated_redirects(
@@ -146,30 +133,6 @@ async def test_list_posts_unauthenticated_redirects(
 
 
 # --- Detail page ---------------------------------------------------------
-
-
-async def test_get_post_detail_renders(
-    authenticated_client: AsyncClient,
-    db_test_session_manager: async_sessionmaker[AsyncSession],
-    logged_in_user: User,
-):
-    """GET /posts/{id} renders the detail page for an existing post."""
-    author = create_test_user(username=f"author-{uuid.uuid4()}")
-    title = f"detail-{uuid.uuid4()}"
-    body = f"body-{uuid.uuid4()}"
-    post = _post(title=title, body=body, owner_id=author.id)
-
-    async with db_test_session_manager() as session:
-        async with session.begin():
-            session.add(author)
-            session.add(post)
-
-    response = await authenticated_client.get(f"/posts/{post.id}")
-    assert response.status_code == 200
-    page = response.text
-    assert title in page
-    assert body in page
-    assert author.username in page
 
 
 async def test_get_post_detail_404(
@@ -193,59 +156,6 @@ async def test_get_post_detail_malformed_uuid_422(
 # --- Create --------------------------------------------------------------
 
 
-async def test_create_post_happy_path(
-    authenticated_client: AsyncClient,
-    db_test_session_manager: async_sessionmaker[AsyncSession],
-    logged_in_user: User,
-):
-    """POST /posts persists the post owned by the session user and returns 201
-    with Location + HX-Redirect headers."""
-    title = f"new-{uuid.uuid4()}"
-    body = f"body-{uuid.uuid4()}"
-
-    response = await authenticated_client.post(
-        "/posts", json={"kind": "note", "title": title, "body": body}
-    )
-
-    assert response.status_code == 201
-    payload = response.json()
-    assert "id" in payload
-    new_id = uuid.UUID(payload["id"])
-    expected_location = f"/posts/{new_id}"
-    assert response.headers.get("Location") == expected_location
-    assert response.headers.get("HX-Redirect") == expected_location
-
-    # Persisted, owned by the logged-in user
-    async with db_test_session_manager() as session:
-        result = await session.execute(select(Post).filter(Post.id == new_id))
-        persisted = result.scalars().first()
-        assert persisted is not None
-        assert persisted.kind == "note"
-        assert persisted.note_detail.title == title
-        assert persisted.note_detail.body == body
-        assert persisted.owner_id == logged_in_user.id
-
-
-async def test_create_post_strips_whitespace(
-    authenticated_client: AsyncClient,
-    db_test_session_manager: async_sessionmaker[AsyncSession],
-    logged_in_user: User,
-):
-    """Title and body are trimmed before persistence."""
-    response = await authenticated_client.post(
-        "/posts",
-        json={"kind": "note", "title": "  hello  ", "body": "  world  "},
-    )
-    assert response.status_code == 201
-    new_id = uuid.UUID(response.json()["id"])
-
-    async with db_test_session_manager() as session:
-        result = await session.execute(select(Post).filter(Post.id == new_id))
-        persisted = result.scalars().first()
-        assert persisted.note_detail.title == "hello"
-        assert persisted.note_detail.body == "world"
-
-
 async def test_create_post_rejects_owner_id_in_payload(
     authenticated_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],
@@ -260,7 +170,11 @@ async def test_create_post_rejects_owner_id_in_payload(
 
     response = await authenticated_client.post(
         "/posts",
-        json={"kind": "note", "title": "t", "body": "b", "owner_id": str(other.id)},
+        json={
+            "kind": "client_referral",
+            "description": "d",
+            "owner_id": str(other.id),
+        },
     )
     assert response.status_code == 422
 
@@ -276,29 +190,20 @@ async def test_create_post_rejects_unknown_field(
 ):
     """Unknown fields are rejected with 422."""
     response = await authenticated_client.post(
-        "/posts", json={"kind": "note", "title": "t", "body": "b", "evil": True}
+        "/posts",
+        json={"kind": "client_referral", "description": "d", "evil": True},
     )
     assert response.status_code == 422
 
 
-@pytest.mark.parametrize(
-    "payload",
-    [
-        {"kind": "note", "body": "no title"},
-        {"kind": "note", "title": "no body"},
-        {"kind": "note"},
-        {"kind": "note", "title": "", "body": "b"},
-        {"kind": "note", "title": "t", "body": "   "},
-        {"title": "t", "body": "b"},  # missing kind
-        {"kind": "not_a_kind", "title": "t", "body": "b"},  # invalid kind
-    ],
-)
-async def test_create_post_missing_or_empty_fields_422(
-    payload,
+async def test_create_post_rejects_retired_note_kind(
     authenticated_client: AsyncClient,
     logged_in_user: User,
 ):
-    response = await authenticated_client.post("/posts", json=payload)
+    """The `note` kind was removed; create payloads must 422."""
+    response = await authenticated_client.post(
+        "/posts", json={"kind": "note", "title": "t", "body": "b"}
+    )
     assert response.status_code == 422
 
 
@@ -308,7 +213,7 @@ async def test_create_post_unauthenticated_redirects(
     """Anonymous request to POST /posts is redirected to login (HTML auth flow)."""
     response = await test_client.post(
         "/posts",
-        json={"kind": "note", "title": "t", "body": "b"},
+        json={"kind": "client_referral", "description": "d"},
         headers={"accept": "text/html"},
         follow_redirects=False,
     )
@@ -319,73 +224,6 @@ async def test_create_post_unauthenticated_redirects(
 # --- Update (PATCH) ------------------------------------------------------
 
 
-async def test_owner_can_patch_title_only(
-    authenticated_client: AsyncClient,
-    db_test_session_manager: async_sessionmaker[AsyncSession],
-    logged_in_user: User,
-):
-    """PATCH with only `title` updates title and leaves body untouched."""
-    original_body = f"body-{uuid.uuid4()}"
-    post = _post(title="orig", body=original_body, owner_id=logged_in_user.id)
-    async with db_test_session_manager() as session:
-        async with session.begin():
-            session.add(post)
-
-    new_title = f"new-{uuid.uuid4()}"
-    response = await authenticated_client.patch(
-        f"/posts/{post.id}", json={"kind": "note", "title": new_title}
-    )
-
-    assert response.status_code == 200
-    assert response.headers.get("HX-Refresh") == "true"
-    body = response.json()
-    assert body["title"] == new_title
-    assert body["body"] == original_body
-
-    async with db_test_session_manager() as session:
-        result = await session.execute(select(Post).filter(Post.id == post.id))
-        refreshed = result.scalars().first()
-        assert refreshed.note_detail.title == new_title
-        assert refreshed.note_detail.body == original_body
-
-
-async def test_owner_can_patch_body_only(
-    authenticated_client: AsyncClient,
-    db_test_session_manager: async_sessionmaker[AsyncSession],
-    logged_in_user: User,
-):
-    original_title = f"title-{uuid.uuid4()}"
-    post = _post(title=original_title, body="orig", owner_id=logged_in_user.id)
-    async with db_test_session_manager() as session:
-        async with session.begin():
-            session.add(post)
-
-    response = await authenticated_client.patch(
-        f"/posts/{post.id}", json={"kind": "note", "body": "fresh"}
-    )
-    assert response.status_code == 200
-    assert response.json()["title"] == original_title
-    assert response.json()["body"] == "fresh"
-
-
-async def test_owner_can_patch_both_fields(
-    authenticated_client: AsyncClient,
-    db_test_session_manager: async_sessionmaker[AsyncSession],
-    logged_in_user: User,
-):
-    post = _post(title="t", body="b", owner_id=logged_in_user.id)
-    async with db_test_session_manager() as session:
-        async with session.begin():
-            session.add(post)
-
-    response = await authenticated_client.patch(
-        f"/posts/{post.id}", json={"kind": "note", "title": "T2", "body": "B2"}
-    )
-    assert response.status_code == 200
-    assert response.json()["title"] == "T2"
-    assert response.json()["body"] == "B2"
-
-
 async def test_non_owner_cannot_patch_post(
     authenticated_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],
@@ -393,21 +231,22 @@ async def test_non_owner_cannot_patch_post(
 ):
     """A non-owner non-admin gets 403 and the post is not mutated."""
     other = create_test_user(username=f"other-{uuid.uuid4()}")
-    post = _post(title="orig", body="orig", owner_id=other.id)
+    post = _client_referral_post(description="orig", owner_id=other.id)
     async with db_test_session_manager() as session:
         async with session.begin():
             session.add(other)
             session.add(post)
 
     response = await authenticated_client.patch(
-        f"/posts/{post.id}", json={"kind": "note", "title": "hijack"}
+        f"/posts/{post.id}",
+        json={"kind": "client_referral", "description": "hijack"},
     )
     assert response.status_code == 403
 
     async with db_test_session_manager() as session:
         result = await session.execute(select(Post).filter(Post.id == post.id))
         refreshed = result.scalars().first()
-        assert refreshed.note_detail.title == "orig"
+        assert refreshed.client_referral_detail.description == "orig"
 
 
 async def test_admin_can_patch_anyone_post(
@@ -417,17 +256,18 @@ async def test_admin_can_patch_anyone_post(
 ):
     await promote_to_admin(db_test_session_manager, logged_in_user.email)
     other = create_test_user(username=f"other-{uuid.uuid4()}")
-    post = _post(title="orig", body="orig", owner_id=other.id)
+    post = _client_referral_post(description="orig", owner_id=other.id)
     async with db_test_session_manager() as session:
         async with session.begin():
             session.add(other)
             session.add(post)
 
     response = await authenticated_client.patch(
-        f"/posts/{post.id}", json={"kind": "note", "title": "moderated"}
+        f"/posts/{post.id}",
+        json={"kind": "client_referral", "description": "moderated"},
     )
     assert response.status_code == 200
-    assert response.json()["title"] == "moderated"
+    assert response.json()["description"] == "moderated"
 
 
 async def test_patch_404_for_unknown_post(
@@ -435,7 +275,8 @@ async def test_patch_404_for_unknown_post(
     logged_in_user: User,
 ):
     response = await authenticated_client.patch(
-        f"/posts/{uuid.uuid4()}", json={"kind": "note", "title": "x"}
+        f"/posts/{uuid.uuid4()}",
+        json={"kind": "client_referral", "description": "x"},
     )
     assert response.status_code == 404
 
@@ -447,7 +288,7 @@ async def test_patch_rejects_owner_id_in_payload(
 ):
     """Even the owner cannot reassign owner_id via PATCH (server-managed)."""
     other = create_test_user(username=f"other-{uuid.uuid4()}")
-    post = _post(title="t", body="b", owner_id=logged_in_user.id)
+    post = _client_referral_post(description="d", owner_id=logged_in_user.id)
     async with db_test_session_manager() as session:
         async with session.begin():
             session.add(other)
@@ -455,49 +296,28 @@ async def test_patch_rejects_owner_id_in_payload(
 
     response = await authenticated_client.patch(
         f"/posts/{post.id}",
-        json={"kind": "note", "title": "t2", "owner_id": str(other.id)},
+        json={
+            "kind": "client_referral",
+            "description": "d2",
+            "owner_id": str(other.id),
+        },
     )
     assert response.status_code == 422
 
 
-@pytest.mark.parametrize(
-    "payload",
-    [
-        {"kind": "note"},
-        {"kind": "note", "title": None, "body": None},
-        {"kind": "note", "title": "   "},
-        {"kind": "note", "body": ""},
-        {"title": "x"},  # missing kind
-        {"kind": "not_a_kind", "title": "x"},  # invalid kind
-    ],
-)
-async def test_patch_invalid_body_422(
-    payload,
+async def test_patch_rejects_retired_note_kind(
     authenticated_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user: User,
 ):
-    post = _post(title="t", body="b", owner_id=logged_in_user.id)
-    async with db_test_session_manager() as session:
-        async with session.begin():
-            session.add(post)
-
-    response = await authenticated_client.patch(f"/posts/{post.id}", json=payload)
-    assert response.status_code == 422
-
-
-async def test_patch_rejects_unknown_field(
-    authenticated_client: AsyncClient,
-    db_test_session_manager: async_sessionmaker[AsyncSession],
-    logged_in_user: User,
-):
-    post = _post(title="t", body="b", owner_id=logged_in_user.id)
+    """Patches with `kind='note'` (retired) must 422 at the schema layer."""
+    post = _client_referral_post(description="d", owner_id=logged_in_user.id)
     async with db_test_session_manager() as session:
         async with session.begin():
             session.add(post)
 
     response = await authenticated_client.patch(
-        f"/posts/{post.id}", json={"kind": "note", "title": "x", "evil": True}
+        f"/posts/{post.id}", json={"kind": "note", "title": "t"}
     )
     assert response.status_code == 422
 
@@ -507,7 +327,7 @@ async def test_patch_unauthenticated_redirects(
 ):
     response = await test_client.patch(
         f"/posts/{uuid.uuid4()}",
-        json={"kind": "note", "title": "t"},
+        json={"kind": "client_referral", "description": "t"},
         headers={"accept": "text/html"},
         follow_redirects=False,
     )
@@ -516,25 +336,6 @@ async def test_patch_unauthenticated_redirects(
 
 
 # --- Create form page (GET /posts/form) ----------------------------------
-
-
-async def test_get_post_form_renders(
-    authenticated_client: AsyncClient,
-    logged_in_user: User,
-):
-    """GET /posts/form renders the form for an authenticated user."""
-    response = await authenticated_client.get("/posts/form")
-
-    assert response.status_code == 200
-    assert "text/html" in response.headers["content-type"]
-
-    tree = HTMLParser(response.text)
-    form = tree.css_first("form")
-    assert form is not None
-    assert form.attributes.get("hx-post") == "/posts"
-    assert form.attributes.get("hx-ext") == "json-enc"
-    assert tree.css_first("input#title") is not None
-    assert tree.css_first("textarea#body") is not None
 
 
 async def test_get_post_form_unauthenticated_redirects(
@@ -556,26 +357,24 @@ async def test_form_route_does_not_shadow_detail_route(
     logged_in_user: User,
 ):
     """Sanity check the /posts/form ordering — a real UUID still hits the detail route."""
-    post = _post(title="t", body="b", owner_id=logged_in_user.id)
+    description = f"detail-{uuid.uuid4()}"
+    post = _client_referral_post(description=description, owner_id=logged_in_user.id)
     async with db_test_session_manager() as session:
         async with session.begin():
             session.add(post)
 
     response = await authenticated_client.get(f"/posts/{post.id}")
     assert response.status_code == 200
-    assert "t" in response.text
+    assert description in response.text
 
 
-async def test_list_page_links_to_create_form(
+async def test_list_page_links_to_create_forms(
     authenticated_client: AsyncClient,
     logged_in_user: User,
 ):
     response = await authenticated_client.get("/posts")
     assert response.status_code == 200
     tree = HTMLParser(response.text)
-    link = tree.css_first('a[href="/posts/form?kind=note"]')
-    assert link is not None
-    assert "New note" in link.text()
     cr_link = tree.css_first('a[href="/posts/form?kind=client_referral"]')
     assert cr_link is not None
     pa_link = tree.css_first('a[href="/posts/form?kind=provider_availability"]')
@@ -585,32 +384,6 @@ async def test_list_page_links_to_create_form(
 # --- Edit form page (GET /posts/{id}/form) -------------------------------
 
 
-async def test_owner_can_open_edit_form(
-    authenticated_client: AsyncClient,
-    db_test_session_manager: async_sessionmaker[AsyncSession],
-    logged_in_user: User,
-):
-    """The owner sees the edit form pre-filled with current values."""
-    post = _post(title="orig title", body="orig body", owner_id=logged_in_user.id)
-    async with db_test_session_manager() as session:
-        async with session.begin():
-            session.add(post)
-
-    response = await authenticated_client.get(f"/posts/{post.id}/form")
-    assert response.status_code == 200
-    tree = HTMLParser(response.text)
-    form = tree.css_first("form")
-    assert form is not None
-    assert form.attributes.get("hx-patch") == f"/posts/{post.id}"
-    assert form.attributes.get("hx-ext") == "json-enc"
-    title_input = tree.css_first("input#title")
-    assert title_input is not None
-    assert title_input.attributes.get("value") == "orig title"
-    body_textarea = tree.css_first("textarea#body")
-    assert body_textarea is not None
-    assert "orig body" in body_textarea.text()
-
-
 async def test_admin_can_open_edit_form_for_any_post(
     authenticated_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],
@@ -618,7 +391,7 @@ async def test_admin_can_open_edit_form_for_any_post(
 ):
     await promote_to_admin(db_test_session_manager, logged_in_user.email)
     other = create_test_user(username=f"other-{uuid.uuid4()}")
-    post = _post(title="t", body="b", owner_id=other.id)
+    post = _client_referral_post(description="d", owner_id=other.id)
     async with db_test_session_manager() as session:
         async with session.begin():
             session.add(other)
@@ -634,7 +407,7 @@ async def test_non_owner_cannot_open_edit_form(
     logged_in_user: User,
 ):
     other = create_test_user(username=f"other-{uuid.uuid4()}")
-    post = _post(title="t", body="b", owner_id=other.id)
+    post = _client_referral_post(description="d", owner_id=other.id)
     async with db_test_session_manager() as session:
         async with session.begin():
             session.add(other)
@@ -672,7 +445,7 @@ async def test_detail_page_shows_edit_link_for_owner(
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user: User,
 ):
-    post = _post(title="t", body="b", owner_id=logged_in_user.id)
+    post = _client_referral_post(description="d", owner_id=logged_in_user.id)
     async with db_test_session_manager() as session:
         async with session.begin():
             session.add(post)
@@ -694,7 +467,7 @@ async def test_detail_page_shows_edit_link_for_admin(
 ):
     await promote_to_admin(db_test_session_manager, logged_in_user.email)
     other = create_test_user(username=f"other-{uuid.uuid4()}")
-    post = _post(title="t", body="b", owner_id=other.id)
+    post = _client_referral_post(description="d", owner_id=other.id)
     async with db_test_session_manager() as session:
         async with session.begin():
             session.add(other)
@@ -712,7 +485,7 @@ async def test_detail_page_hides_edit_link_for_stranger(
     logged_in_user: User,
 ):
     other = create_test_user(username=f"other-{uuid.uuid4()}")
-    post = _post(title="t", body="b", owner_id=other.id)
+    post = _client_referral_post(description="d", owner_id=other.id)
     async with db_test_session_manager() as session:
         async with session.begin():
             session.add(other)
@@ -731,7 +504,7 @@ async def test_detail_page_delete_button_for_owner(
 ):
     """The owner sees a Delete button wired to DELETE /posts/{id} with a
     confirmation prompt."""
-    post = _post(title="t", body="b", owner_id=logged_in_user.id)
+    post = _client_referral_post(description="d", owner_id=logged_in_user.id)
     async with db_test_session_manager() as session:
         async with session.begin():
             session.add(post)
@@ -756,7 +529,7 @@ async def test_detail_page_delete_button_for_admin(
     """An admin viewing another user's post sees the Delete button too."""
     await promote_to_admin(db_test_session_manager, logged_in_user.email)
     other = create_test_user(username=f"other-{uuid.uuid4()}")
-    post = _post(title="t", body="b", owner_id=other.id)
+    post = _client_referral_post(description="d", owner_id=other.id)
     async with db_test_session_manager() as session:
         async with session.begin():
             session.add(other)
@@ -773,90 +546,19 @@ async def test_detail_page_delete_button_for_admin(
 # --- Audit log -----------------------------------------------------------
 
 
-async def test_create_post_writes_audit_row(
-    authenticated_client: AsyncClient,
-    db_test_session_manager: async_sessionmaker[AsyncSession],
-    logged_in_user: User,
-):
-    """Each successful POST /posts writes exactly one audit row."""
-    title = f"audited-{uuid.uuid4()}"
-    body = f"body-{uuid.uuid4()}"
-
-    response = await authenticated_client.post(
-        "/posts", json={"kind": "note", "title": title, "body": body}
-    )
-    assert response.status_code == 201
-    new_id = uuid.UUID(response.json()["id"])
-
-    async with db_test_session_manager() as session:
-        repo = AuditRepository(session)
-        rows = await repo.list_for_resource(resource_type="post", resource_id=new_id)
-        assert len(rows) == 1
-        row = rows[0]
-        assert row.actor_id == logged_in_user.id
-        assert row.action == "create_post"
-        assert row.before is None
-        assert row.after == {
-            "kind": "note",
-            "title": title,
-            "body": body,
-            "owner_id": str(logged_in_user.id),
-        }
-
-
-async def test_patch_post_writes_audit_row_with_before_and_after(
-    authenticated_client: AsyncClient,
-    db_test_session_manager: async_sessionmaker[AsyncSession],
-    logged_in_user: User,
-):
-    """Each successful PATCH /posts/{id} writes one audit row capturing
-    pre- and post-mutation snapshots."""
-    post = _post(title="orig title", body="orig body", owner_id=logged_in_user.id)
-    async with db_test_session_manager() as session:
-        async with session.begin():
-            session.add(post)
-
-    response = await authenticated_client.patch(
-        f"/posts/{post.id}", json={"kind": "note", "title": "new title"}
-    )
-    assert response.status_code == 200
-
-    async with db_test_session_manager() as session:
-        repo = AuditRepository(session)
-        rows = await repo.list_for_resource(resource_type="post", resource_id=post.id)
-        assert len(rows) == 1
-        row = rows[0]
-        assert row.actor_id == logged_in_user.id
-        assert row.action == "update_post"
-        assert row.before == {
-            "kind": "note",
-            "title": "orig title",
-            "body": "orig body",
-            "owner_id": str(logged_in_user.id),
-        }
-        assert row.after == {
-            "kind": "note",
-            "title": "new title",
-            "body": "orig body",
-            "owner_id": str(logged_in_user.id),
-        }
-
-
 async def test_failed_create_writes_no_audit_row(
     authenticated_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user: User,
 ):
-    """A 422 (schema rejection) must not leak an audit row — the discipline
-    requires audit lands iff the mutation does."""
+    """A 422 (schema rejection) must not leak an audit row."""
     response = await authenticated_client.post(
-        "/posts", json={"kind": "note", "title": "t", "body": "b", "evil": True}
+        "/posts",
+        json={"kind": "client_referral", "description": "d", "evil": True},
     )
     assert response.status_code == 422
 
     async with db_test_session_manager() as session:
-        # No specific resource_id to query — assert the post-typed audit
-        # table is empty.
         result = await session.execute(
             select(AuditLog).filter(AuditLog.resource_type == "post")
         )
@@ -870,14 +572,15 @@ async def test_unauthorized_patch_writes_no_audit_row(
 ):
     """A 403 must not leak an audit row."""
     other = create_test_user(username=f"other-{uuid.uuid4()}")
-    post = _post(title="t", body="b", owner_id=other.id)
+    post = _client_referral_post(description="d", owner_id=other.id)
     async with db_test_session_manager() as session:
         async with session.begin():
             session.add(other)
             session.add(post)
 
     response = await authenticated_client.patch(
-        f"/posts/{post.id}", json={"kind": "note", "title": "hijack"}
+        f"/posts/{post.id}",
+        json={"kind": "client_referral", "description": "hijack"},
     )
     assert response.status_code == 403
 
@@ -896,14 +599,15 @@ async def test_admin_patch_audit_actor_is_admin_not_owner(
     the admin (the requester), not the post owner."""
     await promote_to_admin(db_test_session_manager, logged_in_user.email)
     other = create_test_user(username=f"other-{uuid.uuid4()}")
-    post = _post(title="t", body="b", owner_id=other.id)
+    post = _client_referral_post(description="d", owner_id=other.id)
     async with db_test_session_manager() as session:
         async with session.begin():
             session.add(other)
             session.add(post)
 
     response = await authenticated_client.patch(
-        f"/posts/{post.id}", json={"kind": "note", "title": "moderated"}
+        f"/posts/{post.id}",
+        json={"kind": "client_referral", "description": "moderated"},
     )
     assert response.status_code == 200
 
@@ -912,66 +616,11 @@ async def test_admin_patch_audit_actor_is_admin_not_owner(
         rows = await repo.list_for_resource(resource_type="post", resource_id=post.id)
         assert len(rows) == 1
         assert rows[0].actor_id == logged_in_user.id  # admin, not other
-        assert rows[0].after["title"] == "moderated"
+        assert rows[0].after["description"] == "moderated"
         assert rows[0].after["owner_id"] == str(other.id)
 
 
 # --- Delete (DELETE) -----------------------------------------------------
-
-
-async def test_owner_can_delete_own_post(
-    authenticated_client: AsyncClient,
-    db_test_session_manager: async_sessionmaker[AsyncSession],
-    logged_in_user: User,
-):
-    """DELETE by the owner returns 204, removes the row, and sets HX-Redirect."""
-    post = _post(title="t", body="b", owner_id=logged_in_user.id)
-    async with db_test_session_manager() as session:
-        async with session.begin():
-            session.add(post)
-
-    response = await authenticated_client.delete(f"/posts/{post.id}")
-    assert response.status_code == 204
-    assert response.headers.get("HX-Redirect") == "/posts"
-
-    async with db_test_session_manager() as session:
-        result = await session.execute(select(Post).filter(Post.id == post.id))
-        assert result.scalars().first() is None
-
-
-async def test_delete_post_cascades_note_detail(
-    authenticated_client: AsyncClient,
-    db_test_session_manager: async_sessionmaker[AsyncSession],
-    logged_in_user: User,
-):
-    """Deleting a post must remove its note_detail row too — the FK has
-    ON DELETE CASCADE so no orphan rows are left behind."""
-    post = _post(title="doomed", body="b", owner_id=logged_in_user.id)
-    async with db_test_session_manager() as session:
-        async with session.begin():
-            session.add(post)
-    post_id = post.id
-
-    response = await authenticated_client.delete(f"/posts/{post_id}")
-    assert response.status_code == 204
-
-    async with db_test_session_manager() as session:
-        post_row = (
-            (await session.execute(select(Post).filter(Post.id == post_id)))
-            .scalars()
-            .first()
-        )
-        detail_row = (
-            (
-                await session.execute(
-                    select(NoteDetail).filter(NoteDetail.post_id == post_id)
-                )
-            )
-            .scalars()
-            .first()
-        )
-        assert post_row is None
-        assert detail_row is None
 
 
 async def test_admin_can_delete_anyone_post(
@@ -982,7 +631,7 @@ async def test_admin_can_delete_anyone_post(
     """An admin can hard-delete a post owned by another user."""
     await promote_to_admin(db_test_session_manager, logged_in_user.email)
     other = create_test_user(username=f"other-{uuid.uuid4()}")
-    post = _post(title="t", body="b", owner_id=other.id)
+    post = _client_referral_post(description="d", owner_id=other.id)
     async with db_test_session_manager() as session:
         async with session.begin():
             session.add(other)
@@ -1003,7 +652,7 @@ async def test_non_owner_cannot_delete_post(
 ):
     """A non-owner non-admin gets 403 and the post is preserved."""
     other = create_test_user(username=f"other-{uuid.uuid4()}")
-    post = _post(title="orig", body="orig", owner_id=other.id)
+    post = _client_referral_post(description="orig", owner_id=other.id)
     async with db_test_session_manager() as session:
         async with session.begin():
             session.add(other)
@@ -1016,7 +665,7 @@ async def test_non_owner_cannot_delete_post(
         result = await session.execute(select(Post).filter(Post.id == post.id))
         refreshed = result.scalars().first()
         assert refreshed is not None
-        assert refreshed.note_detail.title == "orig"
+        assert refreshed.client_referral_detail.description == "orig"
 
 
 async def test_delete_404_for_unknown_post(
@@ -1039,40 +688,6 @@ async def test_delete_unauthenticated_redirects(
     assert "/auth/login" in response.headers["location"]
 
 
-async def test_delete_post_writes_audit_row(
-    authenticated_client: AsyncClient,
-    db_test_session_manager: async_sessionmaker[AsyncSession],
-    logged_in_user: User,
-):
-    """Each successful DELETE writes one audit row capturing the pre-delete
-    state in `before`, with `after=None`."""
-    title = f"doomed-{uuid.uuid4()}"
-    body = f"body-{uuid.uuid4()}"
-    post = _post(title=title, body=body, owner_id=logged_in_user.id)
-    async with db_test_session_manager() as session:
-        async with session.begin():
-            session.add(post)
-    post_id = post.id
-
-    response = await authenticated_client.delete(f"/posts/{post_id}")
-    assert response.status_code == 204
-
-    async with db_test_session_manager() as session:
-        repo = AuditRepository(session)
-        rows = await repo.list_for_resource(resource_type="post", resource_id=post_id)
-        assert len(rows) == 1
-        row = rows[0]
-        assert row.actor_id == logged_in_user.id
-        assert row.action == "delete_post"
-        assert row.before == {
-            "kind": "note",
-            "title": title,
-            "body": body,
-            "owner_id": str(logged_in_user.id),
-        }
-        assert row.after is None
-
-
 async def test_unauthorized_delete_writes_no_audit_row(
     authenticated_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],
@@ -1080,7 +695,7 @@ async def test_unauthorized_delete_writes_no_audit_row(
 ):
     """A 403 on DELETE must not leak an audit row."""
     other = create_test_user(username=f"other-{uuid.uuid4()}")
-    post = _post(title="t", body="b", owner_id=other.id)
+    post = _client_referral_post(description="d", owner_id=other.id)
     async with db_test_session_manager() as session:
         async with session.begin():
             session.add(other)
@@ -1104,7 +719,7 @@ async def test_admin_delete_audit_actor_is_admin_not_owner(
     the admin (the requester), not the post owner."""
     await promote_to_admin(db_test_session_manager, logged_in_user.email)
     other = create_test_user(username=f"other-{uuid.uuid4()}")
-    post = _post(title="t", body="b", owner_id=other.id)
+    post = _client_referral_post(description="d", owner_id=other.id)
     async with db_test_session_manager() as session:
         async with session.begin():
             session.add(other)
@@ -1131,8 +746,8 @@ async def test_create_client_referral_happy_path(
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user: User,
 ):
-    """`POST /posts` with `kind='client_referral'` persists a
-    client_referral with the right detail row and audit row."""
+    """`POST /posts` with `kind='client_referral'` persists with the right
+    detail row and audit row."""
     description = f"needs-{uuid.uuid4()}"
 
     response = await authenticated_client.post(
@@ -1149,7 +764,6 @@ async def test_create_client_referral_happy_path(
         assert persisted is not None
         assert persisted.kind == "client_referral"
         assert persisted.client_referral_detail.description == description
-        assert persisted.note_detail is None
         assert persisted.owner_id == logged_in_user.id
 
     async with db_test_session_manager() as session:
@@ -1217,7 +831,20 @@ async def test_get_client_referral_form_renders(
     assert form.attributes.get("hx-post") == "/posts"
     assert form.attributes.get("hx-ext") == "json-enc"
     assert tree.css_first("textarea#description") is not None
-    # Hidden kind input is what tells the discriminator which member to pick.
+    kind_input = tree.css_first('input[name="kind"]')
+    assert kind_input is not None
+    assert kind_input.attributes.get("value") == "client_referral"
+
+
+async def test_get_post_form_default_kind_is_client_referral(
+    authenticated_client: AsyncClient,
+    logged_in_user: User,
+):
+    """`GET /posts/form` without a `kind` query parameter renders the
+    first registered kind's form (currently client_referral)."""
+    response = await authenticated_client.get("/posts/form")
+    assert response.status_code == 200
+    tree = HTMLParser(response.text)
     kind_input = tree.css_first('input[name="kind"]')
     assert kind_input is not None
     assert kind_input.attributes.get("value") == "client_referral"
@@ -1229,6 +856,15 @@ async def test_get_post_form_unknown_kind_422(
 ):
     """`?kind=…` is constrained by a `Literal` — unknown values 422."""
     response = await authenticated_client.get("/posts/form?kind=not_a_kind")
+    assert response.status_code == 422
+
+
+async def test_get_post_form_retired_note_kind_422(
+    authenticated_client: AsyncClient,
+    logged_in_user: User,
+):
+    """`?kind=note` was retired and is rejected with 422 by the Literal."""
+    response = await authenticated_client.get("/posts/form?kind=note")
     assert response.status_code == 422
 
 
@@ -1332,17 +968,18 @@ async def test_owner_can_patch_client_referral_description(
         assert refreshed.client_referral_detail.description == new_description
 
 
-async def test_patch_note_with_client_referral_payload_does_not_mutate(
+async def test_patch_provider_availability_with_client_referral_payload_does_not_mutate(
     authenticated_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user: User,
 ):
-    """A note post can't be patched with a client_referral payload — kind
-    is part of the resource identity. The 400 must fire before any
-    mutation, and no audit row may be written."""
-    original_title = f"orig-{uuid.uuid4()}"
-    original_body = f"body-{uuid.uuid4()}"
-    post = _post(title=original_title, body=original_body, owner_id=logged_in_user.id)
+    """A provider_availability post can't be patched with a client_referral
+    payload — kind is part of the resource identity. The 400 must fire
+    before any mutation, and no audit row may be written."""
+    original = f"orig-{uuid.uuid4()}"
+    post = _provider_availability_post(
+        practice_name=original, owner_id=logged_in_user.id
+    )
     async with db_test_session_manager() as session:
         async with session.begin():
             session.add(post)
@@ -1354,30 +991,27 @@ async def test_patch_note_with_client_referral_payload_does_not_mutate(
     )
     assert response.status_code == 400
 
-    # Post is unmodified: kind, detail row, and the orphan detail table
-    # for the rejected kind must all be untouched.
     async with db_test_session_manager() as session:
         result = await session.execute(select(Post).filter(Post.id == post_id))
         refreshed = result.scalars().first()
-        assert refreshed.kind == "note"
-        assert refreshed.note_detail.title == original_title
-        assert refreshed.note_detail.body == original_body
+        assert refreshed.kind == "provider_availability"
+        assert refreshed.provider_availability_detail.practice_name == original
         assert refreshed.client_referral_detail is None
 
-    # No audit row leaked.
     async with db_test_session_manager() as session:
         repo = AuditRepository(session)
         rows = await repo.list_for_resource(resource_type="post", resource_id=post_id)
         assert rows == []
 
 
-async def test_patch_client_referral_with_note_payload_does_not_mutate(
+async def test_patch_client_referral_with_provider_availability_payload_does_not_mutate(
     authenticated_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user: User,
 ):
-    """Reverse direction: a client_referral can't be patched with a note
-    payload either. Same invariant — kind is fixed once set."""
+    """Reverse direction: a client_referral can't be patched with a
+    provider_availability payload either. Same invariant — kind is fixed
+    once set."""
     original_description = f"orig-{uuid.uuid4()}"
     post = _client_referral_post(
         description=original_description, owner_id=logged_in_user.id
@@ -1389,7 +1023,7 @@ async def test_patch_client_referral_with_note_payload_does_not_mutate(
 
     response = await authenticated_client.patch(
         f"/posts/{post_id}",
-        json={"kind": "note", "title": "hijack", "body": "hijack"},
+        json={"kind": "provider_availability", "practice_name": "hijack"},
     )
     assert response.status_code == 400
 
@@ -1398,7 +1032,7 @@ async def test_patch_client_referral_with_note_payload_does_not_mutate(
         refreshed = result.scalars().first()
         assert refreshed.kind == "client_referral"
         assert refreshed.client_referral_detail.description == original_description
-        assert refreshed.note_detail is None
+        assert refreshed.provider_availability_detail is None
 
     async with db_test_session_manager() as session:
         repo = AuditRepository(session)
@@ -1498,7 +1132,6 @@ async def test_create_provider_availability_happy_path(
         assert persisted is not None
         assert persisted.kind == "provider_availability"
         assert persisted.provider_availability_detail.practice_name == practice_name
-        assert persisted.note_detail is None
         assert persisted.client_referral_detail is None
         assert persisted.owner_id == logged_in_user.id
 
@@ -1680,42 +1313,6 @@ async def test_owner_can_patch_provider_availability_practice_name(
         result = await session.execute(select(Post).filter(Post.id == post.id))
         refreshed = result.scalars().first()
         assert refreshed.provider_availability_detail.practice_name == new_practice_name
-
-
-async def test_patch_provider_availability_with_note_payload_does_not_mutate(
-    authenticated_client: AsyncClient,
-    db_test_session_manager: async_sessionmaker[AsyncSession],
-    logged_in_user: User,
-):
-    """A provider_availability post can't be patched with a note payload —
-    same kind-immutability invariant as the other kinds. State + audit
-    log must be untouched after the 400."""
-    original = f"orig-{uuid.uuid4()}"
-    post = _provider_availability_post(
-        practice_name=original, owner_id=logged_in_user.id
-    )
-    async with db_test_session_manager() as session:
-        async with session.begin():
-            session.add(post)
-    post_id = post.id
-
-    response = await authenticated_client.patch(
-        f"/posts/{post_id}",
-        json={"kind": "note", "title": "hijack", "body": "hijack"},
-    )
-    assert response.status_code == 400
-
-    async with db_test_session_manager() as session:
-        result = await session.execute(select(Post).filter(Post.id == post_id))
-        refreshed = result.scalars().first()
-        assert refreshed.kind == "provider_availability"
-        assert refreshed.provider_availability_detail.practice_name == original
-        assert refreshed.note_detail is None
-
-    async with db_test_session_manager() as session:
-        repo = AuditRepository(session)
-        rows = await repo.list_for_resource(resource_type="post", resource_id=post_id)
-        assert rows == []
 
 
 async def test_owner_can_delete_provider_availability(

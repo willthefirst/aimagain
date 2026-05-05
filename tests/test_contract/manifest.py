@@ -35,7 +35,6 @@ import pytest
 
 from .infrastructure.servers.consumer import (
     _setup_post_owner_actions_stub,
-    _setup_posts_form_stub,
     _setup_users_admin_actions_stub,
 )
 from .tests.shared.mock_data_factory import MockDataFactory
@@ -86,24 +85,6 @@ CONTRACT_PAIRS: list[ContractPair] = [
         consumer_setup_fn=_setup_users_admin_actions_stub,
         provider_state="User 11111111-1111-1111-1111-111111111111 exists and is active",
         pytest_marks=(pytest.mark.provider, pytest.mark.users),
-    ),
-    ContractPair(
-        consumer_name="post-create-form",
-        provider_name="posts-api",
-        pact_port=1236,
-        handler_mocks_factory=MockDataFactory.create_post_create_dependency_config,
-        consumer_setup_fn=_setup_posts_form_stub,
-        provider_state="Posts API accepts a create request",
-        pytest_marks=(pytest.mark.provider, pytest.mark.posts),
-    ),
-    ContractPair(
-        consumer_name="post-edit-form",
-        provider_name="posts-api",
-        pact_port=1237,
-        handler_mocks_factory=MockDataFactory.create_post_edit_dependency_config,
-        consumer_setup_fn=_setup_posts_form_stub,
-        provider_state="Post 22222222-2222-2222-2222-222222222222 exists and is owned by the requester",
-        pytest_marks=(pytest.mark.provider, pytest.mark.posts),
     ),
     ContractPair(
         consumer_name="post-owner-actions",

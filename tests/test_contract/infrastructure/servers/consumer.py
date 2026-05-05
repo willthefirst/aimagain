@@ -41,13 +41,11 @@ class ConsumerServerConfig:
         self,
         auth_pages: bool = True,
         users_admin_actions: bool = False,
-        posts_pages: bool = False,
         posts_owner_actions: bool = False,
         mock_auth: bool = True,
     ):
         self.auth_pages = auth_pages
         self.users_admin_actions = users_admin_actions
-        self.posts_pages = posts_pages
         self.posts_owner_actions = posts_owner_actions
         self.mock_auth = mock_auth
 
@@ -89,33 +87,6 @@ def _setup_users_admin_actions_stub(app: FastAPI) -> None:
         )
 
 
-def _setup_posts_form_stub(app: FastAPI) -> None:
-    """Mount stub pages that render the real `posts/new.html` and
-    `posts/edit.html` templates. The contract surface is the forms'
-    HTMX-decorated submissions; the create POST and edit PATCH are intercepted
-    by Playwright before they leave the browser, so no database is needed.
-    """
-    from ...tests.shared.mock_data_factory import make_post_stub
-
-    @app.get("/posts/form")
-    async def posts_form_stub_page(request: Request):
-        return APIResponse.html_response(
-            template_name="posts/new.html", context={}, request=request
-        )
-
-    @app.get("/posts/{post_id}/form")
-    async def posts_edit_form_stub_page(request: Request, post_id: uuid.UUID):
-        # The note edit-form template reads `post.note_detail.title/body`;
-        # `make_post_stub` populates that off `REGISTERED_KINDS` so a kind
-        # rename is a single-edit change in `src/models/post_kinds.py`.
-        post = make_post_stub(
-            "note", post_id=post_id, title="Stub title", body="Stub body"
-        )
-        return APIResponse.html_response(
-            template_name="posts/edit.html", context={"post": post}, request=request
-        )
-
-
 def _setup_post_owner_actions_stub(app: FastAPI) -> None:
     """Mount a stub page that renders the real `posts/detail.html` template
     with hardcoded post + current_user, so the `_owner_actions.html` partial
@@ -136,12 +107,10 @@ def _setup_post_owner_actions_stub(app: FastAPI) -> None:
         # equals post id here so the partial's owner-or-admin gate is a
         # don't-care (current_user is a superuser).
         post = make_post_stub(
-            "note",
+            "client_referral",
             post_id=post_id,
             owner_id=post_id,
             owner_username="post_owner",
-            title="Stub title",
-            body="Stub body",
         )
         # The mock auth in `run_consumer_server_process` makes current_user a
         # superuser when `posts_owner_actions=True`, so the partial's
@@ -163,8 +132,6 @@ def setup_consumer_app_routes(app: FastAPI, config: ConsumerServerConfig) -> Non
         app.include_router(auth_pages.auth_pages_api_router)
     if config.users_admin_actions:
         _setup_users_admin_actions_stub(app)
-    if config.posts_pages:
-        _setup_posts_form_stub(app)
     if config.posts_owner_actions:
         _setup_post_owner_actions_stub(app)
 
