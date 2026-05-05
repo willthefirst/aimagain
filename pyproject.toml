@@ -91,6 +91,15 @@ filterwarnings = [
     "ignore:.*will be deprecated Pact Python v3:PendingDeprecationWarning",
 ]
 
+# Custom marks used by contract-test provider verifications, declared so
+# `-m provider` (etc.) can filter without `PytestUnknownMarkWarning`.
+markers = [
+    "provider: provider-side contract verification tests (Pact verifier)",
+    "auth: contract pairs whose provider is `auth-api`",
+    "users: contract pairs whose provider is `users-api`",
+    "posts: contract pairs whose provider is `posts-api`",
+]
+
 [tool.title-case-check]
 ignore_files = [
     "*.log", "*.tmp", ".git/**", "venv/**", "node_modules/**",

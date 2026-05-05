@@ -37,9 +37,11 @@ tests/test_contract/
 ├── README.md                          # This file
 ├── conftest.py                        # Session fixtures: consumer server, provider server, browser, page
 ├── constants.py                       # Shared test data + Pact identifiers
+├── manifest.py                        # CONTRACT_PAIRS — single source of truth per pair
+├── test_manifest.py                   # Manifest-consistency tests (uniqueness, derived-state coverage)
 ├── artifacts/                         # Generated pact files and logs (gitignored except .gitkeep)
 ├── infrastructure/
-│   ├── config.py                      # Hosts, ports, KNOWN_PROVIDER_STATES
+│   ├── config.py                      # Hosts, ports; KNOWN_PROVIDER_STATES is derived from `manifest.py`
 │   ├── servers/
 │   │   ├── base.py                    # ServerManager: subprocess lifecycle + health-poll
 │   │   ├── consumer.py                # Hosts the HTML pages under test
@@ -56,14 +58,14 @@ tests/test_contract/
     │   ├── test_post_edit_form.py       # Edit-post form contract
     │   └── test_post_owner_actions.py   # Owner-actions partial contract (Delete)
     ├── provider/
-    │   ├── test_auth_verification.py
+    │   ├── test_auth_verification.py            # Parametrized over `pairs_for_provider("auth-api")`
     │   ├── test_user_admin_actions_verification.py
-    │   └── test_posts_verification.py   # Verifies post create, edit, and owner-actions pacts
+    │   └── test_posts_verification.py           # Parametrized over every `posts-api` pair in the manifest
     └── shared/
         ├── consumer_test_base.py      # BaseConsumerTest abstract class
         ├── helpers.py                 # Pact + Playwright glue
-        ├── mock_data_factory.py       # Mock data + dependency-override configs
-        └── provider_verification_base.py
+        ├── mock_data_factory.py       # Mock data + dependency-override configs; `make_post_stub`
+        └── provider_verification_base.py  # `verify_pair(pair, provider_server)` + decorator helpers
 ```
 
 ## Running
@@ -80,17 +82,18 @@ dev test tests/test_contract/tests/consumer/test_auth_form.py
 
 Consumer tests must run before provider tests in any single session — the consumer run *generates* the pact JSON files in `artifacts/pacts/` that the provider run *verifies against*. Running both with one invocation (above) handles this ordering automatically.
 
-Provider tests carry `pytest.mark.provider` (set via `BaseProviderVerification.pytest_marks`), so `-m provider` works to filter those. Consumer tests are not currently marked, so there is no symmetric `-m consumer` filter.
+Provider tests carry `pytest.mark.provider` (applied directly to the parametrized test functions in `tests/provider/test_*_verification.py`), so `-m provider` filters them. Per-provider marks (`auth`, `users`, `posts`) are also registered in `pyproject.toml` so per-API filtering (`-m posts`) is also valid. Each pair's `pytest_marks` field in [`manifest.py`](manifest.py) records the same set as documentation — keeping them in sync is a manual discipline today (see follow-up note in the manifest's docstring). Consumer tests are not currently marked, so there is no symmetric `-m consumer` filter.
 
 ## Adding a contract test pair
 
 When you add a new HTML form (per [`src/api/routes/RESOURCE_GRAMMAR.md`](../../src/api/routes/RESOURCE_GRAMMAR.md) — every form-bearing resource MUST have a contract test pair):
 
-1. **Add a flag** to `ConsumerServerConfig` in `infrastructure/servers/consumer.py` and a corresponding `app.include_router(...)` call so the consumer server can mount your form's page route.
-2. **Add constants** for the API path, provider state, consumer/provider Pact names, and a unique Pact port to `constants.py`. Append the provider state string to `KNOWN_PROVIDER_STATES` in `infrastructure/config.py`.
-3. **Write the consumer test** (`tests/consumer/test_<resource>_form.py`) — drive the form with Playwright and assert the intercepted request matches a Pact expectation.
-4. **Add a `MockDataFactory.create_<resource>_dependency_config()`** mapping the route's business-logic handler import path (the one used by `from ... import` inside the route module) to a mock return value. For Post-shaped stubs, use `make_post_stub(kind, **field_overrides)` from `tests/shared/mock_data_factory.py` — it reads the per-kind detail relationship and field tuple from `REGISTERED_KINDS` in [`src/models/post_kinds.py`](../../src/models/post_kinds.py), so adding/renaming a kind's fields doesn't require touching contract test code.
-5. **Write the provider test** (`tests/provider/test_<resource>_verification.py`) — subclass `BaseProviderVerification` and call `verify_pact(provider_server)` under the dependency-override decorator.
+1. **(If the consumer needs an HTML stub page)** add a flag to `ConsumerServerConfig` in `infrastructure/servers/consumer.py` and a `_setup_*_stub` function that mounts the page. Reference the setup function as the pair's `consumer_setup_fn` in step 3.
+2. **Add constants** for the API path, consumer/provider Pact names, and a unique Pact port to `constants.py`. (Provider states no longer need to be appended to `KNOWN_PROVIDER_STATES` separately — the manifest entry's `provider_state` is what drives that list.)
+3. **Add a `ContractPair` entry** to [`manifest.py`](manifest.py): consumer + provider names, port, `provider_state` string, `pytest_marks` tuple, and the optional `consumer_setup_fn` / `handler_mocks_factory` callables. The provider verification test under `tests/provider/test_<resource>_verification.py` parametrizes over `pairs_for_provider(provider_name)` automatically — no per-pair subclass needed.
+4. **Write the consumer test** (`tests/consumer/test_<resource>_form.py`) — drive the form with Playwright and assert the intercepted request matches a Pact expectation.
+5. **(If the route needs handler-level mocks)** add a `MockDataFactory.create_<resource>_dependency_config()` classmethod returning `{handler_path: {"return_value_config": ...}}`, and reference it as `handler_mocks_factory` on the manifest entry. For Post-shaped stubs, use `make_post_stub(kind, **field_overrides)` from `tests/shared/mock_data_factory.py` — it reads the per-kind detail relationship and field tuple from `REGISTERED_KINDS` in [`src/models/post_kinds.py`](../../src/models/post_kinds.py).
+6. **(If the provider name is new)** create `tests/provider/test_<resource>_verification.py` with a parametrized test function (see existing files as templates — they're 8 lines each, parametrized over `pairs_for_provider`).
 
 ## Related documentation
 

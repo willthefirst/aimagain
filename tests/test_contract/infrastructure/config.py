@@ -30,11 +30,17 @@ CONSUMER_BASE_URL = URL(f"http://{CONSUMER_HOST}:{CONSUMER_PORT}")
 # Database configuration
 TEST_DATABASE_URL = "sqlite+aiosqlite:///:memory:"
 
-# Provider states the verifier may post during setup. Tests append more as they
-# introduce new states.
-KNOWN_PROVIDER_STATES = [
-    "User test.user@example.com does not exist",
-    "User 11111111-1111-1111-1111-111111111111 exists and is active",
-    "Posts API accepts a create request",
-    "Post 22222222-2222-2222-2222-222222222222 exists and is owned by the requester",
-]
+
+# Provider states the verifier may post during setup. Derived from
+# `tests.test_contract.manifest.CONTRACT_PAIRS`; new pairs append their
+# state via the manifest, not here.
+def _known_provider_states() -> list[str]:
+    # Imported lazily because the manifest pulls in stub setup functions,
+    # which transitively load `src.models` etc. — fine, just keeps this
+    # module's import surface flat.
+    from ..manifest import known_provider_states
+
+    return known_provider_states()
+
+
+KNOWN_PROVIDER_STATES: list[str] = _known_provider_states()
