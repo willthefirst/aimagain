@@ -64,14 +64,29 @@ Each model maps to a database table with explicit relationships managed by SQLAl
 
 `Post` is the parent table for any post-shaped resource. It carries identity, ownership, timestamps, and a `kind` discriminator. Kind-specific fields live in their own detail table keyed by `post_id` (PK + FK with `ON DELETE CASCADE`).
 
-Kinds today: `note` (→ `note_details`), `client_referral` (→ `client_referral_details`), and `provider_availability` (→ `provider_availability_details`). The two non-note kinds are MVP shape — full intake forms per [`../../notes/forms_spec.md`](../../notes/forms_spec.md) follow. Adding a new kind means: (a) widen the CHECK on `posts.kind`, (b) add a new detail table, (c) add a `relationship(..., uselist=False, cascade="all, delete-orphan", lazy="selectin")` on `Post`. Detail rows have no `id` of their own — `post_id` is both PK and FK, enforcing 1:1.
+Kinds today: `note` (→ `note_details`), `client_referral` (→ `client_referral_details`), and `provider_availability` (→ `provider_availability_details`). The two non-note kinds are MVP shape — full intake forms per [`../../notes/forms_spec.md`](../../notes/forms_spec.md) follow. Detail rows have no `id` of their own — `post_id` is both PK and FK, enforcing 1:1.
+
+### The `post_kinds` registry
+
+The set of allowed kinds — and the per-kind detail relationship + field metadata used across the codebase — lives in [`post_kinds.py`](post_kinds.py) as `REGISTERED_KINDS: dict[str, KindSpec]`. Every cross-cutting site reads from it:
+
+- `Post.__table_args__` builds its `CheckConstraint` from `kind_check_sql()` — the SQL is derived from `KIND_NAMES`.
+- The route's `Literal[*KIND_NAMES]` for `GET /posts/form?kind=…` is derived.
+- The form-template selection in `src/api/routes/posts.py` reads `spec.create_template` / `spec.edit_template`.
+- `src/repositories/post_repository.py:_attach_detail` looks up by detail-class via `KIND_BY_DETAIL_MODEL`; `update_post` writes to `spec.detail_relationship` for the post's kind.
+- `src/logic/post_processing.py:handle_create_post` and `handle_update_post` dispatch via `REGISTERED_KINDS[payload.kind]` instead of `isinstance` ladders.
+- `src/schemas/post.py:_flatten_post_to_dict` reads the relationship + field tuple from the registry (so `PostRead`, `PostAuditSnapshot` flatten through it).
+- `src/templates/posts/list.html` receives `post_kinds` in its context and renders the per-kind "New X" links from it.
+
+Adding a kind is therefore: (1) a registry entry in `post_kinds.py`, (2) a new detail model file + a `relationship(...)` line on `Post`, (3) the four Pydantic variant classes in `src/schemas/post.py`, (4) the per-kind templates under `src/templates/posts/`, (5) an Alembic migration. Removing a kind is the inverse. No edits in routes, repositories, or logic — those layers are registry-driven. The consistency tests in [`test_post_kinds.py`](test_post_kinds.py) guard against re-encoding the kind set inline anywhere new.
 
 ## Directory structure
 
 **Core model files:**
 
 - `user.py` - User authentication and profile (extends FastAPI Users)
-- `post.py` - Parent row for posts: kind discriminator + owner FK; one detail table per kind
+- `post.py` - Parent row for posts: kind discriminator + owner FK; one detail table per kind. CHECK constraint is derived from `post_kinds.py`.
+- `post_kinds.py` - `REGISTERED_KINDS` registry: per-kind detail model, relationship name, field tuple, templates, list label. Single source of truth for the kind set.
 - `note_detail.py` - `kind='note'` detail (title + body); 1:1 with `posts` via `post_id`
 - `client_referral_detail.py` - `kind='client_referral'` detail (description; MVP); 1:1 with `posts` via `post_id`
 - `provider_availability_detail.py` - `kind='provider_availability'` detail (practice_name; MVP); 1:1 with `posts` via `post_id`
@@ -260,7 +275,9 @@ class NewEntity(BaseModel):
 
 ## Tests
 
-**TODO** — no colocated tests yet. Most model behavior is exercised indirectly through repository and route tests. Add `src/models/test_<model_name>.py` when a model carries non-trivial logic (computed fields, validators, custom `__init__`, etc.) that warrants direct coverage.
+- `test_post_kinds.py` — guards the `post_kinds` registry as the single source of truth: asserts `KIND_NAMES` matches the registry, the rendered `kind_check_sql()` matches what `Post.__table_args__` actually produces, the route's `Literal[*KIND_NAMES]` reflects the registry, the inverse `KIND_BY_DETAIL_MODEL` lookup is well-formed, and the per-kind relationship-name convention holds. If a future change re-encodes the kind set inline somewhere, the relevant test here fails.
+
+Most other model behavior is exercised indirectly through repository and route tests. Add `src/models/test_<model_name>.py` when a model carries non-trivial logic (computed fields, validators, custom `__init__`, etc.) that warrants direct coverage.
 
 When changing a model's schema, generate an Alembic migration as part of the same change — see [`../../CLAUDE.md`](../../CLAUDE.md).
 

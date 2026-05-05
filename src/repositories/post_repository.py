@@ -1,10 +1,12 @@
-from typing import Sequence
+from typing import Any, Sequence
 from uuid import UUID
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.models import (
+    KIND_BY_DETAIL_MODEL,
+    REGISTERED_KINDS,
     ClientReferralDetail,
     NoteDetail,
     Post,
@@ -19,16 +21,12 @@ PostDetail = NoteDetail | ClientReferralDetail | ProviderAvailabilityDetail
 def _attach_detail(post: Post, detail: PostDetail) -> None:
     """Wire a fresh detail row up to its parent on the right relationship.
 
-    Adding a new `kind` means adding its detail class here.
-    """
-    if isinstance(detail, NoteDetail):
-        post.note_detail = detail
-    elif isinstance(detail, ClientReferralDetail):
-        post.client_referral_detail = detail
-    elif isinstance(detail, ProviderAvailabilityDetail):
-        post.provider_availability_detail = detail
-    else:
+    The detail-class-to-relationship mapping is the registry in
+    `src/models/post_kinds.py` — adding a new kind there is enough."""
+    spec = KIND_BY_DETAIL_MODEL.get(type(detail))
+    if spec is None:
         raise TypeError(f"unsupported detail type: {type(detail).__name__}")
+    setattr(post, spec.detail_relationship, detail)
 
 
 class PostRepository(BaseRepository):
@@ -62,41 +60,26 @@ class PostRepository(BaseRepository):
         await self.session.refresh(post)
         return post
 
-    async def update_post(
-        self,
-        post: Post,
-        *,
-        title: str | None = None,
-        body: str | None = None,
-        description: str | None = None,
-        practice_name: str | None = None,
-    ) -> Post:
-        """Mutates only the per-kind fields that were provided and flushes;
+    async def update_post(self, post: Post, **detail_fields: Any) -> Post:
+        """Mutates the per-kind detail fields that were provided and flushes;
         the caller commits.
 
-        - `title` / `body` are written to `post.note_detail` (kind='note').
-        - `description` is written to `post.client_referral_detail`
-          (kind='client_referral').
-        - `practice_name` is written to `post.provider_availability_detail`
-          (kind='provider_availability').
+        `detail_fields` is keyed by the field names on the post's
+        per-kind detail row (the `KindSpec.detail_fields` for `post.kind`
+        in `src/models/post_kinds.py`). Fields whose value is `None` and
+        fields that don't belong to the post's kind are silently skipped
+        — the calling logic layer is responsible for rejecting cross-kind
+        writes at the route boundary with a 400.
 
-        `post.kind` is intentionally not a parameter and never written by
-        this method — kind is part of the resource identity and is fixed
-        at create time. Cross-kind writes (e.g. `title` on a
-        client_referral) are silently skipped here; the calling logic
-        layer rejects them at the route boundary with a 400.
+        `post.kind` is intentionally not writable here: kind is part of
+        the resource identity and is fixed at create time.
         """
-        if post.kind == "note":
-            if title is not None:
-                post.note_detail.title = title
-            if body is not None:
-                post.note_detail.body = body
-        elif post.kind == "client_referral":
-            if description is not None:
-                post.client_referral_detail.description = description
-        elif post.kind == "provider_availability":
-            if practice_name is not None:
-                post.provider_availability_detail.practice_name = practice_name
+        spec = REGISTERED_KINDS[post.kind]
+        detail = getattr(post, spec.detail_relationship)
+        for field_name, value in detail_fields.items():
+            if value is None or field_name not in spec.detail_fields:
+                continue
+            setattr(detail, field_name, value)
         self.session.add(post)
         await self.session.flush()
         await self.session.refresh(post)
