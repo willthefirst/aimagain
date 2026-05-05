@@ -95,7 +95,7 @@ def _setup_posts_form_stub(app: FastAPI) -> None:
     HTMX-decorated submissions; the create POST and edit PATCH are intercepted
     by Playwright before they leave the browser, so no database is needed.
     """
-    from ..tests.shared.mock_data_factory import make_post_stub
+    from ...tests.shared.mock_data_factory import make_post_stub
 
     @app.get("/posts/form")
     async def posts_form_stub_page(request: Request):
@@ -123,7 +123,7 @@ def _setup_post_owner_actions_stub(app: FastAPI) -> None:
     HTMX-decorated Delete button inside the partial; what we render here is
     the same partial production code paths render.
     """
-    from ..tests.shared.mock_data_factory import make_post_stub
+    from ...tests.shared.mock_data_factory import make_post_stub
 
     class _StubAttrs:
         def __init__(self, **kwargs):
