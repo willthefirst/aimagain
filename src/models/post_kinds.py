@@ -33,7 +33,6 @@ from dataclasses import dataclass
 from typing import Final
 
 from .client_referral_detail import ClientReferralDetail
-from .note_detail import NoteDetail
 from .provider_availability_detail import ProviderAvailabilityDetail
 
 
@@ -51,15 +50,6 @@ class KindSpec:
 
 
 REGISTERED_KINDS: Final[dict[str, KindSpec]] = {
-    "note": KindSpec(
-        name="note",
-        detail_model=NoteDetail,
-        detail_relationship="note_detail",
-        detail_fields=("title", "body"),
-        list_label="note",
-        create_template="posts/new.html",
-        edit_template="posts/edit.html",
-    ),
     "client_referral": KindSpec(
         name="client_referral",
         detail_model=ClientReferralDetail,

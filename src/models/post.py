@@ -29,12 +29,6 @@ class Post(BaseModel):
     )
 
     owner = relationship("User", lazy="joined")
-    note_detail = relationship(
-        "NoteDetail",
-        uselist=False,
-        cascade="all, delete-orphan",
-        lazy="selectin",
-    )
     client_referral_detail = relationship(
         "ClientReferralDetail",
         uselist=False,

@@ -11,8 +11,6 @@ from src.repositories.post_repository import PostRepository
 from src.schemas.post import (
     ClientReferralCreate,
     ClientReferralUpdate,
-    NoteCreate,
-    NoteUpdate,
     ProviderAvailabilityCreate,
     ProviderAvailabilityUpdate,
     post_audit_snapshot,
@@ -20,8 +18,8 @@ from src.schemas.post import (
 
 logger = logging.getLogger(__name__)
 
-PostCreatePayload = NoteCreate | ClientReferralCreate | ProviderAvailabilityCreate
-PostUpdatePayload = NoteUpdate | ClientReferralUpdate | ProviderAvailabilityUpdate
+PostCreatePayload = ClientReferralCreate | ProviderAvailabilityCreate
+PostUpdatePayload = ClientReferralUpdate | ProviderAvailabilityUpdate
 
 
 def _snapshot_post(post: Post) -> dict:

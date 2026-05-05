@@ -80,12 +80,6 @@ class _PostReadBase(BaseModel):
         return _flatten_post_to_dict(data) or data
 
 
-class NoteRead(_PostReadBase):
-    kind: Literal["note"]
-    title: str
-    body: str
-
-
 class ClientReferralRead(_PostReadBase):
     kind: Literal["client_referral"]
     description: str
@@ -97,31 +91,13 @@ class ProviderAvailabilityRead(_PostReadBase):
 
 
 PostRead = Annotated[
-    Union[NoteRead, ClientReferralRead, ProviderAvailabilityRead],
+    Union[ClientReferralRead, ProviderAvailabilityRead],
     Field(discriminator="kind"),
 ]
 post_read_adapter: TypeAdapter = TypeAdapter(PostRead)
 
 
 # --- Create payloads ----------------------------------------------------
-
-
-class NoteCreate(BaseModel):
-    """Create payload for `kind='note'`."""
-
-    kind: Literal["note"]
-    title: str
-    body: str
-
-    model_config = ConfigDict(extra="forbid")
-
-    @field_validator("title", "body")
-    @classmethod
-    def _strip_and_require_non_empty(cls, v: str) -> str:
-        v = v.strip()
-        if not v:
-            raise ValueError("must not be empty")
-        return v
 
 
 class ClientReferralCreate(BaseModel):
@@ -159,37 +135,13 @@ class ProviderAvailabilityCreate(BaseModel):
 
 
 PostCreate = Annotated[
-    Union[NoteCreate, ClientReferralCreate, ProviderAvailabilityCreate],
+    Union[ClientReferralCreate, ProviderAvailabilityCreate],
     Field(discriminator="kind"),
 ]
 post_create_adapter: TypeAdapter = TypeAdapter(PostCreate)
 
 
 # --- Update payloads (partial) ------------------------------------------
-
-
-class NoteUpdate(BaseModel):
-    kind: Literal["note"]
-    title: str | None = None
-    body: str | None = None
-
-    model_config = ConfigDict(extra="forbid")
-
-    @field_validator("title", "body")
-    @classmethod
-    def _strip_and_require_non_empty(cls, v: str | None) -> str | None:
-        if v is None:
-            return None
-        v = v.strip()
-        if not v:
-            raise ValueError("must not be empty")
-        return v
-
-    @model_validator(mode="after")
-    def _at_least_one_field(self) -> "NoteUpdate":
-        if self.title is None and self.body is None:
-            raise ValueError("at least one of title, body must be provided")
-        return self
 
 
 class ClientReferralUpdate(BaseModel):
@@ -239,7 +191,7 @@ class ProviderAvailabilityUpdate(BaseModel):
 
 
 PostUpdate = Annotated[
-    Union[NoteUpdate, ClientReferralUpdate, ProviderAvailabilityUpdate],
+    Union[ClientReferralUpdate, ProviderAvailabilityUpdate],
     Field(discriminator="kind"),
 ]
 post_update_adapter: TypeAdapter = TypeAdapter(PostUpdate)
@@ -259,12 +211,6 @@ class _PostAuditSnapshotBase(BaseModel):
         return _flatten_post_to_dict(data) or data
 
 
-class NoteAuditSnapshot(_PostAuditSnapshotBase):
-    kind: Literal["note"]
-    title: str
-    body: str
-
-
 class ClientReferralAuditSnapshot(_PostAuditSnapshotBase):
     kind: Literal["client_referral"]
     description: str
@@ -277,7 +223,6 @@ class ProviderAvailabilityAuditSnapshot(_PostAuditSnapshotBase):
 
 PostAuditSnapshot = Annotated[
     Union[
-        NoteAuditSnapshot,
         ClientReferralAuditSnapshot,
         ProviderAvailabilityAuditSnapshot,
     ],

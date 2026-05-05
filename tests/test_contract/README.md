@@ -54,8 +54,6 @@ tests/test_contract/
     ├── consumer/
     │   ├── test_auth_form.py            # Registration form contract
     │   ├── test_user_admin_actions.py   # Admin-actions partial contract
-    │   ├── test_post_form.py            # New-post form contract
-    │   ├── test_post_edit_form.py       # Edit-post form contract
     │   └── test_post_owner_actions.py   # Owner-actions partial contract (Delete)
     ├── provider/
     │   ├── test_auth_verification.py            # Parametrized over `pairs_for_provider("auth-api")`

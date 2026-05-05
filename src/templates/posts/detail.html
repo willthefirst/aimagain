@@ -1,19 +1,13 @@
 {% extends "base.html" %}
 {% block title %}
-{%- if post.kind == "note" -%}
-Post: {{ post.note_detail.title }}
-{%- elif post.kind == "client_referral" -%}
+{%- if post.kind == "client_referral" -%}
 Client referral
 {%- elif post.kind == "provider_availability" -%}
 Provider availability: {{ post.provider_availability_detail.practice_name }}
 {%- endif -%}
 {% endblock %}
 {% block content %}
-{% if post.kind == "note" %}
-<h1>{{ post.note_detail.title }}</h1>
-<p>by <a href="/users/{{ post.owner_id }}">{{ post.owner.username }}</a></p>
-<div class="post-body">{{ post.note_detail.body }}</div>
-{% elif post.kind == "client_referral" %}
+{% if post.kind == "client_referral" %}
 <h1>Client referral</h1>
 <p>by <a href="/users/{{ post.owner_id }}">{{ post.owner.username }}</a></p>
 <div class="post-body">
