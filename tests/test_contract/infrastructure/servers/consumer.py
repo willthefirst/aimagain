@@ -95,10 +95,7 @@ def _setup_posts_form_stub(app: FastAPI) -> None:
     HTMX-decorated submissions; the create POST and edit PATCH are intercepted
     by Playwright before they leave the browser, so no database is needed.
     """
-
-    class _StubAttrs:
-        def __init__(self, **kwargs):
-            self.__dict__.update(kwargs)
+    from ..tests.shared.mock_data_factory import make_post_stub
 
     @app.get("/posts/form")
     async def posts_form_stub_page(request: Request):
@@ -108,12 +105,11 @@ def _setup_posts_form_stub(app: FastAPI) -> None:
 
     @app.get("/posts/{post_id}/form")
     async def posts_edit_form_stub_page(request: Request, post_id: uuid.UUID):
-        # `posts/edit.html` reads `post.note_detail.title/body` after the
-        # parent/detail split — mirror that shape here so the template renders.
-        post = _StubAttrs(
-            id=post_id,
-            kind="note",
-            note_detail=_StubAttrs(title="Stub title", body="Stub body"),
+        # The note edit-form template reads `post.note_detail.title/body`;
+        # `make_post_stub` populates that off `REGISTERED_KINDS` so a kind
+        # rename is a single-edit change in `src/models/post_kinds.py`.
+        post = make_post_stub(
+            "note", post_id=post_id, title="Stub title", body="Stub body"
         )
         return APIResponse.html_response(
             template_name="posts/edit.html", context={"post": post}, request=request
@@ -127,6 +123,7 @@ def _setup_post_owner_actions_stub(app: FastAPI) -> None:
     HTMX-decorated Delete button inside the partial; what we render here is
     the same partial production code paths render.
     """
+    from ..tests.shared.mock_data_factory import make_post_stub
 
     class _StubAttrs:
         def __init__(self, **kwargs):
@@ -134,15 +131,17 @@ def _setup_post_owner_actions_stub(app: FastAPI) -> None:
 
     @app.get("/posts/{post_id}")
     async def post_owner_actions_stub_page(request: Request, post_id: uuid.UUID):
-        owner = _StubAttrs(id=post_id, username="post_owner")
-        # `posts/detail.html` reads `post.note_detail.title/body` after the
-        # parent/detail split — mirror that shape so the template renders.
-        post = _StubAttrs(
-            id=post_id,
-            kind="note",
-            note_detail=_StubAttrs(title="Stub title", body="Stub body"),
-            owner_id=owner.id,
-            owner=owner,
+        # The detail template reads the per-kind detail relationship;
+        # `make_post_stub` populates it off `REGISTERED_KINDS`. Owner id
+        # equals post id here so the partial's owner-or-admin gate is a
+        # don't-care (current_user is a superuser).
+        post = make_post_stub(
+            "note",
+            post_id=post_id,
+            owner_id=post_id,
+            owner_username="post_owner",
+            title="Stub title",
+            body="Stub body",
         )
         # The mock auth in `run_consumer_server_process` makes current_user a
         # superuser when `posts_owner_actions=True`, so the partial's
