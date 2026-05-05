@@ -24,8 +24,8 @@ from .base import ServerManager, setup_health_check_route
 # the pact path against a known target id without round-tripping a database.
 STUB_TARGET_USER_ID = uuid.UUID("11111111-1111-1111-1111-111111111111")
 
-# Stable UUID used by the post-edit stub page; matches `STUB_POST_ID` in
-# `tests/test_contract/constants.py`.
+# Stable UUID used by the post-owner-actions stub page; matches `STUB_POST_ID`
+# in `tests/test_contract/constants.py`.
 STUB_POST_ID = uuid.UUID("22222222-2222-2222-2222-222222222222")
 
 
@@ -41,13 +41,11 @@ class ConsumerServerConfig:
         self,
         auth_pages: bool = True,
         users_admin_actions: bool = False,
-        posts_pages: bool = False,
         posts_owner_actions: bool = False,
         mock_auth: bool = True,
     ):
         self.auth_pages = auth_pages
         self.users_admin_actions = users_admin_actions
-        self.posts_pages = posts_pages
         self.posts_owner_actions = posts_owner_actions
         self.mock_auth = mock_auth
 
@@ -89,37 +87,6 @@ def _setup_users_admin_actions_stub(app: FastAPI) -> None:
         )
 
 
-def _setup_posts_form_stub(app: FastAPI) -> None:
-    """Mount stub pages that render the real `posts/new.html` and
-    `posts/edit.html` templates. The contract surface is the forms'
-    HTMX-decorated submissions; the create POST and edit PATCH are intercepted
-    by Playwright before they leave the browser, so no database is needed.
-    """
-
-    class _StubAttrs:
-        def __init__(self, **kwargs):
-            self.__dict__.update(kwargs)
-
-    @app.get("/posts/form")
-    async def posts_form_stub_page(request: Request):
-        return APIResponse.html_response(
-            template_name="posts/new.html", context={}, request=request
-        )
-
-    @app.get("/posts/{post_id}/form")
-    async def posts_edit_form_stub_page(request: Request, post_id: uuid.UUID):
-        # `posts/edit.html` reads `post.note_detail.title/body` after the
-        # parent/detail split — mirror that shape here so the template renders.
-        post = _StubAttrs(
-            id=post_id,
-            kind="note",
-            note_detail=_StubAttrs(title="Stub title", body="Stub body"),
-        )
-        return APIResponse.html_response(
-            template_name="posts/edit.html", context={"post": post}, request=request
-        )
-
-
 def _setup_post_owner_actions_stub(app: FastAPI) -> None:
     """Mount a stub page that renders the real `posts/detail.html` template
     with hardcoded post + current_user, so the `_owner_actions.html` partial
@@ -135,12 +102,13 @@ def _setup_post_owner_actions_stub(app: FastAPI) -> None:
     @app.get("/posts/{post_id}")
     async def post_owner_actions_stub_page(request: Request, post_id: uuid.UUID):
         owner = _StubAttrs(id=post_id, username="post_owner")
-        # `posts/detail.html` reads `post.note_detail.title/body` after the
-        # parent/detail split — mirror that shape so the template renders.
+        # `posts/detail.html` reads `post.client_referral_detail.description`
+        # for `kind='client_referral'` — mirror that shape so the template
+        # renders.
         post = _StubAttrs(
             id=post_id,
-            kind="note",
-            note_detail=_StubAttrs(title="Stub title", body="Stub body"),
+            kind="client_referral",
+            client_referral_detail=_StubAttrs(description="Stub description"),
             owner_id=owner.id,
             owner=owner,
         )
@@ -164,8 +132,6 @@ def setup_consumer_app_routes(app: FastAPI, config: ConsumerServerConfig) -> Non
         app.include_router(auth_pages.auth_pages_api_router)
     if config.users_admin_actions:
         _setup_users_admin_actions_stub(app)
-    if config.posts_pages:
-        _setup_posts_form_stub(app)
     if config.posts_owner_actions:
         _setup_post_owner_actions_stub(app)
 

@@ -31,12 +31,10 @@ logger = logging.getLogger(__name__)
 # value not in here yields a 422 from FastAPI's Literal validator,
 # avoiding any chance of arbitrary template selection from the URL.
 _CREATE_FORM_TEMPLATES: dict[str, str] = {
-    "note": "posts/new.html",
     "client_referral": "posts/new_client_referral.html",
     "provider_availability": "posts/new_provider_availability.html",
 }
 _EDIT_FORM_TEMPLATES: dict[str, str] = {
-    "note": "posts/edit.html",
     "client_referral": "posts/edit_client_referral.html",
     "provider_availability": "posts/edit_provider_availability.html",
 }
@@ -46,13 +44,6 @@ def _patch_response_body(post) -> dict:
     """Per-kind flat response body for `PATCH /posts/{id}`. The wire
     shape mirrors the POST/GET projection's flat fields so HTMX clients
     don't have to know about parent/detail."""
-    if post.kind == "note":
-        return {
-            "id": str(post.id),
-            "kind": "note",
-            "title": post.note_detail.title,
-            "body": post.note_detail.body,
-        }
     if post.kind == "client_referral":
         return {
             "id": str(post.id),
@@ -90,12 +81,14 @@ async def list_posts(
 @router.get("/form")
 async def get_post_form(
     request: Request,
-    kind: Literal["note", "client_referral", "provider_availability"] = Query("note"),
+    kind: Literal["client_referral", "provider_availability"] = Query(
+        "client_referral"
+    ),
     user: User = Depends(current_active_user),
 ):
     """Provides an HTML page with the create-post form for the given
-    `kind` (default `'note'`). Unsupported kinds 422 via FastAPI's
-    Literal validator.
+    `kind` (default `'client_referral'`). Unsupported kinds 422 via
+    FastAPI's Literal validator.
 
     Registered before `/{post_id}` so the literal `form` is not parsed
     as a UUID.
@@ -161,11 +154,10 @@ async def create_post(
 ):
     """Creates a post owned by the authenticated user.
 
-    The body is a discriminated union on `kind`: pre-existing note
-    payloads (`{title, body}`) keep working without sending the field;
-    `client_referral` payloads must include `kind: "client_referral"`.
-    `owner_id` is server-set from the session; clients sending it (or
-    any other unknown field) are rejected with 422 by the schema.
+    The body is a discriminated union on `kind`: clients must include
+    a `kind` matching one of the registered variants. `owner_id` is
+    server-set from the session; clients sending it (or any other
+    unknown field) are rejected with 422 by the schema.
     """
     created = await handle_create_post(
         payload=payload,

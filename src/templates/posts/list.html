@@ -4,8 +4,6 @@
 <h1>Posts</h1>
 
 <p>
-  <a href="/posts/form">New note</a>
-  ·
   <a href="/posts/form?kind=client_referral">New client referral</a>
   ·
   <a href="/posts/form?kind=provider_availability">New provider availability</a>
@@ -15,10 +13,7 @@
 <ul>
   {% for post in posts %}
   <li>
-    {% if post.kind == "note" %}
-    <a href="/posts/{{ post.id }}">{{ post.note_detail.title }}</a>
-    <span class="post-kind">[note]</span>
-    {% elif post.kind == "client_referral" %}
+    {% if post.kind == "client_referral" %}
     <a href="/posts/{{ post.id }}">{{ post.client_referral_detail.description | truncate(80) }}</a>
     <span class="post-kind">[client referral]</span>
     {% elif post.kind == "provider_availability" %}

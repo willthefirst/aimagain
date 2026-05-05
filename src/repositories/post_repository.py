@@ -6,14 +6,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.models import (
     ClientReferralDetail,
-    NoteDetail,
     Post,
     ProviderAvailabilityDetail,
 )
 
 from .base import BaseRepository
 
-PostDetail = NoteDetail | ClientReferralDetail | ProviderAvailabilityDetail
+PostDetail = ClientReferralDetail | ProviderAvailabilityDetail
 
 
 def _attach_detail(post: Post, detail: PostDetail) -> None:
@@ -21,9 +20,7 @@ def _attach_detail(post: Post, detail: PostDetail) -> None:
 
     Adding a new `kind` means adding its detail class here.
     """
-    if isinstance(detail, NoteDetail):
-        post.note_detail = detail
-    elif isinstance(detail, ClientReferralDetail):
+    if isinstance(detail, ClientReferralDetail):
         post.client_referral_detail = detail
     elif isinstance(detail, ProviderAvailabilityDetail):
         post.provider_availability_detail = detail
@@ -66,15 +63,12 @@ class PostRepository(BaseRepository):
         self,
         post: Post,
         *,
-        title: str | None = None,
-        body: str | None = None,
         description: str | None = None,
         practice_name: str | None = None,
     ) -> Post:
         """Mutates only the per-kind fields that were provided and flushes;
         the caller commits.
 
-        - `title` / `body` are written to `post.note_detail` (kind='note').
         - `description` is written to `post.client_referral_detail`
           (kind='client_referral').
         - `practice_name` is written to `post.provider_availability_detail`
@@ -82,16 +76,11 @@ class PostRepository(BaseRepository):
 
         `post.kind` is intentionally not a parameter and never written by
         this method — kind is part of the resource identity and is fixed
-        at create time. Cross-kind writes (e.g. `title` on a
+        at create time. Cross-kind writes (e.g. `practice_name` on a
         client_referral) are silently skipped here; the calling logic
         layer rejects them at the route boundary with a 400.
         """
-        if post.kind == "note":
-            if title is not None:
-                post.note_detail.title = title
-            if body is not None:
-                post.note_detail.body = body
-        elif post.kind == "client_referral":
+        if post.kind == "client_referral":
             if description is not None:
                 post.client_referral_detail.description = description
         elif post.kind == "provider_availability":

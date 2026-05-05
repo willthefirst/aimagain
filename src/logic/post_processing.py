@@ -7,7 +7,6 @@ from src.api.common.exceptions import BadRequestError, ForbiddenError, NotFoundE
 from src.logic.audit import AuditAction, record_audit
 from src.models import (
     ClientReferralDetail,
-    NoteDetail,
     Post,
     ProviderAvailabilityDetail,
     User,
@@ -17,8 +16,6 @@ from src.repositories.post_repository import PostRepository
 from src.schemas.post import (
     ClientReferralCreate,
     ClientReferralUpdate,
-    NoteCreate,
-    NoteUpdate,
     ProviderAvailabilityCreate,
     ProviderAvailabilityUpdate,
     post_audit_snapshot,
@@ -88,7 +85,7 @@ async def handle_get_post_edit_form(
 
 
 async def handle_create_post(
-    payload: NoteCreate | ClientReferralCreate | ProviderAvailabilityCreate,
+    payload: ClientReferralCreate | ProviderAvailabilityCreate,
     post_repo: PostRepository,
     audit_repo: AuditRepository,
     requesting_user: User,
@@ -100,10 +97,7 @@ async def handle_create_post(
     `src/schemas/post.py`) to build the right per-kind detail row. New
     kinds add a branch here.
     """
-    if isinstance(payload, NoteCreate):
-        post = Post(kind="note", owner_id=requesting_user.id)
-        detail = NoteDetail(title=payload.title, body=payload.body)
-    elif isinstance(payload, ClientReferralCreate):
+    if isinstance(payload, ClientReferralCreate):
         post = Post(kind="client_referral", owner_id=requesting_user.id)
         detail = ClientReferralDetail(description=payload.description)
     elif isinstance(payload, ProviderAvailabilityCreate):
@@ -129,7 +123,7 @@ async def handle_create_post(
 
 async def handle_update_post(
     post_id: UUID,
-    payload: NoteUpdate | ClientReferralUpdate | ProviderAvailabilityUpdate,
+    payload: ClientReferralUpdate | ProviderAvailabilityUpdate,
     post_repo: PostRepository,
     audit_repo: AuditRepository,
     requesting_user: User,
@@ -159,11 +153,7 @@ async def handle_update_post(
         )
 
     before = _snapshot_post(post)
-    if isinstance(payload, NoteUpdate):
-        updated = await post_repo.update_post(
-            post, title=payload.title, body=payload.body
-        )
-    elif isinstance(payload, ClientReferralUpdate):
+    if isinstance(payload, ClientReferralUpdate):
         updated = await post_repo.update_post(post, description=payload.description)
     else:  # ProviderAvailabilityUpdate
         updated = await post_repo.update_post(post, practice_name=payload.practice_name)

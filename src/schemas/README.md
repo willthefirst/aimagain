@@ -62,7 +62,7 @@ Schemas act as the data contract layer between HTTP and business logic.
 | Schema File | Domain    | Responsibilities                             | Schema Types                                             |
 | ----------- | --------- | -------------------------------------------- | -------------------------------------------------------- |
 | **user.py** | User data | User CRUD plus activation state-axis subresource (extends FastAPI Users) and audit snapshots | UserRead, UserCreate, UserUpdate, UserActivationUpdate, UserAuditSnapshot, UserActivationAuditSnapshot |
-| **post.py** | Posts     | `PostCreate`/`PostUpdate`/`PostRead`/`PostAuditSnapshot` are kind-discriminated unions keyed on the (required) `kind` field. Create/Update variants apply `extra="forbid"`, strip whitespace, and (for partial update) require at least one mutable field. Read and AuditSnapshot variants share a single `_flatten_post_to_dict` helper driven by `_KIND_DETAILS` (one entry per kind: detail-relationship name + field tuple), so adding a kind only adds one registry row + four small variant classes. `post_audit_snapshot(post)` validates a SQLAlchemy `Post` against the audit union and returns a JSON-mode dump. | Note*, ClientReferral*, ProviderAvailability* variants of Create/Update/Read/AuditSnapshot, plus the discriminated-union aliases PostCreate/PostUpdate/PostRead/PostAuditSnapshot and the helper `post_audit_snapshot` |
+| **post.py** | Posts     | `PostCreate`/`PostUpdate`/`PostRead`/`PostAuditSnapshot` are kind-discriminated unions keyed on the (required) `kind` field. Create/Update variants apply `extra="forbid"`, strip whitespace, and (for partial update) require at least one mutable field. Read and AuditSnapshot variants share a single `_flatten_post_to_dict` helper driven by `_KIND_DETAILS` (one entry per kind: detail-relationship name + field tuple), so adding a kind only adds one registry row + four small variant classes. `post_audit_snapshot(post)` validates a SQLAlchemy `Post` against the audit union and returns a JSON-mode dump. | ClientReferral*, ProviderAvailability* variants of Create/Update/Read/AuditSnapshot, plus the discriminated-union aliases PostCreate/PostUpdate/PostRead/PostAuditSnapshot and the helper `post_audit_snapshot` |
 
 ## Directory structure
 
@@ -238,7 +238,7 @@ UserUpdate
 
 Colocated tests live alongside the schema modules:
 
-- `test_post.py` — exercises the kind-discriminated `PostCreate`/`PostUpdate` unions: backward-compat default-to-`note`, explicit-kind variants, the `extra="forbid"` boundary (rejects `owner_id`, unknown fields, cross-kind field bleed), per-kind whitespace stripping, and the partial-update at-least-one rule. Also covers `post_audit_snapshot` flattening through the right detail relationship for each registered kind.
+- `test_post.py` — exercises the kind-discriminated `PostCreate`/`PostUpdate` unions for each registered kind, the `extra="forbid"` boundary (rejects `owner_id`, unknown fields, cross-kind field bleed), per-kind whitespace stripping, the partial-update at-least-one rule, and the rejection of the retired `note` kind. Also covers `post_audit_snapshot` flattening through the right detail relationship for each registered kind.
 
 Add `src/schemas/test_<schema_name>.py` when a schema has non-trivial validators or computed fields whose behavior isn't obvious from the field definitions.
 
