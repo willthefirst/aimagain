@@ -33,10 +33,12 @@ logger = logging.getLogger(__name__)
 _CREATE_FORM_TEMPLATES: dict[str, str] = {
     "note": "posts/new.html",
     "client_referral": "posts/new_client_referral.html",
+    "provider_availability": "posts/new_provider_availability.html",
 }
 _EDIT_FORM_TEMPLATES: dict[str, str] = {
     "note": "posts/edit.html",
     "client_referral": "posts/edit_client_referral.html",
+    "provider_availability": "posts/edit_provider_availability.html",
 }
 
 
@@ -56,6 +58,12 @@ def _patch_response_body(post) -> dict:
             "id": str(post.id),
             "kind": "client_referral",
             "description": post.client_referral_detail.description,
+        }
+    if post.kind == "provider_availability":
+        return {
+            "id": str(post.id),
+            "kind": "provider_availability",
+            "practice_name": post.provider_availability_detail.practice_name,
         }
     raise ValueError(f"unsupported post kind: {post.kind!r}")
 
@@ -82,7 +90,7 @@ async def list_posts(
 @router.get("/form")
 async def get_post_form(
     request: Request,
-    kind: Literal["note", "client_referral"] = Query("note"),
+    kind: Literal["note", "client_referral", "provider_availability"] = Query("note"),
     user: User = Depends(current_active_user),
 ):
     """Provides an HTML page with the create-post form for the given

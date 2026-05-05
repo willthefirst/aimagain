@@ -4,6 +4,8 @@
 Post: {{ post.note_detail.title }}
 {%- elif post.kind == "client_referral" -%}
 Client referral
+{%- elif post.kind == "provider_availability" -%}
+Provider availability: {{ post.provider_availability_detail.practice_name }}
 {%- endif -%}
 {% endblock %}
 {% block content %}
@@ -17,6 +19,13 @@ Client referral
 <div class="post-body">
   <p><strong>Description:</strong></p>
   <p>{{ post.client_referral_detail.description }}</p>
+</div>
+{% elif post.kind == "provider_availability" %}
+<h1>Provider availability</h1>
+<p>by <a href="/users/{{ post.owner_id }}">{{ post.owner.username }}</a></p>
+<div class="post-body">
+  <p><strong>Practice name:</strong></p>
+  <p>{{ post.provider_availability_detail.practice_name }}</p>
 </div>
 {% endif %}
 

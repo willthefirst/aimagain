@@ -14,7 +14,12 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from sqlalchemy.types import Uuid
 
-from src.models import ClientReferralDetail, NoteDetail, Post
+from src.models import (
+    ClientReferralDetail,
+    NoteDetail,
+    Post,
+    ProviderAvailabilityDetail,
+)
 from src.repositories.post_repository import PostRepository
 from tests.helpers import create_test_user
 
@@ -285,6 +290,123 @@ async def test_delete_post_cascades_client_referral_detail(
                 await session.execute(
                     select(ClientReferralDetail).filter(
                         ClientReferralDetail.post_id == post_id
+                    )
+                )
+            )
+            .scalars()
+            .first()
+        )
+        assert post_row is None
+        assert detail_row is None
+
+
+# --- Provider availability kind ------------------------------------------
+
+
+async def test_create_post_persists_parent_and_provider_availability_detail(
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+):
+    owner = await _seed_owner(db_test_session_manager)
+
+    async with db_test_session_manager() as session:
+        repo = PostRepository(session)
+        post = Post(kind="provider_availability", owner_id=owner.id)
+        detail = ProviderAvailabilityDetail(practice_name="Acme Health")
+        created = await repo.create_post(post, detail)
+        await session.commit()
+        post_id = created.id
+
+    async with db_test_session_manager() as session:
+        post_row = (
+            (await session.execute(select(Post).filter(Post.id == post_id)))
+            .scalars()
+            .first()
+        )
+        detail_row = (
+            (
+                await session.execute(
+                    select(ProviderAvailabilityDetail).filter(
+                        ProviderAvailabilityDetail.post_id == post_id
+                    )
+                )
+            )
+            .scalars()
+            .first()
+        )
+        assert post_row is not None
+        assert post_row.kind == "provider_availability"
+        assert detail_row is not None
+        assert detail_row.practice_name == "Acme Health"
+
+
+async def test_update_post_writes_to_provider_availability_detail(
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+):
+    owner = await _seed_owner(db_test_session_manager)
+
+    async with db_test_session_manager() as session:
+        repo = PostRepository(session)
+        created = await repo.create_post(
+            Post(kind="provider_availability", owner_id=owner.id),
+            ProviderAvailabilityDetail(practice_name="Acme"),
+        )
+        await session.commit()
+        post_id = created.id
+
+    async with db_test_session_manager() as session:
+        repo = PostRepository(session)
+        post = await repo.get_post_by_id(post_id)
+        await repo.update_post(post, practice_name="Acme Renamed")
+        await session.commit()
+
+    async with db_test_session_manager() as session:
+        detail_row = (
+            (
+                await session.execute(
+                    select(ProviderAvailabilityDetail).filter(
+                        ProviderAvailabilityDetail.post_id == post_id
+                    )
+                )
+            )
+            .scalars()
+            .first()
+        )
+        assert detail_row.practice_name == "Acme Renamed"
+
+
+async def test_delete_post_cascades_provider_availability_detail(
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+):
+    """Deleting a provider_availability parent removes its detail row via
+    FK CASCADE."""
+    owner = await _seed_owner(db_test_session_manager)
+
+    async with db_test_session_manager() as session:
+        repo = PostRepository(session)
+        created = await repo.create_post(
+            Post(kind="provider_availability", owner_id=owner.id),
+            ProviderAvailabilityDetail(practice_name="Doomed"),
+        )
+        await session.commit()
+        post_id = created.id
+
+    async with db_test_session_manager() as session:
+        repo = PostRepository(session)
+        post = await repo.get_post_by_id(post_id)
+        await repo.delete_post(post)
+        await session.commit()
+
+    async with db_test_session_manager() as session:
+        post_row = (
+            (await session.execute(select(Post).filter(Post.id == post_id)))
+            .scalars()
+            .first()
+        )
+        detail_row = (
+            (
+                await session.execute(
+                    select(ProviderAvailabilityDetail).filter(
+                        ProviderAvailabilityDetail.post_id == post_id
                     )
                 )
             )

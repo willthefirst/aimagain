@@ -20,6 +20,8 @@ from src.schemas.post import (
     ClientReferralUpdate,
     NoteCreate,
     NoteUpdate,
+    ProviderAvailabilityCreate,
+    ProviderAvailabilityUpdate,
     post_audit_snapshot,
     post_create_adapter,
     post_update_adapter,
@@ -285,6 +287,120 @@ def test_audit_snapshot_unknown_kind_raises():
         owner_id=uuid.uuid4(),
         note_detail=None,
         client_referral_detail=None,
+        provider_availability_detail=None,
     )
     with pytest.raises(ValidationError):
         post_audit_snapshot(post)
+
+
+# --- provider_availability variants -------------------------------------
+
+
+def test_post_create_dispatches_provider_availability():
+    p = post_create_adapter.validate_python(
+        {"kind": "provider_availability", "practice_name": "Acme Health"}
+    )
+    assert isinstance(p, ProviderAvailabilityCreate)
+    assert p.kind == "provider_availability"
+    assert p.practice_name == "Acme Health"
+
+
+def test_post_create_strips_surrounding_whitespace_provider_availability():
+    p = post_create_adapter.validate_python(
+        {"kind": "provider_availability", "practice_name": "  Acme  "}
+    )
+    assert p.practice_name == "Acme"
+
+
+def test_post_create_provider_availability_rejects_empty_practice_name():
+    with pytest.raises(ValidationError):
+        post_create_adapter.validate_python(
+            {"kind": "provider_availability", "practice_name": "   "}
+        )
+
+
+def test_post_create_provider_availability_requires_practice_name():
+    with pytest.raises(ValidationError):
+        post_create_adapter.validate_python({"kind": "provider_availability"})
+
+
+def test_post_create_rejects_unknown_fields_on_provider_availability():
+    with pytest.raises(ValidationError):
+        post_create_adapter.validate_python(
+            {
+                "kind": "provider_availability",
+                "practice_name": "Acme",
+                "evil": True,
+            }
+        )
+
+
+def test_post_create_rejects_note_fields_on_provider_availability():
+    """Cross-kind field bleed must not validate."""
+    with pytest.raises(ValidationError):
+        post_create_adapter.validate_python(
+            {
+                "kind": "provider_availability",
+                "practice_name": "Acme",
+                "title": "t",
+                "body": "b",
+            }
+        )
+
+
+def test_post_update_provider_availability_accepts_practice_name():
+    p = post_update_adapter.validate_python(
+        {"kind": "provider_availability", "practice_name": "Renamed"}
+    )
+    assert isinstance(p, ProviderAvailabilityUpdate)
+    assert p.practice_name == "Renamed"
+
+
+def test_post_update_provider_availability_strips_whitespace():
+    p = post_update_adapter.validate_python(
+        {"kind": "provider_availability", "practice_name": "  Renamed  "}
+    )
+    assert p.practice_name == "Renamed"
+
+
+def test_post_update_provider_availability_requires_practice_name():
+    with pytest.raises(ValidationError):
+        post_update_adapter.validate_python(
+            {"kind": "provider_availability", "practice_name": None}
+        )
+
+
+def test_post_update_provider_availability_rejects_whitespace_only():
+    with pytest.raises(ValidationError):
+        post_update_adapter.validate_python(
+            {"kind": "provider_availability", "practice_name": "   "}
+        )
+
+
+def test_post_update_provider_availability_rejects_unknown_field():
+    with pytest.raises(ValidationError):
+        post_update_adapter.validate_python(
+            {
+                "kind": "provider_availability",
+                "practice_name": "Acme",
+                "evil": True,
+            }
+        )
+
+
+def test_audit_snapshot_for_provider_availability_post():
+    """Snapshotting a `kind='provider_availability'` post flattens through
+    `provider_availability_detail`."""
+    owner_id = uuid.uuid4()
+    post = SimpleNamespace(
+        kind="provider_availability",
+        owner_id=owner_id,
+        note_detail=None,
+        client_referral_detail=None,
+        provider_availability_detail=SimpleNamespace(practice_name="Acme Health"),
+    )
+    assert post_audit_snapshot(post) == {
+        "kind": "provider_availability",
+        "practice_name": "Acme Health",
+        "owner_id": str(owner_id),
+    }

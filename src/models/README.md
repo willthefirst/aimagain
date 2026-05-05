@@ -54,16 +54,17 @@ Each model maps to a database table with explicit relationships managed by SQLAl
 | Model        | Primary Purpose                                  | Key Fields                                                          | Unique Constraints |
 | ------------ | ------------------------------------------------ | ------------------------------------------------------------------- | ------------------ |
 | **User**     | Authentication and identity                      | username                                                            | username, email    |
-| **Post**     | User-authored content (parent of per-kind detail) | kind (CHECK `'note', 'client_referral'`), owner_id (FK)             | —                  |
+| **Post**     | User-authored content (parent of per-kind detail) | kind (CHECK `'note', 'client_referral', 'provider_availability'`), owner_id (FK) | —                  |
 | **NoteDetail** | Per-kind detail for `kind='note'` posts         | post_id (PK + FK to posts, CASCADE), title, body                    | —                  |
 | **ClientReferralDetail** | Per-kind detail for `kind='client_referral'` posts (MVP: one field) | post_id (PK + FK to posts, CASCADE), description | — |
+| **ProviderAvailabilityDetail** | Per-kind detail for `kind='provider_availability'` posts (MVP: one field) | post_id (PK + FK to posts, CASCADE), practice_name | — |
 | **AuditLog** | Append-only mutation record (RESOURCE_GRAMMAR.md:135) | actor_id (FK, SET NULL), resource_type, resource_id, action, before/after (JSON) | —                  |
 
 ### Parent / per-kind-detail split
 
 `Post` is the parent table for any post-shaped resource. It carries identity, ownership, timestamps, and a `kind` discriminator. Kind-specific fields live in their own detail table keyed by `post_id` (PK + FK with `ON DELETE CASCADE`).
 
-Kinds today: `note` (→ `note_details`) and `client_referral` (→ `client_referral_details`; MVP shape — full intake form per [`../../notes/forms_spec.md`](../../notes/forms_spec.md) follows). Adding a new kind means: (a) widen the CHECK on `posts.kind`, (b) add a new detail table, (c) add a `relationship(..., uselist=False, cascade="all, delete-orphan", lazy="selectin")` on `Post`. Detail rows have no `id` of their own — `post_id` is both PK and FK, enforcing 1:1.
+Kinds today: `note` (→ `note_details`), `client_referral` (→ `client_referral_details`), and `provider_availability` (→ `provider_availability_details`). The two non-note kinds are MVP shape — full intake forms per [`../../notes/forms_spec.md`](../../notes/forms_spec.md) follow. Adding a new kind means: (a) widen the CHECK on `posts.kind`, (b) add a new detail table, (c) add a `relationship(..., uselist=False, cascade="all, delete-orphan", lazy="selectin")` on `Post`. Detail rows have no `id` of their own — `post_id` is both PK and FK, enforcing 1:1.
 
 ## Directory structure
 
@@ -73,6 +74,7 @@ Kinds today: `note` (→ `note_details`) and `client_referral` (→ `client_refe
 - `post.py` - Parent row for posts: kind discriminator + owner FK; one detail table per kind
 - `note_detail.py` - `kind='note'` detail (title + body); 1:1 with `posts` via `post_id`
 - `client_referral_detail.py` - `kind='client_referral'` detail (description; MVP); 1:1 with `posts` via `post_id`
+- `provider_availability_detail.py` - `kind='provider_availability'` detail (practice_name; MVP); 1:1 with `posts` via `post_id`
 
 **Infrastructure:**
 

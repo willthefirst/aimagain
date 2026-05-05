@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block title %}New provider availability{% endblock %}
+{% block content %}
+<h1>New provider availability</h1>
+<p>MVP form: just a practice name for now. The full intake form (per
+<code>notes/forms_spec.md</code>) follows.</p>
+<form hx-post="/posts" hx-ext="json-enc">
+  <input type="hidden" name="kind" value="provider_availability" />
+  <label for="practice_name">Practice name:</label><br />
+  <input type="text" id="practice_name" name="practice_name" required /><br /><br />
+  <input type="submit" value="Create provider availability" />
+</form>
+
+<hr />
+<a href="/posts">Back to posts</a>
+{% endblock %}

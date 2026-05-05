@@ -3,6 +3,7 @@ from .base import Base, BaseModel, metadata
 from .client_referral_detail import ClientReferralDetail
 from .note_detail import NoteDetail
 from .post import Post
+from .provider_availability_detail import ProviderAvailabilityDetail
 from .user import User
 
 __all__ = [
@@ -12,6 +13,7 @@ __all__ = [
     "ClientReferralDetail",
     "NoteDetail",
     "Post",
+    "ProviderAvailabilityDetail",
     "User",
     "metadata",
 ]
