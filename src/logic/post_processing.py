@@ -5,7 +5,13 @@ from fastapi import Request
 
 from src.api.common.exceptions import BadRequestError, ForbiddenError, NotFoundError
 from src.logic.audit import AuditAction, record_audit
-from src.models import ClientReferralDetail, NoteDetail, Post, User
+from src.models import (
+    ClientReferralDetail,
+    NoteDetail,
+    Post,
+    ProviderAvailabilityDetail,
+    User,
+)
 from src.repositories.audit_repository import AuditRepository
 from src.repositories.post_repository import PostRepository
 from src.schemas.post import (
@@ -13,6 +19,8 @@ from src.schemas.post import (
     ClientReferralUpdate,
     NoteCreate,
     NoteUpdate,
+    ProviderAvailabilityCreate,
+    ProviderAvailabilityUpdate,
     post_audit_snapshot,
 )
 
@@ -80,7 +88,7 @@ async def handle_get_post_edit_form(
 
 
 async def handle_create_post(
-    payload: NoteCreate | ClientReferralCreate,
+    payload: NoteCreate | ClientReferralCreate | ProviderAvailabilityCreate,
     post_repo: PostRepository,
     audit_repo: AuditRepository,
     requesting_user: User,
@@ -98,6 +106,9 @@ async def handle_create_post(
     elif isinstance(payload, ClientReferralCreate):
         post = Post(kind="client_referral", owner_id=requesting_user.id)
         detail = ClientReferralDetail(description=payload.description)
+    elif isinstance(payload, ProviderAvailabilityCreate):
+        post = Post(kind="provider_availability", owner_id=requesting_user.id)
+        detail = ProviderAvailabilityDetail(practice_name=payload.practice_name)
     else:  # pragma: no cover — schema discriminator should make this unreachable
         raise BadRequestError(detail=f"unsupported post kind: {payload.kind!r}")
 
@@ -118,7 +129,7 @@ async def handle_create_post(
 
 async def handle_update_post(
     post_id: UUID,
-    payload: NoteUpdate | ClientReferralUpdate,
+    payload: NoteUpdate | ClientReferralUpdate | ProviderAvailabilityUpdate,
     post_repo: PostRepository,
     audit_repo: AuditRepository,
     requesting_user: User,
@@ -152,8 +163,10 @@ async def handle_update_post(
         updated = await post_repo.update_post(
             post, title=payload.title, body=payload.body
         )
-    else:
+    elif isinstance(payload, ClientReferralUpdate):
         updated = await post_repo.update_post(post, description=payload.description)
+    else:  # ProviderAvailabilityUpdate
+        updated = await post_repo.update_post(post, practice_name=payload.practice_name)
     await record_audit(
         audit_repo,
         actor_id=requesting_user.id,

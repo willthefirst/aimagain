@@ -6,7 +6,14 @@ from selectolax.parser import HTMLParser
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from src.models import AuditLog, ClientReferralDetail, NoteDetail, Post, User
+from src.models import (
+    AuditLog,
+    ClientReferralDetail,
+    NoteDetail,
+    Post,
+    ProviderAvailabilityDetail,
+    User,
+)
 from src.repositories.audit_repository import AuditRepository
 from tests.helpers import create_test_user, promote_to_admin
 
@@ -27,6 +34,15 @@ def _client_referral_post(*, description: str, owner_id) -> Post:
     """Build a `kind='client_referral'` Post + its detail."""
     post = Post(kind="client_referral", owner_id=owner_id)
     post.client_referral_detail = ClientReferralDetail(description=description)
+    return post
+
+
+def _provider_availability_post(*, practice_name: str, owner_id) -> Post:
+    """Build a `kind='provider_availability'` Post + its detail."""
+    post = Post(kind="provider_availability", owner_id=owner_id)
+    post.provider_availability_detail = ProviderAvailabilityDetail(
+        practice_name=practice_name
+    )
     return post
 
 
@@ -562,6 +578,8 @@ async def test_list_page_links_to_create_form(
     assert "New note" in link.text()
     cr_link = tree.css_first('a[href="/posts/form?kind=client_referral"]')
     assert cr_link is not None
+    pa_link = tree.css_first('a[href="/posts/form?kind=provider_availability"]')
+    assert pa_link is not None
 
 
 # --- Edit form page (GET /posts/{id}/form) -------------------------------
@@ -1449,6 +1467,320 @@ async def test_delete_client_referral_writes_audit_row(
         assert rows[0].before == {
             "kind": "client_referral",
             "description": description,
+            "owner_id": str(logged_in_user.id),
+        }
+        assert rows[0].after is None
+
+
+# --- Provider availability kind: end-to-end ------------------------------
+
+
+async def test_create_provider_availability_happy_path(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user: User,
+):
+    """`POST /posts` with `kind='provider_availability'` persists with
+    the right detail row + audit row."""
+    practice_name = f"Acme-{uuid.uuid4()}"
+
+    response = await authenticated_client.post(
+        "/posts",
+        json={"kind": "provider_availability", "practice_name": practice_name},
+    )
+
+    assert response.status_code == 201
+    new_id = uuid.UUID(response.json()["id"])
+
+    async with db_test_session_manager() as session:
+        result = await session.execute(select(Post).filter(Post.id == new_id))
+        persisted = result.scalars().first()
+        assert persisted is not None
+        assert persisted.kind == "provider_availability"
+        assert persisted.provider_availability_detail.practice_name == practice_name
+        assert persisted.note_detail is None
+        assert persisted.client_referral_detail is None
+        assert persisted.owner_id == logged_in_user.id
+
+    async with db_test_session_manager() as session:
+        repo = AuditRepository(session)
+        rows = await repo.list_for_resource(resource_type="post", resource_id=new_id)
+        assert len(rows) == 1
+        assert rows[0].action == "create_post"
+        assert rows[0].before is None
+        assert rows[0].after == {
+            "kind": "provider_availability",
+            "practice_name": practice_name,
+            "owner_id": str(logged_in_user.id),
+        }
+
+
+async def test_create_provider_availability_strips_whitespace(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user: User,
+):
+    response = await authenticated_client.post(
+        "/posts",
+        json={"kind": "provider_availability", "practice_name": "  Acme  "},
+    )
+    assert response.status_code == 201
+    new_id = uuid.UUID(response.json()["id"])
+
+    async with db_test_session_manager() as session:
+        result = await session.execute(select(Post).filter(Post.id == new_id))
+        persisted = result.scalars().first()
+        assert persisted.provider_availability_detail.practice_name == "Acme"
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        {"kind": "provider_availability"},  # missing practice_name
+        {"kind": "provider_availability", "practice_name": ""},
+        {"kind": "provider_availability", "practice_name": "   "},
+        {
+            "kind": "provider_availability",
+            "practice_name": "Acme",
+            "title": "bleed",
+        },
+        {
+            "kind": "provider_availability",
+            "practice_name": "Acme",
+            "evil": True,
+        },
+    ],
+)
+async def test_create_provider_availability_rejects_invalid_payload(
+    payload,
+    authenticated_client: AsyncClient,
+    logged_in_user: User,
+):
+    response = await authenticated_client.post("/posts", json=payload)
+    assert response.status_code == 422
+
+
+async def test_get_provider_availability_form_renders(
+    authenticated_client: AsyncClient,
+    logged_in_user: User,
+):
+    """`GET /posts/form?kind=provider_availability` renders the kind-specific
+    create form."""
+    response = await authenticated_client.get("/posts/form?kind=provider_availability")
+    assert response.status_code == 200
+    tree = HTMLParser(response.text)
+    form = tree.css_first("form")
+    assert form is not None
+    assert form.attributes.get("hx-post") == "/posts"
+    assert form.attributes.get("hx-ext") == "json-enc"
+    assert tree.css_first("input#practice_name") is not None
+    kind_input = tree.css_first('input[name="kind"]')
+    assert kind_input is not None
+    assert kind_input.attributes.get("value") == "provider_availability"
+
+
+async def test_list_renders_provider_availability_row(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user: User,
+):
+    """`GET /posts` lists a provider_availability with a kind label."""
+    author = create_test_user(username=f"author-{uuid.uuid4()}")
+    practice_name = f"Practice-{uuid.uuid4()}"
+    post = _provider_availability_post(practice_name=practice_name, owner_id=author.id)
+
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            session.add(author)
+            session.add(post)
+
+    response = await authenticated_client.get("/posts")
+    assert response.status_code == 200
+    page = response.text
+    assert practice_name in page
+    assert "provider availability" in page.lower()
+
+
+async def test_get_provider_availability_detail_renders(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user: User,
+):
+    author = create_test_user(username=f"author-{uuid.uuid4()}")
+    practice_name = f"Detail-{uuid.uuid4()}"
+    post = _provider_availability_post(practice_name=practice_name, owner_id=author.id)
+
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            session.add(author)
+            session.add(post)
+
+    response = await authenticated_client.get(f"/posts/{post.id}")
+    assert response.status_code == 200
+    page = response.text
+    assert practice_name in page
+    assert author.username in page
+
+
+async def test_owner_can_open_provider_availability_edit_form(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user: User,
+):
+    """The owner of a provider_availability sees the kind-specific edit
+    form pre-filled with the current practice name."""
+    practice_name = f"Edit-{uuid.uuid4()}"
+    post = _provider_availability_post(
+        practice_name=practice_name, owner_id=logged_in_user.id
+    )
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            session.add(post)
+
+    response = await authenticated_client.get(f"/posts/{post.id}/form")
+    assert response.status_code == 200
+    tree = HTMLParser(response.text)
+    form = tree.css_first("form")
+    assert form is not None
+    assert form.attributes.get("hx-patch") == f"/posts/{post.id}"
+    practice_input = tree.css_first("input#practice_name")
+    assert practice_input is not None
+    assert practice_input.attributes.get("value") == practice_name
+    kind_input = tree.css_first('input[name="kind"]')
+    assert kind_input is not None
+    assert kind_input.attributes.get("value") == "provider_availability"
+
+
+async def test_owner_can_patch_provider_availability_practice_name(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user: User,
+):
+    post = _provider_availability_post(practice_name="orig", owner_id=logged_in_user.id)
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            session.add(post)
+
+    new_practice_name = f"Renamed-{uuid.uuid4()}"
+    response = await authenticated_client.patch(
+        f"/posts/{post.id}",
+        json={
+            "kind": "provider_availability",
+            "practice_name": new_practice_name,
+        },
+    )
+    assert response.status_code == 200
+    assert response.headers.get("HX-Refresh") == "true"
+    body = response.json()
+    assert body["kind"] == "provider_availability"
+    assert body["practice_name"] == new_practice_name
+    assert "title" not in body and "body" not in body and "description" not in body
+
+    async with db_test_session_manager() as session:
+        result = await session.execute(select(Post).filter(Post.id == post.id))
+        refreshed = result.scalars().first()
+        assert refreshed.provider_availability_detail.practice_name == new_practice_name
+
+
+async def test_patch_provider_availability_with_note_payload_does_not_mutate(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user: User,
+):
+    """A provider_availability post can't be patched with a note payload —
+    same kind-immutability invariant as the other kinds. State + audit
+    log must be untouched after the 400."""
+    original = f"orig-{uuid.uuid4()}"
+    post = _provider_availability_post(
+        practice_name=original, owner_id=logged_in_user.id
+    )
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            session.add(post)
+    post_id = post.id
+
+    response = await authenticated_client.patch(
+        f"/posts/{post_id}",
+        json={"kind": "note", "title": "hijack", "body": "hijack"},
+    )
+    assert response.status_code == 400
+
+    async with db_test_session_manager() as session:
+        result = await session.execute(select(Post).filter(Post.id == post_id))
+        refreshed = result.scalars().first()
+        assert refreshed.kind == "provider_availability"
+        assert refreshed.provider_availability_detail.practice_name == original
+        assert refreshed.note_detail is None
+
+    async with db_test_session_manager() as session:
+        repo = AuditRepository(session)
+        rows = await repo.list_for_resource(resource_type="post", resource_id=post_id)
+        assert rows == []
+
+
+async def test_owner_can_delete_provider_availability(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user: User,
+):
+    """`DELETE /posts/{id}` works for provider_availability; cascades the detail."""
+    post = _provider_availability_post(
+        practice_name="doomed", owner_id=logged_in_user.id
+    )
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            session.add(post)
+    post_id = post.id
+
+    response = await authenticated_client.delete(f"/posts/{post_id}")
+    assert response.status_code == 204
+
+    async with db_test_session_manager() as session:
+        post_row = (
+            (await session.execute(select(Post).filter(Post.id == post_id)))
+            .scalars()
+            .first()
+        )
+        detail_row = (
+            (
+                await session.execute(
+                    select(ProviderAvailabilityDetail).filter(
+                        ProviderAvailabilityDetail.post_id == post_id
+                    )
+                )
+            )
+            .scalars()
+            .first()
+        )
+        assert post_row is None
+        assert detail_row is None
+
+
+async def test_delete_provider_availability_writes_audit_row(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user: User,
+):
+    practice_name = f"doomed-{uuid.uuid4()}"
+    post = _provider_availability_post(
+        practice_name=practice_name, owner_id=logged_in_user.id
+    )
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            session.add(post)
+    post_id = post.id
+
+    response = await authenticated_client.delete(f"/posts/{post_id}")
+    assert response.status_code == 204
+
+    async with db_test_session_manager() as session:
+        repo = AuditRepository(session)
+        rows = await repo.list_for_resource(resource_type="post", resource_id=post_id)
+        assert len(rows) == 1
+        assert rows[0].action == "delete_post"
+        assert rows[0].before == {
+            "kind": "provider_availability",
+            "practice_name": practice_name,
             "owner_id": str(logged_in_user.id),
         }
         assert rows[0].after is None

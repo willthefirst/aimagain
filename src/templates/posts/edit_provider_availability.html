@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block title %}Edit provider availability{% endblock %}
+{% block content %}
+<h1>Edit provider availability</h1>
+<form hx-patch="/posts/{{ post.id }}" hx-ext="json-enc">
+  <input type="hidden" name="kind" value="provider_availability" />
+  <label for="practice_name">Practice name:</label><br />
+  <input type="text" id="practice_name" name="practice_name" value="{{ post.provider_availability_detail.practice_name }}" required /><br /><br />
+  <input type="submit" value="Save changes" />
+</form>
+
+<hr />
+<a href="/posts/{{ post.id }}">Cancel</a>
+{% endblock %}

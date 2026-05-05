@@ -37,6 +37,10 @@ from pydantic import (
 _KIND_DETAILS: dict[str, tuple[str, tuple[str, ...]]] = {
     "note": ("note_detail", ("title", "body")),
     "client_referral": ("client_referral_detail", ("description",)),
+    "provider_availability": (
+        "provider_availability_detail",
+        ("practice_name",),
+    ),
 }
 
 
@@ -97,7 +101,15 @@ class ClientReferralRead(_PostReadBase):
     description: str
 
 
-PostRead = Annotated[Union[NoteRead, ClientReferralRead], Field(discriminator="kind")]
+class ProviderAvailabilityRead(_PostReadBase):
+    kind: Literal["provider_availability"]
+    practice_name: str
+
+
+PostRead = Annotated[
+    Union[NoteRead, ClientReferralRead, ProviderAvailabilityRead],
+    Field(discriminator="kind"),
+]
 post_read_adapter: TypeAdapter = TypeAdapter(PostRead)
 
 
@@ -139,8 +151,26 @@ class ClientReferralCreate(BaseModel):
         return v
 
 
+class ProviderAvailabilityCreate(BaseModel):
+    """Create payload for `kind='provider_availability'`. MVP: one field."""
+
+    kind: Literal["provider_availability"]
+    practice_name: str
+
+    model_config = ConfigDict(extra="forbid")
+
+    @field_validator("practice_name")
+    @classmethod
+    def _strip_and_require_non_empty(cls, v: str) -> str:
+        v = v.strip()
+        if not v:
+            raise ValueError("must not be empty")
+        return v
+
+
 PostCreate = Annotated[
-    Union[NoteCreate, ClientReferralCreate], Field(discriminator="kind")
+    Union[NoteCreate, ClientReferralCreate, ProviderAvailabilityCreate],
+    Field(discriminator="kind"),
 ]
 post_create_adapter: TypeAdapter = TypeAdapter(PostCreate)
 
@@ -195,8 +225,32 @@ class ClientReferralUpdate(BaseModel):
         return self
 
 
+class ProviderAvailabilityUpdate(BaseModel):
+    kind: Literal["provider_availability"]
+    practice_name: str | None = None
+
+    model_config = ConfigDict(extra="forbid")
+
+    @field_validator("practice_name")
+    @classmethod
+    def _strip_and_require_non_empty(cls, v: str | None) -> str | None:
+        if v is None:
+            return None
+        v = v.strip()
+        if not v:
+            raise ValueError("must not be empty")
+        return v
+
+    @model_validator(mode="after")
+    def _at_least_one_field(self) -> "ProviderAvailabilityUpdate":
+        if self.practice_name is None:
+            raise ValueError("practice_name must be provided")
+        return self
+
+
 PostUpdate = Annotated[
-    Union[NoteUpdate, ClientReferralUpdate], Field(discriminator="kind")
+    Union[NoteUpdate, ClientReferralUpdate, ProviderAvailabilityUpdate],
+    Field(discriminator="kind"),
 ]
 post_update_adapter: TypeAdapter = TypeAdapter(PostUpdate)
 
@@ -226,8 +280,17 @@ class ClientReferralAuditSnapshot(_PostAuditSnapshotBase):
     description: str
 
 
+class ProviderAvailabilityAuditSnapshot(_PostAuditSnapshotBase):
+    kind: Literal["provider_availability"]
+    practice_name: str
+
+
 PostAuditSnapshot = Annotated[
-    Union[NoteAuditSnapshot, ClientReferralAuditSnapshot],
+    Union[
+        NoteAuditSnapshot,
+        ClientReferralAuditSnapshot,
+        ProviderAvailabilityAuditSnapshot,
+    ],
     Field(discriminator="kind"),
 ]
 _post_audit_snapshot_adapter: TypeAdapter = TypeAdapter(PostAuditSnapshot)

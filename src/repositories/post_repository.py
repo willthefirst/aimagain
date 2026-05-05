@@ -4,11 +4,16 @@ from uuid import UUID
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.models import ClientReferralDetail, NoteDetail, Post
+from src.models import (
+    ClientReferralDetail,
+    NoteDetail,
+    Post,
+    ProviderAvailabilityDetail,
+)
 
 from .base import BaseRepository
 
-PostDetail = NoteDetail | ClientReferralDetail
+PostDetail = NoteDetail | ClientReferralDetail | ProviderAvailabilityDetail
 
 
 def _attach_detail(post: Post, detail: PostDetail) -> None:
@@ -20,6 +25,8 @@ def _attach_detail(post: Post, detail: PostDetail) -> None:
         post.note_detail = detail
     elif isinstance(detail, ClientReferralDetail):
         post.client_referral_detail = detail
+    elif isinstance(detail, ProviderAvailabilityDetail):
+        post.provider_availability_detail = detail
     else:
         raise TypeError(f"unsupported detail type: {type(detail).__name__}")
 
@@ -62,6 +69,7 @@ class PostRepository(BaseRepository):
         title: str | None = None,
         body: str | None = None,
         description: str | None = None,
+        practice_name: str | None = None,
     ) -> Post:
         """Mutates only the per-kind fields that were provided and flushes;
         the caller commits.
@@ -69,6 +77,8 @@ class PostRepository(BaseRepository):
         - `title` / `body` are written to `post.note_detail` (kind='note').
         - `description` is written to `post.client_referral_detail`
           (kind='client_referral').
+        - `practice_name` is written to `post.provider_availability_detail`
+          (kind='provider_availability').
 
         `post.kind` is intentionally not a parameter and never written by
         this method — kind is part of the resource identity and is fixed
@@ -84,6 +94,9 @@ class PostRepository(BaseRepository):
         elif post.kind == "client_referral":
             if description is not None:
                 post.client_referral_detail.description = description
+        elif post.kind == "provider_availability":
+            if practice_name is not None:
+                post.provider_availability_detail.practice_name = practice_name
         self.session.add(post)
         await self.session.flush()
         await self.session.refresh(post)

@@ -11,13 +11,18 @@ class Post(BaseModel):
     Carries identity, ownership, timestamps, and the `kind` discriminator.
     Kind-specific fields live in a per-kind detail table joined on
     `post_id`. Kinds today: `'note'` (→ `NoteDetail`), `'client_referral'`
-    (→ `ClientReferralDetail`). Adding a kind means widening the CHECK
-    here, adding a detail table, and adding a `relationship(...)` below.
+    (→ `ClientReferralDetail`), `'provider_availability'`
+    (→ `ProviderAvailabilityDetail`). Adding a kind means widening the
+    CHECK here, adding a detail table, and adding a `relationship(...)`
+    below.
     """
 
     __tablename__ = "posts"
     __table_args__ = (
-        CheckConstraint("kind IN ('note', 'client_referral')", name="ck_posts_kind"),
+        CheckConstraint(
+            "kind IN ('note', 'client_referral', 'provider_availability')",
+            name="ck_posts_kind",
+        ),
     )
 
     kind = Column(Text, nullable=False)
@@ -36,6 +41,12 @@ class Post(BaseModel):
     )
     client_referral_detail = relationship(
         "ClientReferralDetail",
+        uselist=False,
+        cascade="all, delete-orphan",
+        lazy="selectin",
+    )
+    provider_availability_detail = relationship(
+        "ProviderAvailabilityDetail",
         uselist=False,
         cascade="all, delete-orphan",
         lazy="selectin",
