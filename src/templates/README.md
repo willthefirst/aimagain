@@ -190,8 +190,7 @@ def prepare_template_context(request: Request, user: User, data: Any) -> dict:
         "request": request,          # Required by FastAPI templates
         "current_user": user,        # Current authenticated user
         "is_authenticated": bool(user), # Authentication status
-        "is_development": settings.ENVIRONMENT == "development",
-        "livereload_port": settings.LIVERELOAD_PORT if settings.ENVIRONMENT == "development" else None,
+        **get_template_context(),    # Include environment context (safe development-only features)
 
         # Page-specific data
         "page_title": "Page Title",

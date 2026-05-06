@@ -10,6 +10,7 @@ class Settings(BaseSettings):
     SECRET: str
     DATABASE_URL: str
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
+    ENVIRONMENT: str = "production"
 
     model_config = ConfigDict(env_file=".env", env_file_encoding="utf-8")
 

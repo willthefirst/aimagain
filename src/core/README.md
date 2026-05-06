@@ -105,7 +105,7 @@ class Settings(BaseSettings):
 
     # Optional settings with defaults
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
-    ENVIRONMENT: str = "development"
+    ENVIRONMENT: str = "production"
 
     # Pydantic configuration
     model_config = ConfigDict(
@@ -169,11 +169,11 @@ class Settings(BaseSettings):
 Set up templates with environment-aware features:
 
 ```python
-import os
 from fastapi.templating import Jinja2Templates
+from src.core.config import settings
 
-# Environment-aware configuration
-auto_reload = os.getenv("ENVIRONMENT", "development") == "development"
+# Environment-aware configuration (never use unsafe defaults)
+auto_reload = settings.ENVIRONMENT == "development"
 
 # Configure template system
 templates = Jinja2Templates(
@@ -184,8 +184,8 @@ templates = Jinja2Templates(
 def get_template_context() -> dict:
     """Get global template context with environment information."""
     return {
-        "is_development": os.getenv("ENVIRONMENT") == "development",
-        "livereload_port": os.getenv("LIVERELOAD_PORT", "35729"),
+        "is_development": settings.ENVIRONMENT == "development",
+        "livereload_port": "35729",  # Only used if is_development is True
     }
 
 # Usage in routes:
@@ -364,7 +364,10 @@ def test_with_custom_config():
 
 ## Tests
 
-**TODO** — no colocated tests yet. When changing config loading or templating utilities, add `src/core/test_<file>.py`. Config tests should cover env var precedence and validation error messages; templating tests should cover URL building and any Jinja globals/filters.
+Configuration and templating utilities are tested in `tests/test_core.py`. Tests cover:
+- Environment variable defaults (particularly ensuring production is the safe default)
+- Template context generation for development vs production
+- LIVERELOAD script conditionally loading only in development
 
 ## Related documentation
 
