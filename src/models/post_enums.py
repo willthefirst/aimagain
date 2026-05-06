@@ -203,6 +203,81 @@ TREATMENT_SETTINGS_LABELS: Final[dict[str, str]] = {
     "residential": "Residential",
 }
 
+LICENSE_TYPES: Final[tuple[str, ...]] = (
+    "lcsw",
+    "lpc",
+    "lmft",
+    "lmhc",
+    "lcpc",
+    "psyd",
+    "phd",
+    "md",
+    "do",
+    "np",
+    "pmhnp",
+    "other",
+)
+LICENSE_TYPES_LABELS: Final[dict[str, str]] = {
+    "lcsw": "Licensed Clinical Social Worker (LCSW)",
+    "lpc": "Licensed Professional Counselor (LPC)",
+    "lmft": "Licensed Marriage and Family Therapist (LMFT)",
+    "lmhc": "Licensed Mental Health Counselor (LMHC)",
+    "lcpc": "Licensed Clinical Professional Counselor (LCPC)",
+    "psyd": "Doctor of Psychology (PsyD)",
+    "phd": "Doctor of Philosophy (PhD)",
+    "md": "Medical Doctor (MD)",
+    "do": "Doctor of Osteopathic Medicine (DO)",
+    "np": "Nurse Practitioner (NP)",
+    "pmhnp": "Psychiatric Mental Health Nurse Practitioner (PMHNP)",
+    "other": "Other",
+}
+
+EDUCATION_TYPES: Final[tuple[str, ...]] = (
+    "ba_bs",
+    "ma_ms",
+    "msw",
+    "phd",
+    "psyd",
+    "md",
+    "do",
+    "edd",
+    "other",
+)
+EDUCATION_TYPES_LABELS: Final[dict[str, str]] = {
+    "ba_bs": "Bachelor's Degree (BA/BS)",
+    "ma_ms": "Master of Arts/Science (MA/MS)",
+    "msw": "Master of Social Work (MSW)",
+    "phd": "Doctor of Philosophy (PhD)",
+    "psyd": "Doctor of Psychology (PsyD)",
+    "md": "Medical Doctor (MD)",
+    "do": "Doctor of Osteopathic Medicine (DO)",
+    "edd": "Doctor of Education (EdD)",
+    "other": "Other",
+}
+
+CERTIFICATION_TYPES: Final[tuple[str, ...]] = (
+    "emdr",
+    "dbt",
+    "cbt",
+    "gottman_1",
+    "gottman_2",
+    "gottman_3",
+    "cpr",
+    "ccatp",
+    "other",
+)
+CERTIFICATION_TYPES_LABELS: Final[dict[str, str]] = {
+    "emdr": "EMDR",
+    "dbt": "DBT Certification",
+    "cbt": "CBT Certification",
+    "gottman_1": "Gottman Method Level 1",
+    "gottman_2": "Gottman Method Level 2",
+    "gottman_3": "Gottman Method Level 3",
+    "cpr": "CPR Certified",
+    "ccatp": "Certified Clinical Anxiety Treatment Professional (CCATP)",
+    "other": "Other",
+}
+
 
 def check_in_tuple_sql(column: str, values: tuple[str, ...]) -> str:
     """SQL fragment for a `column IN (...)` CHECK constraint, rendered
