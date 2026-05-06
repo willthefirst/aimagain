@@ -215,9 +215,10 @@ async def patch_post(
         audit_repo=audit_repo,
         requesting_user=user,
     )
+    location = f"/posts/{updated.id}"
     return JSONResponse(
         content=_patch_response_body(updated),
-        headers={"HX-Refresh": "true"},
+        headers={"HX-Redirect": location},
     )
 
 

@@ -971,7 +971,7 @@ async def test_owner_can_patch_client_referral_description(
         data={"kind": "client_referral", "description": new_description},
     )
     assert response.status_code == 200
-    assert response.headers.get("HX-Refresh") == "true"
+    assert response.headers.get("HX-Redirect") == f"/posts/{post.id}"
     body = response.json()
     assert body["kind"] == "client_referral"
     assert body["description"] == new_description
@@ -1313,7 +1313,7 @@ async def test_owner_can_patch_provider_availability_practice_name(
         },
     )
     assert response.status_code == 200
-    assert response.headers.get("HX-Refresh") == "true"
+    assert response.headers.get("HX-Redirect") == f"/posts/{post.id}"
     body = response.json()
     assert body["kind"] == "provider_availability"
     assert body["practice_name"] == new_practice_name
