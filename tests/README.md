@@ -11,7 +11,12 @@ See [`../CLAUDE.md`](../CLAUDE.md) for the full definition-of-done contract that
 ## What lives here
 
 - **`fixtures.py`** — shared pytest fixtures (`test_client`, `authenticated_client`, `db_test_session_manager`, `logged_in_user`, etc.). Loaded globally via `pytest_plugins = ["tests.fixtures"]` in the repo-root `conftest.py`, so colocated tests anywhere under `src/` can use them.
-- **`helpers.py`** — non-fixture test utilities. Currently exports `create_test_user(...)` for building User instances and `promote_to_admin(...)` for flipping `is_superuser=True` on a fixture-created user (used by tests that exercise admin-gated routes). Import as `from tests.helpers import create_test_user, promote_to_admin`.
+- **`helpers.py`** — non-fixture test utilities. Exports:
+  - `create_test_user(...)` for building User instances.
+  - `promote_to_admin(...)` for flipping `is_superuser=True` on a fixture-created user (admin-gated route tests).
+  - Per-kind post factories: `client_referral_payload(**overrides)` / `provider_availability_payload(**overrides)` return wire-valid `POST /posts` JSON bodies, and `make_client_referral_detail(**overrides)` / `make_provider_availability_detail(**overrides)` return spec-compliant ORM detail rows. Both factories supply spec-required fields with valid defaults so tests only override the fields they're asserting on; the defaults sit next to the factory functions in `helpers.py` so updating spec defaults is a one-place change.
+
+  Import as `from tests.helpers import create_test_user, promote_to_admin, client_referral_payload, ...`.
 - **`README.md`** — this file.
 - **(future) cross-module integration tests** — tests that span multiple layers and don't have a single owning module belong here, not under `src/`.
 
@@ -26,9 +31,9 @@ See [`../CLAUDE.md`](../CLAUDE.md) for the full definition-of-done contract that
 | --- | --- |
 | `src/api/routes/` | `test_auth_routes.py`, `test_users.py`, `test_posts.py` |
 | `src/schemas/` | `test_post.py` |
-| `src/repositories/` | `test_audit_repository.py` |
-| `src/logic/` | `test_audit.py` |
-| `src/models/` | none yet — gap |
+| `src/repositories/` | `test_audit_repository.py`, `test_post_repository.py` |
+| `src/logic/` | `test_audit.py`, `test_audit_discipline.py` |
+| `src/models/` | `test_post_kinds.py` |
 
 ## Cross-layer tests: the documented exception
 
