@@ -49,23 +49,28 @@ class KindSpec:
     edit_template: str
 
 
+def _detail_fields(detail_model: type) -> tuple[str, ...]:
+    """User-facing column names of a per-kind detail model.
+
+    Excludes only the `post_id` PK/FK — every other column on the table
+    is a wire-surface field. Sourcing this from the model itself rather
+    than a hand-maintained tuple means adding/dropping a column is a
+    one-place change: registry-driven flatten, audit snapshot, and
+    PATCH response automatically pick it up. The
+    `test_detail_fields_match_model_columns` guard in
+    `test_post_kinds.py` keeps the convention honest if some future
+    column ever needs to be excluded — drop the test or add an opt-out
+    mechanism then, deliberately.
+    """
+    return tuple(c.name for c in detail_model.__table__.columns if c.name != "post_id")
+
+
 REGISTERED_KINDS: Final[dict[str, KindSpec]] = {
     "client_referral": KindSpec(
         name="client_referral",
         detail_model=ClientReferralDetail,
         detail_relationship="client_referral_detail",
-        detail_fields=(
-            "location_city",
-            "location_state",
-            "location_zip",
-            "location_in_person",
-            "location_virtual",
-            "client_dem_ages",
-            "language_preferred",
-            "description",
-            "services_psychotherapy_modality",
-            "insurance",
-        ),
+        detail_fields=_detail_fields(ClientReferralDetail),
         list_label="client referral",
         create_template="posts/new_client_referral.html",
         edit_template="posts/edit_client_referral.html",
@@ -74,22 +79,7 @@ REGISTERED_KINDS: Final[dict[str, KindSpec]] = {
         name="provider_availability",
         detail_model=ProviderAvailabilityDetail,
         detail_relationship="provider_availability_detail",
-        detail_fields=(
-            "practice_name",
-            "available_providers",
-            "location_city",
-            "location_state",
-            "location_zip",
-            "in_person_sessions",
-            "virtual_sessions",
-            "treatment_modality",
-            "client_focus",
-            "age_group",
-            "non_english_services",
-            "payment_situation",
-            "sliding_scale",
-            "cost",
-        ),
+        detail_fields=_detail_fields(ProviderAvailabilityDetail),
         list_label="provider availability",
         create_template="posts/new_provider_availability.html",
         edit_template="posts/edit_provider_availability.html",

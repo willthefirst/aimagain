@@ -39,58 +39,13 @@ depends_on: Union[str, Sequence[str], None] = None
 # and survives future renames of the model-layer constants. Mirrors the
 # tuples in `src/models/post_enums.py` at the time of authoring.
 _US_STATES = (
-    "AL",
-    "AK",
-    "AZ",
-    "AR",
-    "CA",
-    "CO",
-    "CT",
-    "DE",
-    "DC",
-    "FL",
-    "GA",
-    "HI",
-    "ID",
-    "IL",
-    "IN",
-    "IA",
-    "KS",
-    "KY",
-    "LA",
-    "ME",
-    "MD",
-    "MA",
-    "MI",
-    "MN",
-    "MS",
-    "MO",
-    "MT",
-    "NE",
-    "NV",
-    "NH",
-    "NJ",
-    "NM",
-    "NY",
-    "NC",
-    "ND",
-    "OH",
-    "OK",
-    "OR",
-    "PA",
-    "RI",
-    "SC",
-    "SD",
-    "TN",
-    "TX",
-    "UT",
-    "VT",
-    "VA",
-    "WA",
-    "WV",
-    "WI",
+    "AL", "AK", "AZ", "AR", "CA", "CO", "CT", "DE", "DC", "FL",
+    "GA", "HI", "ID", "IL", "IN", "IA", "KS", "KY", "LA", "ME",
+    "MD", "MA", "MI", "MN", "MS", "MO", "MT", "NE", "NV", "NH",
+    "NJ", "NM", "NY", "NC", "ND", "OH", "OK", "OR", "PA", "RI",
+    "SC", "SD", "TN", "TX", "UT", "VT", "VA", "WA", "WV", "WI",
     "WY",
-)
+)  # fmt: skip
 _LOCATION_AVAILABILITY = ("yes", "no", "please_contact")
 _AGE_GROUPS = (
     "children_0_5",
@@ -105,164 +60,85 @@ _LANGUAGE_PREFERRED = ("no", "yes")
 _INSURANCE = ("in_network", "out_of_network", "in_and_out_of_network")
 
 
+# --- Tiny file-local helpers --------------------------------------------
+#
+# Each call site in upgrade()/downgrade() repeats the same shape (text
+# column with server default, CHECK constraint named after the table +
+# column, paired drops in downgrade). These wrap the boilerplate so the
+# migration body reads as a flat field list rather than column-builder
+# noise.
+
+
 def _check_in_tuple_sql(column: str, values: tuple[str, ...]) -> str:
     return f"{column} IN (" + ", ".join(repr(v) for v in values) + ")"
+
+
+def _add_required_text(batch_op, column: str, server_default: str = "") -> None:
+    batch_op.add_column(
+        sa.Column(column, sa.Text(), server_default=server_default, nullable=False)
+    )
+
+
+def _add_optional_text(batch_op, column: str) -> None:
+    batch_op.add_column(sa.Column(column, sa.Text(), nullable=True))
+
+
+def _add_check(batch_op, table: str, column: str, values: tuple[str, ...]) -> None:
+    batch_op.create_check_constraint(
+        f"ck_{table}_{column}",
+        _check_in_tuple_sql(column, values),
+    )
+
+
+def _drop_check(batch_op, table: str, column: str) -> None:
+    batch_op.drop_constraint(f"ck_{table}_{column}", type_="check")
 
 
 def upgrade() -> None:
     """Upgrade schema."""
     # --- client_referral_details --------------------------------------
-    with op.batch_alter_table("client_referral_details") as batch_op:
+    table = "client_referral_details"
+    with op.batch_alter_table(table) as batch_op:
         # Section 1 — client location
-        batch_op.add_column(
-            sa.Column("location_city", sa.Text(), server_default="", nullable=False)
-        )
-        batch_op.add_column(
-            sa.Column("location_state", sa.Text(), server_default="AL", nullable=False)
-        )
-        batch_op.add_column(
-            sa.Column("location_zip", sa.Text(), server_default="00000", nullable=False)
-        )
-        batch_op.add_column(
-            sa.Column(
-                "location_in_person",
-                sa.Text(),
-                server_default="no",
-                nullable=False,
-            )
-        )
-        batch_op.add_column(
-            sa.Column(
-                "location_virtual",
-                sa.Text(),
-                server_default="no",
-                nullable=False,
-            )
-        )
+        _add_required_text(batch_op, "location_city")
+        _add_required_text(batch_op, "location_state", "AL")
+        _add_required_text(batch_op, "location_zip", "00000")
+        _add_required_text(batch_op, "location_in_person", "no")
+        _add_required_text(batch_op, "location_virtual", "no")
         # Section 2 — demographics
-        batch_op.add_column(
-            sa.Column(
-                "client_dem_ages",
-                sa.Text(),
-                server_default="adults_25_64",
-                nullable=False,
-            )
-        )
-        batch_op.add_column(
-            sa.Column(
-                "language_preferred",
-                sa.Text(),
-                server_default="no",
-                nullable=False,
-            )
-        )
+        _add_required_text(batch_op, "client_dem_ages", "adults_25_64")
+        _add_required_text(batch_op, "language_preferred", "no")
         # Section 4 — services (psychotherapy modality is optional)
-        batch_op.add_column(
-            sa.Column("services_psychotherapy_modality", sa.Text(), nullable=True)
-        )
+        _add_optional_text(batch_op, "services_psychotherapy_modality")
         # Section 5 — insurance
-        batch_op.add_column(
-            sa.Column(
-                "insurance",
-                sa.Text(),
-                server_default="in_network",
-                nullable=False,
-            )
-        )
+        _add_required_text(batch_op, "insurance", "in_network")
 
-        batch_op.create_check_constraint(
-            "ck_client_referral_details_location_state",
-            _check_in_tuple_sql("location_state", _US_STATES),
-        )
-        batch_op.create_check_constraint(
-            "ck_client_referral_details_location_in_person",
-            _check_in_tuple_sql("location_in_person", _LOCATION_AVAILABILITY),
-        )
-        batch_op.create_check_constraint(
-            "ck_client_referral_details_location_virtual",
-            _check_in_tuple_sql("location_virtual", _LOCATION_AVAILABILITY),
-        )
-        batch_op.create_check_constraint(
-            "ck_client_referral_details_client_dem_ages",
-            _check_in_tuple_sql("client_dem_ages", _AGE_GROUPS),
-        )
-        batch_op.create_check_constraint(
-            "ck_client_referral_details_language_preferred",
-            _check_in_tuple_sql("language_preferred", _LANGUAGE_PREFERRED),
-        )
-        batch_op.create_check_constraint(
-            "ck_client_referral_details_insurance",
-            _check_in_tuple_sql("insurance", _INSURANCE),
-        )
+        _add_check(batch_op, table, "location_state", _US_STATES)
+        _add_check(batch_op, table, "location_in_person", _LOCATION_AVAILABILITY)
+        _add_check(batch_op, table, "location_virtual", _LOCATION_AVAILABILITY)
+        _add_check(batch_op, table, "client_dem_ages", _AGE_GROUPS)
+        _add_check(batch_op, table, "language_preferred", _LANGUAGE_PREFERRED)
+        _add_check(batch_op, table, "insurance", _INSURANCE)
 
     # --- provider_availability_details --------------------------------
-    with op.batch_alter_table("provider_availability_details") as batch_op:
+    table = "provider_availability_details"
+    with op.batch_alter_table(table) as batch_op:
         # Section 1 — provider information
-        batch_op.add_column(
-            sa.Column(
-                "available_providers",
-                sa.Text(),
-                server_default="",
-                nullable=False,
-            )
-        )
+        _add_required_text(batch_op, "available_providers")
         # Section 2 — location
-        batch_op.add_column(
-            sa.Column("location_city", sa.Text(), server_default="", nullable=False)
-        )
-        batch_op.add_column(
-            sa.Column("location_state", sa.Text(), server_default="AL", nullable=False)
-        )
-        batch_op.add_column(
-            sa.Column("location_zip", sa.Text(), server_default="00000", nullable=False)
-        )
+        _add_required_text(batch_op, "location_city")
+        _add_required_text(batch_op, "location_state", "AL")
+        _add_required_text(batch_op, "location_zip", "00000")
         # Section 3 — availability
-        batch_op.add_column(
-            sa.Column(
-                "in_person_sessions",
-                sa.Text(),
-                server_default="no",
-                nullable=False,
-            )
-        )
-        batch_op.add_column(
-            sa.Column(
-                "virtual_sessions",
-                sa.Text(),
-                server_default="no",
-                nullable=False,
-            )
-        )
+        _add_required_text(batch_op, "in_person_sessions", "no")
+        _add_required_text(batch_op, "virtual_sessions", "no")
         # Section 4 — featured services
-        batch_op.add_column(sa.Column("treatment_modality", sa.Text(), nullable=True))
-        batch_op.add_column(
-            sa.Column("client_focus", sa.Text(), server_default="", nullable=False)
-        )
-        batch_op.add_column(
-            sa.Column(
-                "age_group",
-                sa.Text(),
-                server_default="adults_25_64",
-                nullable=False,
-            )
-        )
-        batch_op.add_column(
-            sa.Column(
-                "non_english_services",
-                sa.Text(),
-                server_default="no",
-                nullable=False,
-            )
-        )
+        _add_optional_text(batch_op, "treatment_modality")
+        _add_required_text(batch_op, "client_focus")
+        _add_required_text(batch_op, "age_group", "adults_25_64")
+        _add_required_text(batch_op, "non_english_services", "no")
         # Section 5 — insurance
-        batch_op.add_column(
-            sa.Column(
-                "payment_situation",
-                sa.Text(),
-                server_default="in_network",
-                nullable=False,
-            )
-        )
+        _add_required_text(batch_op, "payment_situation", "in_network")
         batch_op.add_column(
             sa.Column(
                 "sliding_scale",
@@ -271,97 +147,70 @@ def upgrade() -> None:
                 nullable=False,
             )
         )
-        batch_op.add_column(sa.Column("cost", sa.Text(), nullable=True))
+        _add_optional_text(batch_op, "cost")
 
-        batch_op.create_check_constraint(
-            "ck_provider_availability_details_location_state",
-            _check_in_tuple_sql("location_state", _US_STATES),
-        )
-        batch_op.create_check_constraint(
-            "ck_provider_availability_details_in_person_sessions",
-            _check_in_tuple_sql("in_person_sessions", _LOCATION_AVAILABILITY),
-        )
-        batch_op.create_check_constraint(
-            "ck_provider_availability_details_virtual_sessions",
-            _check_in_tuple_sql("virtual_sessions", _LOCATION_AVAILABILITY),
-        )
-        batch_op.create_check_constraint(
-            "ck_provider_availability_details_age_group",
-            _check_in_tuple_sql("age_group", _AGE_GROUPS),
-        )
-        batch_op.create_check_constraint(
-            "ck_provider_availability_details_non_english_services",
-            _check_in_tuple_sql("non_english_services", _LANGUAGE_PREFERRED),
-        )
-        batch_op.create_check_constraint(
-            "ck_provider_availability_details_payment_situation",
-            _check_in_tuple_sql("payment_situation", _INSURANCE),
-        )
+        _add_check(batch_op, table, "location_state", _US_STATES)
+        _add_check(batch_op, table, "in_person_sessions", _LOCATION_AVAILABILITY)
+        _add_check(batch_op, table, "virtual_sessions", _LOCATION_AVAILABILITY)
+        _add_check(batch_op, table, "age_group", _AGE_GROUPS)
+        _add_check(batch_op, table, "non_english_services", _LANGUAGE_PREFERRED)
+        _add_check(batch_op, table, "payment_situation", _INSURANCE)
 
 
 def downgrade() -> None:
     """Downgrade schema."""
     # --- provider_availability_details --------------------------------
-    with op.batch_alter_table("provider_availability_details") as batch_op:
-        batch_op.drop_constraint(
-            "ck_provider_availability_details_payment_situation", type_="check"
-        )
-        batch_op.drop_constraint(
-            "ck_provider_availability_details_non_english_services",
-            type_="check",
-        )
-        batch_op.drop_constraint(
-            "ck_provider_availability_details_age_group", type_="check"
-        )
-        batch_op.drop_constraint(
-            "ck_provider_availability_details_virtual_sessions", type_="check"
-        )
-        batch_op.drop_constraint(
-            "ck_provider_availability_details_in_person_sessions", type_="check"
-        )
-        batch_op.drop_constraint(
-            "ck_provider_availability_details_location_state", type_="check"
-        )
+    table = "provider_availability_details"
+    with op.batch_alter_table(table) as batch_op:
+        for column in (
+            "payment_situation",
+            "non_english_services",
+            "age_group",
+            "virtual_sessions",
+            "in_person_sessions",
+            "location_state",
+        ):
+            _drop_check(batch_op, table, column)
 
-        batch_op.drop_column("cost")
-        batch_op.drop_column("sliding_scale")
-        batch_op.drop_column("payment_situation")
-        batch_op.drop_column("non_english_services")
-        batch_op.drop_column("age_group")
-        batch_op.drop_column("client_focus")
-        batch_op.drop_column("treatment_modality")
-        batch_op.drop_column("virtual_sessions")
-        batch_op.drop_column("in_person_sessions")
-        batch_op.drop_column("location_zip")
-        batch_op.drop_column("location_state")
-        batch_op.drop_column("location_city")
-        batch_op.drop_column("available_providers")
+        for column in (
+            "cost",
+            "sliding_scale",
+            "payment_situation",
+            "non_english_services",
+            "age_group",
+            "client_focus",
+            "treatment_modality",
+            "virtual_sessions",
+            "in_person_sessions",
+            "location_zip",
+            "location_state",
+            "location_city",
+            "available_providers",
+        ):
+            batch_op.drop_column(column)
 
     # --- client_referral_details --------------------------------------
-    with op.batch_alter_table("client_referral_details") as batch_op:
-        batch_op.drop_constraint("ck_client_referral_details_insurance", type_="check")
-        batch_op.drop_constraint(
-            "ck_client_referral_details_language_preferred", type_="check"
-        )
-        batch_op.drop_constraint(
-            "ck_client_referral_details_client_dem_ages", type_="check"
-        )
-        batch_op.drop_constraint(
-            "ck_client_referral_details_location_virtual", type_="check"
-        )
-        batch_op.drop_constraint(
-            "ck_client_referral_details_location_in_person", type_="check"
-        )
-        batch_op.drop_constraint(
-            "ck_client_referral_details_location_state", type_="check"
-        )
+    table = "client_referral_details"
+    with op.batch_alter_table(table) as batch_op:
+        for column in (
+            "insurance",
+            "language_preferred",
+            "client_dem_ages",
+            "location_virtual",
+            "location_in_person",
+            "location_state",
+        ):
+            _drop_check(batch_op, table, column)
 
-        batch_op.drop_column("insurance")
-        batch_op.drop_column("services_psychotherapy_modality")
-        batch_op.drop_column("language_preferred")
-        batch_op.drop_column("client_dem_ages")
-        batch_op.drop_column("location_virtual")
-        batch_op.drop_column("location_in_person")
-        batch_op.drop_column("location_zip")
-        batch_op.drop_column("location_state")
-        batch_op.drop_column("location_city")
+        for column in (
+            "insurance",
+            "services_psychotherapy_modality",
+            "language_preferred",
+            "client_dem_ages",
+            "location_virtual",
+            "location_in_person",
+            "location_zip",
+            "location_state",
+            "location_city",
+        ):
+            batch_op.drop_column(column)

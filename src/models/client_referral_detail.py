@@ -11,6 +11,16 @@ from .post_enums import (
     check_in_tuple_sql,
 )
 
+_TABLE = "client_referral_details"
+
+
+def _ck(column: str, values: tuple[str, ...]) -> CheckConstraint:
+    """`column IN (values)` CHECK named `ck_<table>_<column>`."""
+    return CheckConstraint(
+        check_in_tuple_sql(column, values),
+        name=f"ck_{_TABLE}_{column}",
+    )
+
 
 class ClientReferralDetail(Base):
     """Per-kind detail row for posts of `kind = 'client_referral'`.
@@ -23,39 +33,21 @@ class ClientReferralDetail(Base):
     Form 1. Enum-typed columns (`location_state`, `location_in_person`,
     `location_virtual`, `client_dem_ages`, `language_preferred`,
     `insurance`) carry CHECK constraints rendered from the tuples in
-    `post.py` via `check_in_tuple_sql`.
+    `post_enums.py` via `check_in_tuple_sql`.
 
     Multi-select fields from the spec (`desired_times`, `services`)
     follow in a separate change once the wire-format extension for
     array-valued checkboxes lands.
     """
 
-    __tablename__ = "client_referral_details"
+    __tablename__ = _TABLE
     __table_args__ = (
-        CheckConstraint(
-            check_in_tuple_sql("location_state", US_STATES),
-            name="ck_client_referral_details_location_state",
-        ),
-        CheckConstraint(
-            check_in_tuple_sql("location_in_person", LOCATION_AVAILABILITY_OPTIONS),
-            name="ck_client_referral_details_location_in_person",
-        ),
-        CheckConstraint(
-            check_in_tuple_sql("location_virtual", LOCATION_AVAILABILITY_OPTIONS),
-            name="ck_client_referral_details_location_virtual",
-        ),
-        CheckConstraint(
-            check_in_tuple_sql("client_dem_ages", CLIENT_AGE_GROUPS),
-            name="ck_client_referral_details_client_dem_ages",
-        ),
-        CheckConstraint(
-            check_in_tuple_sql("language_preferred", LANGUAGE_PREFERRED_OPTIONS),
-            name="ck_client_referral_details_language_preferred",
-        ),
-        CheckConstraint(
-            check_in_tuple_sql("insurance", INSURANCE_OPTIONS),
-            name="ck_client_referral_details_insurance",
-        ),
+        _ck("location_state", US_STATES),
+        _ck("location_in_person", LOCATION_AVAILABILITY_OPTIONS),
+        _ck("location_virtual", LOCATION_AVAILABILITY_OPTIONS),
+        _ck("client_dem_ages", CLIENT_AGE_GROUPS),
+        _ck("language_preferred", LANGUAGE_PREFERRED_OPTIONS),
+        _ck("insurance", INSURANCE_OPTIONS),
     )
 
     post_id = Column(
