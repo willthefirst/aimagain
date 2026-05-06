@@ -121,6 +121,15 @@ CLIENT_REFERRAL_SERVICES: Final[tuple[str, ...]] = (
     "allied_health",
 )
 
+# Treatment settings categories. `provider_availability` only; required-min-1.
+TREATMENT_SETTINGS: Final[tuple[str, ...]] = (
+    "outpatient",
+    "iop",
+    "crisis_care",
+    "php",
+    "residential",
+)
+
 
 # --- Display labels for select <option>s --------------------------------
 #
@@ -185,6 +194,13 @@ CLIENT_REFERRAL_SERVICE_LABELS: Final[dict[str, str]] = {
     "psychotherapy": "Psychotherapy",
     "case_management": "Case management",
     "allied_health": "Allied health",
+}
+TREATMENT_SETTINGS_LABELS: Final[dict[str, str]] = {
+    "outpatient": "Outpatient",
+    "iop": "IOP",
+    "crisis_care": "Crisis care",
+    "php": "PHP",
+    "residential": "Residential",
 }
 
 
