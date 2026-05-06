@@ -14,8 +14,17 @@ The per-kind detail relationship + fields live in
 means the four Pydantic variant classes (Read/Create/Update/
 AuditSnapshot) plus their entry in the discriminated unions; everything
 else flows from the registry.
+
+Controlled-vocabulary fields (state, age group, etc.) are typed as
+`Literal[*TUPLE]` against tuples in `src/models/post.py` so the
+schema's accepted values stay in lockstep with the DB CHECK
+constraints. The guardrail test
+`test_schema_literals_match_model_tuples` (in `test_post.py`) asserts
+this; if you add or rename a vocabulary, update both sides and the
+test will keep them honest.
 """
 
+import re
 import uuid
 from datetime import datetime
 from typing import Annotated, Literal, Union
@@ -30,6 +39,53 @@ from pydantic import (
 )
 
 from src.models import REGISTERED_KINDS
+from src.models.post_enums import (
+    CLIENT_AGE_GROUPS,
+    INSURANCE_OPTIONS,
+    LANGUAGE_PREFERRED_OPTIONS,
+    LOCATION_AVAILABILITY_OPTIONS,
+    US_STATES,
+)
+
+# --- Shared validators --------------------------------------------------
+
+_ZIP_RE = re.compile(r"^\d{5}$")
+
+
+def _strip_required(v: str) -> str:
+    v = v.strip()
+    if not v:
+        raise ValueError("must not be empty")
+    return v
+
+
+def _strip_required_or_none(v: str | None) -> str | None:
+    if v is None:
+        return None
+    return _strip_required(v)
+
+
+def _strip_optional(v: str | None) -> str | None:
+    """Strip whitespace; collapse empty/whitespace-only to `None`. Used for
+    optional free-text fields where '' from a blank input means absent."""
+    if v is None:
+        return None
+    v = v.strip()
+    return v or None
+
+
+def _validate_zip(v: str) -> str:
+    v = v.strip()
+    if not _ZIP_RE.match(v):
+        raise ValueError("must be a 5-digit ZIP code")
+    return v
+
+
+def _validate_zip_or_none(v: str | None) -> str | None:
+    if v is None:
+        return None
+    return _validate_zip(v)
+
 
 # --- Shared flatten helper ----------------------------------------------
 
@@ -82,12 +138,34 @@ class _PostReadBase(BaseModel):
 
 class ClientReferralRead(_PostReadBase):
     kind: Literal["client_referral"]
+    location_city: str
+    location_state: Literal[*US_STATES]
+    location_zip: str
+    location_in_person: Literal[*LOCATION_AVAILABILITY_OPTIONS]
+    location_virtual: Literal[*LOCATION_AVAILABILITY_OPTIONS]
+    client_dem_ages: Literal[*CLIENT_AGE_GROUPS]
+    language_preferred: Literal[*LANGUAGE_PREFERRED_OPTIONS]
     description: str
+    services_psychotherapy_modality: str | None = None
+    insurance: Literal[*INSURANCE_OPTIONS]
 
 
 class ProviderAvailabilityRead(_PostReadBase):
     kind: Literal["provider_availability"]
     practice_name: str
+    available_providers: str
+    location_city: str
+    location_state: Literal[*US_STATES]
+    location_zip: str
+    in_person_sessions: Literal[*LOCATION_AVAILABILITY_OPTIONS]
+    virtual_sessions: Literal[*LOCATION_AVAILABILITY_OPTIONS]
+    treatment_modality: str | None = None
+    client_focus: str
+    age_group: Literal[*CLIENT_AGE_GROUPS]
+    non_english_services: Literal[*LANGUAGE_PREFERRED_OPTIONS]
+    payment_situation: Literal[*INSURANCE_OPTIONS]
+    sliding_scale: bool
+    cost: str | None = None
 
 
 PostRead = Annotated[
@@ -101,37 +179,83 @@ post_read_adapter: TypeAdapter = TypeAdapter(PostRead)
 
 
 class ClientReferralCreate(BaseModel):
-    """Create payload for `kind='client_referral'`. MVP: one field."""
+    """Create payload for `kind='client_referral'`. Field set follows
+    [`notes/forms_spec.md`](../../notes/forms_spec.md) Form 1; multi-select
+    fields (`desired_times`, `services`) follow in a separate change."""
 
     kind: Literal["client_referral"]
+    location_city: str
+    location_state: Literal[*US_STATES]
+    location_zip: str
+    location_in_person: Literal[*LOCATION_AVAILABILITY_OPTIONS]
+    location_virtual: Literal[*LOCATION_AVAILABILITY_OPTIONS]
+    client_dem_ages: Literal[*CLIENT_AGE_GROUPS]
+    language_preferred: Literal[*LANGUAGE_PREFERRED_OPTIONS]
     description: str
+    services_psychotherapy_modality: str | None = None
+    insurance: Literal[*INSURANCE_OPTIONS]
 
     model_config = ConfigDict(extra="forbid")
 
-    @field_validator("description")
+    @field_validator("location_city", "description")
     @classmethod
-    def _strip_and_require_non_empty(cls, v: str) -> str:
-        v = v.strip()
-        if not v:
-            raise ValueError("must not be empty")
-        return v
+    def _strip_required(cls, v: str) -> str:
+        return _strip_required(v)
+
+    @field_validator("location_zip")
+    @classmethod
+    def _validate_zip(cls, v: str) -> str:
+        return _validate_zip(v)
+
+    @field_validator("services_psychotherapy_modality")
+    @classmethod
+    def _strip_optional(cls, v: str | None) -> str | None:
+        return _strip_optional(v)
 
 
 class ProviderAvailabilityCreate(BaseModel):
-    """Create payload for `kind='provider_availability'`. MVP: one field."""
+    """Create payload for `kind='provider_availability'`. Field set follows
+    [`notes/forms_spec.md`](../../notes/forms_spec.md) Form 2; multi-select
+    fields (`desired_times`, `services`, `settings`) follow in a separate
+    change."""
 
     kind: Literal["provider_availability"]
     practice_name: str
+    available_providers: str
+    location_city: str
+    location_state: Literal[*US_STATES]
+    location_zip: str
+    in_person_sessions: Literal[*LOCATION_AVAILABILITY_OPTIONS]
+    virtual_sessions: Literal[*LOCATION_AVAILABILITY_OPTIONS]
+    treatment_modality: str | None = None
+    client_focus: str
+    age_group: Literal[*CLIENT_AGE_GROUPS]
+    non_english_services: Literal[*LANGUAGE_PREFERRED_OPTIONS] = "no"
+    payment_situation: Literal[*INSURANCE_OPTIONS]
+    sliding_scale: bool
+    cost: str | None = None
 
     model_config = ConfigDict(extra="forbid")
 
-    @field_validator("practice_name")
+    @field_validator(
+        "practice_name",
+        "available_providers",
+        "location_city",
+        "client_focus",
+    )
     @classmethod
-    def _strip_and_require_non_empty(cls, v: str) -> str:
-        v = v.strip()
-        if not v:
-            raise ValueError("must not be empty")
-        return v
+    def _strip_required(cls, v: str) -> str:
+        return _strip_required(v)
+
+    @field_validator("location_zip")
+    @classmethod
+    def _validate_zip(cls, v: str) -> str:
+        return _validate_zip(v)
+
+    @field_validator("treatment_modality", "cost")
+    @classmethod
+    def _strip_optional(cls, v: str | None) -> str | None:
+        return _strip_optional(v)
 
 
 PostCreate = Annotated[
@@ -142,51 +266,99 @@ post_create_adapter: TypeAdapter = TypeAdapter(PostCreate)
 
 
 # --- Update payloads (partial) ------------------------------------------
+#
+# Every per-kind editable field is made `T | None = None` and the
+# at-least-one-field rule is enforced in a model validator. Fields whose
+# value is `None` are interpreted as "leave unchanged" by
+# `PostRepository.update_post`. Optional free-text fields can therefore
+# only be *set* via PATCH today, not cleared back to `None`; that's a
+# pre-existing repository semantic and intentionally out of scope here.
+
+
+def _at_least_one_editable_field(self) -> None:
+    fields = type(self).model_fields
+    if all(getattr(self, name) is None for name in fields if name != "kind"):
+        raise ValueError("at least one editable field must be provided")
 
 
 class ClientReferralUpdate(BaseModel):
     kind: Literal["client_referral"]
+    location_city: str | None = None
+    location_state: Literal[*US_STATES] | None = None
+    location_zip: str | None = None
+    location_in_person: Literal[*LOCATION_AVAILABILITY_OPTIONS] | None = None
+    location_virtual: Literal[*LOCATION_AVAILABILITY_OPTIONS] | None = None
+    client_dem_ages: Literal[*CLIENT_AGE_GROUPS] | None = None
+    language_preferred: Literal[*LANGUAGE_PREFERRED_OPTIONS] | None = None
     description: str | None = None
+    services_psychotherapy_modality: str | None = None
+    insurance: Literal[*INSURANCE_OPTIONS] | None = None
 
     model_config = ConfigDict(extra="forbid")
 
-    @field_validator("description")
+    @field_validator("location_city", "description")
     @classmethod
-    def _strip_and_require_non_empty(cls, v: str | None) -> str | None:
-        if v is None:
-            return None
-        v = v.strip()
-        if not v:
-            raise ValueError("must not be empty")
-        return v
+    def _strip_required(cls, v: str | None) -> str | None:
+        return _strip_required_or_none(v)
+
+    @field_validator("location_zip")
+    @classmethod
+    def _validate_zip(cls, v: str | None) -> str | None:
+        return _validate_zip_or_none(v)
+
+    @field_validator("services_psychotherapy_modality")
+    @classmethod
+    def _strip_optional(cls, v: str | None) -> str | None:
+        return _strip_optional(v)
 
     @model_validator(mode="after")
     def _at_least_one_field(self) -> "ClientReferralUpdate":
-        if self.description is None:
-            raise ValueError("description must be provided")
+        _at_least_one_editable_field(self)
         return self
 
 
 class ProviderAvailabilityUpdate(BaseModel):
     kind: Literal["provider_availability"]
     practice_name: str | None = None
+    available_providers: str | None = None
+    location_city: str | None = None
+    location_state: Literal[*US_STATES] | None = None
+    location_zip: str | None = None
+    in_person_sessions: Literal[*LOCATION_AVAILABILITY_OPTIONS] | None = None
+    virtual_sessions: Literal[*LOCATION_AVAILABILITY_OPTIONS] | None = None
+    treatment_modality: str | None = None
+    client_focus: str | None = None
+    age_group: Literal[*CLIENT_AGE_GROUPS] | None = None
+    non_english_services: Literal[*LANGUAGE_PREFERRED_OPTIONS] | None = None
+    payment_situation: Literal[*INSURANCE_OPTIONS] | None = None
+    sliding_scale: bool | None = None
+    cost: str | None = None
 
     model_config = ConfigDict(extra="forbid")
 
-    @field_validator("practice_name")
+    @field_validator(
+        "practice_name",
+        "available_providers",
+        "location_city",
+        "client_focus",
+    )
     @classmethod
-    def _strip_and_require_non_empty(cls, v: str | None) -> str | None:
-        if v is None:
-            return None
-        v = v.strip()
-        if not v:
-            raise ValueError("must not be empty")
-        return v
+    def _strip_required(cls, v: str | None) -> str | None:
+        return _strip_required_or_none(v)
+
+    @field_validator("location_zip")
+    @classmethod
+    def _validate_zip(cls, v: str | None) -> str | None:
+        return _validate_zip_or_none(v)
+
+    @field_validator("treatment_modality", "cost")
+    @classmethod
+    def _strip_optional(cls, v: str | None) -> str | None:
+        return _strip_optional(v)
 
     @model_validator(mode="after")
     def _at_least_one_field(self) -> "ProviderAvailabilityUpdate":
-        if self.practice_name is None:
-            raise ValueError("practice_name must be provided")
+        _at_least_one_editable_field(self)
         return self
 
 
@@ -213,12 +385,34 @@ class _PostAuditSnapshotBase(BaseModel):
 
 class ClientReferralAuditSnapshot(_PostAuditSnapshotBase):
     kind: Literal["client_referral"]
+    location_city: str
+    location_state: Literal[*US_STATES]
+    location_zip: str
+    location_in_person: Literal[*LOCATION_AVAILABILITY_OPTIONS]
+    location_virtual: Literal[*LOCATION_AVAILABILITY_OPTIONS]
+    client_dem_ages: Literal[*CLIENT_AGE_GROUPS]
+    language_preferred: Literal[*LANGUAGE_PREFERRED_OPTIONS]
     description: str
+    services_psychotherapy_modality: str | None = None
+    insurance: Literal[*INSURANCE_OPTIONS]
 
 
 class ProviderAvailabilityAuditSnapshot(_PostAuditSnapshotBase):
     kind: Literal["provider_availability"]
     practice_name: str
+    available_providers: str
+    location_city: str
+    location_state: Literal[*US_STATES]
+    location_zip: str
+    in_person_sessions: Literal[*LOCATION_AVAILABILITY_OPTIONS]
+    virtual_sessions: Literal[*LOCATION_AVAILABILITY_OPTIONS]
+    treatment_modality: str | None = None
+    client_focus: str
+    age_group: Literal[*CLIENT_AGE_GROUPS]
+    non_english_services: Literal[*LANGUAGE_PREFERRED_OPTIONS]
+    payment_situation: Literal[*INSURANCE_OPTIONS]
+    sliding_scale: bool
+    cost: str | None = None
 
 
 PostAuditSnapshot = Annotated[
@@ -238,7 +432,7 @@ def post_audit_snapshot(post) -> dict:
     — the `kind` discriminator picks the matching variant, which then
     flattens through the right detail relationship via the shared
     `_flatten_post_to_dict` helper. Adding a new `kind` only requires
-    registering it in `_KIND_DETAILS` and adding its `*AuditSnapshot`
+    registering it in `REGISTERED_KINDS` and adding its `*AuditSnapshot`
     variant to the union above.
     """
     return _post_audit_snapshot_adapter.validate_python(post).model_dump(mode="json")

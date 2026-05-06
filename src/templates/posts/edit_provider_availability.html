@@ -1,11 +1,103 @@
 {% extends "base.html" %}
+{% set d = post.provider_availability_detail %}
 {% block title %}Edit provider availability{% endblock %}
 {% block content %}
 <h1>Edit provider availability</h1>
 <form hx-patch="/posts/{{ post.id }}" hx-ext="json-enc">
   <input type="hidden" name="kind" value="provider_availability" />
-  <label for="practice_name">Practice name:</label><br />
-  <input type="text" id="practice_name" name="practice_name" value="{{ post.provider_availability_detail.practice_name }}" required /><br /><br />
+
+  <fieldset>
+    <legend>Provider information</legend>
+
+    <label for="practice_name">Practice name:</label><br />
+    <input type="text" id="practice_name" name="practice_name" value="{{ d.practice_name }}" required /><br /><br />
+
+    <label for="available_providers">Available providers:</label><br />
+    <input type="text" id="available_providers" name="available_providers" value="{{ d.available_providers }}" required /><br /><br />
+  </fieldset>
+
+  <fieldset>
+    <legend>Location</legend>
+
+    <label for="location_city">City:</label><br />
+    <input type="text" id="location_city" name="location_city" value="{{ d.location_city }}" required /><br /><br />
+
+    <label for="location_state">State:</label><br />
+    <select id="location_state" name="location_state" required>
+      {% for state in ("AL","AK","AZ","AR","CA","CO","CT","DE","DC","FL","GA","HI","ID","IL","IN","IA","KS","KY","LA","ME","MD","MA","MI","MN","MS","MO","MT","NE","NV","NH","NJ","NM","NY","NC","ND","OH","OK","OR","PA","RI","SC","SD","TN","TX","UT","VT","VA","WA","WV","WI","WY") %}
+      <option value="{{ state }}"{% if d.location_state == state %} selected{% endif %}>{{ state }}</option>
+      {% endfor %}
+    </select><br /><br />
+
+    <label for="location_zip">ZIP:</label><!-- title-case-ignore --><br />
+    <input type="text" id="location_zip" name="location_zip" value="{{ d.location_zip }}" pattern="\d{5}" maxlength="5" required /><br /><br />
+  </fieldset>
+
+  <fieldset>
+    <legend>Availability</legend>
+
+    <label for="in_person_sessions">In-person sessions:</label><!-- title-case-ignore --><br />
+    <select id="in_person_sessions" name="in_person_sessions" required>
+      <option value="yes"{% if d.in_person_sessions == "yes" %} selected{% endif %}>Yes</option>
+      <option value="no"{% if d.in_person_sessions == "no" %} selected{% endif %}>No</option>
+      <option value="please_contact"{% if d.in_person_sessions == "please_contact" %} selected{% endif %}>Please contact</option>
+    </select><br /><br />
+
+    <label for="virtual_sessions">Virtual sessions:</label><br />
+    <select id="virtual_sessions" name="virtual_sessions" required>
+      <option value="yes"{% if d.virtual_sessions == "yes" %} selected{% endif %}>Yes</option>
+      <option value="no"{% if d.virtual_sessions == "no" %} selected{% endif %}>No</option>
+      <option value="please_contact"{% if d.virtual_sessions == "please_contact" %} selected{% endif %}>Please contact</option>
+    </select><br /><br />
+  </fieldset>
+
+  <fieldset>
+    <legend>Featured services</legend>
+
+    <label for="treatment_modality">Treatment modality (optional):</label><br />
+    <input type="text" id="treatment_modality" name="treatment_modality" value="{{ d.treatment_modality or '' }}" /><br /><br />
+
+    <label for="client_focus">Client focus (no PII):</label><!-- title-case-ignore --><br />
+    <textarea id="client_focus" name="client_focus" required>{{ d.client_focus }}</textarea><br /><br />
+
+    <label for="age_group">Age group:</label><br />
+    <select id="age_group" name="age_group" required>
+      <option value="children_0_5"{% if d.age_group == "children_0_5" %} selected{% endif %}>Children 0–5</option>
+      <option value="children_6_10"{% if d.age_group == "children_6_10" %} selected{% endif %}>Children 6–10</option>
+      <option value="preteens_11_13"{% if d.age_group == "preteens_11_13" %} selected{% endif %}>Preteens 11–13</option>
+      <option value="adolescents_14_18"{% if d.age_group == "adolescents_14_18" %} selected{% endif %}>Adolescents 14–18</option>
+      <option value="young_adults_19_24"{% if d.age_group == "young_adults_19_24" %} selected{% endif %}>Young adults 19–24</option>
+      <option value="adults_25_64"{% if d.age_group == "adults_25_64" %} selected{% endif %}>Adults 25–64</option>
+      <option value="older_adults_65_plus"{% if d.age_group == "older_adults_65_plus" %} selected{% endif %}>Older adults 65+</option>
+    </select><br /><br />
+
+    <label for="non_english_services">Services offered in non-English language?</label><br />
+    <select id="non_english_services" name="non_english_services">
+      <option value="no"{% if d.non_english_services == "no" %} selected{% endif %}>No</option>
+      <option value="yes"{% if d.non_english_services == "yes" %} selected{% endif %}>Yes</option>
+    </select><br /><br />
+  </fieldset>
+
+  <fieldset>
+    <legend>Insurance</legend>
+
+    <label for="payment_situation">Payment situation:</label><br />
+    <select id="payment_situation" name="payment_situation" required>
+      <option value="in_network"{% if d.payment_situation == "in_network" %} selected{% endif %}>In-network</option>
+      <option value="out_of_network"{% if d.payment_situation == "out_of_network" %} selected{% endif %}>Out-of-network</option>
+      <option value="in_and_out_of_network"{% if d.payment_situation == "in_and_out_of_network" %} selected{% endif %}>In- and out-of-network</option>
+    </select><br /><br />
+
+    <fieldset>
+      <legend>Sliding scale?</legend>
+      <label><input type="radio" name="sliding_scale" value="true"{% if d.sliding_scale %} checked{% endif %} required /> Yes</label>
+      <label><input type="radio" name="sliding_scale" value="false"{% if not d.sliding_scale %} checked{% endif %} required /> No</label>
+    </fieldset><br />
+
+    <label for="cost">Cost (optional):</label><br />
+    <input type="text" id="cost" name="cost" value="{{ d.cost or '' }}" /><br /><br />
+  </fieldset>
+
   <input type="submit" value="Save changes" />
 </form>
 

@@ -20,7 +20,11 @@ from src.models import (
     ProviderAvailabilityDetail,
 )
 from src.repositories.post_repository import PostRepository
-from tests.helpers import create_test_user
+from tests.helpers import (
+    create_test_user,
+    make_client_referral_detail,
+    make_provider_availability_detail,
+)
 
 pytestmark = pytest.mark.asyncio
 
@@ -47,7 +51,7 @@ async def test_raw_sql_delete_post_cascades_via_fk(
         repo = PostRepository(session)
         created = await repo.create_post(
             Post(kind="client_referral", owner_id=owner.id),
-            ClientReferralDetail(description="doomed"),
+            make_client_referral_detail(description="doomed"),
         )
         await session.commit()
         post_id = created.id
@@ -87,7 +91,7 @@ async def test_create_post_persists_parent_and_client_referral_detail(
     async with db_test_session_manager() as session:
         repo = PostRepository(session)
         post = Post(kind="client_referral", owner_id=owner.id)
-        detail = ClientReferralDetail(description="needs placement")
+        detail = make_client_referral_detail(description="needs placement")
         created = await repo.create_post(post, detail)
         await session.commit()
         post_id = created.id
@@ -124,7 +128,7 @@ async def test_update_post_writes_to_client_referral_detail(
         repo = PostRepository(session)
         created = await repo.create_post(
             Post(kind="client_referral", owner_id=owner.id),
-            ClientReferralDetail(description="orig"),
+            make_client_referral_detail(description="orig"),
         )
         await session.commit()
         post_id = created.id
@@ -160,7 +164,7 @@ async def test_delete_post_cascades_client_referral_detail(
         repo = PostRepository(session)
         created = await repo.create_post(
             Post(kind="client_referral", owner_id=owner.id),
-            ClientReferralDetail(description="doomed"),
+            make_client_referral_detail(description="doomed"),
         )
         await session.commit()
         post_id = created.id
@@ -203,7 +207,7 @@ async def test_create_post_persists_parent_and_provider_availability_detail(
     async with db_test_session_manager() as session:
         repo = PostRepository(session)
         post = Post(kind="provider_availability", owner_id=owner.id)
-        detail = ProviderAvailabilityDetail(practice_name="Acme Health")
+        detail = make_provider_availability_detail(practice_name="Acme Health")
         created = await repo.create_post(post, detail)
         await session.commit()
         post_id = created.id
@@ -240,7 +244,7 @@ async def test_update_post_writes_to_provider_availability_detail(
         repo = PostRepository(session)
         created = await repo.create_post(
             Post(kind="provider_availability", owner_id=owner.id),
-            ProviderAvailabilityDetail(practice_name="Acme"),
+            make_provider_availability_detail(practice_name="Acme"),
         )
         await session.commit()
         post_id = created.id
@@ -277,7 +281,7 @@ async def test_delete_post_cascades_provider_availability_detail(
         repo = PostRepository(session)
         created = await repo.create_post(
             Post(kind="provider_availability", owner_id=owner.id),
-            ProviderAvailabilityDetail(practice_name="Doomed"),
+            make_provider_availability_detail(practice_name="Doomed"),
         )
         await session.commit()
         post_id = created.id
@@ -325,7 +329,7 @@ async def test_post_with_unknown_kind_violates_check_constraint(
         repo = PostRepository(session)
         post = Post(kind="not_a_kind", owner_id=owner.id)
         with pytest.raises(IntegrityError):
-            await repo.create_post(post, ClientReferralDetail(description="d"))
+            await repo.create_post(post, make_client_referral_detail(description="d"))
             await session.commit()
 
 
@@ -339,5 +343,5 @@ async def test_retired_note_kind_violates_check_constraint(
         repo = PostRepository(session)
         post = Post(kind="note", owner_id=owner.id)
         with pytest.raises(IntegrityError):
-            await repo.create_post(post, ClientReferralDetail(description="d"))
+            await repo.create_post(post, make_client_referral_detail(description="d"))
             await session.commit()

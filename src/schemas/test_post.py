@@ -3,44 +3,63 @@
 Covers:
 - The kind-discriminated union accepts each kind's payload and rejects
   unknown / missing `kind` values.
-- Per-kind validation: non-empty stripping, partial-update at-least-one
-  rule, server-managed-field rejection, unknown-field rejection.
+- Per-kind validation: non-empty stripping, ZIP regex, controlled
+  vocabularies, partial-update at-least-one rule, server-managed-field
+  rejection, unknown-field rejection.
 - `post_audit_snapshot` projects a SQLAlchemy `Post` of any registered
   kind through the right snapshot class.
+- `test_schema_literals_match_model_tuples` guards that the
+  `Literal[*TUPLE]` types here stay aligned with the source-of-truth
+  tuples in `src/models/post_enums.py`.
 """
 
 import uuid
 from types import SimpleNamespace
+from typing import get_args
 
 import pytest
 from pydantic import ValidationError
 
+from src.models.post_enums import (
+    CLIENT_AGE_GROUPS,
+    INSURANCE_OPTIONS,
+    LANGUAGE_PREFERRED_OPTIONS,
+    LOCATION_AVAILABILITY_OPTIONS,
+    US_STATES,
+)
 from src.schemas.post import (
     ClientReferralCreate,
+    ClientReferralRead,
     ClientReferralUpdate,
     ProviderAvailabilityCreate,
+    ProviderAvailabilityRead,
     ProviderAvailabilityUpdate,
     post_audit_snapshot,
     post_create_adapter,
     post_update_adapter,
 )
+from tests.helpers import client_referral_payload, provider_availability_payload
 
 # --- PostCreate (discriminated union) -----------------------------------
 
 
 def test_post_create_dispatches_client_referral():
-    p = post_create_adapter.validate_python(
-        {"kind": "client_referral", "description": "needs a clinician"}
-    )
+    payload = client_referral_payload(description="needs a clinician")
+    p = post_create_adapter.validate_python(payload)
     assert isinstance(p, ClientReferralCreate)
     assert p.kind == "client_referral"
     assert p.description == "needs a clinician"
+    assert p.location_city == "Springfield"
+    assert p.location_state == "IL"
+    assert p.insurance == "in_network"
 
 
 def test_post_create_requires_kind():
     """`kind` is required — no default fallback."""
+    payload = client_referral_payload()
+    payload.pop("kind")
     with pytest.raises(ValidationError):
-        post_create_adapter.validate_python({"description": "needs help"})
+        post_create_adapter.validate_python(payload)
 
 
 def test_post_create_rejects_unknown_kind():
@@ -58,40 +77,91 @@ def test_post_create_rejects_retired_note_kind():
 
 def test_post_create_strips_surrounding_whitespace_client_referral():
     p = post_create_adapter.validate_python(
-        {"kind": "client_referral", "description": "  help  "}
+        client_referral_payload(description="  help  ", location_city="  Boise  ")
     )
     assert p.description == "help"
+    assert p.location_city == "Boise"
 
 
 def test_post_create_client_referral_rejects_empty_description():
     with pytest.raises(ValidationError):
+        post_create_adapter.validate_python(client_referral_payload(description="   "))
+
+
+@pytest.mark.parametrize(
+    "missing_field",
+    [
+        "location_city",
+        "location_state",
+        "location_zip",
+        "location_in_person",
+        "location_virtual",
+        "client_dem_ages",
+        "language_preferred",
+        "description",
+        "insurance",
+    ],
+)
+def test_post_create_client_referral_requires_all_required_fields(missing_field):
+    payload = client_referral_payload()
+    payload.pop(missing_field)
+    with pytest.raises(ValidationError):
+        post_create_adapter.validate_python(payload)
+
+
+def test_post_create_client_referral_optional_fields_default_none():
+    p = post_create_adapter.validate_python(client_referral_payload())
+    assert p.services_psychotherapy_modality is None
+
+
+def test_post_create_client_referral_strips_optional_to_none():
+    p = post_create_adapter.validate_python(
+        client_referral_payload(services_psychotherapy_modality="   ")
+    )
+    assert p.services_psychotherapy_modality is None
+
+
+def test_post_create_client_referral_rejects_invalid_zip():
+    with pytest.raises(ValidationError):
+        post_create_adapter.validate_python(client_referral_payload(location_zip="abc"))
+    with pytest.raises(ValidationError):
         post_create_adapter.validate_python(
-            {"kind": "client_referral", "description": "   "}
+            client_referral_payload(location_zip="1234")
         )
 
 
-def test_post_create_client_referral_requires_description():
+def test_post_create_client_referral_rejects_unknown_state():
     with pytest.raises(ValidationError):
-        post_create_adapter.validate_python({"kind": "client_referral"})
+        post_create_adapter.validate_python(
+            client_referral_payload(location_state="ZZ")
+        )
+
+
+def test_post_create_client_referral_rejects_unknown_age_group():
+    with pytest.raises(ValidationError):
+        post_create_adapter.validate_python(
+            client_referral_payload(client_dem_ages="too_old")
+        )
+
+
+def test_post_create_client_referral_rejects_unknown_insurance():
+    with pytest.raises(ValidationError):
+        post_create_adapter.validate_python(
+            client_referral_payload(insurance="cash_only")
+        )
 
 
 def test_post_create_rejects_owner_id():
     """owner_id is server-managed; clients sending it must be rejected."""
     with pytest.raises(ValidationError):
         post_create_adapter.validate_python(
-            {
-                "kind": "client_referral",
-                "description": "d",
-                "owner_id": str(uuid.uuid4()),
-            }
+            client_referral_payload(owner_id=str(uuid.uuid4()))
         )
 
 
 def test_post_create_rejects_unknown_fields_on_client_referral():
     with pytest.raises(ValidationError):
-        post_create_adapter.validate_python(
-            {"kind": "client_referral", "description": "d", "evil": True}
-        )
+        post_create_adapter.validate_python(client_referral_payload(evil=True))
 
 
 # --- PostUpdate (discriminated union) -----------------------------------
@@ -103,6 +173,16 @@ def test_post_update_client_referral_accepts_description():
     )
     assert isinstance(p, ClientReferralUpdate)
     assert p.description == "fresh"
+
+
+def test_post_update_client_referral_accepts_partial_other_field():
+    """Any one editable field is enough for a partial update."""
+    p = post_update_adapter.validate_python(
+        {"kind": "client_referral", "location_city": "Boise"}
+    )
+    assert isinstance(p, ClientReferralUpdate)
+    assert p.location_city == "Boise"
+    assert p.description is None
 
 
 def test_post_update_requires_kind():
@@ -127,17 +207,31 @@ def test_post_update_strips_whitespace_client_referral():
     assert p.description == "hi"
 
 
-def test_post_update_client_referral_requires_description():
+def test_post_update_client_referral_requires_at_least_one_field():
+    """An empty PATCH (just `kind`) must 422."""
+    with pytest.raises(ValidationError):
+        post_update_adapter.validate_python({"kind": "client_referral"})
+
+
+def test_post_update_client_referral_explicit_nulls_only_is_rejected():
+    """All editable fields explicitly null still counts as no-op → 422."""
     with pytest.raises(ValidationError):
         post_update_adapter.validate_python(
-            {"kind": "client_referral", "description": None}
+            {"kind": "client_referral", "description": None, "location_city": None}
         )
 
 
-def test_post_update_client_referral_rejects_whitespace_only():
+def test_post_update_client_referral_rejects_whitespace_only_description():
     with pytest.raises(ValidationError):
         post_update_adapter.validate_python(
             {"kind": "client_referral", "description": "   "}
+        )
+
+
+def test_post_update_client_referral_rejects_invalid_zip():
+    with pytest.raises(ValidationError):
+        post_update_adapter.validate_python(
+            {"kind": "client_referral", "location_zip": "12"}
         )
 
 
@@ -164,16 +258,19 @@ def test_post_update_client_referral_rejects_unknown_field():
 
 def test_audit_snapshot_for_client_referral_post():
     owner_id = uuid.uuid4()
+    detail_attrs = client_referral_payload()
+    detail_attrs.pop("kind")
     post = SimpleNamespace(
         kind="client_referral",
         owner_id=owner_id,
-        client_referral_detail=SimpleNamespace(description="needs a clinician"),
+        client_referral_detail=SimpleNamespace(**detail_attrs),
     )
-    assert post_audit_snapshot(post) == {
-        "kind": "client_referral",
-        "description": "needs a clinician",
-        "owner_id": str(owner_id),
-    }
+    snap = post_audit_snapshot(post)
+    assert snap["kind"] == "client_referral"
+    assert snap["owner_id"] == str(owner_id)
+    assert snap["description"] == detail_attrs["description"]
+    assert snap["location_city"] == detail_attrs["location_city"]
+    assert snap["insurance"] == detail_attrs["insurance"]
 
 
 def test_audit_snapshot_unknown_kind_raises():
@@ -195,16 +292,25 @@ def test_audit_snapshot_unknown_kind_raises():
 
 def test_post_create_dispatches_provider_availability():
     p = post_create_adapter.validate_python(
-        {"kind": "provider_availability", "practice_name": "Acme Health"}
+        provider_availability_payload(practice_name="Acme Health")
     )
     assert isinstance(p, ProviderAvailabilityCreate)
     assert p.kind == "provider_availability"
     assert p.practice_name == "Acme Health"
+    assert p.sliding_scale is False
+
+
+def test_post_create_provider_availability_default_non_english_services():
+    """`non_english_services` is optional with a default of 'no'."""
+    payload = provider_availability_payload()
+    payload.pop("non_english_services")
+    p = post_create_adapter.validate_python(payload)
+    assert p.non_english_services == "no"
 
 
 def test_post_create_strips_surrounding_whitespace_provider_availability():
     p = post_create_adapter.validate_python(
-        {"kind": "provider_availability", "practice_name": "  Acme  "}
+        provider_availability_payload(practice_name="  Acme  ")
     )
     assert p.practice_name == "Acme"
 
@@ -212,35 +318,43 @@ def test_post_create_strips_surrounding_whitespace_provider_availability():
 def test_post_create_provider_availability_rejects_empty_practice_name():
     with pytest.raises(ValidationError):
         post_create_adapter.validate_python(
-            {"kind": "provider_availability", "practice_name": "   "}
+            provider_availability_payload(practice_name="   ")
         )
 
 
-def test_post_create_provider_availability_requires_practice_name():
+@pytest.mark.parametrize(
+    "missing_field",
+    [
+        "practice_name",
+        "available_providers",
+        "location_city",
+        "location_state",
+        "location_zip",
+        "in_person_sessions",
+        "virtual_sessions",
+        "client_focus",
+        "age_group",
+        "payment_situation",
+        "sliding_scale",
+    ],
+)
+def test_post_create_provider_availability_requires_required_fields(missing_field):
+    payload = provider_availability_payload()
+    payload.pop(missing_field)
     with pytest.raises(ValidationError):
-        post_create_adapter.validate_python({"kind": "provider_availability"})
+        post_create_adapter.validate_python(payload)
 
 
 def test_post_create_rejects_unknown_fields_on_provider_availability():
     with pytest.raises(ValidationError):
-        post_create_adapter.validate_python(
-            {
-                "kind": "provider_availability",
-                "practice_name": "Acme",
-                "evil": True,
-            }
-        )
+        post_create_adapter.validate_python(provider_availability_payload(evil=True))
 
 
 def test_post_create_rejects_cross_kind_field_bleed():
     """Cross-kind field bleed must not validate."""
     with pytest.raises(ValidationError):
         post_create_adapter.validate_python(
-            {
-                "kind": "provider_availability",
-                "practice_name": "Acme",
-                "description": "d",
-            }
+            provider_availability_payload(description="d")
         )
 
 
@@ -252,6 +366,14 @@ def test_post_update_provider_availability_accepts_practice_name():
     assert p.practice_name == "Renamed"
 
 
+def test_post_update_provider_availability_accepts_sliding_scale_only():
+    p = post_update_adapter.validate_python(
+        {"kind": "provider_availability", "sliding_scale": True}
+    )
+    assert isinstance(p, ProviderAvailabilityUpdate)
+    assert p.sliding_scale is True
+
+
 def test_post_update_provider_availability_strips_whitespace():
     p = post_update_adapter.validate_python(
         {"kind": "provider_availability", "practice_name": "  Renamed  "}
@@ -259,11 +381,9 @@ def test_post_update_provider_availability_strips_whitespace():
     assert p.practice_name == "Renamed"
 
 
-def test_post_update_provider_availability_requires_practice_name():
+def test_post_update_provider_availability_requires_at_least_one_field():
     with pytest.raises(ValidationError):
-        post_update_adapter.validate_python(
-            {"kind": "provider_availability", "practice_name": None}
-        )
+        post_update_adapter.validate_python({"kind": "provider_availability"})
 
 
 def test_post_update_provider_availability_rejects_whitespace_only():
@@ -288,14 +408,78 @@ def test_audit_snapshot_for_provider_availability_post():
     """Snapshotting a `kind='provider_availability'` post flattens through
     `provider_availability_detail`."""
     owner_id = uuid.uuid4()
+    detail_attrs = provider_availability_payload()
+    detail_attrs.pop("kind")
     post = SimpleNamespace(
         kind="provider_availability",
         owner_id=owner_id,
         client_referral_detail=None,
-        provider_availability_detail=SimpleNamespace(practice_name="Acme Health"),
+        provider_availability_detail=SimpleNamespace(**detail_attrs),
     )
-    assert post_audit_snapshot(post) == {
-        "kind": "provider_availability",
-        "practice_name": "Acme Health",
-        "owner_id": str(owner_id),
-    }
+    snap = post_audit_snapshot(post)
+    assert snap["kind"] == "provider_availability"
+    assert snap["owner_id"] == str(owner_id)
+    assert snap["practice_name"] == detail_attrs["practice_name"]
+    assert snap["sliding_scale"] is False
+    assert snap["cost"] is None
+
+
+# --- Schema-literal vs model-tuple guardrail ----------------------------
+
+
+def _literal_args(model_cls, field_name: str) -> tuple[str, ...]:
+    """Pull the `Literal[...]` accepted values off a Pydantic field's
+    annotation, regardless of `Optional` wrapping."""
+    annotation = model_cls.model_fields[field_name].annotation
+    args = get_args(annotation)
+    if args:
+        # Optional[...] / Union[...]: find the Literal arm.
+        for arm in args:
+            literal_values = get_args(arm)
+            if literal_values and all(isinstance(v, str) for v in literal_values):
+                return literal_values
+        # Direct Literal[...]
+        if all(isinstance(a, str) for a in args):
+            return args
+    return ()
+
+
+@pytest.mark.parametrize(
+    "model_cls,field,expected",
+    [
+        # Read variants
+        (ClientReferralRead, "location_state", US_STATES),
+        (ClientReferralRead, "location_in_person", LOCATION_AVAILABILITY_OPTIONS),
+        (ClientReferralRead, "location_virtual", LOCATION_AVAILABILITY_OPTIONS),
+        (ClientReferralRead, "client_dem_ages", CLIENT_AGE_GROUPS),
+        (ClientReferralRead, "language_preferred", LANGUAGE_PREFERRED_OPTIONS),
+        (ClientReferralRead, "insurance", INSURANCE_OPTIONS),
+        (ProviderAvailabilityRead, "location_state", US_STATES),
+        (ProviderAvailabilityRead, "in_person_sessions", LOCATION_AVAILABILITY_OPTIONS),
+        (ProviderAvailabilityRead, "virtual_sessions", LOCATION_AVAILABILITY_OPTIONS),
+        (ProviderAvailabilityRead, "age_group", CLIENT_AGE_GROUPS),
+        (ProviderAvailabilityRead, "non_english_services", LANGUAGE_PREFERRED_OPTIONS),
+        (ProviderAvailabilityRead, "payment_situation", INSURANCE_OPTIONS),
+        # Create variants
+        (ClientReferralCreate, "location_state", US_STATES),
+        (ClientReferralCreate, "client_dem_ages", CLIENT_AGE_GROUPS),
+        (ClientReferralCreate, "insurance", INSURANCE_OPTIONS),
+        (
+            ProviderAvailabilityCreate,
+            "non_english_services",
+            LANGUAGE_PREFERRED_OPTIONS,
+        ),
+        (ProviderAvailabilityCreate, "payment_situation", INSURANCE_OPTIONS),
+        # Update variants (Optional[Literal[*TUPLE]])
+        (ClientReferralUpdate, "location_state", US_STATES),
+        (ClientReferralUpdate, "insurance", INSURANCE_OPTIONS),
+        (ProviderAvailabilityUpdate, "age_group", CLIENT_AGE_GROUPS),
+    ],
+)
+def test_schema_literals_match_model_tuples(model_cls, field, expected):
+    """Per `notes/forms_spec.md`: schema `Literal[*TUPLE]`s and DB CHECK
+    universes must agree, sourced from the tuples in
+    `src/models/post_enums.py`. If you add or rename a vocabulary value,
+    update both places (and the migration); this guardrail keeps them
+    honest."""
+    assert set(_literal_args(model_cls, field)) == set(expected)

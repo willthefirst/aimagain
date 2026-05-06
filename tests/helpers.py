@@ -1,12 +1,12 @@
 import uuid
-from typing import Optional
+from typing import Any, Optional
 from uuid import UUID  # Import UUID
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 # Need ORM models
-from src.models import User
+from src.models import ClientReferralDetail, ProviderAvailabilityDetail, User
 
 
 def create_test_user(
@@ -28,6 +28,74 @@ def create_test_user(
         is_active=is_active,
         is_superuser=is_superuser,
         is_verified=is_verified,
+    )
+
+
+# --- Per-kind detail factories --------------------------------------------
+#
+# Both per-kind detail tables now have many required columns (see
+# `notes/forms_spec.md`). Tests that don't care about the specifics still
+# need a *valid* row to exercise route / repo / schema behavior, so these
+# factories supply spec-compliant defaults and let callers override per
+# field.
+
+_CLIENT_REFERRAL_DEFAULTS: dict[str, Any] = {
+    "location_city": "Springfield",
+    "location_state": "IL",
+    "location_zip": "62701",
+    "location_in_person": "yes",
+    "location_virtual": "no",
+    "client_dem_ages": "adults_25_64",
+    "language_preferred": "no",
+    "description": "needs placement",
+    "services_psychotherapy_modality": None,
+    "insurance": "in_network",
+}
+
+_PROVIDER_AVAILABILITY_DEFAULTS: dict[str, Any] = {
+    "practice_name": "Acme Health",
+    "available_providers": "Dr. Doe; Dr. Roe",
+    "location_city": "Springfield",
+    "location_state": "IL",
+    "location_zip": "62701",
+    "in_person_sessions": "yes",
+    "virtual_sessions": "no",
+    "treatment_modality": None,
+    "client_focus": "general adult outpatient",
+    "age_group": "adults_25_64",
+    "non_english_services": "no",
+    "payment_situation": "in_network",
+    "sliding_scale": False,
+    "cost": None,
+}
+
+
+def client_referral_payload(**overrides: Any) -> dict[str, Any]:
+    """Build a wire-valid `kind='client_referral'` create/update payload.
+    Returns a fresh dict each call. Pass overrides by field name to
+    customize."""
+    return {"kind": "client_referral", **_CLIENT_REFERRAL_DEFAULTS, **overrides}
+
+
+def provider_availability_payload(**overrides: Any) -> dict[str, Any]:
+    """Build a wire-valid `kind='provider_availability'` create/update payload.
+    Returns a fresh dict each call."""
+    return {
+        "kind": "provider_availability",
+        **_PROVIDER_AVAILABILITY_DEFAULTS,
+        **overrides,
+    }
+
+
+def make_client_referral_detail(**overrides: Any) -> ClientReferralDetail:
+    """Build a `ClientReferralDetail` ORM row with spec-compliant defaults."""
+    return ClientReferralDetail(**{**_CLIENT_REFERRAL_DEFAULTS, **overrides})
+
+
+def make_provider_availability_detail(**overrides: Any) -> ProviderAvailabilityDetail:
+    """Build a `ProviderAvailabilityDetail` ORM row with spec-compliant defaults."""
+    return ProviderAvailabilityDetail(
+        **{**_PROVIDER_AVAILABILITY_DEFAULTS, **overrides}
     )
 
 
