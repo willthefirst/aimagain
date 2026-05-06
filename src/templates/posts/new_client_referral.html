@@ -1,89 +1,10 @@
 {% extends "base.html" %}
+{% from "posts/_client_referral_form.html" import client_referral_form %}
 {% block title %}New client referral{% endblock %}
 {% block content %}
 <h1>New client referral</h1>
 <p>Per <code>notes/forms_spec.md</code>. No PII.</p>
-<form hx-post="/posts" hx-ext="json-enc">
-  <input type="hidden" name="kind" value="client_referral" />
-
-  <fieldset>
-    <legend>Client location</legend>
-
-    <label for="location_city">City:</label><br />
-    <input type="text" id="location_city" name="location_city" required /><br /><br />
-
-    <label for="location_state">State:</label><br />
-    <select id="location_state" name="location_state" required>
-      <option value="" disabled selected>--</option>
-      {% for state in ("AL","AK","AZ","AR","CA","CO","CT","DE","DC","FL","GA","HI","ID","IL","IN","IA","KS","KY","LA","ME","MD","MA","MI","MN","MS","MO","MT","NE","NV","NH","NJ","NM","NY","NC","ND","OH","OK","OR","PA","RI","SC","SD","TN","TX","UT","VT","VA","WA","WV","WI","WY") %}
-      <option value="{{ state }}">{{ state }}</option>
-      {% endfor %}
-    </select><br /><br />
-
-    <label for="location_zip">ZIP:</label><!-- title-case-ignore --><br />
-    <input type="text" id="location_zip" name="location_zip" pattern="\d{5}" maxlength="5" required /><br /><br />
-
-    <label for="location_in_person">In-person sessions:</label><!-- title-case-ignore --><br />
-    <select id="location_in_person" name="location_in_person" required>
-      <option value="yes">Yes</option>
-      <option value="no">No</option>
-      <option value="please_contact">Please contact</option>
-    </select><br /><br />
-
-    <label for="location_virtual">Virtual sessions:</label><br />
-    <select id="location_virtual" name="location_virtual" required>
-      <option value="yes">Yes</option>
-      <option value="no">No</option>
-      <option value="please_contact">Please contact</option>
-    </select><br /><br />
-  </fieldset>
-
-  <fieldset>
-    <legend>Demographics</legend>
-
-    <label for="client_dem_ages">Age group:</label><br />
-    <select id="client_dem_ages" name="client_dem_ages" required>
-      <option value="children_0_5">Children 0–5</option>
-      <option value="children_6_10">Children 6–10</option>
-      <option value="preteens_11_13">Preteens 11–13</option>
-      <option value="adolescents_14_18">Adolescents 14–18</option>
-      <option value="young_adults_19_24">Young adults 19–24</option>
-      <option value="adults_25_64">Adults 25–64</option>
-      <option value="older_adults_65_plus">Older adults 65+</option>
-    </select><br /><br />
-
-    <label for="language_preferred">Services preferred in language other than English?</label><!-- title-case-ignore --><br />
-    <select id="language_preferred" name="language_preferred" required>
-      <option value="no" selected>No</option>
-      <option value="yes">Yes</option>
-    </select><br /><br />
-  </fieldset>
-
-  <fieldset>
-    <legend>Description</legend>
-    <label for="description">Description (no PII):</label><!-- title-case-ignore --><br />
-    <textarea id="description" name="description" required></textarea><br /><br />
-  </fieldset>
-
-  <fieldset>
-    <legend>Services</legend>
-    <label for="services_psychotherapy_modality">Psychotherapy modality (optional, e.g. DBT, EMDR):</label><!-- title-case-ignore --><br />
-    <input type="text" id="services_psychotherapy_modality" name="services_psychotherapy_modality" /><br /><br />
-  </fieldset>
-
-  <fieldset>
-    <legend>Insurance</legend>
-    <label for="insurance">Payment situation:</label><br />
-    <select id="insurance" name="insurance" required>
-      <option value="" disabled selected>--</option>
-      <option value="in_network">In-network</option>
-      <option value="out_of_network">Out-of-network</option>
-      <option value="in_and_out_of_network">In- and out-of-network</option>
-    </select><br /><br />
-  </fieldset>
-
-  <input type="submit" value="Create client referral" />
-</form>
+{{ client_referral_form("post", "/posts", "Create client referral") }}
 
 <hr />
 <a href="/posts">Back to posts</a>

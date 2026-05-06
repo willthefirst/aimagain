@@ -1,0 +1,54 @@
+{# Shared form body for `kind='client_referral'`.
+
+Used by both `posts/new_client_referral.html` (create, no prefill) and
+`posts/edit_client_referral.html` (update, prefilled). Caller passes:
+
+  - `hx_method`: "post" or "patch"
+  - `action`: the form submit URL
+  - `submit_label`: the visible submit-button text
+  - `post`: the persisted Post (for edit) or `None` (for create)
+
+Field set follows `notes/forms_spec.md` Form 1 — minus the multi-select
+fields (`desired_times`, `services`), which follow in a separate change.
+Field order, labels, and required/optional state all live here in one
+place; new vs edit difference is the prefill, not the structure.
+#}
+{%- from "posts/_form_macros.html" import text_field, textarea_field, select_field -%}
+{%- macro client_referral_form(hx_method, action, submit_label, post=None) -%}
+{%- set d = post.client_referral_detail if post else None -%}
+<form hx-{{ hx_method }}="{{ action }}" hx-ext="json-enc">
+  <input type="hidden" name="kind" value="client_referral" />
+
+  <fieldset>
+    <legend>Client location</legend>
+    {{ text_field("location_city", "City", current=d.location_city if d else None) }}
+    {{ select_field("location_state", "State", US_STATES, current=d.location_state if d else None, placeholder=true) }}
+    {{ text_field("location_zip", "ZIP", current=d.location_zip if d else None, pattern="\\d{5}", maxlength=5, title_case_ignore=true) }}
+    {{ select_field("location_in_person", "In-person sessions", LOCATION_AVAILABILITY_OPTIONS, labels=LOCATION_AVAILABILITY_LABELS, current=d.location_in_person if d else None, title_case_ignore=true) }}
+    {{ select_field("location_virtual", "Virtual sessions", LOCATION_AVAILABILITY_OPTIONS, labels=LOCATION_AVAILABILITY_LABELS, current=d.location_virtual if d else None) }}
+  </fieldset>
+
+  <fieldset>
+    <legend>Demographics</legend>
+    {{ select_field("client_dem_ages", "Age group", CLIENT_AGE_GROUPS, labels=CLIENT_AGE_GROUP_LABELS, current=d.client_dem_ages if d else None) }}
+    {{ select_field("language_preferred", "Services preferred in language other than English?", LANGUAGE_PREFERRED_OPTIONS, labels=LANGUAGE_PREFERRED_LABELS, current=(d.language_preferred if d else "no"), title_case_ignore=true) }}
+  </fieldset>
+
+  <fieldset>
+    <legend>Description</legend>
+    {{ textarea_field("description", "Description (no PII)", current=d.description if d else None, title_case_ignore=true) }}
+  </fieldset>
+
+  <fieldset>
+    <legend>Services</legend>
+    {{ text_field("services_psychotherapy_modality", "Psychotherapy modality (optional, e.g. DBT, EMDR)", current=d.services_psychotherapy_modality if d else None, required=false, title_case_ignore=true) }}
+  </fieldset>
+
+  <fieldset>
+    <legend>Insurance</legend>
+    {{ select_field("insurance", "Payment situation", INSURANCE_OPTIONS, labels=INSURANCE_LABELS, current=d.insurance if d else None, placeholder=true) }}
+  </fieldset>
+
+  <input type="submit" value="{{ submit_label }}" />
+</form>
+{%- endmacro -%}

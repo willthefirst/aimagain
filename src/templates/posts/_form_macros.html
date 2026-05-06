@@ -1,0 +1,49 @@
+{# Form-field render macros.
+
+Each macro emits one labelled field (label + control + line breaks) so
+per-kind form partials read as a flat field list rather than HTML
+boilerplate. The `<select>` and bool-radio macros iterate over a
+controlled-vocabulary tuple from `src/models/post_enums.py` (registered
+as Jinja globals in `src/core/templating.py`) and look display labels up
+in the matching `*_LABELS` dict — adding a value to a tuple flows to
+every form using these macros, no per-template edits.
+
+`current` is the prefilled value (None on the create form, the persisted
+value on edit). For the bool-radio `current` should be `True` / `False`
+/ `None` — neither radio is checked when `None`.
+
+`title_case_ignore` lets a caller suppress the project's title-case
+linter for a label whose human spelling intentionally diverges from
+sentence case (acronyms like ZIP/PII, hyphenated openers like
+"In-person"). The flag adds the inline ignore comment on the label line.
+#}
+
+{% macro text_field(name, label, current=None, required=True, pattern=None, maxlength=None, title_case_ignore=False) -%}
+<label for="{{ name }}">{{ label }}:</label>{% if title_case_ignore %}<!-- title-case-ignore -->{% endif %}<br />
+<input type="text" id="{{ name }}" name="{{ name }}"{% if current is not none %} value="{{ current }}"{% endif %}{% if pattern %} pattern="{{ pattern }}"{% endif %}{% if maxlength %} maxlength="{{ maxlength }}"{% endif %}{% if required %} required{% endif %} /><br /><br />
+{%- endmacro %}
+
+{% macro textarea_field(name, label, current=None, required=True, title_case_ignore=False) -%}
+<label for="{{ name }}">{{ label }}:</label>{% if title_case_ignore %}<!-- title-case-ignore -->{% endif %}<br />
+<textarea id="{{ name }}" name="{{ name }}"{% if required %} required{% endif %}>{{ current or "" }}</textarea><br /><br />
+{%- endmacro %}
+
+{% macro select_field(name, label, options, labels=None, current=None, required=True, placeholder=False, title_case_ignore=False) -%}
+<label for="{{ name }}">{{ label }}:</label>{% if title_case_ignore %}<!-- title-case-ignore -->{% endif %}<br />
+<select id="{{ name }}" name="{{ name }}"{% if required %} required{% endif %}>
+  {%- if placeholder and not current %}
+  <option value="" disabled selected>--</option>
+  {%- endif %}
+  {%- for v in options %}
+  <option value="{{ v }}"{% if current == v %} selected{% endif %}>{{ labels[v] if labels else v }}</option>
+  {%- endfor %}
+</select><br /><br />
+{%- endmacro %}
+
+{% macro radio_bool_field(name, label, current=None, required=True) -%}
+<fieldset>
+  <legend>{{ label }}</legend>
+  <label><input type="radio" name="{{ name }}" value="true"{% if current is sameas true %} checked{% endif %}{% if required %} required{% endif %} /> Yes</label>
+  <label><input type="radio" name="{{ name }}" value="false"{% if current is sameas false %} checked{% endif %}{% if required %} required{% endif %} /> No</label>
+</fieldset><br />
+{%- endmacro %}

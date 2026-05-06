@@ -1,0 +1,57 @@
+{# Shared form body for `kind='provider_availability'`.
+
+Used by both `posts/new_provider_availability.html` (create) and
+`posts/edit_provider_availability.html` (update). Caller passes:
+
+  - `hx_method`: "post" or "patch"
+  - `action`: the form submit URL
+  - `submit_label`: the visible submit-button text
+  - `post`: the persisted Post (for edit) or `None` (for create)
+
+Field set follows `notes/forms_spec.md` Form 2 — minus the multi-select
+fields (`desired_times`, `services`, `settings`), which follow in a
+separate change.
+#}
+{%- from "posts/_form_macros.html" import text_field, textarea_field, select_field, radio_bool_field -%}
+{%- macro provider_availability_form(hx_method, action, submit_label, post=None) -%}
+{%- set d = post.provider_availability_detail if post else None -%}
+<form hx-{{ hx_method }}="{{ action }}" hx-ext="json-enc">
+  <input type="hidden" name="kind" value="provider_availability" />
+
+  <fieldset>
+    <legend>Provider information</legend>
+    {{ text_field("practice_name", "Practice name", current=d.practice_name if d else None) }}
+    {{ text_field("available_providers", "Available providers", current=d.available_providers if d else None) }}
+  </fieldset>
+
+  <fieldset>
+    <legend>Location</legend>
+    {{ text_field("location_city", "City", current=d.location_city if d else None) }}
+    {{ select_field("location_state", "State", US_STATES, current=d.location_state if d else None, placeholder=true) }}
+    {{ text_field("location_zip", "ZIP", current=d.location_zip if d else None, pattern="\\d{5}", maxlength=5, title_case_ignore=true) }}
+  </fieldset>
+
+  <fieldset>
+    <legend>Availability</legend>
+    {{ select_field("in_person_sessions", "In-person sessions", LOCATION_AVAILABILITY_OPTIONS, labels=LOCATION_AVAILABILITY_LABELS, current=d.in_person_sessions if d else None, title_case_ignore=true) }}
+    {{ select_field("virtual_sessions", "Virtual sessions", LOCATION_AVAILABILITY_OPTIONS, labels=LOCATION_AVAILABILITY_LABELS, current=d.virtual_sessions if d else None) }}
+  </fieldset>
+
+  <fieldset>
+    <legend>Featured services</legend>
+    {{ text_field("treatment_modality", "Treatment modality (optional, e.g. DBT, EMDR)", current=d.treatment_modality if d else None, required=false, title_case_ignore=true) }}
+    {{ textarea_field("client_focus", "Client focus (no PII)", current=d.client_focus if d else None, title_case_ignore=true) }}
+    {{ select_field("age_group", "Age group", CLIENT_AGE_GROUPS, labels=CLIENT_AGE_GROUP_LABELS, current=d.age_group if d else None) }}
+    {{ select_field("non_english_services", "Services offered in non-English language?", LANGUAGE_PREFERRED_OPTIONS, labels=LANGUAGE_PREFERRED_LABELS, current=(d.non_english_services if d else "no"), required=false, title_case_ignore=true) }}
+  </fieldset>
+
+  <fieldset>
+    <legend>Insurance</legend>
+    {{ select_field("payment_situation", "Payment situation", INSURANCE_OPTIONS, labels=INSURANCE_LABELS, current=d.payment_situation if d else None, placeholder=true) }}
+    {{ radio_bool_field("sliding_scale", "Sliding scale?", current=d.sliding_scale if d else None) }}
+    {{ text_field("cost", "Cost (optional, free text)", current=d.cost if d else None, required=false) }}
+  </fieldset>
+
+  <input type="submit" value="{{ submit_label }}" />
+</form>
+{%- endmacro -%}
