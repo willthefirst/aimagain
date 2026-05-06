@@ -73,14 +73,18 @@ Core modules are imported and used throughout the application stack.
 | Module            | Purpose                             | Key Functionality                                 |
 | ----------------- | ----------------------------------- | ------------------------------------------------- |
 | **config.py**     | Application settings and validation | Environment variables, validation, error handling |
-| **templating.py** | Template system configuration       | Jinja2 setup, global context, auto-reload         |
+| **templating.py** | Template system configuration       | Jinja2 setup, global context, auto-reload, post-enum tuples + label dicts exposed as Jinja globals |
 
 ## Directory structure
 
 ```
 core/
 ├── config.py       # Application settings with environment validation
-├── templating.py   # Template system configuration and global context
+├── templating.py   # Jinja2 environment + global context. Registers the
+│                   #   controlled-vocabulary tuples + display-label dicts
+│                   #   from `src/models/post_enums.py` as Jinja globals
+│                   #   so per-kind form templates can iterate over them
+│                   #   directly (single source of truth for option lists).
 └── __init__.py     # Package exports
 ```
 

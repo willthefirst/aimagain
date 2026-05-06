@@ -16,12 +16,21 @@ AuditSnapshot) plus their entry in the discriminated unions; everything
 else flows from the registry.
 
 Controlled-vocabulary fields (state, age group, etc.) are typed as
-`Literal[*TUPLE]` against tuples in `src/models/post.py` so the
+`Literal[*TUPLE]` against tuples in `src/models/post_enums.py` so the
 schema's accepted values stay in lockstep with the DB CHECK
-constraints. The guardrail test
-`test_schema_literals_match_model_tuples` (in `test_post.py`) asserts
-this; if you add or rename a vocabulary, update both sides and the
-test will keep them honest.
+constraints. Free-text fields (city, ZIP, descriptions, optional
+modality strings) carry their input cleaning via
+`Annotated[T, AfterValidator(fn)]` aliases (`StrippedText`, `ZipText`,
+`StrippedOptionalText`) so the cleaning rule lives in one place and
+attaches to the field type rather than per-class `@field_validator`
+methods. The Update variants reuse the same aliases as `T | None`;
+Pydantic skips the AfterValidator on the `None` arm, so one alias
+covers required and optional flavors.
+
+Two guardrail tests in `test_post.py` keep enums in lockstep:
+`test_schema_literals_match_model_tuples` (Literal universes match the
+tuples) and `test_labels_cover_their_tuples` (every value has a
+display label).
 """
 
 import re
@@ -30,11 +39,11 @@ from datetime import datetime
 from typing import Annotated, Literal, Union
 
 from pydantic import (
+    AfterValidator,
     BaseModel,
     ConfigDict,
     Field,
     TypeAdapter,
-    field_validator,
     model_validator,
 )
 
@@ -47,7 +56,15 @@ from src.models.post_enums import (
     US_STATES,
 )
 
-# --- Shared validators --------------------------------------------------
+# --- Field-cleaning helpers ---------------------------------------------
+#
+# Each runs AFTER Pydantic's type validation, so for required fields
+# typed as plain `str` Pydantic has already rejected `None` before the
+# validator sees the value. For Update fields typed as `T | None`,
+# Pydantic skips AfterValidator on the `None` arm, so the helper only
+# ever sees real strings. That's why a single helper works for both
+# Create (required) and Update (optional) — no `_or_none` variants
+# needed.
 
 _ZIP_RE = re.compile(r"^\d{5}$")
 
@@ -59,21 +76,6 @@ def _strip_required(v: str) -> str:
     return v
 
 
-def _strip_required_or_none(v: str | None) -> str | None:
-    if v is None:
-        return None
-    return _strip_required(v)
-
-
-def _strip_optional(v: str | None) -> str | None:
-    """Strip whitespace; collapse empty/whitespace-only to `None`. Used for
-    optional free-text fields where '' from a blank input means absent."""
-    if v is None:
-        return None
-    v = v.strip()
-    return v or None
-
-
 def _validate_zip(v: str) -> str:
     v = v.strip()
     if not _ZIP_RE.match(v):
@@ -81,10 +83,27 @@ def _validate_zip(v: str) -> str:
     return v
 
 
-def _validate_zip_or_none(v: str | None) -> str | None:
+def _strip_optional(v: str | None) -> str | None:
+    """Strip whitespace; collapse empty/whitespace-only to `None`. Used
+    for optional free-text fields where '' from a blank input means
+    absent. Receives `None` directly because the surrounding type is
+    `str | None` (not `str`), so the AfterValidator fires on every
+    arm of the union — including `None`."""
     if v is None:
         return None
-    return _validate_zip(v)
+    v = v.strip()
+    return v or None
+
+
+# --- Annotated field types ----------------------------------------------
+#
+# Attach the cleaning rule to the field's type, not to a per-class
+# `@field_validator` method. Each variant just declares the field with
+# the right alias; the validator definition lives once.
+
+StrippedText = Annotated[str, AfterValidator(_strip_required)]
+ZipText = Annotated[str, AfterValidator(_validate_zip)]
+StrippedOptionalText = Annotated[str | None, AfterValidator(_strip_optional)]
 
 
 # --- Shared flatten helper ----------------------------------------------
@@ -176,6 +195,11 @@ post_read_adapter: TypeAdapter = TypeAdapter(PostRead)
 
 
 # --- Create payloads ----------------------------------------------------
+#
+# Free-text fields use the Annotated aliases for input cleaning; enum
+# fields use `Literal[*TUPLE]`; bool/int fields are plain Python types.
+# `extra="forbid"` rejects unknown fields with 422. Cross-kind field
+# bleed is rejected by the discriminated union one level up.
 
 
 class ClientReferralCreate(BaseModel):
@@ -184,33 +208,18 @@ class ClientReferralCreate(BaseModel):
     fields (`desired_times`, `services`) follow in a separate change."""
 
     kind: Literal["client_referral"]
-    location_city: str
+    location_city: StrippedText
     location_state: Literal[*US_STATES]
-    location_zip: str
+    location_zip: ZipText
     location_in_person: Literal[*LOCATION_AVAILABILITY_OPTIONS]
     location_virtual: Literal[*LOCATION_AVAILABILITY_OPTIONS]
     client_dem_ages: Literal[*CLIENT_AGE_GROUPS]
     language_preferred: Literal[*LANGUAGE_PREFERRED_OPTIONS]
-    description: str
-    services_psychotherapy_modality: str | None = None
+    description: StrippedText
+    services_psychotherapy_modality: StrippedOptionalText = None
     insurance: Literal[*INSURANCE_OPTIONS]
 
     model_config = ConfigDict(extra="forbid")
-
-    @field_validator("location_city", "description")
-    @classmethod
-    def _strip_required(cls, v: str) -> str:
-        return _strip_required(v)
-
-    @field_validator("location_zip")
-    @classmethod
-    def _validate_zip(cls, v: str) -> str:
-        return _validate_zip(v)
-
-    @field_validator("services_psychotherapy_modality")
-    @classmethod
-    def _strip_optional(cls, v: str | None) -> str | None:
-        return _strip_optional(v)
 
 
 class ProviderAvailabilityCreate(BaseModel):
@@ -220,42 +229,22 @@ class ProviderAvailabilityCreate(BaseModel):
     change."""
 
     kind: Literal["provider_availability"]
-    practice_name: str
-    available_providers: str
-    location_city: str
+    practice_name: StrippedText
+    available_providers: StrippedText
+    location_city: StrippedText
     location_state: Literal[*US_STATES]
-    location_zip: str
+    location_zip: ZipText
     in_person_sessions: Literal[*LOCATION_AVAILABILITY_OPTIONS]
     virtual_sessions: Literal[*LOCATION_AVAILABILITY_OPTIONS]
-    treatment_modality: str | None = None
-    client_focus: str
+    treatment_modality: StrippedOptionalText = None
+    client_focus: StrippedText
     age_group: Literal[*CLIENT_AGE_GROUPS]
     non_english_services: Literal[*LANGUAGE_PREFERRED_OPTIONS] = "no"
     payment_situation: Literal[*INSURANCE_OPTIONS]
     sliding_scale: bool
-    cost: str | None = None
+    cost: StrippedOptionalText = None
 
     model_config = ConfigDict(extra="forbid")
-
-    @field_validator(
-        "practice_name",
-        "available_providers",
-        "location_city",
-        "client_focus",
-    )
-    @classmethod
-    def _strip_required(cls, v: str) -> str:
-        return _strip_required(v)
-
-    @field_validator("location_zip")
-    @classmethod
-    def _validate_zip(cls, v: str) -> str:
-        return _validate_zip(v)
-
-    @field_validator("treatment_modality", "cost")
-    @classmethod
-    def _strip_optional(cls, v: str | None) -> str | None:
-        return _strip_optional(v)
 
 
 PostCreate = Annotated[
@@ -267,12 +256,17 @@ post_create_adapter: TypeAdapter = TypeAdapter(PostCreate)
 
 # --- Update payloads (partial) ------------------------------------------
 #
-# Every per-kind editable field is made `T | None = None` and the
-# at-least-one-field rule is enforced in a model validator. Fields whose
-# value is `None` are interpreted as "leave unchanged" by
+# Every per-kind editable field is `T | None = None` and the
+# at-least-one-field rule is enforced in a model validator. Fields
+# whose value is `None` are interpreted as "leave unchanged" by
 # `PostRepository.update_post`. Optional free-text fields can therefore
 # only be *set* via PATCH today, not cleared back to `None`; that's a
 # pre-existing repository semantic and intentionally out of scope here.
+#
+# The Annotated cleaning aliases attach to the non-`None` arm of the
+# union, so e.g. `StrippedText | None` strips and validates a provided
+# string but leaves `None` untouched — same alias works for both
+# Create and Update.
 
 
 def _at_least_one_editable_field(self) -> None:
@@ -283,33 +277,18 @@ def _at_least_one_editable_field(self) -> None:
 
 class ClientReferralUpdate(BaseModel):
     kind: Literal["client_referral"]
-    location_city: str | None = None
+    location_city: StrippedText | None = None
     location_state: Literal[*US_STATES] | None = None
-    location_zip: str | None = None
+    location_zip: ZipText | None = None
     location_in_person: Literal[*LOCATION_AVAILABILITY_OPTIONS] | None = None
     location_virtual: Literal[*LOCATION_AVAILABILITY_OPTIONS] | None = None
     client_dem_ages: Literal[*CLIENT_AGE_GROUPS] | None = None
     language_preferred: Literal[*LANGUAGE_PREFERRED_OPTIONS] | None = None
-    description: str | None = None
-    services_psychotherapy_modality: str | None = None
+    description: StrippedText | None = None
+    services_psychotherapy_modality: StrippedOptionalText = None
     insurance: Literal[*INSURANCE_OPTIONS] | None = None
 
     model_config = ConfigDict(extra="forbid")
-
-    @field_validator("location_city", "description")
-    @classmethod
-    def _strip_required(cls, v: str | None) -> str | None:
-        return _strip_required_or_none(v)
-
-    @field_validator("location_zip")
-    @classmethod
-    def _validate_zip(cls, v: str | None) -> str | None:
-        return _validate_zip_or_none(v)
-
-    @field_validator("services_psychotherapy_modality")
-    @classmethod
-    def _strip_optional(cls, v: str | None) -> str | None:
-        return _strip_optional(v)
 
     @model_validator(mode="after")
     def _at_least_one_field(self) -> "ClientReferralUpdate":
@@ -319,42 +298,22 @@ class ClientReferralUpdate(BaseModel):
 
 class ProviderAvailabilityUpdate(BaseModel):
     kind: Literal["provider_availability"]
-    practice_name: str | None = None
-    available_providers: str | None = None
-    location_city: str | None = None
+    practice_name: StrippedText | None = None
+    available_providers: StrippedText | None = None
+    location_city: StrippedText | None = None
     location_state: Literal[*US_STATES] | None = None
-    location_zip: str | None = None
+    location_zip: ZipText | None = None
     in_person_sessions: Literal[*LOCATION_AVAILABILITY_OPTIONS] | None = None
     virtual_sessions: Literal[*LOCATION_AVAILABILITY_OPTIONS] | None = None
-    treatment_modality: str | None = None
-    client_focus: str | None = None
+    treatment_modality: StrippedOptionalText = None
+    client_focus: StrippedText | None = None
     age_group: Literal[*CLIENT_AGE_GROUPS] | None = None
     non_english_services: Literal[*LANGUAGE_PREFERRED_OPTIONS] | None = None
     payment_situation: Literal[*INSURANCE_OPTIONS] | None = None
     sliding_scale: bool | None = None
-    cost: str | None = None
+    cost: StrippedOptionalText = None
 
     model_config = ConfigDict(extra="forbid")
-
-    @field_validator(
-        "practice_name",
-        "available_providers",
-        "location_city",
-        "client_focus",
-    )
-    @classmethod
-    def _strip_required(cls, v: str | None) -> str | None:
-        return _strip_required_or_none(v)
-
-    @field_validator("location_zip")
-    @classmethod
-    def _validate_zip(cls, v: str | None) -> str | None:
-        return _validate_zip_or_none(v)
-
-    @field_validator("treatment_modality", "cost")
-    @classmethod
-    def _strip_optional(cls, v: str | None) -> str | None:
-        return _strip_optional(v)
 
     @model_validator(mode="after")
     def _at_least_one_field(self) -> "ProviderAvailabilityUpdate":

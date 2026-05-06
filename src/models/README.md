@@ -85,7 +85,7 @@ Adding a kind is therefore: (1) a registry entry in `post_kinds.py`, (2) a new d
 
 - `user.py` - User authentication and profile (extends FastAPI Users)
 - `post.py` - Parent row for posts: kind discriminator + owner FK; one detail table per kind. CHECK constraint is derived from `post_kinds.py`.
-- `post_kinds.py` - `REGISTERED_KINDS` registry: per-kind detail model, relationship name, field tuple, templates, list label. Single source of truth for the kind set.
+- `post_kinds.py` - `REGISTERED_KINDS` registry: per-kind detail model, relationship name, field tuple (derived from the model's columns via `_detail_fields(model)` so the registry never drifts from the schema), templates, list label. Single source of truth for the kind set.
 - `post_enums.py` - Controlled-vocabulary tuples shared by per-kind detail columns (`US_STATES`, `LOCATION_AVAILABILITY_OPTIONS`, `CLIENT_AGE_GROUPS`, `LANGUAGE_PREFERRED_OPTIONS`, `INSURANCE_OPTIONS`) plus a `check_in_tuple_sql` helper that renders DB-level CHECK fragments from them, and matching `*_LABELS` dicts (`LOCATION_AVAILABILITY_LABELS`, `CLIENT_AGE_GROUP_LABELS`, `LANGUAGE_PREFERRED_LABELS`, `INSURANCE_LABELS`) that hold the human-readable label for each value. Single source of truth — `src/schemas/post.py` derives its `Literal[*TUPLE]`s from these tuples and the form-render macros in `src/templates/posts/_form_macros.html` iterate over them via Jinja globals. Two guardrail tests in `src/schemas/test_post.py` keep the schema literals + the label dicts in lockstep with the tuples. Lives in its own leaf module so the detail models can depend on it without a circular import through `post_kinds`.
 - `client_referral_detail.py` - `kind='client_referral'` detail; 1:1 with `posts` via `post_id`. Columns cover the scalar fields from `notes/forms_spec.md` Form 1; enum columns CHECK against `post_enums.py`.
 - `provider_availability_detail.py` - `kind='provider_availability'` detail; 1:1 with `posts` via `post_id`. Columns cover the scalar fields from `notes/forms_spec.md` Form 2; enum columns CHECK against `post_enums.py`.
@@ -274,7 +274,7 @@ class NewEntity(BaseModel):
 
 ## Tests
 
-- `test_post_kinds.py` — guards the `post_kinds` registry as the single source of truth: asserts `KIND_NAMES` matches the registry, the rendered `kind_check_sql()` matches what `Post.__table_args__` actually produces, the route's `Literal[*KIND_NAMES]` reflects the registry, the inverse `KIND_BY_DETAIL_MODEL` lookup is well-formed, and the per-kind relationship-name convention holds. If a future change re-encodes the kind set inline somewhere, the relevant test here fails.
+- `test_post_kinds.py` — guards the `post_kinds` registry as the single source of truth: asserts `KIND_NAMES` matches the registry, the rendered `kind_check_sql()` matches what `Post.__table_args__` actually produces, the route's `Literal[*KIND_NAMES]` reflects the registry, the inverse `KIND_BY_DETAIL_MODEL` lookup is well-formed, the per-kind relationship-name convention holds, and `KindSpec.detail_fields` exactly matches the underlying detail model's column list (so the introspection-driven derivation can't silently drift from the schema). If a future change re-encodes the kind set inline somewhere, the relevant test here fails.
 
 Most other model behavior is exercised indirectly through repository and route tests. Add `src/models/test_<model_name>.py` when a model carries non-trivial logic (computed fields, validators, custom `__init__`, etc.) that warrants direct coverage.
 
