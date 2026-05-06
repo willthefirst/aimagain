@@ -41,6 +41,7 @@ from typing import Annotated, Literal, Union
 from pydantic import (
     AfterValidator,
     BaseModel,
+    BeforeValidator,
     ConfigDict,
     Field,
     TypeAdapter,
@@ -107,6 +108,28 @@ ZipText = Annotated[str, AfterValidator(_validate_zip)]
 StrippedOptionalText = Annotated[str | None, AfterValidator(_strip_optional)]
 
 
+def _scalar_to_list(v):
+    """Wrap a single string in a one-element list. HTML form posts collapse
+    a 1-checkbox-checked group to a scalar (htmx's `json-enc` only emits
+    an array when the same name appears 2+ times); this normalizes that
+    1-element case before the `Literal[*TUPLE]` member check fires. The
+    0-element case is handled by the field default `[]`; the 2+ case
+    already arrives as a list. When `services` (#125) and `settings`
+    (#126) wire up, they reuse this validator the same way."""
+    if isinstance(v, str):
+        return [v]
+    return v
+
+
+# Annotated alias for the `desired_times` multi-checkbox field. The
+# `BeforeValidator` runs first and normalizes a scalar string to a
+# single-element list (see `_scalar_to_list`); `Literal[*TUPLE]` then
+# validates each member.
+DesiredTimesField = Annotated[
+    list[Literal[*DESIRED_TIME_SLOTS]], BeforeValidator(_scalar_to_list)
+]
+
+
 # --- Shared flatten helper ----------------------------------------------
 
 
@@ -163,7 +186,7 @@ class ClientReferralRead(_PostReadBase):
     location_zip: str
     location_in_person: Literal[*LOCATION_AVAILABILITY_OPTIONS]
     location_virtual: Literal[*LOCATION_AVAILABILITY_OPTIONS]
-    desired_times: list[Literal[*DESIRED_TIME_SLOTS]] = []
+    desired_times: DesiredTimesField = []
     client_dem_ages: Literal[*CLIENT_AGE_GROUPS]
     language_preferred: Literal[*LANGUAGE_PREFERRED_OPTIONS]
     description: str
@@ -180,7 +203,7 @@ class ProviderAvailabilityRead(_PostReadBase):
     location_zip: str
     in_person_sessions: Literal[*LOCATION_AVAILABILITY_OPTIONS]
     virtual_sessions: Literal[*LOCATION_AVAILABILITY_OPTIONS]
-    desired_times: list[Literal[*DESIRED_TIME_SLOTS]] = []
+    desired_times: DesiredTimesField = []
     treatment_modality: str | None = None
     client_focus: str
     age_group: Literal[*CLIENT_AGE_GROUPS]
@@ -217,7 +240,7 @@ class ClientReferralCreate(BaseModel):
     location_zip: ZipText
     location_in_person: Literal[*LOCATION_AVAILABILITY_OPTIONS]
     location_virtual: Literal[*LOCATION_AVAILABILITY_OPTIONS]
-    desired_times: list[Literal[*DESIRED_TIME_SLOTS]] = []
+    desired_times: DesiredTimesField = []
     client_dem_ages: Literal[*CLIENT_AGE_GROUPS]
     language_preferred: Literal[*LANGUAGE_PREFERRED_OPTIONS]
     description: StrippedText
@@ -241,7 +264,7 @@ class ProviderAvailabilityCreate(BaseModel):
     location_zip: ZipText
     in_person_sessions: Literal[*LOCATION_AVAILABILITY_OPTIONS]
     virtual_sessions: Literal[*LOCATION_AVAILABILITY_OPTIONS]
-    desired_times: list[Literal[*DESIRED_TIME_SLOTS]] = []
+    desired_times: DesiredTimesField = []
     treatment_modality: StrippedOptionalText = None
     client_focus: StrippedText
     age_group: Literal[*CLIENT_AGE_GROUPS]
@@ -298,7 +321,7 @@ class ClientReferralUpdate(BaseModel):
     # `None` = leave unchanged (per `update_post`); `[]` = clear all
     # selections. List-valued PATCH replaces the whole list — partial
     # add/remove is intentionally out of scope.
-    desired_times: list[Literal[*DESIRED_TIME_SLOTS]] | None = None
+    desired_times: DesiredTimesField | None = None
     client_dem_ages: Literal[*CLIENT_AGE_GROUPS] | None = None
     language_preferred: Literal[*LANGUAGE_PREFERRED_OPTIONS] | None = None
     description: StrippedText | None = None
@@ -322,7 +345,7 @@ class ProviderAvailabilityUpdate(BaseModel):
     location_zip: ZipText | None = None
     in_person_sessions: Literal[*LOCATION_AVAILABILITY_OPTIONS] | None = None
     virtual_sessions: Literal[*LOCATION_AVAILABILITY_OPTIONS] | None = None
-    desired_times: list[Literal[*DESIRED_TIME_SLOTS]] | None = None
+    desired_times: DesiredTimesField | None = None
     treatment_modality: StrippedOptionalText = None
     client_focus: StrippedText | None = None
     age_group: Literal[*CLIENT_AGE_GROUPS] | None = None
@@ -367,7 +390,7 @@ class ClientReferralAuditSnapshot(_PostAuditSnapshotBase):
     location_zip: str
     location_in_person: Literal[*LOCATION_AVAILABILITY_OPTIONS]
     location_virtual: Literal[*LOCATION_AVAILABILITY_OPTIONS]
-    desired_times: list[Literal[*DESIRED_TIME_SLOTS]] = []
+    desired_times: DesiredTimesField = []
     client_dem_ages: Literal[*CLIENT_AGE_GROUPS]
     language_preferred: Literal[*LANGUAGE_PREFERRED_OPTIONS]
     description: str
@@ -384,7 +407,7 @@ class ProviderAvailabilityAuditSnapshot(_PostAuditSnapshotBase):
     location_zip: str
     in_person_sessions: Literal[*LOCATION_AVAILABILITY_OPTIONS]
     virtual_sessions: Literal[*LOCATION_AVAILABILITY_OPTIONS]
-    desired_times: list[Literal[*DESIRED_TIME_SLOTS]] = []
+    desired_times: DesiredTimesField = []
     treatment_modality: str | None = None
     client_focus: str
     age_group: Literal[*CLIENT_AGE_GROUPS]

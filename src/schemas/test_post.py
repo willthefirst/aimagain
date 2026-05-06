@@ -526,6 +526,30 @@ def test_post_create_desired_times_accepts_subset(payload_factory):
     "payload_factory",
     [client_referral_payload, provider_availability_payload],
 )
+def test_post_create_desired_times_coerces_scalar_to_singleton_list(payload_factory):
+    """htmx's `json-enc` collapses a 1-checkbox-checked group to a scalar
+    string on the wire (only emits an array when the same name appears
+    2+ times). The schema's `_scalar_to_list` BeforeValidator wraps that
+    scalar back into a list before the `Literal[*TUPLE]` member check
+    fires; otherwise users who pick exactly one slot would 422."""
+    p = post_create_adapter.validate_python(
+        payload_factory(desired_times="monday_morning")
+    )
+    assert p.desired_times == ["monday_morning"]
+
+
+@pytest.mark.parametrize("kind", ["client_referral", "provider_availability"])
+def test_post_update_desired_times_coerces_scalar_to_singleton_list(kind):
+    p = post_update_adapter.validate_python(
+        {"kind": kind, "desired_times": "monday_morning"}
+    )
+    assert p.desired_times == ["monday_morning"]
+
+
+@pytest.mark.parametrize(
+    "payload_factory",
+    [client_referral_payload, provider_availability_payload],
+)
 def test_post_create_desired_times_rejects_unknown_token(payload_factory):
     with pytest.raises(ValidationError):
         post_create_adapter.validate_python(

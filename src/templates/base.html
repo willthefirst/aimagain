@@ -7,58 +7,6 @@
       integrity="sha384-HGfztofotfshcF7+8n44JQL2oJmowVChPTg48S+jvZoztPfvwD79OC/LTtG6dMp+"
       crossorigin="anonymous"></script>
     <script src="https://unpkg.com/htmx.org/dist/ext/json-enc.js"></script>
-    <script>
-      // json-enc-arrays: variant of htmx's json-enc extension that lets a
-      // form declare which field names must serialize as arrays even when
-      // 0 or 1 controls match (default htmx form encoding collapses 0
-      // controls to absent and 1 control to a scalar). Declare the names
-      // on the form: <form hx-ext="json-enc-arrays" data-array-fields="desired_times services">.
-      // Used by the multi-select checkbox grids in posts/_form_macros.html
-      // so 0/1/2+ checked boxes always serialize as []/[x]/[x,y].
-      ;(function () {
-        if (typeof htmx === 'undefined') return
-        htmx.defineExtension('json-enc-arrays', {
-          onEvent: function (name, evt) {
-            if (name === 'htmx:configRequest') {
-              evt.detail.headers['Content-Type'] = 'application/json'
-            }
-          },
-          encodeParameters: function (xhr, parameters, elt) {
-            xhr.overrideMimeType('text/json')
-            var arrayFields = (
-              elt.getAttribute('data-array-fields') || ''
-            )
-              .split(/\s+/)
-              .filter(Boolean)
-            var arraySet = {}
-            arrayFields.forEach(function (n) {
-              arraySet[n] = true
-            })
-            var object = {}
-            // Pre-seed declared array fields to [] so a form with zero
-            // checked boxes still posts the key.
-            arrayFields.forEach(function (n) {
-              object[n] = []
-            })
-            parameters.forEach(function (value, key) {
-              if (arraySet[key]) {
-                object[key].push(value)
-                return
-              }
-              if (Object.prototype.hasOwnProperty.call(object, key)) {
-                if (!Array.isArray(object[key])) {
-                  object[key] = [object[key]]
-                }
-                object[key].push(value)
-              } else {
-                object[key] = value
-              }
-            })
-            return JSON.stringify(object)
-          },
-        })
-      })()
-    </script>
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     {% block head %}{% endblock %} {% if is_development %}
     <!-- LiveReload script for development hot reloading -->
