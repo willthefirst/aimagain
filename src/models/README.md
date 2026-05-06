@@ -55,15 +55,15 @@ Each model maps to a database table with explicit relationships managed by SQLAl
 | ------------ | ------------------------------------------------ | ------------------------------------------------------------------- | ------------------ |
 | **User**     | Authentication and identity                      | username                                                            | username, email    |
 | **Post**     | User-authored content (parent of per-kind detail) | kind (CHECK `'client_referral', 'provider_availability'`), owner_id (FK) | —                  |
-| **ClientReferralDetail** | Per-kind detail for `kind='client_referral'` posts (MVP: one field) | post_id (PK + FK to posts, CASCADE), description | — |
-| **ProviderAvailabilityDetail** | Per-kind detail for `kind='provider_availability'` posts (MVP: one field) | post_id (PK + FK to posts, CASCADE), practice_name | — |
+| **ClientReferralDetail** | Per-kind detail for `kind='client_referral'` posts. Carries the full intake-form fields per [`../../notes/forms_spec.md`](../../notes/forms_spec.md) Form 1 (location, demographics, description, services, insurance) — minus the multi-select fields, which follow in a separate change. Enum columns CHECK against tuples in [`post_enums.py`](post_enums.py). | post_id (PK + FK to posts, CASCADE), description, location_*, client_dem_ages, language_preferred, services_psychotherapy_modality, insurance | — |
+| **ProviderAvailabilityDetail** | Per-kind detail for `kind='provider_availability'` posts. Carries the full intake-form fields per [`../../notes/forms_spec.md`](../../notes/forms_spec.md) Form 2 (provider info, location, availability, featured services, insurance) — minus the multi-select fields. Enum columns CHECK against tuples in [`post_enums.py`](post_enums.py). | post_id (PK + FK to posts, CASCADE), practice_name, available_providers, location_*, in_person_sessions, virtual_sessions, treatment_modality, client_focus, age_group, non_english_services, payment_situation, sliding_scale, cost | — |
 | **AuditLog** | Append-only mutation record (RESOURCE_GRAMMAR.md:135) | actor_id (FK, SET NULL), resource_type, resource_id, action, before/after (JSON) | —                  |
 
 ### Parent / per-kind-detail split
 
 `Post` is the parent table for any post-shaped resource. It carries identity, ownership, timestamps, and a `kind` discriminator. Kind-specific fields live in their own detail table keyed by `post_id` (PK + FK with `ON DELETE CASCADE`).
 
-Kinds today: `client_referral` (→ `client_referral_details`) and `provider_availability` (→ `provider_availability_details`). Both are MVP shape — full intake forms per [`../../notes/forms_spec.md`](../../notes/forms_spec.md) follow. The retired `note` kind (title + body) was removed once the two real kinds landed and the registry made the cleanup a one-line change. Detail rows have no `id` of their own — `post_id` is both PK and FK, enforcing 1:1.
+Kinds today: `client_referral` (→ `client_referral_details`) and `provider_availability` (→ `provider_availability_details`). Both carry the scalar (single-value) fields from the intake forms in [`../../notes/forms_spec.md`](../../notes/forms_spec.md); the multi-select fields (`desired_times`, `services`, `settings`) follow in a separate change once the wire-format extension for array-valued checkboxes lands. The retired `note` kind (title + body) was removed once the two real kinds landed and the registry made the cleanup a one-line change. Detail rows have no `id` of their own — `post_id` is both PK and FK, enforcing 1:1.
 
 ### The `post_kinds` registry
 
@@ -86,8 +86,9 @@ Adding a kind is therefore: (1) a registry entry in `post_kinds.py`, (2) a new d
 - `user.py` - User authentication and profile (extends FastAPI Users)
 - `post.py` - Parent row for posts: kind discriminator + owner FK; one detail table per kind. CHECK constraint is derived from `post_kinds.py`.
 - `post_kinds.py` - `REGISTERED_KINDS` registry: per-kind detail model, relationship name, field tuple, templates, list label. Single source of truth for the kind set.
-- `client_referral_detail.py` - `kind='client_referral'` detail (description; MVP); 1:1 with `posts` via `post_id`
-- `provider_availability_detail.py` - `kind='provider_availability'` detail (practice_name; MVP); 1:1 with `posts` via `post_id`
+- `post_enums.py` - Controlled-vocabulary tuples shared by per-kind detail columns (`US_STATES`, `LOCATION_AVAILABILITY_OPTIONS`, `CLIENT_AGE_GROUPS`, `LANGUAGE_PREFERRED_OPTIONS`, `INSURANCE_OPTIONS`) plus a `check_in_tuple_sql` helper that renders DB-level CHECK fragments from them. Single source of truth — `src/schemas/post.py` derives its `Literal[*TUPLE]`s from these tuples (guardrail test in `src/schemas/test_post.py`). Lives in its own leaf module so the detail models can depend on it without a circular import through `post_kinds`.
+- `client_referral_detail.py` - `kind='client_referral'` detail; 1:1 with `posts` via `post_id`. Columns cover the scalar fields from `notes/forms_spec.md` Form 1; enum columns CHECK against `post_enums.py`.
+- `provider_availability_detail.py` - `kind='provider_availability'` detail; 1:1 with `posts` via `post_id`. Columns cover the scalar fields from `notes/forms_spec.md` Form 2; enum columns CHECK against `post_enums.py`.
 
 **Infrastructure:**
 

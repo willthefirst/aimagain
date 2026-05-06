@@ -8,18 +8,66 @@ Provider availability: {{ post.provider_availability_detail.practice_name }}
 {% endblock %}
 {% block content %}
 {% if post.kind == "client_referral" %}
+{% set d = post.client_referral_detail %}
 <h1>Client referral</h1>
 <p>by <a href="/users/{{ post.owner_id }}">{{ post.owner.username }}</a></p>
 <div class="post-body">
-  <p><strong>Description:</strong></p>
-  <p>{{ post.client_referral_detail.description }}</p>
+  <dl>
+    <dt>Location</dt>
+    <dd>{{ d.location_city }}, {{ d.location_state }} {{ d.location_zip }}</dd>
+    <dt>In-person sessions</dt>
+    <dd>{{ d.location_in_person }}</dd>
+    <dt>Virtual sessions</dt>
+    <dd>{{ d.location_virtual }}</dd>
+    <dt>Age group</dt>
+    <dd>{{ d.client_dem_ages }}</dd>
+    <dt>Language preferred (non-English)</dt>
+    <dd>{{ d.language_preferred }}</dd>
+    <dt>Description</dt>
+    <dd>{{ d.description }}</dd>
+    {% if d.services_psychotherapy_modality %}
+    <dt>Psychotherapy modality</dt>
+    <dd>{{ d.services_psychotherapy_modality }}</dd>
+    {% endif %}
+    <dt>Insurance</dt>
+    <dd>{{ d.insurance }}</dd>
+  </dl>
 </div>
 {% elif post.kind == "provider_availability" %}
+{% set d = post.provider_availability_detail %}
 <h1>Provider availability</h1>
 <p>by <a href="/users/{{ post.owner_id }}">{{ post.owner.username }}</a></p>
 <div class="post-body">
-  <p><strong>Practice name:</strong></p>
-  <p>{{ post.provider_availability_detail.practice_name }}</p>
+  <dl>
+    <dt>Practice name</dt>
+    <dd>{{ d.practice_name }}</dd>
+    <dt>Available providers</dt>
+    <dd>{{ d.available_providers }}</dd>
+    <dt>Location</dt>
+    <dd>{{ d.location_city }}, {{ d.location_state }} {{ d.location_zip }}</dd>
+    <dt>In-person sessions</dt>
+    <dd>{{ d.in_person_sessions }}</dd>
+    <dt>Virtual sessions</dt>
+    <dd>{{ d.virtual_sessions }}</dd>
+    {% if d.treatment_modality %}
+    <dt>Treatment modality</dt>
+    <dd>{{ d.treatment_modality }}</dd>
+    {% endif %}
+    <dt>Client focus</dt>
+    <dd>{{ d.client_focus }}</dd>
+    <dt>Age group</dt>
+    <dd>{{ d.age_group }}</dd>
+    <dt>Non-English services</dt>
+    <dd>{{ d.non_english_services }}</dd>
+    <dt>Payment situation</dt>
+    <dd>{{ d.payment_situation }}</dd>
+    <dt>Sliding scale</dt>
+    <dd>{{ "yes" if d.sliding_scale else "no" }}</dd>
+    {% if d.cost %}
+    <dt>Cost</dt>
+    <dd>{{ d.cost }}</dd>
+    {% endif %}
+  </dl>
 </div>
 {% endif %}
 

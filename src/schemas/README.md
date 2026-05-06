@@ -62,14 +62,14 @@ Schemas act as the data contract layer between HTTP and business logic.
 | Schema File | Domain    | Responsibilities                             | Schema Types                                             |
 | ----------- | --------- | -------------------------------------------- | -------------------------------------------------------- |
 | **user.py** | User data | User CRUD plus activation state-axis subresource (extends FastAPI Users) and audit snapshots | UserRead, UserCreate, UserUpdate, UserActivationUpdate, UserAuditSnapshot, UserActivationAuditSnapshot |
-| **post.py** | Posts     | `PostCreate`/`PostUpdate`/`PostRead`/`PostAuditSnapshot` are kind-discriminated unions keyed on the (required) `kind` field. Create/Update variants apply `extra="forbid"`, strip whitespace, and (for partial update) require at least one mutable field. Read and AuditSnapshot variants share a single `_flatten_post_to_dict` helper that reads the per-kind detail relationship and field tuple from `REGISTERED_KINDS` in [`src/models/post_kinds.py`](../models/post_kinds.py) — adding a kind there is what wires the flatten path up. `post_audit_snapshot(post)` validates a SQLAlchemy `Post` against the audit union and returns a JSON-mode dump. | Note*, ClientReferral*, ProviderAvailability* variants of Create/Update/Read/AuditSnapshot, plus the discriminated-union aliases PostCreate/PostUpdate/PostRead/PostAuditSnapshot and the helper `post_audit_snapshot` |
+| **post.py** | Posts     | `PostCreate`/`PostUpdate`/`PostRead`/`PostAuditSnapshot` are kind-discriminated unions keyed on the (required) `kind` field. Create/Update variants apply `extra="forbid"`, strip whitespace, validate ZIPs against `^\d{5}$`, type controlled-vocabulary fields as `Literal[*TUPLE]` against the tuples in [`src/models/post_enums.py`](../models/post_enums.py), and (for partial update) require at least one mutable field. Read and AuditSnapshot variants share a single `_flatten_post_to_dict` helper that reads the per-kind detail relationship and field tuple from `REGISTERED_KINDS` in [`src/models/post_kinds.py`](../models/post_kinds.py) — adding a kind there is what wires the flatten path up. `post_audit_snapshot(post)` validates a SQLAlchemy `Post` against the audit union and returns a JSON-mode dump. | ClientReferral*, ProviderAvailability* variants of Create/Update/Read/AuditSnapshot, plus the discriminated-union aliases PostCreate/PostUpdate/PostRead/PostAuditSnapshot and the helper `post_audit_snapshot` |
 
 ## Directory structure
 
 **Domain schema files:**
 
 - `user.py` - User schemas extending FastAPI Users base schemas
-- `post.py` - Per-kind post schemas wrapped in discriminated-union aliases (`PostCreate`/`PostUpdate`/`PostRead`/`PostAuditSnapshot`) keyed on the required `kind` field. The Read and AuditSnapshot variants share one `_flatten_post_to_dict` helper that reads from `REGISTERED_KINDS` in [`src/models/post_kinds.py`](../models/post_kinds.py); adding a new kind means a registry entry there plus the four Pydantic variant classes here.
+- `post.py` - Per-kind post schemas wrapped in discriminated-union aliases (`PostCreate`/`PostUpdate`/`PostRead`/`PostAuditSnapshot`) keyed on the required `kind` field. The Read and AuditSnapshot variants share one `_flatten_post_to_dict` helper that reads from `REGISTERED_KINDS` in [`src/models/post_kinds.py`](../models/post_kinds.py); adding a new kind means a registry entry there plus the four Pydantic variant classes here. Controlled-vocabulary fields use `Literal[*TUPLE]` against the tuples in [`src/models/post_enums.py`](../models/post_enums.py); the `test_schema_literals_match_model_tuples` guardrail in `test_post.py` keeps schema and model in lockstep.
 
 ## Implementation patterns
 
@@ -238,7 +238,7 @@ UserUpdate
 
 Colocated tests live alongside the schema modules:
 
-- `test_post.py` — exercises the kind-discriminated `PostCreate`/`PostUpdate` unions: backward-compat default-to-`note`, explicit-kind variants, the `extra="forbid"` boundary (rejects `owner_id`, unknown fields, cross-kind field bleed), per-kind whitespace stripping, and the partial-update at-least-one rule. Also covers `post_audit_snapshot` flattening through the right detail relationship for each registered kind.
+- `test_post.py` — exercises the kind-discriminated `PostCreate`/`PostUpdate` unions: explicit-kind variants, the `extra="forbid"` boundary (rejects `owner_id`, unknown fields, cross-kind field bleed), per-kind whitespace stripping, ZIP regex, controlled-vocabulary rejection, and the partial-update at-least-one-field rule. Also covers `post_audit_snapshot` flattening through the right detail relationship for each registered kind, and the `test_schema_literals_match_model_tuples` guardrail that asserts the `Literal[*TUPLE]` types here stay aligned with the source-of-truth tuples in `src/models/post_enums.py`.
 
 Add `src/schemas/test_<schema_name>.py` when a schema has non-trivial validators or computed fields whose behavior isn't obvious from the field definitions.
 

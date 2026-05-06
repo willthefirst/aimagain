@@ -14,24 +14,34 @@ from src.models import (
     User,
 )
 from src.repositories.audit_repository import AuditRepository
-from tests.helpers import create_test_user, promote_to_admin
+from tests.helpers import (
+    client_referral_payload,
+    create_test_user,
+    make_client_referral_detail,
+    make_provider_availability_detail,
+    promote_to_admin,
+    provider_availability_payload,
+)
 
 # Mark all tests in this module as async
 pytestmark = pytest.mark.asyncio
 
 
-def _client_referral_post(*, description: str, owner_id) -> Post:
-    """Build a `kind='client_referral'` Post + its detail."""
+def _client_referral_post(*, description: str, owner_id, **overrides) -> Post:
+    """Build a `kind='client_referral'` Post + its spec-compliant detail.
+    Per-field overrides flow through to the detail row."""
     post = Post(kind="client_referral", owner_id=owner_id)
-    post.client_referral_detail = ClientReferralDetail(description=description)
+    post.client_referral_detail = make_client_referral_detail(
+        description=description, **overrides
+    )
     return post
 
 
-def _provider_availability_post(*, practice_name: str, owner_id) -> Post:
-    """Build a `kind='provider_availability'` Post + its detail."""
+def _provider_availability_post(*, practice_name: str, owner_id, **overrides) -> Post:
+    """Build a `kind='provider_availability'` Post + its spec-compliant detail."""
     post = Post(kind="provider_availability", owner_id=owner_id)
-    post.provider_availability_detail = ProviderAvailabilityDetail(
-        practice_name=practice_name
+    post.provider_availability_detail = make_provider_availability_detail(
+        practice_name=practice_name, **overrides
     )
     return post
 
@@ -752,7 +762,7 @@ async def test_create_client_referral_happy_path(
 
     response = await authenticated_client.post(
         "/posts",
-        json={"kind": "client_referral", "description": description},
+        json=client_referral_payload(description=description),
     )
 
     assert response.status_code == 201
@@ -764,6 +774,7 @@ async def test_create_client_referral_happy_path(
         assert persisted is not None
         assert persisted.kind == "client_referral"
         assert persisted.client_referral_detail.description == description
+        assert persisted.client_referral_detail.location_state == "IL"
         assert persisted.owner_id == logged_in_user.id
 
     async with db_test_session_manager() as session:
@@ -772,10 +783,12 @@ async def test_create_client_referral_happy_path(
         assert len(rows) == 1
         assert rows[0].action == "create_post"
         assert rows[0].before is None
+        expected = client_referral_payload(description=description)
+        expected.pop("kind")
         assert rows[0].after == {
             "kind": "client_referral",
-            "description": description,
             "owner_id": str(logged_in_user.id),
+            **expected,
         }
 
 
@@ -786,7 +799,7 @@ async def test_create_client_referral_strips_whitespace(
 ):
     response = await authenticated_client.post(
         "/posts",
-        json={"kind": "client_referral", "description": "  needs help  "},
+        json=client_referral_payload(description="  needs help  "),
     )
     assert response.status_code == 201
     new_id = uuid.UUID(response.json()["id"])
@@ -800,11 +813,14 @@ async def test_create_client_referral_strips_whitespace(
 @pytest.mark.parametrize(
     "payload",
     [
-        {"kind": "client_referral"},  # missing description
-        {"kind": "client_referral", "description": ""},
-        {"kind": "client_referral", "description": "   "},
-        {"kind": "client_referral", "description": "ok", "title": "bleed"},
-        {"kind": "client_referral", "description": "ok", "evil": True},
+        {"kind": "client_referral"},  # missing every required field
+        client_referral_payload(description=""),
+        client_referral_payload(description="   "),
+        client_referral_payload(location_zip="abc"),  # non-numeric ZIP
+        client_referral_payload(location_state="ZZ"),  # not a US state
+        client_referral_payload(insurance="cash_only"),  # not in INSURANCE_OPTIONS
+        client_referral_payload(title="bleed"),  # cross-kind field bleed
+        client_referral_payload(evil=True),  # unknown field
         {"kind": "unknown_kind", "description": "ok"},
     ],
 )
@@ -1098,11 +1114,10 @@ async def test_delete_client_referral_writes_audit_row(
         rows = await repo.list_for_resource(resource_type="post", resource_id=post_id)
         assert len(rows) == 1
         assert rows[0].action == "delete_post"
-        assert rows[0].before == {
-            "kind": "client_referral",
-            "description": description,
-            "owner_id": str(logged_in_user.id),
-        }
+        assert rows[0].before["kind"] == "client_referral"
+        assert rows[0].before["description"] == description
+        assert rows[0].before["owner_id"] == str(logged_in_user.id)
+        assert rows[0].before["location_state"] == "IL"
         assert rows[0].after is None
 
 
@@ -1120,7 +1135,7 @@ async def test_create_provider_availability_happy_path(
 
     response = await authenticated_client.post(
         "/posts",
-        json={"kind": "provider_availability", "practice_name": practice_name},
+        json=provider_availability_payload(practice_name=practice_name),
     )
 
     assert response.status_code == 201
@@ -1132,6 +1147,7 @@ async def test_create_provider_availability_happy_path(
         assert persisted is not None
         assert persisted.kind == "provider_availability"
         assert persisted.provider_availability_detail.practice_name == practice_name
+        assert persisted.provider_availability_detail.sliding_scale is False
         assert persisted.client_referral_detail is None
         assert persisted.owner_id == logged_in_user.id
 
@@ -1141,10 +1157,12 @@ async def test_create_provider_availability_happy_path(
         assert len(rows) == 1
         assert rows[0].action == "create_post"
         assert rows[0].before is None
+        expected = provider_availability_payload(practice_name=practice_name)
+        expected.pop("kind")
         assert rows[0].after == {
             "kind": "provider_availability",
-            "practice_name": practice_name,
             "owner_id": str(logged_in_user.id),
+            **expected,
         }
 
 
@@ -1155,7 +1173,7 @@ async def test_create_provider_availability_strips_whitespace(
 ):
     response = await authenticated_client.post(
         "/posts",
-        json={"kind": "provider_availability", "practice_name": "  Acme  "},
+        json=provider_availability_payload(practice_name="  Acme  "),
     )
     assert response.status_code == 201
     new_id = uuid.UUID(response.json()["id"])
@@ -1169,19 +1187,13 @@ async def test_create_provider_availability_strips_whitespace(
 @pytest.mark.parametrize(
     "payload",
     [
-        {"kind": "provider_availability"},  # missing practice_name
-        {"kind": "provider_availability", "practice_name": ""},
-        {"kind": "provider_availability", "practice_name": "   "},
-        {
-            "kind": "provider_availability",
-            "practice_name": "Acme",
-            "title": "bleed",
-        },
-        {
-            "kind": "provider_availability",
-            "practice_name": "Acme",
-            "evil": True,
-        },
+        {"kind": "provider_availability"},  # missing every required field
+        provider_availability_payload(practice_name=""),
+        provider_availability_payload(practice_name="   "),
+        provider_availability_payload(location_state="ZZ"),  # not a US state
+        provider_availability_payload(payment_situation="cash_only"),
+        provider_availability_payload(title="bleed"),  # cross-kind bleed
+        provider_availability_payload(evil=True),  # unknown field
     ],
 )
 async def test_create_provider_availability_rejects_invalid_payload(
@@ -1375,9 +1387,8 @@ async def test_delete_provider_availability_writes_audit_row(
         rows = await repo.list_for_resource(resource_type="post", resource_id=post_id)
         assert len(rows) == 1
         assert rows[0].action == "delete_post"
-        assert rows[0].before == {
-            "kind": "provider_availability",
-            "practice_name": practice_name,
-            "owner_id": str(logged_in_user.id),
-        }
+        assert rows[0].before["kind"] == "provider_availability"
+        assert rows[0].before["practice_name"] == practice_name
+        assert rows[0].before["owner_id"] == str(logged_in_user.id)
+        assert rows[0].before["sliding_scale"] is False
         assert rows[0].after is None

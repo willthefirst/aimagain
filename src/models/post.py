@@ -16,6 +16,9 @@ class Post(BaseModel):
     [`post_kinds.py`](post_kinds.py); the CHECK constraint here is
     derived from it via `kind_check_sql()`. Adding a kind means adding
     a registry entry there and a `relationship(...)` line below.
+
+    Per-kind detail tables additionally use the controlled-vocabulary
+    tuples in [`post_enums.py`](post_enums.py) for their enum columns.
     """
 
     __tablename__ = "posts"
