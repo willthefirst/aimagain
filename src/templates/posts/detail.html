@@ -29,6 +29,10 @@ Provider availability: {{ post.provider_availability_detail.practice_name }}
     <dd>{{ LANGUAGE_PREFERRED_LABELS[d.language_preferred] }}</dd>
     <dt>Description</dt>
     <dd>{{ d.description }}</dd>
+    {% if d.services %}
+    <dt>Services</dt>
+    <dd>{% for s in d.services %}{{ CLIENT_REFERRAL_SERVICE_LABELS[s] }}{% if not loop.last %}, {% endif %}{% endfor %}</dd>
+    {% endif %}
     {% if d.services_psychotherapy_modality %}
     <dt>Psychotherapy modality</dt>
     <dd>{{ d.services_psychotherapy_modality }}</dd>
@@ -56,6 +60,10 @@ Provider availability: {{ post.provider_availability_detail.practice_name }}
     {% if d.desired_times %}
     <dt>Desired times</dt>
     <dd>{% for slot in d.desired_times %}{{ DESIRED_TIME_SLOT_LABELS[slot] }}{% if not loop.last %}, {% endif %}{% endfor %}</dd>
+    {% endif %}
+    {% if d.services %}
+    <dt>Services</dt>
+    <dd>{% for s in d.services %}{{ CLIENT_REFERRAL_SERVICE_LABELS[s] }}{% if not loop.last %}, {% endif %}{% endfor %}</dd>
     {% endif %}
     {% if d.treatment_modality %}
     <dt>Treatment modality</dt>

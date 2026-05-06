@@ -49,6 +49,7 @@ _CLIENT_REFERRAL_DEFAULTS: dict[str, Any] = {
     "client_dem_ages": "adults_25_64",
     "language_preferred": "no",
     "description": "needs placement",
+    "services": [],
     "services_psychotherapy_modality": None,
     "insurance": "in_network",
 }
@@ -62,6 +63,9 @@ _PROVIDER_AVAILABILITY_DEFAULTS: dict[str, Any] = {
     "in_person_sessions": "yes",
     "virtual_sessions": "no",
     "desired_times": [],
+    # PA requires min-1 service on the wire — pick a stable default that
+    # tests overriding `services` can assume isn't already in the list.
+    "services": ["evaluation"],
     "treatment_modality": None,
     "client_focus": "general adult outpatient",
     "age_group": "adults_25_64",
