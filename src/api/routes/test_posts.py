@@ -180,7 +180,7 @@ async def test_create_post_rejects_owner_id_in_payload(
 
     response = await authenticated_client.post(
         "/posts",
-        json={
+        data={
             "kind": "client_referral",
             "description": "d",
             "owner_id": str(other.id),
@@ -201,7 +201,7 @@ async def test_create_post_rejects_unknown_field(
     """Unknown fields are rejected with 422."""
     response = await authenticated_client.post(
         "/posts",
-        json={"kind": "client_referral", "description": "d", "evil": True},
+        data={"kind": "client_referral", "description": "d", "evil": True},
     )
     assert response.status_code == 422
 
@@ -212,7 +212,7 @@ async def test_create_post_rejects_retired_note_kind(
 ):
     """The `note` kind was removed; create payloads must 422."""
     response = await authenticated_client.post(
-        "/posts", json={"kind": "note", "title": "t", "body": "b"}
+        "/posts", data={"kind": "note", "title": "t", "body": "b"}
     )
     assert response.status_code == 422
 
@@ -223,7 +223,7 @@ async def test_create_post_unauthenticated_redirects(
     """Anonymous request to POST /posts is redirected to login (HTML auth flow)."""
     response = await test_client.post(
         "/posts",
-        json={"kind": "client_referral", "description": "d"},
+        data={"kind": "client_referral", "description": "d"},
         headers={"accept": "text/html"},
         follow_redirects=False,
     )
@@ -249,7 +249,7 @@ async def test_non_owner_cannot_patch_post(
 
     response = await authenticated_client.patch(
         f"/posts/{post.id}",
-        json={"kind": "client_referral", "description": "hijack"},
+        data={"kind": "client_referral", "description": "hijack"},
     )
     assert response.status_code == 403
 
@@ -274,7 +274,7 @@ async def test_admin_can_patch_anyone_post(
 
     response = await authenticated_client.patch(
         f"/posts/{post.id}",
-        json={"kind": "client_referral", "description": "moderated"},
+        data={"kind": "client_referral", "description": "moderated"},
     )
     assert response.status_code == 200
     assert response.json()["description"] == "moderated"
@@ -286,7 +286,7 @@ async def test_patch_404_for_unknown_post(
 ):
     response = await authenticated_client.patch(
         f"/posts/{uuid.uuid4()}",
-        json={"kind": "client_referral", "description": "x"},
+        data={"kind": "client_referral", "description": "x"},
     )
     assert response.status_code == 404
 
@@ -306,7 +306,7 @@ async def test_patch_rejects_owner_id_in_payload(
 
     response = await authenticated_client.patch(
         f"/posts/{post.id}",
-        json={
+        data={
             "kind": "client_referral",
             "description": "d2",
             "owner_id": str(other.id),
@@ -327,7 +327,7 @@ async def test_patch_rejects_retired_note_kind(
             session.add(post)
 
     response = await authenticated_client.patch(
-        f"/posts/{post.id}", json={"kind": "note", "title": "t"}
+        f"/posts/{post.id}", data={"kind": "note", "title": "t"}
     )
     assert response.status_code == 422
 
@@ -337,7 +337,7 @@ async def test_patch_unauthenticated_redirects(
 ):
     response = await test_client.patch(
         f"/posts/{uuid.uuid4()}",
-        json={"kind": "client_referral", "description": "t"},
+        data={"kind": "client_referral", "description": "t"},
         headers={"accept": "text/html"},
         follow_redirects=False,
     )
@@ -564,7 +564,7 @@ async def test_failed_create_writes_no_audit_row(
     """A 422 (schema rejection) must not leak an audit row."""
     response = await authenticated_client.post(
         "/posts",
-        json={"kind": "client_referral", "description": "d", "evil": True},
+        data={"kind": "client_referral", "description": "d", "evil": True},
     )
     assert response.status_code == 422
 
@@ -590,7 +590,7 @@ async def test_unauthorized_patch_writes_no_audit_row(
 
     response = await authenticated_client.patch(
         f"/posts/{post.id}",
-        json={"kind": "client_referral", "description": "hijack"},
+        data={"kind": "client_referral", "description": "hijack"},
     )
     assert response.status_code == 403
 
@@ -617,7 +617,7 @@ async def test_admin_patch_audit_actor_is_admin_not_owner(
 
     response = await authenticated_client.patch(
         f"/posts/{post.id}",
-        json={"kind": "client_referral", "description": "moderated"},
+        data={"kind": "client_referral", "description": "moderated"},
     )
     assert response.status_code == 200
 
@@ -762,7 +762,7 @@ async def test_create_client_referral_happy_path(
 
     response = await authenticated_client.post(
         "/posts",
-        json=client_referral_payload(description=description),
+        data=client_referral_payload(description=description),
     )
 
     assert response.status_code == 201
@@ -799,7 +799,7 @@ async def test_create_client_referral_strips_whitespace(
 ):
     response = await authenticated_client.post(
         "/posts",
-        json=client_referral_payload(description="  needs help  "),
+        data=client_referral_payload(description="  needs help  "),
     )
     assert response.status_code == 201
     new_id = uuid.UUID(response.json()["id"])
@@ -829,7 +829,7 @@ async def test_create_client_referral_rejects_invalid_payload(
     authenticated_client: AsyncClient,
     logged_in_user: User,
 ):
-    response = await authenticated_client.post("/posts", json=payload)
+    response = await authenticated_client.post("/posts", data=payload)
     assert response.status_code == 422
 
 
@@ -845,7 +845,6 @@ async def test_get_client_referral_form_renders(
     form = tree.css_first("form")
     assert form is not None
     assert form.attributes.get("hx-post") == "/posts"
-    assert form.attributes.get("hx-ext") == "json-enc"
     assert tree.css_first("textarea#description") is not None
     kind_input = tree.css_first('input[name="kind"]')
     assert kind_input is not None
@@ -969,7 +968,7 @@ async def test_owner_can_patch_client_referral_description(
     new_description = f"updated-{uuid.uuid4()}"
     response = await authenticated_client.patch(
         f"/posts/{post.id}",
-        json={"kind": "client_referral", "description": new_description},
+        data={"kind": "client_referral", "description": new_description},
     )
     assert response.status_code == 200
     assert response.headers.get("HX-Refresh") == "true"
@@ -1003,7 +1002,7 @@ async def test_patch_provider_availability_with_client_referral_payload_does_not
 
     response = await authenticated_client.patch(
         f"/posts/{post_id}",
-        json={"kind": "client_referral", "description": "hijack"},
+        data={"kind": "client_referral", "description": "hijack"},
     )
     assert response.status_code == 400
 
@@ -1039,7 +1038,7 @@ async def test_patch_client_referral_with_provider_availability_payload_does_not
 
     response = await authenticated_client.patch(
         f"/posts/{post_id}",
-        json={"kind": "provider_availability", "practice_name": "hijack"},
+        data={"kind": "provider_availability", "practice_name": "hijack"},
     )
     assert response.status_code == 400
 
@@ -1135,7 +1134,7 @@ async def test_create_provider_availability_happy_path(
 
     response = await authenticated_client.post(
         "/posts",
-        json=provider_availability_payload(practice_name=practice_name),
+        data=provider_availability_payload(practice_name=practice_name),
     )
 
     assert response.status_code == 201
@@ -1173,7 +1172,7 @@ async def test_create_provider_availability_strips_whitespace(
 ):
     response = await authenticated_client.post(
         "/posts",
-        json=provider_availability_payload(practice_name="  Acme  "),
+        data=provider_availability_payload(practice_name="  Acme  "),
     )
     assert response.status_code == 201
     new_id = uuid.UUID(response.json()["id"])
@@ -1201,7 +1200,7 @@ async def test_create_provider_availability_rejects_invalid_payload(
     authenticated_client: AsyncClient,
     logged_in_user: User,
 ):
-    response = await authenticated_client.post("/posts", json=payload)
+    response = await authenticated_client.post("/posts", data=payload)
     assert response.status_code == 422
 
 
@@ -1217,7 +1216,6 @@ async def test_get_provider_availability_form_renders(
     form = tree.css_first("form")
     assert form is not None
     assert form.attributes.get("hx-post") == "/posts"
-    assert form.attributes.get("hx-ext") == "json-enc"
     assert tree.css_first("input#practice_name") is not None
     kind_input = tree.css_first('input[name="kind"]')
     assert kind_input is not None
@@ -1309,7 +1307,7 @@ async def test_owner_can_patch_provider_availability_practice_name(
     new_practice_name = f"Renamed-{uuid.uuid4()}"
     response = await authenticated_client.patch(
         f"/posts/{post.id}",
-        json={
+        data={
             "kind": "provider_availability",
             "practice_name": new_practice_name,
         },

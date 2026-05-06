@@ -10,16 +10,15 @@ Used by both `posts/new_provider_availability.html` (create) and
 
 Field set follows `notes/forms_spec.md` Form 2.
 
-The `desired_times` checkbox grid relies on stock `json-enc` semantics
-plus a Pydantic `BeforeValidator` (`_scalar_to_list` in
-`src/schemas/post.py`) that wraps a 1-checkbox scalar back into a list.
-0 boxes checked → key absent → schema default `[]`; 1 box → scalar →
-coerced to `[x]`; 2+ boxes → array (json-enc collapses duplicate keys).
+The `desired_times` checkbox grid sends form-encoded data with multiple
+values for the same field name. The form naturally encodes multiple
+checkboxes as `desired_times=monday_morning&desired_times=friday_evening`,
+which FastAPI/Pydantic parses as a list.
 #}
 {%- from "posts/_form_macros.html" import text_field, textarea_field, select_field, radio_bool_field, time_grid_field, multi_select_field -%}
 {%- macro provider_availability_form(hx_method, action, submit_label, post=None) -%}
 {%- set d = post.provider_availability_detail if post else None -%}
-<form hx-{{ hx_method }}="{{ action }}" hx-ext="json-enc">
+<form hx-{{ hx_method }}="{{ action }}">
   <input type="hidden" name="kind" value="provider_availability" />
 
   <fieldset>
