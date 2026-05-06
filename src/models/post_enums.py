@@ -90,6 +90,40 @@ INSURANCE_OPTIONS: Final[tuple[str, ...]] = (
 )
 
 
+# --- Display labels for select <option>s --------------------------------
+#
+# Where the storage value isn't directly usable as the dropdown label
+# (e.g. `children_0_5`, `in_network`), the labels live next to the tuple
+# they cover. The form-render macro in
+# `src/templates/posts/_form_macros.html` looks up labels via these
+# dicts; missing keys fail at render time. A guardrail test in
+# `src/schemas/test_post.py` asserts every value in a tuple has a label.
+#
+# `US_STATES` deliberately has no label dict — the value (USPS
+# abbreviation) is the right user-facing label.
+
+LOCATION_AVAILABILITY_LABELS: Final[dict[str, str]] = {
+    "yes": "Yes",
+    "no": "No",
+    "please_contact": "Please contact",
+}
+CLIENT_AGE_GROUP_LABELS: Final[dict[str, str]] = {
+    "children_0_5": "Children 0–5",
+    "children_6_10": "Children 6–10",
+    "preteens_11_13": "Preteens 11–13",
+    "adolescents_14_18": "Adolescents 14–18",
+    "young_adults_19_24": "Young adults 19–24",
+    "adults_25_64": "Adults 25–64",
+    "older_adults_65_plus": "Older adults 65+",
+}
+LANGUAGE_PREFERRED_LABELS: Final[dict[str, str]] = {"no": "No", "yes": "Yes"}
+INSURANCE_LABELS: Final[dict[str, str]] = {
+    "in_network": "In-network",
+    "out_of_network": "Out-of-network",
+    "in_and_out_of_network": "In- and out-of-network",
+}
+
+
 def check_in_tuple_sql(column: str, values: tuple[str, ...]) -> str:
     """SQL fragment for a `column IN (...)` CHECK constraint, rendered
     from a tuple. Used by per-kind detail tables so the DB-level

@@ -1,87 +1,9 @@
 {% extends "base.html" %}
-{% set d = post.client_referral_detail %}
+{% from "posts/_client_referral_form.html" import client_referral_form %}
 {% block title %}Edit client referral{% endblock %}
 {% block content %}
 <h1>Edit client referral</h1>
-<form hx-patch="/posts/{{ post.id }}" hx-ext="json-enc">
-  <input type="hidden" name="kind" value="client_referral" />
-
-  <fieldset>
-    <legend>Client location</legend>
-
-    <label for="location_city">City:</label><br />
-    <input type="text" id="location_city" name="location_city" value="{{ d.location_city }}" required /><br /><br />
-
-    <label for="location_state">State:</label><br />
-    <select id="location_state" name="location_state" required>
-      {% for state in ("AL","AK","AZ","AR","CA","CO","CT","DE","DC","FL","GA","HI","ID","IL","IN","IA","KS","KY","LA","ME","MD","MA","MI","MN","MS","MO","MT","NE","NV","NH","NJ","NM","NY","NC","ND","OH","OK","OR","PA","RI","SC","SD","TN","TX","UT","VT","VA","WA","WV","WI","WY") %}
-      <option value="{{ state }}"{% if d.location_state == state %} selected{% endif %}>{{ state }}</option>
-      {% endfor %}
-    </select><br /><br />
-
-    <label for="location_zip">ZIP:</label><!-- title-case-ignore --><br />
-    <input type="text" id="location_zip" name="location_zip" value="{{ d.location_zip }}" pattern="\d{5}" maxlength="5" required /><br /><br />
-
-    <label for="location_in_person">In-person sessions:</label><!-- title-case-ignore --><br />
-    <select id="location_in_person" name="location_in_person" required>
-      <option value="yes"{% if d.location_in_person == "yes" %} selected{% endif %}>Yes</option>
-      <option value="no"{% if d.location_in_person == "no" %} selected{% endif %}>No</option>
-      <option value="please_contact"{% if d.location_in_person == "please_contact" %} selected{% endif %}>Please contact</option>
-    </select><br /><br />
-
-    <label for="location_virtual">Virtual sessions:</label><br />
-    <select id="location_virtual" name="location_virtual" required>
-      <option value="yes"{% if d.location_virtual == "yes" %} selected{% endif %}>Yes</option>
-      <option value="no"{% if d.location_virtual == "no" %} selected{% endif %}>No</option>
-      <option value="please_contact"{% if d.location_virtual == "please_contact" %} selected{% endif %}>Please contact</option>
-    </select><br /><br />
-  </fieldset>
-
-  <fieldset>
-    <legend>Demographics</legend>
-
-    <label for="client_dem_ages">Age group:</label><br />
-    <select id="client_dem_ages" name="client_dem_ages" required>
-      <option value="children_0_5"{% if d.client_dem_ages == "children_0_5" %} selected{% endif %}>Children 0–5</option>
-      <option value="children_6_10"{% if d.client_dem_ages == "children_6_10" %} selected{% endif %}>Children 6–10</option>
-      <option value="preteens_11_13"{% if d.client_dem_ages == "preteens_11_13" %} selected{% endif %}>Preteens 11–13</option>
-      <option value="adolescents_14_18"{% if d.client_dem_ages == "adolescents_14_18" %} selected{% endif %}>Adolescents 14–18</option>
-      <option value="young_adults_19_24"{% if d.client_dem_ages == "young_adults_19_24" %} selected{% endif %}>Young adults 19–24</option>
-      <option value="adults_25_64"{% if d.client_dem_ages == "adults_25_64" %} selected{% endif %}>Adults 25–64</option>
-      <option value="older_adults_65_plus"{% if d.client_dem_ages == "older_adults_65_plus" %} selected{% endif %}>Older adults 65+</option>
-    </select><br /><br />
-
-    <label for="language_preferred">Services preferred in language other than English?</label><!-- title-case-ignore --><br />
-    <select id="language_preferred" name="language_preferred" required>
-      <option value="no"{% if d.language_preferred == "no" %} selected{% endif %}>No</option>
-      <option value="yes"{% if d.language_preferred == "yes" %} selected{% endif %}>Yes</option>
-    </select><br /><br />
-  </fieldset>
-
-  <fieldset>
-    <legend>Description</legend>
-    <label for="description">Description (no PII):</label><!-- title-case-ignore --><br />
-    <textarea id="description" name="description" required>{{ d.description }}</textarea><br /><br />
-  </fieldset>
-
-  <fieldset>
-    <legend>Services</legend>
-    <label for="services_psychotherapy_modality">Psychotherapy modality (optional):</label><br />
-    <input type="text" id="services_psychotherapy_modality" name="services_psychotherapy_modality" value="{{ d.services_psychotherapy_modality or '' }}" /><br /><br />
-  </fieldset>
-
-  <fieldset>
-    <legend>Insurance</legend>
-    <label for="insurance">Payment situation:</label><br />
-    <select id="insurance" name="insurance" required>
-      <option value="in_network"{% if d.insurance == "in_network" %} selected{% endif %}>In-network</option>
-      <option value="out_of_network"{% if d.insurance == "out_of_network" %} selected{% endif %}>Out-of-network</option>
-      <option value="in_and_out_of_network"{% if d.insurance == "in_and_out_of_network" %} selected{% endif %}>In- and out-of-network</option>
-    </select><br /><br />
-  </fieldset>
-
-  <input type="submit" value="Save changes" />
-</form>
+{{ client_referral_form("patch", "/posts/" ~ post.id, "Save changes", post=post) }}
 
 <hr />
 <a href="/posts/{{ post.id }}">Cancel</a>

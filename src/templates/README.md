@@ -66,7 +66,7 @@ Templates use inheritance for consistent layout and feature-specific customizati
 | **/**      | Base layout and shared | `base.html` - Foundation template                                      |
 | **auth/**  | Authentication pages   | login, register, forgot/reset password                                 |
 | **users/** | User management        | list, detail, `_admin_actions.html` partial (shared by list & detail)  |
-| **posts/** | Posts                  | list, detail, `new.html` + `edit.html` (forms), `_owner_actions.html` partial (shared by detail) |
+| **posts/** | Posts                  | list, detail, per-kind `new_<kind>.html` + `edit_<kind>.html` thin wrappers around `_<kind>_form.html` partials, `_form_macros.html` (shared field macros), `_owner_actions.html` partial (shared by detail) |
 | **me/**    | Personal/profile pages | user profile                                                           |
 
 ### Reusable partial convention
@@ -74,6 +74,15 @@ Templates use inheritance for consistent layout and feature-specific customizati
 Files prefixed with `_` (e.g. `_admin_actions.html`) are **shared partials** intended to be `{% include %}`d from multiple full pages. They are not rendered directly by routes. The convention exists so that, e.g., adding a new admin button to `users/_admin_actions.html` automatically appears on both the user list and the user detail page without per-page edits.
 
 A partial documents its required context at the top in a `{# ... #}` comment, and is responsible for its own access guards (`{% if current_user.is_superuser %}` etc). Backend authorization is enforced separately in the logic layer — the template guard is presentation only.
+
+### Form macros + per-kind form partials (posts/)
+
+The two intake forms (`client_referral`, `provider_availability`) each have a create page and an edit page. Rather than duplicate the field set across the two pages — and across the two kinds — the field structure lives in two layers:
+
+1. **`posts/_form_macros.html`** defines field-render macros (`text_field`, `textarea_field`, `select_field`, `radio_bool_field`). Each one emits a label + control + line-breaks; the `<select>` macro iterates over a controlled-vocabulary tuple and looks display labels up in a sibling `*_LABELS` dict. The tuples and label dicts come from `src/models/post_enums.py`, exposed as Jinja globals via `src/core/templating.py`. Adding a value to a tuple flows automatically to every form using these macros.
+2. **`posts/_<kind>_form.html`** (`_client_referral_form.html`, `_provider_availability_form.html`) wraps the macros into one form-body macro per kind, encoding field order, section grouping, labels, and required/optional state. Both `new_<kind>.html` and `edit_<kind>.html` then collapse to ~5 lines that call the form macro with `(hx_method, action, submit_label, post=...)`. The new vs edit difference reduces to URL + submit label + prefilled values.
+
+The labels-vs-tuple guardrail (`test_labels_cover_their_tuples`) lives in `src/schemas/test_post.py`; if a value lands in a tuple without a matching label, the form's `<select>` would render a `KeyError` at request time, so the test catches it at CI time instead.
 
 ## Directory structure
 
@@ -92,9 +101,14 @@ templates/
 ├── posts/                      # Post templates
 │   ├── list.html               # Post listing
 │   ├── detail.html             # Post detail (includes _owner_actions.html)
-│   ├── new.html                # Create-post form (HTMX json-enc → POST /posts)
-│   ├── edit.html               # Edit-post form (HTMX json-enc → PATCH /posts/{id})
-│   └── _owner_actions.html     # Reusable owner-actions partial (Edit link)
+│   ├── new_client_referral.html       # Thin wrapper over _client_referral_form.html
+│   ├── edit_client_referral.html      # Thin wrapper over _client_referral_form.html
+│   ├── new_provider_availability.html # Thin wrapper over _provider_availability_form.html
+│   ├── edit_provider_availability.html
+│   ├── _client_referral_form.html      # Per-kind form body (used by new + edit)
+│   ├── _provider_availability_form.html
+│   ├── _form_macros.html       # Shared field macros (text_field, select_field, …)
+│   └── _owner_actions.html     # Reusable owner-actions partial (Edit/Delete)
 └── me/                         # Personal user pages
     └── profile.html            # User's profile page
 ```

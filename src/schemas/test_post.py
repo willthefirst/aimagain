@@ -11,6 +11,9 @@ Covers:
 - `test_schema_literals_match_model_tuples` guards that the
   `Literal[*TUPLE]` types here stay aligned with the source-of-truth
   tuples in `src/models/post_enums.py`.
+- `test_labels_cover_their_tuples` guards that every value in a
+  `*_OPTIONS`/`*_GROUPS` tuple has an entry in its sibling
+  `*_LABELS` dict (consumed by the form-render macro).
 """
 
 import uuid
@@ -21,9 +24,13 @@ import pytest
 from pydantic import ValidationError
 
 from src.models.post_enums import (
+    CLIENT_AGE_GROUP_LABELS,
     CLIENT_AGE_GROUPS,
+    INSURANCE_LABELS,
     INSURANCE_OPTIONS,
+    LANGUAGE_PREFERRED_LABELS,
     LANGUAGE_PREFERRED_OPTIONS,
+    LOCATION_AVAILABILITY_LABELS,
     LOCATION_AVAILABILITY_OPTIONS,
     US_STATES,
 )
@@ -483,3 +490,24 @@ def test_schema_literals_match_model_tuples(model_cls, field, expected):
     update both places (and the migration); this guardrail keeps them
     honest."""
     assert set(_literal_args(model_cls, field)) == set(expected)
+
+
+# --- Display labels cover their value tuples ----------------------------
+
+
+@pytest.mark.parametrize(
+    "values,labels",
+    [
+        (LOCATION_AVAILABILITY_OPTIONS, LOCATION_AVAILABILITY_LABELS),
+        (CLIENT_AGE_GROUPS, CLIENT_AGE_GROUP_LABELS),
+        (LANGUAGE_PREFERRED_OPTIONS, LANGUAGE_PREFERRED_LABELS),
+        (INSURANCE_OPTIONS, INSURANCE_LABELS),
+    ],
+)
+def test_labels_cover_their_tuples(values, labels):
+    """Each `*_LABELS` dict in `src/models/post_enums.py` must have a
+    label for every value in its corresponding tuple. The form-render
+    macro looks labels up by value; an unmapped value would render with
+    a `KeyError` at request time. Catching it here keeps the failure
+    mode loud and offline."""
+    assert set(labels) == set(values)
