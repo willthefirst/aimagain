@@ -67,3 +67,17 @@ def test_each_spec_detail_relationship_matches_kind_name():
     every kind agrees, asserting it catches typos."""
     for kind, spec in REGISTERED_KINDS.items():
         assert spec.detail_relationship == f"{kind}_detail"
+
+
+def test_detail_fields_match_model_columns():
+    """`KindSpec.detail_fields` is derived from the SQLAlchemy model's
+    columns (minus the `post_id` PK/FK). This test asserts that
+    contract: every non-`post_id` column on the detail table appears in
+    `detail_fields`, in declaration order. Adding or dropping a column
+    flows automatically; the alternative (a hand-maintained tuple in
+    `post_kinds.py`) used to drift silently."""
+    for spec in REGISTERED_KINDS.values():
+        expected = tuple(
+            c.name for c in spec.detail_model.__table__.columns if c.name != "post_id"
+        )
+        assert spec.detail_fields == expected

@@ -11,6 +11,16 @@ from .post_enums import (
     check_in_tuple_sql,
 )
 
+_TABLE = "provider_availability_details"
+
+
+def _ck(column: str, values: tuple[str, ...]) -> CheckConstraint:
+    """`column IN (values)` CHECK named `ck_<table>_<column>`."""
+    return CheckConstraint(
+        check_in_tuple_sql(column, values),
+        name=f"ck_{_TABLE}_{column}",
+    )
+
 
 class ProviderAvailabilityDetail(Base):
     """Per-kind detail row for posts of `kind = 'provider_availability'`.
@@ -21,43 +31,26 @@ class ProviderAvailabilityDetail(Base):
 
     Field set follows [`notes/forms_spec.md`](../../notes/forms_spec.md)'s
     Form 2. Enum-typed columns carry CHECK constraints rendered from the
-    tuples in `post.py` via `check_in_tuple_sql`. Where a concept appears
-    on both forms (`location_state`, `in_person_sessions`/`virtual_sessions`,
-    `age_group`, `non_english_services`, `payment_situation`) the column
-    types and vocabularies match the corresponding `client_referral_details`
-    columns — see the spec's "Field-name overlap" table.
+    tuples in `post_enums.py` via `check_in_tuple_sql`. Where a concept
+    appears on both forms (`location_state`, `in_person_sessions`/
+    `virtual_sessions`, `age_group`, `non_english_services`,
+    `payment_situation`) the column types and vocabularies match the
+    corresponding `client_referral_details` columns — see the spec's
+    "Field-name overlap" table.
 
     Multi-select fields from the spec (`desired_times`, `services`,
     `settings`) follow in a separate change once the wire-format extension
     for array-valued checkboxes lands.
     """
 
-    __tablename__ = "provider_availability_details"
+    __tablename__ = _TABLE
     __table_args__ = (
-        CheckConstraint(
-            check_in_tuple_sql("location_state", US_STATES),
-            name="ck_provider_availability_details_location_state",
-        ),
-        CheckConstraint(
-            check_in_tuple_sql("in_person_sessions", LOCATION_AVAILABILITY_OPTIONS),
-            name="ck_provider_availability_details_in_person_sessions",
-        ),
-        CheckConstraint(
-            check_in_tuple_sql("virtual_sessions", LOCATION_AVAILABILITY_OPTIONS),
-            name="ck_provider_availability_details_virtual_sessions",
-        ),
-        CheckConstraint(
-            check_in_tuple_sql("age_group", CLIENT_AGE_GROUPS),
-            name="ck_provider_availability_details_age_group",
-        ),
-        CheckConstraint(
-            check_in_tuple_sql("non_english_services", LANGUAGE_PREFERRED_OPTIONS),
-            name="ck_provider_availability_details_non_english_services",
-        ),
-        CheckConstraint(
-            check_in_tuple_sql("payment_situation", INSURANCE_OPTIONS),
-            name="ck_provider_availability_details_payment_situation",
-        ),
+        _ck("location_state", US_STATES),
+        _ck("in_person_sessions", LOCATION_AVAILABILITY_OPTIONS),
+        _ck("virtual_sessions", LOCATION_AVAILABILITY_OPTIONS),
+        _ck("age_group", CLIENT_AGE_GROUPS),
+        _ck("non_english_services", LANGUAGE_PREFERRED_OPTIONS),
+        _ck("payment_situation", INSURANCE_OPTIONS),
     )
 
     post_id = Column(
