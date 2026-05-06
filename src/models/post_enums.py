@@ -109,6 +109,18 @@ DESIRED_TIME_SLOTS: Final[tuple[str, ...]] = tuple(
     f"{day}_{part}" for day in DESIRED_TIME_DAYS for part in DESIRED_TIME_PARTS
 )
 
+# Service-line categories. The same vocabulary appears on both forms:
+# optional `services` on `client_referral` (empty list allowed) and
+# required-min-1 `services` on `provider_availability`. Required-ness
+# differs but the value set is shared, so the tuple is single-sourced.
+CLIENT_REFERRAL_SERVICES: Final[tuple[str, ...]] = (
+    "evaluation",
+    "medication_management",
+    "psychotherapy",
+    "case_management",
+    "allied_health",
+)
+
 
 # --- Display labels for select <option>s --------------------------------
 #
@@ -166,6 +178,13 @@ DESIRED_TIME_SLOT_LABELS: Final[dict[str, str]] = {
     f"{day}_{part}": f"{DESIRED_TIME_DAY_LABELS[day]} {DESIRED_TIME_PART_LABELS[part].lower()}"
     for day in DESIRED_TIME_DAYS
     for part in DESIRED_TIME_PARTS
+}
+CLIENT_REFERRAL_SERVICE_LABELS: Final[dict[str, str]] = {
+    "evaluation": "Evaluation",
+    "medication_management": "Medication management",
+    "psychotherapy": "Psychotherapy",
+    "case_management": "Case management",
+    "allied_health": "Allied health",
 }
 
 

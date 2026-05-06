@@ -51,6 +51,7 @@ from pydantic import (
 from src.models import REGISTERED_KINDS
 from src.models.post_enums import (
     CLIENT_AGE_GROUPS,
+    CLIENT_REFERRAL_SERVICES,
     DESIRED_TIME_SLOTS,
     INSURANCE_OPTIONS,
     LANGUAGE_PREFERRED_OPTIONS,
@@ -114,20 +115,28 @@ def _scalar_to_list(v):
     an array when the same name appears 2+ times); this normalizes that
     1-element case before the `Literal[*TUPLE]` member check fires. The
     0-element case is handled by the field default `[]`; the 2+ case
-    already arrives as a list. When `services` (#125) and `settings`
-    (#126) wire up, they reuse this validator the same way."""
+    already arrives as a list. Reused by every multi-checkbox field
+    (`desired_times`, `services`, and the upcoming `settings`)."""
     if isinstance(v, str):
         return [v]
     return v
 
 
-# Annotated alias for the `desired_times` multi-checkbox field. The
-# `BeforeValidator` runs first and normalizes a scalar string to a
-# single-element list (see `_scalar_to_list`); `Literal[*TUPLE]` then
-# validates each member.
+# Annotated aliases for the multi-checkbox fields. The `BeforeValidator`
+# runs first and normalizes a scalar string to a single-element list
+# (see `_scalar_to_list`); `Literal[*TUPLE]` then validates each member.
 DesiredTimesField = Annotated[
     list[Literal[*DESIRED_TIME_SLOTS]], BeforeValidator(_scalar_to_list)
 ]
+ServicesField = Annotated[
+    list[Literal[*CLIENT_REFERRAL_SERVICES]], BeforeValidator(_scalar_to_list)
+]
+# `provider_availability.services` is required-min-1 on the wire; layer
+# the constraint over the shared alias so the scalar-coercion still runs
+# first. `min_length` only fires on the list arm of `T | None`, so the
+# same alias works for `T` (Create/Read/AuditSnapshot) and `T | None`
+# (Update — `None` means "leave unchanged"; an empty list 422s).
+RequiredServicesField = Annotated[ServicesField, Field(min_length=1)]
 
 
 # --- Shared flatten helper ----------------------------------------------
@@ -190,6 +199,7 @@ class ClientReferralRead(_PostReadBase):
     client_dem_ages: Literal[*CLIENT_AGE_GROUPS]
     language_preferred: Literal[*LANGUAGE_PREFERRED_OPTIONS]
     description: str
+    services: ServicesField = []
     services_psychotherapy_modality: str | None = None
     insurance: Literal[*INSURANCE_OPTIONS]
 
@@ -204,6 +214,10 @@ class ProviderAvailabilityRead(_PostReadBase):
     in_person_sessions: Literal[*LOCATION_AVAILABILITY_OPTIONS]
     virtual_sessions: Literal[*LOCATION_AVAILABILITY_OPTIONS]
     desired_times: DesiredTimesField = []
+    # Read does not enforce min-1 — pre-services PA rows backfilled to
+    # `[]` by the migration would otherwise be unreadable. Min-1 lives
+    # on Create/Update only, where it actually prevents new violations.
+    services: ServicesField = []
     treatment_modality: str | None = None
     client_focus: str
     age_group: Literal[*CLIENT_AGE_GROUPS]
@@ -230,9 +244,7 @@ post_read_adapter: TypeAdapter = TypeAdapter(PostRead)
 
 class ClientReferralCreate(BaseModel):
     """Create payload for `kind='client_referral'`. Field set follows
-    [`notes/forms_spec.md`](../../notes/forms_spec.md) Form 1; the
-    remaining multi-select field (`services`) follows in a separate
-    change."""
+    [`notes/forms_spec.md`](../../notes/forms_spec.md) Form 1."""
 
     kind: Literal["client_referral"]
     location_city: StrippedText
@@ -244,6 +256,7 @@ class ClientReferralCreate(BaseModel):
     client_dem_ages: Literal[*CLIENT_AGE_GROUPS]
     language_preferred: Literal[*LANGUAGE_PREFERRED_OPTIONS]
     description: StrippedText
+    services: ServicesField = []
     services_psychotherapy_modality: StrippedOptionalText = None
     insurance: Literal[*INSURANCE_OPTIONS]
 
@@ -253,8 +266,8 @@ class ClientReferralCreate(BaseModel):
 class ProviderAvailabilityCreate(BaseModel):
     """Create payload for `kind='provider_availability'`. Field set follows
     [`notes/forms_spec.md`](../../notes/forms_spec.md) Form 2; the
-    remaining multi-select fields (`services`, `settings`) follow in a
-    separate change."""
+    remaining multi-select field (`settings`) follows in a separate
+    change."""
 
     kind: Literal["provider_availability"]
     practice_name: StrippedText
@@ -265,6 +278,9 @@ class ProviderAvailabilityCreate(BaseModel):
     in_person_sessions: Literal[*LOCATION_AVAILABILITY_OPTIONS]
     virtual_sessions: Literal[*LOCATION_AVAILABILITY_OPTIONS]
     desired_times: DesiredTimesField = []
+    # Required min-1 on PA per spec — divergence from CR's optional
+    # `services`. No default: an absent field 422s, an empty list 422s.
+    services: RequiredServicesField
     treatment_modality: StrippedOptionalText = None
     client_focus: StrippedText
     age_group: Literal[*CLIENT_AGE_GROUPS]
@@ -325,6 +341,7 @@ class ClientReferralUpdate(BaseModel):
     client_dem_ages: Literal[*CLIENT_AGE_GROUPS] | None = None
     language_preferred: Literal[*LANGUAGE_PREFERRED_OPTIONS] | None = None
     description: StrippedText | None = None
+    services: ServicesField | None = None
     services_psychotherapy_modality: StrippedOptionalText = None
     insurance: Literal[*INSURANCE_OPTIONS] | None = None
 
@@ -346,6 +363,10 @@ class ProviderAvailabilityUpdate(BaseModel):
     in_person_sessions: Literal[*LOCATION_AVAILABILITY_OPTIONS] | None = None
     virtual_sessions: Literal[*LOCATION_AVAILABILITY_OPTIONS] | None = None
     desired_times: DesiredTimesField | None = None
+    # `None` = leave unchanged; `min_length=1` rejects an explicit `[]`.
+    # Clearing services entirely is intentionally not supported on PA —
+    # the wire invariant is min-1.
+    services: RequiredServicesField | None = None
     treatment_modality: StrippedOptionalText = None
     client_focus: StrippedText | None = None
     age_group: Literal[*CLIENT_AGE_GROUPS] | None = None
@@ -394,6 +415,7 @@ class ClientReferralAuditSnapshot(_PostAuditSnapshotBase):
     client_dem_ages: Literal[*CLIENT_AGE_GROUPS]
     language_preferred: Literal[*LANGUAGE_PREFERRED_OPTIONS]
     description: str
+    services: ServicesField = []
     services_psychotherapy_modality: str | None = None
     insurance: Literal[*INSURANCE_OPTIONS]
 
@@ -408,6 +430,9 @@ class ProviderAvailabilityAuditSnapshot(_PostAuditSnapshotBase):
     in_person_sessions: Literal[*LOCATION_AVAILABILITY_OPTIONS]
     virtual_sessions: Literal[*LOCATION_AVAILABILITY_OPTIONS]
     desired_times: DesiredTimesField = []
+    # AuditSnapshot mirrors Read — no min-1 enforcement, so historic /
+    # backfilled rows can be projected without 422-ing the audit pipeline.
+    services: ServicesField = []
     treatment_modality: str | None = None
     client_focus: str
     age_group: Literal[*CLIENT_AGE_GROUPS]

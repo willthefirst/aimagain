@@ -38,16 +38,18 @@ class ProviderAvailabilityDetail(Base):
     corresponding `client_referral_details` columns — see the spec's
     "Field-name overlap" table.
 
-    `desired_times` is a JSON column of `list[DESIRED_TIME_SLOTS]`.
-    Storing as JSON (rather than a child join table) trades SQL set
-    semantics for simplicity — the field is read-once, render-once with
-    no SQL queries against its members today. Vocabulary is enforced by
-    the Pydantic `Literal[*DESIRED_TIME_SLOTS]` on the wire schemas;
-    a SQL CHECK against JSON-array members is awkward in SQLite and
-    intentionally skipped.
+    The two JSON multi-select columns (`desired_times`, `services`)
+    store `list[*]` of controlled-vocabulary tokens. Storing as JSON
+    (rather than child join tables) trades SQL set semantics for
+    simplicity — both fields are read-once, render-once with no SQL
+    queries against their members today. Vocabularies are enforced by
+    the Pydantic `Literal[*TUPLE]` on the wire schemas; SQL CHECKs
+    against JSON-array members are awkward in SQLite and intentionally
+    skipped. `services` is required-min-1 on the wire here (the sibling
+    `client_referral_details` schema allows empty).
 
-    The remaining multi-select fields from the spec (`services`,
-    `settings`) follow in a separate change.
+    The remaining multi-select field from the spec (`settings`) follows
+    in a separate change.
     """
 
     __tablename__ = _TABLE
@@ -83,6 +85,7 @@ class ProviderAvailabilityDetail(Base):
     )
 
     # Section 4 — featured services
+    services = Column(JSON, nullable=False, server_default=text("'[]'"), default=list)
     treatment_modality = Column(Text, nullable=True)
     client_focus = Column(Text, nullable=False)
     age_group = Column(Text, nullable=False)

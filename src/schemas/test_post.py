@@ -26,6 +26,8 @@ from pydantic import ValidationError
 from src.models.post_enums import (
     CLIENT_AGE_GROUP_LABELS,
     CLIENT_AGE_GROUPS,
+    CLIENT_REFERRAL_SERVICE_LABELS,
+    CLIENT_REFERRAL_SERVICES,
     DESIRED_TIME_SLOT_LABELS,
     DESIRED_TIME_SLOTS,
     INSURANCE_LABELS,
@@ -584,6 +586,107 @@ def test_post_update_desired_times_rejects_unknown_token(kind):
         )
 
 
+# --- services multi-select ----------------------------------------------
+#
+# Same shape as `desired_times` (scalar coercion + Literal vocabulary) on
+# both kinds, plus a min-1 invariant on `provider_availability` that the
+# `RequiredServicesField` annotation enforces on Create and Update.
+
+
+def test_post_create_client_referral_services_defaults_to_empty_list():
+    """CR's `services` is optional with `[]` default — omitting it is fine."""
+    payload = client_referral_payload()
+    payload.pop("services", None)
+    p = post_create_adapter.validate_python(payload)
+    assert p.services == []
+
+
+@pytest.mark.parametrize(
+    "payload_factory",
+    [client_referral_payload, provider_availability_payload],
+)
+def test_post_create_services_accepts_subset(payload_factory):
+    p = post_create_adapter.validate_python(
+        payload_factory(services=["evaluation", "psychotherapy"])
+    )
+    assert p.services == ["evaluation", "psychotherapy"]
+
+
+@pytest.mark.parametrize(
+    "payload_factory",
+    [client_referral_payload, provider_availability_payload],
+)
+def test_post_create_services_coerces_scalar_to_singleton_list(payload_factory):
+    """Same json-enc 1-checkbox-collapses-to-scalar story as `desired_times`
+    — the shared `_scalar_to_list` BeforeValidator handles it."""
+    p = post_create_adapter.validate_python(payload_factory(services="evaluation"))
+    assert p.services == ["evaluation"]
+
+
+@pytest.mark.parametrize(
+    "payload_factory",
+    [client_referral_payload, provider_availability_payload],
+)
+def test_post_create_services_rejects_unknown_token(payload_factory):
+    with pytest.raises(ValidationError):
+        post_create_adapter.validate_python(payload_factory(services=["telekinesis"]))
+
+
+def test_post_create_provider_availability_services_rejects_empty_list():
+    """PA's `services` is required-min-1; an explicit `[]` 422s."""
+    with pytest.raises(ValidationError):
+        post_create_adapter.validate_python(provider_availability_payload(services=[]))
+
+
+def test_post_create_provider_availability_services_required():
+    """Omitting `services` entirely on PA also 422s — no default fallback."""
+    payload = provider_availability_payload()
+    payload.pop("services")
+    with pytest.raises(ValidationError):
+        post_create_adapter.validate_python(payload)
+
+
+@pytest.mark.parametrize(
+    "kind",
+    ["client_referral", "provider_availability"],
+)
+def test_post_update_services_coerces_scalar_to_singleton_list(kind):
+    p = post_update_adapter.validate_python({"kind": kind, "services": "evaluation"})
+    assert p.services == ["evaluation"]
+
+
+def test_post_update_client_referral_services_accepts_empty_list():
+    """CR's `services` is optional, so PATCHing `services: []` clears the
+    selection — same semantics as `desired_times`."""
+    p = post_update_adapter.validate_python({"kind": "client_referral", "services": []})
+    assert p.services == []
+
+
+def test_post_update_provider_availability_services_rejects_empty_list():
+    """PA preserves the min-1 invariant on PATCH: explicit `[]` 422s; `None`
+    (leave-unchanged) is the supported way to not mutate the field."""
+    with pytest.raises(ValidationError):
+        post_update_adapter.validate_python(
+            {"kind": "provider_availability", "services": []}
+        )
+
+
+def test_post_update_provider_availability_services_accepts_non_empty_list():
+    p = post_update_adapter.validate_python(
+        {"kind": "provider_availability", "services": ["psychotherapy"]}
+    )
+    assert p.services == ["psychotherapy"]
+
+
+@pytest.mark.parametrize(
+    "kind",
+    ["client_referral", "provider_availability"],
+)
+def test_post_update_services_rejects_unknown_token(kind):
+    with pytest.raises(ValidationError):
+        post_update_adapter.validate_python({"kind": kind, "services": ["telekinesis"]})
+
+
 # --- Display labels cover their value tuples ----------------------------
 
 
@@ -595,6 +698,7 @@ def test_post_update_desired_times_rejects_unknown_token(kind):
         (LANGUAGE_PREFERRED_OPTIONS, LANGUAGE_PREFERRED_LABELS),
         (INSURANCE_OPTIONS, INSURANCE_LABELS),
         (DESIRED_TIME_SLOTS, DESIRED_TIME_SLOT_LABELS),
+        (CLIENT_REFERRAL_SERVICES, CLIENT_REFERRAL_SERVICE_LABELS),
     ],
 )
 def test_labels_cover_their_tuples(values, labels):
