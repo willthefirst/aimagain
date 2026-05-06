@@ -1,11 +1,10 @@
-import os
-
 from fastapi.templating import Jinja2Templates
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
+from src.core.config import settings
 from src.models import post_enums
 
-auto_reload = os.getenv("ENVIRONMENT", "development") == "development"
+auto_reload = settings.ENVIRONMENT == "development"
 
 _env = Environment(
     loader=FileSystemLoader("src/templates"),
@@ -50,6 +49,6 @@ templates = Jinja2Templates(env=_env)
 def get_template_context():
     """Get global template context with environment information."""
     return {
-        "is_development": os.getenv("ENVIRONMENT", "development") == "development",
-        "livereload_port": os.getenv("LIVERELOAD_PORT", "35729"),
+        "is_development": settings.ENVIRONMENT == "development",
+        "livereload_port": "35729",
     }
