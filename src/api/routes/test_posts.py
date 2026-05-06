@@ -845,7 +845,7 @@ async def test_get_client_referral_form_renders(
     form = tree.css_first("form")
     assert form is not None
     assert form.attributes.get("hx-post") == "/posts"
-    assert form.attributes.get("hx-ext") == "json-enc"
+    assert form.attributes.get("hx-ext") == "json-enc-arrays"
     assert tree.css_first("textarea#description") is not None
     kind_input = tree.css_first('input[name="kind"]')
     assert kind_input is not None
@@ -1217,7 +1217,7 @@ async def test_get_provider_availability_form_renders(
     form = tree.css_first("form")
     assert form is not None
     assert form.attributes.get("hx-post") == "/posts"
-    assert form.attributes.get("hx-ext") == "json-enc"
+    assert form.attributes.get("hx-ext") == "json-enc-arrays"
     assert tree.css_first("input#practice_name") is not None
     kind_input = tree.css_first('input[name="kind"]')
     assert kind_input is not None

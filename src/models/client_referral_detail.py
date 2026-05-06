@@ -1,4 +1,4 @@
-from sqlalchemy import CheckConstraint, Column, ForeignKey, Text
+from sqlalchemy import JSON, CheckConstraint, Column, ForeignKey, Text, text
 from sqlalchemy.types import Uuid
 
 from .base import Base
@@ -35,9 +35,16 @@ class ClientReferralDetail(Base):
     `insurance`) carry CHECK constraints rendered from the tuples in
     `post_enums.py` via `check_in_tuple_sql`.
 
-    Multi-select fields from the spec (`desired_times`, `services`)
-    follow in a separate change once the wire-format extension for
-    array-valued checkboxes lands.
+    `desired_times` is a JSON column of `list[DESIRED_TIME_SLOTS]`.
+    Storing as JSON (rather than a child join table) trades SQL set
+    semantics for simplicity — the field is read-once, render-once with
+    no SQL queries against its members today. Vocabulary is enforced by
+    the Pydantic `Literal[*DESIRED_TIME_SLOTS]` on the wire schemas;
+    a SQL CHECK against JSON-array members is awkward in SQLite and
+    intentionally skipped.
+
+    The remaining multi-select fields from the spec (`services`) follow
+    in a separate change.
     """
 
     __tablename__ = _TABLE
@@ -62,6 +69,9 @@ class ClientReferralDetail(Base):
     location_zip = Column(Text, nullable=False)
     location_in_person = Column(Text, nullable=False)
     location_virtual = Column(Text, nullable=False)
+    desired_times = Column(
+        JSON, nullable=False, server_default=text("'[]'"), default=list
+    )
 
     # Section 2 — demographics
     client_dem_ages = Column(Text, nullable=False)

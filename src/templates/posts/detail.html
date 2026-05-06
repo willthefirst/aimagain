@@ -19,6 +19,10 @@ Provider availability: {{ post.provider_availability_detail.practice_name }}
     <dd>{{ LOCATION_AVAILABILITY_LABELS[d.location_in_person] }}</dd>
     <dt>Virtual sessions</dt>
     <dd>{{ LOCATION_AVAILABILITY_LABELS[d.location_virtual] }}</dd>
+    {% if d.desired_times %}
+    <dt>Desired times</dt>
+    <dd>{% for slot in d.desired_times %}{{ DESIRED_TIME_SLOT_LABELS[slot] }}{% if not loop.last %}, {% endif %}{% endfor %}</dd>
+    {% endif %}
     <dt>Age group</dt>
     <dd>{{ CLIENT_AGE_GROUP_LABELS[d.client_dem_ages] }}</dd>
     <dt>Language preferred (non-English)</dt>
@@ -49,6 +53,10 @@ Provider availability: {{ post.provider_availability_detail.practice_name }}
     <dd>{{ LOCATION_AVAILABILITY_LABELS[d.in_person_sessions] }}</dd>
     <dt>Virtual sessions</dt>
     <dd>{{ LOCATION_AVAILABILITY_LABELS[d.virtual_sessions] }}</dd>
+    {% if d.desired_times %}
+    <dt>Desired times</dt>
+    <dd>{% for slot in d.desired_times %}{{ DESIRED_TIME_SLOT_LABELS[slot] }}{% if not loop.last %}, {% endif %}{% endfor %}</dd>
+    {% endif %}
     {% if d.treatment_modality %}
     <dt>Treatment modality</dt>
     <dd>{{ d.treatment_modality }}</dd>
