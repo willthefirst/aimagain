@@ -12,16 +12,16 @@ Field set follows `notes/forms_spec.md` Form 2 — minus the remaining
 multi-select fields (`services`, `settings`), which follow in a
 separate change.
 
-`data-array-fields` lists wire field names that the
-`json-enc-arrays` extension must always serialize as a JSON array
-(see `base.html`). `desired_times` is the only multi-select wired in
-this kind today; `services` and `settings` join the list when they
-land.
+The `desired_times` checkbox grid relies on stock `json-enc` semantics
+plus a Pydantic `BeforeValidator` (`_scalar_to_list` in
+`src/schemas/post.py`) that wraps a 1-checkbox scalar back into a list.
+0 boxes checked → key absent → schema default `[]`; 1 box → scalar →
+coerced to `[x]`; 2+ boxes → array (json-enc collapses duplicate keys).
 #}
 {%- from "posts/_form_macros.html" import text_field, textarea_field, select_field, radio_bool_field, time_grid_field -%}
 {%- macro provider_availability_form(hx_method, action, submit_label, post=None) -%}
 {%- set d = post.provider_availability_detail if post else None -%}
-<form hx-{{ hx_method }}="{{ action }}" hx-ext="json-enc-arrays" data-array-fields="desired_times">
+<form hx-{{ hx_method }}="{{ action }}" hx-ext="json-enc">
   <input type="hidden" name="kind" value="provider_availability" />
 
   <fieldset>
