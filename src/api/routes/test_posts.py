@@ -1114,10 +1114,10 @@ async def test_delete_client_referral_writes_audit_row(
         rows = await repo.list_for_resource(resource_type="post", resource_id=post_id)
         assert len(rows) == 1
         assert rows[0].action == "delete_post"
-        assert rows[0].before["kind"] == "client_referral"
-        assert rows[0].before["description"] == description
-        assert rows[0].before["owner_id"] == str(logged_in_user.id)
-        assert rows[0].before["location_state"] == "IL"
+        assert rows[0].before == {
+            **client_referral_payload(description=description),
+            "owner_id": str(logged_in_user.id),
+        }
         assert rows[0].after is None
 
 
@@ -1387,8 +1387,8 @@ async def test_delete_provider_availability_writes_audit_row(
         rows = await repo.list_for_resource(resource_type="post", resource_id=post_id)
         assert len(rows) == 1
         assert rows[0].action == "delete_post"
-        assert rows[0].before["kind"] == "provider_availability"
-        assert rows[0].before["practice_name"] == practice_name
-        assert rows[0].before["owner_id"] == str(logged_in_user.id)
-        assert rows[0].before["sliding_scale"] is False
+        assert rows[0].before == {
+            **provider_availability_payload(practice_name=practice_name),
+            "owner_id": str(logged_in_user.id),
+        }
         assert rows[0].after is None

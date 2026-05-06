@@ -239,6 +239,10 @@ class ProviderAvailabilityCreate(BaseModel):
     treatment_modality: StrippedOptionalText = None
     client_focus: StrippedText
     age_group: Literal[*CLIENT_AGE_GROUPS]
+    # Optional + default per spec — provider form's "non-English services"
+    # is asymmetric with the client form's `language_preferred` (required,
+    # also defaults to "no"). Both default to "no"; only the
+    # required-ness differs. See `notes/forms_spec.md` Sections 4 / 2.
     non_english_services: Literal[*LANGUAGE_PREFERRED_OPTIONS] = "no"
     payment_situation: Literal[*INSURANCE_OPTIONS]
     sliding_scale: bool
@@ -269,9 +273,12 @@ post_create_adapter: TypeAdapter = TypeAdapter(PostCreate)
 # Create and Update.
 
 
-def _at_least_one_editable_field(self) -> None:
-    fields = type(self).model_fields
-    if all(getattr(self, name) is None for name in fields if name != "kind"):
+def _assert_any_editable_field_set(model: BaseModel) -> None:
+    """Raise `ValueError` if every field on `model` other than `kind`
+    is `None`. Shared between the per-kind Update variants so the
+    at-least-one-field rule lives in one place."""
+    fields = type(model).model_fields
+    if all(getattr(model, name) is None for name in fields if name != "kind"):
         raise ValueError("at least one editable field must be provided")
 
 
@@ -292,7 +299,7 @@ class ClientReferralUpdate(BaseModel):
 
     @model_validator(mode="after")
     def _at_least_one_field(self) -> "ClientReferralUpdate":
-        _at_least_one_editable_field(self)
+        _assert_any_editable_field_set(self)
         return self
 
 
@@ -317,7 +324,7 @@ class ProviderAvailabilityUpdate(BaseModel):
 
     @model_validator(mode="after")
     def _at_least_one_field(self) -> "ProviderAvailabilityUpdate":
-        _at_least_one_editable_field(self)
+        _assert_any_editable_field_set(self)
         return self
 
 

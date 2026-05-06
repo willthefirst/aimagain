@@ -70,7 +70,11 @@ _INSURANCE = ("in_network", "out_of_network", "in_and_out_of_network")
 
 
 def _check_in_tuple_sql(column: str, values: tuple[str, ...]) -> str:
-    return f"{column} IN (" + ", ".join(repr(v) for v in values) + ")"
+    # SQL single-quote literals with `'` doubled. Mirrors
+    # `src.models.post_enums.check_in_tuple_sql`; kept local so the
+    # migration stays self-contained.
+    quoted = ", ".join("'" + v.replace("'", "''") + "'" for v in values)
+    return f"{column} IN ({quoted})"
 
 
 def _add_required_text(batch_op, column: str, server_default: str = "") -> None:

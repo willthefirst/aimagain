@@ -128,5 +128,12 @@ def check_in_tuple_sql(column: str, values: tuple[str, ...]) -> str:
     """SQL fragment for a `column IN (...)` CHECK constraint, rendered
     from a tuple. Used by per-kind detail tables so the DB-level
     vocabulary stays in lockstep with the Python tuples above. Mirrors
-    the `kind_check_sql()` pattern used by the parent `posts` table."""
-    return f"{column} IN (" + ", ".join(repr(v) for v in values) + ")"
+    the `kind_check_sql()` pattern used by the parent `posts` table.
+
+    Uses SQL single-quote string literals with `'` doubled per SQL
+    standard. `repr()` would work for the current ASCII-only enum
+    values but switches to double-quoted form when a value contains
+    `'`, which SQLite parses as an identifier rather than a string —
+    so it's not safe for arbitrary future values."""
+    quoted = ", ".join("'" + v.replace("'", "''") + "'" for v in values)
+    return f"{column} IN ({quoted})"
