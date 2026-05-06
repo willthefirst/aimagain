@@ -26,6 +26,8 @@ from pydantic import ValidationError
 from src.models.post_enums import (
     CLIENT_AGE_GROUP_LABELS,
     CLIENT_AGE_GROUPS,
+    DESIRED_TIME_SLOT_LABELS,
+    DESIRED_TIME_SLOTS,
     INSURANCE_LABELS,
     INSURANCE_OPTIONS,
     LANGUAGE_PREFERRED_LABELS,
@@ -492,6 +494,72 @@ def test_schema_literals_match_model_tuples(model_cls, field, expected):
     assert set(_literal_args(model_cls, field)) == set(expected)
 
 
+# --- desired_times multi-select -----------------------------------------
+
+
+@pytest.mark.parametrize(
+    "payload_factory,kind",
+    [
+        (client_referral_payload, "client_referral"),
+        (provider_availability_payload, "provider_availability"),
+    ],
+)
+def test_post_create_desired_times_defaults_to_empty_list(payload_factory, kind):
+    payload = payload_factory()
+    payload.pop("desired_times", None)
+    p = post_create_adapter.validate_python(payload)
+    assert p.desired_times == []
+
+
+@pytest.mark.parametrize(
+    "payload_factory",
+    [client_referral_payload, provider_availability_payload],
+)
+def test_post_create_desired_times_accepts_subset(payload_factory):
+    p = post_create_adapter.validate_python(
+        payload_factory(desired_times=["monday_morning", "friday_evening"])
+    )
+    assert p.desired_times == ["monday_morning", "friday_evening"]
+
+
+@pytest.mark.parametrize(
+    "payload_factory",
+    [client_referral_payload, provider_availability_payload],
+)
+def test_post_create_desired_times_rejects_unknown_token(payload_factory):
+    with pytest.raises(ValidationError):
+        post_create_adapter.validate_python(
+            payload_factory(desired_times=["monday_brunch"])
+        )
+
+
+@pytest.mark.parametrize(
+    "kind",
+    ["client_referral", "provider_availability"],
+)
+def test_post_update_desired_times_replaces_with_explicit_list(kind):
+    """Sending an explicit list (including `[]`) replaces the persisted
+    selection. None is "leave unchanged" — that's the standard
+    `update_post` semantic, not specific to this field."""
+    p = post_update_adapter.validate_python(
+        {"kind": kind, "desired_times": ["monday_morning"]}
+    )
+    assert p.desired_times == ["monday_morning"]
+    p = post_update_adapter.validate_python({"kind": kind, "desired_times": []})
+    assert p.desired_times == []
+
+
+@pytest.mark.parametrize(
+    "kind",
+    ["client_referral", "provider_availability"],
+)
+def test_post_update_desired_times_rejects_unknown_token(kind):
+    with pytest.raises(ValidationError):
+        post_update_adapter.validate_python(
+            {"kind": kind, "desired_times": ["monday_brunch"]}
+        )
+
+
 # --- Display labels cover their value tuples ----------------------------
 
 
@@ -502,6 +570,7 @@ def test_schema_literals_match_model_tuples(model_cls, field, expected):
         (CLIENT_AGE_GROUPS, CLIENT_AGE_GROUP_LABELS),
         (LANGUAGE_PREFERRED_OPTIONS, LANGUAGE_PREFERRED_LABELS),
         (INSURANCE_OPTIONS, INSURANCE_LABELS),
+        (DESIRED_TIME_SLOTS, DESIRED_TIME_SLOT_LABELS),
     ],
 )
 def test_labels_cover_their_tuples(values, labels):

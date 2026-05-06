@@ -8,15 +8,20 @@ Used by both `posts/new_client_referral.html` (create, no prefill) and
   - `submit_label`: the visible submit-button text
   - `post`: the persisted Post (for edit) or `None` (for create)
 
-Field set follows `notes/forms_spec.md` Form 1 — minus the multi-select
-fields (`desired_times`, `services`), which follow in a separate change.
+Field set follows `notes/forms_spec.md` Form 1 — minus the remaining
+multi-select field (`services`), which follows in a separate change.
 Field order, labels, and required/optional state all live here in one
 place; new vs edit difference is the prefill, not the structure.
+
+`data-array-fields` lists wire field names that the
+`json-enc-arrays` extension must always serialize as a JSON array
+(see `base.html`). `desired_times` is the only multi-select wired in
+this kind today; `services` joins the list when it lands.
 #}
-{%- from "posts/_form_macros.html" import text_field, textarea_field, select_field -%}
+{%- from "posts/_form_macros.html" import text_field, textarea_field, select_field, time_grid_field -%}
 {%- macro client_referral_form(hx_method, action, submit_label, post=None) -%}
 {%- set d = post.client_referral_detail if post else None -%}
-<form hx-{{ hx_method }}="{{ action }}" hx-ext="json-enc">
+<form hx-{{ hx_method }}="{{ action }}" hx-ext="json-enc-arrays" data-array-fields="desired_times">
   <input type="hidden" name="kind" value="client_referral" />
 
   <fieldset>
@@ -26,6 +31,7 @@ place; new vs edit difference is the prefill, not the structure.
     {{ text_field("location_zip", "ZIP", current=d.location_zip if d else None, pattern="\\d{5}", maxlength=5, title_case_ignore=true) }}
     {{ select_field("location_in_person", "In-person sessions", LOCATION_AVAILABILITY_OPTIONS, labels=LOCATION_AVAILABILITY_LABELS, current=d.location_in_person if d else None, placeholder=true, title_case_ignore=true) }}
     {{ select_field("location_virtual", "Virtual sessions", LOCATION_AVAILABILITY_OPTIONS, labels=LOCATION_AVAILABILITY_LABELS, current=d.location_virtual if d else None, placeholder=true) }}
+    {{ time_grid_field("desired_times", "Desired times (optional)", current=d.desired_times if d else None) }}
   </fieldset>
 
   <fieldset>

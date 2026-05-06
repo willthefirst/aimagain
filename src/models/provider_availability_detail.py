@@ -1,4 +1,4 @@
-from sqlalchemy import Boolean, CheckConstraint, Column, ForeignKey, Text
+from sqlalchemy import JSON, Boolean, CheckConstraint, Column, ForeignKey, Text, text
 from sqlalchemy.types import Uuid
 
 from .base import Base
@@ -38,9 +38,16 @@ class ProviderAvailabilityDetail(Base):
     corresponding `client_referral_details` columns — see the spec's
     "Field-name overlap" table.
 
-    Multi-select fields from the spec (`desired_times`, `services`,
-    `settings`) follow in a separate change once the wire-format extension
-    for array-valued checkboxes lands.
+    `desired_times` is a JSON column of `list[DESIRED_TIME_SLOTS]`.
+    Storing as JSON (rather than a child join table) trades SQL set
+    semantics for simplicity — the field is read-once, render-once with
+    no SQL queries against its members today. Vocabulary is enforced by
+    the Pydantic `Literal[*DESIRED_TIME_SLOTS]` on the wire schemas;
+    a SQL CHECK against JSON-array members is awkward in SQLite and
+    intentionally skipped.
+
+    The remaining multi-select fields from the spec (`services`,
+    `settings`) follow in a separate change.
     """
 
     __tablename__ = _TABLE
@@ -71,6 +78,9 @@ class ProviderAvailabilityDetail(Base):
     # Section 3 — availability
     in_person_sessions = Column(Text, nullable=False)
     virtual_sessions = Column(Text, nullable=False)
+    desired_times = Column(
+        JSON, nullable=False, server_default=text("'[]'"), default=list
+    )
 
     # Section 4 — featured services
     treatment_modality = Column(Text, nullable=True)
