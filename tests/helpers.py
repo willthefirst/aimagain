@@ -66,6 +66,9 @@ _PROVIDER_AVAILABILITY_DEFAULTS: dict[str, Any] = {
     # PA requires min-1 service on the wire — pick a stable default that
     # tests overriding `services` can assume isn't already in the list.
     "services": ["evaluation"],
+    # PA requires min-1 setting on the wire — pick a stable default that
+    # tests overriding `settings` can assume isn't already in the list.
+    "settings": ["outpatient"],
     "treatment_modality": None,
     "client_focus": "general adult outpatient",
     "age_group": "adults_25_64",

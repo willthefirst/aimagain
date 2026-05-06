@@ -8,8 +8,7 @@ Used by both `posts/new_provider_availability.html` (create) and
   - `submit_label`: the visible submit-button text
   - `post`: the persisted Post (for edit) or `None` (for create)
 
-Field set follows `notes/forms_spec.md` Form 2 — minus the remaining
-multi-select field (`settings`), which follows in a separate change.
+Field set follows `notes/forms_spec.md` Form 2.
 
 The `desired_times` checkbox grid relies on stock `json-enc` semantics
 plus a Pydantic `BeforeValidator` (`_scalar_to_list` in
@@ -46,6 +45,7 @@ coerced to `[x]`; 2+ boxes → array (json-enc collapses duplicate keys).
   <fieldset>
     <legend>Featured services</legend>
     {{ multi_select_field("services", "Services (select at least one)", CLIENT_REFERRAL_SERVICES, labels=CLIENT_REFERRAL_SERVICE_LABELS, current=d.services if d else None) }}
+    {{ multi_select_field("settings", "Treatment settings (select at least one)", TREATMENT_SETTINGS, labels=TREATMENT_SETTINGS_LABELS, current=d.settings if d else None) }}
     {{ text_field("treatment_modality", "Treatment modality (optional, e.g. DBT, EMDR)", current=d.treatment_modality if d else None, required=false, title_case_ignore=true) }}
     {{ textarea_field("client_focus", "Client focus (no PII)", current=d.client_focus if d else None, title_case_ignore=true) }}
     {{ select_field("age_group", "Age group", CLIENT_AGE_GROUPS, labels=CLIENT_AGE_GROUP_LABELS, current=d.age_group if d else None, placeholder=true) }}

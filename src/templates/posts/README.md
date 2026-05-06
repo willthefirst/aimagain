@@ -1,6 +1,6 @@
 # Posts templates
 
-Jinja templates for the post CRUD flows. HTMX-driven; forms submit JSON via `hx-ext="json-enc"`. Every multi-checkbox group on the forms (`desired_times`, `services`, and the upcoming `settings`) relies on stock json-enc semantics (0 boxes → key absent, 1 box → scalar, 2+ → array) plus a `_scalar_to_list` `BeforeValidator` on the wire schema that wraps the 1-element scalar back into a list — see [`src/schemas/post.py`](../../schemas/post.py). Keeping the normalization in Python avoids a JS-only failure mode that's invisible to server tests.
+Jinja templates for the post CRUD flows. HTMX-driven; forms submit JSON via `hx-ext="json-enc"`. Every multi-checkbox group on the forms (`desired_times`, `services`, and `settings`) relies on stock json-enc semantics (0 boxes → key absent, 1 box → scalar, 2+ → array) plus a `_scalar_to_list` `BeforeValidator` on the wire schema that wraps the 1-element scalar back into a list — see [`src/schemas/post.py`](../../schemas/post.py). Keeping the normalization in Python avoids a JS-only failure mode that's invisible to server tests.
 
 ## Files
 
@@ -14,7 +14,7 @@ Jinja templates for the post CRUD flows. HTMX-driven; forms submit JSON via `hx-
 
 ## Parent / per-kind detail
 
-`Post` is split into a parent row (id, kind, owner, timestamps) and a per-kind detail row. Kinds today: `client_referral` (`post.client_referral_detail`) and `provider_availability` (`post.provider_availability_detail`). Both carry the scalar (single-value) fields from the intake forms in [`notes/forms_spec.md`](../../../notes/forms_spec.md) plus the `desired_times` (7×3 grid) and `services` (5-checkbox) multi-selects, both stored as JSON. CR's `services` is optional; PA's is required-min-1. The remaining multi-select field (`settings`) follows in a separate change.
+`Post` is split into a parent row (id, kind, owner, timestamps) and a per-kind detail row. Kinds today: `client_referral` (`post.client_referral_detail`) and `provider_availability` (`post.provider_availability_detail`). Both carry the scalar (single-value) fields from the intake forms in [`notes/forms_spec.md`](../../../notes/forms_spec.md) plus the `desired_times` (7×3 grid) and `services` (5-checkbox) multi-selects, both stored as JSON. CR's `services` is optional; PA's is required-min-1. PA also carries the `settings` (5-checkbox) multi-select (required-min-1).
 
 Templates dereference through the right relationship per branch: `{{ d.description }}` after `{% set d = post.client_referral_detail %}` inside a `kind == "client_referral"` block, etc. Don't reach for `post.title` — it isn't there. Detail relationships are eager-loaded (`lazy="selectin"`) so accessing them from a template is safe.
 

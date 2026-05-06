@@ -56,6 +56,7 @@ from src.models.post_enums import (
     INSURANCE_OPTIONS,
     LANGUAGE_PREFERRED_OPTIONS,
     LOCATION_AVAILABILITY_OPTIONS,
+    TREATMENT_SETTINGS,
     US_STATES,
 )
 
@@ -137,6 +138,12 @@ ServicesField = Annotated[
 # same alias works for `T` (Create/Read/AuditSnapshot) and `T | None`
 # (Update — `None` means "leave unchanged"; an empty list 422s).
 RequiredServicesField = Annotated[ServicesField, Field(min_length=1)]
+SettingsField = Annotated[
+    list[Literal[*TREATMENT_SETTINGS]], BeforeValidator(_scalar_to_list)
+]
+# `provider_availability.settings` is required-min-1 on the wire; same
+# pattern as services.
+RequiredSettingsField = Annotated[SettingsField, Field(min_length=1)]
 
 
 # --- Shared flatten helper ----------------------------------------------
@@ -218,6 +225,7 @@ class ProviderAvailabilityRead(_PostReadBase):
     # `[]` by the migration would otherwise be unreadable. Min-1 lives
     # on Create/Update only, where it actually prevents new violations.
     services: ServicesField = []
+    settings: SettingsField = []
     treatment_modality: str | None = None
     client_focus: str
     age_group: Literal[*CLIENT_AGE_GROUPS]
@@ -265,9 +273,7 @@ class ClientReferralCreate(BaseModel):
 
 class ProviderAvailabilityCreate(BaseModel):
     """Create payload for `kind='provider_availability'`. Field set follows
-    [`notes/forms_spec.md`](../../notes/forms_spec.md) Form 2; the
-    remaining multi-select field (`settings`) follows in a separate
-    change."""
+    [`notes/forms_spec.md`](../../notes/forms_spec.md) Form 2."""
 
     kind: Literal["provider_availability"]
     practice_name: StrippedText
@@ -281,6 +287,7 @@ class ProviderAvailabilityCreate(BaseModel):
     # Required min-1 on PA per spec — divergence from CR's optional
     # `services`. No default: an absent field 422s, an empty list 422s.
     services: RequiredServicesField
+    settings: RequiredSettingsField
     treatment_modality: StrippedOptionalText = None
     client_focus: StrippedText
     age_group: Literal[*CLIENT_AGE_GROUPS]
@@ -367,6 +374,7 @@ class ProviderAvailabilityUpdate(BaseModel):
     # Clearing services entirely is intentionally not supported on PA —
     # the wire invariant is min-1.
     services: RequiredServicesField | None = None
+    settings: RequiredSettingsField | None = None
     treatment_modality: StrippedOptionalText = None
     client_focus: StrippedText | None = None
     age_group: Literal[*CLIENT_AGE_GROUPS] | None = None
@@ -433,6 +441,7 @@ class ProviderAvailabilityAuditSnapshot(_PostAuditSnapshotBase):
     # AuditSnapshot mirrors Read — no min-1 enforcement, so historic /
     # backfilled rows can be projected without 422-ing the audit pipeline.
     services: ServicesField = []
+    settings: SettingsField = []
     treatment_modality: str | None = None
     client_focus: str
     age_group: Literal[*CLIENT_AGE_GROUPS]
