@@ -2,8 +2,9 @@ import logging
 from typing import Literal
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Query, Request, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
 from fastapi.responses import JSONResponse
+from pydantic import ValidationError
 
 from src.api.common import APIResponse, BaseRouter
 from src.auth_config import current_active_user
@@ -20,11 +21,27 @@ from src.models import KIND_NAMES, REGISTERED_KINDS, User
 from src.repositories.audit_repository import AuditRepository
 from src.repositories.dependencies import get_audit_repository, get_post_repository
 from src.repositories.post_repository import PostRepository
-from src.schemas.post import PostCreate, PostUpdate
+from src.schemas.post import post_create_adapter, post_update_adapter
 
 posts_api_router = APIRouter(prefix="/posts")
 router = BaseRouter(router=posts_api_router, default_tags=["posts"])
 logger = logging.getLogger(__name__)
+
+
+async def parse_form_to_payload(request: Request) -> dict:
+    """Parse form-encoded request body into a payload dict.
+
+    For form-encoded requests with multiple values for the same key
+    (e.g., desired_times, services from multiple checkboxes), returns
+    them as lists. Single values are returned as scalars.
+    """
+    form_data = await request.form()
+    payload = {}
+    for key in form_data:
+        values = form_data.getlist(key)
+        # If multiple values for same key, keep as list; single value as scalar
+        payload[key] = values if len(values) > 1 else values[0] if values else None
+    return payload
 
 
 def _patch_response_body(post) -> dict:
@@ -129,18 +146,28 @@ async def get_post(
 
 @router.post("", status_code=status.HTTP_201_CREATED)
 async def create_post(
-    payload: PostCreate,
+    request: Request,
     post_repo: PostRepository = Depends(get_post_repository),
     audit_repo: AuditRepository = Depends(get_audit_repository),
     user: User = Depends(current_active_user),
 ):
     """Creates a post owned by the authenticated user.
 
-    The body is a discriminated union on `kind`: clients must include
-    a `kind` matching one of the registered variants. `owner_id` is
-    server-set from the session; clients sending it (or any other
-    unknown field) are rejected with 422 by the schema.
+    The body must be form-encoded. The `kind` field is required and must
+    match one of the registered variants. `owner_id` is server-set from
+    the session; clients sending it (or any other unknown field) are
+    rejected with 422 by the schema.
     """
+    payload_dict = await parse_form_to_payload(request)
+    try:
+        payload = post_create_adapter.validate_python(payload_dict)
+    except ValidationError as e:
+        # Convert Pydantic errors to JSON-serializable format
+        errors = [
+            {"loc": err["loc"], "msg": err["msg"], "type": err["type"]}
+            for err in e.errors()
+        ]
+        raise HTTPException(status_code=422, detail=errors)
     created = await handle_create_post(
         payload=payload,
         post_repo=post_repo,
@@ -158,7 +185,7 @@ async def create_post(
 @router.patch("/{post_id}")
 async def patch_post(
     post_id: UUID,
-    payload: PostUpdate,
+    request: Request,
     post_repo: PostRepository = Depends(get_post_repository),
     audit_repo: AuditRepository = Depends(get_audit_repository),
     user: User = Depends(current_active_user),
@@ -169,7 +196,18 @@ async def patch_post(
     are rejected by the schema's `extra="forbid"`. The body must include
     at least one mutable field for the post's kind. `kind` cannot be
     changed via PATCH; mismatches are rejected with 400.
+    The body must be form-encoded.
     """
+    payload_dict = await parse_form_to_payload(request)
+    try:
+        payload = post_update_adapter.validate_python(payload_dict)
+    except ValidationError as e:
+        # Convert Pydantic errors to JSON-serializable format
+        errors = [
+            {"loc": err["loc"], "msg": err["msg"], "type": err["type"]}
+            for err in e.errors()
+        ]
+        raise HTTPException(status_code=422, detail=errors)
     updated = await handle_update_post(
         post_id=post_id,
         payload=payload,
