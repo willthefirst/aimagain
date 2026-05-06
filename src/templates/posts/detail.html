@@ -16,13 +16,13 @@ Provider availability: {{ post.provider_availability_detail.practice_name }}
     <dt>Location</dt>
     <dd>{{ d.location_city }}, {{ d.location_state }} {{ d.location_zip }}</dd>
     <dt>In-person sessions</dt>
-    <dd>{{ d.location_in_person }}</dd>
+    <dd>{{ LOCATION_AVAILABILITY_LABELS[d.location_in_person] }}</dd>
     <dt>Virtual sessions</dt>
-    <dd>{{ d.location_virtual }}</dd>
+    <dd>{{ LOCATION_AVAILABILITY_LABELS[d.location_virtual] }}</dd>
     <dt>Age group</dt>
-    <dd>{{ d.client_dem_ages }}</dd>
+    <dd>{{ CLIENT_AGE_GROUP_LABELS[d.client_dem_ages] }}</dd>
     <dt>Language preferred (non-English)</dt>
-    <dd>{{ d.language_preferred }}</dd>
+    <dd>{{ LANGUAGE_PREFERRED_LABELS[d.language_preferred] }}</dd>
     <dt>Description</dt>
     <dd>{{ d.description }}</dd>
     {% if d.services_psychotherapy_modality %}
@@ -30,7 +30,7 @@ Provider availability: {{ post.provider_availability_detail.practice_name }}
     <dd>{{ d.services_psychotherapy_modality }}</dd>
     {% endif %}
     <dt>Insurance</dt>
-    <dd>{{ d.insurance }}</dd>
+    <dd>{{ INSURANCE_LABELS[d.insurance] }}</dd>
   </dl>
 </div>
 {% elif post.kind == "provider_availability" %}
@@ -46,9 +46,9 @@ Provider availability: {{ post.provider_availability_detail.practice_name }}
     <dt>Location</dt>
     <dd>{{ d.location_city }}, {{ d.location_state }} {{ d.location_zip }}</dd>
     <dt>In-person sessions</dt>
-    <dd>{{ d.in_person_sessions }}</dd>
+    <dd>{{ LOCATION_AVAILABILITY_LABELS[d.in_person_sessions] }}</dd>
     <dt>Virtual sessions</dt>
-    <dd>{{ d.virtual_sessions }}</dd>
+    <dd>{{ LOCATION_AVAILABILITY_LABELS[d.virtual_sessions] }}</dd>
     {% if d.treatment_modality %}
     <dt>Treatment modality</dt>
     <dd>{{ d.treatment_modality }}</dd>
@@ -56,13 +56,13 @@ Provider availability: {{ post.provider_availability_detail.practice_name }}
     <dt>Client focus</dt>
     <dd>{{ d.client_focus }}</dd>
     <dt>Age group</dt>
-    <dd>{{ d.age_group }}</dd>
+    <dd>{{ CLIENT_AGE_GROUP_LABELS[d.age_group] }}</dd>
     <dt>Non-English services</dt>
-    <dd>{{ d.non_english_services }}</dd>
+    <dd>{{ LANGUAGE_PREFERRED_LABELS[d.non_english_services] }}</dd>
     <dt>Payment situation</dt>
-    <dd>{{ d.payment_situation }}</dd>
+    <dd>{{ INSURANCE_LABELS[d.payment_situation] }}</dd>
     <dt>Sliding scale</dt>
-    <dd>{{ "yes" if d.sliding_scale else "no" }}</dd>
+    <dd>{{ "Yes" if d.sliding_scale else "No" }}</dd>
     {% if d.cost %}
     <dt>Cost</dt>
     <dd>{{ d.cost }}</dd>

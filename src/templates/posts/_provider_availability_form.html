@@ -33,15 +33,15 @@ separate change.
 
   <fieldset>
     <legend>Availability</legend>
-    {{ select_field("in_person_sessions", "In-person sessions", LOCATION_AVAILABILITY_OPTIONS, labels=LOCATION_AVAILABILITY_LABELS, current=d.in_person_sessions if d else None, title_case_ignore=true) }}
-    {{ select_field("virtual_sessions", "Virtual sessions", LOCATION_AVAILABILITY_OPTIONS, labels=LOCATION_AVAILABILITY_LABELS, current=d.virtual_sessions if d else None) }}
+    {{ select_field("in_person_sessions", "In-person sessions", LOCATION_AVAILABILITY_OPTIONS, labels=LOCATION_AVAILABILITY_LABELS, current=d.in_person_sessions if d else None, placeholder=true, title_case_ignore=true) }}
+    {{ select_field("virtual_sessions", "Virtual sessions", LOCATION_AVAILABILITY_OPTIONS, labels=LOCATION_AVAILABILITY_LABELS, current=d.virtual_sessions if d else None, placeholder=true) }}
   </fieldset>
 
   <fieldset>
     <legend>Featured services</legend>
     {{ text_field("treatment_modality", "Treatment modality (optional, e.g. DBT, EMDR)", current=d.treatment_modality if d else None, required=false, title_case_ignore=true) }}
     {{ textarea_field("client_focus", "Client focus (no PII)", current=d.client_focus if d else None, title_case_ignore=true) }}
-    {{ select_field("age_group", "Age group", CLIENT_AGE_GROUPS, labels=CLIENT_AGE_GROUP_LABELS, current=d.age_group if d else None) }}
+    {{ select_field("age_group", "Age group", CLIENT_AGE_GROUPS, labels=CLIENT_AGE_GROUP_LABELS, current=d.age_group if d else None, placeholder=true) }}
     {{ select_field("non_english_services", "Services offered in non-English language?", LANGUAGE_PREFERRED_OPTIONS, labels=LANGUAGE_PREFERRED_LABELS, current=(d.non_english_services if d else "no"), required=false, title_case_ignore=true) }}
   </fieldset>
 

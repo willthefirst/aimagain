@@ -13,9 +13,11 @@ value on edit). For the bool-radio `current` should be `True` / `False`
 / `None` — neither radio is checked when `None`.
 
 `title_case_ignore` lets a caller suppress the project's title-case
-linter for a label whose human spelling intentionally diverges from
-sentence case (acronyms like ZIP/PII, hyphenated openers like
-"In-person"). The flag adds the inline ignore comment on the label line.
+linter (`scripts/dev/title_case_check.py`, run by `dev lint`) for a
+label whose human spelling intentionally diverges from sentence case
+(acronyms like ZIP/PII, hyphenated openers like "In-person"). The
+flag emits the inline `<!-- title-case-ignore -->` HTML comment that
+the linter looks for on the label line.
 #}
 
 {% macro text_field(name, label, current=None, required=True, pattern=None, maxlength=None, title_case_ignore=False) -%}
