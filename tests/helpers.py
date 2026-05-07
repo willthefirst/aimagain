@@ -154,6 +154,37 @@ _PROVIDER_CERTIFICATION_DEFAULTS: dict[str, Any] = {
 }
 
 
+def _drop_none(d: dict[str, Any]) -> dict[str, Any]:
+    """Drop keys whose value is `None`. Form-encoded HTTP requests collapse
+    `None` to an empty string on the wire, which then 422s any Pydantic
+    `T | None` field that can't coerce '' (e.g. `date | None`). The form
+    contract is "absent field = leave as default", so dropping `None` keys
+    here matches that contract before httpx serializes the dict."""
+    return {k: v for k, v in d.items() if v is not None}
+
+
+def provider_profile_payload(**overrides: Any) -> dict[str, Any]:
+    """Build a wire-valid `POST /provider-profiles` form-encoded payload.
+    Returns a fresh flat dict each call. Sub-entity arrays are intentionally
+    omitted — credentials are added via the dedicated sub-resource endpoints."""
+    return _drop_none({**_PROVIDER_PROFILE_DEFAULTS, **overrides})
+
+
+def licensure_payload(**overrides: Any) -> dict[str, Any]:
+    """Build a wire-valid `POST /provider-profiles/{id}/licensures` payload."""
+    return _drop_none({**_PROVIDER_LICENSURE_DEFAULTS, **overrides})
+
+
+def education_payload(**overrides: Any) -> dict[str, Any]:
+    """Build a wire-valid `POST /provider-profiles/{id}/educations` payload."""
+    return _drop_none({**_PROVIDER_EDUCATION_DEFAULTS, **overrides})
+
+
+def certification_payload(**overrides: Any) -> dict[str, Any]:
+    """Build a wire-valid `POST /provider-profiles/{id}/certifications` payload."""
+    return _drop_none({**_PROVIDER_CERTIFICATION_DEFAULTS, **overrides})
+
+
 def make_provider_profile(*, user_id: UUID, **overrides: Any) -> ProviderProfile:
     """Build a `ProviderProfile` ORM row with CHECK-valid defaults."""
     return ProviderProfile(
