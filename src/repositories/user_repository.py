@@ -15,9 +15,7 @@ class UserRepository(BaseRepository):
 
     async def get_user_by_id(self, user_id: UUID) -> User | None:
         """Retrieves a user by their ID."""
-        stmt = select(User).filter(User.id == user_id)
-        result = await self.session.execute(stmt)
-        return result.scalars().first()
+        return await self._get_by_id(User, user_id)
 
     async def get_user_by_username(self, username: str) -> User | None:
         """Retrieves a user by their username."""
@@ -56,5 +54,4 @@ class UserRepository(BaseRepository):
 
     async def delete_user(self, user: User) -> None:
         """Hard-deletes the user row; the caller commits."""
-        await self.session.delete(user)
-        await self.session.flush()
+        await self._delete(user)
