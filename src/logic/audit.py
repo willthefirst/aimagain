@@ -40,6 +40,18 @@ class AuditAction(str, Enum):
     SET_USER_ACTIVATION = "set_user_activation"
     DELETE_USER = "delete_user"
     REGISTER = "register"
+    CREATE_PROVIDER_PROFILE = "create_provider_profile"
+    UPDATE_PROVIDER_PROFILE = "update_provider_profile"
+    DELETE_PROVIDER_PROFILE = "delete_provider_profile"
+    CREATE_LICENSURE = "create_licensure"
+    UPDATE_LICENSURE = "update_licensure"
+    DELETE_LICENSURE = "delete_licensure"
+    CREATE_EDUCATION = "create_education"
+    UPDATE_EDUCATION = "update_education"
+    DELETE_EDUCATION = "delete_education"
+    CREATE_CERTIFICATION = "create_certification"
+    UPDATE_CERTIFICATION = "update_certification"
+    DELETE_CERTIFICATION = "delete_certification"
 
 
 async def record_audit(

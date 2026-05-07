@@ -105,9 +105,12 @@ class ProviderProfileRepository(BaseRepository):
         self, profile: ProviderProfile, **fields: Any
     ) -> ProviderLicensure:
         """Creates a new licensure attached to the profile; the caller
-        commits."""
-        licensure = ProviderLicensure(profile_id=profile.id, **fields)
-        self.session.add(licensure)
+        commits. Appends through `profile.licensures` so the parent's
+        in-memory collection stays consistent — callers that snapshot
+        the parent right after see the new child without an extra
+        `session.refresh(parent, attribute_names=[...])`."""
+        licensure = ProviderLicensure(**fields)
+        profile.licensures.append(licensure)
         await self.session.flush()
         await self.session.refresh(licensure)
         return licensure
@@ -143,9 +146,11 @@ class ProviderProfileRepository(BaseRepository):
         self, profile: ProviderProfile, **fields: Any
     ) -> ProviderEducation:
         """Creates a new education entry attached to the profile; the
-        caller commits."""
-        education = ProviderEducation(profile_id=profile.id, **fields)
-        self.session.add(education)
+        caller commits. Appends through `profile.educations` so the
+        parent's in-memory collection stays consistent — see
+        `add_licensure` for the rationale."""
+        education = ProviderEducation(**fields)
+        profile.educations.append(education)
         await self.session.flush()
         await self.session.refresh(education)
         return education
@@ -185,9 +190,11 @@ class ProviderProfileRepository(BaseRepository):
         self, profile: ProviderProfile, **fields: Any
     ) -> ProviderCertification:
         """Creates a new certification attached to the profile; the caller
-        commits."""
-        certification = ProviderCertification(profile_id=profile.id, **fields)
-        self.session.add(certification)
+        commits. Appends through `profile.certifications` so the parent's
+        in-memory collection stays consistent — see `add_licensure` for
+        the rationale."""
+        certification = ProviderCertification(**fields)
+        profile.certifications.append(certification)
         await self.session.flush()
         await self.session.refresh(certification)
         return certification
