@@ -69,6 +69,7 @@ Common utilities handle concerns that span multiple routes and domains.
 | **APIResponse** | Response formatting    | JSON/HTML responses, template context                           | All route handlers       |
 | **Decorators**  | Cross-cutting concerns | Error handling, logging                                         | BaseRouter (automatic)   |
 | **Exceptions**  | Error vocabulary       | API exception classes raised by logic; fastapi-users translator | Logic handlers, decorator |
+| **Forms**       | Form-encoded request glue | `parse_form_to_payload` and `validate_or_422`                | Route handlers that accept form-encoded bodies |
 
 ## Directory structure
 
@@ -78,6 +79,7 @@ Common utilities handle concerns that span multiple routes and domains.
 - `responses.py` - Standardized response formatting for JSON and HTML
 - `decorators.py` - Error handling and logging decorators applied to all routes
 - `exceptions.py` - `APIException` subclasses (`NotFoundError`, `ForbiddenError`, ...) raised by logic, plus the fastapi-users → HTTP translator
+- `forms.py` - HTTP-adapter primitives for form-encoded route bodies: `parse_form_to_payload(request)` (form → dict, lists for repeated keys) and `validate_or_422(adapter, payload_dict)` (run a `TypeAdapter`, translate `ValidationError` to 422 with `[{"loc","msg","type"}]`). Home for any HTTP-adapter primitive that two or more route modules would otherwise import from each other.
 
 **Package infrastructure:**
 
