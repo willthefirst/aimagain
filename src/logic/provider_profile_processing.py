@@ -138,6 +138,24 @@ async def handle_get_provider_profile_form(
     return {"request": request, "current_user": requesting_user}
 
 
+async def handle_get_provider_profile_edit_form(
+    request: Request,
+    profile_id: UUID,
+    repo: ProviderProfileRepository,
+    requesting_user: User,
+) -> dict[str, Any]:
+    """Loads a profile for the edit-form page. 404 if missing, 403 if the
+    requester is neither owner nor admin (mirrors `_assert_can_mutate`).
+
+    The repo's `get_by_id` eager-loads `licensures`, `educations`, and
+    `certifications` via `lazy="selectin"`, so the template can render
+    each sub-section without further queries.
+    """
+    profile = await _load_profile_or_404(profile_id, repo)
+    _assert_can_mutate(profile, requesting_user)
+    return {"request": request, "profile": profile, "current_user": requesting_user}
+
+
 async def handle_create_profile(
     payload: ProviderProfileCreate,
     repo: ProviderProfileRepository,

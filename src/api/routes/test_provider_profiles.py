@@ -23,6 +23,7 @@ from tests.helpers import (
     make_provider_education,
     make_provider_licensure,
     make_provider_profile,
+    promote_to_admin,
     provider_profile_payload,
 )
 
@@ -90,7 +91,7 @@ async def test_create_profile_happy_path(
     assert response.status_code == 201
     new_id = uuid.UUID(response.json()["id"])
     assert response.headers["Location"] == f"/provider-profiles/{new_id}"
-    assert response.headers["HX-Redirect"] == f"/provider-profiles/{new_id}"
+    assert response.headers["HX-Redirect"] == f"/provider-profiles/{new_id}/form"
 
     async with db_test_session_manager() as session:
         result = await session.execute(
@@ -263,7 +264,7 @@ async def test_patch_profile_updates_fields(
 
     assert response.status_code == 200
     assert response.json()["practice_name"] == "New Name"
-    assert response.headers["HX-Redirect"] == f"/provider-profiles/{profile_id}"
+    assert response.headers["HX-Redirect"] == f"/provider-profiles/{profile_id}/form"
 
     async with db_test_session_manager() as session:
         refreshed = (
@@ -374,7 +375,7 @@ async def test_create_licensure_happy_path(
 
     assert response.status_code == 201
     new_id = uuid.UUID(response.json()["id"])
-    assert response.headers["HX-Redirect"] == f"/provider-profiles/{profile_id}"
+    assert response.headers["HX-Redirect"] == f"/provider-profiles/{profile_id}/form"
 
     async with db_test_session_manager() as session:
         persisted = (
@@ -619,3 +620,98 @@ async def test_form_route_does_not_shadow_get_by_id(
     response = await authenticated_client.get(f"/provider-profiles/{profile_id}")
     assert response.status_code == 200
     assert response.json()["id"] == str(profile_id)
+
+
+# --- Edit form page (GET /provider-profiles/{id}/form) -------------------
+
+
+async def test_owner_can_open_edit_form(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user: User,
+):
+    """Owner sees the edit form pre-filled with profile fields and any
+    existing credential sub-rows."""
+    profile_id = await _seed_profile_for(
+        db_test_session_manager,
+        user_id=logged_in_user.id,
+        practice_name="Acme Counseling",
+    )
+    licensure = make_provider_licensure(
+        profile_id=profile_id, license_type="lcsw", license_number="L-12345"
+    )
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            session.add(licensure)
+
+    response = await authenticated_client.get(f"/provider-profiles/{profile_id}/form")
+    assert response.status_code == 200
+    tree = HTMLParser(response.text)
+    practice_input = tree.css_first('input[name="practice_name"]')
+    assert practice_input is not None
+    assert practice_input.attributes.get("value") == "Acme Counseling"
+    practice_form = tree.css_first(f'form[hx-patch="/provider-profiles/{profile_id}"]')
+    assert practice_form is not None
+    # The seeded licensure should be rendered in the licensures list.
+    assert "L-12345" in response.text
+    # Sub-section add forms target the right URLs.
+    assert (
+        tree.css_first(f'form[hx-post="/provider-profiles/{profile_id}/licensures"]')
+        is not None
+    )
+    assert (
+        tree.css_first(f'form[hx-post="/provider-profiles/{profile_id}/educations"]')
+        is not None
+    )
+    assert (
+        tree.css_first(
+            f'form[hx-post="/provider-profiles/{profile_id}/certifications"]'
+        )
+        is not None
+    )
+
+
+async def test_admin_can_open_edit_form_for_any_profile(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user: User,
+):
+    await promote_to_admin(db_test_session_manager, logged_in_user.email)
+    _other_user_id, profile_id = await _seed_other_user_with_profile(
+        db_test_session_manager
+    )
+    response = await authenticated_client.get(f"/provider-profiles/{profile_id}/form")
+    assert response.status_code == 200
+
+
+async def test_non_owner_cannot_open_edit_form(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user: User,
+):
+    _other_user_id, profile_id = await _seed_other_user_with_profile(
+        db_test_session_manager
+    )
+    response = await authenticated_client.get(f"/provider-profiles/{profile_id}/form")
+    assert response.status_code == 403
+
+
+async def test_edit_form_returns_404_for_unknown_id(
+    authenticated_client: AsyncClient,
+    logged_in_user: User,
+):
+    response = await authenticated_client.get(f"/provider-profiles/{uuid.uuid4()}/form")
+    assert response.status_code == 404
+
+
+async def test_edit_form_unauthenticated_redirects(
+    test_client: AsyncClient,
+):
+    profile_id = uuid.uuid4()
+    response = await test_client.get(
+        f"/provider-profiles/{profile_id}/form",
+        headers={"accept": "text/html"},
+        follow_redirects=False,
+    )
+    assert response.status_code == 302
+    assert "/auth/login" in response.headers["location"]

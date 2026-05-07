@@ -1,0 +1,128 @@
+{% extends "base.html" %}
+{%- from "posts/_form_macros.html" import text_field, select_field -%}
+{% block title %}Edit provider profile{% endblock %}
+{% block content %}
+<h1>Edit provider profile</h1>
+
+<section>
+  <h2>Practice</h2>
+  <form hx-patch="/provider-profiles/{{ profile.id }}">
+    <fieldset>
+      <legend>Practice location</legend>
+      {{ text_field("practice_name", "Practice name", current=profile.practice_name, maxlength=200) }}
+      {{ text_field("location_city", "City", current=profile.location_city, maxlength=120) }}
+      {{ select_field("location_state", "State", US_STATES, current=profile.location_state) }}
+      {{ text_field("location_zip", "ZIP", current=profile.location_zip, pattern="\\d{5}", maxlength=5, title_case_ignore=true) }}
+    </fieldset>
+    <fieldset>
+      <legend>Session availability</legend>
+      {{ select_field("in_person_sessions", "In-person sessions", LOCATION_AVAILABILITY_OPTIONS, labels=LOCATION_AVAILABILITY_LABELS, current=profile.in_person_sessions, title_case_ignore=true) }}
+      {{ select_field("virtual_sessions", "Virtual sessions", LOCATION_AVAILABILITY_OPTIONS, labels=LOCATION_AVAILABILITY_LABELS, current=profile.virtual_sessions) }}
+    </fieldset>
+    <input type="submit" value="Save practice details" />
+  </form>
+</section>
+
+<hr />
+
+<section>
+  <h2>Licensures</h2>
+  {% if profile.licensures %}
+  <ul class="licensures-list">
+    {%- for lic in profile.licensures %}
+    <li>
+      <strong>{{ LICENSE_TYPES_LABELS[lic.license_type] }}</strong>
+      &mdash; {{ lic.license_number }} ({{ lic.issuing_state }}){% if lic.expiration_date %}, expires {{ lic.expiration_date }}{% endif %}
+      <button
+        type="button"
+        hx-delete="/provider-profiles/{{ profile.id }}/licensures/{{ lic.id }}"
+        hx-confirm="Remove this licensure?"
+      >Delete</button>
+    </li>
+    {%- endfor %}
+  </ul>
+  {% else %}
+  <p>No licensures yet.</p>
+  {% endif %}
+
+  <form hx-post="/provider-profiles/{{ profile.id }}/licensures">
+    <fieldset>
+      <legend>Add licensure</legend>
+      {{ select_field("license_type", "License type", LICENSE_TYPES, labels=LICENSE_TYPES_LABELS, placeholder=true) }}
+      {{ text_field("license_number", "License number", maxlength=120) }}
+      {{ select_field("issuing_state", "Issuing state", US_STATES, placeholder=true) }}
+      {{ text_field("expiration_date", "Expiration date (YYYY-MM-DD)", required=false, pattern="\\d{4}-\\d{2}-\\d{2}", maxlength=10) }}
+    </fieldset>
+    <input type="submit" value="Add licensure" />
+  </form>
+</section>
+
+<hr />
+
+<section>
+  <h2>Education</h2>
+  {% if profile.educations %}
+  <ul class="educations-list">
+    {%- for edu in profile.educations %}
+    <li>
+      <strong>{{ EDUCATION_TYPES_LABELS[edu.education_type] }}</strong>
+      &mdash; {{ edu.institution }}{% if edu.month_completed %}, {{ edu.month_completed }}{% endif %}
+      <button
+        type="button"
+        hx-delete="/provider-profiles/{{ profile.id }}/educations/{{ edu.id }}"
+        hx-confirm="Remove this education entry?"
+      >Delete</button>
+    </li>
+    {%- endfor %}
+  </ul>
+  {% else %}
+  <p>No education entries yet.</p>
+  {% endif %}
+
+  <form hx-post="/provider-profiles/{{ profile.id }}/educations">
+    <fieldset>
+      <legend>Add education</legend>
+      {{ select_field("education_type", "Education type", EDUCATION_TYPES, labels=EDUCATION_TYPES_LABELS, placeholder=true) }}
+      {{ text_field("institution", "Institution", maxlength=200) }}
+      {{ text_field("month_completed", "Month completed (YYYY-MM)", required=false, pattern="\\d{4}-\\d{2}", maxlength=7) }}
+    </fieldset>
+    <input type="submit" value="Add education" />
+  </form>
+</section>
+
+<hr />
+
+<section>
+  <h2>Certifications</h2>
+  {% if profile.certifications %}
+  <ul class="certifications-list">
+    {%- for cert in profile.certifications %}
+    <li>
+      <strong>{{ CERTIFICATION_TYPES_LABELS[cert.certification_type] }}</strong>
+      &mdash; {{ cert.certifying_body }}{% if cert.expiration_date %}, expires {{ cert.expiration_date }}{% endif %}
+      <button
+        type="button"
+        hx-delete="/provider-profiles/{{ profile.id }}/certifications/{{ cert.id }}"
+        hx-confirm="Remove this certification?"
+      >Delete</button>
+    </li>
+    {%- endfor %}
+  </ul>
+  {% else %}
+  <p>No certifications yet.</p>
+  {% endif %}
+
+  <form hx-post="/provider-profiles/{{ profile.id }}/certifications">
+    <fieldset>
+      <legend>Add certification</legend>
+      {{ select_field("certification_type", "Certification type", CERTIFICATION_TYPES, labels=CERTIFICATION_TYPES_LABELS, placeholder=true) }}
+      {{ text_field("certifying_body", "Certifying body", maxlength=200) }}
+      {{ text_field("expiration_date", "Expiration date (YYYY-MM-DD)", required=false, pattern="\\d{4}-\\d{2}-\\d{2}", maxlength=10) }}
+    </fieldset>
+    <input type="submit" value="Add certification" />
+  </form>
+</section>
+
+<hr />
+<a href="/provider-profiles">Back to profiles</a>
+{% endblock %}
