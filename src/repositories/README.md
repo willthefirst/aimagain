@@ -189,6 +189,43 @@ async def handle_create_entity(data, user, repo: [Entity]Repository):
     return entity
 ```
 
+### CRUD primitives on `BaseRepository` <!-- title-case-ignore -->
+
+`BaseRepository` carries four protected primitives that capture the exact shapes every resource repo writes by hand. They own only the flush/refresh ritual; they never call `commit()`. Use them when your method body is one of these shapes plus *zero* other operations; otherwise write the body explicitly.
+
+| Primitive | Shape it captures |
+| --- | --- |
+| `_get_by_id(Model, id)` | `select(Model).filter(Model.id == id).scalars().first()` |
+| `_persist_new(obj)` | `session.add(obj); flush; refresh; return obj` |
+| `_add_child(parent, "collection", child)` | `getattr(parent, "collection").append(child); flush; refresh(child); return child` |
+| `_patch(obj, **fields)` | skip-`None` `setattr` loop, then `flush; refresh; return obj` |
+| `_delete(obj)` | `session.delete(obj); flush` |
+
+When *not* to delegate:
+
+- `list_X` queries (joins, filters, custom ordering) — write them out.
+- `get_X_by_<field>` lookups that are not by primary key — write them out.
+- `update_X` methods that need a richer skip predicate (e.g. `PostRepository.update_post`'s "skip fields not in this kind's spec") — write them out and document why.
+- Any flow that wires up multiple related rows in one flush — e.g. `PostRepository.create_post` calls `_attach_detail` before delegating to `_persist_new`, but the attachment itself stays explicit.
+
+```python
+# Typical resource repo using the primitives:
+async def get_by_id(self, profile_id: UUID) -> ProviderProfile | None:
+    return await self._get_by_id(ProviderProfile, profile_id)
+
+async def create_profile(self, user_id: UUID, **fields) -> ProviderProfile:
+    return await self._persist_new(ProviderProfile(user_id=user_id, **fields))
+
+async def add_licensure(self, profile, **fields) -> ProviderLicensure:
+    return await self._add_child(profile, "licensures", ProviderLicensure(**fields))
+
+async def update_profile(self, profile, **fields) -> ProviderProfile:
+    return await self._patch(profile, **fields)
+
+async def delete_profile(self, profile) -> None:
+    await self._delete(profile)
+```
+
 ## Common issues and solutions
 
 ### Issue: N+1 query problems

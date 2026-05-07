@@ -35,9 +35,7 @@ class PostRepository(BaseRepository):
     async def get_post_by_id(self, post_id: UUID) -> Post | None:
         """Retrieves a post by its ID. Per-kind detail relationships are
         eager-loaded via `lazy="selectin"` on the model."""
-        stmt = select(Post).filter(Post.id == post_id)
-        result = await self.session.execute(stmt)
-        return result.scalars().first()
+        return await self._get_by_id(Post, post_id)
 
     async def list_posts(self) -> Sequence[Post]:
         """Lists all posts, newest first. Detail relationships are eager-loaded."""
@@ -54,10 +52,7 @@ class PostRepository(BaseRepository):
         detail's type). CASCADE on the FK keeps lifetimes locked together.
         """
         _attach_detail(post, detail)
-        self.session.add(post)
-        await self.session.flush()
-        await self.session.refresh(post)
-        return post
+        return await self._persist_new(post)
 
     async def update_post(self, post: Post, **detail_fields: Any) -> Post:
         """Mutates the per-kind detail fields that were provided and flushes;
@@ -87,5 +82,4 @@ class PostRepository(BaseRepository):
     async def delete_post(self, post: Post) -> None:
         """Deletes a post and flushes; the caller commits. The per-kind
         detail row is removed by `ON DELETE CASCADE` on the FK."""
-        await self.session.delete(post)
-        await self.session.flush()
+        await self._delete(post)
