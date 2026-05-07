@@ -28,6 +28,10 @@ STUB_TARGET_USER_ID = uuid.UUID("11111111-1111-1111-1111-111111111111")
 # `tests/test_contract/constants.py`.
 STUB_POST_ID = uuid.UUID("22222222-2222-2222-2222-222222222222")
 
+# Stable UUID used by the provider-profile-edit stub page; matches
+# `STUB_PROFILE_ID` in `tests/test_contract/constants.py`.
+STUB_PROFILE_ID = uuid.UUID("44444444-4444-4444-4444-444444444444")
+
 
 class ConsumerServerConfig:
     """Toggles for which page routes the consumer server should mount.
@@ -43,12 +47,14 @@ class ConsumerServerConfig:
         users_admin_actions: bool = False,
         posts_owner_actions: bool = False,
         provider_profile_create_form: bool = False,
+        provider_profile_edit_form: bool = False,
         mock_auth: bool = True,
     ):
         self.auth_pages = auth_pages
         self.users_admin_actions = users_admin_actions
         self.posts_owner_actions = posts_owner_actions
         self.provider_profile_create_form = provider_profile_create_form
+        self.provider_profile_edit_form = provider_profile_edit_form
         self.mock_auth = mock_auth
 
 
@@ -155,6 +161,45 @@ def _setup_provider_profile_create_form_stub(app: FastAPI) -> None:
         )
 
 
+def _setup_provider_profile_edit_form_stub(app: FastAPI) -> None:
+    """Mount a stub page that renders the real `provider_profiles/edit.html`
+    template with a hardcoded profile, so the practice-fields PATCH form is
+    exercised without needing a database. The contract surface is the form's
+    `PATCH /provider-profiles/{id}` request shape.
+    """
+
+    class _StubAttrs:
+        def __init__(self, **kwargs):
+            self.__dict__.update(kwargs)
+
+    @app.get("/provider-profiles/{profile_id}/form")
+    async def provider_profile_edit_form_stub_page(
+        request: Request, profile_id: uuid.UUID
+    ):
+        profile = _StubAttrs(
+            id=profile_id,
+            practice_name="Acme Counseling",
+            location_city="Brooklyn",
+            location_state="NY",
+            location_zip="11201",
+            in_person_sessions="yes",
+            virtual_sessions="please_contact",
+            licensures=[],
+            educations=[],
+            certifications=[],
+        )
+        current_user = _StubAttrs(
+            id=uuid.UUID("00000000-0000-0000-0000-000000000004"),
+            username="provider_user",
+            is_superuser=False,
+        )
+        return APIResponse.html_response(
+            template_name="provider_profiles/edit.html",
+            context={"profile": profile, "current_user": current_user},
+            request=request,
+        )
+
+
 def setup_consumer_app_routes(app: FastAPI, config: ConsumerServerConfig) -> None:
     if config.auth_pages:
         app.include_router(auth_pages.auth_pages_api_router)
@@ -164,6 +209,8 @@ def setup_consumer_app_routes(app: FastAPI, config: ConsumerServerConfig) -> Non
         _setup_post_owner_actions_stub(app)
     if config.provider_profile_create_form:
         _setup_provider_profile_create_form_stub(app)
+    if config.provider_profile_edit_form:
+        _setup_provider_profile_edit_form_stub(app)
 
 
 def run_consumer_server_process(
