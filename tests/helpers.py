@@ -6,7 +6,15 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 # Need ORM models
-from src.models import ClientReferralDetail, ProviderAvailabilityDetail, User
+from src.models import (
+    ClientReferralDetail,
+    ProviderAvailabilityDetail,
+    ProviderCertification,
+    ProviderEducation,
+    ProviderLicensure,
+    ProviderProfile,
+    User,
+)
 
 
 def create_test_user(
@@ -105,6 +113,74 @@ def make_provider_availability_detail(**overrides: Any) -> ProviderAvailabilityD
     """Build a `ProviderAvailabilityDetail` ORM row with spec-compliant defaults."""
     return ProviderAvailabilityDetail(
         **{**_PROVIDER_AVAILABILITY_DEFAULTS, **overrides}
+    )
+
+
+# --- Provider profile + sub-table factories -------------------------------
+#
+# Defaults supply CHECK-constraint-valid values so tests that don't care
+# about credential specifics still produce inserts that pass DB-level
+# guards. The owning FK (`user_id` for profiles, `profile_id` for
+# sub-rows) is a required keyword-only parameter — making it required
+# turns "I forgot the FK" into a `TypeError` at the factory call site
+# instead of a `NOT NULL` violation at flush time.
+
+_PROVIDER_PROFILE_DEFAULTS: dict[str, Any] = {
+    "practice_name": "Acme Health",
+    "location_city": "Springfield",
+    "location_state": "IL",
+    "location_zip": "62701",
+    "in_person_sessions": "yes",
+    "virtual_sessions": "no",
+}
+
+_PROVIDER_LICENSURE_DEFAULTS: dict[str, Any] = {
+    "license_type": "lcsw",
+    "license_number": "L-12345",
+    "issuing_state": "IL",
+    "expiration_date": None,
+}
+
+_PROVIDER_EDUCATION_DEFAULTS: dict[str, Any] = {
+    "education_type": "msw",
+    "institution": "State University",
+    "month_completed": None,
+}
+
+_PROVIDER_CERTIFICATION_DEFAULTS: dict[str, Any] = {
+    "certification_type": "emdr",
+    "certifying_body": "EMDRIA",
+    "expiration_date": None,
+}
+
+
+def make_provider_profile(*, user_id: UUID, **overrides: Any) -> ProviderProfile:
+    """Build a `ProviderProfile` ORM row with CHECK-valid defaults."""
+    return ProviderProfile(
+        user_id=user_id, **{**_PROVIDER_PROFILE_DEFAULTS, **overrides}
+    )
+
+
+def make_provider_licensure(*, profile_id: UUID, **overrides: Any) -> ProviderLicensure:
+    """Build a `ProviderLicensure` ORM row with CHECK-valid defaults."""
+    return ProviderLicensure(
+        profile_id=profile_id, **{**_PROVIDER_LICENSURE_DEFAULTS, **overrides}
+    )
+
+
+def make_provider_education(*, profile_id: UUID, **overrides: Any) -> ProviderEducation:
+    """Build a `ProviderEducation` ORM row with CHECK-valid defaults."""
+    return ProviderEducation(
+        profile_id=profile_id, **{**_PROVIDER_EDUCATION_DEFAULTS, **overrides}
+    )
+
+
+def make_provider_certification(
+    *, profile_id: UUID, **overrides: Any
+) -> ProviderCertification:
+    """Build a `ProviderCertification` ORM row with CHECK-valid defaults."""
+    return ProviderCertification(
+        profile_id=profile_id, **{**_PROVIDER_CERTIFICATION_DEFAULTS, **overrides}
     )
 
 

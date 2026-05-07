@@ -5,6 +5,7 @@ from src.db import get_db_session
 
 from .audit_repository import AuditRepository
 from .post_repository import PostRepository
+from .provider_profile_repository import ProviderProfileRepository
 from .user_repository import UserRepository
 
 
@@ -27,3 +28,10 @@ def get_audit_repository(
 ) -> AuditRepository:
     """Dependency provider for AuditRepository."""
     return AuditRepository(session)
+
+
+def get_provider_profile_repository(
+    session: AsyncSession = Depends(get_db_session),
+) -> ProviderProfileRepository:
+    """Dependency provider for ProviderProfileRepository."""
+    return ProviderProfileRepository(session)
