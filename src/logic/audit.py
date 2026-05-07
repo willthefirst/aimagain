@@ -13,11 +13,20 @@ schema permits it.
 when wiring `record_audit` into a new mutation handler; never reuse an
 existing value for a different semantic — values are persisted forever and
 existing rows depend on the meaning being stable.
+
+`AuditedResource` bundles the three things that always vary together for a
+CRUD-shaped resource: the persisted `resource_type` string, the
+create/update/delete `AuditAction` triple, and the snapshotter that builds
+the row's `before`/`after` JSON. Declare one per audited resource alongside
+your `handle_*` definitions and call `record_audit_for(...)` instead of
+re-typing the three constants at every callsite. Non-CRUD audits (register,
+set-activation, etc.) keep using `record_audit(...)` directly.
 """
 
 import logging
+from dataclasses import dataclass
 from enum import Enum
-from typing import Any
+from typing import Any, Callable, Literal
 from uuid import UUID
 
 from src.models import AuditLog
@@ -54,6 +63,42 @@ class AuditAction(str, Enum):
     DELETE_CERTIFICATION = "delete_certification"
 
 
+Verb = Literal["create", "update", "delete"]
+
+
+@dataclass(frozen=True, slots=True)
+class AuditedResource:
+    """Declarative bundle for a CRUD-shaped audited resource.
+
+    Module-level constants are the intended use:
+
+        PROFILE = AuditedResource(
+            type="provider_profile",
+            snapshot=lambda obj: ProviderProfileAuditSnapshot
+                .model_validate(obj).model_dump(mode="json"),
+            create=AuditAction.CREATE_PROVIDER_PROFILE,
+            update=AuditAction.UPDATE_PROVIDER_PROFILE,
+            delete=AuditAction.DELETE_PROVIDER_PROFILE,
+        )
+
+    Each handler then calls `record_audit_for(audit_repo, resource=PROFILE,
+    verb="update", ...)` instead of typing `resource_type=`, `action=`, and
+    a per-resource `_snapshot_X` wrapper at every callsite.
+
+    `AuditAction` membership is intentionally *not* derived from this dataclass:
+    enum values are persisted forever and must stay explicit.
+    """
+
+    type: str
+    snapshot: Callable[[Any], dict[str, Any]]
+    create: AuditAction
+    update: AuditAction
+    delete: AuditAction
+
+    def action_for(self, verb: Verb) -> AuditAction:
+        return getattr(self, verb)
+
+
 async def record_audit(
     audit_repo: AuditRepository,
     *,
@@ -75,3 +120,27 @@ async def record_audit(
     )
     logger.info(f"Audit: actor={actor_id} {action.value} {resource_type}/{resource_id}")
     return row
+
+
+async def record_audit_for(
+    audit_repo: AuditRepository,
+    *,
+    resource: AuditedResource,
+    verb: Verb,
+    actor_id: UUID | None,
+    target_id: UUID,
+    before: dict[str, Any] | None = None,
+    after: dict[str, Any] | None = None,
+) -> AuditLog:
+    """Record an audit row for `resource` + `verb`, deriving `resource_type`
+    and `action` from the `AuditedResource` declaration. The caller still
+    supplies the snapshots and the actor."""
+    return await record_audit(
+        audit_repo,
+        actor_id=actor_id,
+        resource_type=resource.type,
+        resource_id=target_id,
+        action=resource.action_for(verb),
+        before=before,
+        after=after,
+    )
