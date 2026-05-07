@@ -19,6 +19,8 @@ import logging
 from typing import Any, Sequence
 from uuid import UUID
 
+from fastapi import Request
+
 from src.api.common.exceptions import BadRequestError, ForbiddenError, NotFoundError
 from src.logic.audit import AuditAction, record_audit
 from src.models import (
@@ -126,6 +128,14 @@ async def handle_get_my_profile(
     if profile is None:
         raise NotFoundError(detail="You do not have a provider profile yet")
     return profile
+
+
+async def handle_get_provider_profile_form(
+    request: Request,
+    requesting_user: User,
+) -> dict[str, Any]:
+    """Builds the template context for the create-provider-profile form."""
+    return {"request": request, "current_user": requesting_user}
 
 
 async def handle_create_profile(

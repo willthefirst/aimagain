@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{%- from "posts/_form_macros.html" import text_field, select_field -%}
+{% block title %}Create provider profile{% endblock %}
+{% block content %}
+<h1>Create provider profile</h1>
+<p>Practice details only. Add licensures, education, and certifications after creating the profile.</p>
+
+<form hx-post="/provider-profiles">
+  <fieldset>
+    <legend>Practice</legend>
+    {{ text_field("practice_name", "Practice name", maxlength=200) }}
+    {{ text_field("location_city", "City", maxlength=120) }}
+    {{ select_field("location_state", "State", US_STATES, placeholder=true) }}
+    {{ text_field("location_zip", "ZIP", pattern="\\d{5}", maxlength=5, title_case_ignore=true) }}
+  </fieldset>
+
+  <fieldset>
+    <legend>Session availability</legend>
+    {{ select_field("in_person_sessions", "In-person sessions", LOCATION_AVAILABILITY_OPTIONS, labels=LOCATION_AVAILABILITY_LABELS, placeholder=true, title_case_ignore=true) }}
+    {{ select_field("virtual_sessions", "Virtual sessions", LOCATION_AVAILABILITY_OPTIONS, labels=LOCATION_AVAILABILITY_LABELS, placeholder=true) }}
+  </fieldset>
+
+  <input type="submit" value="Create profile" />
+</form>
+
+<hr />
+<a href="/provider-profiles">Back to profiles</a>
+{% endblock %}

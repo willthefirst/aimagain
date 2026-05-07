@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response,
 from fastapi.responses import JSONResponse
 from pydantic import TypeAdapter, ValidationError
 
-from src.api.common import BaseRouter
+from src.api.common import APIResponse, BaseRouter
 from src.api.routes.posts import parse_form_to_payload
 from src.auth_config import current_active_user
 from src.logic.provider_profile_processing import (
@@ -19,6 +19,7 @@ from src.logic.provider_profile_processing import (
     handle_delete_profile,
     handle_get_my_profile,
     handle_get_profile,
+    handle_get_provider_profile_form,
     handle_list_profiles,
     handle_update_certification,
     handle_update_education,
@@ -154,6 +155,26 @@ async def get_my_profile(
     yet (profiles are not auto-created on registration)."""
     profile = await handle_get_my_profile(repo, user)
     return JSONResponse(content=_profile_read_dict(profile))
+
+
+# --- Form routes --------------------------------------------------------
+# Registered before `/{profile_id}` so the literal `form` is not parsed as a UUID.
+
+
+@router.get("/form")
+async def get_provider_profile_form(
+    request: Request,
+    user: User = Depends(current_active_user),
+):
+    """Renders the create-profile HTML form."""
+    context = await handle_get_provider_profile_form(
+        request=request, requesting_user=user
+    )
+    return APIResponse.html_response(
+        template_name="provider_profiles/new.html",
+        context=context,
+        request=request,
+    )
 
 
 # --- Profile item routes ------------------------------------------------

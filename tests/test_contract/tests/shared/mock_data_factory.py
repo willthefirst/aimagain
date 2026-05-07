@@ -140,3 +140,21 @@ class MockDataFactory:
         return {
             "src.api.routes.posts.handle_delete_post": {"return_value_config": None}
         }
+
+    @classmethod
+    def create_provider_profile_create_dependency_config(cls) -> Dict[str, Any]:
+        """Mock for `handle_create_profile`.
+
+        The route under test (`POST /provider-profiles`) reads `id` off
+        the handler's return value to build the response body and the
+        `Location` / `HX-Redirect` headers. A `SimpleNamespace` exposing
+        `id` is sufficient.
+        """
+        stub_profile = SimpleNamespace(
+            id=UUID("33333333-3333-3333-3333-333333333333"),
+        )
+        return {
+            "src.api.routes.provider_profiles.handle_create_profile": {
+                "return_value_config": stub_profile
+            }
+        }
