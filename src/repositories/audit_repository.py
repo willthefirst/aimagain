@@ -34,24 +34,20 @@ class AuditRepository(BaseRepository):
         The row's `created_at` (inherited from BaseModel) doubles as the
         audit `at` field — see `src/models/audit_log.py`.
         """
-        row = AuditLog(
-            actor_id=actor_id,
-            resource_type=resource_type,
-            resource_id=resource_id,
-            action=action,
-            before=before,
-            after=after,
+        return await self._persist_new(
+            AuditLog(
+                actor_id=actor_id,
+                resource_type=resource_type,
+                resource_id=resource_id,
+                action=action,
+                before=before,
+                after=after,
+            )
         )
-        self.session.add(row)
-        await self.session.flush()
-        await self.session.refresh(row)
-        return row
 
     async def get_by_id(self, audit_id: UUID) -> AuditLog | None:
         """Look up a single audit row. Primarily for tests."""
-        stmt = select(AuditLog).filter(AuditLog.id == audit_id)
-        result = await self.session.execute(stmt)
-        return result.scalars().first()
+        return await self._get_by_id(AuditLog, audit_id)
 
     async def list_for_resource(
         self, *, resource_type: str, resource_id: UUID
