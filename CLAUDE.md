@@ -88,7 +88,11 @@ Each entry should be issue-shaped:
 ### <one-line title>
 **Friction:** what slowed me down, with a concrete example.
 **Fix:** the specific change that would prevent it (file, command, config).
+**Why didn't existing patterns prevent this?** <one sentence — if an existing pattern *should* have prevented this and you didn't follow it, that's a class-of-bug signal>
+**Could this class recur elsewhere?** <name the audit you'd run, or write "no, one-off" — forces the audit step *before* filing>
 **Effort:** small / medium / large.
 ```
+
+The two middle fields are sorting questions, not approval gates. Most entries will answer "no existing pattern applies" and "no, one-off" in ten words and move on. The *signal* is when the answer to the first is "an existing pattern applies and I didn't follow it" — that's the fork between filing a doc note and filing a structural-prevention issue. The second field forces an audit before generalizing, so retro entries don't imply current bugs that don't actually exist.
 
 Cover the single biggest time sink, any missing/misleading tool or doc, and anything that worked unexpectedly well (so it gets repeated).
