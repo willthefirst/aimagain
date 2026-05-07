@@ -7,7 +7,7 @@ failure instead of a code-review catch.
 
 The check parses each `*_processing.py` in `src/logic/`, walks every
 `async def handle_*` function, and fails the test if the function calls
-`.commit()` without also calling `record_audit(...)`.
+`.commit()` without also calling `record_audit(...)` or `record_audit_for(...)`.
 
 Opt-out: add `audit-discipline-ignore` to the function's docstring with a
 brief reason. Use sparingly — the rule is the rule for a good reason.
@@ -71,7 +71,8 @@ HANDLERS = _all_handlers()
     ids=[f"{p.name}::{f.name}" for p, f in HANDLERS],
 )
 def test_handler_obeys_audit_discipline(path: Path, func: ast.AsyncFunctionDef) -> None:
-    """A `handle_*` that calls `.commit()` MUST also call `record_audit(...)`.
+    """A `handle_*` that calls `.commit()` MUST also call `record_audit(...)`
+    or `record_audit_for(...)`.
 
     The check is intentionally conservative — read-only handlers (no commit)
     pass trivially; mutation handlers without the audit call fail with a
@@ -81,16 +82,18 @@ def test_handler_obeys_audit_discipline(path: Path, func: ast.AsyncFunctionDef) 
         pytest.skip(f"{func.name} opted out via audit-discipline-ignore")
 
     commits = _has_call_named(func, "commit")
-    audits = _has_call_named(func, "record_audit")
+    audits = _has_call_named(func, "record_audit") or _has_call_named(
+        func, "record_audit_for"
+    )
 
     if commits and not audits:
         pytest.fail(
             f"{path.name}::{func.name} calls .commit() without record_audit. "
             "Mutation handlers MUST write an audit row in the same transaction "
-            "(RESOURCE_GRAMMAR.md:135). Either add a `record_audit(...)` call "
-            "before the commit, or — if this handler legitimately doesn't "
-            "mutate — annotate its docstring with `audit-discipline-ignore: "
-            "<reason>`."
+            "(RESOURCE_GRAMMAR.md:135). Either add a `record_audit(...)` or "
+            "`record_audit_for(...)` call before the commit, or — if this "
+            "handler legitimately doesn't mutate — annotate its docstring "
+            "with `audit-discipline-ignore: <reason>`."
         )
 
 
@@ -102,12 +105,15 @@ def test_check_finds_handlers() -> None:
 
 
 def test_at_least_one_handler_actually_audits() -> None:
-    """Sanity: at least one handler in the codebase calls record_audit.
-    If this fails, the import-graph or AST walk is broken — not a discipline
-    failure, a self-test failure.
+    """Sanity: at least one handler in the codebase calls record_audit
+    or record_audit_for. If this fails, the import-graph or AST walk is
+    broken — not a discipline failure, a self-test failure.
     """
     auditing = [
-        (path, func) for path, func in HANDLERS if _has_call_named(func, "record_audit")
+        (path, func)
+        for path, func in HANDLERS
+        if _has_call_named(func, "record_audit")
+        or _has_call_named(func, "record_audit_for")
     ]
     assert auditing, (
         "no handler calls record_audit — either the AST walk is broken or "
@@ -146,6 +152,18 @@ async def handle_good(repo, audit_repo, user):
 """)
     assert _has_call_named(good, "commit")
     assert _has_call_named(good, "record_audit")
+
+
+def test_check_approves_handler_that_uses_record_audit_for() -> None:
+    """The discipline check accepts the resource-flavored helper too."""
+    good = _parse_handler("""
+async def handle_good_for(repo, audit_repo, user):
+    await record_audit_for(audit_repo, resource=R, verb="update")
+    await repo.session.commit()
+    return None
+""")
+    assert _has_call_named(good, "commit")
+    assert _has_call_named(good, "record_audit_for")
 
 
 def test_check_skips_handler_with_opt_out_in_docstring() -> None:

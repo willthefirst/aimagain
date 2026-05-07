@@ -4,7 +4,7 @@ from uuid import UUID
 from fastapi import Request
 
 from src.api.common.exceptions import BadRequestError, ForbiddenError, NotFoundError
-from src.logic.audit import AuditAction, record_audit
+from src.logic.audit import AuditAction, AuditedResource, record_audit_for
 from src.models import REGISTERED_KINDS, Post, User
 from src.repositories.audit_repository import AuditRepository
 from src.repositories.post_repository import PostRepository
@@ -22,14 +22,13 @@ PostCreatePayload = ClientReferralCreate | ProviderAvailabilityCreate
 PostUpdatePayload = ClientReferralUpdate | ProviderAvailabilityUpdate
 
 
-def _snapshot_post(post: Post) -> dict:
-    """Capture the user-meaningful fields of a post for audit before/after.
-
-    The kind-specific projection lives in `src/schemas/post.py`; this is
-    a thin alias so callers don't reach into the schemas layer for an
-    audit-only helper.
-    """
-    return post_audit_snapshot(post)
+POST = AuditedResource(
+    type="post",
+    snapshot=post_audit_snapshot,
+    create=AuditAction.CREATE_POST,
+    update=AuditAction.UPDATE_POST,
+    delete=AuditAction.DELETE_POST,
+)
 
 
 async def handle_list_posts(
@@ -110,14 +109,14 @@ async def handle_create_post(
     detail = spec.detail_model(**{f: getattr(payload, f) for f in spec.detail_fields})
 
     created = await post_repo.create_post(post, detail)
-    await record_audit(
+    await record_audit_for(
         audit_repo,
+        resource=POST,
+        verb="create",
         actor_id=requesting_user.id,
-        resource_type="post",
-        resource_id=created.id,
-        action=AuditAction.CREATE_POST,
+        target_id=created.id,
         before=None,
-        after=_snapshot_post(created),
+        after=POST.snapshot(created),
     )
     await post_repo.session.commit()
     logger.info(f"Handler: user {requesting_user.id} created post {created.id}")
@@ -156,19 +155,19 @@ async def handle_update_post(
         )
 
     spec = REGISTERED_KINDS[payload.kind]
-    before = _snapshot_post(post)
+    before = POST.snapshot(post)
     updated = await post_repo.update_post(
         post,
         **{f: getattr(payload, f) for f in spec.detail_fields},
     )
-    await record_audit(
+    await record_audit_for(
         audit_repo,
+        resource=POST,
+        verb="update",
         actor_id=requesting_user.id,
-        resource_type="post",
-        resource_id=updated.id,
-        action=AuditAction.UPDATE_POST,
+        target_id=updated.id,
         before=before,
-        after=_snapshot_post(updated),
+        after=POST.snapshot(updated),
     )
     await post_repo.session.commit()
     logger.info(f"Handler: user {requesting_user.id} updated post {updated.id}")
@@ -195,14 +194,14 @@ async def handle_delete_post(
     if post.owner_id != requesting_user.id and not requesting_user.is_superuser:
         raise ForbiddenError(detail="Only the owner or an admin can delete this post")
 
-    before = _snapshot_post(post)
+    before = POST.snapshot(post)
     target_id = post.id
-    await record_audit(
+    await record_audit_for(
         audit_repo,
+        resource=POST,
+        verb="delete",
         actor_id=requesting_user.id,
-        resource_type="post",
-        resource_id=target_id,
-        action=AuditAction.DELETE_POST,
+        target_id=target_id,
         before=before,
         after=None,
     )

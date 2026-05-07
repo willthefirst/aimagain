@@ -20,9 +20,10 @@ from typing import Any, Sequence
 from uuid import UUID
 
 from fastapi import Request
+from pydantic import BaseModel
 
 from src.api.common.exceptions import BadRequestError, ForbiddenError, NotFoundError
-from src.logic.audit import AuditAction, record_audit
+from src.logic.audit import AuditAction, AuditedResource, record_audit_for
 from src.models import (
     ProviderCertification,
     ProviderEducation,
@@ -50,29 +51,47 @@ from src.schemas.provider_profile import (
 logger = logging.getLogger(__name__)
 
 
-# --- Snapshot helpers ----------------------------------------------------
+# --- Audited-resource declarations ---------------------------------------
 
 
-def _snapshot_profile(profile: ProviderProfile) -> dict[str, Any]:
-    return ProviderProfileAuditSnapshot.model_validate(profile).model_dump(mode="json")
+def _snap(schema_cls: type[BaseModel]):
+    """Build a snapshotter that validates an ORM row through the given
+    `*AuditSnapshot` schema and returns a JSON-mode dump."""
+
+    def _snapshot(obj: Any) -> dict[str, Any]:
+        return schema_cls.model_validate(obj).model_dump(mode="json")
+
+    return _snapshot
 
 
-def _snapshot_licensure(licensure: ProviderLicensure) -> dict[str, Any]:
-    return ProviderLicensureAuditSnapshot.model_validate(licensure).model_dump(
-        mode="json"
-    )
-
-
-def _snapshot_education(education: ProviderEducation) -> dict[str, Any]:
-    return ProviderEducationAuditSnapshot.model_validate(education).model_dump(
-        mode="json"
-    )
-
-
-def _snapshot_certification(cert: ProviderCertification) -> dict[str, Any]:
-    return ProviderCertificationAuditSnapshot.model_validate(cert).model_dump(
-        mode="json"
-    )
+PROFILE = AuditedResource(
+    type="provider_profile",
+    snapshot=_snap(ProviderProfileAuditSnapshot),
+    create=AuditAction.CREATE_PROVIDER_PROFILE,
+    update=AuditAction.UPDATE_PROVIDER_PROFILE,
+    delete=AuditAction.DELETE_PROVIDER_PROFILE,
+)
+LICENSURE = AuditedResource(
+    type="provider_licensure",
+    snapshot=_snap(ProviderLicensureAuditSnapshot),
+    create=AuditAction.CREATE_LICENSURE,
+    update=AuditAction.UPDATE_LICENSURE,
+    delete=AuditAction.DELETE_LICENSURE,
+)
+EDUCATION = AuditedResource(
+    type="provider_education",
+    snapshot=_snap(ProviderEducationAuditSnapshot),
+    create=AuditAction.CREATE_EDUCATION,
+    update=AuditAction.UPDATE_EDUCATION,
+    delete=AuditAction.DELETE_EDUCATION,
+)
+CERTIFICATION = AuditedResource(
+    type="provider_certification",
+    snapshot=_snap(ProviderCertificationAuditSnapshot),
+    create=AuditAction.CREATE_CERTIFICATION,
+    update=AuditAction.UPDATE_CERTIFICATION,
+    delete=AuditAction.DELETE_CERTIFICATION,
+)
 
 
 # --- Authorization helper ------------------------------------------------
@@ -186,14 +205,14 @@ async def handle_create_profile(
     for certification in payload.certifications:
         await repo.add_certification(created, **certification.model_dump())
 
-    await record_audit(
+    await record_audit_for(
         audit_repo,
+        resource=PROFILE,
+        verb="create",
         actor_id=requesting_user.id,
-        resource_type="provider_profile",
-        resource_id=created.id,
-        action=AuditAction.CREATE_PROVIDER_PROFILE,
+        target_id=created.id,
         before=None,
-        after=_snapshot_profile(created),
+        after=PROFILE.snapshot(created),
     )
     await repo.session.commit()
     logger.info(
@@ -213,18 +232,18 @@ async def handle_update_profile(
     profile = await _load_profile_or_404(profile_id, repo)
     _assert_can_mutate(profile, requesting_user)
 
-    before = _snapshot_profile(profile)
+    before = PROFILE.snapshot(profile)
     updated = await repo.update_profile(
         profile, **payload.model_dump(exclude_unset=True)
     )
-    await record_audit(
+    await record_audit_for(
         audit_repo,
+        resource=PROFILE,
+        verb="update",
         actor_id=requesting_user.id,
-        resource_type="provider_profile",
-        resource_id=updated.id,
-        action=AuditAction.UPDATE_PROVIDER_PROFILE,
+        target_id=updated.id,
         before=before,
-        after=_snapshot_profile(updated),
+        after=PROFILE.snapshot(updated),
     )
     await repo.session.commit()
     logger.info(
@@ -249,14 +268,14 @@ async def handle_delete_profile(
     profile = await _load_profile_or_404(profile_id, repo)
     _assert_can_mutate(profile, requesting_user)
 
-    before = _snapshot_profile(profile)
+    before = PROFILE.snapshot(profile)
     target_id = profile.id
-    await record_audit(
+    await record_audit_for(
         audit_repo,
+        resource=PROFILE,
+        verb="delete",
         actor_id=requesting_user.id,
-        resource_type="provider_profile",
-        resource_id=target_id,
-        action=AuditAction.DELETE_PROVIDER_PROFILE,
+        target_id=target_id,
         before=before,
         after=None,
     )
@@ -281,14 +300,14 @@ async def handle_create_licensure(
     _assert_can_mutate(profile, requesting_user)
 
     created = await repo.add_licensure(profile, **payload.model_dump())
-    await record_audit(
+    await record_audit_for(
         audit_repo,
+        resource=LICENSURE,
+        verb="create",
         actor_id=requesting_user.id,
-        resource_type="provider_licensure",
-        resource_id=created.id,
-        action=AuditAction.CREATE_LICENSURE,
+        target_id=created.id,
         before=None,
-        after=_snapshot_licensure(created),
+        after=LICENSURE.snapshot(created),
     )
     await repo.session.commit()
     return created
@@ -309,18 +328,18 @@ async def handle_update_licensure(
     if licensure is None or licensure.profile_id != profile.id:
         raise NotFoundError(detail="Licensure not found")
 
-    before = _snapshot_licensure(licensure)
+    before = LICENSURE.snapshot(licensure)
     updated = await repo.update_licensure(
         licensure, **payload.model_dump(exclude_unset=True)
     )
-    await record_audit(
+    await record_audit_for(
         audit_repo,
+        resource=LICENSURE,
+        verb="update",
         actor_id=requesting_user.id,
-        resource_type="provider_licensure",
-        resource_id=updated.id,
-        action=AuditAction.UPDATE_LICENSURE,
+        target_id=updated.id,
         before=before,
-        after=_snapshot_licensure(updated),
+        after=LICENSURE.snapshot(updated),
     )
     await repo.session.commit()
     return updated
@@ -340,14 +359,14 @@ async def handle_delete_licensure(
     if licensure is None or licensure.profile_id != profile.id:
         raise NotFoundError(detail="Licensure not found")
 
-    before = _snapshot_licensure(licensure)
+    before = LICENSURE.snapshot(licensure)
     target_id = licensure.id
-    await record_audit(
+    await record_audit_for(
         audit_repo,
+        resource=LICENSURE,
+        verb="delete",
         actor_id=requesting_user.id,
-        resource_type="provider_licensure",
-        resource_id=target_id,
-        action=AuditAction.DELETE_LICENSURE,
+        target_id=target_id,
         before=before,
         after=None,
     )
@@ -369,14 +388,14 @@ async def handle_create_education(
     _assert_can_mutate(profile, requesting_user)
 
     created = await repo.add_education(profile, **payload.model_dump())
-    await record_audit(
+    await record_audit_for(
         audit_repo,
+        resource=EDUCATION,
+        verb="create",
         actor_id=requesting_user.id,
-        resource_type="provider_education",
-        resource_id=created.id,
-        action=AuditAction.CREATE_EDUCATION,
+        target_id=created.id,
         before=None,
-        after=_snapshot_education(created),
+        after=EDUCATION.snapshot(created),
     )
     await repo.session.commit()
     return created
@@ -397,18 +416,18 @@ async def handle_update_education(
     if education is None or education.profile_id != profile.id:
         raise NotFoundError(detail="Education entry not found")
 
-    before = _snapshot_education(education)
+    before = EDUCATION.snapshot(education)
     updated = await repo.update_education(
         education, **payload.model_dump(exclude_unset=True)
     )
-    await record_audit(
+    await record_audit_for(
         audit_repo,
+        resource=EDUCATION,
+        verb="update",
         actor_id=requesting_user.id,
-        resource_type="provider_education",
-        resource_id=updated.id,
-        action=AuditAction.UPDATE_EDUCATION,
+        target_id=updated.id,
         before=before,
-        after=_snapshot_education(updated),
+        after=EDUCATION.snapshot(updated),
     )
     await repo.session.commit()
     return updated
@@ -428,14 +447,14 @@ async def handle_delete_education(
     if education is None or education.profile_id != profile.id:
         raise NotFoundError(detail="Education entry not found")
 
-    before = _snapshot_education(education)
+    before = EDUCATION.snapshot(education)
     target_id = education.id
-    await record_audit(
+    await record_audit_for(
         audit_repo,
+        resource=EDUCATION,
+        verb="delete",
         actor_id=requesting_user.id,
-        resource_type="provider_education",
-        resource_id=target_id,
-        action=AuditAction.DELETE_EDUCATION,
+        target_id=target_id,
         before=before,
         after=None,
     )
@@ -457,14 +476,14 @@ async def handle_create_certification(
     _assert_can_mutate(profile, requesting_user)
 
     created = await repo.add_certification(profile, **payload.model_dump())
-    await record_audit(
+    await record_audit_for(
         audit_repo,
+        resource=CERTIFICATION,
+        verb="create",
         actor_id=requesting_user.id,
-        resource_type="provider_certification",
-        resource_id=created.id,
-        action=AuditAction.CREATE_CERTIFICATION,
+        target_id=created.id,
         before=None,
-        after=_snapshot_certification(created),
+        after=CERTIFICATION.snapshot(created),
     )
     await repo.session.commit()
     return created
@@ -485,18 +504,18 @@ async def handle_update_certification(
     if certification is None or certification.profile_id != profile.id:
         raise NotFoundError(detail="Certification not found")
 
-    before = _snapshot_certification(certification)
+    before = CERTIFICATION.snapshot(certification)
     updated = await repo.update_certification(
         certification, **payload.model_dump(exclude_unset=True)
     )
-    await record_audit(
+    await record_audit_for(
         audit_repo,
+        resource=CERTIFICATION,
+        verb="update",
         actor_id=requesting_user.id,
-        resource_type="provider_certification",
-        resource_id=updated.id,
-        action=AuditAction.UPDATE_CERTIFICATION,
+        target_id=updated.id,
         before=before,
-        after=_snapshot_certification(updated),
+        after=CERTIFICATION.snapshot(updated),
     )
     await repo.session.commit()
     return updated
@@ -516,14 +535,14 @@ async def handle_delete_certification(
     if certification is None or certification.profile_id != profile.id:
         raise NotFoundError(detail="Certification not found")
 
-    before = _snapshot_certification(certification)
+    before = CERTIFICATION.snapshot(certification)
     target_id = certification.id
-    await record_audit(
+    await record_audit_for(
         audit_repo,
+        resource=CERTIFICATION,
+        verb="delete",
         actor_id=requesting_user.id,
-        resource_type="provider_certification",
-        resource_id=target_id,
-        action=AuditAction.DELETE_CERTIFICATION,
+        target_id=target_id,
         before=before,
         after=None,
     )
