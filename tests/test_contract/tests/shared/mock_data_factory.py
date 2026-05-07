@@ -158,3 +158,36 @@ class MockDataFactory:
                 "return_value_config": stub_profile
             }
         }
+
+    @classmethod
+    def create_provider_profile_update_dependency_config(cls) -> Dict[str, Any]:
+        """Mock for `handle_update_profile`.
+
+        The route under test (`PATCH /provider-profiles/{id}`) packs the
+        handler's return value through `_profile_read_dict`, which calls
+        `ProviderProfileRead.model_validate` — so the stub must expose
+        every field that schema requires.
+        """
+        from datetime import datetime, timezone
+
+        now = datetime.now(timezone.utc)
+        stub_profile = SimpleNamespace(
+            id=UUID("44444444-4444-4444-4444-444444444444"),
+            user_id=UUID("00000000-0000-0000-0000-000000000004"),
+            created_at=now,
+            updated_at=now,
+            practice_name="Acme Counseling",
+            location_city="Brooklyn",
+            location_state="NY",
+            location_zip="11201",
+            in_person_sessions="yes",
+            virtual_sessions="please_contact",
+            licensures=[],
+            educations=[],
+            certifications=[],
+        )
+        return {
+            "src.api.routes.provider_profiles.handle_update_profile": {
+                "return_value_config": stub_profile
+            }
+        }
