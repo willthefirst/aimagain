@@ -18,6 +18,10 @@ from .post_kinds import (
     kind_check_sql,
 )
 from .provider_availability_detail import ProviderAvailabilityDetail
+from .provider_certification import ProviderCertification
+from .provider_education import ProviderEducation
+from .provider_licensure import ProviderLicensure
+from .provider_profile import ProviderProfile
 from .user import User
 
 __all__ = [
@@ -34,6 +38,10 @@ __all__ = [
     "LOCATION_AVAILABILITY_OPTIONS",
     "Post",
     "ProviderAvailabilityDetail",
+    "ProviderCertification",
+    "ProviderEducation",
+    "ProviderLicensure",
+    "ProviderProfile",
     "REGISTERED_KINDS",
     "US_STATES",
     "User",
