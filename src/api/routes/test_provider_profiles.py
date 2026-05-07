@@ -2,6 +2,7 @@ import uuid
 
 import pytest
 from httpx import AsyncClient
+from selectolax.parser import HTMLParser
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
@@ -557,3 +558,64 @@ async def test_create_certification_happy_path(
         )
         assert persisted is not None
         assert persisted.certifying_body == "Test Cert Body"
+
+
+# --- Create form page (GET /provider-profiles/form) ----------------------
+
+
+async def test_get_provider_profile_form_renders(
+    authenticated_client: AsyncClient,
+    logged_in_user: User,
+):
+    """`GET /provider-profiles/form` renders the create form posting to
+    the JSON API."""
+    response = await authenticated_client.get("/provider-profiles/form")
+    assert response.status_code == 200
+    tree = HTMLParser(response.text)
+    form = tree.css_first("form")
+    assert form is not None
+    assert form.attributes.get("hx-post") == "/provider-profiles"
+    # Required practice fields are present.
+    assert tree.css_first('input[name="practice_name"]') is not None
+    assert tree.css_first('input[name="location_city"]') is not None
+    assert tree.css_first('input[name="location_zip"]') is not None
+    # State select with all 51 entries (50 states + DC) plus a placeholder.
+    state_select = tree.css_first('select[name="location_state"]')
+    assert state_select is not None
+    state_options = state_select.css("option")
+    assert len(state_options) == 52  # 51 + placeholder
+    # Availability selects with three real options + placeholder.
+    in_person = tree.css_first('select[name="in_person_sessions"]')
+    virtual = tree.css_first('select[name="virtual_sessions"]')
+    assert in_person is not None
+    assert virtual is not None
+    assert len(in_person.css("option")) == 4
+    assert len(virtual.css("option")) == 4
+
+
+async def test_get_provider_profile_form_unauthenticated_redirects(
+    test_client: AsyncClient,
+):
+    response = await test_client.get(
+        "/provider-profiles/form",
+        headers={"accept": "text/html"},
+        follow_redirects=False,
+    )
+    assert response.status_code == 302
+    assert "/auth/login" in response.headers["location"]
+    assert "next=/provider-profiles/form" in response.headers["location"]
+
+
+async def test_form_route_does_not_shadow_get_by_id(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user: User,
+):
+    """A real UUID still hits the read-by-id route — `/form` is matched
+    only as the literal segment, not as a UUID path param."""
+    profile_id = await _seed_profile_for(
+        db_test_session_manager, user_id=logged_in_user.id
+    )
+    response = await authenticated_client.get(f"/provider-profiles/{profile_id}")
+    assert response.status_code == 200
+    assert response.json()["id"] == str(profile_id)

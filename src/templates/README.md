@@ -67,6 +67,7 @@ Templates use inheritance for consistent layout and feature-specific customizati
 | **auth/**  | Authentication pages   | login, register, forgot/reset password                                 |
 | **users/** | User management        | list, detail, `_admin_actions.html` partial (shared by list & detail)  |
 | **posts/** | Posts                  | list, detail, per-kind `new_<kind>.html` + `edit_<kind>.html` thin wrappers around `_<kind>_form.html` partials, `_form_macros.html` (shared field macros), `_owner_actions.html` partial (shared by detail) |
+| **provider_profiles/** | Provider profiles | `new.html` (create form). Imports field macros from `posts/_form_macros.html` rather than duplicating them. |
 | **me/**    | Personal/profile pages | user profile                                                           |
 
 ### Reusable partial convention
@@ -109,6 +110,8 @@ templates/
 │   ├── _provider_availability_form.html
 │   ├── _form_macros.html       # Shared field macros (text_field, select_field, …)
 │   └── _owner_actions.html     # Reusable owner-actions partial (Edit/Delete)
+├── provider_profiles/          # Provider profile templates
+│   └── new.html                # Create form (imports posts/_form_macros.html)
 └── me/                         # Personal user pages
     └── profile.html            # User's profile page
 ```

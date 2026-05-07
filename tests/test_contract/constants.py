@@ -20,12 +20,17 @@ STUB_POST_ID = uuid.UUID("22222222-2222-2222-2222-222222222222")
 POST_DELETE_API_PATH = f"/posts/{STUB_POST_ID}"
 POST_DETAIL_PAGE_PATH = f"/posts/{STUB_POST_ID}"
 
+# Provider-profile create form pact.
+PROVIDER_PROFILE_CREATE_API_PATH = "/provider-profiles"
+PROVIDER_PROFILE_CREATE_FORM_PAGE_PATH = "/provider-profiles/form"
+
 # Provider states
 PROVIDER_STATE_USER_DOES_NOT_EXIST = f"User {TEST_EMAIL} does not exist"
 PROVIDER_STATE_USER_EXISTS_AND_ACTIVE = f"User {TARGET_USER_ID} exists and is active"
 PROVIDER_STATE_POST_EXISTS_AND_OWNED = (
     f"Post {STUB_POST_ID} exists and is owned by the requester"
 )
+PROVIDER_STATE_USER_CAN_CREATE_PROFILE = "User can create a provider profile"
 
 # Consumer / provider Pact identifiers
 CONSUMER_NAME_REGISTRATION = "registration-form"
@@ -37,6 +42,9 @@ PROVIDER_NAME_USERS = "users-api"
 CONSUMER_NAME_POST_OWNER_ACTIONS = "post-owner-actions"
 PROVIDER_NAME_POSTS = "posts-api"
 
+CONSUMER_NAME_PROVIDER_PROFILE_CREATE_FORM = "provider-profile-create-form"
+PROVIDER_NAME_PROVIDER_PROFILES = "provider-profiles-api"
+
 # Timeouts
 NETWORK_TIMEOUT_MS = 500
 
@@ -44,3 +52,4 @@ NETWORK_TIMEOUT_MS = 500
 PACT_PORT_AUTH = 1234
 PACT_PORT_USER_ACTIVATION = 1235
 PACT_PORT_POST_DELETE = 1238
+PACT_PORT_PROVIDER_PROFILE_CREATE = 1239

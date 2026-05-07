@@ -42,11 +42,13 @@ class ConsumerServerConfig:
         auth_pages: bool = True,
         users_admin_actions: bool = False,
         posts_owner_actions: bool = False,
+        provider_profile_create_form: bool = False,
         mock_auth: bool = True,
     ):
         self.auth_pages = auth_pages
         self.users_admin_actions = users_admin_actions
         self.posts_owner_actions = posts_owner_actions
+        self.provider_profile_create_form = provider_profile_create_form
         self.mock_auth = mock_auth
 
 
@@ -127,6 +129,32 @@ def _setup_post_owner_actions_stub(app: FastAPI) -> None:
         )
 
 
+def _setup_provider_profile_create_form_stub(app: FastAPI) -> None:
+    """Mount a stub page that renders the real `provider_profiles/new.html`
+    template, so the create-form's HTMX submit is exercised without
+    needing a database. The contract surface is the form's `POST
+    /provider-profiles` request shape; what we render here is the same
+    template production code paths render.
+    """
+
+    class _StubAttrs:
+        def __init__(self, **kwargs):
+            self.__dict__.update(kwargs)
+
+    @app.get("/provider-profiles/form")
+    async def provider_profile_create_form_stub_page(request: Request):
+        current_user = _StubAttrs(
+            id=uuid.UUID("00000000-0000-0000-0000-000000000003"),
+            username="provider_user",
+            is_superuser=False,
+        )
+        return APIResponse.html_response(
+            template_name="provider_profiles/new.html",
+            context={"current_user": current_user},
+            request=request,
+        )
+
+
 def setup_consumer_app_routes(app: FastAPI, config: ConsumerServerConfig) -> None:
     if config.auth_pages:
         app.include_router(auth_pages.auth_pages_api_router)
@@ -134,6 +162,8 @@ def setup_consumer_app_routes(app: FastAPI, config: ConsumerServerConfig) -> Non
         _setup_users_admin_actions_stub(app)
     if config.posts_owner_actions:
         _setup_post_owner_actions_stub(app)
+    if config.provider_profile_create_form:
+        _setup_provider_profile_create_form_stub(app)
 
 
 def run_consumer_server_process(
