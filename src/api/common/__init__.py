@@ -11,6 +11,7 @@ from .exceptions import (
     UnauthorizedError,
     handle_fastapi_users_error,
 )
+from .forms import parse_form_to_payload, validate_or_422
 from .responses import APIResponse
 
 __all__ = [
@@ -25,4 +26,6 @@ __all__ = [
     "InternalServerError",
     "handle_fastapi_users_error",
     "BaseRouter",
+    "parse_form_to_payload",
+    "validate_or_422",
 ]

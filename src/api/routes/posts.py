@@ -2,11 +2,15 @@ import logging
 from typing import Literal
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
+from fastapi import APIRouter, Depends, Query, Request, Response, status
 from fastapi.responses import JSONResponse
-from pydantic import ValidationError
 
-from src.api.common import APIResponse, BaseRouter
+from src.api.common import (
+    APIResponse,
+    BaseRouter,
+    parse_form_to_payload,
+    validate_or_422,
+)
 from src.auth_config import current_active_user
 from src.logic.post_processing import (
     handle_create_post,
@@ -26,22 +30,6 @@ from src.schemas.post import post_create_adapter, post_update_adapter
 posts_api_router = APIRouter(prefix="/posts")
 router = BaseRouter(router=posts_api_router, default_tags=["posts"])
 logger = logging.getLogger(__name__)
-
-
-async def parse_form_to_payload(request: Request) -> dict:
-    """Parse form-encoded request body into a payload dict.
-
-    For form-encoded requests with multiple values for the same key
-    (e.g., desired_times, services from multiple checkboxes), returns
-    them as lists. Single values are returned as scalars.
-    """
-    form_data = await request.form()
-    payload = {}
-    for key in form_data:
-        values = form_data.getlist(key)
-        # If multiple values for same key, keep as list; single value as scalar
-        payload[key] = values if len(values) > 1 else values[0] if values else None
-    return payload
 
 
 def _patch_response_body(post) -> dict:
@@ -159,15 +147,7 @@ async def create_post(
     rejected with 422 by the schema.
     """
     payload_dict = await parse_form_to_payload(request)
-    try:
-        payload = post_create_adapter.validate_python(payload_dict)
-    except ValidationError as e:
-        # Convert Pydantic errors to JSON-serializable format
-        errors = [
-            {"loc": err["loc"], "msg": err["msg"], "type": err["type"]}
-            for err in e.errors()
-        ]
-        raise HTTPException(status_code=422, detail=errors)
+    payload = validate_or_422(post_create_adapter, payload_dict)
     created = await handle_create_post(
         payload=payload,
         post_repo=post_repo,
@@ -199,15 +179,7 @@ async def patch_post(
     The body must be form-encoded.
     """
     payload_dict = await parse_form_to_payload(request)
-    try:
-        payload = post_update_adapter.validate_python(payload_dict)
-    except ValidationError as e:
-        # Convert Pydantic errors to JSON-serializable format
-        errors = [
-            {"loc": err["loc"], "msg": err["msg"], "type": err["type"]}
-            for err in e.errors()
-        ]
-        raise HTTPException(status_code=422, detail=errors)
+    payload = validate_or_422(post_update_adapter, payload_dict)
     updated = await handle_update_post(
         post_id=post_id,
         payload=payload,

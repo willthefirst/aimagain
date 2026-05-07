@@ -1,12 +1,16 @@
 import logging
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
+from fastapi import APIRouter, Depends, Query, Request, Response, status
 from fastapi.responses import JSONResponse
-from pydantic import TypeAdapter, ValidationError
+from pydantic import TypeAdapter
 
-from src.api.common import APIResponse, BaseRouter
-from src.api.routes.posts import parse_form_to_payload
+from src.api.common import (
+    APIResponse,
+    BaseRouter,
+    parse_form_to_payload,
+    validate_or_422,
+)
 from src.auth_config import current_active_user
 from src.logic.provider_profile_processing import (
     handle_create_certification,
@@ -71,19 +75,6 @@ _certification_create_adapter: TypeAdapter = TypeAdapter(ProviderCertificationCr
 _certification_update_adapter: TypeAdapter = TypeAdapter(ProviderCertificationUpdate)
 
 
-def _validate_or_422(adapter: TypeAdapter, payload_dict: dict):
-    """Run a payload dict through a `TypeAdapter` and translate `ValidationError`
-    to the wire-shape 422 used by `src/api/routes/posts.py:155-167`."""
-    try:
-        return adapter.validate_python(payload_dict)
-    except ValidationError as e:
-        errors = [
-            {"loc": err["loc"], "msg": err["msg"], "type": err["type"]}
-            for err in e.errors()
-        ]
-        raise HTTPException(status_code=422, detail=errors)
-
-
 def _profile_read_dict(profile) -> dict:
     return ProviderProfileRead.model_validate(profile).model_dump(mode="json")
 
@@ -128,7 +119,7 @@ async def create_profile(
     """Creates the requesting user's provider profile. Form-encoded body. 400 if
     the user already has a profile (one-per-user uniqueness)."""
     payload_dict = await parse_form_to_payload(request)
-    payload = _validate_or_422(_profile_create_adapter, payload_dict)
+    payload = validate_or_422(_profile_create_adapter, payload_dict)
     created = await handle_create_profile(
         payload=payload,
         repo=repo,
@@ -227,7 +218,7 @@ async def patch_profile(
     """Partially updates the practice/availability fields. Owner-only; admins
     may edit any profile. Sub-entity lists are managed via their own routes."""
     payload_dict = await parse_form_to_payload(request)
-    payload = _validate_or_422(_profile_update_adapter, payload_dict)
+    payload = validate_or_422(_profile_update_adapter, payload_dict)
     updated = await handle_update_profile(
         profile_id=profile_id,
         payload=payload,
@@ -275,7 +266,7 @@ async def create_licensure(
     user: User = Depends(current_active_user),
 ):
     payload_dict = await parse_form_to_payload(request)
-    payload = _validate_or_422(_licensure_create_adapter, payload_dict)
+    payload = validate_or_422(_licensure_create_adapter, payload_dict)
     created = await handle_create_licensure(
         profile_id=profile_id,
         payload=payload,
@@ -302,7 +293,7 @@ async def patch_licensure(
     user: User = Depends(current_active_user),
 ):
     payload_dict = await parse_form_to_payload(request)
-    payload = _validate_or_422(_licensure_update_adapter, payload_dict)
+    payload = validate_or_422(_licensure_update_adapter, payload_dict)
     updated = await handle_update_licensure(
         profile_id=profile_id,
         licensure_id=licensure_id,
@@ -354,7 +345,7 @@ async def create_education(
     user: User = Depends(current_active_user),
 ):
     payload_dict = await parse_form_to_payload(request)
-    payload = _validate_or_422(_education_create_adapter, payload_dict)
+    payload = validate_or_422(_education_create_adapter, payload_dict)
     created = await handle_create_education(
         profile_id=profile_id,
         payload=payload,
@@ -381,7 +372,7 @@ async def patch_education(
     user: User = Depends(current_active_user),
 ):
     payload_dict = await parse_form_to_payload(request)
-    payload = _validate_or_422(_education_update_adapter, payload_dict)
+    payload = validate_or_422(_education_update_adapter, payload_dict)
     updated = await handle_update_education(
         profile_id=profile_id,
         education_id=education_id,
@@ -433,7 +424,7 @@ async def create_certification(
     user: User = Depends(current_active_user),
 ):
     payload_dict = await parse_form_to_payload(request)
-    payload = _validate_or_422(_certification_create_adapter, payload_dict)
+    payload = validate_or_422(_certification_create_adapter, payload_dict)
     created = await handle_create_certification(
         profile_id=profile_id,
         payload=payload,
@@ -460,7 +451,7 @@ async def patch_certification(
     user: User = Depends(current_active_user),
 ):
     payload_dict = await parse_form_to_payload(request)
-    payload = _validate_or_422(_certification_update_adapter, payload_dict)
+    payload = validate_or_422(_certification_update_adapter, payload_dict)
     updated = await handle_update_certification(
         profile_id=profile_id,
         certification_id=certification_id,
