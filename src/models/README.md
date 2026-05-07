@@ -280,9 +280,29 @@ class NewEntity(BaseModel):
     happened_at = Column(DateTime(timezone=True), nullable=False)  # With timezone
 ```
 
+### Issue: Missing parent-side relationship breaks flush ordering
+
+**Problem**: A model with a `ForeignKey` column but no `relationship()` may be flushed before its parent in a single-transaction seed, producing `FOREIGN KEY constraint failed` errors that look unrelated to ORM modeling.
+
+**Why**: SQLAlchemy's flush-ordering graph is built from `relationship()` declarations, not raw FK columns. Without a relationship at either end, the unit of work has no signal to flush parent before child. SQLite's `PRAGMA foreign_keys = ON` (set in `tests/fixtures.py`) then rejects the out-of-order INSERT.
+
+**Solution**: Add `relationship(...)` at one end of every domain-edge FK — either the child's many-to-one (`profile.user`) or the parent's collection (`user.profiles`); either is enough to fix flush ordering. The exception is denormalized historical references (e.g. `audit_log.actor_id`) — those go on the `ALLOWED_BARE_FKS` allowlist in `test_fk_relationship_coverage.py` with a one-line justification.
+
+```python
+# Bad - bare FK; flush order is undefined, single-transaction seeds may fail
+class ProviderProfile(BaseModel):
+    user_id = Column(Uuid(as_uuid=True), ForeignKey("users.id"), nullable=False)
+
+# Good - relationship covers the FK; flush order is parent-then-child
+class ProviderProfile(BaseModel):
+    user_id = Column(Uuid(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    user = relationship("User")
+```
+
 ## Tests
 
 - `test_post_kinds.py` — guards the `post_kinds` registry as the single source of truth: asserts `KIND_NAMES` matches the registry, the rendered `kind_check_sql()` matches what `Post.__table_args__` actually produces, the route's `Literal[*KIND_NAMES]` reflects the registry, the inverse `KIND_BY_DETAIL_MODEL` lookup is well-formed, the per-kind relationship-name convention holds, and `KindSpec.detail_fields` exactly matches the underlying detail model's column list (so the introspection-driven derivation can't silently drift from the schema). If a future change re-encodes the kind set inline somewhere, the relevant test here fails.
+- `test_fk_relationship_coverage.py` — guards against the flush-ordering trap above: walks every `ForeignKey` on every mapped class and asserts that at least one end declares a covering `relationship()`, or that the FK appears in the in-file `ALLOWED_BARE_FKS` allowlist with a one-line justification. The allowlist's value is the reason — that documentation is half the point.
 
 Most other model behavior is exercised indirectly through repository and route tests. Add `src/models/test_<model_name>.py` when a model carries non-trivial logic (computed fields, validators, custom `__init__`, etc.) that warrants direct coverage.
 
