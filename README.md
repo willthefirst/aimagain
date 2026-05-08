@@ -50,7 +50,6 @@ Every directory under `src/` has its own README describing what the layer does, 
 
 - [`alembic/README.md`](alembic/README.md) — database migrations
 - [`deployment/README.md`](deployment/README.md) — deployment procedures, including [bootstrapping the first admin user](deployment/README.md#bootstrapping-an-admin)
-- [`notes/README.md`](notes/README.md) — development notes and planning
 
 ## Prerequisites
 
@@ -115,4 +114,3 @@ For the layer responsibilities and dependency rules, see [`src/README.md`](src/R
 
 - **Issues**: GitHub issues for bug reports and feature requests
 - **Discussions**: GitHub discussions for questions and ideas
-- **Development planning**: [`notes/README.md`](notes/README.md)

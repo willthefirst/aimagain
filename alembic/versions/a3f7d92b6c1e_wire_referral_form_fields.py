@@ -1,7 +1,7 @@
 """wire client_referral and provider_availability form fields
 
 Extends the per-kind detail tables to cover the scalar (non-multi-select)
-fields from `notes/forms_spec.md`. Adds CHECK constraints for the
+fields from the intake forms. Adds CHECK constraints for the
 controlled-vocabulary columns (state, age group, etc.) so the DB-level
 universe of accepted values matches the Pydantic `Literal[*TUPLE]`s.
 
@@ -13,8 +13,8 @@ controlled vocabulary. Wire-layer validation prevents new rows from
 being created with sentinel values; the defaults only matter for
 backfilling pre-existing MVP test data.
 
-The multi-select fields from the spec (`desired_times`, `services`,
-`settings`) follow in a separate migration.
+The multi-select fields (`desired_times`, `services`, `settings`)
+follow in separate migrations.
 
 Revision ID: a3f7d92b6c1e
 Revises: c2d3e4f5a6b7

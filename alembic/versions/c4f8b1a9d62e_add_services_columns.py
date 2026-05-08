@@ -1,6 +1,6 @@
 """add services JSON columns to per-kind detail tables
 
-Adds the multi-select `services` field from `notes/forms_spec.md` to
+Adds the multi-select `services` field from the intake forms to
 both `client_referral_details` and `provider_availability_details`.
 Stored as a JSON array of `CLIENT_REFERRAL_SERVICES` tokens; vocabulary
 is enforced on the wire by Pydantic, mirroring the `desired_times`

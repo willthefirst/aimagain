@@ -206,8 +206,8 @@ post_read_adapter: TypeAdapter = TypeAdapter(PostRead)
 
 
 class ClientReferralCreate(BaseModel):
-    """Create payload for `kind='client_referral'`. Field set follows
-    [`notes/forms_spec.md`](../../notes/forms_spec.md) Form 1."""
+    """Create payload for `kind='client_referral'`. Field set follows the
+    client-referral intake form."""
 
     kind: Literal["client_referral"]
     location_city: StrippedText
@@ -228,7 +228,7 @@ class ClientReferralCreate(BaseModel):
 
 class ProviderAvailabilityCreate(BaseModel):
     """Create payload for `kind='provider_availability'`. Field set follows
-    [`notes/forms_spec.md`](../../notes/forms_spec.md) Form 2."""
+    the provider-availability intake form."""
 
     kind: Literal["provider_availability"]
     practice_name: StrippedText
@@ -249,7 +249,7 @@ class ProviderAvailabilityCreate(BaseModel):
     # Optional + default per spec — provider form's "non-English services"
     # is asymmetric with the client form's `language_preferred` (required,
     # also defaults to "no"). Both default to "no"; only the
-    # required-ness differs. See `notes/forms_spec.md` Sections 4 / 2.
+    # required-ness differs.
     non_english_services: Literal[*LANGUAGE_PREFERRED_OPTIONS] = "no"
     payment_situation: Literal[*INSURANCE_OPTIONS]
     sliding_scale: bool

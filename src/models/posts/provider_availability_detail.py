@@ -29,14 +29,13 @@ class ProviderAvailabilityDetail(Base):
     parent. CASCADE on the FK keeps the detail row in lockstep with the
     parent's lifecycle.
 
-    Field set follows [`notes/forms_spec.md`](../../notes/forms_spec.md)'s
-    Form 2. Enum-typed columns carry CHECK constraints rendered from the
+    Field set follows the provider-availability intake form.
+    Enum-typed columns carry CHECK constraints rendered from the
     tuples in `../enums.py` via `check_in_tuple_sql`. Where a concept
     appears on both forms (`location_state`, `in_person_sessions`/
     `virtual_sessions`, `age_group`, `non_english_services`,
     `payment_situation`) the column types and vocabularies match the
-    corresponding `client_referral_details` columns — see the spec's
-    "Field-name overlap" table.
+    corresponding `client_referral_details` columns.
 
     The three JSON multi-select columns (`desired_times`, `services`,
     `settings`) store `list[*]` of controlled-vocabulary tokens. Storing

@@ -1,7 +1,7 @@
 """add settings JSON column to provider_availability_details
 
-Adds the multi-select `settings` field from `notes/forms_spec.md` Form 2
-to `provider_availability_details` only. Stored as a JSON array of
+Adds the multi-select `settings` field from the provider-availability
+intake form to `provider_availability_details` only. Stored as a JSON array of
 `TREATMENT_SETTINGS` tokens (outpatient, iop, crisis_care, php,
 residential); vocabulary is enforced on the wire by Pydantic, mirroring
 the `services` and `desired_times` column shapes. Same rationale: SQL

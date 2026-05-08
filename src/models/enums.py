@@ -21,9 +21,7 @@ them in turn.
 
 The schema layer's `Literal[*TUPLE]` types are derived from the same
 tuples; the guardrail test `test_schema_literals_match_model_tuples`
-(in `src/schemas/test_post.py`) keeps them in lockstep. See
-[`../../notes/forms_spec.md`](../../notes/forms_spec.md) for the form
-spec these vocabularies feed.
+(in `src/schemas/posts/test_post.py`) keeps them in lockstep.
 """
 
 from typing import Final
