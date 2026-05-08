@@ -23,6 +23,7 @@ from fastapi import Request
 from pydantic import BaseModel
 
 from src.api.common.exceptions import ForbiddenError, NotFoundError
+from src.logic._authz import assert_owner_or_admin
 from src.logic.audit import AuditAction, AuditedResource, mutate
 from src.models import (
     Provider,
@@ -93,16 +94,6 @@ CERTIFICATION = AuditedResource(
     update=AuditAction.UPDATE_CERTIFICATION,
     delete=AuditAction.DELETE_CERTIFICATION,
 )
-
-
-# --- Authorization helper ------------------------------------------------
-
-
-def _assert_can_mutate(profile: Provider, user: User) -> None:
-    if profile.user_id != user.id and not user.is_superuser:
-        raise ForbiddenError(
-            detail="Only the profile owner or an admin can perform this action"
-        )
 
 
 async def _load_provider_or_404(
@@ -209,14 +200,16 @@ async def handle_get_provider_edit_form(
     requesting_user: User,
 ) -> dict[str, Any]:
     """Loads a profile for the edit-form page. 404 if missing, 403 if the
-    requester is neither owner nor admin (mirrors `_assert_can_mutate`).
+    requester is neither owner nor admin (mirrors `assert_owner_or_admin`).
 
     The repo's `get_by_id` eager-loads `licensures`, `educations`, and
     `certifications` via `lazy="selectin"`, so the template can render
     each sub-section without further queries.
     """
     profile = await _load_provider_or_404(provider_id, repo)
-    _assert_can_mutate(profile, requesting_user)
+    assert_owner_or_admin(
+        profile, requesting_user, owner_attr="user_id", action="modify this provider"
+    )
     return {"request": request, "profile": profile, "current_user": requesting_user}
 
 
@@ -266,7 +259,9 @@ async def handle_update_provider(
 ) -> Provider:
     """Patches practice/availability fields on the profile. Owner-or-admin only."""
     profile = await _load_provider_or_404(provider_id, repo)
-    _assert_can_mutate(profile, requesting_user)
+    assert_owner_or_admin(
+        profile, requesting_user, owner_attr="user_id", action="modify this provider"
+    )
 
     async with mutate(
         repo,
@@ -294,7 +289,9 @@ async def handle_delete_provider(
     durable record.
     """
     profile = await _load_provider_or_404(provider_id, repo)
-    _assert_can_mutate(profile, requesting_user)
+    assert_owner_or_admin(
+        profile, requesting_user, owner_attr="user_id", action="modify this provider"
+    )
 
     async with mutate(
         repo,
@@ -318,7 +315,9 @@ async def handle_create_licensure(
     requesting_user: User,
 ) -> ProviderLicensure:
     profile = await _load_provider_or_404(provider_id, repo)
-    _assert_can_mutate(profile, requesting_user)
+    assert_owner_or_admin(
+        profile, requesting_user, owner_attr="user_id", action="modify this provider"
+    )
 
     created = await repo.add_licensure(profile, **payload.model_dump())
     async with mutate(
@@ -342,7 +341,9 @@ async def handle_update_licensure(
     requesting_user: User,
 ) -> ProviderLicensure:
     profile = await _load_provider_or_404(provider_id, repo)
-    _assert_can_mutate(profile, requesting_user)
+    assert_owner_or_admin(
+        profile, requesting_user, owner_attr="user_id", action="modify this provider"
+    )
 
     licensure = await _load_subrow_or_404(
         repo.get_licensure_by_id, licensure_id, profile.id, name="Licensure"
@@ -367,7 +368,9 @@ async def handle_delete_licensure(
     requesting_user: User,
 ) -> None:
     profile = await _load_provider_or_404(provider_id, repo)
-    _assert_can_mutate(profile, requesting_user)
+    assert_owner_or_admin(
+        profile, requesting_user, owner_attr="user_id", action="modify this provider"
+    )
 
     licensure = await _load_subrow_or_404(
         repo.get_licensure_by_id, licensure_id, profile.id, name="Licensure"
@@ -394,7 +397,9 @@ async def handle_create_education(
     requesting_user: User,
 ) -> ProviderEducation:
     profile = await _load_provider_or_404(provider_id, repo)
-    _assert_can_mutate(profile, requesting_user)
+    assert_owner_or_admin(
+        profile, requesting_user, owner_attr="user_id", action="modify this provider"
+    )
 
     created = await repo.add_education(profile, **payload.model_dump())
     async with mutate(
@@ -418,7 +423,9 @@ async def handle_update_education(
     requesting_user: User,
 ) -> ProviderEducation:
     profile = await _load_provider_or_404(provider_id, repo)
-    _assert_can_mutate(profile, requesting_user)
+    assert_owner_or_admin(
+        profile, requesting_user, owner_attr="user_id", action="modify this provider"
+    )
 
     education = await _load_subrow_or_404(
         repo.get_education_by_id, education_id, profile.id, name="Education entry"
@@ -443,7 +450,9 @@ async def handle_delete_education(
     requesting_user: User,
 ) -> None:
     profile = await _load_provider_or_404(provider_id, repo)
-    _assert_can_mutate(profile, requesting_user)
+    assert_owner_or_admin(
+        profile, requesting_user, owner_attr="user_id", action="modify this provider"
+    )
 
     education = await _load_subrow_or_404(
         repo.get_education_by_id, education_id, profile.id, name="Education entry"
@@ -470,7 +479,9 @@ async def handle_create_certification(
     requesting_user: User,
 ) -> ProviderCertification:
     profile = await _load_provider_or_404(provider_id, repo)
-    _assert_can_mutate(profile, requesting_user)
+    assert_owner_or_admin(
+        profile, requesting_user, owner_attr="user_id", action="modify this provider"
+    )
 
     created = await repo.add_certification(profile, **payload.model_dump())
     async with mutate(
@@ -494,7 +505,9 @@ async def handle_update_certification(
     requesting_user: User,
 ) -> ProviderCertification:
     profile = await _load_provider_or_404(provider_id, repo)
-    _assert_can_mutate(profile, requesting_user)
+    assert_owner_or_admin(
+        profile, requesting_user, owner_attr="user_id", action="modify this provider"
+    )
 
     certification = await _load_subrow_or_404(
         repo.get_certification_by_id,
@@ -524,7 +537,9 @@ async def handle_delete_certification(
     requesting_user: User,
 ) -> None:
     profile = await _load_provider_or_404(provider_id, repo)
-    _assert_can_mutate(profile, requesting_user)
+    assert_owner_or_admin(
+        profile, requesting_user, owner_attr="user_id", action="modify this provider"
+    )
 
     certification = await _load_subrow_or_404(
         repo.get_certification_by_id,
