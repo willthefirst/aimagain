@@ -4,7 +4,7 @@
 <h1>Users</h1>
 
 {% if users %}
-<ul>
+<ul id="user-list">
   {% for user in users %}
   <li{% if not user.is_active %} class="deactivated"{% endif %}>
     <a href="/users/{{ user.id }}">{{ user.username }}</a>
