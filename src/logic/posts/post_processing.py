@@ -34,7 +34,7 @@ POST = AuditedResource(
 
 async def handle_list_posts(
     request: Request,
-    post_repo: PostRepository,
+    repo: PostRepository,
     requesting_user: User,
 ):
     """Loads all posts (newest first) and returns the template context.
@@ -42,7 +42,7 @@ async def handle_list_posts(
     Includes the registered post kinds in the context so the list page
     can render its per-kind "New X" links from a single source of truth.
     """
-    posts = await post_repo.list_posts()
+    posts = await repo.list_posts()
     return {
         "request": request,
         "posts": posts,
@@ -54,11 +54,11 @@ async def handle_list_posts(
 async def handle_get_post_detail(
     request: Request,
     post_id: UUID,
-    post_repo: PostRepository,
+    repo: PostRepository,
     requesting_user: User,
 ):
     """Loads a single post for the detail page; 404s if missing."""
-    post = await post_repo.get_post_by_id(post_id)
+    post = await repo.get_post_by_id(post_id)
     if post is None:
         raise NotFoundError(detail="Post not found")
 
@@ -76,12 +76,12 @@ async def handle_get_post_form(
 async def handle_get_post_edit_form(
     request: Request,
     post_id: UUID,
-    post_repo: PostRepository,
+    repo: PostRepository,
     requesting_user: User,
 ):
     """Loads a post for the edit-form page. 404 if missing, 403 if the
     requester is neither owner nor admin (mirrors `handle_update_post`)."""
-    post = await post_repo.get_post_by_id(post_id)
+    post = await repo.get_post_by_id(post_id)
     if post is None:
         raise NotFoundError(detail="Post not found")
 
@@ -92,7 +92,7 @@ async def handle_get_post_edit_form(
 
 async def handle_create_post(
     payload: PostCreatePayload,
-    post_repo: PostRepository,
+    repo: PostRepository,
     audit_repo: AuditRepository,
     requesting_user: User,
 ) -> Post:
@@ -108,9 +108,9 @@ async def handle_create_post(
     post = Post(kind=payload.kind, owner_id=requesting_user.id)
     detail = spec.detail_model(**{f: getattr(payload, f) for f in spec.detail_fields})
 
-    created = await post_repo.create_post(post, detail)
+    created = await repo.create_post(post, detail)
     async with mutate(
-        post_repo,
+        repo,
         audit_repo,
         actor=requesting_user,
         target=created,
@@ -124,7 +124,7 @@ async def handle_create_post(
 async def handle_update_post(
     post_id: UUID,
     payload: PostUpdatePayload,
-    post_repo: PostRepository,
+    repo: PostRepository,
     audit_repo: AuditRepository,
     requesting_user: User,
 ) -> Post:
@@ -137,7 +137,7 @@ async def handle_update_post(
     via PATCH. 404 if missing, 403 if not authorized, 400 on kind
     mismatch. Per-kind field set comes from `REGISTERED_KINDS`.
     """
-    post = await post_repo.get_post_by_id(post_id)
+    post = await repo.get_post_by_id(post_id)
     if post is None:
         raise NotFoundError(detail="Post not found")
 
@@ -153,14 +153,14 @@ async def handle_update_post(
 
     spec = REGISTERED_KINDS[payload.kind]
     async with mutate(
-        post_repo,
+        repo,
         audit_repo,
         actor=requesting_user,
         target=post,
         resource=POST,
         verb="update",
     ):
-        await post_repo.update_post(
+        await repo.update_post(
             post,
             **{f: getattr(payload, f) for f in spec.detail_fields},
         )
@@ -169,7 +169,7 @@ async def handle_update_post(
 
 async def handle_delete_post(
     post_id: UUID,
-    post_repo: PostRepository,
+    repo: PostRepository,
     audit_repo: AuditRepository,
     requesting_user: User,
 ) -> None:
@@ -180,18 +180,18 @@ async def handle_delete_post(
 
     404 if missing, 403 if not authorized.
     """
-    post = await post_repo.get_post_by_id(post_id)
+    post = await repo.get_post_by_id(post_id)
     if post is None:
         raise NotFoundError(detail="Post not found")
 
     assert_owner_or_admin(post, requesting_user, action="delete this post")
 
     async with mutate(
-        post_repo,
+        repo,
         audit_repo,
         actor=requesting_user,
         target=post,
         resource=POST,
         verb="delete",
     ):
-        await post_repo.delete_post(post)
+        await repo.delete_post(post)

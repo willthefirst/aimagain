@@ -58,7 +58,7 @@ async def list_posts(
     """
     context = await handle_list_posts(
         request=request,
-        post_repo=post_repo,
+        repo=post_repo,
         requesting_user=user,
     )
     return APIResponse.html_response(
@@ -102,7 +102,7 @@ async def get_post_edit_form(
     context = await handle_get_post_edit_form(
         request=request,
         post_id=post_id,
-        post_repo=post_repo,
+        repo=post_repo,
         requesting_user=user,
     )
     post_kind = context["post"].kind
@@ -125,7 +125,7 @@ async def get_post(
     context = await handle_get_post_detail(
         request=request,
         post_id=post_id,
-        post_repo=post_repo,
+        repo=post_repo,
         requesting_user=user,
     )
     return APIResponse.html_response(
@@ -150,7 +150,7 @@ async def create_post(
     payload = await parse_and_validate_form(request, post_create_adapter)
     created = await handle_create_post(
         payload=payload,
-        post_repo=post_repo,
+        repo=post_repo,
         audit_repo=audit_repo,
         requesting_user=user,
     )
@@ -177,7 +177,7 @@ async def patch_post(
     updated = await handle_update_post(
         post_id=post_id,
         payload=payload,
-        post_repo=post_repo,
+        repo=post_repo,
         audit_repo=audit_repo,
         requesting_user=user,
     )
@@ -199,7 +199,7 @@ async def delete_post(
     """
     await handle_delete_post(
         post_id=post_id,
-        post_repo=post_repo,
+        repo=post_repo,
         audit_repo=audit_repo,
         requesting_user=user,
     )
