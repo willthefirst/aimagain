@@ -22,7 +22,7 @@ from uuid import UUID
 from fastapi import Request
 from pydantic import BaseModel
 
-from src.api.common.exceptions import BadRequestError, ForbiddenError, NotFoundError
+from src.api.common.exceptions import ForbiddenError, NotFoundError
 from src.logic.audit import AuditAction, AuditedResource, mutate
 from src.models import (
     ProviderCertification,
@@ -209,18 +209,13 @@ async def handle_create_profile(
     audit_repo: AuditRepository,
     requesting_user: User,
 ) -> ProviderProfile:
-    """Creates the requesting user's profile plus any inline credential sub-rows.
-
-    400 if the user already has a profile (the `uq_provider_profiles_user_id`
-    constraint would catch this at the DB; we surface a clean message
-    instead of an integrity error). One `CREATE_PROVIDER_PROFILE` audit row
-    is written whose `after` snapshot includes the inline sub-rows — the
-    snapshot schema embeds the nested credential lists, so a single row
-    captures the full create.
+    """Creates a profile owned by the requesting user plus any inline
+    credential sub-rows. A user may own zero, one, or many profiles —
+    nothing here rejects a second create. One `CREATE_PROVIDER_PROFILE`
+    audit row is written whose `after` snapshot includes the inline
+    sub-rows — the snapshot schema embeds the nested credential lists,
+    so a single row captures the full create.
     """
-    if await repo.get_by_user_id(requesting_user.id) is not None:
-        raise BadRequestError(detail="User already has a provider profile")
-
     profile_fields = payload.model_dump(
         exclude={"licensures", "educations", "certifications"}
     )
