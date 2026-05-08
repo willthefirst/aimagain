@@ -613,15 +613,12 @@ class TitleCaseChecker:
         values. Inline ``style="..."`` is invisible here because ``style``
         isn't in ``LINTABLE_ATTR_NAMES``; ``<script>``/``<style>`` subtrees
         are skipped by ``NEVER_DESCEND_TAGS``.
-        """
-        if HTMLParser is None:
-            print(
-                f"Warning: selectolax is not installed; cannot parse {file_path}. "
-                "Install with: pip install selectolax",
-                file=sys.stderr,
-            )
-            return []
 
+        Callers must ensure ``selectolax`` is importable before invoking
+        this — the CLI guards in ``main()``. Per-file warn-and-skip used
+        to live here and silently masked missing-dep environments
+        (regression #198).
+        """
         stripped_content = self._strip_jinja(content)
 
         try:
@@ -994,6 +991,19 @@ Exception handling:
     )
 
     args = parser.parse_args()
+
+    if HTMLParser is None:
+        # Hard-fail rather than warn-and-skip per file: a missing parser
+        # used to cause every HTML/Jinja template to be silently skipped,
+        # so a real violation could pass `dev lint` locally and only
+        # surface in CI (#198).
+        print(
+            "Error: selectolax is not installed in this interpreter "
+            f"({sys.executable}). HTML/Jinja templates cannot be checked. "
+            "Install with: pip install selectolax",
+            file=sys.stderr,
+        )
+        return 1
 
     # --check-only overrides --fix
     fix_mode = args.fix and not args.check_only
