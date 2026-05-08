@@ -5,16 +5,52 @@ contract is the kwargs they pass, not the internals of the repo.
 """
 
 import uuid
+from datetime import datetime
 
 import pytest
+from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from src.logic.audit import AuditAction, AuditedResource, mutate, record_audit
+from src.logic.audit import (
+    AuditAction,
+    AuditedResource,
+    make_snapshotter,
+    mutate,
+    record_audit,
+)
 from src.repositories.audit_repository import AuditRepository
 from src.repositories.posts.post_repository import PostRepository
 from tests.helpers import create_test_user
 
 pytestmark = pytest.mark.asyncio
+
+
+class _ExampleSnapshot(BaseModel):
+    id: uuid.UUID
+    name: str
+    when: datetime
+
+    model_config = {"from_attributes": True}
+
+
+def test_make_snapshotter_returns_json_mode_dict():
+    """The snapshotter validates an ORM-shaped object and returns a dict
+    whose datetime/uuid values are serialized as strings (JSON mode)."""
+
+    class _Row:
+        def __init__(self):
+            self.id = uuid.uuid4()
+            self.name = "foo"
+            self.when = datetime(2026, 1, 1, 12, 0, 0)
+
+    row = _Row()
+    snap = make_snapshotter(_ExampleSnapshot)(row)
+
+    assert snap == {
+        "id": str(row.id),
+        "name": "foo",
+        "when": "2026-01-01T12:00:00",
+    }
 
 
 async def test_record_audit_round_trips_through_repo(

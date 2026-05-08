@@ -6,7 +6,7 @@ from fastapi_users import models
 from fastapi_users.manager import BaseUserManager, UserManagerDependency
 
 from src.auth_config import get_user_manager
-from src.logic.audit import AuditAction, record_audit
+from src.logic.audit import AuditAction, make_snapshotter, record_audit
 from src.repositories.audit_repository import AuditRepository
 from src.repositories.dependencies import get_audit_repository
 from src.schemas.users.user import UserAuditSnapshot, UserCreate, UserRead
@@ -14,6 +14,8 @@ from src.schemas.users.user import UserAuditSnapshot, UserCreate, UserRead
 logger = logging.getLogger(__name__)
 
 AppUserManager = UserManagerDependency[models.UP, models.ID]
+
+_snapshot_user = make_snapshotter(UserAuditSnapshot)
 
 
 async def handle_registration(
@@ -41,7 +43,7 @@ async def handle_registration(
         resource_id=created_user.id,
         action=AuditAction.REGISTER,
         before=None,
-        after=UserAuditSnapshot.model_validate(created_user).model_dump(mode="json"),
+        after=_snapshot_user(created_user),
     )
     await audit_repo.session.commit()
     return created_user

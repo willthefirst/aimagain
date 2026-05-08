@@ -4,7 +4,7 @@ from uuid import UUID
 from fastapi import Request
 
 from src.api.common.exceptions import ForbiddenError, NotFoundError
-from src.logic.audit import AuditAction, record_audit
+from src.logic.audit import AuditAction, make_snapshotter, record_audit
 from src.models import User
 from src.repositories.audit_repository import AuditRepository
 from src.repositories.providers.provider_repository import ProviderRepository
@@ -17,21 +17,8 @@ from src.schemas.users.user import (
 
 logger = logging.getLogger(__name__)
 
-
-def _snapshot_user_activation(user: User) -> dict:
-    """Capture just the activation axis for audit before/after.
-
-    Field set is defined by `UserActivationAuditSnapshot`.
-    """
-    return UserActivationAuditSnapshot.model_validate(user).model_dump(mode="json")
-
-
-def _snapshot_user(user: User) -> dict:
-    """Capture user-meaningful fields for `delete_user` audit `before`.
-
-    Field set is defined by `UserAuditSnapshot`.
-    """
-    return UserAuditSnapshot.model_validate(user).model_dump(mode="json")
+_snapshot_user_activation = make_snapshotter(UserActivationAuditSnapshot)
+_snapshot_user = make_snapshotter(UserAuditSnapshot)
 
 
 async def handle_list_users(
