@@ -11,6 +11,11 @@ from src.api.common import (
     parse_and_validate_form,
     updated_response,
 )
+from src.api.common.subresource_routes import (
+    SubresourceDeps,
+    SubresourceSpec,
+    register_subresource_routes,
+)
 from src.auth_config import current_active_user
 from src.logic.providers.provider_processing import (
     handle_create_certification,
@@ -226,214 +231,59 @@ async def delete_provider(
     return deleted_response(hx_redirect="/providers")
 
 
-# --- Licensure sub-resource ---------------------------------------------
+# --- Sub-resource CRUD (licensure / education / certification) ----------
+# Three near-identical CRUD blocks live in src/api/common/subresource_routes.py
+# and are mounted via register_subresource_routes; per-sub-resource knobs
+# (path segment, schemas, handlers, child-id kwarg name) live in the specs
+# below.
 
-
-@router.post("/{provider_id}/licensures", status_code=status.HTTP_201_CREATED)
-async def create_licensure(
-    provider_id: UUID,
-    request: Request,
-    repo: ProviderRepository = Depends(get_provider_repository),
-    audit_repo: AuditRepository = Depends(get_audit_repository),
-    user: User = Depends(current_active_user),
-):
-    payload = await parse_and_validate_form(request, licensure_create_adapter)
-    created = await handle_create_licensure(
-        provider_id=provider_id,
-        payload=payload,
-        repo=repo,
-        audit_repo=audit_repo,
-        requesting_user=user,
-    )
-    return created_response(
-        id=created.id,
-        location=f"/providers/{provider_id}",
-        hx_redirect=f"/providers/{provider_id}/form",
-    )
-
-
-@router.patch("/{provider_id}/licensures/{licensure_id}")
-async def patch_licensure(
-    provider_id: UUID,
-    licensure_id: UUID,
-    request: Request,
-    repo: ProviderRepository = Depends(get_provider_repository),
-    audit_repo: AuditRepository = Depends(get_audit_repository),
-    user: User = Depends(current_active_user),
-):
-    payload = await parse_and_validate_form(request, licensure_update_adapter)
-    updated = await handle_update_licensure(
-        provider_id=provider_id,
-        licensure_id=licensure_id,
-        payload=payload,
-        repo=repo,
-        audit_repo=audit_repo,
-        requesting_user=user,
-    )
-    return updated_response(
-        body=_licensure_read_dict(updated),
-        hx_redirect=f"/providers/{provider_id}/form",
-    )
-
-
-@router.delete(
-    "/{provider_id}/licensures/{licensure_id}",
-    status_code=status.HTTP_204_NO_CONTENT,
+_provider_subresource_deps = SubresourceDeps(
+    repo=get_provider_repository,
+    audit_repo=get_audit_repository,
+    user=current_active_user,
 )
-async def delete_licensure(
-    provider_id: UUID,
-    licensure_id: UUID,
-    repo: ProviderRepository = Depends(get_provider_repository),
-    audit_repo: AuditRepository = Depends(get_audit_repository),
-    user: User = Depends(current_active_user),
-):
-    await handle_delete_licensure(
-        provider_id=provider_id,
-        licensure_id=licensure_id,
-        repo=repo,
-        audit_repo=audit_repo,
-        requesting_user=user,
-    )
-    return deleted_response(hx_redirect=f"/providers/{provider_id}/form")
 
-
-# --- Education sub-resource ---------------------------------------------
-
-
-@router.post("/{provider_id}/educations", status_code=status.HTTP_201_CREATED)
-async def create_education(
-    provider_id: UUID,
-    request: Request,
-    repo: ProviderRepository = Depends(get_provider_repository),
-    audit_repo: AuditRepository = Depends(get_audit_repository),
-    user: User = Depends(current_active_user),
-):
-    payload = await parse_and_validate_form(request, education_create_adapter)
-    created = await handle_create_education(
-        provider_id=provider_id,
-        payload=payload,
-        repo=repo,
-        audit_repo=audit_repo,
-        requesting_user=user,
-    )
-    return created_response(
-        id=created.id,
-        location=f"/providers/{provider_id}",
-        hx_redirect=f"/providers/{provider_id}/form",
-    )
-
-
-@router.patch("/{provider_id}/educations/{education_id}")
-async def patch_education(
-    provider_id: UUID,
-    education_id: UUID,
-    request: Request,
-    repo: ProviderRepository = Depends(get_provider_repository),
-    audit_repo: AuditRepository = Depends(get_audit_repository),
-    user: User = Depends(current_active_user),
-):
-    payload = await parse_and_validate_form(request, education_update_adapter)
-    updated = await handle_update_education(
-        provider_id=provider_id,
-        education_id=education_id,
-        payload=payload,
-        repo=repo,
-        audit_repo=audit_repo,
-        requesting_user=user,
-    )
-    return updated_response(
-        body=_education_read_dict(updated),
-        hx_redirect=f"/providers/{provider_id}/form",
-    )
-
-
-@router.delete(
-    "/{provider_id}/educations/{education_id}",
-    status_code=status.HTTP_204_NO_CONTENT,
+register_subresource_routes(
+    router,
+    SubresourceSpec(
+        collection="licensures",
+        child_id_param="licensure_id",
+        create_adapter=licensure_create_adapter,
+        update_adapter=licensure_update_adapter,
+        read_to_dict=_licensure_read_dict,
+        create_handler=handle_create_licensure,
+        update_handler=handle_update_licensure,
+        delete_handler=handle_delete_licensure,
+    ),
+    deps=_provider_subresource_deps,
 )
-async def delete_education(
-    provider_id: UUID,
-    education_id: UUID,
-    repo: ProviderRepository = Depends(get_provider_repository),
-    audit_repo: AuditRepository = Depends(get_audit_repository),
-    user: User = Depends(current_active_user),
-):
-    await handle_delete_education(
-        provider_id=provider_id,
-        education_id=education_id,
-        repo=repo,
-        audit_repo=audit_repo,
-        requesting_user=user,
-    )
-    return deleted_response(hx_redirect=f"/providers/{provider_id}/form")
 
-
-# --- Certification sub-resource -----------------------------------------
-
-
-@router.post("/{provider_id}/certifications", status_code=status.HTTP_201_CREATED)
-async def create_certification(
-    provider_id: UUID,
-    request: Request,
-    repo: ProviderRepository = Depends(get_provider_repository),
-    audit_repo: AuditRepository = Depends(get_audit_repository),
-    user: User = Depends(current_active_user),
-):
-    payload = await parse_and_validate_form(request, certification_create_adapter)
-    created = await handle_create_certification(
-        provider_id=provider_id,
-        payload=payload,
-        repo=repo,
-        audit_repo=audit_repo,
-        requesting_user=user,
-    )
-    return created_response(
-        id=created.id,
-        location=f"/providers/{provider_id}",
-        hx_redirect=f"/providers/{provider_id}/form",
-    )
-
-
-@router.patch("/{provider_id}/certifications/{certification_id}")
-async def patch_certification(
-    provider_id: UUID,
-    certification_id: UUID,
-    request: Request,
-    repo: ProviderRepository = Depends(get_provider_repository),
-    audit_repo: AuditRepository = Depends(get_audit_repository),
-    user: User = Depends(current_active_user),
-):
-    payload = await parse_and_validate_form(request, certification_update_adapter)
-    updated = await handle_update_certification(
-        provider_id=provider_id,
-        certification_id=certification_id,
-        payload=payload,
-        repo=repo,
-        audit_repo=audit_repo,
-        requesting_user=user,
-    )
-    return updated_response(
-        body=_certification_read_dict(updated),
-        hx_redirect=f"/providers/{provider_id}/form",
-    )
-
-
-@router.delete(
-    "/{provider_id}/certifications/{certification_id}",
-    status_code=status.HTTP_204_NO_CONTENT,
+register_subresource_routes(
+    router,
+    SubresourceSpec(
+        collection="educations",
+        child_id_param="education_id",
+        create_adapter=education_create_adapter,
+        update_adapter=education_update_adapter,
+        read_to_dict=_education_read_dict,
+        create_handler=handle_create_education,
+        update_handler=handle_update_education,
+        delete_handler=handle_delete_education,
+    ),
+    deps=_provider_subresource_deps,
 )
-async def delete_certification(
-    provider_id: UUID,
-    certification_id: UUID,
-    repo: ProviderRepository = Depends(get_provider_repository),
-    audit_repo: AuditRepository = Depends(get_audit_repository),
-    user: User = Depends(current_active_user),
-):
-    await handle_delete_certification(
-        provider_id=provider_id,
-        certification_id=certification_id,
-        repo=repo,
-        audit_repo=audit_repo,
-        requesting_user=user,
-    )
-    return deleted_response(hx_redirect=f"/providers/{provider_id}/form")
+
+register_subresource_routes(
+    router,
+    SubresourceSpec(
+        collection="certifications",
+        child_id_param="certification_id",
+        create_adapter=certification_create_adapter,
+        update_adapter=certification_update_adapter,
+        read_to_dict=_certification_read_dict,
+        create_handler=handle_create_certification,
+        update_handler=handle_update_certification,
+        delete_handler=handle_delete_certification,
+    ),
+    deps=_provider_subresource_deps,
+)
