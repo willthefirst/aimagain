@@ -1,13 +1,15 @@
 import logging
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Request, status
+from fastapi import APIRouter, Depends, Request
 from fastapi.responses import JSONResponse
 
-from src.api.common import APIResponse, BaseRouter, deleted_response
+from src.api.common import APIResponse, BaseRouter
+from src.api.common.resource_routes import ResourceSpec, mount_delete
 from src.auth_config import current_active_user, current_admin_user
 from src.logic.providers.provider_processing import handle_list_user_providers
 from src.logic.users.user_processing import (
+    USER,
     handle_delete_user,
     handle_get_user_detail,
     handle_list_users,
@@ -27,6 +29,16 @@ from src.schemas.users.user import UserActivationUpdate
 users_api_router = APIRouter(prefix="/users")
 router = BaseRouter(router=users_api_router, default_tags=["users"])
 logger = logging.getLogger(__name__)
+
+
+USER_SPEC = ResourceSpec(
+    collection="users",
+    id_param="user_id",
+    repo_dep=get_user_repository,
+    audit_resource=USER,
+    read_user_dep=current_active_user,
+    write_user_dep=current_admin_user,
+)
 
 
 @router.get("")
@@ -120,18 +132,12 @@ async def set_user_activation(
     )
 
 
-@router.delete("/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_user(
-    user_id: UUID,
-    user_repo: UserRepository = Depends(get_user_repository),
-    audit_repo: AuditRepository = Depends(get_audit_repository),
-    admin: User = Depends(current_admin_user),
-):
-    """Admin-only: hard-delete a user."""
-    await handle_delete_user(
-        user_id=user_id,
-        repo=user_repo,
-        audit_repo=audit_repo,
-        requesting_user=admin,
-    )
-    return deleted_response(hx_redirect="/users")
+# DELETE /users/{user_id} is mounted via the unified ResourceSpec grammar.
+# Admin-only: hard-delete a user. The handler uses `mutate(verb="delete")`
+# so the audit row + commit are owned by the context manager.
+mount_delete(
+    router,
+    USER_SPEC,
+    handler=handle_delete_user,
+    audit_repo_dep=get_audit_repository,
+)
