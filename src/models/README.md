@@ -92,7 +92,6 @@ Models follow the [cluster pattern](../README.md#domain-entities-and-the-cluster
   - `base.py` — `BaseModel` with common fields (id, timestamps, soft deletion). Every model inherits from it.
   - `enums.py` — Controlled-vocabulary tuples + `*_LABELS` dicts + a `check_in_tuple_sql` helper that renders DB-level `CHECK` fragments from a tuple. The single source of truth that schemas (`Literal[*TUPLE]`), form macros (Jinja globals), and DB constraints all derive from. Lives at the parent level because 2+ clusters depend on it — and is a *leaf* (no internal imports), so any cluster can import from it without cycling back through cluster code.
   - `audit_log.py` — Append-only mutation record. See [`api/routes/RESOURCE_GRAMMAR.md`](../api/routes/RESOURCE_GRAMMAR.md).
-  - `user.py` — User authentication and profile (extends FastAPI Users). Lives at the parent today because it predates clustering and has no internal complexity that would justify a `users/` cluster yet; this is the same exception path that any single-file entity follows until the cluster pulls its weight.
   - `__init__.py` — Re-exports model classes and constants. External code should always import from `src.models` (e.g. `from src.models import Post, REGISTERED_KINDS`); the `__init__.py` keeps that surface stable across cluster moves.
 
 A model in cluster A does not import from cluster B; if two clusters need a shared primitive, hoist it to the parent level (the path `enums.py` took).
