@@ -3,7 +3,7 @@
 {% block title %}New client referral{% endblock %}
 {% block content %}
 <h1>New client referral</h1>
-<p>Per <code>notes/forms_spec.md</code>. No PII.</p>
+<p>Per <code>notes/forms_spec.md</code>. No PII.</p>{# title-case-ignore — "PII" acronym #}
 {{ client_referral_form("post", "/posts", "Create client referral") }}
 
 <hr />

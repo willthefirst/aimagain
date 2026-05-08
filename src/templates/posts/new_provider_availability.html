@@ -3,7 +3,7 @@
 {% block title %}New provider availability{% endblock %}
 {% block content %}
 <h1>New provider availability</h1>
-<p>Per <code>notes/forms_spec.md</code>. No PII.</p>
+<p>Per <code>notes/forms_spec.md</code>. No PII.</p>{# title-case-ignore — "PII" acronym #}
 {{ provider_availability_form("post", "/posts", "Create provider availability") }}
 
 <hr />

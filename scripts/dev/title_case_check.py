@@ -5,6 +5,18 @@ Title case checker for enforcing sentence case in documentation and templates.
 This script checks for titles that should be in sentence case and reports violations.
 It supports multiple file formats and allows for flexible exception handling.
 
+For HTML and Jinja files the checker parses the document with selectolax and
+lints only text inside a small allowlist of content elements (plus a few
+user-facing attribute values). It never inspects tag names, other attribute
+names, attribute values like ``style``/``href``/``class``, or content inside
+``<script>``/``<style>``/``<code>``/``<pre>``/``<kbd>`` — those structural
+distinctions are what the parser is for. This replaces the previous regex
+approach, which couldn't tell text nodes from attribute values and required
+hand-curated CSS-property allowlists to suppress false positives.
+
+Markdown files keep their existing line-based regex treatment — Markdown is
+mostly prose by default and the regex approach works well there.
+
 Usage:
     python scripts/dev/title_case_check.py                    # Check all files
 python scripts/dev/title_case_check.py --fix              # Auto-fix violations
@@ -23,40 +35,64 @@ try:
 except ImportError:
     pathspec = None
 
+try:
+    from selectolax.parser import HTMLParser
+except ImportError:
+    HTMLParser = None
+
 
 class TitleCaseChecker:
     """Check and optionally fix title case violations."""
 
-    # Patterns for different file types
+    # Markdown-only patterns. HTML/Jinja are handled by the parsed-mode
+    # checker, not by these regexes.
     PATTERNS = {
         "markdown": [
             (r"^(#{1,6})\s+(.+)$", "markdown_header"),
             (r"<h([1-6]).*?>(.*?)</h\1>", "html_header_in_md"),
         ],
-        "html": [
-            (r"<h([1-6])[^>]*>(.*?)</h\1>", "html_header"),
-            (r"<title[^>]*>(.*?)</title>", "html_title"),
-            (r"<label[^>]*>(.*?)</label>", "html_label"),
-            (r"<button[^>]*>(.*?)</button>", "html_button"),
-            (r"<a[^>]*>(.*?)</a>", "html_link"),
-            (r"<strong[^>]*>(.*?)</strong>", "html_strong"),
-            (r"<b[^>]*>(.*?)</b>", "html_bold"),
-            # Standalone text patterns that look like labels (word/phrase followed by colon)
-            (r"\b([A-Z][a-zA-Z\s]+):\s*", "standalone_label"),
-        ],
-        "jinja": [
-            (r"<h([1-6])[^>]*>(.*?)</h\1>", "html_header"),
-            (r"<title[^>]*>(.*?)</title>", "html_title"),
-            (r"{%\s*block\s+title\s*%}(.*?){%\s*endblock\s*%}", "jinja_title_block"),
-            (r"<label[^>]*>(.*?)</label>", "html_label"),
-            (r"<button[^>]*>(.*?)</button>", "html_button"),
-            (r"<a[^>]*>(.*?)</a>", "html_link"),
-            (r"<strong[^>]*>(.*?)</strong>", "html_strong"),
-            (r"<b[^>]*>(.*?)</b>", "html_bold"),
-            # Standalone text patterns that look like labels (word/phrase followed by colon)
-            (r"\b([A-Z][a-zA-Z\s]+):\s*", "standalone_label"),
-        ],
     }
+
+    # Element names whose text content is treated as user-facing prose and
+    # linted for sentence case. Anything not in this set is structurally
+    # ignored — its text isn't prose by default.
+    LINTABLE_TEXT_TAGS = {
+        "h1",
+        "h2",
+        "h3",
+        "h4",
+        "h5",
+        "h6",
+        "p",
+        "a",
+        "button",
+        "label",
+        "title",
+        "strong",
+        "b",
+        "li",
+        "td",
+        "th",
+        "summary",
+        "figcaption",
+        "dt",
+        "dd",
+    }
+
+    # Attribute names whose *values* are user-facing prose. Every other
+    # attribute value (href, src, class, id, style, data-*, hx-*, ...) is
+    # ignored — it isn't prose, no matter what it looks like.
+    LINTABLE_ATTR_NAMES = {
+        "title",
+        "alt",
+        "placeholder",
+        "aria-label",
+        "aria-description",
+    }
+
+    # Elements whose entire subtree is non-prose by definition (code, raw
+    # CSS/JS). The walker never descends into these.
+    NEVER_DESCEND_TAGS = {"script", "style", "code", "pre", "kbd"}
 
     # File extensions to check
     FILE_EXTENSIONS = {
@@ -141,6 +177,20 @@ class TitleCaseChecker:
         r"# title-case-ignore",  # Markdown comment
     ]
 
+    # Jinja preprocessing: strip Jinja syntax before handing source to the
+    # HTML parser. Comments drop entirely; statements and expressions are
+    # replaced with an opaque sentinel so the parser still sees syntactically
+    # valid HTML (e.g. ``href="{{ url }}"`` → ``href="…SENTINEL…"``) and so
+    # text-node boundaries are preserved. Any prose text or attribute value
+    # whose final form *contains* the sentinel is skipped by the linter —
+    # there's a runtime substitution there and we can't judge its case.
+    JINJA_SENTINEL = "JINJAPLACEHOLDER"
+    JINJA_REGEXES = [
+        (re.compile(r"{#.*?#}", re.DOTALL), ""),
+        (re.compile(r"{%.*?%}", re.DOTALL), JINJA_SENTINEL),
+        (re.compile(r"{{.*?}}", re.DOTALL), JINJA_SENTINEL),
+    ]
+
     def __init__(self, fix_mode: bool = False, respect_gitignore: bool = True):
         self.fix_mode = fix_mode
         self.respect_gitignore = respect_gitignore
@@ -213,15 +263,6 @@ class TitleCaseChecker:
         for pattern in self.IGNORE_PATTERNS:
             if re.search(pattern, line, re.IGNORECASE):
                 return True
-
-        # Ignore lines that are inside CSS style blocks
-        if re.search(r"^\s*[a-z-]+\s*:\s*[^;]+;?\s*$", line.strip()):
-            return True
-
-        # Ignore lines that are Jinja comments
-        if re.search(r"^\s*{#.*#}\s*$", line.strip()):
-            return True
-
         return False
 
     def should_ignore_file(self, file_path: Path) -> bool:
@@ -307,11 +348,35 @@ class TitleCaseChecker:
         return cleaned
 
     def convert_to_sentence_case(self, text: str) -> str:
-        """Convert text to sentence case, preserving proper nouns and acronyms."""
+        """Convert text to sentence case, preserving proper nouns and acronyms.
+
+        Handles multi-sentence input: each sentence (split on ``.!?`` followed
+        by whitespace) is converted independently and rejoined. This matters
+        for ``<p>`` content like "Forgot your password? Reset here", where
+        each clause carries its own capitalisation.
+        """
         # Check if this is a colon pattern that should be exempt
         if self.is_colon_pattern(text):
             return text
 
+        # Multi-sentence: split on sentence-ending punctuation followed by
+        # whitespace and convert each sentence independently. We split only
+        # when *both* sides look like a real sentence boundary: a letter
+        # before the punctuation (so "1. ssh to droplet" doesn't split on a
+        # numbering) AND an uppercase letter after the whitespace (so
+        # abbreviations like "vs. divergence" or mid-clause exclamations
+        # like "complete! all" don't split). This is conservative on
+        # purpose — false splits create noisy false positives, and the
+        # cases we actually need to handle (`?` before a capitalised CTA,
+        # `.` between two sentences with proper capitalisation) all match.
+        parts = re.split(r"(?<=[a-zA-Z][.!?])\s+(?=[A-Z])", text.strip())
+        if len(parts) > 1:
+            return " ".join(self._convert_single_sentence(p) for p in parts)
+
+        return self._convert_single_sentence(text)
+
+    def _convert_single_sentence(self, text: str) -> str:
+        """Convert a single-sentence string to sentence case."""
         # Remove HTML tags for processing
         clean_text = re.sub(r"<[^>]+>", "", text).strip()
 
@@ -432,12 +497,16 @@ class TitleCaseChecker:
         if file_type is None:
             return []
 
-        patterns = self.PATTERNS[file_type]
-        violations = []
+        if file_type in ("html", "jinja"):
+            return self._check_html_parsed(content, file_path)
+        return self._check_markdown(content, file_path)
+
+    def _check_markdown(self, content: str, file_path: Path) -> List[Dict]:
+        """Line-based regex check for Markdown files."""
+        patterns = self.PATTERNS["markdown"]
+        violations: List[Dict] = []
 
         lines = content.split("\n")
-        in_style_block = False
-        in_script_block = False
         in_fenced_code_block = False
 
         for line_num, line in enumerate(lines, 1):
@@ -445,29 +514,11 @@ class TitleCaseChecker:
             # them is source code, not prose — `#` and `<h1>` patterns there
             # are syntax, not headings, and must not be flagged.
             stripped = line.lstrip()
-            if file_type == "markdown" and (
-                stripped.startswith("```") or stripped.startswith("~~~")
-            ):
+            if stripped.startswith("```") or stripped.startswith("~~~"):
                 in_fenced_code_block = not in_fenced_code_block
                 continue
 
             if in_fenced_code_block:
-                continue
-
-            # Track context
-            if "<style" in line.lower():
-                in_style_block = True
-            elif "</style>" in line.lower():
-                in_style_block = False
-                continue  # Skip the closing style tag line
-            elif "<script" in line.lower():
-                in_script_block = True
-            elif "</script>" in line.lower():
-                in_script_block = False
-                continue  # Skip the closing script tag line
-
-            # Skip lines in style or script blocks
-            if in_style_block or in_script_block:
                 continue
 
             if self.should_ignore_line(line):
@@ -479,108 +530,249 @@ class TitleCaseChecker:
                     if pattern_type == "markdown_header":
                         title_text = match.group(2).strip()
                         header_level = match.group(1)
-                    elif pattern_type in ["html_header", "html_header_in_md"]:
+                    elif pattern_type == "html_header_in_md":
                         title_text = match.group(2).strip()
                         header_level = f"h{match.group(1)}"
-                    elif pattern_type in ["html_title", "jinja_title_block"]:
-                        title_text = match.group(1).strip()
-                        header_level = "title"
-                    elif pattern_type in ["html_label", "html_button", "html_link"]:
-                        title_text = match.group(1).strip()
-                        header_level = pattern_type.replace("html_", "")
-                    elif pattern_type in ["html_strong", "html_bold"]:
-                        title_text = match.group(1).strip()
-                        header_level = pattern_type.replace("html_", "")
-                        # Skip if this contains Jinja template expressions
-                        if self._contains_jinja_expression(title_text):
-                            continue
-                    elif pattern_type in ["standalone_label"]:
+                    elif pattern_type == "standalone_label":
                         title_text = match.group(1).strip()
                         header_level = "label"
-                        # Additional filtering for standalone labels
-                        if self._is_likely_css_property(
-                            title_text
-                        ) or self._is_in_comment_context(line):
-                            continue
                     else:
                         continue
 
                     if title_text and not self.is_sentence_case(title_text):
-                        violation = {
-                            "file": file_path,
-                            "line": line_num,
-                            "original": title_text,
-                            "suggested": self.convert_to_sentence_case(title_text),
-                            "pattern_type": pattern_type,
-                            "header_level": header_level,
-                            "full_line": line,
-                        }
-                        violations.append(violation)
+                        violations.append(
+                            {
+                                "file": file_path,
+                                "line": line_num,
+                                "original": title_text,
+                                "suggested": self.convert_to_sentence_case(title_text),
+                                "pattern_type": pattern_type,
+                                "header_level": header_level,
+                                "full_line": line,
+                            }
+                        )
 
         return violations
 
-    def _is_likely_css_property(self, text: str) -> bool:
-        """Check if text looks like a CSS property name."""
-        css_properties = {
-            "margin",
-            "padding",
-            "border",
-            "background",
-            "color",
-            "font",
-            "text",
-            "display",
-            "position",
-            "top",
-            "bottom",
-            "left",
-            "right",
-            "width",
-            "height",
-            "max-width",
-            "max-height",
-            "min-width",
-            "min-height",
-            "overflow",
-            "float",
-            "clear",
-            "z-index",
-            "opacity",
-            "visibility",
-            "cursor",
-            "outline",
-            "box-shadow",
-            "border-radius",
-            "transform",
-            "transition",
-            "animation",
-            "flex",
-            "grid",
-        }
-        return text.lower().replace("-", "").replace(" ", "") in css_properties
+    def _strip_jinja(self, content: str) -> str:
+        """Strip Jinja syntax so the HTML parser doesn't choke on it.
 
-    def _is_in_comment_context(self, line: str) -> bool:
-        """Check if the line appears to be in a comment context."""
-        stripped = line.strip()
-        return (
-            stripped.startswith("{#")
-            or stripped.startswith("<!--")
-            or "{#" in line
-            and "#}" in line
+        Statements and comments drop entirely. Expressions are replaced with
+        an opaque alphabetic token so attributes that embed them
+        (``href="{{ url }}"``) remain syntactically valid HTML and so
+        surrounding text-node boundaries are preserved.
+        """
+        for pattern, replacement in self.JINJA_REGEXES:
+            content = pattern.sub(replacement, content)
+        return content
+
+    def _check_html_parsed(self, content: str, file_path: Path) -> List[Dict]:
+        """Parse HTML/Jinja and lint only prose nodes (text in content
+        elements + a small allowlist of user-facing attribute values).
+
+        This is the systemic fix for what the regex-mode linter couldn't
+        express: structural distinction between text nodes and attribute
+        values. Inline ``style="..."`` is invisible here because ``style``
+        isn't in ``LINTABLE_ATTR_NAMES``; ``<script>``/``<style>`` subtrees
+        are skipped by ``NEVER_DESCEND_TAGS``.
+        """
+        if HTMLParser is None:
+            print(
+                f"Warning: selectolax is not installed; cannot parse {file_path}. "
+                "Install with: pip install selectolax",
+                file=sys.stderr,
+            )
+            return []
+
+        stripped_content = self._strip_jinja(content)
+
+        try:
+            tree = HTMLParser(stripped_content)
+        except Exception as e:
+            # Parser failure is a "skip with warning", never "fall back to
+            # raw-text regex" — that's the bug we just fixed.
+            print(
+                f"Warning: could not parse {file_path}: {e}; skipping",
+                file=sys.stderr,
+            )
+            return []
+
+        if tree.root is None:
+            return []
+
+        violations: List[Dict] = []
+        line_starts = self._compute_line_starts(content)
+        self._walk(tree.root, file_path, content, line_starts, violations)
+        return violations
+
+    @staticmethod
+    def _compute_line_starts(content: str) -> List[int]:
+        """Return the character offset at which each line starts."""
+        starts = [0]
+        for i, ch in enumerate(content):
+            if ch == "\n":
+                starts.append(i + 1)
+        return starts
+
+    @staticmethod
+    def _offset_to_line(offset: int, line_starts: List[int]) -> int:
+        """Map a 0-based character offset back to a 1-based line number."""
+        # Binary search would be faster; linear is plenty for source files.
+        line = 1
+        for i, start in enumerate(line_starts):
+            if start > offset:
+                break
+            line = i + 1
+        return line
+
+    def _locate_in_source(
+        self,
+        needles: List[str],
+        content: str,
+        line_starts: List[int],
+    ) -> int:
+        """Return the 1-based line number of the first needle that occurs
+        verbatim in ``content``. Falls back to line 1.
+
+        Callers pass several candidate strings ordered from most to least
+        specific (e.g. the joined deep text, then the first leaf text-node).
+        Inline children — ``<code>``, ``<em>``, etc. — break verbatim
+        searches on the deep text but the leaf-fragment search still finds a
+        plausible line for diagnostics and ``title-case-ignore`` placement.
+        """
+        for needle in needles:
+            if not needle:
+                continue
+            idx = content.find(needle)
+            if idx != -1:
+                return self._offset_to_line(idx, line_starts)
+        return 1
+
+    def _walk(
+        self,
+        node,
+        file_path: Path,
+        content: str,
+        line_starts: List[int],
+        violations: List[Dict],
+    ) -> None:
+        """Recursively walk the parsed tree and collect violations."""
+        tag = node.tag
+
+        if tag in self.NEVER_DESCEND_TAGS:
+            return
+
+        # Lint attribute values from the user-facing allowlist.
+        if node.attributes:
+            for attr_name, attr_value in node.attributes.items():
+                if attr_name not in self.LINTABLE_ATTR_NAMES:
+                    continue
+                if not attr_value:
+                    continue
+                self._maybe_record(
+                    text=attr_value,
+                    header_level=f"@{attr_name}",
+                    file_path=file_path,
+                    content=content,
+                    line_starts=line_starts,
+                    violations=violations,
+                    locator_candidates=[attr_value],
+                )
+
+        # Lint the deep text content of recognised content elements. We use
+        # deep text so that ``<p>Some <em>bad</em> phrase</p>`` is judged as
+        # one prose unit; nested lintable elements (``<a>`` inside ``<p>``)
+        # are also linted independently when the walker reaches them.
+        if tag in self.LINTABLE_TEXT_TAGS:
+            try:
+                deep_text = node.text(deep=True)
+            except Exception:
+                deep_text = None
+            if deep_text:
+                normalized = " ".join(deep_text.split())
+                if normalized:
+                    locator_candidates = [normalized, deep_text]
+                    leaf = self._first_leaf_text(node)
+                    if leaf:
+                        locator_candidates.append(leaf)
+                    self._maybe_record(
+                        text=normalized,
+                        header_level=tag,
+                        file_path=file_path,
+                        content=content,
+                        line_starts=line_starts,
+                        violations=violations,
+                        locator_candidates=locator_candidates,
+                    )
+
+        # Descend.
+        for child in node.iter(include_text=False):
+            self._walk(child, file_path, content, line_starts, violations)
+
+    def _first_leaf_text(self, node) -> str:
+        """Return the first non-empty text-node descendant's content.
+
+        Used as a locator fallback: when an element's deep text doesn't
+        appear verbatim in source (because inline children like ``<code>``
+        broke the substring), the first leaf text *is* a verbatim source
+        substring and gives us a reliable line number for diagnostics.
+        """
+        for child in node.iter(include_text=True):
+            if child.tag == "-text":
+                fragment = (child.text() or "").strip()
+                if fragment:
+                    return fragment
+            else:
+                if child.tag in self.NEVER_DESCEND_TAGS:
+                    continue
+                inner = self._first_leaf_text(child)
+                if inner:
+                    return inner
+        return ""
+
+    def _maybe_record(
+        self,
+        text: str,
+        header_level: str,
+        file_path: Path,
+        content: str,
+        line_starts: List[int],
+        violations: List[Dict],
+        locator_candidates: List[str],
+    ) -> None:
+        """If ``text`` violates sentence case, append a violation record."""
+        text = text.strip()
+        if not text:
+            return
+        if self.JINJA_SENTINEL in text:
+            # Text contains a Jinja substitution (`{{ ... }}` or `{% ... %}`).
+            # We can't judge the rendered case, so skip.
+            return
+        if self.is_sentence_case(text):
+            return
+
+        line_num = self._locate_in_source(locator_candidates, content, line_starts)
+
+        # Honour the per-line escape hatch even in parsed mode: if the
+        # source line carries a ``title-case-ignore`` marker, suppress.
+        try:
+            line_text = content.split("\n")[line_num - 1]
+        except IndexError:
+            line_text = ""
+        if self.should_ignore_line(line_text):
+            return
+
+        violations.append(
+            {
+                "file": file_path,
+                "line": line_num,
+                "original": text,
+                "suggested": self.convert_to_sentence_case(text),
+                "pattern_type": "html_parsed",
+                "header_level": header_level,
+                "full_line": line_text,
+            }
         )
-
-    def _contains_jinja_expression(self, text: str) -> bool:
-        """Check if text contains Jinja template expressions."""
-        jinja_patterns = [
-            r"{%.*?%}",  # Jinja blocks like {% block %}, {% for %}, etc.
-            r"{{.*?}}",  # Jinja variables like {{ variable }}
-            r"{#.*?#}",  # Jinja comments like {# comment #}
-        ]
-
-        for pattern in jinja_patterns:
-            if re.search(pattern, text, re.DOTALL):
-                return True
-        return False
 
     def fix_file(self, file_path: Path, violations: List[Dict]) -> bool:
         """Fix title case violations in a file."""
