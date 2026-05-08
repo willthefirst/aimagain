@@ -119,7 +119,7 @@ Tests for `scripts/dev/*` live colocated as `scripts/dev/test_*.py`, matching th
 
 Async script that flips `is_superuser` on a user matched by email. Used by `dev promote-admin` (local) and `deployment/droplet-files/promote-admin.sh` (production). Idempotent — re-running with the same target value is a no-op. Refuses to auto-create users on a typo (would silently mint a ghost admin).
 
-Tests: [`../tests/test_promote_admin.py`](../tests/test_promote_admin.py).
+Tests: [`dev/test_promote_admin.py`](dev/test_promote_admin.py).
 
 ### `title_case_check.py`
 
