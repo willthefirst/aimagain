@@ -12,48 +12,45 @@ from src.api.common import (
     validate_or_422,
 )
 from src.auth_config import current_active_user
-from src.logic.provider_profile_processing import (
+from src.logic.provider_processing import (
     handle_create_certification,
     handle_create_education,
     handle_create_licensure,
-    handle_create_profile,
+    handle_create_provider,
     handle_delete_certification,
     handle_delete_education,
     handle_delete_licensure,
-    handle_delete_profile,
-    handle_get_provider_profile_detail,
-    handle_get_provider_profile_edit_form,
-    handle_get_provider_profile_form,
-    handle_list_provider_profiles,
+    handle_delete_provider,
+    handle_get_provider_detail,
+    handle_get_provider_edit_form,
+    handle_get_provider_form,
+    handle_list_providers,
     handle_update_certification,
     handle_update_education,
     handle_update_licensure,
-    handle_update_profile,
+    handle_update_provider,
 )
 from src.models import User
 from src.repositories.audit_repository import AuditRepository
-from src.repositories.dependencies import (
-    get_audit_repository,
-    get_provider_profile_repository,
-)
-from src.repositories.provider_profile_repository import ProviderProfileRepository
-from src.schemas.provider_profile import (
+from src.repositories.dependencies import get_audit_repository, get_provider_repository
+from src.repositories.provider_repository import ProviderRepository
+from src.schemas.provider import (
     ProviderCertificationCreate,
     ProviderCertificationRead,
     ProviderCertificationUpdate,
+    ProviderCreate,
     ProviderEducationCreate,
     ProviderEducationRead,
     ProviderEducationUpdate,
     ProviderLicensureCreate,
     ProviderLicensureRead,
     ProviderLicensureUpdate,
-    ProviderProfileCreate,
-    ProviderProfileRead,
-    ProviderProfileUpdate,
+    ProviderRead,
+    ProviderUpdate,
 )
 
-provider_profiles_api_router = APIRouter(prefix="/providers")
-router = BaseRouter(router=provider_profiles_api_router, default_tags=["providers"])
+providers_api_router = APIRouter(prefix="/providers")
+router = BaseRouter(router=providers_api_router, default_tags=["providers"])
 logger = logging.getLogger(__name__)
 
 
@@ -62,8 +59,8 @@ logger = logging.getLogger(__name__)
 # per schema. Defined here (not in the schema module) because the provider-profile
 # schemas don't currently expose discriminated unions that would need an adapter
 # anywhere else.
-_profile_create_adapter: TypeAdapter = TypeAdapter(ProviderProfileCreate)
-_profile_update_adapter: TypeAdapter = TypeAdapter(ProviderProfileUpdate)
+_provider_create_adapter: TypeAdapter = TypeAdapter(ProviderCreate)
+_provider_update_adapter: TypeAdapter = TypeAdapter(ProviderUpdate)
 _licensure_create_adapter: TypeAdapter = TypeAdapter(ProviderLicensureCreate)
 _licensure_update_adapter: TypeAdapter = TypeAdapter(ProviderLicensureUpdate)
 _education_create_adapter: TypeAdapter = TypeAdapter(ProviderEducationCreate)
@@ -72,8 +69,8 @@ _certification_create_adapter: TypeAdapter = TypeAdapter(ProviderCertificationCr
 _certification_update_adapter: TypeAdapter = TypeAdapter(ProviderCertificationUpdate)
 
 
-def _profile_read_dict(profile) -> dict:
-    return ProviderProfileRead.model_validate(profile).model_dump(mode="json")
+def _provider_read_dict(profile) -> dict:
+    return ProviderRead.model_validate(profile).model_dump(mode="json")
 
 
 def _licensure_read_dict(row) -> dict:
@@ -92,40 +89,40 @@ def _certification_read_dict(row) -> dict:
 
 
 @router.get("")
-async def list_profiles(
+async def list_providers(
     request: Request,
     license_type: str | None = Query(None),
     issuing_state: str | None = Query(None),
-    repo: ProviderProfileRepository = Depends(get_provider_profile_repository),
+    repo: ProviderRepository = Depends(get_provider_repository),
 ):
     """Public HTML listing of provider profiles. Optional `license_type` and
     `issuing_state` filters narrow the results to profiles that hold a
     licensure matching both filters."""
-    context = await handle_list_provider_profiles(
+    context = await handle_list_providers(
         request=request,
         repo=repo,
         license_type=license_type,
         issuing_state=issuing_state,
     )
     return APIResponse.html_response(
-        template_name="provider_profiles/list.html",
+        template_name="providers/list.html",
         context=context,
         request=request,
     )
 
 
 @router.post("", status_code=status.HTTP_201_CREATED)
-async def create_profile(
+async def create_provider(
     request: Request,
-    repo: ProviderProfileRepository = Depends(get_provider_profile_repository),
+    repo: ProviderRepository = Depends(get_provider_repository),
     audit_repo: AuditRepository = Depends(get_audit_repository),
     user: User = Depends(current_active_user),
 ):
     """Creates a provider profile owned by the requesting user. Form-encoded
     body. A user may own multiple profiles."""
     payload_dict = await parse_form_to_payload(request)
-    payload = validate_or_422(_profile_create_adapter, payload_dict)
-    created = await handle_create_profile(
+    payload = validate_or_422(_provider_create_adapter, payload_dict)
+    created = await handle_create_provider(
         payload=payload,
         repo=repo,
         audit_repo=audit_repo,
@@ -145,16 +142,14 @@ async def create_profile(
 
 
 @router.get("/form")
-async def get_provider_profile_form(
+async def get_provider_form(
     request: Request,
     user: User = Depends(current_active_user),
 ):
     """Renders the create-profile HTML form."""
-    context = await handle_get_provider_profile_form(
-        request=request, requesting_user=user
-    )
+    context = await handle_get_provider_form(request=request, requesting_user=user)
     return APIResponse.html_response(
-        template_name="provider_profiles/new.html",
+        template_name="providers/new.html",
         context=context,
         request=request,
     )
@@ -167,41 +162,41 @@ async def get_provider_profile_form(
 async def get_profile(
     profile_id: UUID,
     request: Request,
-    repo: ProviderProfileRepository = Depends(get_provider_profile_repository),
+    repo: ProviderRepository = Depends(get_provider_repository),
     user: User = Depends(current_active_user),
 ):
     """Renders an HTML detail page for any profile. 404 if missing."""
-    context = await handle_get_provider_profile_detail(
+    context = await handle_get_provider_detail(
         request=request,
         profile_id=profile_id,
         repo=repo,
         requesting_user=user,
     )
     return APIResponse.html_response(
-        template_name="provider_profiles/detail.html",
+        template_name="providers/detail.html",
         context=context,
         request=request,
     )
 
 
 @router.get("/{profile_id}/form")
-async def get_provider_profile_edit_form(
+async def get_provider_edit_form(
     profile_id: UUID,
     request: Request,
-    repo: ProviderProfileRepository = Depends(get_provider_profile_repository),
+    repo: ProviderRepository = Depends(get_provider_repository),
     user: User = Depends(current_active_user),
 ):
     """Renders the edit-profile HTML page. Owner-only; admins may edit any
     profile. 404 if missing, 403 if not authorized.
     """
-    context = await handle_get_provider_profile_edit_form(
+    context = await handle_get_provider_edit_form(
         request=request,
         profile_id=profile_id,
         repo=repo,
         requesting_user=user,
     )
     return APIResponse.html_response(
-        template_name="provider_profiles/edit.html",
+        template_name="providers/edit.html",
         context=context,
         request=request,
     )
@@ -211,15 +206,15 @@ async def get_provider_profile_edit_form(
 async def patch_profile(
     profile_id: UUID,
     request: Request,
-    repo: ProviderProfileRepository = Depends(get_provider_profile_repository),
+    repo: ProviderRepository = Depends(get_provider_repository),
     audit_repo: AuditRepository = Depends(get_audit_repository),
     user: User = Depends(current_active_user),
 ):
     """Partially updates the practice/availability fields. Owner-only; admins
     may edit any profile. Sub-entity lists are managed via their own routes."""
     payload_dict = await parse_form_to_payload(request)
-    payload = validate_or_422(_profile_update_adapter, payload_dict)
-    updated = await handle_update_profile(
+    payload = validate_or_422(_provider_update_adapter, payload_dict)
+    updated = await handle_update_provider(
         profile_id=profile_id,
         payload=payload,
         repo=repo,
@@ -228,21 +223,21 @@ async def patch_profile(
     )
     location = f"/providers/{updated.id}/form"
     return JSONResponse(
-        content=_profile_read_dict(updated),
+        content=_provider_read_dict(updated),
         headers={"HX-Redirect": location},
     )
 
 
 @router.delete("/{profile_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_profile(
+async def delete_provider(
     profile_id: UUID,
-    repo: ProviderProfileRepository = Depends(get_provider_profile_repository),
+    repo: ProviderRepository = Depends(get_provider_repository),
     audit_repo: AuditRepository = Depends(get_audit_repository),
     user: User = Depends(current_active_user),
 ):
     """Hard-deletes the profile (sub-rows cascade). Owner-only; admins may
     delete any profile."""
-    await handle_delete_profile(
+    await handle_delete_provider(
         profile_id=profile_id,
         repo=repo,
         audit_repo=audit_repo,
@@ -261,7 +256,7 @@ async def delete_profile(
 async def create_licensure(
     profile_id: UUID,
     request: Request,
-    repo: ProviderProfileRepository = Depends(get_provider_profile_repository),
+    repo: ProviderRepository = Depends(get_provider_repository),
     audit_repo: AuditRepository = Depends(get_audit_repository),
     user: User = Depends(current_active_user),
 ):
@@ -288,7 +283,7 @@ async def patch_licensure(
     profile_id: UUID,
     licensure_id: UUID,
     request: Request,
-    repo: ProviderProfileRepository = Depends(get_provider_profile_repository),
+    repo: ProviderRepository = Depends(get_provider_repository),
     audit_repo: AuditRepository = Depends(get_audit_repository),
     user: User = Depends(current_active_user),
 ):
@@ -316,7 +311,7 @@ async def patch_licensure(
 async def delete_licensure(
     profile_id: UUID,
     licensure_id: UUID,
-    repo: ProviderProfileRepository = Depends(get_provider_profile_repository),
+    repo: ProviderRepository = Depends(get_provider_repository),
     audit_repo: AuditRepository = Depends(get_audit_repository),
     user: User = Depends(current_active_user),
 ):
@@ -340,7 +335,7 @@ async def delete_licensure(
 async def create_education(
     profile_id: UUID,
     request: Request,
-    repo: ProviderProfileRepository = Depends(get_provider_profile_repository),
+    repo: ProviderRepository = Depends(get_provider_repository),
     audit_repo: AuditRepository = Depends(get_audit_repository),
     user: User = Depends(current_active_user),
 ):
@@ -367,7 +362,7 @@ async def patch_education(
     profile_id: UUID,
     education_id: UUID,
     request: Request,
-    repo: ProviderProfileRepository = Depends(get_provider_profile_repository),
+    repo: ProviderRepository = Depends(get_provider_repository),
     audit_repo: AuditRepository = Depends(get_audit_repository),
     user: User = Depends(current_active_user),
 ):
@@ -395,7 +390,7 @@ async def patch_education(
 async def delete_education(
     profile_id: UUID,
     education_id: UUID,
-    repo: ProviderProfileRepository = Depends(get_provider_profile_repository),
+    repo: ProviderRepository = Depends(get_provider_repository),
     audit_repo: AuditRepository = Depends(get_audit_repository),
     user: User = Depends(current_active_user),
 ):
@@ -419,7 +414,7 @@ async def delete_education(
 async def create_certification(
     profile_id: UUID,
     request: Request,
-    repo: ProviderProfileRepository = Depends(get_provider_profile_repository),
+    repo: ProviderRepository = Depends(get_provider_repository),
     audit_repo: AuditRepository = Depends(get_audit_repository),
     user: User = Depends(current_active_user),
 ):
@@ -446,7 +441,7 @@ async def patch_certification(
     profile_id: UUID,
     certification_id: UUID,
     request: Request,
-    repo: ProviderProfileRepository = Depends(get_provider_profile_repository),
+    repo: ProviderRepository = Depends(get_provider_repository),
     audit_repo: AuditRepository = Depends(get_audit_repository),
     user: User = Depends(current_active_user),
 ):
@@ -474,7 +469,7 @@ async def patch_certification(
 async def delete_certification(
     profile_id: UUID,
     certification_id: UUID,
-    repo: ProviderProfileRepository = Depends(get_provider_profile_repository),
+    repo: ProviderRepository = Depends(get_provider_repository),
     audit_repo: AuditRepository = Depends(get_audit_repository),
     user: User = Depends(current_active_user),
 ):

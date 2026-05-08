@@ -7,7 +7,7 @@ from src.api.common.exceptions import ForbiddenError, NotFoundError
 from src.logic.audit import AuditAction, record_audit
 from src.models import User
 from src.repositories.audit_repository import AuditRepository
-from src.repositories.provider_profile_repository import ProviderProfileRepository
+from src.repositories.provider_repository import ProviderRepository
 from src.repositories.user_repository import UserRepository
 from src.schemas.user import (
     UserActivationAuditSnapshot,
@@ -76,23 +76,23 @@ async def handle_get_user_detail(
     request: Request,
     user_id: UUID,
     user_repo: UserRepository,
-    profile_repo: ProviderProfileRepository,
+    profile_repo: ProviderRepository,
     requesting_user: User,
 ):
-    """Loads a single user for the detail page along with the provider
-    profiles they own; 404s if the user is missing. Profile data is
-    already publicly available via `GET /providers`, so the embedded list
-    is gated only by the existing user-detail auth (any active user)."""
+    """Loads a single user for the detail page along with the providers
+    they own; 404s if the user is missing. Provider data is already
+    publicly available via `GET /providers`, so the embedded list is gated
+    only by the existing user-detail auth (any active user)."""
     target = await user_repo.get_user_by_id(user_id)
     if target is None:
         raise NotFoundError(detail="User not found")
 
-    provider_profiles = await profile_repo.list_for_user(user_id)
+    providers = await profile_repo.list_for_user(user_id)
 
     return {
         "request": request,
         "target_user": target,
-        "provider_profiles": provider_profiles,
+        "providers": providers,
         "current_user": requesting_user,
     }
 

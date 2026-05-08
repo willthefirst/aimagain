@@ -16,12 +16,12 @@ def _ck(column: str, values: tuple[str, ...]) -> CheckConstraint:
     )
 
 
-class ProviderProfile(BaseModel):
+class Provider(BaseModel):
     """Provider's directory profile — practice info, location, and session
     availability flags. A user may own zero, one, or many profiles; ownership
     is recorded via the non-unique `user_id` FK. Distinct from
     `posts/provider_availability_detail.py` (which is a per-post detail row for a
-    specific outreach `Post`); a `ProviderProfile` is a long-lived directory
+    specific outreach `Post`); a `Provider` is a long-lived directory
     entry that owns the provider's credential lists (licensures, educations,
     certifications) via cascade.
     """

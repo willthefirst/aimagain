@@ -6,7 +6,7 @@ from fastapi.responses import JSONResponse
 
 from src.api.common import APIResponse, BaseRouter
 from src.auth_config import current_active_user, current_admin_user
-from src.logic.provider_profile_processing import handle_list_user_provider_profiles
+from src.logic.provider_processing import handle_list_user_providers
 from src.logic.user_processing import (
     handle_delete_user,
     handle_get_user_detail,
@@ -17,10 +17,10 @@ from src.models import User
 from src.repositories.audit_repository import AuditRepository
 from src.repositories.dependencies import (
     get_audit_repository,
-    get_provider_profile_repository,
+    get_provider_repository,
     get_user_repository,
 )
-from src.repositories.provider_profile_repository import ProviderProfileRepository
+from src.repositories.provider_repository import ProviderRepository
 from src.repositories.user_repository import UserRepository
 from src.schemas.user import UserActivationUpdate
 
@@ -54,7 +54,7 @@ async def get_user(
     user_id: UUID,
     request: Request,
     user_repo: UserRepository = Depends(get_user_repository),
-    profile_repo: ProviderProfileRepository = Depends(get_provider_profile_repository),
+    profile_repo: ProviderRepository = Depends(get_provider_repository),
     user: User = Depends(current_active_user),
 ):
     """Provides an HTML detail page for a single user, including the list
@@ -72,15 +72,15 @@ async def get_user(
 
 
 @router.get("/{user_id}/provider-profiles")
-async def list_user_provider_profiles(
+async def list_user_providers(
     user_id: UUID,
     request: Request,
-    profile_repo: ProviderProfileRepository = Depends(get_provider_profile_repository),
+    profile_repo: ProviderRepository = Depends(get_provider_repository),
     user_repo: UserRepository = Depends(get_user_repository),
     user: User = Depends(current_active_user),
 ):
     """Renders the provider-profile list for a user. Self or admin only."""
-    context = await handle_list_user_provider_profiles(
+    context = await handle_list_user_providers(
         request=request,
         target_user_id=user_id,
         repo=profile_repo,
@@ -88,7 +88,7 @@ async def list_user_provider_profiles(
         requesting_user=user,
     )
     return APIResponse.html_response(
-        template_name="users/provider_profiles_list.html",
+        template_name="users/providers_list.html",
         context=context,
         request=request,
     )

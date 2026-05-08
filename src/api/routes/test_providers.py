@@ -7,10 +7,10 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from src.models import (
+    Provider,
     ProviderCertification,
     ProviderEducation,
     ProviderLicensure,
-    ProviderProfile,
     User,
 )
 from src.repositories.audit_repository import AuditRepository
@@ -19,12 +19,12 @@ from tests.helpers import (
     create_test_user,
     education_payload,
     licensure_payload,
+    make_provider,
     make_provider_certification,
     make_provider_education,
     make_provider_licensure,
-    make_provider_profile,
     promote_to_admin,
-    provider_profile_payload,
+    provider_payload,
 )
 
 pytestmark = pytest.mark.asyncio
@@ -40,7 +40,7 @@ async def _seed_profile_for(
     **overrides,
 ) -> uuid.UUID:
     """Insert a profile owned by `user_id` and return its id."""
-    profile = make_provider_profile(user_id=user_id, **overrides)
+    profile = make_provider(user_id=user_id, **overrides)
     async with db_test_session_manager() as session:
         async with session.begin():
             session.add(profile)
@@ -85,7 +85,7 @@ async def test_create_profile_happy_path(
     persists the profile and an audit row."""
     response = await authenticated_client.post(
         "/providers",
-        data=provider_profile_payload(practice_name="Acme Therapy"),
+        data=provider_payload(practice_name="Acme Therapy"),
     )
 
     assert response.status_code == 201
@@ -94,9 +94,7 @@ async def test_create_profile_happy_path(
     assert response.headers["HX-Redirect"] == f"/providers/{new_id}/form"
 
     async with db_test_session_manager() as session:
-        result = await session.execute(
-            select(ProviderProfile).filter(ProviderProfile.id == new_id)
-        )
+        result = await session.execute(select(Provider).filter(Provider.id == new_id))
         persisted = result.scalars().first()
         assert persisted is not None
         assert persisted.user_id == logged_in_user.id
@@ -120,13 +118,13 @@ async def test_create_profile_allows_multiple_per_user(
     """A user may own multiple provider profiles. Two successive POSTs both
     return 201 and persist as distinct rows owned by the same user."""
     first = await authenticated_client.post(
-        "/providers", data=provider_profile_payload(practice_name="First")
+        "/providers", data=provider_payload(practice_name="First")
     )
     assert first.status_code == 201
     first_id = uuid.UUID(first.json()["id"])
 
     second = await authenticated_client.post(
-        "/providers", data=provider_profile_payload(practice_name="Second")
+        "/providers", data=provider_payload(practice_name="Second")
     )
     assert second.status_code == 201
     second_id = uuid.UUID(second.json()["id"])
@@ -135,7 +133,7 @@ async def test_create_profile_allows_multiple_per_user(
 
     async with db_test_session_manager() as session:
         result = await session.execute(
-            select(ProviderProfile).filter(ProviderProfile.user_id == logged_in_user.id)
+            select(Provider).filter(Provider.user_id == logged_in_user.id)
         )
         owned = result.scalars().all()
         assert {p.id for p in owned} == {first_id, second_id}
@@ -149,7 +147,7 @@ async def test_create_profile_rejects_unknown_field(
     """`extra='forbid'` on the schema rejects unknown form fields with 422."""
     response = await authenticated_client.post(
         "/providers",
-        data=provider_profile_payload(user_id=str(uuid.uuid4())),
+        data=provider_payload(user_id=str(uuid.uuid4())),
     )
     assert response.status_code == 422
 
@@ -329,11 +327,7 @@ async def test_patch_profile_updates_fields(
 
     async with db_test_session_manager() as session:
         refreshed = (
-            (
-                await session.execute(
-                    select(ProviderProfile).filter(ProviderProfile.id == profile_id)
-                )
-            )
+            (await session.execute(select(Provider).filter(Provider.id == profile_id)))
             .scalars()
             .first()
         )
@@ -376,9 +370,7 @@ async def test_delete_profile_returns_204_and_cascades(
 
     async with db_test_session_manager() as session:
         assert (
-            await session.execute(
-                select(ProviderProfile).filter(ProviderProfile.id == profile_id)
-            )
+            await session.execute(select(Provider).filter(Provider.id == profile_id))
         ).scalars().first() is None
         # Sub-rows cascade-deleted via FK ON DELETE CASCADE + ORM cascade.
         assert (
@@ -623,7 +615,7 @@ async def test_create_certification_happy_path(
 # --- Create form page (GET /providers/form) ----------------------
 
 
-async def test_get_provider_profile_form_renders(
+async def test_get_provider_form_renders(
     authenticated_client: AsyncClient,
     logged_in_user: User,
 ):
@@ -653,7 +645,7 @@ async def test_get_provider_profile_form_renders(
     assert len(virtual.css("option")) == 4
 
 
-async def test_get_provider_profile_form_unauthenticated_redirects(
+async def test_get_provider_form_unauthenticated_redirects(
     test_client: AsyncClient,
 ):
     response = await test_client.get(

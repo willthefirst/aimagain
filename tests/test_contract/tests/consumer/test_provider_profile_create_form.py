@@ -4,7 +4,7 @@ Verifies that the HTMX-decorated form rendered by
 `templates/provider_profiles/new.html` (mounted via the
 `provider_profile_create_form` stub on the consumer server) issues a
 `POST /providers` form-encoded request with the practice and
-availability fields the route's `ProviderProfileCreate` schema expects.
+availability fields the route's `ProviderCreate` schema expects.
 The contract surface is the form wiring (method, path, Content-Type,
 field names) — the response on success is a 201 with `HX-Redirect` to
 the new profile.

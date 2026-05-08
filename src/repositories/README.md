@@ -63,7 +63,7 @@ Each repository manages one primary domain entity with related data access opera
 | ------------------ | -------------- | ----------------------------------------------------------------------------- |
 | **UserRepository** | User           | User lookup, listing, activation toggle, hard delete                          |
 | **PostRepository** | Post (parent + per-kind detail) | Post lookup by id, list all posts (newest first), persist a new post + its detail row in one flush (the detail's type — `ClientReferralDetail` or `ProviderAvailabilityDetail` — picks the relationship via `KIND_BY_DETAIL_MODEL`), partial update (per-kind fields on the matching `*_detail` row, dispatched via `REGISTERED_KINDS[post.kind]`), hard delete (CASCADE removes the detail; caller commits) |
-| **ProviderProfileRepository** | ProviderProfile (parent + cascade-managed sub-tables) | Profile CRUD (`get_by_id`, `get_by_user_id`, `create_profile`, `update_profile`, `delete_profile`); filterable `list_profiles(license_type=, issuing_state=)` joins through `provider_licensures` and `.distinct()`s the parent rows; per-sub-table CRUD (`add_*` / `update_*` / `delete_*`) for licensures, educations, and certifications. Cascade on delete via ORM `all, delete-orphan` + FK `ON DELETE CASCADE`. |
+| **ProviderRepository** | Provider (parent + cascade-managed sub-tables) | Profile CRUD (`get_by_id`, `get_by_user_id`, `create_provider`, `update_provider`, `delete_provider`); filterable `list_providers(license_type=, issuing_state=)` joins through `provider_licensures` and `.distinct()`s the parent rows; per-sub-table CRUD (`add_*` / `update_*` / `delete_*`) for licensures, educations, and certifications. Cascade on delete via ORM `all, delete-orphan` + FK `ON DELETE CASCADE`. |
 | **AuditRepository** | AuditLog | Append-only writes (`record(...)`), single-row read, list-by-resource. No update or delete methods — audit rows are immutable. |
 
 ## Directory structure
@@ -72,7 +72,7 @@ Each repository manages one primary domain entity with related data access opera
 
 - `user_repository.py` - User data access and lookup
 - `post_repository.py` - Post data access and lookup
-- `provider_profile_repository.py` - Provider directory profile + cascade-managed credential sub-tables
+- `provider_repository.py` - Provider directory entry + cascade-managed credential sub-tables
 - `audit_repository.py` - Append-only audit log writes and reads
 
 **Infrastructure:**
@@ -210,19 +210,19 @@ When *not* to delegate:
 
 ```python
 # Typical resource repo using the primitives:
-async def get_by_id(self, profile_id: UUID) -> ProviderProfile | None:
-    return await self._get_by_id(ProviderProfile, profile_id)
+async def get_by_id(self, profile_id: UUID) -> Provider | None:
+    return await self._get_by_id(Provider, profile_id)
 
-async def create_profile(self, user_id: UUID, **fields) -> ProviderProfile:
-    return await self._persist_new(ProviderProfile(user_id=user_id, **fields))
+async def create_provider(self, user_id: UUID, **fields) -> Provider:
+    return await self._persist_new(Provider(user_id=user_id, **fields))
 
 async def add_licensure(self, profile, **fields) -> ProviderLicensure:
     return await self._add_child(profile, "licensures", ProviderLicensure(**fields))
 
-async def update_profile(self, profile, **fields) -> ProviderProfile:
+async def update_provider(self, profile, **fields) -> Provider:
     return await self._patch(profile, **fields)
 
-async def delete_profile(self, profile) -> None:
+async def delete_provider(self, profile) -> None:
     await self._delete(profile)
 ```
 
@@ -301,7 +301,7 @@ Colocated tests live alongside the repositories:
 
 - `test_audit_repository.py` — exercises append-only writes, FK `SET NULL` on actor delete, and list-by-resource ordering against the in-memory test DB.
 - `test_post_repository.py` — exercises parent + detail create/update/delete for every registered kind (`client_referral`, `provider_availability`), including a raw-SQL DELETE that proves the FK CASCADE fires (not just the ORM cascade). Also covers the `posts.kind` CHECK constraint rejecting unregistered kinds (including the retired `note` kind). Relies on `PRAGMA foreign_keys = ON` being set globally by the test engine fixture. Detail-row construction goes through `make_<kind>_detail` factories in [`tests/helpers.py`](../../tests/helpers.py) so spec-required fields are filled with valid defaults; tests override only what they're asserting on. Per-kind dispatch in `_attach_detail` and `update_post` is registry-driven via `REGISTERED_KINDS` / `KIND_BY_DETAIL_MODEL` from [`src/models/posts/post_kinds.py`](../models/posts/post_kinds.py); the registry-consistency tests live with the registry, not here.
-- `test_provider_profile_repository.py` — exercises profile CRUD, cascade delete (parent + sub-rows gone in one shot), `list_profiles` filtering through licensures (license_type, issuing_state, AND-composed, `.distinct()` de-dup), and CRUD round-trips for each sub-table (licensure, education, certification). Sub-row construction uses `make_provider_*` factories in [`tests/helpers.py`](../../tests/helpers.py).
+- `test_provider_repository.py` — exercises profile CRUD, cascade delete (parent + sub-rows gone in one shot), `list_providers` filtering through licensures (license_type, issuing_state, AND-composed, `.distinct()` de-dup), and CRUD round-trips for each sub-table (licensure, education, certification). Sub-row construction uses `make_provider_*` factories in [`tests/helpers.py`](../../tests/helpers.py).
 
 When adding a new repository method, extend (or create) `src/repositories/test_<repo_name>.py` and exercise it via the `db_test_session_manager` fixture from [`tests/fixtures.py`](../../tests/fixtures.py).
 

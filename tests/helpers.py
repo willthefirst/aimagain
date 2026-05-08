@@ -8,11 +8,11 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 # Need ORM models
 from src.models import (
     ClientReferralDetail,
+    Provider,
     ProviderAvailabilityDetail,
     ProviderCertification,
     ProviderEducation,
     ProviderLicensure,
-    ProviderProfile,
     User,
 )
 
@@ -116,11 +116,11 @@ def make_provider_availability_detail(**overrides: Any) -> ProviderAvailabilityD
     )
 
 
-# --- Provider profile + sub-table factories -------------------------------
+# --- Provider + credential sub-table factories ---------------------------
 #
 # Defaults supply CHECK-constraint-valid values so tests that don't care
 # about credential specifics still produce inserts that pass DB-level
-# guards. The owning FK (`user_id` for profiles, `profile_id` for
+# guards. The owning FK (`user_id` for providers, `profile_id` for
 # sub-rows) is a required keyword-only parameter — making it required
 # turns "I forgot the FK" into a `TypeError` at the factory call site
 # instead of a `NOT NULL` violation at flush time.
@@ -163,7 +163,7 @@ def _drop_none(d: dict[str, Any]) -> dict[str, Any]:
     return {k: v for k, v in d.items() if v is not None}
 
 
-def provider_profile_payload(**overrides: Any) -> dict[str, Any]:
+def provider_payload(**overrides: Any) -> dict[str, Any]:
     """Build a wire-valid `POST /providers` form-encoded payload.
     Returns a fresh flat dict each call. Sub-entity arrays are intentionally
     omitted — credentials are added via the dedicated sub-resource endpoints."""
@@ -185,11 +185,9 @@ def certification_payload(**overrides: Any) -> dict[str, Any]:
     return _drop_none({**_PROVIDER_CERTIFICATION_DEFAULTS, **overrides})
 
 
-def make_provider_profile(*, user_id: UUID, **overrides: Any) -> ProviderProfile:
-    """Build a `ProviderProfile` ORM row with CHECK-valid defaults."""
-    return ProviderProfile(
-        user_id=user_id, **{**_PROVIDER_PROFILE_DEFAULTS, **overrides}
-    )
+def make_provider(*, user_id: UUID, **overrides: Any) -> Provider:
+    """Build a `Provider` ORM row with CHECK-valid defaults."""
+    return Provider(user_id=user_id, **{**_PROVIDER_PROFILE_DEFAULTS, **overrides})
 
 
 def make_provider_licensure(*, profile_id: UUID, **overrides: Any) -> ProviderLicensure:

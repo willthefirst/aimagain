@@ -104,7 +104,7 @@ CONTRACT_PAIRS: list[ContractPair] = [
         handler_mocks_factory=MockDataFactory.create_provider_profile_create_dependency_config,
         consumer_setup_fn=_setup_provider_profile_create_form_stub,
         provider_state="User can create a provider profile",
-        pytest_marks=(pytest.mark.provider, pytest.mark.provider_profiles),
+        pytest_marks=(pytest.mark.provider, pytest.mark.providers),
     ),
     ContractPair(
         consumer_name="provider-profile-edit-form",
@@ -113,7 +113,7 @@ CONTRACT_PAIRS: list[ContractPair] = [
         handler_mocks_factory=MockDataFactory.create_provider_profile_update_dependency_config,
         consumer_setup_fn=_setup_provider_profile_edit_form_stub,
         provider_state="Provider profile 44444444-4444-4444-4444-444444444444 exists and is owned by the requester",
-        pytest_marks=(pytest.mark.provider, pytest.mark.provider_profiles),
+        pytest_marks=(pytest.mark.provider, pytest.mark.providers),
     ),
 ]
 

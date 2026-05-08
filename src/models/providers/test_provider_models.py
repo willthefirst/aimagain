@@ -1,4 +1,4 @@
-"""Tests for the four `ProviderProfile`-family models.
+"""Tests for the four `Provider`-family models.
 
 Exercises the invariants the DB layer owns: the per-user UniqueConstraint
 on `provider_profiles`, the cascade from a profile down to its credential
@@ -12,17 +12,17 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from src.models import (
+    Provider,
     ProviderCertification,
     ProviderEducation,
     ProviderLicensure,
-    ProviderProfile,
 )
 from tests.helpers import create_test_user
 
 pytestmark = pytest.mark.asyncio
 
 
-def _make_profile(user, **overrides) -> ProviderProfile:
+def _make_profile(user, **overrides) -> Provider:
     defaults = dict(
         user=user,
         practice_name="Acme Health",
@@ -32,10 +32,10 @@ def _make_profile(user, **overrides) -> ProviderProfile:
         in_person_sessions="yes",
         virtual_sessions="no",
     )
-    return ProviderProfile(**{**defaults, **overrides})
+    return Provider(**{**defaults, **overrides})
 
 
-async def test_create_provider_profile_persists(
+async def test_create_provider_persists(
     db_test_session_manager: async_sessionmaker[AsyncSession],
 ):
     user = create_test_user()
@@ -48,7 +48,7 @@ async def test_create_provider_profile_persists(
         profile = (
             (
                 await session.execute(
-                    select(ProviderProfile).filter(ProviderProfile.user_id == user.id)
+                    select(Provider).filter(Provider.user_id == user.id)
                 )
             )
             .scalars()
@@ -58,7 +58,7 @@ async def test_create_provider_profile_persists(
         assert profile.practice_name == "Acme Health"
 
 
-async def test_provider_profile_allows_multiple_per_user(
+async def test_provider_allows_multiple_per_user(
     db_test_session_manager: async_sessionmaker[AsyncSession],
 ):
     """A user may own multiple provider profiles — the previously-enforced
@@ -72,7 +72,7 @@ async def test_provider_profile_allows_multiple_per_user(
     async with db_test_session_manager() as session:
         async with session.begin():
             session.add(
-                ProviderProfile(
+                Provider(
                     user_id=user.id,
                     practice_name="Other Practice",
                     location_city="Springfield",
@@ -84,7 +84,7 @@ async def test_provider_profile_allows_multiple_per_user(
             )
 
         result = await session.execute(
-            select(ProviderProfile).filter(ProviderProfile.user_id == user.id)
+            select(Provider).filter(Provider.user_id == user.id)
         )
         profiles = result.scalars().all()
         assert len(profiles) == 2
@@ -94,7 +94,7 @@ async def test_provider_profile_allows_multiple_per_user(
 async def test_delete_profile_cascades_credentials(
     db_test_session_manager: async_sessionmaker[AsyncSession],
 ):
-    """Deleting a `ProviderProfile` removes its licensures, educations,
+    """Deleting a `Provider` removes its licensures, educations,
     and certifications via the FK CASCADE."""
     user = create_test_user()
     async with db_test_session_manager() as session:
@@ -125,7 +125,7 @@ async def test_delete_profile_cascades_credentials(
 
     async with db_test_session_manager() as session:
         async with session.begin():
-            loaded = await session.get(ProviderProfile, profile_id)
+            loaded = await session.get(Provider, profile_id)
             await session.delete(loaded)
 
     async with db_test_session_manager() as session:
