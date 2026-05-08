@@ -1,10 +1,10 @@
 import logging
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Request, Response, status
+from fastapi import APIRouter, Depends, Request, status
 from fastapi.responses import JSONResponse
 
-from src.api.common import APIResponse, BaseRouter
+from src.api.common import APIResponse, BaseRouter, deleted_response
 from src.auth_config import current_active_user, current_admin_user
 from src.logic.providers.provider_processing import handle_list_user_providers
 from src.logic.users.user_processing import (
@@ -134,7 +134,4 @@ async def delete_user(
         audit_repo=audit_repo,
         requesting_user=admin,
     )
-    return Response(
-        status_code=status.HTTP_204_NO_CONTENT,
-        headers={"HX-Redirect": "/users"},
-    )
+    return deleted_response(hx_redirect="/users")
