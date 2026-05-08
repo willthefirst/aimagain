@@ -11,27 +11,20 @@ every form using these macros, no per-template edits.
 `current` is the prefilled value (None on the create form, the persisted
 value on edit). For the bool-radio `current` should be `True` / `False`
 / `None` — neither radio is checked when `None`.
-
-`title_case_ignore` lets a caller suppress the project's title-case
-linter (`scripts/dev/title_case_check.py`, run by `dev lint`) for a
-label whose human spelling intentionally diverges from sentence case
-(acronyms like ZIP/PII, hyphenated openers like "In-person"). The
-flag emits the inline `<!-- title-case-ignore -->` HTML comment that
-the linter looks for on the label line.
 #}
 
-{% macro text_field(name, label, current=None, required=True, pattern=None, maxlength=None, title_case_ignore=False) -%}
-<label for="{{ name }}">{{ label }}:</label>{% if title_case_ignore %}<!-- title-case-ignore -->{% endif %}<br />
+{% macro text_field(name, label, current=None, required=True, pattern=None, maxlength=None) -%}
+<label for="{{ name }}">{{ label }}:</label><br />
 <input type="text" id="{{ name }}" name="{{ name }}"{% if current is not none %} value="{{ current }}"{% endif %}{% if pattern %} pattern="{{ pattern }}"{% endif %}{% if maxlength %} maxlength="{{ maxlength }}"{% endif %}{% if required %} required{% endif %} /><br /><br />
 {%- endmacro %}
 
-{% macro textarea_field(name, label, current=None, required=True, title_case_ignore=False) -%}
-<label for="{{ name }}">{{ label }}:</label>{% if title_case_ignore %}<!-- title-case-ignore -->{% endif %}<br />
+{% macro textarea_field(name, label, current=None, required=True) -%}
+<label for="{{ name }}">{{ label }}:</label><br />
 <textarea id="{{ name }}" name="{{ name }}"{% if required %} required{% endif %}>{{ current or "" }}</textarea><br /><br />
 {%- endmacro %}
 
-{% macro select_field(name, label, options, labels=None, current=None, required=True, placeholder=False, title_case_ignore=False) -%}
-<label for="{{ name }}">{{ label }}:</label>{% if title_case_ignore %}<!-- title-case-ignore -->{% endif %}<br />
+{% macro select_field(name, label, options, labels=None, current=None, required=True, placeholder=False) -%}
+<label for="{{ name }}">{{ label }}:</label><br />
 <select id="{{ name }}" name="{{ name }}"{% if required %} required{% endif %}>
   {%- if placeholder and not current %}
   <option value="" disabled selected>--</option>

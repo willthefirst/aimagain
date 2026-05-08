@@ -111,8 +111,12 @@ class TitleCaseChecker:
         ".sqlite3",
     }
 
-    # Words that should remain capitalized (proper nouns, acronyms, etc.)
+    # Words that should remain capitalized (proper nouns, acronyms, etc.).
+    # Add domain acronyms and language names here rather than asking authors
+    # to scatter ``title-case-ignore`` markers — the marker is the escape
+    # hatch for one-offs, not a vocabulary problem.
     ALWAYS_CAPITALIZE = {
+        # Web/protocol acronyms
         "API",
         "APIs",
         "URL",
@@ -127,21 +131,16 @@ class TitleCaseChecker:
         "SQL",
         "REST",
         "RESTful",
+        "OAuth",
+        "JWT",
+        "UUID",
+        "UUIDs",
+        # Tech / framework names
         "FastAPI",
         "SQLAlchemy",
         "Jinja2",
         "pytest",
         "GitHub",
-        "OAuth",
-        "JWT",
-        "UUID",
-        "UUIDs",
-        "CRUD",
-        "TDD",
-        "LLM",
-        "LLMs",
-        "AI",
-        "MVP",
         "PostgreSQL",
         "SQLite",
         "Docker",
@@ -149,6 +148,36 @@ class TitleCaseChecker:
         "JavaScript",
         "TypeScript",
         "Pact",  # Contract testing framework
+        # General-domain acronyms
+        "CRUD",
+        "TDD",
+        "LLM",
+        "LLMs",
+        "AI",
+        "MVP",
+        # App-domain acronyms (intake forms, public-facing copy)
+        "ZIP",  # Postal code field
+        "PII",  # Personally identifiable information
+        "DBT",  # Dialectical behavior therapy
+        "EMDR",  # Eye movement desensitization and reprocessing
+        # Language names — surface in form labels ("non-English", "Spanish")
+        # and standard sentence-case rules would lowercase them.
+        "English",
+        "Spanish",
+        "Mandarin",
+        "Cantonese",
+        "French",
+        "German",
+        "Japanese",
+        "Korean",
+        "Vietnamese",
+        "Tagalog",
+        "Arabic",
+        "Hebrew",
+        "Hindi",
+        "Russian",
+        "Italian",
+        "Portuguese",
     }
 
     # HTTP methods are ambiguous: they overlap with common English words
@@ -398,6 +427,15 @@ class TitleCaseChecker:
 
         result_words = []
         for i, word in enumerate(words):
+            # Backtick-wrapped code spans (`.env`, `BaseRepository`) are
+            # identifiers, not prose. Preserve verbatim and don't let any
+            # case rule touch them — including the "first word" rule,
+            # which would otherwise mangle a header opening with a span
+            # like ``` `.env` vs `.env.test` ```.
+            if "`" in word:
+                result_words.append(word)
+                continue
+
             # Remove punctuation for checking
             clean_word = re.sub(r"[^\w]", "", word)
 

@@ -362,7 +362,7 @@ def test_inline_title_case_ignore_marker_suppresses(tmp_path):
         tmp_path,
         """
         <html><body>
-        <dt>ZIP</dt>{# title-case-ignore #}
+        <h1>Some Bad Heading</h1>{# title-case-ignore #}
         </body></html>
         """,
     )
@@ -386,3 +386,71 @@ def test_fix_mode_replaces_text_in_html(tmp_path):
     assert "Bad heading" in file.read_text(encoding="utf-8")
     # Running again on the fixed file produces no violations.
     assert TitleCaseChecker(respect_gitignore=False).check_file(file) == []
+
+
+# ---------------------------------------------------------------------------
+# Vocabulary and code-span handling
+#
+# These are the rules that displaced the bulk of the project's
+# ``title-case-ignore`` markers: the linter recognises domain acronyms and
+# language names directly, and treats backtick-wrapped tokens in Markdown
+# headers as code rather than prose. Each test pins a class of false
+# positive that previously required a hand-placed ignore.
+# ---------------------------------------------------------------------------
+
+
+def test_markdown_header_starting_with_backtick_code_span(tmp_path):
+    """A code span at the start of a header must not be lower-cased into
+    prose (``\\`.env\\` vs \\`.env.test\\``` → ``.Env vs ...``).
+    """
+    file = _write_md(tmp_path, "### `.env` vs `.env.test`\n")
+    assert _check(file) == []
+
+
+def test_markdown_header_with_camelcase_in_backticks(tmp_path):
+    """CamelCase identifiers wrapped in backticks must survive verbatim,
+    not be lower-cased to ``baserepository``."""
+    file = _write_md(tmp_path, "### CRUD primitives on `BaseRepository`\n")
+    assert _check(file) == []
+
+
+def test_acronyms_in_form_labels_pass(tmp_path):
+    """Domain acronyms (ZIP/PII/DBT/EMDR) are part of the allowlist; form
+    labels using them must not require per-line ignore markers."""
+    file = _write_html(
+        tmp_path,
+        """
+        <html><body>
+        <label>ZIP:</label>
+        <label>Description (no PII):</label>
+        <label>Treatment modality (optional, e.g. DBT, EMDR):</label>
+        </body></html>
+        """,
+    )
+    assert _check(file) == []
+
+
+def test_language_names_in_prose_pass(tmp_path):
+    """Language names (English, Spanish, ...) are part of the allowlist
+    so labels like "Services in English?" don't need per-line ignores."""
+    file = _write_html(
+        tmp_path,
+        """
+        <html><body>
+        <label>Services preferred in language other than English?</label>
+        <p>Available in Spanish and Mandarin.</p>
+        </body></html>
+        """,
+    )
+    assert _check(file) == []
+
+
+def test_genuinely_miscased_acronym_neighbour_still_flags(tmp_path):
+    """Adding ZIP to the allowlist must not let an adjacent miscased word
+    slip through — only ZIP is preserved, the rest is sentence-cased."""
+    file = _write_html(
+        tmp_path,
+        "<html><body><h1>ZIP Code Lookup</h1></body></html>",
+    )
+    originals = {v["original"] for v in _check(file)}
+    assert "ZIP Code Lookup" in originals
