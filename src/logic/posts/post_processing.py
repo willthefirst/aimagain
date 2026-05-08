@@ -80,14 +80,25 @@ async def handle_get_post_edit_form(
     requesting_user: User,
 ):
     """Loads a post for the edit-form page. 404 if missing, 403 if the
-    requester is neither owner nor admin (mirrors `handle_update_post`)."""
+    requester is neither owner nor admin (mirrors `handle_update_post`).
+
+    Returns ``template_name`` in the context so `mount_form` renders the
+    kind-specific edit template (each post kind has its own edit page).
+    The mount pops ``template_name`` before rendering so it doesn't leak
+    into the Jinja context.
+    """
     post = await repo.get_post_by_id(post_id)
     if post is None:
         raise NotFoundError(detail="Post not found")
 
     assert_owner_or_admin(post, requesting_user, action="edit this post")
 
-    return {"request": request, "post": post, "current_user": requesting_user}
+    return {
+        "request": request,
+        "post": post,
+        "current_user": requesting_user,
+        "template_name": REGISTERED_KINDS[post.kind].edit_template,
+    }
 
 
 async def handle_create_post(

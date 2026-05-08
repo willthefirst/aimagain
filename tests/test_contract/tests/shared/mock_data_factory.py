@@ -138,7 +138,9 @@ class MockDataFactory:
         is a valid mock return.
         """
         return {
-            "src.api.routes.posts.handle_delete_post": {"return_value_config": None}
+            "src.logic.posts.post_processing.handle_delete_post": {
+                "return_value_config": None
+            }
         }
 
     @classmethod
