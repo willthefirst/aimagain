@@ -12,7 +12,7 @@ from src.api.common import (
     validate_or_422,
 )
 from src.auth_config import current_active_user
-from src.logic.provider_processing import (
+from src.logic.providers.provider_processing import (
     handle_create_certification,
     handle_create_education,
     handle_create_licensure,

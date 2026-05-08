@@ -12,7 +12,7 @@ from src.api.common import (
     validate_or_422,
 )
 from src.auth_config import current_active_user
-from src.logic.post_processing import (
+from src.logic.posts.post_processing import (
     handle_create_post,
     handle_delete_post,
     handle_get_post_detail,
