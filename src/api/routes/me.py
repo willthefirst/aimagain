@@ -4,7 +4,14 @@ from fastapi import APIRouter, Depends, Request
 
 from src.api.common import APIResponse, BaseRouter
 from src.auth_config import current_active_user
+from src.logic.provider_profile_processing import handle_list_user_provider_profiles
 from src.models import User
+from src.repositories.dependencies import (
+    get_provider_profile_repository,
+    get_user_repository,
+)
+from src.repositories.provider_profile_repository import ProviderProfileRepository
+from src.repositories.user_repository import UserRepository
 from src.schemas.user import UserRead
 
 logger = logging.getLogger(__name__)
@@ -34,5 +41,28 @@ async def get_my_profile(
     return APIResponse.html_response(
         template_name="me/profile.html",
         context={"user": user},
+        request=request,
+    )
+
+
+@router.get("/provider-profiles")
+async def list_my_provider_profiles(
+    request: Request,
+    repo: ProviderProfileRepository = Depends(get_provider_profile_repository),
+    user_repo: UserRepository = Depends(get_user_repository),
+    user: User = Depends(current_active_user),
+):
+    """Renders the current user's provider-profile list. Convenience alias
+    for `GET /users/{requesting_user.id}/provider-profiles`."""
+    context = await handle_list_user_provider_profiles(
+        request=request,
+        target_user_id=user.id,
+        repo=repo,
+        user_repo=user_repo,
+        requesting_user=user,
+    )
+    return APIResponse.html_response(
+        template_name="users/provider_profiles_list.html",
+        context=context,
         request=request,
     )

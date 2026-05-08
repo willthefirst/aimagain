@@ -35,6 +35,16 @@ class ProviderProfileRepository(BaseRepository):
         result = await self.session.execute(stmt)
         return result.scalars().first()
 
+    async def list_for_user(self, user_id: UUID) -> Sequence[ProviderProfile]:
+        """Lists every profile owned by the given user, newest first."""
+        stmt = (
+            select(ProviderProfile)
+            .filter(ProviderProfile.user_id == user_id)
+            .order_by(ProviderProfile.created_at.desc())
+        )
+        result = await self.session.execute(stmt)
+        return result.scalars().all()
+
     async def list_profiles(
         self,
         *,

@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block title %}Provider profiles — {{ target_user.username }}{% endblock %}
+{% block content %}
+{% if is_self %}
+<h1 id="user-provider-profiles-heading">Your provider profiles</h1>
+{% else %}
+<h1 id="user-provider-profiles-heading">{{ target_user.username }}&rsquo;s provider profiles</h1>
+{% endif %}
+
+{% if profiles %}
+<ul id="user-provider-profiles" class="profiles-list">
+  {%- for profile in profiles %}
+  <li>
+    <a href="/provider-profiles/{{ profile.id }}">{{ profile.practice_name }}</a>
+    &mdash; {{ profile.location_city }}, {{ profile.location_state }}
+  </li>
+  {%- endfor %}
+</ul>
+{% else %}
+<p id="user-provider-profiles-empty">
+  {% if is_self %}
+  You have not created any provider profiles yet.
+  <a href="/provider-profiles/form">Create your first profile</a>.
+  {% else %}
+  This user has no provider profiles yet.
+  {% endif %}
+</p>
+{% endif %}
+{% endblock %}

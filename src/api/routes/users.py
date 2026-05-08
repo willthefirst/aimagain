@@ -6,6 +6,7 @@ from fastapi.responses import JSONResponse
 
 from src.api.common import APIResponse, BaseRouter
 from src.auth_config import current_active_user, current_admin_user
+from src.logic.provider_profile_processing import handle_list_user_provider_profiles
 from src.logic.user_processing import (
     handle_delete_user,
     handle_get_user_detail,
@@ -14,7 +15,12 @@ from src.logic.user_processing import (
 )
 from src.models import User
 from src.repositories.audit_repository import AuditRepository
-from src.repositories.dependencies import get_audit_repository, get_user_repository
+from src.repositories.dependencies import (
+    get_audit_repository,
+    get_provider_profile_repository,
+    get_user_repository,
+)
+from src.repositories.provider_profile_repository import ProviderProfileRepository
 from src.repositories.user_repository import UserRepository
 from src.schemas.user import UserActivationUpdate
 
@@ -59,6 +65,29 @@ async def get_user(
     )
     return APIResponse.html_response(
         template_name="users/detail.html", context=context, request=request
+    )
+
+
+@router.get("/{user_id}/provider-profiles")
+async def list_user_provider_profiles(
+    user_id: UUID,
+    request: Request,
+    profile_repo: ProviderProfileRepository = Depends(get_provider_profile_repository),
+    user_repo: UserRepository = Depends(get_user_repository),
+    user: User = Depends(current_active_user),
+):
+    """Renders the provider-profile list for a user. Self or admin only."""
+    context = await handle_list_user_provider_profiles(
+        request=request,
+        target_user_id=user_id,
+        repo=profile_repo,
+        user_repo=user_repo,
+        requesting_user=user,
+    )
+    return APIResponse.html_response(
+        template_name="users/provider_profiles_list.html",
+        context=context,
+        request=request,
     )
 
 
