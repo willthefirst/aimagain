@@ -4,7 +4,7 @@ This file is the contract between you (the AI agent) and this codebase. Read it 
 
 ## Architecture in one line
 
-The code under `src/` is organized by **layer**, not by feature: `api/`, `services/`, `repositories/`, `models/`, `schemas/`, `logic/`, `middleware/`, `core/`, `templates/`. A new entity (e.g. a `Widget`) typically touches every layer. See [`src/README.md`](src/README.md) for layer responsibilities and the dependency rules between them.
+The code under `src/` is organized by **layer**, not by feature; each layer is a subdirectory of `src/`. A new entity typically touches every layer. See [`src/README.md`](src/README.md) for layer responsibilities, the dependency rules between layers, and the cluster pattern that organizes entities within each layer.
 
 ## Definition of done
 
