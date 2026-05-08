@@ -4,7 +4,7 @@ from uuid import UUID
 from fastapi import Request
 
 from src.api.common.exceptions import BadRequestError, ForbiddenError, NotFoundError
-from src.logic.audit import AuditAction, AuditedResource, record_audit_for
+from src.logic.audit import AuditAction, AuditedResource, mutate
 from src.models import REGISTERED_KINDS, Post, User
 from src.repositories.audit_repository import AuditRepository
 from src.repositories.post_repository import PostRepository
@@ -109,17 +109,15 @@ async def handle_create_post(
     detail = spec.detail_model(**{f: getattr(payload, f) for f in spec.detail_fields})
 
     created = await post_repo.create_post(post, detail)
-    await record_audit_for(
+    async with mutate(
+        post_repo,
         audit_repo,
+        actor=requesting_user,
+        target=created,
         resource=POST,
         verb="create",
-        actor_id=requesting_user.id,
-        target_id=created.id,
-        before=None,
-        after=POST.snapshot(created),
-    )
-    await post_repo.session.commit()
-    logger.info(f"Handler: user {requesting_user.id} created post {created.id}")
+    ):
+        pass
     return created
 
 
@@ -155,23 +153,19 @@ async def handle_update_post(
         )
 
     spec = REGISTERED_KINDS[payload.kind]
-    before = POST.snapshot(post)
-    updated = await post_repo.update_post(
-        post,
-        **{f: getattr(payload, f) for f in spec.detail_fields},
-    )
-    await record_audit_for(
+    async with mutate(
+        post_repo,
         audit_repo,
+        actor=requesting_user,
+        target=post,
         resource=POST,
         verb="update",
-        actor_id=requesting_user.id,
-        target_id=updated.id,
-        before=before,
-        after=POST.snapshot(updated),
-    )
-    await post_repo.session.commit()
-    logger.info(f"Handler: user {requesting_user.id} updated post {updated.id}")
-    return updated
+    ):
+        await post_repo.update_post(
+            post,
+            **{f: getattr(payload, f) for f in spec.detail_fields},
+        )
+    return post
 
 
 async def handle_delete_post(
@@ -194,17 +188,12 @@ async def handle_delete_post(
     if post.owner_id != requesting_user.id and not requesting_user.is_superuser:
         raise ForbiddenError(detail="Only the owner or an admin can delete this post")
 
-    before = POST.snapshot(post)
-    target_id = post.id
-    await record_audit_for(
+    async with mutate(
+        post_repo,
         audit_repo,
+        actor=requesting_user,
+        target=post,
         resource=POST,
         verb="delete",
-        actor_id=requesting_user.id,
-        target_id=target_id,
-        before=before,
-        after=None,
-    )
-    await post_repo.delete_post(post)
-    await post_repo.session.commit()
-    logger.info(f"Handler: user {requesting_user.id} deleted post {target_id}")
+    ):
+        await post_repo.delete_post(post)

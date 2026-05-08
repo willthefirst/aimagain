@@ -7,7 +7,17 @@ failure instead of a code-review catch.
 
 The check parses each `*_processing.py` in `src/logic/`, walks every
 `async def handle_*` function, and fails the test if the function calls
-`.commit()` without also calling `record_audit(...)` or `record_audit_for(...)`.
+`.commit()` without an audit-recording call. Three names satisfy the
+rule:
+
+  * `record_audit(...)` — the low-level helper, used by non-CRUD
+    mutations (register, set-activation).
+  * `record_audit_for(...)` — the resource-flavored helper used when
+    a handler doesn't fit the snapshot/mutate/audit/commit ritual.
+  * `mutate(...)` — the async context manager that wraps the ritual;
+    it calls `record_audit_for` and `session.commit()` internally, so a
+    handler that uses it never types `.commit()` directly. The check
+    treats a `mutate` call as satisfying the rule.
 
 Opt-out: add `audit-discipline-ignore` to the function's docstring with a
 brief reason. Use sparingly — the rule is the rule for a good reason.
@@ -81,19 +91,22 @@ def test_handler_obeys_audit_discipline(path: Path, func: ast.AsyncFunctionDef) 
     if _is_opted_out(func):
         pytest.skip(f"{func.name} opted out via audit-discipline-ignore")
 
-    commits = _has_call_named(func, "commit")
-    audits = _has_call_named(func, "record_audit") or _has_call_named(
-        func, "record_audit_for"
+    commits = _has_call_named(func, "commit") or _has_call_named(func, "mutate")
+    audits = (
+        _has_call_named(func, "record_audit")
+        or _has_call_named(func, "record_audit_for")
+        or _has_call_named(func, "mutate")
     )
 
     if commits and not audits:
         pytest.fail(
             f"{path.name}::{func.name} calls .commit() without record_audit. "
             "Mutation handlers MUST write an audit row in the same transaction "
-            "(RESOURCE_GRAMMAR.md:135). Either add a `record_audit(...)` or "
-            "`record_audit_for(...)` call before the commit, or — if this "
-            "handler legitimately doesn't mutate — annotate its docstring "
-            "with `audit-discipline-ignore: <reason>`."
+            "(RESOURCE_GRAMMAR.md:135). Either wrap the mutation in "
+            "`async with mutate(...)`, or add a `record_audit(...)` / "
+            "`record_audit_for(...)` call before the commit. If this handler "
+            "legitimately doesn't mutate, annotate its docstring with "
+            "`audit-discipline-ignore: <reason>`."
         )
 
 
@@ -105,18 +118,20 @@ def test_check_finds_handlers() -> None:
 
 
 def test_at_least_one_handler_actually_audits() -> None:
-    """Sanity: at least one handler in the codebase calls record_audit
-    or record_audit_for. If this fails, the import-graph or AST walk is
-    broken — not a discipline failure, a self-test failure.
+    """Sanity: at least one handler in the codebase records audit
+    (via `record_audit`, `record_audit_for`, or `mutate`). If this fails,
+    the import-graph or AST walk is broken — not a discipline failure,
+    a self-test failure.
     """
     auditing = [
         (path, func)
         for path, func in HANDLERS
         if _has_call_named(func, "record_audit")
         or _has_call_named(func, "record_audit_for")
+        or _has_call_named(func, "mutate")
     ]
     assert auditing, (
-        "no handler calls record_audit — either the AST walk is broken or "
+        "no handler records audit — either the AST walk is broken or "
         "the audit retrofit hasn't shipped"
     )
 
@@ -164,6 +179,22 @@ async def handle_good_for(repo, audit_repo, user):
 """)
     assert _has_call_named(good, "commit")
     assert _has_call_named(good, "record_audit_for")
+
+
+def test_check_approves_handler_that_uses_mutate() -> None:
+    """The discipline check accepts `mutate(...)` — it owns the audit
+    + commit internally, so a handler that uses it never types either
+    name directly."""
+    good = _parse_handler("""
+async def handle_good_mutate(repo, audit_repo, user, target):
+    async with mutate(repo, audit_repo, actor=user, target=target,
+                      resource=R, verb="update"):
+        await repo.update_X(target, x=1)
+""")
+    assert _has_call_named(good, "mutate")
+    assert not _has_call_named(good, "record_audit")
+    assert not _has_call_named(good, "record_audit_for")
+    assert not _has_call_named(good, "commit")
 
 
 def test_check_skips_handler_with_opt_out_in_docstring() -> None:

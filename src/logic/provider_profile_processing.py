@@ -23,7 +23,7 @@ from fastapi import Request
 from pydantic import BaseModel
 
 from src.api.common.exceptions import BadRequestError, ForbiddenError, NotFoundError
-from src.logic.audit import AuditAction, AuditedResource, record_audit_for
+from src.logic.audit import AuditAction, AuditedResource, mutate
 from src.models import (
     ProviderCertification,
     ProviderEducation,
@@ -111,6 +111,17 @@ async def _load_profile_or_404(
     if profile is None:
         raise NotFoundError(detail="Provider profile not found")
     return profile
+
+
+async def _load_subrow_or_404(getter, sub_id: UUID, parent_id: UUID, *, name: str):
+    """Load a credential sub-row and verify its `profile_id` matches the
+    URL's `profile_id`. 404 if missing or if the FK is for a different
+    parent — without this, `/profiles/A/licensures/B` would silently
+    mutate a sub-row owned by profile B."""
+    row = await getter(sub_id)
+    if row is None or row.profile_id != parent_id:
+        raise NotFoundError(detail=f"{name} not found")
+    return row
 
 
 # --- Profile handlers ----------------------------------------------------
@@ -205,19 +216,15 @@ async def handle_create_profile(
     for certification in payload.certifications:
         await repo.add_certification(created, **certification.model_dump())
 
-    await record_audit_for(
+    async with mutate(
+        repo,
         audit_repo,
+        actor=requesting_user,
+        target=created,
         resource=PROFILE,
         verb="create",
-        actor_id=requesting_user.id,
-        target_id=created.id,
-        before=None,
-        after=PROFILE.snapshot(created),
-    )
-    await repo.session.commit()
-    logger.info(
-        f"Handler: user {requesting_user.id} created provider profile {created.id}"
-    )
+    ):
+        pass
     return created
 
 
@@ -232,24 +239,16 @@ async def handle_update_profile(
     profile = await _load_profile_or_404(profile_id, repo)
     _assert_can_mutate(profile, requesting_user)
 
-    before = PROFILE.snapshot(profile)
-    updated = await repo.update_profile(
-        profile, **payload.model_dump(exclude_unset=True)
-    )
-    await record_audit_for(
+    async with mutate(
+        repo,
         audit_repo,
+        actor=requesting_user,
+        target=profile,
         resource=PROFILE,
         verb="update",
-        actor_id=requesting_user.id,
-        target_id=updated.id,
-        before=before,
-        after=PROFILE.snapshot(updated),
-    )
-    await repo.session.commit()
-    logger.info(
-        f"Handler: user {requesting_user.id} updated provider profile {updated.id}"
-    )
-    return updated
+    ):
+        await repo.update_profile(profile, **payload.model_dump(exclude_unset=True))
+    return profile
 
 
 async def handle_delete_profile(
@@ -268,22 +267,15 @@ async def handle_delete_profile(
     profile = await _load_profile_or_404(profile_id, repo)
     _assert_can_mutate(profile, requesting_user)
 
-    before = PROFILE.snapshot(profile)
-    target_id = profile.id
-    await record_audit_for(
+    async with mutate(
+        repo,
         audit_repo,
+        actor=requesting_user,
+        target=profile,
         resource=PROFILE,
         verb="delete",
-        actor_id=requesting_user.id,
-        target_id=target_id,
-        before=before,
-        after=None,
-    )
-    await repo.delete_profile(profile)
-    await repo.session.commit()
-    logger.info(
-        f"Handler: user {requesting_user.id} deleted provider profile {target_id}"
-    )
+    ):
+        await repo.delete_profile(profile)
 
 
 # --- Licensure handlers --------------------------------------------------
@@ -300,16 +292,15 @@ async def handle_create_licensure(
     _assert_can_mutate(profile, requesting_user)
 
     created = await repo.add_licensure(profile, **payload.model_dump())
-    await record_audit_for(
+    async with mutate(
+        repo,
         audit_repo,
+        actor=requesting_user,
+        target=created,
         resource=LICENSURE,
         verb="create",
-        actor_id=requesting_user.id,
-        target_id=created.id,
-        before=None,
-        after=LICENSURE.snapshot(created),
-    )
-    await repo.session.commit()
+    ):
+        pass
     return created
 
 
@@ -324,25 +315,19 @@ async def handle_update_licensure(
     profile = await _load_profile_or_404(profile_id, repo)
     _assert_can_mutate(profile, requesting_user)
 
-    licensure = await repo.get_licensure_by_id(licensure_id)
-    if licensure is None or licensure.profile_id != profile.id:
-        raise NotFoundError(detail="Licensure not found")
-
-    before = LICENSURE.snapshot(licensure)
-    updated = await repo.update_licensure(
-        licensure, **payload.model_dump(exclude_unset=True)
+    licensure = await _load_subrow_or_404(
+        repo.get_licensure_by_id, licensure_id, profile.id, name="Licensure"
     )
-    await record_audit_for(
+    async with mutate(
+        repo,
         audit_repo,
+        actor=requesting_user,
+        target=licensure,
         resource=LICENSURE,
         verb="update",
-        actor_id=requesting_user.id,
-        target_id=updated.id,
-        before=before,
-        after=LICENSURE.snapshot(updated),
-    )
-    await repo.session.commit()
-    return updated
+    ):
+        await repo.update_licensure(licensure, **payload.model_dump(exclude_unset=True))
+    return licensure
 
 
 async def handle_delete_licensure(
@@ -355,23 +340,18 @@ async def handle_delete_licensure(
     profile = await _load_profile_or_404(profile_id, repo)
     _assert_can_mutate(profile, requesting_user)
 
-    licensure = await repo.get_licensure_by_id(licensure_id)
-    if licensure is None or licensure.profile_id != profile.id:
-        raise NotFoundError(detail="Licensure not found")
-
-    before = LICENSURE.snapshot(licensure)
-    target_id = licensure.id
-    await record_audit_for(
+    licensure = await _load_subrow_or_404(
+        repo.get_licensure_by_id, licensure_id, profile.id, name="Licensure"
+    )
+    async with mutate(
+        repo,
         audit_repo,
+        actor=requesting_user,
+        target=licensure,
         resource=LICENSURE,
         verb="delete",
-        actor_id=requesting_user.id,
-        target_id=target_id,
-        before=before,
-        after=None,
-    )
-    await repo.delete_licensure(licensure)
-    await repo.session.commit()
+    ):
+        await repo.delete_licensure(licensure)
 
 
 # --- Education handlers --------------------------------------------------
@@ -388,16 +368,15 @@ async def handle_create_education(
     _assert_can_mutate(profile, requesting_user)
 
     created = await repo.add_education(profile, **payload.model_dump())
-    await record_audit_for(
+    async with mutate(
+        repo,
         audit_repo,
+        actor=requesting_user,
+        target=created,
         resource=EDUCATION,
         verb="create",
-        actor_id=requesting_user.id,
-        target_id=created.id,
-        before=None,
-        after=EDUCATION.snapshot(created),
-    )
-    await repo.session.commit()
+    ):
+        pass
     return created
 
 
@@ -412,25 +391,19 @@ async def handle_update_education(
     profile = await _load_profile_or_404(profile_id, repo)
     _assert_can_mutate(profile, requesting_user)
 
-    education = await repo.get_education_by_id(education_id)
-    if education is None or education.profile_id != profile.id:
-        raise NotFoundError(detail="Education entry not found")
-
-    before = EDUCATION.snapshot(education)
-    updated = await repo.update_education(
-        education, **payload.model_dump(exclude_unset=True)
+    education = await _load_subrow_or_404(
+        repo.get_education_by_id, education_id, profile.id, name="Education entry"
     )
-    await record_audit_for(
+    async with mutate(
+        repo,
         audit_repo,
+        actor=requesting_user,
+        target=education,
         resource=EDUCATION,
         verb="update",
-        actor_id=requesting_user.id,
-        target_id=updated.id,
-        before=before,
-        after=EDUCATION.snapshot(updated),
-    )
-    await repo.session.commit()
-    return updated
+    ):
+        await repo.update_education(education, **payload.model_dump(exclude_unset=True))
+    return education
 
 
 async def handle_delete_education(
@@ -443,23 +416,18 @@ async def handle_delete_education(
     profile = await _load_profile_or_404(profile_id, repo)
     _assert_can_mutate(profile, requesting_user)
 
-    education = await repo.get_education_by_id(education_id)
-    if education is None or education.profile_id != profile.id:
-        raise NotFoundError(detail="Education entry not found")
-
-    before = EDUCATION.snapshot(education)
-    target_id = education.id
-    await record_audit_for(
+    education = await _load_subrow_or_404(
+        repo.get_education_by_id, education_id, profile.id, name="Education entry"
+    )
+    async with mutate(
+        repo,
         audit_repo,
+        actor=requesting_user,
+        target=education,
         resource=EDUCATION,
         verb="delete",
-        actor_id=requesting_user.id,
-        target_id=target_id,
-        before=before,
-        after=None,
-    )
-    await repo.delete_education(education)
-    await repo.session.commit()
+    ):
+        await repo.delete_education(education)
 
 
 # --- Certification handlers ----------------------------------------------
@@ -476,16 +444,15 @@ async def handle_create_certification(
     _assert_can_mutate(profile, requesting_user)
 
     created = await repo.add_certification(profile, **payload.model_dump())
-    await record_audit_for(
+    async with mutate(
+        repo,
         audit_repo,
+        actor=requesting_user,
+        target=created,
         resource=CERTIFICATION,
         verb="create",
-        actor_id=requesting_user.id,
-        target_id=created.id,
-        before=None,
-        after=CERTIFICATION.snapshot(created),
-    )
-    await repo.session.commit()
+    ):
+        pass
     return created
 
 
@@ -500,25 +467,24 @@ async def handle_update_certification(
     profile = await _load_profile_or_404(profile_id, repo)
     _assert_can_mutate(profile, requesting_user)
 
-    certification = await repo.get_certification_by_id(certification_id)
-    if certification is None or certification.profile_id != profile.id:
-        raise NotFoundError(detail="Certification not found")
-
-    before = CERTIFICATION.snapshot(certification)
-    updated = await repo.update_certification(
-        certification, **payload.model_dump(exclude_unset=True)
+    certification = await _load_subrow_or_404(
+        repo.get_certification_by_id,
+        certification_id,
+        profile.id,
+        name="Certification",
     )
-    await record_audit_for(
+    async with mutate(
+        repo,
         audit_repo,
+        actor=requesting_user,
+        target=certification,
         resource=CERTIFICATION,
         verb="update",
-        actor_id=requesting_user.id,
-        target_id=updated.id,
-        before=before,
-        after=CERTIFICATION.snapshot(updated),
-    )
-    await repo.session.commit()
-    return updated
+    ):
+        await repo.update_certification(
+            certification, **payload.model_dump(exclude_unset=True)
+        )
+    return certification
 
 
 async def handle_delete_certification(
@@ -531,20 +497,18 @@ async def handle_delete_certification(
     profile = await _load_profile_or_404(profile_id, repo)
     _assert_can_mutate(profile, requesting_user)
 
-    certification = await repo.get_certification_by_id(certification_id)
-    if certification is None or certification.profile_id != profile.id:
-        raise NotFoundError(detail="Certification not found")
-
-    before = CERTIFICATION.snapshot(certification)
-    target_id = certification.id
-    await record_audit_for(
+    certification = await _load_subrow_or_404(
+        repo.get_certification_by_id,
+        certification_id,
+        profile.id,
+        name="Certification",
+    )
+    async with mutate(
+        repo,
         audit_repo,
+        actor=requesting_user,
+        target=certification,
         resource=CERTIFICATION,
         verb="delete",
-        actor_id=requesting_user.id,
-        target_id=target_id,
-        before=before,
-        after=None,
-    )
-    await repo.delete_certification(certification)
-    await repo.session.commit()
+    ):
+        await repo.delete_certification(certification)

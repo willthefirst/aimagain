@@ -21,15 +21,23 @@ the row's `before`/`after` JSON. Declare one per audited resource alongside
 your `handle_*` definitions and call `record_audit_for(...)` instead of
 re-typing the three constants at every callsite. Non-CRUD audits (register,
 set-activation, etc.) keep using `record_audit(...)` directly.
+
+`mutate(...)` is an async context manager that wraps the snapshot-before /
+mutate / record_audit / commit ritual. Inside the `async with` body the
+caller does the actual mutation; on a clean exit the context manager
+captures the post-mutation snapshot, records the audit row, and commits.
+On an exception the audit row is not written and no commit fires, so the
+transaction rolls back atomically.
 """
 
 import logging
+from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from enum import Enum
 from typing import Any, Callable, Literal
 from uuid import UUID
 
-from src.models import AuditLog
+from src.models import AuditLog, User
 from src.repositories.audit_repository import AuditRepository
 
 logger = logging.getLogger(__name__)
@@ -143,4 +151,54 @@ async def record_audit_for(
         action=resource.action_for(verb),
         before=before,
         after=after,
+    )
+
+
+@asynccontextmanager
+async def mutate(
+    repo: Any,
+    audit_repo: AuditRepository,
+    *,
+    actor: User,
+    target: Any,
+    resource: AuditedResource,
+    verb: Verb,
+):
+    """Wrap the snapshot-before / mutate / record_audit / commit ritual.
+
+    Use inside a mutation handler:
+
+        async with mutate(repo, audit_repo, actor=user, target=licensure,
+                          resource=LICENSURE, verb="update"):
+            await repo.update_licensure(licensure, **payload.model_dump(exclude_unset=True))
+
+    Snapshot timing:
+      - `before` is captured before yielding (None for `verb="create"`).
+      - `after` is captured after the body returns (None for `verb="delete"`).
+      - `target.id` is captured up-front so a delete still has it after
+        the row is gone.
+
+    Exceptions raised in the body propagate; the audit row and commit
+    are skipped, so the transaction rolls back atomically. This is the
+    load-bearing contract: a mutation that raises must not produce an
+    audit row, and an audit row must never be durable without its
+    matching mutation.
+    """
+    target_id: UUID = target.id
+    before = None if verb == "create" else resource.snapshot(target)
+    yield
+    after = None if verb == "delete" else resource.snapshot(target)
+    await record_audit_for(
+        audit_repo,
+        resource=resource,
+        verb=verb,
+        actor_id=actor.id,
+        target_id=target_id,
+        before=before,
+        after=after,
+    )
+    await repo.session.commit()
+    logger.info(
+        f"Handler: actor={actor.id} {resource.action_for(verb).value} "
+        f"{resource.type}/{target_id}"
     )
