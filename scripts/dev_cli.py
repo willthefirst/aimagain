@@ -256,6 +256,10 @@ class QualityCommands:
                 "🏷️ Checking title case...",
                 [sys.executable, "scripts/dev/title_case_check.py", "--check-only"],
             ),
+            (
+                "🔗 Checking template import boundaries...",
+                [sys.executable, "scripts/dev/template_imports_check.py"],
+            ),
         ]
 
         exit_code = 0
