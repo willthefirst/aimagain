@@ -104,59 +104,37 @@ There is no separate domain-error hierarchy (e.g. `ServiceError`, `BusinessRuleE
 
 ## Domain entities and the cluster pattern
 
-The codebase has a small set of top-level domain entities — currently `posts`, `providers`, `users`, `auth`, `me`, `audit` — and the layer matrix above is only one axis of the architecture. The other axis is **the entity itself**: every entity should have a 1:1 directory presence at every layer that touches it, and every layer should have a *shared tier* at the parent level for genuinely cross-entity infrastructure.
+The layer matrix above is one axis of the architecture; the other is the **domain entity**. Every domain entity has a 1:1 directory presence at each layer that touches it, and every layer has a *shared tier* at the parent level for genuinely cross-entity infrastructure. The directory listing IS the entity registry — `ls src/<layer>/` is the source of truth for what entities exist.
 
-**The import rule.** A file in `<layer>/<entity>/` may import from its own cluster and from the layer's shared tier. Cross-cluster imports (e.g. `models/posts/foo.py` importing from `models/providers/`) are forbidden — fix the design or hoist the shared piece into the parent. Two lint checks enforce this:
+**The import rule.** A file in `<layer>/<entity>/` may import from its own cluster and from the layer's shared tier (anything at `<layer>/`'s parent level). Cross-cluster imports (a file in cluster A importing from cluster B) are forbidden — fix the design or hoist the shared piece into the parent. Two lint checks enforce this:
 
 - [`scripts/dev/template_imports_check.py`](../scripts/dev/template_imports_check.py) — Jinja `{% extends/include/from/import %}` directives across `src/templates/`.
-- [`scripts/dev/python_cluster_imports_check.py`](../scripts/dev/python_cluster_imports_check.py) — Python `from ...` imports across `src/models/`, `src/schemas/`, `src/repositories/`, `src/logic/`. Cluster directories are auto-discovered (any subdirectory with `.py` files) so a future cluster picks up the rule for free.
+- [`scripts/dev/python_cluster_imports_check.py`](../scripts/dev/python_cluster_imports_check.py) — Python `from ...` imports across the clustered Python layers. Cluster directories are auto-discovered (any subdirectory with `.py` files) so new entities and new clusters pick up the rule for free.
 
 Both run as part of `dev lint` and as pre-commit hooks scoped to the relevant file globs.
 
-**Current state of the convention across layers.**
-
-| Layer | Cluster directories | Parent-level shared tier |
-| --- | --- | --- |
-| `templates/` | yes (all entities) | `_shared/`, `base.html` |
-| `models/` | partial — `posts/`, `providers/` ([#191](https://github.com/willthefirst/bedlam-connect/pull/191)); `user.py` not yet a cluster | `enums.py`, `base.py`, `audit_log.py` |
-| `schemas/` | yes — `posts/`, `providers/`, `users/` ([#209](https://github.com/willthefirst/bedlam-connect/pull/209)) | `_validators.py` |
-| `repositories/` | yes — `posts/`, `providers/`, `users/`, `audit/` ([#210](https://github.com/willthefirst/bedlam-connect/pull/210)) | `base.py`, `dependencies.py` |
-| `logic/` | yes — `posts/`, `providers/`, `users/`, `auth/` ([#211](https://github.com/willthefirst/bedlam-connect/pull/211)) | `audit.py` |
-| `api/routes/` | not applicable — single-file-per-entity is the layer's shape; URL grammar in [`api/routes/RESOURCE_GRAMMAR.md`](api/routes/RESOURCE_GRAMMAR.md) handles the per-entity contract | `common/` |
-
-The remaining migration is `src/models/users/` (currently `models/user.py`) — small, optional, takes the rule from "convention everywhere it can apply" to "convention everywhere full stop."
-
-**Documentation locality.** The same shape applies to READMEs. A layer's parent README describes the layer's *contract* (what's a repository, what may it depend on) and the shared tier; entity-specific facts that are non-trivial enough to write down belong in the entity cluster's own README (`<layer>/<entity>/README.md`). When an entity has nothing surprising to say at a layer, no entity README is required — silence is fine. This avoids the "fact stated in two places" drift the [single-source-of-truth rule](../CLAUDE.md#one-source-of-truth--link-dont-copy) calls out: each fact has exactly one home.
+**Documentation locality.** Parent READMEs describe the layer's contract — what a repository is, what it depends on, what the shared tier provides — but do not enumerate which entities currently exist or list per-entity contents. Entity-specific facts live in the cluster's own README (`<layer>/<entity>/README.md`); when an entity has nothing surprising to say at a layer, no cluster README is required. This is the [grammar-not-alphabet rule](../CLAUDE.md#grammar-not-alphabet) applied to README content.
 
 ## Directory structure
 
-**Core files:**
+**Core files** at `src/`:
 
 - `main.py` - FastAPI application entry point
 - `db.py` - Database configuration and sessions
 - `auth_config.py` - Authentication setup (FastAPI-Users with JWT cookies)
 
-**Main layers:**
+**Layers** (each with its own README describing the layer's contract):
 
 - `api/` - HTTP API layer
-  - `routes/` - Route definitions by domain
-  - `common/` - Shared utilities, decorators, and the API exception classes
-- `logic/` - Business logic, orchestration, and the transaction commit
-  - `<entity>_processing.py` - `handle_*` functions per entity
-  - `audit.py` - Audit-log helper used by mutation handlers
-- `repositories/` - Data access layer
-  - `user_repository.py` - User data access
-  - `base.py` - Common repository patterns
+- `logic/` - Business logic, orchestration, transaction commit
+- `repositories/` - Data access
 - `models/` - Database models
-  - `user.py` - User model (with `username` field)
-  - `base.py` - Common model fields (UUID, timestamps, soft delete)
-
-**Supporting components:**
-
 - `schemas/` - Request/response validation (Pydantic)
-- `templates/` - HTML templates for web interface (Jinja2 + HTMX)
-- `middleware/` - Cross-cutting concerns (currently empty)
-- `core/` - Configuration and utilities
+- `templates/` - HTML templates (Jinja2 + HTMX)
+- `middleware/` - Cross-cutting concerns
+- `core/` - Configuration, utilities
+
+Each clustered layer has the shape `<layer>/<entity>/...` for entity-specific code plus parent-level files for the shared tier; see the layer's README for its contract.
 
 ## Implementation patterns
 

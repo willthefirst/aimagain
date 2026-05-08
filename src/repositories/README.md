@@ -57,31 +57,16 @@ class [Entity]Repository:
 
 Each repository manages one primary domain entity with related data access operations.
 
-## Repository responsibility matrix
+## Layer organization
 
-| Repository         | Primary Entity | Key Responsibilities                                                          |
-| ------------------ | -------------- | ----------------------------------------------------------------------------- |
-| **UserRepository** | User           | User lookup, listing, activation toggle, hard delete                          |
-| **PostRepository** | Post (parent + per-kind detail) | Post lookup by id, list all posts (newest first), persist a new post + its detail row in one flush (the detail's type — `ClientReferralDetail` or `ProviderAvailabilityDetail` — picks the relationship via `KIND_BY_DETAIL_MODEL`), partial update (per-kind fields on the matching `*_detail` row, dispatched via `REGISTERED_KINDS[post.kind]`), hard delete (CASCADE removes the detail; caller commits) |
-| **ProviderRepository** | Provider (parent + cascade-managed sub-tables) | Profile CRUD (`get_by_id`, `get_by_user_id`, `create_provider`, `update_provider`, `delete_provider`); filterable `list_providers(license_type=, issuing_state=)` joins through `provider_licensures` and `.distinct()`s the parent rows; per-sub-table CRUD (`add_*` / `update_*` / `delete_*`) for licensures, educations, and certifications. Cascade on delete via ORM `all, delete-orphan` + FK `ON DELETE CASCADE`. |
-| **AuditRepository** | AuditLog | Append-only writes (`record(...)`), single-row read, list-by-resource. No update or delete methods — audit rows are immutable. |
+Repositories follow the [cluster pattern](../README.md#domain-entities-and-the-cluster-pattern):
 
-## Directory structure
+- One cluster directory per domain entity (`<entity>/`). Each holds `<entity>_repository.py` (the repository class with its data-access methods) plus `test_<entity>_repository.py`. Per-entity query patterns, eager-loading choices, cascade behavior, and read filters live inside the cluster, with a `<entity>/README.md` if anything is non-obvious.
+- Parent-level shared tier:
+  - `base.py` — `BaseRepository` generic with common session management. Every repository inherits from it.
+  - `dependencies.py` — FastAPI `Depends()` providers that wire each repository to the request-scoped session. Adding a new repository means appending one provider here.
 
-Repositories follow the [cluster pattern](../README.md#domain-entities-and-the-cluster-pattern): one cluster directory per entity; tests colocated. `base.py` and `dependencies.py` stay at the parent level as the shared tier.
-
-**Cluster directories** (one per entity):
-
-- `users/user_repository.py` - User data access and lookup
-- `posts/post_repository.py` + `posts/test_post_repository.py` - Post data access and lookup
-- `providers/provider_repository.py` + `providers/test_provider_repository.py` - Provider directory entry + cascade-managed credential sub-tables
-- `audit/audit_repository.py` + `audit/test_audit_repository.py` - Append-only audit log writes and reads
-
-**Parent-level shared tier:**
-
-- `base.py` - BaseRepository with common session management
-- `dependencies.py` - FastAPI `Depends()` providers wiring each repository to the request-scoped session
-- `dependencies.py` - FastAPI dependency injection for all repositories
+A repository does not import from a peer cluster's repository; if logic needs to coordinate two entities, that orchestration belongs in the [logic layer](../logic/README.md), not in repositories.
 
 ## Implementation patterns
 
