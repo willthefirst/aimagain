@@ -7,7 +7,7 @@ A **FastAPI skeleton/boilerplate** with server-side rendering, providing a clean
 Bedlam Connect provides a **production-ready project skeleton** with:
 
 - **Server-side rendering** with HTMX for progressive enhancement
-- **Clean architecture** with clear separation of concerns (Routes, Logic, Services, Repositories)
+- **Clean architecture** with clear separation of concerns — see [`src/README.md`](src/README.md) for the layer matrix
 - **User authentication** using FastAPI-Users with JWT cookie-based sessions
 - **Production-ready deployment** with Docker and CI/CD automation
 
@@ -44,18 +44,7 @@ This project follows a **single-source-of-truth** documentation convention: each
 
 ### Module-level documentation
 
-Every `src/<module>/` has its own README describing what it does, what it doesn't do, and its tests:
-
-- [`src/api/README.md`](src/api/README.md) — API layer
-  - [`src/api/routes/README.md`](src/api/routes/README.md) — route organization
-  - [`src/api/common/README.md`](src/api/common/README.md) — shared API utilities and the API exception classes
-- [`src/logic/README.md`](src/logic/README.md) — business logic, orchestration, transaction commits
-- [`src/repositories/README.md`](src/repositories/README.md) — data access
-- [`src/models/README.md`](src/models/README.md) — SQLAlchemy models
-- [`src/schemas/README.md`](src/schemas/README.md) — Pydantic request/response
-- [`src/middleware/README.md`](src/middleware/README.md) — middleware
-- [`src/core/README.md`](src/core/README.md) — config + templating
-- [`src/templates/README.md`](src/templates/README.md) — Jinja2 + HTMX templates
+Every directory under `src/` has its own README describing what the layer does, what it doesn't do, its parent-level shared tier, and its tests. Open them as you navigate — `src/README.md` is the entry point.
 
 ### Supporting documentation
 

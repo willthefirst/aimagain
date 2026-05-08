@@ -25,15 +25,9 @@ See [`../CLAUDE.md`](../CLAUDE.md) for the full definition-of-done contract that
 - **Unit tests for a specific module.** Those go next to the source: `src/<module>/test_*.py`.
 - **Module-specific fixtures.** If a fixture is only useful for one module's tests, define it in a `conftest.py` next to that module's tests.
 
-## Where the colocated tests are today
+## Finding the colocated tests
 
-| Module | Tests |
-| --- | --- |
-| `src/api/routes/` | `test_auth_routes.py`, `test_users.py`, `test_posts.py` |
-| `src/schemas/` | `test_post.py` |
-| `src/repositories/` | `test_audit_repository.py`, `test_post_repository.py` |
-| `src/logic/` | `test_audit.py`, `test_audit_discipline.py` |
-| `src/models/` | `test_post_kinds.py` |
+`find src -name 'test_*.py'` lists every colocated test in the codebase. They live next to the source they cover, named `test_<source>.py`. Don't maintain a list of test files in this README — `find` is the registry.
 
 ## Cross-layer tests: the documented exception
 

@@ -1,9 +1,3 @@
----
-description:
-globs:
-alwaysApply: false
----
-
 # API layer: HTTP routes and request handling
 
 The `api/` directory contains all HTTP-related code, organized around **domain-driven routing** with consistent patterns for error handling, logging, and response formatting.
@@ -76,32 +70,10 @@ async def create_entity(
 
 Routes are organized by domain and use consistent patterns for common concerns.
 
-## API organization matrix
+## Layer organization
 
-| Component      | Purpose                         | Example Files              | Dependencies               |
-| -------------- | ------------------------------- | -------------------------- | -------------------------- |
-| **Routes**     | HTTP endpoints by domain        | `routes/users.py`          | Logic handlers, Repositories, Schemas |
-| **Common**     | Shared utilities and patterns   | `common/base_router.py`    | FastAPI, Decorators        |
-| **Logic**      | Business logic + commit         | `../logic/*_processing.py` | Repositories, Schemas, API exceptions |
-| **Responses**  | Standardized response formats   | `common/responses.py`      | Templates, JSON            |
-
-## Directory structure
-
-**Core API files:**
-
-- `routes/` - Domain-organized HTTP endpoints
-  - `users.py` - User-related endpoints
-  - `me.py` - Current user profile endpoints
-  - `auth_routes.py` - Authentication API endpoints
-  - `auth_pages.py` - Authentication web pages
-
-**Common utilities:**
-
-- `common/` - Shared API patterns and utilities
-  - `base_router.py` - Router wrapper with standard decorators
-  - `decorators.py` - Error handling and logging decorators
-  - `exceptions.py` - `APIException` subclasses raised by logic; fastapi-users translator
-  - `responses.py` - Standardized response formats
+- `routes/` — HTTP endpoint definitions, one file per resource. See [`routes/README.md`](routes/README.md) for the route organization contract and the URL grammar that every resource follows ([`routes/RESOURCE_GRAMMAR.md`](routes/RESOURCE_GRAMMAR.md)).
+- `common/` — shared API infrastructure: `BaseRouter` (auto-applied error handling + logging decorators), `APIException` subclasses (`NotFoundError`, `ForbiddenError`, etc.) raised by logic and passed through to FastAPI, the fastapi-users error translator, and the standardized `APIResponse` helpers. See [`common/README.md`](common/README.md).
 
 ## Implementation patterns
 

@@ -10,7 +10,7 @@ Routes are **ultra-thin HTTP adapters** that handle request parsing, delegate to
 
 ### What we do
 
-- **Domain organization**: Routes grouped by business concepts (users, auth)
+- **Domain organization**: one route file per resource, named after the resource
 - **Thin route handlers**: Routes only handle HTTP concerns, business logic stays in processing layer
 - **Consistent delegation**: All routes delegate to processing functions in the `logic/` layer
 - **Standardized patterns**: BaseRouter provides consistent error handling and logging
@@ -69,34 +69,14 @@ async def create_entity(
 
 Routes are organized by domain with consistent delegation patterns.
 
-## Domain route organization matrix
+## Layer organization
 
-| Route File         | Domain               | Primary Responsibilities         | Main Endpoints                                                                                                                  | Dependencies          |
-| ------------------ | -------------------- | -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- | --------------------- |
-| **users.py**       | User data            | User listing, detail, admin actions, owned-provider list | `GET /users`, `GET /users/{id}`, `GET /users/{id}/providers` (self or admin), `PUT /users/{id}/activation` (admin), `DELETE /users/{id}` (admin) | UserRepository, ProviderRepository |
-| **posts.py**       | Posts                | Post listing, detail, create, partial update, hard delete, and per-kind create/edit form pages | `GET /posts`, `GET /posts/form?kind=…` (kinds from `REGISTERED_KINDS`), `GET /posts/{id}`, `GET /posts/{id}/form`, `POST /posts`, `PATCH /posts/{id}`, `DELETE /posts/{id}` | PostRepository        |
-| **providers.py** | Providers | Provider + credential sub-resource CRUD (form-encoded mutation bodies, JSON + `HX-Redirect` mutation responses) plus public HTML directory listing, HTML detail (`GET /{id}`), and create/edit form pages. Public listing; the rest require auth and authorize through the logic-layer's owner/admin guard. Mutation responses set `HX-Redirect` back to `/{id}/form` so the edit page is the post-submit landing for every provider + sub-resource mutation. The "current user's providers" view lives at `/users/me/providers` (see `me.py`), not on this resource. | `GET /providers` (public HTML, `?license_type=&issuing_state=` filters), `POST /providers`, `GET /providers/form`, `GET /providers/{id}` (HTML detail), `GET /providers/{id}/form`, `PATCH /providers/{id}`, `DELETE /providers/{id}`, plus `POST/PATCH/DELETE /providers/{id}/{licensures,educations,certifications}/...` | ProviderRepository |
-| **me.py**          | Current user context | User profile, current-user JSON, current-user providers | `GET /users/me`, `GET /users/me/profile`, `GET /users/me/providers`                                       | Auth, ProviderRepository |
-| **auth_routes.py** | Authentication API   | Login, register, password reset  | `/auth/*`                                                                                                                       | Authentication logic  |
-| **auth_pages.py**  | Authentication UI    | Login, register forms            | `/login`, `/register`                                                                                                           | Authentication logic  |
+- One route file per resource: `<resource>.py` defines the HTTP endpoints for that resource. Per-resource specifics — exact endpoints, mutation-response shapes, sub-resources, HX-Redirect behavior — live in that file's docstrings and (when worth writing down) in any cluster-level doc the resource owns.
+- `auth_routes.py` and `auth_pages.py` are the JSON-API and HTML-page split for authentication; both follow the same delegation pattern as resource routes.
+- `me.py` holds the `/users/me/*` aliases — current-user shortcuts whose handlers delegate to the same logic functions as the user-scoped routes, so behavior stays identical.
+- `__init__.py` re-exports the route modules.
 
-## Directory structure
-
-**Domain route files:**
-
-- `users.py` - User listing and access
-- `posts.py` - Post listing, detail, create, partial update, hard delete, and per-kind HTML form pages. `GET /posts/form?kind=…` selects the create-form template (`Literal[*KIND_NAMES]` from [`src/models/posts/post_kinds.py`](../../models/posts/post_kinds.py) → 422 on unknown kinds); `GET /posts/{id}/form` reads `spec.edit_template` from the same registry given the persisted `post.kind`. `POST /posts` accepts a kind-discriminated body (`kind` required); `PATCH /posts/{id}` rejects payloads whose `kind` doesn't match the persisted post. The `_patch_response_body` flatten reads the per-kind detail relationship + fields from `REGISTERED_KINDS`.
-- `providers.py` - Provider + three credential sub-resources (licensure, education, certification). Mounted at `/providers`. Form-encoded mutation bodies (the codebase standard); mutation responses are `JSONResponse` with `HX-Redirect`/`Location` headers. Read routes render HTML: `GET /providers` renders `providers/list.html` (public; the template includes a license-type / issuing-state filter form whose active values are echoed back as `selected_*` context keys), and `GET /providers/{id}` renders `providers/detail.html` (the `Edit` link is gated to owner-or-admin in the template using `current_user`). Listing is the only public read; everything else requires `current_active_user`. Authorization (owner-or-admin) is delegated entirely to the logic layer's `_assert_can_mutate` — routes are thin adapters that bind params, validate via per-schema `TypeAdapter`, and delegate to the matching `handle_*` function. Form-encoded bodies and the 422 translation flow through `parse_form_to_payload` and `validate_or_422` from `src/api/common/forms.py`. `GET /providers/form` returns the create-form HTML page (registered before `/{provider_id}` so the literal `form` is not parsed as a UUID); the form posts to `POST /providers`. `GET /providers/{id}/form` returns the edit-form HTML page (owner-or-admin guard via `handle_get_provider_edit_form`). All provider + sub-resource mutation responses (POST/PATCH/DELETE except parent DELETE) set `HX-Redirect: /providers/{id}/form` so the user lands back on the edit page; parent DELETE redirects to `/providers`. The "list providers owned by user X" view is an ownership-subresource of `users` and lives at `GET /users/{id}/providers` (in `users.py`) with a `/users/me/providers` alias (in `me.py`) — see `RESOURCE_GRAMMAR.md` on ownership subresources.
-- `me.py` - Current user shortcuts: `GET /users/me` (JSON), `GET /users/me/profile` (HTML user-identity page), and `GET /users/me/providers` (HTML list of providers owned by the current user — alias for `GET /users/{my_id}/providers`). The alias delegates to `handle_list_user_providers` so its auth/template/empty-state behavior is identical to the user-scoped form.
-
-**Authentication routes:**
-
-- `auth_routes.py` - JSON API endpoints for authentication
-- `auth_pages.py` - HTML forms for authentication
-
-**Package files:**
-
-- `__init__.py` - Route exports and package configuration
+The URL shape every resource MUST follow is defined in [`RESOURCE_GRAMMAR.md`](RESOURCE_GRAMMAR.md). This README documents how routes are wired; the grammar documents what URLs and lifecycles a resource MUST present.
 
 ## Implementation patterns
 
@@ -256,21 +236,9 @@ async def create_entity():
 
 ### Main application route registration
 
-The `me` router MUST be registered **before** the `users` router so that requests to `/users/me` match the literal `me` handler instead of being parsed as a UUID by the `/users/{user_id}` parametric route.
+The `me` router MUST be registered **before** the `users` router so that requests to `/users/me` match the literal `me` handler instead of being parsed as a UUID by the `/users/{user_id}` parametric route. More generally, any route that adds a literal segment under another resource's parametric path must be registered first.
 
-```python
-# In main.py
-from src.api.routes import (
-    users,
-    auth_routes,
-    auth_pages,
-    me,
-)
-
-app.include_router(auth_pages.auth_pages_api_router)
-app.include_router(me.me_router_instance, tags=["me"])
-app.include_router(users.users_api_router, tags=["users"])
-```
+The actual registration order lives in [`src/main.py`](../../main.py) — that's the source of truth, not this README.
 
 ### Route naming and organization
 
@@ -284,13 +252,9 @@ The URL shape, HTTP method, and form-page conventions for every resource are def
 
 ## Tests
 
-Colocated alongside the routes:
+Tests are colocated with the routes they cover (`test_<resource>.py` next to `<resource>.py`). When adding a new route, add or extend the matching `test_*.py` file in this directory. Shared fixtures (`test_client`, `authenticated_client`, `db_test_session_manager`, `logged_in_user`) come from [`tests/fixtures.py`](../../../tests/fixtures.py); user-construction helpers from [`tests/helpers.py`](../../../tests/helpers.py).
 
-- `test_auth_routes.py` — registration, login, logout, password reset, session protection (covers `auth_routes.py` and `auth_pages.py`).
-- `test_users.py` — `GET /users` listing behavior (covers `users.py`).
-- `test_posts.py` — `GET /posts`, `GET /posts/{id}`, `POST /posts`, `PATCH /posts/{id}`, `DELETE /posts/{id}`, `GET /posts/form?kind=…`, and `GET /posts/{id}/form` (covers `posts.py`). Exercises every kind end-to-end: per-kind create/list/detail/edit-form/PATCH/DELETE with the full intake-form field set (factories in [`tests/helpers.py`](../../../tests/helpers.py) supply spec-required defaults so individual tests only override what they're asserting on), the kind-mismatch 400 on PATCH (asserts state-unchanged + no audit row), owner-or-admin authorization on PATCH and DELETE, the `extra="forbid"` scrub of `owner_id`, route-ordering checks, audit-row before/after assertions, the rejection of the retired `note` kind, and `_owner_actions.html` partial visibility on the detail page. Pact contract pair for the owner-actions Delete button lives under [`tests/test_contract/`](../../../tests/test_contract/README.md); per-kind create/edit-form contract pairs are deferred until the form schemas stabilize.
-
-When adding a new route, add (or extend) a `test_*.py` file in this same directory. Shared fixtures (`test_client`, `authenticated_client`, `db_test_session_manager`, `logged_in_user`) come from [`tests/fixtures.py`](../../../tests/fixtures.py); user-construction helpers from [`tests/helpers.py`](../../../tests/helpers.py).
+Pact contract pairs for HTML forms and HX-driven buttons live under [`tests/test_contract/`](../../../tests/test_contract/README.md); per [`RESOURCE_GRAMMAR.md`](RESOURCE_GRAMMAR.md), every resource exposing an HTML form gets a contract pair.
 
 ## Related documentation
 
