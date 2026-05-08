@@ -14,14 +14,14 @@ from src.logic.user_processing import (
     handle_set_user_activation,
 )
 from src.models import User
-from src.repositories.audit_repository import AuditRepository
+from src.repositories.audit.audit_repository import AuditRepository
 from src.repositories.dependencies import (
     get_audit_repository,
     get_provider_repository,
     get_user_repository,
 )
-from src.repositories.provider_repository import ProviderRepository
-from src.repositories.user_repository import UserRepository
+from src.repositories.providers.provider_repository import ProviderRepository
+from src.repositories.users.user_repository import UserRepository
 from src.schemas.users.user import UserActivationUpdate
 
 users_api_router = APIRouter(prefix="/users")

@@ -21,7 +21,7 @@ from src.models import (
     ProviderLicensure,
     User,
 )
-from src.repositories.provider_repository import ProviderRepository
+from src.repositories.providers.provider_repository import ProviderRepository
 from tests.helpers import (
     create_test_user,
     make_provider,

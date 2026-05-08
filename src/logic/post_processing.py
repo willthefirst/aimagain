@@ -6,8 +6,8 @@ from fastapi import Request
 from src.api.common.exceptions import BadRequestError, ForbiddenError, NotFoundError
 from src.logic.audit import AuditAction, AuditedResource, mutate
 from src.models import REGISTERED_KINDS, Post, User
-from src.repositories.audit_repository import AuditRepository
-from src.repositories.post_repository import PostRepository
+from src.repositories.audit.audit_repository import AuditRepository
+from src.repositories.posts.post_repository import PostRepository
 from src.schemas.posts.post import (
     ClientReferralCreate,
     ClientReferralUpdate,

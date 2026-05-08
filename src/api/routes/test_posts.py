@@ -13,7 +13,7 @@ from src.models import (
     ProviderAvailabilityDetail,
     User,
 )
-from src.repositories.audit_repository import AuditRepository
+from src.repositories.audit.audit_repository import AuditRepository
 from tests.helpers import (
     client_referral_payload,
     create_test_user,

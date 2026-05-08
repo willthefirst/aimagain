@@ -7,8 +7,8 @@ from src.auth_config import current_active_user
 from src.logic.provider_processing import handle_list_user_providers
 from src.models import User
 from src.repositories.dependencies import get_provider_repository, get_user_repository
-from src.repositories.provider_repository import ProviderRepository
-from src.repositories.user_repository import UserRepository
+from src.repositories.providers.provider_repository import ProviderRepository
+from src.repositories.users.user_repository import UserRepository
 from src.schemas.users.user import UserRead
 
 logger = logging.getLogger(__name__)

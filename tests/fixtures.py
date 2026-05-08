@@ -195,7 +195,7 @@ async def logged_in_user(
     # The user was created in authenticated_client fixture
     # Fetch the user from the DB based on the known test email
     async with db_test_session_manager() as session:
-        from src.repositories.user_repository import UserRepository
+        from src.repositories.users.user_repository import UserRepository
 
         user_repo = UserRepository(session)
         user = await user_repo.get_user_by_email("testuser@example.com")
