@@ -6,9 +6,9 @@ This directory contains scripts organized by purpose for better maintainability.
 
 ```
 scripts/
-├── dev/                     # Development utilities
-│   ├── title_case_check.py # Code quality enforcement
-│   └── template_imports_check.py # Forbid cross-resource template imports
+├── dev/                     # One file per `dev <command>` implementation,
+│                            #   each with its colocated `test_*.py`.
+│                            #   `ls scripts/dev/*.py` is the source of truth.
 ├── runtime/                 # Application runtime scripts
 │   ├── start.sh            # Production startup script
 │   └── start-dev.sh        # Development startup script with hot reloading

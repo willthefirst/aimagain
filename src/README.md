@@ -65,10 +65,14 @@ async def create_entity(data: dict, session: AsyncSession = Depends(get_db_sessi
     # ... more business logic
     return new_entity
 
-# Good - delegate to service layer
+# Good - delegate to a logic handler that owns the commit
 @router.post("/[entities]")
-async def create_entity(data: EntityCreate, service: EntityService = Depends()):
-    return await service.create_entity(data)
+async def create_entity(
+    data: EntityCreate,
+    user: User = Depends(current_active_user),
+    repo: EntityRepository = Depends(get_entity_repository),
+):
+    return await handle_create_entity(data, user, repo)
 ```
 
 ## Architecture: Simple layered design
@@ -92,7 +96,7 @@ Everything else (schemas, models, templates) supports these main layers. There i
 | **Logic**        | active   | Business logic, orchestration, transaction commit           | `logic/*.py`        | Repositories, Schemas, Models, API common exceptions |
 | **Repositories** | active   | Data access, queries                                        | `repositories/*.py` | Models, Database                      |
 | **Models**       | active   | Database schema, relationships                              | `models/*.py`       | SQLAlchemy                            |
-| **Schemas**      | active   | Request/response validation                                 | `schemas/*.py`      | Pydantic                              |
+| **Schemas**      | active   | Request/response validation                                 | `schemas/*.py`      | Pydantic, Models (enums + registries only) |
 | **Middleware**   | empty    | Cross-cutting concerns                                      | `middleware/*.py`   | FastAPI                               |
 | **Core**         | active   | Configuration, utilities                                    | `core/*.py`         | None                                  |
 
