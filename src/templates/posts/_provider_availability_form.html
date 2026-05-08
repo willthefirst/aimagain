@@ -15,7 +15,7 @@ values for the same field name. The form naturally encodes multiple
 checkboxes as `desired_times=monday_morning&desired_times=friday_evening`,
 which FastAPI/Pydantic parses as a list.
 #}
-{%- from "posts/_form_macros.html" import text_field, textarea_field, select_field, radio_bool_field, time_grid_field, multi_select_field -%}
+{%- from "_shared/form_fields.html" import text_field, textarea_field, select_field, radio_bool_field, time_grid_field, multi_select_field -%}
 {%- macro provider_availability_form(hx_method, action, submit_label, post=None) -%}
 {%- set d = post.provider_availability_detail if post else None -%}
 <form hx-{{ hx_method }}="{{ action }}">

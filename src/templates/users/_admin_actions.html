@@ -11,6 +11,7 @@
    Backend self-guards live in src/logic/user_processing.py — this
    `{% if %}` is presentation only.
 #}
+{%- from "_shared/actions.html" import confirm_delete_button -%}
 {% if current_user and current_user.is_superuser and target_user.id != current_user.id %}
 <span class="admin-actions" data-user-id="{{ target_user.id }}">
   {% if target_user.is_active %}
@@ -32,11 +33,6 @@
     Reactivate
   </button>
   {% endif %}
-  <button
-    type="button"
-    hx-delete="/users/{{ target_user.id }}"
-    hx-confirm="Permanently delete {{ target_user.username }}? This cannot be undone.">
-    Delete
-  </button>
+  {{ confirm_delete_button("/users/" ~ target_user.id, "Permanently delete " ~ target_user.username ~ "? This cannot be undone.") }}
 </span>
 {% endif %}

@@ -1,0 +1,28 @@
+{# Form-skeleton macros for HTMX-driven CRUD forms. #}
+
+{# Single-fieldset add form. Wraps caller-supplied field markup in
+`<form><fieldset><legend>…</legend>{{ caller() }}</fieldset><input
+type="submit"></form>`. Used by sub-resource sections that have the
+same shape (legend + flat field list + submit button), e.g. the
+licensure / education / certification add forms in providers/edit.html.
+
+Forms with multiple fieldsets or non-trivial structure should stay
+hand-rolled — this macro deliberately covers only the single-fieldset
+case.
+
+Example:
+  {% call inline_add_form("/providers/" ~ profile.id ~ "/licensures",
+                          "Add licensure", "Add licensure") %}
+    {{ select_field(...) }}
+    {{ text_field(...) }}
+  {% endcall %}
+#}
+{% macro inline_add_form(action, legend, submit_label, method="post") -%}
+<form hx-{{ method }}="{{ action }}">
+  <fieldset>
+    <legend>{{ legend }}</legend>
+    {{ caller() }}
+  </fieldset>
+  <input type="submit" value="{{ submit_label }}" />
+</form>
+{%- endmacro %}

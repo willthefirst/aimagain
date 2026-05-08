@@ -1,0 +1,24 @@
+{# Section-shape macros shared across CRUD detail/edit pages. #}
+
+{# Render a `<ul>` of items or an empty-state `<p>`. The caller passes
+the per-item `<li>` body via `{% call(item) %}…{% endcall %}`. The macro
+owns the if/else split and the list class — callers own the row markup
+and the surrounding `<section>` / `<h2>` (those vary too little to be
+worth wrapping but the empty-state branch is repeated enough that it is).
+
+Example:
+  {% call(lic) list_or_empty(profile.licensures, "licensures-list", "No licensures yet.") %}
+  <li>… {{ lic.license_number }} …</li>
+  {% endcall %}
+#}
+{% macro list_or_empty(items, list_class, empty_message) -%}
+{% if items %}
+<ul class="{{ list_class }}">
+  {%- for item in items %}
+  {{ caller(item) }}
+  {%- endfor %}
+</ul>
+{% else %}
+<p>{{ empty_message }}</p>
+{% endif %}
+{%- endmacro %}

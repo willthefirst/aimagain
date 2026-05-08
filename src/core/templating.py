@@ -19,7 +19,7 @@ _env = Environment(
 # value to a tuple in `enums.py` then shows up everywhere — schema,
 # DB, and form dropdown — without per-template edits. The label dicts
 # are looked up in the form-render macro
-# (`src/templates/posts/_form_macros.html`); the
+# (`src/templates/_shared/form_fields.html`); the
 # `test_labels_cover_their_tuples` guardrail asserts every value in a
 # tuple has a label.
 _env.globals.update(
