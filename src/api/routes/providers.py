@@ -11,14 +11,12 @@ from src.api.common.resource_routes import (
     mount_form,
     mount_update,
 )
-from src.api.common.subresource_routes import (
-    SubresourceDeps,
-    SubresourceSpec,
-    register_subresource_routes,
-)
 from src.auth_config import current_active_user
 from src.logic._authz import assert_owner_or_admin
 from src.logic.providers.provider_processing import (
+    CERTIFICATION,
+    EDUCATION,
+    LICENSURE,
     handle_create_certification,
     handle_create_education,
     handle_create_licensure,
@@ -186,58 +184,85 @@ mount_delete(
 
 
 # --- Sub-resource CRUD (licensure / education / certification) ----------
-# Three near-identical CRUD blocks live in src/api/common/subresource_routes.py
-# and are mounted via register_subresource_routes; per-sub-resource knobs
-# (path segment, schemas, handlers, child-id kwarg name) live in the specs
-# below.
+# Each sub-resource is a `ResourceSpec` whose `parent=PROVIDER_SPEC`.
+# The mount functions walk the parent chain to build paths like
+# `/{provider_id}/licensures/{licensure_id}` and inject parent ids into
+# the handler under their declared kwarg names.
 
-_provider_subresource_deps = SubresourceDeps(
-    repo=get_provider_repository,
-    audit_repo=get_audit_repository,
-    user=current_active_user,
+
+def _provider_subresource_redirect(*, provider_id, **_):
+    """Sub-row mutations redirect HTMX clients back to the provider edit
+    form so the user can keep editing the parent + its credentials."""
+    return f"/providers/{provider_id}/form"
+
+
+LICENSURE_SPEC = ResourceSpec(
+    collection="licensures",
+    id_param="licensure_id",
+    repo_dep=get_provider_repository,
+    audit_resource=LICENSURE,
+    write_user_dep=current_active_user,
+    write_authz=assert_owner_or_admin,
+    create_adapter=licensure_create_adapter,
+    update_adapter=licensure_update_adapter,
+    read_to_dict=_licensure_read_dict,
+    create_redirect=_provider_subresource_redirect,
+    update_redirect=_provider_subresource_redirect,
+    delete_redirect=_provider_subresource_redirect,
+    parent=PROVIDER_SPEC,
+)
+EDUCATION_SPEC = ResourceSpec(
+    collection="educations",
+    id_param="education_id",
+    repo_dep=get_provider_repository,
+    audit_resource=EDUCATION,
+    write_user_dep=current_active_user,
+    write_authz=assert_owner_or_admin,
+    create_adapter=education_create_adapter,
+    update_adapter=education_update_adapter,
+    read_to_dict=_education_read_dict,
+    create_redirect=_provider_subresource_redirect,
+    update_redirect=_provider_subresource_redirect,
+    delete_redirect=_provider_subresource_redirect,
+    parent=PROVIDER_SPEC,
+)
+CERTIFICATION_SPEC = ResourceSpec(
+    collection="certifications",
+    id_param="certification_id",
+    repo_dep=get_provider_repository,
+    audit_resource=CERTIFICATION,
+    write_user_dep=current_active_user,
+    write_authz=assert_owner_or_admin,
+    create_adapter=certification_create_adapter,
+    update_adapter=certification_update_adapter,
+    read_to_dict=_certification_read_dict,
+    create_redirect=_provider_subresource_redirect,
+    update_redirect=_provider_subresource_redirect,
+    delete_redirect=_provider_subresource_redirect,
+    parent=PROVIDER_SPEC,
 )
 
-register_subresource_routes(
-    router,
-    SubresourceSpec(
-        collection="licensures",
-        child_id_param="licensure_id",
-        create_adapter=licensure_create_adapter,
-        update_adapter=licensure_update_adapter,
-        read_to_dict=_licensure_read_dict,
-        create_handler=handle_create_licensure,
-        update_handler=handle_update_licensure,
-        delete_handler=handle_delete_licensure,
+
+for _spec, _create, _update, _delete in (
+    (
+        LICENSURE_SPEC,
+        handle_create_licensure,
+        handle_update_licensure,
+        handle_delete_licensure,
     ),
-    deps=_provider_subresource_deps,
-)
-
-register_subresource_routes(
-    router,
-    SubresourceSpec(
-        collection="educations",
-        child_id_param="education_id",
-        create_adapter=education_create_adapter,
-        update_adapter=education_update_adapter,
-        read_to_dict=_education_read_dict,
-        create_handler=handle_create_education,
-        update_handler=handle_update_education,
-        delete_handler=handle_delete_education,
+    (
+        EDUCATION_SPEC,
+        handle_create_education,
+        handle_update_education,
+        handle_delete_education,
     ),
-    deps=_provider_subresource_deps,
-)
-
-register_subresource_routes(
-    router,
-    SubresourceSpec(
-        collection="certifications",
-        child_id_param="certification_id",
-        create_adapter=certification_create_adapter,
-        update_adapter=certification_update_adapter,
-        read_to_dict=_certification_read_dict,
-        create_handler=handle_create_certification,
-        update_handler=handle_update_certification,
-        delete_handler=handle_delete_certification,
+    (
+        CERTIFICATION_SPEC,
+        handle_create_certification,
+        handle_update_certification,
+        handle_delete_certification,
     ),
-    deps=_provider_subresource_deps,
-)
+):
+    mount_create(router, _spec, handler=_create, audit_repo_dep=get_audit_repository)
+    mount_update(router, _spec, handler=_update, audit_repo_dep=get_audit_repository)
+    mount_delete(router, _spec, handler=_delete, audit_repo_dep=get_audit_repository)
