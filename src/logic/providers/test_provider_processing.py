@@ -15,7 +15,7 @@ from starlette.requests import Request
 
 from src.api.common.exceptions import ForbiddenError, NotFoundError
 from src.logic.audit import AuditAction
-from src.logic.provider_processing import (
+from src.logic.providers.provider_processing import (
     handle_create_certification,
     handle_create_education,
     handle_create_licensure,

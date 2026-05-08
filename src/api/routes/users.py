@@ -6,8 +6,8 @@ from fastapi.responses import JSONResponse
 
 from src.api.common import APIResponse, BaseRouter
 from src.auth_config import current_active_user, current_admin_user
-from src.logic.provider_processing import handle_list_user_providers
-from src.logic.user_processing import (
+from src.logic.providers.provider_processing import handle_list_user_providers
+from src.logic.users.user_processing import (
     handle_delete_user,
     handle_get_user_detail,
     handle_list_users,

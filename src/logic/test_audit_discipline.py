@@ -5,7 +5,8 @@ row in the same transaction as the mutation. The discipline is easy to
 forget on a new handler — this test makes "forgot the audit call" a CI
 failure instead of a code-review catch.
 
-The check parses each `*_processing.py` in `src/logic/`, walks every
+The check parses each `*_processing.py` under `src/logic/` (recursively,
+so per-entity cluster directories are covered), walks every
 `async def handle_*` function, and fails the test if the function calls
 `.commit()` without an audit-recording call. Three names satisfy the
 rule:
@@ -29,7 +30,7 @@ from pathlib import Path
 import pytest
 
 LOGIC_DIR = Path(__file__).parent
-PROCESSING_FILES = sorted(LOGIC_DIR.glob("*_processing.py"))
+PROCESSING_FILES = sorted(LOGIC_DIR.rglob("*_processing.py"))
 
 
 def _has_call_named(node: ast.AST, name: str) -> bool:

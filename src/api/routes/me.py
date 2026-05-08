@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, Request
 
 from src.api.common import APIResponse, BaseRouter
 from src.auth_config import current_active_user
-from src.logic.provider_processing import handle_list_user_providers
+from src.logic.providers.provider_processing import handle_list_user_providers
 from src.models import User
 from src.repositories.dependencies import get_provider_repository, get_user_repository
 from src.repositories.providers.provider_repository import ProviderRepository
