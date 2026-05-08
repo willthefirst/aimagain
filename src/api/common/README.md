@@ -70,6 +70,8 @@ Common utilities handle concerns that span multiple routes and domains.
 | **Decorators**  | Cross-cutting concerns | Error handling, logging                                         | BaseRouter (automatic)   |
 | **Exceptions**  | Error vocabulary       | API exception classes raised by logic; fastapi-users translator | Logic handlers, decorator |
 | **Forms**       | Form-encoded request glue | `parse_form_to_payload` and `validate_or_422`                | Route handlers that accept form-encoded bodies |
+| **resource_routes** | Unified `ResourceSpec` grammar | Declare a resource once, opt into the operations to expose via `mount_*` | Route files for any CRUD-shaped resource |
+| **subresource_routes** | Sub-resource CRUD shorthand (legacy) | `SubresourceSpec` + `register_subresource_routes`. Folds into `resource_routes` in slice 8. | `providers.py` (until slice 8 / #253) |
 
 ## Directory structure
 
@@ -80,10 +82,87 @@ Common utilities handle concerns that span multiple routes and domains.
 - `decorators.py` - Error handling and logging decorators applied to all routes
 - `exceptions.py` - `APIException` subclasses (`NotFoundError`, `ForbiddenError`, ...) raised by logic, plus the fastapi-users → HTTP translator
 - `forms.py` - HTTP-adapter primitives for form-encoded route bodies: `parse_form_to_payload(request)` (form → dict, lists for repeated keys) and `validate_or_422(adapter, payload_dict)` (run a `TypeAdapter`, translate `ValidationError` to 422 with `[{"loc","msg","type"}]`). Home for any HTTP-adapter primitive that two or more route modules would otherwise import from each other.
+- `resource_routes.py` - Unified `ResourceSpec` + opt-in `mount_*` grammar. See [Unified resource grammar](#unified-resource-grammar) below.
+- `subresource_routes.py` - Earlier `SubresourceSpec` + `register_subresource_routes` helper that handles provider sub-resource CRUD. Slice 8 (#253) folds it into `resource_routes` via the `parent` field on `ResourceSpec`; until then both coexist.
 
 **Package infrastructure:**
 
 - `__init__.py` - Exports all common utilities for easy import
+
+## Unified resource grammar
+
+`resource_routes.py` is the in-progress home for a unified `ResourceSpec` + opt-in `mount_*` grammar that covers every CRUD-shaped route. It's being built incrementally in 10 slices (see issues with the `refactor` label whose titles start with "Slice"); today only `mount_delete` is wired up and exercised by `users.py`.
+
+### The shape
+
+A resource declares a single `ResourceSpec` describing its **identity** — collection name, id param, primary repo, audit bundle, auth deps, schemas, templates, redirect targets. The route file then **opts in** to the operations it wants to expose by calling the corresponding mount function:
+
+```python
+from src.api.common.resource_routes import ResourceSpec, mount_delete
+from src.logic.users.user_processing import USER, handle_delete_user
+
+users_api_router = APIRouter(prefix="/users")
+router = BaseRouter(router=users_api_router, default_tags=["users"])
+
+USER_SPEC = ResourceSpec(
+    collection="users",
+    id_param="user_id",
+    repo_dep=get_user_repository,
+    audit_resource=USER,                  # AuditedResource bundle from logic
+    read_user_dep=current_active_user,
+    write_user_dep=current_admin_user,
+)
+
+mount_delete(
+    router,
+    USER_SPEC,
+    handler=handle_delete_user,
+    audit_repo_dep=get_audit_repository,
+)
+```
+
+### Why this shape
+
+- **Opt-in mounts.** A read-only resource simply doesn't call `mount_create`/`mount_update`/`mount_delete` — there's no `read_only=True` flag because *not calling the mount* is the cleanest way to express "don't expose this verb." A backend-only resource (e.g. an async verification record written by a worker) still declares `audit_resource` so the worker can call `mutate(...)`, but the route file mounts only `mount_list` / `mount_detail`.
+- **Spec is identity, mounts are operations.** Adding a new mount function (`mount_list`, `mount_create`, ...) doesn't change `ResourceSpec`'s shape for resources that don't use it — defaults are `None`. The dataclass grows fields incrementally as new mounts land.
+- **Sub-resources nest via `parent`.** A child `ResourceSpec` carrying `parent=parent_spec` produces paths like `/providers/{provider_id}/licensures/{licensure_id}` — same mount functions, no separate registration helper. (Slice 8 / #253 lifts the current restriction that `mount_delete` rejects parent-bearing specs.)
+- **Polymorphic resources via handler-driven knobs.** Posts dispatch templates by `kind`; the route doesn't need to. The handler returns a `template_name` in its context dict and the mount honors it. This keeps the spec's shape stable even when the resource's behavior is polymorphic. (Lands in slice 5 / #250 for `mount_form`.)
+
+### Handler signatures
+
+Mount functions invoke handlers with a fixed shape so the spec can plumb args generically. Every handler the mounts call expects:
+
+- **`<id_param>=<UUID>`** for routes with an id in the path (detail/update/delete), under the per-resource kwarg name declared in the spec (`user_id`, `post_id`, ...).
+- **`repo=<primary repo>`** for the resource's primary repository, sourced from `spec.repo_dep`.
+- **`audit_repo=<AuditRepository>`** for mutation handlers, sourced from `audit_repo_dep` passed to the mount call (it's a layer-wide concern, not a per-resource knob).
+- **`requesting_user=<User>`** for any handler that gates on auth, sourced from `spec.read_user_dep` or `spec.write_user_dep`.
+- **`payload=<validated body>`** for create/update handlers (slices 6–7).
+
+Secondary repos (e.g. `user_repo: UserRepository` in the multi-repo `handle_list_user_providers`) keep their typed name per the [logic-layer convention](../../logic/README.md#handler-kwarg-naming) and arrive via `spec.extra_repo_deps`.
+
+### What's mounted today
+
+| Mount | Status | Resources using it |
+| --- | --- | --- |
+| `mount_delete` | Landed (slice 3 / #248) | `users` (DELETE) |
+| `mount_list` / `mount_detail` | Slice 4 / #249 | — |
+| `mount_form` | Slice 5 / #250 | — |
+| `mount_create` / `mount_update` | Slice 6 / #251 | — |
+| `mount_related_list` | Slice 9 / #254 | — |
+| Sub-resource via `parent=` | Slice 8 / #253 | — |
+
+Per-mount docstrings in `resource_routes.py` are the canonical reference for required spec fields and exact handler kwargs.
+
+### What's *not* meant for this grammar
+
+The grammar fits resource-shaped routes. It's deliberately **not** a home for:
+
+- **Auth flows** — register/login/verify/reset-password live in `auth_routes.py` / `auth_pages.py`. State-machine semantics, not CRUD.
+- **`/me/*` singletons** — no parent id, session-sourced. Stays bespoke (slice 9 decision).
+- **State-mutation actions like `PUT /users/{id}/activation`** — idempotent set with `HX-Refresh`, not partial edit with `HX-Redirect`. Doesn't match `mount_update` semantics.
+- **Utility endpoints** — `/`, `/health`.
+
+Slice 10 (#255) documents these explicitly. If a future case suggests the grammar should grow to fit them, that's the moment to reshape `ResourceSpec`, not to escape-hatch around it.
 
 ## Implementation patterns
 
@@ -305,7 +384,13 @@ handle_fastapi_users_error(fastapi_users_exception) -> APIException
 
 ## Tests
 
-**TODO** — no colocated tests yet. Add `test_*.py` here when modifying utilities in this directory (e.g. response helpers, error mapping). The route-level tests under `../routes/` exercise some of this behavior indirectly but should not be relied on as the only coverage.
+Colocated tests cover the helpers in this directory:
+
+- `test_responses.py` — `APIResponse`, `created_response`, `updated_response`, `deleted_response`, `refreshed_response`.
+- `test_subresource_routes.py` — `SubresourceSpec` + `register_subresource_routes` (slice 8 / #253 folds this into `resource_routes`).
+- `test_resource_routes.py` — `ResourceSpec` + per-mount tests. Add a test here whenever a new mount function lands or an existing one grows a knob.
+
+Route-level tests under `../routes/` exercise the mounts indirectly via the resources that use them; the unit tests here cover spec validation, error handling at mount time, and the path-param wiring that the route-level tests can't easily isolate.
 
 ## Related documentation
 
