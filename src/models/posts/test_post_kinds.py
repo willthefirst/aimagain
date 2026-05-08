@@ -10,13 +10,8 @@ fails.
 from typing import get_args
 
 from src.api.routes.posts import get_post_form
-from src.models import (
-    KIND_BY_DETAIL_MODEL,
-    KIND_NAMES,
-    REGISTERED_KINDS,
-    Post,
-    kind_check_sql,
-)
+from src.models import KIND_BY_DETAIL_MODEL, KIND_NAMES, REGISTERED_KINDS, Post
+from src.models.posts.post_kinds import kind_check_sql
 
 
 def test_kind_names_matches_registered_kinds():
