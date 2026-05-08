@@ -25,7 +25,7 @@ from src.logic.provider_profile_processing import (
     handle_get_provider_profile_detail,
     handle_get_provider_profile_edit_form,
     handle_get_provider_profile_form,
-    handle_list_profiles,
+    handle_list_provider_profiles,
     handle_update_certification,
     handle_update_education,
     handle_update_licensure,
@@ -96,17 +96,25 @@ def _certification_read_dict(row) -> dict:
 
 @router.get("")
 async def list_profiles(
+    request: Request,
     license_type: str | None = Query(None),
     issuing_state: str | None = Query(None),
     repo: ProviderProfileRepository = Depends(get_provider_profile_repository),
 ):
-    """Public listing of provider profiles. Optional `license_type` and
+    """Public HTML listing of provider profiles. Optional `license_type` and
     `issuing_state` filters narrow the results to profiles that hold a
     licensure matching both filters."""
-    profiles = await handle_list_profiles(
-        repo, license_type=license_type, issuing_state=issuing_state
+    context = await handle_list_provider_profiles(
+        request=request,
+        repo=repo,
+        license_type=license_type,
+        issuing_state=issuing_state,
     )
-    return JSONResponse(content=[_profile_read_dict(p) for p in profiles])
+    return APIResponse.html_response(
+        template_name="provider_profiles/list.html",
+        context=context,
+        request=request,
+    )
 
 
 @router.post("", status_code=status.HTTP_201_CREATED)

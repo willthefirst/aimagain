@@ -16,7 +16,7 @@ silently mutate a licensure belonging to a different profile.
 """
 
 import logging
-from typing import Any, Sequence
+from typing import Any
 from uuid import UUID
 
 from fastapi import Request
@@ -127,16 +127,25 @@ async def _load_subrow_or_404(getter, sub_id: UUID, parent_id: UUID, *, name: st
 # --- Profile handlers ----------------------------------------------------
 
 
-async def handle_list_profiles(
+async def handle_list_provider_profiles(
+    request: Request,
     repo: ProviderProfileRepository,
     *,
     license_type: str | None = None,
     issuing_state: str | None = None,
-) -> Sequence[ProviderProfile]:
-    """Public listing — no auth gate, no audit, no commit."""
-    return await repo.list_profiles(
+) -> dict[str, Any]:
+    """Public listing — no auth gate, no audit, no commit. Returns the
+    template context for the HTML list page; the active filter values are
+    forwarded so the template can preselect them in its filter form."""
+    profiles = await repo.list_profiles(
         license_type=license_type, issuing_state=issuing_state
     )
+    return {
+        "request": request,
+        "profiles": profiles,
+        "selected_license_type": license_type,
+        "selected_issuing_state": issuing_state,
+    }
 
 
 async def handle_get_provider_profile_detail(
