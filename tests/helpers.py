@@ -41,11 +41,11 @@ def create_test_user(
 
 # --- Per-kind detail factories --------------------------------------------
 #
-# Both per-kind detail tables now have many required columns (see
-# `notes/forms_spec.md`). Tests that don't care about the specifics still
-# need a *valid* row to exercise route / repo / schema behavior, so these
-# factories supply spec-compliant defaults and let callers override per
-# field.
+# Both per-kind detail tables now have many required columns (see the
+# per-kind Pydantic schemas in `src/schemas/posts/post.py`). Tests that
+# don't care about the specifics still need a *valid* row to exercise
+# route / repo / schema behavior, so these factories supply
+# spec-compliant defaults and let callers override per field.
 
 _CLIENT_REFERRAL_DEFAULTS: dict[str, Any] = {
     "location_city": "Springfield",

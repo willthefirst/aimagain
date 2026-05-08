@@ -1,6 +1,6 @@
 """add desired_times JSON columns to per-kind detail tables
 
-Adds the multi-select `desired_times` field from `notes/forms_spec.md`
+Adds the multi-select `desired_times` field from the intake forms
 to both `client_referral_details` and `provider_availability_details`.
 Stored as a JSON array of `<day>_<slot>` tokens; vocabulary is enforced
 on the wire by the Pydantic `Literal[*DESIRED_TIME_SLOTS]` annotation

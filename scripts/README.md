@@ -138,7 +138,7 @@ python scripts/dev/title_case_check.py --fix
 python scripts/dev/title_case_check.py templates/
 
 # Check specific files
-python scripts/dev/title_case_check.py README.md notes/
+python scripts/dev/title_case_check.py README.md src/
 ```
 
 #### 🏗️ **supported file types**

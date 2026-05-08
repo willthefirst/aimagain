@@ -20,4 +20,4 @@ Configuration files for:
 - Application source code configuration (belongs in `pyproject.toml`)
 - Docker-specific files (belong at root level)
 - Scripts (belong in `scripts/` directory)
-- Documentation (belongs in `notes/` or at root level)
+- Documentation (belongs at root level or in module READMEs)

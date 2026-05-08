@@ -957,7 +957,7 @@ Examples:
       python scripts/dev/title_case_check.py                    # Check all files
     python scripts/dev/title_case_check.py --fix              # Auto-fix violations
     python scripts/dev/title_case_check.py templates/         # Check specific directory
-    python scripts/dev/title_case_check.py README.md notes/   # Check specific files/dirs
+    python scripts/dev/title_case_check.py README.md src/     # Check specific files/dirs
 
 Exception handling:
   - Add 'title-case-ignore' in a comment to ignore specific lines

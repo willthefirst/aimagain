@@ -29,8 +29,8 @@ class ClientReferralDetail(Base):
     parent. CASCADE on the FK keeps the detail row in lockstep with the
     parent's lifecycle.
 
-    Field set follows [`notes/forms_spec.md`](../../notes/forms_spec.md)'s
-    Form 1. Enum-typed columns (`location_state`, `location_in_person`,
+    Field set follows the client-referral intake form.
+    Enum-typed columns (`location_state`, `location_in_person`,
     `location_virtual`, `client_dem_ages`, `language_preferred`,
     `insurance`) carry CHECK constraints rendered from the tuples in
     `../enums.py` via `check_in_tuple_sql`.
