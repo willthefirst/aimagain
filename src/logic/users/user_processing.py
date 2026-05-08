@@ -4,7 +4,13 @@ from uuid import UUID
 from fastapi import Request
 
 from src.api.common.exceptions import ForbiddenError, NotFoundError
-from src.logic.audit import AuditAction, make_snapshotter, record_audit
+from src.logic.audit import (
+    AuditAction,
+    AuditedResource,
+    make_snapshotter,
+    mutate,
+    record_audit,
+)
 from src.models import User
 from src.repositories.audit_repository import AuditRepository
 from src.repositories.providers.provider_repository import ProviderRepository
@@ -18,7 +24,15 @@ from src.schemas.users.user import (
 logger = logging.getLogger(__name__)
 
 _snapshot_user_activation = make_snapshotter(UserActivationAuditSnapshot)
-_snapshot_user = make_snapshotter(UserAuditSnapshot)
+
+
+USER = AuditedResource(
+    type="user",
+    snapshot=make_snapshotter(UserAuditSnapshot),
+    create=AuditAction.CREATE_USER,
+    update=AuditAction.UPDATE_USER,
+    delete=AuditAction.DELETE_USER,
+)
 
 
 async def handle_list_users(
@@ -131,10 +145,11 @@ async def handle_delete_user(
     requesting_user: User,
 ) -> None:
     """Admin-only: hard-delete a user row. Writes an audit row in the same
-    transaction (recorded before the delete fires so the actor FK is still
-    valid; the row's `before` captures the soon-to-be-gone state).
+    transaction; `before` captures the soon-to-be-gone state, `after` is None.
 
-    Self-guard mirrors `handle_set_user_activation`; the route dep blocks non-admins.
+    Self-delete is forbidden (the actor is never the target), so writing the
+    audit row after the delete fires is safe — the actor row stays around
+    for the FK and `mutate()` captures `target.id` up front.
     """
     target = await repo.get_user_by_id(user_id)
     if target is None:
@@ -143,16 +158,12 @@ async def handle_delete_user(
         raise ForbiddenError(detail="Admins cannot delete their own account here")
 
     logger.info(f"Handler: admin {requesting_user.id} hard-deleting user {target.id}")
-    before = _snapshot_user(target)
-    target_id = target.id
-    await record_audit(
+    async with mutate(
+        repo,
         audit_repo,
-        actor_id=requesting_user.id,
-        resource_type="user",
-        resource_id=target_id,
-        action=AuditAction.DELETE_USER,
-        before=before,
-        after=None,
-    )
-    await repo.delete_user(target)
-    await repo.session.commit()
+        actor=requesting_user,
+        target=target,
+        resource=USER,
+        verb="delete",
+    ):
+        await repo.delete_user(target)
