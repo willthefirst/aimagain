@@ -1,5 +1,7 @@
 # Per-developer Claude Code settings (project settings.json is committed)
 .claude/settings.local.json
+.claude/scheduled_tasks.lock
+.claude/worktrees/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
