@@ -3,7 +3,8 @@ from uuid import UUID
 
 from fastapi import Request
 
-from src.api.common.exceptions import BadRequestError, ForbiddenError, NotFoundError
+from src.api.common.exceptions import BadRequestError, NotFoundError
+from src.logic._authz import assert_owner_or_admin
 from src.logic.audit import AuditAction, AuditedResource, mutate
 from src.models import REGISTERED_KINDS, Post, User
 from src.repositories.audit_repository import AuditRepository
@@ -84,8 +85,7 @@ async def handle_get_post_edit_form(
     if post is None:
         raise NotFoundError(detail="Post not found")
 
-    if post.owner_id != requesting_user.id and not requesting_user.is_superuser:
-        raise ForbiddenError(detail="Only the owner or an admin can edit this post")
+    assert_owner_or_admin(post, requesting_user, action="edit this post")
 
     return {"request": request, "post": post, "current_user": requesting_user}
 
@@ -141,8 +141,7 @@ async def handle_update_post(
     if post is None:
         raise NotFoundError(detail="Post not found")
 
-    if post.owner_id != requesting_user.id and not requesting_user.is_superuser:
-        raise ForbiddenError(detail="Only the owner or an admin can edit this post")
+    assert_owner_or_admin(post, requesting_user, action="edit this post")
 
     if payload.kind != post.kind:
         raise BadRequestError(
@@ -185,8 +184,7 @@ async def handle_delete_post(
     if post is None:
         raise NotFoundError(detail="Post not found")
 
-    if post.owner_id != requesting_user.id and not requesting_user.is_superuser:
-        raise ForbiddenError(detail="Only the owner or an admin can delete this post")
+    assert_owner_or_admin(post, requesting_user, action="delete this post")
 
     async with mutate(
         post_repo,
