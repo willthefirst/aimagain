@@ -65,6 +65,7 @@ Repositories follow the [cluster pattern](../README.md#domain-entities-and-the-c
 - Parent-level shared tier:
   - `base.py` — `BaseRepository` generic with common session management. Every repository inherits from it.
   - `dependencies.py` — FastAPI `Depends()` providers that wire each repository to the request-scoped session. Adding a new repository means appending one provider here.
+  - `audit_repository.py` (+ its `test_audit_repository.py`) — append-only audit log, cross-cutting infrastructure consumed by every entity's logic handlers. Lives flat at the layer's shared tier (matching `src/logic/audit.py` and `src/models/audit_log.py`) rather than in a cluster, because audit isn't a domain entity in its own right.
 
 A repository does not import from a peer cluster's repository; if logic needs to coordinate two entities, that orchestration belongs in the [logic layer](../logic/README.md), not in repositories.
 

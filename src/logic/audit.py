@@ -38,7 +38,7 @@ from typing import Any, Callable, Literal
 from uuid import UUID
 
 from src.models import AuditLog, User
-from src.repositories.audit.audit_repository import AuditRepository
+from src.repositories.audit_repository import AuditRepository
 
 logger = logging.getLogger(__name__)
 

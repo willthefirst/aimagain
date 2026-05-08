@@ -10,7 +10,7 @@ import pytest
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from src.logic.audit import AuditAction, AuditedResource, mutate, record_audit
-from src.repositories.audit.audit_repository import AuditRepository
+from src.repositories.audit_repository import AuditRepository
 from src.repositories.posts.post_repository import PostRepository
 from tests.helpers import create_test_user
 
