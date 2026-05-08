@@ -137,7 +137,7 @@ async def create_provider(
 
 
 # --- Form routes --------------------------------------------------------
-# Registered before `/{profile_id}` so the literal `form` is not parsed as a UUID.
+# Registered before `/{provider_id}` so the literal `form` is not parsed as a UUID.
 
 
 @router.get("/form")
@@ -157,9 +157,9 @@ async def get_provider_form(
 # --- Profile item routes ------------------------------------------------
 
 
-@router.get("/{profile_id}")
+@router.get("/{provider_id}")
 async def get_profile(
-    profile_id: UUID,
+    provider_id: UUID,
     request: Request,
     repo: ProviderRepository = Depends(get_provider_repository),
     user: User = Depends(current_active_user),
@@ -167,7 +167,7 @@ async def get_profile(
     """Renders an HTML detail page for any profile. 404 if missing."""
     context = await handle_get_provider_detail(
         request=request,
-        profile_id=profile_id,
+        provider_id=provider_id,
         repo=repo,
         requesting_user=user,
     )
@@ -178,9 +178,9 @@ async def get_profile(
     )
 
 
-@router.get("/{profile_id}/form")
+@router.get("/{provider_id}/form")
 async def get_provider_edit_form(
-    profile_id: UUID,
+    provider_id: UUID,
     request: Request,
     repo: ProviderRepository = Depends(get_provider_repository),
     user: User = Depends(current_active_user),
@@ -190,7 +190,7 @@ async def get_provider_edit_form(
     """
     context = await handle_get_provider_edit_form(
         request=request,
-        profile_id=profile_id,
+        provider_id=provider_id,
         repo=repo,
         requesting_user=user,
     )
@@ -201,9 +201,9 @@ async def get_provider_edit_form(
     )
 
 
-@router.patch("/{profile_id}")
+@router.patch("/{provider_id}")
 async def patch_profile(
-    profile_id: UUID,
+    provider_id: UUID,
     request: Request,
     repo: ProviderRepository = Depends(get_provider_repository),
     audit_repo: AuditRepository = Depends(get_audit_repository),
@@ -214,7 +214,7 @@ async def patch_profile(
     payload_dict = await parse_form_to_payload(request)
     payload = validate_or_422(_provider_update_adapter, payload_dict)
     updated = await handle_update_provider(
-        profile_id=profile_id,
+        provider_id=provider_id,
         payload=payload,
         repo=repo,
         audit_repo=audit_repo,
@@ -227,9 +227,9 @@ async def patch_profile(
     )
 
 
-@router.delete("/{profile_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/{provider_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_provider(
-    profile_id: UUID,
+    provider_id: UUID,
     repo: ProviderRepository = Depends(get_provider_repository),
     audit_repo: AuditRepository = Depends(get_audit_repository),
     user: User = Depends(current_active_user),
@@ -237,7 +237,7 @@ async def delete_provider(
     """Hard-deletes the profile (sub-rows cascade). Owner-only; admins may
     delete any profile."""
     await handle_delete_provider(
-        profile_id=profile_id,
+        provider_id=provider_id,
         repo=repo,
         audit_repo=audit_repo,
         requesting_user=user,
@@ -251,9 +251,9 @@ async def delete_provider(
 # --- Licensure sub-resource ---------------------------------------------
 
 
-@router.post("/{profile_id}/licensures", status_code=status.HTTP_201_CREATED)
+@router.post("/{provider_id}/licensures", status_code=status.HTTP_201_CREATED)
 async def create_licensure(
-    profile_id: UUID,
+    provider_id: UUID,
     request: Request,
     repo: ProviderRepository = Depends(get_provider_repository),
     audit_repo: AuditRepository = Depends(get_audit_repository),
@@ -262,14 +262,14 @@ async def create_licensure(
     payload_dict = await parse_form_to_payload(request)
     payload = validate_or_422(_licensure_create_adapter, payload_dict)
     created = await handle_create_licensure(
-        profile_id=profile_id,
+        provider_id=provider_id,
         payload=payload,
         repo=repo,
         audit_repo=audit_repo,
         requesting_user=user,
     )
-    parent_location = f"/providers/{profile_id}"
-    edit_location = f"/providers/{profile_id}/form"
+    parent_location = f"/providers/{provider_id}"
+    edit_location = f"/providers/{provider_id}/form"
     return JSONResponse(
         status_code=status.HTTP_201_CREATED,
         content={"id": str(created.id)},
@@ -277,9 +277,9 @@ async def create_licensure(
     )
 
 
-@router.patch("/{profile_id}/licensures/{licensure_id}")
+@router.patch("/{provider_id}/licensures/{licensure_id}")
 async def patch_licensure(
-    profile_id: UUID,
+    provider_id: UUID,
     licensure_id: UUID,
     request: Request,
     repo: ProviderRepository = Depends(get_provider_repository),
@@ -289,14 +289,14 @@ async def patch_licensure(
     payload_dict = await parse_form_to_payload(request)
     payload = validate_or_422(_licensure_update_adapter, payload_dict)
     updated = await handle_update_licensure(
-        profile_id=profile_id,
+        provider_id=provider_id,
         licensure_id=licensure_id,
         payload=payload,
         repo=repo,
         audit_repo=audit_repo,
         requesting_user=user,
     )
-    location = f"/providers/{profile_id}/form"
+    location = f"/providers/{provider_id}/form"
     return JSONResponse(
         content=_licensure_read_dict(updated),
         headers={"HX-Redirect": location},
@@ -304,18 +304,18 @@ async def patch_licensure(
 
 
 @router.delete(
-    "/{profile_id}/licensures/{licensure_id}",
+    "/{provider_id}/licensures/{licensure_id}",
     status_code=status.HTTP_204_NO_CONTENT,
 )
 async def delete_licensure(
-    profile_id: UUID,
+    provider_id: UUID,
     licensure_id: UUID,
     repo: ProviderRepository = Depends(get_provider_repository),
     audit_repo: AuditRepository = Depends(get_audit_repository),
     user: User = Depends(current_active_user),
 ):
     await handle_delete_licensure(
-        profile_id=profile_id,
+        provider_id=provider_id,
         licensure_id=licensure_id,
         repo=repo,
         audit_repo=audit_repo,
@@ -323,16 +323,16 @@ async def delete_licensure(
     )
     return Response(
         status_code=status.HTTP_204_NO_CONTENT,
-        headers={"HX-Redirect": f"/providers/{profile_id}/form"},
+        headers={"HX-Redirect": f"/providers/{provider_id}/form"},
     )
 
 
 # --- Education sub-resource ---------------------------------------------
 
 
-@router.post("/{profile_id}/educations", status_code=status.HTTP_201_CREATED)
+@router.post("/{provider_id}/educations", status_code=status.HTTP_201_CREATED)
 async def create_education(
-    profile_id: UUID,
+    provider_id: UUID,
     request: Request,
     repo: ProviderRepository = Depends(get_provider_repository),
     audit_repo: AuditRepository = Depends(get_audit_repository),
@@ -341,14 +341,14 @@ async def create_education(
     payload_dict = await parse_form_to_payload(request)
     payload = validate_or_422(_education_create_adapter, payload_dict)
     created = await handle_create_education(
-        profile_id=profile_id,
+        provider_id=provider_id,
         payload=payload,
         repo=repo,
         audit_repo=audit_repo,
         requesting_user=user,
     )
-    parent_location = f"/providers/{profile_id}"
-    edit_location = f"/providers/{profile_id}/form"
+    parent_location = f"/providers/{provider_id}"
+    edit_location = f"/providers/{provider_id}/form"
     return JSONResponse(
         status_code=status.HTTP_201_CREATED,
         content={"id": str(created.id)},
@@ -356,9 +356,9 @@ async def create_education(
     )
 
 
-@router.patch("/{profile_id}/educations/{education_id}")
+@router.patch("/{provider_id}/educations/{education_id}")
 async def patch_education(
-    profile_id: UUID,
+    provider_id: UUID,
     education_id: UUID,
     request: Request,
     repo: ProviderRepository = Depends(get_provider_repository),
@@ -368,14 +368,14 @@ async def patch_education(
     payload_dict = await parse_form_to_payload(request)
     payload = validate_or_422(_education_update_adapter, payload_dict)
     updated = await handle_update_education(
-        profile_id=profile_id,
+        provider_id=provider_id,
         education_id=education_id,
         payload=payload,
         repo=repo,
         audit_repo=audit_repo,
         requesting_user=user,
     )
-    location = f"/providers/{profile_id}/form"
+    location = f"/providers/{provider_id}/form"
     return JSONResponse(
         content=_education_read_dict(updated),
         headers={"HX-Redirect": location},
@@ -383,18 +383,18 @@ async def patch_education(
 
 
 @router.delete(
-    "/{profile_id}/educations/{education_id}",
+    "/{provider_id}/educations/{education_id}",
     status_code=status.HTTP_204_NO_CONTENT,
 )
 async def delete_education(
-    profile_id: UUID,
+    provider_id: UUID,
     education_id: UUID,
     repo: ProviderRepository = Depends(get_provider_repository),
     audit_repo: AuditRepository = Depends(get_audit_repository),
     user: User = Depends(current_active_user),
 ):
     await handle_delete_education(
-        profile_id=profile_id,
+        provider_id=provider_id,
         education_id=education_id,
         repo=repo,
         audit_repo=audit_repo,
@@ -402,16 +402,16 @@ async def delete_education(
     )
     return Response(
         status_code=status.HTTP_204_NO_CONTENT,
-        headers={"HX-Redirect": f"/providers/{profile_id}/form"},
+        headers={"HX-Redirect": f"/providers/{provider_id}/form"},
     )
 
 
 # --- Certification sub-resource -----------------------------------------
 
 
-@router.post("/{profile_id}/certifications", status_code=status.HTTP_201_CREATED)
+@router.post("/{provider_id}/certifications", status_code=status.HTTP_201_CREATED)
 async def create_certification(
-    profile_id: UUID,
+    provider_id: UUID,
     request: Request,
     repo: ProviderRepository = Depends(get_provider_repository),
     audit_repo: AuditRepository = Depends(get_audit_repository),
@@ -420,14 +420,14 @@ async def create_certification(
     payload_dict = await parse_form_to_payload(request)
     payload = validate_or_422(_certification_create_adapter, payload_dict)
     created = await handle_create_certification(
-        profile_id=profile_id,
+        provider_id=provider_id,
         payload=payload,
         repo=repo,
         audit_repo=audit_repo,
         requesting_user=user,
     )
-    parent_location = f"/providers/{profile_id}"
-    edit_location = f"/providers/{profile_id}/form"
+    parent_location = f"/providers/{provider_id}"
+    edit_location = f"/providers/{provider_id}/form"
     return JSONResponse(
         status_code=status.HTTP_201_CREATED,
         content={"id": str(created.id)},
@@ -435,9 +435,9 @@ async def create_certification(
     )
 
 
-@router.patch("/{profile_id}/certifications/{certification_id}")
+@router.patch("/{provider_id}/certifications/{certification_id}")
 async def patch_certification(
-    profile_id: UUID,
+    provider_id: UUID,
     certification_id: UUID,
     request: Request,
     repo: ProviderRepository = Depends(get_provider_repository),
@@ -447,14 +447,14 @@ async def patch_certification(
     payload_dict = await parse_form_to_payload(request)
     payload = validate_or_422(_certification_update_adapter, payload_dict)
     updated = await handle_update_certification(
-        profile_id=profile_id,
+        provider_id=provider_id,
         certification_id=certification_id,
         payload=payload,
         repo=repo,
         audit_repo=audit_repo,
         requesting_user=user,
     )
-    location = f"/providers/{profile_id}/form"
+    location = f"/providers/{provider_id}/form"
     return JSONResponse(
         content=_certification_read_dict(updated),
         headers={"HX-Redirect": location},
@@ -462,18 +462,18 @@ async def patch_certification(
 
 
 @router.delete(
-    "/{profile_id}/certifications/{certification_id}",
+    "/{provider_id}/certifications/{certification_id}",
     status_code=status.HTTP_204_NO_CONTENT,
 )
 async def delete_certification(
-    profile_id: UUID,
+    provider_id: UUID,
     certification_id: UUID,
     repo: ProviderRepository = Depends(get_provider_repository),
     audit_repo: AuditRepository = Depends(get_audit_repository),
     user: User = Depends(current_active_user),
 ):
     await handle_delete_certification(
-        profile_id=profile_id,
+        provider_id=provider_id,
         certification_id=certification_id,
         repo=repo,
         audit_repo=audit_repo,
@@ -481,5 +481,5 @@ async def delete_certification(
     )
     return Response(
         status_code=status.HTTP_204_NO_CONTENT,
-        headers={"HX-Redirect": f"/providers/{profile_id}/form"},
+        headers={"HX-Redirect": f"/providers/{provider_id}/form"},
     )

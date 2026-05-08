@@ -120,7 +120,7 @@ def make_provider_availability_detail(**overrides: Any) -> ProviderAvailabilityD
 #
 # Defaults supply CHECK-constraint-valid values so tests that don't care
 # about credential specifics still produce inserts that pass DB-level
-# guards. The owning FK (`user_id` for providers, `profile_id` for
+# guards. The owning FK (`user_id` for providers, `provider_id` for
 # sub-rows) is a required keyword-only parameter — making it required
 # turns "I forgot the FK" into a `TypeError` at the factory call site
 # instead of a `NOT NULL` violation at flush time.
@@ -190,26 +190,30 @@ def make_provider(*, user_id: UUID, **overrides: Any) -> Provider:
     return Provider(user_id=user_id, **{**_PROVIDER_PROFILE_DEFAULTS, **overrides})
 
 
-def make_provider_licensure(*, profile_id: UUID, **overrides: Any) -> ProviderLicensure:
+def make_provider_licensure(
+    *, provider_id: UUID, **overrides: Any
+) -> ProviderLicensure:
     """Build a `ProviderLicensure` ORM row with CHECK-valid defaults."""
     return ProviderLicensure(
-        profile_id=profile_id, **{**_PROVIDER_LICENSURE_DEFAULTS, **overrides}
+        provider_id=provider_id, **{**_PROVIDER_LICENSURE_DEFAULTS, **overrides}
     )
 
 
-def make_provider_education(*, profile_id: UUID, **overrides: Any) -> ProviderEducation:
+def make_provider_education(
+    *, provider_id: UUID, **overrides: Any
+) -> ProviderEducation:
     """Build a `ProviderEducation` ORM row with CHECK-valid defaults."""
     return ProviderEducation(
-        profile_id=profile_id, **{**_PROVIDER_EDUCATION_DEFAULTS, **overrides}
+        provider_id=provider_id, **{**_PROVIDER_EDUCATION_DEFAULTS, **overrides}
     )
 
 
 def make_provider_certification(
-    *, profile_id: UUID, **overrides: Any
+    *, provider_id: UUID, **overrides: Any
 ) -> ProviderCertification:
     """Build a `ProviderCertification` ORM row with CHECK-valid defaults."""
     return ProviderCertification(
-        profile_id=profile_id, **{**_PROVIDER_CERTIFICATION_DEFAULTS, **overrides}
+        provider_id=provider_id, **{**_PROVIDER_CERTIFICATION_DEFAULTS, **overrides}
     )
 
 

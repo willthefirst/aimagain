@@ -571,7 +571,7 @@ async def test_failed_delete_writes_no_audit_row(
 # --- Providers ownership-subresource ----------------------------
 
 
-async def _seed_user_profile(
+async def _seed_user_provider(
     db_test_session_manager: async_sessionmaker[AsyncSession],
     *,
     user_id: uuid.UUID,
@@ -609,10 +609,10 @@ async def test_get_my_providers_lists_owned(
 ):
     """`GET /users/me/providers` lists the current user's profiles
     with the right hrefs."""
-    first_id = await _seed_user_profile(
+    first_id = await _seed_user_provider(
         db_test_session_manager, user_id=logged_in_user.id, practice_name="First"
     )
-    second_id = await _seed_user_profile(
+    second_id = await _seed_user_provider(
         db_test_session_manager, user_id=logged_in_user.id, practice_name="Second"
     )
 
@@ -636,7 +636,7 @@ async def test_get_user_providers_self(
 ):
     """`GET /users/{my_id}/providers` works for the current user
     (equivalent to the /me alias)."""
-    await _seed_user_profile(
+    await _seed_user_provider(
         db_test_session_manager, user_id=logged_in_user.id, practice_name="Mine"
     )
 
@@ -657,7 +657,7 @@ async def test_get_user_providers_admin_can_view_other(
     async with db_test_session_manager() as session:
         async with session.begin():
             session.add(target)
-    await _seed_user_profile(
+    await _seed_user_provider(
         db_test_session_manager, user_id=target.id, practice_name="Target Practice"
     )
 

@@ -21,7 +21,7 @@ A `Provider` is **not** the same thing as a `ProviderAvailabilityDetail`. They l
 Before this extraction the four model files were flat siblings of the rest of `src/models/`. They behaved as one cluster the directory didn't reflect:
 
 - `provider.py` declares the parent-side `relationship(...)` for all three sub-record types via `cascade="all, delete-orphan"`.
-- `provider_licensure.py`, `provider_education.py`, `provider_certification.py` each carry a `profile_id` FK back to `provider_profiles` with `ondelete="CASCADE"` — they have no meaning without a parent profile.
+- `provider_licensure.py`, `provider_education.py`, `provider_certification.py` each carry a `provider_id` FK back to `provider_profiles` with `ondelete="CASCADE"` — they have no meaning without a parent profile.
 - All four share the table-CHECK pattern (CHECK rendered from a tuple in `../enums.py` via `check_in_tuple_sql`).
 
 Pulling them into `providers/` makes the boundary explicit. The cross-cluster shared modules (the controlled-vocabulary tuples in [`../enums.py`](../enums.py), the `BaseModel` in [`../base.py`](../base.py)) stay at the parent level because the `posts/` cluster also consumes them.
@@ -30,7 +30,7 @@ Pulling them into `providers/` makes the boundary explicit. The cross-cluster sh
 
 If the directory profile needs a fourth credential category (e.g. board certifications distinct from professional certifications, malpractice insurance records, etc.):
 
-1. Add a new file `provider_<credential>.py` here. Follow the shape of `provider_certification.py`: extends `BaseModel`, has a `profile_id` FK to `provider_profiles` with CASCADE, enum columns CHECK against tuples in `../enums.py`.
+1. Add a new file `provider_<credential>.py` here. Follow the shape of `provider_certification.py`: extends `BaseModel`, has a `provider_id` FK to `provider_profiles` with CASCADE, enum columns CHECK against tuples in `../enums.py`.
 2. Add a `relationship("Provider<Credential>", cascade="all, delete-orphan", lazy="selectin")` line on `Provider`.
 3. Re-export the new class from [`../__init__.py`](../__init__.py).
 4. Add a controlled-vocabulary tuple + label dict to `../enums.py` if the new record introduces one.

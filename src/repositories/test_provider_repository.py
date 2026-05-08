@@ -67,11 +67,11 @@ async def test_create_profile_persists_row(
             virtual_sessions="no",
         )
         await session.commit()
-        profile_id = created.id
+        provider_id = created.id
 
     async with db_test_session_manager() as session:
         row = (
-            (await session.execute(select(Provider).filter(Provider.id == profile_id)))
+            (await session.execute(select(Provider).filter(Provider.id == provider_id)))
             .scalars()
             .first()
         )
@@ -97,13 +97,13 @@ async def test_get_by_id_finds_created_profile(
             virtual_sessions="no",
         )
         await session.commit()
-        profile_id = created.id
+        provider_id = created.id
 
     async with db_test_session_manager() as session:
         repo = ProviderRepository(session)
-        found = await repo.get_by_id(profile_id)
+        found = await repo.get_by_id(provider_id)
         assert found is not None
-        assert found.id == profile_id
+        assert found.id == provider_id
 
 
 async def test_get_by_user_id_finds_created_profile(
@@ -148,11 +148,11 @@ async def test_update_profile_changes_fields_visible_on_refetch(
             virtual_sessions="no",
         )
         await session.commit()
-        profile_id = created.id
+        provider_id = created.id
 
     async with db_test_session_manager() as session:
         repo = ProviderRepository(session)
-        profile = await repo.get_by_id(profile_id)
+        profile = await repo.get_by_id(provider_id)
         assert profile is not None
         await repo.update_provider(
             profile, practice_name="Renamed", location_city="Chicago"
@@ -161,7 +161,7 @@ async def test_update_profile_changes_fields_visible_on_refetch(
 
     async with db_test_session_manager() as session:
         row = (
-            (await session.execute(select(Provider).filter(Provider.id == profile_id)))
+            (await session.execute(select(Provider).filter(Provider.id == provider_id)))
             .scalars()
             .first()
         )
@@ -183,28 +183,28 @@ async def test_delete_profile_cascades_licensures(
             await session.flush()
             session.add(
                 make_provider_licensure(
-                    profile_id=profile.id, license_type="lcsw", issuing_state="IL"
+                    provider_id=profile.id, license_type="lcsw", issuing_state="IL"
                 )
             )
             session.add(
                 make_provider_licensure(
-                    profile_id=profile.id, license_type="lpc", issuing_state="CA"
+                    provider_id=profile.id, license_type="lpc", issuing_state="CA"
                 )
             )
-            session.add(make_provider_education(profile_id=profile.id))
-            session.add(make_provider_certification(profile_id=profile.id))
-            profile_id = profile.id
+            session.add(make_provider_education(provider_id=profile.id))
+            session.add(make_provider_certification(provider_id=profile.id))
+            provider_id = profile.id
 
     async with db_test_session_manager() as session:
         repo = ProviderRepository(session)
-        profile = await repo.get_by_id(profile_id)
+        profile = await repo.get_by_id(provider_id)
         assert profile is not None
         await repo.delete_provider(profile)
         await session.commit()
 
     async with db_test_session_manager() as session:
         profile_row = (
-            (await session.execute(select(Provider).filter(Provider.id == profile_id)))
+            (await session.execute(select(Provider).filter(Provider.id == provider_id)))
             .scalars()
             .first()
         )
@@ -212,7 +212,7 @@ async def test_delete_profile_cascades_licensures(
             (
                 await session.execute(
                     select(ProviderLicensure).filter(
-                        ProviderLicensure.profile_id == profile_id
+                        ProviderLicensure.provider_id == provider_id
                     )
                 )
             )
@@ -223,7 +223,7 @@ async def test_delete_profile_cascades_licensures(
             (
                 await session.execute(
                     select(ProviderEducation).filter(
-                        ProviderEducation.profile_id == profile_id
+                        ProviderEducation.provider_id == provider_id
                     )
                 )
             )
@@ -234,7 +234,7 @@ async def test_delete_profile_cascades_licensures(
             (
                 await session.execute(
                     select(ProviderCertification).filter(
-                        ProviderCertification.profile_id == profile_id
+                        ProviderCertification.provider_id == provider_id
                     )
                 )
             )
@@ -281,12 +281,12 @@ async def test_list_profiles_filtered_by_license_type(
             await session.flush()
             session.add(
                 make_provider_licensure(
-                    profile_id=profile_a.id, license_type="lcsw", issuing_state="IL"
+                    provider_id=profile_a.id, license_type="lcsw", issuing_state="IL"
                 )
             )
             session.add(
                 make_provider_licensure(
-                    profile_id=profile_b.id, license_type="lpc", issuing_state="IL"
+                    provider_id=profile_b.id, license_type="lpc", issuing_state="IL"
                 )
             )
             keep_id = profile_a.id
@@ -311,12 +311,12 @@ async def test_list_profiles_filtered_by_issuing_state(
             await session.flush()
             session.add(
                 make_provider_licensure(
-                    profile_id=profile_a.id, license_type="lcsw", issuing_state="CA"
+                    provider_id=profile_a.id, license_type="lcsw", issuing_state="CA"
                 )
             )
             session.add(
                 make_provider_licensure(
-                    profile_id=profile_b.id, license_type="lcsw", issuing_state="IL"
+                    provider_id=profile_b.id, license_type="lcsw", issuing_state="IL"
                 )
             )
             keep_id = profile_a.id
@@ -345,19 +345,19 @@ async def test_list_profiles_combined_filter_is_anded(
             # A: matches both filters
             session.add(
                 make_provider_licensure(
-                    profile_id=profile_a.id, license_type="lcsw", issuing_state="CA"
+                    provider_id=profile_a.id, license_type="lcsw", issuing_state="CA"
                 )
             )
             # B: matches license_type only
             session.add(
                 make_provider_licensure(
-                    profile_id=profile_b.id, license_type="lcsw", issuing_state="IL"
+                    provider_id=profile_b.id, license_type="lcsw", issuing_state="IL"
                 )
             )
             # C: matches issuing_state only
             session.add(
                 make_provider_licensure(
-                    profile_id=profile_c.id, license_type="lpc", issuing_state="CA"
+                    provider_id=profile_c.id, license_type="lpc", issuing_state="CA"
                 )
             )
             keep_id = profile_a.id
@@ -381,7 +381,7 @@ async def test_list_profiles_distinct_when_multiple_licensures_match(
             await session.flush()
             session.add(
                 make_provider_licensure(
-                    profile_id=profile.id,
+                    provider_id=profile.id,
                     license_type="lcsw",
                     issuing_state="IL",
                     license_number="L-1",
@@ -389,7 +389,7 @@ async def test_list_profiles_distinct_when_multiple_licensures_match(
             )
             session.add(
                 make_provider_licensure(
-                    profile_id=profile.id,
+                    provider_id=profile.id,
                     license_type="lcsw",
                     issuing_state="CA",
                     license_number="L-2",
@@ -415,11 +415,11 @@ async def test_licensure_crud_round_trip(
             profile = make_provider(user_id=user.id)
             session.add(profile)
             await session.flush()
-            profile_id = profile.id
+            provider_id = profile.id
 
     async with db_test_session_manager() as session:
         repo = ProviderRepository(session)
-        profile = await repo.get_by_id(profile_id)
+        profile = await repo.get_by_id(provider_id)
         licensure = await repo.add_licensure(
             profile,
             license_type="lcsw",
@@ -458,11 +458,11 @@ async def test_education_crud_round_trip(
             profile = make_provider(user_id=user.id)
             session.add(profile)
             await session.flush()
-            profile_id = profile.id
+            provider_id = profile.id
 
     async with db_test_session_manager() as session:
         repo = ProviderRepository(session)
-        profile = await repo.get_by_id(profile_id)
+        profile = await repo.get_by_id(provider_id)
         education = await repo.add_education(
             profile,
             education_type="msw",
@@ -500,11 +500,11 @@ async def test_certification_crud_round_trip(
             profile = make_provider(user_id=user.id)
             session.add(profile)
             await session.flush()
-            profile_id = profile.id
+            provider_id = profile.id
 
     async with db_test_session_manager() as session:
         repo = ProviderRepository(session)
-        profile = await repo.get_by_id(profile_id)
+        profile = await repo.get_by_id(provider_id)
         cert = await repo.add_certification(
             profile,
             certification_type="emdr",

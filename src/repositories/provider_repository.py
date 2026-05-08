@@ -20,10 +20,10 @@ class ProviderRepository(BaseRepository):
 
     # --- Provider reads --------------------------------------------
 
-    async def get_by_id(self, profile_id: UUID) -> Provider | None:
+    async def get_by_id(self, provider_id: UUID) -> Provider | None:
         """Retrieves a profile by id. Sub-table relationships are
         eager-loaded via `lazy="selectin"` on the model."""
-        return await self._get_by_id(Provider, profile_id)
+        return await self._get_by_id(Provider, provider_id)
 
     async def get_by_user_id(self, user_id: UUID) -> Provider | None:
         """Retrieves a profile owned by the given user. A user may own
@@ -58,7 +58,7 @@ class ProviderRepository(BaseRepository):
         if license_type is not None or issuing_state is not None:
             stmt = stmt.join(
                 ProviderLicensure,
-                ProviderLicensure.profile_id == Provider.id,
+                ProviderLicensure.provider_id == Provider.id,
             )
             if license_type is not None:
                 stmt = stmt.filter(ProviderLicensure.license_type == license_type)

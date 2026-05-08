@@ -86,7 +86,7 @@ async def _seed_user(
     return user
 
 
-async def _seed_profile(
+async def _seed_provider(
     db_test_session_manager: async_sessionmaker[AsyncSession],
     *,
     user_id: uuid.UUID,
@@ -99,7 +99,7 @@ async def _seed_profile(
         async with session.begin():
             session.add(profile)
         await session.refresh(profile)
-        profile_id = profile.id
+        provider_id = profile.id
 
     licensure_id: uuid.UUID | None = None
     education_id: uuid.UUID | None = None
@@ -107,13 +107,13 @@ async def _seed_profile(
     async with db_test_session_manager() as session:
         async with session.begin():
             if with_licensure:
-                lic = make_provider_licensure(profile_id=profile_id)
+                lic = make_provider_licensure(provider_id=provider_id)
                 session.add(lic)
             if with_education:
-                edu = make_provider_education(profile_id=profile_id)
+                edu = make_provider_education(provider_id=provider_id)
                 session.add(edu)
             if with_certification:
-                cert = make_provider_certification(profile_id=profile_id)
+                cert = make_provider_certification(provider_id=provider_id)
                 session.add(cert)
         if with_licensure:
             await session.refresh(lic)
@@ -125,7 +125,7 @@ async def _seed_profile(
             await session.refresh(cert)
             certification_id = cert.id
 
-    return profile_id, licensure_id, education_id, certification_id
+    return provider_id, licensure_id, education_id, certification_id
 
 
 def _profile_create_payload(**overrides) -> ProviderCreate:
@@ -163,8 +163,8 @@ async def test_list_providers_returns_persisted_profiles(
 ):
     user_a = await _seed_user(db_test_session_manager)
     user_b = await _seed_user(db_test_session_manager)
-    await _seed_profile(db_test_session_manager, user_id=user_a.id)
-    await _seed_profile(db_test_session_manager, user_id=user_b.id)
+    await _seed_provider(db_test_session_manager, user_id=user_a.id)
+    await _seed_provider(db_test_session_manager, user_id=user_b.id)
 
     async with db_test_session_manager() as session:
         repo = ProviderRepository(session)
@@ -179,15 +179,15 @@ async def test_list_providers_filters_by_license_type(
 ):
     user_a = await _seed_user(db_test_session_manager)
     user_b = await _seed_user(db_test_session_manager)
-    profile_a, *_ = await _seed_profile(
+    profile_a, *_ = await _seed_provider(
         db_test_session_manager, user_id=user_a.id, with_licensure=True
     )
-    profile_b, *_ = await _seed_profile(db_test_session_manager, user_id=user_b.id)
+    profile_b, *_ = await _seed_provider(db_test_session_manager, user_id=user_b.id)
     # Add a non-matching licensure to profile_b
     async with db_test_session_manager() as session:
         async with session.begin():
             session.add(
-                make_provider_licensure(profile_id=profile_b, license_type="lpc")
+                make_provider_licensure(provider_id=profile_b, license_type="lpc")
             )
 
     async with db_test_session_manager() as session:
@@ -203,17 +203,17 @@ async def test_get_provider_detail_returns_context(
     db_test_session_manager: async_sessionmaker[AsyncSession],
 ):
     user = await _seed_user(db_test_session_manager)
-    profile_id, *_ = await _seed_profile(db_test_session_manager, user_id=user.id)
+    provider_id, *_ = await _seed_provider(db_test_session_manager, user_id=user.id)
 
     async with db_test_session_manager() as session:
         repo = ProviderRepository(session)
         context = await handle_get_provider_detail(
             request=_fake_request(),
-            profile_id=profile_id,
+            provider_id=provider_id,
             repo=repo,
             requesting_user=user,
         )
-        assert context["profile"].id == profile_id
+        assert context["profile"].id == provider_id
         assert context["current_user"] is user
         assert "request" in context
 
@@ -227,7 +227,7 @@ async def test_get_provider_detail_404_for_unknown_id(
         with pytest.raises(NotFoundError):
             await handle_get_provider_detail(
                 request=_fake_request(),
-                profile_id=uuid.uuid4(),
+                provider_id=uuid.uuid4(),
                 repo=repo,
                 requesting_user=user,
             )
@@ -240,8 +240,8 @@ async def test_list_user_providers_self_returns_owned(
     db_test_session_manager: async_sessionmaker[AsyncSession],
 ):
     user = await _seed_user(db_test_session_manager)
-    first_id, *_ = await _seed_profile(db_test_session_manager, user_id=user.id)
-    second_id, *_ = await _seed_profile(db_test_session_manager, user_id=user.id)
+    first_id, *_ = await _seed_provider(db_test_session_manager, user_id=user.id)
+    second_id, *_ = await _seed_provider(db_test_session_manager, user_id=user.id)
 
     async with db_test_session_manager() as session:
         profile_repo = ProviderRepository(session)
@@ -284,7 +284,7 @@ async def test_list_user_providers_admin_can_view_anyone(
 ):
     target = await _seed_user(db_test_session_manager)
     admin = await _seed_user(db_test_session_manager, is_superuser=True)
-    profile_id, *_ = await _seed_profile(db_test_session_manager, user_id=target.id)
+    provider_id, *_ = await _seed_provider(db_test_session_manager, user_id=target.id)
 
     async with db_test_session_manager() as session:
         profile_repo = ProviderRepository(session)
@@ -299,7 +299,7 @@ async def test_list_user_providers_admin_can_view_anyone(
 
     assert context["is_self"] is False
     assert context["target_user"].id == target.id
-    assert [p.id for p in context["profiles"]] == [profile_id]
+    assert [p.id for p in context["profiles"]] == [provider_id]
 
 
 async def test_list_user_providers_non_admin_cannot_view_other(
@@ -411,7 +411,7 @@ async def test_create_profile_with_inline_children_captures_them_in_audit(
             (
                 await session.execute(
                     select(ProviderLicensure).filter(
-                        ProviderLicensure.profile_id == created.id
+                        ProviderLicensure.provider_id == created.id
                     )
                 )
             )
@@ -427,7 +427,7 @@ async def test_create_profile_allows_multiple_per_user(
     """A user may own multiple profiles. The handler creates a second profile
     successfully without surfacing the previously-enforced 1:1 rejection."""
     user = await _seed_user(db_test_session_manager)
-    first_id, *_ = await _seed_profile(db_test_session_manager, user_id=user.id)
+    first_id, *_ = await _seed_provider(db_test_session_manager, user_id=user.id)
 
     async with db_test_session_manager() as session:
         repo = ProviderRepository(session)
@@ -451,13 +451,13 @@ async def test_update_profile_updates_fields_and_writes_audit(
     db_test_session_manager: async_sessionmaker[AsyncSession],
 ):
     user = await _seed_user(db_test_session_manager)
-    profile_id, *_ = await _seed_profile(db_test_session_manager, user_id=user.id)
+    provider_id, *_ = await _seed_provider(db_test_session_manager, user_id=user.id)
 
     async with db_test_session_manager() as session:
         repo = ProviderRepository(session)
         audit_repo = AuditRepository(session)
         updated = await handle_update_provider(
-            profile_id,
+            provider_id,
             ProviderUpdate(practice_name="New Name"),
             repo,
             audit_repo,
@@ -468,7 +468,7 @@ async def test_update_profile_updates_fields_and_writes_audit(
     rows = await _audit_rows_for(
         db_test_session_manager,
         resource_type="provider_profile",
-        resource_id=profile_id,
+        resource_id=provider_id,
     )
     assert len(rows) == 1
     assert rows[0].action == AuditAction.UPDATE_PROVIDER
@@ -481,14 +481,14 @@ async def test_update_profile_403_for_non_owner(
 ):
     owner = await _seed_user(db_test_session_manager)
     intruder = await _seed_user(db_test_session_manager)
-    profile_id, *_ = await _seed_profile(db_test_session_manager, user_id=owner.id)
+    provider_id, *_ = await _seed_provider(db_test_session_manager, user_id=owner.id)
 
     async with db_test_session_manager() as session:
         repo = ProviderRepository(session)
         audit_repo = AuditRepository(session)
         with pytest.raises(ForbiddenError):
             await handle_update_provider(
-                profile_id,
+                provider_id,
                 ProviderUpdate(practice_name="Hijacked"),
                 repo,
                 audit_repo,
@@ -501,13 +501,13 @@ async def test_update_profile_succeeds_for_superuser(
 ):
     owner = await _seed_user(db_test_session_manager)
     admin = await _seed_user(db_test_session_manager, is_superuser=True)
-    profile_id, *_ = await _seed_profile(db_test_session_manager, user_id=owner.id)
+    provider_id, *_ = await _seed_provider(db_test_session_manager, user_id=owner.id)
 
     async with db_test_session_manager() as session:
         repo = ProviderRepository(session)
         audit_repo = AuditRepository(session)
         updated = await handle_update_provider(
-            profile_id,
+            provider_id,
             ProviderUpdate(practice_name="By Admin"),
             repo,
             audit_repo,
@@ -518,7 +518,7 @@ async def test_update_profile_succeeds_for_superuser(
     rows = await _audit_rows_for(
         db_test_session_manager,
         resource_type="provider_profile",
-        resource_id=profile_id,
+        resource_id=provider_id,
     )
     assert rows[0].actor_id == admin.id
 
@@ -547,19 +547,19 @@ async def test_delete_profile_removes_row_and_writes_audit(
     db_test_session_manager: async_sessionmaker[AsyncSession],
 ):
     user = await _seed_user(db_test_session_manager)
-    profile_id, licensure_id, *_ = await _seed_profile(
+    provider_id, licensure_id, *_ = await _seed_provider(
         db_test_session_manager, user_id=user.id, with_licensure=True
     )
 
     async with db_test_session_manager() as session:
         repo = ProviderRepository(session)
         audit_repo = AuditRepository(session)
-        await handle_delete_provider(profile_id, repo, audit_repo, user)
+        await handle_delete_provider(provider_id, repo, audit_repo, user)
 
     # Profile and cascaded sub-row both gone.
     async with db_test_session_manager() as session:
         assert (
-            await session.execute(select(Provider).filter(Provider.id == profile_id))
+            await session.execute(select(Provider).filter(Provider.id == provider_id))
         ).scalars().first() is None
         assert (
             await session.execute(
@@ -570,7 +570,7 @@ async def test_delete_profile_removes_row_and_writes_audit(
     rows = await _audit_rows_for(
         db_test_session_manager,
         resource_type="provider_profile",
-        resource_id=profile_id,
+        resource_id=provider_id,
     )
     assert len(rows) == 1
     assert rows[0].action == AuditAction.DELETE_PROVIDER
@@ -583,13 +583,13 @@ async def test_delete_profile_403_for_non_owner(
 ):
     owner = await _seed_user(db_test_session_manager)
     intruder = await _seed_user(db_test_session_manager)
-    profile_id, *_ = await _seed_profile(db_test_session_manager, user_id=owner.id)
+    provider_id, *_ = await _seed_provider(db_test_session_manager, user_id=owner.id)
 
     async with db_test_session_manager() as session:
         repo = ProviderRepository(session)
         audit_repo = AuditRepository(session)
         with pytest.raises(ForbiddenError):
-            await handle_delete_provider(profile_id, repo, audit_repo, intruder)
+            await handle_delete_provider(provider_id, repo, audit_repo, intruder)
 
 
 # --- Licensure handlers -------------------------------------------------
@@ -599,13 +599,13 @@ async def test_create_licensure_attaches_to_profile_and_audits(
     db_test_session_manager: async_sessionmaker[AsyncSession],
 ):
     user = await _seed_user(db_test_session_manager)
-    profile_id, *_ = await _seed_profile(db_test_session_manager, user_id=user.id)
+    provider_id, *_ = await _seed_provider(db_test_session_manager, user_id=user.id)
 
     async with db_test_session_manager() as session:
         repo = ProviderRepository(session)
         audit_repo = AuditRepository(session)
         created = await handle_create_licensure(
-            profile_id,
+            provider_id,
             ProviderLicensureCreate(
                 license_type="lcsw", license_number="L-99", issuing_state="IL"
             ),
@@ -614,7 +614,7 @@ async def test_create_licensure_attaches_to_profile_and_audits(
             user,
         )
 
-    assert created.profile_id == profile_id
+    assert created.provider_id == provider_id
     assert created.license_number == "L-99"
     rows = await _audit_rows_for(
         db_test_session_manager,
@@ -630,14 +630,14 @@ async def test_create_licensure_403_for_non_owner(
 ):
     owner = await _seed_user(db_test_session_manager)
     intruder = await _seed_user(db_test_session_manager)
-    profile_id, *_ = await _seed_profile(db_test_session_manager, user_id=owner.id)
+    provider_id, *_ = await _seed_provider(db_test_session_manager, user_id=owner.id)
 
     async with db_test_session_manager() as session:
         repo = ProviderRepository(session)
         audit_repo = AuditRepository(session)
         with pytest.raises(ForbiddenError):
             await handle_create_licensure(
-                profile_id,
+                provider_id,
                 ProviderLicensureCreate(
                     license_type="lcsw", license_number="L-99", issuing_state="IL"
                 ),
@@ -651,7 +651,7 @@ async def test_update_licensure_audits_before_after(
     db_test_session_manager: async_sessionmaker[AsyncSession],
 ):
     user = await _seed_user(db_test_session_manager)
-    profile_id, licensure_id, *_ = await _seed_profile(
+    provider_id, licensure_id, *_ = await _seed_provider(
         db_test_session_manager, user_id=user.id, with_licensure=True
     )
 
@@ -659,7 +659,7 @@ async def test_update_licensure_audits_before_after(
         repo = ProviderRepository(session)
         audit_repo = AuditRepository(session)
         updated = await handle_update_licensure(
-            profile_id,
+            provider_id,
             licensure_id,
             ProviderLicensureUpdate(license_number="L-NEW"),
             repo,
@@ -683,8 +683,8 @@ async def test_update_licensure_404_when_sub_row_belongs_to_other_profile(
 ):
     user_a = await _seed_user(db_test_session_manager)
     user_b = await _seed_user(db_test_session_manager)
-    profile_a, *_ = await _seed_profile(db_test_session_manager, user_id=user_a.id)
-    profile_b, lic_b, *_ = await _seed_profile(
+    profile_a, *_ = await _seed_provider(db_test_session_manager, user_id=user_a.id)
+    profile_b, lic_b, *_ = await _seed_provider(
         db_test_session_manager, user_id=user_b.id, with_licensure=True
     )
 
@@ -708,14 +708,14 @@ async def test_delete_licensure_removes_row_and_audits(
     db_test_session_manager: async_sessionmaker[AsyncSession],
 ):
     user = await _seed_user(db_test_session_manager)
-    profile_id, licensure_id, *_ = await _seed_profile(
+    provider_id, licensure_id, *_ = await _seed_provider(
         db_test_session_manager, user_id=user.id, with_licensure=True
     )
 
     async with db_test_session_manager() as session:
         repo = ProviderRepository(session)
         audit_repo = AuditRepository(session)
-        await handle_delete_licensure(profile_id, licensure_id, repo, audit_repo, user)
+        await handle_delete_licensure(provider_id, licensure_id, repo, audit_repo, user)
 
     async with db_test_session_manager() as session:
         assert (
@@ -740,20 +740,20 @@ async def test_create_education_attaches_and_audits(
     db_test_session_manager: async_sessionmaker[AsyncSession],
 ):
     user = await _seed_user(db_test_session_manager)
-    profile_id, *_ = await _seed_profile(db_test_session_manager, user_id=user.id)
+    provider_id, *_ = await _seed_provider(db_test_session_manager, user_id=user.id)
 
     async with db_test_session_manager() as session:
         repo = ProviderRepository(session)
         audit_repo = AuditRepository(session)
         created = await handle_create_education(
-            profile_id,
+            provider_id,
             ProviderEducationCreate(education_type="phd", institution="Some U"),
             repo,
             audit_repo,
             user,
         )
 
-    assert created.profile_id == profile_id
+    assert created.provider_id == provider_id
     rows = await _audit_rows_for(
         db_test_session_manager,
         resource_type="provider_education",
@@ -766,7 +766,7 @@ async def test_update_education_audits(
     db_test_session_manager: async_sessionmaker[AsyncSession],
 ):
     user = await _seed_user(db_test_session_manager)
-    profile_id, _, education_id, _ = await _seed_profile(
+    provider_id, _, education_id, _ = await _seed_provider(
         db_test_session_manager, user_id=user.id, with_education=True
     )
 
@@ -774,7 +774,7 @@ async def test_update_education_audits(
         repo = ProviderRepository(session)
         audit_repo = AuditRepository(session)
         updated = await handle_update_education(
-            profile_id,
+            provider_id,
             education_id,
             ProviderEducationUpdate(institution="New U"),
             repo,
@@ -795,14 +795,14 @@ async def test_delete_education_removes_and_audits(
     db_test_session_manager: async_sessionmaker[AsyncSession],
 ):
     user = await _seed_user(db_test_session_manager)
-    profile_id, _, education_id, _ = await _seed_profile(
+    provider_id, _, education_id, _ = await _seed_provider(
         db_test_session_manager, user_id=user.id, with_education=True
     )
 
     async with db_test_session_manager() as session:
         repo = ProviderRepository(session)
         audit_repo = AuditRepository(session)
-        await handle_delete_education(profile_id, education_id, repo, audit_repo, user)
+        await handle_delete_education(provider_id, education_id, repo, audit_repo, user)
 
     async with db_test_session_manager() as session:
         assert (
@@ -822,13 +822,13 @@ async def test_create_certification_attaches_and_audits(
     db_test_session_manager: async_sessionmaker[AsyncSession],
 ):
     user = await _seed_user(db_test_session_manager)
-    profile_id, *_ = await _seed_profile(db_test_session_manager, user_id=user.id)
+    provider_id, *_ = await _seed_provider(db_test_session_manager, user_id=user.id)
 
     async with db_test_session_manager() as session:
         repo = ProviderRepository(session)
         audit_repo = AuditRepository(session)
         created = await handle_create_certification(
-            profile_id,
+            provider_id,
             ProviderCertificationCreate(
                 certification_type="emdr", certifying_body="EMDRIA"
             ),
@@ -837,7 +837,7 @@ async def test_create_certification_attaches_and_audits(
             user,
         )
 
-    assert created.profile_id == profile_id
+    assert created.provider_id == provider_id
     rows = await _audit_rows_for(
         db_test_session_manager,
         resource_type="provider_certification",
@@ -850,7 +850,7 @@ async def test_update_certification_audits(
     db_test_session_manager: async_sessionmaker[AsyncSession],
 ):
     user = await _seed_user(db_test_session_manager)
-    profile_id, _, _, certification_id = await _seed_profile(
+    provider_id, _, _, certification_id = await _seed_provider(
         db_test_session_manager, user_id=user.id, with_certification=True
     )
 
@@ -858,7 +858,7 @@ async def test_update_certification_audits(
         repo = ProviderRepository(session)
         audit_repo = AuditRepository(session)
         updated = await handle_update_certification(
-            profile_id,
+            provider_id,
             certification_id,
             ProviderCertificationUpdate(certifying_body="New Body"),
             repo,
@@ -879,7 +879,7 @@ async def test_delete_certification_removes_and_audits(
     db_test_session_manager: async_sessionmaker[AsyncSession],
 ):
     user = await _seed_user(db_test_session_manager)
-    profile_id, _, _, certification_id = await _seed_profile(
+    provider_id, _, _, certification_id = await _seed_provider(
         db_test_session_manager, user_id=user.id, with_certification=True
     )
 
@@ -887,7 +887,7 @@ async def test_delete_certification_removes_and_audits(
         repo = ProviderRepository(session)
         audit_repo = AuditRepository(session)
         await handle_delete_certification(
-            profile_id, certification_id, repo, audit_repo, user
+            provider_id, certification_id, repo, audit_repo, user
         )
 
     async with db_test_session_manager() as session:
