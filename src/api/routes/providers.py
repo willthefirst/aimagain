@@ -11,6 +11,7 @@ from src.api.common import (
     parse_and_validate_form,
     updated_response,
 )
+from src.api.common.resource_routes import ResourceSpec, mount_form
 from src.api.common.subresource_routes import (
     SubresourceDeps,
     SubresourceSpec,
@@ -57,6 +58,18 @@ from src.schemas.providers.provider import (
 providers_api_router = APIRouter(prefix="/providers")
 router = BaseRouter(router=providers_api_router, default_tags=["providers"])
 logger = logging.getLogger(__name__)
+
+
+# Spec is incrementally fleshed out as each slice migrates more operations
+# onto the mounts. Slice 5 (#250) fills in just enough to mount the two
+# form routes; slice 6 (#251) adds adapters/redirects for create/update.
+PROVIDER_SPEC = ResourceSpec(
+    collection="providers",
+    id_param="provider_id",
+    repo_dep=get_provider_repository,
+    read_user_dep=current_active_user,
+    write_user_dep=current_active_user,
+)
 
 
 def _provider_read_dict(profile) -> dict:
@@ -125,21 +138,22 @@ async def create_provider(
 
 
 # --- Form routes --------------------------------------------------------
-# Registered before `/{provider_id}` so the literal `form` is not parsed as a UUID.
-
-
-@router.get("/form")
-async def get_provider_form(
-    request: Request,
-    user: User = Depends(current_active_user),
-):
-    """Renders the create-profile HTML form."""
-    context = await handle_get_provider_form(request=request, requesting_user=user)
-    return APIResponse.html_response(
-        template_name="providers/new.html",
-        context=context,
-        request=request,
-    )
+# Mounted before `/{provider_id}` so the literal `form` segment is not
+# parsed as a UUID. Two form templates: `new.html` (create) and
+# `edit.html` (edit, identifies the profile from the URL id).
+mount_form(
+    router,
+    PROVIDER_SPEC,
+    handler=handle_get_provider_form,
+    template="providers/new.html",
+)
+mount_form(
+    router,
+    PROVIDER_SPEC,
+    handler=handle_get_provider_edit_form,
+    template="providers/edit.html",
+    on_existing=True,
+)
 
 
 # --- Profile item routes ------------------------------------------------
@@ -161,29 +175,6 @@ async def get_profile(
     )
     return APIResponse.html_response(
         template_name="providers/detail.html",
-        context=context,
-        request=request,
-    )
-
-
-@router.get("/{provider_id}/form")
-async def get_provider_edit_form(
-    provider_id: UUID,
-    request: Request,
-    repo: ProviderRepository = Depends(get_provider_repository),
-    user: User = Depends(current_active_user),
-):
-    """Renders the edit-profile HTML page. Owner-only; admins may edit any
-    profile. 404 if missing, 403 if not authorized.
-    """
-    context = await handle_get_provider_edit_form(
-        request=request,
-        provider_id=provider_id,
-        repo=repo,
-        requesting_user=user,
-    )
-    return APIResponse.html_response(
-        template_name="providers/edit.html",
         context=context,
         request=request,
     )

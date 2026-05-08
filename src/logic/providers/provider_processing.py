@@ -179,8 +179,15 @@ async def handle_list_user_providers(
 async def handle_get_provider_form(
     request: Request,
     requesting_user: User,
+    repo: ProviderRepository | None = None,
 ) -> dict[str, Any]:
-    """Builds the template context for the create-provider form."""
+    """Builds the template context for the create-provider form.
+
+    `repo` is accepted for uniformity with the mount_form contract (every
+    form handler gets the resource's primary repo) but not used here —
+    creating a profile doesn't need to load anything from the db.
+    """
+    del repo  # explicitly unused
     return {"request": request, "current_user": requesting_user}
 
 

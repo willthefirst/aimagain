@@ -307,6 +307,87 @@ def mount_detail(
     router.get(f"/{{{id_param}}}")(_detail)
 
 
+def mount_form(
+    router: Any,
+    spec: ResourceSpec,
+    handler: Callable[..., Awaitable[dict]],
+    *,
+    template: str | None = None,
+    on_existing: bool = False,
+    extra_repo_deps: tuple[Callable[..., Any], ...] = (),
+) -> None:
+    """Mount a form-rendering route.
+
+    ``on_existing=False`` mounts ``GET /<collection>/form`` (create-form,
+    no entity loaded).
+    ``on_existing=True`` mounts ``GET /<collection>/{<id_param>}/form``
+    (edit-form, entity loaded by the handler).
+
+    Template precedence (highest to lowest):
+      1. ``template_name`` returned in the handler's context dict (for
+         polymorphic resources whose template varies at request time —
+         e.g. posts kind-dispatch).
+      2. ``template`` kwarg on this call (the simple two-form case where
+         create and edit render different static templates).
+      3. ``spec.form_template`` (the spec's default).
+
+    Handler kwargs: ``request``, ``repo``, ``requesting_user``, the
+    resource id under ``spec.id_param`` (only when ``on_existing=True``),
+    and any ``extra_repo_deps``. Pure create-form handlers that don't
+    use the repo still have to accept ``repo=`` (just ignore it) —
+    uniform mount-handler contract beats a special case.
+    """
+    if spec.parent is not None:
+        raise NotImplementedError(
+            "mount_form with spec.parent is not supported yet (slice 8 / #253)."
+        )
+    id_param = spec.id_param
+    extra_deps_named = _name_extra_repo_deps(extra_repo_deps)
+    spec_template = spec.form_template
+
+    if on_existing:
+        path = f"/{{{id_param}}}/form"
+        path_params = (("request", Request), (id_param, UUID))
+    else:
+        path = "/form"
+        path_params = (("request", Request),)
+
+    async def _form(**kwargs: Any) -> Any:
+        request: Request = kwargs["request"]
+        handler_kwargs: dict[str, Any] = {
+            "request": request,
+            "repo": kwargs["repo"],
+            "requesting_user": kwargs.get("requesting_user"),
+            **{name: kwargs[name] for name, _ in extra_deps_named},
+        }
+        if on_existing:
+            handler_kwargs[id_param] = kwargs[id_param]
+
+        context = await handler(**handler_kwargs)
+        # Resolve template: handler context > per-mount kwarg > spec field.
+        # `pop` so the template name doesn't leak into the rendered context.
+        resolved_template = (
+            context.pop("template_name", None) or template or spec_template
+        )
+        if resolved_template is None:
+            raise RuntimeError(
+                f"mount_form for {spec.collection!r} (on_existing={on_existing}) "
+                "could not resolve a template — set spec.form_template, "
+                "the per-mount `template=` kwarg, or have the handler return "
+                "`template_name` in its context."
+            )
+        return APIResponse.html_response(
+            template_name=resolved_template, context=context, request=request
+        )
+
+    _set_route_signature(
+        _form,
+        path_params=path_params,
+        deps=_read_route_deps(spec, extra_deps_named),
+    )
+    router.get(path)(_form)
+
+
 def _name_extra_repo_deps(
     deps: tuple[Callable[..., Any], ...],
 ) -> tuple[tuple[str, Callable[..., Any]], ...]:
