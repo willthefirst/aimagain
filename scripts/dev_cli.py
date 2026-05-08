@@ -20,12 +20,12 @@ ENV_TEMPLATE = """# Development environment variables
 DATABASE_URL=sqlite+aiosqlite:///./data/app.db
 
 # Application
-DEBUG=true
 # 32+ bytes required so JWT HMAC keys meet the SHA256 minimum
 SECRET=dev-only-do-not-use-in-prod-aaaaaaaa
+ACCESS_TOKEN_EXPIRE_MINUTES=60
 
-# Development
-DEVELOPMENT=true
+# Development — enables template auto-reload
+ENVIRONMENT=development
 """
 
 
