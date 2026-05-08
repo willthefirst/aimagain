@@ -20,7 +20,10 @@ repos:
         language_version: python3.11
 
   - repo: https://github.com/pycqa/isort
-    rev: 5.12.0
+    # Keep in sync with the isort version installed via pyproject.toml so
+    # pre-commit and `dev lint`/CI agree on import ordering. Same hazard
+    # as black above (PR #73 flap).
+    rev: 6.0.1
     hooks:
       - id: isort
 
