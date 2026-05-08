@@ -1,19 +1,22 @@
 import logging
 from typing import Literal
-from uuid import UUID
 
-from fastapi import APIRouter, Depends, Query, Request, status
+from fastapi import APIRouter, Depends, Query, Request
 
-from src.api.common import (
-    APIResponse,
-    BaseRouter,
-    created_response,
-    deleted_response,
-    parse_and_validate_form,
-    updated_response,
+from src.api.common import APIResponse, BaseRouter
+from src.api.common.resource_routes import (
+    ResourceSpec,
+    mount_create,
+    mount_delete,
+    mount_detail,
+    mount_form,
+    mount_list,
+    mount_update,
 )
 from src.auth_config import current_active_user
+from src.logic._authz import assert_owner_or_admin
 from src.logic.posts.post_processing import (
+    POST,
     handle_create_post,
     handle_delete_post,
     handle_get_post_detail,
@@ -23,9 +26,7 @@ from src.logic.posts.post_processing import (
     handle_update_post,
 )
 from src.models import KIND_NAMES, REGISTERED_KINDS, User
-from src.repositories.audit_repository import AuditRepository
 from src.repositories.dependencies import get_audit_repository, get_post_repository
-from src.repositories.posts.post_repository import PostRepository
 from src.schemas.posts.post import post_create_adapter, post_update_adapter
 
 posts_api_router = APIRouter(prefix="/posts")
@@ -47,38 +48,47 @@ def _patch_response_body(post) -> dict:
     }
 
 
-@router.get("")
-async def list_posts(
-    request: Request,
-    post_repo: PostRepository = Depends(get_post_repository),
-    user: User = Depends(current_active_user),
-):
-    """Provides an HTML page listing all posts (newest first).
-    Requires authentication.
-    """
-    context = await handle_list_posts(
-        request=request,
-        repo=post_repo,
-        requesting_user=user,
-    )
-    return APIResponse.html_response(
-        template_name="posts/list.html", context=context, request=request
-    )
+POST_SPEC = ResourceSpec(
+    collection="posts",
+    id_param="post_id",
+    repo_dep=get_post_repository,
+    audit_resource=POST,
+    read_user_dep=current_active_user,
+    write_user_dep=current_active_user,
+    write_authz=assert_owner_or_admin,
+    create_adapter=post_create_adapter,
+    update_adapter=post_update_adapter,
+    read_to_dict=_patch_response_body,
+    list_template="posts/list.html",
+    detail_template="posts/detail.html",
+    # After update, redirect to the detail page (not the form).
+    update_redirect=lambda *, post_id: f"/posts/{post_id}",
+    # Create has no `create_redirect` override — the mount's default
+    # (HX-Redirect = Location = /posts/{id}) matches the previous shape.
+)
 
 
+# Route registration order matters: literal segments and longer paths must
+# be registered before the more general `/{post_id}` so FastAPI doesn't
+# match `form` as a UUID. The order below mirrors the path specificity.
+
+# GET /posts — list page.
+mount_list(router, POST_SPEC, handler=handle_list_posts)
+
+
+# GET /posts/form?kind=<X> — stays bespoke. The kind query param picks
+# the per-kind create template at request time. mount_form's contract
+# doesn't accept additional query params; widening the spec for this
+# single polymorphic-by-query case would bloat the grammar for everyone.
+# Slice 10 (#255) revisits whether the grammar should grow to fit it.
 @router.get("/form")
 async def get_post_form(
     request: Request,
     kind: Literal[*KIND_NAMES] = Query(KIND_NAMES[0]),
     user: User = Depends(current_active_user),
 ):
-    """Provides an HTML page with the create-post form for the given
-    `kind` (default: first registered kind). Unsupported kinds 422 via
-    FastAPI's Literal validator. The kind set comes from `REGISTERED_KINDS`.
-
-    Registered before `/{post_id}` so the literal `form` is not parsed
-    as a UUID.
-    """
+    """Provides the create-post form for `kind` (defaults to the first
+    registered kind). Unsupported kinds 422 via FastAPI's Literal."""
     context = await handle_get_post_form(request=request, requesting_user=user)
     return APIResponse.html_response(
         template_name=REGISTERED_KINDS[kind].create_template,
@@ -87,120 +97,28 @@ async def get_post_form(
     )
 
 
-@router.get("/{post_id}/form")
-async def get_post_edit_form(
-    post_id: UUID,
-    request: Request,
-    post_repo: PostRepository = Depends(get_post_repository),
-    user: User = Depends(current_active_user),
-):
-    """Provides an HTML page with the edit-post form. Owner-only; admins may
-    edit any post. The template is selected from the post's `kind`, so
-    each kind's edit form lives in its own file. 404 if missing, 403 if
-    not authorized.
-    """
-    context = await handle_get_post_edit_form(
-        request=request,
-        post_id=post_id,
-        repo=post_repo,
-        requesting_user=user,
-    )
-    post_kind = context["post"].kind
-    return APIResponse.html_response(
-        template_name=REGISTERED_KINDS[post_kind].edit_template,
-        context=context,
-        request=request,
-    )
+# GET /posts/{post_id}/form — handler returns `template_name` in context
+# so mount_form picks the right kind-specific edit template at request time.
+mount_form(
+    router,
+    POST_SPEC,
+    handler=handle_get_post_edit_form,
+    on_existing=True,
+)
 
 
-@router.get("/{post_id}")
-async def get_post(
-    post_id: UUID,
-    request: Request,
-    post_repo: PostRepository = Depends(get_post_repository),
-    user: User = Depends(current_active_user),
-):
-    """Provides an HTML detail page for a single post. The template
-    branches on `post.kind` to render the right per-kind body."""
-    context = await handle_get_post_detail(
-        request=request,
-        post_id=post_id,
-        repo=post_repo,
-        requesting_user=user,
-    )
-    return APIResponse.html_response(
-        template_name="posts/detail.html", context=context, request=request
-    )
+# GET /posts/{post_id} — detail page. Registered after /form and /{id}/form
+# so literal segments take precedence.
+mount_detail(router, POST_SPEC, handler=handle_get_post_detail)
 
 
-@router.post("", status_code=status.HTTP_201_CREATED)
-async def create_post(
-    request: Request,
-    post_repo: PostRepository = Depends(get_post_repository),
-    audit_repo: AuditRepository = Depends(get_audit_repository),
-    user: User = Depends(current_active_user),
-):
-    """Creates a post owned by the authenticated user.
-
-    The body must be form-encoded. The `kind` field is required and must
-    match one of the registered variants. `owner_id` is server-set from
-    the session; clients sending it (or any other unknown field) are
-    rejected with 422 by the schema.
-    """
-    payload = await parse_and_validate_form(request, post_create_adapter)
-    created = await handle_create_post(
-        payload=payload,
-        repo=post_repo,
-        audit_repo=audit_repo,
-        requesting_user=user,
-    )
-    return created_response(id=created.id, location=f"/posts/{created.id}")
-
-
-@router.patch("/{post_id}")
-async def patch_post(
-    post_id: UUID,
-    request: Request,
-    post_repo: PostRepository = Depends(get_post_repository),
-    audit_repo: AuditRepository = Depends(get_audit_repository),
-    user: User = Depends(current_active_user),
-):
-    """Partially updates a post. Owner-only; admins may edit any post.
-
-    Server-managed fields (`id`, `owner_id`, `created_at`, `updated_at`)
-    are rejected by the schema's `extra="forbid"`. The body must include
-    at least one mutable field for the post's kind. `kind` cannot be
-    changed via PATCH; mismatches are rejected with 400.
-    The body must be form-encoded.
-    """
-    payload = await parse_and_validate_form(request, post_update_adapter)
-    updated = await handle_update_post(
-        post_id=post_id,
-        payload=payload,
-        repo=post_repo,
-        audit_repo=audit_repo,
-        requesting_user=user,
-    )
-    return updated_response(
-        body=_patch_response_body(updated),
-        hx_redirect=f"/posts/{updated.id}",
-    )
-
-
-@router.delete("/{post_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_post(
-    post_id: UUID,
-    post_repo: PostRepository = Depends(get_post_repository),
-    audit_repo: AuditRepository = Depends(get_audit_repository),
-    user: User = Depends(current_active_user),
-):
-    """Hard-deletes a post. Owner-only; admins may delete any post.
-    404 if missing, 403 if not authorized.
-    """
-    await handle_delete_post(
-        post_id=post_id,
-        repo=post_repo,
-        audit_repo=audit_repo,
-        requesting_user=user,
-    )
-    return deleted_response(hx_redirect="/posts")
+# Mutations — methods differ from the GETs above so order is independent.
+mount_create(
+    router, POST_SPEC, handler=handle_create_post, audit_repo_dep=get_audit_repository
+)
+mount_update(
+    router, POST_SPEC, handler=handle_update_post, audit_repo_dep=get_audit_repository
+)
+mount_delete(
+    router, POST_SPEC, handler=handle_delete_post, audit_repo_dep=get_audit_repository
+)
