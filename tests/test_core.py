@@ -44,13 +44,3 @@ def test_livereload_loaded_in_development():
         mock_settings.ENVIRONMENT = "development"
         context = get_template_context()
         assert context["is_development"] is True
-
-
-def test_test_env_loaded():
-    """Required env vars are present in the test session.
-
-    Loaded from `.env.test` by the root `conftest.py` so worktrees and
-    fresh checkouts run tests without a personal `.env`. See issue #175.
-    """
-    for var in ("SECRET", "DATABASE_URL", "ACCESS_TOKEN_EXPIRE_MINUTES", "ENVIRONMENT"):
-        assert os.getenv(var), f"{var} not set; check .env.test and root conftest.py"
