@@ -16,10 +16,12 @@ silently mutate a licensure belonging to a different profile.
 """
 
 import logging
+from dataclasses import dataclass
 from typing import Any
 from uuid import UUID
 
 from fastapi import Request
+from pydantic import BaseModel
 
 from src.api.common.exceptions import ForbiddenError, NotFoundError
 from src.logic._authz import assert_owner_or_admin
@@ -293,6 +295,133 @@ async def handle_delete_provider(
         await repo.delete_provider(profile)
 
 
+# --- Sub-row CRUD helpers ------------------------------------------------
+# Three private helpers parameterized by `_SubrowSpec` cover the nine public
+# sub-row handlers below. Each public handler is a thin wrapper that
+# preserves its existing signature so route callers and tests don't change.
+
+
+@dataclass(frozen=True)
+class _SubrowSpec:
+    resource: AuditedResource
+    add: str
+    update: str
+    delete: str
+    get_by_id: str
+    display_name: str
+
+
+_LICENSURE_SPEC = _SubrowSpec(
+    resource=LICENSURE,
+    add="add_licensure",
+    update="update_licensure",
+    delete="delete_licensure",
+    get_by_id="get_licensure_by_id",
+    display_name="Licensure",
+)
+_EDUCATION_SPEC = _SubrowSpec(
+    resource=EDUCATION,
+    add="add_education",
+    update="update_education",
+    delete="delete_education",
+    get_by_id="get_education_by_id",
+    display_name="Education entry",
+)
+_CERTIFICATION_SPEC = _SubrowSpec(
+    resource=CERTIFICATION,
+    add="add_certification",
+    update="update_certification",
+    delete="delete_certification",
+    get_by_id="get_certification_by_id",
+    display_name="Certification",
+)
+
+
+async def _handle_subrow_create(
+    *,
+    provider_id: UUID,
+    payload: BaseModel,
+    repo: ProviderRepository,
+    audit_repo: AuditRepository,
+    requesting_user: User,
+    spec: _SubrowSpec,
+) -> Any:
+    profile = await _load_provider_or_404(provider_id, repo)
+    assert_owner_or_admin(
+        profile, requesting_user, owner_attr="user_id", action="modify this provider"
+    )
+
+    created = await getattr(repo, spec.add)(profile, **payload.model_dump())
+    async with mutate(
+        repo,
+        audit_repo,
+        actor=requesting_user,
+        target=created,
+        resource=spec.resource,
+        verb="create",
+    ):
+        pass
+    return created
+
+
+async def _handle_subrow_update(
+    *,
+    provider_id: UUID,
+    child_id: UUID,
+    payload: BaseModel,
+    repo: ProviderRepository,
+    audit_repo: AuditRepository,
+    requesting_user: User,
+    spec: _SubrowSpec,
+) -> Any:
+    profile = await _load_provider_or_404(provider_id, repo)
+    assert_owner_or_admin(
+        profile, requesting_user, owner_attr="user_id", action="modify this provider"
+    )
+
+    row = await _load_subrow_or_404(
+        getattr(repo, spec.get_by_id), child_id, profile.id, name=spec.display_name
+    )
+    async with mutate(
+        repo,
+        audit_repo,
+        actor=requesting_user,
+        target=row,
+        resource=spec.resource,
+        verb="update",
+    ):
+        await getattr(repo, spec.update)(row, **payload.model_dump(exclude_unset=True))
+    return row
+
+
+async def _handle_subrow_delete(
+    *,
+    provider_id: UUID,
+    child_id: UUID,
+    repo: ProviderRepository,
+    audit_repo: AuditRepository,
+    requesting_user: User,
+    spec: _SubrowSpec,
+) -> None:
+    profile = await _load_provider_or_404(provider_id, repo)
+    assert_owner_or_admin(
+        profile, requesting_user, owner_attr="user_id", action="modify this provider"
+    )
+
+    row = await _load_subrow_or_404(
+        getattr(repo, spec.get_by_id), child_id, profile.id, name=spec.display_name
+    )
+    async with mutate(
+        repo,
+        audit_repo,
+        actor=requesting_user,
+        target=row,
+        resource=spec.resource,
+        verb="delete",
+    ):
+        await getattr(repo, spec.delete)(row)
+
+
 # --- Licensure handlers --------------------------------------------------
 
 
@@ -303,22 +432,14 @@ async def handle_create_licensure(
     audit_repo: AuditRepository,
     requesting_user: User,
 ) -> ProviderLicensure:
-    profile = await _load_provider_or_404(provider_id, repo)
-    assert_owner_or_admin(
-        profile, requesting_user, owner_attr="user_id", action="modify this provider"
+    return await _handle_subrow_create(
+        provider_id=provider_id,
+        payload=payload,
+        repo=repo,
+        audit_repo=audit_repo,
+        requesting_user=requesting_user,
+        spec=_LICENSURE_SPEC,
     )
-
-    created = await repo.add_licensure(profile, **payload.model_dump())
-    async with mutate(
-        repo,
-        audit_repo,
-        actor=requesting_user,
-        target=created,
-        resource=LICENSURE,
-        verb="create",
-    ):
-        pass
-    return created
 
 
 async def handle_update_licensure(
@@ -329,24 +450,15 @@ async def handle_update_licensure(
     audit_repo: AuditRepository,
     requesting_user: User,
 ) -> ProviderLicensure:
-    profile = await _load_provider_or_404(provider_id, repo)
-    assert_owner_or_admin(
-        profile, requesting_user, owner_attr="user_id", action="modify this provider"
+    return await _handle_subrow_update(
+        provider_id=provider_id,
+        child_id=licensure_id,
+        payload=payload,
+        repo=repo,
+        audit_repo=audit_repo,
+        requesting_user=requesting_user,
+        spec=_LICENSURE_SPEC,
     )
-
-    licensure = await _load_subrow_or_404(
-        repo.get_licensure_by_id, licensure_id, profile.id, name="Licensure"
-    )
-    async with mutate(
-        repo,
-        audit_repo,
-        actor=requesting_user,
-        target=licensure,
-        resource=LICENSURE,
-        verb="update",
-    ):
-        await repo.update_licensure(licensure, **payload.model_dump(exclude_unset=True))
-    return licensure
 
 
 async def handle_delete_licensure(
@@ -356,23 +468,14 @@ async def handle_delete_licensure(
     audit_repo: AuditRepository,
     requesting_user: User,
 ) -> None:
-    profile = await _load_provider_or_404(provider_id, repo)
-    assert_owner_or_admin(
-        profile, requesting_user, owner_attr="user_id", action="modify this provider"
+    await _handle_subrow_delete(
+        provider_id=provider_id,
+        child_id=licensure_id,
+        repo=repo,
+        audit_repo=audit_repo,
+        requesting_user=requesting_user,
+        spec=_LICENSURE_SPEC,
     )
-
-    licensure = await _load_subrow_or_404(
-        repo.get_licensure_by_id, licensure_id, profile.id, name="Licensure"
-    )
-    async with mutate(
-        repo,
-        audit_repo,
-        actor=requesting_user,
-        target=licensure,
-        resource=LICENSURE,
-        verb="delete",
-    ):
-        await repo.delete_licensure(licensure)
 
 
 # --- Education handlers --------------------------------------------------
@@ -385,22 +488,14 @@ async def handle_create_education(
     audit_repo: AuditRepository,
     requesting_user: User,
 ) -> ProviderEducation:
-    profile = await _load_provider_or_404(provider_id, repo)
-    assert_owner_or_admin(
-        profile, requesting_user, owner_attr="user_id", action="modify this provider"
+    return await _handle_subrow_create(
+        provider_id=provider_id,
+        payload=payload,
+        repo=repo,
+        audit_repo=audit_repo,
+        requesting_user=requesting_user,
+        spec=_EDUCATION_SPEC,
     )
-
-    created = await repo.add_education(profile, **payload.model_dump())
-    async with mutate(
-        repo,
-        audit_repo,
-        actor=requesting_user,
-        target=created,
-        resource=EDUCATION,
-        verb="create",
-    ):
-        pass
-    return created
 
 
 async def handle_update_education(
@@ -411,24 +506,15 @@ async def handle_update_education(
     audit_repo: AuditRepository,
     requesting_user: User,
 ) -> ProviderEducation:
-    profile = await _load_provider_or_404(provider_id, repo)
-    assert_owner_or_admin(
-        profile, requesting_user, owner_attr="user_id", action="modify this provider"
+    return await _handle_subrow_update(
+        provider_id=provider_id,
+        child_id=education_id,
+        payload=payload,
+        repo=repo,
+        audit_repo=audit_repo,
+        requesting_user=requesting_user,
+        spec=_EDUCATION_SPEC,
     )
-
-    education = await _load_subrow_or_404(
-        repo.get_education_by_id, education_id, profile.id, name="Education entry"
-    )
-    async with mutate(
-        repo,
-        audit_repo,
-        actor=requesting_user,
-        target=education,
-        resource=EDUCATION,
-        verb="update",
-    ):
-        await repo.update_education(education, **payload.model_dump(exclude_unset=True))
-    return education
 
 
 async def handle_delete_education(
@@ -438,23 +524,14 @@ async def handle_delete_education(
     audit_repo: AuditRepository,
     requesting_user: User,
 ) -> None:
-    profile = await _load_provider_or_404(provider_id, repo)
-    assert_owner_or_admin(
-        profile, requesting_user, owner_attr="user_id", action="modify this provider"
+    await _handle_subrow_delete(
+        provider_id=provider_id,
+        child_id=education_id,
+        repo=repo,
+        audit_repo=audit_repo,
+        requesting_user=requesting_user,
+        spec=_EDUCATION_SPEC,
     )
-
-    education = await _load_subrow_or_404(
-        repo.get_education_by_id, education_id, profile.id, name="Education entry"
-    )
-    async with mutate(
-        repo,
-        audit_repo,
-        actor=requesting_user,
-        target=education,
-        resource=EDUCATION,
-        verb="delete",
-    ):
-        await repo.delete_education(education)
 
 
 # --- Certification handlers ----------------------------------------------
@@ -467,22 +544,14 @@ async def handle_create_certification(
     audit_repo: AuditRepository,
     requesting_user: User,
 ) -> ProviderCertification:
-    profile = await _load_provider_or_404(provider_id, repo)
-    assert_owner_or_admin(
-        profile, requesting_user, owner_attr="user_id", action="modify this provider"
+    return await _handle_subrow_create(
+        provider_id=provider_id,
+        payload=payload,
+        repo=repo,
+        audit_repo=audit_repo,
+        requesting_user=requesting_user,
+        spec=_CERTIFICATION_SPEC,
     )
-
-    created = await repo.add_certification(profile, **payload.model_dump())
-    async with mutate(
-        repo,
-        audit_repo,
-        actor=requesting_user,
-        target=created,
-        resource=CERTIFICATION,
-        verb="create",
-    ):
-        pass
-    return created
 
 
 async def handle_update_certification(
@@ -493,29 +562,15 @@ async def handle_update_certification(
     audit_repo: AuditRepository,
     requesting_user: User,
 ) -> ProviderCertification:
-    profile = await _load_provider_or_404(provider_id, repo)
-    assert_owner_or_admin(
-        profile, requesting_user, owner_attr="user_id", action="modify this provider"
+    return await _handle_subrow_update(
+        provider_id=provider_id,
+        child_id=certification_id,
+        payload=payload,
+        repo=repo,
+        audit_repo=audit_repo,
+        requesting_user=requesting_user,
+        spec=_CERTIFICATION_SPEC,
     )
-
-    certification = await _load_subrow_or_404(
-        repo.get_certification_by_id,
-        certification_id,
-        profile.id,
-        name="Certification",
-    )
-    async with mutate(
-        repo,
-        audit_repo,
-        actor=requesting_user,
-        target=certification,
-        resource=CERTIFICATION,
-        verb="update",
-    ):
-        await repo.update_certification(
-            certification, **payload.model_dump(exclude_unset=True)
-        )
-    return certification
 
 
 async def handle_delete_certification(
@@ -525,23 +580,11 @@ async def handle_delete_certification(
     audit_repo: AuditRepository,
     requesting_user: User,
 ) -> None:
-    profile = await _load_provider_or_404(provider_id, repo)
-    assert_owner_or_admin(
-        profile, requesting_user, owner_attr="user_id", action="modify this provider"
+    await _handle_subrow_delete(
+        provider_id=provider_id,
+        child_id=certification_id,
+        repo=repo,
+        audit_repo=audit_repo,
+        requesting_user=requesting_user,
+        spec=_CERTIFICATION_SPEC,
     )
-
-    certification = await _load_subrow_or_404(
-        repo.get_certification_by_id,
-        certification_id,
-        profile.id,
-        name="Certification",
-    )
-    async with mutate(
-        repo,
-        audit_repo,
-        actor=requesting_user,
-        target=certification,
-        resource=CERTIFICATION,
-        verb="delete",
-    ):
-        await repo.delete_certification(certification)
