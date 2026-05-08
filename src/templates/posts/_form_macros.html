@@ -42,6 +42,23 @@ the linter looks for on the label line.
 </select><br /><br />
 {%- endmacro %}
 
+{# Filter-form variant of `select_field`. Two differences from the
+   create/edit variant — the field is never required (so the user can
+   submit with no filter applied), and the leading `<option value="">`
+   is a real, selectable "no filter" option rather than a disabled
+   placeholder. `current` is the active filter value (None when no
+   filter is applied); the matching option is preselected, otherwise
+   the "any" option is. #}
+{% macro filter_select_field(name, label, options, labels=None, current=None, any_label="Any") -%}
+<label for="{{ name }}">{{ label }}:</label><br />
+<select id="{{ name }}" name="{{ name }}">
+  <option value=""{% if not current %} selected{% endif %}>{{ any_label }}</option>
+  {%- for v in options %}
+  <option value="{{ v }}"{% if current == v %} selected{% endif %}>{{ labels[v] if labels else v }}</option>
+  {%- endfor %}
+</select><br /><br />
+{%- endmacro %}
+
 {% macro radio_bool_field(name, label, current=None, required=True) -%}
 <fieldset>
   <legend>{{ label }}</legend>
