@@ -19,13 +19,13 @@ Controlled-vocabulary fields (state, age group, etc.) are typed as
 `Literal[*TUPLE]` against tuples in `src/models/post_enums.py` so the
 schema's accepted values stay in lockstep with the DB CHECK
 constraints. Free-text fields (city, ZIP, descriptions, optional
-modality strings) carry their input cleaning via
-`Annotated[T, AfterValidator(fn)]` aliases (`StrippedText`, `ZipText`,
-`StrippedOptionalText`) so the cleaning rule lives in one place and
-attaches to the field type rather than per-class `@field_validator`
-methods. The Update variants reuse the same aliases as `T | None`;
-Pydantic skips the AfterValidator on the `None` arm, so one alias
-covers required and optional flavors.
+modality strings) use the `StrippedText`, `ZipText`, and
+`StrippedOptionalText` aliases from
+[`src/schemas/_validators.py`](_validators.py) so the cleaning rule
+lives in one place and attaches to the field type rather than
+per-class `@field_validator` methods. The Update variants reuse the
+same aliases as `T | None`; Pydantic skips the AfterValidator on the
+`None` arm, so one alias covers required and optional flavors.
 
 Two guardrail tests in `test_post.py` keep enums in lockstep:
 `test_schema_literals_match_model_tuples` (Literal universes match the
@@ -33,13 +33,11 @@ tuples) and `test_labels_cover_their_tuples` (every value has a
 display label).
 """
 
-import re
 import uuid
 from datetime import datetime
 from typing import Annotated, Literal, Union
 
 from pydantic import (
-    AfterValidator,
     BaseModel,
     BeforeValidator,
     ConfigDict,
@@ -59,55 +57,12 @@ from src.models.post_enums import (
     TREATMENT_SETTINGS,
     US_STATES,
 )
-
-# --- Field-cleaning helpers ---------------------------------------------
-#
-# Each runs AFTER Pydantic's type validation, so for required fields
-# typed as plain `str` Pydantic has already rejected `None` before the
-# validator sees the value. For Update fields typed as `T | None`,
-# Pydantic skips AfterValidator on the `None` arm, so the helper only
-# ever sees real strings. That's why a single helper works for both
-# Create (required) and Update (optional) — no `_or_none` variants
-# needed.
-
-_ZIP_RE = re.compile(r"^\d{5}$")
-
-
-def _strip_required(v: str) -> str:
-    v = v.strip()
-    if not v:
-        raise ValueError("must not be empty")
-    return v
-
-
-def _validate_zip(v: str) -> str:
-    v = v.strip()
-    if not _ZIP_RE.match(v):
-        raise ValueError("must be a 5-digit ZIP code")
-    return v
-
-
-def _strip_optional(v: str | None) -> str | None:
-    """Strip whitespace; collapse empty/whitespace-only to `None`. Used
-    for optional free-text fields where '' from a blank input means
-    absent. Receives `None` directly because the surrounding type is
-    `str | None` (not `str`), so the AfterValidator fires on every
-    arm of the union — including `None`."""
-    if v is None:
-        return None
-    v = v.strip()
-    return v or None
-
-
-# --- Annotated field types ----------------------------------------------
-#
-# Attach the cleaning rule to the field's type, not to a per-class
-# `@field_validator` method. Each variant just declares the field with
-# the right alias; the validator definition lives once.
-
-StrippedText = Annotated[str, AfterValidator(_strip_required)]
-ZipText = Annotated[str, AfterValidator(_validate_zip)]
-StrippedOptionalText = Annotated[str | None, AfterValidator(_strip_optional)]
+from src.schemas._validators import (
+    StrippedOptionalText,
+    StrippedText,
+    ZipText,
+    assert_any_field_set,
+)
 
 
 def _scalar_to_list(v):
@@ -325,13 +280,7 @@ post_create_adapter: TypeAdapter = TypeAdapter(PostCreate)
 # Create and Update.
 
 
-def _assert_any_editable_field_set(model: BaseModel) -> None:
-    """Raise `ValueError` if every field on `model` other than `kind`
-    is `None`. Shared between the per-kind Update variants so the
-    at-least-one-field rule lives in one place."""
-    fields = type(model).model_fields
-    if all(getattr(model, name) is None for name in fields if name != "kind"):
-        raise ValueError("at least one editable field must be provided")
+_UPDATE_DISCRIMINATOR_EXCLUDE = frozenset({"kind"})
 
 
 class ClientReferralUpdate(BaseModel):
@@ -356,7 +305,7 @@ class ClientReferralUpdate(BaseModel):
 
     @model_validator(mode="after")
     def _at_least_one_field(self) -> "ClientReferralUpdate":
-        _assert_any_editable_field_set(self)
+        assert_any_field_set(self, exclude=_UPDATE_DISCRIMINATOR_EXCLUDE)
         return self
 
 
@@ -387,7 +336,7 @@ class ProviderAvailabilityUpdate(BaseModel):
 
     @model_validator(mode="after")
     def _at_least_one_field(self) -> "ProviderAvailabilityUpdate":
-        _assert_any_editable_field_set(self)
+        assert_any_field_set(self, exclude=_UPDATE_DISCRIMINATOR_EXCLUDE)
         return self
 
 
