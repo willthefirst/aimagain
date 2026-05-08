@@ -105,28 +105,48 @@ def test_mount_delete_uses_custom_redirect_callable():
     assert resp.headers["HX-Redirect"] == f"/sprockets-overview?last={sprocket_id}"
 
 
-def test_mount_delete_rejects_subresource_spec_until_slice_8():
+def test_mount_delete_subresource_path_includes_parent_id():
+    """A child ResourceSpec with `parent=` mounts the path under the
+    parent's id-param. Handler receives both ids by their declared kwarg
+    names. The router prefix carries the topmost ancestor's collection."""
+    captured = {}
+
+    async def delete_handler(**kwargs):
+        captured.update(kwargs)
+
     parent = ResourceSpec(
         collection="parents",
         id_param="parent_id",
-        repo_dep=lambda: None,
-        write_user_dep=lambda: None,
+        repo_dep=lambda: SimpleNamespace(name="parent_repo"),
+        write_user_dep=lambda: SimpleNamespace(id=uuid4(), is_superuser=True),
     )
     child = ResourceSpec(
         collection="children",
         id_param="child_id",
-        repo_dep=lambda: None,
-        write_user_dep=lambda: None,
+        repo_dep=lambda: SimpleNamespace(name="child_repo"),
+        write_user_dep=lambda: SimpleNamespace(id=uuid4(), is_superuser=True),
         parent=parent,
     )
-    router = APIRouter()
-    with pytest.raises(NotImplementedError, match="parent"):
-        mount_delete(
-            router,
-            child,
-            handler=lambda **_: None,
-            audit_repo_dep=lambda: None,
-        )
+
+    app = FastAPI()
+    router = APIRouter(prefix="/parents")  # topmost collection lives in prefix
+    mount_delete(
+        router,
+        child,
+        handler=delete_handler,
+        audit_repo_dep=lambda: SimpleNamespace(name="audit_repo"),
+    )
+    app.include_router(router)
+    client = TestClient(app)
+
+    parent_id = uuid4()
+    child_id = uuid4()
+    resp = client.delete(f"/parents/{parent_id}/children/{child_id}")
+
+    assert resp.status_code == 204
+    assert str(captured["parent_id"]) == str(parent_id)
+    assert str(captured["child_id"]) == str(child_id)
+    assert captured["repo"].name == "child_repo"
 
 
 def test_mount_delete_requires_write_user_dep():

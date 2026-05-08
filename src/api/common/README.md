@@ -70,8 +70,7 @@ Common utilities handle concerns that span multiple routes and domains.
 | **Decorators**  | Cross-cutting concerns | Error handling, logging                                         | BaseRouter (automatic)   |
 | **Exceptions**  | Error vocabulary       | API exception classes raised by logic; fastapi-users translator | Logic handlers, decorator |
 | **Forms**       | Form-encoded request glue | `parse_form_to_payload` and `validate_or_422`                | Route handlers that accept form-encoded bodies |
-| **resource_routes** | Unified `ResourceSpec` grammar | Declare a resource once, opt into the operations to expose via `mount_*` | Route files for any CRUD-shaped resource |
-| **subresource_routes** | Sub-resource CRUD shorthand (legacy) | `SubresourceSpec` + `register_subresource_routes`. Folds into `resource_routes` in slice 8. | `providers.py` (until slice 8 / #253) |
+| **resource_routes** | Unified `ResourceSpec` grammar | Declare a resource once, opt into the operations to expose via `mount_*`; sub-resources nest via `parent=` | Route files for any CRUD-shaped resource (top-level and sub-resource) |
 
 ## Directory structure
 
@@ -82,8 +81,7 @@ Common utilities handle concerns that span multiple routes and domains.
 - `decorators.py` - Error handling and logging decorators applied to all routes
 - `exceptions.py` - `APIException` subclasses (`NotFoundError`, `ForbiddenError`, ...) raised by logic, plus the fastapi-users → HTTP translator
 - `forms.py` - HTTP-adapter primitives for form-encoded route bodies: `parse_form_to_payload(request)` (form → dict, lists for repeated keys) and `validate_or_422(adapter, payload_dict)` (run a `TypeAdapter`, translate `ValidationError` to 422 with `[{"loc","msg","type"}]`). Home for any HTTP-adapter primitive that two or more route modules would otherwise import from each other.
-- `resource_routes.py` - Unified `ResourceSpec` + opt-in `mount_*` grammar. See [Unified resource grammar](#unified-resource-grammar) below.
-- `subresource_routes.py` - Earlier `SubresourceSpec` + `register_subresource_routes` helper that handles provider sub-resource CRUD. Slice 8 (#253) folds it into `resource_routes` via the `parent` field on `ResourceSpec`; until then both coexist.
+- `resource_routes.py` - Unified `ResourceSpec` + opt-in `mount_*` grammar (covers top-level *and* sub-resource CRUD via `parent=`). See [Unified resource grammar](#unified-resource-grammar) below.
 
 **Package infrastructure:**
 
@@ -125,7 +123,7 @@ mount_delete(
 
 - **Opt-in mounts.** A read-only resource simply doesn't call `mount_create`/`mount_update`/`mount_delete` — there's no `read_only=True` flag because *not calling the mount* is the cleanest way to express "don't expose this verb." A backend-only resource (e.g. an async verification record written by a worker) still declares `audit_resource` so the worker can call `mutate(...)`, but the route file mounts only `mount_list` / `mount_detail`.
 - **Spec is identity, mounts are operations.** Adding a new mount function (`mount_list`, `mount_create`, ...) doesn't change `ResourceSpec`'s shape for resources that don't use it — defaults are `None`. The dataclass grows fields incrementally as new mounts land.
-- **Sub-resources nest via `parent`.** A child `ResourceSpec` carrying `parent=parent_spec` produces paths like `/providers/{provider_id}/licensures/{licensure_id}` — same mount functions, no separate registration helper. (Slice 8 / #253 lifts the current restriction that `mount_delete` rejects parent-bearing specs.)
+- **Sub-resources nest via `parent`.** A child `ResourceSpec` carrying `parent=parent_spec` produces paths like `/providers/{provider_id}/licensures/{licensure_id}` — same `mount_create`/`mount_update`/`mount_delete` functions as top-level resources. The router's prefix is the topmost ancestor's collection (e.g. `APIRouter(prefix="/providers")`); the mount walks the parent chain to build the rest of the path. Handler kwargs include every parent id by its declared `id_param` name (`provider_id=...`, then the resource's own id).
 - **Polymorphic resources via handler-driven knobs.** Posts dispatch templates by `kind`; the route doesn't need to. The handler returns a `template_name` in its context dict and the mount honors it. This keeps the spec's shape stable even when the resource's behavior is polymorphic — `mount_form` for `GET /posts/{id}/form` uses this in slice 7. The grammar isn't infinitely flexible though: `GET /posts/form?kind=X` (where the *query param* picks the template) stays bespoke because mount_form's contract doesn't carry query params, and widening it for one case would bloat every spec.
 
 ### Handler signatures
@@ -146,10 +144,10 @@ Secondary repos (e.g. `user_repo: UserRepository` in the multi-repo `handle_list
 | --- | --- | --- |
 | `mount_delete` | Landed (slice 3 / #248) | `users` (DELETE) |
 | `mount_list` / `mount_detail` | Landed (slice 4 / #249) | `users` (GET / and GET /{id}) |
-| `mount_form` | Slice 5 / #250 | — |
-| `mount_create` / `mount_update` | Slice 6 / #251 | — |
+| `mount_form` | Landed (slice 5 / #250) | `providers` (GET /form, GET /{id}/form); `posts` (edit form via handler-returned template_name) |
+| `mount_create` / `mount_update` | Landed (slice 6 / #251) | `providers`, `posts`, `licensures`, `educations`, `certifications` |
 | `mount_related_list` | Slice 9 / #254 | — |
-| Sub-resource via `parent=` | Slice 8 / #253 | — |
+| Sub-resource via `parent=` | Landed (slice 8 / #253) | `licensures`, `educations`, `certifications` (under providers) |
 
 ### Multi-repo handlers: `extra_repo_deps`
 

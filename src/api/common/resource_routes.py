@@ -151,46 +151,42 @@ def mount_delete(
     knob — every mounted mutation uses the same one. Callers import it
     once and reuse it across all `mount_*` calls.
 
-    Until slice 8 (#253) sub-resource support lands, this asserts
-    ``spec.parent is None``. The path is just ``/{<id_param>}`` —
-    callers register the router with the resource's collection prefix
-    (e.g. ``APIRouter(prefix="/users")``).
+    Sub-resources nest via ``spec.parent``. The router's prefix is the
+    topmost ancestor's collection; the mount produces a path like
+    ``/{provider_id}/licensures/{licensure_id}`` for a licensure spec
+    whose parent is the provider spec. The handler receives every parent
+    id by its id_param name (e.g. ``provider_id=...``) plus the resource's
+    own id (``licensure_id=...``).
     """
-    if spec.parent is not None:
-        raise NotImplementedError(
-            "mount_delete with spec.parent is not supported yet "
-            "(slice 8 / issue #253). Use register_subresource_routes for now."
-        )
     if spec.write_user_dep is None:
         raise ValueError(
             f"mount_delete requires {spec.collection!r} to set "
             "write_user_dep — silent public deletes would be a bug."
         )
 
-    path = f"/{{{spec.id_param}}}"
+    path = _path_segments_under_router(spec, with_id=True)
+    parent_path_params = _parent_path_param_pairs(spec)
     id_param = spec.id_param
     delete_redirect = spec.delete_redirect
     default_redirect = f"/{spec.collection}"
 
     async def _delete(**kwargs: Any) -> Any:
-        # FastAPI binds the path param under `id_param`, the deps under
-        # the names declared in `__signature__` below.
-        resource_id = kwargs[id_param]
+        path_kwargs = _kwargs_for_handler_path(spec, kwargs, with_id=True)
         await _resolve_handler(handler)(
-            **{id_param: resource_id},
+            **path_kwargs,
             repo=kwargs["repo"],
             audit_repo=kwargs["audit_repo"],
             requesting_user=kwargs["requesting_user"],
         )
         if delete_redirect is not None:
-            hx_redirect = delete_redirect(**{id_param: resource_id})
+            hx_redirect = delete_redirect(**path_kwargs)
         else:
             hx_redirect = default_redirect
         return deleted_response(hx_redirect=hx_redirect)
 
     _set_route_signature(
         _delete,
-        path_params=((id_param, UUID),),
+        path_params=(*parent_path_params, (id_param, UUID)),
         deps=(
             ("repo", spec.repo_dep),
             ("audit_repo", audit_repo_dep),
@@ -418,10 +414,6 @@ def mount_create(
 
     Requires: ``spec.write_user_dep``, ``spec.create_adapter``.
     """
-    if spec.parent is not None:
-        raise NotImplementedError(
-            "mount_create with spec.parent is not supported yet (slice 8 / #253)."
-        )
     if spec.write_user_dep is None:
         raise ValueError(
             f"mount_create requires {spec.collection!r} to set write_user_dep."
@@ -436,32 +428,51 @@ def mount_create(
     create_adapter = spec.create_adapter
     create_redirect = spec.create_redirect
 
+    path = _path_segments_under_router(spec, with_id=False)
+    parent_path_params = _parent_path_param_pairs(spec)
+
     async def _create(**kwargs: Any) -> Any:
         request: Request = kwargs["request"]
         payload = await parse_and_validate_form(request, create_adapter)
+        path_kwargs = _kwargs_for_handler_path(spec, kwargs, with_id=False)
         created = await _resolve_handler(handler)(
+            **path_kwargs,
             payload=payload,
             repo=kwargs["repo"],
             audit_repo=kwargs["audit_repo"],
             requesting_user=kwargs["requesting_user"],
         )
-        location = f"/{collection}/{created.id}"
+        # Default Location is the canonical resource URL — for a top-level
+        # resource that's /<collection>/{id}; for a sub-resource we point
+        # at the parent because the spec doesn't have a "list children"
+        # canonical URL convention. Per-resource overrides via
+        # `create_redirect` handle the HX-Redirect target.
+        if spec.parent is None:
+            location = f"/{collection}/{created.id}"
+        else:
+            top = _walk_parent_chain(spec)[0]
+            top_id = path_kwargs[top.id_param]
+            # Conservative: redirect to the parent detail page. If a
+            # resource needs a different canonical URL it should set
+            # create_redirect explicitly (which sets the HX-Redirect; the
+            # Location header still points at the parent).
+            location = f"/{top.collection}/{top_id}"
         if create_redirect is not None:
-            hx = create_redirect(**{id_param: created.id})
+            hx = create_redirect(**path_kwargs, **{id_param: created.id})
         else:
             hx = location
         return created_response(id=created.id, location=location, hx_redirect=hx)
 
     _set_route_signature(
         _create,
-        path_params=(("request", Request),),
+        path_params=(("request", Request), *parent_path_params),
         deps=(
             ("repo", spec.repo_dep),
             ("audit_repo", audit_repo_dep),
             ("requesting_user", spec.write_user_dep),
         ),
     )
-    router.post("", status_code=status.HTTP_201_CREATED)(_create)
+    router.post(path, status_code=status.HTTP_201_CREATED)(_create)
 
 
 def mount_update(
@@ -486,10 +497,6 @@ def mount_update(
     ``read_to_dict`` is optional but conventional — clients often want
     the new state without a follow-up GET.
     """
-    if spec.parent is not None:
-        raise NotImplementedError(
-            "mount_update with spec.parent is not supported yet (slice 8 / #253)."
-        )
     if spec.write_user_dep is None:
         raise ValueError(
             f"mount_update requires {spec.collection!r} to set write_user_dep."
@@ -505,12 +512,15 @@ def mount_update(
     update_redirect = spec.update_redirect
     read_to_dict = spec.read_to_dict
 
+    path = _path_segments_under_router(spec, with_id=True)
+    parent_path_params = _parent_path_param_pairs(spec)
+
     async def _update(**kwargs: Any) -> Any:
         request: Request = kwargs["request"]
-        resource_id: UUID = kwargs[id_param]
         payload = await parse_and_validate_form(request, update_adapter)
+        path_kwargs = _kwargs_for_handler_path(spec, kwargs, with_id=True)
         updated = await _resolve_handler(handler)(
-            **{id_param: resource_id},
+            **path_kwargs,
             payload=payload,
             repo=kwargs["repo"],
             audit_repo=kwargs["audit_repo"],
@@ -518,21 +528,91 @@ def mount_update(
         )
         body = read_to_dict(updated) if read_to_dict else None
         if update_redirect is not None:
-            hx = update_redirect(**{id_param: updated.id})
+            hx = update_redirect(**path_kwargs)
         else:
             hx = f"/{collection}/{updated.id}"
         return updated_response(body=body, hx_redirect=hx)
 
     _set_route_signature(
         _update,
-        path_params=(("request", Request), (id_param, UUID)),
+        path_params=(("request", Request), *parent_path_params, (id_param, UUID)),
         deps=(
             ("repo", spec.repo_dep),
             ("audit_repo", audit_repo_dep),
             ("requesting_user", spec.write_user_dep),
         ),
     )
-    router.patch(f"/{{{id_param}}}")(_update)
+    router.patch(path)(_update)
+
+
+def _walk_parent_chain(spec: ResourceSpec) -> list[ResourceSpec]:
+    """Return ancestors top-to-bottom including ``spec`` itself.
+
+    For a spec with ``parent`` chain ``A → B → C`` (where C is ``spec``),
+    returns ``[A, B, C]`` — outermost first.
+    """
+    chain: list[ResourceSpec] = []
+    s: ResourceSpec | None = spec
+    while s is not None:
+        chain.append(s)
+        s = s.parent
+    return list(reversed(chain))
+
+
+def _path_segments_under_router(spec: ResourceSpec, *, with_id: bool) -> str:
+    """Build the route path *relative to the router's prefix*.
+
+    The router's prefix is expected to be the topmost ancestor's
+    collection (e.g. ``APIRouter(prefix="/providers")`` for both
+    provider routes and licensure-under-provider routes). This function
+    produces the rest:
+
+    ``/{provider_id}/licensures`` (no id) or
+    ``/{provider_id}/licensures/{licensure_id}`` (with id) for a
+    licensure spec whose parent is the provider spec.
+
+    For a top-level spec (no parent), returns ``""`` (no id) or
+    ``/{spec.id_param}`` (with id).
+    """
+    chain = _walk_parent_chain(spec)
+    # chain[0] is topmost ancestor; its collection is the router prefix.
+    # Each subsequent entry contributes /{parent.id_param}/{this.collection}.
+    parts: list[str] = []
+    for child in chain[1:]:
+        assert child.parent is not None
+        parts.append(f"/{{{child.parent.id_param}}}/{child.collection}")
+    if with_id:
+        parts.append(f"/{{{spec.id_param}}}")
+    return "".join(parts)
+
+
+def _parent_path_param_pairs(spec: ResourceSpec) -> tuple[tuple[str, type], ...]:
+    """All parent id-params (excluding ``spec.id_param``) the route binds.
+
+    For a licensure spec under provider, returns ``(("provider_id", UUID),)``.
+    For a top-level spec, returns ``()``.
+    """
+    out: list[tuple[str, type]] = []
+    s: ResourceSpec | None = spec.parent
+    while s is not None:
+        out.append((s.id_param, UUID))
+        s = s.parent
+    out.reverse()
+    return tuple(out)
+
+
+def _kwargs_for_handler_path(
+    spec: ResourceSpec, kwargs: dict[str, Any], *, with_id: bool
+) -> dict[str, Any]:
+    """Pluck the parent ids (and the spec's own id if ``with_id``) out of
+    the route's kwargs into a fresh dict suitable for splatting into a
+    handler call as ``**path_kwargs``."""
+    out: dict[str, Any] = {}
+    for name, _ in _parent_path_param_pairs(spec):
+        out[name] = kwargs[name]
+    if with_id:
+        out[spec.id_param] = kwargs[spec.id_param]
+    return out
 
 
 def _resolve_handler(fn: Callable[..., Any]) -> Callable[..., Any]:
