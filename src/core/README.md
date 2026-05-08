@@ -371,10 +371,10 @@ def test_with_custom_config():
 
 ## Tests
 
-Configuration and templating utilities are tested in `tests/test_core.py`. Tests cover:
-- Environment variable defaults (particularly ensuring production is the safe default)
-- Template context generation for development vs production
-- LIVERELOAD script conditionally loading only in development
+Each module has a colocated `test_<module>.py` covering its behavior:
+
+- `test_config.py` — environment variable defaults, particularly that production is the safe default.
+- `test_templating.py` — template context generation, including livereload only loading in development.
 
 ## Related documentation
 
