@@ -41,20 +41,34 @@ from src.models.enums import (
 )
 from src.schemas._validators import StrippedText, ZipText, assert_any_field_set
 
-# --- ProviderLicensure --------------------------------------------------
 
+class _ProviderSubrowBase(BaseModel):
+    """Common fields for every provider sub-row Read and AuditSnapshot
+    schema (licensure / education / certification). Subclasses add
+    entity-specific fields.
 
-class ProviderLicensureRead(BaseModel):
+    The two surfaces are structurally identical here (same FK column,
+    same timestamps, same `from_attributes` config), so they share one
+    base — unlike `_PostReadBase` / `_PostAuditSnapshotBase` in the post
+    cluster, which differ because Read carries a flattening validator.
+    """
+
     id: uuid.UUID
     provider_id: uuid.UUID
     created_at: datetime
     updated_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+# --- ProviderLicensure --------------------------------------------------
+
+
+class ProviderLicensureRead(_ProviderSubrowBase):
     license_type: str
     license_number: str
     issuing_state: str
     expiration_date: date | None = None
-
-    model_config = ConfigDict(from_attributes=True)
 
 
 class ProviderLicensureCreate(BaseModel):
@@ -86,32 +100,20 @@ class ProviderLicensureUpdate(BaseModel):
 licensure_update_adapter: TypeAdapter = TypeAdapter(ProviderLicensureUpdate)
 
 
-class ProviderLicensureAuditSnapshot(BaseModel):
-    id: uuid.UUID
-    provider_id: uuid.UUID
-    created_at: datetime
-    updated_at: datetime
+class ProviderLicensureAuditSnapshot(_ProviderSubrowBase):
     license_type: str
     license_number: str
     issuing_state: str
     expiration_date: date | None = None
 
-    model_config = ConfigDict(from_attributes=True)
-
 
 # --- ProviderEducation --------------------------------------------------
 
 
-class ProviderEducationRead(BaseModel):
-    id: uuid.UUID
-    provider_id: uuid.UUID
-    created_at: datetime
-    updated_at: datetime
+class ProviderEducationRead(_ProviderSubrowBase):
     education_type: str
     institution: str
     month_completed: str | None = None
-
-    model_config = ConfigDict(from_attributes=True)
 
 
 class ProviderEducationCreate(BaseModel):
@@ -144,31 +146,19 @@ class ProviderEducationUpdate(BaseModel):
 education_update_adapter: TypeAdapter = TypeAdapter(ProviderEducationUpdate)
 
 
-class ProviderEducationAuditSnapshot(BaseModel):
-    id: uuid.UUID
-    provider_id: uuid.UUID
-    created_at: datetime
-    updated_at: datetime
+class ProviderEducationAuditSnapshot(_ProviderSubrowBase):
     education_type: str
     institution: str
     month_completed: str | None = None
-
-    model_config = ConfigDict(from_attributes=True)
 
 
 # --- ProviderCertification ----------------------------------------------
 
 
-class ProviderCertificationRead(BaseModel):
-    id: uuid.UUID
-    provider_id: uuid.UUID
-    created_at: datetime
-    updated_at: datetime
+class ProviderCertificationRead(_ProviderSubrowBase):
     certification_type: str
     certifying_body: str
     expiration_date: date | None = None
-
-    model_config = ConfigDict(from_attributes=True)
 
 
 class ProviderCertificationCreate(BaseModel):
@@ -198,16 +188,10 @@ class ProviderCertificationUpdate(BaseModel):
 certification_update_adapter: TypeAdapter = TypeAdapter(ProviderCertificationUpdate)
 
 
-class ProviderCertificationAuditSnapshot(BaseModel):
-    id: uuid.UUID
-    provider_id: uuid.UUID
-    created_at: datetime
-    updated_at: datetime
+class ProviderCertificationAuditSnapshot(_ProviderSubrowBase):
     certification_type: str
     certifying_body: str
     expiration_date: date | None = None
-
-    model_config = ConfigDict(from_attributes=True)
 
 
 # --- Provider ----------------------------------------------------
