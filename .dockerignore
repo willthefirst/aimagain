@@ -56,6 +56,7 @@ coverage.xml
 .env
 .env.local
 .env.*.local
+.env.test
 
 # Database files (SQLite)
 *.db
@@ -134,4 +135,4 @@ celerybeat.pid
 dmypy.json
 
 # Pyre type checker
-.pyre/ 
+.pyre/
