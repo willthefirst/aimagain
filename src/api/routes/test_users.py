@@ -71,7 +71,7 @@ async def test_list_users_one_user(
     assert "text/html" in response.headers["content-type"]
 
     tree = HTMLParser(response.text)
-    user_list_items = tree.css("ul:not(#primary-nav) > li")
+    user_list_items = tree.css("#user-list > li")
     assert len(user_list_items) == 1, "Expected one user in the list"
     assert (
         test_username in user_list_items[0].text()
@@ -101,7 +101,7 @@ async def test_list_users_multiple_users(
     assert "text/html" in response.headers["content-type"]
 
     tree = HTMLParser(response.text)
-    user_list_items = tree.css("ul:not(#primary-nav) > li")
+    user_list_items = tree.css("#user-list > li")
     assert len(user_list_items) == 2, "Expected two users in the list"
 
     usernames_found = {item.text() for item in user_list_items}

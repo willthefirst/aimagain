@@ -104,6 +104,12 @@ async def test_my_endpoint(authenticated_client, logged_in_user):
     assert response.json()["id"] == str(logged_in_user.id)
 ```
 
+### Template-test selectors
+
+Template-test selectors must be scoped to a stable handle on the region under test. Give the element you're asserting on an `id`, `class`, or `data-testid`, and select through it (e.g. `#user-list > li`). Do **not** rely on a page having only one `<ul>` / `<form>` / `<table>` — that property is incidental and breaks the first time anything list-shaped lands in a shared template.
+
+Corollary: when adding markup to `base.html` or another shared template, give the new element a stable handle too (e.g. `id="primary-nav"`) so tests can scope around it independently. Exclusion selectors like `ul:not(#primary-nav) > li` are a smell — prefer inclusion (`#user-list > li`) over exclusion.
+
 ### Creating extra users in a test
 
 ```python

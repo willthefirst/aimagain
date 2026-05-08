@@ -11,7 +11,7 @@
 </p>
 
 {% if posts %}
-<ul>
+<ul id="post-list">
   {% for post in posts %}
   <li>
     {% if post.kind == "client_referral" %}
