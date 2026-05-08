@@ -9,7 +9,7 @@ from src.models import User
 from src.repositories.dependencies import get_provider_repository, get_user_repository
 from src.repositories.provider_repository import ProviderRepository
 from src.repositories.user_repository import UserRepository
-from src.schemas.user import UserRead
+from src.schemas.users.user import UserRead
 
 logger = logging.getLogger(__name__)
 me_router_instance = APIRouter(prefix="/users/me")

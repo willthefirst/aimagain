@@ -8,7 +8,7 @@ from src.logic.audit import AuditAction, AuditedResource, mutate
 from src.models import REGISTERED_KINDS, Post, User
 from src.repositories.audit_repository import AuditRepository
 from src.repositories.post_repository import PostRepository
-from src.schemas.post import (
+from src.schemas.posts.post import (
     ClientReferralCreate,
     ClientReferralUpdate,
     ProviderAvailabilityCreate,

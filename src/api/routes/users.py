@@ -22,7 +22,7 @@ from src.repositories.dependencies import (
 )
 from src.repositories.provider_repository import ProviderRepository
 from src.repositories.user_repository import UserRepository
-from src.schemas.user import UserActivationUpdate
+from src.schemas.users.user import UserActivationUpdate
 
 users_api_router = APIRouter(prefix="/users")
 router = BaseRouter(router=users_api_router, default_tags=["users"])

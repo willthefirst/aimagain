@@ -8,7 +8,7 @@ from fastapi.responses import JSONResponse, RedirectResponse
 from src.api.routes import auth_routes
 from src.auth_config import auth_backend, fastapi_users
 from src.db import check_database_health
-from src.schemas.user import UserRead
+from src.schemas.users.user import UserRead
 
 from .api.routes import auth_pages, me, posts, providers, users
 

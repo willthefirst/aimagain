@@ -38,7 +38,7 @@ from src.models.enums import (
     LOCATION_AVAILABILITY_OPTIONS,
     US_STATES,
 )
-from src.schemas.post import (
+from src.schemas.posts.post import (
     ClientReferralCreate,
     ClientReferralRead,
     ClientReferralUpdate,

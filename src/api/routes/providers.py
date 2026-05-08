@@ -34,7 +34,7 @@ from src.models import User
 from src.repositories.audit_repository import AuditRepository
 from src.repositories.dependencies import get_audit_repository, get_provider_repository
 from src.repositories.provider_repository import ProviderRepository
-from src.schemas.provider import (
+from src.schemas.providers.provider import (
     ProviderCertificationCreate,
     ProviderCertificationRead,
     ProviderCertificationUpdate,

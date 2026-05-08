@@ -9,7 +9,7 @@ from src.models import User
 from src.repositories.audit_repository import AuditRepository
 from src.repositories.provider_repository import ProviderRepository
 from src.repositories.user_repository import UserRepository
-from src.schemas.user import (
+from src.schemas.users.user import (
     UserActivationAuditSnapshot,
     UserActivationUpdate,
     UserAuditSnapshot,
