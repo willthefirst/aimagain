@@ -242,6 +242,56 @@ async def test_detail_hides_admin_actions_for_non_admin(
     assert tree.css_first("span.admin-actions") is None
 
 
+async def test_detail_shows_provider_profiles_empty_state(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user: User,
+):
+    """User with no provider profiles → empty-state copy on the detail page."""
+    target = create_test_user(username=f"target-{uuid.uuid4()}")
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            session.add(target)
+
+    response = await authenticated_client.get(f"/users/{target.id}")
+    assert response.status_code == 200
+    tree = HTMLParser(response.text)
+    assert tree.css_first("#user-detail-provider-profiles") is None
+    empty = tree.css_first("#user-detail-provider-profiles-empty")
+    assert empty is not None
+    assert "No provider profiles yet" in empty.text()
+
+
+async def test_detail_lists_owned_provider_profiles(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user: User,
+):
+    """User with multiple profiles → all are linked from the detail page."""
+    target = create_test_user(username=f"target-{uuid.uuid4()}")
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            session.add(target)
+    first = make_provider_profile(user_id=target.id, practice_name="First")
+    second = make_provider_profile(user_id=target.id, practice_name="Second")
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            session.add_all([first, second])
+        await session.refresh(first)
+        await session.refresh(second)
+
+    response = await authenticated_client.get(f"/users/{target.id}")
+    assert response.status_code == 200
+    tree = HTMLParser(response.text)
+    assert tree.css_first("#user-detail-provider-profiles-empty") is None
+    items = tree.css("#user-detail-provider-profiles > li")
+    assert len(items) == 2
+    hrefs = {
+        a.attributes.get("href") for a in tree.css("#user-detail-provider-profiles a")
+    }
+    assert hrefs == {f"/providers/{first.id}", f"/providers/{second.id}"}
+
+
 # --- Activation endpoint -------------------------------------------------
 
 

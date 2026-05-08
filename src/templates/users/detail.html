@@ -12,5 +12,23 @@
 {% include "users/_admin_actions.html" %}
 
 <hr />
+
+<section>
+  <h2>Provider profiles</h2>
+  {% if provider_profiles %}
+  <ul id="user-detail-provider-profiles" class="profiles-list">
+    {%- for profile in provider_profiles %}
+    <li>
+      <a href="/providers/{{ profile.id }}">{{ profile.practice_name }}</a>
+      &mdash; {{ profile.location_city }}, {{ profile.location_state }}
+    </li>
+    {%- endfor %}
+  </ul>
+  {% else %}
+  <p id="user-detail-provider-profiles-empty">No provider profiles yet.</p>
+  {% endif %}
+</section>
+
+<hr />
 <a href="/users">Back to users</a>
 {% endblock %}
