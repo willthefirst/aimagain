@@ -1,8 +1,8 @@
-"""Consumer contract: editing the practice fields on the provider-profile edit form.
+"""Consumer contract: editing the practice fields on the provider edit form.
 
 Verifies that the practice-fields HTMX form rendered by
-`templates/provider_profiles/edit.html` (mounted via the
-`provider_profile_edit_form` stub on the consumer server) issues a
+`templates/providers/edit.html` (mounted via the
+`provider_edit_form` stub on the consumer server) issues a
 `PATCH /providers/{id}` form-encoded request with at least the
 `practice_name` field. The contract surface is the form wiring (method,
 path, Content-Type, field name); the response on success is a 200 JSON
@@ -18,13 +18,13 @@ from pact import Like
 from playwright.async_api import Page
 
 from tests.test_contract.constants import (
-    CONSUMER_NAME_PROVIDER_PROFILE_EDIT_FORM,
+    CONSUMER_NAME_PROVIDER_EDIT_FORM,
     NETWORK_TIMEOUT_MS,
-    PACT_PORT_PROVIDER_PROFILE_EDIT,
-    PROVIDER_NAME_PROVIDER_PROFILES,
-    PROVIDER_PROFILE_EDIT_FORM_PAGE_PATH,
-    PROVIDER_PROFILE_PATCH_API_PATH,
-    PROVIDER_STATE_PROFILE_EXISTS_AND_OWNED,
+    PACT_PORT_PROVIDER_EDIT,
+    PROVIDER_EDIT_FORM_PAGE_PATH,
+    PROVIDER_NAME_PROVIDERS,
+    PROVIDER_PATCH_API_PATH,
+    PROVIDER_STATE_PROVIDER_EXISTS_AND_OWNED,
 )
 from tests.test_contract.tests.shared.helpers import (
     setup_pact,
@@ -34,23 +34,21 @@ from tests.test_contract.tests.shared.helpers import (
 
 @pytest.mark.parametrize(
     "origin_with_routes",
-    [{"provider_profile_edit_form": True, "auth_pages": False}],
+    [{"provider_edit_form": True, "auth_pages": False}],
     indirect=True,
 )
 @pytest.mark.asyncio(loop_scope="session")
-async def test_consumer_provider_profile_edit_form_submits(
-    origin_with_routes: str, page: Page
-):
+async def test_consumer_provider_edit_form_submits(origin_with_routes: str, page: Page):
     """Edit a single practice field on the stubbed edit page; assert the
     intercepted PATCH matches the contracted shape."""
     pact = setup_pact(
-        CONSUMER_NAME_PROVIDER_PROFILE_EDIT_FORM,
-        PROVIDER_NAME_PROVIDER_PROFILES,
-        port=PACT_PORT_PROVIDER_PROFILE_EDIT,
+        CONSUMER_NAME_PROVIDER_EDIT_FORM,
+        PROVIDER_NAME_PROVIDERS,
+        port=PACT_PORT_PROVIDER_EDIT,
     )
     mock_server_uri = pact.uri
-    edit_page_url = f"{origin_with_routes}{PROVIDER_PROFILE_EDIT_FORM_PAGE_PATH}"
-    full_mock_url = f"{mock_server_uri}{PROVIDER_PROFILE_PATCH_API_PATH}"
+    edit_page_url = f"{origin_with_routes}{PROVIDER_EDIT_FORM_PAGE_PATH}"
+    full_mock_url = f"{mock_server_uri}{PROVIDER_PATCH_API_PATH}"
 
     expected_request_headers = {
         "Content-Type": Like("application/x-www-form-urlencoded")
@@ -69,11 +67,11 @@ async def test_consumer_provider_profile_edit_form_submits(
     )
 
     (
-        pact.given(PROVIDER_STATE_PROFILE_EXISTS_AND_OWNED)
+        pact.given(PROVIDER_STATE_PROVIDER_EXISTS_AND_OWNED)
         .upon_receiving("a request to patch a provider profile via web form")
         .with_request(
             method="PATCH",
-            path=PROVIDER_PROFILE_PATCH_API_PATH,
+            path=PROVIDER_PATCH_API_PATH,
             headers=expected_request_headers,
             body=expected_request_body,
         )
@@ -86,7 +84,7 @@ async def test_consumer_provider_profile_edit_form_submits(
 
     await setup_playwright_pact_interception(
         page=page,
-        api_path_to_intercept=PROVIDER_PROFILE_PATCH_API_PATH,
+        api_path_to_intercept=PROVIDER_PATCH_API_PATH,
         mock_pact_url=full_mock_url,
         http_method="PATCH",
     )
@@ -97,7 +95,7 @@ async def test_consumer_provider_profile_edit_form_submits(
         await page.locator('input[name="practice_name"]').fill("Bayside Counseling")
         # Submit the practice-fields form (the first one on the page).
         await page.locator(
-            f'form[hx-patch="{PROVIDER_PROFILE_PATCH_API_PATH}"] input[type="submit"]'
+            f'form[hx-patch="{PROVIDER_PATCH_API_PATH}"] input[type="submit"]'
         ).click()
         await page.wait_for_timeout(NETWORK_TIMEOUT_MS)
 

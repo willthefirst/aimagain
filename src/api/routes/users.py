@@ -58,7 +58,7 @@ async def get_user(
     user: User = Depends(current_active_user),
 ):
     """Provides an HTML detail page for a single user, including the list
-    of provider profiles they own."""
+    of providers they own."""
     context = await handle_get_user_detail(
         request=request,
         user_id=user_id,
@@ -71,7 +71,7 @@ async def get_user(
     )
 
 
-@router.get("/{user_id}/provider-profiles")
+@router.get("/{user_id}/providers")
 async def list_user_providers(
     user_id: UUID,
     request: Request,
@@ -79,7 +79,7 @@ async def list_user_providers(
     user_repo: UserRepository = Depends(get_user_repository),
     user: User = Depends(current_active_user),
 ):
-    """Renders the provider-profile list for a user. Self or admin only."""
+    """Renders the provider list for a user. Self or admin only."""
     context = await handle_list_user_providers(
         request=request,
         target_user_id=user_id,

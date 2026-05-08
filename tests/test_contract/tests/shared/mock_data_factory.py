@@ -142,7 +142,7 @@ class MockDataFactory:
         }
 
     @classmethod
-    def create_provider_profile_create_dependency_config(cls) -> Dict[str, Any]:
+    def create_provider_create_dependency_config(cls) -> Dict[str, Any]:
         """Mock for `handle_create_provider`.
 
         The route under test (`POST /providers`) reads `id` off
@@ -160,7 +160,7 @@ class MockDataFactory:
         }
 
     @classmethod
-    def create_provider_profile_update_dependency_config(cls) -> Dict[str, Any]:
+    def create_provider_update_dependency_config(cls) -> Dict[str, Any]:
         """Mock for `handle_update_provider`.
 
         The route under test (`PATCH /providers/{id}`) packs the

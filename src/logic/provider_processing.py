@@ -108,7 +108,7 @@ def _assert_can_mutate(profile: Provider, user: User) -> None:
 async def _load_provider_or_404(profile_id: UUID, repo: ProviderRepository) -> Provider:
     profile = await repo.get_by_id(profile_id)
     if profile is None:
-        raise NotFoundError(detail="Provider profile not found")
+        raise NotFoundError(detail="Provider not found")
     return profile
 
 
@@ -170,14 +170,14 @@ async def handle_list_user_providers(
     user_repo: UserRepository,
     requesting_user: User,
 ) -> dict[str, Any]:
-    """Returns the template context for the user-scoped provider-profile
+    """Returns the template context for the user-scoped provider
     list page. A user may view their own list; admins may view anyone's.
     404 if the target user does not exist; 403 if a non-admin requests
     another user's list.
     """
     if target_user_id != requesting_user.id and not requesting_user.is_superuser:
         raise ForbiddenError(
-            detail="Only the target user or an admin may view their provider profiles"
+            detail="Only the target user or an admin may view their providers"
         )
     target_user = await user_repo.get_user_by_id(target_user_id)
     if target_user is None:
@@ -196,7 +196,7 @@ async def handle_get_provider_form(
     request: Request,
     requesting_user: User,
 ) -> dict[str, Any]:
-    """Builds the template context for the create-provider-profile form."""
+    """Builds the template context for the create-provider form."""
     return {"request": request, "current_user": requesting_user}
 
 

@@ -1,8 +1,8 @@
-"""Consumer contract: filling and submitting the provider-profile create form.
+"""Consumer contract: filling and submitting the provider create form.
 
 Verifies that the HTMX-decorated form rendered by
-`templates/provider_profiles/new.html` (mounted via the
-`provider_profile_create_form` stub on the consumer server) issues a
+`templates/providers/new.html` (mounted via the
+`provider_create_form` stub on the consumer server) issues a
 `POST /providers` form-encoded request with the practice and
 availability fields the route's `ProviderCreate` schema expects.
 The contract surface is the form wiring (method, path, Content-Type,
@@ -15,13 +15,13 @@ from pact import Like
 from playwright.async_api import Page
 
 from tests.test_contract.constants import (
-    CONSUMER_NAME_PROVIDER_PROFILE_CREATE_FORM,
+    CONSUMER_NAME_PROVIDER_CREATE_FORM,
     NETWORK_TIMEOUT_MS,
-    PACT_PORT_PROVIDER_PROFILE_CREATE,
-    PROVIDER_NAME_PROVIDER_PROFILES,
-    PROVIDER_PROFILE_CREATE_API_PATH,
-    PROVIDER_PROFILE_CREATE_FORM_PAGE_PATH,
-    PROVIDER_STATE_USER_CAN_CREATE_PROFILE,
+    PACT_PORT_PROVIDER_CREATE,
+    PROVIDER_CREATE_API_PATH,
+    PROVIDER_CREATE_FORM_PAGE_PATH,
+    PROVIDER_NAME_PROVIDERS,
+    PROVIDER_STATE_USER_CAN_CREATE_PROVIDER,
 )
 from tests.test_contract.tests.shared.helpers import (
     setup_pact,
@@ -31,23 +31,23 @@ from tests.test_contract.tests.shared.helpers import (
 
 @pytest.mark.parametrize(
     "origin_with_routes",
-    [{"provider_profile_create_form": True, "auth_pages": False}],
+    [{"provider_create_form": True, "auth_pages": False}],
     indirect=True,
 )
 @pytest.mark.asyncio(loop_scope="session")
-async def test_consumer_provider_profile_create_form_submits(
+async def test_consumer_provider_create_form_submits(
     origin_with_routes: str, page: Page
 ):
     """Fill the create form on the stubbed page; assert the intercepted
     request matches the contracted shape."""
     pact = setup_pact(
-        CONSUMER_NAME_PROVIDER_PROFILE_CREATE_FORM,
-        PROVIDER_NAME_PROVIDER_PROFILES,
-        port=PACT_PORT_PROVIDER_PROFILE_CREATE,
+        CONSUMER_NAME_PROVIDER_CREATE_FORM,
+        PROVIDER_NAME_PROVIDERS,
+        port=PACT_PORT_PROVIDER_CREATE,
     )
     mock_server_uri = pact.uri
-    form_page_url = f"{origin_with_routes}{PROVIDER_PROFILE_CREATE_FORM_PAGE_PATH}"
-    full_mock_url = f"{mock_server_uri}{PROVIDER_PROFILE_CREATE_API_PATH}"
+    form_page_url = f"{origin_with_routes}{PROVIDER_CREATE_FORM_PAGE_PATH}"
+    full_mock_url = f"{mock_server_uri}{PROVIDER_CREATE_API_PATH}"
 
     # Browser form submit sets Content-Type to
     # `application/x-www-form-urlencoded; charset=UTF-8`; pact-ruby's header
@@ -65,11 +65,11 @@ async def test_consumer_provider_profile_create_form_submits(
     )
 
     (
-        pact.given(PROVIDER_STATE_USER_CAN_CREATE_PROFILE)
+        pact.given(PROVIDER_STATE_USER_CAN_CREATE_PROVIDER)
         .upon_receiving("a request to create a provider profile via web form")
         .with_request(
             method="POST",
-            path=PROVIDER_PROFILE_CREATE_API_PATH,
+            path=PROVIDER_CREATE_API_PATH,
             headers=expected_request_headers,
             body=expected_request_body,
         )
@@ -82,7 +82,7 @@ async def test_consumer_provider_profile_create_form_submits(
 
     await setup_playwright_pact_interception(
         page=page,
-        api_path_to_intercept=PROVIDER_PROFILE_CREATE_API_PATH,
+        api_path_to_intercept=PROVIDER_CREATE_API_PATH,
         mock_pact_url=full_mock_url,
         http_method="POST",
     )

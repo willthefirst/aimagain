@@ -1,4 +1,4 @@
-"""Tests for the provider-profile wire schemas.
+"""Tests for the provider wire schemas.
 
 Covers:
 - Controlled-vocabulary fields reject values outside their tuples.

@@ -242,12 +242,12 @@ async def test_detail_hides_admin_actions_for_non_admin(
     assert tree.css_first("span.admin-actions") is None
 
 
-async def test_detail_shows_provider_profiles_empty_state(
+async def test_detail_shows_providers_empty_state(
     authenticated_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user: User,
 ):
-    """User with no provider profiles → empty-state copy on the detail page."""
+    """User with no providers → empty-state copy on the detail page."""
     target = create_test_user(username=f"target-{uuid.uuid4()}")
     async with db_test_session_manager() as session:
         async with session.begin():
@@ -256,13 +256,13 @@ async def test_detail_shows_provider_profiles_empty_state(
     response = await authenticated_client.get(f"/users/{target.id}")
     assert response.status_code == 200
     tree = HTMLParser(response.text)
-    assert tree.css_first("#user-detail-provider-profiles") is None
-    empty = tree.css_first("#user-detail-provider-profiles-empty")
+    assert tree.css_first("#user-detail-providers") is None
+    empty = tree.css_first("#user-detail-providers-empty")
     assert empty is not None
     assert "No providers yet" in empty.text()
 
 
-async def test_detail_lists_owned_provider_profiles(
+async def test_detail_lists_owned_providers(
     authenticated_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user: User,
@@ -283,12 +283,10 @@ async def test_detail_lists_owned_provider_profiles(
     response = await authenticated_client.get(f"/users/{target.id}")
     assert response.status_code == 200
     tree = HTMLParser(response.text)
-    assert tree.css_first("#user-detail-provider-profiles-empty") is None
-    items = tree.css("#user-detail-provider-profiles > li")
+    assert tree.css_first("#user-detail-providers-empty") is None
+    items = tree.css("#user-detail-providers > li")
     assert len(items) == 2
-    hrefs = {
-        a.attributes.get("href") for a in tree.css("#user-detail-provider-profiles a")
-    }
+    hrefs = {a.attributes.get("href") for a in tree.css("#user-detail-providers a")}
     assert hrefs == {f"/providers/{first.id}", f"/providers/{second.id}"}
 
 
@@ -570,7 +568,7 @@ async def test_failed_delete_writes_no_audit_row(
         assert rows == []
 
 
-# --- Provider profiles ownership-subresource ----------------------------
+# --- Providers ownership-subresource ----------------------------
 
 
 async def _seed_user_profile(
@@ -587,29 +585,29 @@ async def _seed_user_profile(
         return profile.id
 
 
-async def test_get_my_provider_profiles_empty_state(
+async def test_get_my_providers_empty_state(
     authenticated_client: AsyncClient,
     logged_in_user: User,
 ):
-    """`GET /users/me/provider-profiles` renders the empty state when the
+    """`GET /users/me/providers` renders the empty state when the
     current user owns no profiles."""
-    response = await authenticated_client.get("/users/me/provider-profiles")
+    response = await authenticated_client.get("/users/me/providers")
 
     assert response.status_code == 200
     assert response.headers["content-type"].startswith("text/html")
     tree = HTMLParser(response.text)
-    assert tree.css_first("#user-provider-profiles") is None
-    empty = tree.css_first("#user-provider-profiles-empty")
+    assert tree.css_first("#user-providers") is None
+    empty = tree.css_first("#user-providers-empty")
     assert empty is not None
     assert "have not created" in empty.text()
 
 
-async def test_get_my_provider_profiles_lists_owned(
+async def test_get_my_providers_lists_owned(
     authenticated_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user: User,
 ):
-    """`GET /users/me/provider-profiles` lists the current user's profiles
+    """`GET /users/me/providers` lists the current user's profiles
     with the right hrefs."""
     first_id = await _seed_user_profile(
         db_test_session_manager, user_id=logged_in_user.id, practice_name="First"
@@ -618,44 +616,42 @@ async def test_get_my_provider_profiles_lists_owned(
         db_test_session_manager, user_id=logged_in_user.id, practice_name="Second"
     )
 
-    response = await authenticated_client.get("/users/me/provider-profiles")
+    response = await authenticated_client.get("/users/me/providers")
 
     assert response.status_code == 200
     tree = HTMLParser(response.text)
-    items = tree.css("#user-provider-profiles > li")
+    items = tree.css("#user-providers > li")
     assert len(items) == 2
-    hrefs = {a.attributes.get("href") for a in tree.css("#user-provider-profiles a")}
+    hrefs = {a.attributes.get("href") for a in tree.css("#user-providers a")}
     assert hrefs == {
         f"/providers/{first_id}",
         f"/providers/{second_id}",
     }
 
 
-async def test_get_user_provider_profiles_self(
+async def test_get_user_providers_self(
     authenticated_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user: User,
 ):
-    """`GET /users/{my_id}/provider-profiles` works for the current user
+    """`GET /users/{my_id}/providers` works for the current user
     (equivalent to the /me alias)."""
     await _seed_user_profile(
         db_test_session_manager, user_id=logged_in_user.id, practice_name="Mine"
     )
 
-    response = await authenticated_client.get(
-        f"/users/{logged_in_user.id}/provider-profiles"
-    )
+    response = await authenticated_client.get(f"/users/{logged_in_user.id}/providers")
     assert response.status_code == 200
     tree = HTMLParser(response.text)
-    assert len(tree.css("#user-provider-profiles > li")) == 1
+    assert len(tree.css("#user-providers > li")) == 1
 
 
-async def test_get_user_provider_profiles_admin_can_view_other(
+async def test_get_user_providers_admin_can_view_other(
     authenticated_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user: User,
 ):
-    """Admin can view another user's provider-profile list."""
+    """Admin can view another user's provider list."""
     await promote_to_admin(db_test_session_manager, logged_in_user.email)
     target = create_test_user(username=f"target-{uuid.uuid4()}")
     async with db_test_session_manager() as session:
@@ -665,31 +661,31 @@ async def test_get_user_provider_profiles_admin_can_view_other(
         db_test_session_manager, user_id=target.id, practice_name="Target Practice"
     )
 
-    response = await authenticated_client.get(f"/users/{target.id}/provider-profiles")
+    response = await authenticated_client.get(f"/users/{target.id}/providers")
     assert response.status_code == 200
     tree = HTMLParser(response.text)
-    heading = tree.css_first("#user-provider-profiles-heading")
+    heading = tree.css_first("#user-providers-heading")
     assert heading is not None
     assert target.username in heading.text()
-    assert len(tree.css("#user-provider-profiles > li")) == 1
+    assert len(tree.css("#user-providers > li")) == 1
 
 
-async def test_get_user_provider_profiles_non_admin_forbidden_for_other(
+async def test_get_user_providers_non_admin_forbidden_for_other(
     authenticated_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user: User,
 ):
-    """A non-admin user cannot view another user's provider-profile list."""
+    """A non-admin user cannot view another user's provider list."""
     target = create_test_user(username=f"target-{uuid.uuid4()}")
     async with db_test_session_manager() as session:
         async with session.begin():
             session.add(target)
 
-    response = await authenticated_client.get(f"/users/{target.id}/provider-profiles")
+    response = await authenticated_client.get(f"/users/{target.id}/providers")
     assert response.status_code == 403
 
 
-async def test_get_user_provider_profiles_404_for_unknown_user(
+async def test_get_user_providers_404_for_unknown_user(
     authenticated_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user: User,
@@ -697,17 +693,21 @@ async def test_get_user_provider_profiles_404_for_unknown_user(
     """Admin requesting an unknown user's list gets 404 (not 403)."""
     await promote_to_admin(db_test_session_manager, logged_in_user.email)
 
-    response = await authenticated_client.get(
-        f"/users/{uuid.uuid4()}/provider-profiles"
-    )
+    response = await authenticated_client.get(f"/users/{uuid.uuid4()}/providers")
     assert response.status_code == 404
 
 
-async def test_legacy_provider_profiles_prefix_gone(
+async def test_legacy_provider_profiles_paths_gone(
     authenticated_client: AsyncClient,
     logged_in_user: User,
 ):
-    """The legacy `/provider-profiles*` prefix has been renamed to `/providers*`.
-    Requests to the old path no longer match any route."""
-    response = await authenticated_client.get("/provider-profiles")
-    assert response.status_code == 404
+    """The legacy `/provider-profiles*` paths have been renamed to `/providers*`.
+    Requests to any old path — top-level, /me alias, or user-scoped — no longer
+    match any route."""
+    for path in (
+        "/provider-profiles",
+        "/users/me/provider-profiles",
+        f"/users/{logged_in_user.id}/provider-profiles",
+    ):
+        response = await authenticated_client.get(path)
+        assert response.status_code == 404, f"{path} unexpectedly matched"

@@ -61,7 +61,7 @@ async def test_create_provider_persists(
 async def test_provider_allows_multiple_per_user(
     db_test_session_manager: async_sessionmaker[AsyncSession],
 ):
-    """A user may own multiple provider profiles — the previously-enforced
+    """A user may own multiple providers — the previously-enforced
     `uq_provider_profiles_user_id` constraint was dropped in `8f20a93effc9`."""
     user = create_test_user()
     async with db_test_session_manager() as session:

@@ -56,9 +56,8 @@ logger = logging.getLogger(__name__)
 
 # Module-level TypeAdapters mirror the `post_create_adapter` / `post_update_adapter`
 # pattern in `src/schemas/post.py` — pre-built adapters keep validation in one place
-# per schema. Defined here (not in the schema module) because the provider-profile
-# schemas don't currently expose discriminated unions that would need an adapter
-# anywhere else.
+# per schema. Defined here (not in the schema module) because the provider schemas
+# don't currently expose discriminated unions that would need an adapter anywhere else.
 _provider_create_adapter: TypeAdapter = TypeAdapter(ProviderCreate)
 _provider_update_adapter: TypeAdapter = TypeAdapter(ProviderUpdate)
 _licensure_create_adapter: TypeAdapter = TypeAdapter(ProviderLicensureCreate)
@@ -95,7 +94,7 @@ async def list_providers(
     issuing_state: str | None = Query(None),
     repo: ProviderRepository = Depends(get_provider_repository),
 ):
-    """Public HTML listing of provider profiles. Optional `license_type` and
+    """Public HTML listing of providers. Optional `license_type` and
     `issuing_state` filters narrow the results to profiles that hold a
     licensure matching both filters."""
     context = await handle_list_providers(
@@ -118,7 +117,7 @@ async def create_provider(
     audit_repo: AuditRepository = Depends(get_audit_repository),
     user: User = Depends(current_active_user),
 ):
-    """Creates a provider profile owned by the requesting user. Form-encoded
+    """Creates a provider owned by the requesting user. Form-encoded
     body. A user may own multiple profiles."""
     payload_dict = await parse_form_to_payload(request)
     payload = validate_or_422(_provider_create_adapter, payload_dict)

@@ -1,8 +1,8 @@
 {% extends "base.html" %}
 {%- from "posts/_form_macros.html" import filter_select_field -%}
-{% block title %}Provider profiles{% endblock %}
+{% block title %}Providers{% endblock %}
 {% block content %}
-<h1>Provider profiles</h1>
+<h1>Providers</h1>
 
 <form method="get" action="/providers">
   <fieldset>
@@ -24,6 +24,6 @@
   {%- endfor %}
 </ul>
 {% else %}
-<p>No provider profiles found.</p>
+<p>No providers found.</p>
 {% endif %}
 {% endblock %}
