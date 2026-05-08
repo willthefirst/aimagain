@@ -22,6 +22,7 @@ from src.api.common.resource_routes import (
     ResourceSpec,
     mount_delete,
     mount_detail,
+    mount_form,
     mount_list,
 )
 
@@ -289,6 +290,140 @@ def test_extra_repo_deps_must_be_named_get_x_repository():
         mount_detail(
             router, spec, handler=lambda **_: {}, extra_repo_deps=(badly_named,)
         )
+
+
+def _stub_html_response(monkeypatch):
+    """Patch APIResponse.html_response to return a simple JSONResponse so
+    tests don't need real templates. Returns the captured dict the patch
+    writes into."""
+    captured = {}
+
+    def fake(*, template_name, context, request):
+        captured["template_name"] = template_name
+        captured["context"] = context
+        from fastapi.responses import JSONResponse
+
+        return JSONResponse({"ok": True})
+
+    monkeypatch.setattr(
+        "src.api.common.resource_routes.APIResponse.html_response",
+        staticmethod(fake),
+    )
+    return captured
+
+
+def test_mount_form_create_route_at_form_path(monkeypatch):
+    """on_existing=False mounts GET /<collection>/form (no id in URL)."""
+    captured_handler: dict = {}
+
+    async def form_handler(**kwargs):
+        captured_handler.update(kwargs)
+        return {"current_user": kwargs.get("requesting_user")}
+
+    spec = ResourceSpec(
+        collection="widgets",
+        id_param="widget_id",
+        repo_dep=lambda: SimpleNamespace(name="repo"),
+        read_user_dep=lambda: SimpleNamespace(id=uuid4()),
+    )
+    rendered = _stub_html_response(monkeypatch)
+
+    app = FastAPI()
+    router = APIRouter(prefix="/widgets")
+    mount_form(router, spec, handler=form_handler, template="widgets/new.html")
+    app.include_router(router)
+
+    resp = TestClient(app).get("/widgets/form")
+    assert resp.status_code == 200
+    assert rendered["template_name"] == "widgets/new.html"
+    assert "widget_id" not in captured_handler
+
+
+def test_mount_form_edit_route_at_id_form_path(monkeypatch):
+    """on_existing=True mounts GET /<collection>/{id}/form, passes id to handler."""
+    captured_handler: dict = {}
+
+    async def form_handler(**kwargs):
+        captured_handler.update(kwargs)
+        return {}
+
+    spec = ResourceSpec(
+        collection="gadgets",
+        id_param="gadget_id",
+        repo_dep=lambda: SimpleNamespace(name="repo"),
+        read_user_dep=lambda: SimpleNamespace(id=uuid4()),
+    )
+    _stub_html_response(monkeypatch)
+
+    app = FastAPI()
+    router = APIRouter(prefix="/gadgets")
+    mount_form(
+        router,
+        spec,
+        handler=form_handler,
+        template="gadgets/edit.html",
+        on_existing=True,
+    )
+    app.include_router(router)
+
+    gadget_id = uuid4()
+    resp = TestClient(app).get(f"/gadgets/{gadget_id}/form")
+    assert resp.status_code == 200
+    assert str(captured_handler["gadget_id"]) == str(gadget_id)
+
+
+def test_mount_form_handler_template_name_overrides_kwarg(monkeypatch):
+    """Handler returning template_name in context wins over the per-mount kwarg.
+    This is what posts kind-dispatch will use in slice 7 (#252). The template_name
+    key is popped so it doesn't appear in the rendered context dict."""
+
+    async def form_handler(**kwargs):
+        return {"template_name": "widgets/from-handler.html", "x": 1}
+
+    spec = ResourceSpec(
+        collection="widgets",
+        id_param="widget_id",
+        repo_dep=lambda: SimpleNamespace(name="repo"),
+        read_user_dep=lambda: SimpleNamespace(id=uuid4()),
+    )
+    rendered = _stub_html_response(monkeypatch)
+
+    app = FastAPI()
+    router = APIRouter(prefix="/widgets")
+    mount_form(router, spec, handler=form_handler, template="widgets/from-kwarg.html")
+    app.include_router(router)
+
+    resp = TestClient(app).get("/widgets/form")
+    assert resp.status_code == 200
+    assert rendered["template_name"] == "widgets/from-handler.html"
+    assert "template_name" not in rendered["context"]
+    assert rendered["context"] == {"x": 1}
+
+
+def test_mount_form_no_template_anywhere_raises():
+    """No template on spec, no template kwarg, handler doesn't return one
+    → RuntimeError at request time. The mount catches the misconfiguration
+    in the request path; the route's BaseRouter wrapping in production
+    surfaces this as 500. Here we use a bare APIRouter so the exception
+    propagates directly through TestClient."""
+
+    async def form_handler(**kwargs):
+        return {}
+
+    spec = ResourceSpec(
+        collection="widgets",
+        id_param="widget_id",
+        repo_dep=lambda: SimpleNamespace(name="repo"),
+        read_user_dep=lambda: SimpleNamespace(id=uuid4()),
+    )
+
+    app = FastAPI()
+    router = APIRouter(prefix="/widgets")
+    mount_form(router, spec, handler=form_handler)
+    app.include_router(router)
+
+    with pytest.raises(RuntimeError, match="could not resolve a template"):
+        TestClient(app).get("/widgets/form")
 
 
 def test_mount_delete_404_propagates_from_handler():
