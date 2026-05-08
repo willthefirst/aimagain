@@ -37,10 +37,30 @@ from enum import Enum
 from typing import Any, Callable, Literal
 from uuid import UUID
 
+from pydantic import BaseModel
+
 from src.models import AuditLog, User
 from src.repositories.audit_repository import AuditRepository
 
 logger = logging.getLogger(__name__)
+
+
+def make_snapshotter(
+    schema_cls: type[BaseModel],
+) -> Callable[[Any], dict[str, Any]]:
+    """Build a snapshotter that validates an ORM row through `schema_cls`
+    and returns a JSON-mode dict.
+
+    Used by `AuditedResource.snapshot` and by handlers calling
+    `record_audit(before=..., after=...)` directly. Centralizes the
+    `SchemaCls.model_validate(obj).model_dump(mode="json")` chain so
+    audit-row snapshots have one shape across the codebase.
+    """
+
+    def _snapshot(obj: Any) -> dict[str, Any]:
+        return schema_cls.model_validate(obj).model_dump(mode="json")
+
+    return _snapshot
 
 
 class AuditAction(str, Enum):

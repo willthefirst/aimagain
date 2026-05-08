@@ -20,11 +20,10 @@ from typing import Any
 from uuid import UUID
 
 from fastapi import Request
-from pydantic import BaseModel
 
 from src.api.common.exceptions import ForbiddenError, NotFoundError
 from src.logic._authz import assert_owner_or_admin
-from src.logic.audit import AuditAction, AuditedResource, mutate
+from src.logic.audit import AuditAction, AuditedResource, make_snapshotter, mutate
 from src.models import (
     Provider,
     ProviderCertification,
@@ -56,40 +55,30 @@ logger = logging.getLogger(__name__)
 # --- Audited-resource declarations ---------------------------------------
 
 
-def _snap(schema_cls: type[BaseModel]):
-    """Build a snapshotter that validates an ORM row through the given
-    `*AuditSnapshot` schema and returns a JSON-mode dump."""
-
-    def _snapshot(obj: Any) -> dict[str, Any]:
-        return schema_cls.model_validate(obj).model_dump(mode="json")
-
-    return _snapshot
-
-
 PROFILE = AuditedResource(
     type="provider_profile",
-    snapshot=_snap(ProviderAuditSnapshot),
+    snapshot=make_snapshotter(ProviderAuditSnapshot),
     create=AuditAction.CREATE_PROVIDER,
     update=AuditAction.UPDATE_PROVIDER,
     delete=AuditAction.DELETE_PROVIDER,
 )
 LICENSURE = AuditedResource(
     type="provider_licensure",
-    snapshot=_snap(ProviderLicensureAuditSnapshot),
+    snapshot=make_snapshotter(ProviderLicensureAuditSnapshot),
     create=AuditAction.CREATE_LICENSURE,
     update=AuditAction.UPDATE_LICENSURE,
     delete=AuditAction.DELETE_LICENSURE,
 )
 EDUCATION = AuditedResource(
     type="provider_education",
-    snapshot=_snap(ProviderEducationAuditSnapshot),
+    snapshot=make_snapshotter(ProviderEducationAuditSnapshot),
     create=AuditAction.CREATE_EDUCATION,
     update=AuditAction.UPDATE_EDUCATION,
     delete=AuditAction.DELETE_EDUCATION,
 )
 CERTIFICATION = AuditedResource(
     type="provider_certification",
-    snapshot=_snap(ProviderCertificationAuditSnapshot),
+    snapshot=make_snapshotter(ProviderCertificationAuditSnapshot),
     create=AuditAction.CREATE_CERTIFICATION,
     update=AuditAction.UPDATE_CERTIFICATION,
     delete=AuditAction.DELETE_CERTIFICATION,
