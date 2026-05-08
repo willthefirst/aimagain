@@ -260,6 +260,10 @@ class QualityCommands:
                 "🔗 Checking template import boundaries...",
                 [sys.executable, "scripts/dev/template_imports_check.py"],
             ),
+            (
+                "🐍 Checking Python cluster boundaries...",
+                [sys.executable, "scripts/dev/python_cluster_imports_check.py"],
+            ),
         ]
 
         exit_code = 0

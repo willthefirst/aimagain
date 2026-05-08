@@ -51,3 +51,10 @@ repos:
         language: python
         files: ^src/templates/.*\.html$
         pass_filenames: true
+
+      - id: python-cluster-imports-check
+        name: Check Python cluster boundaries
+        entry: python scripts/dev/python_cluster_imports_check.py
+        language: python
+        files: ^src/(models|schemas|repositories|logic)/.*\.py$
+        pass_filenames: true
