@@ -25,9 +25,9 @@ class ProviderLicensure(BaseModel):
         _ck("issuing_state", US_STATES),
     )
 
-    profile_id = Column(
+    provider_id = Column(
         Uuid(as_uuid=True),
-        ForeignKey("provider_profiles.id", ondelete="CASCADE"),
+        ForeignKey("providers.id", ondelete="CASCADE"),
         nullable=False,
     )
     license_type = Column(Text, nullable=False)

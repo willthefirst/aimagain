@@ -121,11 +121,11 @@ async def test_delete_profile_cascades_credentials(
                 )
             )
             session.add(profile)
-        profile_id = profile.id
+        provider_id = profile.id
 
     async with db_test_session_manager() as session:
         async with session.begin():
-            loaded = await session.get(Provider, profile_id)
+            loaded = await session.get(Provider, provider_id)
             await session.delete(loaded)
 
     async with db_test_session_manager() as session:
@@ -133,7 +133,7 @@ async def test_delete_profile_cascades_credentials(
             rows = (
                 (
                     await session.execute(
-                        select(cls).filter(cls.profile_id == profile_id)
+                        select(cls).filter(cls.provider_id == provider_id)
                     )
                 )
                 .scalars()
@@ -152,14 +152,14 @@ async def test_invalid_license_type_violates_check_constraint(
             session.add(user)
             profile = _make_profile(user)
             session.add(profile)
-        profile_id = profile.id
+        provider_id = profile.id
 
     with pytest.raises(IntegrityError):
         async with db_test_session_manager() as session:
             async with session.begin():
                 session.add(
                     ProviderLicensure(
-                        profile_id=profile_id,
+                        provider_id=provider_id,
                         license_type="not_a_real_license",
                         license_number="X-1",
                         issuing_state="IL",

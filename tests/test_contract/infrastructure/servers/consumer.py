@@ -172,10 +172,10 @@ def _setup_provider_edit_form_stub(app: FastAPI) -> None:
         def __init__(self, **kwargs):
             self.__dict__.update(kwargs)
 
-    @app.get("/providers/{profile_id}/form")
-    async def provider_edit_form_stub_page(request: Request, profile_id: uuid.UUID):
+    @app.get("/providers/{provider_id}/form")
+    async def provider_edit_form_stub_page(request: Request, provider_id: uuid.UUID):
         profile = _StubAttrs(
-            id=profile_id,
+            id=provider_id,
             practice_name="Acme Counseling",
             location_city="Brooklyn",
             location_state="NY",

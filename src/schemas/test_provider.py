@@ -197,10 +197,10 @@ def test_profile_create_defaults_credential_lists_to_empty():
 def test_profile_read_validates_from_nested_dict():
     """`ProviderRead.model_validate` should construct the nested
     sub-entity Read schemas without needing real ORM objects."""
-    profile_id = uuid.uuid4()
+    provider_id = uuid.uuid4()
     now = _now()
     payload = {
-        "id": profile_id,
+        "id": provider_id,
         "user_id": uuid.uuid4(),
         "created_at": now,
         "updated_at": now,
@@ -213,7 +213,7 @@ def test_profile_read_validates_from_nested_dict():
         "licensures": [
             {
                 "id": uuid.uuid4(),
-                "profile_id": profile_id,
+                "provider_id": provider_id,
                 "created_at": now,
                 "updated_at": now,
                 "license_type": "lcsw",
@@ -225,7 +225,7 @@ def test_profile_read_validates_from_nested_dict():
         "educations": [
             {
                 "id": uuid.uuid4(),
-                "profile_id": profile_id,
+                "provider_id": provider_id,
                 "created_at": now,
                 "updated_at": now,
                 "education_type": "msw",
@@ -236,7 +236,7 @@ def test_profile_read_validates_from_nested_dict():
         "certifications": [
             {
                 "id": uuid.uuid4(),
-                "profile_id": profile_id,
+                "provider_id": provider_id,
                 "created_at": now,
                 "updated_at": now,
                 "certification_type": "emdr",

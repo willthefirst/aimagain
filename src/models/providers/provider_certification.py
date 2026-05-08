@@ -23,9 +23,9 @@ class ProviderCertification(BaseModel):
     __tablename__ = _TABLE
     __table_args__ = (_ck("certification_type", CERTIFICATION_TYPES),)
 
-    profile_id = Column(
+    provider_id = Column(
         Uuid(as_uuid=True),
-        ForeignKey("provider_profiles.id", ondelete="CASCADE"),
+        ForeignKey("providers.id", ondelete="CASCADE"),
         nullable=False,
     )
     certification_type = Column(Text, nullable=False)

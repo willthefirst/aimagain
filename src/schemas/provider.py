@@ -46,7 +46,7 @@ from src.schemas._validators import StrippedText, ZipText, assert_any_field_set
 
 class ProviderLicensureRead(BaseModel):
     id: uuid.UUID
-    profile_id: uuid.UUID
+    provider_id: uuid.UUID
     created_at: datetime
     updated_at: datetime
     license_type: str
@@ -82,7 +82,7 @@ class ProviderLicensureUpdate(BaseModel):
 
 class ProviderLicensureAuditSnapshot(BaseModel):
     id: uuid.UUID
-    profile_id: uuid.UUID
+    provider_id: uuid.UUID
     created_at: datetime
     updated_at: datetime
     license_type: str
@@ -98,7 +98,7 @@ class ProviderLicensureAuditSnapshot(BaseModel):
 
 class ProviderEducationRead(BaseModel):
     id: uuid.UUID
-    profile_id: uuid.UUID
+    provider_id: uuid.UUID
     created_at: datetime
     updated_at: datetime
     education_type: str
@@ -134,7 +134,7 @@ class ProviderEducationUpdate(BaseModel):
 
 class ProviderEducationAuditSnapshot(BaseModel):
     id: uuid.UUID
-    profile_id: uuid.UUID
+    provider_id: uuid.UUID
     created_at: datetime
     updated_at: datetime
     education_type: str
@@ -149,7 +149,7 @@ class ProviderEducationAuditSnapshot(BaseModel):
 
 class ProviderCertificationRead(BaseModel):
     id: uuid.UUID
-    profile_id: uuid.UUID
+    provider_id: uuid.UUID
     created_at: datetime
     updated_at: datetime
     certification_type: str
@@ -182,7 +182,7 @@ class ProviderCertificationUpdate(BaseModel):
 
 class ProviderCertificationAuditSnapshot(BaseModel):
     id: uuid.UUID
-    profile_id: uuid.UUID
+    provider_id: uuid.UUID
     created_at: datetime
     updated_at: datetime
     certification_type: str

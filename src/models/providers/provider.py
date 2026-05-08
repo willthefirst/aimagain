@@ -5,7 +5,7 @@ from sqlalchemy.types import Uuid
 from ..base import BaseModel
 from ..enums import LOCATION_AVAILABILITY_OPTIONS, US_STATES, check_in_tuple_sql
 
-_TABLE = "provider_profiles"
+_TABLE = "providers"
 
 
 def _ck(column: str, values: tuple[str, ...]) -> CheckConstraint:
