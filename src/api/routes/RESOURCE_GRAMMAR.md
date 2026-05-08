@@ -111,6 +111,28 @@ POST  /<resource>/{id}/revisions/{rev_id}/publication  apply revision to live
 
 Only meaningful for lifecycle-adopting resources. Add lazily.
 
+### 5. ownership lists
+
+When one resource owns a 1:N relationship to another (a user owns provider profiles, an organization owns members), the owner-scoped list belongs on the **owner's** URL space, not the child's:
+
+```
+GET /<owner>/{owner_id}/<children>              list children owned by this owner
+GET /<owner>/me/<children>                       convenience alias for the current actor
+```
+
+The independent top-level collection of the child resource (e.g. `GET /<children>` for public discovery) **stays** — these are different views, not duplicates. The ownership-list scopes by who owns the rows; the top-level list lets consumers browse across all owners.
+
+Auth on the owner-scoped list mirrors the owner's normal auth: self by default, with admin escape. Putting the list on `/<owner>/{id}/<children>` rather than `/<children>?owner_id=...` is the contract — it makes the relationship explicit in the URL and lets the same handler power the `/me` alias by sourcing `owner_id` from the session.
+
+Examples:
+
+```
+GET /users/{id}/provider-profiles      list profiles owned by user
+GET /users/me/provider-profiles        ⇒ same handler with owner_id=session.user_id
+```
+
+Don't use this for *all* child relationships — only when "list everything owned by X" is a real consumer view. If consumers only ever want a single child by id (e.g. `/users/{id}/avatar`), use a state-axis or single-value subresource instead.
+
 ### Bonus: hard DELETE
 
 ```

@@ -24,9 +24,9 @@ from src.logic.provider_profile_processing import (
     handle_delete_education,
     handle_delete_licensure,
     handle_delete_profile,
-    handle_get_my_provider_profile_detail,
     handle_get_provider_profile_detail,
     handle_list_provider_profiles,
+    handle_list_user_provider_profiles,
     handle_update_certification,
     handle_update_education,
     handle_update_licensure,
@@ -42,6 +42,7 @@ from src.models import (
 )
 from src.repositories.audit_repository import AuditRepository
 from src.repositories.provider_profile_repository import ProviderProfileRepository
+from src.repositories.user_repository import UserRepository
 from src.schemas.provider_profile import (
     ProviderCertificationCreate,
     ProviderCertificationUpdate,
@@ -234,29 +235,109 @@ async def test_get_provider_profile_detail_404_for_unknown_id(
             )
 
 
-async def test_get_my_provider_profile_detail_returns_context(
+# --- handle_list_user_provider_profiles --------------------------------
+
+
+async def test_list_user_provider_profiles_self_returns_owned(
     db_test_session_manager: async_sessionmaker[AsyncSession],
 ):
     user = await _seed_user(db_test_session_manager)
-    profile_id, *_ = await _seed_profile(db_test_session_manager, user_id=user.id)
+    first_id, *_ = await _seed_profile(db_test_session_manager, user_id=user.id)
+    second_id, *_ = await _seed_profile(db_test_session_manager, user_id=user.id)
 
     async with db_test_session_manager() as session:
-        repo = ProviderProfileRepository(session)
-        context = await handle_get_my_provider_profile_detail(
-            request=_fake_request(), repo=repo, requesting_user=user
+        profile_repo = ProviderProfileRepository(session)
+        user_repo = UserRepository(session)
+        context = await handle_list_user_provider_profiles(
+            request=_fake_request(),
+            target_user_id=user.id,
+            repo=profile_repo,
+            user_repo=user_repo,
+            requesting_user=user,
         )
-        assert context["profile"].id == profile_id
+
+    assert context["is_self"] is True
+    assert context["target_user"].id == user.id
+    assert {p.id for p in context["profiles"]} == {first_id, second_id}
 
 
-async def test_get_my_provider_profile_detail_404_when_user_has_no_profile(
+async def test_list_user_provider_profiles_self_returns_empty_when_none(
     db_test_session_manager: async_sessionmaker[AsyncSession],
 ):
     user = await _seed_user(db_test_session_manager)
+
     async with db_test_session_manager() as session:
-        repo = ProviderProfileRepository(session)
+        profile_repo = ProviderProfileRepository(session)
+        user_repo = UserRepository(session)
+        context = await handle_list_user_provider_profiles(
+            request=_fake_request(),
+            target_user_id=user.id,
+            repo=profile_repo,
+            user_repo=user_repo,
+            requesting_user=user,
+        )
+
+    assert context["is_self"] is True
+    assert list(context["profiles"]) == []
+
+
+async def test_list_user_provider_profiles_admin_can_view_anyone(
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+):
+    target = await _seed_user(db_test_session_manager)
+    admin = await _seed_user(db_test_session_manager, is_superuser=True)
+    profile_id, *_ = await _seed_profile(db_test_session_manager, user_id=target.id)
+
+    async with db_test_session_manager() as session:
+        profile_repo = ProviderProfileRepository(session)
+        user_repo = UserRepository(session)
+        context = await handle_list_user_provider_profiles(
+            request=_fake_request(),
+            target_user_id=target.id,
+            repo=profile_repo,
+            user_repo=user_repo,
+            requesting_user=admin,
+        )
+
+    assert context["is_self"] is False
+    assert context["target_user"].id == target.id
+    assert [p.id for p in context["profiles"]] == [profile_id]
+
+
+async def test_list_user_provider_profiles_non_admin_cannot_view_other(
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+):
+    target = await _seed_user(db_test_session_manager)
+    other = await _seed_user(db_test_session_manager)
+
+    async with db_test_session_manager() as session:
+        profile_repo = ProviderProfileRepository(session)
+        user_repo = UserRepository(session)
+        with pytest.raises(ForbiddenError):
+            await handle_list_user_provider_profiles(
+                request=_fake_request(),
+                target_user_id=target.id,
+                repo=profile_repo,
+                user_repo=user_repo,
+                requesting_user=other,
+            )
+
+
+async def test_list_user_provider_profiles_404_when_target_user_missing(
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+):
+    admin = await _seed_user(db_test_session_manager, is_superuser=True)
+
+    async with db_test_session_manager() as session:
+        profile_repo = ProviderProfileRepository(session)
+        user_repo = UserRepository(session)
         with pytest.raises(NotFoundError):
-            await handle_get_my_provider_profile_detail(
-                request=_fake_request(), repo=repo, requesting_user=user
+            await handle_list_user_provider_profiles(
+                request=_fake_request(),
+                target_user_id=uuid.uuid4(),
+                repo=profile_repo,
+                user_repo=user_repo,
+                requesting_user=admin,
             )
 
 

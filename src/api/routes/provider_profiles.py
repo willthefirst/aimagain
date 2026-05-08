@@ -21,7 +21,6 @@ from src.logic.provider_profile_processing import (
     handle_delete_education,
     handle_delete_licensure,
     handle_delete_profile,
-    handle_get_my_provider_profile_detail,
     handle_get_provider_profile_detail,
     handle_get_provider_profile_edit_form,
     handle_get_provider_profile_form,
@@ -140,29 +139,6 @@ async def create_profile(
         status_code=status.HTTP_201_CREATED,
         content={"id": str(created.id)},
         headers={"Location": detail_location, "HX-Redirect": edit_location},
-    )
-
-
-# --- Per-actor route ----------------------------------------------------
-# Registered before `/{profile_id}` so the literal `me` is not parsed as a UUID.
-
-
-@router.get("/me")
-async def get_my_profile(
-    request: Request,
-    repo: ProviderProfileRepository = Depends(get_provider_profile_repository),
-    user: User = Depends(current_active_user),
-):
-    """Renders the requesting user's profile as an HTML detail page. 404 if
-    they have not created one yet (profiles are not auto-created on
-    registration)."""
-    context = await handle_get_my_provider_profile_detail(
-        request=request, repo=repo, requesting_user=user
-    )
-    return APIResponse.html_response(
-        template_name="provider_profiles/detail.html",
-        context=context,
-        request=request,
     )
 
 

@@ -215,35 +215,6 @@ async def test_get_profile_returns_404_for_unknown_id(
     assert response.status_code == 404
 
 
-async def test_get_my_profile_renders_detail_page(
-    authenticated_client: AsyncClient,
-    db_test_session_manager: async_sessionmaker[AsyncSession],
-    logged_in_user: User,
-):
-    """`GET /provider-profiles/me` renders the same detail template for the
-    requesting user's profile."""
-    profile_id = await _seed_profile_for(
-        db_test_session_manager, user_id=logged_in_user.id, practice_name="Solo"
-    )
-
-    response = await authenticated_client.get("/provider-profiles/me")
-
-    assert response.status_code == 200
-    assert response.headers["content-type"].startswith("text/html")
-    tree = HTMLParser(response.text)
-    assert "Solo" in tree.css_first("h1").text()
-    # Owner — Edit link is present.
-    assert tree.css_first(f'a[href="/provider-profiles/{profile_id}/form"]') is not None
-
-
-async def test_get_my_profile_returns_404_when_not_created(
-    authenticated_client: AsyncClient,
-    logged_in_user: User,
-):
-    response = await authenticated_client.get("/provider-profiles/me")
-    assert response.status_code == 404
-
-
 # --- Profile listing -----------------------------------------------------
 
 

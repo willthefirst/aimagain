@@ -33,6 +33,7 @@ from src.models import (
 )
 from src.repositories.audit_repository import AuditRepository
 from src.repositories.provider_profile_repository import ProviderProfileRepository
+from src.repositories.user_repository import UserRepository
 from src.schemas.provider_profile import (
     ProviderCertificationAuditSnapshot,
     ProviderCertificationCreate,
@@ -164,17 +165,33 @@ async def handle_get_provider_profile_detail(
     return {"request": request, "profile": profile, "current_user": requesting_user}
 
 
-async def handle_get_my_provider_profile_detail(
+async def handle_list_user_provider_profiles(
     request: Request,
+    target_user_id: UUID,
     repo: ProviderProfileRepository,
+    user_repo: UserRepository,
     requesting_user: User,
 ) -> dict[str, Any]:
-    """Returns the requesting user's profile context; 404 if they have not
-    created one yet (profiles are not auto-created on registration)."""
-    profile = await repo.get_by_user_id(requesting_user.id)
-    if profile is None:
-        raise NotFoundError(detail="You do not have a provider profile yet")
-    return {"request": request, "profile": profile, "current_user": requesting_user}
+    """Returns the template context for the user-scoped provider-profile
+    list page. A user may view their own list; admins may view anyone's.
+    404 if the target user does not exist; 403 if a non-admin requests
+    another user's list.
+    """
+    if target_user_id != requesting_user.id and not requesting_user.is_superuser:
+        raise ForbiddenError(
+            detail="Only the target user or an admin may view their provider profiles"
+        )
+    target_user = await user_repo.get_user_by_id(target_user_id)
+    if target_user is None:
+        raise NotFoundError(detail=f"User {target_user_id} not found")
+    profiles = await repo.list_for_user(target_user_id)
+    return {
+        "request": request,
+        "target_user": target_user,
+        "profiles": profiles,
+        "is_self": target_user_id == requesting_user.id,
+        "current_user": requesting_user,
+    }
 
 
 async def handle_get_provider_profile_form(
