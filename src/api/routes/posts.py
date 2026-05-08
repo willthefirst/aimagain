@@ -22,7 +22,7 @@ from src.logic.posts.post_processing import (
     handle_update_post,
 )
 from src.models import KIND_NAMES, REGISTERED_KINDS, User
-from src.repositories.audit.audit_repository import AuditRepository
+from src.repositories.audit_repository import AuditRepository
 from src.repositories.dependencies import get_audit_repository, get_post_repository
 from src.repositories.posts.post_repository import PostRepository
 from src.schemas.posts.post import post_create_adapter, post_update_adapter

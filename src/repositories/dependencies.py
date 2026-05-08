@@ -3,7 +3,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.db import get_db_session
 
-from .audit.audit_repository import AuditRepository
+from .audit_repository import AuditRepository
 from .posts.post_repository import PostRepository
 from .providers.provider_repository import ProviderRepository
 from .users.user_repository import UserRepository

@@ -12,7 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.models import AuditLog
 
-from ..base import BaseRepository
+from .base import BaseRepository
 
 
 class AuditRepository(BaseRepository):

@@ -31,7 +31,7 @@ from src.logic.providers.provider_processing import (
     handle_update_provider,
 )
 from src.models import User
-from src.repositories.audit.audit_repository import AuditRepository
+from src.repositories.audit_repository import AuditRepository
 from src.repositories.dependencies import get_audit_repository, get_provider_repository
 from src.repositories.providers.provider_repository import ProviderRepository
 from src.schemas.providers.provider import (
