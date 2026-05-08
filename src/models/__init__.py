@@ -20,7 +20,7 @@ from .providers.provider import Provider
 from .providers.provider_certification import ProviderCertification
 from .providers.provider_education import ProviderEducation
 from .providers.provider_licensure import ProviderLicensure
-from .user import User
+from .users.user import User
 
 __all__ = [
     "AuditLog",
