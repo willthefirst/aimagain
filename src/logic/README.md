@@ -19,11 +19,11 @@ Logic modules handle **complex business workflows** that need to coordinate repo
 
 ```python
 async def handle_list_users(
-    user_repo: UserRepository,
+    repo: UserRepository,
     requesting_user: User,
 ) -> dict:
     """Orchestrate user listing."""
-    users_list = await user_repo.list_users(exclude_user=requesting_user)
+    users_list = await repo.list_users(exclude_user=requesting_user)
     return {"users": users_list, "current_user": requesting_user}
 ```
 
@@ -42,17 +42,17 @@ async def handle_list_users(session: AsyncSession, user_id: UUID):
     return users.scalars().all()
 
 # Bad - HTTP response creation in logic
-async def handle_get_post(post_id: UUID, post_repo: PostRepository) -> JSONResponse:
-    post = await post_repo.get_post_by_id(post_id)
+async def handle_get_post(post_id: UUID, repo: PostRepository) -> JSONResponse:
+    post = await repo.get_post_by_id(post_id)
     return JSONResponse({"post": post})
 
 # Good - orchestration with proper separation
 async def handle_list_users(
-    user_repo: UserRepository,
+    repo: UserRepository,
     requesting_user: User,
 ):
     """Orchestrate user listing with filtering logic"""
-    users_list = await user_repo.list_users(exclude_user=requesting_user)
+    users_list = await repo.list_users(exclude_user=requesting_user)
     return {"users": users_list, "current_user": requesting_user}
 ```
 
@@ -69,11 +69,11 @@ There is no separate service layer — see [`../README.md`](../README.md) for th
 `logic/` owns the transaction commit:
 
 ```python
-async def handle_set_user_activation(user_id, payload, user_repo, requesting_user):
-    target = await user_repo.get_user_by_id(user_id)
+async def handle_set_user_activation(user_id, payload, repo, requesting_user):
+    target = await repo.get_user_by_id(user_id)
     ...
-    updated = await user_repo.set_user_activation(target, is_active=...)
-    await user_repo.session.commit()   # logic owns the commit
+    updated = await repo.set_user_activation(target, is_active=...)
+    await repo.session.commit()   # logic owns the commit
     return updated
 ```
 
@@ -89,6 +89,25 @@ Logic follows the [cluster pattern](../README.md#domain-entities-and-the-cluster
 A processing module does not import from a peer cluster's processing module; if a workflow needs to coordinate two entities, the parent-level orchestrator is the right home (or a single handler in one cluster that uses the other cluster's repositories, when the dependency direction is clear).
 
 ## Implementation patterns
+
+### Handler kwarg naming
+
+The repository for the resource the handler acts on is named `repo`. Additional repositories the handler needs are named by their type (`user_repo`, `audit_repo`, etc.). This keeps generic mount infrastructure able to inject `repo=` uniformly while leaving multi-repo cases legible.
+
+```python
+# Single-repo handler — primary repo is `repo`:
+async def handle_get_post_detail(post_id: UUID, repo: PostRepository, ...): ...
+
+# Multi-repo handler — primary stays `repo`, secondaries keep their typed name:
+async def handle_list_user_providers(
+    target_user_id: UUID,
+    repo: ProviderRepository,    # primary: providers are what we list
+    user_repo: UserRepository,   # secondary: needed only to verify the target user exists
+    requesting_user: User,
+): ...
+```
+
+The `audit_repo: AuditRepository` injected into mutation handlers is a secondary repo and follows the same rule (named by type, not collapsed to `repo`).
 
 ### Standard processing function structure
 
@@ -135,8 +154,8 @@ async def handle_some_operation(
 Logic handlers raise the API exception classes from `src.api.common.exceptions` directly — there is no separate domain-error hierarchy. The `@handle_route_errors` decorator (applied automatically by `BaseRouter`) lets `HTTPException` subclasses pass through, translates fastapi-users exceptions, and converts anything else into a generic 500.
 
 ```python
-async def handle_get_post_detail(post_id: UUID, post_repo: PostRepository):
-    post = await post_repo.get_post_with_detail(post_id)
+async def handle_get_post_detail(post_id: UUID, repo: PostRepository):
+    post = await repo.get_post_with_detail(post_id)
     if post is None:
         raise NotFoundError(detail="Post not found")  # → 404
     return post
@@ -193,12 +212,12 @@ async def handle_template_rendering_operation(
 ```python
 # Bad - HTTP concerns in logic
 async def handle_get_users(request: Request) -> JSONResponse:
-    users = await user_repo.list_users()
+    users = await repo.list_users()
     return JSONResponse({"users": [user.dict() for user in users]})
 
 # Good - return data for route to handle
-async def handle_get_users(user_repo: UserRepository, requesting_user: User):
-    users = await user_repo.list_users(exclude_user=requesting_user)
+async def handle_get_users(repo: UserRepository, requesting_user: User):
+    users = await repo.list_users(exclude_user=requesting_user)
     return {"users": users, "current_user": requesting_user}
 ```
 

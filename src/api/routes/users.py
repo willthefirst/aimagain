@@ -41,7 +41,7 @@ async def list_users(
     """
     context = await handle_list_users(
         request=request,
-        user_repo=user_repo,
+        repo=user_repo,
         requesting_user=user,
     )
     return APIResponse.html_response(
@@ -62,7 +62,7 @@ async def get_user(
     context = await handle_get_user_detail(
         request=request,
         user_id=user_id,
-        user_repo=user_repo,
+        repo=user_repo,
         profile_repo=profile_repo,
         requesting_user=user,
     )
@@ -106,7 +106,7 @@ async def set_user_activation(
     updated = await handle_set_user_activation(
         user_id=user_id,
         payload=payload,
-        user_repo=user_repo,
+        repo=user_repo,
         audit_repo=audit_repo,
         requesting_user=admin,
     )
@@ -130,7 +130,7 @@ async def delete_user(
     """Admin-only: hard-delete a user."""
     await handle_delete_user(
         user_id=user_id,
-        user_repo=user_repo,
+        repo=user_repo,
         audit_repo=audit_repo,
         requesting_user=admin,
     )

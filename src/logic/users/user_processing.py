@@ -23,7 +23,7 @@ _snapshot_user = make_snapshotter(UserAuditSnapshot)
 
 async def handle_list_users(
     request: Request,
-    user_repo: UserRepository,
+    repo: UserRepository,
     requesting_user: User,
 ):
     """
@@ -31,7 +31,7 @@ async def handle_list_users(
 
     Args:
         request: The FastAPI request object.
-        user_repo: The user repository dependency.
+        repo: The user repository dependency.
         requesting_user: The currently authenticated user.
 
     Returns:
@@ -43,7 +43,7 @@ async def handle_list_users(
     logger.debug(f"Handler: Listing users for user {requesting_user.id}.")
 
     try:
-        users_list = await user_repo.list_users(
+        users_list = await repo.list_users(
             exclude_user=requesting_user,
         )
     except Exception as e:
@@ -62,7 +62,7 @@ async def handle_list_users(
 async def handle_get_user_detail(
     request: Request,
     user_id: UUID,
-    user_repo: UserRepository,
+    repo: UserRepository,
     profile_repo: ProviderRepository,
     requesting_user: User,
 ):
@@ -70,7 +70,7 @@ async def handle_get_user_detail(
     they own; 404s if the user is missing. Provider data is already
     publicly available via `GET /providers`, so the embedded list is gated
     only by the existing user-detail auth (any active user)."""
-    target = await user_repo.get_user_by_id(user_id)
+    target = await repo.get_user_by_id(user_id)
     if target is None:
         raise NotFoundError(detail="User not found")
 
@@ -87,7 +87,7 @@ async def handle_get_user_detail(
 async def handle_set_user_activation(
     user_id: UUID,
     payload: UserActivationUpdate,
-    user_repo: UserRepository,
+    repo: UserRepository,
     audit_repo: AuditRepository,
     requesting_user: User,
 ) -> User:
@@ -97,7 +97,7 @@ async def handle_set_user_activation(
     Self-guard lives here so direct API calls can't bypass the template's
     `{% if %}` hide. The route's `current_admin_user` dep blocks non-admins.
     """
-    target = await user_repo.get_user_by_id(user_id)
+    target = await repo.get_user_by_id(user_id)
     if target is None:
         raise NotFoundError(detail="User not found")
     if target.id == requesting_user.id:
@@ -110,7 +110,7 @@ async def handle_set_user_activation(
         f"Handler: admin {requesting_user.id} setting activation={payload.state} on user {target.id}"
     )
     before = _snapshot_user_activation(target)
-    updated = await user_repo.set_user_activation(target, is_active=is_active)
+    updated = await repo.set_user_activation(target, is_active=is_active)
     await record_audit(
         audit_repo,
         actor_id=requesting_user.id,
@@ -120,13 +120,13 @@ async def handle_set_user_activation(
         before=before,
         after=_snapshot_user_activation(updated),
     )
-    await user_repo.session.commit()
+    await repo.session.commit()
     return updated
 
 
 async def handle_delete_user(
     user_id: UUID,
-    user_repo: UserRepository,
+    repo: UserRepository,
     audit_repo: AuditRepository,
     requesting_user: User,
 ) -> None:
@@ -136,7 +136,7 @@ async def handle_delete_user(
 
     Self-guard mirrors `handle_set_user_activation`; the route dep blocks non-admins.
     """
-    target = await user_repo.get_user_by_id(user_id)
+    target = await repo.get_user_by_id(user_id)
     if target is None:
         raise NotFoundError(detail="User not found")
     if target.id == requesting_user.id:
@@ -154,5 +154,5 @@ async def handle_delete_user(
         before=before,
         after=None,
     )
-    await user_repo.delete_user(target)
-    await user_repo.session.commit()
+    await repo.delete_user(target)
+    await repo.session.commit()
