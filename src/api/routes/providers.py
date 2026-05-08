@@ -1,23 +1,23 @@
 import logging
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Query, Request, status
+from fastapi import APIRouter, Depends, Query, Request
 
-from src.api.common import (
-    APIResponse,
-    BaseRouter,
-    created_response,
-    deleted_response,
-    parse_and_validate_form,
-    updated_response,
+from src.api.common import APIResponse, BaseRouter
+from src.api.common.resource_routes import (
+    ResourceSpec,
+    mount_create,
+    mount_delete,
+    mount_form,
+    mount_update,
 )
-from src.api.common.resource_routes import ResourceSpec, mount_form
 from src.api.common.subresource_routes import (
     SubresourceDeps,
     SubresourceSpec,
     register_subresource_routes,
 )
 from src.auth_config import current_active_user
+from src.logic._authz import assert_owner_or_admin
 from src.logic.providers.provider_processing import (
     handle_create_certification,
     handle_create_education,
@@ -37,7 +37,6 @@ from src.logic.providers.provider_processing import (
     handle_update_provider,
 )
 from src.models import User
-from src.repositories.audit_repository import AuditRepository
 from src.repositories.dependencies import get_audit_repository, get_provider_repository
 from src.repositories.providers.provider_repository import ProviderRepository
 from src.schemas.providers.provider import (
@@ -60,20 +59,24 @@ router = BaseRouter(router=providers_api_router, default_tags=["providers"])
 logger = logging.getLogger(__name__)
 
 
-# Spec is incrementally fleshed out as each slice migrates more operations
-# onto the mounts. Slice 5 (#250) fills in just enough to mount the two
-# form routes; slice 6 (#251) adds adapters/redirects for create/update.
 PROVIDER_SPEC = ResourceSpec(
     collection="providers",
     id_param="provider_id",
     repo_dep=get_provider_repository,
     read_user_dep=current_active_user,
     write_user_dep=current_active_user,
+    write_authz=assert_owner_or_admin,
+    create_adapter=provider_create_adapter,
+    update_adapter=provider_update_adapter,
+    read_to_dict=lambda profile: ProviderRead.model_validate(profile).model_dump(
+        mode="json"
+    ),
+    # After create, redirect to the edit form so the user can flesh out
+    # sub-rows (licensures, educations, certifications). After update,
+    # send them back to the same edit form.
+    create_redirect=lambda *, provider_id: f"/providers/{provider_id}/form",
+    update_redirect=lambda *, provider_id: f"/providers/{provider_id}/form",
 )
-
-
-def _provider_read_dict(profile) -> dict:
-    return ProviderRead.model_validate(profile).model_dump(mode="json")
 
 
 def _licensure_read_dict(row) -> dict:
@@ -114,27 +117,13 @@ async def list_providers(
     )
 
 
-@router.post("", status_code=status.HTTP_201_CREATED)
-async def create_provider(
-    request: Request,
-    repo: ProviderRepository = Depends(get_provider_repository),
-    audit_repo: AuditRepository = Depends(get_audit_repository),
-    user: User = Depends(current_active_user),
-):
-    """Creates a provider owned by the requesting user. Form-encoded
-    body. A user may own multiple profiles."""
-    payload = await parse_and_validate_form(request, provider_create_adapter)
-    created = await handle_create_provider(
-        payload=payload,
-        repo=repo,
-        audit_repo=audit_repo,
-        requesting_user=user,
-    )
-    return created_response(
-        id=created.id,
-        location=f"/providers/{created.id}",
-        hx_redirect=f"/providers/{created.id}/form",
-    )
+# POST /providers — owner inferred from session.
+mount_create(
+    router,
+    PROVIDER_SPEC,
+    handler=handle_create_provider,
+    audit_repo_dep=get_audit_repository,
+)
 
 
 # --- Form routes --------------------------------------------------------
@@ -180,46 +169,20 @@ async def get_profile(
     )
 
 
-@router.patch("/{provider_id}")
-async def patch_profile(
-    provider_id: UUID,
-    request: Request,
-    repo: ProviderRepository = Depends(get_provider_repository),
-    audit_repo: AuditRepository = Depends(get_audit_repository),
-    user: User = Depends(current_active_user),
-):
-    """Partially updates the practice/availability fields. Owner-only; admins
-    may edit any profile. Sub-entity lists are managed via their own routes."""
-    payload = await parse_and_validate_form(request, provider_update_adapter)
-    updated = await handle_update_provider(
-        provider_id=provider_id,
-        payload=payload,
-        repo=repo,
-        audit_repo=audit_repo,
-        requesting_user=user,
-    )
-    return updated_response(
-        body=_provider_read_dict(updated),
-        hx_redirect=f"/providers/{updated.id}/form",
-    )
-
-
-@router.delete("/{provider_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_provider(
-    provider_id: UUID,
-    repo: ProviderRepository = Depends(get_provider_repository),
-    audit_repo: AuditRepository = Depends(get_audit_repository),
-    user: User = Depends(current_active_user),
-):
-    """Hard-deletes the profile (sub-rows cascade). Owner-only; admins may
-    delete any profile."""
-    await handle_delete_provider(
-        provider_id=provider_id,
-        repo=repo,
-        audit_repo=audit_repo,
-        requesting_user=user,
-    )
-    return deleted_response(hx_redirect="/providers")
+# PATCH /providers/{provider_id} — partial update, owner-or-admin (handler enforces).
+mount_update(
+    router,
+    PROVIDER_SPEC,
+    handler=handle_update_provider,
+    audit_repo_dep=get_audit_repository,
+)
+# DELETE /providers/{provider_id} — hard delete, sub-rows cascade.
+mount_delete(
+    router,
+    PROVIDER_SPEC,
+    handler=handle_delete_provider,
+    audit_repo_dep=get_audit_repository,
+)
 
 
 # --- Sub-resource CRUD (licensure / education / certification) ----------

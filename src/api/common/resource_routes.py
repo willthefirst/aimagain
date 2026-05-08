@@ -42,7 +42,13 @@ from uuid import UUID
 from fastapi import Depends, Request, status
 from pydantic import TypeAdapter
 
-from src.api.common.responses import APIResponse, deleted_response
+from src.api.common.forms import parse_and_validate_form
+from src.api.common.responses import (
+    APIResponse,
+    created_response,
+    deleted_response,
+    updated_response,
+)
 from src.logic.audit import AuditedResource
 
 
@@ -170,7 +176,7 @@ def mount_delete(
         # FastAPI binds the path param under `id_param`, the deps under
         # the names declared in `__signature__` below.
         resource_id = kwargs[id_param]
-        await handler(
+        await _resolve_handler(handler)(
             **{id_param: resource_id},
             repo=kwargs["repo"],
             audit_repo=kwargs["audit_repo"],
@@ -237,7 +243,7 @@ def mount_list(
 
     async def _list(**kwargs: Any) -> Any:
         request: Request = kwargs["request"]
-        context = await handler(
+        context = await _resolve_handler(handler)(
             request=request,
             repo=kwargs["repo"],
             requesting_user=kwargs.get("requesting_user"),
@@ -288,7 +294,7 @@ def mount_detail(
     async def _detail(**kwargs: Any) -> Any:
         request: Request = kwargs["request"]
         resource_id: UUID = kwargs[id_param]
-        context = await handler(
+        context = await _resolve_handler(handler)(
             request=request,
             repo=kwargs["repo"],
             requesting_user=kwargs.get("requesting_user"),
@@ -363,7 +369,7 @@ def mount_form(
         if on_existing:
             handler_kwargs[id_param] = kwargs[id_param]
 
-        context = await handler(**handler_kwargs)
+        context = await _resolve_handler(handler)(**handler_kwargs)
         # Resolve template: handler context > per-mount kwarg > spec field.
         # `pop` so the template name doesn't leak into the rendered context.
         resolved_template = (
@@ -386,6 +392,168 @@ def mount_form(
         deps=_read_route_deps(spec, extra_deps_named),
     )
     router.get(path)(_form)
+
+
+def mount_create(
+    router: Any,
+    spec: ResourceSpec,
+    handler: Callable[..., Awaitable[Any]],
+    *,
+    audit_repo_dep: Callable[..., Any],
+) -> None:
+    """Mount ``POST /<collection>``.
+
+    Parses a form-encoded body via ``spec.create_adapter`` (a Pydantic
+    ``TypeAdapter``) and calls the handler with ``payload=``, ``repo=``,
+    ``audit_repo=``, ``requesting_user=``. The handler is expected to use
+    ``mutate(verb="create")`` so the audit row + commit are owned by the
+    context manager.
+
+    Response is ``201 Created`` with ``Location`` and ``HX-Redirect`` set.
+    Defaults: ``Location: /<collection>/<new_id>``, ``HX-Redirect`` =
+    ``spec.create_redirect(...)`` if set, else ``Location``. The
+    ``create_redirect`` callable receives the new id under ``spec.id_param``
+    so it can build a per-resource target (e.g. providers redirect to
+    ``/providers/{id}/form`` after create).
+
+    Requires: ``spec.write_user_dep``, ``spec.create_adapter``.
+    """
+    if spec.parent is not None:
+        raise NotImplementedError(
+            "mount_create with spec.parent is not supported yet (slice 8 / #253)."
+        )
+    if spec.write_user_dep is None:
+        raise ValueError(
+            f"mount_create requires {spec.collection!r} to set write_user_dep."
+        )
+    if spec.create_adapter is None:
+        raise ValueError(
+            f"mount_create requires {spec.collection!r} to set create_adapter."
+        )
+
+    collection = spec.collection
+    id_param = spec.id_param
+    create_adapter = spec.create_adapter
+    create_redirect = spec.create_redirect
+
+    async def _create(**kwargs: Any) -> Any:
+        request: Request = kwargs["request"]
+        payload = await parse_and_validate_form(request, create_adapter)
+        created = await _resolve_handler(handler)(
+            payload=payload,
+            repo=kwargs["repo"],
+            audit_repo=kwargs["audit_repo"],
+            requesting_user=kwargs["requesting_user"],
+        )
+        location = f"/{collection}/{created.id}"
+        if create_redirect is not None:
+            hx = create_redirect(**{id_param: created.id})
+        else:
+            hx = location
+        return created_response(id=created.id, location=location, hx_redirect=hx)
+
+    _set_route_signature(
+        _create,
+        path_params=(("request", Request),),
+        deps=(
+            ("repo", spec.repo_dep),
+            ("audit_repo", audit_repo_dep),
+            ("requesting_user", spec.write_user_dep),
+        ),
+    )
+    router.post("", status_code=status.HTTP_201_CREATED)(_create)
+
+
+def mount_update(
+    router: Any,
+    spec: ResourceSpec,
+    handler: Callable[..., Awaitable[Any]],
+    *,
+    audit_repo_dep: Callable[..., Any],
+) -> None:
+    """Mount ``PATCH /<collection>/{<id_param>}``.
+
+    Parses a form-encoded body via ``spec.update_adapter`` and calls the
+    handler with the resource id (under ``spec.id_param``), ``payload=``,
+    ``repo=``, ``audit_repo=``, ``requesting_user=``. Handler uses
+    ``mutate(verb="update")``.
+
+    Response is ``200 OK`` with body = ``spec.read_to_dict(updated)`` (if
+    set, else empty body) and ``HX-Redirect`` =
+    ``spec.update_redirect(...)`` (if set, else ``f"/<collection>/<id>"``).
+
+    Requires: ``spec.write_user_dep``, ``spec.update_adapter``.
+    ``read_to_dict`` is optional but conventional — clients often want
+    the new state without a follow-up GET.
+    """
+    if spec.parent is not None:
+        raise NotImplementedError(
+            "mount_update with spec.parent is not supported yet (slice 8 / #253)."
+        )
+    if spec.write_user_dep is None:
+        raise ValueError(
+            f"mount_update requires {spec.collection!r} to set write_user_dep."
+        )
+    if spec.update_adapter is None:
+        raise ValueError(
+            f"mount_update requires {spec.collection!r} to set update_adapter."
+        )
+
+    collection = spec.collection
+    id_param = spec.id_param
+    update_adapter = spec.update_adapter
+    update_redirect = spec.update_redirect
+    read_to_dict = spec.read_to_dict
+
+    async def _update(**kwargs: Any) -> Any:
+        request: Request = kwargs["request"]
+        resource_id: UUID = kwargs[id_param]
+        payload = await parse_and_validate_form(request, update_adapter)
+        updated = await _resolve_handler(handler)(
+            **{id_param: resource_id},
+            payload=payload,
+            repo=kwargs["repo"],
+            audit_repo=kwargs["audit_repo"],
+            requesting_user=kwargs["requesting_user"],
+        )
+        body = read_to_dict(updated) if read_to_dict else None
+        if update_redirect is not None:
+            hx = update_redirect(**{id_param: updated.id})
+        else:
+            hx = f"/{collection}/{updated.id}"
+        return updated_response(body=body, hx_redirect=hx)
+
+    _set_route_signature(
+        _update,
+        path_params=(("request", Request), (id_param, UUID)),
+        deps=(
+            ("repo", spec.repo_dep),
+            ("audit_repo", audit_repo_dep),
+            ("requesting_user", spec.write_user_dep),
+        ),
+    )
+    router.patch(f"/{{{id_param}}}")(_update)
+
+
+def _resolve_handler(fn: Callable[..., Any]) -> Callable[..., Any]:
+    """Look up a handler in its home module at call time so test
+    monkey-patches applied via ``setattr(<module>, "<name>", mock)`` take
+    effect — closure-captured references can't be rebound, but a lookup
+    against ``sys.modules`` reads the current binding.
+
+    Falls back to the original reference if anything is missing (e.g. the
+    function is a lambda or its module isn't loaded).
+    """
+    import sys
+
+    mod_name = getattr(fn, "__module__", "")
+    fn_name = getattr(fn, "__name__", "")
+    if not mod_name or not fn_name:
+        return fn
+    mod = sys.modules.get(mod_name)
+    if mod is None:
+        return fn
+    return getattr(mod, fn_name, fn)
 
 
 def _name_extra_repo_deps(

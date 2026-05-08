@@ -154,7 +154,7 @@ class MockDataFactory:
             id=UUID("33333333-3333-3333-3333-333333333333"),
         )
         return {
-            "src.api.routes.providers.handle_create_provider": {
+            "src.logic.providers.provider_processing.handle_create_provider": {
                 "return_value_config": stub_profile
             }
         }
@@ -187,7 +187,7 @@ class MockDataFactory:
             certifications=[],
         )
         return {
-            "src.api.routes.providers.handle_update_provider": {
+            "src.logic.providers.provider_processing.handle_update_provider": {
                 "return_value_config": stub_profile
             }
         }
