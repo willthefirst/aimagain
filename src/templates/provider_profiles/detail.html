@@ -11,7 +11,7 @@
     <dt>Practice name</dt><dd>{{ profile.practice_name }}</dd>
     <dt>City</dt><dd>{{ profile.location_city }}</dd>
     <dt>State</dt><dd>{{ profile.location_state }}</dd>
-    <dt>ZIP</dt><dd>{{ profile.location_zip }}</dd>
+    <dt>ZIP</dt><dd>{{ profile.location_zip }}</dd>{# title-case-ignore — "ZIP" acronym #}
     <dt>In-person sessions</dt><dd>{{ LOCATION_AVAILABILITY_LABELS[profile.in_person_sessions] }}</dd>
     <dt>Virtual sessions</dt><dd>{{ LOCATION_AVAILABILITY_LABELS[profile.virtual_sessions] }}</dd>
   </dl>
