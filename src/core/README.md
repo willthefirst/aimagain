@@ -34,6 +34,13 @@ class Settings(BaseSettings):
             raise
 ```
 
+### `.env` vs `.env.test` <!-- title-case-ignore -->
+
+Two distinct files, two distinct purposes:
+
+- **`.env`** — the developer's personal local config. Gitignored. Read by `Settings` via `env_file=".env"`. **Missing `.env` is an intentional loud failure** — `dev up`, `dev migrate`, etc. should fail clearly when local config isn't set up, not silently fall back to defaults.
+- **`.env.test`** — committed test defaults at the repo root. Loaded **only** by the root `conftest.py` (via `python-dotenv`), so it populates `os.environ` for the pytest session and nothing else. App contexts never see it. This is what makes `dev test` work in fresh checkouts and `git worktree add`-created worktrees without a personal `.env`. See issue #175.
+
 ### What we don't do
 
 - **Business logic**: Business rules belong in services, not configuration

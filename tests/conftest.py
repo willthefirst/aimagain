@@ -1,4 +1,5 @@
 """Pytest configuration and fixtures for tests.
 
-The .env file in the project root provides required configuration for tests.
+Required test env vars come from `.env.test` (committed defaults) loaded by
+the root `conftest.py`; a developer's local `.env`, if present, overrides.
 """
