@@ -39,3 +39,8 @@ repos:
         files: \.(md|html|jinja|jinja2)$
         pass_filenames: true
         args: [--fix]
+        # The script imports selectolax to parse HTML/Jinja files. #198
+        # made the import a hard failure when missing; this declaration
+        # lets pre-commit install it into the hook's isolated venv (which
+        # does not see project deps from pyproject.toml).
+        additional_dependencies: [selectolax]

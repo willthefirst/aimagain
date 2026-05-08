@@ -1,8 +1,8 @@
 from sqlalchemy import CheckConstraint, Column, ForeignKey, Text
 from sqlalchemy.types import Uuid
 
-from .base import BaseModel
-from .enums import EDUCATION_TYPES, check_in_tuple_sql
+from ..base import BaseModel
+from ..enums import EDUCATION_TYPES, check_in_tuple_sql
 
 _TABLE = "provider_educations"
 
