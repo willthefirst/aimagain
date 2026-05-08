@@ -4,13 +4,13 @@ The `repositories/` directory contains the **data access layer** of the applicat
 
 ## Core philosophy: Clean data access abstraction
 
-Repositories provide **focused, domain-specific data access** methods that encapsulate complex SQLAlchemy queries while maintaining transaction boundaries and providing type-safe interfaces for the service layer.
+Repositories provide **focused, domain-specific data access** methods that encapsulate complex SQLAlchemy queries while maintaining transaction boundaries and providing type-safe interfaces for the [`logic/`](../logic/README.md) layer (which owns the commit).
 
 ### What we do
 
 - **Query encapsulation**: Complex SQLAlchemy queries wrapped in meaningful method names
 - **Relationship loading**: Explicit control over eager/lazy loading using `selectinload` and `joinedload`
-- **Transaction management**: Coordinate database operations within service-controlled transactions
+- **Transaction management**: coordinate database operations within logic-controlled transactions (repositories `flush()` but never `commit()` — the calling logic handler owns the commit)
 - **Type safety**: Return proper domain models with full type annotations
 - **Domain-specific methods**: Business-relevant query methods like `list_users()`
 

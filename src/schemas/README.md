@@ -53,7 +53,7 @@ class UserCreateRequest(BaseModel):
 
 ## Architecture: Request/response boundary layer
 
-**API Routes -> Schema Validation -> Service Layer -> Schema Serialization -> Response**
+**API Routes -> Schema Validation -> Logic / Repositories -> Schema Serialization -> Response**
 
 Schemas act as the data contract layer between HTTP and business logic.
 

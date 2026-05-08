@@ -1,18 +1,19 @@
-# Logic: Processing layer between routes and services
+# Logic: business logic, orchestration, and transaction commit
 
-The `logic/` directory contains **processing functions** that handle the orchestration of business operations, serving as the coordination layer between API routes and services while managing error handling, validation, and data transformation for specific use cases.
+The `logic/` directory contains the layer that owns business logic and the transaction commit. There is no separate services layer: see [`../README.md`](../README.md) — `logic/` sits directly between routes and repositories. Logic modules orchestrate repository calls, raise API exceptions directly, and commit (or roll back) the transaction.
 
-## Core philosophy: Business operation orchestration
+## Core philosophy: business logic owns the commit
 
-Logic modules handle **complex business workflows** that require coordination between multiple services, proper error handling, and data transformation, providing a clean separation between HTTP concerns (routes) and pure business logic (services).
+Logic modules handle **complex business workflows** that need to coordinate repositories, enforce auth and business rules, and commit atomically with a matching audit row. They keep HTTP concerns out (routes own those) and database-statement details out (repositories own those).
 
 ### What we do
 
-- **Operation orchestration**: Coordinate complex workflows involving multiple services
-- **Error translation**: Convert service exceptions into appropriate route-level responses
-- **Data transformation**: Transform route input into service method parameters
-- **Business rule validation**: Apply operation-specific business rules and constraints
-- **Logging and monitoring**: Provide detailed logging for business operations
+- **Operation orchestration**: coordinate workflows that touch one or more repositories
+- **Error raising**: raise the API exception classes from [`src/api/common/exceptions.py`](../api/common/exceptions.py) directly — `NotFoundError`, `ForbiddenError`, `BadRequestError` — and let the `@handle_route_errors` decorator translate them into HTTP responses
+- **Data transformation**: turn route input (validated Pydantic models) into repository calls
+- **Business rule enforcement**: apply operation-specific rules and authorization checks
+- **Transaction control**: own the `session.commit()` for every mutation, paired with an audit row via `record_audit(...)` / `mutate(...)`
+- **Logging and monitoring**: detailed logging at the operation boundary
 
 **Example**: User listing orchestration with error handling:
 
@@ -28,12 +29,11 @@ async def handle_list_users(
 
 ### What we don't do
 
-- **Direct database access**: Database operations stay in repositories/services
-- **HTTP response creation**: Routes handle HTTP-specific response formatting
-- **Business rule enforcement**: Core business rules stay in services
-- **Authentication/authorization**: Auth logic stays in auth layer
+- **Direct database access**: database operations stay in repositories
+- **HTTP response creation**: routes handle HTTP-specific response formatting
+- **Authentication/authorization scaffolding**: the auth layer issues the user; logic handlers enforce per-operation rules using that user
 
-**Example**: Don't put repository or HTTP logic in processing functions:
+**Example**: don't put repository or HTTP logic in processing functions:
 
 ```python
 # Bad - direct database access in logic
@@ -42,9 +42,9 @@ async def handle_list_users(session: AsyncSession, user_id: UUID):
     return users.scalars().all()
 
 # Bad - HTTP response creation in logic
-async def handle_get_entity(slug: str) -> JSONResponse:
-    entity = await service.get_entity(slug)
-    return JSONResponse({"entity": entity})
+async def handle_get_post(post_id: UUID, post_repo: PostRepository) -> JSONResponse:
+    post = await post_repo.get_post_by_id(post_id)
+    return JSONResponse({"post": post})
 
 # Good - orchestration with proper separation
 async def handle_list_users(
@@ -56,17 +56,17 @@ async def handle_list_users(
     return {"users": users_list, "current_user": requesting_user}
 ```
 
-## Architecture: Orchestration layer between routes and services
+## Architecture: routes → logic → repositories
 
-**Routes -> Logic -> Services -> Repositories -> Database**
+**Routes -> Logic -> Repositories -> Database**
 
-Logic functions coordinate business operations without handling HTTP or database concerns.
+There is no separate service layer — see [`../README.md`](../README.md) for the canonical layer matrix. Logic functions coordinate business operations without handling HTTP or database statement details.
 
 ### Transactions: logic owns the commit
 
 `get_db_session` (in [`src/db.py`](../db.py)) yields a session and does **not** auto-commit. Repositories deliberately don't commit either — they `flush()` so the result is visible inside the open transaction, but they leave commit/rollback to the caller (see [`../repositories/README.md`](../repositories/README.md)).
 
-There is no separate service layer — `logic/` owns the transaction commit:
+`logic/` owns the transaction commit:
 
 ```python
 async def handle_set_user_activation(user_id, payload, user_repo, requesting_user):

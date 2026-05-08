@@ -2,7 +2,7 @@
 
 The **prescriptive contract** for how every CRUD-shaped resource is exposed over HTTP. It governs URL shape, subresources, the optional publication lifecycle, and when each pattern applies. Read this **before** adding or modifying a resource type.
 
-The grammar carries zero domain knowledge — domain meaning lives in the service layer. That split is what makes the surface scale: adding `/posts` or `/widgets` is following the rulebook, not redesigning the URL space.
+The grammar carries zero domain knowledge — domain meaning lives in the logic layer. That split is what makes the surface scale: adding `/posts` or `/widgets` is following the rulebook, not redesigning the URL space.
 
 The publication lifecycle (`draft | published | archived`) is **not** universal. Resources opt in when it has real domain meaning. Forcing it on sessions, API keys, audit rows, or webhooks creates ceremony without honest semantics.
 
@@ -48,7 +48,7 @@ PUT  /<resource>/{id}/<axis>         set the axis value
 POST /<resource>/{id}/<event>        event-shaped transition (e.g. /publication, /archival)
 ```
 
-The service layer enforces legal transitions and authorization. A resource may have zero, one, or several state-axis subresources — adopt only those with real domain meaning. Examples:
+The logic layer enforces legal transitions and authorization. A resource may have zero, one, or several state-axis subresources — adopt only those with real domain meaning. Examples:
 
 ```
 PUT /posts/{id}/status                draft | published | archived (publication lifecycle)
