@@ -77,7 +77,7 @@ async def handle_get_user_detail(
     request: Request,
     user_id: UUID,
     repo: UserRepository,
-    profile_repo: ProviderRepository,
+    provider_repo: ProviderRepository,
     requesting_user: User,
 ):
     """Loads a single user for the detail page along with the providers
@@ -88,7 +88,7 @@ async def handle_get_user_detail(
     if target is None:
         raise NotFoundError(detail="User not found")
 
-    providers = await profile_repo.list_for_user(user_id)
+    providers = await provider_repo.list_for_user(user_id)
 
     return {
         "request": request,

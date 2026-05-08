@@ -18,7 +18,12 @@ import pytest
 from fastapi import APIRouter, FastAPI
 from fastapi.testclient import TestClient
 
-from src.api.common.resource_routes import ResourceSpec, mount_delete
+from src.api.common.resource_routes import (
+    ResourceSpec,
+    mount_delete,
+    mount_detail,
+    mount_list,
+)
 
 
 def _build_app(spec: ResourceSpec, captured: dict) -> FastAPI:
@@ -137,6 +142,152 @@ def test_mount_delete_requires_write_user_dep():
             spec,
             handler=lambda **_: None,
             audit_repo_dep=lambda: None,
+        )
+
+
+def _build_read_app(
+    spec: ResourceSpec, list_handler, detail_handler, *, detail_extra=()
+):
+    """Mount mount_list + mount_detail and return a TestClient. Handlers
+    return a context dict that the templating layer can render against
+    a stub template."""
+    app = FastAPI()
+    router = APIRouter(prefix=f"/{spec.collection}")
+    mount_list(router, spec, handler=list_handler)
+    mount_detail(router, spec, handler=detail_handler, extra_repo_deps=detail_extra)
+    app.include_router(router)
+    return app
+
+
+def test_mount_list_renders_template_with_handler_context(monkeypatch):
+    captured = {}
+
+    async def list_handler(**kwargs):
+        captured.update(kwargs)
+        return {"users": ["alice", "bob"]}
+
+    async def detail_handler(**kwargs):
+        return {}
+
+    spec = ResourceSpec(
+        collection="widgets",
+        id_param="widget_id",
+        repo_dep=lambda: SimpleNamespace(name="widget_repo"),
+        read_user_dep=lambda: SimpleNamespace(id=uuid4()),
+        list_template="widgets/list.html",
+        detail_template="widgets/detail.html",
+    )
+
+    rendered = {}
+
+    def fake_html_response(*, template_name, context, request):
+        rendered["template_name"] = template_name
+        rendered["context"] = context
+        from fastapi.responses import JSONResponse
+
+        return JSONResponse({"ok": True})
+
+    monkeypatch.setattr(
+        "src.api.common.resource_routes.APIResponse.html_response",
+        staticmethod(fake_html_response),
+    )
+
+    client = TestClient(_build_read_app(spec, list_handler, detail_handler))
+    resp = client.get("/widgets")
+
+    assert resp.status_code == 200
+    assert rendered["template_name"] == "widgets/list.html"
+    assert rendered["context"] == {"users": ["alice", "bob"]}
+    assert captured["repo"].name == "widget_repo"
+
+
+def test_mount_detail_injects_extra_repo_deps_under_derived_name(monkeypatch):
+    """`get_widget_repository` → `widget_repo` kwarg. Confirms the
+    derived-kwarg-name convention reaches the handler."""
+    captured = {}
+
+    async def list_handler(**kwargs):
+        return {}
+
+    async def detail_handler(**kwargs):
+        captured.update(kwargs)
+        return {"widget": kwargs.get("widget_id")}
+
+    def get_audit_repository():
+        return SimpleNamespace(name="audit_repo")
+
+    spec = ResourceSpec(
+        collection="gadgets",
+        id_param="gadget_id",
+        repo_dep=lambda: SimpleNamespace(name="gadget_repo"),
+        read_user_dep=lambda: SimpleNamespace(id=uuid4()),
+        list_template="gadgets/list.html",
+        detail_template="gadgets/detail.html",
+    )
+
+    monkeypatch.setattr(
+        "src.api.common.resource_routes.APIResponse.html_response",
+        staticmethod(
+            lambda *, template_name, context, request: __import__(
+                "fastapi"
+            ).responses.JSONResponse({})
+        ),
+    )
+
+    client = TestClient(
+        _build_read_app(
+            spec, list_handler, detail_handler, detail_extra=(get_audit_repository,)
+        )
+    )
+    gadget_id = uuid4()
+    resp = client.get(f"/gadgets/{gadget_id}")
+
+    assert resp.status_code == 200
+    assert "audit_repo" in captured  # derived from `get_audit_repository`
+    assert captured["audit_repo"].name == "audit_repo"
+    assert "gadget_id" in captured
+    assert str(captured["gadget_id"]) == str(gadget_id)
+
+
+def test_mount_list_requires_list_template():
+    spec = ResourceSpec(
+        collection="widgets",
+        id_param="widget_id",
+        repo_dep=lambda: None,
+        read_user_dep=lambda: None,
+        # list_template intentionally omitted
+    )
+    router = APIRouter()
+    with pytest.raises(ValueError, match="list_template"):
+        mount_list(router, spec, handler=lambda **_: {})
+
+
+def test_mount_detail_requires_detail_template():
+    spec = ResourceSpec(
+        collection="widgets",
+        id_param="widget_id",
+        repo_dep=lambda: None,
+        read_user_dep=lambda: None,
+    )
+    router = APIRouter()
+    with pytest.raises(ValueError, match="detail_template"):
+        mount_detail(router, spec, handler=lambda **_: {})
+
+
+def test_extra_repo_deps_must_be_named_get_x_repository():
+    spec = ResourceSpec(
+        collection="widgets",
+        id_param="widget_id",
+        repo_dep=lambda: None,
+        read_user_dep=lambda: None,
+        list_template="widgets/list.html",
+        detail_template="widgets/detail.html",
+    )
+    badly_named = lambda: None  # noqa: E731 — anonymous lambda has no usable __name__
+    router = APIRouter()
+    with pytest.raises(ValueError, match="get_<entity>_repository"):
+        mount_detail(
+            router, spec, handler=lambda **_: {}, extra_repo_deps=(badly_named,)
         )
 
 

@@ -39,10 +39,10 @@ from dataclasses import dataclass
 from typing import Any, Awaitable, Callable
 from uuid import UUID
 
-from fastapi import Depends, status
+from fastapi import Depends, Request, status
 from pydantic import TypeAdapter
 
-from src.api.common.responses import deleted_response
+from src.api.common.responses import APIResponse, deleted_response
 from src.logic.audit import AuditedResource
 
 
@@ -82,12 +82,11 @@ class ResourceSpec:
         read mounts. Polymorphic resources (e.g. posts kind-dispatch)
         may return ``template_name`` in the handler's context dict to
         override these per-request.
-      extra_repo_deps: ``Depends`` providers for any *additional*
-        repositories the handler needs beyond the primary ``repo_dep``.
-        Mount functions inject these by their dep callable's name
-        (minus the ``get_`` prefix). Used by handlers like
-        ``handle_get_user_detail`` that take both a user repo and a
-        provider repo. Empty for the common single-repo case.
+      (Per-mount ``extra_repo_deps`` kwargs let an individual mount
+        inject additional repos beyond ``repo_dep`` for handlers that
+        need them — e.g. ``handle_get_user_detail`` takes the provider
+        repo. They're per-mount, not per-spec, because different mounts
+        on the same spec may need different extras.)
       create_redirect / update_redirect / delete_redirect: callables
         receiving the path params + (for create/update) the resource id,
         returning the ``HX-Redirect`` URL. ``None`` means use a sensible
@@ -113,8 +112,6 @@ class ResourceSpec:
     list_template: str | None = None
     detail_template: str | None = None
     form_template: str | None = None
-
-    extra_repo_deps: tuple[Callable[..., Any], ...] = ()
 
     create_redirect: Callable[..., str] | None = None
     update_redirect: Callable[..., str] | None = None
@@ -196,6 +193,162 @@ def mount_delete(
     )
 
     router.delete(path, status_code=status.HTTP_204_NO_CONTENT)(_delete)
+
+
+def mount_list(
+    router: Any,
+    spec: ResourceSpec,
+    handler: Callable[..., Awaitable[dict]],
+    *,
+    extra_repo_deps: tuple[Callable[..., Any], ...] = (),
+) -> None:
+    """Mount ``GET /<collection>`` rendering ``spec.list_template``.
+
+    The handler is invoked with ``request``, ``repo`` (from
+    ``spec.repo_dep``), ``requesting_user`` (from ``spec.read_user_dep``,
+    or ``None`` if no auth gate is set), and any ``extra_repo_deps`` under
+    their dep callable's name (``get_<entity>_repository`` →
+    ``<entity>_repo``). The handler returns a context dict; the mount
+    renders ``spec.list_template`` with it.
+
+    ``extra_repo_deps`` is per-mount, not per-spec, because different
+    mounts on the same resource often need different extra repos (e.g.
+    list doesn't need provider_repo but detail does).
+
+    Polymorphic resources can override the template by returning
+    ``template_name`` in the context — slice 5 (#250) wires that through
+    for ``mount_form``; for now ``mount_list`` always uses
+    ``spec.list_template``.
+
+    Until slice 8 (#253), ``spec.parent`` must be ``None`` here; nested
+    list routes use ``mount_related_list`` (slice 9 / #254).
+    """
+    if spec.parent is not None:
+        raise NotImplementedError(
+            "mount_list with spec.parent is not supported yet "
+            "(slice 8 / #253). Use mount_related_list for child collections."
+        )
+    if spec.list_template is None:
+        raise ValueError(
+            f"mount_list requires {spec.collection!r} to set list_template."
+        )
+    list_template = spec.list_template
+    extra_deps_named = _name_extra_repo_deps(extra_repo_deps)
+
+    async def _list(**kwargs: Any) -> Any:
+        request: Request = kwargs["request"]
+        context = await handler(
+            request=request,
+            repo=kwargs["repo"],
+            requesting_user=kwargs.get("requesting_user"),
+            **{name: kwargs[name] for name, _ in extra_deps_named},
+        )
+        return APIResponse.html_response(
+            template_name=list_template, context=context, request=request
+        )
+
+    _set_route_signature(
+        _list,
+        path_params=(("request", Request),),
+        deps=_read_route_deps(spec, extra_deps_named),
+    )
+    router.get("")(_list)
+
+
+def mount_detail(
+    router: Any,
+    spec: ResourceSpec,
+    handler: Callable[..., Awaitable[dict]],
+    *,
+    extra_repo_deps: tuple[Callable[..., Any], ...] = (),
+) -> None:
+    """Mount ``GET /<collection>/{<id_param>}`` rendering ``spec.detail_template``.
+
+    The handler is invoked with ``request``, the resource id under
+    ``spec.id_param``, ``repo``, ``requesting_user``, and any
+    ``extra_repo_deps`` under their derived kwarg name. Returns a
+    context dict; the mount renders ``spec.detail_template`` with it.
+
+    The multi-repo case (e.g. ``handle_get_user_detail`` takes both a
+    user repo and a provider repo) is the canonical reason
+    ``extra_repo_deps`` exists.
+    """
+    if spec.parent is not None:
+        raise NotImplementedError(
+            "mount_detail with spec.parent is not supported yet " "(slice 8 / #253)."
+        )
+    if spec.detail_template is None:
+        raise ValueError(
+            f"mount_detail requires {spec.collection!r} to set detail_template."
+        )
+    id_param = spec.id_param
+    detail_template = spec.detail_template
+    extra_deps_named = _name_extra_repo_deps(extra_repo_deps)
+
+    async def _detail(**kwargs: Any) -> Any:
+        request: Request = kwargs["request"]
+        resource_id: UUID = kwargs[id_param]
+        context = await handler(
+            request=request,
+            repo=kwargs["repo"],
+            requesting_user=kwargs.get("requesting_user"),
+            **{id_param: resource_id},
+            **{name: kwargs[name] for name, _ in extra_deps_named},
+        )
+        return APIResponse.html_response(
+            template_name=detail_template, context=context, request=request
+        )
+
+    _set_route_signature(
+        _detail,
+        path_params=(("request", Request), (id_param, UUID)),
+        deps=_read_route_deps(spec, extra_deps_named),
+    )
+    router.get(f"/{{{id_param}}}")(_detail)
+
+
+def _name_extra_repo_deps(
+    deps: tuple[Callable[..., Any], ...],
+) -> tuple[tuple[str, Callable[..., Any]], ...]:
+    """Derive the kwarg name each extra repo dep is passed under.
+
+    Convention: ``get_provider_repository`` → ``provider_repo``,
+    ``get_audit_repository`` → ``audit_repo``. Strips the ``get_`` prefix
+    and the ``ository`` suffix on ``_repository``. If a dep has a name
+    that doesn't match the convention, raise — silent name-mismatches
+    would be a bug at the kwarg-injection site.
+    """
+    out: list[tuple[str, Callable[..., Any]]] = []
+    for dep in deps:
+        name = getattr(dep, "__name__", None)
+        if not name or not name.startswith("get_"):
+            raise ValueError(
+                f"extra_repo_deps callable {dep!r} must be named "
+                "'get_<entity>_repository' so the kwarg can be derived."
+            )
+        bare = name[len("get_") :]
+        if bare.endswith("_repository"):
+            kwarg = bare[: -len("_repository")] + "_repo"
+        else:
+            kwarg = bare
+        out.append((kwarg, dep))
+    return tuple(out)
+
+
+def _read_route_deps(
+    spec: ResourceSpec,
+    extra_deps_named: tuple[tuple[str, Callable[..., Any]], ...],
+) -> tuple[tuple[str, Callable[..., Any]], ...]:
+    """Build the (kwarg, callable) pairs for the dep-injected params on a
+    read route. Includes the primary repo, optional read user dep, and
+    each extra repo. ``read_user_dep=None`` means public — the route is
+    mounted without a user dep, and the handler receives
+    ``requesting_user=None``."""
+    deps: list[tuple[str, Callable[..., Any]]] = [("repo", spec.repo_dep)]
+    if spec.read_user_dep is not None:
+        deps.append(("requesting_user", spec.read_user_dep))
+    deps.extend(extra_deps_named)
+    return tuple(deps)
 
 
 def _set_route_signature(
