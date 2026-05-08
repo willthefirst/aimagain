@@ -63,11 +63,12 @@ Templates use inheritance for consistent layout and feature-specific customizati
 
 | Directory  | Purpose                | Templates                                                              |
 | ---------- | ---------------------- | ---------------------------------------------------------------------- |
-| **/**      | Base layout and shared | `base.html` - Foundation template (includes site-wide `<nav>` linking to `/posts`, `/users`, `/providers`) |
+| **/**      | Base layout            | `base.html` - Foundation template (includes site-wide `<nav>` linking to `/posts`, `/users`, `/providers`) |
+| **_shared/** | Cross-resource macros | `form_fields.html` (label+control field-render macros), `forms.html` (`inline_add_form` skeleton macro), `sections.html` (`list_or_empty` collection-or-empty-state macro), `actions.html` (`confirm_delete_button` macro). Imported by every resource directory. |
 | **auth/**  | Authentication pages   | login, register, forgot/reset password                                 |
 | **users/** | User management        | list, detail (also embeds an inline list of providers owned by the user, with empty-state when the user has none), `providers_list.html` (rendered by `GET /users/{id}/providers` and the `GET /users/me/providers` alias; pluralized list with self vs. viewing-other empty-state copy), `_admin_actions.html` partial (shared by list & detail) |
-| **posts/** | Posts                  | list, detail, per-kind `new_<kind>.html` + `edit_<kind>.html` thin wrappers around `_<kind>_form.html` partials, `_form_macros.html` (shared field macros), `_owner_actions.html` partial (shared by detail) |
-| **providers/** | Providers | `list.html` (public HTML directory rendered by `GET /providers`; includes a `license_type` / `issuing_state` filter form whose `selected_*` context values preselect the active filter), `detail.html` (read-only HTML detail rendered by `GET /{id}`; shows practice fields, licensures, educations, certifications; an Edit link is rendered for the owner or an admin only), `new.html` (create form), `edit.html` (edit form with practice-fields PATCH plus three sub-resource sections — licensures, educations, certifications — each with inline add form + per-row delete). Imports field macros from `posts/_form_macros.html` rather than duplicating them. The "list providers owned by user X" view lives in `users/providers_list.html`, not here. |
+| **posts/** | Posts                  | list, detail, per-kind `new_<kind>.html` + `edit_<kind>.html` thin wrappers around `_<kind>_form.html` partials, `_owner_actions.html` partial (shared by detail) |
+| **providers/** | Providers | `list.html` (public HTML directory rendered by `GET /providers`; includes a `license_type` / `issuing_state` filter form whose `selected_*` context values preselect the active filter), `detail.html` (read-only HTML detail rendered by `GET /{id}`; shows practice fields, licensures, educations, certifications; an Edit link is rendered for the owner or an admin only), `new.html` (create form), `edit.html` (edit form with practice-fields PATCH plus three sub-resource sections — licensures, educations, certifications — each with inline add form + per-row delete; uses `list_or_empty`, `inline_add_form`, and `confirm_delete_button` from `_shared/`). The "list providers owned by user X" view lives in `users/providers_list.html`, not here. |
 | **me/**    | Personal/profile pages | user profile                                                           |
 
 ### Reusable partial convention
@@ -76,20 +77,31 @@ Files prefixed with `_` (e.g. `_admin_actions.html`) are **shared partials** int
 
 A partial documents its required context at the top in a `{# ... #}` comment, and is responsible for its own access guards (`{% if current_user.is_superuser %}` etc). Backend authorization is enforced separately in the logic layer — the template guard is presentation only.
 
-### Form macros + per-kind form partials (posts/)
+### Shared CRUD macros (`_shared/`)
 
-The two intake forms (`client_referral`, `provider_availability`) each have a create page and an edit page. Rather than duplicate the field set across the two pages — and across the two kinds — the field structure lives in two layers:
+CRUD templates pull from a single `_shared/` directory rather than duplicating the same patterns per resource. Four files, each with a narrow purpose:
 
-1. **`posts/_form_macros.html`** defines field-render macros (`text_field`, `textarea_field`, `select_field`, `filter_select_field`, `radio_bool_field`). Each one emits a label + control + line-breaks; the `<select>` macros iterate over a controlled-vocabulary tuple and look display labels up in a sibling `*_LABELS` dict. The tuples and label dicts come from `src/models/enums.py`, exposed as Jinja globals via `src/core/templating.py`. Adding a value to a tuple flows automatically to every form using these macros. `select_field` is for create/edit forms (required by default; an optional disabled-placeholder); `filter_select_field` is for filter forms on list pages (never required; the leading "Any" option is selectable so the user can clear an active filter).
-2. **`posts/_<kind>_form.html`** (`_client_referral_form.html`, `_provider_availability_form.html`) wraps the macros into one form-body macro per kind, encoding field order, section grouping, labels, and required/optional state. Both `new_<kind>.html` and `edit_<kind>.html` then collapse to ~5 lines that call the form macro with `(hx_method, action, submit_label, post=...)`. The new vs edit difference reduces to URL + submit label + prefilled values.
+1. **`_shared/form_fields.html`** — field-render macros: `text_field`, `textarea_field`, `select_field`, `filter_select_field`, `radio_bool_field`, `multi_select_field`, `time_grid_field`. Each emits a label + control + line-breaks. The `<select>` and checkbox macros iterate over a controlled-vocabulary tuple from [`src/models/enums.py`](../models/enums.py) and look display labels up in the matching `*_LABELS` dict — both registered as Jinja globals in [`src/core/templating.py`](../core/templating.py). Adding a value to a tuple flows automatically to every form using these macros. `select_field` is for create/edit forms (required by default; optional disabled-placeholder); `filter_select_field` is for filter forms on list pages (never required; leading "Any" option is selectable so users can clear filters).
+2. **`_shared/forms.html`** — `inline_add_form(action, legend, submit_label, method="post")`: single-fieldset form skeleton used by sub-resource sections (e.g. licensure / education / certification add forms in `providers/edit.html`). Forms with multiple fieldsets stay hand-rolled.
+3. **`_shared/sections.html`** — `list_or_empty(items, list_class, empty_message)`: `<ul>`-of-items or empty-state `<p>`. Caller passes the per-row `<li>` body via `{% call(item) %}…{% endcall %}`. The `<section>`/`<h2>` wrapper is left to the caller (varies too little to be worth abstracting).
+4. **`_shared/actions.html`** — `confirm_delete_button(url, confirm_message, label="Delete")`: HTMX `hx-delete` button with confirm dialog. Used by `posts/_owner_actions.html`, `users/_admin_actions.html`, and the per-row deletes in `providers/edit.html`.
 
 The labels-vs-tuple guardrail (`test_labels_cover_their_tuples`) lives in `src/schemas/test_post.py`; if a value lands in a tuple without a matching label, the form's `<select>` would render a `KeyError` at request time, so the test catches it at CI time instead.
+
+### Per-kind form partials (posts/)
+
+The two intake forms (`client_referral`, `provider_availability`) each have a create page and an edit page. Rather than duplicate the field set across the two pages — and across the two kinds — `posts/_<kind>_form.html` (`_client_referral_form.html`, `_provider_availability_form.html`) wraps the `_shared/form_fields.html` macros into one form-body macro per kind, encoding field order, section grouping, labels, and required/optional state. Both `new_<kind>.html` and `edit_<kind>.html` then collapse to ~5 lines that call the form macro with `(hx_method, action, submit_label, post=...)`. The new vs edit difference reduces to URL + submit label + prefilled values.
 
 ## Directory structure
 
 ```
 templates/
 ├── base.html                    # Foundation template with HTMX setup
+├── _shared/                     # Cross-resource macros (imported by every resource dir)
+│   ├── form_fields.html         # Field-render macros (text_field, select_field, …)
+│   ├── forms.html               # inline_add_form skeleton macro
+│   ├── sections.html            # list_or_empty collection-or-empty-state macro
+│   └── actions.html             # confirm_delete_button macro
 ├── auth/                        # Authentication flow templates
 │   ├── login.html              # User login form
 │   ├── register.html           # User registration form
@@ -108,12 +120,11 @@ templates/
 │   ├── edit_provider_availability.html
 │   ├── _client_referral_form.html      # Per-kind form body (used by new + edit)
 │   ├── _provider_availability_form.html
-│   ├── _form_macros.html       # Shared field macros (text_field, select_field, …)
 │   └── _owner_actions.html     # Reusable owner-actions partial (Edit/Delete)
 ├── providers/                  # Provider templates
 │   ├── list.html               # Public directory listing with license_type / issuing_state filter
 │   ├── detail.html             # Read-only detail page (GET /{id})
-│   ├── new.html                # Create form (imports posts/_form_macros.html)
+│   ├── new.html                # Create form
 │   └── edit.html               # Edit form: practice fields PATCH + three sub-resource add/delete sections
 └── me/                         # Personal user pages
     └── profile.html            # User's profile page
