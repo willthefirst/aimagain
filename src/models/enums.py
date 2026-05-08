@@ -1,10 +1,23 @@
-"""Controlled-vocabulary tuples for per-kind detail columns.
+"""Controlled-vocabulary tuples shared across model clusters.
 
-Single source of truth for the small enums that the per-kind
-`*_details` tables use as `Text` + CHECK columns. Lives in its own
-module so the detail models can depend on it without dragging in the
-parent `Post` / `post_kinds` registry (which depends on the detail
-models in turn — a leaf module breaks that cycle).
+Single source of truth for the small enums that DB columns use as
+`Text` + CHECK constraints. Two clusters consume this module:
+
+- `posts/` per-kind detail tables (`client_referral_detail`,
+  `provider_availability_detail`) use `US_STATES`, the location/age/
+  language/insurance vocabularies, the `DESIRED_TIME_*` axes, and the
+  service/treatment-setting vocabularies.
+- `provider_profile` and its sub-records (`provider_licensure`,
+  `provider_education`, `provider_certification`) use `US_STATES`,
+  `LOCATION_AVAILABILITY_OPTIONS`, and the `LICENSE_TYPES` /
+  `EDUCATION_TYPES` / `CERTIFICATION_TYPES` credential vocabularies.
+
+Lives at the parent `models/` level (not inside any cluster) precisely
+because both clusters depend on it; nesting it under either would make
+the other reach across cluster boundaries to import it. The module is
+also a leaf — depending on nothing — so detail models can import it
+without dragging in the `posts/post_kinds` registry that depends on
+them in turn.
 
 The schema layer's `Literal[*TUPLE]` types are derived from the same
 tuples; the guardrail test `test_schema_literals_match_model_tuples`

@@ -89,7 +89,7 @@ core/
 ├── config.py       # Application settings with environment validation
 ├── templating.py   # Jinja2 environment + global context. Registers the
 │                   #   controlled-vocabulary tuples + display-label dicts
-│                   #   from `src/models/post_enums.py` as Jinja globals
+│                   #   from `src/models/enums.py` as Jinja globals
 │                   #   so per-kind form templates can iterate over them
 │                   #   directly (single source of truth for option lists).
 └── __init__.py     # Package exports

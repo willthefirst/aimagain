@@ -9,7 +9,7 @@ route layer.
 `make_post_stub(kind, **field_overrides)` is the registry-backed builder
 for Post-shaped `SimpleNamespace` stubs — the per-kind detail
 relationship name and field tuple come from `REGISTERED_KINDS` in
-`src/models/post_kinds.py`, so adding/renaming a kind's fields does not
+`src/models/posts/post_kinds.py`, so adding/renaming a kind's fields does not
 require touching contract test code.
 """
 

@@ -36,7 +36,7 @@ def _patch_response_body(post) -> dict:
     """Per-kind flat response body for `PATCH /posts/{id}`. The wire
     shape mirrors the POST/GET projection's flat fields so HTMX clients
     don't have to know about parent/detail. Per-kind detail relationship
-    + fields come from `REGISTERED_KINDS` in `src/models/post_kinds.py`."""
+    + fields come from `REGISTERED_KINDS` in `src/models/posts/post_kinds.py`."""
     spec = REGISTERED_KINDS[post.kind]
     detail = getattr(post, spec.detail_relationship)
     return {

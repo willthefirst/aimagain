@@ -3,7 +3,7 @@ from sqlalchemy.orm import relationship
 from sqlalchemy.types import Uuid
 
 from .base import BaseModel
-from .post_enums import LOCATION_AVAILABILITY_OPTIONS, US_STATES, check_in_tuple_sql
+from .enums import LOCATION_AVAILABILITY_OPTIONS, US_STATES, check_in_tuple_sql
 
 _TABLE = "provider_profiles"
 

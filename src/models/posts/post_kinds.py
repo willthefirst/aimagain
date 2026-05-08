@@ -8,7 +8,7 @@ labels the route/template layers render for the kind.
 Adding a kind requires:
 
 1. A new entry in `REGISTERED_KINDS` here.
-2. A new detail model under `src/models/<kind>_detail.py`, plus a
+2. A new detail model under `src/models/posts/<kind>_detail.py`, plus a
    `relationship(...)` line on `Post`.
 3. The four Pydantic variant classes in `src/schemas/post.py`
    (Read, Create, Update, AuditSnapshot).
@@ -95,6 +95,6 @@ KIND_BY_DETAIL_MODEL: Final[dict[type, KindSpec]] = {
 
 def kind_check_sql() -> str:
     """SQL fragment for the `posts.kind` CHECK constraint, derived from
-    `KIND_NAMES`. Used by `models/post.py` at class-definition time so
+    `KIND_NAMES`. Used by `models/posts/post.py` at class-definition time so
     the constraint stays in lockstep with the registry."""
     return "kind IN (" + ", ".join(repr(k) for k in KIND_NAMES) + ")"

@@ -3,7 +3,7 @@
 Each macro emits one labelled field (label + control + line breaks) so
 per-kind form partials read as a flat field list rather than HTML
 boilerplate. The `<select>` and bool-radio macros iterate over a
-controlled-vocabulary tuple from `src/models/post_enums.py` (registered
+controlled-vocabulary tuple from `src/models/enums.py` (registered
 as Jinja globals in `src/core/templating.py`) and look display labels up
 in the matching `*_LABELS` dict — adding a value to a tuple flows to
 every form using these macros, no per-template edits.

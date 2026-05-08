@@ -147,7 +147,7 @@ This is the cross-module checklist. The detailed step-by-step (with code snippet
 6. **Route** — wire up the HTTP endpoint that delegates to the logic handler. See [`api/routes/README.md`](api/routes/README.md#implementation-patterns).
 7. **Template (if rendering HTML)** — add the Jinja2 template. See [`templates/README.md`](templates/README.md).
 
-For entities with a discriminator-based polymorphic shape (like `Post` / `kind`), see [`models/post_kinds.py`](models/post_kinds.py) for the registry pattern that drives every cross-cutting site (CHECK constraint, route Literal, template selection, dispatch ladders) from one source. Adding a new discriminator value is a one-file change there plus the per-variant Pydantic classes and templates — no edits in routes, repositories, or logic.
+For entities with a discriminator-based polymorphic shape (like `Post` / `kind`), see [`models/posts/post_kinds.py`](models/posts/post_kinds.py) for the registry pattern that drives every cross-cutting site (CHECK constraint, route Literal, template selection, dispatch ladders) from one source. Adding a new discriminator value is a one-file change there plus the per-variant Pydantic classes and templates — no edits in routes, repositories, or logic.
 
 ### Dependency injection pattern
 

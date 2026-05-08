@@ -21,7 +21,7 @@ def _attach_detail(post: Post, detail: PostDetail) -> None:
     """Wire a fresh detail row up to its parent on the right relationship.
 
     The detail-class-to-relationship mapping is the registry in
-    `src/models/post_kinds.py` — adding a new kind there is enough."""
+    `src/models/posts/post_kinds.py` — adding a new kind there is enough."""
     spec = KIND_BY_DETAIL_MODEL.get(type(detail))
     if spec is None:
         raise TypeError(f"unsupported detail type: {type(detail).__name__}")
@@ -60,7 +60,7 @@ class PostRepository(BaseRepository):
 
         `detail_fields` is keyed by the field names on the post's
         per-kind detail row (the `KindSpec.detail_fields` for `post.kind`
-        in `src/models/post_kinds.py`). Fields whose value is `None` and
+        in `src/models/posts/post_kinds.py`). Fields whose value is `None` and
         fields that don't belong to the post's kind are silently skipped
         — the calling logic layer is responsible for rejecting cross-kind
         writes at the route boundary with a 400.

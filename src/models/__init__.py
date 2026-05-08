@@ -1,8 +1,6 @@
 from .audit_log import AuditLog
 from .base import Base, BaseModel, metadata
-from .client_referral_detail import ClientReferralDetail
-from .post import Post
-from .post_enums import (
+from .enums import (
     CLIENT_AGE_GROUPS,
     INSURANCE_OPTIONS,
     LANGUAGE_PREFERRED_OPTIONS,
@@ -10,14 +8,16 @@ from .post_enums import (
     US_STATES,
     check_in_tuple_sql,
 )
-from .post_kinds import (
+from .posts.client_referral_detail import ClientReferralDetail
+from .posts.post import Post
+from .posts.post_kinds import (
     KIND_BY_DETAIL_MODEL,
     KIND_NAMES,
     REGISTERED_KINDS,
     KindSpec,
     kind_check_sql,
 )
-from .provider_availability_detail import ProviderAvailabilityDetail
+from .posts.provider_availability_detail import ProviderAvailabilityDetail
 from .provider_certification import ProviderCertification
 from .provider_education import ProviderEducation
 from .provider_licensure import ProviderLicensure

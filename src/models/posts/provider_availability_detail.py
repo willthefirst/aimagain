@@ -1,8 +1,8 @@
 from sqlalchemy import JSON, Boolean, CheckConstraint, Column, ForeignKey, Text, text
 from sqlalchemy.types import Uuid
 
-from .base import Base
-from .post_enums import (
+from ..base import Base
+from ..enums import (
     CLIENT_AGE_GROUPS,
     INSURANCE_OPTIONS,
     LANGUAGE_PREFERRED_OPTIONS,
@@ -31,7 +31,7 @@ class ProviderAvailabilityDetail(Base):
 
     Field set follows [`notes/forms_spec.md`](../../notes/forms_spec.md)'s
     Form 2. Enum-typed columns carry CHECK constraints rendered from the
-    tuples in `post_enums.py` via `check_in_tuple_sql`. Where a concept
+    tuples in `../enums.py` via `check_in_tuple_sql`. Where a concept
     appears on both forms (`location_state`, `in_person_sessions`/
     `virtual_sessions`, `age_group`, `non_english_services`,
     `payment_situation`) the column types and vocabularies match the

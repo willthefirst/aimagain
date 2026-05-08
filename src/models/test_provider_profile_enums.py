@@ -1,6 +1,6 @@
 import pytest
 
-from src.models.post_enums import (
+from src.models.enums import (
     CERTIFICATION_TYPES,
     CERTIFICATION_TYPES_LABELS,
     EDUCATION_TYPES,

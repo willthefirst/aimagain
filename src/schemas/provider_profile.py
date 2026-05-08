@@ -15,7 +15,7 @@ routes (added later), so a profile-level PATCH only touches the
 practice/availability fields.
 
 Controlled-vocabulary fields (state, license type, etc.) are typed as
-`Literal[*TUPLE]` against the tuples in `src/models/post_enums.py` so
+`Literal[*TUPLE]` against the tuples in `src/models/enums.py` so
 the schema's accepted values stay in lockstep with the DB CHECK
 constraints. Free-text fields reuse `StrippedText` and `ZipText` from
 [`src/schemas/_validators.py`](_validators.py) — defining them once
@@ -32,7 +32,7 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, model_validator
 
-from src.models.post_enums import (
+from src.models.enums import (
     CERTIFICATION_TYPES,
     EDUCATION_TYPES,
     LICENSE_TYPES,
