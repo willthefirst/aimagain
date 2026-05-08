@@ -106,24 +106,25 @@ There is no separate domain-error hierarchy (e.g. `ServiceError`, `BusinessRuleE
 
 The codebase has a small set of top-level domain entities — currently `posts`, `providers`, `users`, `auth`, `me`, `audit` — and the layer matrix above is only one axis of the architecture. The other axis is **the entity itself**: every entity should have a 1:1 directory presence at every layer that touches it, and every layer should have a *shared tier* at the parent level for genuinely cross-entity infrastructure.
 
-**The import rule.** A file in `<layer>/<entity>/` may import from its own cluster and from the layer's shared tier. Cross-cluster imports (e.g. `models/posts/foo.py` importing from `models/providers/`) are forbidden — fix the design or hoist the shared piece into the parent. Where the directory shape allows, this is lint-enforced (`scripts/dev/template_imports_check.py`, today scoped to `src/templates/`); other layers follow the rule by convention. Audit it with:
+**The import rule.** A file in `<layer>/<entity>/` may import from its own cluster and from the layer's shared tier. Cross-cluster imports (e.g. `models/posts/foo.py` importing from `models/providers/`) are forbidden — fix the design or hoist the shared piece into the parent. Two lint checks enforce this:
 
-```bash
-grep -rnE 'from \.\.(posts|providers|users)' src/models src/repositories src/logic src/schemas
-```
+- [`scripts/dev/template_imports_check.py`](../scripts/dev/template_imports_check.py) — Jinja `{% extends/include/from/import %}` directives across `src/templates/`.
+- [`scripts/dev/python_cluster_imports_check.py`](../scripts/dev/python_cluster_imports_check.py) — Python `from ...` imports across `src/models/`, `src/schemas/`, `src/repositories/`, `src/logic/`. Cluster directories are auto-discovered (any subdirectory with `.py` files) so a future cluster picks up the rule for free.
 
-**Current state of the convention across layers.** Some layers are fully clustered, some still flat:
+Both run as part of `dev lint` and as pre-commit hooks scoped to the relevant file globs.
+
+**Current state of the convention across layers.**
 
 | Layer | Cluster directories | Parent-level shared tier |
 | --- | --- | --- |
 | `templates/` | yes (all entities) | `_shared/`, `base.html` |
-| `models/` | partial — `posts/`, `providers/` ([extracted in #191](https://github.com/willthefirst/bedlam-connect/pull/191)); `user.py` not yet a cluster | `enums.py`, `base.py`, `audit_log.py` |
-| `repositories/` | not yet — flat `<entity>_repository.py` | `base.py`, `dependencies.py` |
-| `logic/` | not yet — flat `<entity>_processing.py` | `audit.py` |
-| `schemas/` | not yet — flat `<entity>.py` | `_validators.py` |
+| `models/` | partial — `posts/`, `providers/` ([#191](https://github.com/willthefirst/bedlam-connect/pull/191)); `user.py` not yet a cluster | `enums.py`, `base.py`, `audit_log.py` |
+| `schemas/` | yes — `posts/`, `providers/`, `users/` ([#209](https://github.com/willthefirst/bedlam-connect/pull/209)) | `_validators.py` |
+| `repositories/` | yes — `posts/`, `providers/`, `users/`, `audit/` ([#210](https://github.com/willthefirst/bedlam-connect/pull/210)) | `base.py`, `dependencies.py` |
+| `logic/` | yes — `posts/`, `providers/`, `users/`, `auth/` ([#211](https://github.com/willthefirst/bedlam-connect/pull/211)) | `audit.py` |
 | `api/routes/` | not applicable — single-file-per-entity is the layer's shape; URL grammar in [`api/routes/RESOURCE_GRAMMAR.md`](api/routes/RESOURCE_GRAMMAR.md) handles the per-entity contract | `common/` |
 
-The trajectory is toward full clustering as each entity's per-layer code grows. The argument that justified PR #191 for models — multiple files per entity made the cluster directory pull its weight — applies to the other layers when they cross the same threshold. Until a layer is clustered, treat the file-level naming convention (`<entity>_<role>.py`) as the implicit cluster boundary; cross-entity imports between sibling files are still smells.
+The remaining migration is `src/models/users/` (currently `models/user.py`) — small, optional, takes the rule from "convention everywhere it can apply" to "convention everywhere full stop."
 
 **Documentation locality.** The same shape applies to READMEs. A layer's parent README describes the layer's *contract* (what's a repository, what may it depend on) and the shared tier; entity-specific facts that are non-trivial enough to write down belong in the entity cluster's own README (`<layer>/<entity>/README.md`). When an entity has nothing surprising to say at a layer, no entity README is required — silence is fine. This avoids the "fact stated in two places" drift the [single-source-of-truth rule](../CLAUDE.md#one-source-of-truth--link-dont-copy) calls out: each fact has exactly one home.
 
