@@ -1,14 +1,14 @@
 {% extends "base.html" %}
-{% block title %}Provider profiles — {{ target_user.username }}{% endblock %}
+{% block title %}Providers — {{ target_user.username }}{% endblock %}
 {% block content %}
 {% if is_self %}
-<h1 id="user-provider-profiles-heading">Your provider profiles</h1>
+<h1 id="user-providers-heading">Your providers</h1>
 {% else %}
-<h1 id="user-provider-profiles-heading">{{ target_user.username }}&rsquo;s provider profiles</h1>
+<h1 id="user-providers-heading">{{ target_user.username }}&rsquo;s providers</h1>
 {% endif %}
 
 {% if profiles %}
-<ul id="user-provider-profiles" class="profiles-list">
+<ul id="user-providers" class="profiles-list">
   {%- for profile in profiles %}
   <li>
     <a href="/providers/{{ profile.id }}">{{ profile.practice_name }}</a>
@@ -17,12 +17,12 @@
   {%- endfor %}
 </ul>
 {% else %}
-<p id="user-provider-profiles-empty">
+<p id="user-providers-empty">
   {% if is_self %}
-  You have not created any provider profiles yet.
-  <a href="/providers/form">Create your first profile</a>.
+  You have not created any providers yet.
+  <a href="/providers/form">Create your first provider</a>.
   {% else %}
-  This user has no provider profiles yet.
+  This user has no providers yet.
   {% endif %}
 </p>
 {% endif %}

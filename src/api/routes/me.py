@@ -42,15 +42,15 @@ async def get_my_profile(
     )
 
 
-@router.get("/provider-profiles")
+@router.get("/providers")
 async def list_my_providers(
     request: Request,
     repo: ProviderRepository = Depends(get_provider_repository),
     user_repo: UserRepository = Depends(get_user_repository),
     user: User = Depends(current_active_user),
 ):
-    """Renders the current user's provider-profile list. Convenience alias
-    for `GET /users/{requesting_user.id}/provider-profiles`."""
+    """Renders the current user's provider list. Convenience alias
+    for `GET /users/{requesting_user.id}/providers`."""
     context = await handle_list_user_providers(
         request=request,
         target_user_id=user.id,

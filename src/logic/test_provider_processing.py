@@ -1,4 +1,4 @@
-"""Tests for provider-profile orchestration handlers.
+"""Tests for provider orchestration handlers.
 
 Exercises happy-path + ownership / not-found / bad-request error cases for
 each handler. Audit-row assertions verify that mutation handlers honor the

@@ -16,7 +16,7 @@
 <section>
   <h2>Providers</h2>
   {% if providers %}
-  <ul id="user-detail-provider-profiles" class="profiles-list">
+  <ul id="user-detail-providers" class="profiles-list">
     {%- for provider in providers %}
     <li>
       <a href="/providers/{{ provider.id }}">{{ provider.practice_name }}</a>
@@ -25,7 +25,7 @@
     {%- endfor %}
   </ul>
   {% else %}
-  <p id="user-detail-provider-profiles-empty">No providers yet.</p>
+  <p id="user-detail-providers-empty">No providers yet.</p>
   {% endif %}
 </section>
 

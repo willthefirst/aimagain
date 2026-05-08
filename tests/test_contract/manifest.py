@@ -35,8 +35,8 @@ import pytest
 
 from .infrastructure.servers.consumer import (
     _setup_post_owner_actions_stub,
-    _setup_provider_profile_create_form_stub,
-    _setup_provider_profile_edit_form_stub,
+    _setup_provider_create_form_stub,
+    _setup_provider_edit_form_stub,
     _setup_users_admin_actions_stub,
 )
 from .tests.shared.mock_data_factory import MockDataFactory
@@ -98,21 +98,21 @@ CONTRACT_PAIRS: list[ContractPair] = [
         pytest_marks=(pytest.mark.provider, pytest.mark.posts),
     ),
     ContractPair(
-        consumer_name="provider-profile-create-form",
-        provider_name="provider-profiles-api",
+        consumer_name="provider-create-form",
+        provider_name="providers-api",
         pact_port=1239,
-        handler_mocks_factory=MockDataFactory.create_provider_profile_create_dependency_config,
-        consumer_setup_fn=_setup_provider_profile_create_form_stub,
-        provider_state="User can create a provider profile",
+        handler_mocks_factory=MockDataFactory.create_provider_create_dependency_config,
+        consumer_setup_fn=_setup_provider_create_form_stub,
+        provider_state="User can create a provider",
         pytest_marks=(pytest.mark.provider, pytest.mark.providers),
     ),
     ContractPair(
-        consumer_name="provider-profile-edit-form",
-        provider_name="provider-profiles-api",
+        consumer_name="provider-edit-form",
+        provider_name="providers-api",
         pact_port=1240,
-        handler_mocks_factory=MockDataFactory.create_provider_profile_update_dependency_config,
-        consumer_setup_fn=_setup_provider_profile_edit_form_stub,
-        provider_state="Provider profile 44444444-4444-4444-4444-444444444444 exists and is owned by the requester",
+        handler_mocks_factory=MockDataFactory.create_provider_update_dependency_config,
+        consumer_setup_fn=_setup_provider_edit_form_stub,
+        provider_state="Provider 44444444-4444-4444-4444-444444444444 exists and is owned by the requester",
         pytest_marks=(pytest.mark.provider, pytest.mark.providers),
     ),
 ]

@@ -115,7 +115,7 @@ async def test_create_profile_allows_multiple_per_user(
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user: User,
 ):
-    """A user may own multiple provider profiles. Two successive POSTs both
+    """A user may own multiple providers. Two successive POSTs both
     return 201 and persist as distinct rows owned by the same user."""
     first = await authenticated_client.post(
         "/providers", data=provider_payload(practice_name="First")
@@ -250,7 +250,7 @@ async def test_list_profiles_renders_empty_state(
     each `<select>` (the `filter_select_field` macro contract)."""
     response = await test_client.get("/providers")
     assert response.status_code == 200
-    assert "No provider profiles found" in response.text
+    assert "No providers found" in response.text
     tree = HTMLParser(response.text)
     assert tree.css_first("ul.profiles-list") is None
     for select_name in ("license_type", "issuing_state"):

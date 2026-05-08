@@ -20,15 +20,15 @@ STUB_POST_ID = uuid.UUID("22222222-2222-2222-2222-222222222222")
 POST_DELETE_API_PATH = f"/posts/{STUB_POST_ID}"
 POST_DETAIL_PAGE_PATH = f"/posts/{STUB_POST_ID}"
 
-# Provider-profile create form pact.
-PROVIDER_PROFILE_CREATE_API_PATH = "/providers"
-PROVIDER_PROFILE_CREATE_FORM_PAGE_PATH = "/providers/form"
+# Provider create form pact.
+PROVIDER_CREATE_API_PATH = "/providers"
+PROVIDER_CREATE_FORM_PAGE_PATH = "/providers/form"
 
-# Provider-profile edit form pact: parent practice-fields PATCH only.
+# Provider edit form pact: parent practice-fields PATCH only.
 # (Sub-resource pacts — licensures, educations, certifications — deferred.)
-STUB_PROFILE_ID = uuid.UUID("44444444-4444-4444-4444-444444444444")
-PROVIDER_PROFILE_PATCH_API_PATH = f"/providers/{STUB_PROFILE_ID}"
-PROVIDER_PROFILE_EDIT_FORM_PAGE_PATH = f"/providers/{STUB_PROFILE_ID}/form"
+STUB_PROVIDER_ID = uuid.UUID("44444444-4444-4444-4444-444444444444")
+PROVIDER_PATCH_API_PATH = f"/providers/{STUB_PROVIDER_ID}"
+PROVIDER_EDIT_FORM_PAGE_PATH = f"/providers/{STUB_PROVIDER_ID}/form"
 
 # Provider states
 PROVIDER_STATE_USER_DOES_NOT_EXIST = f"User {TEST_EMAIL} does not exist"
@@ -36,9 +36,9 @@ PROVIDER_STATE_USER_EXISTS_AND_ACTIVE = f"User {TARGET_USER_ID} exists and is ac
 PROVIDER_STATE_POST_EXISTS_AND_OWNED = (
     f"Post {STUB_POST_ID} exists and is owned by the requester"
 )
-PROVIDER_STATE_USER_CAN_CREATE_PROFILE = "User can create a provider profile"
-PROVIDER_STATE_PROFILE_EXISTS_AND_OWNED = (
-    f"Provider profile {STUB_PROFILE_ID} exists and is owned by the requester"
+PROVIDER_STATE_USER_CAN_CREATE_PROVIDER = "User can create a provider"
+PROVIDER_STATE_PROVIDER_EXISTS_AND_OWNED = (
+    f"Provider {STUB_PROVIDER_ID} exists and is owned by the requester"
 )
 
 # Consumer / provider Pact identifiers
@@ -51,9 +51,9 @@ PROVIDER_NAME_USERS = "users-api"
 CONSUMER_NAME_POST_OWNER_ACTIONS = "post-owner-actions"
 PROVIDER_NAME_POSTS = "posts-api"
 
-CONSUMER_NAME_PROVIDER_PROFILE_CREATE_FORM = "provider-profile-create-form"
-CONSUMER_NAME_PROVIDER_PROFILE_EDIT_FORM = "provider-profile-edit-form"
-PROVIDER_NAME_PROVIDER_PROFILES = "provider-profiles-api"
+CONSUMER_NAME_PROVIDER_CREATE_FORM = "provider-create-form"
+CONSUMER_NAME_PROVIDER_EDIT_FORM = "provider-edit-form"
+PROVIDER_NAME_PROVIDERS = "providers-api"
 
 # Timeouts
 NETWORK_TIMEOUT_MS = 500
@@ -62,5 +62,5 @@ NETWORK_TIMEOUT_MS = 500
 PACT_PORT_AUTH = 1234
 PACT_PORT_USER_ACTIVATION = 1235
 PACT_PORT_POST_DELETE = 1238
-PACT_PORT_PROVIDER_PROFILE_CREATE = 1239
-PACT_PORT_PROVIDER_PROFILE_EDIT = 1240
+PACT_PORT_PROVIDER_CREATE = 1239
+PACT_PORT_PROVIDER_EDIT = 1240

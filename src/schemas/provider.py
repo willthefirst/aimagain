@@ -1,4 +1,4 @@
-"""Wire schemas for provider profile and its credential sub-entities.
+"""Wire schemas for provider and its credential sub-entities.
 
 A `Provider` is a long-lived directory entry owned by a `User`
 (N:1 via `user_id` — a user may own zero, one, or many profiles). It
