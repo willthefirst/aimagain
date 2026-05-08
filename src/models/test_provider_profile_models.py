@@ -3,7 +3,7 @@
 Exercises the invariants the DB layer owns: the per-user UniqueConstraint
 on `provider_profiles`, the cascade from a profile down to its credential
 lists, and the CHECK constraints rendered from the controlled-vocabulary
-tuples in `post_enums.py`.
+tuples in `enums.py`.
 """
 
 import pytest

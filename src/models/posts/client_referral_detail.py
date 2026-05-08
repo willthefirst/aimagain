@@ -1,8 +1,8 @@
 from sqlalchemy import JSON, CheckConstraint, Column, ForeignKey, Text, text
 from sqlalchemy.types import Uuid
 
-from .base import Base
-from .post_enums import (
+from ..base import Base
+from ..enums import (
     CLIENT_AGE_GROUPS,
     INSURANCE_OPTIONS,
     LANGUAGE_PREFERRED_OPTIONS,
@@ -33,7 +33,7 @@ class ClientReferralDetail(Base):
     Form 1. Enum-typed columns (`location_state`, `location_in_person`,
     `location_virtual`, `client_dem_ages`, `language_preferred`,
     `insurance`) carry CHECK constraints rendered from the tuples in
-    `post_enums.py` via `check_in_tuple_sql`.
+    `../enums.py` via `check_in_tuple_sql`.
 
     The two JSON multi-select columns (`desired_times`, `services`)
     store `list[*]` of controlled-vocabulary tokens. Storing as JSON

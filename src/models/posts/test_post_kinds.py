@@ -1,6 +1,6 @@
 """Tests guarding the post-kinds registry as the single source of truth.
 
-The registry in `src/models/post_kinds.py` claims to drive every
+The registry in `src/models/posts/post_kinds.py` claims to drive every
 cross-cutting site (model CHECK, route Literal, form-template dicts,
 detail-class lookup). These tests assert that claim — if a future
 change re-encodes the kind set inline somewhere, the relevant test here

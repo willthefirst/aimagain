@@ -142,4 +142,4 @@ Same column names → same DB column types and the audit-snapshot model can carr
 - **`extra="forbid"`**: every per-kind schema rejects unknown fields with a 422.
 - **PATCH no-op**: every Update variant requires at least one editable field; an empty PATCH 422s.
 - **Edit prefill**: per-kind partial accepts an optional `post` context object; selects/checkboxes mark `selected`/`checked` against its attributes.
-- **Single source of truth for enums**: tuples in `src/models/post_enums.py` (a leaf module so the per-kind detail models can depend on it without circular import). The DB CHECK constraints render from them; a guardrail test (`test_schema_literals_match_model_tuples`) asserts the schema's `Literal[...]`s match.
+- **Single source of truth for enums**: tuples in `src/models/enums.py` (a leaf module so the per-kind detail models can depend on it without circular import). The DB CHECK constraints render from them; a guardrail test (`test_schema_literals_match_model_tuples`) asserts the schema's `Literal[...]`s match.

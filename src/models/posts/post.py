@@ -2,7 +2,7 @@ from sqlalchemy import CheckConstraint, Column, ForeignKey, Text
 from sqlalchemy.orm import relationship
 from sqlalchemy.types import Uuid
 
-from .base import BaseModel
+from ..base import BaseModel
 from .post_kinds import kind_check_sql
 
 
@@ -18,7 +18,7 @@ class Post(BaseModel):
     a registry entry there and a `relationship(...)` line below.
 
     Per-kind detail tables additionally use the controlled-vocabulary
-    tuples in [`post_enums.py`](post_enums.py) for their enum columns.
+    tuples in [`../enums.py`](../enums.py) for their enum columns.
     """
 
     __tablename__ = "posts"
