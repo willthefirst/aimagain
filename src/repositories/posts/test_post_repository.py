@@ -14,12 +14,8 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from sqlalchemy.types import Uuid
 
-from src.models import (
-    ClientReferralDetail,
-    Post,
-    ProviderAvailabilityDetail,
-)
-from src.repositories.post_repository import PostRepository
+from src.models import ClientReferralDetail, Post, ProviderAvailabilityDetail
+from src.repositories.posts.post_repository import PostRepository
 from tests.helpers import (
     create_test_user,
     make_client_referral_detail,

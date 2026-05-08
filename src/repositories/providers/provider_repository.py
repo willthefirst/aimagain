@@ -11,7 +11,7 @@ from src.models import (
     ProviderLicensure,
 )
 
-from .base import BaseRepository
+from ..base import BaseRepository
 
 
 class ProviderRepository(BaseRepository):

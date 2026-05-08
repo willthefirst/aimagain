@@ -12,7 +12,7 @@ from src.models import (
     ProviderAvailabilityDetail,
 )
 
-from .base import BaseRepository
+from ..base import BaseRepository
 
 PostDetail = ClientReferralDetail | ProviderAvailabilityDetail
 

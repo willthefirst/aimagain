@@ -68,23 +68,26 @@ Each repository manages one primary domain entity with related data access opera
 
 ## Directory structure
 
-**Core repository files:**
+Repositories follow the [cluster pattern](../README.md#domain-entities-and-the-cluster-pattern): one cluster directory per entity; tests colocated. `base.py` and `dependencies.py` stay at the parent level as the shared tier.
 
-- `user_repository.py` - User data access and lookup
-- `post_repository.py` - Post data access and lookup
-- `provider_repository.py` - Provider directory entry + cascade-managed credential sub-tables
-- `audit_repository.py` - Append-only audit log writes and reads
+**Cluster directories** (one per entity):
 
-**Infrastructure:**
+- `users/user_repository.py` - User data access and lookup
+- `posts/post_repository.py` + `posts/test_post_repository.py` - Post data access and lookup
+- `providers/provider_repository.py` + `providers/test_provider_repository.py` - Provider directory entry + cascade-managed credential sub-tables
+- `audit/audit_repository.py` + `audit/test_audit_repository.py` - Append-only audit log writes and reads
+
+**Parent-level shared tier:**
 
 - `base.py` - BaseRepository with common session management
+- `dependencies.py` - FastAPI `Depends()` providers wiring each repository to the request-scoped session
 - `dependencies.py` - FastAPI dependency injection for all repositories
 
 ## Implementation patterns
 
 ### Creating a new repository
 
-1. **Define the repository** in `[entity]_repository.py`:
+1. **Define the repository** in `[entity]/[entity]_repository.py`:
 
 ```python
 from typing import Sequence
@@ -94,7 +97,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from src.models import [Entity]
-from .base import BaseRepository
+from ..base import BaseRepository
 
 class [Entity]Repository(BaseRepository):
     def __init__(self, session: AsyncSession):
