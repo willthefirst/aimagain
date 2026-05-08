@@ -31,12 +31,12 @@ which FastAPI/Pydantic parses as a list.
     <legend>Location</legend>
     {{ text_field("location_city", "City", current=d.location_city if d else None) }}
     {{ select_field("location_state", "State", US_STATES, current=d.location_state if d else None, placeholder=true) }}
-    {{ text_field("location_zip", "ZIP", current=d.location_zip if d else None, pattern="\\d{5}", maxlength=5, title_case_ignore=true) }}
+    {{ text_field("location_zip", "ZIP", current=d.location_zip if d else None, pattern="\\d{5}", maxlength=5) }}
   </fieldset>
 
   <fieldset>
     <legend>Availability</legend>
-    {{ select_field("in_person_sessions", "In-person sessions", LOCATION_AVAILABILITY_OPTIONS, labels=LOCATION_AVAILABILITY_LABELS, current=d.in_person_sessions if d else None, placeholder=true, title_case_ignore=true) }}
+    {{ select_field("in_person_sessions", "In-person sessions", LOCATION_AVAILABILITY_OPTIONS, labels=LOCATION_AVAILABILITY_LABELS, current=d.in_person_sessions if d else None, placeholder=true) }}
     {{ select_field("virtual_sessions", "Virtual sessions", LOCATION_AVAILABILITY_OPTIONS, labels=LOCATION_AVAILABILITY_LABELS, current=d.virtual_sessions if d else None, placeholder=true) }}
     {{ time_grid_field("desired_times", "Desired times (optional)", current=d.desired_times if d else None) }}
   </fieldset>
@@ -45,10 +45,10 @@ which FastAPI/Pydantic parses as a list.
     <legend>Featured services</legend>
     {{ multi_select_field("services", "Services (select at least one)", CLIENT_REFERRAL_SERVICES, labels=CLIENT_REFERRAL_SERVICE_LABELS, current=d.services if d else None) }}
     {{ multi_select_field("settings", "Treatment settings (select at least one)", TREATMENT_SETTINGS, labels=TREATMENT_SETTINGS_LABELS, current=d.settings if d else None) }}
-    {{ text_field("treatment_modality", "Treatment modality (optional, e.g. DBT, EMDR)", current=d.treatment_modality if d else None, required=false, title_case_ignore=true) }}
-    {{ textarea_field("client_focus", "Client focus (no PII)", current=d.client_focus if d else None, title_case_ignore=true) }}
+    {{ text_field("treatment_modality", "Treatment modality (optional, e.g. DBT, EMDR)", current=d.treatment_modality if d else None, required=false) }}
+    {{ textarea_field("client_focus", "Client focus (no PII)", current=d.client_focus if d else None) }}
     {{ select_field("age_group", "Age group", CLIENT_AGE_GROUPS, labels=CLIENT_AGE_GROUP_LABELS, current=d.age_group if d else None, placeholder=true) }}
-    {{ select_field("non_english_services", "Services offered in non-English language?", LANGUAGE_PREFERRED_OPTIONS, labels=LANGUAGE_PREFERRED_LABELS, current=(d.non_english_services if d else "no"), required=false, title_case_ignore=true) }}
+    {{ select_field("non_english_services", "Services offered in non-English language?", LANGUAGE_PREFERRED_OPTIONS, labels=LANGUAGE_PREFERRED_LABELS, current=(d.non_english_services if d else "no"), required=false) }}
   </fieldset>
 
   <fieldset>

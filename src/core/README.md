@@ -34,7 +34,7 @@ class Settings(BaseSettings):
             raise
 ```
 
-### `.env` vs `.env.test` <!-- title-case-ignore -->
+### `.env` vs `.env.test`
 
 Two distinct files, two distinct purposes:
 

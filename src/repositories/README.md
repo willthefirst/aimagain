@@ -189,7 +189,7 @@ async def handle_create_entity(data, user, repo: [Entity]Repository):
     return entity
 ```
 
-### CRUD primitives on `BaseRepository` <!-- title-case-ignore -->
+### CRUD primitives on `BaseRepository`
 
 `BaseRepository` carries four protected primitives that capture the exact shapes every resource repo writes by hand. They own only the flush/refresh ritual; they never call `commit()`. Use them when your method body is one of these shapes plus *zero* other operations; otherwise write the body explicitly.
 

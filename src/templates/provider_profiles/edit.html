@@ -12,11 +12,11 @@
       {{ text_field("practice_name", "Practice name", current=profile.practice_name, maxlength=200) }}
       {{ text_field("location_city", "City", current=profile.location_city, maxlength=120) }}
       {{ select_field("location_state", "State", US_STATES, current=profile.location_state) }}
-      {{ text_field("location_zip", "ZIP", current=profile.location_zip, pattern="\\d{5}", maxlength=5, title_case_ignore=true) }}
+      {{ text_field("location_zip", "ZIP", current=profile.location_zip, pattern="\\d{5}", maxlength=5) }}
     </fieldset>
     <fieldset>
       <legend>Session availability</legend>
-      {{ select_field("in_person_sessions", "In-person sessions", LOCATION_AVAILABILITY_OPTIONS, labels=LOCATION_AVAILABILITY_LABELS, current=profile.in_person_sessions, title_case_ignore=true) }}
+      {{ select_field("in_person_sessions", "In-person sessions", LOCATION_AVAILABILITY_OPTIONS, labels=LOCATION_AVAILABILITY_LABELS, current=profile.in_person_sessions) }}
       {{ select_field("virtual_sessions", "Virtual sessions", LOCATION_AVAILABILITY_OPTIONS, labels=LOCATION_AVAILABILITY_LABELS, current=profile.virtual_sessions) }}
     </fieldset>
     <input type="submit" value="Save practice details" />
