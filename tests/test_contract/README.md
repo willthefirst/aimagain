@@ -2,7 +2,7 @@
 
 Pact-based contract tests verify that the **shape of the conversation** between an HTML form (consumer) and the API endpoint it posts to (provider) stays in sync. They do **not** verify business behavior — that's what the colocated unit tests under `src/<layer>/test_*.py` are for.
 
-> **Status:** auth (registration), users (admin actions), and posts (create + edit forms, owner actions) currently have contract test pairs. Add a pair for any new HTML form (or htmx-driven action partial) per the conventions below.
+The current set of contract pairs lives in [`manifest.py`](manifest.py)'s `CONTRACT_PAIRS` — that's the registry. Per [`src/api/routes/RESOURCE_GRAMMAR.md`](../../src/api/routes/RESOURCE_GRAMMAR.md), every resource exposing an HTML form (or htmx-driven action partial) MUST have a contract pair; add new pairs there using the conventions below.
 
 ## Why this directory exists outside the colocated convention
 
@@ -40,31 +40,17 @@ tests/test_contract/
 ├── manifest.py                        # CONTRACT_PAIRS — single source of truth per pair
 ├── test_manifest.py                   # Manifest-consistency tests (uniqueness, derived-state coverage)
 ├── artifacts/                         # Generated pact files and logs (gitignored except .gitkeep)
-├── infrastructure/
-│   ├── config.py                      # Hosts, ports; KNOWN_PROVIDER_STATES is derived from `manifest.py`
-│   ├── servers/
-│   │   ├── base.py                    # ServerManager: subprocess lifecycle + health-poll
-│   │   ├── consumer.py                # Hosts the HTML pages under test
-│   │   └── provider.py                # Runs src.main:app with handler-level mocks
-│   └── utilities/
-│       ├── mocks.py                   # MockAuthManager + monkey-patch helpers
-│       ├── pact_helpers.py            # setup_pact()
-│       └── playwright_helpers.py      # Pact ↔ Playwright route interception
+├── infrastructure/                    # Server orchestration + Pact/Playwright glue
+│   ├── config.py                      # Hosts, ports; KNOWN_PROVIDER_STATES derived from manifest.py
+│   ├── servers/                       # Consumer + provider subprocess managers
+│   └── utilities/                     # MockAuthManager, setup_pact, Playwright route interception
 └── tests/
-    ├── consumer/
-    │   ├── test_auth_form.py            # Registration form contract
-    │   ├── test_user_admin_actions.py   # Admin-actions partial contract
-    │   └── test_post_owner_actions.py   # Owner-actions partial contract (Delete)
-    ├── provider/
-    │   ├── test_auth_verification.py            # Parametrized over `pairs_for_provider("auth-api")`
-    │   ├── test_user_admin_actions_verification.py
-    │   └── test_posts_verification.py           # Parametrized over every `posts-api` pair in the manifest
-    └── shared/
-        ├── consumer_test_base.py      # BaseConsumerTest abstract class
-        ├── helpers.py                 # Pact + Playwright glue
-        ├── mock_data_factory.py       # Mock data + dependency-override configs; `make_post_stub`
-        └── provider_verification_base.py  # `verify_pair(pair, provider_server)` + decorator helpers
+    ├── consumer/                      # One test_<form>.py per HTML form under test
+    ├── provider/                      # One test_<api>_verification.py per API the manifest groups by
+    └── shared/                        # BaseConsumerTest, mock_data_factory, provider_verification_base
 ```
+
+The `consumer/` and `provider/` directories are the registries — each new contract pair adds files there alongside its `manifest.py` entry. `find tests/test_contract -name 'test_*.py'` enumerates them.
 
 ## Running
 
@@ -80,7 +66,7 @@ dev test tests/test_contract/tests/consumer/test_auth_form.py
 
 Consumer tests must run before provider tests in any single session — the consumer run *generates* the pact JSON files in `artifacts/pacts/` that the provider run *verifies against*. Running both with one invocation (above) handles this ordering automatically.
 
-Provider tests carry `pytest.mark.provider` (applied directly to the parametrized test functions in `tests/provider/test_*_verification.py`), so `-m provider` filters them. Per-provider marks (`auth`, `users`, `posts`) are also registered in `pyproject.toml` so per-API filtering (`-m posts`) is also valid. Each pair's `pytest_marks` field in [`manifest.py`](manifest.py) records the same set as documentation — keeping them in sync is a manual discipline today (see follow-up note in the manifest's docstring). Consumer tests are not currently marked, so there is no symmetric `-m consumer` filter.
+Provider tests carry `pytest.mark.provider` (applied directly to the parametrized test functions in `tests/provider/test_*_verification.py`), so `-m provider` filters them. Per-API marks are registered in `pyproject.toml` and applied via each pair's `pytest_marks` field in [`manifest.py`](manifest.py); keeping the two in sync is a manual discipline (see follow-up note in the manifest's docstring). Consumer tests are not marked, so there is no symmetric `-m consumer` filter.
 
 ## Adding a contract test pair
 
