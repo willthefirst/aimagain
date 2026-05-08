@@ -30,7 +30,7 @@ async def test_base_template_renders_primary_nav(
     tree = HTMLParser(response.text)
     nav_items = tree.css("#primary-nav > li > a")
     hrefs = {a.attributes.get("href") for a in nav_items}
-    assert {"/posts", "/users", "/provider-profiles"} <= hrefs
+    assert {"/posts", "/users", "/providers"} <= hrefs
 
 
 # --- Listing -------------------------------------------------------------
@@ -576,8 +576,8 @@ async def test_get_my_provider_profiles_lists_owned(
     assert len(items) == 2
     hrefs = {a.attributes.get("href") for a in tree.css("#user-provider-profiles a")}
     assert hrefs == {
-        f"/provider-profiles/{first_id}",
-        f"/provider-profiles/{second_id}",
+        f"/providers/{first_id}",
+        f"/providers/{second_id}",
     }
 
 
@@ -653,12 +653,11 @@ async def test_get_user_provider_profiles_404_for_unknown_user(
     assert response.status_code == 404
 
 
-async def test_provider_profiles_me_endpoint_removed(
+async def test_legacy_provider_profiles_prefix_gone(
     authenticated_client: AsyncClient,
     logged_in_user: User,
 ):
-    """The legacy `/provider-profiles/me` endpoint is gone — `me` is no longer
-    a reserved literal, so the request now falls through to `/{profile_id}`
-    UUID parsing and 422s."""
-    response = await authenticated_client.get("/provider-profiles/me")
-    assert response.status_code == 422
+    """The legacy `/provider-profiles*` prefix has been renamed to `/providers*`.
+    Requests to the old path no longer match any route."""
+    response = await authenticated_client.get("/provider-profiles")
+    assert response.status_code == 404

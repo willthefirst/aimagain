@@ -6,7 +6,7 @@
 
 <section>
   <h2>Practice</h2>
-  <form hx-patch="/provider-profiles/{{ profile.id }}">
+  <form hx-patch="/providers/{{ profile.id }}">
     <fieldset>
       <legend>Practice location</legend>
       {{ text_field("practice_name", "Practice name", current=profile.practice_name, maxlength=200) }}
@@ -35,7 +35,7 @@
       &mdash; {{ lic.license_number }} ({{ lic.issuing_state }}){% if lic.expiration_date %}, expires {{ lic.expiration_date }}{% endif %}
       <button
         type="button"
-        hx-delete="/provider-profiles/{{ profile.id }}/licensures/{{ lic.id }}"
+        hx-delete="/providers/{{ profile.id }}/licensures/{{ lic.id }}"
         hx-confirm="Remove this licensure?"
       >Delete</button>
     </li>
@@ -45,7 +45,7 @@
   <p>No licensures yet.</p>
   {% endif %}
 
-  <form hx-post="/provider-profiles/{{ profile.id }}/licensures">
+  <form hx-post="/providers/{{ profile.id }}/licensures">
     <fieldset>
       <legend>Add licensure</legend>
       {{ select_field("license_type", "License type", LICENSE_TYPES, labels=LICENSE_TYPES_LABELS, placeholder=true) }}
@@ -69,7 +69,7 @@
       &mdash; {{ edu.institution }}{% if edu.month_completed %}, {{ edu.month_completed }}{% endif %}
       <button
         type="button"
-        hx-delete="/provider-profiles/{{ profile.id }}/educations/{{ edu.id }}"
+        hx-delete="/providers/{{ profile.id }}/educations/{{ edu.id }}"
         hx-confirm="Remove this education entry?"
       >Delete</button>
     </li>
@@ -79,7 +79,7 @@
   <p>No education entries yet.</p>
   {% endif %}
 
-  <form hx-post="/provider-profiles/{{ profile.id }}/educations">
+  <form hx-post="/providers/{{ profile.id }}/educations">
     <fieldset>
       <legend>Add education</legend>
       {{ select_field("education_type", "Education type", EDUCATION_TYPES, labels=EDUCATION_TYPES_LABELS, placeholder=true) }}
@@ -102,7 +102,7 @@
       &mdash; {{ cert.certifying_body }}{% if cert.expiration_date %}, expires {{ cert.expiration_date }}{% endif %}
       <button
         type="button"
-        hx-delete="/provider-profiles/{{ profile.id }}/certifications/{{ cert.id }}"
+        hx-delete="/providers/{{ profile.id }}/certifications/{{ cert.id }}"
         hx-confirm="Remove this certification?"
       >Delete</button>
     </li>
@@ -112,7 +112,7 @@
   <p>No certifications yet.</p>
   {% endif %}
 
-  <form hx-post="/provider-profiles/{{ profile.id }}/certifications">
+  <form hx-post="/providers/{{ profile.id }}/certifications">
     <fieldset>
       <legend>Add certification</legend>
       {{ select_field("certification_type", "Certification type", CERTIFICATION_TYPES, labels=CERTIFICATION_TYPES_LABELS, placeholder=true) }}
@@ -124,5 +124,5 @@
 </section>
 
 <hr />
-<a href="/provider-profiles">Back to profiles</a>
+<a href="/providers">Back to profiles</a>
 {% endblock %}

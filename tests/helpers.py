@@ -164,24 +164,24 @@ def _drop_none(d: dict[str, Any]) -> dict[str, Any]:
 
 
 def provider_profile_payload(**overrides: Any) -> dict[str, Any]:
-    """Build a wire-valid `POST /provider-profiles` form-encoded payload.
+    """Build a wire-valid `POST /providers` form-encoded payload.
     Returns a fresh flat dict each call. Sub-entity arrays are intentionally
     omitted — credentials are added via the dedicated sub-resource endpoints."""
     return _drop_none({**_PROVIDER_PROFILE_DEFAULTS, **overrides})
 
 
 def licensure_payload(**overrides: Any) -> dict[str, Any]:
-    """Build a wire-valid `POST /provider-profiles/{id}/licensures` payload."""
+    """Build a wire-valid `POST /providers/{id}/licensures` payload."""
     return _drop_none({**_PROVIDER_LICENSURE_DEFAULTS, **overrides})
 
 
 def education_payload(**overrides: Any) -> dict[str, Any]:
-    """Build a wire-valid `POST /provider-profiles/{id}/educations` payload."""
+    """Build a wire-valid `POST /providers/{id}/educations` payload."""
     return _drop_none({**_PROVIDER_EDUCATION_DEFAULTS, **overrides})
 
 
 def certification_payload(**overrides: Any) -> dict[str, Any]:
-    """Build a wire-valid `POST /provider-profiles/{id}/certifications` payload."""
+    """Build a wire-valid `POST /providers/{id}/certifications` payload."""
     return _drop_none({**_PROVIDER_CERTIFICATION_DEFAULTS, **overrides})
 
 

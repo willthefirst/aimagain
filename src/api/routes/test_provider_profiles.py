@@ -81,17 +81,17 @@ async def test_create_profile_happy_path(
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user: User,
 ):
-    """POST /provider-profiles with a form-encoded body returns 201 + id and
+    """POST /providers with a form-encoded body returns 201 + id and
     persists the profile and an audit row."""
     response = await authenticated_client.post(
-        "/provider-profiles",
+        "/providers",
         data=provider_profile_payload(practice_name="Acme Therapy"),
     )
 
     assert response.status_code == 201
     new_id = uuid.UUID(response.json()["id"])
-    assert response.headers["Location"] == f"/provider-profiles/{new_id}"
-    assert response.headers["HX-Redirect"] == f"/provider-profiles/{new_id}/form"
+    assert response.headers["Location"] == f"/providers/{new_id}"
+    assert response.headers["HX-Redirect"] == f"/providers/{new_id}/form"
 
     async with db_test_session_manager() as session:
         result = await session.execute(
@@ -120,13 +120,13 @@ async def test_create_profile_allows_multiple_per_user(
     """A user may own multiple provider profiles. Two successive POSTs both
     return 201 and persist as distinct rows owned by the same user."""
     first = await authenticated_client.post(
-        "/provider-profiles", data=provider_profile_payload(practice_name="First")
+        "/providers", data=provider_profile_payload(practice_name="First")
     )
     assert first.status_code == 201
     first_id = uuid.UUID(first.json()["id"])
 
     second = await authenticated_client.post(
-        "/provider-profiles", data=provider_profile_payload(practice_name="Second")
+        "/providers", data=provider_profile_payload(practice_name="Second")
     )
     assert second.status_code == 201
     second_id = uuid.UUID(second.json()["id"])
@@ -148,7 +148,7 @@ async def test_create_profile_rejects_unknown_field(
 ):
     """`extra='forbid'` on the schema rejects unknown form fields with 422."""
     response = await authenticated_client.post(
-        "/provider-profiles",
+        "/providers",
         data=provider_profile_payload(user_id=str(uuid.uuid4())),
     )
     assert response.status_code == 422
@@ -162,7 +162,7 @@ async def test_get_profile_renders_detail_page(
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user: User,
 ):
-    """`GET /provider-profiles/{id}` renders the read-only HTML detail page
+    """`GET /providers/{id}` renders the read-only HTML detail page
     with practice fields and an Edit link for the owner."""
     profile_id = await _seed_profile_for(
         db_test_session_manager, user_id=logged_in_user.id, practice_name="Mine"
@@ -174,7 +174,7 @@ async def test_get_profile_renders_detail_page(
         async with session.begin():
             session.add(licensure)
 
-    response = await authenticated_client.get(f"/provider-profiles/{profile_id}")
+    response = await authenticated_client.get(f"/providers/{profile_id}")
 
     assert response.status_code == 200
     assert response.headers["content-type"].startswith("text/html")
@@ -183,7 +183,7 @@ async def test_get_profile_renders_detail_page(
     # Licensure section renders the seeded row.
     assert "L-99999" in response.text
     # Owner sees an Edit link, no edit forms (read-only).
-    assert tree.css_first(f'a[href="/provider-profiles/{profile_id}/form"]') is not None
+    assert tree.css_first(f'a[href="/providers/{profile_id}/form"]') is not None
     assert tree.css_first("form") is None
 
 
@@ -200,18 +200,18 @@ async def test_get_profile_hides_edit_link_for_non_owner(
             session.add(other)
     profile_id = await _seed_profile_for(db_test_session_manager, user_id=other.id)
 
-    response = await authenticated_client.get(f"/provider-profiles/{profile_id}")
+    response = await authenticated_client.get(f"/providers/{profile_id}")
 
     assert response.status_code == 200
     tree = HTMLParser(response.text)
-    assert tree.css_first(f'a[href="/provider-profiles/{profile_id}/form"]') is None
+    assert tree.css_first(f'a[href="/providers/{profile_id}/form"]') is None
 
 
 async def test_get_profile_returns_404_for_unknown_id(
     authenticated_client: AsyncClient,
     logged_in_user: User,
 ):
-    response = await authenticated_client.get(f"/provider-profiles/{uuid.uuid4()}")
+    response = await authenticated_client.get(f"/providers/{uuid.uuid4()}")
     assert response.status_code == 404
 
 
@@ -232,14 +232,14 @@ async def test_list_profiles_renders_html_for_public(
         db_test_session_manager, user_id=other.id, practice_name="Open House"
     )
 
-    response = await test_client.get("/provider-profiles")
+    response = await test_client.get("/providers")
 
     assert response.status_code == 200
     assert response.headers["content-type"].startswith("text/html")
     tree = HTMLParser(response.text)
     items = tree.css("ul.profiles-list li")
     assert len(items) == 1
-    assert tree.css_first(f'a[href="/provider-profiles/{profile_id}"]') is not None
+    assert tree.css_first(f'a[href="/providers/{profile_id}"]') is not None
     assert "Open House" in response.text
 
 
@@ -250,7 +250,7 @@ async def test_list_profiles_renders_empty_state(
     message instead of an empty `<ul>`. With no filter set, the filter
     form's `<option value="">Any</option>` is the preselected entry on
     each `<select>` (the `filter_select_field` macro contract)."""
-    response = await test_client.get("/provider-profiles")
+    response = await test_client.get("/providers")
     assert response.status_code == 200
     assert "No provider profiles found" in response.text
     tree = HTMLParser(response.text)
@@ -292,14 +292,14 @@ async def test_list_profiles_filters_by_license_type(
                 make_provider_licensure(profile_id=profile_b, license_type="lcsw")
             )
 
-    response = await test_client.get("/provider-profiles?license_type=psyd")
+    response = await test_client.get("/providers?license_type=psyd")
 
     assert response.status_code == 200
     tree = HTMLParser(response.text)
     items = tree.css("ul.profiles-list li")
     assert len(items) == 1
-    assert tree.css_first(f'a[href="/provider-profiles/{profile_a}"]') is not None
-    assert tree.css_first(f'a[href="/provider-profiles/{profile_b}"]') is None
+    assert tree.css_first(f'a[href="/providers/{profile_a}"]') is not None
+    assert tree.css_first(f'a[href="/providers/{profile_b}"]') is None
     # Filter form preserves the active selection.
     selected = tree.css_first('select[name="license_type"] option[selected]')
     assert selected is not None
@@ -319,13 +319,13 @@ async def test_patch_profile_updates_fields(
     )
 
     response = await authenticated_client.patch(
-        f"/provider-profiles/{profile_id}",
+        f"/providers/{profile_id}",
         data={"practice_name": "New Name"},
     )
 
     assert response.status_code == 200
     assert response.json()["practice_name"] == "New Name"
-    assert response.headers["HX-Redirect"] == f"/provider-profiles/{profile_id}/form"
+    assert response.headers["HX-Redirect"] == f"/providers/{profile_id}/form"
 
     async with db_test_session_manager() as session:
         refreshed = (
@@ -348,7 +348,7 @@ async def test_patch_profile_returns_403_if_not_owner(
     _, other_profile_id = await _seed_other_user_with_profile(db_test_session_manager)
 
     response = await authenticated_client.patch(
-        f"/provider-profiles/{other_profile_id}",
+        f"/providers/{other_profile_id}",
         data={"practice_name": "Hijack"},
     )
     assert response.status_code == 403
@@ -371,7 +371,7 @@ async def test_delete_profile_returns_204_and_cascades(
             session.add(make_provider_education(profile_id=profile_id))
             session.add(make_provider_certification(profile_id=profile_id))
 
-    response = await authenticated_client.delete(f"/provider-profiles/{profile_id}")
+    response = await authenticated_client.delete(f"/providers/{profile_id}")
     assert response.status_code == 204
 
     async with db_test_session_manager() as session:
@@ -411,9 +411,7 @@ async def test_delete_profile_returns_403_if_not_owner(
 ):
     _, other_profile_id = await _seed_other_user_with_profile(db_test_session_manager)
 
-    response = await authenticated_client.delete(
-        f"/provider-profiles/{other_profile_id}"
-    )
+    response = await authenticated_client.delete(f"/providers/{other_profile_id}")
     assert response.status_code == 403
 
 
@@ -430,13 +428,13 @@ async def test_create_licensure_happy_path(
     )
 
     response = await authenticated_client.post(
-        f"/provider-profiles/{profile_id}/licensures",
+        f"/providers/{profile_id}/licensures",
         data=licensure_payload(license_number="L-99999"),
     )
 
     assert response.status_code == 201
     new_id = uuid.UUID(response.json()["id"])
-    assert response.headers["HX-Redirect"] == f"/provider-profiles/{profile_id}/form"
+    assert response.headers["HX-Redirect"] == f"/providers/{profile_id}/form"
 
     async with db_test_session_manager() as session:
         persisted = (
@@ -461,7 +459,7 @@ async def test_create_licensure_returns_403_if_not_owner(
     _, other_profile_id = await _seed_other_user_with_profile(db_test_session_manager)
 
     response = await authenticated_client.post(
-        f"/provider-profiles/{other_profile_id}/licensures",
+        f"/providers/{other_profile_id}/licensures",
         data=licensure_payload(),
     )
     assert response.status_code == 403
@@ -472,7 +470,7 @@ async def test_create_licensure_returns_404_for_unknown_profile(
     logged_in_user: User,
 ):
     response = await authenticated_client.post(
-        f"/provider-profiles/{uuid.uuid4()}/licensures",
+        f"/providers/{uuid.uuid4()}/licensures",
         data=licensure_payload(),
     )
     assert response.status_code == 404
@@ -494,7 +492,7 @@ async def test_patch_licensure_updates_fields(
         licensure_id = licensure.id
 
     response = await authenticated_client.patch(
-        f"/provider-profiles/{profile_id}/licensures/{licensure_id}",
+        f"/providers/{profile_id}/licensures/{licensure_id}",
         data={"license_number": "L-2"},
     )
 
@@ -521,7 +519,7 @@ async def test_patch_licensure_returns_404_for_mismatched_profile(
         other_licensure_id = other_licensure.id
 
     response = await authenticated_client.patch(
-        f"/provider-profiles/{my_profile_id}/licensures/{other_licensure_id}",
+        f"/providers/{my_profile_id}/licensures/{other_licensure_id}",
         data={"license_number": "stolen"},
     )
     assert response.status_code == 404
@@ -543,7 +541,7 @@ async def test_delete_licensure_returns_204(
         licensure_id = licensure.id
 
     response = await authenticated_client.delete(
-        f"/provider-profiles/{profile_id}/licensures/{licensure_id}"
+        f"/providers/{profile_id}/licensures/{licensure_id}"
     )
     assert response.status_code == 204
 
@@ -568,7 +566,7 @@ async def test_create_education_happy_path(
     )
 
     response = await authenticated_client.post(
-        f"/provider-profiles/{profile_id}/educations",
+        f"/providers/{profile_id}/educations",
         data=education_payload(institution="Test U"),
     )
 
@@ -599,7 +597,7 @@ async def test_create_certification_happy_path(
     )
 
     response = await authenticated_client.post(
-        f"/provider-profiles/{profile_id}/certifications",
+        f"/providers/{profile_id}/certifications",
         data=certification_payload(certifying_body="Test Cert Body"),
     )
 
@@ -622,21 +620,21 @@ async def test_create_certification_happy_path(
         assert persisted.certifying_body == "Test Cert Body"
 
 
-# --- Create form page (GET /provider-profiles/form) ----------------------
+# --- Create form page (GET /providers/form) ----------------------
 
 
 async def test_get_provider_profile_form_renders(
     authenticated_client: AsyncClient,
     logged_in_user: User,
 ):
-    """`GET /provider-profiles/form` renders the create form posting to
+    """`GET /providers/form` renders the create form posting to
     the JSON API."""
-    response = await authenticated_client.get("/provider-profiles/form")
+    response = await authenticated_client.get("/providers/form")
     assert response.status_code == 200
     tree = HTMLParser(response.text)
     form = tree.css_first("form")
     assert form is not None
-    assert form.attributes.get("hx-post") == "/provider-profiles"
+    assert form.attributes.get("hx-post") == "/providers"
     # Required practice fields are present.
     assert tree.css_first('input[name="practice_name"]') is not None
     assert tree.css_first('input[name="location_city"]') is not None
@@ -659,13 +657,13 @@ async def test_get_provider_profile_form_unauthenticated_redirects(
     test_client: AsyncClient,
 ):
     response = await test_client.get(
-        "/provider-profiles/form",
+        "/providers/form",
         headers={"accept": "text/html"},
         follow_redirects=False,
     )
     assert response.status_code == 302
     assert "/auth/login" in response.headers["location"]
-    assert "next=/provider-profiles/form" in response.headers["location"]
+    assert "next=/providers/form" in response.headers["location"]
 
 
 async def test_form_route_does_not_shadow_get_by_id(
@@ -678,15 +676,15 @@ async def test_form_route_does_not_shadow_get_by_id(
     profile_id = await _seed_profile_for(
         db_test_session_manager, user_id=logged_in_user.id
     )
-    response = await authenticated_client.get(f"/provider-profiles/{profile_id}")
+    response = await authenticated_client.get(f"/providers/{profile_id}")
     assert response.status_code == 200
     assert response.headers["content-type"].startswith("text/html")
     # The detail page links back to the edit form for the same id, which is
     # only present when the profile was actually loaded.
-    assert f"/provider-profiles/{profile_id}/form" in response.text
+    assert f"/providers/{profile_id}/form" in response.text
 
 
-# --- Edit form page (GET /provider-profiles/{id}/form) -------------------
+# --- Edit form page (GET /providers/{id}/form) -------------------
 
 
 async def test_owner_can_open_edit_form(
@@ -708,29 +706,27 @@ async def test_owner_can_open_edit_form(
         async with session.begin():
             session.add(licensure)
 
-    response = await authenticated_client.get(f"/provider-profiles/{profile_id}/form")
+    response = await authenticated_client.get(f"/providers/{profile_id}/form")
     assert response.status_code == 200
     tree = HTMLParser(response.text)
     practice_input = tree.css_first('input[name="practice_name"]')
     assert practice_input is not None
     assert practice_input.attributes.get("value") == "Acme Counseling"
-    practice_form = tree.css_first(f'form[hx-patch="/provider-profiles/{profile_id}"]')
+    practice_form = tree.css_first(f'form[hx-patch="/providers/{profile_id}"]')
     assert practice_form is not None
     # The seeded licensure should be rendered in the licensures list.
     assert "L-12345" in response.text
     # Sub-section add forms target the right URLs.
     assert (
-        tree.css_first(f'form[hx-post="/provider-profiles/{profile_id}/licensures"]')
+        tree.css_first(f'form[hx-post="/providers/{profile_id}/licensures"]')
         is not None
     )
     assert (
-        tree.css_first(f'form[hx-post="/provider-profiles/{profile_id}/educations"]')
+        tree.css_first(f'form[hx-post="/providers/{profile_id}/educations"]')
         is not None
     )
     assert (
-        tree.css_first(
-            f'form[hx-post="/provider-profiles/{profile_id}/certifications"]'
-        )
+        tree.css_first(f'form[hx-post="/providers/{profile_id}/certifications"]')
         is not None
     )
 
@@ -744,7 +740,7 @@ async def test_admin_can_open_edit_form_for_any_profile(
     _other_user_id, profile_id = await _seed_other_user_with_profile(
         db_test_session_manager
     )
-    response = await authenticated_client.get(f"/provider-profiles/{profile_id}/form")
+    response = await authenticated_client.get(f"/providers/{profile_id}/form")
     assert response.status_code == 200
 
 
@@ -756,7 +752,7 @@ async def test_non_owner_cannot_open_edit_form(
     _other_user_id, profile_id = await _seed_other_user_with_profile(
         db_test_session_manager
     )
-    response = await authenticated_client.get(f"/provider-profiles/{profile_id}/form")
+    response = await authenticated_client.get(f"/providers/{profile_id}/form")
     assert response.status_code == 403
 
 
@@ -764,7 +760,7 @@ async def test_edit_form_returns_404_for_unknown_id(
     authenticated_client: AsyncClient,
     logged_in_user: User,
 ):
-    response = await authenticated_client.get(f"/provider-profiles/{uuid.uuid4()}/form")
+    response = await authenticated_client.get(f"/providers/{uuid.uuid4()}/form")
     assert response.status_code == 404
 
 
@@ -773,7 +769,7 @@ async def test_edit_form_unauthenticated_redirects(
 ):
     profile_id = uuid.uuid4()
     response = await test_client.get(
-        f"/provider-profiles/{profile_id}/form",
+        f"/providers/{profile_id}/form",
         headers={"accept": "text/html"},
         follow_redirects=False,
     )

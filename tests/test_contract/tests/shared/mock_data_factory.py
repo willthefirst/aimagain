@@ -145,7 +145,7 @@ class MockDataFactory:
     def create_provider_profile_create_dependency_config(cls) -> Dict[str, Any]:
         """Mock for `handle_create_profile`.
 
-        The route under test (`POST /provider-profiles`) reads `id` off
+        The route under test (`POST /providers`) reads `id` off
         the handler's return value to build the response body and the
         `Location` / `HX-Redirect` headers. A `SimpleNamespace` exposing
         `id` is sufficient.
@@ -163,7 +163,7 @@ class MockDataFactory:
     def create_provider_profile_update_dependency_config(cls) -> Dict[str, Any]:
         """Mock for `handle_update_profile`.
 
-        The route under test (`PATCH /provider-profiles/{id}`) packs the
+        The route under test (`PATCH /providers/{id}`) packs the
         handler's return value through `_profile_read_dict`, which calls
         `ProviderProfileRead.model_validate` — so the stub must expose
         every field that schema requires.

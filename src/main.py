@@ -101,9 +101,7 @@ app.include_router(auth_pages.auth_pages_api_router)
 app.include_router(me.me_router_instance, tags=["me"])
 app.include_router(users.users_api_router, tags=["users"])
 app.include_router(posts.posts_api_router, tags=["posts"])
-app.include_router(
-    provider_profiles.provider_profiles_api_router, tags=["provider-profiles"]
-)
+app.include_router(provider_profiles.provider_profiles_api_router, tags=["providers"])
 
 
 @app.get("/health")
