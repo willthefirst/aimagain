@@ -3,7 +3,6 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query, Request, Response, status
 from fastapi.responses import JSONResponse
-from pydantic import TypeAdapter
 
 from src.api.common import (
     APIResponse,
@@ -35,37 +34,23 @@ from src.repositories.audit_repository import AuditRepository
 from src.repositories.dependencies import get_audit_repository, get_provider_repository
 from src.repositories.providers.provider_repository import ProviderRepository
 from src.schemas.providers.provider import (
-    ProviderCertificationCreate,
     ProviderCertificationRead,
-    ProviderCertificationUpdate,
-    ProviderCreate,
-    ProviderEducationCreate,
     ProviderEducationRead,
-    ProviderEducationUpdate,
-    ProviderLicensureCreate,
     ProviderLicensureRead,
-    ProviderLicensureUpdate,
     ProviderRead,
-    ProviderUpdate,
+    certification_create_adapter,
+    certification_update_adapter,
+    education_create_adapter,
+    education_update_adapter,
+    licensure_create_adapter,
+    licensure_update_adapter,
+    provider_create_adapter,
+    provider_update_adapter,
 )
 
 providers_api_router = APIRouter(prefix="/providers")
 router = BaseRouter(router=providers_api_router, default_tags=["providers"])
 logger = logging.getLogger(__name__)
-
-
-# Module-level TypeAdapters mirror the `post_create_adapter` / `post_update_adapter`
-# pattern in `src/schemas/post.py` — pre-built adapters keep validation in one place
-# per schema. Defined here (not in the schema module) because the provider schemas
-# don't currently expose discriminated unions that would need an adapter anywhere else.
-_provider_create_adapter: TypeAdapter = TypeAdapter(ProviderCreate)
-_provider_update_adapter: TypeAdapter = TypeAdapter(ProviderUpdate)
-_licensure_create_adapter: TypeAdapter = TypeAdapter(ProviderLicensureCreate)
-_licensure_update_adapter: TypeAdapter = TypeAdapter(ProviderLicensureUpdate)
-_education_create_adapter: TypeAdapter = TypeAdapter(ProviderEducationCreate)
-_education_update_adapter: TypeAdapter = TypeAdapter(ProviderEducationUpdate)
-_certification_create_adapter: TypeAdapter = TypeAdapter(ProviderCertificationCreate)
-_certification_update_adapter: TypeAdapter = TypeAdapter(ProviderCertificationUpdate)
 
 
 def _provider_read_dict(profile) -> dict:
@@ -120,7 +105,7 @@ async def create_provider(
     """Creates a provider owned by the requesting user. Form-encoded
     body. A user may own multiple profiles."""
     payload_dict = await parse_form_to_payload(request)
-    payload = validate_or_422(_provider_create_adapter, payload_dict)
+    payload = validate_or_422(provider_create_adapter, payload_dict)
     created = await handle_create_provider(
         payload=payload,
         repo=repo,
@@ -212,7 +197,7 @@ async def patch_profile(
     """Partially updates the practice/availability fields. Owner-only; admins
     may edit any profile. Sub-entity lists are managed via their own routes."""
     payload_dict = await parse_form_to_payload(request)
-    payload = validate_or_422(_provider_update_adapter, payload_dict)
+    payload = validate_or_422(provider_update_adapter, payload_dict)
     updated = await handle_update_provider(
         provider_id=provider_id,
         payload=payload,
@@ -260,7 +245,7 @@ async def create_licensure(
     user: User = Depends(current_active_user),
 ):
     payload_dict = await parse_form_to_payload(request)
-    payload = validate_or_422(_licensure_create_adapter, payload_dict)
+    payload = validate_or_422(licensure_create_adapter, payload_dict)
     created = await handle_create_licensure(
         provider_id=provider_id,
         payload=payload,
@@ -287,7 +272,7 @@ async def patch_licensure(
     user: User = Depends(current_active_user),
 ):
     payload_dict = await parse_form_to_payload(request)
-    payload = validate_or_422(_licensure_update_adapter, payload_dict)
+    payload = validate_or_422(licensure_update_adapter, payload_dict)
     updated = await handle_update_licensure(
         provider_id=provider_id,
         licensure_id=licensure_id,
@@ -339,7 +324,7 @@ async def create_education(
     user: User = Depends(current_active_user),
 ):
     payload_dict = await parse_form_to_payload(request)
-    payload = validate_or_422(_education_create_adapter, payload_dict)
+    payload = validate_or_422(education_create_adapter, payload_dict)
     created = await handle_create_education(
         provider_id=provider_id,
         payload=payload,
@@ -366,7 +351,7 @@ async def patch_education(
     user: User = Depends(current_active_user),
 ):
     payload_dict = await parse_form_to_payload(request)
-    payload = validate_or_422(_education_update_adapter, payload_dict)
+    payload = validate_or_422(education_update_adapter, payload_dict)
     updated = await handle_update_education(
         provider_id=provider_id,
         education_id=education_id,
@@ -418,7 +403,7 @@ async def create_certification(
     user: User = Depends(current_active_user),
 ):
     payload_dict = await parse_form_to_payload(request)
-    payload = validate_or_422(_certification_create_adapter, payload_dict)
+    payload = validate_or_422(certification_create_adapter, payload_dict)
     created = await handle_create_certification(
         provider_id=provider_id,
         payload=payload,
@@ -445,7 +430,7 @@ async def patch_certification(
     user: User = Depends(current_active_user),
 ):
     payload_dict = await parse_form_to_payload(request)
-    payload = validate_or_422(_certification_update_adapter, payload_dict)
+    payload = validate_or_422(certification_update_adapter, payload_dict)
     updated = await handle_update_certification(
         provider_id=provider_id,
         certification_id=certification_id,
