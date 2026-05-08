@@ -454,3 +454,20 @@ def test_genuinely_miscased_acronym_neighbour_still_flags(tmp_path):
     )
     originals = {v["original"] for v in _check(file)}
     assert "ZIP Code Lookup" in originals
+
+
+def test_main_exits_with_error_when_selectolax_missing(monkeypatch, capsys):
+    """If selectolax isn't importable, the CLI must hard-fail rather than
+    silently skip every HTML/Jinja file. Regression for #198 — the old
+    warn-and-skip behavior let `dev lint` pass locally with the wrong
+    interpreter while CI (with deps installed) caught real violations."""
+    from scripts.dev import title_case_check
+
+    monkeypatch.setattr(title_case_check, "HTMLParser", None)
+    monkeypatch.setattr("sys.argv", ["title_case_check.py", "--check-only"])
+
+    rc = title_case_check.main()
+
+    assert rc != 0
+    err = capsys.readouterr().err
+    assert "selectolax" in err

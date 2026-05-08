@@ -254,7 +254,7 @@ class QualityCommands:
             ),
             (
                 "🏷️ Checking title case...",
-                ["python3", "scripts/dev/title_case_check.py", "--check-only"],
+                [sys.executable, "scripts/dev/title_case_check.py", "--check-only"],
             ),
         ]
 
