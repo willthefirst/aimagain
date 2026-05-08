@@ -16,6 +16,23 @@ from tests.helpers import create_test_user, promote_to_admin
 pytestmark = pytest.mark.asyncio
 
 
+# --- Base template nav ---------------------------------------------------
+
+
+async def test_base_template_renders_primary_nav(
+    authenticated_client: AsyncClient,
+    logged_in_user: User,
+):
+    """Pages rendered from base.html include nav links to the main sections."""
+    response = await authenticated_client.get("/users")
+
+    assert response.status_code == 200
+    tree = HTMLParser(response.text)
+    nav_items = tree.css("#primary-nav > li > a")
+    hrefs = {a.attributes.get("href") for a in nav_items}
+    assert {"/posts", "/users", "/provider-profiles"} <= hrefs
+
+
 # --- Listing -------------------------------------------------------------
 
 
@@ -54,7 +71,7 @@ async def test_list_users_one_user(
     assert "text/html" in response.headers["content-type"]
 
     tree = HTMLParser(response.text)
-    user_list_items = tree.css("ul > li")
+    user_list_items = tree.css("ul:not(#primary-nav) > li")
     assert len(user_list_items) == 1, "Expected one user in the list"
     assert (
         test_username in user_list_items[0].text()
@@ -84,7 +101,7 @@ async def test_list_users_multiple_users(
     assert "text/html" in response.headers["content-type"]
 
     tree = HTMLParser(response.text)
-    user_list_items = tree.css("ul > li")
+    user_list_items = tree.css("ul:not(#primary-nav) > li")
     assert len(user_list_items) == 2, "Expected two users in the list"
 
     usernames_found = {item.text() for item in user_list_items}
