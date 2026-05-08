@@ -26,7 +26,7 @@ from src.models.enums import (
     LOCATION_AVAILABILITY_OPTIONS,
     US_STATES,
 )
-from src.schemas.provider import (
+from src.schemas.providers.provider import (
     ProviderCertificationCreate,
     ProviderCertificationUpdate,
     ProviderCreate,

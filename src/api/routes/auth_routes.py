@@ -10,7 +10,7 @@ from src.auth_config import get_user_manager
 from src.logic.auth_processing import handle_registration
 from src.repositories.audit_repository import AuditRepository
 from src.repositories.dependencies import get_audit_repository
-from src.schemas.user import UserCreate, UserRead
+from src.schemas.users.user import UserCreate, UserRead
 
 # router = APIRouter() # Old raw APIRouter
 # Standardized router initialization

@@ -16,7 +16,7 @@ from src.db import get_db_session, get_user_db
 # Assuming your FastAPI app instance is in src.main
 from src.main import app
 from src.models import User, metadata  # Assuming your models define metadata
-from src.schemas.user import UserCreate  # Import UserCreate schema
+from src.schemas.users.user import UserCreate  # Import UserCreate schema
 
 # REMOVED Depends import as it's not used in fixture overrides this way
 # from fastapi import Depends

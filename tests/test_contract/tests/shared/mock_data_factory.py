@@ -19,7 +19,7 @@ from typing import Any, Dict
 from uuid import UUID, uuid4
 
 from src.models import REGISTERED_KINDS
-from src.schemas.user import UserRead
+from src.schemas.users.user import UserRead
 
 
 def make_post_stub(
