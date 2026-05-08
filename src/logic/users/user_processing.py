@@ -6,7 +6,7 @@ from fastapi import Request
 from src.api.common.exceptions import ForbiddenError, NotFoundError
 from src.logic.audit import AuditAction, record_audit
 from src.models import User
-from src.repositories.audit.audit_repository import AuditRepository
+from src.repositories.audit_repository import AuditRepository
 from src.repositories.providers.provider_repository import ProviderRepository
 from src.repositories.users.user_repository import UserRepository
 from src.schemas.users.user import (

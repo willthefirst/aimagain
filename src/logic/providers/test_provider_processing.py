@@ -40,7 +40,7 @@ from src.models import (
     ProviderLicensure,
     User,
 )
-from src.repositories.audit.audit_repository import AuditRepository
+from src.repositories.audit_repository import AuditRepository
 from src.repositories.providers.provider_repository import ProviderRepository
 from src.repositories.users.user_repository import UserRepository
 from src.schemas.providers.provider import (

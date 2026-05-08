@@ -13,7 +13,7 @@ from src.models import (
     ProviderLicensure,
     User,
 )
-from src.repositories.audit.audit_repository import AuditRepository
+from src.repositories.audit_repository import AuditRepository
 from tests.helpers import (
     certification_payload,
     create_test_user,

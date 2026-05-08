@@ -14,7 +14,7 @@ from src.logic.users.user_processing import (
     handle_set_user_activation,
 )
 from src.models import User
-from src.repositories.audit.audit_repository import AuditRepository
+from src.repositories.audit_repository import AuditRepository
 from src.repositories.dependencies import (
     get_audit_repository,
     get_provider_repository,
