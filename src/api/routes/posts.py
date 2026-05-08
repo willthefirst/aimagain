@@ -2,14 +2,15 @@ import logging
 from typing import Literal
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Query, Request, Response, status
-from fastapi.responses import JSONResponse
+from fastapi import APIRouter, Depends, Query, Request, status
 
 from src.api.common import (
     APIResponse,
     BaseRouter,
-    parse_form_to_payload,
-    validate_or_422,
+    created_response,
+    deleted_response,
+    parse_and_validate_form,
+    updated_response,
 )
 from src.auth_config import current_active_user
 from src.logic.posts.post_processing import (
@@ -146,20 +147,14 @@ async def create_post(
     the session; clients sending it (or any other unknown field) are
     rejected with 422 by the schema.
     """
-    payload_dict = await parse_form_to_payload(request)
-    payload = validate_or_422(post_create_adapter, payload_dict)
+    payload = await parse_and_validate_form(request, post_create_adapter)
     created = await handle_create_post(
         payload=payload,
         post_repo=post_repo,
         audit_repo=audit_repo,
         requesting_user=user,
     )
-    location = f"/posts/{created.id}"
-    return JSONResponse(
-        status_code=status.HTTP_201_CREATED,
-        content={"id": str(created.id)},
-        headers={"Location": location, "HX-Redirect": location},
-    )
+    return created_response(id=created.id, location=f"/posts/{created.id}")
 
 
 @router.patch("/{post_id}")
@@ -178,8 +173,7 @@ async def patch_post(
     changed via PATCH; mismatches are rejected with 400.
     The body must be form-encoded.
     """
-    payload_dict = await parse_form_to_payload(request)
-    payload = validate_or_422(post_update_adapter, payload_dict)
+    payload = await parse_and_validate_form(request, post_update_adapter)
     updated = await handle_update_post(
         post_id=post_id,
         payload=payload,
@@ -187,10 +181,9 @@ async def patch_post(
         audit_repo=audit_repo,
         requesting_user=user,
     )
-    location = f"/posts/{updated.id}"
-    return JSONResponse(
-        content=_patch_response_body(updated),
-        headers={"HX-Redirect": location},
+    return updated_response(
+        body=_patch_response_body(updated),
+        hx_redirect=f"/posts/{updated.id}",
     )
 
 
@@ -210,7 +203,4 @@ async def delete_post(
         audit_repo=audit_repo,
         requesting_user=user,
     )
-    return Response(
-        status_code=status.HTTP_204_NO_CONTENT,
-        headers={"HX-Redirect": "/posts"},
-    )
+    return deleted_response(hx_redirect="/posts")

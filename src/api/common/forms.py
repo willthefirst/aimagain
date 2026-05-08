@@ -44,3 +44,15 @@ def validate_or_422(adapter: TypeAdapter, payload_dict: dict):
             for err in e.errors()
         ]
         raise HTTPException(status_code=422, detail=errors)
+
+
+async def parse_and_validate_form(request: Request, adapter: TypeAdapter):
+    """Parse a form-encoded request and validate it through `adapter`.
+
+    Combines the `parse_form_to_payload` and `validate_or_422` pair that
+    every form-encoded mutating route runs back-to-back. The underlying
+    primitives stay public for routes that need to inspect or transform
+    the parsed dict between the two steps.
+    """
+    payload_dict = await parse_form_to_payload(request)
+    return validate_or_422(adapter, payload_dict)
