@@ -88,7 +88,7 @@ async def test_list_posts_one_post(
 
     assert response.status_code == 200
     tree = HTMLParser(response.text)
-    items = tree.css("ul > li")
+    items = tree.css("ul:not(#primary-nav) > li")
     assert len(items) == 1
     item_text = items[0].text()
     assert description in item_text
@@ -124,7 +124,7 @@ async def test_list_posts_orders_newest_first(
     assert response.status_code == 200
 
     tree = HTMLParser(response.text)
-    items = tree.css("ul > li")
+    items = tree.css("ul:not(#primary-nav) > li")
     assert len(items) == 2
     assert newer.client_referral_detail.description in items[0].text()
     assert older.client_referral_detail.description in items[1].text()

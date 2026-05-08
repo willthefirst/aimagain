@@ -63,7 +63,7 @@ Templates use inheritance for consistent layout and feature-specific customizati
 
 | Directory  | Purpose                | Templates                                                              |
 | ---------- | ---------------------- | ---------------------------------------------------------------------- |
-| **/**      | Base layout and shared | `base.html` - Foundation template                                      |
+| **/**      | Base layout and shared | `base.html` - Foundation template (includes site-wide `<nav>` linking to `/posts`, `/users`, `/provider-profiles`) |
 | **auth/**  | Authentication pages   | login, register, forgot/reset password                                 |
 | **users/** | User management        | list, detail, `_admin_actions.html` partial (shared by list & detail)  |
 | **posts/** | Posts                  | list, detail, per-kind `new_<kind>.html` + `edit_<kind>.html` thin wrappers around `_<kind>_form.html` partials, `_form_macros.html` (shared field macros), `_owner_actions.html` partial (shared by detail) |
