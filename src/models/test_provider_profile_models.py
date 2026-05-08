@@ -58,30 +58,37 @@ async def test_create_provider_profile_persists(
         assert profile.practice_name == "Acme Health"
 
 
-async def test_provider_profile_user_id_unique(
+async def test_provider_profile_allows_multiple_per_user(
     db_test_session_manager: async_sessionmaker[AsyncSession],
 ):
-    """Only one profile per user — second insert with same user_id fails."""
+    """A user may own multiple provider profiles — the previously-enforced
+    `uq_provider_profiles_user_id` constraint was dropped in `8f20a93effc9`."""
     user = create_test_user()
     async with db_test_session_manager() as session:
         async with session.begin():
             session.add(user)
             session.add(_make_profile(user))
 
-    with pytest.raises(IntegrityError):
-        async with db_test_session_manager() as session:
-            async with session.begin():
-                session.add(
-                    ProviderProfile(
-                        user_id=user.id,
-                        practice_name="Other Practice",
-                        location_city="Springfield",
-                        location_state="IL",
-                        location_zip="62701",
-                        in_person_sessions="yes",
-                        virtual_sessions="no",
-                    )
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            session.add(
+                ProviderProfile(
+                    user_id=user.id,
+                    practice_name="Other Practice",
+                    location_city="Springfield",
+                    location_state="IL",
+                    location_zip="62701",
+                    in_person_sessions="yes",
+                    virtual_sessions="no",
                 )
+            )
+
+        result = await session.execute(
+            select(ProviderProfile).filter(ProviderProfile.user_id == user.id)
+        )
+        profiles = result.scalars().all()
+        assert len(profiles) == 2
+        assert {p.practice_name for p in profiles} == {"Acme Health", "Other Practice"}
 
 
 async def test_delete_profile_cascades_credentials(

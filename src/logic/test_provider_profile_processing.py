@@ -13,7 +13,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from starlette.requests import Request
 
-from src.api.common.exceptions import BadRequestError, ForbiddenError, NotFoundError
+from src.api.common.exceptions import ForbiddenError, NotFoundError
 from src.logic.audit import AuditAction
 from src.logic.provider_profile_processing import (
     handle_create_certification,
@@ -342,19 +342,27 @@ async def test_create_profile_with_inline_children_captures_them_in_audit(
         assert len(licensures) == 1
 
 
-async def test_create_profile_400_when_user_already_has_one(
+async def test_create_profile_allows_multiple_per_user(
     db_test_session_manager: async_sessionmaker[AsyncSession],
 ):
+    """A user may own multiple profiles. The handler creates a second profile
+    successfully without surfacing the previously-enforced 1:1 rejection."""
     user = await _seed_user(db_test_session_manager)
-    await _seed_profile(db_test_session_manager, user_id=user.id)
+    first_id, *_ = await _seed_profile(db_test_session_manager, user_id=user.id)
 
     async with db_test_session_manager() as session:
         repo = ProviderProfileRepository(session)
         audit_repo = AuditRepository(session)
-        with pytest.raises(BadRequestError):
-            await handle_create_profile(
-                _profile_create_payload(), repo, audit_repo, user
-            )
+        second = await handle_create_profile(
+            _profile_create_payload(practice_name="Second Practice"),
+            repo,
+            audit_repo,
+            user,
+        )
+
+    assert second.id != first_id
+    assert second.user_id == user.id
+    assert second.practice_name == "Second Practice"
 
 
 # --- handle_update_profile ----------------------------------------------

@@ -1,7 +1,8 @@
 """Wire schemas for provider profile and its credential sub-entities.
 
-A `ProviderProfile` is a long-lived directory entry owned by a single
-`User` (1:1 via `user_id`). It holds three credential lists —
+A `ProviderProfile` is a long-lived directory entry owned by a `User`
+(N:1 via `user_id` — a user may own zero, one, or many profiles). It
+holds three credential lists —
 `ProviderLicensure`, `ProviderEducation`, `ProviderCertification` —
 each managed via its own endpoints in later issues. The wire surface
 mirrors that shape: each entity has Read / Create / Update /

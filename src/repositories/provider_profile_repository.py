@@ -26,8 +26,11 @@ class ProviderProfileRepository(BaseRepository):
         return await self._get_by_id(ProviderProfile, profile_id)
 
     async def get_by_user_id(self, user_id: UUID) -> ProviderProfile | None:
-        """Retrieves a profile by its owning user id. The
-        `uq_provider_profiles_user_id` constraint guarantees at most one."""
+        """Retrieves a profile owned by the given user. A user may own
+        multiple profiles; this returns whichever the DB hands back first
+        with no defined ordering, so callers needing a single canonical
+        profile should not rely on this method.
+        """
         stmt = select(ProviderProfile).filter(ProviderProfile.user_id == user_id)
         result = await self.session.execute(stmt)
         return result.scalars().first()

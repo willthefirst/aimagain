@@ -124,8 +124,8 @@ async def create_profile(
     audit_repo: AuditRepository = Depends(get_audit_repository),
     user: User = Depends(current_active_user),
 ):
-    """Creates the requesting user's provider profile. Form-encoded body. 400 if
-    the user already has a profile (one-per-user uniqueness)."""
+    """Creates a provider profile owned by the requesting user. Form-encoded
+    body. A user may own multiple profiles."""
     payload_dict = await parse_form_to_payload(request)
     payload = validate_or_422(_profile_create_adapter, payload_dict)
     created = await handle_create_profile(

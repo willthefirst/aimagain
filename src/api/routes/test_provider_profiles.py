@@ -112,21 +112,34 @@ async def test_create_profile_happy_path(
     assert rows[0].actor_id == logged_in_user.id
 
 
-async def test_create_profile_returns_400_if_already_exists(
+async def test_create_profile_allows_multiple_per_user(
     authenticated_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user: User,
 ):
-    """The one-profile-per-user uniqueness rule surfaces as 400 on second POST."""
+    """A user may own multiple provider profiles. Two successive POSTs both
+    return 201 and persist as distinct rows owned by the same user."""
     first = await authenticated_client.post(
-        "/provider-profiles", data=provider_profile_payload()
+        "/provider-profiles", data=provider_profile_payload(practice_name="First")
     )
     assert first.status_code == 201
+    first_id = uuid.UUID(first.json()["id"])
 
     second = await authenticated_client.post(
-        "/provider-profiles", data=provider_profile_payload(practice_name="Other")
+        "/provider-profiles", data=provider_profile_payload(practice_name="Second")
     )
-    assert second.status_code == 400
+    assert second.status_code == 201
+    second_id = uuid.UUID(second.json()["id"])
+
+    assert first_id != second_id
+
+    async with db_test_session_manager() as session:
+        result = await session.execute(
+            select(ProviderProfile).filter(ProviderProfile.user_id == logged_in_user.id)
+        )
+        owned = result.scalars().all()
+        assert {p.id for p in owned} == {first_id, second_id}
+        assert {p.practice_name for p in owned} == {"First", "Second"}
 
 
 async def test_create_profile_rejects_unknown_field(
