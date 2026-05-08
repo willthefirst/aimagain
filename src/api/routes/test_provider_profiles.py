@@ -144,22 +144,54 @@ async def test_create_profile_rejects_unknown_field(
 # --- Profile reads -------------------------------------------------------
 
 
-async def test_get_profile_returns_profile(
+async def test_get_profile_renders_detail_page(
     authenticated_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user: User,
 ):
+    """`GET /provider-profiles/{id}` renders the read-only HTML detail page
+    with practice fields and an Edit link for the owner."""
     profile_id = await _seed_profile_for(
         db_test_session_manager, user_id=logged_in_user.id, practice_name="Mine"
     )
+    licensure = make_provider_licensure(
+        profile_id=profile_id, license_type="lcsw", license_number="L-99999"
+    )
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            session.add(licensure)
 
     response = await authenticated_client.get(f"/provider-profiles/{profile_id}")
 
     assert response.status_code == 200
-    body = response.json()
-    assert body["id"] == str(profile_id)
-    assert body["practice_name"] == "Mine"
-    assert body["licensures"] == []
+    assert response.headers["content-type"].startswith("text/html")
+    tree = HTMLParser(response.text)
+    assert "Mine" in tree.css_first("h1").text()
+    # Licensure section renders the seeded row.
+    assert "L-99999" in response.text
+    # Owner sees an Edit link, no edit forms (read-only).
+    assert tree.css_first(f'a[href="/provider-profiles/{profile_id}/form"]') is not None
+    assert tree.css_first("form") is None
+
+
+async def test_get_profile_hides_edit_link_for_non_owner(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user: User,
+):
+    """A non-owner viewing someone else's profile sees the detail content
+    but no Edit link."""
+    other = create_test_user(username=f"other-{uuid.uuid4()}")
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            session.add(other)
+    profile_id = await _seed_profile_for(db_test_session_manager, user_id=other.id)
+
+    response = await authenticated_client.get(f"/provider-profiles/{profile_id}")
+
+    assert response.status_code == 200
+    tree = HTMLParser(response.text)
+    assert tree.css_first(f'a[href="/provider-profiles/{profile_id}/form"]') is None
 
 
 async def test_get_profile_returns_404_for_unknown_id(
@@ -170,19 +202,25 @@ async def test_get_profile_returns_404_for_unknown_id(
     assert response.status_code == 404
 
 
-async def test_get_my_profile_returns_my_profile(
+async def test_get_my_profile_renders_detail_page(
     authenticated_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user: User,
 ):
+    """`GET /provider-profiles/me` renders the same detail template for the
+    requesting user's profile."""
     profile_id = await _seed_profile_for(
-        db_test_session_manager, user_id=logged_in_user.id
+        db_test_session_manager, user_id=logged_in_user.id, practice_name="Solo"
     )
 
     response = await authenticated_client.get("/provider-profiles/me")
 
     assert response.status_code == 200
-    assert response.json()["id"] == str(profile_id)
+    assert response.headers["content-type"].startswith("text/html")
+    tree = HTMLParser(response.text)
+    assert "Solo" in tree.css_first("h1").text()
+    # Owner — Edit link is present.
+    assert tree.css_first(f'a[href="/provider-profiles/{profile_id}/form"]') is not None
 
 
 async def test_get_my_profile_returns_404_when_not_created(
@@ -619,7 +657,10 @@ async def test_form_route_does_not_shadow_get_by_id(
     )
     response = await authenticated_client.get(f"/provider-profiles/{profile_id}")
     assert response.status_code == 200
-    assert response.json()["id"] == str(profile_id)
+    assert response.headers["content-type"].startswith("text/html")
+    # The detail page links back to the edit form for the same id, which is
+    # only present when the profile was actually loaded.
+    assert f"/provider-profiles/{profile_id}/form" in response.text
 
 
 # --- Edit form page (GET /provider-profiles/{id}/form) -------------------

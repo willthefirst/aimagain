@@ -139,25 +139,33 @@ async def handle_list_profiles(
     )
 
 
-async def handle_get_profile(
+async def handle_get_provider_profile_detail(
+    request: Request,
     profile_id: UUID,
     repo: ProviderProfileRepository,
     requesting_user: User,
-) -> ProviderProfile:
-    """Authenticated read of any profile by id; 404 if missing."""
-    return await _load_profile_or_404(profile_id, repo)
+) -> dict[str, Any]:
+    """Loads any profile by id for the read-only detail page; 404 if missing.
+
+    The repo's `get_by_id` eager-loads `licensures`, `educations`, and
+    `certifications` via `lazy="selectin"`, so the template can render
+    each sub-section without further queries.
+    """
+    profile = await _load_profile_or_404(profile_id, repo)
+    return {"request": request, "profile": profile, "current_user": requesting_user}
 
 
-async def handle_get_my_profile(
+async def handle_get_my_provider_profile_detail(
+    request: Request,
     repo: ProviderProfileRepository,
     requesting_user: User,
-) -> ProviderProfile:
-    """Returns the requesting user's profile; 404 if they have not created one yet
-    (profiles are not auto-created on registration)."""
+) -> dict[str, Any]:
+    """Returns the requesting user's profile context; 404 if they have not
+    created one yet (profiles are not auto-created on registration)."""
     profile = await repo.get_by_user_id(requesting_user.id)
     if profile is None:
         raise NotFoundError(detail="You do not have a provider profile yet")
-    return profile
+    return {"request": request, "profile": profile, "current_user": requesting_user}
 
 
 async def handle_get_provider_profile_form(
