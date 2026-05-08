@@ -1,14 +1,15 @@
 import logging
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Query, Request, Response, status
-from fastapi.responses import JSONResponse
+from fastapi import APIRouter, Depends, Query, Request, status
 
 from src.api.common import (
     APIResponse,
     BaseRouter,
-    parse_form_to_payload,
-    validate_or_422,
+    created_response,
+    deleted_response,
+    parse_and_validate_form,
+    updated_response,
 )
 from src.auth_config import current_active_user
 from src.logic.providers.provider_processing import (
@@ -104,20 +105,17 @@ async def create_provider(
 ):
     """Creates a provider owned by the requesting user. Form-encoded
     body. A user may own multiple profiles."""
-    payload_dict = await parse_form_to_payload(request)
-    payload = validate_or_422(provider_create_adapter, payload_dict)
+    payload = await parse_and_validate_form(request, provider_create_adapter)
     created = await handle_create_provider(
         payload=payload,
         repo=repo,
         audit_repo=audit_repo,
         requesting_user=user,
     )
-    detail_location = f"/providers/{created.id}"
-    edit_location = f"/providers/{created.id}/form"
-    return JSONResponse(
-        status_code=status.HTTP_201_CREATED,
-        content={"id": str(created.id)},
-        headers={"Location": detail_location, "HX-Redirect": edit_location},
+    return created_response(
+        id=created.id,
+        location=f"/providers/{created.id}",
+        hx_redirect=f"/providers/{created.id}/form",
     )
 
 
@@ -196,8 +194,7 @@ async def patch_profile(
 ):
     """Partially updates the practice/availability fields. Owner-only; admins
     may edit any profile. Sub-entity lists are managed via their own routes."""
-    payload_dict = await parse_form_to_payload(request)
-    payload = validate_or_422(provider_update_adapter, payload_dict)
+    payload = await parse_and_validate_form(request, provider_update_adapter)
     updated = await handle_update_provider(
         provider_id=provider_id,
         payload=payload,
@@ -205,10 +202,9 @@ async def patch_profile(
         audit_repo=audit_repo,
         requesting_user=user,
     )
-    location = f"/providers/{updated.id}/form"
-    return JSONResponse(
-        content=_provider_read_dict(updated),
-        headers={"HX-Redirect": location},
+    return updated_response(
+        body=_provider_read_dict(updated),
+        hx_redirect=f"/providers/{updated.id}/form",
     )
 
 
@@ -227,10 +223,7 @@ async def delete_provider(
         audit_repo=audit_repo,
         requesting_user=user,
     )
-    return Response(
-        status_code=status.HTTP_204_NO_CONTENT,
-        headers={"HX-Redirect": "/providers"},
-    )
+    return deleted_response(hx_redirect="/providers")
 
 
 # --- Licensure sub-resource ---------------------------------------------
@@ -244,8 +237,7 @@ async def create_licensure(
     audit_repo: AuditRepository = Depends(get_audit_repository),
     user: User = Depends(current_active_user),
 ):
-    payload_dict = await parse_form_to_payload(request)
-    payload = validate_or_422(licensure_create_adapter, payload_dict)
+    payload = await parse_and_validate_form(request, licensure_create_adapter)
     created = await handle_create_licensure(
         provider_id=provider_id,
         payload=payload,
@@ -253,12 +245,10 @@ async def create_licensure(
         audit_repo=audit_repo,
         requesting_user=user,
     )
-    parent_location = f"/providers/{provider_id}"
-    edit_location = f"/providers/{provider_id}/form"
-    return JSONResponse(
-        status_code=status.HTTP_201_CREATED,
-        content={"id": str(created.id)},
-        headers={"Location": parent_location, "HX-Redirect": edit_location},
+    return created_response(
+        id=created.id,
+        location=f"/providers/{provider_id}",
+        hx_redirect=f"/providers/{provider_id}/form",
     )
 
 
@@ -271,8 +261,7 @@ async def patch_licensure(
     audit_repo: AuditRepository = Depends(get_audit_repository),
     user: User = Depends(current_active_user),
 ):
-    payload_dict = await parse_form_to_payload(request)
-    payload = validate_or_422(licensure_update_adapter, payload_dict)
+    payload = await parse_and_validate_form(request, licensure_update_adapter)
     updated = await handle_update_licensure(
         provider_id=provider_id,
         licensure_id=licensure_id,
@@ -281,10 +270,9 @@ async def patch_licensure(
         audit_repo=audit_repo,
         requesting_user=user,
     )
-    location = f"/providers/{provider_id}/form"
-    return JSONResponse(
-        content=_licensure_read_dict(updated),
-        headers={"HX-Redirect": location},
+    return updated_response(
+        body=_licensure_read_dict(updated),
+        hx_redirect=f"/providers/{provider_id}/form",
     )
 
 
@@ -306,10 +294,7 @@ async def delete_licensure(
         audit_repo=audit_repo,
         requesting_user=user,
     )
-    return Response(
-        status_code=status.HTTP_204_NO_CONTENT,
-        headers={"HX-Redirect": f"/providers/{provider_id}/form"},
-    )
+    return deleted_response(hx_redirect=f"/providers/{provider_id}/form")
 
 
 # --- Education sub-resource ---------------------------------------------
@@ -323,8 +308,7 @@ async def create_education(
     audit_repo: AuditRepository = Depends(get_audit_repository),
     user: User = Depends(current_active_user),
 ):
-    payload_dict = await parse_form_to_payload(request)
-    payload = validate_or_422(education_create_adapter, payload_dict)
+    payload = await parse_and_validate_form(request, education_create_adapter)
     created = await handle_create_education(
         provider_id=provider_id,
         payload=payload,
@@ -332,12 +316,10 @@ async def create_education(
         audit_repo=audit_repo,
         requesting_user=user,
     )
-    parent_location = f"/providers/{provider_id}"
-    edit_location = f"/providers/{provider_id}/form"
-    return JSONResponse(
-        status_code=status.HTTP_201_CREATED,
-        content={"id": str(created.id)},
-        headers={"Location": parent_location, "HX-Redirect": edit_location},
+    return created_response(
+        id=created.id,
+        location=f"/providers/{provider_id}",
+        hx_redirect=f"/providers/{provider_id}/form",
     )
 
 
@@ -350,8 +332,7 @@ async def patch_education(
     audit_repo: AuditRepository = Depends(get_audit_repository),
     user: User = Depends(current_active_user),
 ):
-    payload_dict = await parse_form_to_payload(request)
-    payload = validate_or_422(education_update_adapter, payload_dict)
+    payload = await parse_and_validate_form(request, education_update_adapter)
     updated = await handle_update_education(
         provider_id=provider_id,
         education_id=education_id,
@@ -360,10 +341,9 @@ async def patch_education(
         audit_repo=audit_repo,
         requesting_user=user,
     )
-    location = f"/providers/{provider_id}/form"
-    return JSONResponse(
-        content=_education_read_dict(updated),
-        headers={"HX-Redirect": location},
+    return updated_response(
+        body=_education_read_dict(updated),
+        hx_redirect=f"/providers/{provider_id}/form",
     )
 
 
@@ -385,10 +365,7 @@ async def delete_education(
         audit_repo=audit_repo,
         requesting_user=user,
     )
-    return Response(
-        status_code=status.HTTP_204_NO_CONTENT,
-        headers={"HX-Redirect": f"/providers/{provider_id}/form"},
-    )
+    return deleted_response(hx_redirect=f"/providers/{provider_id}/form")
 
 
 # --- Certification sub-resource -----------------------------------------
@@ -402,8 +379,7 @@ async def create_certification(
     audit_repo: AuditRepository = Depends(get_audit_repository),
     user: User = Depends(current_active_user),
 ):
-    payload_dict = await parse_form_to_payload(request)
-    payload = validate_or_422(certification_create_adapter, payload_dict)
+    payload = await parse_and_validate_form(request, certification_create_adapter)
     created = await handle_create_certification(
         provider_id=provider_id,
         payload=payload,
@@ -411,12 +387,10 @@ async def create_certification(
         audit_repo=audit_repo,
         requesting_user=user,
     )
-    parent_location = f"/providers/{provider_id}"
-    edit_location = f"/providers/{provider_id}/form"
-    return JSONResponse(
-        status_code=status.HTTP_201_CREATED,
-        content={"id": str(created.id)},
-        headers={"Location": parent_location, "HX-Redirect": edit_location},
+    return created_response(
+        id=created.id,
+        location=f"/providers/{provider_id}",
+        hx_redirect=f"/providers/{provider_id}/form",
     )
 
 
@@ -429,8 +403,7 @@ async def patch_certification(
     audit_repo: AuditRepository = Depends(get_audit_repository),
     user: User = Depends(current_active_user),
 ):
-    payload_dict = await parse_form_to_payload(request)
-    payload = validate_or_422(certification_update_adapter, payload_dict)
+    payload = await parse_and_validate_form(request, certification_update_adapter)
     updated = await handle_update_certification(
         provider_id=provider_id,
         certification_id=certification_id,
@@ -439,10 +412,9 @@ async def patch_certification(
         audit_repo=audit_repo,
         requesting_user=user,
     )
-    location = f"/providers/{provider_id}/form"
-    return JSONResponse(
-        content=_certification_read_dict(updated),
-        headers={"HX-Redirect": location},
+    return updated_response(
+        body=_certification_read_dict(updated),
+        hx_redirect=f"/providers/{provider_id}/form",
     )
 
 
@@ -464,7 +436,4 @@ async def delete_certification(
         audit_repo=audit_repo,
         requesting_user=user,
     )
-    return Response(
-        status_code=status.HTTP_204_NO_CONTENT,
-        headers={"HX-Redirect": f"/providers/{provider_id}/form"},
-    )
+    return deleted_response(hx_redirect=f"/providers/{provider_id}/form")
