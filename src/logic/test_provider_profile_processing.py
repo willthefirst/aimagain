@@ -26,7 +26,7 @@ from src.logic.provider_profile_processing import (
     handle_delete_profile,
     handle_get_my_provider_profile_detail,
     handle_get_provider_profile_detail,
-    handle_list_profiles,
+    handle_list_provider_profiles,
     handle_update_certification,
     handle_update_education,
     handle_update_licensure,
@@ -157,7 +157,7 @@ async def _audit_rows_for(
 # --- Profile reads -------------------------------------------------------
 
 
-async def test_list_profiles_returns_persisted_profiles(
+async def test_list_provider_profiles_returns_persisted_profiles(
     db_test_session_manager: async_sessionmaker[AsyncSession],
 ):
     user_a = await _seed_user(db_test_session_manager)
@@ -167,11 +167,15 @@ async def test_list_profiles_returns_persisted_profiles(
 
     async with db_test_session_manager() as session:
         repo = ProviderProfileRepository(session)
-        result = await handle_list_profiles(repo)
-        assert len(result) == 2
+        context = await handle_list_provider_profiles(
+            request=_fake_request(), repo=repo
+        )
+        assert len(context["profiles"]) == 2
+        assert context["selected_license_type"] is None
+        assert context["selected_issuing_state"] is None
 
 
-async def test_list_profiles_filters_by_license_type(
+async def test_list_provider_profiles_filters_by_license_type(
     db_test_session_manager: async_sessionmaker[AsyncSession],
 ):
     user_a = await _seed_user(db_test_session_manager)
@@ -189,8 +193,11 @@ async def test_list_profiles_filters_by_license_type(
 
     async with db_test_session_manager() as session:
         repo = ProviderProfileRepository(session)
-        result = await handle_list_profiles(repo, license_type="lcsw")
-        assert [p.id for p in result] == [profile_a]
+        context = await handle_list_provider_profiles(
+            request=_fake_request(), repo=repo, license_type="lcsw"
+        )
+        assert [p.id for p in context["profiles"]] == [profile_a]
+        assert context["selected_license_type"] == "lcsw"
 
 
 async def test_get_provider_profile_detail_returns_context(

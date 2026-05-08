@@ -234,37 +234,61 @@ async def test_get_my_profile_returns_404_when_not_created(
 # --- Profile listing -----------------------------------------------------
 
 
-async def test_list_profiles_is_public(
+async def test_list_profiles_renders_html_for_public(
     test_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],
 ):
-    """The list endpoint requires no authentication."""
+    """The list endpoint requires no authentication and renders an HTML
+    page with one entry per persisted profile."""
     other = create_test_user(username=f"public-{uuid.uuid4()}")
     async with db_test_session_manager() as session:
         async with session.begin():
             session.add(other)
-    await _seed_profile_for(db_test_session_manager, user_id=other.id)
+    profile_id = await _seed_profile_for(
+        db_test_session_manager, user_id=other.id, practice_name="Open House"
+    )
 
     response = await test_client.get("/provider-profiles")
 
     assert response.status_code == 200
-    assert isinstance(response.json(), list)
-    assert len(response.json()) == 1
+    assert response.headers["content-type"].startswith("text/html")
+    tree = HTMLParser(response.text)
+    items = tree.css("ul.profiles-list li")
+    assert len(items) == 1
+    assert tree.css_first(f'a[href="/provider-profiles/{profile_id}"]') is not None
+    assert "Open House" in response.text
+
+
+async def test_list_profiles_renders_empty_state(
+    test_client: AsyncClient,
+):
+    """With no persisted profiles, the page renders a friendly empty
+    message instead of an empty `<ul>`."""
+    response = await test_client.get("/provider-profiles")
+    assert response.status_code == 200
+    assert "No provider profiles found" in response.text
+    tree = HTMLParser(response.text)
+    assert tree.css_first("ul.profiles-list") is None
 
 
 async def test_list_profiles_filters_by_license_type(
     test_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],
 ):
-    """`?license_type=` keeps only profiles holding a matching licensure."""
+    """`?license_type=` keeps only profiles holding a matching licensure;
+    the filter form preselects the active value."""
     user_a = create_test_user(username=f"ua-{uuid.uuid4()}")
     user_b = create_test_user(username=f"ub-{uuid.uuid4()}")
     async with db_test_session_manager() as session:
         async with session.begin():
             session.add(user_a)
             session.add(user_b)
-    profile_a = await _seed_profile_for(db_test_session_manager, user_id=user_a.id)
-    profile_b = await _seed_profile_for(db_test_session_manager, user_id=user_b.id)
+    profile_a = await _seed_profile_for(
+        db_test_session_manager, user_id=user_a.id, practice_name="A clinic"
+    )
+    profile_b = await _seed_profile_for(
+        db_test_session_manager, user_id=user_b.id, practice_name="B clinic"
+    )
 
     async with db_test_session_manager() as session:
         async with session.begin():
@@ -278,9 +302,15 @@ async def test_list_profiles_filters_by_license_type(
     response = await test_client.get("/provider-profiles?license_type=psyd")
 
     assert response.status_code == 200
-    body = response.json()
-    assert len(body) == 1
-    assert body[0]["id"] == str(profile_a)
+    tree = HTMLParser(response.text)
+    items = tree.css("ul.profiles-list li")
+    assert len(items) == 1
+    assert tree.css_first(f'a[href="/provider-profiles/{profile_a}"]') is not None
+    assert tree.css_first(f'a[href="/provider-profiles/{profile_b}"]') is None
+    # Filter form preserves the active selection.
+    selected = tree.css_first('select[name="license_type"] option[selected]')
+    assert selected is not None
+    assert selected.attributes.get("value") == "psyd"
 
 
 # --- Profile update ------------------------------------------------------
