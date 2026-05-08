@@ -263,12 +263,21 @@ async def test_list_profiles_renders_empty_state(
     test_client: AsyncClient,
 ):
     """With no persisted profiles, the page renders a friendly empty
-    message instead of an empty `<ul>`."""
+    message instead of an empty `<ul>`. With no filter set, the filter
+    form's `<option value="">Any</option>` is the preselected entry on
+    each `<select>` (the `filter_select_field` macro contract)."""
     response = await test_client.get("/provider-profiles")
     assert response.status_code == 200
     assert "No provider profiles found" in response.text
     tree = HTMLParser(response.text)
     assert tree.css_first("ul.profiles-list") is None
+    for select_name in ("license_type", "issuing_state"):
+        selected = tree.css_first(f'select[name="{select_name}"] option[selected]')
+        assert selected is not None
+        # The "Any" option carries `value=""`, which selectolax surfaces
+        # as a None attribute value rather than the empty string.
+        assert selected.attributes.get("value", "missing") is None
+        assert selected.text().strip() == "Any"
 
 
 async def test_list_profiles_filters_by_license_type(

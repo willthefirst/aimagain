@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{%- from "posts/_form_macros.html" import filter_select_field -%}
 {% block title %}Provider profiles{% endblock %}
 {% block content %}
 <h1>Provider profiles</h1>
@@ -6,24 +7,8 @@
 <form method="get" action="/provider-profiles">
   <fieldset>
     <legend>Filter</legend>
-    <label>
-      License type
-      <select name="license_type">
-        <option value="">Any</option>
-        {%- for value in LICENSE_TYPES %}
-        <option value="{{ value }}"{% if value == selected_license_type %} selected{% endif %}>{{ LICENSE_TYPES_LABELS[value] }}</option>
-        {%- endfor %}
-      </select>
-    </label>
-    <label>
-      Issuing state
-      <select name="issuing_state">
-        <option value="">Any</option>
-        {%- for value in US_STATES %}
-        <option value="{{ value }}"{% if value == selected_issuing_state %} selected{% endif %}>{{ value }}</option>
-        {%- endfor %}
-      </select>
-    </label>
+    {{ filter_select_field("license_type", "License type", LICENSE_TYPES, labels=LICENSE_TYPES_LABELS, current=selected_license_type) }}
+    {{ filter_select_field("issuing_state", "Issuing state", US_STATES, current=selected_issuing_state) }}
     <input type="submit" value="Apply" />
     <a href="/provider-profiles">Clear</a>
   </fieldset>
