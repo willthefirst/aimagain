@@ -83,26 +83,19 @@ The set of allowed kinds — and the per-kind detail relationship + field metada
 
 Adding a kind is therefore: (1) a registry entry in `posts/post_kinds.py`, (2) a new detail model file under `posts/` + a `relationship(...)` line on `Post`, (3) the four Pydantic variant classes in `src/schemas/post.py`, (4) the per-kind templates under `src/templates/posts/`, (5) an Alembic migration. Removing a kind is the inverse. No edits in routes, repositories, or logic — those layers are registry-driven. The consistency tests in [`posts/test_post_kinds.py`](posts/test_post_kinds.py) guard against re-encoding the kind set inline anywhere new.
 
-## Directory structure
+## Layer organization
 
-**Domain clusters:**
+Models follow the [cluster pattern](../README.md#domain-entities-and-the-cluster-pattern):
 
-- [`posts/`](posts/) - Parent `Post` model + the per-kind detail tables + the kind registry. See [`posts/README.md`](posts/README.md) for the cluster's README, file inventory, and "adding a new kind" recipe.
-- [`providers/`](providers/) - Provider directory entry + the three credential sub-record types (licensure, education, certification). See [`providers/README.md`](providers/README.md) for the cluster's README, file inventory, and "adding a new credential type" recipe. Distinct from `posts/provider_availability_detail.py` (per-`Post`); a `Provider` describes a provider directly.
+- One cluster directory per domain entity (`<entity>/`). Each holds the SQLAlchemy table classes for that entity (parent table, sub-records, type registries if discriminator-based) plus colocated tests. Per-entity schema specifics, relationships, cascade behavior, and any "adding a variant" recipe live inside the cluster, with a `<entity>/README.md` describing what's there.
+- Parent-level shared tier:
+  - `base.py` — `BaseModel` with common fields (id, timestamps, soft deletion). Every model inherits from it.
+  - `enums.py` — Controlled-vocabulary tuples + `*_LABELS` dicts + a `check_in_tuple_sql` helper that renders DB-level `CHECK` fragments from a tuple. The single source of truth that schemas (`Literal[*TUPLE]`), form macros (Jinja globals), and DB constraints all derive from. Lives at the parent level because 2+ clusters depend on it — and is a *leaf* (no internal imports), so any cluster can import from it without cycling back through cluster code.
+  - `audit_log.py` — Append-only mutation record. See [`api/routes/RESOURCE_GRAMMAR.md`](../api/routes/RESOURCE_GRAMMAR.md).
+  - `user.py` — User authentication and profile (extends FastAPI Users). Lives at the parent today because it predates clustering and has no internal complexity that would justify a `users/` cluster yet; this is the same exception path that any single-file entity follows until the cluster pulls its weight.
+  - `__init__.py` — Re-exports model classes and constants. External code should always import from `src.models` (e.g. `from src.models import Post, REGISTERED_KINDS`); the `__init__.py` keeps that surface stable across cluster moves.
 
-**Singletons at the parent level:**
-
-- `user.py` - User authentication and profile (extends FastAPI Users).
-- `audit_log.py` - Append-only mutation record (see RESOURCE_GRAMMAR.md).
-
-**Shared at the parent level (consumed by multiple clusters):**
-
-- `enums.py` - Controlled-vocabulary tuples shared across model clusters. Both the `posts/` per-kind detail tables and the provider sub-records consume these (`US_STATES`, `LOCATION_AVAILABILITY_OPTIONS`, the post-detail demographic/insurance/desired-times vocabularies, the `LICENSE_TYPES` / `EDUCATION_TYPES` / `CERTIFICATION_TYPES` credential vocabularies). Plus a `check_in_tuple_sql` helper that renders DB-level CHECK fragments from a tuple, and matching `*_LABELS` dicts that hold the human-readable label for each value. Single source of truth — `src/schemas/post.py` and `src/schemas/provider.py` derive their `Literal[*TUPLE]`s from the tuples here, and the form-render macros in `src/templates/_shared/form_fields.html` iterate over them via Jinja globals. Two guardrail tests in `src/schemas/test_post.py` keep the schema literals + the label dicts in lockstep with the tuples. Lives at the parent level (not inside any cluster) precisely because both clusters depend on it; nesting it under either would force the other to reach across cluster boundaries to import it. The module is also a leaf — depending on nothing — so detail models can import it without dragging in `posts/post_kinds.py` (which depends on the detail models in turn).
-
-**Infrastructure:**
-
-- `base.py` - BaseModel with common fields (id, timestamps, soft deletion).
-- `__init__.py` - Re-exports model classes and constants from the cluster subdirs and the parent-level files. External code should always import from `src.models` (e.g. `from src.models import Post, REGISTERED_KINDS`); the `__init__.py` keeps that surface stable across cluster moves.
+A model in cluster A does not import from cluster B; if two clusters need a shared primitive, hoist it to the parent level (the path `enums.py` took).
 
 ## Implementation patterns
 

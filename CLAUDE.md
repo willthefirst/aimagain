@@ -32,6 +32,18 @@ Each fact has exactly **one home**: the README closest to the code or config tha
 
 If you find a fact stated in two places, **one of them is wrong** — even if both currently agree, they will drift. Pick the one closest to the code, leave it there, and replace the other with a link. The Stop hook only catches drift between code and its colocated README/test; cross-cutting drift (e.g. CLI commands documented in the root README) can only be prevented by not duplicating in the first place.
 
+## Grammar, not alphabet
+
+A parent README expresses the **grammar** of what's in the directory below it — the shape, the rules, the contract every child must follow. It does not enumerate the **alphabet** — the specific entities, files, or counts that exist today.
+
+A grammar is stable across churn: "every cluster directory represents one domain entity; cluster files may import from same cluster + the layer's shared tier." An alphabet drifts every time you add or rename an entity: "currently we have posts, providers, users, auth, audit." The directory listing IS the alphabet — `ls src/<layer>/` is the source of truth for what entities exist.
+
+A useful tell: when you write "currently X" in a parent README, you're describing alphabet. Replace with the grammar (what role X plays for *any* entity) and a pointer to the directory. When you write "always", "must", or "may", you're describing grammar — keep it.
+
+The same rule applies recursively. A cluster's own README (`<layer>/<entity>/README.md`) is the right home for facts about that specific entity — there, the entity *is* the subject, not part of an alphabet. The parent points down to clusters; clusters describe themselves; the parent doesn't restate them.
+
+This complements the [single-source-of-truth rule](#one-source-of-truth--link-dont-copy): that rule says facts have one home; this rule says parent READMEs prefer rules over rosters.
+
 ## Where to look
 
 | Topic | Where it lives |

@@ -77,35 +77,16 @@ async def handle_set_user_activation(user_id, payload, user_repo, requesting_use
     return updated
 ```
 
-## Processing responsibility matrix
+## Layer organization
 
-| Module                    | Purpose                              | Key Functions                  |
-| ------------------------- | ------------------------------------ | ------------------------------ |
-| **users/user_processing.py**    | User operation coordination          | list users with filtering, get user detail (loads target user plus the providers they own — embedded list is gated only by the existing user-detail auth since the same data is public via `/providers`), set activation (writes audit row, commits), delete user (audit row recorded before the delete fires; commits) |
-| **posts/post_processing.py**    | Post operation coordination          | list posts, get post detail, create post (server-sets `owner_id`, dispatches on `payload.kind` to build the matching detail row — `NoteDetail` or `ClientReferralDetail` — writes audit row, commits), update post (owner-or-admin guard, 400 on `payload.kind` ≠ `post.kind` since kind is part of resource identity, before/after audit snapshot via `post_audit_snapshot`, commits), delete post (owner-or-admin guard, audit row recorded before the delete fires with `after=None`, commits — CASCADE removes the detail), build create- and edit-form contexts |
-| **providers/provider_processing.py** | Provider + credential sub-table coordination | `handle_list_providers` returns the public list-page template context (with optional `license_type`/`issuing_state` filters echoed back as `selected_*` keys for the filter form); `handle_get_provider_detail` returns the read-only detail-page template context (sub-rows eager-loaded via `lazy="selectin"`). `handle_list_user_providers` returns the user-scoped list (providers owned by a target user; self-or-admin auth; 404 if target user missing) and powers both `GET /users/{id}/providers` and the `GET /users/me/providers` alias. Plus create / update / delete provider (owner-or-admin guard on mutations, single audit row per top-level mutation; create accepts inline licensures/educations/certifications and the `CREATE_PROVIDER` snapshot embeds them; delete cascades sub-rows in the DB and emits one `DELETE_PROVIDER` row whose `before` captures the full nested state). Plus create/update/delete handlers for each of the three credential sub-tables, each one verifying that the URL's `provider_id` matches the sub-row's `provider_id` (404 on mismatch). `handle_get_provider_form` builds the create-form template context (no DB read; mirror of `handle_get_post_form`); `handle_get_provider_edit_form` loads the provider and enforces the owner-or-admin guard for the edit page. New `AuditAction` values for all twelve mutations live in [`audit.py`](audit.py). |
-| **audit.py** *(parent-level shared tier)* | Audit-log helper + mutation context manager | `record_audit(...)` — append-only mutation row per `RESOURCE_GRAMMAR.md:135`; flushes inside the caller's transaction so the audit lands atomically with the mutation. `AuditedResource` bundles the (`resource_type`, snapshotter, create/update/delete `AuditAction` triple) for a CRUD-shaped resource; `record_audit_for(audit_repo, resource=..., verb=...)` derives `resource_type` and `action` from the bundle. `mutate(repo, audit_repo, actor=..., target=..., resource=..., verb=...)` is the async context manager that wraps the snapshot-before / mutate / record_audit / commit ritual — caller does the mutation inside the `async with` body; on a clean exit `mutate` snapshots, audits, and commits. On exception the audit row and commit are skipped so the transaction rolls back atomically (load-bearing — an audit row must never be durable without its mutation). Non-CRUD audits (register, set-activation, etc.) keep using `record_audit(...)` directly. |
-| **auth/auth_processing.py**    | Authentication workflow coordination | user registration processing (writes a `register` audit row with `actor_id=None`; best-effort atomicity since fastapi-users commits internally) |
+Logic follows the [cluster pattern](../README.md#domain-entities-and-the-cluster-pattern):
 
-## Directory structure
+- One cluster directory per domain entity (`<entity>/`). Each holds `<entity>_processing.py` with the `handle_*` functions that orchestrate that entity's operations, plus `test_<entity>_processing.py`. Per-entity workflow specifics — auth gates, audit-snapshot shapes, transaction boundaries — live inside the cluster, with a `<entity>/README.md` if anything is non-obvious.
+- Parent-level shared tier:
+  - `audit.py` — `record_audit(...)`, `record_audit_for(...)`, and the `mutate(...)` async context manager. Every mutation handler imports from here. The `mutate` ritual snapshots before, performs the mutation in the `async with` body, audits, and commits on clean exit; on exception the audit row and the commit are both skipped so the transaction rolls back atomically (load-bearing — an audit row must never be durable without its mutation). Non-CRUD audits (register, set-activation, etc.) use `record_audit(...)` directly.
+  - `test_audit_discipline.py` — static AST check across every `*_processing.py` (recursively, so cluster directories are covered) that fails if a `handle_*` function calls `.commit()` without a `record_audit(...)`, `record_audit_for(...)`, or `mutate(...)` call. Enforces [`RESOURCE_GRAMMAR.md`'s audit rule](../api/routes/RESOURCE_GRAMMAR.md). Opt out per-handler with `audit-discipline-ignore: <reason>` in the docstring.
 
-Logic follows the [cluster pattern](../README.md#domain-entities-and-the-cluster-pattern): one cluster directory per entity; `audit.py` stays at the parent level as the shared tier (every mutation handler imports from it).
-
-```
-logic/
-├── audit.py                                # [shared] mutation context manager + record_audit
-├── test_audit.py                           # [shared] tests for audit.py
-├── test_audit_discipline.py                # [shared] AST check across all *_processing.py
-├── posts/
-│   └── post_processing.py
-├── providers/
-│   ├── provider_processing.py
-│   └── test_provider_processing.py
-├── users/
-│   └── user_processing.py
-└── auth/
-    └── auth_processing.py
-```
+A processing module does not import from a peer cluster's processing module; if a workflow needs to coordinate two entities, the parent-level orchestrator is the right home (or a single handler in one cluster that uses the other cluster's repositories, when the dependency direction is clear).
 
 ## Implementation patterns
 
