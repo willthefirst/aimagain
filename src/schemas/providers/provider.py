@@ -30,7 +30,7 @@ import uuid
 from datetime import date, datetime
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, model_validator
+from pydantic import BaseModel, ConfigDict, TypeAdapter, model_validator
 
 from src.models.enums import (
     CERTIFICATION_TYPES,
@@ -66,6 +66,9 @@ class ProviderLicensureCreate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
 
+licensure_create_adapter: TypeAdapter = TypeAdapter(ProviderLicensureCreate)
+
+
 class ProviderLicensureUpdate(BaseModel):
     license_type: Literal[*LICENSE_TYPES] | None = None
     license_number: StrippedText | None = None
@@ -78,6 +81,9 @@ class ProviderLicensureUpdate(BaseModel):
     def _at_least_one_field(self) -> "ProviderLicensureUpdate":
         assert_any_field_set(self)
         return self
+
+
+licensure_update_adapter: TypeAdapter = TypeAdapter(ProviderLicensureUpdate)
 
 
 class ProviderLicensureAuditSnapshot(BaseModel):
@@ -119,6 +125,9 @@ class ProviderEducationCreate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
 
+education_create_adapter: TypeAdapter = TypeAdapter(ProviderEducationCreate)
+
+
 class ProviderEducationUpdate(BaseModel):
     education_type: Literal[*EDUCATION_TYPES] | None = None
     institution: StrippedText | None = None
@@ -130,6 +139,9 @@ class ProviderEducationUpdate(BaseModel):
     def _at_least_one_field(self) -> "ProviderEducationUpdate":
         assert_any_field_set(self)
         return self
+
+
+education_update_adapter: TypeAdapter = TypeAdapter(ProviderEducationUpdate)
 
 
 class ProviderEducationAuditSnapshot(BaseModel):
@@ -167,6 +179,9 @@ class ProviderCertificationCreate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
 
+certification_create_adapter: TypeAdapter = TypeAdapter(ProviderCertificationCreate)
+
+
 class ProviderCertificationUpdate(BaseModel):
     certification_type: Literal[*CERTIFICATION_TYPES] | None = None
     certifying_body: StrippedText | None = None
@@ -178,6 +193,9 @@ class ProviderCertificationUpdate(BaseModel):
     def _at_least_one_field(self) -> "ProviderCertificationUpdate":
         assert_any_field_set(self)
         return self
+
+
+certification_update_adapter: TypeAdapter = TypeAdapter(ProviderCertificationUpdate)
 
 
 class ProviderCertificationAuditSnapshot(BaseModel):
@@ -231,6 +249,9 @@ class ProviderCreate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
 
+provider_create_adapter: TypeAdapter = TypeAdapter(ProviderCreate)
+
+
 class ProviderUpdate(BaseModel):
     """Partial update of practice/availability fields only. Sub-entity
     lists (licensures, educations, certifications) are managed via
@@ -249,6 +270,9 @@ class ProviderUpdate(BaseModel):
     def _at_least_one_field(self) -> "ProviderUpdate":
         assert_any_field_set(self)
         return self
+
+
+provider_update_adapter: TypeAdapter = TypeAdapter(ProviderUpdate)
 
 
 class ProviderAuditSnapshot(BaseModel):
