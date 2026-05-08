@@ -18,8 +18,8 @@ Controlled-vocabulary fields (state, license type, etc.) are typed as
 `Literal[*TUPLE]` against the tuples in `src/models/post_enums.py` so
 the schema's accepted values stay in lockstep with the DB CHECK
 constraints. Free-text fields reuse `StrippedText` and `ZipText` from
-[`src/schemas/post.py`](post.py) — defining them once means one source
-of truth for the cleaning rule.
+[`src/schemas/_validators.py`](_validators.py) — defining them once
+means one source of truth for the cleaning rule.
 
 A guardrail test in `test_provider_profile.py`
 (`test_schema_literals_match_model_tuples`) keeps the `Literal`
@@ -39,20 +39,7 @@ from src.models.post_enums import (
     LOCATION_AVAILABILITY_OPTIONS,
     US_STATES,
 )
-from src.schemas.post import StrippedText, ZipText
-
-# --- Shared helpers -----------------------------------------------------
-
-
-def _assert_any_field_set(model: BaseModel) -> None:
-    """Raise `ValueError` if every field on `model` is `None`. Shared
-    between the Update variants so the at-least-one-field rule lives in
-    one place. Provider Update schemas have no discriminator, so all
-    declared fields participate."""
-    fields = type(model).model_fields
-    if all(getattr(model, name) is None for name in fields):
-        raise ValueError("at least one editable field must be provided")
-
+from src.schemas._validators import StrippedText, ZipText, assert_any_field_set
 
 # --- ProviderLicensure --------------------------------------------------
 
@@ -89,7 +76,7 @@ class ProviderLicensureUpdate(BaseModel):
 
     @model_validator(mode="after")
     def _at_least_one_field(self) -> "ProviderLicensureUpdate":
-        _assert_any_field_set(self)
+        assert_any_field_set(self)
         return self
 
 
@@ -141,7 +128,7 @@ class ProviderEducationUpdate(BaseModel):
 
     @model_validator(mode="after")
     def _at_least_one_field(self) -> "ProviderEducationUpdate":
-        _assert_any_field_set(self)
+        assert_any_field_set(self)
         return self
 
 
@@ -189,7 +176,7 @@ class ProviderCertificationUpdate(BaseModel):
 
     @model_validator(mode="after")
     def _at_least_one_field(self) -> "ProviderCertificationUpdate":
-        _assert_any_field_set(self)
+        assert_any_field_set(self)
         return self
 
 
@@ -260,7 +247,7 @@ class ProviderProfileUpdate(BaseModel):
 
     @model_validator(mode="after")
     def _at_least_one_field(self) -> "ProviderProfileUpdate":
-        _assert_any_field_set(self)
+        assert_any_field_set(self)
         return self
 
 
