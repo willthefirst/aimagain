@@ -54,13 +54,16 @@ async def get_user(
     user_id: UUID,
     request: Request,
     user_repo: UserRepository = Depends(get_user_repository),
+    profile_repo: ProviderProfileRepository = Depends(get_provider_profile_repository),
     user: User = Depends(current_active_user),
 ):
-    """Provides an HTML detail page for a single user."""
+    """Provides an HTML detail page for a single user, including the list
+    of provider profiles they own."""
     context = await handle_get_user_detail(
         request=request,
         user_id=user_id,
         user_repo=user_repo,
+        profile_repo=profile_repo,
         requesting_user=user,
     )
     return APIResponse.html_response(
