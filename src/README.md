@@ -102,6 +102,31 @@ Logic-layer `handle_*` functions raise the API exception subclasses directly —
 
 There is no separate domain-error hierarchy (e.g. `ServiceError`, `BusinessRuleError`). An earlier scaffold of that pattern lived under `src/services/exceptions.py` but was never raised by any logic handler — it was deleted in the cleanup that closed issue #107. If a future entity needs a domain-error type that isn't a 1:1 fit for the existing API exceptions, add it next to where it's raised; don't reintroduce a top-level hierarchy.
 
+## Domain entities and the cluster pattern
+
+The codebase has a small set of top-level domain entities — currently `posts`, `providers`, `users`, `auth`, `me`, `audit` — and the layer matrix above is only one axis of the architecture. The other axis is **the entity itself**: every entity should have a 1:1 directory presence at every layer that touches it, and every layer should have a *shared tier* at the parent level for genuinely cross-entity infrastructure.
+
+**The import rule.** A file in `<layer>/<entity>/` may import from its own cluster and from the layer's shared tier. Cross-cluster imports (e.g. `models/posts/foo.py` importing from `models/providers/`) are forbidden — fix the design or hoist the shared piece into the parent. Where the directory shape allows, this is lint-enforced (`scripts/dev/template_imports_check.py`, today scoped to `src/templates/`); other layers follow the rule by convention. Audit it with:
+
+```bash
+grep -rnE 'from \.\.(posts|providers|users)' src/models src/repositories src/logic src/schemas
+```
+
+**Current state of the convention across layers.** Some layers are fully clustered, some still flat:
+
+| Layer | Cluster directories | Parent-level shared tier |
+| --- | --- | --- |
+| `templates/` | yes (all entities) | `_shared/`, `base.html` |
+| `models/` | partial — `posts/`, `providers/` ([extracted in #191](https://github.com/willthefirst/bedlam-connect/pull/191)); `user.py` not yet a cluster | `enums.py`, `base.py`, `audit_log.py` |
+| `repositories/` | not yet — flat `<entity>_repository.py` | `base.py`, `dependencies.py` |
+| `logic/` | not yet — flat `<entity>_processing.py` | `audit.py` |
+| `schemas/` | not yet — flat `<entity>.py` | `_validators.py` |
+| `api/routes/` | not applicable — single-file-per-entity is the layer's shape; URL grammar in [`api/routes/RESOURCE_GRAMMAR.md`](api/routes/RESOURCE_GRAMMAR.md) handles the per-entity contract | `common/` |
+
+The trajectory is toward full clustering as each entity's per-layer code grows. The argument that justified PR #191 for models — multiple files per entity made the cluster directory pull its weight — applies to the other layers when they cross the same threshold. Until a layer is clustered, treat the file-level naming convention (`<entity>_<role>.py`) as the implicit cluster boundary; cross-entity imports between sibling files are still smells.
+
+**Documentation locality.** The same shape applies to READMEs. A layer's parent README describes the layer's *contract* (what's a repository, what may it depend on) and the shared tier; entity-specific facts that are non-trivial enough to write down belong in the entity cluster's own README (`<layer>/<entity>/README.md`). When an entity has nothing surprising to say at a layer, no entity README is required — silence is fine. This avoids the "fact stated in two places" drift the [single-source-of-truth rule](../CLAUDE.md#one-source-of-truth--link-dont-copy) calls out: each fact has exactly one home.
+
 ## Directory structure
 
 **Core files:**
@@ -136,7 +161,7 @@ There is no separate domain-error hierarchy (e.g. `ServiceError`, `BusinessRuleE
 
 ### Adding a new domain entity
 
-This is the cross-module checklist. The detailed step-by-step (with code snippets) for each layer lives in that layer's own README — follow the links so the recipe stays a single source of truth (see [`../CLAUDE.md`](../CLAUDE.md)). For each step, also add or extend the colocated `test_*.py` and update the README in that directory.
+This is the cross-module checklist. The detailed step-by-step (with code snippets) for each layer lives in that layer's own README — follow the links so the recipe stays a single source of truth (see [`../CLAUDE.md`](../CLAUDE.md)). For each step, also add or extend the colocated `test_*.py` and update the relevant README — see [Domain entities and the cluster pattern](#domain-entities-and-the-cluster-pattern) for whether entity-specific docs go in the layer's parent README or in a `<layer>/<entity>/README.md`. Where the layer is already clustered (`templates/`, partly `models/`), create the entity's cluster directory and its README; where the layer is still flat, follow the `<entity>_<role>.py` file convention.
 
 0. **Read [`api/routes/RESOURCE_GRAMMAR.md`](api/routes/RESOURCE_GRAMMAR.md) first.** It dictates the URL shape, the PUT-vs-PATCH rule, the optional publication-lifecycle pattern, and the subresource conventions every resource MUST follow. Decide whether the resource adopts the publication lifecycle, then identify state axes, field clusters, and any subresources you'll need before touching the layers below.
 1. **Model** — define the SQLAlchemy class. See [`models/README.md`](models/README.md#implementation-patterns).
