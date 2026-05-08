@@ -25,28 +25,28 @@ from pydantic import BaseModel
 from src.api.common.exceptions import ForbiddenError, NotFoundError
 from src.logic.audit import AuditAction, AuditedResource, mutate
 from src.models import (
+    Provider,
     ProviderCertification,
     ProviderEducation,
     ProviderLicensure,
-    ProviderProfile,
     User,
 )
 from src.repositories.audit_repository import AuditRepository
-from src.repositories.provider_profile_repository import ProviderProfileRepository
+from src.repositories.provider_repository import ProviderRepository
 from src.repositories.user_repository import UserRepository
-from src.schemas.provider_profile import (
+from src.schemas.provider import (
+    ProviderAuditSnapshot,
     ProviderCertificationAuditSnapshot,
     ProviderCertificationCreate,
     ProviderCertificationUpdate,
+    ProviderCreate,
     ProviderEducationAuditSnapshot,
     ProviderEducationCreate,
     ProviderEducationUpdate,
     ProviderLicensureAuditSnapshot,
     ProviderLicensureCreate,
     ProviderLicensureUpdate,
-    ProviderProfileAuditSnapshot,
-    ProviderProfileCreate,
-    ProviderProfileUpdate,
+    ProviderUpdate,
 )
 
 logger = logging.getLogger(__name__)
@@ -67,10 +67,10 @@ def _snap(schema_cls: type[BaseModel]):
 
 PROFILE = AuditedResource(
     type="provider_profile",
-    snapshot=_snap(ProviderProfileAuditSnapshot),
-    create=AuditAction.CREATE_PROVIDER_PROFILE,
-    update=AuditAction.UPDATE_PROVIDER_PROFILE,
-    delete=AuditAction.DELETE_PROVIDER_PROFILE,
+    snapshot=_snap(ProviderAuditSnapshot),
+    create=AuditAction.CREATE_PROVIDER,
+    update=AuditAction.UPDATE_PROVIDER,
+    delete=AuditAction.DELETE_PROVIDER,
 )
 LICENSURE = AuditedResource(
     type="provider_licensure",
@@ -98,16 +98,14 @@ CERTIFICATION = AuditedResource(
 # --- Authorization helper ------------------------------------------------
 
 
-def _assert_can_mutate(profile: ProviderProfile, user: User) -> None:
+def _assert_can_mutate(profile: Provider, user: User) -> None:
     if profile.user_id != user.id and not user.is_superuser:
         raise ForbiddenError(
             detail="Only the profile owner or an admin can perform this action"
         )
 
 
-async def _load_profile_or_404(
-    profile_id: UUID, repo: ProviderProfileRepository
-) -> ProviderProfile:
+async def _load_provider_or_404(profile_id: UUID, repo: ProviderRepository) -> Provider:
     profile = await repo.get_by_id(profile_id)
     if profile is None:
         raise NotFoundError(detail="Provider profile not found")
@@ -128,9 +126,9 @@ async def _load_subrow_or_404(getter, sub_id: UUID, parent_id: UUID, *, name: st
 # --- Profile handlers ----------------------------------------------------
 
 
-async def handle_list_provider_profiles(
+async def handle_list_providers(
     request: Request,
-    repo: ProviderProfileRepository,
+    repo: ProviderRepository,
     *,
     license_type: str | None = None,
     issuing_state: str | None = None,
@@ -138,7 +136,7 @@ async def handle_list_provider_profiles(
     """Public listing — no auth gate, no audit, no commit. Returns the
     template context for the HTML list page; the active filter values are
     forwarded so the template can preselect them in its filter form."""
-    profiles = await repo.list_profiles(
+    profiles = await repo.list_providers(
         license_type=license_type, issuing_state=issuing_state
     )
     return {
@@ -149,10 +147,10 @@ async def handle_list_provider_profiles(
     }
 
 
-async def handle_get_provider_profile_detail(
+async def handle_get_provider_detail(
     request: Request,
     profile_id: UUID,
-    repo: ProviderProfileRepository,
+    repo: ProviderRepository,
     requesting_user: User,
 ) -> dict[str, Any]:
     """Loads any profile by id for the read-only detail page; 404 if missing.
@@ -161,14 +159,14 @@ async def handle_get_provider_profile_detail(
     `certifications` via `lazy="selectin"`, so the template can render
     each sub-section without further queries.
     """
-    profile = await _load_profile_or_404(profile_id, repo)
+    profile = await _load_provider_or_404(profile_id, repo)
     return {"request": request, "profile": profile, "current_user": requesting_user}
 
 
-async def handle_list_user_provider_profiles(
+async def handle_list_user_providers(
     request: Request,
     target_user_id: UUID,
-    repo: ProviderProfileRepository,
+    repo: ProviderRepository,
     user_repo: UserRepository,
     requesting_user: User,
 ) -> dict[str, Any]:
@@ -194,7 +192,7 @@ async def handle_list_user_provider_profiles(
     }
 
 
-async def handle_get_provider_profile_form(
+async def handle_get_provider_form(
     request: Request,
     requesting_user: User,
 ) -> dict[str, Any]:
@@ -202,10 +200,10 @@ async def handle_get_provider_profile_form(
     return {"request": request, "current_user": requesting_user}
 
 
-async def handle_get_provider_profile_edit_form(
+async def handle_get_provider_edit_form(
     request: Request,
     profile_id: UUID,
-    repo: ProviderProfileRepository,
+    repo: ProviderRepository,
     requesting_user: User,
 ) -> dict[str, Any]:
     """Loads a profile for the edit-form page. 404 if missing, 403 if the
@@ -215,17 +213,17 @@ async def handle_get_provider_profile_edit_form(
     `certifications` via `lazy="selectin"`, so the template can render
     each sub-section without further queries.
     """
-    profile = await _load_profile_or_404(profile_id, repo)
+    profile = await _load_provider_or_404(profile_id, repo)
     _assert_can_mutate(profile, requesting_user)
     return {"request": request, "profile": profile, "current_user": requesting_user}
 
 
-async def handle_create_profile(
-    payload: ProviderProfileCreate,
-    repo: ProviderProfileRepository,
+async def handle_create_provider(
+    payload: ProviderCreate,
+    repo: ProviderRepository,
     audit_repo: AuditRepository,
     requesting_user: User,
-) -> ProviderProfile:
+) -> Provider:
     """Creates a profile owned by the requesting user plus any inline
     credential sub-rows. A user may own zero, one, or many profiles —
     nothing here rejects a second create. One `CREATE_PROVIDER_PROFILE`
@@ -236,7 +234,7 @@ async def handle_create_profile(
     profile_fields = payload.model_dump(
         exclude={"licensures", "educations", "certifications"}
     )
-    created = await repo.create_profile(user_id=requesting_user.id, **profile_fields)
+    created = await repo.create_provider(user_id=requesting_user.id, **profile_fields)
 
     for licensure in payload.licensures:
         await repo.add_licensure(created, **licensure.model_dump())
@@ -257,15 +255,15 @@ async def handle_create_profile(
     return created
 
 
-async def handle_update_profile(
+async def handle_update_provider(
     profile_id: UUID,
-    payload: ProviderProfileUpdate,
-    repo: ProviderProfileRepository,
+    payload: ProviderUpdate,
+    repo: ProviderRepository,
     audit_repo: AuditRepository,
     requesting_user: User,
-) -> ProviderProfile:
+) -> Provider:
     """Patches practice/availability fields on the profile. Owner-or-admin only."""
-    profile = await _load_profile_or_404(profile_id, repo)
+    profile = await _load_provider_or_404(profile_id, repo)
     _assert_can_mutate(profile, requesting_user)
 
     async with mutate(
@@ -276,13 +274,13 @@ async def handle_update_profile(
         resource=PROFILE,
         verb="update",
     ):
-        await repo.update_profile(profile, **payload.model_dump(exclude_unset=True))
+        await repo.update_provider(profile, **payload.model_dump(exclude_unset=True))
     return profile
 
 
-async def handle_delete_profile(
+async def handle_delete_provider(
     profile_id: UUID,
-    repo: ProviderProfileRepository,
+    repo: ProviderRepository,
     audit_repo: AuditRepository,
     requesting_user: User,
 ) -> None:
@@ -293,7 +291,7 @@ async def handle_delete_profile(
     No per-sub-row audit rows — the parent's nested snapshot is the
     durable record.
     """
-    profile = await _load_profile_or_404(profile_id, repo)
+    profile = await _load_provider_or_404(profile_id, repo)
     _assert_can_mutate(profile, requesting_user)
 
     async with mutate(
@@ -304,7 +302,7 @@ async def handle_delete_profile(
         resource=PROFILE,
         verb="delete",
     ):
-        await repo.delete_profile(profile)
+        await repo.delete_provider(profile)
 
 
 # --- Licensure handlers --------------------------------------------------
@@ -313,11 +311,11 @@ async def handle_delete_profile(
 async def handle_create_licensure(
     profile_id: UUID,
     payload: ProviderLicensureCreate,
-    repo: ProviderProfileRepository,
+    repo: ProviderRepository,
     audit_repo: AuditRepository,
     requesting_user: User,
 ) -> ProviderLicensure:
-    profile = await _load_profile_or_404(profile_id, repo)
+    profile = await _load_provider_or_404(profile_id, repo)
     _assert_can_mutate(profile, requesting_user)
 
     created = await repo.add_licensure(profile, **payload.model_dump())
@@ -337,11 +335,11 @@ async def handle_update_licensure(
     profile_id: UUID,
     licensure_id: UUID,
     payload: ProviderLicensureUpdate,
-    repo: ProviderProfileRepository,
+    repo: ProviderRepository,
     audit_repo: AuditRepository,
     requesting_user: User,
 ) -> ProviderLicensure:
-    profile = await _load_profile_or_404(profile_id, repo)
+    profile = await _load_provider_or_404(profile_id, repo)
     _assert_can_mutate(profile, requesting_user)
 
     licensure = await _load_subrow_or_404(
@@ -362,11 +360,11 @@ async def handle_update_licensure(
 async def handle_delete_licensure(
     profile_id: UUID,
     licensure_id: UUID,
-    repo: ProviderProfileRepository,
+    repo: ProviderRepository,
     audit_repo: AuditRepository,
     requesting_user: User,
 ) -> None:
-    profile = await _load_profile_or_404(profile_id, repo)
+    profile = await _load_provider_or_404(profile_id, repo)
     _assert_can_mutate(profile, requesting_user)
 
     licensure = await _load_subrow_or_404(
@@ -389,11 +387,11 @@ async def handle_delete_licensure(
 async def handle_create_education(
     profile_id: UUID,
     payload: ProviderEducationCreate,
-    repo: ProviderProfileRepository,
+    repo: ProviderRepository,
     audit_repo: AuditRepository,
     requesting_user: User,
 ) -> ProviderEducation:
-    profile = await _load_profile_or_404(profile_id, repo)
+    profile = await _load_provider_or_404(profile_id, repo)
     _assert_can_mutate(profile, requesting_user)
 
     created = await repo.add_education(profile, **payload.model_dump())
@@ -413,11 +411,11 @@ async def handle_update_education(
     profile_id: UUID,
     education_id: UUID,
     payload: ProviderEducationUpdate,
-    repo: ProviderProfileRepository,
+    repo: ProviderRepository,
     audit_repo: AuditRepository,
     requesting_user: User,
 ) -> ProviderEducation:
-    profile = await _load_profile_or_404(profile_id, repo)
+    profile = await _load_provider_or_404(profile_id, repo)
     _assert_can_mutate(profile, requesting_user)
 
     education = await _load_subrow_or_404(
@@ -438,11 +436,11 @@ async def handle_update_education(
 async def handle_delete_education(
     profile_id: UUID,
     education_id: UUID,
-    repo: ProviderProfileRepository,
+    repo: ProviderRepository,
     audit_repo: AuditRepository,
     requesting_user: User,
 ) -> None:
-    profile = await _load_profile_or_404(profile_id, repo)
+    profile = await _load_provider_or_404(profile_id, repo)
     _assert_can_mutate(profile, requesting_user)
 
     education = await _load_subrow_or_404(
@@ -465,11 +463,11 @@ async def handle_delete_education(
 async def handle_create_certification(
     profile_id: UUID,
     payload: ProviderCertificationCreate,
-    repo: ProviderProfileRepository,
+    repo: ProviderRepository,
     audit_repo: AuditRepository,
     requesting_user: User,
 ) -> ProviderCertification:
-    profile = await _load_profile_or_404(profile_id, repo)
+    profile = await _load_provider_or_404(profile_id, repo)
     _assert_can_mutate(profile, requesting_user)
 
     created = await repo.add_certification(profile, **payload.model_dump())
@@ -489,11 +487,11 @@ async def handle_update_certification(
     profile_id: UUID,
     certification_id: UUID,
     payload: ProviderCertificationUpdate,
-    repo: ProviderProfileRepository,
+    repo: ProviderRepository,
     audit_repo: AuditRepository,
     requesting_user: User,
 ) -> ProviderCertification:
-    profile = await _load_profile_or_404(profile_id, repo)
+    profile = await _load_provider_or_404(profile_id, repo)
     _assert_can_mutate(profile, requesting_user)
 
     certification = await _load_subrow_or_404(
@@ -519,11 +517,11 @@ async def handle_update_certification(
 async def handle_delete_certification(
     profile_id: UUID,
     certification_id: UUID,
-    repo: ProviderProfileRepository,
+    repo: ProviderRepository,
     audit_repo: AuditRepository,
     requesting_user: User,
 ) -> None:
-    profile = await _load_profile_or_404(profile_id, repo)
+    profile = await _load_provider_or_404(profile_id, repo)
     _assert_can_mutate(profile, requesting_user)
 
     certification = await _load_subrow_or_404(

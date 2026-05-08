@@ -10,7 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from src.models import AuditLog, User
 from src.repositories.audit_repository import AuditRepository
-from tests.helpers import create_test_user, make_provider_profile, promote_to_admin
+from tests.helpers import create_test_user, make_provider, promote_to_admin
 
 # Mark all tests in this module as async
 pytestmark = pytest.mark.asyncio
@@ -259,7 +259,7 @@ async def test_detail_shows_provider_profiles_empty_state(
     assert tree.css_first("#user-detail-provider-profiles") is None
     empty = tree.css_first("#user-detail-provider-profiles-empty")
     assert empty is not None
-    assert "No provider profiles yet" in empty.text()
+    assert "No providers yet" in empty.text()
 
 
 async def test_detail_lists_owned_provider_profiles(
@@ -272,8 +272,8 @@ async def test_detail_lists_owned_provider_profiles(
     async with db_test_session_manager() as session:
         async with session.begin():
             session.add(target)
-    first = make_provider_profile(user_id=target.id, practice_name="First")
-    second = make_provider_profile(user_id=target.id, practice_name="Second")
+    first = make_provider(user_id=target.id, practice_name="First")
+    second = make_provider(user_id=target.id, practice_name="Second")
     async with db_test_session_manager() as session:
         async with session.begin():
             session.add_all([first, second])
@@ -579,7 +579,7 @@ async def _seed_user_profile(
     user_id: uuid.UUID,
     practice_name: str,
 ) -> uuid.UUID:
-    profile = make_provider_profile(user_id=user_id, practice_name=practice_name)
+    profile = make_provider(user_id=user_id, practice_name=practice_name)
     async with db_test_session_manager() as session:
         async with session.begin():
             session.add(profile)

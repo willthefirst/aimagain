@@ -1,6 +1,6 @@
 """Wire schemas for provider profile and its credential sub-entities.
 
-A `ProviderProfile` is a long-lived directory entry owned by a `User`
+A `Provider` is a long-lived directory entry owned by a `User`
 (N:1 via `user_id` — a user may own zero, one, or many profiles). It
 holds three credential lists —
 `ProviderLicensure`, `ProviderEducation`, `ProviderCertification` —
@@ -8,8 +8,8 @@ each managed via its own endpoints in later issues. The wire surface
 mirrors that shape: each entity has Read / Create / Update /
 AuditSnapshot variants.
 
-`ProviderProfileRead` and `ProviderProfileAuditSnapshot` embed the
-sub-entity Read / AuditSnapshot lists. `ProviderProfileUpdate` does
+`ProviderRead` and `ProviderAuditSnapshot` embed the
+sub-entity Read / AuditSnapshot lists. `ProviderUpdate` does
 **not** include nested lists — sub-entities are PATCHed via their own
 routes (added later), so a profile-level PATCH only touches the
 practice/availability fields.
@@ -21,7 +21,7 @@ constraints. Free-text fields reuse `StrippedText` and `ZipText` from
 [`src/schemas/_validators.py`](_validators.py) — defining them once
 means one source of truth for the cleaning rule.
 
-A guardrail test in `test_provider_profile.py`
+A guardrail test in `test_provider.py`
 (`test_schema_literals_match_model_tuples`) keeps the `Literal`
 universes aligned with the source tuples.
 """
@@ -192,10 +192,10 @@ class ProviderCertificationAuditSnapshot(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
-# --- ProviderProfile ----------------------------------------------------
+# --- Provider ----------------------------------------------------
 
 
-class ProviderProfileRead(BaseModel):
+class ProviderRead(BaseModel):
     id: uuid.UUID
     user_id: uuid.UUID
     created_at: datetime
@@ -213,7 +213,7 @@ class ProviderProfileRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
-class ProviderProfileCreate(BaseModel):
+class ProviderCreate(BaseModel):
     """Create payload for a provider's directory profile. `user_id` is
     set by the route from the authenticated user, not accepted on the
     wire."""
@@ -231,7 +231,7 @@ class ProviderProfileCreate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
 
-class ProviderProfileUpdate(BaseModel):
+class ProviderUpdate(BaseModel):
     """Partial update of practice/availability fields only. Sub-entity
     lists (licensures, educations, certifications) are managed via
     their own endpoints, so this schema does not accept them."""
@@ -246,12 +246,12 @@ class ProviderProfileUpdate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     @model_validator(mode="after")
-    def _at_least_one_field(self) -> "ProviderProfileUpdate":
+    def _at_least_one_field(self) -> "ProviderUpdate":
         assert_any_field_set(self)
         return self
 
 
-class ProviderProfileAuditSnapshot(BaseModel):
+class ProviderAuditSnapshot(BaseModel):
     id: uuid.UUID
     user_id: uuid.UUID
     created_at: datetime

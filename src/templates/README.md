@@ -65,9 +65,9 @@ Templates use inheritance for consistent layout and feature-specific customizati
 | ---------- | ---------------------- | ---------------------------------------------------------------------- |
 | **/**      | Base layout and shared | `base.html` - Foundation template (includes site-wide `<nav>` linking to `/posts`, `/users`, `/providers`) |
 | **auth/**  | Authentication pages   | login, register, forgot/reset password                                 |
-| **users/** | User management        | list, detail (also embeds an inline list of provider profiles owned by the user, with empty-state when the user has none), `provider_profiles_list.html` (rendered by `GET /users/{id}/provider-profiles` and the `GET /users/me/provider-profiles` alias; pluralized list with self vs. viewing-other empty-state copy), `_admin_actions.html` partial (shared by list & detail) |
+| **users/** | User management        | list, detail (also embeds an inline list of providers owned by the user, with empty-state when the user has none), `providers_list.html` (rendered by `GET /users/{id}/provider-profiles` and the `GET /users/me/provider-profiles` alias; pluralized list with self vs. viewing-other empty-state copy), `_admin_actions.html` partial (shared by list & detail) |
 | **posts/** | Posts                  | list, detail, per-kind `new_<kind>.html` + `edit_<kind>.html` thin wrappers around `_<kind>_form.html` partials, `_form_macros.html` (shared field macros), `_owner_actions.html` partial (shared by detail) |
-| **provider_profiles/** | Provider profiles | `list.html` (public HTML directory rendered by `GET /providers`; includes a `license_type` / `issuing_state` filter form whose `selected_*` context values preselect the active filter), `detail.html` (read-only HTML detail rendered by `GET /{id}`; shows practice fields, licensures, educations, certifications; an Edit link is rendered for the owner or an admin only), `new.html` (create form), `edit.html` (edit form with practice-fields PATCH plus three sub-resource sections — licensures, educations, certifications — each with inline add form + per-row delete). Imports field macros from `posts/_form_macros.html` rather than duplicating them. The directory keeps the `provider_profiles/` name to match the `ProviderProfile` model — the `/providers` URL is the wire surface only. The "list profiles owned by user X" view lives in `users/provider_profiles_list.html`, not here. |
+| **providers/** | Providers | `list.html` (public HTML directory rendered by `GET /providers`; includes a `license_type` / `issuing_state` filter form whose `selected_*` context values preselect the active filter), `detail.html` (read-only HTML detail rendered by `GET /{id}`; shows practice fields, licensures, educations, certifications; an Edit link is rendered for the owner or an admin only), `new.html` (create form), `edit.html` (edit form with practice-fields PATCH plus three sub-resource sections — licensures, educations, certifications — each with inline add form + per-row delete). Imports field macros from `posts/_form_macros.html` rather than duplicating them. The "list providers owned by user X" view lives in `users/providers_list.html`, not here. |
 | **me/**    | Personal/profile pages | user profile                                                           |
 
 ### Reusable partial convention
@@ -110,7 +110,7 @@ templates/
 │   ├── _provider_availability_form.html
 │   ├── _form_macros.html       # Shared field macros (text_field, select_field, …)
 │   └── _owner_actions.html     # Reusable owner-actions partial (Edit/Delete)
-├── provider_profiles/          # Provider profile templates
+├── providers/                  # Provider templates
 │   ├── list.html               # Public directory listing with license_type / issuing_state filter
 │   ├── detail.html             # Read-only detail page (GET /{id})
 │   ├── new.html                # Create form (imports posts/_form_macros.html)

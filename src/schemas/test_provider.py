@@ -5,7 +5,7 @@ Covers:
 - Create variants reject unknown fields (`extra="forbid"`).
 - Update variants raise `ValidationError` when no editable field is
   set (the at-least-one-field rule).
-- `ProviderProfileRead` round-trips a nested dict through
+- `ProviderRead` round-trips a nested dict through
   `model_validate`, including sub-entity lists.
 - `test_schema_literals_match_model_tuples` guards that `Literal[*TUPLE]`
   types stay aligned with the source-of-truth tuples in
@@ -26,16 +26,16 @@ from src.models.enums import (
     LOCATION_AVAILABILITY_OPTIONS,
     US_STATES,
 )
-from src.schemas.provider_profile import (
+from src.schemas.provider import (
     ProviderCertificationCreate,
     ProviderCertificationUpdate,
+    ProviderCreate,
     ProviderEducationCreate,
     ProviderEducationUpdate,
     ProviderLicensureCreate,
     ProviderLicensureUpdate,
-    ProviderProfileCreate,
-    ProviderProfileRead,
-    ProviderProfileUpdate,
+    ProviderRead,
+    ProviderUpdate,
 )
 
 
@@ -44,7 +44,7 @@ def _now() -> datetime:
 
 
 def _profile_create_kwargs(**overrides):
-    """Minimum-valid kwargs for `ProviderProfileCreate`."""
+    """Minimum-valid kwargs for `ProviderCreate`."""
     base = {
         "practice_name": "Sunrise Counseling",
         "location_city": "Boise",
@@ -96,7 +96,7 @@ def test_certification_create_rejects_unknown_certification_type():
 
 def test_profile_create_rejects_invalid_in_person_sessions():
     with pytest.raises(ValidationError):
-        ProviderProfileCreate(
+        ProviderCreate(
             **_profile_create_kwargs(in_person_sessions="maybe"),
         )
 
@@ -106,7 +106,7 @@ def test_profile_create_rejects_invalid_in_person_sessions():
 
 def test_profile_create_rejects_unknown_field():
     with pytest.raises(ValidationError):
-        ProviderProfileCreate(
+        ProviderCreate(
             **_profile_create_kwargs(),
             stray_field="boom",
         )
@@ -128,7 +128,7 @@ def test_licensure_create_rejects_unknown_field():
 @pytest.mark.parametrize(
     "model_cls",
     [
-        ProviderProfileUpdate,
+        ProviderUpdate,
         ProviderLicensureUpdate,
         ProviderEducationUpdate,
         ProviderCertificationUpdate,
@@ -142,7 +142,7 @@ def test_update_requires_at_least_one_field(model_cls):
 def test_profile_update_accepts_single_field():
     """Sanity check: setting one field is enough — the rule fires only
     when *every* field is `None`."""
-    upd = ProviderProfileUpdate(practice_name="New Name")
+    upd = ProviderUpdate(practice_name="New Name")
     assert upd.practice_name == "New Name"
     assert upd.location_city is None
 
@@ -151,18 +151,18 @@ def test_profile_update_accepts_single_field():
 
 
 def test_profile_create_strips_practice_name():
-    p = ProviderProfileCreate(**_profile_create_kwargs(practice_name="  Sunrise  "))
+    p = ProviderCreate(**_profile_create_kwargs(practice_name="  Sunrise  "))
     assert p.practice_name == "Sunrise"
 
 
 def test_profile_create_rejects_non_5_digit_zip():
     """Smoke test that the imported `ZipText` alias is wired up."""
     with pytest.raises(ValidationError):
-        ProviderProfileCreate(**_profile_create_kwargs(location_zip="123"))
+        ProviderCreate(**_profile_create_kwargs(location_zip="123"))
 
 
 def test_profile_create_accepts_nested_credential_lists():
-    p = ProviderProfileCreate(
+    p = ProviderCreate(
         **_profile_create_kwargs(),
         licensures=[
             {
@@ -185,7 +185,7 @@ def test_profile_create_accepts_nested_credential_lists():
 
 
 def test_profile_create_defaults_credential_lists_to_empty():
-    p = ProviderProfileCreate(**_profile_create_kwargs())
+    p = ProviderCreate(**_profile_create_kwargs())
     assert p.licensures == []
     assert p.educations == []
     assert p.certifications == []
@@ -195,7 +195,7 @@ def test_profile_create_defaults_credential_lists_to_empty():
 
 
 def test_profile_read_validates_from_nested_dict():
-    """`ProviderProfileRead.model_validate` should construct the nested
+    """`ProviderRead.model_validate` should construct the nested
     sub-entity Read schemas without needing real ORM objects."""
     profile_id = uuid.uuid4()
     now = _now()
@@ -246,7 +246,7 @@ def test_profile_read_validates_from_nested_dict():
         ],
     }
 
-    profile = ProviderProfileRead.model_validate(payload)
+    profile = ProviderRead.model_validate(payload)
 
     assert profile.practice_name == "Sunrise"
     assert len(profile.licensures) == 1
@@ -282,16 +282,16 @@ def _literal_args(model_cls, field_name: str) -> tuple[str, ...]:
         (ProviderLicensureCreate, "issuing_state", US_STATES),
         (ProviderEducationCreate, "education_type", EDUCATION_TYPES),
         (ProviderCertificationCreate, "certification_type", CERTIFICATION_TYPES),
-        (ProviderProfileCreate, "location_state", US_STATES),
-        (ProviderProfileCreate, "in_person_sessions", LOCATION_AVAILABILITY_OPTIONS),
-        (ProviderProfileCreate, "virtual_sessions", LOCATION_AVAILABILITY_OPTIONS),
+        (ProviderCreate, "location_state", US_STATES),
+        (ProviderCreate, "in_person_sessions", LOCATION_AVAILABILITY_OPTIONS),
+        (ProviderCreate, "virtual_sessions", LOCATION_AVAILABILITY_OPTIONS),
         # Update variants (Optional[Literal[*TUPLE]])
         (ProviderLicensureUpdate, "license_type", LICENSE_TYPES),
         (ProviderLicensureUpdate, "issuing_state", US_STATES),
         (ProviderEducationUpdate, "education_type", EDUCATION_TYPES),
         (ProviderCertificationUpdate, "certification_type", CERTIFICATION_TYPES),
-        (ProviderProfileUpdate, "location_state", US_STATES),
-        (ProviderProfileUpdate, "in_person_sessions", LOCATION_AVAILABILITY_OPTIONS),
+        (ProviderUpdate, "location_state", US_STATES),
+        (ProviderUpdate, "in_person_sessions", LOCATION_AVAILABILITY_OPTIONS),
     ],
 )
 def test_schema_literals_match_model_tuples(model_cls, field, expected):

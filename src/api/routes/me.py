@@ -4,13 +4,10 @@ from fastapi import APIRouter, Depends, Request
 
 from src.api.common import APIResponse, BaseRouter
 from src.auth_config import current_active_user
-from src.logic.provider_profile_processing import handle_list_user_provider_profiles
+from src.logic.provider_processing import handle_list_user_providers
 from src.models import User
-from src.repositories.dependencies import (
-    get_provider_profile_repository,
-    get_user_repository,
-)
-from src.repositories.provider_profile_repository import ProviderProfileRepository
+from src.repositories.dependencies import get_provider_repository, get_user_repository
+from src.repositories.provider_repository import ProviderRepository
 from src.repositories.user_repository import UserRepository
 from src.schemas.user import UserRead
 
@@ -46,15 +43,15 @@ async def get_my_profile(
 
 
 @router.get("/provider-profiles")
-async def list_my_provider_profiles(
+async def list_my_providers(
     request: Request,
-    repo: ProviderProfileRepository = Depends(get_provider_profile_repository),
+    repo: ProviderRepository = Depends(get_provider_repository),
     user_repo: UserRepository = Depends(get_user_repository),
     user: User = Depends(current_active_user),
 ):
     """Renders the current user's provider-profile list. Convenience alias
     for `GET /users/{requesting_user.id}/provider-profiles`."""
-    context = await handle_list_user_provider_profiles(
+    context = await handle_list_user_providers(
         request=request,
         target_user_id=user.id,
         repo=repo,
@@ -62,7 +59,7 @@ async def list_my_provider_profiles(
         requesting_user=user,
     )
     return APIResponse.html_response(
-        template_name="users/provider_profiles_list.html",
+        template_name="users/providers_list.html",
         context=context,
         request=request,
     )

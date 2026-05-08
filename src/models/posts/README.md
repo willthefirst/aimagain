@@ -12,13 +12,13 @@ This subdirectory holds the SQLAlchemy models for the `posts` table and its per-
 
 ## Why this cluster, not flat siblings
 
-Before this extraction, `post.py`, `post_kinds.py`, and the two detail files lived alongside `provider_profile.py`, `provider_licensure.py`, etc. as siblings of one flat `src/models/`. They formed a cluster the directory didn't reflect:
+Before this extraction, `post.py`, `post_kinds.py`, and the two detail files lived alongside `provider.py`, `provider_licensure.py`, etc. as siblings of one flat `src/models/`. They formed a cluster the directory didn't reflect:
 
 - `post.py` imports from `post_kinds.py`.
 - `post_kinds.py` imports from `client_referral_detail.py` and `provider_availability_detail.py`.
 - The two detail files share a common table-CHECK pattern, both depend on the same `enums.py` vocabularies.
 
-Pulling them into `posts/` makes the boundary explicit: a reader landing here finds the entire posts data model in one place. Cross-domain shared modules (the controlled-vocabulary tuples in `../enums.py`, the `BaseModel` in `../base.py`) stay at the parent level because they're consumed by the provider-profile cluster too.
+Pulling them into `posts/` makes the boundary explicit: a reader landing here finds the entire posts data model in one place. Cross-domain shared modules (the controlled-vocabulary tuples in `../enums.py`, the `BaseModel` in `../base.py`) stay at the parent level because they're consumed by the providers cluster too.
 
 ## Adding a new kind
 

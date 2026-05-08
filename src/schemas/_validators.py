@@ -3,7 +3,7 @@
 Home for `Annotated[T, AfterValidator(fn)]` aliases and small helpers
 that are used by 2+ schema modules. Keeping them here means a domain
 schema module never has to import primitives from a peer domain module
-(e.g. `provider_profile.py` reaching into `post.py`).
+(e.g. `provider.py` reaching into `post.py`).
 
 Trigger to add something here: a primitive is used by 2+ schema modules
 (rule of three, applied generously when callers would otherwise import

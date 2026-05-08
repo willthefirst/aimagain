@@ -57,9 +57,9 @@ class AuditAction(str, Enum):
     SET_USER_ACTIVATION = "set_user_activation"
     DELETE_USER = "delete_user"
     REGISTER = "register"
-    CREATE_PROVIDER_PROFILE = "create_provider_profile"
-    UPDATE_PROVIDER_PROFILE = "update_provider_profile"
-    DELETE_PROVIDER_PROFILE = "delete_provider_profile"
+    CREATE_PROVIDER = "create_provider_profile"
+    UPDATE_PROVIDER = "update_provider_profile"
+    DELETE_PROVIDER = "delete_provider_profile"
     CREATE_LICENSURE = "create_licensure"
     UPDATE_LICENSURE = "update_licensure"
     DELETE_LICENSURE = "delete_licensure"
@@ -82,11 +82,11 @@ class AuditedResource:
 
         PROFILE = AuditedResource(
             type="provider_profile",
-            snapshot=lambda obj: ProviderProfileAuditSnapshot
+            snapshot=lambda obj: ProviderAuditSnapshot
                 .model_validate(obj).model_dump(mode="json"),
-            create=AuditAction.CREATE_PROVIDER_PROFILE,
-            update=AuditAction.UPDATE_PROVIDER_PROFILE,
-            delete=AuditAction.DELETE_PROVIDER_PROFILE,
+            create=AuditAction.CREATE_PROVIDER,
+            update=AuditAction.UPDATE_PROVIDER,
+            delete=AuditAction.DELETE_PROVIDER,
         )
 
     Each handler then calls `record_audit_for(audit_repo, resource=PROFILE,

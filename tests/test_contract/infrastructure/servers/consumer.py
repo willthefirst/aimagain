@@ -136,7 +136,7 @@ def _setup_post_owner_actions_stub(app: FastAPI) -> None:
 
 
 def _setup_provider_profile_create_form_stub(app: FastAPI) -> None:
-    """Mount a stub page that renders the real `provider_profiles/new.html`
+    """Mount a stub page that renders the real `providers/new.html`
     template, so the create-form's HTMX submit is exercised without
     needing a database. The contract surface is the form's `POST
     /providers` request shape; what we render here is the same
@@ -155,14 +155,14 @@ def _setup_provider_profile_create_form_stub(app: FastAPI) -> None:
             is_superuser=False,
         )
         return APIResponse.html_response(
-            template_name="provider_profiles/new.html",
+            template_name="providers/new.html",
             context={"current_user": current_user},
             request=request,
         )
 
 
 def _setup_provider_profile_edit_form_stub(app: FastAPI) -> None:
-    """Mount a stub page that renders the real `provider_profiles/edit.html`
+    """Mount a stub page that renders the real `providers/edit.html`
     template with a hardcoded profile, so the practice-fields PATCH form is
     exercised without needing a database. The contract surface is the form's
     `PATCH /providers/{id}` request shape.
@@ -194,7 +194,7 @@ def _setup_provider_profile_edit_form_stub(app: FastAPI) -> None:
             is_superuser=False,
         )
         return APIResponse.html_response(
-            template_name="provider_profiles/edit.html",
+            template_name="providers/edit.html",
             context={"profile": profile, "current_user": current_user},
             request=request,
         )
