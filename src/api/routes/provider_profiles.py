@@ -52,10 +52,8 @@ from src.schemas.provider_profile import (
     ProviderProfileUpdate,
 )
 
-provider_profiles_api_router = APIRouter(prefix="/provider-profiles")
-router = BaseRouter(
-    router=provider_profiles_api_router, default_tags=["provider-profiles"]
-)
+provider_profiles_api_router = APIRouter(prefix="/providers")
+router = BaseRouter(router=provider_profiles_api_router, default_tags=["providers"])
 logger = logging.getLogger(__name__)
 
 
@@ -133,8 +131,8 @@ async def create_profile(
         audit_repo=audit_repo,
         requesting_user=user,
     )
-    detail_location = f"/provider-profiles/{created.id}"
-    edit_location = f"/provider-profiles/{created.id}/form"
+    detail_location = f"/providers/{created.id}"
+    edit_location = f"/providers/{created.id}/form"
     return JSONResponse(
         status_code=status.HTTP_201_CREATED,
         content={"id": str(created.id)},
@@ -228,7 +226,7 @@ async def patch_profile(
         audit_repo=audit_repo,
         requesting_user=user,
     )
-    location = f"/provider-profiles/{updated.id}/form"
+    location = f"/providers/{updated.id}/form"
     return JSONResponse(
         content=_profile_read_dict(updated),
         headers={"HX-Redirect": location},
@@ -252,7 +250,7 @@ async def delete_profile(
     )
     return Response(
         status_code=status.HTTP_204_NO_CONTENT,
-        headers={"HX-Redirect": "/provider-profiles"},
+        headers={"HX-Redirect": "/providers"},
     )
 
 
@@ -276,8 +274,8 @@ async def create_licensure(
         audit_repo=audit_repo,
         requesting_user=user,
     )
-    parent_location = f"/provider-profiles/{profile_id}"
-    edit_location = f"/provider-profiles/{profile_id}/form"
+    parent_location = f"/providers/{profile_id}"
+    edit_location = f"/providers/{profile_id}/form"
     return JSONResponse(
         status_code=status.HTTP_201_CREATED,
         content={"id": str(created.id)},
@@ -304,7 +302,7 @@ async def patch_licensure(
         audit_repo=audit_repo,
         requesting_user=user,
     )
-    location = f"/provider-profiles/{profile_id}/form"
+    location = f"/providers/{profile_id}/form"
     return JSONResponse(
         content=_licensure_read_dict(updated),
         headers={"HX-Redirect": location},
@@ -331,7 +329,7 @@ async def delete_licensure(
     )
     return Response(
         status_code=status.HTTP_204_NO_CONTENT,
-        headers={"HX-Redirect": f"/provider-profiles/{profile_id}/form"},
+        headers={"HX-Redirect": f"/providers/{profile_id}/form"},
     )
 
 
@@ -355,8 +353,8 @@ async def create_education(
         audit_repo=audit_repo,
         requesting_user=user,
     )
-    parent_location = f"/provider-profiles/{profile_id}"
-    edit_location = f"/provider-profiles/{profile_id}/form"
+    parent_location = f"/providers/{profile_id}"
+    edit_location = f"/providers/{profile_id}/form"
     return JSONResponse(
         status_code=status.HTTP_201_CREATED,
         content={"id": str(created.id)},
@@ -383,7 +381,7 @@ async def patch_education(
         audit_repo=audit_repo,
         requesting_user=user,
     )
-    location = f"/provider-profiles/{profile_id}/form"
+    location = f"/providers/{profile_id}/form"
     return JSONResponse(
         content=_education_read_dict(updated),
         headers={"HX-Redirect": location},
@@ -410,7 +408,7 @@ async def delete_education(
     )
     return Response(
         status_code=status.HTTP_204_NO_CONTENT,
-        headers={"HX-Redirect": f"/provider-profiles/{profile_id}/form"},
+        headers={"HX-Redirect": f"/providers/{profile_id}/form"},
     )
 
 
@@ -434,8 +432,8 @@ async def create_certification(
         audit_repo=audit_repo,
         requesting_user=user,
     )
-    parent_location = f"/provider-profiles/{profile_id}"
-    edit_location = f"/provider-profiles/{profile_id}/form"
+    parent_location = f"/providers/{profile_id}"
+    edit_location = f"/providers/{profile_id}/form"
     return JSONResponse(
         status_code=status.HTTP_201_CREATED,
         content={"id": str(created.id)},
@@ -462,7 +460,7 @@ async def patch_certification(
         audit_repo=audit_repo,
         requesting_user=user,
     )
-    location = f"/provider-profiles/{profile_id}/form"
+    location = f"/providers/{profile_id}/form"
     return JSONResponse(
         content=_certification_read_dict(updated),
         headers={"HX-Redirect": location},
@@ -489,5 +487,5 @@ async def delete_certification(
     )
     return Response(
         status_code=status.HTTP_204_NO_CONTENT,
-        headers={"HX-Redirect": f"/provider-profiles/{profile_id}/form"},
+        headers={"HX-Redirect": f"/providers/{profile_id}/form"},
     )

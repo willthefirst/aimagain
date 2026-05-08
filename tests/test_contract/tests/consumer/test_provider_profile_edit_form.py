@@ -3,7 +3,7 @@
 Verifies that the practice-fields HTMX form rendered by
 `templates/provider_profiles/edit.html` (mounted via the
 `provider_profile_edit_form` stub on the consumer server) issues a
-`PATCH /provider-profiles/{id}` form-encoded request with at least the
+`PATCH /providers/{id}` form-encoded request with at least the
 `practice_name` field. The contract surface is the form wiring (method,
 path, Content-Type, field name); the response on success is a 200 JSON
 with `HX-Redirect` to the same edit page so the user lands back on it.
@@ -79,7 +79,7 @@ async def test_consumer_provider_profile_edit_form_submits(
         )
         .will_respond_with(
             status=200,
-            headers={"HX-Redirect": Like("/provider-profiles/abc/form")},
+            headers={"HX-Redirect": Like("/providers/abc/form")},
             body={"id": Like("44444444-4444-4444-4444-444444444444")},
         )
     )

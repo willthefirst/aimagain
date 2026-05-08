@@ -21,14 +21,14 @@ POST_DELETE_API_PATH = f"/posts/{STUB_POST_ID}"
 POST_DETAIL_PAGE_PATH = f"/posts/{STUB_POST_ID}"
 
 # Provider-profile create form pact.
-PROVIDER_PROFILE_CREATE_API_PATH = "/provider-profiles"
-PROVIDER_PROFILE_CREATE_FORM_PAGE_PATH = "/provider-profiles/form"
+PROVIDER_PROFILE_CREATE_API_PATH = "/providers"
+PROVIDER_PROFILE_CREATE_FORM_PAGE_PATH = "/providers/form"
 
 # Provider-profile edit form pact: parent practice-fields PATCH only.
 # (Sub-resource pacts — licensures, educations, certifications — deferred.)
 STUB_PROFILE_ID = uuid.UUID("44444444-4444-4444-4444-444444444444")
-PROVIDER_PROFILE_PATCH_API_PATH = f"/provider-profiles/{STUB_PROFILE_ID}"
-PROVIDER_PROFILE_EDIT_FORM_PAGE_PATH = f"/provider-profiles/{STUB_PROFILE_ID}/form"
+PROVIDER_PROFILE_PATCH_API_PATH = f"/providers/{STUB_PROFILE_ID}"
+PROVIDER_PROFILE_EDIT_FORM_PAGE_PATH = f"/providers/{STUB_PROFILE_ID}/form"
 
 # Provider states
 PROVIDER_STATE_USER_DOES_NOT_EXIST = f"User {TEST_EMAIL} does not exist"

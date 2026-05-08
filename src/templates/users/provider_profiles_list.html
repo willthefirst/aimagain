@@ -11,7 +11,7 @@
 <ul id="user-provider-profiles" class="profiles-list">
   {%- for profile in profiles %}
   <li>
-    <a href="/provider-profiles/{{ profile.id }}">{{ profile.practice_name }}</a>
+    <a href="/providers/{{ profile.id }}">{{ profile.practice_name }}</a>
     &mdash; {{ profile.location_city }}, {{ profile.location_state }}
   </li>
   {%- endfor %}
@@ -20,7 +20,7 @@
 <p id="user-provider-profiles-empty">
   {% if is_self %}
   You have not created any provider profiles yet.
-  <a href="/provider-profiles/form">Create your first profile</a>.
+  <a href="/providers/form">Create your first profile</a>.
   {% else %}
   This user has no provider profiles yet.
   {% endif %}

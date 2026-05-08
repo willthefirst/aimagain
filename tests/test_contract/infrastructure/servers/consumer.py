@@ -139,7 +139,7 @@ def _setup_provider_profile_create_form_stub(app: FastAPI) -> None:
     """Mount a stub page that renders the real `provider_profiles/new.html`
     template, so the create-form's HTMX submit is exercised without
     needing a database. The contract surface is the form's `POST
-    /provider-profiles` request shape; what we render here is the same
+    /providers` request shape; what we render here is the same
     template production code paths render.
     """
 
@@ -147,7 +147,7 @@ def _setup_provider_profile_create_form_stub(app: FastAPI) -> None:
         def __init__(self, **kwargs):
             self.__dict__.update(kwargs)
 
-    @app.get("/provider-profiles/form")
+    @app.get("/providers/form")
     async def provider_profile_create_form_stub_page(request: Request):
         current_user = _StubAttrs(
             id=uuid.UUID("00000000-0000-0000-0000-000000000003"),
@@ -165,14 +165,14 @@ def _setup_provider_profile_edit_form_stub(app: FastAPI) -> None:
     """Mount a stub page that renders the real `provider_profiles/edit.html`
     template with a hardcoded profile, so the practice-fields PATCH form is
     exercised without needing a database. The contract surface is the form's
-    `PATCH /provider-profiles/{id}` request shape.
+    `PATCH /providers/{id}` request shape.
     """
 
     class _StubAttrs:
         def __init__(self, **kwargs):
             self.__dict__.update(kwargs)
 
-    @app.get("/provider-profiles/{profile_id}/form")
+    @app.get("/providers/{profile_id}/form")
     async def provider_profile_edit_form_stub_page(
         request: Request, profile_id: uuid.UUID
     ):

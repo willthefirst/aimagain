@@ -4,13 +4,13 @@
 {% block content %}
 <h1>Provider profiles</h1>
 
-<form method="get" action="/provider-profiles">
+<form method="get" action="/providers">
   <fieldset>
     <legend>Filter</legend>
     {{ filter_select_field("license_type", "License type", LICENSE_TYPES, labels=LICENSE_TYPES_LABELS, current=selected_license_type) }}
     {{ filter_select_field("issuing_state", "Issuing state", US_STATES, current=selected_issuing_state) }}
     <input type="submit" value="Apply" />
-    <a href="/provider-profiles">Clear</a>
+    <a href="/providers">Clear</a>
   </fieldset>
 </form>
 
@@ -18,7 +18,7 @@
 <ul class="profiles-list">
   {%- for profile in profiles %}
   <li>
-    <a href="/provider-profiles/{{ profile.id }}">{{ profile.practice_name }}</a>
+    <a href="/providers/{{ profile.id }}">{{ profile.practice_name }}</a>
     &mdash; {{ profile.location_city }}, {{ profile.location_state }}
   </li>
   {%- endfor %}
