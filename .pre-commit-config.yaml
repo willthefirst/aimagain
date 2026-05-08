@@ -44,3 +44,10 @@ repos:
         # lets pre-commit install it into the hook's isolated venv (which
         # does not see project deps from pyproject.toml).
         additional_dependencies: [selectolax]
+
+      - id: template-imports-check
+        name: Check template import boundaries
+        entry: python scripts/dev/template_imports_check.py
+        language: python
+        files: ^src/templates/.*\.html$
+        pass_filenames: true
