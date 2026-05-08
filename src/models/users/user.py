@@ -3,7 +3,7 @@ import uuid
 from fastapi_users.db import SQLAlchemyBaseUserTable
 from sqlalchemy import Column, Text
 
-from .base import BaseModel
+from ..base import BaseModel
 
 
 class User(SQLAlchemyBaseUserTable[uuid.UUID], BaseModel):
