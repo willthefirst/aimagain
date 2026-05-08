@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+{% block title %}Provider profile: {{ profile.practice_name }}{% endblock %}
+{% block content %}
+<h1>{{ profile.practice_name }}</h1>
+
+{% set can_edit = current_user and (current_user.id == profile.user_id or current_user.is_superuser) %}
+
+<section>
+  <h2>Practice</h2>
+  <dl>
+    <dt>Practice name</dt><dd>{{ profile.practice_name }}</dd>
+    <dt>City</dt><dd>{{ profile.location_city }}</dd>
+    <dt>State</dt><dd>{{ profile.location_state }}</dd>
+    <dt>ZIP</dt><dd>{{ profile.location_zip }}</dd>
+    <dt>In-person sessions</dt><dd>{{ LOCATION_AVAILABILITY_LABELS[profile.in_person_sessions] }}</dd>
+    <dt>Virtual sessions</dt><dd>{{ LOCATION_AVAILABILITY_LABELS[profile.virtual_sessions] }}</dd>
+  </dl>
+</section>
+
+<hr />
+
+<section>
+  <h2>Licensures</h2>
+  {% if profile.licensures %}
+  <ul class="licensures-list">
+    {%- for lic in profile.licensures %}
+    <li>
+      <strong>{{ LICENSE_TYPES_LABELS[lic.license_type] }}</strong>
+      &mdash; {{ lic.license_number }} ({{ lic.issuing_state }}){% if lic.expiration_date %}, expires {{ lic.expiration_date }}{% endif %}
+    </li>
+    {%- endfor %}
+  </ul>
+  {% else %}
+  <p>No licensures listed.</p>
+  {% endif %}
+</section>
+
+<hr />
+
+<section>
+  <h2>Education</h2>
+  {% if profile.educations %}
+  <ul class="educations-list">
+    {%- for edu in profile.educations %}
+    <li>
+      <strong>{{ EDUCATION_TYPES_LABELS[edu.education_type] }}</strong>
+      &mdash; {{ edu.institution }}{% if edu.month_completed %}, {{ edu.month_completed }}{% endif %}
+    </li>
+    {%- endfor %}
+  </ul>
+  {% else %}
+  <p>No education entries listed.</p>
+  {% endif %}
+</section>
+
+<hr />
+
+<section>
+  <h2>Certifications</h2>
+  {% if profile.certifications %}
+  <ul class="certifications-list">
+    {%- for cert in profile.certifications %}
+    <li>
+      <strong>{{ CERTIFICATION_TYPES_LABELS[cert.certification_type] }}</strong>
+      &mdash; {{ cert.certifying_body }}{% if cert.expiration_date %}, expires {{ cert.expiration_date }}{% endif %}
+    </li>
+    {%- endfor %}
+  </ul>
+  {% else %}
+  <p>No certifications listed.</p>
+  {% endif %}
+</section>
+
+<hr />
+{% if can_edit %}
+<a href="/provider-profiles/{{ profile.id }}/form">Edit profile</a> |
+{% endif %}
+<a href="/provider-profiles">Back to profiles</a>
+{% endblock %}

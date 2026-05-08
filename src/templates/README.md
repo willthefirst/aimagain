@@ -67,7 +67,7 @@ Templates use inheritance for consistent layout and feature-specific customizati
 | **auth/**  | Authentication pages   | login, register, forgot/reset password                                 |
 | **users/** | User management        | list, detail, `_admin_actions.html` partial (shared by list & detail)  |
 | **posts/** | Posts                  | list, detail, per-kind `new_<kind>.html` + `edit_<kind>.html` thin wrappers around `_<kind>_form.html` partials, `_form_macros.html` (shared field macros), `_owner_actions.html` partial (shared by detail) |
-| **provider_profiles/** | Provider profiles | `new.html` (create form), `edit.html` (edit form with practice-fields PATCH plus three sub-resource sections — licensures, educations, certifications — each with inline add form + per-row delete). Imports field macros from `posts/_form_macros.html` rather than duplicating them. |
+| **provider_profiles/** | Provider profiles | `detail.html` (read-only HTML detail rendered by `GET /{id}` and `GET /me`; shows practice fields, licensures, educations, certifications; an Edit link is rendered for the owner or an admin only), `new.html` (create form), `edit.html` (edit form with practice-fields PATCH plus three sub-resource sections — licensures, educations, certifications — each with inline add form + per-row delete). Imports field macros from `posts/_form_macros.html` rather than duplicating them. |
 | **me/**    | Personal/profile pages | user profile                                                           |
 
 ### Reusable partial convention
@@ -111,6 +111,7 @@ templates/
 │   ├── _form_macros.html       # Shared field macros (text_field, select_field, …)
 │   └── _owner_actions.html     # Reusable owner-actions partial (Edit/Delete)
 ├── provider_profiles/          # Provider profile templates
+│   ├── detail.html             # Read-only detail page (GET /{id} and GET /me)
 │   ├── new.html                # Create form (imports posts/_form_macros.html)
 │   └── edit.html               # Edit form: practice fields PATCH + three sub-resource add/delete sections
 └── me/                         # Personal user pages

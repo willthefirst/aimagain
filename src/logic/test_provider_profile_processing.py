@@ -11,6 +11,7 @@ import uuid
 import pytest
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
+from starlette.requests import Request
 
 from src.api.common.exceptions import BadRequestError, ForbiddenError, NotFoundError
 from src.logic.audit import AuditAction
@@ -23,8 +24,8 @@ from src.logic.provider_profile_processing import (
     handle_delete_education,
     handle_delete_licensure,
     handle_delete_profile,
-    handle_get_my_profile,
-    handle_get_profile,
+    handle_get_my_provider_profile_detail,
+    handle_get_provider_profile_detail,
     handle_list_profiles,
     handle_update_certification,
     handle_update_education,
@@ -60,6 +61,13 @@ from tests.helpers import (
 )
 
 pytestmark = pytest.mark.asyncio
+
+
+def _fake_request() -> Request:
+    """Minimal Starlette Request used as a placeholder for handlers that
+    forward the request into a template context but don't otherwise read
+    from it."""
+    return Request({"type": "http", "headers": [], "method": "GET", "path": "/"})
 
 
 # --- Seeding helpers -----------------------------------------------------
@@ -185,7 +193,7 @@ async def test_list_profiles_filters_by_license_type(
         assert [p.id for p in result] == [profile_a]
 
 
-async def test_get_profile_returns_profile(
+async def test_get_provider_profile_detail_returns_context(
     db_test_session_manager: async_sessionmaker[AsyncSession],
 ):
     user = await _seed_user(db_test_session_manager)
@@ -193,21 +201,33 @@ async def test_get_profile_returns_profile(
 
     async with db_test_session_manager() as session:
         repo = ProviderProfileRepository(session)
-        profile = await handle_get_profile(profile_id, repo, user)
-        assert profile.id == profile_id
+        context = await handle_get_provider_profile_detail(
+            request=_fake_request(),
+            profile_id=profile_id,
+            repo=repo,
+            requesting_user=user,
+        )
+        assert context["profile"].id == profile_id
+        assert context["current_user"] is user
+        assert "request" in context
 
 
-async def test_get_profile_404_for_unknown_id(
+async def test_get_provider_profile_detail_404_for_unknown_id(
     db_test_session_manager: async_sessionmaker[AsyncSession],
 ):
     user = await _seed_user(db_test_session_manager)
     async with db_test_session_manager() as session:
         repo = ProviderProfileRepository(session)
         with pytest.raises(NotFoundError):
-            await handle_get_profile(uuid.uuid4(), repo, user)
+            await handle_get_provider_profile_detail(
+                request=_fake_request(),
+                profile_id=uuid.uuid4(),
+                repo=repo,
+                requesting_user=user,
+            )
 
 
-async def test_get_my_profile_returns_users_profile(
+async def test_get_my_provider_profile_detail_returns_context(
     db_test_session_manager: async_sessionmaker[AsyncSession],
 ):
     user = await _seed_user(db_test_session_manager)
@@ -215,18 +235,22 @@ async def test_get_my_profile_returns_users_profile(
 
     async with db_test_session_manager() as session:
         repo = ProviderProfileRepository(session)
-        profile = await handle_get_my_profile(repo, user)
-        assert profile.id == profile_id
+        context = await handle_get_my_provider_profile_detail(
+            request=_fake_request(), repo=repo, requesting_user=user
+        )
+        assert context["profile"].id == profile_id
 
 
-async def test_get_my_profile_404_when_user_has_no_profile(
+async def test_get_my_provider_profile_detail_404_when_user_has_no_profile(
     db_test_session_manager: async_sessionmaker[AsyncSession],
 ):
     user = await _seed_user(db_test_session_manager)
     async with db_test_session_manager() as session:
         repo = ProviderProfileRepository(session)
         with pytest.raises(NotFoundError):
-            await handle_get_my_profile(repo, user)
+            await handle_get_my_provider_profile_detail(
+                request=_fake_request(), repo=repo, requesting_user=user
+            )
 
 
 # --- handle_create_profile ----------------------------------------------

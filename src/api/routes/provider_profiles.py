@@ -21,8 +21,8 @@ from src.logic.provider_profile_processing import (
     handle_delete_education,
     handle_delete_licensure,
     handle_delete_profile,
-    handle_get_my_profile,
-    handle_get_profile,
+    handle_get_my_provider_profile_detail,
+    handle_get_provider_profile_detail,
     handle_get_provider_profile_edit_form,
     handle_get_provider_profile_form,
     handle_list_profiles,
@@ -141,13 +141,21 @@ async def create_profile(
 
 @router.get("/me")
 async def get_my_profile(
+    request: Request,
     repo: ProviderProfileRepository = Depends(get_provider_profile_repository),
     user: User = Depends(current_active_user),
 ):
-    """Returns the requesting user's profile. 404 if they have not created one
-    yet (profiles are not auto-created on registration)."""
-    profile = await handle_get_my_profile(repo, user)
-    return JSONResponse(content=_profile_read_dict(profile))
+    """Renders the requesting user's profile as an HTML detail page. 404 if
+    they have not created one yet (profiles are not auto-created on
+    registration)."""
+    context = await handle_get_my_provider_profile_detail(
+        request=request, repo=repo, requesting_user=user
+    )
+    return APIResponse.html_response(
+        template_name="provider_profiles/detail.html",
+        context=context,
+        request=request,
+    )
 
 
 # --- Form routes --------------------------------------------------------
@@ -176,12 +184,22 @@ async def get_provider_profile_form(
 @router.get("/{profile_id}")
 async def get_profile(
     profile_id: UUID,
+    request: Request,
     repo: ProviderProfileRepository = Depends(get_provider_profile_repository),
     user: User = Depends(current_active_user),
 ):
-    """Authenticated read of any profile by id. 404 if missing."""
-    profile = await handle_get_profile(profile_id, repo, user)
-    return JSONResponse(content=_profile_read_dict(profile))
+    """Renders an HTML detail page for any profile. 404 if missing."""
+    context = await handle_get_provider_profile_detail(
+        request=request,
+        profile_id=profile_id,
+        repo=repo,
+        requesting_user=user,
+    )
+    return APIResponse.html_response(
+        template_name="provider_profiles/detail.html",
+        context=context,
+        request=request,
+    )
 
 
 @router.get("/{profile_id}/form")
