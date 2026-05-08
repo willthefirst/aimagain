@@ -145,11 +145,28 @@ Secondary repos (e.g. `user_repo: UserRepository` in the multi-repo `handle_list
 | Mount | Status | Resources using it |
 | --- | --- | --- |
 | `mount_delete` | Landed (slice 3 / #248) | `users` (DELETE) |
-| `mount_list` / `mount_detail` | Slice 4 / #249 | — |
+| `mount_list` / `mount_detail` | Landed (slice 4 / #249) | `users` (GET / and GET /{id}) |
 | `mount_form` | Slice 5 / #250 | — |
 | `mount_create` / `mount_update` | Slice 6 / #251 | — |
 | `mount_related_list` | Slice 9 / #254 | — |
 | Sub-resource via `parent=` | Slice 8 / #253 | — |
+
+### Multi-repo handlers: `extra_repo_deps`
+
+Some handlers need more than the resource's primary repo — e.g. `handle_get_user_detail` takes both the user repo (the primary) and the provider repo (to embed the owned-providers list on the user-detail page). The mount that needs them passes them via the `extra_repo_deps` kwarg:
+
+```python
+mount_detail(
+    router,
+    USER_SPEC,
+    handler=handle_get_user_detail,
+    extra_repo_deps=(get_provider_repository,),
+)
+```
+
+The mount derives the kwarg name from the dep callable: `get_provider_repository` → `provider_repo` (strip `get_` prefix, replace `_repository` suffix with `_repo`). The handler must take the same name. If the dep doesn't follow the `get_<entity>_repository` convention, the mount raises at registration time — silent name-mismatches would be a request-time bug.
+
+`extra_repo_deps` is per-mount, not per-spec, because different mounts on the same resource often need different extras (the list view doesn't need provider_repo even though the detail view does).
 
 Per-mount docstrings in `resource_routes.py` are the canonical reference for required spec fields and exact handler kwargs.
 

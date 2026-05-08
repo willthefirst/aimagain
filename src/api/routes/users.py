@@ -5,7 +5,12 @@ from fastapi import APIRouter, Depends, Request
 from fastapi.responses import JSONResponse
 
 from src.api.common import APIResponse, BaseRouter
-from src.api.common.resource_routes import ResourceSpec, mount_delete
+from src.api.common.resource_routes import (
+    ResourceSpec,
+    mount_delete,
+    mount_detail,
+    mount_list,
+)
 from src.auth_config import current_active_user, current_admin_user
 from src.logic.providers.provider_processing import handle_list_user_providers
 from src.logic.users.user_processing import (
@@ -38,49 +43,22 @@ USER_SPEC = ResourceSpec(
     audit_resource=USER,
     read_user_dep=current_active_user,
     write_user_dep=current_admin_user,
+    list_template="users/list.html",
+    detail_template="users/detail.html",
 )
 
 
-@router.get("")
-async def list_users(
-    request: Request,
-    user_repo: UserRepository = Depends(get_user_repository),
-    user: User = Depends(current_active_user),
-):
-    """Provides an HTML page listing registered users.
-    Requires authentication.
-    Uses a logic handler to fetch and prepare user data.
-    """
-    context = await handle_list_users(
-        request=request,
-        repo=user_repo,
-        requesting_user=user,
-    )
-    return APIResponse.html_response(
-        template_name="users/list.html", context=context, request=request
-    )
-
-
-@router.get("/{user_id}")
-async def get_user(
-    user_id: UUID,
-    request: Request,
-    user_repo: UserRepository = Depends(get_user_repository),
-    profile_repo: ProviderRepository = Depends(get_provider_repository),
-    user: User = Depends(current_active_user),
-):
-    """Provides an HTML detail page for a single user, including the list
-    of providers they own."""
-    context = await handle_get_user_detail(
-        request=request,
-        user_id=user_id,
-        repo=user_repo,
-        profile_repo=profile_repo,
-        requesting_user=user,
-    )
-    return APIResponse.html_response(
-        template_name="users/detail.html", context=context, request=request
-    )
+# GET /users
+mount_list(router, USER_SPEC, handler=handle_list_users)
+# GET /users/{user_id} — `handle_get_user_detail` also takes the provider
+# repo to embed the owned-providers list. The mount injects it under
+# `provider_repo` (derived from `get_provider_repository`).
+mount_detail(
+    router,
+    USER_SPEC,
+    handler=handle_get_user_detail,
+    extra_repo_deps=(get_provider_repository,),
+)
 
 
 @router.get("/{user_id}/providers")
