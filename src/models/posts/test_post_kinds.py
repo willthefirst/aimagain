@@ -9,7 +9,7 @@ fails.
 
 from typing import get_args
 
-from src.api.routes.posts import get_post_form
+from src.api.routes import posts as posts_routes
 from src.models import KIND_BY_DETAIL_MODEL, KIND_NAMES, REGISTERED_KINDS, Post
 from src.models.posts.post_kinds import kind_check_sql
 
@@ -49,9 +49,17 @@ def test_kind_by_detail_model_inverse_matches_registry():
 
 def test_form_route_literal_matches_registry():
     """The `?kind=` Query parameter on `GET /posts/form` is typed as
-    `Literal[*KIND_NAMES]`; the FastAPI signature must reflect that."""
-    annotations = get_post_form.__annotations__
-    literal_args = get_args(annotations["kind"])
+    `Literal[*KIND_NAMES]`. The QueryParam published on the mount's
+    route signature must reflect that — guards against `KIND_NAMES`
+    drifting from the route's accepted-kinds list."""
+    import inspect
+
+    routes = [
+        r for r in posts_routes.posts_api_router.routes if r.path == "/posts/form"
+    ]
+    assert len(routes) == 1, "expected exactly one /posts/form route"
+    params = inspect.signature(routes[0].endpoint).parameters
+    literal_args = get_args(params["kind"].annotation)
     assert set(literal_args) == set(KIND_NAMES)
 
 

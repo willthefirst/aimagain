@@ -1,14 +1,16 @@
 import logging
 
-from fastapi import APIRouter, Depends, Query, Request
+from fastapi import APIRouter
 
-from src.api.common import APIResponse, BaseRouter
+from src.api.common import BaseRouter
 from src.api.common.resource_routes import (
+    QueryParam,
     ResourceSpec,
     mount_create,
     mount_delete,
     mount_detail,
     mount_form,
+    mount_list,
     mount_update,
 )
 from src.auth_config import current_active_user
@@ -35,7 +37,6 @@ from src.logic.providers.provider_processing import (
     handle_update_provider,
 )
 from src.repositories.dependencies import get_audit_repository, get_provider_repository
-from src.repositories.providers.provider_repository import ProviderRepository
 from src.schemas.providers.provider import (
     ProviderCertificationRead,
     ProviderEducationRead,
@@ -68,6 +69,7 @@ PROVIDER_SPEC = ResourceSpec(
     read_to_dict=lambda profile: ProviderRead.model_validate(profile).model_dump(
         mode="json"
     ),
+    list_template="providers/list.html",
     detail_template="providers/detail.html",
     # After create, redirect to the edit form so the user can flesh out
     # sub-rows (licensures, educations, certifications). After update,
@@ -91,29 +93,19 @@ def _certification_read_dict(row) -> dict:
 
 # --- Profile collection routes ------------------------------------------
 
-
-@router.get("")
-async def list_providers(
-    request: Request,
-    license_type: str | None = Query(None),
-    issuing_state: str | None = Query(None),
-    repo: ProviderRepository = Depends(get_provider_repository),
-):
-    """Public HTML listing of providers. Optional `license_type` and
-    `issuing_state` filters narrow the results to profiles that hold a
-    licensure matching both filters."""
-    context = await handle_list_providers(
-        request=request,
-        repo=repo,
-        license_type=license_type,
-        issuing_state=issuing_state,
-    )
-    return APIResponse.html_response(
-        template_name="providers/list.html",
-        context=context,
-        request=request,
-    )
-
+# GET /providers — public listing with optional license_type / issuing_state
+# filters. `public=True` overrides the spec's `read_user_dep` for this
+# mount only (detail/form/mutations on the same spec stay authenticated).
+mount_list(
+    router,
+    PROVIDER_SPEC,
+    handler=handle_list_providers,
+    public=True,
+    query_params=(
+        QueryParam("license_type", str | None, None),
+        QueryParam("issuing_state", str | None, None),
+    ),
+)
 
 # POST /providers — owner inferred from session.
 mount_create(

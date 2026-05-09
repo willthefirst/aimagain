@@ -99,8 +99,6 @@ The unified grammar fits resource-shaped CRUD. Several existing routes intention
 | `GET /auth/{register,login,forgot-password,reset-password/{token}}` | `auth_pages.py` | Pure form rendering, no resource. Could fit a hypothetical `mount_static_form` but not worth it for 4 routes. |
 | `GET /users/me`, `GET /users/me/profile`, `GET /users/me/providers` | `me.py` | Singleton aliases — no parent id, session-sourced. Adding a `singleton_alias` knob to every spec for 3 routes would be a bad trade. |
 | `PUT /users/{user_id}/activation` | `users.py` | Idempotent state set with `HX-Refresh` (not `HX-Redirect`); admin-only verb. Doesn't match `mount_update` semantics. |
-| `GET /providers` (with `?license_type=`/`?issuing_state=` filters) | `providers.py` | Public listing with query-param filters. `mount_list` doesn't accept query params; widening it for one resource would push the asymmetry onto every spec. |
-| `GET /posts/form?kind=X` | `posts.py` | Polymorphic-by-query-param: the kind picks the create template at request time. `mount_form`'s contract doesn't carry query params. |
 | `GET /`, `GET /health` | `main.py` | Utility endpoints. Not resource-shaped. |
 
 If a future case suggests the grammar should grow to fit one of these, that's the moment to reshape `ResourceSpec` — not to escape-hatch around it.

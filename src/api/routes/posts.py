@@ -1,10 +1,11 @@
 import logging
 from typing import Literal
 
-from fastapi import APIRouter, Depends, Query, Request
+from fastapi import APIRouter
 
-from src.api.common import APIResponse, BaseRouter
+from src.api.common import BaseRouter
 from src.api.common.resource_routes import (
+    QueryParam,
     ResourceSpec,
     mount_create,
     mount_delete,
@@ -25,7 +26,7 @@ from src.logic.posts.post_processing import (
     handle_list_posts,
     handle_update_post,
 )
-from src.models import KIND_NAMES, REGISTERED_KINDS, User
+from src.models import KIND_NAMES, REGISTERED_KINDS
 from src.repositories.dependencies import get_audit_repository, get_post_repository
 from src.schemas.posts.post import post_create_adapter, post_update_adapter
 
@@ -76,25 +77,22 @@ POST_SPEC = ResourceSpec(
 mount_list(router, POST_SPEC, handler=handle_list_posts)
 
 
-# GET /posts/form?kind=<X> — stays bespoke. The kind query param picks
-# the per-kind create template at request time. mount_form's contract
-# doesn't accept additional query params; widening the spec for this
-# single polymorphic-by-query case would bloat the grammar for everyone.
-# Slice 10 (#255) revisits whether the grammar should grow to fit it.
-@router.get("/form")
-async def get_post_form(
-    request: Request,
-    kind: Literal[*KIND_NAMES] = Query(KIND_NAMES[0]),
-    user: User = Depends(current_active_user),
-):
-    """Provides the create-post form for `kind` (defaults to the first
-    registered kind). Unsupported kinds 422 via FastAPI's Literal."""
-    context = await handle_get_post_form(request=request, requesting_user=user)
-    return APIResponse.html_response(
-        template_name=REGISTERED_KINDS[kind].create_template,
-        context=context,
-        request=request,
-    )
+# GET /posts/form?kind=<X> — `kind` query param picks the per-kind create
+# template at request time. The handler returns `template_name` in the
+# context dict; mount_form's three-source resolution picks it up.
+mount_form(
+    router,
+    POST_SPEC,
+    handler=handle_get_post_form,
+    query_params=(
+        QueryParam(
+            "kind",
+            Literal[*KIND_NAMES],
+            KIND_NAMES[0],
+            description="Which post kind's create form to render.",
+        ),
+    ),
+)
 
 
 # GET /posts/{post_id}/form — handler returns `template_name` in context

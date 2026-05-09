@@ -39,7 +39,7 @@ from dataclasses import dataclass
 from typing import Any, Awaitable, Callable
 from uuid import UUID
 
-from fastapi import Depends, Request, status
+from fastapi import Depends, Query, Request, status
 from pydantic import TypeAdapter
 
 from src.api.common.forms import parse_and_validate_form
@@ -50,6 +50,40 @@ from src.api.common.responses import (
     updated_response,
 )
 from src.logic.audit import AuditedResource
+
+_UNSET = object()
+
+
+@dataclass(frozen=True)
+class QueryParam:
+    """Declarative query-param description for ``mount_list`` / ``mount_form``.
+
+    The mount adds it to the route's ``__signature__`` as a FastAPI
+    ``Query(...)`` parameter so OpenAPI docs and 422-on-invalid validation
+    work the same way they would on a hand-written route.
+
+    Fields:
+      name: kwarg name the mount passes to the handler.
+      annotation: type annotation FastAPI uses for parsing/validation
+        (``str | None``, ``Literal["a","b"]``, ``int``, etc.).
+      default: default value if the param is omitted from the URL.
+        Use ``QueryParam.required()`` to mark a param required.
+      description: optional OpenAPI description.
+    """
+
+    name: str
+    annotation: Any
+    default: Any = None
+    description: str = ""
+
+    @classmethod
+    def required(
+        cls, name: str, annotation: Any, *, description: str = ""
+    ) -> "QueryParam":
+        """Mark a query param as required (no default)."""
+        return cls(
+            name=name, annotation=annotation, default=_UNSET, description=description
+        )
 
 
 @dataclass(frozen=True)
@@ -203,27 +237,36 @@ def mount_list(
     handler: Callable[..., Awaitable[dict]],
     *,
     extra_repo_deps: tuple[Callable[..., Any], ...] = (),
+    query_params: tuple[QueryParam, ...] = (),
+    public: bool = False,
 ) -> None:
     """Mount ``GET /<collection>`` rendering ``spec.list_template``.
 
     The handler is invoked with ``request``, ``repo`` (from
     ``spec.repo_dep``), ``requesting_user`` (from ``spec.read_user_dep``,
-    or ``None`` if no auth gate is set), and any ``extra_repo_deps`` under
-    their dep callable's name (``get_<entity>_repository`` →
-    ``<entity>_repo``). The handler returns a context dict; the mount
-    renders ``spec.list_template`` with it.
+    or ``None`` if no auth gate is set), each ``query_params`` entry
+    under its declared name, and any ``extra_repo_deps`` under their dep
+    callable's name (``get_<entity>_repository`` → ``<entity>_repo``).
+    The handler returns a context dict; the mount renders
+    ``spec.list_template`` with it.
 
-    ``extra_repo_deps`` is per-mount, not per-spec, because different
-    mounts on the same resource often need different extra repos (e.g.
-    list doesn't need provider_repo but detail does).
+    ``query_params`` is per-mount because filter shapes are usually
+    list-specific (e.g. provider list takes ``license_type`` and
+    ``issuing_state``; users list takes none today). Each ``QueryParam``
+    becomes a FastAPI ``Query(...)`` parameter on the route, with full
+    OpenAPI doc support and 422-on-invalid validation.
+
+    ``extra_repo_deps`` is per-mount for the same reason — different
+    mounts on the same resource often need different extras.
 
     Polymorphic resources can override the template by returning
-    ``template_name`` in the context — slice 5 (#250) wires that through
-    for ``mount_form``; for now ``mount_list`` always uses
-    ``spec.list_template``.
+    ``template_name`` in the context (the same precedence
+    ``mount_form`` uses).
 
-    Until slice 8 (#253), ``spec.parent`` must be ``None`` here; nested
-    list routes use ``mount_related_list`` (slice 9 / #254).
+    ``public=True`` overrides ``spec.read_user_dep`` for this mount only —
+    used when a resource's list is public but its detail/form pages are
+    authenticated (e.g. providers). The handler still receives
+    ``requesting_user=None`` so it can branch if needed.
     """
     if spec.parent is not None:
         raise NotImplementedError(
@@ -236,6 +279,7 @@ def mount_list(
         )
     list_template = spec.list_template
     extra_deps_named = _name_extra_repo_deps(extra_repo_deps)
+    query_param_names = tuple(qp.name for qp in query_params)
 
     async def _list(**kwargs: Any) -> Any:
         request: Request = kwargs["request"]
@@ -244,15 +288,27 @@ def mount_list(
             repo=kwargs["repo"],
             requesting_user=kwargs.get("requesting_user"),
             **{name: kwargs[name] for name, _ in extra_deps_named},
+            **{name: kwargs[name] for name in query_param_names},
         )
+        # Honor handler-context override for polymorphic templates.
+        resolved_template = context.pop("template_name", None) or list_template
         return APIResponse.html_response(
-            template_name=list_template, context=context, request=request
+            template_name=resolved_template, context=context, request=request
         )
 
+    if public:
+        # Build deps without the spec's read_user_dep — handler receives
+        # `requesting_user=None`.
+        deps: list[tuple[str, Callable[..., Any]]] = [("repo", spec.repo_dep)]
+        deps.extend(extra_deps_named)
+        list_deps = tuple(deps)
+    else:
+        list_deps = _read_route_deps(spec, extra_deps_named)
     _set_route_signature(
         _list,
         path_params=(("request", Request),),
-        deps=_read_route_deps(spec, extra_deps_named),
+        query_params=query_params,
+        deps=list_deps,
     )
     router.get("")(_list)
 
@@ -317,6 +373,7 @@ def mount_form(
     template: str | None = None,
     on_existing: bool = False,
     extra_repo_deps: tuple[Callable[..., Any], ...] = (),
+    query_params: tuple[QueryParam, ...] = (),
 ) -> None:
     """Mount a form-rendering route.
 
@@ -328,16 +385,17 @@ def mount_form(
     Template precedence (highest to lowest):
       1. ``template_name`` returned in the handler's context dict (for
          polymorphic resources whose template varies at request time —
-         e.g. posts kind-dispatch).
+         e.g. posts kind-dispatch where ``?kind=`` picks the template).
       2. ``template`` kwarg on this call (the simple two-form case where
          create and edit render different static templates).
       3. ``spec.form_template`` (the spec's default).
 
     Handler kwargs: ``request``, ``repo``, ``requesting_user``, the
     resource id under ``spec.id_param`` (only when ``on_existing=True``),
-    and any ``extra_repo_deps``. Pure create-form handlers that don't
-    use the repo still have to accept ``repo=`` (just ignore it) —
-    uniform mount-handler contract beats a special case.
+    each ``query_params`` entry under its declared name, and any
+    ``extra_repo_deps``. Pure create-form handlers that don't use the
+    repo still have to accept ``repo=`` (just ignore it) — uniform
+    mount-handler contract beats a special case.
     """
     if spec.parent is not None:
         raise NotImplementedError(
@@ -346,6 +404,7 @@ def mount_form(
     id_param = spec.id_param
     extra_deps_named = _name_extra_repo_deps(extra_repo_deps)
     spec_template = spec.form_template
+    query_param_names = tuple(qp.name for qp in query_params)
 
     if on_existing:
         path = f"/{{{id_param}}}/form"
@@ -361,6 +420,7 @@ def mount_form(
             "repo": kwargs["repo"],
             "requesting_user": kwargs.get("requesting_user"),
             **{name: kwargs[name] for name, _ in extra_deps_named},
+            **{name: kwargs[name] for name in query_param_names},
         }
         if on_existing:
             handler_kwargs[id_param] = kwargs[id_param]
@@ -385,6 +445,7 @@ def mount_form(
     _set_route_signature(
         _form,
         path_params=path_params,
+        query_params=query_params,
         deps=_read_route_deps(spec, extra_deps_named),
     )
     router.get(path)(_form)
@@ -751,6 +812,7 @@ def _set_route_signature(
     *,
     path_params: tuple[tuple[str, type], ...],
     deps: tuple[tuple[str, Callable[..., Any]], ...],
+    query_params: tuple[QueryParam, ...] = (),
 ) -> None:
     """Advertise an explicit signature on a `**kwargs`-based route handler.
 
@@ -761,6 +823,9 @@ def _set_route_signature(
 
     `path_params` are positional-or-keyword params with a type annotation
     and no default — FastAPI binds them from the URL.
+    `query_params` (optional) are positional-or-keyword params whose
+    default is `Query(...)` — FastAPI parses them from the query string,
+    validates against the annotation, and 422s on invalid input.
     `deps` are positional-or-keyword params whose default is `Depends(...)`
     — FastAPI resolves them via the injection system.
     """
@@ -773,6 +838,19 @@ def _set_route_signature(
                 name=name,
                 kind=Parameter.POSITIONAL_OR_KEYWORD,
                 annotation=ann,
+            )
+        )
+    for qp in query_params:
+        if qp.default is _UNSET:
+            default = Query(..., description=qp.description or None)
+        else:
+            default = Query(qp.default, description=qp.description or None)
+        params.append(
+            Parameter(
+                name=qp.name,
+                kind=Parameter.POSITIONAL_OR_KEYWORD,
+                default=default,
+                annotation=qp.annotation,
             )
         )
     for name, dep in deps:
