@@ -432,8 +432,10 @@ APIResponse.success(data, message="Success", status_code=200)
 APIResponse.error(message, status_code=400, code=None)
 
 # HTML responses
-APIResponse.html_response(template_name, context, request)
+APIResponse.html_response(template_name, context, request, current_user=None)
 ```
+
+`html_response` merges three context tiers (later overwrites earlier): caller `context` → dev/global context → chrome scalars from `base_context(current_user)` (`is_authenticated`, `is_admin`, `current_username`, `current_user_id`). Chrome scalars are computed from the authenticated user and overwrite caller-provided values — a handler can't accidentally pass `is_admin=True` for a non-admin viewer. Mount functions in `resource_routes.py` thread `requesting_user` to `current_user`; auth-page handlers (no auth dep) take the default `None`.
 
 ### Exception classes
 

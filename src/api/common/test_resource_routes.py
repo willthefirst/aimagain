@@ -203,9 +203,10 @@ def test_mount_list_renders_template_with_handler_context(monkeypatch):
 
     rendered = {}
 
-    def fake_html_response(*, template_name, context, request):
+    def fake_html_response(*, template_name, context, request, current_user=None):
         rendered["template_name"] = template_name
         rendered["context"] = context
+        rendered["current_user"] = current_user
         from fastapi.responses import JSONResponse
 
         return JSONResponse({"ok": True})
@@ -251,7 +252,7 @@ def test_mount_detail_injects_extra_repo_deps_under_derived_name(monkeypatch):
     monkeypatch.setattr(
         "src.api.common.resource_routes.APIResponse.html_response",
         staticmethod(
-            lambda *, template_name, context, request: __import__(
+            lambda *, template_name, context, request, current_user=None: __import__(
                 "fastapi"
             ).responses.JSONResponse({})
         ),
@@ -320,9 +321,10 @@ def _stub_html_response(monkeypatch):
     writes into."""
     captured = {}
 
-    def fake(*, template_name, context, request):
+    def fake(*, template_name, context, request, current_user=None):
         captured["template_name"] = template_name
         captured["context"] = context
+        captured["current_user"] = current_user
         from fastapi.responses import JSONResponse
 
         return JSONResponse({"ok": True})
