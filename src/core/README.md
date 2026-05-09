@@ -81,6 +81,7 @@ Core modules are imported and used throughout the application stack.
 | ----------------- | ----------------------------------- | ------------------------------------------------- |
 | **config.py**     | Application settings and validation | Environment variables, validation, error handling |
 | **templating.py** | Template system configuration       | Jinja2 setup, global context, auto-reload, post-enum tuples + label dicts exposed as Jinja globals |
+| **form_fields.py**| Schema-driven form-field rendering  | `field_spec(schema_cls, name)` introspects a Pydantic field and returns the spec the `field_for` Jinja macro dispatches on; `HtmlPattern` marker for `Annotated[...]` aliases that need a form-side `pattern`/`maxlength` |
 
 ## Directory structure
 
@@ -92,6 +93,17 @@ core/
 │                   #   from `src/models/enums.py` as Jinja globals
 │                   #   so per-kind form templates can iterate over them
 │                   #   directly (single source of truth for option lists).
+│                   #   Also exposes `field_spec` (from `form_fields.py`)
+│                   #   as a Jinja global and registers the choice-tuple →
+│                   #   labels-dict mapping it uses for `Literal[*TUPLE]`
+│                   #   fields.
+├── form_fields.py  # Schema-driven form rendering. `field_spec(schema_cls,
+│                   #   name)` introspects a Pydantic field and produces
+│                   #   the spec that `field_for` (in
+│                   #   `src/templates/_shared/form_fields.html`)
+│                   #   dispatches on. `HtmlPattern` is the marker an
+│                   #   `Annotated[...]` schema alias attaches to expose
+│                   #   client-side `pattern`/`maxlength` to the form.
 └── __init__.py     # Package exports
 ```
 
@@ -375,6 +387,7 @@ Each module has a colocated `test_<module>.py` covering its behavior:
 
 - `test_config.py` — environment variable defaults, particularly that production is the safe default.
 - `test_templating.py` — template context generation, including livereload only loading in development.
+- `test_form_fields.py` — `field_spec` derivation: required-vs-optional from `T | None`, `Literal[*TUPLE]` → select with labels resolved by tuple-value lookup, `HtmlPattern` marker propagation, and an end-to-end check that `ZipText` carries its pattern through the real `ProviderCreate` schema.
 
 ## Related documentation
 

@@ -194,7 +194,15 @@ async def handle_get_provider_form(
     creating a profile doesn't need to load anything from the db.
     """
     del repo  # explicitly unused
-    return {"request": request, "current_user": requesting_user}
+    return {
+        "request": request,
+        "current_user": requesting_user,
+        # `providers/new.html` calls `field_for(schema, ...)` against
+        # this Pydantic class; pass it explicitly rather than via a
+        # core-level Jinja global so schemas stay opt-in per template
+        # (and core doesn't need to import schemas).
+        "schema": ProviderCreate,
+    }
 
 
 async def handle_get_provider_edit_form(

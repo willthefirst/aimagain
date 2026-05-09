@@ -28,10 +28,11 @@ universes aligned with the source tuples.
 
 import uuid
 from datetime import date, datetime
-from typing import Literal
+from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, TypeAdapter, model_validator
 
+from src.core.form_fields import HtmlPattern
 from src.models.enums import (
     CERTIFICATION_TYPES,
     EDUCATION_TYPES,
@@ -220,8 +221,14 @@ class ProviderCreate(BaseModel):
     set by the route from the authenticated user, not accepted on the
     wire."""
 
-    practice_name: StrippedText
-    location_city: StrippedText
+    # `HtmlPattern(maxlength=...)` is a form-side hint only — does not
+    # affect server-side validation. It exists so the rendered
+    # `<input maxlength=...>` matches the previous hand-rolled form
+    # without restating the number per template. Adding a true server-
+    # side length cap (`pydantic.StringConstraints` etc.) is a separate
+    # concern.
+    practice_name: Annotated[StrippedText, HtmlPattern(maxlength=200)]
+    location_city: Annotated[StrippedText, HtmlPattern(maxlength=120)]
     location_state: Literal[*US_STATES]
     location_zip: ZipText
     in_person_sessions: Literal[*LOCATION_AVAILABILITY_OPTIONS]
