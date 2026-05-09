@@ -91,7 +91,15 @@ def _setup_users_admin_actions_stub(app: FastAPI) -> None:
         )
         return APIResponse.html_response(
             template_name="users/detail.html",
-            context={"target_user": target_user, "current_user": current_user},
+            # `can_admin_actions` mirrors what the production handler would
+            # compute (admin viewing a non-self target). The contract under
+            # test is the admin-actions partial's HTMX shape; pass the flag
+            # the partial reads after the named-flag refactor.
+            context={
+                "target_user": target_user,
+                "current_user": current_user,
+                "can_admin_actions": True,
+            },
             request=request,
         )
 
@@ -131,7 +139,10 @@ def _setup_post_owner_actions_stub(app: FastAPI) -> None:
         )
         return APIResponse.html_response(
             template_name="posts/detail.html",
-            context={"post": post, "current_user": current_user},
+            # `can_edit` mirrors what the production handler would compute
+            # for an admin viewer; the partial reads the named flag after
+            # the affordance refactor (#279).
+            context={"post": post, "current_user": current_user, "can_edit": True},
             request=request,
         )
 
