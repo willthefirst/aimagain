@@ -3,11 +3,17 @@
 {% block content %}
 <h1>{{ target_user.username }}</h1>
 
+{# Private rows (email, active, verified) are gated by `can_view_private`,
+   computed in handle_get_user_detail as `is_self OR is_admin(viewer)`.
+   The handler also omits these fields from the `target_user` projection
+   for non-authorized viewers, so a forgotten guard here cannot re-leak. #}
+{% if can_view_private %}
 <dl>
   <dt>Email</dt><dd>{{ target_user.email }}</dd>
   <dt>Active</dt><dd>{{ "yes" if target_user.is_active else "no" }}</dd>
   <dt>Verified</dt><dd>{{ "yes" if target_user.is_verified else "no" }}</dd>
 </dl>
+{% endif %}
 
 {% include "users/_admin_actions.html" %}
 

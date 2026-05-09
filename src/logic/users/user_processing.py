@@ -102,13 +102,31 @@ async def handle_get_user_detail(
     # Admin actions never apply to the viewer's own profile, so the
     # self-guard composes with the admin check at flag-computation time;
     # the partial just checks the flag.
-    can_admin_actions = is_admin(requesting_user) and target.id != requesting_user.id
+    is_self = requesting_user is not None and target.id == requesting_user.id
+    can_admin_actions = is_admin(requesting_user) and not is_self
+    can_view_private = is_self or is_admin(requesting_user)
+
+    # Project target_user into a dict that omits private fields
+    # (email, is_active, is_verified) for viewers who aren't the user
+    # themselves or an admin. Defense in depth: a forgotten template
+    # guard can re-leak; a missing dict key can't. The same projection
+    # extends naturally to any future JSON endpoint on this resource.
+    target_view = {
+        "id": target.id,
+        "username": target.username,
+    }
+    if can_view_private:
+        target_view["email"] = target.email
+        target_view["is_active"] = target.is_active
+        target_view["is_verified"] = target.is_verified
+
     return {
         "request": request,
-        "target_user": target,
+        "target_user": target_view,
         "providers": providers,
         "current_user": requesting_user,
         "can_admin_actions": can_admin_actions,
+        "can_view_private": can_view_private,
     }
 
 

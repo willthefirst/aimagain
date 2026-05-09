@@ -186,6 +186,77 @@ async def test_get_user_detail_renders(
     assert target_username in tree.body.text()
 
 
+async def test_detail_hides_private_fields_from_strangers(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user: User,
+):
+    """A non-admin viewer looking at *someone else's* profile must not
+    see email, is_active, or is_verified — those are private to the
+    user themselves and admins. The handler's projection omits the
+    fields entirely from context, so even the values can't leak via
+    a forgotten template guard."""
+    target_email = f"private-{uuid.uuid4()}@example.com"
+    target = create_test_user(
+        username=f"target-{uuid.uuid4()}",
+        email=target_email,
+    )
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            session.add(target)
+
+    response = await authenticated_client.get(f"/users/{target.id}")
+
+    assert response.status_code == 200
+    body = response.text
+    assert target_email not in body
+    # The labels themselves are gated, not just the values — no
+    # `<dt>Email</dt>` row should render at all.
+    assert "<dt>Email</dt>" not in body
+    assert "<dt>Active</dt>" not in body
+    assert "<dt>Verified</dt>" not in body
+
+
+async def test_detail_shows_private_fields_to_self(
+    authenticated_client: AsyncClient,
+    logged_in_user: User,
+):
+    """The user viewing their own profile (via /users/me or
+    /users/<own-id>) sees their email, active, and verified rows."""
+    response = await authenticated_client.get("/users/me")
+
+    assert response.status_code == 200
+    body = response.text
+    assert logged_in_user.email in body
+    assert "<dt>Email</dt>" in body
+    assert "<dt>Active</dt>" in body
+    assert "<dt>Verified</dt>" in body
+
+
+async def test_detail_shows_private_fields_to_admin(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user: User,
+):
+    """An admin viewing any user's profile sees the private fields."""
+    await promote_to_admin(db_test_session_manager, logged_in_user.email)
+    target_email = f"target-{uuid.uuid4()}@example.com"
+    target = create_test_user(
+        username=f"target-{uuid.uuid4()}",
+        email=target_email,
+    )
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            session.add(target)
+
+    response = await authenticated_client.get(f"/users/{target.id}")
+
+    assert response.status_code == 200
+    body = response.text
+    assert target_email in body
+    assert "<dt>Email</dt>" in body
+
+
 async def test_detail_shows_admin_actions_for_admin(
     authenticated_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],
