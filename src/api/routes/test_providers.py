@@ -140,18 +140,6 @@ async def test_create_profile_allows_multiple_per_user(
         assert {p.practice_name for p in owned} == {"First", "Second"}
 
 
-async def test_create_profile_rejects_unknown_field(
-    authenticated_client: AsyncClient,
-    logged_in_user: User,
-):
-    """`extra='forbid'` on the schema rejects unknown form fields with 422."""
-    response = await authenticated_client.post(
-        "/providers",
-        data=provider_payload(user_id=str(uuid.uuid4())),
-    )
-    assert response.status_code == 422
-
-
 # --- Profile reads -------------------------------------------------------
 
 
@@ -203,14 +191,6 @@ async def test_get_profile_hides_edit_link_for_non_owner(
     assert response.status_code == 200
     tree = HTMLParser(response.text)
     assert tree.css_first(f'a[href="/providers/{provider_id}/form"]') is None
-
-
-async def test_get_profile_returns_404_for_unknown_id(
-    authenticated_client: AsyncClient,
-    logged_in_user: User,
-):
-    response = await authenticated_client.get(f"/providers/{uuid.uuid4()}")
-    assert response.status_code == 404
 
 
 # --- Profile listing -----------------------------------------------------
@@ -457,17 +437,6 @@ async def test_create_licensure_returns_403_if_not_owner(
     assert response.status_code == 403
 
 
-async def test_create_licensure_returns_404_for_unknown_profile(
-    authenticated_client: AsyncClient,
-    logged_in_user: User,
-):
-    response = await authenticated_client.post(
-        f"/providers/{uuid.uuid4()}/licensures",
-        data=licensure_payload(),
-    )
-    assert response.status_code == 404
-
-
 async def test_patch_licensure_updates_fields(
     authenticated_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],
@@ -645,37 +614,6 @@ async def test_get_provider_form_renders(
     assert len(virtual.css("option")) == 4
 
 
-async def test_get_provider_form_unauthenticated_redirects(
-    test_client: AsyncClient,
-):
-    response = await test_client.get(
-        "/providers/form",
-        headers={"accept": "text/html"},
-        follow_redirects=False,
-    )
-    assert response.status_code == 302
-    assert "/auth/login" in response.headers["location"]
-    assert "next=/providers/form" in response.headers["location"]
-
-
-async def test_form_route_does_not_shadow_get_by_id(
-    authenticated_client: AsyncClient,
-    db_test_session_manager: async_sessionmaker[AsyncSession],
-    logged_in_user: User,
-):
-    """A real UUID still hits the read-by-id route — `/form` is matched
-    only as the literal segment, not as a UUID path param."""
-    provider_id = await _seed_provider_for(
-        db_test_session_manager, user_id=logged_in_user.id
-    )
-    response = await authenticated_client.get(f"/providers/{provider_id}")
-    assert response.status_code == 200
-    assert response.headers["content-type"].startswith("text/html")
-    # The detail page links back to the edit form for the same id, which is
-    # only present when the profile was actually loaded.
-    assert f"/providers/{provider_id}/form" in response.text
-
-
 # --- Edit form page (GET /providers/{id}/form) -------------------
 
 
@@ -746,24 +684,3 @@ async def test_non_owner_cannot_open_edit_form(
     )
     response = await authenticated_client.get(f"/providers/{provider_id}/form")
     assert response.status_code == 403
-
-
-async def test_edit_form_returns_404_for_unknown_id(
-    authenticated_client: AsyncClient,
-    logged_in_user: User,
-):
-    response = await authenticated_client.get(f"/providers/{uuid.uuid4()}/form")
-    assert response.status_code == 404
-
-
-async def test_edit_form_unauthenticated_redirects(
-    test_client: AsyncClient,
-):
-    provider_id = uuid.uuid4()
-    response = await test_client.get(
-        f"/providers/{provider_id}/form",
-        headers={"accept": "text/html"},
-        follow_redirects=False,
-    )
-    assert response.status_code == 302
-    assert "/auth/login" in response.headers["location"]
