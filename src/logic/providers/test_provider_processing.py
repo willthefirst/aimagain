@@ -248,7 +248,7 @@ async def test_list_user_providers_self_returns_owned(
         user_repo = UserRepository(session)
         context = await handle_list_user_providers(
             request=_fake_request(),
-            target_user_id=user.id,
+            user_id=user.id,
             repo=profile_repo,
             user_repo=user_repo,
             requesting_user=user,
@@ -269,7 +269,7 @@ async def test_list_user_providers_self_returns_empty_when_none(
         user_repo = UserRepository(session)
         context = await handle_list_user_providers(
             request=_fake_request(),
-            target_user_id=user.id,
+            user_id=user.id,
             repo=profile_repo,
             user_repo=user_repo,
             requesting_user=user,
@@ -291,7 +291,7 @@ async def test_list_user_providers_admin_can_view_anyone(
         user_repo = UserRepository(session)
         context = await handle_list_user_providers(
             request=_fake_request(),
-            target_user_id=target.id,
+            user_id=target.id,
             repo=profile_repo,
             user_repo=user_repo,
             requesting_user=admin,
@@ -314,7 +314,7 @@ async def test_list_user_providers_non_admin_cannot_view_other(
         with pytest.raises(ForbiddenError):
             await handle_list_user_providers(
                 request=_fake_request(),
-                target_user_id=target.id,
+                user_id=target.id,
                 repo=profile_repo,
                 user_repo=user_repo,
                 requesting_user=other,
@@ -332,7 +332,7 @@ async def test_list_user_providers_404_when_target_user_missing(
         with pytest.raises(NotFoundError):
             await handle_list_user_providers(
                 request=_fake_request(),
-                target_user_id=uuid.uuid4(),
+                user_id=uuid.uuid4(),
                 repo=profile_repo,
                 user_repo=user_repo,
                 requesting_user=admin,

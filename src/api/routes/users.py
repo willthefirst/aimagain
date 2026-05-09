@@ -1,16 +1,18 @@
 import logging
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends
 from fastapi.responses import JSONResponse
 
-from src.api.common import APIResponse, BaseRouter
+from src.api.common import BaseRouter
 from src.api.common.resource_routes import (
     ResourceSpec,
     mount_delete,
     mount_detail,
     mount_list,
+    mount_related_list,
 )
+from src.api.routes.providers import PROVIDER_SPEC
 from src.auth_config import current_active_user, current_admin_user
 from src.logic.providers.provider_processing import handle_list_user_providers
 from src.logic.users.user_processing import (
@@ -27,7 +29,6 @@ from src.repositories.dependencies import (
     get_provider_repository,
     get_user_repository,
 )
-from src.repositories.providers.provider_repository import ProviderRepository
 from src.repositories.users.user_repository import UserRepository
 from src.schemas.users.user import UserActivationUpdate
 
@@ -61,27 +62,18 @@ mount_detail(
 )
 
 
-@router.get("/{user_id}/providers")
-async def list_user_providers(
-    user_id: UUID,
-    request: Request,
-    profile_repo: ProviderRepository = Depends(get_provider_repository),
-    user_repo: UserRepository = Depends(get_user_repository),
-    user: User = Depends(current_active_user),
-):
-    """Renders the provider list for a user. Self or admin only."""
-    context = await handle_list_user_providers(
-        request=request,
-        target_user_id=user_id,
-        repo=profile_repo,
-        user_repo=user_repo,
-        requesting_user=user,
-    )
-    return APIResponse.html_response(
-        template_name="users/providers_list.html",
-        context=context,
-        request=request,
-    )
+# GET /users/{user_id}/providers — related-list, scoped to the parent user.
+# Self-or-admin auth lives inside the handler. Template lives in the parent's
+# namespace (users/providers_list.html), not the child's, since the page is
+# *about a user*, not a generic provider list.
+mount_related_list(
+    router,
+    parent_spec=USER_SPEC,
+    child_spec=PROVIDER_SPEC,
+    handler=handle_list_user_providers,
+    template="users/providers_list.html",
+    extra_repo_deps=(get_user_repository,),
+)
 
 
 @router.put("/{user_id}/activation")

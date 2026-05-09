@@ -545,6 +545,72 @@ def mount_update(
     router.patch(path)(_update)
 
 
+def mount_related_list(
+    router: Any,
+    parent_spec: ResourceSpec,
+    child_spec: ResourceSpec,
+    handler: Callable[..., Awaitable[dict]],
+    *,
+    template: str,
+    extra_repo_deps: tuple[Callable[..., Any], ...] = (),
+) -> None:
+    """Mount ``GET /<parent.collection>/{<parent.id_param>}/<child.collection>``.
+
+    A scoped read of children belonging to a parent — e.g.
+    ``GET /users/{user_id}/providers`` lists the providers owned by a user.
+
+    Handler kwargs: ``request``, the parent id under
+    ``parent_spec.id_param`` (e.g. ``user_id=...``), ``repo`` (the *child's*
+    repo, since the handler returns children), ``requesting_user``, and any
+    ``extra_repo_deps`` under their derived kwarg name. Returns a context
+    dict; the mount renders ``template``.
+
+    ``template`` is a per-mount kwarg (not on the spec) because related-list
+    templates often live in the parent's namespace
+    (``users/providers_list.html``, not ``providers/list.html``) — making
+    it a per-mount knob keeps both the parent and child specs reusable.
+
+    Auth follows the parent's ``read_user_dep`` (the URL is rooted at the
+    parent so its read-auth governs). If the parent is public
+    (``read_user_dep=None``), the route is public too.
+    """
+    if not template:
+        raise ValueError(
+            "mount_related_list requires `template=` — related-list "
+            "templates aren't on the spec because they typically live in "
+            "the parent's namespace."
+        )
+    parent_id_param = parent_spec.id_param
+    extra_deps_named = _name_extra_repo_deps(extra_repo_deps)
+    path = f"/{{{parent_id_param}}}/{child_spec.collection}"
+
+    async def _related_list(**kwargs: Any) -> Any:
+        request: Request = kwargs["request"]
+        parent_id: UUID = kwargs[parent_id_param]
+        context = await _resolve_handler(handler)(
+            request=request,
+            **{parent_id_param: parent_id},
+            repo=kwargs["repo"],
+            requesting_user=kwargs.get("requesting_user"),
+            **{name: kwargs[name] for name, _ in extra_deps_named},
+        )
+        return APIResponse.html_response(
+            template_name=template, context=context, request=request
+        )
+
+    deps: list[tuple[str, Callable[..., Any]]] = [("repo", child_spec.repo_dep)]
+    if parent_spec.read_user_dep is not None:
+        deps.append(("requesting_user", parent_spec.read_user_dep))
+    deps.extend(extra_deps_named)
+
+    _set_route_signature(
+        _related_list,
+        path_params=(("request", Request), (parent_id_param, UUID)),
+        deps=tuple(deps),
+    )
+    router.get(path)(_related_list)
+
+
 def _walk_parent_chain(spec: ResourceSpec) -> list[ResourceSpec]:
     """Return ancestors top-to-bottom including ``spec`` itself.
 
