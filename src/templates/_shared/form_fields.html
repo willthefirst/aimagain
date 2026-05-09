@@ -11,6 +11,13 @@ every form using these macros, no per-template edits.
 `current` is the prefilled value (None on the create form, the persisted
 value on edit). For the bool-radio `current` should be `True` / `False`
 / `None` — neither radio is checked when `None`.
+
+`field_for(schema, name, label, current=None, required=None)` is the
+schema-driven counterpart: it calls `field_spec(schema, name)` (a
+Jinja global pointing at `src/core/form_fields.field_spec`) and
+dispatches to the right control. The schema class is passed in by the
+route handler's template context — see `providers/new.html` for the
+canonical use.
 #}
 
 {% macro text_field(name, label, current=None, required=True, pattern=None, maxlength=None) -%}
@@ -87,6 +94,21 @@ tokens. `current` is an iterable of currently-selected tokens (`[]` on
 create, the persisted list on edit). The form using this macro must
 also declare `data-array-fields="<name> ..."` so a 0-checked grid still
 posts an empty array. #}
+{# Schema-driven dispatch macro. Reads `field_spec(schema, name)` and
+   delegates to `text_field` / `select_field` based on the spec's
+   `kind`. `current` and `required` pass through; pass `required=false`
+   to override the schema-derived default (e.g. an optional filter on a
+   field that's required for create). #}
+{% macro field_for(schema, name, label, current=None, required=None) -%}
+{%- set spec = field_spec(schema, name) -%}
+{%- set is_required = spec.required if required is none else required -%}
+{%- if spec.kind == "select" -%}
+{{ select_field(name, label, spec.choices, labels=spec.labels, current=current, required=is_required, placeholder=true) }}
+{%- elif spec.kind == "text" -%}
+{{ text_field(name, label, current=current, required=is_required, pattern=spec.pattern, maxlength=spec.maxlength) }}
+{%- endif -%}
+{%- endmacro %}
+
 {% macro time_grid_field(name, label, current=None) -%}
 {%- set selected = current or [] -%}
 <fieldset>

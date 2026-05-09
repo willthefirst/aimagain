@@ -2,6 +2,7 @@ from fastapi.templating import Jinja2Templates
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
 from src.core.config import settings
+from src.core.form_fields import field_spec, register_choice_labels
 from src.models import enums
 
 auto_reload = settings.ENVIRONMENT == "development"
@@ -48,7 +49,37 @@ _env.globals.update(
     EDUCATION_TYPES_LABELS=enums.EDUCATION_TYPES_LABELS,
     CERTIFICATION_TYPES=enums.CERTIFICATION_TYPES,
     CERTIFICATION_TYPES_LABELS=enums.CERTIFICATION_TYPES_LABELS,
+    # Pydantic-driven field rendering: `field_for(schema, name, label)`
+    # in `_shared/form_fields.html` calls `field_spec(schema, name)` to
+    # derive the form's HTML attributes (required, choices, pattern,
+    # maxlength) from the schema. The schema class itself is passed
+    # into the template context by the route handler — keeps the
+    # core → schemas import direction clean (see layer matrix in
+    # `src/README.md`).
+    field_spec=field_spec,
 )
+
+# Register the choice-tuple → labels-dict mapping that `field_spec`
+# uses to resolve labels for `Literal[*TUPLE]` fields. Lookup is by
+# tuple value, so the mapping needs to be populated before any
+# template render. Tuples without a labels dict (USPS state codes are
+# self-describing) register `None` so misses are explicit.
+register_choice_labels(enums.US_STATES, None)
+register_choice_labels(
+    enums.LOCATION_AVAILABILITY_OPTIONS, enums.LOCATION_AVAILABILITY_LABELS
+)
+register_choice_labels(enums.CLIENT_AGE_GROUPS, enums.CLIENT_AGE_GROUP_LABELS)
+register_choice_labels(
+    enums.LANGUAGE_PREFERRED_OPTIONS, enums.LANGUAGE_PREFERRED_LABELS
+)
+register_choice_labels(enums.INSURANCE_OPTIONS, enums.INSURANCE_LABELS)
+register_choice_labels(
+    enums.CLIENT_REFERRAL_SERVICES, enums.CLIENT_REFERRAL_SERVICE_LABELS
+)
+register_choice_labels(enums.TREATMENT_SETTINGS, enums.TREATMENT_SETTINGS_LABELS)
+register_choice_labels(enums.LICENSE_TYPES, enums.LICENSE_TYPES_LABELS)
+register_choice_labels(enums.EDUCATION_TYPES, enums.EDUCATION_TYPES_LABELS)
+register_choice_labels(enums.CERTIFICATION_TYPES, enums.CERTIFICATION_TYPES_LABELS)
 
 templates = Jinja2Templates(env=_env)
 

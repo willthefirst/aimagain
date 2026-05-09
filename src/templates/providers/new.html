@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{%- from "_shared/form_fields.html" import text_field, select_field -%}
+{%- from "_shared/form_fields.html" import field_for -%}
 {% block title %}Create provider{% endblock %}
 {% block content %}
 <h1>Create provider</h1>
@@ -8,16 +8,16 @@
 <form hx-post="/providers">
   <fieldset>
     <legend>Practice</legend>
-    {{ text_field("practice_name", "Practice name", maxlength=200) }}
-    {{ text_field("location_city", "City", maxlength=120) }}
-    {{ select_field("location_state", "State", US_STATES, placeholder=true) }}
-    {{ text_field("location_zip", "ZIP", pattern="\\d{5}", maxlength=5) }}
+    {{ field_for(schema, "practice_name", "Practice name") }}
+    {{ field_for(schema, "location_city", "City") }}
+    {{ field_for(schema, "location_state", "State") }}
+    {{ field_for(schema, "location_zip", "ZIP") }}
   </fieldset>
 
   <fieldset>
     <legend>Session availability</legend>
-    {{ select_field("in_person_sessions", "In-person sessions", LOCATION_AVAILABILITY_OPTIONS, labels=LOCATION_AVAILABILITY_LABELS, placeholder=true) }}
-    {{ select_field("virtual_sessions", "Virtual sessions", LOCATION_AVAILABILITY_OPTIONS, labels=LOCATION_AVAILABILITY_LABELS, placeholder=true) }}
+    {{ field_for(schema, "in_person_sessions", "In-person sessions") }}
+    {{ field_for(schema, "virtual_sessions", "Virtual sessions") }}
   </fieldset>
 
   <input type="submit" value="Create profile" />

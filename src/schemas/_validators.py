@@ -20,6 +20,8 @@ from typing import Annotated
 
 from pydantic import AfterValidator, BaseModel
 
+from src.core.form_fields import HtmlPattern
+
 # --- Field-cleaning helpers ---------------------------------------------
 #
 # Each runs AFTER Pydantic's type validation, so for required fields
@@ -66,7 +68,13 @@ def _strip_optional(v: str | None) -> str | None:
 # the right alias; the validator definition lives once.
 
 StrippedText = Annotated[str, AfterValidator(_strip_required)]
-ZipText = Annotated[str, AfterValidator(_validate_zip)]
+# `HtmlPattern` mirrors the regex enforced by `_validate_zip` so the
+# form's `<input pattern>` rejects bad ZIPs client-side. The validator
+# stays the source of truth — keep the two regexes aligned at this
+# definition site.
+ZipText = Annotated[
+    str, AfterValidator(_validate_zip), HtmlPattern(pattern=r"\d{5}", maxlength=5)
+]
 StrippedOptionalText = Annotated[str | None, AfterValidator(_strip_optional)]
 
 

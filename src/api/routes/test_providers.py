@@ -596,10 +596,19 @@ async def test_get_provider_form_renders(
     form = tree.css_first("form")
     assert form is not None
     assert form.attributes.get("hx-post") == "/providers"
-    # Required practice fields are present.
-    assert tree.css_first('input[name="practice_name"]') is not None
-    assert tree.css_first('input[name="location_city"]') is not None
-    assert tree.css_first('input[name="location_zip"]') is not None
+    # Required practice fields are present, with `maxlength` /
+    # `pattern` attributes derived from the `ProviderCreate` schema's
+    # `HtmlPattern` markers via `field_for` → `field_spec`.
+    practice = tree.css_first('input[name="practice_name"]')
+    assert practice is not None
+    assert practice.attributes.get("maxlength") == "200"
+    city = tree.css_first('input[name="location_city"]')
+    assert city is not None
+    assert city.attributes.get("maxlength") == "120"
+    zip_input = tree.css_first('input[name="location_zip"]')
+    assert zip_input is not None
+    assert zip_input.attributes.get("pattern") == r"\d{5}"
+    assert zip_input.attributes.get("maxlength") == "5"
     # State select with all 51 entries (50 states + DC) plus a placeholder.
     state_select = tree.css_first('select[name="location_state"]')
     assert state_select is not None
