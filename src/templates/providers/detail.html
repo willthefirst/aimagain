@@ -3,7 +3,8 @@
 {% block content %}
 <h1>{{ profile.practice_name }}</h1>
 
-{% set can_edit = current_user and (current_user.id == profile.user_id or current_user.is_superuser) %}
+{# `can_edit` is computed by handle_get_provider_detail; templates do
+   not re-derive authorization predicates inline. #}
 
 <section>
   <h2>Practice</h2>

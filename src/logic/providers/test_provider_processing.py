@@ -216,6 +216,10 @@ async def test_get_provider_detail_returns_context(
         assert context["profile"].id == provider_id
         assert context["current_user"] is user
         assert "request" in context
+        # Owner viewing own profile → can_edit True. Non-owner / admin
+        # cases are exercised at the route level
+        # (test_get_profile_hides_edit_link_for_non_owner et al.).
+        assert context["can_edit"] is True
 
 
 async def test_get_provider_detail_404_for_unknown_id(

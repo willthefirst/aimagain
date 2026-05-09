@@ -24,7 +24,7 @@ from fastapi import Request
 from pydantic import BaseModel
 
 from src.api.common.exceptions import ForbiddenError, NotFoundError
-from src.logic._authz import assert_owner_or_admin
+from src.logic._authz import assert_owner_or_admin, is_admin, is_owner
 from src.logic.audit import AuditAction, AuditedResource, make_snapshotter, mutate
 from src.models import (
     Provider,
@@ -150,7 +150,15 @@ async def handle_get_provider_detail(
     each sub-section without further queries.
     """
     profile = await _load_provider_or_404(provider_id, repo)
-    return {"request": request, "profile": profile, "current_user": requesting_user}
+    can_edit = is_owner(profile, requesting_user, owner_attr="user_id") or is_admin(
+        requesting_user
+    )
+    return {
+        "request": request,
+        "profile": profile,
+        "current_user": requesting_user,
+        "can_edit": can_edit,
+    }
 
 
 async def handle_list_user_providers(
