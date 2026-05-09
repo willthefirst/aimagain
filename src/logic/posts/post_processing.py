@@ -4,7 +4,7 @@ from uuid import UUID
 from fastapi import Request
 
 from src.api.common.exceptions import BadRequestError, NotFoundError
-from src.logic._authz import assert_owner_or_admin
+from src.logic._authz import assert_owner_or_admin, is_admin, is_owner
 from src.logic.audit import AuditAction, AuditedResource, mutate
 from src.models import REGISTERED_KINDS, Post, User
 from src.repositories.audit_repository import AuditRepository
@@ -57,12 +57,22 @@ async def handle_get_post_detail(
     repo: PostRepository,
     requesting_user: User,
 ):
-    """Loads a single post for the detail page; 404s if missing."""
+    """Loads a single post for the detail page; 404s if missing.
+
+    Computes `can_edit` (owner-or-admin) so the owner-actions partial
+    can render based on a single named flag instead of re-deriving the
+    rule against `current_user`.
+    """
     post = await repo.get_post_by_id(post_id)
     if post is None:
         raise NotFoundError(detail="Post not found")
 
-    return {"request": request, "post": post, "current_user": requesting_user}
+    return {
+        "request": request,
+        "post": post,
+        "current_user": requesting_user,
+        "can_edit": is_owner(post, requesting_user) or is_admin(requesting_user),
+    }
 
 
 async def handle_get_post_form(

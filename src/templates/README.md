@@ -73,7 +73,7 @@ Per-resource specifics — what fields the list shows, which partials a cluster 
 
 Files prefixed with `_` (e.g. `_admin_actions.html`) are **shared partials** intended to be `{% include %}`d from multiple full pages. They are not rendered directly by routes. The convention exists so that, e.g., adding a new admin button to `users/_admin_actions.html` automatically appears on both the user list and the user detail page without per-page edits.
 
-A partial documents its required context at the top in a `{# ... #}` comment, and is responsible for its own access guards (`{% if current_user.is_superuser %}` etc). Backend authorization is enforced separately in the logic layer — the template guard is presentation only.
+A partial documents its required context at the top in a `{# ... #}` comment, and guards its own rendering on a single named flag (`{% if can_edit %}`, `{% if can_admin_actions %}`). The handler computes the flag using the predicates in [`src/logic/_authz.py`](../logic/_authz.py); partials never introspect `current_user` to decide visibility — that would scatter the authorization rule across templates. Backend authorization is enforced separately in the logic layer — the template guard is presentation only.
 
 ### Shared CRUD macros (`_shared/`)
 

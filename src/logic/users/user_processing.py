@@ -4,6 +4,7 @@ from uuid import UUID
 from fastapi import Request
 
 from src.api.common.exceptions import ForbiddenError, NotFoundError
+from src.logic._authz import is_admin
 from src.logic.audit import (
     AuditAction,
     AuditedResource,
@@ -70,7 +71,15 @@ async def handle_list_users(
         f"Handler: Successfully retrieved {len(users_list)} users for user {requesting_user.id}."
     )
 
-    return {"request": request, "users": users_list, "current_user": requesting_user}
+    # `list_users` excludes the viewer, so every row is some other user;
+    # admin-actions visibility reduces to a single flag for the whole
+    # list rather than a per-row computation.
+    return {
+        "request": request,
+        "users": users_list,
+        "current_user": requesting_user,
+        "can_admin_actions": is_admin(requesting_user),
+    }
 
 
 async def handle_get_user_detail(
@@ -90,11 +99,16 @@ async def handle_get_user_detail(
 
     providers = await provider_repo.list_for_user(user_id)
 
+    # Admin actions never apply to the viewer's own profile, so the
+    # self-guard composes with the admin check at flag-computation time;
+    # the partial just checks the flag.
+    can_admin_actions = is_admin(requesting_user) and target.id != requesting_user.id
     return {
         "request": request,
         "target_user": target,
         "providers": providers,
         "current_user": requesting_user,
+        "can_admin_actions": can_admin_actions,
     }
 
 
