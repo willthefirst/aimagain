@@ -83,6 +83,7 @@ Logic follows the [cluster pattern](../README.md#domain-entities-and-the-cluster
 
 - One cluster directory per domain entity (`<entity>/`). Each holds `<entity>_processing.py` with the `handle_*` functions that orchestrate that entity's operations, plus `test_<entity>_processing.py`. Per-entity workflow specifics — auth gates, audit-snapshot shapes, transaction boundaries — live inside the cluster, with a `<entity>/README.md` if anything is non-obvious.
 - Parent-level shared tier:
+  - `_authz.py` — `is_admin(user)`, `is_owner(obj, user, owner_attr=...)`, and `assert_owner_or_admin(...)`. The booleans are the rule; handlers compose them to compute template-context flags (`can_edit = is_owner(post, user) or is_admin(user)`). The asserting wrapper is the same composition for use as a single-callable in `ResourceSpec.write_authz`. New authorization rules belong here, not inlined into handlers or templates.
   - `audit.py` — `record_audit(...)`, `record_audit_for(...)`, and the `mutate(...)` async context manager. Every mutation handler imports from here. The `mutate` ritual snapshots before, performs the mutation in the `async with` body, audits, and commits on clean exit; on exception the audit row and the commit are both skipped so the transaction rolls back atomically (load-bearing — an audit row must never be durable without its mutation). Non-CRUD audits (register, set-activation, etc.) use `record_audit(...)` directly.
   - `test_audit_discipline.py` — static AST check across every `*_processing.py` (recursively, so cluster directories are covered) that fails if a `handle_*` function calls `.commit()` without a `record_audit(...)`, `record_audit_for(...)`, or `mutate(...)` call. Enforces [`RESOURCE_GRAMMAR.md`'s audit rule](../api/routes/RESOURCE_GRAMMAR.md). Opt out per-handler with `audit-discipline-ignore: <reason>` in the docstring.
 
@@ -119,6 +120,7 @@ from typing import Any, Dict
 from uuid import UUID
 
 from src.api.common.exceptions import ForbiddenError, NotFoundError
+from src.logic._authz import assert_owner_or_admin
 from src.models import User
 from src.repositories.[domain]_repository import [Domain]Repository
 
@@ -141,8 +143,7 @@ async def handle_some_operation(
     target = await repo.get_by_id(target_id)
     if target is None:
         raise NotFoundError(detail="[Entity] not found")
-    if target.owner_id != user.id and not user.is_admin:
-        raise ForbiddenError(detail="Only the owner or an admin can do this")
+    assert_owner_or_admin(target, user, action="do this")
 
     result = await repo.do_the_thing(target)
     await repo.session.commit()

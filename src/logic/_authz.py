@@ -2,10 +2,32 @@
 
 The leading-underscore filename matches `src/schemas/_validators.py` —
 shared infra at the layer's parent level, importable from every cluster.
+
+The boolean predicates (`is_admin`, `is_owner`) are the source of truth
+for the authorization rules. Handlers compose them to compute
+template-context flags (`can_edit = is_owner(post, user) or is_admin(user)`),
+and the asserting form (`assert_owner_or_admin`) wraps the same
+composition for use as a single-callable in `ResourceSpec.write_authz`.
 """
 
 from src.api.common.exceptions import ForbiddenError
 from src.models import User
+
+
+def is_admin(user: User | None) -> bool:
+    """True iff `user` is authenticated and is a superuser."""
+    return user is not None and user.is_superuser
+
+
+def is_owner(obj, user: User | None, *, owner_attr: str = "owner_id") -> bool:
+    """True iff `user` is authenticated and `obj`'s owner-FK matches.
+
+    `owner_attr` names the foreign-key column on `obj` that points at
+    the owning user (`Post.owner_id` vs `Provider.user_id`).
+    """
+    if user is None:
+        return False
+    return getattr(obj, owner_attr) == user.id
 
 
 def assert_owner_or_admin(
@@ -17,11 +39,8 @@ def assert_owner_or_admin(
 ) -> None:
     """Raise `ForbiddenError` unless `user` owns `obj` or is a superuser.
 
-    `owner_attr` names the foreign-key column on `obj` that points at the
-    owning user (`Post.owner_id` vs `Provider.user_id`). `action` is
-    interpolated into the error message: ``"Only the owner or an admin
-    can {action}"``.
+    `action` is interpolated into the error message: ``"Only the owner
+    or an admin can {action}"``.
     """
-    owner_id = getattr(obj, owner_attr)
-    if owner_id != user.id and not user.is_superuser:
+    if not (is_owner(obj, user, owner_attr=owner_attr) or is_admin(user)):
         raise ForbiddenError(detail=f"Only the owner or an admin can {action}")
