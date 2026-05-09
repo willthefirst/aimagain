@@ -53,7 +53,7 @@ async def list_my_providers(
     for `GET /users/{requesting_user.id}/providers`."""
     context = await handle_list_user_providers(
         request=request,
-        target_user_id=user.id,
+        user_id=user.id,
         repo=repo,
         user_repo=user_repo,
         requesting_user=user,

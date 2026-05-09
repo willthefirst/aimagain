@@ -24,6 +24,7 @@ from src.api.common.resource_routes import (
     mount_detail,
     mount_form,
     mount_list,
+    mount_related_list,
 )
 
 
@@ -444,6 +445,70 @@ def test_mount_form_no_template_anywhere_raises():
 
     with pytest.raises(RuntimeError, match="could not resolve a template"):
         TestClient(app).get("/widgets/form")
+
+
+def test_mount_related_list_path_under_parent_id(monkeypatch):
+    """`mount_related_list` mounts GET /<parent>/{parent_id}/<child>. The
+    handler is invoked with the parent id under parent_spec.id_param,
+    `repo` from the *child* spec, and any extra_repo_deps."""
+    captured = {}
+
+    async def list_handler(**kwargs):
+        captured.update(kwargs)
+        return {"profiles": []}
+
+    parent = ResourceSpec(
+        collection="parents",
+        id_param="parent_id",
+        repo_dep=lambda: SimpleNamespace(name="parent_repo"),
+        read_user_dep=lambda: SimpleNamespace(id=uuid4()),
+    )
+    child = ResourceSpec(
+        collection="children",
+        id_param="child_id",
+        repo_dep=lambda: SimpleNamespace(name="child_repo"),
+    )
+
+    rendered = _stub_html_response(monkeypatch)
+
+    app = FastAPI()
+    router = APIRouter(prefix="/parents")
+    mount_related_list(
+        router,
+        parent_spec=parent,
+        child_spec=child,
+        handler=list_handler,
+        template="parents/children_list.html",
+    )
+    app.include_router(router)
+
+    parent_id = uuid4()
+    resp = TestClient(app).get(f"/parents/{parent_id}/children")
+
+    assert resp.status_code == 200
+    assert rendered["template_name"] == "parents/children_list.html"
+    assert "parent_id" in captured
+    assert str(captured["parent_id"]) == str(parent_id)
+    # Handler's `repo` is the CHILD's repo (the handler returns children)
+    assert captured["repo"].name == "child_repo"
+
+
+def test_mount_related_list_requires_template():
+    parent = ResourceSpec(
+        collection="parents", id_param="parent_id", repo_dep=lambda: None
+    )
+    child = ResourceSpec(
+        collection="children", id_param="child_id", repo_dep=lambda: None
+    )
+    router = APIRouter()
+    with pytest.raises(ValueError, match="template"):
+        mount_related_list(
+            router,
+            parent_spec=parent,
+            child_spec=child,
+            handler=lambda **_: {},
+            template="",
+        )
 
 
 def test_mount_delete_404_propagates_from_handler():

@@ -149,7 +149,7 @@ async def handle_get_provider_detail(
 
 async def handle_list_user_providers(
     request: Request,
-    target_user_id: UUID,
+    user_id: UUID,
     repo: ProviderRepository,
     user_repo: UserRepository,
     requesting_user: User,
@@ -159,19 +159,19 @@ async def handle_list_user_providers(
     404 if the target user does not exist; 403 if a non-admin requests
     another user's list.
     """
-    if target_user_id != requesting_user.id and not requesting_user.is_superuser:
+    if user_id != requesting_user.id and not requesting_user.is_superuser:
         raise ForbiddenError(
             detail="Only the target user or an admin may view their providers"
         )
-    target_user = await user_repo.get_user_by_id(target_user_id)
+    target_user = await user_repo.get_user_by_id(user_id)
     if target_user is None:
-        raise NotFoundError(detail=f"User {target_user_id} not found")
-    profiles = await repo.list_for_user(target_user_id)
+        raise NotFoundError(detail=f"User {user_id} not found")
+    profiles = await repo.list_for_user(user_id)
     return {
         "request": request,
         "target_user": target_user,
         "profiles": profiles,
-        "is_self": target_user_id == requesting_user.id,
+        "is_self": user_id == requesting_user.id,
         "current_user": requesting_user,
     }
 

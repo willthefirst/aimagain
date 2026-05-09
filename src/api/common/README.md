@@ -146,7 +146,7 @@ Secondary repos (e.g. `user_repo: UserRepository` in the multi-repo `handle_list
 | `mount_list` / `mount_detail` | Landed (slice 4 / #249) | `users` (GET / and GET /{id}) |
 | `mount_form` | Landed (slice 5 / #250) | `providers` (GET /form, GET /{id}/form); `posts` (edit form via handler-returned template_name) |
 | `mount_create` / `mount_update` | Landed (slice 6 / #251) | `providers`, `posts`, `licensures`, `educations`, `certifications` |
-| `mount_related_list` | Slice 9 / #254 | — |
+| `mount_related_list` | Landed (slice 9 / #254) | `users` (GET /{id}/providers) |
 | Sub-resource via `parent=` | Landed (slice 8 / #253) | `licensures`, `educations`, `certifications` (under providers) |
 
 ### Multi-repo handlers: `extra_repo_deps`
@@ -173,7 +173,7 @@ Per-mount docstrings in `resource_routes.py` are the canonical reference for req
 The grammar fits resource-shaped routes. It's deliberately **not** a home for:
 
 - **Auth flows** — register/login/verify/reset-password live in `auth_routes.py` / `auth_pages.py`. State-machine semantics, not CRUD.
-- **`/me/*` singletons** — no parent id, session-sourced. Stays bespoke (slice 9 decision).
+- **`/me/*` singletons** — no parent id, session-sourced. Stays bespoke (slice 9 decision: 3 routes total in `me.py`; widening the grammar to fit them would add a `singleton_alias` knob to every spec for one cluster's benefit).
 - **State-mutation actions like `PUT /users/{id}/activation`** — idempotent set with `HX-Refresh`, not partial edit with `HX-Redirect`. Doesn't match `mount_update` semantics.
 - **Utility endpoints** — `/`, `/health`.
 
