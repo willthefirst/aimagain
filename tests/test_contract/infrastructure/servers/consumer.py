@@ -16,6 +16,7 @@ from fastapi import FastAPI, Request
 from src.api.common import APIResponse
 from src.api.routes import auth_pages
 from src.auth_config import current_active_user, current_admin_user
+from src.schemas.providers.provider import ProviderCreate
 
 from ..utilities.mocks import MockAuthManager, create_mock_user
 from .base import ServerManager, setup_health_check_route
@@ -156,7 +157,10 @@ def _setup_provider_create_form_stub(app: FastAPI) -> None:
         )
         return APIResponse.html_response(
             template_name="providers/new.html",
-            context={"current_user": current_user},
+            # `schema` is what the template's `field_for` macro
+            # introspects to derive each control — same key the
+            # production `handle_get_provider_form` puts in context.
+            context={"current_user": current_user, "schema": ProviderCreate},
             request=request,
         )
 
