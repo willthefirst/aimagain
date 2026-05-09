@@ -93,14 +93,12 @@ def _certification_read_dict(row) -> dict:
 
 # --- Profile collection routes ------------------------------------------
 
-# GET /providers — public listing with optional license_type / issuing_state
-# filters. `public=True` overrides the spec's `read_user_dep` for this
-# mount only (detail/form/mutations on the same spec stay authenticated).
+# GET /providers — authenticated listing with optional license_type /
+# issuing_state filters.
 mount_list(
     router,
     PROVIDER_SPEC,
     handler=handle_list_providers,
-    public=True,
     query_params=(
         QueryParam("license_type", str | None, None),
         QueryParam("issuing_state", str | None, None),
