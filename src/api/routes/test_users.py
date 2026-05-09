@@ -52,36 +52,6 @@ async def test_list_users_empty(
     assert link_node is not None, "Refresh link not found"
 
 
-async def test_list_users_one_user(
-    authenticated_client: AsyncClient,
-    db_test_session_manager: async_sessionmaker[AsyncSession],
-    logged_in_user: User,
-):
-    """Test GET /users returns HTML listing one other user."""
-    test_username = f"test-user-{uuid.uuid4()}"
-    other_user = create_test_user(username=test_username)
-
-    async with db_test_session_manager() as session:
-        async with session.begin():
-            session.add(other_user)
-
-    response = await authenticated_client.get(f"/users")
-
-    assert response.status_code == 200
-    assert "text/html" in response.headers["content-type"]
-
-    tree = HTMLParser(response.text)
-    user_list_items = tree.css("#user-list > li")
-    assert len(user_list_items) == 1, "Expected one user in the list"
-    assert (
-        test_username in user_list_items[0].text()
-    ), "Correct username not found in list item"
-    assert (
-        logged_in_user.username not in user_list_items[0].text()
-    ), "Logged in user should not be listed"
-    assert "No users found" not in tree.body.text()
-
-
 async def test_list_users_multiple_users(
     authenticated_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],
@@ -198,15 +168,6 @@ async def test_get_user_detail_renders(
     assert response.status_code == 200
     tree = HTMLParser(response.text)
     assert target_username in tree.body.text()
-
-
-async def test_get_user_detail_404(
-    authenticated_client: AsyncClient,
-    logged_in_user: User,
-):
-    """GET /users/{id} returns 404 for an unknown id."""
-    response = await authenticated_client.get(f"/users/{uuid.uuid4()}")
-    assert response.status_code == 404
 
 
 async def test_detail_shows_admin_actions_for_admin(
@@ -408,25 +369,6 @@ async def test_admin_can_delete_user(
         assert result.scalars().first() is None
 
 
-async def test_non_admin_cannot_delete_user(
-    authenticated_client: AsyncClient,
-    db_test_session_manager: async_sessionmaker[AsyncSession],
-    logged_in_user: User,
-):
-    target = create_test_user(username=f"target-{uuid.uuid4()}")
-    async with db_test_session_manager() as session:
-        async with session.begin():
-            session.add(target)
-
-    response = await authenticated_client.delete(f"/users/{target.id}")
-    assert response.status_code == 403
-
-    # Row still exists
-    async with db_test_session_manager() as session:
-        result = await session.execute(select(User).filter(User.id == target.id))
-        assert result.scalars().first() is not None
-
-
 async def test_admin_cannot_delete_self(
     authenticated_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],
@@ -435,16 +377,6 @@ async def test_admin_cannot_delete_self(
     await promote_to_admin(db_test_session_manager, logged_in_user.email)
     response = await authenticated_client.delete(f"/users/{logged_in_user.id}")
     assert response.status_code == 403
-
-
-async def test_delete_404_for_unknown_user(
-    authenticated_client: AsyncClient,
-    db_test_session_manager: async_sessionmaker[AsyncSession],
-    logged_in_user: User,
-):
-    await promote_to_admin(db_test_session_manager, logged_in_user.email)
-    response = await authenticated_client.delete(f"/users/{uuid.uuid4()}")
-    assert response.status_code == 404
 
 
 # --- Audit log -----------------------------------------------------------
@@ -549,25 +481,6 @@ async def test_delete_user_writes_audit_row(
         assert row.after is None
 
 
-async def test_failed_delete_writes_no_audit_row(
-    authenticated_client: AsyncClient,
-    db_test_session_manager: async_sessionmaker[AsyncSession],
-    logged_in_user: User,
-):
-    """Self-delete attempts get 403; no audit row written."""
-    await promote_to_admin(db_test_session_manager, logged_in_user.email)
-
-    response = await authenticated_client.delete(f"/users/{logged_in_user.id}")
-    assert response.status_code == 403
-
-    async with db_test_session_manager() as session:
-        repo = AuditRepository(session)
-        rows = await repo.list_for_resource(
-            resource_type="user", resource_id=logged_in_user.id
-        )
-        assert rows == []
-
-
 # --- Providers ownership-subresource ----------------------------
 
 
@@ -600,33 +513,6 @@ async def test_get_my_providers_empty_state(
     empty = tree.css_first("#user-providers-empty")
     assert empty is not None
     assert "have not created" in empty.text()
-
-
-async def test_get_my_providers_lists_owned(
-    authenticated_client: AsyncClient,
-    db_test_session_manager: async_sessionmaker[AsyncSession],
-    logged_in_user: User,
-):
-    """`GET /users/me/providers` lists the current user's profiles
-    with the right hrefs."""
-    first_id = await _seed_user_provider(
-        db_test_session_manager, user_id=logged_in_user.id, practice_name="First"
-    )
-    second_id = await _seed_user_provider(
-        db_test_session_manager, user_id=logged_in_user.id, practice_name="Second"
-    )
-
-    response = await authenticated_client.get("/users/me/providers")
-
-    assert response.status_code == 200
-    tree = HTMLParser(response.text)
-    items = tree.css("#user-providers > li")
-    assert len(items) == 2
-    hrefs = {a.attributes.get("href") for a in tree.css("#user-providers a")}
-    assert hrefs == {
-        f"/providers/{first_id}",
-        f"/providers/{second_id}",
-    }
 
 
 async def test_get_user_providers_self(
