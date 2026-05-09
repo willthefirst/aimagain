@@ -458,6 +458,7 @@ Colocated tests cover the helpers in this directory:
 - `test_responses.py` — `APIResponse`, `created_response`, `updated_response`, `deleted_response`, `refreshed_response`.
 - `test_subresource_routes.py` — `SubresourceSpec` + `register_subresource_routes` (slice 8 / #253 folds this into `resource_routes`).
 - `test_resource_routes.py` — `ResourceSpec` + per-mount tests. Add a test here whenever a new mount function lands or an existing one grows a knob.
+- `test_middleware.py` — ASGI middleware (currently just `StripEmptyQueryParamsMiddleware`'s pair-stripping helper; integration coverage lives next to the routes it affects).
 
 Route-level tests under `../routes/` exercise the mounts indirectly via the resources that use them; the unit tests here cover spec validation, error handling at mount time, and the path-param wiring that the route-level tests can't easily isolate.
 

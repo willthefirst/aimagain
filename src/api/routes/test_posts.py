@@ -562,6 +562,23 @@ async def test_get_post_form_default_kind_is_client_referral(
     assert kind_input.attributes.get("value") == "client_referral"
 
 
+async def test_get_post_form_treats_empty_kind_as_absent(
+    authenticated_client: AsyncClient,
+    logged_in_user: User,
+):
+    """`GET /posts/form?kind=` should fall back to the default kind
+    rather than 422 against the `Literal[...]` annotation. The
+    middleware strips the empty pair at request entry so FastAPI sees
+    the param as absent and the route's default (`KIND_NAMES[0]`)
+    fires."""
+    response = await authenticated_client.get("/posts/form?kind=")
+    assert response.status_code == 200
+    tree = HTMLParser(response.text)
+    kind_input = tree.css_first('input[name="kind"]')
+    assert kind_input is not None
+    assert kind_input.attributes.get("value") == "client_referral"
+
+
 async def test_list_renders_client_referral_row(
     authenticated_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],
