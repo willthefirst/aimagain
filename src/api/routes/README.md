@@ -8,33 +8,44 @@ The `api/routes/` directory contains **domain-specific route handlers** that def
 
 Routes are **ultra-thin HTTP adapters** that handle request parsing, delegate to processing logic, and format responses while being organized by business domains for maintainability.
 
+CRUD-shaped routes use the **unified `ResourceSpec` + opt-in `mount_*` grammar** in [`src/api/common/resource_routes.py`](../common/README.md#unified-resource-grammar). A resource declares its identity once (`ResourceSpec`) and opts into the operations it wants exposed via `mount_list` / `mount_detail` / `mount_form` / `mount_create` / `mount_update` / `mount_delete` / `mount_related_list`. Sub-resources nest via `parent=`. Routes that don't fit the grammar (auth flows, `/me/*` singletons, idempotent state setters, query-param-driven polymorphism, utility endpoints) stay hand-written — see [Bespoke routes](#bespoke-routes) below.
+
 ### What we do
 
-- **Domain organization**: one route file per resource, named after the resource
-- **Thin route handlers**: Routes only handle HTTP concerns, business logic stays in processing layer
-- **Consistent delegation**: All routes delegate to processing functions in the `logic/` layer
-- **Standardized patterns**: BaseRouter provides consistent error handling and logging
-- **Form and JSON support**: Handle both HTML form submissions and JSON API requests
+- **Domain organization**: one route file per resource, named after the resource.
+- **Thin route handlers**: Routes only handle HTTP concerns; business logic stays in `logic/`.
+- **`ResourceSpec` + `mount_*` for CRUD**: Declare a `ResourceSpec`, call the mount functions for the operations you want. The route file becomes a manifest, not a hand-rolled CRUD wall.
+- **Hand-written for the routes that don't fit**: Auth flows, singletons, state-setters, etc. stay explicit — the grammar is for resource-shaped routes, not protocols.
+- **Consistent delegation**: All routes delegate to processing functions in `logic/`.
+- **Standardized patterns**: BaseRouter wraps every route with error handling and logging.
+- **Form and JSON support**: Form-encoded mutations + HTMX response shape are the route convention.
 
-**Example**: Clean route that delegates to processing logic:
+**Example**: A typical route file with the unified grammar:
 
 ```python
-@router.get("/users")
-async def list_users(
-    request: Request,
-    user: User = Depends(current_active_user),
-    user_repo: UserRepository = Depends(get_user_repository),
-):
-    result = await handle_list_users(
-        user_repo=user_repo,
-        requesting_user=user,
-    )
-    return APIResponse.html_response(
-        template_name="users/list.html",
-        context=result,
-        request=request,
-    )
+USER_SPEC = ResourceSpec(
+    collection="users",
+    id_param="user_id",
+    repo_dep=get_user_repository,
+    audit_resource=USER,
+    read_user_dep=current_active_user,
+    write_user_dep=current_admin_user,
+    list_template="users/list.html",
+    detail_template="users/detail.html",
+)
+
+mount_list(router, USER_SPEC, handler=handle_list_users)
+mount_detail(
+    router, USER_SPEC, handler=handle_get_user_detail,
+    extra_repo_deps=(get_provider_repository,),  # multi-repo handler
+)
+mount_delete(
+    router, USER_SPEC, handler=handle_delete_user,
+    audit_repo_dep=get_audit_repository,
+)
 ```
+
+The full grammar (knobs, mount kwargs, polymorphism via handler-context, sub-resources) is documented in [`api/common/README.md`](../common/README.md#unified-resource-grammar).
 
 ### What we don't do
 
@@ -78,65 +89,95 @@ Routes are organized by domain with consistent delegation patterns.
 
 The URL shape every resource MUST follow is defined in [`RESOURCE_GRAMMAR.md`](RESOURCE_GRAMMAR.md). This README documents how routes are wired; the grammar documents what URLs and lifecycles a resource MUST present.
 
+## Bespoke routes
+
+The unified grammar fits resource-shaped CRUD. Several existing routes intentionally stay hand-written. Each is a deliberate choice — adding a knob to `ResourceSpec` to fit them would bloat the grammar for one cluster's benefit.
+
+| Route(s) | File | Reason it stays bespoke |
+|---|---|---|
+| `POST /auth/register` | `auth_routes.py` | Auth-flow protocol (token issuance, fastapi-users hooks). Not CRUD on a domain entity. |
+| `GET /auth/{register,login,forgot-password,reset-password/{token}}` | `auth_pages.py` | Pure form rendering, no resource. Could fit a hypothetical `mount_static_form` but not worth it for 4 routes. |
+| `GET /users/me`, `GET /users/me/profile`, `GET /users/me/providers` | `me.py` | Singleton aliases — no parent id, session-sourced. Adding a `singleton_alias` knob to every spec for 3 routes would be a bad trade. |
+| `PUT /users/{user_id}/activation` | `users.py` | Idempotent state set with `HX-Refresh` (not `HX-Redirect`); admin-only verb. Doesn't match `mount_update` semantics. |
+| `GET /providers` (with `?license_type=`/`?issuing_state=` filters) | `providers.py` | Public listing with query-param filters. `mount_list` doesn't accept query params; widening it for one resource would push the asymmetry onto every spec. |
+| `GET /posts/form?kind=X` | `posts.py` | Polymorphic-by-query-param: the kind picks the create template at request time. `mount_form`'s contract doesn't carry query params. |
+| `GET /`, `GET /health` | `main.py` | Utility endpoints. Not resource-shaped. |
+
+If a future case suggests the grammar should grow to fit one of these, that's the moment to reshape `ResourceSpec` — not to escape-hatch around it.
+
 ## Implementation patterns
 
-### Creating a new route file
+### Adding a CRUD-shaped resource (the common case)
 
-1. **Create the route file** in `[domain].py`:
+1. Create the route file `<resource>.py`. Declare a `ResourceSpec` and call mount functions:
 
 ```python
-import logging
-
-from fastapi import APIRouter, Depends, Request
-
-from src.api.common import APIResponse, BaseRouter
+from src.api.common import BaseRouter
+from src.api.common.resource_routes import (
+    ResourceSpec, mount_create, mount_delete, mount_detail, mount_list, mount_update
+)
 from src.auth_config import current_active_user
-from src.logic.[domain]_processing import handle_create_[domain], handle_list_[domain]
-from src.models import User
-from src.repositories.dependencies import get_[domain]_repository
-from src.repositories.[domain]_repository import [Domain]Repository
+from src.logic._authz import assert_owner_or_admin
+from src.logic.<entity>.<entity>_processing import (
+    <ENTITY>, handle_create_<entity>, handle_delete_<entity>, ...
+)
+from src.repositories.dependencies import get_<entity>_repository, get_audit_repository
+from src.schemas.<entity>.<entity> import <entity>_create_adapter, <entity>_update_adapter
 
-logger = logging.getLogger(__name__)
+router = BaseRouter(router=APIRouter(prefix="/<entities>"))
 
-# Create APIRouter instance and wrap with BaseRouter
-[domain]_router_instance = APIRouter()
-router = BaseRouter(router=[domain]_router_instance)
+<ENTITY>_SPEC = ResourceSpec(
+    collection="<entities>",
+    id_param="<entity>_id",
+    repo_dep=get_<entity>_repository,
+    audit_resource=<ENTITY>,
+    read_user_dep=current_active_user,
+    write_user_dep=current_active_user,
+    write_authz=assert_owner_or_admin,
+    create_adapter=<entity>_create_adapter,
+    update_adapter=<entity>_update_adapter,
+    read_to_dict=lambda obj: <Entity>Read.model_validate(obj).model_dump(mode="json"),
+    list_template="<entities>/list.html",
+    detail_template="<entities>/detail.html",
+    form_template="<entities>/new.html",
+)
+
+mount_list(router, <ENTITY>_SPEC, handler=handle_list_<entity>)
+mount_detail(router, <ENTITY>_SPEC, handler=handle_get_<entity>_detail)
+mount_form(router, <ENTITY>_SPEC, handler=handle_get_<entity>_form, template="<entities>/new.html")
+mount_form(router, <ENTITY>_SPEC, handler=handle_get_<entity>_edit_form, template="<entities>/edit.html", on_existing=True)
+mount_create(router, <ENTITY>_SPEC, handler=handle_create_<entity>, audit_repo_dep=get_audit_repository)
+mount_update(router, <ENTITY>_SPEC, handler=handle_update_<entity>, audit_repo_dep=get_audit_repository)
+mount_delete(router, <ENTITY>_SPEC, handler=handle_delete_<entity>, audit_repo_dep=get_audit_repository)
 ```
 
-2. **Add route handlers with delegation pattern**:
+2. Register the router in `src/main.py`. (Order matters when literal segments would shadow parametric ones — e.g. `/me/*` must be registered before the `/users` router.)
+
+3. Add a colocated `test_<resource>.py`. The mount functions handle behavioral plumbing; tests verify resource-specific auth + handler behavior.
+
+### Adding a sub-resource
+
+Same pattern, plus `parent=PARENT_SPEC`. The mount walks the chain to build the path and inject parent ids:
 
 ```python
-@router.get("/[domain]")
-async def list_[domain](
-    request: Request,
-    user: User = Depends(current_active_user),
-    repo: [Domain]Repository = Depends(get_[domain]_repository),
-):
-    """Lists [domain] items by calling the logic handler."""
-    items = await handle_list_[domain](repo, requesting_user=user)
-    return APIResponse.html_response(
-        template_name="[domain]/list.html",
-        context={"items": items},
-        request=request,
-    )
-
-@router.post("/[domain]")
-async def create_[domain](
-    data: [Domain]Create,
-    user: User = Depends(current_active_user),
-    repo: [Domain]Repository = Depends(get_[domain]_repository),
-):
-    """Creates [domain] item by calling the logic handler."""
-    return await handle_create_[domain](data, user, repo)
+LICENSURE_SPEC = ResourceSpec(
+    collection="licensures",
+    id_param="licensure_id",
+    repo_dep=get_provider_repository,
+    audit_resource=LICENSURE,
+    write_user_dep=current_active_user,
+    write_authz=assert_owner_or_admin,
+    create_adapter=licensure_create_adapter,
+    update_adapter=licensure_update_adapter,
+    read_to_dict=_licensure_read_dict,
+    parent=PROVIDER_SPEC,
+)
+mount_create(router, LICENSURE_SPEC, handler=handle_create_licensure, audit_repo_dep=get_audit_repository)
+mount_update(router, LICENSURE_SPEC, handler=handle_update_licensure, audit_repo_dep=get_audit_repository)
+mount_delete(router, LICENSURE_SPEC, handler=handle_delete_licensure, audit_repo_dep=get_audit_repository)
 ```
 
-3. **Register the routes** in main application:
-
-```python
-# In main.py or route registration
-from src.api.routes import [domain]
-app.include_router([domain].[domain]_router_instance, tags=["[domain]"])
-```
+The handler receives both `provider_id=` and `licensure_id=` (plus `payload=`, `repo=`, `audit_repo=`, `requesting_user=`).
 
 ### Baserouter pattern for consistency
 

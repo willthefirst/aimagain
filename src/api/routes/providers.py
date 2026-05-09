@@ -1,5 +1,4 @@
 import logging
-from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query, Request
 
@@ -8,6 +7,7 @@ from src.api.common.resource_routes import (
     ResourceSpec,
     mount_create,
     mount_delete,
+    mount_detail,
     mount_form,
     mount_update,
 )
@@ -34,7 +34,6 @@ from src.logic.providers.provider_processing import (
     handle_update_licensure,
     handle_update_provider,
 )
-from src.models import User
 from src.repositories.dependencies import get_audit_repository, get_provider_repository
 from src.repositories.providers.provider_repository import ProviderRepository
 from src.schemas.providers.provider import (
@@ -69,6 +68,7 @@ PROVIDER_SPEC = ResourceSpec(
     read_to_dict=lambda profile: ProviderRead.model_validate(profile).model_dump(
         mode="json"
     ),
+    detail_template="providers/detail.html",
     # After create, redirect to the edit form so the user can flesh out
     # sub-rows (licensures, educations, certifications). After update,
     # send them back to the same edit form.
@@ -145,26 +145,8 @@ mount_form(
 
 # --- Profile item routes ------------------------------------------------
 
-
-@router.get("/{provider_id}")
-async def get_profile(
-    provider_id: UUID,
-    request: Request,
-    repo: ProviderRepository = Depends(get_provider_repository),
-    user: User = Depends(current_active_user),
-):
-    """Renders an HTML detail page for any profile. 404 if missing."""
-    context = await handle_get_provider_detail(
-        request=request,
-        provider_id=provider_id,
-        repo=repo,
-        requesting_user=user,
-    )
-    return APIResponse.html_response(
-        template_name="providers/detail.html",
-        context=context,
-        request=request,
-    )
+# GET /providers/{provider_id} — detail page.
+mount_detail(router, PROVIDER_SPEC, handler=handle_get_provider_detail)
 
 
 # PATCH /providers/{provider_id} — partial update, owner-or-admin (handler enforces).
