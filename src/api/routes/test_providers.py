@@ -196,13 +196,13 @@ async def test_get_profile_hides_edit_link_for_non_owner(
 # --- Profile listing -----------------------------------------------------
 
 
-async def test_list_profiles_renders_html_for_public(
-    test_client: AsyncClient,
+async def test_list_profiles_renders_html(
+    authenticated_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],
 ):
-    """The list endpoint requires no authentication and renders an HTML
-    page with one entry per persisted profile."""
-    other = create_test_user(username=f"public-{uuid.uuid4()}")
+    """`GET /providers` renders an HTML page with one entry per
+    persisted profile, regardless of which user owns it."""
+    other = create_test_user(username=f"other-{uuid.uuid4()}")
     async with db_test_session_manager() as session:
         async with session.begin():
             session.add(other)
@@ -210,7 +210,7 @@ async def test_list_profiles_renders_html_for_public(
         db_test_session_manager, user_id=other.id, practice_name="Open House"
     )
 
-    response = await test_client.get("/providers")
+    response = await authenticated_client.get("/providers")
 
     assert response.status_code == 200
     assert response.headers["content-type"].startswith("text/html")
@@ -222,13 +222,13 @@ async def test_list_profiles_renders_html_for_public(
 
 
 async def test_list_profiles_renders_empty_state(
-    test_client: AsyncClient,
+    authenticated_client: AsyncClient,
 ):
     """With no persisted profiles, the page renders a friendly empty
     message instead of an empty `<ul>`. With no filter set, the filter
     form's `<option value="">Any</option>` is the preselected entry on
     each `<select>` (the `filter_select_field` macro contract)."""
-    response = await test_client.get("/providers")
+    response = await authenticated_client.get("/providers")
     assert response.status_code == 200
     assert "No providers found" in response.text
     tree = HTMLParser(response.text)
@@ -243,7 +243,7 @@ async def test_list_profiles_renders_empty_state(
 
 
 async def test_list_profiles_filters_by_license_type(
-    test_client: AsyncClient,
+    authenticated_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],
 ):
     """`?license_type=` keeps only profiles holding a matching licensure;
@@ -270,7 +270,7 @@ async def test_list_profiles_filters_by_license_type(
                 make_provider_licensure(provider_id=profile_b, license_type="lcsw")
             )
 
-    response = await test_client.get("/providers?license_type=psyd")
+    response = await authenticated_client.get("/providers?license_type=psyd")
 
     assert response.status_code == 200
     tree = HTMLParser(response.text)
