@@ -284,6 +284,33 @@ async def test_list_profiles_filters_by_license_type(
     assert selected.attributes.get("value") == "psyd"
 
 
+async def test_list_profiles_treats_empty_filter_values_as_absent(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+):
+    """Pressing "Apply" on the filter form with no selection submits
+    `?license_type=&issuing_state=` — empty values, not absent. The
+    `StripEmptyQueryParamsMiddleware` removes those pairs at request
+    entry so the route's declared defaults fire and every profile
+    renders, the same as visiting `/providers` with no query string.
+    Without the middleware the empty strings reach the repo's filter
+    and zero rows match (the bug this regression test guards)."""
+    other = create_test_user(username=f"empty-filter-{uuid.uuid4()}")
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            session.add(other)
+    await _seed_provider_for(
+        db_test_session_manager, user_id=other.id, practice_name="Filter Test"
+    )
+
+    response = await authenticated_client.get("/providers?license_type=&issuing_state=")
+
+    assert response.status_code == 200
+    tree = HTMLParser(response.text)
+    items = tree.css("ul.profiles-list li")
+    assert len(items) == 1, "Empty filter values should not exclude rows"
+
+
 # --- Profile update ------------------------------------------------------
 
 
