@@ -113,13 +113,19 @@ async def _load_subrow_or_404(getter, sub_id: UUID, parent_id: UUID, *, name: st
 async def handle_list_providers(
     request: Request,
     repo: ProviderRepository,
-    *,
+    requesting_user: User | None = None,
     license_type: str | None = None,
     issuing_state: str | None = None,
 ) -> dict[str, Any]:
     """Public listing — no auth gate, no audit, no commit. Returns the
     template context for the HTML list page; the active filter values are
-    forwarded so the template can preselect them in its filter form."""
+    forwarded so the template can preselect them in its filter form.
+
+    `requesting_user` is `None` for this handler — `mount_list(...,
+    public=True)` skips the auth dep — but the kwarg is accepted for
+    uniformity with the mount contract.
+    """
+    del requesting_user  # explicitly unused — public route
     profiles = await repo.list_providers(
         license_type=license_type, issuing_state=issuing_state
     )

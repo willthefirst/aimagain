@@ -19,6 +19,7 @@ from fastapi import APIRouter, FastAPI
 from fastapi.testclient import TestClient
 
 from src.api.common.resource_routes import (
+    QueryParam,
     ResourceSpec,
     mount_delete,
     mount_detail,
@@ -445,6 +446,105 @@ def test_mount_form_no_template_anywhere_raises():
 
     with pytest.raises(RuntimeError, match="could not resolve a template"):
         TestClient(app).get("/widgets/form")
+
+
+def test_mount_list_passes_query_params_to_handler(monkeypatch):
+    """Each `QueryParam` reaches the handler under its declared name."""
+    captured = {}
+
+    async def list_handler(**kwargs):
+        captured.update(kwargs)
+        return {"items": []}
+
+    spec = ResourceSpec(
+        collection="widgets",
+        id_param="widget_id",
+        repo_dep=lambda: SimpleNamespace(name="repo"),
+        read_user_dep=lambda: SimpleNamespace(id=uuid4()),
+        list_template="widgets/list.html",
+    )
+    _stub_html_response(monkeypatch)
+
+    app = FastAPI()
+    router = APIRouter(prefix="/widgets")
+    mount_list(
+        router,
+        spec,
+        handler=list_handler,
+        query_params=(
+            QueryParam("kind", str | None, None),
+            QueryParam("active", bool, True),
+        ),
+    )
+    app.include_router(router)
+
+    resp = TestClient(app).get("/widgets?kind=foo&active=false")
+    assert resp.status_code == 200
+    assert captured["kind"] == "foo"
+    assert captured["active"] is False
+
+
+def test_mount_list_public_skips_auth_dep(monkeypatch):
+    """`public=True` overrides the spec's read_user_dep; handler still
+    receives `requesting_user=None` for kwarg uniformity."""
+    captured = {}
+
+    async def list_handler(**kwargs):
+        captured.update(kwargs)
+        return {"items": []}
+
+    def required_user():
+        raise RuntimeError("auth dep should not be called when public=True")
+
+    spec = ResourceSpec(
+        collection="widgets",
+        id_param="widget_id",
+        repo_dep=lambda: SimpleNamespace(name="repo"),
+        read_user_dep=required_user,
+        list_template="widgets/list.html",
+    )
+    _stub_html_response(monkeypatch)
+
+    app = FastAPI()
+    router = APIRouter(prefix="/widgets")
+    mount_list(router, spec, handler=list_handler, public=True)
+    app.include_router(router)
+
+    resp = TestClient(app).get("/widgets")
+    assert resp.status_code == 200
+    assert captured["requesting_user"] is None
+
+
+def test_mount_form_query_param_drives_handler_template_choice(monkeypatch):
+    """A query param (e.g. `?kind=`) reaches the handler, and the handler's
+    `template_name` in context picks the rendered template — the existing
+    precedence chain handles polymorphic-by-query forms."""
+
+    async def form_handler(**kwargs):
+        kind = kwargs["kind"]
+        return {"template_name": f"widgets/{kind}.html"}
+
+    spec = ResourceSpec(
+        collection="widgets",
+        id_param="widget_id",
+        repo_dep=lambda: SimpleNamespace(name="repo"),
+        read_user_dep=lambda: SimpleNamespace(id=uuid4()),
+    )
+    rendered = _stub_html_response(monkeypatch)
+
+    app = FastAPI()
+    router = APIRouter(prefix="/widgets")
+    mount_form(
+        router,
+        spec,
+        handler=form_handler,
+        query_params=(QueryParam("kind", str, "default"),),
+    )
+    app.include_router(router)
+
+    resp = TestClient(app).get("/widgets/form?kind=variant_b")
+    assert resp.status_code == 200
+    assert rendered["template_name"] == "widgets/variant_b.html"
 
 
 def test_mount_related_list_path_under_parent_id(monkeypatch):

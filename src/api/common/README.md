@@ -166,6 +166,34 @@ The mount derives the kwarg name from the dep callable: `get_provider_repository
 
 `extra_repo_deps` is per-mount, not per-spec, because different mounts on the same resource often need different extras (the list view doesn't need provider_repo even though the detail view does).
 
+### Query-param mounts
+
+`mount_list` and `mount_form` accept a per-mount `query_params=` kwarg — a tuple of `QueryParam(name, annotation, default)` declarations. Each becomes a FastAPI `Query(...)` parameter on the route signature (so OpenAPI docs and 422-on-invalid validation work like a hand-written route would), and the parsed value reaches the handler under its declared name.
+
+```python
+# Filtered list — providers' license_type / issuing_state filters.
+mount_list(
+    router, PROVIDER_SPEC, handler=handle_list_providers,
+    public=True,                                          # see below
+    query_params=(
+        QueryParam("license_type", str | None, None),
+        QueryParam("issuing_state", str | None, None),
+    ),
+)
+
+# Polymorphic-by-query form — posts' ?kind=client_referral picks the template.
+mount_form(
+    router, POST_SPEC, handler=handle_get_post_form,
+    query_params=(QueryParam("kind", Literal[*KIND_NAMES], KIND_NAMES[0]),),
+)
+```
+
+For the kind-picks-template case, the handler returns `template_name=...` in its context dict and the existing three-source resolution (handler-context > kwarg > spec) renders it.
+
+`mount_list` also accepts `public=True` to override the spec's `read_user_dep` for that mount only — used when a resource's list is public but its detail/form pages are authenticated (providers). The handler still receives `requesting_user=None` for kwarg uniformity.
+
+### Per-mount references
+
 Per-mount docstrings in `resource_routes.py` are the canonical reference for required spec fields and exact handler kwargs.
 
 ### What's *not* meant for this grammar
@@ -173,7 +201,7 @@ Per-mount docstrings in `resource_routes.py` are the canonical reference for req
 The grammar fits resource-shaped routes. It's deliberately **not** a home for:
 
 - **Auth flows** — register/login/verify/reset-password live in `auth_routes.py` / `auth_pages.py`. State-machine semantics, not CRUD.
-- **`/me/*` singletons** — no parent id, session-sourced. Stays bespoke (slice 9 decision: 3 routes total in `me.py`; widening the grammar to fit them would add a `singleton_alias` knob to every spec for one cluster's benefit).
+- **`/me/*` singletons** — no parent id, session-sourced. Stays bespoke: 3 routes total in `me.py`; widening the grammar to fit them would add a `singleton_alias` knob to every spec for one cluster's benefit.
 - **State-mutation actions like `PUT /users/{id}/activation`** — idempotent set with `HX-Refresh`, not partial edit with `HX-Redirect`. Doesn't match `mount_update` semantics.
 - **Utility endpoints** — `/`, `/health`.
 

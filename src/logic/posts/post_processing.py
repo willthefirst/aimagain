@@ -68,9 +68,25 @@ async def handle_get_post_detail(
 async def handle_get_post_form(
     request: Request,
     requesting_user: User,
+    repo: PostRepository | None = None,
+    kind: str = "",
 ):
-    """Builds the template context for the create-post form."""
-    return {"request": request, "current_user": requesting_user}
+    """Builds the template context for the create-post form.
+
+    `kind` picks the per-kind create template; the handler returns
+    `template_name` in the context so `mount_form` renders the
+    kind-specific template. Empty `kind` defaults to the first
+    registered kind, matching the previous bespoke route's
+    `Query(KIND_NAMES[0])` default. `repo` is accepted for uniformity
+    with the mount_form contract but unused here.
+    """
+    del repo  # explicitly unused
+    chosen_kind = kind or next(iter(REGISTERED_KINDS))
+    return {
+        "request": request,
+        "current_user": requesting_user,
+        "template_name": REGISTERED_KINDS[chosen_kind].create_template,
+    }
 
 
 async def handle_get_post_edit_form(
