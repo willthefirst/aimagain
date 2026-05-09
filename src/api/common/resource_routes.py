@@ -319,6 +319,7 @@ def mount_detail(
     handler: Callable[..., Awaitable[dict]],
     *,
     extra_repo_deps: tuple[Callable[..., Any], ...] = (),
+    singleton_alias: tuple[str, Callable[..., Any]] | None = None,
 ) -> None:
     """Mount ``GET /<collection>/{<id_param>}`` rendering ``spec.detail_template``.
 
@@ -330,6 +331,12 @@ def mount_detail(
     The multi-repo case (e.g. ``handle_get_user_detail`` takes both a
     user repo and a provider repo) is the canonical reason
     ``extra_repo_deps`` exists.
+
+    ``singleton_alias=("me", current_active_user)`` additionally mounts
+    ``GET /<collection>/<alias>`` (e.g. ``/users/me``). The id is sourced
+    from ``current_active_user().id`` and passed to the handler under
+    ``spec.id_param`` — same handler, same template, same response shape.
+    The alias is purely an id-derivation convenience.
     """
     if spec.parent is not None:
         raise NotImplementedError(
@@ -362,6 +369,30 @@ def mount_detail(
         path_params=(("request", Request), (id_param, UUID)),
         deps=_read_route_deps(spec, extra_deps_named),
     )
+
+    if singleton_alias is not None:
+        # Register the literal alias path BEFORE the parametric `/{id}` route
+        # so FastAPI matches `/users/me` against the alias instead of trying
+        # to parse `me` as a UUID against `/users/{user_id}`.
+        alias_segment, session_dep = singleton_alias
+
+        async def _detail_alias(**kwargs: Any) -> Any:
+            session_user = kwargs["__session_user__"]
+            kwargs[id_param] = session_user.id
+            kwargs["requesting_user"] = session_user
+            return await _detail(**kwargs)
+
+        _set_route_signature(
+            _detail_alias,
+            path_params=(("request", Request),),
+            deps=(
+                ("repo", spec.repo_dep),
+                ("__session_user__", session_dep),
+                *extra_deps_named,
+            ),
+        )
+        router.get(f"/{alias_segment}")(_detail_alias)
+
     router.get(f"/{{{id_param}}}")(_detail)
 
 
@@ -614,6 +645,7 @@ def mount_related_list(
     *,
     template: str,
     extra_repo_deps: tuple[Callable[..., Any], ...] = (),
+    singleton_alias: tuple[str, Callable[..., Any]] | None = None,
 ) -> None:
     """Mount ``GET /<parent.collection>/{<parent.id_param>}/<child.collection>``.
 
@@ -634,6 +666,13 @@ def mount_related_list(
     Auth follows the parent's ``read_user_dep`` (the URL is rooted at the
     parent so its read-auth governs). If the parent is public
     (``read_user_dep=None``), the route is public too.
+
+    ``singleton_alias=("me", current_active_user)`` additionally mounts
+    ``GET /<parent.collection>/<alias>/<child.collection>`` (e.g.
+    ``/users/me/providers``). The parent id is sourced from
+    ``current_active_user().id`` and passed to the handler — same handler,
+    same template, same response. The alias is purely an id-derivation
+    convenience.
     """
     if not template:
         raise ValueError(
@@ -669,6 +708,32 @@ def mount_related_list(
         path_params=(("request", Request), (parent_id_param, UUID)),
         deps=tuple(deps),
     )
+
+    if singleton_alias is not None:
+        # Register the literal alias path BEFORE the parametric path so
+        # FastAPI matches `/users/me/providers` against the alias instead
+        # of trying to parse `me` as a UUID.
+        alias_segment, session_dep = singleton_alias
+        alias_path = f"/{alias_segment}/{child_spec.collection}"
+
+        async def _related_list_alias(**kwargs: Any) -> Any:
+            session_user = kwargs["__session_user__"]
+            kwargs[parent_id_param] = session_user.id
+            kwargs["requesting_user"] = session_user
+            return await _related_list(**kwargs)
+
+        alias_deps: list[tuple[str, Callable[..., Any]]] = [
+            ("repo", child_spec.repo_dep),
+            ("__session_user__", session_dep),
+        ]
+        alias_deps.extend(extra_deps_named)
+        _set_route_signature(
+            _related_list_alias,
+            path_params=(("request", Request),),
+            deps=tuple(alias_deps),
+        )
+        router.get(alias_path)(_related_list_alias)
+
     router.get(path)(_related_list)
 
 

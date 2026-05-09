@@ -51,21 +51,26 @@ USER_SPEC = ResourceSpec(
 
 # GET /users
 mount_list(router, USER_SPEC, handler=handle_list_users)
-# GET /users/{user_id} — `handle_get_user_detail` also takes the provider
-# repo to embed the owned-providers list. The mount injects it under
-# `provider_repo` (derived from `get_provider_repository`).
+# GET /users/{user_id} AND GET /users/me — `singleton_alias=("me", session_dep)`
+# also mounts `/users/me`, which sources the id from the session. Same
+# template, same handler — `me` is purely an id-derivation convenience.
+# `handle_get_user_detail` takes the provider repo to embed the
+# owned-providers list; the mount injects it under `provider_repo`
+# (derived from `get_provider_repository`).
 mount_detail(
     router,
     USER_SPEC,
     handler=handle_get_user_detail,
     extra_repo_deps=(get_provider_repository,),
+    singleton_alias=("me", current_active_user),
 )
 
 
-# GET /users/{user_id}/providers — related-list, scoped to the parent user.
-# Self-or-admin auth lives inside the handler. Template lives in the parent's
-# namespace (users/providers_list.html), not the child's, since the page is
-# *about a user*, not a generic provider list.
+# GET /users/{user_id}/providers AND GET /users/me/providers — related-list,
+# scoped to the parent user. `singleton_alias=` plumbs the same handler at
+# the `/me/...` path with the parent id sourced from the session. Self-or-admin
+# auth lives inside the handler. Template is in the parent's namespace
+# (users/providers_list.html), not the child's, since the page is *about a user*.
 mount_related_list(
     router,
     parent_spec=USER_SPEC,
@@ -73,6 +78,7 @@ mount_related_list(
     handler=handle_list_user_providers,
     template="users/providers_list.html",
     extra_repo_deps=(get_user_repository,),
+    singleton_alias=("me", current_active_user),
 )
 
 

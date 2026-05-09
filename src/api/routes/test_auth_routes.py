@@ -81,11 +81,12 @@ async def test_login_success(test_client: AsyncClient, logged_in_user: User):
     access_token = response.headers["Set-Cookie"].split(";")[0].split("=")[1]
     assert access_token is not None
 
-    # Optional: Verify token works by accessing a protected route (like /users/me)
+    # Optional: Verify token works by accessing a protected route (`/users/me`,
+    # which renders the user-detail HTML for the session owner).
     auth_header = {"Cookie": f"fastapiusersauth={access_token}"}
     me_response = await test_client.get("/users/me", headers=auth_header)
     assert me_response.status_code == 200
-    assert me_response.json()["email"] == logged_in_user.email
+    assert logged_in_user.email in me_response.text
 
 
 async def test_login_failure_wrong_password(
@@ -113,10 +114,11 @@ async def test_login_failure_nonexistent_user(test_client: AsyncClient):
 
 async def test_logout_success(authenticated_client: AsyncClient):
     """Test successful logout."""
-    # First, verify we are logged in by accessing a protected route
+    # First, verify we are logged in by accessing a protected route (`/users/me`
+    # renders the user-detail HTML for the session owner).
     me_response_before = await authenticated_client.get("/users/me")
     assert me_response_before.status_code == 200
-    user_email = me_response_before.json()["email"]  # Store email for later check
+    user_email_html = me_response_before.text  # Store body for later check
 
     # Perform logout
     logout_response = await authenticated_client.post("/auth/jwt/logout")
@@ -140,9 +142,8 @@ async def test_logout_success(authenticated_client: AsyncClient):
     # assert me_response_after.status_code == 401
     # assert "Not authenticated" in me_response_after.json().get("detail", "")
     assert me_response_after.status_code == 200  # Change expectation to 200 OK
-    assert (
-        me_response_after.json()["email"] == user_email
-    )  # Verify it's still the same user
+    # Verify it's still the same user — same HTML response as before logout.
+    assert me_response_after.text == user_email_html
 
 
 async def test_forgot_password_request(test_client: AsyncClient, logged_in_user: User):
@@ -253,18 +254,18 @@ async def test_get_reset_password_page(test_client: AsyncClient):
 async def test_unauthorized_redirect_for_browser_requests(test_client: AsyncClient):
     """Test that browser requests (HTML accept header) get redirected to login page when unauthorized."""
     response = await test_client.get(
-        "/users/me/profile",
+        "/users/me",
         headers={"Accept": "text/html"},
         follow_redirects=False,
     )
     assert response.status_code == 302
-    assert response.headers["location"] == "/auth/login?next=/users/me/profile"
+    assert response.headers["location"] == "/auth/login?next=/users/me"
 
 
 async def test_unauthorized_json_response_for_api_requests(test_client: AsyncClient):
     """Test that API requests (JSON accept header) get JSON error response when unauthorized."""
     response = await test_client.get(
-        "/users/me/profile", headers={"Accept": "application/json"}
+        "/users/me", headers={"Accept": "application/json"}
     )
     assert response.status_code == 401
     assert response.json() == {"detail": "Unauthorized"}
@@ -272,7 +273,7 @@ async def test_unauthorized_json_response_for_api_requests(test_client: AsyncCli
 
 async def test_unauthorized_default_behavior(test_client: AsyncClient):
     """Test that requests without explicit Accept header get JSON response (API default)."""
-    response = await test_client.get("/users/me/profile")
+    response = await test_client.get("/users/me")
     assert response.status_code == 401
     assert response.json() == {"detail": "Unauthorized"}
 
@@ -280,7 +281,7 @@ async def test_unauthorized_default_behavior(test_client: AsyncClient):
 async def test_unauthorized_redirect_follows_to_login_page(test_client: AsyncClient):
     """Test that following the redirect leads to the login page."""
     response = await test_client.get(
-        "/users/me/profile",
+        "/users/me",
         headers={"Accept": "text/html"},
         follow_redirects=True,
     )

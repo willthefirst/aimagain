@@ -547,6 +547,92 @@ def test_mount_form_query_param_drives_handler_template_choice(monkeypatch):
     assert rendered["template_name"] == "widgets/variant_b.html"
 
 
+def test_mount_detail_singleton_alias_sources_id_from_session(monkeypatch):
+    """`singleton_alias=("me", session_dep)` mounts an additional GET
+    /<collection>/<alias> that sources the resource id from
+    `session_dep().id` instead of the URL. Same handler, same template."""
+    captured = {}
+    session_user_id = uuid4()
+
+    async def detail_handler(**kwargs):
+        captured.update(kwargs)
+        return {"x": 1}
+
+    spec = ResourceSpec(
+        collection="widgets",
+        id_param="widget_id",
+        repo_dep=lambda: SimpleNamespace(name="repo"),
+        read_user_dep=lambda: SimpleNamespace(id=uuid4()),
+        detail_template="widgets/detail.html",
+    )
+    _stub_html_response(monkeypatch)
+
+    def session_dep():
+        return SimpleNamespace(id=session_user_id)
+
+    app = FastAPI()
+    router = APIRouter(prefix="/widgets")
+    mount_detail(
+        router,
+        spec,
+        handler=detail_handler,
+        singleton_alias=("me", session_dep),
+    )
+    app.include_router(router)
+
+    resp = TestClient(app).get("/widgets/me")
+    assert resp.status_code == 200
+    assert captured["widget_id"] == session_user_id
+    # Parametric route still works alongside the alias:
+    parametric_id = uuid4()
+    resp2 = TestClient(app).get(f"/widgets/{parametric_id}")
+    assert resp2.status_code == 200
+    assert captured["widget_id"] == parametric_id
+
+
+def test_mount_related_list_singleton_alias_sources_id_from_session(monkeypatch):
+    """Same shape for related-list — the parent id is sourced from session
+    when the alias path is hit."""
+    captured = {}
+    session_user_id = uuid4()
+
+    async def list_handler(**kwargs):
+        captured.update(kwargs)
+        return {"items": []}
+
+    parent = ResourceSpec(
+        collection="parents",
+        id_param="parent_id",
+        repo_dep=lambda: SimpleNamespace(name="parent_repo"),
+        read_user_dep=lambda: SimpleNamespace(id=uuid4()),
+    )
+    child = ResourceSpec(
+        collection="children",
+        id_param="child_id",
+        repo_dep=lambda: SimpleNamespace(name="child_repo"),
+    )
+    _stub_html_response(monkeypatch)
+
+    def session_dep():
+        return SimpleNamespace(id=session_user_id)
+
+    app = FastAPI()
+    router = APIRouter(prefix="/parents")
+    mount_related_list(
+        router,
+        parent_spec=parent,
+        child_spec=child,
+        handler=list_handler,
+        template="parents/children_list.html",
+        singleton_alias=("me", session_dep),
+    )
+    app.include_router(router)
+
+    resp = TestClient(app).get("/parents/me/children")
+    assert resp.status_code == 200
+    assert captured["parent_id"] == session_user_id
+
+
 def test_mount_related_list_path_under_parent_id(monkeypatch):
     """`mount_related_list` mounts GET /<parent>/{parent_id}/<child>. The
     handler is invoked with the parent id under parent_spec.id_param,

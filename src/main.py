@@ -10,7 +10,7 @@ from src.auth_config import auth_backend, fastapi_users
 from src.db import check_database_health
 from src.schemas.users.user import UserRead
 
-from .api.routes import auth_pages, me, posts, providers, users
+from .api.routes import auth_pages, posts, providers, users
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -95,10 +95,10 @@ app.include_router(
     tags=["auth"],
 )
 app.include_router(auth_pages.auth_pages_api_router)
-# `me` router is registered BEFORE the parametric `/users/{user_id}` routes
-# so that `/users/me` matches the literal `me` handler instead of being
-# interpreted as a UUID and 422-ing.
-app.include_router(me.me_router_instance, tags=["me"])
+# `/users/me` and `/users/me/providers` are mounted on `users_api_router`
+# itself via `singleton_alias=("me", current_active_user)` on `mount_detail`
+# / `mount_related_list` — the mounts register the literal `/me*` paths
+# before the parametric `/{user_id}` so FastAPI matches them first.
 app.include_router(users.users_api_router, tags=["users"])
 app.include_router(posts.posts_api_router, tags=["posts"])
 app.include_router(providers.providers_api_router, tags=["providers"])

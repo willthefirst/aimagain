@@ -192,6 +192,31 @@ For the kind-picks-template case, the handler returns `template_name=...` in its
 
 `mount_list` also accepts `public=True` to override the spec's `read_user_dep` for that mount only — used when a resource's list is public but its detail/form pages are authenticated (providers). The handler still receives `requesting_user=None` for kwarg uniformity.
 
+### Singleton aliases (e.g. `/users/me`)
+
+`mount_detail` and `mount_related_list` accept a per-mount `singleton_alias=("me", session_dep)` kwarg. When set, the mount registers an additional route at `/<collection>/<alias>[...]` whose resource id is sourced from `session_dep().id` instead of the URL. Same handler, same template — the alias is purely an id-derivation convenience.
+
+```python
+mount_detail(
+    router, USER_SPEC, handler=handle_get_user_detail,
+    extra_repo_deps=(get_provider_repository,),
+    singleton_alias=("me", current_active_user),
+)
+# Mounts BOTH GET /users/{user_id} AND GET /users/me; same handler with
+# user_id=<URL> or <session.id>.
+
+mount_related_list(
+    router, parent_spec=USER_SPEC, child_spec=PROVIDER_SPEC,
+    handler=handle_list_user_providers,
+    template="users/providers_list.html",
+    extra_repo_deps=(get_user_repository,),
+    singleton_alias=("me", current_active_user),
+)
+# Mounts /users/{user_id}/providers AND /users/me/providers.
+```
+
+The mount registers the alias path BEFORE the parametric one within the same router so FastAPI matches `/users/me` against the literal alias instead of trying to parse `me` as a UUID against `/users/{user_id}`.
+
 ### Per-mount references
 
 Per-mount docstrings in `resource_routes.py` are the canonical reference for required spec fields and exact handler kwargs.
@@ -201,7 +226,6 @@ Per-mount docstrings in `resource_routes.py` are the canonical reference for req
 The grammar fits resource-shaped routes. It's deliberately **not** a home for:
 
 - **Auth flows** — register/login/verify/reset-password live in `auth_routes.py` / `auth_pages.py`. State-machine semantics, not CRUD.
-- **`/me/*` singletons** — no parent id, session-sourced. Stays bespoke: 3 routes total in `me.py`; widening the grammar to fit them would add a `singleton_alias` knob to every spec for one cluster's benefit.
 - **State-mutation actions like `PUT /users/{id}/activation`** — idempotent set with `HX-Refresh`, not partial edit with `HX-Redirect`. Doesn't match `mount_update` semantics.
 - **Utility endpoints** — `/`, `/health`.
 
