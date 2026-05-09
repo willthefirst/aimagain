@@ -16,7 +16,6 @@ from src.core.form_fields import (
     register_choice_labels,
 )
 
-
 _COLORS = ("red", "green", "blue")
 _COLOR_LABELS = {"red": "Red", "green": "Green", "blue": "Blue"}
 register_choice_labels(_COLORS, _COLOR_LABELS)
