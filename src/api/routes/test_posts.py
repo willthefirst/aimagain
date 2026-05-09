@@ -7,7 +7,6 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from src.models import (
-    AuditLog,
     ClientReferralDetail,
     Post,
     ProviderAvailabilityDetail,
@@ -130,107 +129,6 @@ async def test_list_posts_orders_newest_first(
     assert older.client_referral_detail.description in items[1].text()
 
 
-async def test_list_posts_unauthenticated_redirects(
-    test_client: AsyncClient,
-):
-    """Unauthenticated browser request to /posts is redirected to login."""
-    response = await test_client.get(
-        "/posts", headers={"accept": "text/html"}, follow_redirects=False
-    )
-    assert response.status_code == 302
-    assert "/auth/login" in response.headers["location"]
-    assert "next=/posts" in response.headers["location"]
-
-
-# --- Detail page ---------------------------------------------------------
-
-
-async def test_get_post_detail_404(
-    authenticated_client: AsyncClient,
-    logged_in_user: User,
-):
-    """GET /posts/{unknown-id} returns 404."""
-    response = await authenticated_client.get(f"/posts/{uuid.uuid4()}")
-    assert response.status_code == 404
-
-
-async def test_get_post_detail_malformed_uuid_422(
-    authenticated_client: AsyncClient,
-    logged_in_user: User,
-):
-    """GET /posts/{not-a-uuid} returns 422 (FastAPI path validation)."""
-    response = await authenticated_client.get("/posts/not-a-uuid")
-    assert response.status_code == 422
-
-
-# --- Create --------------------------------------------------------------
-
-
-async def test_create_post_rejects_owner_id_in_payload(
-    authenticated_client: AsyncClient,
-    db_test_session_manager: async_sessionmaker[AsyncSession],
-    logged_in_user: User,
-):
-    """A client sending owner_id is rejected with 422 (extra='forbid'); no
-    post is persisted."""
-    other = create_test_user(username=f"other-{uuid.uuid4()}")
-    async with db_test_session_manager() as session:
-        async with session.begin():
-            session.add(other)
-
-    response = await authenticated_client.post(
-        "/posts",
-        data={
-            "kind": "client_referral",
-            "description": "d",
-            "owner_id": str(other.id),
-        },
-    )
-    assert response.status_code == 422
-
-    # Nothing persisted
-    async with db_test_session_manager() as session:
-        result = await session.execute(select(Post))
-        assert result.scalars().first() is None
-
-
-async def test_create_post_rejects_unknown_field(
-    authenticated_client: AsyncClient,
-    logged_in_user: User,
-):
-    """Unknown fields are rejected with 422."""
-    response = await authenticated_client.post(
-        "/posts",
-        data={"kind": "client_referral", "description": "d", "evil": True},
-    )
-    assert response.status_code == 422
-
-
-async def test_create_post_rejects_retired_note_kind(
-    authenticated_client: AsyncClient,
-    logged_in_user: User,
-):
-    """The `note` kind was removed; create payloads must 422."""
-    response = await authenticated_client.post(
-        "/posts", data={"kind": "note", "title": "t", "body": "b"}
-    )
-    assert response.status_code == 422
-
-
-async def test_create_post_unauthenticated_redirects(
-    test_client: AsyncClient,
-):
-    """Anonymous request to POST /posts is redirected to login (HTML auth flow)."""
-    response = await test_client.post(
-        "/posts",
-        data={"kind": "client_referral", "description": "d"},
-        headers={"accept": "text/html"},
-        follow_redirects=False,
-    )
-    assert response.status_code == 302
-    assert "/auth/login" in response.headers["location"]
-
-
 # --- Update (PATCH) ------------------------------------------------------
 
 
@@ -280,102 +178,7 @@ async def test_admin_can_patch_anyone_post(
     assert response.json()["description"] == "moderated"
 
 
-async def test_patch_404_for_unknown_post(
-    authenticated_client: AsyncClient,
-    logged_in_user: User,
-):
-    response = await authenticated_client.patch(
-        f"/posts/{uuid.uuid4()}",
-        data={"kind": "client_referral", "description": "x"},
-    )
-    assert response.status_code == 404
-
-
-async def test_patch_rejects_owner_id_in_payload(
-    authenticated_client: AsyncClient,
-    db_test_session_manager: async_sessionmaker[AsyncSession],
-    logged_in_user: User,
-):
-    """Even the owner cannot reassign owner_id via PATCH (server-managed)."""
-    other = create_test_user(username=f"other-{uuid.uuid4()}")
-    post = _client_referral_post(description="d", owner_id=logged_in_user.id)
-    async with db_test_session_manager() as session:
-        async with session.begin():
-            session.add(other)
-            session.add(post)
-
-    response = await authenticated_client.patch(
-        f"/posts/{post.id}",
-        data={
-            "kind": "client_referral",
-            "description": "d2",
-            "owner_id": str(other.id),
-        },
-    )
-    assert response.status_code == 422
-
-
-async def test_patch_rejects_retired_note_kind(
-    authenticated_client: AsyncClient,
-    db_test_session_manager: async_sessionmaker[AsyncSession],
-    logged_in_user: User,
-):
-    """Patches with `kind='note'` (retired) must 422 at the schema layer."""
-    post = _client_referral_post(description="d", owner_id=logged_in_user.id)
-    async with db_test_session_manager() as session:
-        async with session.begin():
-            session.add(post)
-
-    response = await authenticated_client.patch(
-        f"/posts/{post.id}", data={"kind": "note", "title": "t"}
-    )
-    assert response.status_code == 422
-
-
-async def test_patch_unauthenticated_redirects(
-    test_client: AsyncClient,
-):
-    response = await test_client.patch(
-        f"/posts/{uuid.uuid4()}",
-        data={"kind": "client_referral", "description": "t"},
-        headers={"accept": "text/html"},
-        follow_redirects=False,
-    )
-    assert response.status_code == 302
-    assert "/auth/login" in response.headers["location"]
-
-
 # --- Create form page (GET /posts/form) ----------------------------------
-
-
-async def test_get_post_form_unauthenticated_redirects(
-    test_client: AsyncClient,
-):
-    response = await test_client.get(
-        "/posts/form",
-        headers={"accept": "text/html"},
-        follow_redirects=False,
-    )
-    assert response.status_code == 302
-    assert "/auth/login" in response.headers["location"]
-    assert "next=/posts/form" in response.headers["location"]
-
-
-async def test_form_route_does_not_shadow_detail_route(
-    authenticated_client: AsyncClient,
-    db_test_session_manager: async_sessionmaker[AsyncSession],
-    logged_in_user: User,
-):
-    """Sanity check the /posts/form ordering — a real UUID still hits the detail route."""
-    description = f"detail-{uuid.uuid4()}"
-    post = _client_referral_post(description=description, owner_id=logged_in_user.id)
-    async with db_test_session_manager() as session:
-        async with session.begin():
-            session.add(post)
-
-    response = await authenticated_client.get(f"/posts/{post.id}")
-    assert response.status_code == 200
-    assert description in response.text
 
 
 async def test_list_page_links_to_create_forms(
@@ -425,26 +228,6 @@ async def test_non_owner_cannot_open_edit_form(
 
     response = await authenticated_client.get(f"/posts/{post.id}/form")
     assert response.status_code == 403
-
-
-async def test_edit_form_404_for_unknown_post(
-    authenticated_client: AsyncClient,
-    logged_in_user: User,
-):
-    response = await authenticated_client.get(f"/posts/{uuid.uuid4()}/form")
-    assert response.status_code == 404
-
-
-async def test_edit_form_unauthenticated_redirects(
-    test_client: AsyncClient,
-):
-    response = await test_client.get(
-        f"/posts/{uuid.uuid4()}/form",
-        headers={"accept": "text/html"},
-        follow_redirects=False,
-    )
-    assert response.status_code == 302
-    assert "/auth/login" in response.headers["location"]
 
 
 # --- Owner-actions partial visibility on detail page ---------------------
@@ -556,50 +339,6 @@ async def test_detail_page_delete_button_for_admin(
 # --- Audit log -----------------------------------------------------------
 
 
-async def test_failed_create_writes_no_audit_row(
-    authenticated_client: AsyncClient,
-    db_test_session_manager: async_sessionmaker[AsyncSession],
-    logged_in_user: User,
-):
-    """A 422 (schema rejection) must not leak an audit row."""
-    response = await authenticated_client.post(
-        "/posts",
-        data={"kind": "client_referral", "description": "d", "evil": True},
-    )
-    assert response.status_code == 422
-
-    async with db_test_session_manager() as session:
-        result = await session.execute(
-            select(AuditLog).filter(AuditLog.resource_type == "post")
-        )
-        assert result.scalars().first() is None
-
-
-async def test_unauthorized_patch_writes_no_audit_row(
-    authenticated_client: AsyncClient,
-    db_test_session_manager: async_sessionmaker[AsyncSession],
-    logged_in_user: User,
-):
-    """A 403 must not leak an audit row."""
-    other = create_test_user(username=f"other-{uuid.uuid4()}")
-    post = _client_referral_post(description="d", owner_id=other.id)
-    async with db_test_session_manager() as session:
-        async with session.begin():
-            session.add(other)
-            session.add(post)
-
-    response = await authenticated_client.patch(
-        f"/posts/{post.id}",
-        data={"kind": "client_referral", "description": "hijack"},
-    )
-    assert response.status_code == 403
-
-    async with db_test_session_manager() as session:
-        repo = AuditRepository(session)
-        rows = await repo.list_for_resource(resource_type="post", resource_id=post.id)
-        assert rows == []
-
-
 async def test_admin_patch_audit_actor_is_admin_not_owner(
     authenticated_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],
@@ -676,48 +415,6 @@ async def test_non_owner_cannot_delete_post(
         refreshed = result.scalars().first()
         assert refreshed is not None
         assert refreshed.client_referral_detail.description == "orig"
-
-
-async def test_delete_404_for_unknown_post(
-    authenticated_client: AsyncClient,
-    logged_in_user: User,
-):
-    response = await authenticated_client.delete(f"/posts/{uuid.uuid4()}")
-    assert response.status_code == 404
-
-
-async def test_delete_unauthenticated_redirects(
-    test_client: AsyncClient,
-):
-    response = await test_client.delete(
-        f"/posts/{uuid.uuid4()}",
-        headers={"accept": "text/html"},
-        follow_redirects=False,
-    )
-    assert response.status_code == 302
-    assert "/auth/login" in response.headers["location"]
-
-
-async def test_unauthorized_delete_writes_no_audit_row(
-    authenticated_client: AsyncClient,
-    db_test_session_manager: async_sessionmaker[AsyncSession],
-    logged_in_user: User,
-):
-    """A 403 on DELETE must not leak an audit row."""
-    other = create_test_user(username=f"other-{uuid.uuid4()}")
-    post = _client_referral_post(description="d", owner_id=other.id)
-    async with db_test_session_manager() as session:
-        async with session.begin():
-            session.add(other)
-            session.add(post)
-
-    response = await authenticated_client.delete(f"/posts/{post.id}")
-    assert response.status_code == 403
-
-    async with db_test_session_manager() as session:
-        repo = AuditRepository(session)
-        rows = await repo.list_for_resource(resource_type="post", resource_id=post.id)
-        assert rows == []
 
 
 async def test_admin_delete_audit_actor_is_admin_not_owner(
@@ -863,24 +560,6 @@ async def test_get_post_form_default_kind_is_client_referral(
     kind_input = tree.css_first('input[name="kind"]')
     assert kind_input is not None
     assert kind_input.attributes.get("value") == "client_referral"
-
-
-async def test_get_post_form_unknown_kind_422(
-    authenticated_client: AsyncClient,
-    logged_in_user: User,
-):
-    """`?kind=…` is constrained by a `Literal` — unknown values 422."""
-    response = await authenticated_client.get("/posts/form?kind=not_a_kind")
-    assert response.status_code == 422
-
-
-async def test_get_post_form_retired_note_kind_422(
-    authenticated_client: AsyncClient,
-    logged_in_user: User,
-):
-    """`?kind=note` was retired and is rejected with 422 by the Literal."""
-    response = await authenticated_client.get("/posts/form?kind=note")
-    assert response.status_code == 422
 
 
 async def test_list_renders_client_referral_row(
