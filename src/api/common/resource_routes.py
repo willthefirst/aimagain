@@ -293,7 +293,10 @@ def mount_list(
         # Honor handler-context override for polymorphic templates.
         resolved_template = context.pop("template_name", None) or list_template
         return APIResponse.html_response(
-            template_name=resolved_template, context=context, request=request
+            template_name=resolved_template,
+            context=context,
+            request=request,
+            current_user=kwargs.get("requesting_user"),
         )
 
     if public:
@@ -361,7 +364,10 @@ def mount_detail(
             **{name: kwargs[name] for name, _ in extra_deps_named},
         )
         return APIResponse.html_response(
-            template_name=detail_template, context=context, request=request
+            template_name=detail_template,
+            context=context,
+            request=request,
+            current_user=kwargs.get("requesting_user"),
         )
 
     _set_route_signature(
@@ -470,7 +476,10 @@ def mount_form(
                 "`template_name` in its context."
             )
         return APIResponse.html_response(
-            template_name=resolved_template, context=context, request=request
+            template_name=resolved_template,
+            context=context,
+            request=request,
+            current_user=kwargs.get("requesting_user"),
         )
 
     _set_route_signature(
@@ -695,7 +704,10 @@ def mount_related_list(
             **{name: kwargs[name] for name, _ in extra_deps_named},
         )
         return APIResponse.html_response(
-            template_name=template, context=context, request=request
+            template_name=template,
+            context=context,
+            request=request,
+            current_user=kwargs.get("requesting_user"),
         )
 
     deps: list[tuple[str, Callable[..., Any]]] = [("repo", child_spec.repo_dep)]

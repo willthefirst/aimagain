@@ -3,19 +3,59 @@ from typing import Any
 from fastapi import Response, status
 from fastapi.responses import JSONResponse
 
+from src.logic._authz import is_admin
+from src.models import User
+
+
+def base_context(user: User | None) -> dict:
+    """Flat scalars the chrome layer (`base.html` + identity widgets) reads
+    on every render.
+
+    Returning primitives instead of the `User` object means templates
+    cannot accidentally introspect identity fields (`{{ user.email }}`)
+    and tests can render the chrome with literals rather than
+    constructing a User.
+
+    `is_admin` is computed via `src.logic._authz.is_admin` so the rule
+    has a single home; templates never re-derive it.
+    """
+    return {
+        "is_authenticated": user is not None,
+        "is_admin": is_admin(user),
+        "current_username": user.username if user is not None else None,
+        "current_user_id": user.id if user is not None else None,
+    }
+
 
 class APIResponse:
     @staticmethod
-    def html_response(template_name: str, context: dict, request: Any) -> Any:
+    def html_response(
+        template_name: str,
+        context: dict,
+        request: Any,
+        *,
+        current_user: User | None = None,
+    ) -> Any:
         """
         Helper for HTML responses using templates.
-        Includes global template context for development features.
+
+        Merges three context tiers (later tiers overwrite earlier ones):
+          1. caller-provided `context`
+          2. dev/global context (`is_development`, livereload port)
+          3. chrome scalars from `base_context(current_user)`
+
+        Chrome scalars overwrite the caller — they're computed from the
+        authenticated `current_user` and are not callable-overridable, so
+        a handler can't accidentally pass `is_admin=True` for a non-admin
+        viewer.
         """
         from src.core.templating import get_template_context, templates
 
-        # Merge the provided context with global template context
-        global_context = get_template_context()
-        merged_context = {**global_context, **context}
+        merged_context = {
+            **context,
+            **get_template_context(),
+            **base_context(current_user),
+        }
 
         return templates.TemplateResponse(request, template_name, merged_context)
 

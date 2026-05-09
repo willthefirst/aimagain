@@ -19,18 +19,34 @@ pytestmark = pytest.mark.asyncio
 # --- Base template nav ---------------------------------------------------
 
 
-async def test_base_template_renders_primary_nav(
+async def test_base_template_renders_primary_nav_when_authenticated(
     authenticated_client: AsyncClient,
     logged_in_user: User,
 ):
-    """Pages rendered from base.html include nav links to the main sections."""
+    """Authenticated pages include nav links to the main sections plus the
+    `/users/me` shortcut to the viewer's own profile."""
     response = await authenticated_client.get("/users")
 
     assert response.status_code == 200
     tree = HTMLParser(response.text)
     nav_items = tree.css("#primary-nav > li > a")
     hrefs = {a.attributes.get("href") for a in nav_items}
-    assert {"/posts", "/users", "/providers"} <= hrefs
+    assert {"/posts", "/users", "/providers", "/users/me"} <= hrefs
+
+
+async def test_base_template_hides_nav_for_anonymous_visitors(
+    test_client: AsyncClient,
+):
+    """Public pages (auth flow) must not link to auth-gated sections —
+    those links would 401 and clutter the page for users who can't use
+    them yet. The chrome `{% if is_authenticated %}` gate is what
+    enforces this; the four scalars from `base_context(None)` are what
+    let `base.html` make the call without per-handler boilerplate."""
+    response = await test_client.get("/auth/login")
+
+    assert response.status_code == 200
+    tree = HTMLParser(response.text)
+    assert tree.css_first("#primary-nav") is None
 
 
 # --- Listing -------------------------------------------------------------

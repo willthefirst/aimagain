@@ -2,13 +2,48 @@
 
 import json
 import uuid
+from types import SimpleNamespace
 
 from .responses import (
+    base_context,
     created_response,
     deleted_response,
     refreshed_response,
     updated_response,
 )
+
+# --- base_context: chrome scalars ----------------------------------------
+
+
+def test_base_context_anonymous():
+    ctx = base_context(None)
+    assert ctx == {
+        "is_authenticated": False,
+        "is_admin": False,
+        "current_username": None,
+        "current_user_id": None,
+    }
+
+
+def test_base_context_regular_user():
+    user_id = uuid.uuid4()
+    user = SimpleNamespace(id=user_id, username="alice", is_superuser=False)
+    assert base_context(user) == {
+        "is_authenticated": True,
+        "is_admin": False,
+        "current_username": "alice",
+        "current_user_id": user_id,
+    }
+
+
+def test_base_context_admin():
+    user = SimpleNamespace(id=uuid.uuid4(), username="root", is_superuser=True)
+    ctx = base_context(user)
+    assert ctx["is_admin"] is True
+    assert ctx["is_authenticated"] is True
+
+
+# --- existing helpers ----------------------------------------------------
 
 
 def test_created_response_defaults_hx_redirect_to_location():
