@@ -6,7 +6,7 @@ from fastapi import Request
 from src.api.common.exceptions import BadRequestError, NotFoundError
 from src.logic._authz import assert_owner_or_admin, is_admin, is_owner
 from src.logic.audit import AuditAction, AuditedResource, mutate
-from src.models import REGISTERED_KINDS, Post, User
+from src.models import POST_KINDS, Post, User
 from src.repositories.audit_repository import AuditRepository
 from src.repositories.posts.post_repository import PostRepository
 from src.schemas.posts.post import (
@@ -47,7 +47,7 @@ async def handle_list_posts(
         "request": request,
         "posts": posts,
         "current_user": requesting_user,
-        "post_kinds": list(REGISTERED_KINDS.values()),
+        "post_kinds": list(POST_KINDS.values()),
     }
 
 
@@ -87,15 +87,15 @@ async def handle_get_post_form(
     `template_name` in the context so `mount_form` renders the
     kind-specific template. Empty `kind` defaults to the first
     registered kind, matching the previous bespoke route's
-    `Query(KIND_NAMES[0])` default. `repo` is accepted for uniformity
+    `Query(POST_KIND_NAMES[0])` default. `repo` is accepted for uniformity
     with the mount_form contract but unused here.
     """
     del repo  # explicitly unused
-    chosen_kind = kind or next(iter(REGISTERED_KINDS))
+    chosen_kind = kind or next(iter(POST_KINDS))
     return {
         "request": request,
         "current_user": requesting_user,
-        "template_name": REGISTERED_KINDS[chosen_kind].create_template,
+        "template_name": POST_KINDS[chosen_kind].create_template,
     }
 
 
@@ -123,7 +123,7 @@ async def handle_get_post_edit_form(
         "request": request,
         "post": post,
         "current_user": requesting_user,
-        "template_name": REGISTERED_KINDS[post.kind].edit_template,
+        "template_name": POST_KINDS[post.kind].edit_template,
     }
 
 
@@ -136,12 +136,12 @@ async def handle_create_post(
     """Creates a post owned by the requesting user; writes an audit row in
     the same transaction; commits on success.
 
-    Dispatches via the `REGISTERED_KINDS` registry: the `kind` discriminator
+    Dispatches via the `POST_KINDS` registry: the `kind` discriminator
     on the payload picks the spec, and the spec's `detail_model` +
     `detail_fields` build the right detail row. Adding a new kind means
     a registry entry — no edits here.
     """
-    spec = REGISTERED_KINDS[payload.kind]
+    spec = POST_KINDS[payload.kind]
     post = Post(kind=payload.kind, owner_id=requesting_user.id)
     detail = spec.detail_model(**{f: getattr(payload, f) for f in spec.detail_fields})
 
@@ -172,7 +172,7 @@ async def handle_update_post(
     The payload's `kind` must match the persisted post's `kind` — `kind`
     is part of the resource identity once created and cannot be migrated
     via PATCH. 404 if missing, 403 if not authorized, 400 on kind
-    mismatch. Per-kind field set comes from `REGISTERED_KINDS`.
+    mismatch. Per-kind field set comes from `POST_KINDS`.
     """
     post = await repo.get_post_by_id(post_id)
     if post is None:
@@ -188,7 +188,7 @@ async def handle_update_post(
             )
         )
 
-    spec = REGISTERED_KINDS[payload.kind]
+    spec = POST_KINDS[payload.kind]
     async with mutate(
         repo,
         audit_repo,

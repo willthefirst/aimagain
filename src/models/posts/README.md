@@ -4,11 +4,11 @@ This subdirectory holds the SQLAlchemy models for the `posts` table and its per-
 
 ## Files
 
-- `post.py` — `Post`, the parent table for any post-shaped resource. Carries identity, ownership, timestamps, and the `kind` discriminator. The `ck_posts_kind` CHECK constraint is rendered from `kind_check_sql()` in `post_kinds.py`. Adding a kind means adding a registry entry and a `relationship(...)` line to `Post`.
-- `post_kinds.py` — `REGISTERED_KINDS`, the single source of truth for the kind set. Each `KindSpec` records the kind name, its detail-model class, the relationship attribute on `Post`, the detail row's user-facing field tuple (derived from the model's columns via `_detail_fields(model)`), the create/edit template paths, and the user-facing list label. Every cross-cutting site reads from this registry — see [`../README.md` § "The `post_kinds` registry"](../README.md#the-post_kinds-registry) for the full list.
+- `post.py` — `Post`, the parent table for any post-shaped resource. Carries identity, ownership, timestamps, and the `kind` discriminator. The `ck_posts_kind` CHECK constraint is rendered from `POST_KINDS.check_sql()` in `post_kinds.py`. Adding a kind means adding a registry entry and a `relationship(...)` line to `Post`.
+- `post_kinds.py` — `POST_KINDS: DiscriminatorRegistry[PostKindSpec]`, the single source of truth for the kind set. Each `PostKindSpec` records the kind name, its detail-model class, the relationship attribute on `Post`, the detail row's user-facing field tuple (derived from the model's columns via `_detail_fields(model)`), the create/edit template paths, and the user-facing list label. The registry's bookkeeping (`names` tuple, `check_sql()`, reverse indexes) comes from the generic `DiscriminatorRegistry` in [`../_polymorphic.py`](../_polymorphic.py); this file declares only the post-specific Spec shape and the registry instance. Every cross-cutting site reads from this registry — see [`../README.md` § "The `post_kinds` registry"](../README.md#the-post_kinds-registry) for the full list.
 - `client_referral_detail.py` — `ClientReferralDetail`, the detail row for `kind='client_referral'`. 1:1 with `posts` via `post_id` (PK + FK with CASCADE). Columns track the client-referral intake form; enum columns CHECK against tuples in [`../enums.py`](../enums.py); the `desired_times` and `services` JSON multi-selects have their vocabularies enforced on the wire by Pydantic (no SQL CHECK against array members).
 - `provider_availability_detail.py` — `ProviderAvailabilityDetail`, the detail row for `kind='provider_availability'`. Same shape as `ClientReferralDetail` but tracks the provider-availability intake form; adds the `settings` JSON multi-select. `services` and `settings` are required-min-1 on the wire (vs. optional/absent on Client Referral).
-- `test_post_kinds.py` — guardrail tests for the registry as the single source of truth. Asserts `KIND_NAMES` matches the registry, the rendered `kind_check_sql()` matches what `Post.__table_args__` actually produces, the route's `Literal[*KIND_NAMES]` is in lockstep, the inverse `KIND_BY_DETAIL_MODEL` lookup is well-formed, the per-kind relationship-name convention holds, and `KindSpec.detail_fields` matches the detail-model column list exactly. If anyone re-encodes the kind set inline somewhere, one of these tests fails.
+- `test_post_kinds.py` — guardrail tests for the registry as the single source of truth. Asserts `POST_KIND_NAMES` matches the registry, the rendered `POST_KINDS.check_sql()` matches what `Post.__table_args__` actually produces, the route's `Literal[*POST_KIND_NAMES]` is in lockstep, the inverse `POST_KIND_BY_DETAIL_MODEL` lookup is well-formed, the per-kind relationship-name convention holds, and `PostKindSpec.detail_fields` matches the detail-model column list exactly. If anyone re-encodes the kind set inline somewhere, one of these tests fails.
 
 ## Why this cluster, not flat siblings
 
@@ -26,11 +26,11 @@ The full cross-layer recipe lives in [`../../README.md`](../../README.md#adding-
 
 1. Add a new detail model file `<kind>_detail.py` in this directory. Follow the shape of `client_referral_detail.py`: 1:1 with `posts` via `post_id` PK+FK with CASCADE, enum columns CHECK against tuples in `../enums.py` via `check_in_tuple_sql`.
 2. Add a `relationship("<KindDetail>", uselist=False, cascade="all, delete-orphan", lazy="selectin")` line on `Post` in `post.py`.
-3. Add a `KindSpec` entry to `REGISTERED_KINDS` in `post_kinds.py`. The `detail_fields` tuple is derived from the model's columns automatically; you only supply the name, detail class, relationship attribute, label, and template paths.
+3. Add a `PostKindSpec` entry to `POST_KINDS` in `post_kinds.py`. The `detail_fields` tuple is derived from the model's columns automatically; you only supply the name, detail class, relationship attribute, label, and template paths.
 4. Re-export the new detail class from `../__init__.py`.
 5. Generate an Alembic migration for the new detail table and the widened `posts.kind` CHECK.
 
-The remaining layers (Pydantic schemas, repository dispatch, logic handlers, route Literal, templates) are all registry-driven — `test_post_kinds.py` will fail loudly if any of them drifts from `REGISTERED_KINDS`.
+The remaining layers (Pydantic schemas, repository dispatch, logic handlers, route Literal, templates) are all registry-driven — `test_post_kinds.py` will fail loudly if any of them drifts from `POST_KINDS`.
 
 ## Removing a kind
 

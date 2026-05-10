@@ -569,7 +569,7 @@ async def test_get_post_form_treats_empty_kind_as_absent(
     """`GET /posts/form?kind=` should fall back to the default kind
     rather than 422 against the `Literal[...]` annotation. The
     middleware strips the empty pair at request entry so FastAPI sees
-    the param as absent and the route's default (`KIND_NAMES[0]`)
+    the param as absent and the route's default (`POST_KIND_NAMES[0]`)
     fires."""
     response = await authenticated_client.get("/posts/form?kind=")
     assert response.status_code == 200

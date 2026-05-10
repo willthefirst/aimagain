@@ -185,7 +185,7 @@ mount_list(
 # Polymorphic-by-query form — posts' ?kind=client_referral picks the template.
 mount_form(
     router, POST_SPEC, handler=handle_get_post_form,
-    query_params=(QueryParam("kind", Literal[*KIND_NAMES], KIND_NAMES[0]),),
+    query_params=(QueryParam("kind", Literal[*POST_KIND_NAMES], POST_KIND_NAMES[0]),),
 )
 ```
 

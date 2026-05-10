@@ -8,7 +8,7 @@ route layer.
 
 `make_post_stub(kind, **field_overrides)` is the registry-backed builder
 for Post-shaped `SimpleNamespace` stubs — the per-kind detail
-relationship name and field tuple come from `REGISTERED_KINDS` in
+relationship name and field tuple come from `POST_KINDS` in
 `src/models/posts/post_kinds.py`, so adding/renaming a kind's fields does not
 require touching contract test code.
 """
@@ -18,7 +18,7 @@ from types import SimpleNamespace
 from typing import Any, Dict
 from uuid import UUID, uuid4
 
-from src.models import REGISTERED_KINDS
+from src.models import POST_KINDS
 from src.schemas.users.user import UserRead
 
 
@@ -33,7 +33,7 @@ def make_post_stub(
     """Return a Post-shaped `SimpleNamespace` stub for `kind`.
 
     The right per-kind detail relationship is populated (driven by
-    `REGISTERED_KINDS[kind]`); the other kinds' detail relationships are
+    `POST_KINDS[kind]`); the other kinds' detail relationships are
     set to `None` so template `{% if post.X %}` checks behave correctly.
 
     Detail fields default to `f"stub {field}"`; override individually
@@ -41,7 +41,7 @@ def make_post_stub(
     through onto the detail `SimpleNamespace` (caller's responsibility
     not to send cross-kind fields).
     """
-    spec = REGISTERED_KINDS[kind]
+    spec = POST_KINDS[kind]
     detail_values: dict[str, Any] = {f: f"stub {f}" for f in spec.detail_fields}
     detail_values.update(field_overrides)
     detail = SimpleNamespace(**detail_values)
@@ -52,7 +52,7 @@ def make_post_stub(
 
     other_relationships = {
         other_spec.detail_relationship: None
-        for other_kind, other_spec in REGISTERED_KINDS.items()
+        for other_kind, other_spec in POST_KINDS.items()
         if other_kind != kind
     }
 

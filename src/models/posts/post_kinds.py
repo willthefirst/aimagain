@@ -1,13 +1,13 @@
 """Single source of truth for post kinds.
 
-`REGISTERED_KINDS` registers each kind's name, its per-kind detail
+`POST_KINDS` registers each kind's name, its per-kind detail
 SQLAlchemy model, the relationship attribute on `Post` that points at
 that detail, the detail row's user-facing fields, and the templates and
 labels the route/template layers render for the kind.
 
 Adding a kind requires:
 
-1. A new entry in `REGISTERED_KINDS` here.
+1. A new entry in `POST_KINDS` here.
 2. A new detail model under `src/models/posts/<kind>_detail.py`, plus a
    `relationship(...)` line on `Post`.
 3. The four Pydantic variant classes in `src/schemas/post.py`
@@ -27,17 +27,23 @@ Removing a kind is the inverse: delete the registry entry, the detail
 model + relationship, the four Pydantic classes, the templates, and ship
 a migration that drops the detail table and narrows the CHECK. No edits
 in routes, repositories, or logic.
+
+The bookkeeping (names tuple, reverse-by-detail-model index, CHECK SQL
+generator) is provided by the generic `DiscriminatorRegistry` in
+`src/models/_polymorphic.py`; this module only declares the
+post-specific `PostKindSpec` shape and the registry instance.
 """
 
 from dataclasses import dataclass
 from typing import Final
 
+from .._polymorphic import DiscriminatorRegistry
 from .client_referral_detail import ClientReferralDetail
 from .provider_availability_detail import ProviderAvailabilityDetail
 
 
 @dataclass(frozen=True)
-class KindSpec:
+class PostKindSpec:
     """Per-kind metadata. See module docstring for the registration contract."""
 
     name: str
@@ -65,36 +71,32 @@ def _detail_fields(detail_model: type) -> tuple[str, ...]:
     return tuple(c.name for c in detail_model.__table__.columns if c.name != "post_id")
 
 
-REGISTERED_KINDS: Final[dict[str, KindSpec]] = {
-    "client_referral": KindSpec(
-        name="client_referral",
-        detail_model=ClientReferralDetail,
-        detail_relationship="client_referral_detail",
-        detail_fields=_detail_fields(ClientReferralDetail),
-        list_label="client referral",
-        create_template="posts/new_client_referral.html",
-        edit_template="posts/edit_client_referral.html",
-    ),
-    "provider_availability": KindSpec(
-        name="provider_availability",
-        detail_model=ProviderAvailabilityDetail,
-        detail_relationship="provider_availability_detail",
-        detail_fields=_detail_fields(ProviderAvailabilityDetail),
-        list_label="provider availability",
-        create_template="posts/new_provider_availability.html",
-        edit_template="posts/edit_provider_availability.html",
-    ),
-}
+POST_KINDS: Final[DiscriminatorRegistry[PostKindSpec]] = DiscriminatorRegistry(
+    column="kind",
+    specs={
+        "client_referral": PostKindSpec(
+            name="client_referral",
+            detail_model=ClientReferralDetail,
+            detail_relationship="client_referral_detail",
+            detail_fields=_detail_fields(ClientReferralDetail),
+            list_label="client referral",
+            create_template="posts/new_client_referral.html",
+            edit_template="posts/edit_client_referral.html",
+        ),
+        "provider_availability": PostKindSpec(
+            name="provider_availability",
+            detail_model=ProviderAvailabilityDetail,
+            detail_relationship="provider_availability_detail",
+            detail_fields=_detail_fields(ProviderAvailabilityDetail),
+            list_label="provider availability",
+            create_template="posts/new_provider_availability.html",
+            edit_template="posts/edit_provider_availability.html",
+        ),
+    },
+)
 
-KIND_NAMES: Final[tuple[str, ...]] = tuple(REGISTERED_KINDS)
+POST_KIND_NAMES: Final[tuple[str, ...]] = POST_KINDS.names
 
-KIND_BY_DETAIL_MODEL: Final[dict[type, KindSpec]] = {
-    spec.detail_model: spec for spec in REGISTERED_KINDS.values()
-}
-
-
-def kind_check_sql() -> str:
-    """SQL fragment for the `posts.kind` CHECK constraint, derived from
-    `KIND_NAMES`. Used by `models/posts/post.py` at class-definition time so
-    the constraint stays in lockstep with the registry."""
-    return "kind IN (" + ", ".join(repr(k) for k in KIND_NAMES) + ")"
+POST_KIND_BY_DETAIL_MODEL: Final[dict[type, PostKindSpec]] = POST_KINDS.reverse_index(
+    lambda spec: spec.detail_model,
+)

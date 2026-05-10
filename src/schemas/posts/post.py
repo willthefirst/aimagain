@@ -46,7 +46,7 @@ from pydantic import (
     model_validator,
 )
 
-from src.models import REGISTERED_KINDS
+from src.models import POST_KINDS
 from src.models.enums import (
     CLIENT_AGE_GROUPS,
     CLIENT_REFERRAL_SERVICES,
@@ -114,10 +114,10 @@ def _flatten_post_to_dict(post) -> dict | None:
     audit-snapshot variants share this helper; Pydantic silently drops
     fields that aren't declared on a given variant (neither Read nor
     AuditSnapshot uses `extra="forbid"`), so the same flat dict feeds
-    both shapes. Per-kind metadata comes from `REGISTERED_KINDS`.
+    both shapes. Per-kind metadata comes from `POST_KINDS`.
     """
     kind = getattr(post, "kind", None)
-    spec = REGISTERED_KINDS.get(kind)
+    spec = POST_KINDS.get(kind)
     if spec is None:
         return None
     detail = getattr(post, spec.detail_relationship, None)
@@ -417,7 +417,7 @@ def post_audit_snapshot(post) -> dict:
     — the `kind` discriminator picks the matching variant, which then
     flattens through the right detail relationship via the shared
     `_flatten_post_to_dict` helper. Adding a new `kind` only requires
-    registering it in `REGISTERED_KINDS` and adding its `*AuditSnapshot`
+    registering it in `POST_KINDS` and adding its `*AuditSnapshot`
     variant to the union above.
     """
     return _post_audit_snapshot_adapter.validate_python(post).model_dump(mode="json")
