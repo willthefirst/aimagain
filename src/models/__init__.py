@@ -7,6 +7,7 @@ from .enums import (
     LOCATION_AVAILABILITY_OPTIONS,
     US_STATES,
 )
+from .favorites.user_favorite import UserFavorite
 from .posts.client_referral_detail import ClientReferralDetail
 from .posts.post import Post
 from .posts.post_kinds import (
@@ -43,5 +44,6 @@ __all__ = [
     "Provider",
     "US_STATES",
     "User",
+    "UserFavorite",
     "metadata",
 ]

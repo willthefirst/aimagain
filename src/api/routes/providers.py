@@ -36,7 +36,11 @@ from src.logic.providers.provider_processing import (
     handle_update_licensure,
     handle_update_provider,
 )
-from src.repositories.dependencies import get_audit_repository, get_provider_repository
+from src.repositories.dependencies import (
+    get_audit_repository,
+    get_provider_repository,
+    get_user_favorite_repository,
+)
 from src.schemas.providers.provider import (
     ProviderCertificationRead,
     ProviderEducationRead,
@@ -135,8 +139,16 @@ mount_form(
 
 # --- Provider item routes ------------------------------------------------
 
-# GET /providers/{provider_id} — detail page.
-mount_detail(router, PROVIDER_SPEC, handler=handle_get_provider_detail)
+# GET /providers/{provider_id} — detail page. The `is_favorited` per-viewer
+# flag (computed in the handler against `UserFavoriteRepository`) lives in
+# the template context, so the mount injects the favorites repo via
+# `extra_repo_deps`.
+mount_detail(
+    router,
+    PROVIDER_SPEC,
+    handler=handle_get_provider_detail,
+    extra_repo_deps=(get_user_favorite_repository,),
+)
 
 
 # PATCH /providers/{provider_id} — partial update, owner-or-admin (handler enforces).

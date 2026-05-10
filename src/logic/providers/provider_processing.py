@@ -34,6 +34,7 @@ from src.models import (
     User,
 )
 from src.repositories.audit_repository import AuditRepository
+from src.repositories.favorites.user_favorite_repository import UserFavoriteRepository
 from src.repositories.providers.provider_repository import ProviderRepository
 from src.repositories.users.user_repository import UserRepository
 from src.schemas.providers.provider import (
@@ -141,6 +142,7 @@ async def handle_get_provider_detail(
     request: Request,
     provider_id: UUID,
     repo: ProviderRepository,
+    user_favorite_repo: UserFavoriteRepository,
     requesting_user: User,
 ) -> dict[str, Any]:
     """Loads any provider by id for the read-only detail page; 404 if missing.
@@ -148,14 +150,27 @@ async def handle_get_provider_detail(
     The repo's `get_by_id` eager-loads `licensures`, `educations`, and
     `certifications` via `lazy="selectin"`, so the template can render
     each sub-section without further queries.
+
+    Per-viewer derived fields live in the context dict, not on `provider`
+    itself — `is_favorited` is a property of the (viewer, provider) pair,
+    not of the provider. Same shape as `can_edit`. Anonymous viewers
+    (`requesting_user is None`) get `is_favorited=False` without a DB
+    round-trip.
     """
     provider = await _load_provider_or_404(provider_id, repo)
     can_edit = is_owner(provider, requesting_user) or is_admin(requesting_user)
+    if requesting_user is None:
+        is_favorited = False
+    else:
+        is_favorited = await user_favorite_repo.is_favorited(
+            user_id=requesting_user.id, provider_id=provider.id
+        )
     return {
         "request": request,
         "provider": provider,
         "current_user": requesting_user,
         "can_edit": can_edit,
+        "is_favorited": is_favorited,
     }
 
 

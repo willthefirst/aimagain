@@ -4,6 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.db import get_db_session
 
 from .audit_repository import AuditRepository
+from .favorites.user_favorite_repository import UserFavoriteRepository
 from .posts.post_repository import PostRepository
 from .providers.provider_repository import ProviderRepository
 from .users.user_repository import UserRepository
@@ -35,3 +36,10 @@ def get_provider_repository(
 ) -> ProviderRepository:
     """Dependency provider for ProviderRepository."""
     return ProviderRepository(session)
+
+
+def get_user_favorite_repository(
+    session: AsyncSession = Depends(get_db_session),
+) -> UserFavoriteRepository:
+    """Dependency provider for UserFavoriteRepository."""
+    return UserFavoriteRepository(session)

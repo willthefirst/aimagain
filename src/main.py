@@ -11,7 +11,7 @@ from src.auth_config import auth_backend, fastapi_users
 from src.db import check_database_health
 from src.schemas.users.user import UserRead
 
-from .api.routes import auth_pages, posts, providers, users
+from .api.routes import auth_pages, favorites, posts, providers, users
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -109,6 +109,10 @@ app.include_router(auth_pages.auth_pages_api_router)
 app.include_router(users.users_api_router, tags=["users"])
 app.include_router(posts.posts_api_router, tags=["posts"])
 app.include_router(providers.providers_api_router, tags=["providers"])
+# `/users/me/favorites/*` is mounted on its own router (favorites_api_router)
+# rather than on users_api_router, because favorites is its own resource
+# cluster — the path just happens to live under /users/me for self-scoping.
+app.include_router(favorites.favorites_api_router, tags=["favorites"])
 
 
 @app.get("/health")

@@ -91,6 +91,8 @@ class AuditAction(str, Enum):
     CREATE_CERTIFICATION = "create_certification"
     UPDATE_CERTIFICATION = "update_certification"
     DELETE_CERTIFICATION = "delete_certification"
+    ADD_FAVORITE = "add_favorite"
+    REMOVE_FAVORITE = "remove_favorite"
 
 
 Verb = Literal["create", "update", "delete"]
