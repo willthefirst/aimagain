@@ -15,44 +15,25 @@ This directory contains all files and documentation related to deploying the Bed
 
 ```
 deployment/
-├── README.md                     # This documentation
-├── droplet-files/               # Files deployed to /opt/bedlam-connect/ on droplet
-│   ├── deploy.sh               # Main deployment script (blue-green)
-│   ├── docker-compose.blue-green.yml  # Docker Compose configuration
-│   ├── cleanup-docker.sh       # Docker cleanup utility
-│   └── promote-admin.sh        # Bootstrap/manage admin users on prod
-└── scripts/                    # Helper scripts (future use)
+├── README.md          # This documentation
+├── droplet-files/     # Files synced to /opt/bedlam-connect/deployment/ on the droplet
+└── scripts/           # Helper scripts run by CI (e.g. deploy-copy-files.sh)
 ```
+
+The actual contents of each subdirectory are the source of truth — `ls deployment/droplet-files/` and `ls deployment/scripts/` always tell you what's there.
 
 ## 🔄 How automated deployment works
 
 ### GitHub actions workflow
 
-1. **Build Phase**: Docker image is built and pushed to GitHub Container Registry
-2. **SCP Phase**: Deployment files are automatically copied to droplet via SCP
-3. **Deploy Phase**: `deploy.sh` is executed on the droplet for zero-downtime deployment
+The deploy pipeline lives in [`.github/workflows/cd.yml`](../.github/workflows/cd.yml). It runs in two jobs:
 
-### Scp automation details
+1. **`build-and-push`** — builds the Docker image from [`deployment/docker/Dockerfile`](docker/Dockerfile) and pushes it to GitHub Container Registry.
+2. **`deploy`** — copies deployment files to the droplet by running [`deployment/scripts/deploy-copy-files.sh`](scripts/deploy-copy-files.sh), then SSHes in and executes `deploy.sh` for zero-downtime deployment.
 
-The GitHub Actions workflow (`.github/workflows/build-and-push.yml`) includes:
+**Where files land:** `deploy-copy-files.sh` SCPs `deployment/droplet-files/*` to **`/opt/bedlam-connect/deployment/`** on the droplet (not `/opt/bedlam-connect/`). The deploy step then `cd`s into that directory before running `./deploy.sh`.
 
-```yaml
-- name: Copy deployment files to droplet
-  uses: appleboy/scp-action@v0.1.7
-  with:
-    host: ${{ secrets.DROPLET_HOST }}
-    username: ${{ secrets.DROPLET_USERNAME }}
-    key: ${{ secrets.DROPLET_SSH_KEY }}
-    source: 'deployment/droplet-files/*'
-    target: '/opt/bedlam-connect/'
-    strip_components: 2
-```
-
-**Key Points:**
-
-- `strip_components: 2` removes `deployment/droplet-files/` from the path
-- Files end up directly in `/opt/bedlam-connect/` on the droplet
-- No more manual SCP required!
+For the exact SCP and SSH steps, read [`cd.yml`](../.github/workflows/cd.yml) and [`scripts/deploy-copy-files.sh`](scripts/deploy-copy-files.sh) — they're the source of truth, not this README.
 
 ## 🏗️ Blue-Green deployment process
 
@@ -76,9 +57,9 @@ The app has no admin user out of the box, and admin actions (delete user, deacti
 
 ```bash
 ssh user@your-droplet-ip
-cd /opt/bedlam-connect
-./promote-admin you@example.com           # grant
-./promote-admin you@example.com --revoke  # revoke
+cd /opt/bedlam-connect/deployment
+./promote-admin.sh you@example.com           # grant
+./promote-admin.sh you@example.com --revoke  # revoke
 ```
 
 The wrapper auto-detects the running blue/green container and execs the promotion script inside it — no `docker exec` incantation to remember. It's idempotent (safe to re-run) and refuses on a missing user (won't auto-create from a typo).
@@ -95,15 +76,17 @@ If GitHub Actions fails, you can deploy manually:
 
 ```bash
 ssh user@your-droplet-ip
-cd /opt/bedlam-connect
+cd /opt/bedlam-connect/deployment
 ```
 
 ### 2. update files (if needed)
 
 ```bash
-# Copy files from your local machine
-scp deployment/droplet-files/* user@droplet-ip:/opt/bedlam-connect/
+# From your local machine
+scp deployment/droplet-files/* user@droplet-ip:/opt/bedlam-connect/deployment/
 ```
+
+(or run `deployment/scripts/deploy-copy-files.sh` with the right env vars set — same as CI does.)
 
 ### 3. run deployment
 
@@ -257,7 +240,7 @@ docker system df
 
 ### Emergency contacts
 
-- **GitHub Actions**: Check `.github/workflows/build-and-push.yml`
+- **GitHub Actions**: Check [`.github/workflows/cd.yml`](../.github/workflows/cd.yml)
 - **Droplet Access**: SSH key and connection details in GitHub secrets
 - **DNS/SSL**: Managed by Certbot on droplet
 
@@ -274,4 +257,4 @@ Deployment is working correctly when:
 - ✅ Zero downtime during deployment
 - ✅ Old instances are properly cleaned up
 
-**Remember**: This automated setup means you should never need to manually SCP files to the droplet again. All deployment file changes are handled automatically through GitHub Actions!
+CI handles the SCP step for you on every push to `main` — manual SCP from your laptop is the emergency fallback above, not the everyday workflow.
