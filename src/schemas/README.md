@@ -1,247 +1,30 @@
 # Schemas: Request/response validation and serialization
 
-The `schemas/` directory contains **Pydantic schemas** that define the structure and validation rules for API requests and responses, providing type safety, automatic serialization, and comprehensive validation.
-
-## Core philosophy: Type-safe API contracts
-
-Schemas serve as **API contracts** that ensure data consistency between clients and the server while providing automatic validation, serialization, and comprehensive error messages for invalid data.
-
-### What we do
-
-- **Request validation**: Validate incoming API data with clear error messages
-- **Response serialization**: Convert database models to JSON with proper field selection
-- **Type safety**: Provide full type annotations for IDE support and runtime validation
-- **Configuration**: Use Pydantic's ConfigDict for ORM integration and serialization control
-
-**Example**: Schema with ORM integration:
-
-```python
-class UserRead(schemas.BaseUser):
-    username: str
-
-    model_config = ConfigDict(from_attributes=True)  # ORM integration
-```
-
-### What we don't do
-
-- **Business logic**: Schemas only define structure and basic validation, no business rules
-- **Database operations**: Schemas don't interact with databases directly
-- **Complex computed fields**: Keep schemas focused on data structure
-- **Authentication logic**: Authentication concerns stay in auth layer
-
-**Example**: Don't implement business logic in schemas:
-
-```python
-# Bad - business logic in schema
-class UserCreateRequest(BaseModel):
-    username: str
-
-    def validate_user_can_register(self, existing_users):  # Business logic
-        if len(existing_users) >= MAX_USERS:
-            raise ValueError("Too many users")
-
-# Good - structure and validation only
-class UserCreateRequest(BaseModel):
-    username: str
-
-    @field_validator('username')
-    def validate_username(cls, v):
-        if len(v.strip()) == 0:
-            raise ValueError('Username cannot be empty')
-        return v.strip()
-```
-
-## Architecture: Request/response boundary layer
-
-**API Routes -> Schema Validation -> Logic / Repositories -> Schema Serialization -> Response**
-
-Schemas act as the data contract layer between HTTP and business logic.
+The `schemas/` directory contains **Pydantic schemas** that define the structure and validation rules for API requests and responses.
 
 ## Layer organization
 
 Schemas follow the [cluster pattern](../README.md#domain-entities-and-the-cluster-pattern):
 
-- One cluster directory per domain entity (`<entity>/`). Each holds the Pydantic Create/Update/Read/AuditSnapshot variants for that entity (and its sub-entities, if any), plus the colocated test file. Per-entity specifics — discriminator unions, controlled-vocabulary fields, embedded sub-entities — live inside the cluster, with a `<entity>/README.md` if anything is non-obvious.
+- One cluster directory per domain entity (`<entity>/`). Each holds the Pydantic Create / Update / Read / AuditSnapshot variants for that entity (and its sub-entities, if any), plus the colocated test file. Per-entity specifics — discriminator unions, controlled-vocabulary fields, embedded sub-entities — live inside the cluster, with a `<entity>/README.md` if anything is non-obvious.
 - Parent-level shared tier (`_validators.py`) — `Annotated[T, AfterValidator(fn)]` aliases and helpers used by 2+ clusters. Add to it when a primitive is used by 2+ schema modules, or when two modules are about to define near-duplicates of the same helper. An alias may also attach an `HtmlPattern(pattern=..., maxlength=...)` marker (from [`src/core/form_fields.py`](../core/form_fields.py)) when the alias's regex/length constraint should also be exposed as the form's client-side `pattern`/`maxlength` — keeps both surfaces aligned at the alias's definition site rather than duplicated per template.
 
 A schema cluster does not import from a peer cluster; cross-cluster reuse happens via the shared tier ([lint-enforced](../README.md#domain-entities-and-the-cluster-pattern)).
 
 The labels-vs-tuple guardrail (`test_schema_literals_match_model_tuples`) lives alongside each cluster's tests; it asserts the cluster's `Literal[*TUPLE]` types stay aligned with the source-of-truth tuples in [`src/models/enums.py`](../models/enums.py).
 
-## Implementation patterns
+## Naming
 
-### Creating request/response schema pairs
-
-Most domains have both request (input) and response (output) schemas:
-
-```python
-# Request schema - validates incoming data
-class [Entity]CreateRequest(BaseModel):
-    name: str  # Required field
-
-    @field_validator('name')
-    def validate_name_not_empty(cls, v):
-        if not v.strip():
-            raise ValueError('Name cannot be empty')
-        return v.strip()
-
-# Response schema - serializes outgoing data
-class [Entity]Response(BaseModel):
-    id: UUID
-    name: str
-    created_at: datetime
-
-    model_config = ConfigDict(from_attributes=True)  # Enable ORM conversion
-```
-
-### Orm integration pattern
-
-Use ConfigDict to enable automatic conversion from SQLAlchemy models:
-
-```python
-class [Entity]Response(BaseModel):
-    id: UUID
-    name: str
-    created_at: datetime
-
-    model_config = ConfigDict(from_attributes=True)
-
-# Usage in routes - automatic conversion
-@router.get("/[entities]/{entity_id}")
-async def get_entity(entity_id: UUID) -> [Entity]Response:
-    entity = await repo.get_by_id(entity_id)
-    return [Entity]Response.model_validate(entity)  # Auto-converts from ORM
-```
-
-### FastAPI users integration pattern
-
-Extend FastAPI Users schemas for authentication:
-
-```python
-from fastapi_users import schemas
-
-class UserRead(schemas.BaseUser):
-    username: str  # Add custom fields to base user
-
-class UserCreate(schemas.BaseUserCreate):
-    username: str  # Add custom fields to registration
-
-class UserUpdate(schemas.BaseUserUpdate):
-    username: str  # Add custom fields to updates
-```
-
-## Common schema issues and solutions
-
-### Issue: Missing validation leading to bad data
-
-**Problem**: Invalid data gets through to business logic
-**Solution**: Add comprehensive field validation
-
-```python
-# Bad - no validation
-class [Entity]CreateRequest(BaseModel):
-    name: str
-
-# Good - comprehensive validation
-class [Entity]CreateRequest(BaseModel):
-    name: str
-
-    @field_validator('name')
-    def validate_name(cls, v):
-        v = v.strip()
-        if not v:
-            raise ValueError('Name cannot be empty')
-        if len(v) > 200:
-            raise ValueError('Name too long (max 200 characters)')
-        return v
-```
-
-### Issue: Inconsistent ORM conversion
-
-**Problem**: Some schemas work with ORM models, others don't
-**Solution**: Consistently use ConfigDict(from_attributes=True)
-
-```python
-# Bad - missing ORM configuration
-class [Entity]Response(BaseModel):
-    id: UUID
-    name: str
-    # Will fail when converting from SQLAlchemy model
-
-# Good - proper ORM integration
-class [Entity]Response(BaseModel):
-    id: UUID
-    name: str
-
-    model_config = ConfigDict(from_attributes=True)
-```
-
-### Issue: Exposing internal fields in responses
-
-**Problem**: Response schemas include fields that shouldn't be public
-**Solution**: Explicitly define what fields to include/exclude
-
-```python
-# Bad - exposing internal fields
-class UserResponse(BaseModel):
-    id: UUID
-    username: str
-    email: str
-    password_hash: str  # Should not be exposed!
-
-# Good - only expose public fields
-class UserResponse(BaseModel):
-    id: UUID
-    username: str
-    email: str
-    created_at: datetime
-
-    model_config = ConfigDict(from_attributes=True)
-```
-
-## Schema naming conventions
-
-### Consistent naming patterns
-
-```python
-# Request schemas - data coming IN
-[Domain]CreateRequest
-[Domain]UpdateRequest
-
-# Response schemas - data going OUT
-[Domain]Response
-[Domain]ListResponse
-
-# Enums - controlled vocabularies
-[Domain]Status
-[Domain]Type
-```
-
-### Example naming consistency
-
-```python
-# User domain (follows FastAPI users pattern)
-UserRead
-UserCreate
-UserUpdate
-
-# New domain example
-[Entity]CreateRequest
-[Entity]Response
-[Entity]Status  # Enum
-```
+The conventions are visible in the existing schemas (`ClientReferralCreate`, `ClientReferralRead`, `ClientReferralUpdate`, `ClientReferralAuditSnapshot`, etc.). The User cluster follows fastapi-users' `UserRead` / `UserCreate` / `UserUpdate` shape. Match the surrounding cluster when adding a new schema.
 
 ## Tests
 
-Colocated tests live inside each cluster directory:
-
-- `posts/test_post.py` — exercises the kind-discriminated `PostCreate`/`PostUpdate` unions: explicit-kind variants, the `extra="forbid"` boundary (rejects `owner_id`, unknown fields, cross-kind field bleed), per-kind whitespace stripping, ZIP regex, controlled-vocabulary rejection, and the partial-update at-least-one-field rule. Also covers `post_audit_snapshot` flattening through the right detail relationship for each registered kind, and the `test_schema_literals_match_model_tuples` guardrail that asserts the `Literal[*TUPLE]` types here stay aligned with the source-of-truth tuples in `src/models/enums.py`.
-- `providers/test_provider.py` — covers the four provider entities (`Provider` + licensure + education + certification): controlled-vocabulary rejection, `extra="forbid"` rejection, the at-least-one-field rule on each Update variant, `ProviderRead.model_validate` round-trip on a nested dict, and the `test_schema_literals_match_model_tuples` guardrail aligning `Literal[*TUPLE]` types with `src/models/enums.py`.
+Each cluster owns its colocated `test_*.py`. See `posts/test_post.py` and `providers/test_provider.py` for the existing examples; their test names are the source of truth for what's covered.
 
 Add `src/schemas/<entity>/test_<file>.py` when a schema has non-trivial validators or computed fields whose behavior isn't obvious from the field definitions.
 
 ## Related documentation
 
-- [API Routes](../api/routes/README.md) - API routes that use these schemas for validation
-- [Models Layer](../models/README.md) - Database models that schemas serialize
-- [API Layer](../api/README.md) - Overall API architecture showing schema role
+- [API Routes](../api/routes/README.md) — routes that use these schemas for validation
+- [Models Layer](../models/README.md) — database models that schemas serialize
+- [API Layer](../api/README.md) — overall API architecture

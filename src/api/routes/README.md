@@ -84,8 +84,9 @@ Routes are organized by domain with consistent delegation patterns.
 
 - One route file per resource: `<resource>.py` defines the HTTP endpoints for that resource. Per-resource specifics — exact endpoints, mutation-response shapes, sub-resources, HX-Redirect behavior — live in that file's docstrings and (when worth writing down) in any cluster-level doc the resource owns.
 - `auth_routes.py` and `auth_pages.py` are the JSON-API and HTML-page split for authentication; both follow the same delegation pattern as resource routes.
-- `me.py` holds the `/users/me/*` aliases — current-user shortcuts whose handlers delegate to the same logic functions as the user-scoped routes, so behavior stays identical.
 - `__init__.py` re-exports the route modules.
+
+Singleton-alias routes like `/users/me` and `/users/me/providers` are mounted alongside their parametric counterparts via `singleton_alias=` on `mount_detail` / `mount_related_list` (see the [unified resource grammar](../common/README.md#singleton-aliases-eg-usersme)). They are not a separate route file.
 
 The URL shape every resource MUST follow is defined in [`RESOURCE_GRAMMAR.md`](RESOURCE_GRAMMAR.md). This README documents how routes are wired; the grammar documents what URLs and lifecycles a resource MUST present.
 
@@ -97,7 +98,7 @@ The unified grammar fits resource-shaped CRUD. Several existing routes intention
 |---|---|---|
 | `POST /auth/register` | `auth_routes.py` | Auth-flow protocol (token issuance, fastapi-users hooks). Not CRUD on a domain entity. |
 | `GET /auth/{register,login,forgot-password,reset-password/{token}}` | `auth_pages.py` | Pure form rendering, no resource. Could fit a hypothetical `mount_static_form` but not worth it for 4 routes. |
-| `GET /users/me`, `GET /users/me/profile`, `GET /users/me/providers` | `me.py` | Singleton aliases — no parent id, session-sourced. Adding a `singleton_alias` knob to every spec for 3 routes would be a bad trade. |
+| `GET /users/me`, `GET /users/me/providers` | `users.py` (mounted via `singleton_alias=`) | Singleton aliases — no parent id, session-sourced. Mounted as additional paths on the existing `mount_detail` / `mount_related_list` calls; see [`api/common/README.md`](../common/README.md#singleton-aliases-eg-usersme). |
 | `PUT /users/{user_id}/activation` | `users.py` | Idempotent state set with `HX-Refresh` (not `HX-Redirect`); admin-only verb. Doesn't match `mount_update` semantics. |
 | `GET /`, `GET /health` | `main.py` | Utility endpoints. Not resource-shaped. |
 
@@ -275,7 +276,7 @@ async def create_entity():
 
 ### Main application route registration
 
-The `me` router MUST be registered **before** the `users` router so that requests to `/users/me` match the literal `me` handler instead of being parsed as a UUID by the `/users/{user_id}` parametric route. More generally, any route that adds a literal segment under another resource's parametric path must be registered first.
+The order in which `app.include_router(...)` calls fire determines route precedence: any route adding a literal segment under another resource's parametric path must be registered first (or, if both come from the same router, mounted first inside it — `singleton_alias=` does this for `/users/me`).
 
 The actual registration order lives in [`src/main.py`](../../main.py) — that's the source of truth, not this README.
 

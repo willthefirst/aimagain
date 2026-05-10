@@ -86,7 +86,7 @@ Run `dev --help` for the live, authoritative list. As of this writing:
 | `dev logs [-f] [service]` | Show logs from the dev environment, optionally following or scoped to one service. |
 | `dev restart [service]` | Restart the whole dev environment or a single service. |
 | `dev test [-v] [--tb MODE] [-m MARKERS] [-k KEYWORDS] [path ...]` | Run pytest. Each `path` can be a directory, a file, or a `file::testname` selector; pass several to run unrelated targets in one invocation. The literal token `contract` is a shortcut that expands to `tests/test_contract` — that directory is excluded from default collection (see [`../tests/test_contract/README.md`](../tests/test_contract/README.md)) and is easy to forget the path to. |
-| `dev lint` | Run black, isort, autoflake, and the title-case checker. Pre-commit runs the same checks automatically. |
+| `dev lint` | Run all linting checks. Pre-commit runs the same checks automatically. See [`scripts/dev_cli.py`](dev_cli.py)'s `QualityCommands.lint` for the live list. |
 | `dev fmt` | Auto-fix formatting in place by running `black .` and `isort .` in write mode. The natural pre-commit companion to `dev lint`. |
 | `dev seed` | Apply any pending Alembic migrations, then seed the dev database with fixture users for manual testing. Migrations run first so a freshly added revision doesn't cause the seed to crash against a stale schema. |
 | `dev routes [prefix]` | Print every HTTP route registered on `src.main:app` grouped by path prefix. Surfaces router shadowing — two `include_router` calls registering handlers on overlapping paths — without spinning up the server. |

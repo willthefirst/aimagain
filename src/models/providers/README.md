@@ -13,7 +13,7 @@ A `Provider` is **not** the same thing as a `ProviderAvailabilityDetail`. They l
 - `provider_licensure.py` — `ProviderLicensure`. One row per professional license held by a provider. CASCADE on the parent FK keeps the credential list in lockstep with the `Provider`. `license_type` CHECKs against `LICENSE_TYPES`; `issuing_state` CHECKs against `US_STATES`.
 - `provider_education.py` — `ProviderEducation`. One row per educational credential. CASCADE on the parent FK. `education_type` CHECKs against `EDUCATION_TYPES`. `month_completed` is `Text` storing `"YYYY-MM"` rather than a `Date` — the form captures month precision only.
 - `provider_certification.py` — `ProviderCertification`. One row per professional certification. CASCADE on the parent FK. `certification_type` CHECKs against `CERTIFICATION_TYPES`.
-- `test_provider_models.py` — direct DB-layer coverage of the cluster: per-user FK behavior, the cascade from a `Provider` down to its credential lists (raw-SQL `DELETE` on the parent proves FK CASCADE fires, not just the ORM cascade), and `IntegrityError` on each enum CHECK rejection.
+- `test_provider_models.py` — direct DB-layer coverage of the cluster. See the file for the exact assertions; test names are the source of truth.
 - `test_provider_enums.py` — guardrail asserting every value in the credential vocabularies (`LICENSE_TYPES`, `EDUCATION_TYPES`, `CERTIFICATION_TYPES`) has a matching entry in its `*_LABELS` dict in [`../enums.py`](../enums.py). The form-render macros look up labels by value at request time; missing keys would 500 the request.
 
 ## Why this cluster, not flat siblings
