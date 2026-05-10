@@ -12,7 +12,7 @@ For any code change in `src/<layer>/`, the change is **not done** until all four
 
 1. The code change itself is in.
 2. The colocated `src/<layer>/README.md` reflects new/changed/removed behavior — or you have explicitly verified it is still accurate.
-3. The colocated test file (`src/<layer>/test_*.py`) is updated or added to cover the change.
+3. The change has test coverage that pins what changed — colocated `src/<layer>/test_*.py` for clusters with non-obvious logic, route-level tests under `src/api/routes/test_*.py` for thin pass-through clusters. See the layer READMEs (`src/logic/README.md`, `src/repositories/README.md`) for the per-layer judgment.
 4. `dev test` passes and `dev lint` passes.
 
 If a layer has no README or no test file yet, **create them as part of the change**. Don't defer.
@@ -72,7 +72,7 @@ Pre-commit hooks run lint automatically — don't bypass with `--no-verify`.
 2. Read the README of the layer you're changing, plus the layers it depends on.
 3. If a single change forces edits across most layers (model + schema + repo + service + route), follow the entity checklist in [`src/README.md`](src/README.md#adding-a-new-domain-entity) — that's expected for new entities, not a smell.
 4. **Before adding or modifying a resource type**, read [`src/api/routes/RESOURCE_GRAMMAR.md`](src/api/routes/RESOURCE_GRAMMAR.md) first. It's the prescriptive contract for URL shape, lifecycle states, and subresource conventions.
-5. **Before adding or moving a route**, run `dev routes [prefix]` to see every handler currently mounted. Catches router shadowing before tests do. Full CLI list: [`scripts/README.md`](scripts/README.md).
+5. **Before adding or moving a route**, run `dev routes [prefix]` to see every handler currently mounted. Catches router shadowing before tests do. Full CLI list: `dev --help` (source: [`scripts/dev_cli.py`](scripts/dev_cli.py)).
 6. **Before changing a wire or storage contract**, do the contract-surface check below. The layer matrix tells you *which layers* a change touches; this tells you *which contracts* it touches.
 
 ## Before implementing a multi-layer change: contract-surface check
