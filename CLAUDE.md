@@ -84,6 +84,14 @@ Before writing code on any change that modifies a schema, route, template, or pe
 
 3. **For each breaking surface, who decides?** If the breakage is scoped (only internal callers, only your tests) you can absorb it. If it leaks past your boundary (HTML forms, external API consumers, persisted data already in production) **surface the choice to the user explicitly** before implementing — *"this changes X for existing clients; OK, or do you want me to prep first?"* Don't decide silently inside the implementation.
 
+4. **Which other READMEs reference symbols, files, or paths I'm renaming, deleting, or changing?** Layer-by-layer planning catches *which layers a change touches*; it doesn't catch *which other layers' READMEs reference the symbols being changed*. For each renamed or removed identifier, run:
+
+   ```bash
+   grep -rn "<old-name>" $(find . -name README.md -not -path './.claude/*' -not -path './.pytest_cache/*')
+   ```
+
+   Update or delete any matches as part of the same PR — neighbor-README drift is otherwise invisible until the next reader hits a stale claim.
+
 The cost of skipping this check is one end-of-PR realization that you took the wrong shape — by which point unwinding is more work than the prep PR would have been.
 
 ## Plan mode
