@@ -4,8 +4,6 @@ from fastapi import APIRouter
 
 from src.api.common import BaseRouter
 from src.api.common.resource_routes import (
-    QueryParam,
-    ResourceSpec,
     mount_create,
     mount_delete,
     mount_detail,
@@ -13,12 +11,11 @@ from src.api.common.resource_routes import (
     mount_list,
     mount_update,
 )
-from src.auth_config import current_active_user
-from src.logic._authz import assert_owner_or_admin
+from src.api.common.specs.provider import PROVIDER_ENTITY
+from src.api.common.specs.provider_certification import CERTIFICATION_ENTITY
+from src.api.common.specs.provider_education import EDUCATION_ENTITY
+from src.api.common.specs.provider_licensure import LICENSURE_ENTITY
 from src.logic.providers.provider_processing import (
-    CERTIFICATION,
-    EDUCATION,
-    LICENSURE,
     handle_create_certification,
     handle_create_education,
     handle_create_licensure,
@@ -36,73 +33,33 @@ from src.logic.providers.provider_processing import (
     handle_update_licensure,
     handle_update_provider,
 )
-from src.repositories.dependencies import get_provider_repository
-from src.schemas.providers.provider import (
-    ProviderCertificationRead,
-    ProviderEducationRead,
-    ProviderLicensureRead,
-    ProviderRead,
-    certification_create_adapter,
-    certification_update_adapter,
-    education_create_adapter,
-    education_update_adapter,
-    licensure_create_adapter,
-    licensure_update_adapter,
-    provider_create_adapter,
-    provider_update_adapter,
-)
 
 providers_api_router = APIRouter(prefix="/providers")
 router = BaseRouter(router=providers_api_router, default_tags=["providers"])
 logger = logging.getLogger(__name__)
 
 
-PROVIDER_SPEC = ResourceSpec(
-    collection="providers",
-    id_param="provider_id",
-    repo_dep=get_provider_repository,
-    read_user_dep=current_active_user,
-    write_user_dep=current_active_user,
-    write_authz=assert_owner_or_admin,
-    create_adapter=provider_create_adapter,
-    update_adapter=provider_update_adapter,
-    read_to_dict=lambda provider: ProviderRead.model_validate(provider).model_dump(
-        mode="json"
-    ),
-    list_template="providers/list.html",
-    detail_template="providers/detail.html",
-    # After create, redirect to the edit form so the user can flesh out
-    # sub-rows (licensures, educations, certifications). After update,
-    # send them back to the same edit form.
-    create_redirect=lambda *, provider_id: f"/providers/{provider_id}/form",
-    update_redirect=lambda *, provider_id: f"/providers/{provider_id}/form",
-)
-
-
-def _licensure_read_dict(row) -> dict:
-    return ProviderLicensureRead.model_validate(row).model_dump(mode="json")
-
-
-def _education_read_dict(row) -> dict:
-    return ProviderEducationRead.model_validate(row).model_dump(mode="json")
-
-
-def _certification_read_dict(row) -> dict:
-    return ProviderCertificationRead.model_validate(row).model_dump(mode="json")
+# All four route-level ResourceSpecs are derived from their EntitySpecs.
+# The entity specs in `src/api/common/specs/` are the single declaration
+# of identity (audit binding, adapters, redirects, filters, route flags,
+# templates); the mount helpers still consume `ResourceSpec`, so we
+# bridge via `to_resource_spec()`.
+PROVIDER_SPEC = PROVIDER_ENTITY.to_resource_spec()
+LICENSURE_SPEC = LICENSURE_ENTITY.to_resource_spec()
+EDUCATION_SPEC = EDUCATION_ENTITY.to_resource_spec()
+CERTIFICATION_SPEC = CERTIFICATION_ENTITY.to_resource_spec()
 
 
 # --- Provider collection routes ------------------------------------------
 
 # GET /providers — authenticated listing with optional license_type /
-# issuing_state filters.
+# issuing_state filters. The filter shape is declared on the entity spec
+# so the canonical declaration lives upstream of the mount call.
 mount_list(
     router,
     PROVIDER_SPEC,
     handler=handle_list_providers,
-    query_params=(
-        QueryParam("license_type", str | None, None),
-        QueryParam("issuing_state", str | None, None),
-    ),
+    query_params=PROVIDER_ENTITY.filters,
 )
 
 # POST /providers — owner inferred from session.
@@ -149,63 +106,12 @@ mount_delete(
 
 
 # --- Sub-resource CRUD (licensure / education / certification) ----------
-# Each sub-resource is a `ResourceSpec` whose `parent=PROVIDER_SPEC`.
-# The mount functions walk the parent chain to build paths like
+# Each sub-resource's spec carries `parent=PROVIDER_ENTITY` (resolved on
+# the entity spec), so `to_resource_spec()` produces a `ResourceSpec`
+# whose `parent` is a derived `PROVIDER_SPEC`. The mount functions walk
+# that parent chain to build paths like
 # `/{provider_id}/licensures/{licensure_id}` and inject parent ids into
 # the handler under their declared kwarg names.
-
-
-def _provider_subresource_redirect(*, provider_id, **_):
-    """Sub-row mutations redirect HTMX clients back to the provider edit
-    form so the user can keep editing the parent + its credentials."""
-    return f"/providers/{provider_id}/form"
-
-
-LICENSURE_SPEC = ResourceSpec(
-    collection="licensures",
-    id_param="licensure_id",
-    repo_dep=get_provider_repository,
-    audit_resource=LICENSURE,
-    write_user_dep=current_active_user,
-    write_authz=assert_owner_or_admin,
-    create_adapter=licensure_create_adapter,
-    update_adapter=licensure_update_adapter,
-    read_to_dict=_licensure_read_dict,
-    create_redirect=_provider_subresource_redirect,
-    update_redirect=_provider_subresource_redirect,
-    delete_redirect=_provider_subresource_redirect,
-    parent=PROVIDER_SPEC,
-)
-EDUCATION_SPEC = ResourceSpec(
-    collection="educations",
-    id_param="education_id",
-    repo_dep=get_provider_repository,
-    audit_resource=EDUCATION,
-    write_user_dep=current_active_user,
-    write_authz=assert_owner_or_admin,
-    create_adapter=education_create_adapter,
-    update_adapter=education_update_adapter,
-    read_to_dict=_education_read_dict,
-    create_redirect=_provider_subresource_redirect,
-    update_redirect=_provider_subresource_redirect,
-    delete_redirect=_provider_subresource_redirect,
-    parent=PROVIDER_SPEC,
-)
-CERTIFICATION_SPEC = ResourceSpec(
-    collection="certifications",
-    id_param="certification_id",
-    repo_dep=get_provider_repository,
-    audit_resource=CERTIFICATION,
-    write_user_dep=current_active_user,
-    write_authz=assert_owner_or_admin,
-    create_adapter=certification_create_adapter,
-    update_adapter=certification_update_adapter,
-    read_to_dict=_certification_read_dict,
-    create_redirect=_provider_subresource_redirect,
-    update_redirect=_provider_subresource_redirect,
-    delete_redirect=_provider_subresource_redirect,
-    parent=PROVIDER_SPEC,
-)
 
 
 for _spec, _create, _update, _delete in (

@@ -395,6 +395,7 @@ async def test_list_user_providers_404_when_target_user_missing(
 # --- handle_create_provider ----------------------------------------------
 
 
+# PHASE2_REDUNDANT: framework-shaped — generic mount_create + audit row.
 async def test_create_provider_persists_row_and_writes_audit(
     db_test_session_manager: async_sessionmaker[AsyncSession],
 ):
@@ -500,6 +501,7 @@ async def test_create_provider_allows_multiple_per_user(
 # --- handle_update_provider ----------------------------------------------
 
 
+# PHASE2_REDUNDANT: framework-shaped — generic mount_update + audit row.
 async def test_update_provider_updates_fields_and_writes_audit(
     db_test_session_manager: async_sessionmaker[AsyncSession],
 ):
@@ -529,6 +531,7 @@ async def test_update_provider_updates_fields_and_writes_audit(
     assert rows[0].after["practice_name"] == "New Name"
 
 
+# PHASE2_REDUNDANT: framework-shaped — write_authz wiring on mount_update.
 async def test_update_provider_403_for_non_owner(
     db_test_session_manager: async_sessionmaker[AsyncSession],
 ):
@@ -596,6 +599,7 @@ async def test_update_provider_404_for_unknown_id(
 # --- handle_delete_provider ----------------------------------------------
 
 
+# PHASE2_REDUNDANT: framework-shaped — generic mount_delete + audit row.
 async def test_delete_provider_removes_row_and_writes_audit(
     db_test_session_manager: async_sessionmaker[AsyncSession],
 ):
@@ -648,6 +652,7 @@ async def test_delete_provider_403_for_non_owner(
 # --- Licensure handlers -------------------------------------------------
 
 
+# PHASE2_REDUNDANT: framework-shaped — subrow mount_create + parent-chain audit.
 async def test_create_licensure_attaches_to_provider_and_audits(
     db_test_session_manager: async_sessionmaker[AsyncSession],
 ):
@@ -700,6 +705,7 @@ async def test_create_licensure_403_for_non_owner(
             )
 
 
+# PHASE2_REDUNDANT: framework-shaped — subrow mount_update + before/after audit shape.
 async def test_update_licensure_audits_before_after(
     db_test_session_manager: async_sessionmaker[AsyncSession],
 ):
@@ -757,6 +763,7 @@ async def test_update_licensure_404_when_sub_row_belongs_to_other_provider(
             )
 
 
+# PHASE2_REDUNDANT: framework-shaped — subrow mount_delete + audit shape.
 async def test_delete_licensure_removes_row_and_audits(
     db_test_session_manager: async_sessionmaker[AsyncSession],
 ):

@@ -24,8 +24,12 @@ from fastapi import Request
 from pydantic import BaseModel
 
 from src.api.common.exceptions import ForbiddenError, NotFoundError
+from src.api.common.specs.provider import PROVIDER_ENTITY
+from src.api.common.specs.provider_certification import CERTIFICATION_ENTITY
+from src.api.common.specs.provider_education import EDUCATION_ENTITY
+from src.api.common.specs.provider_licensure import LICENSURE_ENTITY
 from src.logic._authz import assert_owner_or_admin, is_admin, is_owner
-from src.logic.audit import AuditAction, AuditedResource, make_snapshotter, mutate
+from src.logic.audit import AuditedResource, mutate
 from src.models import (
     Provider,
     ProviderCertification,
@@ -38,15 +42,11 @@ from src.repositories.favorites.user_favorite_repository import UserFavoriteRepo
 from src.repositories.providers.provider_repository import ProviderRepository
 from src.repositories.users.user_repository import UserRepository
 from src.schemas.providers.provider import (
-    ProviderAuditSnapshot,
-    ProviderCertificationAuditSnapshot,
     ProviderCertificationCreate,
     ProviderCertificationUpdate,
     ProviderCreate,
-    ProviderEducationAuditSnapshot,
     ProviderEducationCreate,
     ProviderEducationUpdate,
-    ProviderLicensureAuditSnapshot,
     ProviderLicensureCreate,
     ProviderLicensureUpdate,
     ProviderUpdate,
@@ -55,37 +55,19 @@ from src.schemas.providers.provider import (
 logger = logging.getLogger(__name__)
 
 
-# --- Audited-resource declarations ---------------------------------------
+# --- Audited-resource bindings -------------------------------------------
+#
+# The four declarations themselves now live in
+# `src/api/common/specs/<entity>.py`; these module-level constants are
+# thin re-exports so handler bodies can keep their existing
+# `resource=PROVIDER` / `resource=LICENSURE` shape without churn. The
+# spec is the source of truth.
 
 
-PROVIDER = AuditedResource(
-    type="provider",
-    snapshot=make_snapshotter(ProviderAuditSnapshot),
-    create=AuditAction.CREATE_PROVIDER,
-    update=AuditAction.UPDATE_PROVIDER,
-    delete=AuditAction.DELETE_PROVIDER,
-)
-LICENSURE = AuditedResource(
-    type="provider_licensure",
-    snapshot=make_snapshotter(ProviderLicensureAuditSnapshot),
-    create=AuditAction.CREATE_LICENSURE,
-    update=AuditAction.UPDATE_LICENSURE,
-    delete=AuditAction.DELETE_LICENSURE,
-)
-EDUCATION = AuditedResource(
-    type="provider_education",
-    snapshot=make_snapshotter(ProviderEducationAuditSnapshot),
-    create=AuditAction.CREATE_EDUCATION,
-    update=AuditAction.UPDATE_EDUCATION,
-    delete=AuditAction.DELETE_EDUCATION,
-)
-CERTIFICATION = AuditedResource(
-    type="provider_certification",
-    snapshot=make_snapshotter(ProviderCertificationAuditSnapshot),
-    create=AuditAction.CREATE_CERTIFICATION,
-    update=AuditAction.UPDATE_CERTIFICATION,
-    delete=AuditAction.DELETE_CERTIFICATION,
-)
+PROVIDER = PROVIDER_ENTITY.audit
+LICENSURE = LICENSURE_ENTITY.audit
+EDUCATION = EDUCATION_ENTITY.audit
+CERTIFICATION = CERTIFICATION_ENTITY.audit
 
 
 async def _load_provider_or_404(

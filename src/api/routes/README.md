@@ -10,7 +10,7 @@ Routes are **ultra-thin HTTP adapters** that handle request parsing, delegate to
 
 CRUD-shaped routes use the **unified `ResourceSpec` + opt-in `mount_*` grammar** in [`src/api/common/resource_routes.py`](../common/README.md#unified-resource-grammar). A resource declares its identity once (`ResourceSpec`) and opts into the operations it wants exposed via `mount_list` / `mount_detail` / `mount_form` / `mount_create` / `mount_update` / `mount_delete` / `mount_related_list`. Sub-resources nest via `parent=`. Routes that don't fit the grammar (auth flows, `/me/*` singletons, idempotent state setters, query-param-driven polymorphism, utility endpoints) stay hand-written — see [Bespoke routes](#bespoke-routes) below.
 
-Entities migrated to the `EntitySpec` pattern (phase 1 of #317; today just `users`) declare their identity once in [`src/api/common/specs/<entity>.py`](../common/README.md#entityspec) and derive the route-level `ResourceSpec` via `EntitySpec.to_resource_spec()`. Mount calls still take the `ResourceSpec`; the only difference is where the declaration lives. Unmigrated entities continue to declare `ResourceSpec` inline in their route file.
+Entities migrated to the `EntitySpec` pattern (phase 1 of #317; today: `users`, `providers`, and the three provider-owned credentials) declare their identity once in [`src/api/common/specs/<entity>.py`](../common/README.md#entityspec) and derive the route-level `ResourceSpec` via `EntitySpec.to_resource_spec()`. Mount calls still take the `ResourceSpec`; the only difference is where the declaration lives. Unmigrated entities continue to declare `ResourceSpec` inline in their route file.
 
 ### What we do
 
