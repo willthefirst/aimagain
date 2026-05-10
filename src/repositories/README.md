@@ -97,9 +97,9 @@ class [Entity]Repository(BaseRepository):
 
     async def list_[entities](self) -> Sequence[[Entity]]:
         """Lists all [entities] with appropriate ordering."""
-        stmt = select([Entity]).order_by([Entity].created_at.desc())
-        result = await self.session.execute(stmt)
-        return result.scalars().all()
+        return await self._list(
+            select([Entity]).order_by([Entity].created_at.desc())
+        )
 
     async def create_[entity](self, **kwargs) -> [Entity]:
         """Creates a new [entity] with the provided data."""
@@ -180,19 +180,22 @@ async def handle_create_entity(data, user, repo: [Entity]Repository):
 
 ### CRUD primitives on `BaseRepository`
 
-`BaseRepository` carries four protected primitives that capture the exact shapes every resource repo writes by hand. They own only the flush/refresh ritual; they never call `commit()`. Use them when your method body is one of these shapes plus *zero* other operations; otherwise write the body explicitly.
+`BaseRepository` carries protected primitives that capture the exact shapes every resource repo writes by hand. They own only the flush/refresh ritual; they never call `commit()`. Use them when your method body is one of these shapes plus *zero* other operations; otherwise write the body explicitly.
 
 | Primitive | Shape it captures |
 | --- | --- |
 | `_get_by_id(Model, id)` | `select(Model).filter(Model.id == id).scalars().first()` |
+| `_list(stmt, *, limit=None, offset=None)` | `execute(stmt); return result.scalars().all()` — generic on `T` so `_list(select(Post))` returns `Sequence[Post]`. Filter/order/join logic stays inline in the calling method; pagination kwargs are optional and default to "return everything." |
+| `_count(stmt)` | `select(func.count()).select_from(stmt.subquery()); return scalar_one()` — caller passes the same `select(...)` they'd pass to `_list`; filters, joins, and `.distinct()` are preserved by the subquery wrapper. |
 | `_persist_new(obj)` | `session.add(obj); flush; refresh; return obj` |
 | `_add_child(parent, "collection", child)` | `getattr(parent, "collection").append(child); flush; refresh(child); return child` |
 | `_patch(obj, **fields)` | skip-`None` `setattr` loop, then `flush; refresh; return obj` |
 | `_delete(obj)` | `session.delete(obj); flush` |
 
+`_list` and `_count` are the binding targets for pagination + total-count endpoints. The primitives are in place, but no endpoint adopts them today — each per-endpoint wire-contract decision (return `{items, total}`? thread `limit`/`offset`?) is independent of having the primitives exist.
+
 When *not* to delegate:
 
-- `list_X` queries (joins, filters, custom ordering) — write them out.
 - `get_X_by_<field>` lookups that are not by primary key — write them out.
 - `update_X` methods that need a richer skip predicate (e.g. `PostRepository.update_post`'s "skip fields not in this kind's spec") — write them out and document why.
 - Any flow that wires up multiple related rows in one flush — e.g. `PostRepository.create_post` calls `_attach_detail` before delegating to `_persist_new`, but the attachment itself stays explicit.
@@ -288,6 +291,7 @@ async def handle_list_entities_for_user(user: User, repo: [Entity]Repository):
 
 Colocated tests live alongside the repositories:
 
+- `test_base.py` — exercises `_list` (pagination via `limit` / `offset`, statement-order preservation, empty result) and `_count` (filters, joins with `.distinct()`); the other `BaseRepository` primitives are covered transitively by per-resource repo tests.
 - `test_audit_repository.py` — exercises append-only writes, FK `SET NULL` on actor delete, and list-by-resource ordering against the in-memory test DB.
 - `test_post_repository.py` — exercises parent + detail create/update/delete for every registered kind (`client_referral`, `provider_availability`), including a raw-SQL DELETE that proves the FK CASCADE fires (not just the ORM cascade). Also covers the `posts.kind` CHECK constraint rejecting unregistered kinds (including the retired `note` kind). Relies on `PRAGMA foreign_keys = ON` being set globally by the test engine fixture. Detail-row construction goes through `make_<kind>_detail` factories in [`tests/helpers.py`](../../tests/helpers.py) so spec-required fields are filled with valid defaults; tests override only what they're asserting on. Per-kind dispatch in `_attach_detail` and `update_post` is registry-driven via `POST_KINDS` / `POST_KIND_BY_DETAIL_MODEL` from [`src/models/posts/post_kinds.py`](../models/posts/post_kinds.py); the registry-consistency tests live with the registry, not here.
 - `test_provider_repository.py` — exercises `Provider` CRUD, cascade delete (parent + sub-rows gone in one shot), `list_providers` filtering through licensures (license_type, issuing_state, AND-composed, `.distinct()` de-dup), and CRUD round-trips for each sub-table (licensure, education, certification). Sub-row construction uses `make_provider_*` factories in [`tests/helpers.py`](../../tests/helpers.py).

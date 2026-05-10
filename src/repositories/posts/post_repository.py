@@ -39,9 +39,7 @@ class PostRepository(BaseRepository):
 
     async def list_posts(self) -> Sequence[Post]:
         """Lists all posts, newest first. Detail relationships are eager-loaded."""
-        stmt = select(Post).order_by(Post.created_at.desc())
-        result = await self.session.execute(stmt)
-        return result.scalars().all()
+        return await self._list(select(Post).order_by(Post.created_at.desc()))
 
     async def create_post(self, post: Post, detail: PostDetail) -> Post:
         """Persists a new post + its per-kind detail in one flush; the

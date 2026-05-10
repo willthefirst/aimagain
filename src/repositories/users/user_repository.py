@@ -41,8 +41,7 @@ class UserRepository(BaseRepository):
             stmt = stmt.filter(User.id != exclude_user.id)
 
         stmt = stmt.order_by(User.username)
-        result = await self.session.execute(stmt)
-        return result.scalars().all()
+        return await self._list(stmt)
 
     async def set_user_activation(self, user: User, *, is_active: bool) -> User:
         """Sets `is_active` on the user and flushes; the caller commits."""

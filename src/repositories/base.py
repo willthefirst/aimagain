@@ -12,11 +12,14 @@ method body explicitly — that domain-specific shape is exactly what the
 named per-resource methods are for.
 """
 
-from typing import Any
+from collections.abc import Sequence
+from typing import Any, TypeVar
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import Select, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
+
+T = TypeVar("T")
 
 
 class BaseRepository:
@@ -28,6 +31,45 @@ class BaseRepository:
         stmt = select(model).filter(model.id == obj_id)
         result = await self.session.execute(stmt)
         return result.scalars().first()
+
+    async def _list(
+        self,
+        stmt: Select[tuple[T]],
+        *,
+        limit: int | None = None,
+        offset: int | None = None,
+    ) -> Sequence[T]:
+        """Execute a `select(...)` statement and return its scalars.
+
+        Generic over the selected entity: `_list(select(Post))` returns
+        `Sequence[Post]`, verified by the type checker via `T`. Centralizes
+        the `result = await session.execute(stmt); return
+        result.scalars().all()` boilerplate every list-style method repeats.
+
+        `limit` and `offset` are optional kwargs — when both are `None`,
+        returns the full result set unchanged. Filter, order, and join
+        logic stay in the calling method (where the domain-specific shape
+        is most expressive).
+        """
+        if offset is not None:
+            stmt = stmt.offset(offset)
+        if limit is not None:
+            stmt = stmt.limit(limit)
+        result = await self.session.execute(stmt)
+        return result.scalars().all()
+
+    async def _count(self, stmt: Select[Any]) -> int:
+        """Count rows matching `stmt` without fetching them.
+
+        Wraps `select(func.count()).select_from(stmt.subquery())` so the
+        caller passes the same `select(...)` they'd pass to `_list`. The
+        subquery wrapper preserves filters, joins, and `.distinct()` — the
+        count reflects exactly the rows `_list` would return ignoring
+        pagination.
+        """
+        count_stmt = select(func.count()).select_from(stmt.subquery())
+        result = await self.session.execute(count_stmt)
+        return result.scalar_one()
 
     async def _persist_new(self, obj: Any) -> Any:
         """Add a fresh ORM instance, flush, and refresh; return the row.
