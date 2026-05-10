@@ -17,7 +17,7 @@ def _ck(column: str, values: tuple[str, ...]) -> CheckConstraint:
 
 class ProviderEducation(BaseModel):
     """One row per educational credential held by a provider. CASCADE on
-    the parent FK keeps the credential list in lockstep with the profile.
+    the parent FK keeps the credential list in lockstep with the `Provider`.
 
     `month_completed` is stored as a "YYYY-MM" string rather than a Date
     because the form captures month-precision only.

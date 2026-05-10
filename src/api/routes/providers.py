@@ -66,7 +66,7 @@ PROVIDER_SPEC = ResourceSpec(
     write_authz=assert_owner_or_admin,
     create_adapter=provider_create_adapter,
     update_adapter=provider_update_adapter,
-    read_to_dict=lambda profile: ProviderRead.model_validate(profile).model_dump(
+    read_to_dict=lambda provider: ProviderRead.model_validate(provider).model_dump(
         mode="json"
     ),
     list_template="providers/list.html",
@@ -91,7 +91,7 @@ def _certification_read_dict(row) -> dict:
     return ProviderCertificationRead.model_validate(row).model_dump(mode="json")
 
 
-# --- Profile collection routes ------------------------------------------
+# --- Provider collection routes ------------------------------------------
 
 # GET /providers — authenticated listing with optional license_type /
 # issuing_state filters.
@@ -117,7 +117,7 @@ mount_create(
 # --- Form routes --------------------------------------------------------
 # Mounted before `/{provider_id}` so the literal `form` segment is not
 # parsed as a UUID. Two form templates: `new.html` (create) and
-# `edit.html` (edit, identifies the profile from the URL id).
+# `edit.html` (edit, identifies the provider from the URL id).
 mount_form(
     router,
     PROVIDER_SPEC,
@@ -133,7 +133,7 @@ mount_form(
 )
 
 
-# --- Profile item routes ------------------------------------------------
+# --- Provider item routes ------------------------------------------------
 
 # GET /providers/{provider_id} — detail page.
 mount_detail(router, PROVIDER_SPEC, handler=handle_get_provider_detail)

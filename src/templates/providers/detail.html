@@ -1,7 +1,7 @@
 {% extends "base.html" %}
-{% block title %}Provider: {{ profile.practice_name }}{% endblock %}
+{% block title %}Provider: {{ provider.practice_name }}{% endblock %}
 {% block content %}
-<h1>{{ profile.practice_name }}</h1>
+<h1>{{ provider.practice_name }}</h1>
 
 {# `can_edit` is computed by handle_get_provider_detail; templates do
    not re-derive authorization predicates inline. #}
@@ -9,12 +9,12 @@
 <section>
   <h2>Practice</h2>
   <dl>
-    <dt>Practice name</dt><dd>{{ profile.practice_name }}</dd>
-    <dt>City</dt><dd>{{ profile.location_city }}</dd>
-    <dt>State</dt><dd>{{ profile.location_state }}</dd>
-    <dt>ZIP</dt><dd>{{ profile.location_zip }}</dd>
-    <dt>In-person sessions</dt><dd>{{ LOCATION_AVAILABILITY_LABELS[profile.in_person_sessions] }}</dd>
-    <dt>Virtual sessions</dt><dd>{{ LOCATION_AVAILABILITY_LABELS[profile.virtual_sessions] }}</dd>
+    <dt>Practice name</dt><dd>{{ provider.practice_name }}</dd>
+    <dt>City</dt><dd>{{ provider.location_city }}</dd>
+    <dt>State</dt><dd>{{ provider.location_state }}</dd>
+    <dt>ZIP</dt><dd>{{ provider.location_zip }}</dd>
+    <dt>In-person sessions</dt><dd>{{ LOCATION_AVAILABILITY_LABELS[provider.in_person_sessions] }}</dd>
+    <dt>Virtual sessions</dt><dd>{{ LOCATION_AVAILABILITY_LABELS[provider.virtual_sessions] }}</dd>
   </dl>
 </section>
 
@@ -22,9 +22,9 @@
 
 <section>
   <h2>Licensures</h2>
-  {% if profile.licensures %}
+  {% if provider.licensures %}
   <ul class="licensures-list">
-    {%- for lic in profile.licensures %}
+    {%- for lic in provider.licensures %}
     <li>
       <strong>{{ LICENSE_TYPES_LABELS[lic.license_type] }}</strong>
       &mdash; {{ lic.license_number }} ({{ lic.issuing_state }}){% if lic.expiration_date %}, expires {{ lic.expiration_date }}{% endif %}
@@ -40,9 +40,9 @@
 
 <section>
   <h2>Education</h2>
-  {% if profile.educations %}
+  {% if provider.educations %}
   <ul class="educations-list">
-    {%- for edu in profile.educations %}
+    {%- for edu in provider.educations %}
     <li>
       <strong>{{ EDUCATION_TYPES_LABELS[edu.education_type] }}</strong>
       &mdash; {{ edu.institution }}{% if edu.month_completed %}, {{ edu.month_completed }}{% endif %}
@@ -58,9 +58,9 @@
 
 <section>
   <h2>Certifications</h2>
-  {% if profile.certifications %}
+  {% if provider.certifications %}
   <ul class="certifications-list">
-    {%- for cert in profile.certifications %}
+    {%- for cert in provider.certifications %}
     <li>
       <strong>{{ CERTIFICATION_TYPES_LABELS[cert.certification_type] }}</strong>
       &mdash; {{ cert.certifying_body }}{% if cert.expiration_date %}, expires {{ cert.expiration_date }}{% endif %}
@@ -74,7 +74,7 @@
 
 <hr />
 {% if can_edit %}
-<a href="/providers/{{ profile.id }}/form">Edit profile</a> |
+<a href="/providers/{{ provider.id }}/form">Edit provider</a> |
 {% endif %}
-<a href="/providers">Back to profiles</a>
+<a href="/providers">Back to providers</a>
 {% endblock %}

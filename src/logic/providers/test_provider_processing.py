@@ -94,12 +94,12 @@ async def _seed_provider(
     with_education: bool = False,
     with_certification: bool = False,
 ) -> tuple[uuid.UUID, uuid.UUID | None, uuid.UUID | None, uuid.UUID | None]:
-    profile = make_provider(user_id=user_id)
+    provider = make_provider(user_id=user_id)
     async with db_test_session_manager() as session:
         async with session.begin():
-            session.add(profile)
-        await session.refresh(profile)
-        provider_id = profile.id
+            session.add(provider)
+        await session.refresh(provider)
+        provider_id = provider.id
 
     licensure_id: uuid.UUID | None = None
     education_id: uuid.UUID | None = None
@@ -128,7 +128,7 @@ async def _seed_provider(
     return provider_id, licensure_id, education_id, certification_id
 
 
-def _profile_create_payload(**overrides) -> ProviderCreate:
+def _provider_create_payload(**overrides) -> ProviderCreate:
     base = dict(
         practice_name="Acme Health",
         location_city="Springfield",
@@ -155,10 +155,10 @@ async def _audit_rows_for(
         return list(rows)
 
 
-# --- Profile reads -------------------------------------------------------
+# --- Provider reads -------------------------------------------------------
 
 
-async def test_list_providers_returns_persisted_profiles(
+async def test_list_providers_returns_persisted_rows(
     db_test_session_manager: async_sessionmaker[AsyncSession],
 ):
     user_a = await _seed_user(db_test_session_manager)
@@ -169,7 +169,7 @@ async def test_list_providers_returns_persisted_profiles(
     async with db_test_session_manager() as session:
         repo = ProviderRepository(session)
         context = await handle_list_providers(request=_fake_request(), repo=repo)
-        assert len(context["profiles"]) == 2
+        assert len(context["providers"]) == 2
         assert context["selected_license_type"] is None
         assert context["selected_issuing_state"] is None
 
@@ -179,15 +179,15 @@ async def test_list_providers_filters_by_license_type(
 ):
     user_a = await _seed_user(db_test_session_manager)
     user_b = await _seed_user(db_test_session_manager)
-    profile_a, *_ = await _seed_provider(
+    provider_a, *_ = await _seed_provider(
         db_test_session_manager, user_id=user_a.id, with_licensure=True
     )
-    profile_b, *_ = await _seed_provider(db_test_session_manager, user_id=user_b.id)
-    # Add a non-matching licensure to profile_b
+    provider_b, *_ = await _seed_provider(db_test_session_manager, user_id=user_b.id)
+    # Add a non-matching licensure to provider_b
     async with db_test_session_manager() as session:
         async with session.begin():
             session.add(
-                make_provider_licensure(provider_id=profile_b, license_type="lpc")
+                make_provider_licensure(provider_id=provider_b, license_type="lpc")
             )
 
     async with db_test_session_manager() as session:
@@ -195,7 +195,7 @@ async def test_list_providers_filters_by_license_type(
         context = await handle_list_providers(
             request=_fake_request(), repo=repo, license_type="lcsw"
         )
-        assert [p.id for p in context["profiles"]] == [profile_a]
+        assert [p.id for p in context["providers"]] == [provider_a]
         assert context["selected_license_type"] == "lcsw"
 
 
@@ -213,12 +213,12 @@ async def test_get_provider_detail_returns_context(
             repo=repo,
             requesting_user=user,
         )
-        assert context["profile"].id == provider_id
+        assert context["provider"].id == provider_id
         assert context["current_user"] is user
         assert "request" in context
-        # Owner viewing own profile → can_edit True. Non-owner / admin
+        # Owner viewing own provider → can_edit True. Non-owner / admin
         # cases are exercised at the route level
-        # (test_get_profile_hides_edit_link_for_non_owner et al.).
+        # (test_get_provider_hides_edit_link_for_non_owner et al.).
         assert context["can_edit"] is True
 
 
@@ -248,19 +248,19 @@ async def test_list_user_providers_self_returns_owned(
     second_id, *_ = await _seed_provider(db_test_session_manager, user_id=user.id)
 
     async with db_test_session_manager() as session:
-        profile_repo = ProviderRepository(session)
+        provider_repo = ProviderRepository(session)
         user_repo = UserRepository(session)
         context = await handle_list_user_providers(
             request=_fake_request(),
             user_id=user.id,
-            repo=profile_repo,
+            repo=provider_repo,
             user_repo=user_repo,
             requesting_user=user,
         )
 
     assert context["is_self"] is True
     assert context["target_user"].id == user.id
-    assert {p.id for p in context["profiles"]} == {first_id, second_id}
+    assert {p.id for p in context["providers"]} == {first_id, second_id}
 
 
 async def test_list_user_providers_self_returns_empty_when_none(
@@ -269,18 +269,18 @@ async def test_list_user_providers_self_returns_empty_when_none(
     user = await _seed_user(db_test_session_manager)
 
     async with db_test_session_manager() as session:
-        profile_repo = ProviderRepository(session)
+        provider_repo = ProviderRepository(session)
         user_repo = UserRepository(session)
         context = await handle_list_user_providers(
             request=_fake_request(),
             user_id=user.id,
-            repo=profile_repo,
+            repo=provider_repo,
             user_repo=user_repo,
             requesting_user=user,
         )
 
     assert context["is_self"] is True
-    assert list(context["profiles"]) == []
+    assert list(context["providers"]) == []
 
 
 async def test_list_user_providers_admin_can_view_anyone(
@@ -291,19 +291,19 @@ async def test_list_user_providers_admin_can_view_anyone(
     provider_id, *_ = await _seed_provider(db_test_session_manager, user_id=target.id)
 
     async with db_test_session_manager() as session:
-        profile_repo = ProviderRepository(session)
+        provider_repo = ProviderRepository(session)
         user_repo = UserRepository(session)
         context = await handle_list_user_providers(
             request=_fake_request(),
             user_id=target.id,
-            repo=profile_repo,
+            repo=provider_repo,
             user_repo=user_repo,
             requesting_user=admin,
         )
 
     assert context["is_self"] is False
     assert context["target_user"].id == target.id
-    assert [p.id for p in context["profiles"]] == [provider_id]
+    assert [p.id for p in context["providers"]] == [provider_id]
 
 
 async def test_list_user_providers_non_admin_cannot_view_other(
@@ -313,13 +313,13 @@ async def test_list_user_providers_non_admin_cannot_view_other(
     other = await _seed_user(db_test_session_manager)
 
     async with db_test_session_manager() as session:
-        profile_repo = ProviderRepository(session)
+        provider_repo = ProviderRepository(session)
         user_repo = UserRepository(session)
         with pytest.raises(ForbiddenError):
             await handle_list_user_providers(
                 request=_fake_request(),
                 user_id=target.id,
-                repo=profile_repo,
+                repo=provider_repo,
                 user_repo=user_repo,
                 requesting_user=other,
             )
@@ -331,13 +331,13 @@ async def test_list_user_providers_404_when_target_user_missing(
     admin = await _seed_user(db_test_session_manager, is_superuser=True)
 
     async with db_test_session_manager() as session:
-        profile_repo = ProviderRepository(session)
+        provider_repo = ProviderRepository(session)
         user_repo = UserRepository(session)
         with pytest.raises(NotFoundError):
             await handle_list_user_providers(
                 request=_fake_request(),
                 user_id=uuid.uuid4(),
-                repo=profile_repo,
+                repo=provider_repo,
                 user_repo=user_repo,
                 requesting_user=admin,
             )
@@ -346,11 +346,11 @@ async def test_list_user_providers_404_when_target_user_missing(
 # --- handle_create_provider ----------------------------------------------
 
 
-async def test_create_profile_persists_row_and_writes_audit(
+async def test_create_provider_persists_row_and_writes_audit(
     db_test_session_manager: async_sessionmaker[AsyncSession],
 ):
     user = await _seed_user(db_test_session_manager)
-    payload = _profile_create_payload()
+    payload = _provider_create_payload()
 
     async with db_test_session_manager() as session:
         repo = ProviderRepository(session)
@@ -372,11 +372,11 @@ async def test_create_profile_persists_row_and_writes_audit(
     assert rows[0].after["practice_name"] == "Acme Health"
 
 
-async def test_create_profile_with_inline_children_captures_them_in_audit(
+async def test_create_provider_with_inline_children_captures_them_in_audit(
     db_test_session_manager: async_sessionmaker[AsyncSession],
 ):
     user = await _seed_user(db_test_session_manager)
-    payload = _profile_create_payload(
+    payload = _provider_create_payload(
         licensures=[
             ProviderLicensureCreate(
                 license_type="lcsw", license_number="L-1", issuing_state="IL"
@@ -425,10 +425,10 @@ async def test_create_profile_with_inline_children_captures_them_in_audit(
         assert len(licensures) == 1
 
 
-async def test_create_profile_allows_multiple_per_user(
+async def test_create_provider_allows_multiple_per_user(
     db_test_session_manager: async_sessionmaker[AsyncSession],
 ):
-    """A user may own multiple profiles. The handler creates a second profile
+    """A user may own multiple providers. The handler creates a second provider
     successfully without surfacing the previously-enforced 1:1 rejection."""
     user = await _seed_user(db_test_session_manager)
     first_id, *_ = await _seed_provider(db_test_session_manager, user_id=user.id)
@@ -437,7 +437,7 @@ async def test_create_profile_allows_multiple_per_user(
         repo = ProviderRepository(session)
         audit_repo = AuditRepository(session)
         second = await handle_create_provider(
-            _profile_create_payload(practice_name="Second Practice"),
+            _provider_create_payload(practice_name="Second Practice"),
             repo,
             audit_repo,
             user,
@@ -451,7 +451,7 @@ async def test_create_profile_allows_multiple_per_user(
 # --- handle_update_provider ----------------------------------------------
 
 
-async def test_update_profile_updates_fields_and_writes_audit(
+async def test_update_provider_updates_fields_and_writes_audit(
     db_test_session_manager: async_sessionmaker[AsyncSession],
 ):
     user = await _seed_user(db_test_session_manager)
@@ -480,7 +480,7 @@ async def test_update_profile_updates_fields_and_writes_audit(
     assert rows[0].after["practice_name"] == "New Name"
 
 
-async def test_update_profile_403_for_non_owner(
+async def test_update_provider_403_for_non_owner(
     db_test_session_manager: async_sessionmaker[AsyncSession],
 ):
     owner = await _seed_user(db_test_session_manager)
@@ -500,7 +500,7 @@ async def test_update_profile_403_for_non_owner(
             )
 
 
-async def test_update_profile_succeeds_for_superuser(
+async def test_update_provider_succeeds_for_superuser(
     db_test_session_manager: async_sessionmaker[AsyncSession],
 ):
     owner = await _seed_user(db_test_session_manager)
@@ -527,7 +527,7 @@ async def test_update_profile_succeeds_for_superuser(
     assert rows[0].actor_id == admin.id
 
 
-async def test_update_profile_404_for_unknown_id(
+async def test_update_provider_404_for_unknown_id(
     db_test_session_manager: async_sessionmaker[AsyncSession],
 ):
     user = await _seed_user(db_test_session_manager)
@@ -547,7 +547,7 @@ async def test_update_profile_404_for_unknown_id(
 # --- handle_delete_provider ----------------------------------------------
 
 
-async def test_delete_profile_removes_row_and_writes_audit(
+async def test_delete_provider_removes_row_and_writes_audit(
     db_test_session_manager: async_sessionmaker[AsyncSession],
 ):
     user = await _seed_user(db_test_session_manager)
@@ -560,7 +560,7 @@ async def test_delete_profile_removes_row_and_writes_audit(
         audit_repo = AuditRepository(session)
         await handle_delete_provider(provider_id, repo, audit_repo, user)
 
-    # Profile and cascaded sub-row both gone.
+    # Provider and cascaded sub-row both gone.
     async with db_test_session_manager() as session:
         assert (
             await session.execute(select(Provider).filter(Provider.id == provider_id))
@@ -582,7 +582,7 @@ async def test_delete_profile_removes_row_and_writes_audit(
     assert len(rows[0].before["licensures"]) == 1
 
 
-async def test_delete_profile_403_for_non_owner(
+async def test_delete_provider_403_for_non_owner(
     db_test_session_manager: async_sessionmaker[AsyncSession],
 ):
     owner = await _seed_user(db_test_session_manager)
@@ -599,7 +599,7 @@ async def test_delete_profile_403_for_non_owner(
 # --- Licensure handlers -------------------------------------------------
 
 
-async def test_create_licensure_attaches_to_profile_and_audits(
+async def test_create_licensure_attaches_to_provider_and_audits(
     db_test_session_manager: async_sessionmaker[AsyncSession],
 ):
     user = await _seed_user(db_test_session_manager)
@@ -682,24 +682,24 @@ async def test_update_licensure_audits_before_after(
     assert rows[0].after["license_number"] == "L-NEW"
 
 
-async def test_update_licensure_404_when_sub_row_belongs_to_other_profile(
+async def test_update_licensure_404_when_sub_row_belongs_to_other_provider(
     db_test_session_manager: async_sessionmaker[AsyncSession],
 ):
     user_a = await _seed_user(db_test_session_manager)
     user_b = await _seed_user(db_test_session_manager)
-    profile_a, *_ = await _seed_provider(db_test_session_manager, user_id=user_a.id)
-    profile_b, lic_b, *_ = await _seed_provider(
+    provider_a, *_ = await _seed_provider(db_test_session_manager, user_id=user_a.id)
+    provider_b, lic_b, *_ = await _seed_provider(
         db_test_session_manager, user_id=user_b.id, with_licensure=True
     )
 
-    # user_a tries to update lic_b via profile_a — should 404, not 403, since
+    # user_a tries to update lic_b via provider_a — should 404, not 403, since
     # the URL claims a sub-row that doesn't belong to the named parent.
     async with db_test_session_manager() as session:
         repo = ProviderRepository(session)
         audit_repo = AuditRepository(session)
         with pytest.raises(NotFoundError):
             await handle_update_licensure(
-                profile_a,
+                provider_a,
                 lic_b,
                 ProviderLicensureUpdate(license_number="L-X"),
                 repo,

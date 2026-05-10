@@ -43,7 +43,7 @@ def _now() -> datetime:
     return datetime.now(timezone.utc)
 
 
-def _profile_create_kwargs(**overrides):
+def _provider_create_kwargs(**overrides):
     """Minimum-valid kwargs for `ProviderCreate`."""
     base = {
         "practice_name": "Sunrise Counseling",
@@ -94,20 +94,20 @@ def test_certification_create_rejects_unknown_certification_type():
         )
 
 
-def test_profile_create_rejects_invalid_in_person_sessions():
+def test_provider_create_rejects_invalid_in_person_sessions():
     with pytest.raises(ValidationError):
         ProviderCreate(
-            **_profile_create_kwargs(in_person_sessions="maybe"),
+            **_provider_create_kwargs(in_person_sessions="maybe"),
         )
 
 
 # --- extra="forbid" -----------------------------------------------------
 
 
-def test_profile_create_rejects_unknown_field():
+def test_provider_create_rejects_unknown_field():
     with pytest.raises(ValidationError):
         ProviderCreate(
-            **_profile_create_kwargs(),
+            **_provider_create_kwargs(),
             stray_field="boom",
         )
 
@@ -139,7 +139,7 @@ def test_update_requires_at_least_one_field(model_cls):
         model_cls()
 
 
-def test_profile_update_accepts_single_field():
+def test_provider_update_accepts_single_field():
     """Sanity check: setting one field is enough — the rule fires only
     when *every* field is `None`."""
     upd = ProviderUpdate(practice_name="New Name")
@@ -150,20 +150,20 @@ def test_profile_update_accepts_single_field():
 # --- Create payload smoke tests -----------------------------------------
 
 
-def test_profile_create_strips_practice_name():
-    p = ProviderCreate(**_profile_create_kwargs(practice_name="  Sunrise  "))
+def test_provider_create_strips_practice_name():
+    p = ProviderCreate(**_provider_create_kwargs(practice_name="  Sunrise  "))
     assert p.practice_name == "Sunrise"
 
 
-def test_profile_create_rejects_non_5_digit_zip():
+def test_provider_create_rejects_non_5_digit_zip():
     """Smoke test that the imported `ZipText` alias is wired up."""
     with pytest.raises(ValidationError):
-        ProviderCreate(**_profile_create_kwargs(location_zip="123"))
+        ProviderCreate(**_provider_create_kwargs(location_zip="123"))
 
 
-def test_profile_create_accepts_nested_credential_lists():
+def test_provider_create_accepts_nested_credential_lists():
     p = ProviderCreate(
-        **_profile_create_kwargs(),
+        **_provider_create_kwargs(),
         licensures=[
             {
                 "license_type": "lcsw",
@@ -184,8 +184,8 @@ def test_profile_create_accepts_nested_credential_lists():
     assert p.certifications[0].certification_type == "emdr"
 
 
-def test_profile_create_defaults_credential_lists_to_empty():
-    p = ProviderCreate(**_profile_create_kwargs())
+def test_provider_create_defaults_credential_lists_to_empty():
+    p = ProviderCreate(**_provider_create_kwargs())
     assert p.licensures == []
     assert p.educations == []
     assert p.certifications == []
@@ -194,7 +194,7 @@ def test_profile_create_defaults_credential_lists_to_empty():
 # --- Read from nested dict ----------------------------------------------
 
 
-def test_profile_read_validates_from_nested_dict():
+def test_provider_read_validates_from_nested_dict():
     """`ProviderRead.model_validate` should construct the nested
     sub-entity Read schemas without needing real ORM objects."""
     provider_id = uuid.uuid4()
@@ -246,13 +246,13 @@ def test_profile_read_validates_from_nested_dict():
         ],
     }
 
-    profile = ProviderRead.model_validate(payload)
+    provider = ProviderRead.model_validate(payload)
 
-    assert profile.practice_name == "Sunrise"
-    assert len(profile.licensures) == 1
-    assert profile.licensures[0].license_type == "lcsw"
-    assert profile.educations[0].month_completed == "2010-05"
-    assert profile.certifications[0].expiration_date is None
+    assert provider.practice_name == "Sunrise"
+    assert len(provider.licensures) == 1
+    assert provider.licensures[0].license_type == "lcsw"
+    assert provider.educations[0].month_completed == "2010-05"
+    assert provider.certifications[0].expiration_date is None
 
 
 # --- Schema-literal vs model-tuple guardrail ----------------------------

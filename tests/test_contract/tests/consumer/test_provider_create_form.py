@@ -7,7 +7,7 @@ Verifies that the HTMX-decorated form rendered by
 availability fields the route's `ProviderCreate` schema expects.
 The contract surface is the form wiring (method, path, Content-Type,
 field names) — the response on success is a 201 with `HX-Redirect` to
-the new profile.
+the new provider.
 """
 
 import pytest

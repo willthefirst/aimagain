@@ -102,7 +102,7 @@ class AuditedResource:
 
     Module-level constants are the intended use:
 
-        PROFILE = AuditedResource(
+        PROVIDER = AuditedResource(
             type="provider_profile",
             snapshot=lambda obj: ProviderAuditSnapshot
                 .model_validate(obj).model_dump(mode="json"),
@@ -111,7 +111,7 @@ class AuditedResource:
             delete=AuditAction.DELETE_PROVIDER,
         )
 
-    Each handler then calls `record_audit_for(audit_repo, resource=PROFILE,
+    Each handler then calls `record_audit_for(audit_repo, resource=PROVIDER,
     verb="update", ...)` instead of typing `resource_type=`, `action=`, and
     a per-resource `_snapshot_X` wrapper at every callsite.
 

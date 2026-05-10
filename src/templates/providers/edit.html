@@ -9,18 +9,18 @@
 
 <section>
   <h2>Practice</h2>
-  <form hx-patch="/providers/{{ profile.id }}">
+  <form hx-patch="/providers/{{ provider.id }}">
     <fieldset>
       <legend>Practice location</legend>
-      {{ text_field("practice_name", "Practice name", current=profile.practice_name, maxlength=200) }}
-      {{ text_field("location_city", "City", current=profile.location_city, maxlength=120) }}
-      {{ select_field("location_state", "State", US_STATES, current=profile.location_state) }}
-      {{ text_field("location_zip", "ZIP", current=profile.location_zip, pattern="\\d{5}", maxlength=5) }}
+      {{ text_field("practice_name", "Practice name", current=provider.practice_name, maxlength=200) }}
+      {{ text_field("location_city", "City", current=provider.location_city, maxlength=120) }}
+      {{ select_field("location_state", "State", US_STATES, current=provider.location_state) }}
+      {{ text_field("location_zip", "ZIP", current=provider.location_zip, pattern="\\d{5}", maxlength=5) }}
     </fieldset>
     <fieldset>
       <legend>Session availability</legend>
-      {{ select_field("in_person_sessions", "In-person sessions", LOCATION_AVAILABILITY_OPTIONS, labels=LOCATION_AVAILABILITY_LABELS, current=profile.in_person_sessions) }}
-      {{ select_field("virtual_sessions", "Virtual sessions", LOCATION_AVAILABILITY_OPTIONS, labels=LOCATION_AVAILABILITY_LABELS, current=profile.virtual_sessions) }}
+      {{ select_field("in_person_sessions", "In-person sessions", LOCATION_AVAILABILITY_OPTIONS, labels=LOCATION_AVAILABILITY_LABELS, current=provider.in_person_sessions) }}
+      {{ select_field("virtual_sessions", "Virtual sessions", LOCATION_AVAILABILITY_OPTIONS, labels=LOCATION_AVAILABILITY_LABELS, current=provider.virtual_sessions) }}
     </fieldset>
     <input type="submit" value="Save practice details" />
   </form>
@@ -30,15 +30,15 @@
 
 <section>
   <h2>Licensures</h2>
-  {% call(lic) list_or_empty(profile.licensures, "licensures-list", "No licensures yet.") %}
+  {% call(lic) list_or_empty(provider.licensures, "licensures-list", "No licensures yet.") %}
   <li>
     <strong>{{ LICENSE_TYPES_LABELS[lic.license_type] }}</strong>
     &mdash; {{ lic.license_number }} ({{ lic.issuing_state }}){% if lic.expiration_date %}, expires {{ lic.expiration_date }}{% endif %}
-    {{ confirm_delete_button("/providers/" ~ profile.id ~ "/licensures/" ~ lic.id, "Remove this licensure?") }}
+    {{ confirm_delete_button("/providers/" ~ provider.id ~ "/licensures/" ~ lic.id, "Remove this licensure?") }}
   </li>
   {% endcall %}
 
-  {% call inline_add_form("/providers/" ~ profile.id ~ "/licensures", "Add licensure", "Add licensure") %}
+  {% call inline_add_form("/providers/" ~ provider.id ~ "/licensures", "Add licensure", "Add licensure") %}
     {{ select_field("license_type", "License type", LICENSE_TYPES, labels=LICENSE_TYPES_LABELS, placeholder=true) }}
     {{ text_field("license_number", "License number", maxlength=120) }}
     {{ select_field("issuing_state", "Issuing state", US_STATES, placeholder=true) }}
@@ -50,15 +50,15 @@
 
 <section>
   <h2>Education</h2>
-  {% call(edu) list_or_empty(profile.educations, "educations-list", "No education entries yet.") %}
+  {% call(edu) list_or_empty(provider.educations, "educations-list", "No education entries yet.") %}
   <li>
     <strong>{{ EDUCATION_TYPES_LABELS[edu.education_type] }}</strong>
     &mdash; {{ edu.institution }}{% if edu.month_completed %}, {{ edu.month_completed }}{% endif %}
-    {{ confirm_delete_button("/providers/" ~ profile.id ~ "/educations/" ~ edu.id, "Remove this education entry?") }}
+    {{ confirm_delete_button("/providers/" ~ provider.id ~ "/educations/" ~ edu.id, "Remove this education entry?") }}
   </li>
   {% endcall %}
 
-  {% call inline_add_form("/providers/" ~ profile.id ~ "/educations", "Add education", "Add education") %}
+  {% call inline_add_form("/providers/" ~ provider.id ~ "/educations", "Add education", "Add education") %}
     {{ select_field("education_type", "Education type", EDUCATION_TYPES, labels=EDUCATION_TYPES_LABELS, placeholder=true) }}
     {{ text_field("institution", "Institution", maxlength=200) }}
     {{ text_field("month_completed", "Month completed (YYYY-MM)", required=false, pattern="\\d{4}-\\d{2}", maxlength=7) }}
@@ -69,15 +69,15 @@
 
 <section>
   <h2>Certifications</h2>
-  {% call(cert) list_or_empty(profile.certifications, "certifications-list", "No certifications yet.") %}
+  {% call(cert) list_or_empty(provider.certifications, "certifications-list", "No certifications yet.") %}
   <li>
     <strong>{{ CERTIFICATION_TYPES_LABELS[cert.certification_type] }}</strong>
     &mdash; {{ cert.certifying_body }}{% if cert.expiration_date %}, expires {{ cert.expiration_date }}{% endif %}
-    {{ confirm_delete_button("/providers/" ~ profile.id ~ "/certifications/" ~ cert.id, "Remove this certification?") }}
+    {{ confirm_delete_button("/providers/" ~ provider.id ~ "/certifications/" ~ cert.id, "Remove this certification?") }}
   </li>
   {% endcall %}
 
-  {% call inline_add_form("/providers/" ~ profile.id ~ "/certifications", "Add certification", "Add certification") %}
+  {% call inline_add_form("/providers/" ~ provider.id ~ "/certifications", "Add certification", "Add certification") %}
     {{ select_field("certification_type", "Certification type", CERTIFICATION_TYPES, labels=CERTIFICATION_TYPES_LABELS, placeholder=true) }}
     {{ text_field("certifying_body", "Certifying body", maxlength=200) }}
     {{ text_field("expiration_date", "Expiration date (YYYY-MM-DD)", required=false, pattern="\\d{4}-\\d{2}-\\d{2}", maxlength=10) }}
@@ -85,5 +85,5 @@
 </section>
 
 <hr />
-<a href="/providers">Back to profiles</a>
+<a href="/providers">Back to providers</a>
 {% endblock %}

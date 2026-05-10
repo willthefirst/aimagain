@@ -125,7 +125,7 @@ def make_provider_availability_detail(**overrides: Any) -> ProviderAvailabilityD
 # turns "I forgot the FK" into a `TypeError` at the factory call site
 # instead of a `NOT NULL` violation at flush time.
 
-_PROVIDER_PROFILE_DEFAULTS: dict[str, Any] = {
+_PROVIDER_DEFAULTS: dict[str, Any] = {
     "practice_name": "Acme Health",
     "location_city": "Springfield",
     "location_state": "IL",
@@ -167,7 +167,7 @@ def provider_payload(**overrides: Any) -> dict[str, Any]:
     """Build a wire-valid `POST /providers` form-encoded payload.
     Returns a fresh flat dict each call. Sub-entity arrays are intentionally
     omitted — credentials are added via the dedicated sub-resource endpoints."""
-    return _drop_none({**_PROVIDER_PROFILE_DEFAULTS, **overrides})
+    return _drop_none({**_PROVIDER_DEFAULTS, **overrides})
 
 
 def licensure_payload(**overrides: Any) -> dict[str, Any]:
@@ -187,7 +187,7 @@ def certification_payload(**overrides: Any) -> dict[str, Any]:
 
 def make_provider(*, user_id: UUID, **overrides: Any) -> Provider:
     """Build a `Provider` ORM row with CHECK-valid defaults."""
-    return Provider(user_id=user_id, **{**_PROVIDER_PROFILE_DEFAULTS, **overrides})
+    return Provider(user_id=user_id, **{**_PROVIDER_DEFAULTS, **overrides})
 
 
 def make_provider_licensure(

@@ -24,7 +24,7 @@ async def test_base_template_renders_primary_nav_when_authenticated(
     logged_in_user: User,
 ):
     """Authenticated pages include nav links to the main sections plus the
-    `/users/me` shortcut to the viewer's own profile."""
+    `/users/me` shortcut to the viewer's own user page."""
     response = await authenticated_client.get("/users")
 
     assert response.status_code == 200
@@ -244,7 +244,7 @@ async def test_detail_lists_owned_providers(
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user: User,
 ):
-    """User with multiple profiles → all are linked from the detail page."""
+    """User with multiple providers → all are linked from the detail page."""
     target = create_test_user(username=f"target-{uuid.uuid4()}")
     async with db_test_session_manager() as session:
         async with session.begin():
@@ -506,12 +506,12 @@ async def _seed_user_provider(
     user_id: uuid.UUID,
     practice_name: str,
 ) -> uuid.UUID:
-    profile = make_provider(user_id=user_id, practice_name=practice_name)
+    provider = make_provider(user_id=user_id, practice_name=practice_name)
     async with db_test_session_manager() as session:
         async with session.begin():
-            session.add(profile)
-        await session.refresh(profile)
-        return profile.id
+            session.add(provider)
+        await session.refresh(provider)
+        return provider.id
 
 
 async def test_get_my_providers_empty_state(
@@ -519,7 +519,7 @@ async def test_get_my_providers_empty_state(
     logged_in_user: User,
 ):
     """`GET /users/me/providers` renders the empty state when the
-    current user owns no profiles."""
+    current user owns no providers."""
     response = await authenticated_client.get("/users/me/providers")
 
     assert response.status_code == 200

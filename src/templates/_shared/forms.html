@@ -11,7 +11,7 @@ hand-rolled — this macro deliberately covers only the single-fieldset
 case.
 
 Example:
-  {% call inline_add_form("/providers/" ~ profile.id ~ "/licensures",
+  {% call inline_add_form("/providers/" ~ provider.id ~ "/licensures",
                           "Add licensure", "Add licensure") %}
     {{ select_field(...) }}
     {{ text_field(...) }}

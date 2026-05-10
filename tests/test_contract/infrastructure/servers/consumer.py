@@ -178,7 +178,7 @@ def _setup_provider_create_form_stub(app: FastAPI) -> None:
 
 def _setup_provider_edit_form_stub(app: FastAPI) -> None:
     """Mount a stub page that renders the real `providers/edit.html`
-    template with a hardcoded profile, so the practice-fields PATCH form is
+    template with a hardcoded provider, so the practice-fields PATCH form is
     exercised without needing a database. The contract surface is the form's
     `PATCH /providers/{id}` request shape.
     """
@@ -189,7 +189,7 @@ def _setup_provider_edit_form_stub(app: FastAPI) -> None:
 
     @app.get("/providers/{provider_id}/form")
     async def provider_edit_form_stub_page(request: Request, provider_id: uuid.UUID):
-        profile = _StubAttrs(
+        provider = _StubAttrs(
             id=provider_id,
             practice_name="Acme Counseling",
             location_city="Brooklyn",
@@ -208,7 +208,7 @@ def _setup_provider_edit_form_stub(app: FastAPI) -> None:
         )
         return APIResponse.html_response(
             template_name="providers/edit.html",
-            context={"profile": profile, "current_user": current_user},
+            context={"provider": provider, "current_user": current_user},
             request=request,
         )
 

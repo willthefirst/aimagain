@@ -7,7 +7,7 @@ Single source of truth for the small enums that DB columns use as
   `provider_availability_detail`) use `US_STATES`, the location/age/
   language/insurance vocabularies, the `DESIRED_TIME_*` axes, and the
   service/treatment-setting vocabularies.
-- `provider_profile` and its sub-records (`provider_licensure`,
+- `Provider` and its sub-records (`provider_licensure`,
   `provider_education`, `provider_certification`) use `US_STATES`,
   `LOCATION_AVAILABILITY_OPTIONS`, and the `LICENSE_TYPES` /
   `EDUCATION_TYPES` / `CERTIFICATION_TYPES` credential vocabularies.
