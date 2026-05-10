@@ -61,7 +61,7 @@ Each repository manages one primary domain entity with related data access opera
 
 Repositories follow the [cluster pattern](../README.md#domain-entities-and-the-cluster-pattern):
 
-- One cluster directory per domain entity (`<entity>/`). Each holds `<entity>_repository.py` (the repository class with its data-access methods) plus `test_<entity>_repository.py`. Per-entity query patterns, eager-loading choices, cascade behavior, and read filters live inside the cluster, with a `<entity>/README.md` if anything is non-obvious.
+- One cluster directory per domain entity (`<entity>/`). Each holds `<entity>_repository.py` (the repository class with its data-access methods). Clusters with non-obvious queries (eager-loading choices, ownership filters, soft-delete semantics, multi-step writes) earn a colocated `test_<entity>_repository.py` — `providers/test_provider_repository.py` is the worked example. Thin pass-through clusters whose methods are direct ORM wrappers can lean on route-level coverage; the test exists when a future reader would otherwise have to read the SQL to learn the contract. Per-entity query patterns, eager-loading choices, cascade behavior, and read filters live inside the cluster, with a `<entity>/README.md` if anything is non-obvious.
 - Parent-level shared tier:
   - `base.py` — `BaseRepository` generic with common session management. Every repository inherits from it.
   - `dependencies.py` — FastAPI `Depends()` providers that wire each repository to the request-scoped session. Adding a new repository means appending one provider here.

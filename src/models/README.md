@@ -89,7 +89,7 @@ Models follow the [cluster pattern](../README.md#domain-entities-and-the-cluster
 
 - One cluster directory per domain entity (`<entity>/`). Each holds the SQLAlchemy table classes for that entity (parent table, sub-records, type registries if discriminator-based) plus colocated tests. Per-entity schema specifics, relationships, cascade behavior, and any "adding a variant" recipe live inside the cluster, with a `<entity>/README.md` describing what's there.
 - Parent-level shared tier:
-  - `base.py` — `BaseModel` with common fields (id, timestamps, soft deletion). Every model inherits from it.
+  - `base.py` — `Base = declarative_base()` plus `BaseModel(Base)` with the common entity fields (`id` UUID PK, `created_at`, `updated_at`, `deleted_at`). Most domain entities inherit from `BaseModel`. The post-detail tables (`ClientReferralDetail`, `ProviderAvailabilityDetail`) inherit from `Base` directly: they have no surrogate `id` (their `post_id` PK doubles as the FK), no timestamps, no soft delete — their lifecycle is governed by FK CASCADE from the parent `Post`. The `from .base import Base` vs `from .base import BaseModel` line in each model file is the source of truth for which tier it sits in.
   - `enums.py` — Controlled-vocabulary tuples + `*_LABELS` dicts + a `check_in_tuple_sql` helper that renders DB-level `CHECK` fragments from a tuple. The single source of truth that schemas (`Literal[*TUPLE]`), form macros (Jinja globals), and DB constraints all derive from. Lives at the parent level because 2+ clusters depend on it — and is a *leaf* (no internal imports), so any cluster can import from it without cycling back through cluster code.
   - `audit_log.py` — Append-only mutation record. See [`api/routes/RESOURCE_GRAMMAR.md`](../api/routes/RESOURCE_GRAMMAR.md).
   - `__init__.py` — Re-exports model classes and constants. External code should always import from `src.models` (e.g. `from src.models import Post, REGISTERED_KINDS`); the `__init__.py` keeps that surface stable across cluster moves.
@@ -145,33 +145,6 @@ __all__ = [
 ```bash
 alembic revision --autogenerate -m "Add new_entity table"
 alembic upgrade head
-```
-
-### Basemodel inheritance pattern
-
-All models inherit from `BaseModel` for consistent structure:
-
-```python
-class BaseModel(declarative_base()):
-    __abstract__ = True
-
-    # UUID primary key
-    id = Column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
-
-    # Automatic audit timestamps
-    @declared_attr
-    def created_at(cls):
-        return Column(DateTime(timezone=True), nullable=False, server_default=func.now())
-
-    @declared_attr
-    def updated_at(cls):
-        return Column(DateTime(timezone=True), nullable=False,
-                     server_default=func.now(), onupdate=func.now())
-
-    # Soft deletion support
-    @declared_attr
-    def deleted_at(cls):
-        return Column(DateTime(timezone=True), nullable=True)
 ```
 
 ### Relationship definition pattern
