@@ -13,9 +13,11 @@ from src.api.common.resource_routes import (
 )
 from src.api.routes.providers import PROVIDER_SPEC
 from src.auth_config import current_active_user, current_admin_user
+from src.logic._authz import is_self_or_admin
 from src.logic.providers.provider_processing import handle_list_user_providers
 from src.logic.users.user_processing import (
     USER,
+    USER_PRIVATE_FIELDS,
     handle_delete_user,
     handle_get_user_detail,
     handle_list_users,
@@ -42,6 +44,14 @@ USER_SPEC = ResourceSpec(
     write_user_dep=current_admin_user,
     list_template="users/list.html",
     detail_template="users/detail.html",
+    # Field-level visibility: viewers outside `is_self_or_admin` see only
+    # public fields. The same tuple + predicate are applied by
+    # `project_view` inside `handle_get_user_detail`; declaring them on
+    # the spec makes the gating rule readable by any future cross-layer
+    # consumer (JSON endpoint, audit snapshot, OpenAPI doc). Template
+    # `{% if can_view_private %}` guard remains as defense in depth.
+    private_fields=USER_PRIVATE_FIELDS,
+    private_field_predicate=is_self_or_admin,
 )
 
 

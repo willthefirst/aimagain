@@ -30,6 +30,18 @@ def is_owner(obj, user: User | None, *, owner_attr: str = "owner_id") -> bool:
     return getattr(obj, owner_attr) == user.id
 
 
+def is_self_or_admin(actor: User | None, target) -> bool:
+    """True iff `actor` is authenticated and is either `target` itself or a superuser.
+
+    Distinct signature from `is_owner`: the resource *is* the user, not
+    an FK to one, so there is no `owner_attr` knob — equality is between
+    `actor.id` and `target.id` directly.
+    """
+    if actor is None:
+        return False
+    return actor.id == target.id or actor.is_superuser
+
+
 def assert_owner_or_admin(
     obj,
     user: User,

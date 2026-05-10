@@ -4,7 +4,8 @@ from uuid import UUID
 from fastapi import Request
 
 from src.api.common.exceptions import ForbiddenError, NotFoundError
-from src.logic._authz import is_admin
+from src.api.common.projections import project_view
+from src.logic._authz import is_admin, is_self_or_admin
 from src.logic.audit import (
     AuditAction,
     AuditedResource,
@@ -34,6 +35,14 @@ USER = AuditedResource(
     update=AuditAction.UPDATE_USER,
     delete=AuditAction.DELETE_USER,
 )
+
+# Field-level visibility: `email`, `is_active`, `is_verified` are gated
+# by `is_self_or_admin(actor, target)`. Declared here so both the
+# handler (which applies the projection) and the route layer (which
+# declares the same tuple on `USER_SPEC.private_fields` for any future
+# cross-layer reader) share one source of truth — keeping them aligned
+# without a circular import between logic and api/routes.
+USER_PRIVATE_FIELDS: tuple[str, ...] = ("email", "is_active", "is_verified")
 
 
 async def handle_list_users(
@@ -90,21 +99,18 @@ async def handle_get_user_detail(
     # the partial just checks the flag.
     is_self = requesting_user is not None and target.id == requesting_user.id
     can_admin_actions = is_admin(requesting_user) and not is_self
-    can_view_private = is_self or is_admin(requesting_user)
+    can_view_private = is_self_or_admin(requesting_user, target)
 
-    # Project target_user into a dict that omits private fields
-    # (email, is_active, is_verified) for viewers who aren't the user
-    # themselves or an admin. Defense in depth: a forgotten template
-    # guard can re-leak; a missing dict key can't. The same projection
-    # extends naturally to any future JSON endpoint on this resource.
-    target_view = {
-        "id": target.id,
-        "username": target.username,
-    }
-    if can_view_private:
-        target_view["email"] = target.email
-        target_view["is_active"] = target.is_active
-        target_view["is_verified"] = target.is_verified
+    # Project target_user into a dict that omits private fields for
+    # viewers outside the predicate. Defense in depth: a forgotten
+    # template guard can re-leak; a missing dict key can't.
+    target_view = project_view(
+        target,
+        public_fields=("id", "username"),
+        actor=requesting_user,
+        private_fields=USER_PRIVATE_FIELDS,
+        private_field_predicate=is_self_or_admin,
+    )
 
     return {
         "request": request,

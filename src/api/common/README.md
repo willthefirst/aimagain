@@ -68,6 +68,7 @@ Common utilities handle concerns that span multiple routes and domains.
 | **Decorators**  | Cross-cutting concerns | Error handling, logging                                         | BaseRouter (automatic)   |
 | **Exceptions**  | Error vocabulary       | API exception classes raised by logic; fastapi-users translator | Logic handlers, decorator |
 | **Forms**       | Form-encoded request glue | `parse_form_to_payload` and `validate_or_422`                | Route handlers that accept form-encoded bodies |
+| **projections** | View-projection with field-level visibility | `project_view(obj, public_fields, actor, private_fields, private_field_predicate)` — gate fields per viewer | Handlers building per-viewer response dicts (user detail today) |
 | **resource_routes** | Unified `ResourceSpec` grammar | Declare a resource once, opt into the operations to expose via `mount_*`; sub-resources nest via `parent=` | Route files for any CRUD-shaped resource (top-level and sub-resource) |
 
 ## Directory structure
@@ -79,6 +80,7 @@ Common utilities handle concerns that span multiple routes and domains.
 - `decorators.py` - Error handling and logging decorators applied to all routes
 - `exceptions.py` - `APIException` subclasses (`NotFoundError`, `ForbiddenError`, ...) raised by logic, plus the fastapi-users → HTTP translator
 - `forms.py` - HTTP-adapter primitives for request bodies: `parse_form_to_payload(request)` (form → dict, lists for repeated keys), `validate_or_422(adapter, payload_dict)` (run a `TypeAdapter`, translate `ValidationError` to 422 with `[{"loc","msg","type"}]`), and the back-to-back wrappers `parse_and_validate_form` / `parse_and_validate_json` (form-encoded vs. JSON body — state-axis subresources use the JSON variant). Home for any HTTP-adapter primitive that two or more route modules would otherwise import from each other.
+- `projections.py` - `project_view(obj, *, public_fields, actor, private_fields=(), private_field_predicate=None)` builds a dict of `public_fields` from `obj` and conditionally appends `private_fields` when `private_field_predicate(actor, obj)` is true. Used by handlers that gate fields per viewer (today: user detail, where `email` / `is_active` / `is_verified` are visible only to the user themselves or an admin). Defense in depth alongside template-level guards: omitting keys at projection time means a forgotten `{% if %}` cannot re-leak. `ResourceSpec.private_fields` / `private_field_predicate` store the same primitives as declarative metadata so future cross-layer readers (JSON endpoint, audit snapshot, OpenAPI doc) can read the rule without rediscovering it.
 - `resource_routes.py` - Unified `ResourceSpec` + opt-in `mount_*` grammar (covers top-level *and* sub-resource CRUD via `parent=`). See [Unified resource grammar](#unified-resource-grammar) below.
 
 **Package infrastructure:**
@@ -447,6 +449,7 @@ Colocated tests cover the helpers in this directory:
 
 - `test_responses.py` — `APIResponse`, `created_response`, `updated_response`, `deleted_response`, `refreshed_response`.
 - `test_resource_routes.py` — `ResourceSpec` + per-mount tests (covers sub-resource routes via `parent=` since slice 8 / #253). Add a test here whenever a new mount function lands or an existing one grows a knob.
+- `test_projections.py` — `project_view` (per-viewer field gating).
 - `test_middleware.py` — ASGI middleware (currently just `StripEmptyQueryParamsMiddleware`'s pair-stripping helper; integration coverage lives next to the routes it affects).
 
 Route-level tests under `../routes/` exercise the mounts indirectly via the resources that use them; the unit tests here cover spec validation, error handling at mount time, and the path-param wiring that the route-level tests can't easily isolate.

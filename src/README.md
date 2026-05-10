@@ -93,7 +93,7 @@ Everything else (schemas, models, templates) supports these main layers. There i
 | Layer            | Status   | Responsibility                                              | Example Files       | Dependencies                          |
 | ---------------- | -------- | ----------------------------------------------------------- | ------------------- | ------------------------------------- |
 | **API**          | active   | HTTP handling, routing, validation                          | `api/routes/*.py`   | Logic, Repositories, Schemas          |
-| **Logic**        | active   | Business logic, orchestration, transaction commit           | `logic/*.py`        | Repositories, Schemas, Models, API common exceptions |
+| **Logic**        | active   | Business logic, orchestration, transaction commit           | `logic/*.py`        | Repositories, Schemas, Models, API common exceptions + pure helpers (projections) |
 | **Repositories** | active   | Data access, queries                                        | `repositories/*.py` | Models, Database                      |
 | **Models**       | active   | Database schema, relationships                              | `models/*.py`       | SQLAlchemy                            |
 | **Schemas**      | active   | Request/response validation                                 | `schemas/*.py`      | Pydantic, Models (enums + registries only), Core (`form_fields.HtmlPattern` marker only) |
