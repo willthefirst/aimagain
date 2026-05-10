@@ -25,7 +25,7 @@ A Stop hook checks the diff at end-of-turn and surfaces a reminder when source f
 
 Each fact has exactly **one home**: the README closest to the code or config that the fact describes. Other docs link to it; they never restate it.
 
-- The CLI's command list lives in [`scripts/README.md`](scripts/README.md). Every other doc that wants to mention a command links there.
+- The CLI's command list is exposed by `dev --help` and `dev <command> --help`, generated from the argparse definitions in [`scripts/dev_cli.py`](scripts/dev_cli.py). Every other doc that wants to mention a command links to `dev --help`, not a hand-maintained restatement.
 - The layered architecture lives in [`src/README.md`](src/README.md). The root README and layer READMEs link there, not duplicate it.
 - A layer's behavior, conventions, and tests live in `src/<layer>/README.md`. Cross-references go upward via links.
 - Migrations live in [`alembic/README.md`](alembic/README.md). Deployment in [`deployment/README.md`](deployment/README.md). Testing conventions in [`tests/README.md`](tests/README.md).
@@ -50,7 +50,7 @@ This complements the [single-source-of-truth rule](#one-source-of-truth--link-do
 | --- | --- |
 | Architecture, layer responsibilities, dependency rules | [`src/README.md`](src/README.md) |
 | Resource URL grammar, lifecycle, subresource conventions | [`src/api/routes/RESOURCE_GRAMMAR.md`](src/api/routes/RESOURCE_GRAMMAR.md) |
-| CLI commands (`dev ...`) | [`scripts/README.md`](scripts/README.md) |
+| CLI commands (`dev ...`) | `dev --help` (source: [`scripts/dev_cli.py`](scripts/dev_cli.py)) |
 | Testing conventions, fixtures | [`tests/README.md`](tests/README.md) |
 | Database migrations | [`alembic/README.md`](alembic/README.md) |
 | Deployment | [`deployment/README.md`](deployment/README.md) |
