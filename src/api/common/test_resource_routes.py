@@ -154,6 +154,44 @@ def test_mount_delete_subresource_path_includes_parent_id():
     assert captured["repo"].name == "child_repo"
 
 
+def test_resource_spec_private_fields_without_predicate_raises():
+    """Declaring `private_fields` without a predicate would silently leak
+    them — the construction-time guard makes the misconfiguration loud."""
+    with pytest.raises(ValueError, match="private_field_predicate"):
+        ResourceSpec(
+            collection="widgets",
+            id_param="widget_id",
+            repo_dep=lambda: None,
+            private_fields=("secret",),
+            # private_field_predicate intentionally omitted
+        )
+
+
+def test_resource_spec_private_fields_with_predicate_constructs():
+    """Both set: construction succeeds and the fields round-trip."""
+    predicate = lambda actor, target: False  # noqa: E731
+    spec = ResourceSpec(
+        collection="widgets",
+        id_param="widget_id",
+        repo_dep=lambda: None,
+        private_fields=("secret",),
+        private_field_predicate=predicate,
+    )
+    assert spec.private_fields == ("secret",)
+    assert spec.private_field_predicate is predicate
+
+
+def test_resource_spec_no_private_fields_no_predicate_constructs():
+    """Default case (no private fields at all): predicate may stay None."""
+    spec = ResourceSpec(
+        collection="widgets",
+        id_param="widget_id",
+        repo_dep=lambda: None,
+    )
+    assert spec.private_fields == ()
+    assert spec.private_field_predicate is None
+
+
 def test_mount_delete_requires_write_user_dep():
     spec = ResourceSpec(
         collection="widgets",

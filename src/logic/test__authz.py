@@ -6,7 +6,12 @@ from types import SimpleNamespace
 import pytest
 
 from src.api.common.exceptions import ForbiddenError
-from src.logic._authz import assert_owner_or_admin, is_admin, is_owner
+from src.logic._authz import (
+    assert_owner_or_admin,
+    is_admin,
+    is_owner,
+    is_self_or_admin,
+)
 
 
 def _user(*, is_superuser: bool = False, id_=None):
@@ -60,6 +65,31 @@ def test_is_owner_custom_owner_attr():
     u = _user()
     obj = SimpleNamespace(user_id=u.id)
     assert is_owner(obj, u, owner_attr="user_id") is True
+
+
+# --- is_self_or_admin ------------------------------------------------------
+
+
+def test_is_self_or_admin_none_actor():
+    target = _user()
+    assert is_self_or_admin(None, target) is False
+
+
+def test_is_self_or_admin_self():
+    u = _user()
+    assert is_self_or_admin(u, u) is True
+
+
+def test_is_self_or_admin_admin_other():
+    admin = _user(is_superuser=True)
+    target = _user()
+    assert is_self_or_admin(admin, target) is True
+
+
+def test_is_self_or_admin_stranger():
+    actor = _user()
+    target = _user()
+    assert is_self_or_admin(actor, target) is False
 
 
 # --- assert_owner_or_admin (composes is_owner + is_admin) ------------------

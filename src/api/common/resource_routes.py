@@ -131,6 +131,18 @@ class ResourceSpec:
         receiving the path params + (for create/update) the resource id,
         returning the ``HX-Redirect`` URL. ``None`` means use a sensible
         default per mount.
+      private_fields: tuple of attribute names that are visible only to
+        viewers for whom ``private_field_predicate(actor, target)`` is
+        true. Empty tuple means no field-level gating; the resource is
+        either fully public or fully gated by the route's auth dep.
+        Read by ``src.api.common.projections.project_view`` so the
+        gating rule can be applied uniformly anywhere a view dict is
+        built. Declaring private fields without a predicate raises at
+        construction time.
+      private_field_predicate: ``Callable[[actor, target], bool]``
+        invoked by ``project_view`` to decide whether ``private_fields``
+        should appear in the projected view. Required when
+        ``private_fields`` is non-empty.
       parent: another ``ResourceSpec`` for sub-resources. Slice 8 (#253)
         wires this through; until then ``mount_delete`` asserts
         ``parent is None``.
@@ -157,7 +169,25 @@ class ResourceSpec:
     update_redirect: Callable[..., str] | None = None
     delete_redirect: Callable[..., str] | None = None
 
+    private_fields: tuple[str, ...] = ()
+    private_field_predicate: Callable[..., bool] | None = None
+
     parent: "ResourceSpec | None" = None
+
+    def __post_init__(self) -> None:
+        # Field-level visibility metadata: `private_fields` names the
+        # attributes gated by `private_field_predicate(actor, target)`.
+        # Read by `src.api.common.projections.project_view` (and any
+        # future layer — JSON endpoint, audit snapshot, OpenAPI doc —
+        # that needs to know which fields are private). Declaring fields
+        # without a predicate would silently leak them, so require both
+        # together.
+        if self.private_fields and self.private_field_predicate is None:
+            raise ValueError(
+                f"ResourceSpec({self.collection!r}) declares private_fields="
+                f"{self.private_fields!r} but no private_field_predicate — "
+                "private fields cannot be gated without a predicate."
+            )
 
 
 def mount_delete(
