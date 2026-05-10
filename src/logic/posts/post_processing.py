@@ -4,8 +4,9 @@ from uuid import UUID
 from fastapi import Request
 
 from src.api.common.exceptions import BadRequestError, NotFoundError
+from src.api.common.specs.post import POST_ENTITY
 from src.logic._authz import assert_owner_or_admin, is_admin, is_owner
-from src.logic.audit import AuditAction, AuditedResource, mutate
+from src.logic.audit import mutate
 from src.models import POST_KINDS, Post, User
 from src.repositories.audit_repository import AuditRepository
 from src.repositories.posts.post_repository import PostRepository
@@ -14,7 +15,6 @@ from src.schemas.posts.post import (
     ClientReferralUpdate,
     ProviderAvailabilityCreate,
     ProviderAvailabilityUpdate,
-    post_audit_snapshot,
 )
 
 logger = logging.getLogger(__name__)
@@ -23,13 +23,9 @@ PostCreatePayload = ClientReferralCreate | ProviderAvailabilityCreate
 PostUpdatePayload = ClientReferralUpdate | ProviderAvailabilityUpdate
 
 
-POST = AuditedResource(
-    type="post",
-    snapshot=post_audit_snapshot,
-    create=AuditAction.CREATE_POST,
-    update=AuditAction.UPDATE_POST,
-    delete=AuditAction.DELETE_POST,
-)
+# Audit binding lives on the spec (single declaration). Re-exported as
+# `POST` so handler bodies can keep their `resource=POST` shape.
+POST = POST_ENTITY.audit
 
 
 async def handle_list_posts(

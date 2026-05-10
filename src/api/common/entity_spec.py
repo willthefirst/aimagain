@@ -32,6 +32,7 @@ from pydantic import BaseModel, TypeAdapter
 
 from src.api.common.resource_routes import QueryParam, ResourceSpec
 from src.logic.audit import AuditAction, AuditedResource
+from src.models._polymorphic import DiscriminatorRegistry
 
 
 @dataclass(frozen=True, slots=True)
@@ -176,6 +177,17 @@ class EntitySpec:
     create_redirect: Callable[..., str] | None = None
     update_redirect: Callable[..., str] | None = None
     delete_redirect: Callable[..., str] | None = None
+
+    # Polymorphism -------------------------------------------------------
+    # Bound to a `DiscriminatorRegistry` (`src.models._polymorphic`) for
+    # entities whose detail rows live in per-variant tables keyed on a
+    # discriminator column. Phase 1 makes the binding load-bearing: the
+    # route file reads `Literal[*entity.discriminator.names]` for the
+    # form `?kind=` query param instead of importing the registry's
+    # `names` tuple directly. Layers that consume the registry's
+    # *contents* (dispatch ladders in logic / schema / repo) keep their
+    # direct registry imports — the spec only declares the binding.
+    discriminator: DiscriminatorRegistry | None = None
 
     # Templates ----------------------------------------------------------
     templates: Templates = field(default_factory=Templates)

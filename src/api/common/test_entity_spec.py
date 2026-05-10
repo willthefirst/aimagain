@@ -225,6 +225,24 @@ def test_parent_with_routes_constructs():
     assert child.parent is parent
 
 
+def test_discriminator_defaults_to_none():
+    """Only polymorphic entities (posts) set this — others leave it as None."""
+    spec = _make_spec()
+    assert spec.discriminator is None
+
+
+def test_discriminator_accepts_registry_instance():
+    """`DiscriminatorRegistry` from `src.models._polymorphic` plugs in."""
+    from src.models._polymorphic import DiscriminatorRegistry
+
+    registry = DiscriminatorRegistry(
+        column="kind", specs={"a": "spec-a", "b": "spec-b"}
+    )
+    spec = _make_spec(discriminator=registry)
+    assert spec.discriminator is registry
+    assert spec.discriminator.names == ("a", "b")
+
+
 def test_to_resource_spec_walks_parent_chain():
     """`to_resource_spec()` on a child propagates the parent chain so
     the mount layer can build nested paths."""
