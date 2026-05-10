@@ -23,7 +23,9 @@ def is_owner(obj, user: User | None, *, owner_attr: str = "owner_id") -> bool:
     """True iff `user` is authenticated and `obj`'s owner-FK matches.
 
     `owner_attr` names the foreign-key column on `obj` that points at
-    the owning user (`Post.owner_id` vs `Provider.user_id`).
+    the owning user. Defaults to `"owner_id"`, which matches both
+    `Post.owner_id` and `Provider.owner_id`; the knob is kept for future
+    entities whose owner FK is not literally named `owner_id`.
     """
     if user is None:
         return False

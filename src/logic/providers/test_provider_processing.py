@@ -94,7 +94,7 @@ async def _seed_provider(
     with_education: bool = False,
     with_certification: bool = False,
 ) -> tuple[uuid.UUID, uuid.UUID | None, uuid.UUID | None, uuid.UUID | None]:
-    provider = make_provider(user_id=user_id)
+    provider = make_provider(owner_id=user_id)
     async with db_test_session_manager() as session:
         async with session.begin():
             session.add(provider)
@@ -357,7 +357,7 @@ async def test_create_provider_persists_row_and_writes_audit(
         audit_repo = AuditRepository(session)
         created = await handle_create_provider(payload, repo, audit_repo, user)
 
-    assert created.user_id == user.id
+    assert created.owner_id == user.id
     assert created.practice_name == "Acme Health"
 
     rows = await _audit_rows_for(
@@ -444,7 +444,7 @@ async def test_create_provider_allows_multiple_per_user(
         )
 
     assert second.id != first_id
-    assert second.user_id == user.id
+    assert second.owner_id == user.id
     assert second.practice_name == "Second Practice"
 
 

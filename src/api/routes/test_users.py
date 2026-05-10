@@ -320,8 +320,8 @@ async def test_detail_lists_owned_providers(
     async with db_test_session_manager() as session:
         async with session.begin():
             session.add(target)
-    first = make_provider(user_id=target.id, practice_name="First")
-    second = make_provider(user_id=target.id, practice_name="Second")
+    first = make_provider(owner_id=target.id, practice_name="First")
+    second = make_provider(owner_id=target.id, practice_name="Second")
     async with db_test_session_manager() as session:
         async with session.begin():
             session.add_all([first, second])
@@ -577,7 +577,7 @@ async def _seed_user_provider(
     user_id: uuid.UUID,
     practice_name: str,
 ) -> uuid.UUID:
-    provider = make_provider(user_id=user_id, practice_name=practice_name)
+    provider = make_provider(owner_id=user_id, practice_name=practice_name)
     async with db_test_session_manager() as session:
         async with session.begin():
             session.add(provider)

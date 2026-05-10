@@ -203,7 +203,7 @@ async def get_by_id(self, provider_id: UUID) -> Provider | None:
     return await self._get_by_id(Provider, provider_id)
 
 async def create_provider(self, user_id: UUID, **fields) -> Provider:
-    return await self._persist_new(Provider(user_id=user_id, **fields))
+    return await self._persist_new(Provider(owner_id=user_id, **fields))
 
 async def add_licensure(self, provider, **fields) -> ProviderLicensure:
     return await self._add_child(provider, "licensures", ProviderLicensure(**fields))

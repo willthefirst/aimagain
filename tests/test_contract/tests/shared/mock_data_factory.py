@@ -174,7 +174,7 @@ class MockDataFactory:
         now = datetime.now(timezone.utc)
         stub_provider = SimpleNamespace(
             id=UUID("44444444-4444-4444-4444-444444444444"),
-            user_id=UUID("00000000-0000-0000-0000-000000000004"),
+            owner_id=UUID("00000000-0000-0000-0000-000000000004"),
             created_at=now,
             updated_at=now,
             practice_name="Acme Counseling",

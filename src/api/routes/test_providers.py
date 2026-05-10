@@ -40,7 +40,7 @@ async def _seed_provider_for(
     **overrides,
 ) -> uuid.UUID:
     """Insert a provider owned by `user_id` and return its id."""
-    provider = make_provider(user_id=user_id, **overrides)
+    provider = make_provider(owner_id=user_id, **overrides)
     async with db_test_session_manager() as session:
         async with session.begin():
             session.add(provider)
@@ -97,7 +97,7 @@ async def test_create_provider_happy_path(
         result = await session.execute(select(Provider).filter(Provider.id == new_id))
         persisted = result.scalars().first()
         assert persisted is not None
-        assert persisted.user_id == logged_in_user.id
+        assert persisted.owner_id == logged_in_user.id
         assert persisted.practice_name == "Acme Therapy"
 
     rows = await _audit_rows_for(
@@ -133,7 +133,7 @@ async def test_create_provider_allows_multiple_per_user(
 
     async with db_test_session_manager() as session:
         result = await session.execute(
-            select(Provider).filter(Provider.user_id == logged_in_user.id)
+            select(Provider).filter(Provider.owner_id == logged_in_user.id)
         )
         owned = result.scalars().all()
         assert {p.id for p in owned} == {first_id, second_id}
