@@ -99,7 +99,6 @@ The unified grammar fits resource-shaped CRUD. Several existing routes intention
 | `POST /auth/register` | `auth_routes.py` | Auth-flow protocol (token issuance, fastapi-users hooks). Not CRUD on a domain entity. |
 | `GET /auth/{register,login,forgot-password,reset-password/{token}}` | `auth_pages.py` | Pure form rendering, no resource. Could fit a hypothetical `mount_static_form` but not worth it for 4 routes. |
 | `GET /users/me`, `GET /users/me/providers` | `users.py` (mounted via `singleton_alias=`) | Singleton aliases — no parent id, session-sourced. Mounted as additional paths on the existing `mount_detail` / `mount_related_list` calls; see [`api/common/README.md`](../common/README.md#singleton-aliases-eg-usersme). |
-| `PUT /users/{user_id}/activation` | `users.py` | Idempotent state set with `HX-Refresh` (not `HX-Redirect`); admin-only verb. Doesn't match `mount_update` semantics. |
 | `GET /`, `GET /health` | `main.py` | Utility endpoints. Not resource-shaped. |
 
 If a future case suggests the grammar should grow to fit one of these, that's the moment to reshape `ResourceSpec` — not to escape-hatch around it.

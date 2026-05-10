@@ -4,6 +4,8 @@ import json
 import uuid
 from types import SimpleNamespace
 
+import pytest
+
 from .responses import (
     base_context,
     created_response,
@@ -89,3 +91,23 @@ def test_refreshed_response_204_with_hx_refresh():
     resp = refreshed_response()
     assert resp.status_code == 200
     assert resp.headers["HX-Refresh"] == "true"
+
+
+def test_updated_response_hx_refresh_sets_header_with_body():
+    """`hx_refresh=True` swaps the HX-Redirect header for HX-Refresh while
+    keeping the optional body — the shape state-axis subresources need."""
+    resp = updated_response(body={"id": "u1", "is_active": False}, hx_refresh=True)
+    assert resp.status_code == 200
+    assert json.loads(resp.body) == {"id": "u1", "is_active": False}
+    assert resp.headers["HX-Refresh"] == "true"
+    assert "HX-Redirect" not in resp.headers
+
+
+def test_updated_response_requires_one_of_redirect_or_refresh():
+    with pytest.raises(ValueError, match="hx_redirect or hx_refresh"):
+        updated_response(body={"x": 1})
+
+
+def test_updated_response_rejects_both_redirect_and_refresh():
+    with pytest.raises(ValueError, match="hx_redirect or hx_refresh"):
+        updated_response(hx_redirect="/x", hx_refresh=True)

@@ -77,12 +77,33 @@ def created_response(
     )
 
 
-def updated_response(*, body: dict | None = None, hx_redirect: str) -> JSONResponse:
-    """200 OK with optional body and `HX-Redirect: <hx_redirect>`."""
+def updated_response(
+    *,
+    body: dict | None = None,
+    hx_redirect: str | None = None,
+    hx_refresh: bool = False,
+) -> JSONResponse:
+    """200 OK with optional body and exactly one of HX-Redirect / HX-Refresh.
+
+    `hx_redirect` sends HTMX to a new URL (PATCH on a parent resource —
+    edit succeeded, here's where to go). `hx_refresh=True` tells HTMX to
+    reload the current page in place (PUT on a state-axis subresource —
+    activation flipped, re-render so the affordances update). Mutually
+    exclusive — set one.
+    """
+    if (hx_redirect is None) == (not hx_refresh):
+        raise ValueError(
+            "updated_response requires exactly one of hx_redirect or hx_refresh"
+        )
+    headers = (
+        {"HX-Redirect": hx_redirect}
+        if hx_redirect is not None
+        else {"HX-Refresh": "true"}
+    )
     return JSONResponse(
         status_code=status.HTTP_200_OK,
         content=body or {},
-        headers={"HX-Redirect": hx_redirect},
+        headers=headers,
     )
 
 

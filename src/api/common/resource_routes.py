@@ -42,7 +42,7 @@ from uuid import UUID
 from fastapi import Depends, Query, Request, status
 from pydantic import TypeAdapter
 
-from src.api.common.forms import parse_and_validate_form
+from src.api.common.forms import parse_and_validate_form, parse_and_validate_json
 from src.api.common.responses import (
     APIResponse,
     created_response,
@@ -644,6 +644,89 @@ def mount_update(
         ),
     )
     router.patch(path)(_update)
+
+
+def mount_state_axis(
+    router: Any,
+    spec: ResourceSpec,
+    handler: Callable[..., Awaitable[Any]],
+    *,
+    axis_name: str,
+    body_schema: type,
+    audit_repo_dep: Callable[..., Any],
+    response_to_dict: Callable[[Any], dict] | None = None,
+) -> None:
+    """Mount ``PUT /<collection>/{<id_param>}/<axis_name>``.
+
+    Implements the state-axis subresource shape from
+    ``src/api/routes/RESOURCE_GRAMMAR.md`` (lines 44-51): a PUT that
+    idempotently sets a state value on a resource. Distinct from
+    ``mount_update`` (PATCH on the parent for ordinary fields) — the
+    response uses ``HX-Refresh: true`` instead of ``HX-Redirect`` because
+    the surrounding page renders affordances based on the new state and
+    needs to re-fetch in place.
+
+    Parses a JSON body via ``body_schema`` (a Pydantic ``BaseModel``
+    subclass) and calls the handler with the resource id under
+    ``spec.id_param``, ``payload=`` (the validated body), ``repo=``,
+    ``audit_repo=``, and ``requesting_user=``. The handler owns the
+    mutation and audit row — state-axis actions like
+    ``SET_USER_ACTIVATION`` live outside the
+    ``AuditedResource(create, update, delete)`` triple, so they call
+    ``record_audit`` directly rather than going through ``mutate()``.
+    This mount stays minimum-disruption: it does *not* thread the
+    ``AuditAction`` to the handler.
+
+    ``body_schema`` is explicit (not auto-derived from the axis name's
+    Literal tuple) because state-axis bodies may carry richer payloads
+    than ``{<axis>: <value>}`` for some axes — e.g. a deactivation
+    reason or a verified-by id. Single-field bodies still pay one
+    declaration to keep the surface uniform.
+
+    Response is ``200 OK`` with body = ``response_to_dict(updated)`` (if
+    set, else ``{}``) and ``HX-Refresh: true``. The projection is
+    per-mount because each axis surfaces a different field
+    (activation → ``is_active``; verification → ``is_verified``).
+
+    Requires: ``spec.write_user_dep``, ``body_schema``.
+    """
+    if spec.write_user_dep is None:
+        raise ValueError(
+            f"mount_state_axis requires {spec.collection!r} to set write_user_dep."
+        )
+    if spec.parent is not None:
+        raise NotImplementedError(
+            "mount_state_axis with spec.parent is not supported yet."
+        )
+
+    id_param = spec.id_param
+    body_adapter = TypeAdapter(body_schema)
+    path = f"/{{{id_param}}}/{axis_name}"
+
+    async def _state_axis(**kwargs: Any) -> Any:
+        request: Request = kwargs["request"]
+        payload = await parse_and_validate_json(request, body_adapter)
+        resource_id: UUID = kwargs[id_param]
+        updated = await _resolve_handler(handler)(
+            **{id_param: resource_id},
+            payload=payload,
+            repo=kwargs["repo"],
+            audit_repo=kwargs["audit_repo"],
+            requesting_user=kwargs["requesting_user"],
+        )
+        body = response_to_dict(updated) if response_to_dict else None
+        return updated_response(body=body, hx_refresh=True)
+
+    _set_route_signature(
+        _state_axis,
+        path_params=(("request", Request), (id_param, UUID)),
+        deps=(
+            ("repo", spec.repo_dep),
+            ("audit_repo", audit_repo_dep),
+            ("requesting_user", spec.write_user_dep),
+        ),
+    )
+    router.put(path)(_state_axis)
 
 
 def mount_related_list(
