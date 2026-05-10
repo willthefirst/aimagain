@@ -53,7 +53,7 @@ class AuditRepository(BaseRepository):
         self, *, resource_type: str, resource_id: UUID
     ) -> Sequence[AuditLog]:
         """List audit rows for a given resource, oldest first."""
-        stmt = (
+        return await self._list(
             select(AuditLog)
             .filter(
                 AuditLog.resource_type == resource_type,
@@ -61,5 +61,3 @@ class AuditRepository(BaseRepository):
             )
             .order_by(AuditLog.created_at.asc())
         )
-        result = await self.session.execute(stmt)
-        return result.scalars().all()

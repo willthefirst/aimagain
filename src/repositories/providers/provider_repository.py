@@ -37,13 +37,11 @@ class ProviderRepository(BaseRepository):
 
     async def list_for_user(self, user_id: UUID) -> Sequence[Provider]:
         """Lists every provider owned by the given user, newest first."""
-        stmt = (
+        return await self._list(
             select(Provider)
             .filter(Provider.owner_id == user_id)
             .order_by(Provider.created_at.desc())
         )
-        result = await self.session.execute(stmt)
-        return result.scalars().all()
 
     async def list_providers(
         self,
@@ -66,8 +64,7 @@ class ProviderRepository(BaseRepository):
                 stmt = stmt.filter(ProviderLicensure.issuing_state == issuing_state)
             stmt = stmt.distinct()
         stmt = stmt.order_by(Provider.created_at.desc())
-        result = await self.session.execute(stmt)
-        return result.scalars().all()
+        return await self._list(stmt)
 
     # --- Provider mutations ----------------------------------------
 
