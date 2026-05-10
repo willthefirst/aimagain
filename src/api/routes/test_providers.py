@@ -102,11 +102,11 @@ async def test_create_provider_happy_path(
 
     rows = await _audit_rows_for(
         db_test_session_manager,
-        resource_type="provider_profile",
+        resource_type="provider",
         resource_id=new_id,
     )
     assert len(rows) == 1
-    assert rows[0].action == "create_provider_profile"
+    assert rows[0].action == "create_provider"
     assert rows[0].actor_id == logged_in_user.id
 
 

@@ -79,9 +79,9 @@ class AuditAction(str, Enum):
     UPDATE_USER = "update_user"
     DELETE_USER = "delete_user"
     REGISTER = "register"
-    CREATE_PROVIDER = "create_provider_profile"
-    UPDATE_PROVIDER = "update_provider_profile"
-    DELETE_PROVIDER = "delete_provider_profile"
+    CREATE_PROVIDER = "create_provider"
+    UPDATE_PROVIDER = "update_provider"
+    DELETE_PROVIDER = "delete_provider"
     CREATE_LICENSURE = "create_licensure"
     UPDATE_LICENSURE = "update_licensure"
     DELETE_LICENSURE = "delete_licensure"
@@ -103,7 +103,7 @@ class AuditedResource:
     Module-level constants are the intended use:
 
         PROVIDER = AuditedResource(
-            type="provider_profile",
+            type="provider",
             snapshot=lambda obj: ProviderAuditSnapshot
                 .model_validate(obj).model_dump(mode="json"),
             create=AuditAction.CREATE_PROVIDER,
