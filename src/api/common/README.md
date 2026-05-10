@@ -70,6 +70,7 @@ Common utilities handle concerns that span multiple routes and domains.
 | **Forms**       | Form-encoded request glue | `parse_form_to_payload` and `validate_or_422`                | Route handlers that accept form-encoded bodies |
 | **projections** | View-projection with field-level visibility | `project_view(obj, public_fields, actor, private_fields, private_field_predicate)` — gate fields per viewer | Handlers building per-viewer response dicts (user detail today) |
 | **resource_routes** | Unified `ResourceSpec` grammar | Declare a resource once, opt into the operations to expose via `mount_*`; sub-resources nest via `parent=` | Route files for any CRUD-shaped resource (top-level and sub-resource) |
+| **entity_spec** | `EntitySpec` — single declaration of a domain entity | Audit binding, private-field visibility, route opt-ins, state-axis shape, related-list subresources, templates. `to_resource_spec()` bridges to the mount helpers. Phase 1 of #317. | Route files + logic-layer handlers for entities migrated to this pattern (today: `users`). Per-entity instances live in `specs/<entity>.py`. |
 
 ## Directory structure
 
@@ -82,6 +83,8 @@ Common utilities handle concerns that span multiple routes and domains.
 - `forms.py` - HTTP-adapter primitives for request bodies: `parse_form_to_payload(request)` (form → dict, lists for repeated keys), `validate_or_422(adapter, payload_dict)` (run a `TypeAdapter`, translate `ValidationError` to 422 with `[{"loc","msg","type"}]`), and the back-to-back wrappers `parse_and_validate_form` / `parse_and_validate_json` (form-encoded vs. JSON body — state-axis subresources use the JSON variant). Home for any HTTP-adapter primitive that two or more route modules would otherwise import from each other.
 - `projections.py` - `project_view(obj, *, public_fields, actor, private_fields=(), private_field_predicate=None)` builds a dict of `public_fields` from `obj` and conditionally appends `private_fields` when `private_field_predicate(actor, obj)` is true. Used by handlers that gate fields per viewer (today: user detail, where `email` / `is_active` / `is_verified` are visible only to the user themselves or an admin). Defense in depth alongside template-level guards: omitting keys at projection time means a forgotten `{% if %}` cannot re-leak. `ResourceSpec.private_fields` / `private_field_predicate` store the same primitives as declarative metadata so future cross-layer readers (JSON endpoint, audit snapshot, OpenAPI doc) can read the rule without rediscovering it.
 - `resource_routes.py` - Unified `ResourceSpec` + opt-in `mount_*` grammar (covers top-level *and* sub-resource CRUD via `parent=`). See [Unified resource grammar](#unified-resource-grammar) below.
+- `entity_spec.py` - `EntitySpec` dataclass: single declaration of a domain entity's identity (audit binding, private-field visibility, route opt-ins, state-axis shape, related-list subresources, templates). Per-entity instances live under `specs/<entity>.py` and are read by route files (via `to_resource_spec()` for the mount helpers) and logic-layer handlers (for audit and visibility primitives). See [EntitySpec](#entityspec) below. Phase 1 of #317 — users-only so far; other entities still declare `ResourceSpec` inline in the route file.
+- `specs/` - Per-entity `EntitySpec` instances. One file per migrated entity (today: `user.py`).
 
 **Package infrastructure:**
 
@@ -96,22 +99,30 @@ Common utilities handle concerns that span multiple routes and domains.
 A resource declares a single `ResourceSpec` describing its **identity** — collection name, id param, primary repo, audit bundle, auth deps, schemas, templates, redirect targets. The route file then **opts in** to the operations it wants to expose by calling the corresponding mount function:
 
 ```python
-from src.api.common.resource_routes import ResourceSpec, mount_delete
-from src.logic.users.user_processing import USER, handle_delete_user
+# Migrated entities (users) — read the spec from api/common/specs/<entity>.py:
+from src.api.common.resource_routes import mount_delete
+from src.api.common.specs.user import USER_ENTITY
+from src.logic.users.user_processing import handle_delete_user
 
 users_api_router = APIRouter(prefix="/users")
 router = BaseRouter(router=users_api_router, default_tags=["users"])
 
-USER_SPEC = ResourceSpec(
-    collection="users",
-    id_param="user_id",
-    repo_dep=get_user_repository,
-    audit_resource=USER,                  # AuditedResource bundle from logic
-    read_user_dep=current_active_user,
-    write_user_dep=current_admin_user,
-)
-
+USER_SPEC = USER_ENTITY.to_resource_spec()
 mount_delete(router, USER_SPEC, handler=handle_delete_user)
+
+# Unmigrated entities (providers, posts, …) — declare ResourceSpec inline:
+from src.api.common.resource_routes import ResourceSpec, mount_delete
+from src.logic.providers.provider_processing import PROVIDER, handle_delete_provider
+
+PROVIDER_SPEC = ResourceSpec(
+    collection="providers",
+    id_param="provider_id",
+    repo_dep=get_provider_repository,
+    audit_resource=PROVIDER,              # AuditedResource bundle from logic
+    read_user_dep=current_active_user,
+    write_user_dep=current_active_user,
+)
+mount_delete(router, PROVIDER_SPEC, handler=handle_delete_provider)
 ```
 
 ### Why this shape
@@ -218,6 +229,56 @@ The mount registers the alias path BEFORE the parametric one within the same rou
 ### Per-mount references
 
 Per-mount docstrings in `resource_routes.py` are the canonical reference for required spec fields and exact handler kwargs.
+
+## `EntitySpec`
+
+`entity_spec.py` defines `EntitySpec`, the **upstream declaration** of a domain entity. Where `ResourceSpec` (above) is what the mount helpers consume, `EntitySpec` is the single declaration the rest of the codebase reads from. Today (phase 1 of #317) only `users` uses this pattern; other entities still declare `ResourceSpec` inline in their route files and `AuditedResource` next to their handlers.
+
+### What it captures
+
+Per-entity instances at `src/api/common/specs/<entity>.py` carry:
+
+- **Identity** — `name`, `url_collection`, `id_param`, `model`, `owner_attr`.
+- **FastAPI deps** — `repo_dep`, `read_user_dep`, `write_user_dep`.
+- **Audit binding** — `audit: AuditedResource` (the same dataclass logic-layer mutations have always used).
+- **Visibility** — `private_fields`, `private_field_predicate` (the projection rule from #304).
+- **Route opt-ins** — `routes: RouteSet` flags for which mounts the route file makes.
+- **State axes** — `state_axes: tuple[StateAxis, ...]` (axis name, body schema, audit action, response projection).
+- **Related-list subresources** — `subresources: tuple[RelatedListSubresource, ...]` (child spec, template, optional `singleton_alias`).
+- **Templates** — `templates: Templates` for the list and detail views.
+
+### How layers read from it
+
+```python
+# Route file: derive a ResourceSpec for the mount helpers.
+USER_SPEC = USER_ENTITY.to_resource_spec()
+mount_list(router, USER_SPEC, handler=handle_list_users)
+
+axis = USER_ENTITY.state_axis("activation")
+mount_state_axis(router, USER_SPEC, handler=handle_set_user_activation,
+                 axis_name=axis.name, body_schema=axis.body_schema,
+                 response_to_dict=axis.response_to_dict)
+
+# Logic-layer handler: read audit + visibility primitives.
+async with mutate(repo, audit_repo, ..., resource=USER_ENTITY.audit, verb="delete"):
+    await repo.delete_user(target)
+
+view = project_view(
+    target,
+    public_fields=("id", "username"),
+    actor=requesting_user,
+    private_fields=USER_ENTITY.private_fields,
+    private_field_predicate=USER_ENTITY.private_field_predicate,
+)
+```
+
+### Phase-1 caveat: handler references are *not* on the spec
+
+`StateAxis.handler` and `RelatedListSubresource.handler` exist as fields but stay `None` in phase 1. Including a handler reference would mean `api.common.specs.<entity>` importing from `src.logic.<entity>`, which is the opposite of the usual layer direction and creates a circular import with handlers that themselves read from the spec. Phase 1 keeps the spec **metadata-only**; route files supply the handler in the matching `mount_*` call. Phase 2 will revisit when the cycle is broken structurally.
+
+### Cross-entity references
+
+`RelatedListSubresource.child_spec` is a `ResourceSpec`, not an `EntitySpec`, so a migrated parent can reference an unmigrated child. The users spec points at `PROVIDER_SPEC` (declared inline in `api/routes/providers.py`); a future PR migrating providers will retarget this to `PROVIDER_ENTITY`.
 
 ### What's *not* meant for this grammar
 

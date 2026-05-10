@@ -10,6 +10,8 @@ Routes are **ultra-thin HTTP adapters** that handle request parsing, delegate to
 
 CRUD-shaped routes use the **unified `ResourceSpec` + opt-in `mount_*` grammar** in [`src/api/common/resource_routes.py`](../common/README.md#unified-resource-grammar). A resource declares its identity once (`ResourceSpec`) and opts into the operations it wants exposed via `mount_list` / `mount_detail` / `mount_form` / `mount_create` / `mount_update` / `mount_delete` / `mount_related_list`. Sub-resources nest via `parent=`. Routes that don't fit the grammar (auth flows, `/me/*` singletons, idempotent state setters, query-param-driven polymorphism, utility endpoints) stay hand-written — see [Bespoke routes](#bespoke-routes) below.
 
+Entities migrated to the `EntitySpec` pattern (phase 1 of #317; today just `users`) declare their identity once in [`src/api/common/specs/<entity>.py`](../common/README.md#entityspec) and derive the route-level `ResourceSpec` via `EntitySpec.to_resource_spec()`. Mount calls still take the `ResourceSpec`; the only difference is where the declaration lives. Unmigrated entities continue to declare `ResourceSpec` inline in their route file.
+
 ### What we do
 
 - **Domain organization**: one route file per resource, named after the resource.
@@ -23,20 +25,27 @@ CRUD-shaped routes use the **unified `ResourceSpec` + opt-in `mount_*` grammar**
 **Example**: A typical route file with the unified grammar:
 
 ```python
-USER_SPEC = ResourceSpec(
-    collection="users",
-    id_param="user_id",
-    repo_dep=get_user_repository,
-    audit_resource=USER,
-    read_user_dep=current_active_user,
-    write_user_dep=current_admin_user,
-    list_template="users/list.html",
-    detail_template="users/detail.html",
-)
-
+# Users — migrated to EntitySpec (phase 1 of #317). Identity lives in
+# `src/api/common/specs/user.py`; the route file derives the mount-time
+# ResourceSpec via `.to_resource_spec()`.
+USER_SPEC = USER_ENTITY.to_resource_spec()
 mount_list(router, USER_SPEC, handler=handle_list_users)
 mount_detail(router, USER_SPEC, handler=handle_get_user_detail)
 mount_delete(router, USER_SPEC, handler=handle_delete_user)
+
+# Unmigrated entities (providers, posts, …) still declare ResourceSpec
+# inline next to their mount calls. Example shape:
+PROVIDER_SPEC = ResourceSpec(
+    collection="providers",
+    id_param="provider_id",
+    repo_dep=get_provider_repository,
+    audit_resource=PROVIDER,
+    read_user_dep=current_active_user,
+    write_user_dep=current_active_user,
+    list_template="providers/list.html",
+    detail_template="providers/detail.html",
+)
+mount_list(router, PROVIDER_SPEC, handler=handle_list_providers)
 ```
 
 The full grammar (knobs, mount kwargs, polymorphism via handler-context, sub-resources) is documented in [`api/common/README.md`](../common/README.md#unified-resource-grammar).
