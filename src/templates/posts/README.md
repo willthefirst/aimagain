@@ -1,6 +1,6 @@
 # Posts templates
 
-Jinja templates for the post CRUD flows. HTMX-driven; forms submit JSON via `hx-ext="json-enc"`. Every multi-checkbox group on the forms (`desired_times`, `services`, and `settings`) relies on stock json-enc semantics (0 boxes → key absent, 1 box → scalar, 2+ → array) plus a `_scalar_to_list` `BeforeValidator` on the wire schema that wraps the 1-element scalar back into a list — see [`src/schemas/post.py`](../../schemas/post.py). Keeping the normalization in Python avoids a JS-only failure mode that's invisible to server tests.
+Jinja templates for the post CRUD flows. HTMX-driven; forms submit form-encoded data via `hx-{post,patch}` (see [`_client_referral_form.html`](_client_referral_form.html) / [`_provider_availability_form.html`](_provider_availability_form.html)). Multi-checkbox fields (`desired_times`, `services`, `settings`) are normalized on the wire schema by `_scalar_to_list` in [`src/schemas/posts/post.py`](../../schemas/posts/post.py).
 
 ## Files
 
