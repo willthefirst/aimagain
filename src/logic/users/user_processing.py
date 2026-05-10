@@ -5,14 +5,9 @@ from fastapi import Request
 
 from src.api.common.exceptions import ForbiddenError, NotFoundError
 from src.api.common.projections import project_view
-from src.logic._authz import is_admin, is_self_or_admin
-from src.logic.audit import (
-    AuditAction,
-    AuditedResource,
-    make_snapshotter,
-    mutate,
-    record_audit,
-)
+from src.api.common.specs.user import USER_ENTITY
+from src.logic._authz import is_admin
+from src.logic.audit import make_snapshotter, mutate, record_audit
 from src.models import User
 from src.repositories.audit_repository import AuditRepository
 from src.repositories.providers.provider_repository import ProviderRepository
@@ -20,29 +15,11 @@ from src.repositories.users.user_repository import UserRepository
 from src.schemas.users.user import (
     UserActivationAuditSnapshot,
     UserActivationUpdate,
-    UserAuditSnapshot,
 )
 
 logger = logging.getLogger(__name__)
 
 _snapshot_user_activation = make_snapshotter(UserActivationAuditSnapshot)
-
-
-USER = AuditedResource(
-    type="user",
-    snapshot=make_snapshotter(UserAuditSnapshot),
-    create=AuditAction.CREATE_USER,
-    update=AuditAction.UPDATE_USER,
-    delete=AuditAction.DELETE_USER,
-)
-
-# Field-level visibility: `email`, `is_active`, `is_verified` are gated
-# by `is_self_or_admin(actor, target)`. Declared here so both the
-# handler (which applies the projection) and the route layer (which
-# declares the same tuple on `USER_SPEC.private_fields` for any future
-# cross-layer reader) share one source of truth — keeping them aligned
-# without a circular import between logic and api/routes.
-USER_PRIVATE_FIELDS: tuple[str, ...] = ("email", "is_active", "is_verified")
 
 
 async def handle_list_users(
@@ -99,7 +76,7 @@ async def handle_get_user_detail(
     # the partial just checks the flag.
     is_self = requesting_user is not None and target.id == requesting_user.id
     can_admin_actions = is_admin(requesting_user) and not is_self
-    can_view_private = is_self_or_admin(requesting_user, target)
+    can_view_private = USER_ENTITY.private_field_predicate(requesting_user, target)
 
     # Project target_user into a dict that omits private fields for
     # viewers outside the predicate. Defense in depth: a forgotten
@@ -108,8 +85,8 @@ async def handle_get_user_detail(
         target,
         public_fields=("id", "username"),
         actor=requesting_user,
-        private_fields=USER_PRIVATE_FIELDS,
-        private_field_predicate=is_self_or_admin,
+        private_fields=USER_ENTITY.private_fields,
+        private_field_predicate=USER_ENTITY.private_field_predicate,
     )
 
     return {
@@ -149,12 +126,13 @@ async def handle_set_user_activation(
     )
     before = _snapshot_user_activation(target)
     updated = await repo.set_user_activation(target, is_active=is_active)
+    activation_axis = USER_ENTITY.state_axis("activation")
     await record_audit(
         audit_repo,
         actor_id=requesting_user.id,
-        resource_type="user",
+        resource_type=USER_ENTITY.audit.type,
         resource_id=updated.id,
-        action=AuditAction.SET_USER_ACTIVATION,
+        action=activation_axis.action,
         before=before,
         after=_snapshot_user_activation(updated),
     )
@@ -187,7 +165,7 @@ async def handle_delete_user(
         audit_repo,
         actor=requesting_user,
         target=target,
-        resource=USER,
+        resource=USER_ENTITY.audit,
         verb="delete",
     ):
         await repo.delete_user(target)

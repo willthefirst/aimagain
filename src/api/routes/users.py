@@ -4,51 +4,32 @@ from fastapi import APIRouter
 
 from src.api.common import BaseRouter
 from src.api.common.resource_routes import (
-    ResourceSpec,
     mount_delete,
     mount_detail,
     mount_list,
     mount_related_list,
     mount_state_axis,
 )
-from src.api.routes.providers import PROVIDER_SPEC
-from src.auth_config import current_active_user, current_admin_user
-from src.logic._authz import is_self_or_admin
+from src.api.common.specs.user import USER_ENTITY
+from src.auth_config import current_active_user
 from src.logic.providers.provider_processing import handle_list_user_providers
 from src.logic.users.user_processing import (
-    USER,
-    USER_PRIVATE_FIELDS,
     handle_delete_user,
     handle_get_user_detail,
     handle_list_users,
     handle_set_user_activation,
 )
-from src.repositories.dependencies import get_user_repository
-from src.schemas.users.user import UserActivationUpdate
 
 users_api_router = APIRouter(prefix="/users")
 router = BaseRouter(router=users_api_router, default_tags=["users"])
 logger = logging.getLogger(__name__)
 
 
-USER_SPEC = ResourceSpec(
-    collection="users",
-    id_param="user_id",
-    repo_dep=get_user_repository,
-    audit_resource=USER,
-    read_user_dep=current_active_user,
-    write_user_dep=current_admin_user,
-    list_template="users/list.html",
-    detail_template="users/detail.html",
-    # Field-level visibility: viewers outside `is_self_or_admin` see only
-    # public fields. The same tuple + predicate are applied by
-    # `project_view` inside `handle_get_user_detail`; declaring them on
-    # the spec makes the gating rule readable by any future cross-layer
-    # consumer (JSON endpoint, audit snapshot, OpenAPI doc). Template
-    # `{% if can_view_private %}` guard remains as defense in depth.
-    private_fields=USER_PRIVATE_FIELDS,
-    private_field_predicate=is_self_or_admin,
-)
+# Derive the mount-time `ResourceSpec` from the entity spec. `USER_ENTITY`
+# is the single declaration of identity (audit binding, private-field
+# visibility, route flags, state-axis shape, subresources, templates);
+# `mount_*` helpers still consume `ResourceSpec`, so we bridge.
+USER_SPEC = USER_ENTITY.to_resource_spec()
 
 
 # GET /users
@@ -68,35 +49,33 @@ mount_detail(
 
 
 # GET /users/{user_id}/providers AND GET /users/me/providers — related-list,
-# scoped to the parent user. `singleton_alias=` plumbs the same handler at
-# the `/me/...` path with the parent id sourced from the session. Self-or-admin
-# auth lives inside the handler. Template is in the parent's namespace
-# (users/providers_list.html), not the child's, since the page is *about a user*.
+# scoped to the parent user. The subresource shape (child spec, template,
+# `/me` alias) is declared once on `USER_ENTITY.subresources`; the mount
+# call reads from there so the spec stays the single source of truth.
+_providers_subresource = USER_ENTITY.subresources[0]
 mount_related_list(
     router,
     parent_spec=USER_SPEC,
-    child_spec=PROVIDER_SPEC,
+    child_spec=_providers_subresource.child_spec,
     handler=handle_list_user_providers,
-    template="users/providers_list.html",
-    singleton_alias=("me", current_active_user),
+    template=_providers_subresource.template,
+    singleton_alias=_providers_subresource.singleton_alias,
 )
 
 
 # PUT /users/{user_id}/activation — admin-only state-axis flip.
-# `response_to_dict` projects the User into the activation-axis wire shape
-# (`is_active` is the field this axis can change; `id`/`username` are
-# included for client-side reconciliation).
+# Axis shape (name, body schema, response projection) is declared on
+# `USER_ENTITY.state_axes`; the handler is bound here because phase 1
+# does not carry handler references on the spec (see the docstring on
+# `src/api/common/entity_spec.py` for the import-direction rationale).
+_activation_axis = USER_ENTITY.state_axis("activation")
 mount_state_axis(
     router,
     USER_SPEC,
     handler=handle_set_user_activation,
-    axis_name="activation",
-    body_schema=UserActivationUpdate,
-    response_to_dict=lambda user: {
-        "id": str(user.id),
-        "username": user.username,
-        "is_active": user.is_active,
-    },
+    axis_name=_activation_axis.name,
+    body_schema=_activation_axis.body_schema,
+    response_to_dict=_activation_axis.response_to_dict,
 )
 
 

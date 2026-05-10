@@ -1,0 +1,86 @@
+"""`USER_ENTITY`: the single declaration of the user resource.
+
+Read by:
+  - `src/api/routes/users.py` — derives `USER_SPEC` for the mount helpers
+    and reads the activation state-axis shape.
+  - `src/logic/users/user_processing.py` — reads `USER_ENTITY.audit` for
+    the `mutate(...)` resource binding, `USER_ENTITY.private_fields`
+    and `USER_ENTITY.private_field_predicate` for the user-detail
+    projection, and `USER_ENTITY.state_axis("activation").action` for
+    the activation audit row.
+
+This module imports `PROVIDER_SPEC` from the providers route file for
+the related-list subresource declaration. That's an `api/common ->
+api/routes` import — opposite of the usual layer direction — and is
+phase-1 churn that resolves once providers gets its own `EntitySpec`
+(future PR A2): the reference will then point at `PROVIDER_ENTITY`
+and the inversion goes away.
+"""
+
+from typing import Final
+
+from src.api.common.entity_spec import (
+    EntitySpec,
+    RelatedListSubresource,
+    RouteSet,
+    StateAxis,
+    Templates,
+)
+from src.api.routes.providers import PROVIDER_SPEC
+from src.auth_config import current_active_user, current_admin_user
+from src.logic._authz import is_self_or_admin
+from src.logic.audit import AuditAction, AuditedResource, make_snapshotter
+from src.models import User
+from src.repositories.dependencies import get_user_repository
+from src.schemas.users.user import UserActivationUpdate, UserAuditSnapshot
+
+USER_AUDITED_RESOURCE: Final[AuditedResource] = AuditedResource(
+    type="user",
+    snapshot=make_snapshotter(UserAuditSnapshot),
+    create=AuditAction.CREATE_USER,
+    update=AuditAction.UPDATE_USER,
+    delete=AuditAction.DELETE_USER,
+)
+
+
+def _activation_response_to_dict(user: User) -> dict:
+    return {
+        "id": str(user.id),
+        "username": user.username,
+        "is_active": user.is_active,
+    }
+
+
+USER_ENTITY: Final[EntitySpec] = EntitySpec(
+    name="user",
+    url_collection="users",
+    id_param="user_id",
+    model=User,
+    owner_attr=None,  # the resource *is* the user; not owned by another user
+    repo_dep=get_user_repository,
+    read_user_dep=current_active_user,
+    write_user_dep=current_admin_user,
+    audit=USER_AUDITED_RESOURCE,
+    private_fields=("email", "is_active", "is_verified"),
+    private_field_predicate=is_self_or_admin,
+    routes=RouteSet(list=True, detail=True, delete=True),
+    state_axes=(
+        StateAxis(
+            name="activation",
+            body_schema=UserActivationUpdate,
+            action=AuditAction.SET_USER_ACTIVATION,
+            response_to_dict=_activation_response_to_dict,
+        ),
+    ),
+    subresources=(
+        RelatedListSubresource(
+            child_spec=PROVIDER_SPEC,
+            template="users/providers_list.html",
+            singleton_alias=("me", current_active_user),
+        ),
+    ),
+    templates=Templates(
+        list="users/list.html",
+        detail="users/detail.html",
+    ),
+)

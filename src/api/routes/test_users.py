@@ -52,6 +52,7 @@ async def test_base_template_hides_nav_for_anonymous_visitors(
 # --- Listing -------------------------------------------------------------
 
 
+# PHASE2_REDUNDANT: framework-shaped — generic mount_list rendering.
 async def test_list_users_empty(
     authenticated_client: AsyncClient,
     logged_in_user: User,
@@ -68,6 +69,7 @@ async def test_list_users_empty(
     assert link_node is not None, "Refresh link not found"
 
 
+# PHASE2_REDUNDANT: framework-shaped — generic mount_list rendering.
 async def test_list_users_multiple_users(
     authenticated_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],
@@ -168,6 +170,7 @@ async def test_list_shows_reactivate_for_deactivated_user(
 # --- Detail page ---------------------------------------------------------
 
 
+# PHASE2_REDUNDANT: framework-shaped — generic mount_detail rendering.
 async def test_get_user_detail_renders(
     authenticated_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],
@@ -290,6 +293,7 @@ async def test_detail_hides_admin_actions_for_non_admin(
     assert tree.css_first("span.admin-actions") is None
 
 
+# PHASE2_REDUNDANT: framework-shaped — related-list empty state via mount_related_list.
 async def test_detail_shows_providers_empty_state(
     authenticated_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],
@@ -310,6 +314,7 @@ async def test_detail_shows_providers_empty_state(
     assert "No providers yet" in empty.text()
 
 
+# PHASE2_REDUNDANT: framework-shaped — related-list rendering via mount_related_list.
 async def test_detail_lists_owned_providers(
     authenticated_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],
@@ -341,6 +346,7 @@ async def test_detail_lists_owned_providers(
 # --- Activation endpoint -------------------------------------------------
 
 
+# PHASE2_REDUNDANT: framework-shaped — mount_state_axis happy path.
 async def test_admin_can_deactivate_user(
     authenticated_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],
@@ -368,6 +374,7 @@ async def test_admin_can_deactivate_user(
         assert refreshed.is_active is False
 
 
+# PHASE2_REDUNDANT: framework-shaped — mount_state_axis happy path (inverse).
 async def test_admin_can_reactivate_user(
     authenticated_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],
@@ -420,6 +427,7 @@ async def test_admin_cannot_deactivate_self(
     assert response.status_code == 403
 
 
+# PHASE2_REDUNDANT: framework-shaped — mount_state_axis 404 wiring.
 async def test_activation_404_for_unknown_user(
     authenticated_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],
@@ -436,6 +444,7 @@ async def test_activation_404_for_unknown_user(
 # --- Delete endpoint -----------------------------------------------------
 
 
+# PHASE2_REDUNDANT: framework-shaped — mount_delete happy path + HX-Redirect.
 async def test_admin_can_delete_user(
     authenticated_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],
@@ -469,6 +478,7 @@ async def test_admin_cannot_delete_self(
 # --- Audit log -----------------------------------------------------------
 
 
+# PHASE2_REDUNDANT: framework-shaped — audit binding via state-axis action.
 async def test_set_user_activation_writes_audit_row(
     authenticated_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],
@@ -499,6 +509,7 @@ async def test_set_user_activation_writes_audit_row(
         assert row.after == {"is_active": False}
 
 
+# PHASE2_REDUNDANT: framework-shaped — audit-on-success-only guarantee.
 async def test_failed_activation_writes_no_audit_row(
     authenticated_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],
@@ -521,6 +532,7 @@ async def test_failed_activation_writes_no_audit_row(
         assert rows == []
 
 
+# PHASE2_REDUNDANT: framework-shaped — audit binding via AuditedResource on mutate().
 async def test_delete_user_writes_audit_row(
     authenticated_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],
