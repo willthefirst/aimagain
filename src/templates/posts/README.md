@@ -4,7 +4,7 @@ Jinja templates for the post CRUD flows. HTMX-driven; forms submit form-encoded 
 
 ## Files
 
-- `list.html` — listing page (`GET /posts`). Newest-first; branches on `post.kind` to render a kind-appropriate row label. The "New X" links at the top are rendered from `post_kinds` (a list of `KindSpec` from [`src/models/posts/post_kinds.py`](../../models/posts/post_kinds.py), passed in by `handle_list_posts`), so adding a registered kind automatically adds its create-form link.
+- `list.html` — listing page (`GET /posts`). Newest-first; branches on `post.kind` to render a kind-appropriate row label. The "New X" links at the top are rendered from `post_kinds` (a list of `PostKindSpec` from [`src/models/posts/post_kinds.py`](../../models/posts/post_kinds.py), passed in by `handle_list_posts`), so adding a registered kind automatically adds its create-form link.
 - `detail.html` — single-post read view (`GET /posts/{id}`). Branches on `post.kind` to render the right detail block. Includes `_owner_actions.html`.
 - `_client_referral_form.html` / `_provider_availability_form.html` — per-kind form-body macros. Each takes `(hx_method, action, submit_label, post=None)` and renders the full intake form using the shared field-render macros from [`../_shared/form_fields.html`](../_shared/form_fields.html). Field order, section grouping, labels, and required/optional state live here in one place per kind.
 - `new_<kind>.html` — create-form page; ~5-line wrapper that imports the per-kind form macro and calls it with `hx_method="post"`, `action="/posts"`.
@@ -20,6 +20,6 @@ Templates dereference through the right relationship per branch: `{{ d.descripti
 ## When a new kind ships
 
 1. Add the per-kind form-body partial `posts/_<kind>_form.html` (a `{% macro %}` taking `(hx_method, action, submit_label, post=None)`) using the shared field-render macros in [`../_shared/form_fields.html`](../_shared/form_fields.html).
-2. Add `posts/new_<kind>.html` and `posts/edit_<kind>.html` as ~5-line wrappers around the form macro. Register their paths on the kind's `KindSpec` in [`src/models/posts/post_kinds.py`](../../models/posts/post_kinds.py); the route layer reads `spec.create_template` / `spec.edit_template` from there.
+2. Add `posts/new_<kind>.html` and `posts/edit_<kind>.html` as ~5-line wrappers around the form macro. Register their paths on the kind's `PostKindSpec` in [`src/models/posts/post_kinds.py`](../../models/posts/post_kinds.py); the route layer reads `spec.create_template` / `spec.edit_template` from there.
 3. Add a `{% elif post.kind == "<kind>" %}` branch in `list.html` and `detail.html` for the per-kind row label and read-view body. (The "New X" link in `list.html` follows automatically via the registry-driven loop.)
 4. If the kind introduces a new controlled-vocabulary, add the tuple + `*_LABELS` dict to `src/models/enums.py` and register both as Jinja globals in `src/core/templating.py`. The shared `select_field` macro then renders dropdowns from them with no further per-template work.

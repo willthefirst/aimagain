@@ -3,7 +3,7 @@ from sqlalchemy.orm import relationship
 from sqlalchemy.types import Uuid
 
 from ..base import BaseModel
-from .post_kinds import kind_check_sql
+from .post_kinds import POST_KINDS
 
 
 class Post(BaseModel):
@@ -14,15 +14,15 @@ class Post(BaseModel):
     `post_id`. The set of allowed kinds — and the per-kind detail
     relationship + field metadata used across the codebase — lives in
     [`post_kinds.py`](post_kinds.py); the CHECK constraint here is
-    derived from it via `kind_check_sql()`. Adding a kind means adding
-    a registry entry there and a `relationship(...)` line below.
+    derived from it via `POST_KINDS.check_sql()`. Adding a kind means
+    adding a registry entry there and a `relationship(...)` line below.
 
     Per-kind detail tables additionally use the controlled-vocabulary
     tuples in [`../enums.py`](../enums.py) for their enum columns.
     """
 
     __tablename__ = "posts"
-    __table_args__ = (CheckConstraint(kind_check_sql(), name="ck_posts_kind"),)
+    __table_args__ = (CheckConstraint(POST_KINDS.check_sql(), name="ck_posts_kind"),)
 
     kind = Column(Text, nullable=False)
     owner_id = Column(

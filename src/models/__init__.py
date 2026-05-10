@@ -10,10 +10,10 @@ from .enums import (
 from .posts.client_referral_detail import ClientReferralDetail
 from .posts.post import Post
 from .posts.post_kinds import (
-    KIND_BY_DETAIL_MODEL,
-    KIND_NAMES,
-    REGISTERED_KINDS,
-    KindSpec,
+    POST_KIND_BY_DETAIL_MODEL,
+    POST_KIND_NAMES,
+    POST_KINDS,
+    PostKindSpec,
 )
 from .posts.provider_availability_detail import ProviderAvailabilityDetail
 from .providers.provider import Provider
@@ -29,18 +29,18 @@ __all__ = [
     "CLIENT_AGE_GROUPS",
     "ClientReferralDetail",
     "INSURANCE_OPTIONS",
-    "KIND_BY_DETAIL_MODEL",
-    "KIND_NAMES",
-    "KindSpec",
     "LANGUAGE_PREFERRED_OPTIONS",
     "LOCATION_AVAILABILITY_OPTIONS",
+    "POST_KIND_BY_DETAIL_MODEL",
+    "POST_KIND_NAMES",
+    "POST_KINDS",
     "Post",
+    "PostKindSpec",
     "ProviderAvailabilityDetail",
     "ProviderCertification",
     "ProviderEducation",
     "ProviderLicensure",
     "Provider",
-    "REGISTERED_KINDS",
     "US_STATES",
     "User",
     "metadata",

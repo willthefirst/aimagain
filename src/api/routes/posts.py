@@ -26,7 +26,7 @@ from src.logic.posts.post_processing import (
     handle_list_posts,
     handle_update_post,
 )
-from src.models import KIND_NAMES, REGISTERED_KINDS
+from src.models import POST_KIND_NAMES, POST_KINDS
 from src.repositories.dependencies import get_audit_repository, get_post_repository
 from src.schemas.posts.post import post_create_adapter, post_update_adapter
 
@@ -39,8 +39,8 @@ def _patch_response_body(post) -> dict:
     """Per-kind flat response body for `PATCH /posts/{id}`. The wire
     shape mirrors the POST/GET projection's flat fields so HTMX clients
     don't have to know about parent/detail. Per-kind detail relationship
-    + fields come from `REGISTERED_KINDS` in `src/models/posts/post_kinds.py`."""
-    spec = REGISTERED_KINDS[post.kind]
+    + fields come from `POST_KINDS` in `src/models/posts/post_kinds.py`."""
+    spec = POST_KINDS[post.kind]
     detail = getattr(post, spec.detail_relationship)
     return {
         "id": str(post.id),
@@ -87,8 +87,8 @@ mount_form(
     query_params=(
         QueryParam(
             "kind",
-            Literal[*KIND_NAMES],
-            KIND_NAMES[0],
+            Literal[*POST_KIND_NAMES],
+            POST_KIND_NAMES[0],
             description="Which post kind's create form to render.",
         ),
     ),

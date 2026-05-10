@@ -71,13 +71,15 @@ Kinds today: `client_referral` (→ `client_referral_details`) and `provider_ava
 
 ### The `post_kinds` registry
 
-The set of allowed kinds — and the per-kind detail relationship + field metadata used across the codebase — lives in [`posts/post_kinds.py`](posts/post_kinds.py) as `REGISTERED_KINDS: dict[str, KindSpec]`. Every cross-cutting site reads from it:
+The set of allowed kinds — and the per-kind detail relationship + field metadata used across the codebase — lives in [`posts/post_kinds.py`](posts/post_kinds.py) as `POST_KINDS: DiscriminatorRegistry[PostKindSpec]`. The `DiscriminatorRegistry` machinery (names tuple, reverse-by-detail-model index, CHECK SQL generator) is the post-agnostic infrastructure in [`_polymorphic.py`](_polymorphic.py); `PostKindSpec` is the post-specific Spec dataclass that the registry holds. Any future polymorphic entity gets its own Spec dataclass and its own `DiscriminatorRegistry[…]` instance, sharing the bookkeeping.
 
-- `Post.__table_args__` builds its `CheckConstraint` from `kind_check_sql()` — the SQL is derived from `KIND_NAMES`.
-- The route's `Literal[*KIND_NAMES]` for `GET /posts/form?kind=…` is derived.
+Every cross-cutting site reads from `POST_KINDS`:
+
+- `Post.__table_args__` builds its `CheckConstraint` from `POST_KINDS.check_sql()` — the SQL is derived from `POST_KINDS.names`.
+- The route's `Literal[*POST_KIND_NAMES]` for `GET /posts/form?kind=…` is derived.
 - The form-template selection in `src/api/routes/posts.py` reads `spec.create_template` / `spec.edit_template`.
-- `src/repositories/post_repository.py:_attach_detail` looks up by detail-class via `KIND_BY_DETAIL_MODEL`; `update_post` writes to `spec.detail_relationship` for the post's kind.
-- `src/logic/post_processing.py:handle_create_post` and `handle_update_post` dispatch via `REGISTERED_KINDS[payload.kind]` instead of `isinstance` ladders.
+- `src/repositories/post_repository.py:_attach_detail` looks up by detail-class via `POST_KIND_BY_DETAIL_MODEL`; `update_post` writes to `spec.detail_relationship` for the post's kind.
+- `src/logic/post_processing.py:handle_create_post` and `handle_update_post` dispatch via `POST_KINDS[payload.kind]` instead of `isinstance` ladders.
 - `src/schemas/post.py:_flatten_post_to_dict` reads the relationship + field tuple from the registry (so `PostRead`, `PostAuditSnapshot` flatten through it).
 - `src/templates/posts/list.html` receives `post_kinds` in its context and renders the per-kind "New X" links from it.
 
@@ -92,7 +94,8 @@ Models follow the [cluster pattern](../README.md#domain-entities-and-the-cluster
   - `base.py` — `Base = declarative_base()` plus `BaseModel(Base)` with the common entity fields (`id` UUID PK, `created_at`, `updated_at`, `deleted_at`). Most domain entities inherit from `BaseModel`. The post-detail tables (`ClientReferralDetail`, `ProviderAvailabilityDetail`) inherit from `Base` directly: they have no surrogate `id` (their `post_id` PK doubles as the FK), no timestamps, no soft delete — their lifecycle is governed by FK CASCADE from the parent `Post`. The `from .base import Base` vs `from .base import BaseModel` line in each model file is the source of truth for which tier it sits in.
   - `enums.py` — Controlled-vocabulary tuples + `*_LABELS` dicts + a `check_in_tuple_sql` helper that renders DB-level `CHECK` fragments from a tuple. The single source of truth that schemas (`Literal[*TUPLE]`), form macros (Jinja globals), and DB constraints all derive from. Lives at the parent level because 2+ clusters depend on it — and is a *leaf* (no internal imports), so any cluster can import from it without cycling back through cluster code.
   - `audit_log.py` — Append-only mutation record. See [`api/routes/RESOURCE_GRAMMAR.md`](../api/routes/RESOURCE_GRAMMAR.md).
-  - `__init__.py` — Re-exports model classes and constants. External code should always import from `src.models` (e.g. `from src.models import Post, REGISTERED_KINDS`); the `__init__.py` keeps that surface stable across cluster moves.
+  - `__init__.py` — Re-exports model classes and constants. External code should always import from `src.models` (e.g. `from src.models import Post, POST_KINDS`); the `__init__.py` keeps that surface stable across cluster moves.
+  - `_polymorphic.py` — `DiscriminatorRegistry[S]`, the generic bookkeeping for any polymorphic-entity discriminator (names tuple, reverse index, CHECK SQL fragment). Imported directly by entity registries (`from src.models._polymorphic import DiscriminatorRegistry`); not re-exported through `__init__.py` because it's shared infrastructure, not a domain symbol. Today's only consumer is `posts/post_kinds.py`; a second polymorphic entity would add its own Spec dataclass + `DiscriminatorRegistry[…]` instance and reuse the same bookkeeping.
 
 A model in cluster A does not import from cluster B; if two clusters need a shared primitive, hoist it to the parent level (the path `enums.py` took).
 

@@ -120,7 +120,7 @@ def _setup_post_owner_actions_stub(app: FastAPI) -> None:
     @app.get("/posts/{post_id}")
     async def post_owner_actions_stub_page(request: Request, post_id: uuid.UUID):
         # The detail template reads the per-kind detail relationship;
-        # `make_post_stub` populates it off `REGISTERED_KINDS`. Owner id
+        # `make_post_stub` populates it off `POST_KINDS`. Owner id
         # equals post id here so the partial's owner-or-admin gate is a
         # don't-care (current_user is a superuser).
         post = make_post_stub(

@@ -5,8 +5,8 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.models import (
-    KIND_BY_DETAIL_MODEL,
-    REGISTERED_KINDS,
+    POST_KIND_BY_DETAIL_MODEL,
+    POST_KINDS,
     ClientReferralDetail,
     Post,
     ProviderAvailabilityDetail,
@@ -22,7 +22,7 @@ def _attach_detail(post: Post, detail: PostDetail) -> None:
 
     The detail-class-to-relationship mapping is the registry in
     `src/models/posts/post_kinds.py` — adding a new kind there is enough."""
-    spec = KIND_BY_DETAIL_MODEL.get(type(detail))
+    spec = POST_KIND_BY_DETAIL_MODEL.get(type(detail))
     if spec is None:
         raise TypeError(f"unsupported detail type: {type(detail).__name__}")
     setattr(post, spec.detail_relationship, detail)
@@ -59,7 +59,7 @@ class PostRepository(BaseRepository):
         the caller commits.
 
         `detail_fields` is keyed by the field names on the post's
-        per-kind detail row (the `KindSpec.detail_fields` for `post.kind`
+        per-kind detail row (the `PostKindSpec.detail_fields` for `post.kind`
         in `src/models/posts/post_kinds.py`). Fields whose value is `None` and
         fields that don't belong to the post's kind are silently skipped
         — the calling logic layer is responsible for rejecting cross-kind
@@ -68,7 +68,7 @@ class PostRepository(BaseRepository):
         `post.kind` is intentionally not writable here: kind is part of
         the resource identity and is fixed at create time.
         """
-        spec = REGISTERED_KINDS[post.kind]
+        spec = POST_KINDS[post.kind]
         detail = getattr(post, spec.detail_relationship)
         for field_name, value in detail_fields.items():
             if value is None or field_name not in spec.detail_fields:
