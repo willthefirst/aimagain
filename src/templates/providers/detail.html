@@ -73,6 +73,28 @@
 </section>
 
 <hr />
+
+{# Favorite toggle. `is_favorited` is a per-viewer flag computed by
+   handle_get_provider_detail; templates do not re-derive it. The button
+   is hidden for anonymous viewers — there's no actor to attach the
+   edge to. #}
+{% if is_authenticated %}
+<section class="favorite-toggle">
+  {% if is_favorited %}
+  <button type="button"
+          hx-delete="/users/me/favorites/{{ provider.id }}"
+          hx-confirm="Remove this provider from your favorites?">
+    Unfavorite
+  </button>
+  {% else %}
+  <button type="button"
+          hx-post="/users/me/favorites/{{ provider.id }}">
+    Favorite
+  </button>
+  {% endif %}
+</section>
+{% endif %}
+
 {% if can_edit %}
 <a href="/providers/{{ provider.id }}/form">Edit provider</a> |
 {% endif %}

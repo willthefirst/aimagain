@@ -41,6 +41,7 @@ from src.models import (
     User,
 )
 from src.repositories.audit_repository import AuditRepository
+from src.repositories.favorites.user_favorite_repository import UserFavoriteRepository
 from src.repositories.providers.provider_repository import ProviderRepository
 from src.repositories.users.user_repository import UserRepository
 from src.schemas.providers.provider import (
@@ -211,6 +212,7 @@ async def test_get_provider_detail_returns_context(
             request=_fake_request(),
             provider_id=provider_id,
             repo=repo,
+            user_favorite_repo=UserFavoriteRepository(session),
             requesting_user=user,
         )
         assert context["provider"].id == provider_id
@@ -220,6 +222,9 @@ async def test_get_provider_detail_returns_context(
         # cases are exercised at the route level
         # (test_get_provider_hides_edit_link_for_non_owner et al.).
         assert context["can_edit"] is True
+        # `is_favorited` is a per-viewer derived field; the owner here
+        # has not favorited their own provider.
+        assert context["is_favorited"] is False
 
 
 async def test_get_provider_detail_404_for_unknown_id(
@@ -233,8 +238,52 @@ async def test_get_provider_detail_404_for_unknown_id(
                 request=_fake_request(),
                 provider_id=uuid.uuid4(),
                 repo=repo,
+                user_favorite_repo=UserFavoriteRepository(session),
                 requesting_user=user,
             )
+
+
+async def test_get_provider_detail_is_favorited_true_when_self_favorited(
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+):
+    """A viewer who has favorited the provider sees `is_favorited=True`."""
+    user = await _seed_user(db_test_session_manager)
+    other = await _seed_user(db_test_session_manager)
+    provider_id, *_ = await _seed_provider(db_test_session_manager, user_id=other.id)
+
+    async with db_test_session_manager() as session:
+        fav_repo = UserFavoriteRepository(session)
+        await fav_repo.add_favorite(user_id=user.id, provider_id=provider_id)
+        await session.commit()
+
+    async with db_test_session_manager() as session:
+        context = await handle_get_provider_detail(
+            request=_fake_request(),
+            provider_id=provider_id,
+            repo=ProviderRepository(session),
+            user_favorite_repo=UserFavoriteRepository(session),
+            requesting_user=user,
+        )
+        assert context["is_favorited"] is True
+
+
+async def test_get_provider_detail_is_favorited_false_for_anonymous_viewer(
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+):
+    """A `None` `requesting_user` never sees `is_favorited=True` — the
+    flag is meaningless without an actor."""
+    other = await _seed_user(db_test_session_manager)
+    provider_id, *_ = await _seed_provider(db_test_session_manager, user_id=other.id)
+
+    async with db_test_session_manager() as session:
+        context = await handle_get_provider_detail(
+            request=_fake_request(),
+            provider_id=provider_id,
+            repo=ProviderRepository(session),
+            user_favorite_repo=UserFavoriteRepository(session),
+            requesting_user=None,
+        )
+        assert context["is_favorited"] is False
 
 
 # --- handle_list_user_providers --------------------------------
