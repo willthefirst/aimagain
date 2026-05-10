@@ -586,7 +586,18 @@ Examples:
         parser.set_defaults(func=lambda args: self.dev.restart(args.service))
 
     def _add_test_parser(self, subparsers):
-        parser = subparsers.add_parser("test", help="Run tests")
+        parser = subparsers.add_parser(
+            "test",
+            help="Run tests",
+            description=(
+                "Run pytest. Each path may be a directory, file, or "
+                "`file::testname` selector; pass several to run unrelated "
+                "targets in one invocation. The literal token `contract` is "
+                "a shortcut that expands to `tests/test_contract` — that "
+                "directory is excluded from default collection (binds ports, "
+                "needs a Playwright browser) and is easy to forget the path to."
+            ),
+        )
         parser.add_argument(
             "-v", "--verbose", action="store_true", help="Verbose output"
         )
@@ -611,22 +622,51 @@ Examples:
         )
 
     def _add_lint_parser(self, subparsers):
-        parser = subparsers.add_parser("lint", help="Run linting checks")
+        parser = subparsers.add_parser(
+            "lint",
+            help="Run linting checks",
+            description=(
+                "Run all linting checks: black, isort, title-case, "
+                "template-import-boundaries, python-cluster-boundaries. "
+                "Pre-commit hooks run the same checks automatically — "
+                "don't bypass with --no-verify."
+            ),
+        )
         parser.set_defaults(func=lambda args: self.quality.lint())
 
     def _add_fmt_parser(self, subparsers):
         parser = subparsers.add_parser(
-            "fmt", help="Auto-fix formatting (runs black and isort in write mode)"
+            "fmt",
+            help="Auto-fix formatting (runs black and isort in write mode)",
+            description=(
+                "Auto-fix formatting in place by running `black .` and "
+                "`isort .` in write mode. The natural pre-commit companion "
+                "to `dev lint`."
+            ),
         )
         parser.set_defaults(func=lambda args: self.quality.fmt())
 
     def _add_setup_parser(self, subparsers):
-        parser = subparsers.add_parser("setup", help="Set up development environment")
+        parser = subparsers.add_parser(
+            "setup",
+            help="Set up development environment",
+            description=(
+                "First-time setup: creates `.env` from the template if "
+                "missing and initializes the local database."
+            ),
+        )
         parser.set_defaults(func=lambda args: self.setup.setup())
 
     def _add_seed_parser(self, subparsers):
         parser = subparsers.add_parser(
-            "seed", help="Seed the dev database with fixture users"
+            "seed",
+            help="Seed the dev database with fixture users",
+            description=(
+                "Apply any pending Alembic migrations, then seed the dev "
+                "database with fixture users for manual testing. Migrations "
+                "run first so a freshly added revision doesn't cause the "
+                "seed to crash against a stale schema."
+            ),
         )
         parser.set_defaults(func=lambda args: self.seed_cmd.seed())
 
@@ -634,6 +674,12 @@ Examples:
         parser = subparsers.add_parser(
             "routes",
             help="List every HTTP route registered on the app (catches shadowing)",
+            description=(
+                "Print every HTTP route registered on `src.main:app` grouped "
+                "by path prefix. Surfaces router shadowing — two "
+                "`include_router` calls registering handlers on overlapping "
+                "paths — without spinning up the server."
+            ),
         )
         parser.add_argument(
             "prefix",
@@ -646,6 +692,14 @@ Examples:
         parser = subparsers.add_parser(
             "promote-admin",
             help="Grant or revoke admin (is_superuser) status for a user by email",
+            description=(
+                "Grant or revoke admin (`is_superuser`) status for a user "
+                "matched by email. Idempotent — re-running with the same "
+                "target is a no-op. Errors if no user matches (refuses to "
+                "auto-create users on a typo). Runs inside the dev "
+                "container. For the prod equivalent see the admin-"
+                "bootstrapping section in `deployment/README.md`."
+            ),
         )
         parser.add_argument("email", help="Email address of the user to (de)promote")
         parser.add_argument(
@@ -665,15 +719,30 @@ Examples:
         sub = parser.add_subparsers(dest="migrate_cmd")
 
         gen = sub.add_parser(
-            "generate", help="alembic revision --autogenerate -m <message>"
+            "generate",
+            help="alembic revision --autogenerate -m <message>",
+            description=(
+                "Generate a new Alembic revision via `--autogenerate` "
+                "(host mode, requires `DATABASE_URL`). Review the generated "
+                "file under `alembic/versions/` before applying — "
+                "autogenerate isn't perfect at detection."
+            ),
         )
         gen.add_argument("message", help="Revision message (required)")
         gen.set_defaults(func=lambda args: self.migrate_cmd.generate(args.message))
 
-        up = sub.add_parser("up", help="alembic upgrade head")
+        up = sub.add_parser(
+            "up",
+            help="alembic upgrade head",
+            description="Apply all pending Alembic migrations against the host DB.",
+        )
         up.set_defaults(func=lambda args: self.migrate_cmd.up())
 
-        down = sub.add_parser("down", help="alembic downgrade -<N> (default N=1)")
+        down = sub.add_parser(
+            "down",
+            help="alembic downgrade -<N> (default N=1)",
+            description="Reverse N migrations against the host DB. N defaults to 1.",
+        )
         down.add_argument(
             "steps",
             nargs="?",
@@ -686,6 +755,14 @@ Examples:
         rt = sub.add_parser(
             "roundtrip",
             help="upgrade head → downgrade -1 → upgrade head against a scratch DB",
+            description=(
+                "Sanity-check a migration end-to-end against a throwaway "
+                "sqlite DB at `/tmp/bedlam-migrate-roundtrip.db` (override "
+                "with --scratch): upgrade head → downgrade -1 → upgrade "
+                "head. Removes the scratch file on success; leaves it on "
+                "failure for inspection. Never touches "
+                "`data/bedlam-connect.db`."
+            ),
         )
         rt.add_argument(
             "--scratch",
