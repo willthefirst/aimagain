@@ -143,6 +143,7 @@ async def test_create_provider_allows_multiple_per_user(
 # --- Provider reads -------------------------------------------------------
 
 
+# PHASE2_REDUNDANT: framework-shaped — mount_detail rendering happy path.
 async def test_get_provider_renders_detail_page(
     authenticated_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],
@@ -196,6 +197,7 @@ async def test_get_provider_hides_edit_link_for_non_owner(
 # --- Provider listing -----------------------------------------------------
 
 
+# PHASE2_REDUNDANT: framework-shaped — mount_list rendering happy path.
 async def test_list_providers_renders_html(
     authenticated_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],
@@ -221,6 +223,7 @@ async def test_list_providers_renders_html(
     assert "Open House" in response.text
 
 
+# PHASE2_REDUNDANT: framework-shaped — mount_list empty state.
 async def test_list_providers_renders_empty_state(
     authenticated_client: AsyncClient,
 ):
@@ -314,6 +317,7 @@ async def test_list_providers_treats_empty_filter_values_as_absent(
 # --- Provider update ------------------------------------------------------
 
 
+# PHASE2_REDUNDANT: framework-shaped — mount_update happy path.
 async def test_patch_provider_updates_fields(
     authenticated_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],
@@ -341,6 +345,7 @@ async def test_patch_provider_updates_fields(
         assert refreshed.practice_name == "New Name"
 
 
+# PHASE2_REDUNDANT: framework-shaped — write_authz binding on mount_update.
 async def test_patch_provider_returns_403_if_not_owner(
     authenticated_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],
@@ -403,6 +408,7 @@ async def test_delete_provider_returns_204_and_cascades(
         ).scalars().first() is None
 
 
+# PHASE2_REDUNDANT: framework-shaped — write_authz binding on mount_delete.
 async def test_delete_provider_returns_403_if_not_owner(
     authenticated_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],
@@ -417,6 +423,7 @@ async def test_delete_provider_returns_403_if_not_owner(
 # --- Licensure sub-resource ---------------------------------------------
 
 
+# PHASE2_REDUNDANT: framework-shaped — mount_create subrow happy path.
 async def test_create_licensure_happy_path(
     authenticated_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],
@@ -464,6 +471,7 @@ async def test_create_licensure_returns_403_if_not_owner(
     assert response.status_code == 403
 
 
+# PHASE2_REDUNDANT: framework-shaped — mount_update subrow happy path.
 async def test_patch_licensure_updates_fields(
     authenticated_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],
@@ -513,6 +521,7 @@ async def test_patch_licensure_returns_404_for_mismatched_provider(
     assert response.status_code == 404
 
 
+# PHASE2_REDUNDANT: framework-shaped — mount_delete subrow happy path.
 async def test_delete_licensure_returns_204(
     authenticated_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],
@@ -544,6 +553,7 @@ async def test_delete_licensure_returns_204(
 # --- Education / certification happy paths ------------------------------
 
 
+# PHASE2_REDUNDANT: framework-shaped — mount_create subrow happy path (education).
 async def test_create_education_happy_path(
     authenticated_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],
@@ -575,6 +585,7 @@ async def test_create_education_happy_path(
         assert persisted.institution == "Test U"
 
 
+# PHASE2_REDUNDANT: framework-shaped — mount_create subrow happy path (certification).
 async def test_create_certification_happy_path(
     authenticated_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],
@@ -611,6 +622,7 @@ async def test_create_certification_happy_path(
 # --- Create form page (GET /providers/form) ----------------------
 
 
+# PHASE2_REDUNDANT: framework-shaped — mount_form (new) rendering happy path.
 async def test_get_provider_form_renders(
     authenticated_client: AsyncClient,
     logged_in_user: User,

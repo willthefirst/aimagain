@@ -1,36 +1,36 @@
 """`EntitySpec`: single declaration of a domain entity.
 
-Phase 1 of the migration described in #317. Today the users vertical
-declares its identity in three parallel places:
+Phase 1 of the migration described in #317. The migration is
+incremental — A1 (#317) introduced the abstraction against `users`,
+A2 (#320) extended it to the providers vertical (Provider + three
+owned subentities), and later A-series PRs will add the remaining
+clusters.
 
-  - `USER_SPEC = ResourceSpec(...)` in `src/api/routes/users.py`
-  - `USER = AuditedResource(...)` and `USER_PRIVATE_FIELDS` in
-    `src/logic/users/user_processing.py`
-  - mount-call state-axis arguments scattered around the route file
+`EntitySpec` is the single source of truth that layer-level sites
+read **from** for migrated entities. The mount helpers still consume
+`ResourceSpec`; an entity spec derives one via
+:meth:`EntitySpec.to_resource_spec`. Phase 2 (a later track) will
+introduce generation that binds directly against `EntitySpec`;
+phase 1 just makes the declarations load-bearing without changing any
+behavior.
 
-`EntitySpec` is the single source of truth those layer-level sites read
-*from*. The mount helpers still consume `ResourceSpec`; an entity spec
-derives one via :meth:`EntitySpec.to_resource_spec`. Phase 2 (a later
-track) will introduce generation that binds directly against
-`EntitySpec`; phase 1 just makes the declarations load-bearing without
-changing any behavior.
-
-The dataclass intentionally stops short of carrying handler references
-on its state-axis / subresource descriptors: the spec sits in
-`src/api/common/specs/` and pulling handlers in would mean
+The dataclass intentionally stops short of carrying handler
+references on its state-axis / subresource descriptors: the spec
+sits in `src/api/common/specs/` and pulling handlers in would mean
 `api.common.specs` importing `src.logic.<entity>`, which is the
-opposite of the usual layer direction and creates an import cycle with
-handlers that read from the spec. Phase 1 keeps the spec as
-*metadata*; route files supply the handler in the matching `mount_*`
-call. Phase 2 can revisit once the cycle is broken structurally.
+opposite of the usual layer direction and creates an import cycle
+with handlers that read from the spec. Phase 1 keeps the spec as
+*metadata*; route files supply the handler in the matching
+`mount_*` call. Phase 2 can revisit once the cycle is broken
+structurally.
 """
 
 from dataclasses import dataclass, field
 from typing import Any, Awaitable, Callable
 
-from pydantic import BaseModel
+from pydantic import BaseModel, TypeAdapter
 
-from src.api.common.resource_routes import ResourceSpec
+from src.api.common.resource_routes import QueryParam, ResourceSpec
 from src.logic.audit import AuditAction, AuditedResource
 
 
@@ -38,9 +38,15 @@ from src.logic.audit import AuditAction, AuditedResource
 class RouteSet:
     """Per-entity opt-in flags for which `mount_*` calls a route file makes.
 
-    Phase 1 reads these for documentation/test purposes only — route
-    files still call the mounts explicitly. Phase 2 will use them to
-    drive auto-mounting.
+    Phase 1 reads these for documentation / test purposes only —
+    route files still call the mounts explicitly. Phase 2 will use
+    them to drive auto-mounting.
+
+    `form_new` and `form_edit` are separate because providers (the
+    first migrated entity that uses forms) mounts two `mount_form`
+    calls — one for the create form (no entity id), one for the edit
+    form (`on_existing=True`). A single `form` flag couldn't
+    distinguish.
     """
 
     list: bool = False
@@ -48,7 +54,8 @@ class RouteSet:
     delete: bool = False
     create: bool = False
     update: bool = False
-    form: bool = False
+    form_new: bool = False
+    form_edit: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -57,9 +64,9 @@ class StateAxis:
 
     `handler` and `response_to_dict` are intentionally optional in
     phase 1: the route file passes the handler directly to
-    `mount_state_axis`, because importing logic handlers into the spec
-    module would invert the usual layer direction. Phase 2 will populate
-    `handler` once the import direction is sorted.
+    `mount_state_axis`, because importing logic handlers into the
+    spec module would invert the usual layer direction. Phase 2 will
+    populate `handler` once the import direction is sorted.
     """
 
     name: str
@@ -81,11 +88,10 @@ class Templates:
 class RelatedListSubresource:
     """A `GET /<entity>/{id}/<child.collection>` related-list subresource.
 
-    `child_spec` is a `ResourceSpec` (not `EntitySpec`) so phase 1 can
-    reference unmigrated entities — the providers-under-user related
-    list points at the existing `PROVIDER_SPEC`. Subsequent A* PRs
-    swap each child to the corresponding `EntitySpec`/`ResourceSpec`
-    once the child is migrated.
+    `child_spec` is a `ResourceSpec` (not `EntitySpec`) so a parent
+    can reference unmigrated children — the value can come from
+    either a hand-rolled inline `ResourceSpec(...)` or from
+    ``<CHILD_ENTITY>.to_resource_spec()`` once the child is migrated.
 
     `handler` is omitted for the same reason as `StateAxis.handler`:
     the route file binds it at mount time.
@@ -106,13 +112,24 @@ class EntitySpec:
         (`USER_ENTITY.audit`, `USER_ENTITY.private_fields`,
         `USER_ENTITY.private_field_predicate`).
       - Route files, via :meth:`to_resource_spec` for the `mount_*`
-        helpers, plus direct lookup for state-axis / subresource shape.
-      - Spec-correctness tests (`src/api/common/specs/test_<entity>.py`)
-        that assert the spec declares the right things.
+        helpers, plus direct lookup for state-axis / subresource
+        shape and list-filter declarations.
+      - Spec-correctness tests
+        (`src/api/common/specs/test_<entity>.py`) that assert the
+        spec declares the right things.
 
-    Construction validates pairings that would otherwise leak silently
-    (e.g. `private_fields` without a predicate) — failing at import
-    time is loud and immediate.
+    Construction validates pairings that would otherwise leak
+    silently — for instance, `private_fields` without a predicate
+    would silently leak the fields, `routes.create=True` without a
+    `create_adapter` would crash at first request rather than at
+    startup. Failing at import time is loud and immediate.
+
+    Owned subentities (sub-resources whose URL nests under a parent —
+    `/providers/{provider_id}/licensures/...`) set ``parent`` to
+    their parent's `EntitySpec`. :meth:`to_resource_spec` walks the
+    chain so the derived `ResourceSpec` carries
+    ``parent=parent_entity.to_resource_spec()`` — the mount layer's
+    parent-chain machinery handles path building from there.
     """
 
     # Identity ------------------------------------------------------------
@@ -124,13 +141,22 @@ class EntitySpec:
     model: type
     owner_attr: str | None = "owner_id"
 
+    # Parent (owned subentity link) --------------------------------------
+    parent: "EntitySpec | None" = None
+
     # FastAPI deps -------------------------------------------------------
     repo_dep: Callable[..., Any] | None = None
     read_user_dep: Callable[..., Any] | None = None
     write_user_dep: Callable[..., Any] | None = None
+    write_authz: Callable[..., None] | None = None
 
     # Audit --------------------------------------------------------------
     audit: AuditedResource | None = None
+
+    # Body adapters + projection ----------------------------------------
+    create_adapter: TypeAdapter | None = None
+    update_adapter: TypeAdapter | None = None
+    read_to_dict: Callable[[Any], dict] | None = None
 
     # Visibility ---------------------------------------------------------
     private_fields: tuple[str, ...] = ()
@@ -139,9 +165,17 @@ class EntitySpec:
     # Route opt-ins ------------------------------------------------------
     routes: RouteSet = field(default_factory=RouteSet)
 
+    # List-page filters --------------------------------------------------
+    filters: tuple[QueryParam, ...] = ()
+
     # State axes + subresources -----------------------------------------
     state_axes: tuple[StateAxis, ...] = ()
     subresources: tuple[RelatedListSubresource, ...] = ()
+
+    # HX-Redirect targets ------------------------------------------------
+    create_redirect: Callable[..., str] | None = None
+    update_redirect: Callable[..., str] | None = None
+    delete_redirect: Callable[..., str] | None = None
 
     # Templates ----------------------------------------------------------
     templates: Templates = field(default_factory=Templates)
@@ -163,16 +197,56 @@ class EntitySpec:
                 f"EntitySpec({self.name!r}) declares duplicate state-axis "
                 f"names: {axis_names}"
             )
+        # `routes.create=True` without a create adapter would crash at
+        # first request — `mount_create` already raises here, but
+        # surfacing the misconfiguration at spec-construction time is
+        # earlier and more localized.
+        if self.routes.create and self.create_adapter is None:
+            raise ValueError(
+                f"EntitySpec({self.name!r}) has routes.create=True but no "
+                "create_adapter — mount_create cannot parse a body without one."
+            )
+        if self.routes.update and self.update_adapter is None:
+            raise ValueError(
+                f"EntitySpec({self.name!r}) has routes.update=True but no "
+                "update_adapter — mount_update cannot parse a body without one."
+            )
+        # An owned subentity that doesn't expose any HTTP routes is
+        # unreachable. Either the routes are wrong or the parent link
+        # is — either way, surface the inconsistency at import time.
+        if self.parent is not None and not self._has_any_route():
+            raise ValueError(
+                f"EntitySpec({self.name!r}) declares parent="
+                f"{self.parent.name!r} but no routes are opted in — "
+                "the subentity would be unreachable."
+            )
+
+    def _has_any_route(self) -> bool:
+        r = self.routes
+        return (
+            r.list
+            or r.detail
+            or r.create
+            or r.update
+            or r.delete
+            or r.form_new
+            or r.form_edit
+        )
 
     def to_resource_spec(self) -> ResourceSpec:
         """Derive a `ResourceSpec` for the mount helpers.
 
         Phase 1 keeps `ResourceSpec` as the layer-of-glue that the
         existing `mount_*` functions consume. Route files do
-        `USER_SPEC = USER_ENTITY.to_resource_spec()` and pass that to
-        the mount calls — same call shapes, just the source of truth
-        moves up one level.
+        ``<ENTITY>_SPEC = <ENTITY>_ENTITY.to_resource_spec()`` and
+        pass that to the mount calls — same call shapes, just the
+        source of truth moves up one level.
+
+        Owned-subentity specs (`self.parent is not None`) carry a
+        derived `parent` `ResourceSpec` so the mount layer's
+        parent-chain machinery can walk it for path nesting.
         """
+        parent_rs = self.parent.to_resource_spec() if self.parent is not None else None
         return ResourceSpec(
             collection=self.url_collection,
             id_param=self.id_param,
@@ -180,17 +254,25 @@ class EntitySpec:
             audit_resource=self.audit,
             read_user_dep=self.read_user_dep,
             write_user_dep=self.write_user_dep,
+            write_authz=self.write_authz,
+            create_adapter=self.create_adapter,
+            update_adapter=self.update_adapter,
+            read_to_dict=self.read_to_dict,
             list_template=self.templates.list,
             detail_template=self.templates.detail,
+            create_redirect=self.create_redirect,
+            update_redirect=self.update_redirect,
+            delete_redirect=self.delete_redirect,
             private_fields=self.private_fields,
             private_field_predicate=self.private_field_predicate,
+            parent=parent_rs,
         )
 
     def state_axis(self, name: str) -> StateAxis:
         """Look up a state axis by name.
 
-        Lets handlers read the audit `AuditAction` for a non-CRUD axis
-        directly from the spec instead of hardcoding the enum:
+        Lets handlers read the audit `AuditAction` for a non-CRUD
+        axis directly from the spec instead of hardcoding the enum:
 
             action=USER_ENTITY.state_axis("activation").action
         """
