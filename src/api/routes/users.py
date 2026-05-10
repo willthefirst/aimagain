@@ -23,11 +23,7 @@ from src.logic.users.user_processing import (
     handle_list_users,
     handle_set_user_activation,
 )
-from src.repositories.dependencies import (
-    get_audit_repository,
-    get_provider_repository,
-    get_user_repository,
-)
+from src.repositories.dependencies import get_user_repository
 from src.schemas.users.user import UserActivationUpdate
 
 users_api_router = APIRouter(prefix="/users")
@@ -67,7 +63,6 @@ mount_detail(
     router,
     USER_SPEC,
     handler=handle_get_user_detail,
-    extra_repo_deps=(get_provider_repository,),
     singleton_alias=("me", current_active_user),
 )
 
@@ -83,7 +78,6 @@ mount_related_list(
     child_spec=PROVIDER_SPEC,
     handler=handle_list_user_providers,
     template="users/providers_list.html",
-    extra_repo_deps=(get_user_repository,),
     singleton_alias=("me", current_active_user),
 )
 
@@ -98,7 +92,6 @@ mount_state_axis(
     handler=handle_set_user_activation,
     axis_name="activation",
     body_schema=UserActivationUpdate,
-    audit_repo_dep=get_audit_repository,
     response_to_dict=lambda user: {
         "id": str(user.id),
         "username": user.username,
@@ -114,5 +107,4 @@ mount_delete(
     router,
     USER_SPEC,
     handler=handle_delete_user,
-    audit_repo_dep=get_audit_repository,
 )

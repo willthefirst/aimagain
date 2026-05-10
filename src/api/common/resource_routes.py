@@ -35,12 +35,14 @@ others. See the per-mount docstrings for the exact handler kwargs each
 expects.
 """
 
+import inspect
+import types
 from dataclasses import dataclass
-from typing import Any, Awaitable, Callable
+from typing import Any, Awaitable, Callable, Union, get_args, get_origin
 from uuid import UUID
 
 from fastapi import Depends, Query, Request, status
-from pydantic import TypeAdapter
+from pydantic import BaseModel, TypeAdapter
 
 from src.api.common.forms import parse_and_validate_form, parse_and_validate_json
 from src.api.common.responses import (
@@ -50,6 +52,7 @@ from src.api.common.responses import (
     updated_response,
 )
 from src.logic.audit import AuditedResource
+from src.repositories.dependencies import UnknownRepoTypeError, resolver_for
 
 _UNSET = object()
 
@@ -122,11 +125,10 @@ class ResourceSpec:
         read mounts. Polymorphic resources (e.g. posts kind-dispatch)
         may return ``template_name`` in the handler's context dict to
         override these per-request.
-      (Per-mount ``extra_repo_deps`` kwargs let an individual mount
-        inject additional repos beyond ``repo_dep`` for handlers that
-        need them — e.g. ``handle_get_user_detail`` takes the provider
-        repo. They're per-mount, not per-spec, because different mounts
-        on the same spec may need different extras.)
+      (Additional repos beyond ``repo_dep`` are not declared on the
+        spec — handlers spell each one out as a typed parameter and
+        the mount layer resolves it via the type→resolver registry in
+        ``src.repositories.dependencies``.)
       create_redirect / update_redirect / delete_redirect: callables
         receiving the path params + (for create/update) the resource id,
         returning the ``HX-Redirect`` URL. ``None`` means use a sensible
@@ -194,26 +196,19 @@ def mount_delete(
     router: Any,
     spec: ResourceSpec,
     handler: Callable[..., Awaitable[None]],
-    *,
-    audit_repo_dep: Callable[..., Any],
 ) -> None:
     """Mount ``DELETE /<collection>/{<id_param>}`` on ``router``.
 
-    The handler is invoked with the resource id (under ``spec.id_param``),
-    ``repo`` (from ``spec.repo_dep``), ``audit_repo`` (from
-    ``audit_repo_dep``), and ``requesting_user`` (from
-    ``spec.write_user_dep``). The handler is expected to use
-    ``mutate(verb="delete")`` so the audit row is written and the
-    transaction commits inside the same scope.
+    The handler's typed signature drives dep wiring: parameters named
+    `repo`, `audit_repo`, `requesting_user`, and the resource id (under
+    ``spec.id_param``, plus any parent ids for sub-resources) are bound
+    automatically. The handler is expected to use ``mutate(verb="delete")``
+    so the audit row is written and the transaction commits inside the
+    same scope.
 
     Response is ``204 No Content`` with ``HX-Redirect`` set by
     ``spec.delete_redirect(**path_params)`` if provided, else
     ``f"/{spec.collection}"``.
-
-    `audit_repo_dep` is passed in rather than read from the spec because
-    the audit repo dependency is a layer-wide concern, not a per-resource
-    knob — every mounted mutation uses the same one. Callers import it
-    once and reuse it across all `mount_*` calls.
 
     Sub-resources nest via ``spec.parent``. The router's prefix is the
     topmost ancestor's collection; the mount produces a path like
@@ -229,36 +224,32 @@ def mount_delete(
         )
 
     path = _path_segments_under_router(spec, with_id=True)
-    parent_path_params = _parent_path_param_pairs(spec)
+    parent_id_names = tuple(p[0] for p in _parent_path_param_pairs(spec))
     id_param = spec.id_param
     delete_redirect = spec.delete_redirect
     default_redirect = f"/{spec.collection}"
 
-    async def _delete(**kwargs: Any) -> Any:
-        path_kwargs = _kwargs_for_handler_path(spec, kwargs, with_id=True)
-        await _resolve_handler(handler)(
-            **path_kwargs,
-            repo=kwargs["repo"],
-            audit_repo=kwargs["audit_repo"],
-            requesting_user=kwargs["requesting_user"],
-        )
+    async def response_builder(*, handler, handler_kwarg_names, kwargs):
+        await _call_handler_with(handler, handler_kwarg_names, kwargs)
+        path_kwargs = {name: kwargs[name] for name in (*parent_id_names, id_param)}
         if delete_redirect is not None:
             hx_redirect = delete_redirect(**path_kwargs)
         else:
             hx_redirect = default_redirect
         return deleted_response(hx_redirect=hx_redirect)
 
-    _set_route_signature(
-        _delete,
-        path_params=(*parent_path_params, (id_param, UUID)),
-        deps=(
-            ("repo", spec.repo_dep),
-            ("audit_repo", audit_repo_dep),
-            ("requesting_user", spec.write_user_dep),
+    route_fn = _synthesize_route_fn(
+        handler=handler,
+        spec=spec,
+        options=_SynthOptions(
+            user_dep=spec.write_user_dep,
+            path_param_names=(*parent_id_names, id_param),
+            inject_request=False,
         ),
+        response_builder=response_builder,
     )
 
-    router.delete(path, status_code=status.HTTP_204_NO_CONTENT)(_delete)
+    router.delete(path, status_code=status.HTTP_204_NO_CONTENT)(route_fn)
 
 
 def mount_list(
@@ -266,17 +257,17 @@ def mount_list(
     spec: ResourceSpec,
     handler: Callable[..., Awaitable[dict]],
     *,
-    extra_repo_deps: tuple[Callable[..., Any], ...] = (),
     query_params: tuple[QueryParam, ...] = (),
     public: bool = False,
 ) -> None:
     """Mount ``GET /<collection>`` rendering ``spec.list_template``.
 
-    The handler is invoked with ``request``, ``repo`` (from
-    ``spec.repo_dep``), ``requesting_user`` (from ``spec.read_user_dep``,
-    or ``None`` if no auth gate is set), each ``query_params`` entry
-    under its declared name, and any ``extra_repo_deps`` under their dep
-    callable's name (``get_<entity>_repository`` → ``<entity>_repo``).
+    The handler's typed signature drives dep wiring: parameters named
+    `repo`, `requesting_user`, and any additional repo-typed params
+    (resolved via the type registry in
+    ``src.repositories.dependencies``) are bound automatically. Each
+    ``query_params`` entry is added to the route as a FastAPI
+    ``Query(...)`` and passed to the handler under its declared name.
     The handler returns a context dict; the mount renders
     ``spec.list_template`` with it.
 
@@ -286,17 +277,15 @@ def mount_list(
     becomes a FastAPI ``Query(...)`` parameter on the route, with full
     OpenAPI doc support and 422-on-invalid validation.
 
-    ``extra_repo_deps`` is per-mount for the same reason — different
-    mounts on the same resource often need different extras.
-
     Polymorphic resources can override the template by returning
     ``template_name`` in the context (the same precedence
     ``mount_form`` uses).
 
     ``public=True`` overrides ``spec.read_user_dep`` for this mount only —
     used when a resource's list is public but its detail/form pages are
-    authenticated (e.g. providers). The handler still receives
-    ``requesting_user=None`` so it can branch if needed.
+    authenticated (e.g. providers). The handler should declare
+    ``requesting_user: User | None`` so the synthesis can pass ``None``
+    for anonymous viewers.
     """
     if spec.parent is not None:
         raise NotImplementedError(
@@ -308,19 +297,10 @@ def mount_list(
             f"mount_list requires {spec.collection!r} to set list_template."
         )
     list_template = spec.list_template
-    extra_deps_named = _name_extra_repo_deps(extra_repo_deps)
-    query_param_names = tuple(qp.name for qp in query_params)
 
-    async def _list(**kwargs: Any) -> Any:
+    async def response_builder(*, handler, handler_kwarg_names, kwargs):
         request: Request = kwargs["request"]
-        context = await _resolve_handler(handler)(
-            request=request,
-            repo=kwargs["repo"],
-            requesting_user=kwargs.get("requesting_user"),
-            **{name: kwargs[name] for name, _ in extra_deps_named},
-            **{name: kwargs[name] for name in query_param_names},
-        )
-        # Honor handler-context override for polymorphic templates.
+        context = await _call_handler_with(handler, handler_kwarg_names, kwargs)
         resolved_template = context.pop("template_name", None) or list_template
         return APIResponse.html_response(
             template_name=resolved_template,
@@ -329,21 +309,17 @@ def mount_list(
             current_user=kwargs.get("requesting_user"),
         )
 
-    if public:
-        # Build deps without the spec's read_user_dep — handler receives
-        # `requesting_user=None`.
-        deps: list[tuple[str, Callable[..., Any]]] = [("repo", spec.repo_dep)]
-        deps.extend(extra_deps_named)
-        list_deps = tuple(deps)
-    else:
-        list_deps = _read_route_deps(spec, extra_deps_named)
-    _set_route_signature(
-        _list,
-        path_params=(("request", Request),),
-        query_params=query_params,
-        deps=list_deps,
+    user_dep = None if public else spec.read_user_dep
+    route_fn = _synthesize_route_fn(
+        handler=handler,
+        spec=spec,
+        options=_SynthOptions(
+            user_dep=user_dep,
+            query_params=query_params,
+        ),
+        response_builder=response_builder,
     )
-    router.get("")(_list)
+    router.get("")(route_fn)
 
 
 def mount_detail(
@@ -351,19 +327,21 @@ def mount_detail(
     spec: ResourceSpec,
     handler: Callable[..., Awaitable[dict]],
     *,
-    extra_repo_deps: tuple[Callable[..., Any], ...] = (),
     singleton_alias: tuple[str, Callable[..., Any]] | None = None,
 ) -> None:
     """Mount ``GET /<collection>/{<id_param>}`` rendering ``spec.detail_template``.
 
-    The handler is invoked with ``request``, the resource id under
-    ``spec.id_param``, ``repo``, ``requesting_user``, and any
-    ``extra_repo_deps`` under their derived kwarg name. Returns a
-    context dict; the mount renders ``spec.detail_template`` with it.
+    The handler's typed signature drives dep wiring: ``request``, the
+    resource id under ``spec.id_param``, ``repo``, ``requesting_user``,
+    and any extra repos (resolved via the type registry in
+    ``src.repositories.dependencies``) are bound automatically. The
+    handler returns a context dict; the mount renders
+    ``spec.detail_template`` with it.
 
     The multi-repo case (e.g. ``handle_get_user_detail`` takes both a
-    user repo and a provider repo) is the canonical reason
-    ``extra_repo_deps`` exists.
+    user repo and a provider repo) just requires the handler to declare
+    each repo as a typed param — the synthesis finds the resolver in
+    the registry.
 
     ``singleton_alias=("me", current_active_user)`` additionally mounts
     ``GET /<collection>/<alias>`` (e.g. ``/users/me``). The id is sourced
@@ -373,7 +351,7 @@ def mount_detail(
     """
     if spec.parent is not None:
         raise NotImplementedError(
-            "mount_detail with spec.parent is not supported yet " "(slice 8 / #253)."
+            "mount_detail with spec.parent is not supported yet (slice 8 / #253)."
         )
     if spec.detail_template is None:
         raise ValueError(
@@ -381,18 +359,10 @@ def mount_detail(
         )
     id_param = spec.id_param
     detail_template = spec.detail_template
-    extra_deps_named = _name_extra_repo_deps(extra_repo_deps)
 
-    async def _detail(**kwargs: Any) -> Any:
+    async def response_builder(*, handler, handler_kwarg_names, kwargs):
         request: Request = kwargs["request"]
-        resource_id: UUID = kwargs[id_param]
-        context = await _resolve_handler(handler)(
-            request=request,
-            repo=kwargs["repo"],
-            requesting_user=kwargs.get("requesting_user"),
-            **{id_param: resource_id},
-            **{name: kwargs[name] for name, _ in extra_deps_named},
-        )
+        context = await _call_handler_with(handler, handler_kwarg_names, kwargs)
         return APIResponse.html_response(
             template_name=detail_template,
             context=context,
@@ -400,10 +370,14 @@ def mount_detail(
             current_user=kwargs.get("requesting_user"),
         )
 
-    _set_route_signature(
-        _detail,
-        path_params=(("request", Request), (id_param, UUID)),
-        deps=_read_route_deps(spec, extra_deps_named),
+    route_fn = _synthesize_route_fn(
+        handler=handler,
+        spec=spec,
+        options=_SynthOptions(
+            user_dep=spec.read_user_dep,
+            path_param_names=(id_param,),
+        ),
+        response_builder=response_builder,
     )
 
     if singleton_alias is not None:
@@ -412,24 +386,33 @@ def mount_detail(
         # to parse `me` as a UUID against `/users/{user_id}`.
         alias_segment, session_dep = singleton_alias
 
-        async def _detail_alias(**kwargs: Any) -> Any:
+        async def alias_response_builder(*, handler, handler_kwarg_names, kwargs):
+            # Source the resource id from the session-resolved user.
             session_user = kwargs["__session_user__"]
-            kwargs[id_param] = session_user.id
-            kwargs["requesting_user"] = session_user
-            return await _detail(**kwargs)
+            kwargs = {
+                **kwargs,
+                id_param: session_user.id,
+                "requesting_user": session_user,
+            }
+            return await response_builder(
+                handler=handler, handler_kwarg_names=handler_kwarg_names, kwargs=kwargs
+            )
 
-        _set_route_signature(
-            _detail_alias,
-            path_params=(("request", Request),),
-            deps=(
-                ("repo", spec.repo_dep),
-                ("__session_user__", session_dep),
-                *extra_deps_named,
+        alias_route_fn = _synthesize_route_fn(
+            handler=handler,
+            spec=spec,
+            options=_SynthOptions(
+                user_dep=None,  # session_dep supplies the user; don't double-inject
+                # Tell synthesis that `id_param` and `requesting_user` come
+                # from the wrapper, not from the URL or auth dep.
+                handler_supplied_names=(id_param, "requesting_user"),
+                extra_static_deps=(("__session_user__", session_dep),),
             ),
+            response_builder=alias_response_builder,
         )
-        router.get(f"/{alias_segment}")(_detail_alias)
+        router.get(f"/{alias_segment}")(alias_route_fn)
 
-    router.get(f"/{{{id_param}}}")(_detail)
+    router.get(f"/{{{id_param}}}")(route_fn)
 
 
 def mount_form(
@@ -439,7 +422,6 @@ def mount_form(
     *,
     template: str | None = None,
     on_existing: bool = False,
-    extra_repo_deps: tuple[Callable[..., Any], ...] = (),
     query_params: tuple[QueryParam, ...] = (),
 ) -> None:
     """Mount a form-rendering route.
@@ -460,39 +442,21 @@ def mount_form(
     Handler kwargs: ``request``, ``repo``, ``requesting_user``, the
     resource id under ``spec.id_param`` (only when ``on_existing=True``),
     each ``query_params`` entry under its declared name, and any
-    ``extra_repo_deps``. Pure create-form handlers that don't use the
-    repo still have to accept ``repo=`` (just ignore it) — uniform
-    mount-handler contract beats a special case.
+    typed repos the handler declares (resolved via the registry).
     """
     if spec.parent is not None:
         raise NotImplementedError(
             "mount_form with spec.parent is not supported yet (slice 8 / #253)."
         )
     id_param = spec.id_param
-    extra_deps_named = _name_extra_repo_deps(extra_repo_deps)
     spec_template = spec.form_template
-    query_param_names = tuple(qp.name for qp in query_params)
 
-    if on_existing:
-        path = f"/{{{id_param}}}/form"
-        path_params = (("request", Request), (id_param, UUID))
-    else:
-        path = "/form"
-        path_params = (("request", Request),)
+    path = f"/{{{id_param}}}/form" if on_existing else "/form"
+    path_param_names = (id_param,) if on_existing else ()
 
-    async def _form(**kwargs: Any) -> Any:
+    async def response_builder(*, handler, handler_kwarg_names, kwargs):
         request: Request = kwargs["request"]
-        handler_kwargs: dict[str, Any] = {
-            "request": request,
-            "repo": kwargs["repo"],
-            "requesting_user": kwargs.get("requesting_user"),
-            **{name: kwargs[name] for name, _ in extra_deps_named},
-            **{name: kwargs[name] for name in query_param_names},
-        }
-        if on_existing:
-            handler_kwargs[id_param] = kwargs[id_param]
-
-        context = await _resolve_handler(handler)(**handler_kwargs)
+        context = await _call_handler_with(handler, handler_kwarg_names, kwargs)
         # Resolve template: handler context > per-mount kwarg > spec field.
         # `pop` so the template name doesn't leak into the rendered context.
         resolved_template = (
@@ -512,29 +476,32 @@ def mount_form(
             current_user=kwargs.get("requesting_user"),
         )
 
-    _set_route_signature(
-        _form,
-        path_params=path_params,
-        query_params=query_params,
-        deps=_read_route_deps(spec, extra_deps_named),
+    route_fn = _synthesize_route_fn(
+        handler=handler,
+        spec=spec,
+        options=_SynthOptions(
+            user_dep=spec.read_user_dep,
+            query_params=query_params,
+            path_param_names=path_param_names,
+        ),
+        response_builder=response_builder,
     )
-    router.get(path)(_form)
+    router.get(path)(route_fn)
 
 
 def mount_create(
     router: Any,
     spec: ResourceSpec,
     handler: Callable[..., Awaitable[Any]],
-    *,
-    audit_repo_dep: Callable[..., Any],
 ) -> None:
     """Mount ``POST /<collection>``.
 
     Parses a form-encoded body via ``spec.create_adapter`` (a Pydantic
-    ``TypeAdapter``) and calls the handler with ``payload=``, ``repo=``,
-    ``audit_repo=``, ``requesting_user=``. The handler is expected to use
-    ``mutate(verb="create")`` so the audit row + commit are owned by the
-    context manager.
+    ``TypeAdapter``) and calls the handler with ``payload=``, plus any
+    typed deps the handler declares (``repo``, ``audit_repo``,
+    ``requesting_user``, any extra repos via the registry). The handler
+    is expected to use ``mutate(verb="create")`` so the audit row +
+    commit are owned by the context manager.
 
     Response is ``201 Created`` with ``Location`` and ``HX-Redirect`` set.
     Defaults: ``Location: /<collection>/<new_id>``, ``HX-Redirect`` =
@@ -560,19 +527,13 @@ def mount_create(
     create_redirect = spec.create_redirect
 
     path = _path_segments_under_router(spec, with_id=False)
-    parent_path_params = _parent_path_param_pairs(spec)
+    parent_id_names = tuple(p[0] for p in _parent_path_param_pairs(spec))
 
-    async def _create(**kwargs: Any) -> Any:
+    async def response_builder(*, handler, handler_kwarg_names, kwargs):
         request: Request = kwargs["request"]
-        payload = await parse_and_validate_form(request, create_adapter)
-        path_kwargs = _kwargs_for_handler_path(spec, kwargs, with_id=False)
-        created = await _resolve_handler(handler)(
-            **path_kwargs,
-            payload=payload,
-            repo=kwargs["repo"],
-            audit_repo=kwargs["audit_repo"],
-            requesting_user=kwargs["requesting_user"],
-        )
+        kwargs["payload"] = await parse_and_validate_form(request, create_adapter)
+        created = await _call_handler_with(handler, handler_kwarg_names, kwargs)
+        path_kwargs = {name: kwargs[name] for name in parent_id_names}
         # Default Location is the canonical resource URL — for a top-level
         # resource that's /<collection>/{id}; for a sub-resource we point
         # at the parent because the spec doesn't have a "list children"
@@ -583,10 +544,6 @@ def mount_create(
         else:
             top = _walk_parent_chain(spec)[0]
             top_id = path_kwargs[top.id_param]
-            # Conservative: redirect to the parent detail page. If a
-            # resource needs a different canonical URL it should set
-            # create_redirect explicitly (which sets the HX-Redirect; the
-            # Location header still points at the parent).
             location = f"/{top.collection}/{top_id}"
         if create_redirect is not None:
             hx = create_redirect(**path_kwargs, **{id_param: created.id})
@@ -594,30 +551,29 @@ def mount_create(
             hx = location
         return created_response(id=created.id, location=location, hx_redirect=hx)
 
-    _set_route_signature(
-        _create,
-        path_params=(("request", Request), *parent_path_params),
-        deps=(
-            ("repo", spec.repo_dep),
-            ("audit_repo", audit_repo_dep),
-            ("requesting_user", spec.write_user_dep),
+    route_fn = _synthesize_route_fn(
+        handler=handler,
+        spec=spec,
+        options=_SynthOptions(
+            user_dep=spec.write_user_dep,
+            body_adapter=create_adapter,
+            path_param_names=parent_id_names,
         ),
+        response_builder=response_builder,
     )
-    router.post(path, status_code=status.HTTP_201_CREATED)(_create)
+    router.post(path, status_code=status.HTTP_201_CREATED)(route_fn)
 
 
 def mount_update(
     router: Any,
     spec: ResourceSpec,
     handler: Callable[..., Awaitable[Any]],
-    *,
-    audit_repo_dep: Callable[..., Any],
 ) -> None:
     """Mount ``PATCH /<collection>/{<id_param>}``.
 
     Parses a form-encoded body via ``spec.update_adapter`` and calls the
     handler with the resource id (under ``spec.id_param``), ``payload=``,
-    ``repo=``, ``audit_repo=``, ``requesting_user=``. Handler uses
+    and any typed deps the handler declares. Handler uses
     ``mutate(verb="update")``.
 
     Response is ``200 OK`` with body = ``spec.read_to_dict(updated)`` (if
@@ -644,19 +600,13 @@ def mount_update(
     read_to_dict = spec.read_to_dict
 
     path = _path_segments_under_router(spec, with_id=True)
-    parent_path_params = _parent_path_param_pairs(spec)
+    parent_id_names = tuple(p[0] for p in _parent_path_param_pairs(spec))
 
-    async def _update(**kwargs: Any) -> Any:
+    async def response_builder(*, handler, handler_kwarg_names, kwargs):
         request: Request = kwargs["request"]
-        payload = await parse_and_validate_form(request, update_adapter)
-        path_kwargs = _kwargs_for_handler_path(spec, kwargs, with_id=True)
-        updated = await _resolve_handler(handler)(
-            **path_kwargs,
-            payload=payload,
-            repo=kwargs["repo"],
-            audit_repo=kwargs["audit_repo"],
-            requesting_user=kwargs["requesting_user"],
-        )
+        kwargs["payload"] = await parse_and_validate_form(request, update_adapter)
+        updated = await _call_handler_with(handler, handler_kwarg_names, kwargs)
+        path_kwargs = {name: kwargs[name] for name in (*parent_id_names, id_param)}
         body = read_to_dict(updated) if read_to_dict else None
         if update_redirect is not None:
             hx = update_redirect(**path_kwargs)
@@ -664,16 +614,17 @@ def mount_update(
             hx = f"/{collection}/{updated.id}"
         return updated_response(body=body, hx_redirect=hx)
 
-    _set_route_signature(
-        _update,
-        path_params=(("request", Request), *parent_path_params, (id_param, UUID)),
-        deps=(
-            ("repo", spec.repo_dep),
-            ("audit_repo", audit_repo_dep),
-            ("requesting_user", spec.write_user_dep),
+    route_fn = _synthesize_route_fn(
+        handler=handler,
+        spec=spec,
+        options=_SynthOptions(
+            user_dep=spec.write_user_dep,
+            body_adapter=update_adapter,
+            path_param_names=(*parent_id_names, id_param),
         ),
+        response_builder=response_builder,
     )
-    router.patch(path)(_update)
+    router.patch(path)(route_fn)
 
 
 def mount_state_axis(
@@ -683,7 +634,6 @@ def mount_state_axis(
     *,
     axis_name: str,
     body_schema: type,
-    audit_repo_dep: Callable[..., Any],
     response_to_dict: Callable[[Any], dict] | None = None,
 ) -> None:
     """Mount ``PUT /<collection>/{<id_param>}/<axis_name>``.
@@ -733,30 +683,25 @@ def mount_state_axis(
     body_adapter = TypeAdapter(body_schema)
     path = f"/{{{id_param}}}/{axis_name}"
 
-    async def _state_axis(**kwargs: Any) -> Any:
+    async def response_builder(*, handler, handler_kwarg_names, kwargs):
         request: Request = kwargs["request"]
-        payload = await parse_and_validate_json(request, body_adapter)
-        resource_id: UUID = kwargs[id_param]
-        updated = await _resolve_handler(handler)(
-            **{id_param: resource_id},
-            payload=payload,
-            repo=kwargs["repo"],
-            audit_repo=kwargs["audit_repo"],
-            requesting_user=kwargs["requesting_user"],
-        )
+        kwargs["payload"] = await parse_and_validate_json(request, body_adapter)
+        updated = await _call_handler_with(handler, handler_kwarg_names, kwargs)
         body = response_to_dict(updated) if response_to_dict else None
         return updated_response(body=body, hx_refresh=True)
 
-    _set_route_signature(
-        _state_axis,
-        path_params=(("request", Request), (id_param, UUID)),
-        deps=(
-            ("repo", spec.repo_dep),
-            ("audit_repo", audit_repo_dep),
-            ("requesting_user", spec.write_user_dep),
+    route_fn = _synthesize_route_fn(
+        handler=handler,
+        spec=spec,
+        options=_SynthOptions(
+            user_dep=spec.write_user_dep,
+            body_adapter=body_adapter,
+            body_format="json",
+            path_param_names=(id_param,),
         ),
+        response_builder=response_builder,
     )
-    router.put(path)(_state_axis)
+    router.put(path)(route_fn)
 
 
 def mount_related_list(
@@ -766,7 +711,6 @@ def mount_related_list(
     handler: Callable[..., Awaitable[dict]],
     *,
     template: str,
-    extra_repo_deps: tuple[Callable[..., Any], ...] = (),
     singleton_alias: tuple[str, Callable[..., Any]] | None = None,
 ) -> None:
     """Mount ``GET /<parent.collection>/{<parent.id_param>}/<child.collection>``.
@@ -775,10 +719,11 @@ def mount_related_list(
     ``GET /users/{user_id}/providers`` lists the providers owned by a user.
 
     Handler kwargs: ``request``, the parent id under
-    ``parent_spec.id_param`` (e.g. ``user_id=...``), ``repo`` (the *child's*
-    repo, since the handler returns children), ``requesting_user``, and any
-    ``extra_repo_deps`` under their derived kwarg name. Returns a context
-    dict; the mount renders ``template``.
+    ``parent_spec.id_param`` (e.g. ``user_id=...``), ``repo`` (the
+    *child's* repo, since the handler returns children),
+    ``requesting_user``, and any typed repos the handler declares
+    (resolved via the type registry). Returns a context dict; the
+    mount renders ``template``.
 
     ``template`` is a per-mount kwarg (not on the spec) because related-list
     templates often live in the parent's namespace
@@ -803,19 +748,11 @@ def mount_related_list(
             "the parent's namespace."
         )
     parent_id_param = parent_spec.id_param
-    extra_deps_named = _name_extra_repo_deps(extra_repo_deps)
     path = f"/{{{parent_id_param}}}/{child_spec.collection}"
 
-    async def _related_list(**kwargs: Any) -> Any:
+    async def response_builder(*, handler, handler_kwarg_names, kwargs):
         request: Request = kwargs["request"]
-        parent_id: UUID = kwargs[parent_id_param]
-        context = await _resolve_handler(handler)(
-            request=request,
-            **{parent_id_param: parent_id},
-            repo=kwargs["repo"],
-            requesting_user=kwargs.get("requesting_user"),
-            **{name: kwargs[name] for name, _ in extra_deps_named},
-        )
+        context = await _call_handler_with(handler, handler_kwarg_names, kwargs)
         return APIResponse.html_response(
             template_name=template,
             context=context,
@@ -823,43 +760,47 @@ def mount_related_list(
             current_user=kwargs.get("requesting_user"),
         )
 
-    deps: list[tuple[str, Callable[..., Any]]] = [("repo", child_spec.repo_dep)]
-    if parent_spec.read_user_dep is not None:
-        deps.append(("requesting_user", parent_spec.read_user_dep))
-    deps.extend(extra_deps_named)
-
-    _set_route_signature(
-        _related_list,
-        path_params=(("request", Request), (parent_id_param, UUID)),
-        deps=tuple(deps),
+    # The route renders children, so the synthesis hands the handler the
+    # *child's* repo under `repo`. The parent-id path param is bound by
+    # name from the URL. Auth follows the *parent's* read user dep.
+    route_fn = _synthesize_route_fn(
+        handler=handler,
+        spec=child_spec,
+        options=_SynthOptions(
+            user_dep=parent_spec.read_user_dep,
+            path_param_names=(parent_id_param,),
+        ),
+        response_builder=response_builder,
     )
 
     if singleton_alias is not None:
-        # Register the literal alias path BEFORE the parametric path so
-        # FastAPI matches `/users/me/providers` against the alias instead
-        # of trying to parse `me` as a UUID.
         alias_segment, session_dep = singleton_alias
         alias_path = f"/{alias_segment}/{child_spec.collection}"
 
-        async def _related_list_alias(**kwargs: Any) -> Any:
+        async def alias_response_builder(*, handler, handler_kwarg_names, kwargs):
             session_user = kwargs["__session_user__"]
-            kwargs[parent_id_param] = session_user.id
-            kwargs["requesting_user"] = session_user
-            return await _related_list(**kwargs)
+            kwargs = {
+                **kwargs,
+                parent_id_param: session_user.id,
+                "requesting_user": session_user,
+            }
+            return await response_builder(
+                handler=handler, handler_kwarg_names=handler_kwarg_names, kwargs=kwargs
+            )
 
-        alias_deps: list[tuple[str, Callable[..., Any]]] = [
-            ("repo", child_spec.repo_dep),
-            ("__session_user__", session_dep),
-        ]
-        alias_deps.extend(extra_deps_named)
-        _set_route_signature(
-            _related_list_alias,
-            path_params=(("request", Request),),
-            deps=tuple(alias_deps),
+        alias_route_fn = _synthesize_route_fn(
+            handler=handler,
+            spec=child_spec,
+            options=_SynthOptions(
+                user_dep=None,
+                handler_supplied_names=(parent_id_param, "requesting_user"),
+                extra_static_deps=(("__session_user__", session_dep),),
+            ),
+            response_builder=alias_response_builder,
         )
-        router.get(alias_path)(_related_list_alias)
+        router.get(alias_path)(alias_route_fn)
 
-    router.get(path)(_related_list)
+    router.get(path)(route_fn)
 
 
 def _walk_parent_chain(spec: ResourceSpec) -> list[ResourceSpec]:
@@ -918,20 +859,6 @@ def _parent_path_param_pairs(spec: ResourceSpec) -> tuple[tuple[str, type], ...]
     return tuple(out)
 
 
-def _kwargs_for_handler_path(
-    spec: ResourceSpec, kwargs: dict[str, Any], *, with_id: bool
-) -> dict[str, Any]:
-    """Pluck the parent ids (and the spec's own id if ``with_id``) out of
-    the route's kwargs into a fresh dict suitable for splatting into a
-    handler call as ``**path_kwargs``."""
-    out: dict[str, Any] = {}
-    for name, _ in _parent_path_param_pairs(spec):
-        out[name] = kwargs[name]
-    if with_id:
-        out[spec.id_param] = kwargs[spec.id_param]
-    return out
-
-
 def _resolve_handler(fn: Callable[..., Any]) -> Callable[..., Any]:
     """Look up a handler in its home module at call time so test
     monkey-patches applied via ``setattr(<module>, "<name>", mock)`` take
@@ -953,103 +880,317 @@ def _resolve_handler(fn: Callable[..., Any]) -> Callable[..., Any]:
     return getattr(mod, fn_name, fn)
 
 
-def _name_extra_repo_deps(
-    deps: tuple[Callable[..., Any], ...],
-) -> tuple[tuple[str, Callable[..., Any]], ...]:
-    """Derive the kwarg name each extra repo dep is passed under.
+# --- Signature synthesis -------------------------------------------------
+#
+# `_synthesize_route_fn` introspects each handler's typed signature and
+# pairs every parameter with the right source (path / Depends / Query /
+# body parser). The handler's signature becomes the single source of
+# truth: forgetting to wire a dep is a registration-time `MountError`,
+# not a first-request crash.
+#
+# Each mount supplies the response shape via `response_builder`. The
+# synthesis helper handles the boring middle: introspection, signature
+# construction, kwarg routing.
 
-    Convention: ``get_provider_repository`` → ``provider_repo``,
-    ``get_audit_repository`` → ``audit_repo``. Strips the ``get_`` prefix
-    and the ``ository`` suffix on ``_repository``. If a dep has a name
-    that doesn't match the convention, raise — silent name-mismatches
-    would be a bug at the kwarg-injection site.
+
+class MountError(TypeError):
+    """Raised at mount-registration time when the handler signature is
+    incompatible with what the mount can supply. The error names the
+    handler, the offending parameter, and (where applicable) the type
+    that lacks a registry entry. App startup fails immediately rather
+    than the first request 500-ing."""
+
+
+def _is_optional(annotation: Any) -> tuple[bool, Any]:
+    """If `annotation` is `T | None` / `Optional[T]`, return `(True, T)`;
+    otherwise `(False, annotation)`. Handles both the 3.10+ pipe syntax
+    (`types.UnionType`) and `typing.Union[..., None]`."""
+    origin = get_origin(annotation)
+    if origin in (Union, types.UnionType):
+        args = [a for a in get_args(annotation) if a is not type(None)]
+        if len(args) == 1 and type(None) in get_args(annotation):
+            return True, args[0]
+    return False, annotation
+
+
+def _is_pydantic_model(annotation: Any) -> bool:
+    return isinstance(annotation, type) and issubclass(annotation, BaseModel)
+
+
+@dataclass(frozen=True)
+class _SynthOptions:
+    """Per-mount configuration the synthesis helper needs beyond the
+    handler signature.
+
+    - `user_dep` resolves `requesting_user`. `None` means the route is
+      public (the spec's read user dep was bypassed, e.g. `public=True`
+      on `mount_list`).
+    - `body_adapter` parses `payload` from the request body when the
+      handler takes a `payload` param. `body_format` picks form-encoded
+      vs JSON parsing.
+    - `query_params` are declarative query params the mount injects.
+    - `path_param_names` lists every URL path param the route binds
+      (the resource id + any parent ids for sub-resources).
+    - `handler_supplied_names` lists handler kwargs that the response
+      builder will populate itself before calling the handler (used by
+      `singleton_alias` routes that derive the resource id and the
+      `requesting_user` from a session dep instead of the URL/auth).
+      The synthesis skips these from the FastAPI signature entirely;
+      the response builder must fill them via `kwargs[name] = ...`
+      before delegating.
+    - `extra_static_deps` are additional `Depends(...)` bindings the
+      synthesis can't derive from the handler signature (e.g.
+      `__session_user__` for alias routes). Keyed by the kwarg name the
+      route fn receives; mount-supplied callables consume them inside
+      `response_builder`.
+    - `inject_request` adds a `request: Request` to the route fn even
+      if the handler doesn't take one — needed when the response builder
+      reads the request (template rendering uses it for chrome).
     """
-    out: list[tuple[str, Callable[..., Any]]] = []
-    for dep in deps:
-        name = getattr(dep, "__name__", None)
-        if not name or not name.startswith("get_"):
-            raise ValueError(
-                f"extra_repo_deps callable {dep!r} must be named "
-                "'get_<entity>_repository' so the kwarg can be derived."
-            )
-        bare = name[len("get_") :]
-        if bare.endswith("_repository"):
-            kwarg = bare[: -len("_repository")] + "_repo"
-        else:
-            kwarg = bare
-        out.append((kwarg, dep))
-    return tuple(out)
+
+    user_dep: Callable[..., Any] | None
+    body_adapter: TypeAdapter | None = None
+    body_format: str = "form"  # "form" or "json"
+    query_params: tuple[QueryParam, ...] = ()
+    path_param_names: tuple[str, ...] = ()
+    handler_supplied_names: tuple[str, ...] = ()
+    extra_static_deps: tuple[tuple[str, Callable[..., Any]], ...] = ()
+    inject_request: bool = True
 
 
-def _read_route_deps(
-    spec: ResourceSpec,
-    extra_deps_named: tuple[tuple[str, Callable[..., Any]], ...],
-) -> tuple[tuple[str, Callable[..., Any]], ...]:
-    """Build the (kwarg, callable) pairs for the dep-injected params on a
-    read route. Includes the primary repo, optional read user dep, and
-    each extra repo. ``read_user_dep=None`` means public — the route is
-    mounted without a user dep, and the handler receives
-    ``requesting_user=None``."""
-    deps: list[tuple[str, Callable[..., Any]]] = [("repo", spec.repo_dep)]
-    if spec.read_user_dep is not None:
-        deps.append(("requesting_user", spec.read_user_dep))
-    deps.extend(extra_deps_named)
-    return tuple(deps)
-
-
-def _set_route_signature(
-    fn: Callable[..., Any],
+def _synthesize_route_fn(
     *,
-    path_params: tuple[tuple[str, type], ...],
-    deps: tuple[tuple[str, Callable[..., Any]], ...],
-    query_params: tuple[QueryParam, ...] = (),
-) -> None:
-    """Advertise an explicit signature on a `**kwargs`-based route handler.
+    handler: Callable[..., Any],
+    spec: ResourceSpec,
+    options: _SynthOptions,
+    response_builder: Callable[..., Awaitable[Any]],
+) -> Callable[..., Any]:
+    """Build a FastAPI route function from `handler`'s typed signature.
 
-    FastAPI introspects `inspect.signature(fn)` to figure out path params
-    and dependencies. The mount helpers define the actual handler with
-    `**kwargs` (so the parameter names can be data-driven from the
-    `ResourceSpec`) and call this to publish the signature FastAPI sees.
+    Walks the handler's parameters; for each one, decides whether it's
+    a path param, a body, a query param, or a `Depends`-injected value
+    (repo / user / audit_repo / extra repo via the type registry).
+    Builds a wrapper whose `__signature__` is what FastAPI sees;
+    delegates response shaping to `response_builder`.
 
-    `path_params` are positional-or-keyword params with a type annotation
-    and no default — FastAPI binds them from the URL.
-    `query_params` (optional) are positional-or-keyword params whose
-    default is `Query(...)` — FastAPI parses them from the query string,
-    validates against the annotation, and 422s on invalid input.
-    `deps` are positional-or-keyword params whose default is `Depends(...)`
-    — FastAPI resolves them via the injection system.
+    `response_builder` receives the FULL kwarg dict the wrapper resolves
+    (handler kwargs + `request` + any `extra_static_deps`) so each mount
+    can pick what it needs to build the response. It is responsible for
+    calling the handler (via `_resolve_handler`) and returning the
+    Response.
+
+    Raises `MountError` at registration time if the handler signature
+    has a parameter the synthesis can't classify.
     """
-    from inspect import Parameter, Signature
+    handler_sig = inspect.signature(handler)
+    path_set = set(options.path_param_names)
+    handler_supplied_set = set(options.handler_supplied_names)
+    query_names = {qp.name for qp in options.query_params}
+    qp_by_name = {qp.name: qp for qp in options.query_params}
 
-    params: list[Parameter] = []
-    for name, ann in path_params:
-        params.append(
-            Parameter(
-                name=name,
-                kind=Parameter.POSITIONAL_OR_KEYWORD,
-                annotation=ann,
+    # Names we'll route through to the handler when it's called.
+    handler_kwarg_names: list[str] = []
+    # Handler kwargs that the synthesis fills with `None` itself (public
+    # route + `User | None` requesting_user). The route wrapper merges
+    # these into kwargs before calling the handler so the param is
+    # present in the call.
+    auto_none_handler_kwargs: list[str] = []
+    # FastAPI-visible parameter list for the synthesized signature.
+    synth_params: list[inspect.Parameter] = []
+
+    # Always inject `request` into the wrapper signature if requested,
+    # even when the handler doesn't take one — `response_builder` may
+    # still need it for template rendering.
+    request_in_handler = "request" in handler_sig.parameters
+    if options.inject_request or request_in_handler:
+        synth_params.append(
+            inspect.Parameter(
+                name="request",
+                kind=inspect.Parameter.POSITIONAL_OR_KEYWORD,
+                annotation=Request,
             )
         )
-    for qp in query_params:
-        if qp.default is _UNSET:
-            default = Query(..., description=qp.description or None)
-        else:
-            default = Query(qp.default, description=qp.description or None)
-        params.append(
-            Parameter(
-                name=qp.name,
-                kind=Parameter.POSITIONAL_OR_KEYWORD,
-                default=default,
-                annotation=qp.annotation,
+        if request_in_handler:
+            handler_kwarg_names.append("request")
+
+    for param_name, param in handler_sig.parameters.items():
+        if param_name == "request":
+            continue  # already handled
+        # Skip *args / **kwargs — they're not part of the FastAPI-visible
+        # contract. The handler may use them for forwarding, but the
+        # synthesis only resolves named typed params.
+        if param.kind in (
+            inspect.Parameter.VAR_POSITIONAL,
+            inspect.Parameter.VAR_KEYWORD,
+        ):
+            continue
+        annotation = param.annotation
+        is_opt, base_ann = _is_optional(annotation)
+
+        # Handler-supplied: the response builder fills this kwarg before
+        # calling the handler (e.g. alias routes derive `id_param` and
+        # `requesting_user` from a session dep). Skip the FastAPI param
+        # entirely; the handler kwarg name is recorded so the wrapper
+        # forwards it.
+        if param_name in handler_supplied_set:
+            handler_kwarg_names.append(param_name)
+            continue
+
+        # Path param? The handler asks for it by name; FastAPI binds it
+        # from the URL when the route's path string contains it.
+        if param_name in path_set:
+            synth_params.append(
+                inspect.Parameter(
+                    name=param_name,
+                    kind=inspect.Parameter.POSITIONAL_OR_KEYWORD,
+                    annotation=UUID,
+                )
+            )
+            handler_kwarg_names.append(param_name)
+            continue
+
+        # Query param? Declared on the mount.
+        if param_name in query_names:
+            qp = qp_by_name[param_name]
+            default = (
+                Query(..., description=qp.description or None)
+                if qp.default is _UNSET
+                else Query(qp.default, description=qp.description or None)
+            )
+            synth_params.append(
+                inspect.Parameter(
+                    name=param_name,
+                    kind=inspect.Parameter.POSITIONAL_OR_KEYWORD,
+                    annotation=qp.annotation,
+                    default=default,
+                )
+            )
+            handler_kwarg_names.append(param_name)
+            continue
+
+        # `payload`: parsed from the request body by `response_builder`.
+        # No Depends — body parsing happens inside the wrapper because
+        # form-encoded bodies need the raw request.
+        if param_name == "payload":
+            if options.body_adapter is None:
+                raise MountError(
+                    f"{handler.__qualname__} declares a `payload` parameter "
+                    "but the mount did not supply a body adapter. This is a "
+                    "mount/spec misconfiguration."
+                )
+            handler_kwarg_names.append(param_name)
+            continue
+
+        # `requesting_user`: the auth-resolved actor. `User | None`
+        # means "may be None for anonymous viewers"; require the mount
+        # to have a user dep set, OR accept None when `user_dep is None`
+        # and the annotation is Optional.
+        if param_name == "requesting_user":
+            if options.user_dep is None:
+                if not is_opt:
+                    raise MountError(
+                        f"{handler.__qualname__} declares "
+                        "`requesting_user: User` but the mount is public "
+                        "(no user dep). Either declare the param as "
+                        "`User | None` or set a user dep on the spec."
+                    )
+                # Public route with optional user: pass None directly
+                # (no Depends; no FastAPI-visible param). The wrapper
+                # fills `kwargs[param_name] = None` before delegating.
+                handler_kwarg_names.append(param_name)
+                auto_none_handler_kwargs.append(param_name)
+                continue
+            synth_params.append(
+                inspect.Parameter(
+                    name=param_name,
+                    kind=inspect.Parameter.POSITIONAL_OR_KEYWORD,
+                    annotation=annotation,
+                    default=Depends(options.user_dep),
+                )
+            )
+            handler_kwarg_names.append(param_name)
+            continue
+
+        # `repo`: the spec's primary repo. Type is informational only —
+        # we don't verify it matches `spec.repo_dep`'s return type
+        # because tests intentionally use stub callables that return
+        # `SimpleNamespace`. The spec is the source of truth for which
+        # resolver to use; the annotation just documents intent.
+        if param_name == "repo":
+            synth_params.append(
+                inspect.Parameter(
+                    name=param_name,
+                    kind=inspect.Parameter.POSITIONAL_OR_KEYWORD,
+                    annotation=annotation,
+                    default=Depends(spec.repo_dep),
+                )
+            )
+            handler_kwarg_names.append(param_name)
+            continue
+
+        # Extra repos: resolve via the type registry. Includes `audit_repo`
+        # and any per-handler additional repos (e.g. `user_favorite_repo`
+        # on the provider-detail handler).
+        if not isinstance(base_ann, type):
+            raise MountError(
+                f"{handler.__qualname__} parameter {param_name!r} has "
+                f"annotation {annotation!r} that is not a class — the "
+                "synthesis helper cannot decide how to inject it. Path "
+                "params should match the spec's id_param (or a parent's "
+                "id_param); query params must be declared in the mount's "
+                "`query_params=`."
+            )
+        try:
+            resolver = resolver_for(base_ann)
+        except UnknownRepoTypeError as exc:
+            raise MountError(
+                f"{handler.__qualname__} parameter {param_name!r}: " f"{exc}"
+            ) from None
+        synth_params.append(
+            inspect.Parameter(
+                name=param_name,
+                kind=inspect.Parameter.POSITIONAL_OR_KEYWORD,
+                annotation=annotation,
+                default=Depends(resolver),
             )
         )
-    for name, dep in deps:
-        params.append(
-            Parameter(
+        handler_kwarg_names.append(param_name)
+
+    # Extra static deps (alias session dep, etc.) — FastAPI-visible,
+    # not passed to the handler unless the wrapper does so explicitly.
+    for name, dep in options.extra_static_deps:
+        synth_params.append(
+            inspect.Parameter(
                 name=name,
-                kind=Parameter.POSITIONAL_OR_KEYWORD,
-                default=Depends(dep),
+                kind=inspect.Parameter.POSITIONAL_OR_KEYWORD,
                 annotation=Any,
+                default=Depends(dep),
             )
         )
-    fn.__signature__ = Signature(parameters=params)  # type: ignore[attr-defined]
+
+    async def _route(**kwargs: Any) -> Any:
+        for name in auto_none_handler_kwargs:
+            kwargs.setdefault(name, None)
+        return await response_builder(
+            handler=handler,
+            handler_kwarg_names=handler_kwarg_names,
+            kwargs=kwargs,
+        )
+
+    _route.__signature__ = inspect.Signature(parameters=synth_params)  # type: ignore[attr-defined]
+    return _route
+
+
+async def _call_handler_with(
+    handler: Callable[..., Any],
+    handler_kwarg_names: list[str],
+    kwargs: dict[str, Any],
+) -> Any:
+    """Call `handler` with the subset of `kwargs` matching the
+    introspected handler kwargs. Goes through `_resolve_handler` so
+    test monkey-patching against the handler's home module takes effect.
+    """
+    handler_kwargs = {
+        name: kwargs[name] for name in handler_kwarg_names if name in kwargs
+    }
+    return await _resolve_handler(handler)(**handler_kwargs)

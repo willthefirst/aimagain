@@ -36,11 +36,7 @@ from src.logic.providers.provider_processing import (
     handle_update_licensure,
     handle_update_provider,
 )
-from src.repositories.dependencies import (
-    get_audit_repository,
-    get_provider_repository,
-    get_user_favorite_repository,
-)
+from src.repositories.dependencies import get_provider_repository
 from src.schemas.providers.provider import (
     ProviderCertificationRead,
     ProviderEducationRead,
@@ -110,12 +106,7 @@ mount_list(
 )
 
 # POST /providers — owner inferred from session.
-mount_create(
-    router,
-    PROVIDER_SPEC,
-    handler=handle_create_provider,
-    audit_repo_dep=get_audit_repository,
-)
+mount_create(router, PROVIDER_SPEC, handler=handle_create_provider)
 
 
 # --- Form routes --------------------------------------------------------
@@ -141,29 +132,19 @@ mount_form(
 
 # GET /providers/{provider_id} — detail page. The `is_favorited` per-viewer
 # flag (computed in the handler against `UserFavoriteRepository`) lives in
-# the template context, so the mount injects the favorites repo via
-# `extra_repo_deps`.
-mount_detail(
-    router,
-    PROVIDER_SPEC,
-    handler=handle_get_provider_detail,
-    extra_repo_deps=(get_user_favorite_repository,),
-)
+# the template context; the handler's typed signature is enough — the
+# mount's signature synthesis resolves the favorites repo via the type
+# registry, no explicit wiring needed.
+mount_detail(router, PROVIDER_SPEC, handler=handle_get_provider_detail)
 
 
 # PATCH /providers/{provider_id} — partial update, owner-or-admin (handler enforces).
-mount_update(
-    router,
-    PROVIDER_SPEC,
-    handler=handle_update_provider,
-    audit_repo_dep=get_audit_repository,
-)
+mount_update(router, PROVIDER_SPEC, handler=handle_update_provider)
 # DELETE /providers/{provider_id} — hard delete, sub-rows cascade.
 mount_delete(
     router,
     PROVIDER_SPEC,
     handler=handle_delete_provider,
-    audit_repo_dep=get_audit_repository,
 )
 
 
@@ -247,6 +228,6 @@ for _spec, _create, _update, _delete in (
         handle_delete_certification,
     ),
 ):
-    mount_create(router, _spec, handler=_create, audit_repo_dep=get_audit_repository)
-    mount_update(router, _spec, handler=_update, audit_repo_dep=get_audit_repository)
-    mount_delete(router, _spec, handler=_delete, audit_repo_dep=get_audit_repository)
+    mount_create(router, _spec, handler=_create)
+    mount_update(router, _spec, handler=_update)
+    mount_delete(router, _spec, handler=_delete)
