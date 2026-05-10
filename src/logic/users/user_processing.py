@@ -55,21 +55,7 @@ async def handle_list_users(
     Raises:
         Exception: Propagates exceptions from the repository layer.
     """
-    logger.debug(f"Handler: Listing users for user {requesting_user.id}.")
-
-    try:
-        users_list = await repo.list_users(
-            exclude_user=requesting_user,
-        )
-    except Exception as e:
-        logger.error(
-            f"Handler: Error listing users from repository: {e}", exc_info=True
-        )
-        raise
-
-    logger.debug(
-        f"Handler: Successfully retrieved {len(users_list)} users for user {requesting_user.id}."
-    )
+    users_list = await repo.list_users(exclude_user=requesting_user)
 
     # `list_users` excludes the viewer, so every row is some other user;
     # admin-actions visibility reduces to a single flag for the whole
