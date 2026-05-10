@@ -44,6 +44,14 @@ The same rule applies recursively. A cluster's own README (`<layer>/<entity>/REA
 
 This complements the [single-source-of-truth rule](#one-source-of-truth--link-dont-copy): that rule says facts have one home; this rule says parent READMEs prefer rules over rosters.
 
+**Default to not creating a new README.** A README earns its existence by documenting something `ls` and the code can't:
+
+- A non-obvious pattern (registry-driven dispatch, polymorphic discriminator, cardinality decision).
+- A deliberate deviation from the layer's grammar.
+- A constraint or contract that spans files in non-obvious ways.
+
+If the only thing a candidate README would say is enumerate-what-`ls`-shows or restate-the-layer-rules, don't write it. Empty or aspirational READMEs are net-negative — they tell the next reader to expect content that isn't load-bearing.
+
 ## Where to look
 
 | Topic | Where it lives |
