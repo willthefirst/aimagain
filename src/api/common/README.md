@@ -39,20 +39,18 @@ async def list_users():
 
 ```python
 # Bad - business logic in common utility
-class APIResponse:
-    @staticmethod
-    def create_user_response(user):
-        # Business logic about user formatting
-        if user.is_admin:
-            return {"status": "admin", "data": {...}}
+def create_user_response(user):
+    # Business logic about user formatting
+    if user.is_admin:
+        return {"status": "admin", "data": {...}}
 
-# Good - generic response formatting only
-class APIResponse:
-    @staticmethod
-    def success(data: Any, message: str = "Success") -> JSONResponse:
-        return JSONResponse(
-            content={"status": "success", "message": message, "data": data}
-        )
+# Good - generic response formatting only (see responses.py)
+def created_response(*, id, location, hx_redirect=None) -> JSONResponse:
+    return JSONResponse(
+        status_code=201,
+        content={"id": str(id)},
+        headers={"Location": location, "HX-Redirect": hx_redirect or location},
+    )
 ```
 
 ## Architecture: Cross-cutting concerns layer
@@ -66,7 +64,7 @@ Common utilities handle concerns that span multiple routes and domains.
 | Utility         | Purpose                | Responsibilities                                                | Used By                  |
 | --------------- | ---------------------- | --------------------------------------------------------------- | ------------------------ |
 | **BaseRouter**  | Route standardization  | Apply decorators, manage dependencies                           | All route files          |
-| **APIResponse** | Response formatting    | JSON/HTML responses, template context                           | All route handlers       |
+| **responses**   | Response formatting    | `APIResponse.html_response` for templates; module-level `created_/updated_/deleted_/refreshed_response` for HTMX-aware mutations | All route handlers       |
 | **Decorators**  | Cross-cutting concerns | Error handling, logging                                         | BaseRouter (automatic)   |
 | **Exceptions**  | Error vocabulary       | API exception classes raised by logic; fastapi-users translator | Logic handlers, decorator |
 | **Forms**       | Form-encoded request glue | `parse_form_to_payload` and `validate_or_422`                | Route handlers that accept form-encoded bodies |
@@ -262,21 +260,18 @@ async def list_users():
     return await handle_list_users()
 ```
 
-### Apiresponse pattern for consistent formatting
+### Response helpers for consistent formatting
 
-Use APIResponse for all response formatting:
+Use `APIResponse.html_response` for HTML pages and the module-level `*_response` helpers for HTMX-driven mutations:
 
 ```python
-from src.api.common import APIResponse
-
-# JSON API responses
-@router.get("/api/users")
-async def list_users_api():
-    users = await get_users()
-    return APIResponse.success(
-        data=users,
-        message="Users retrieved successfully"
-    )
+from src.api.common import (
+    APIResponse,
+    created_response,
+    deleted_response,
+    refreshed_response,
+    updated_response,
+)
 
 # HTML template responses
 @router.get("/users")
@@ -285,15 +280,18 @@ async def list_users_page(request: Request):
     return APIResponse.html_response(
         template_name="users/list.html",
         context={"users": users},
-        request=request
+        request=request,
     )
 
-# Error responses (usually automatic via decorators)
-return APIResponse.error(
-    message="Invalid data",
-    status_code=400,
-    code="INVALID_DATA"
-)
+# Mutation responses (HTMX-aware)
+return created_response(id=user.id, location=f"/users/{user.id}")
+return updated_response(hx_redirect=f"/users/{user.id}")
+return deleted_response(hx_redirect="/users")
+return refreshed_response()
+
+# Error responses are *raised*, not returned — logic handlers raise an
+# APIException subclass and the @handle_route_errors decorator turns it
+# into the right HTTP status. See "Error handling pattern" below.
 ```
 
 ### Error handling pattern
@@ -394,44 +392,35 @@ async def list_users(user_repo: UserRepository = Depends(get_user_repository)):
 **Solution**: Always use APIResponse for consistency
 
 ```python
-# Bad - mixed response formats
-@router.get("/users")
-async def list_users(user_repo: UserRepository = Depends(get_user_repository)):
-    return await handle_list_users(user_repo)  # Raw data
+# Bad - bespoke response shape per route
+@router.post("/users")
+async def create_user(...):
+    user = await handle_create_user(...)
+    return {"id": str(user.id), "status": "ok"}  # Custom format
 
-@router.get("/data")
-async def get_data():
-    return {"data": data, "status": "ok"}  # Custom format
-
-# Good - consistent response format
-@router.get("/users")
-async def list_users(user_repo: UserRepository = Depends(get_user_repository)):
-    users = await handle_list_users(user_repo)
-    return APIResponse.success(data=users)
-
-@router.get("/data")
-async def get_data():
-    data = await fetch_data()
-    return APIResponse.success(data=data)
+# Good - shared mutation helper
+@router.post("/users")
+async def create_user(...):
+    user = await handle_create_user(...)
+    return created_response(id=user.id, location=f"/users/{user.id}")
 ```
 
 ## Available decorators and utilities
 
 ### Decorators (applied automatically by baserouter)
 
-```python
-@log_route_call        # Logs entry, exit, and errors
-@handle_route_errors   # Passes HTTPException through; translates fastapi-users; 500 for the rest
-```
+Both decorators are wrapped onto every endpoint by `BaseRouter`; route files don't import them directly. Logging covers entry/exit/error; error handling passes `HTTPException` through, translates fastapi-users exceptions, and converts anything unexpected into a 500. `handle_route_errors` is exported from `src.api.common` for tests that want to invoke it directly.
 
 ### Response utilities
 
 ```python
-# JSON responses
-APIResponse.success(data, message="Success", status_code=200)
-APIResponse.error(message, status_code=400, code=None)
+# Mutation helpers (module-level functions in responses.py)
+created_response(id, location, hx_redirect=None)   # 201, sets Location + HX-Redirect
+updated_response(body=None, hx_redirect=...)       # 200 + HX-Redirect
+deleted_response(hx_redirect=...)                  # 204 + HX-Redirect
+refreshed_response()                               # 200 + HX-Refresh: true
 
-# HTML responses
+# HTML responses (method on APIResponse)
 APIResponse.html_response(template_name, context, request, current_user=None)
 ```
 
@@ -440,24 +429,23 @@ APIResponse.html_response(template_name, context, request, current_user=None)
 ### Exception classes
 
 ```python
-# APIException subclasses raised directly by logic handlers
+# APIException subclasses exported from src.api.common, raised directly by logic handlers
 NotFoundError(detail)       # 404
 BadRequestError(detail)     # 400
-UnauthorizedError(detail)   # 401
 ForbiddenError(detail)      # 403
-InternalServerError(detail) # 500
 
 # fastapi-users exception translator (called by the decorator)
 handle_fastapi_users_error(fastapi_users_exception) -> APIException
 ```
+
+`exceptions.py` also defines `UnauthorizedError` (401) and `InternalServerError` (500), but they're not currently used by any handler and are not re-exported from `__init__.py`. Import them from `src.api.common.exceptions` directly if a future handler needs them.
 
 ## Tests
 
 Colocated tests cover the helpers in this directory:
 
 - `test_responses.py` — `APIResponse`, `created_response`, `updated_response`, `deleted_response`, `refreshed_response`.
-- `test_subresource_routes.py` — `SubresourceSpec` + `register_subresource_routes` (slice 8 / #253 folds this into `resource_routes`).
-- `test_resource_routes.py` — `ResourceSpec` + per-mount tests. Add a test here whenever a new mount function lands or an existing one grows a knob.
+- `test_resource_routes.py` — `ResourceSpec` + per-mount tests (covers sub-resource routes via `parent=` since slice 8 / #253). Add a test here whenever a new mount function lands or an existing one grows a knob.
 - `test_middleware.py` — ASGI middleware (currently just `StripEmptyQueryParamsMiddleware`'s pair-stripping helper; integration coverage lives next to the routes it affects).
 
 Route-level tests under `../routes/` exercise the mounts indirectly via the resources that use them; the unit tests here cover spec validation, error handling at mount time, and the path-param wiring that the route-level tests can't easily isolate.
