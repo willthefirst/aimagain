@@ -17,13 +17,12 @@ def _ck(column: str, values: tuple[str, ...]) -> CheckConstraint:
 
 
 class Provider(BaseModel):
-    """Provider's directory profile — practice info, location, and session
-    availability flags. A user may own zero, one, or many profiles; ownership
-    is recorded via the non-unique `user_id` FK. Distinct from
-    `posts/provider_availability_detail.py` (which is a per-post detail row for a
-    specific outreach `Post`); a `Provider` is a long-lived directory
-    entry that owns the provider's credential lists (licensures, educations,
-    certifications) via cascade.
+    """Long-lived provider directory entry. Owns the provider's credential
+    lists (licensures, educations, certifications) via cascade. A user may
+    own multiple profiles — `uq_provider_profiles_user_id` was dropped in
+    `8f20a93effc9` to allow it — so the `user_id` FK is intentionally
+    non-unique. Distinct from `ProviderAvailabilityDetail`, which is a
+    per-Post detail row tied to one outreach `Post`.
     """
 
     __tablename__ = _TABLE
