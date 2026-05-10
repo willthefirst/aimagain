@@ -120,7 +120,7 @@ def make_provider_availability_detail(**overrides: Any) -> ProviderAvailabilityD
 #
 # Defaults supply CHECK-constraint-valid values so tests that don't care
 # about credential specifics still produce inserts that pass DB-level
-# guards. The owning FK (`user_id` for providers, `provider_id` for
+# guards. The owning FK (`owner_id` for providers, `provider_id` for
 # sub-rows) is a required keyword-only parameter — making it required
 # turns "I forgot the FK" into a `TypeError` at the factory call site
 # instead of a `NOT NULL` violation at flush time.
@@ -185,9 +185,9 @@ def certification_payload(**overrides: Any) -> dict[str, Any]:
     return _drop_none({**_PROVIDER_CERTIFICATION_DEFAULTS, **overrides})
 
 
-def make_provider(*, user_id: UUID, **overrides: Any) -> Provider:
+def make_provider(*, owner_id: UUID, **overrides: Any) -> Provider:
     """Build a `Provider` ORM row with CHECK-valid defaults."""
-    return Provider(user_id=user_id, **{**_PROVIDER_DEFAULTS, **overrides})
+    return Provider(owner_id=owner_id, **{**_PROVIDER_DEFAULTS, **overrides})
 
 
 def make_provider_licensure(

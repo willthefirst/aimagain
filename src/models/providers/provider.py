@@ -20,7 +20,7 @@ class Provider(BaseModel):
     """Long-lived provider directory entry. Owns the provider's credential
     lists (licensures, educations, certifications) via cascade. A user may
     own multiple `Provider` rows — `uq_provider_profiles_user_id` was
-    dropped in `8f20a93effc9` to allow it — so the `user_id` FK is
+    dropped in `8f20a93effc9` to allow it — so the `owner_id` FK is
     intentionally non-unique. Distinct from `ProviderAvailabilityDetail`,
     which is a per-Post detail row tied to one outreach `Post`.
     """
@@ -32,7 +32,7 @@ class Provider(BaseModel):
         _ck("virtual_sessions", LOCATION_AVAILABILITY_OPTIONS),
     )
 
-    user_id = Column(
+    owner_id = Column(
         Uuid(as_uuid=True),
         ForeignKey("users.id", ondelete="CASCADE"),
         nullable=False,

@@ -1,7 +1,7 @@
 """Wire schemas for provider and its credential sub-entities.
 
 A `Provider` is a long-lived directory entry owned by a `User`
-(N:1 via `user_id` — a user may own zero, one, or many providers). It
+(N:1 via `owner_id` — a user may own zero, one, or many providers). It
 holds three credential lists —
 `ProviderLicensure`, `ProviderEducation`, `ProviderCertification` —
 each managed via its own endpoints in later issues. The wire surface
@@ -200,7 +200,7 @@ class ProviderCertificationAuditSnapshot(_ProviderSubrowBase):
 
 class ProviderRead(BaseModel):
     id: uuid.UUID
-    user_id: uuid.UUID
+    owner_id: uuid.UUID
     created_at: datetime
     updated_at: datetime
     practice_name: str
@@ -217,7 +217,7 @@ class ProviderRead(BaseModel):
 
 
 class ProviderCreate(BaseModel):
-    """Create payload for a provider's directory provider. `user_id` is
+    """Create payload for a provider's directory provider. `owner_id` is
     set by the route from the authenticated user, not accepted on the
     wire."""
 
@@ -268,7 +268,7 @@ provider_update_adapter: TypeAdapter = TypeAdapter(ProviderUpdate)
 
 class ProviderAuditSnapshot(BaseModel):
     id: uuid.UUID
-    user_id: uuid.UUID
+    owner_id: uuid.UUID
     created_at: datetime
     updated_at: datetime
     practice_name: str

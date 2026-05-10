@@ -201,7 +201,7 @@ def test_provider_read_validates_from_nested_dict():
     now = _now()
     payload = {
         "id": provider_id,
-        "user_id": uuid.uuid4(),
+        "owner_id": uuid.uuid4(),
         "created_at": now,
         "updated_at": now,
         "practice_name": "Sunrise",

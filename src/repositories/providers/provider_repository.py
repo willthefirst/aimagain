@@ -31,7 +31,7 @@ class ProviderRepository(BaseRepository):
         with no defined ordering, so callers needing a single canonical
         provider should not rely on this method.
         """
-        stmt = select(Provider).filter(Provider.user_id == user_id)
+        stmt = select(Provider).filter(Provider.owner_id == user_id)
         result = await self.session.execute(stmt)
         return result.scalars().first()
 
@@ -39,7 +39,7 @@ class ProviderRepository(BaseRepository):
         """Lists every provider owned by the given user, newest first."""
         stmt = (
             select(Provider)
-            .filter(Provider.user_id == user_id)
+            .filter(Provider.owner_id == user_id)
             .order_by(Provider.created_at.desc())
         )
         result = await self.session.execute(stmt)
@@ -72,7 +72,7 @@ class ProviderRepository(BaseRepository):
     # --- Provider mutations ----------------------------------------
 
     async def create_provider(self, user_id: UUID, **fields: Any) -> Provider:
-        return await self._persist_new(Provider(user_id=user_id, **fields))
+        return await self._persist_new(Provider(owner_id=user_id, **fields))
 
     async def update_provider(self, provider: Provider, **fields: Any) -> Provider:
         return await self._patch(provider, **fields)

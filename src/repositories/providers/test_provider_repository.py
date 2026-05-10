@@ -76,7 +76,7 @@ async def test_create_provider_persists_row(
             .first()
         )
         assert row is not None
-        assert row.user_id == user.id
+        assert row.owner_id == user.id
         assert row.practice_name == "Acme Health"
 
 
@@ -128,7 +128,7 @@ async def test_get_by_user_id_finds_created_provider(
         repo = ProviderRepository(session)
         found = await repo.get_by_user_id(user.id)
         assert found is not None
-        assert found.user_id == user.id
+        assert found.owner_id == user.id
 
 
 async def test_update_provider_changes_fields_visible_on_refetch(
@@ -178,7 +178,7 @@ async def test_delete_provider_cascades_licensures(
 
     async with db_test_session_manager() as session:
         async with session.begin():
-            provider = make_provider(user_id=user.id)
+            provider = make_provider(owner_id=user.id)
             session.add(provider)
             await session.flush()
             session.add(
@@ -258,8 +258,8 @@ async def test_list_providers_no_filters_returns_all(
 
     async with db_test_session_manager() as session:
         async with session.begin():
-            session.add(make_provider(user_id=user_a.id))
-            session.add(make_provider(user_id=user_b.id))
+            session.add(make_provider(owner_id=user_a.id))
+            session.add(make_provider(owner_id=user_b.id))
 
     async with db_test_session_manager() as session:
         repo = ProviderRepository(session)
@@ -275,8 +275,8 @@ async def test_list_providers_filtered_by_license_type(
 
     async with db_test_session_manager() as session:
         async with session.begin():
-            provider_a = make_provider(user_id=user_a.id)
-            provider_b = make_provider(user_id=user_b.id)
+            provider_a = make_provider(owner_id=user_a.id)
+            provider_b = make_provider(owner_id=user_b.id)
             session.add_all([provider_a, provider_b])
             await session.flush()
             session.add(
@@ -305,8 +305,8 @@ async def test_list_providers_filtered_by_issuing_state(
 
     async with db_test_session_manager() as session:
         async with session.begin():
-            provider_a = make_provider(user_id=user_a.id)
-            provider_b = make_provider(user_id=user_b.id)
+            provider_a = make_provider(owner_id=user_a.id)
+            provider_b = make_provider(owner_id=user_b.id)
             session.add_all([provider_a, provider_b])
             await session.flush()
             session.add(
@@ -337,9 +337,9 @@ async def test_list_providers_combined_filter_is_anded(
 
     async with db_test_session_manager() as session:
         async with session.begin():
-            provider_a = make_provider(user_id=user_a.id)
-            provider_b = make_provider(user_id=user_b.id)
-            provider_c = make_provider(user_id=user_c.id)
+            provider_a = make_provider(owner_id=user_a.id)
+            provider_b = make_provider(owner_id=user_b.id)
+            provider_c = make_provider(owner_id=user_c.id)
             session.add_all([provider_a, provider_b, provider_c])
             await session.flush()
             # A: matches both filters
@@ -376,7 +376,7 @@ async def test_list_providers_distinct_when_multiple_licensures_match(
 
     async with db_test_session_manager() as session:
         async with session.begin():
-            provider = make_provider(user_id=user.id)
+            provider = make_provider(owner_id=user.id)
             session.add(provider)
             await session.flush()
             session.add(
@@ -412,7 +412,7 @@ async def test_licensure_crud_round_trip(
 
     async with db_test_session_manager() as session:
         async with session.begin():
-            provider = make_provider(user_id=user.id)
+            provider = make_provider(owner_id=user.id)
             session.add(provider)
             await session.flush()
             provider_id = provider.id
@@ -455,7 +455,7 @@ async def test_education_crud_round_trip(
 
     async with db_test_session_manager() as session:
         async with session.begin():
-            provider = make_provider(user_id=user.id)
+            provider = make_provider(owner_id=user.id)
             session.add(provider)
             await session.flush()
             provider_id = provider.id
@@ -497,7 +497,7 @@ async def test_certification_crud_round_trip(
 
     async with db_test_session_manager() as session:
         async with session.begin():
-            provider = make_provider(user_id=user.id)
+            provider = make_provider(owner_id=user.id)
             session.add(provider)
             await session.flush()
             provider_id = provider.id

@@ -150,9 +150,7 @@ async def handle_get_provider_detail(
     each sub-section without further queries.
     """
     provider = await _load_provider_or_404(provider_id, repo)
-    can_edit = is_owner(provider, requesting_user, owner_attr="user_id") or is_admin(
-        requesting_user
-    )
+    can_edit = is_owner(provider, requesting_user) or is_admin(requesting_user)
     return {
         "request": request,
         "provider": provider,
@@ -227,9 +225,7 @@ async def handle_get_provider_edit_form(
     each sub-section without further queries.
     """
     provider = await _load_provider_or_404(provider_id, repo)
-    assert_owner_or_admin(
-        provider, requesting_user, owner_attr="user_id", action="modify this provider"
-    )
+    assert_owner_or_admin(provider, requesting_user, action="modify this provider")
     return {"request": request, "provider": provider, "current_user": requesting_user}
 
 
@@ -279,9 +275,7 @@ async def handle_update_provider(
 ) -> Provider:
     """Patches practice/availability fields on the provider. Owner-or-admin only."""
     provider = await _load_provider_or_404(provider_id, repo)
-    assert_owner_or_admin(
-        provider, requesting_user, owner_attr="user_id", action="modify this provider"
-    )
+    assert_owner_or_admin(provider, requesting_user, action="modify this provider")
 
     async with mutate(
         repo,
@@ -309,9 +303,7 @@ async def handle_delete_provider(
     durable record.
     """
     provider = await _load_provider_or_404(provider_id, repo)
-    assert_owner_or_admin(
-        provider, requesting_user, owner_attr="user_id", action="modify this provider"
-    )
+    assert_owner_or_admin(provider, requesting_user, action="modify this provider")
 
     async with mutate(
         repo,
@@ -376,9 +368,7 @@ async def _handle_subrow_create(
     spec: _SubrowSpec,
 ) -> Any:
     provider = await _load_provider_or_404(provider_id, repo)
-    assert_owner_or_admin(
-        provider, requesting_user, owner_attr="user_id", action="modify this provider"
-    )
+    assert_owner_or_admin(provider, requesting_user, action="modify this provider")
 
     created = await getattr(repo, spec.add)(provider, **payload.model_dump())
     async with mutate(
@@ -404,9 +394,7 @@ async def _handle_subrow_update(
     spec: _SubrowSpec,
 ) -> Any:
     provider = await _load_provider_or_404(provider_id, repo)
-    assert_owner_or_admin(
-        provider, requesting_user, owner_attr="user_id", action="modify this provider"
-    )
+    assert_owner_or_admin(provider, requesting_user, action="modify this provider")
 
     row = await _load_subrow_or_404(
         getattr(repo, spec.get_by_id), child_id, provider.id, name=spec.display_name
@@ -433,9 +421,7 @@ async def _handle_subrow_delete(
     spec: _SubrowSpec,
 ) -> None:
     provider = await _load_provider_or_404(provider_id, repo)
-    assert_owner_or_admin(
-        provider, requesting_user, owner_attr="user_id", action="modify this provider"
-    )
+    assert_owner_or_admin(provider, requesting_user, action="modify this provider")
 
     row = await _load_subrow_or_404(
         getattr(repo, spec.get_by_id), child_id, provider.id, name=spec.display_name

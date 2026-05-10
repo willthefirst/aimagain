@@ -49,7 +49,7 @@ async def test_create_provider_persists(
         provider = (
             (
                 await session.execute(
-                    select(Provider).filter(Provider.user_id == user.id)
+                    select(Provider).filter(Provider.owner_id == user.id)
                 )
             )
             .scalars()
@@ -74,7 +74,7 @@ async def test_provider_allows_multiple_per_user(
         async with session.begin():
             session.add(
                 Provider(
-                    user_id=user.id,
+                    owner_id=user.id,
                     practice_name="Other Practice",
                     location_city="Springfield",
                     location_state="IL",
@@ -85,7 +85,7 @@ async def test_provider_allows_multiple_per_user(
             )
 
         result = await session.execute(
-            select(Provider).filter(Provider.user_id == user.id)
+            select(Provider).filter(Provider.owner_id == user.id)
         )
         providers = result.scalars().all()
         assert len(providers) == 2
