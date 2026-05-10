@@ -56,3 +56,19 @@ async def parse_and_validate_form(request: Request, adapter: TypeAdapter):
     """
     payload_dict = await parse_form_to_payload(request)
     return validate_or_422(adapter, payload_dict)
+
+
+async def parse_and_validate_json(request: Request, adapter: TypeAdapter):
+    """Parse a JSON request body and validate it through `adapter`.
+
+    Mirrors `parse_and_validate_form` for state-axis subresources whose
+    PUT bodies arrive as JSON (e.g. `PUT /users/{id}/activation`). Form
+    encoding is the standard for HTML forms; state-axis flips are
+    typically issued by HTMX with a JSON body since there's no form to
+    submit (just a button).
+    """
+    try:
+        payload_dict = await request.json()
+    except Exception:
+        raise HTTPException(status_code=422, detail="Invalid JSON body")
+    return validate_or_422(adapter, payload_dict)

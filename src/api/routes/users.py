@@ -1,8 +1,6 @@
 import logging
-from uuid import UUID
 
-from fastapi import APIRouter, Depends
-from fastapi.responses import JSONResponse
+from fastapi import APIRouter
 
 from src.api.common import BaseRouter
 from src.api.common.resource_routes import (
@@ -11,6 +9,7 @@ from src.api.common.resource_routes import (
     mount_detail,
     mount_list,
     mount_related_list,
+    mount_state_axis,
 )
 from src.api.routes.providers import PROVIDER_SPEC
 from src.auth_config import current_active_user, current_admin_user
@@ -22,14 +21,11 @@ from src.logic.users.user_processing import (
     handle_list_users,
     handle_set_user_activation,
 )
-from src.models import User
-from src.repositories.audit_repository import AuditRepository
 from src.repositories.dependencies import (
     get_audit_repository,
     get_provider_repository,
     get_user_repository,
 )
-from src.repositories.users.user_repository import UserRepository
 from src.schemas.users.user import UserActivationUpdate
 
 users_api_router = APIRouter(prefix="/users")
@@ -82,30 +78,23 @@ mount_related_list(
 )
 
 
-@router.put("/{user_id}/activation")
-async def set_user_activation(
-    user_id: UUID,
-    payload: UserActivationUpdate,
-    user_repo: UserRepository = Depends(get_user_repository),
-    audit_repo: AuditRepository = Depends(get_audit_repository),
-    admin: User = Depends(current_admin_user),
-):
-    """Admin-only: activate or deactivate a user."""
-    updated = await handle_set_user_activation(
-        user_id=user_id,
-        payload=payload,
-        repo=user_repo,
-        audit_repo=audit_repo,
-        requesting_user=admin,
-    )
-    return JSONResponse(
-        content={
-            "id": str(updated.id),
-            "username": updated.username,
-            "is_active": updated.is_active,
-        },
-        headers={"HX-Refresh": "true"},
-    )
+# PUT /users/{user_id}/activation — admin-only state-axis flip.
+# `response_to_dict` projects the User into the activation-axis wire shape
+# (`is_active` is the field this axis can change; `id`/`username` are
+# included for client-side reconciliation).
+mount_state_axis(
+    router,
+    USER_SPEC,
+    handler=handle_set_user_activation,
+    axis_name="activation",
+    body_schema=UserActivationUpdate,
+    audit_repo_dep=get_audit_repository,
+    response_to_dict=lambda user: {
+        "id": str(user.id),
+        "username": user.username,
+        "is_active": user.is_active,
+    },
+)
 
 
 # DELETE /users/{user_id} is mounted via the unified ResourceSpec grammar.

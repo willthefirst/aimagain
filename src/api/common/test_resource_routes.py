@@ -12,11 +12,13 @@ mount functions end-to-end. Validates that:
 """
 
 from types import SimpleNamespace
+from typing import Literal
 from uuid import uuid4
 
 import pytest
 from fastapi import APIRouter, FastAPI
 from fastapi.testclient import TestClient
+from pydantic import BaseModel
 
 from src.api.common.resource_routes import (
     QueryParam,
@@ -26,6 +28,7 @@ from src.api.common.resource_routes import (
     mount_form,
     mount_list,
     mount_related_list,
+    mount_state_axis,
 )
 
 
@@ -697,6 +700,139 @@ def test_mount_related_list_requires_template():
             handler=lambda **_: {},
             template="",
         )
+
+
+# --- mount_state_axis ----------------------------------------------------
+
+
+class _AxisBody(BaseModel):
+    state: Literal["on", "off"]
+
+
+def _build_state_axis_app(spec: ResourceSpec, handler, *, axis_name="toggle", **kwargs):
+    app = FastAPI()
+    router = APIRouter(prefix=f"/{spec.collection}")
+    mount_state_axis(
+        router,
+        spec,
+        handler=handler,
+        axis_name=axis_name,
+        body_schema=_AxisBody,
+        audit_repo_dep=lambda: SimpleNamespace(name="audit_repo"),
+        **kwargs,
+    )
+    app.include_router(router)
+    return app
+
+
+def test_mount_state_axis_happy_path_returns_hx_refresh_with_projected_body():
+    """PUT /<collection>/{id}/<axis> calls handler, projects via
+    response_to_dict, returns 200 + HX-Refresh + projected body."""
+    captured: dict = {}
+
+    async def handler(**kwargs):
+        captured.update(kwargs)
+        return SimpleNamespace(id=kwargs["widget_id"], name="w1", state="on")
+
+    spec = ResourceSpec(
+        collection="widgets",
+        id_param="widget_id",
+        repo_dep=lambda: SimpleNamespace(name="repo"),
+        write_user_dep=lambda: SimpleNamespace(id=uuid4(), is_superuser=True),
+    )
+    app = _build_state_axis_app(
+        spec,
+        handler,
+        response_to_dict=lambda w: {"id": str(w.id), "name": w.name, "state": w.state},
+    )
+    widget_id = uuid4()
+    resp = TestClient(app).put(f"/widgets/{widget_id}/toggle", json={"state": "on"})
+    assert resp.status_code == 200
+    assert resp.headers["HX-Refresh"] == "true"
+    assert "HX-Redirect" not in resp.headers
+    body = resp.json()
+    assert body == {"id": str(widget_id), "name": "w1", "state": "on"}
+    # Handler received id under the spec's id_param + the validated payload.
+    assert str(captured["widget_id"]) == str(widget_id)
+    assert isinstance(captured["payload"], _AxisBody)
+    assert captured["payload"].state == "on"
+    assert captured["repo"].name == "repo"
+    assert captured["audit_repo"].name == "audit_repo"
+
+
+def test_mount_state_axis_invalid_body_returns_422():
+    async def handler(**kwargs):
+        raise AssertionError("handler should not be called for invalid body")
+
+    spec = ResourceSpec(
+        collection="widgets",
+        id_param="widget_id",
+        repo_dep=lambda: SimpleNamespace(name="repo"),
+        write_user_dep=lambda: SimpleNamespace(id=uuid4(), is_superuser=True),
+    )
+    app = _build_state_axis_app(spec, handler)
+    resp = TestClient(app).put(f"/widgets/{uuid4()}/toggle", json={"state": "bogus"})
+    assert resp.status_code == 422
+
+
+def test_mount_state_axis_path_includes_axis_name():
+    """Wrong axis segment ⇒ 404 (route not registered under that path)."""
+
+    async def handler(**kwargs):
+        return SimpleNamespace(id=uuid4())
+
+    spec = ResourceSpec(
+        collection="widgets",
+        id_param="widget_id",
+        repo_dep=lambda: SimpleNamespace(name="repo"),
+        write_user_dep=lambda: SimpleNamespace(id=uuid4(), is_superuser=True),
+    )
+    app = _build_state_axis_app(spec, handler, axis_name="activation")
+    # Right axis works:
+    ok = TestClient(app).put(f"/widgets/{uuid4()}/activation", json={"state": "on"})
+    assert ok.status_code == 200
+    # Wrong axis 404s:
+    bad = TestClient(app).put(f"/widgets/{uuid4()}/somethingelse", json={"state": "on"})
+    assert bad.status_code == 404
+
+
+def test_mount_state_axis_requires_write_user_dep():
+    spec = ResourceSpec(
+        collection="widgets",
+        id_param="widget_id",
+        repo_dep=lambda: None,
+        # write_user_dep intentionally omitted
+    )
+    router = APIRouter()
+    with pytest.raises(ValueError, match="write_user_dep"):
+        mount_state_axis(
+            router,
+            spec,
+            handler=lambda **_: None,
+            axis_name="toggle",
+            body_schema=_AxisBody,
+            audit_repo_dep=lambda: None,
+        )
+
+
+def test_mount_state_axis_no_response_to_dict_returns_empty_body():
+    """Without `response_to_dict`, the body is `{}` — handler still runs
+    and the HX-Refresh header still fires."""
+
+    async def handler(**kwargs):
+        return SimpleNamespace(id=kwargs["widget_id"])
+
+    spec = ResourceSpec(
+        collection="widgets",
+        id_param="widget_id",
+        repo_dep=lambda: SimpleNamespace(name="repo"),
+        write_user_dep=lambda: SimpleNamespace(id=uuid4(), is_superuser=True),
+    )
+    app = _build_state_axis_app(spec, handler)
+    resp = TestClient(app).put(f"/widgets/{uuid4()}/toggle", json={"state": "off"})
+    assert resp.status_code == 200
+    assert resp.json() == {}
+    assert resp.headers["HX-Refresh"] == "true"
 
 
 def test_mount_delete_404_propagates_from_handler():

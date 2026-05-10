@@ -124,7 +124,7 @@ class MockDataFactory:
             user_read = cls.create_user_read(is_active=False)
 
         return {
-            "src.api.routes.users.handle_set_user_activation": {
+            "src.logic.users.user_processing.handle_set_user_activation": {
                 "return_value_config": user_read
             }
         }

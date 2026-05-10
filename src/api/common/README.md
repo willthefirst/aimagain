@@ -78,7 +78,7 @@ Common utilities handle concerns that span multiple routes and domains.
 - `responses.py` - Standardized response formatting for JSON and HTML
 - `decorators.py` - Error handling and logging decorators applied to all routes
 - `exceptions.py` - `APIException` subclasses (`NotFoundError`, `ForbiddenError`, ...) raised by logic, plus the fastapi-users → HTTP translator
-- `forms.py` - HTTP-adapter primitives for form-encoded route bodies: `parse_form_to_payload(request)` (form → dict, lists for repeated keys) and `validate_or_422(adapter, payload_dict)` (run a `TypeAdapter`, translate `ValidationError` to 422 with `[{"loc","msg","type"}]`). Home for any HTTP-adapter primitive that two or more route modules would otherwise import from each other.
+- `forms.py` - HTTP-adapter primitives for request bodies: `parse_form_to_payload(request)` (form → dict, lists for repeated keys), `validate_or_422(adapter, payload_dict)` (run a `TypeAdapter`, translate `ValidationError` to 422 with `[{"loc","msg","type"}]`), and the back-to-back wrappers `parse_and_validate_form` / `parse_and_validate_json` (form-encoded vs. JSON body — state-axis subresources use the JSON variant). Home for any HTTP-adapter primitive that two or more route modules would otherwise import from each other.
 - `resource_routes.py` - Unified `ResourceSpec` + opt-in `mount_*` grammar (covers top-level *and* sub-resource CRUD via `parent=`). See [Unified resource grammar](#unified-resource-grammar) below.
 
 **Package infrastructure:**
@@ -145,6 +145,7 @@ Secondary repos (e.g. `user_repo: UserRepository` in the multi-repo `handle_list
 | `mount_form` | Landed (slice 5 / #250) | `providers` (GET /form, GET /{id}/form); `posts` (edit form via handler-returned template_name) |
 | `mount_create` / `mount_update` | Landed (slice 6 / #251) | `providers`, `posts`, `licensures`, `educations`, `certifications` |
 | `mount_related_list` | Landed (slice 9 / #254) | `users` (GET /{id}/providers) |
+| `mount_state_axis` | Landed (#302) | `users` (PUT /{id}/activation) |
 | Sub-resource via `parent=` | Landed (slice 8 / #253) | `licensures`, `educations`, `certifications` (under providers) |
 
 ### Multi-repo handlers: `extra_repo_deps`
@@ -224,7 +225,6 @@ Per-mount docstrings in `resource_routes.py` are the canonical reference for req
 The grammar fits resource-shaped routes. It's deliberately **not** a home for:
 
 - **Auth flows** — register/login/verify/reset-password live in `auth_routes.py` / `auth_pages.py`. State-machine semantics, not CRUD.
-- **State-mutation actions like `PUT /users/{id}/activation`** — idempotent set with `HX-Refresh`, not partial edit with `HX-Redirect`. Doesn't match `mount_update` semantics.
 - **Utility endpoints** — `/`, `/health`.
 
 Slice 10 (#255) documents these explicitly. If a future case suggests the grammar should grow to fit them, that's the moment to reshape `ResourceSpec`, not to escape-hatch around it.
@@ -417,8 +417,9 @@ Both decorators are wrapped onto every endpoint by `BaseRouter`; route files don
 # Mutation helpers (module-level functions in responses.py)
 created_response(id, location, hx_redirect=None)   # 201, sets Location + HX-Redirect
 updated_response(body=None, hx_redirect=...)       # 200 + HX-Redirect
+updated_response(body=..., hx_refresh=True)        # 200 + HX-Refresh (state-axis flips)
 deleted_response(hx_redirect=...)                  # 204 + HX-Redirect
-refreshed_response()                               # 200 + HX-Refresh: true
+refreshed_response()                               # 200 + HX-Refresh: true (no body)
 
 # HTML responses (method on APIResponse)
 APIResponse.html_response(template_name, context, request, current_user=None)
