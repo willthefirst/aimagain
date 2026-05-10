@@ -152,12 +152,12 @@ class MockDataFactory:
         `Location` / `HX-Redirect` headers. A `SimpleNamespace` exposing
         `id` is sufficient.
         """
-        stub_profile = SimpleNamespace(
+        stub_provider = SimpleNamespace(
             id=UUID("33333333-3333-3333-3333-333333333333"),
         )
         return {
             "src.logic.providers.provider_processing.handle_create_provider": {
-                "return_value_config": stub_profile
+                "return_value_config": stub_provider
             }
         }
 
@@ -166,14 +166,13 @@ class MockDataFactory:
         """Mock for `handle_update_provider`.
 
         The route under test (`PATCH /providers/{id}`) packs the
-        handler's return value through `_profile_read_dict`, which calls
-        `ProviderRead.model_validate` — so the stub must expose
-        every field that schema requires.
+        handler's return value through `ProviderRead.model_validate` — so
+        the stub must expose every field that schema requires.
         """
         from datetime import datetime, timezone
 
         now = datetime.now(timezone.utc)
-        stub_profile = SimpleNamespace(
+        stub_provider = SimpleNamespace(
             id=UUID("44444444-4444-4444-4444-444444444444"),
             user_id=UUID("00000000-0000-0000-0000-000000000004"),
             created_at=now,
@@ -190,6 +189,6 @@ class MockDataFactory:
         )
         return {
             "src.logic.providers.provider_processing.handle_update_provider": {
-                "return_value_config": stub_profile
+                "return_value_config": stub_provider
             }
         }

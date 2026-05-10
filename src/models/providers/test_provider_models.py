@@ -1,9 +1,10 @@
 """Tests for the four `Provider`-family models.
 
-Exercises the invariants the DB layer owns: the per-user UniqueConstraint
-on `provider_profiles`, the cascade from a profile down to its credential
-lists, and the CHECK constraints rendered from the controlled-vocabulary
-tuples in `enums.py`.
+Exercises the invariants the DB layer owns: that multiple `Provider` rows
+per user are allowed (the original `uq_provider_profiles_user_id` was
+dropped in `8f20a93effc9`), the cascade from a `Provider` down to its
+credential lists, and the CHECK constraints rendered from the
+controlled-vocabulary tuples in `enums.py`.
 """
 
 import pytest
@@ -22,7 +23,7 @@ from tests.helpers import create_test_user
 pytestmark = pytest.mark.asyncio
 
 
-def _make_profile(user, **overrides) -> Provider:
+def _make_provider(user, **overrides) -> Provider:
     defaults = dict(
         user=user,
         practice_name="Acme Health",
@@ -42,10 +43,10 @@ async def test_create_provider_persists(
     async with db_test_session_manager() as session:
         async with session.begin():
             session.add(user)
-            session.add(_make_profile(user))
+            session.add(_make_provider(user))
 
     async with db_test_session_manager() as session:
-        profile = (
+        provider = (
             (
                 await session.execute(
                     select(Provider).filter(Provider.user_id == user.id)
@@ -54,8 +55,8 @@ async def test_create_provider_persists(
             .scalars()
             .first()
         )
-        assert profile is not None
-        assert profile.practice_name == "Acme Health"
+        assert provider is not None
+        assert provider.practice_name == "Acme Health"
 
 
 async def test_provider_allows_multiple_per_user(
@@ -67,7 +68,7 @@ async def test_provider_allows_multiple_per_user(
     async with db_test_session_manager() as session:
         async with session.begin():
             session.add(user)
-            session.add(_make_profile(user))
+            session.add(_make_provider(user))
 
     async with db_test_session_manager() as session:
         async with session.begin():
@@ -86,12 +87,12 @@ async def test_provider_allows_multiple_per_user(
         result = await session.execute(
             select(Provider).filter(Provider.user_id == user.id)
         )
-        profiles = result.scalars().all()
-        assert len(profiles) == 2
-        assert {p.practice_name for p in profiles} == {"Acme Health", "Other Practice"}
+        providers = result.scalars().all()
+        assert len(providers) == 2
+        assert {p.practice_name for p in providers} == {"Acme Health", "Other Practice"}
 
 
-async def test_delete_profile_cascades_credentials(
+async def test_delete_provider_cascades_credentials(
     db_test_session_manager: async_sessionmaker[AsyncSession],
 ):
     """Deleting a `Provider` removes its licensures, educations,
@@ -100,28 +101,28 @@ async def test_delete_profile_cascades_credentials(
     async with db_test_session_manager() as session:
         async with session.begin():
             session.add(user)
-            profile = _make_profile(user)
-            profile.licensures.append(
+            provider = _make_provider(user)
+            provider.licensures.append(
                 ProviderLicensure(
                     license_type="lcsw",
                     license_number="LCSW-123",
                     issuing_state="IL",
                 )
             )
-            profile.educations.append(
+            provider.educations.append(
                 ProviderEducation(
                     education_type="msw",
                     institution="State University",
                 )
             )
-            profile.certifications.append(
+            provider.certifications.append(
                 ProviderCertification(
                     certification_type="emdr",
                     certifying_body="EMDRIA",
                 )
             )
-            session.add(profile)
-        provider_id = profile.id
+            session.add(provider)
+        provider_id = provider.id
 
     async with db_test_session_manager() as session:
         async with session.begin():
@@ -150,9 +151,9 @@ async def test_invalid_license_type_violates_check_constraint(
     async with db_test_session_manager() as session:
         async with session.begin():
             session.add(user)
-            profile = _make_profile(user)
-            session.add(profile)
-        provider_id = profile.id
+            provider = _make_provider(user)
+            session.add(provider)
+        provider_id = provider.id
 
     with pytest.raises(IntegrityError):
         async with db_test_session_manager() as session:

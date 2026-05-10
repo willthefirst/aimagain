@@ -7,12 +7,12 @@
 <h1 id="user-providers-heading">{{ target_user.username }}&rsquo;s providers</h1>
 {% endif %}
 
-{% if profiles %}
-<ul id="user-providers" class="profiles-list">
-  {%- for profile in profiles %}
+{% if providers %}
+<ul id="user-providers" class="providers-list">
+  {%- for provider in providers %}
   <li>
-    <a href="/providers/{{ profile.id }}">{{ profile.practice_name }}</a>
-    &mdash; {{ profile.location_city }}, {{ profile.location_state }}
+    <a href="/providers/{{ provider.id }}">{{ provider.practice_name }}</a>
+    &mdash; {{ provider.location_city }}, {{ provider.location_state }}
   </li>
   {%- endfor %}
 </ul>

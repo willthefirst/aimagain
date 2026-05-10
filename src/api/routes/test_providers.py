@@ -39,19 +39,19 @@ async def _seed_provider_for(
     user_id: uuid.UUID,
     **overrides,
 ) -> uuid.UUID:
-    """Insert a profile owned by `user_id` and return its id."""
-    profile = make_provider(user_id=user_id, **overrides)
+    """Insert a provider owned by `user_id` and return its id."""
+    provider = make_provider(user_id=user_id, **overrides)
     async with db_test_session_manager() as session:
         async with session.begin():
-            session.add(profile)
-        await session.refresh(profile)
-        return profile.id
+            session.add(provider)
+        await session.refresh(provider)
+        return provider.id
 
 
 async def _seed_other_user_with_provider(
     db_test_session_manager: async_sessionmaker[AsyncSession],
 ) -> tuple[uuid.UUID, uuid.UUID]:
-    """Create a second user + their profile. Returns (user_id, provider_id)."""
+    """Create a second user + their provider. Returns (user_id, provider_id)."""
     other = create_test_user(username=f"other-{uuid.uuid4()}")
     async with db_test_session_manager() as session:
         async with session.begin():
@@ -73,16 +73,16 @@ async def _audit_rows_for(
         )
 
 
-# --- Profile create ------------------------------------------------------
+# --- Provider create ------------------------------------------------------
 
 
-async def test_create_profile_happy_path(
+async def test_create_provider_happy_path(
     authenticated_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user: User,
 ):
     """POST /providers with a form-encoded body returns 201 + id and
-    persists the profile and an audit row."""
+    persists the provider and an audit row."""
     response = await authenticated_client.post(
         "/providers",
         data=provider_payload(practice_name="Acme Therapy"),
@@ -110,7 +110,7 @@ async def test_create_profile_happy_path(
     assert rows[0].actor_id == logged_in_user.id
 
 
-async def test_create_profile_allows_multiple_per_user(
+async def test_create_provider_allows_multiple_per_user(
     authenticated_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user: User,
@@ -140,10 +140,10 @@ async def test_create_profile_allows_multiple_per_user(
         assert {p.practice_name for p in owned} == {"First", "Second"}
 
 
-# --- Profile reads -------------------------------------------------------
+# --- Provider reads -------------------------------------------------------
 
 
-async def test_get_profile_renders_detail_page(
+async def test_get_provider_renders_detail_page(
     authenticated_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user: User,
@@ -173,12 +173,12 @@ async def test_get_profile_renders_detail_page(
     assert tree.css_first("form") is None
 
 
-async def test_get_profile_hides_edit_link_for_non_owner(
+async def test_get_provider_hides_edit_link_for_non_owner(
     authenticated_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user: User,
 ):
-    """A non-owner viewing someone else's profile sees the detail content
+    """A non-owner viewing someone else's provider sees the detail content
     but no Edit link."""
     other = create_test_user(username=f"other-{uuid.uuid4()}")
     async with db_test_session_manager() as session:
@@ -193,15 +193,15 @@ async def test_get_profile_hides_edit_link_for_non_owner(
     assert tree.css_first(f'a[href="/providers/{provider_id}/form"]') is None
 
 
-# --- Profile listing -----------------------------------------------------
+# --- Provider listing -----------------------------------------------------
 
 
-async def test_list_profiles_renders_html(
+async def test_list_providers_renders_html(
     authenticated_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],
 ):
     """`GET /providers` renders an HTML page with one entry per
-    persisted profile, regardless of which user owns it."""
+    persisted provider, regardless of which user owns it."""
     other = create_test_user(username=f"other-{uuid.uuid4()}")
     async with db_test_session_manager() as session:
         async with session.begin():
@@ -215,16 +215,16 @@ async def test_list_profiles_renders_html(
     assert response.status_code == 200
     assert response.headers["content-type"].startswith("text/html")
     tree = HTMLParser(response.text)
-    items = tree.css("ul.profiles-list li")
+    items = tree.css("ul.providers-list li")
     assert len(items) == 1
     assert tree.css_first(f'a[href="/providers/{provider_id}"]') is not None
     assert "Open House" in response.text
 
 
-async def test_list_profiles_renders_empty_state(
+async def test_list_providers_renders_empty_state(
     authenticated_client: AsyncClient,
 ):
-    """With no persisted profiles, the page renders a friendly empty
+    """With no persisted providers, the page renders a friendly empty
     message instead of an empty `<ul>`. With no filter set, the filter
     form's `<option value="">Any</option>` is the preselected entry on
     each `<select>` (the `filter_select_field` macro contract)."""
@@ -232,7 +232,7 @@ async def test_list_profiles_renders_empty_state(
     assert response.status_code == 200
     assert "No providers found" in response.text
     tree = HTMLParser(response.text)
-    assert tree.css_first("ul.profiles-list") is None
+    assert tree.css_first("ul.providers-list") is None
     for select_name in ("license_type", "issuing_state"):
         selected = tree.css_first(f'select[name="{select_name}"] option[selected]')
         assert selected is not None
@@ -242,11 +242,11 @@ async def test_list_profiles_renders_empty_state(
         assert selected.text().strip() == "Any"
 
 
-async def test_list_profiles_filters_by_license_type(
+async def test_list_providers_filters_by_license_type(
     authenticated_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],
 ):
-    """`?license_type=` keeps only profiles holding a matching licensure;
+    """`?license_type=` keeps only providers holding a matching licensure;
     the filter form preselects the active value."""
     user_a = create_test_user(username=f"ua-{uuid.uuid4()}")
     user_b = create_test_user(username=f"ub-{uuid.uuid4()}")
@@ -254,44 +254,44 @@ async def test_list_profiles_filters_by_license_type(
         async with session.begin():
             session.add(user_a)
             session.add(user_b)
-    profile_a = await _seed_provider_for(
+    provider_a = await _seed_provider_for(
         db_test_session_manager, user_id=user_a.id, practice_name="A clinic"
     )
-    profile_b = await _seed_provider_for(
+    provider_b = await _seed_provider_for(
         db_test_session_manager, user_id=user_b.id, practice_name="B clinic"
     )
 
     async with db_test_session_manager() as session:
         async with session.begin():
             session.add(
-                make_provider_licensure(provider_id=profile_a, license_type="psyd")
+                make_provider_licensure(provider_id=provider_a, license_type="psyd")
             )
             session.add(
-                make_provider_licensure(provider_id=profile_b, license_type="lcsw")
+                make_provider_licensure(provider_id=provider_b, license_type="lcsw")
             )
 
     response = await authenticated_client.get("/providers?license_type=psyd")
 
     assert response.status_code == 200
     tree = HTMLParser(response.text)
-    items = tree.css("ul.profiles-list li")
+    items = tree.css("ul.providers-list li")
     assert len(items) == 1
-    assert tree.css_first(f'a[href="/providers/{profile_a}"]') is not None
-    assert tree.css_first(f'a[href="/providers/{profile_b}"]') is None
+    assert tree.css_first(f'a[href="/providers/{provider_a}"]') is not None
+    assert tree.css_first(f'a[href="/providers/{provider_b}"]') is None
     # Filter form preserves the active selection.
     selected = tree.css_first('select[name="license_type"] option[selected]')
     assert selected is not None
     assert selected.attributes.get("value") == "psyd"
 
 
-async def test_list_profiles_treats_empty_filter_values_as_absent(
+async def test_list_providers_treats_empty_filter_values_as_absent(
     authenticated_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],
 ):
     """Pressing "Apply" on the filter form with no selection submits
     `?license_type=&issuing_state=` — empty values, not absent. The
     `StripEmptyQueryParamsMiddleware` removes those pairs at request
-    entry so the route's declared defaults fire and every profile
+    entry so the route's declared defaults fire and every provider
     renders, the same as visiting `/providers` with no query string.
     Without the middleware the empty strings reach the repo's filter
     and zero rows match (the bug this regression test guards)."""
@@ -307,14 +307,14 @@ async def test_list_profiles_treats_empty_filter_values_as_absent(
 
     assert response.status_code == 200
     tree = HTMLParser(response.text)
-    items = tree.css("ul.profiles-list li")
+    items = tree.css("ul.providers-list li")
     assert len(items) == 1, "Empty filter values should not exclude rows"
 
 
-# --- Profile update ------------------------------------------------------
+# --- Provider update ------------------------------------------------------
 
 
-async def test_patch_profile_updates_fields(
+async def test_patch_provider_updates_fields(
     authenticated_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user: User,
@@ -341,7 +341,7 @@ async def test_patch_profile_updates_fields(
         assert refreshed.practice_name == "New Name"
 
 
-async def test_patch_profile_returns_403_if_not_owner(
+async def test_patch_provider_returns_403_if_not_owner(
     authenticated_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user: User,
@@ -355,10 +355,10 @@ async def test_patch_profile_returns_403_if_not_owner(
     assert response.status_code == 403
 
 
-# --- Profile delete ------------------------------------------------------
+# --- Provider delete ------------------------------------------------------
 
 
-async def test_delete_profile_returns_204_and_cascades(
+async def test_delete_provider_returns_204_and_cascades(
     authenticated_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user: User,
@@ -403,7 +403,7 @@ async def test_delete_profile_returns_204_and_cascades(
         ).scalars().first() is None
 
 
-async def test_delete_profile_returns_403_if_not_owner(
+async def test_delete_provider_returns_403_if_not_owner(
     authenticated_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user: User,
@@ -488,13 +488,13 @@ async def test_patch_licensure_updates_fields(
     assert response.json()["license_number"] == "L-2"
 
 
-async def test_patch_licensure_returns_404_for_mismatched_profile(
+async def test_patch_licensure_returns_404_for_mismatched_provider(
     authenticated_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user: User,
 ):
-    """A licensure_id that belongs to a different profile must 404, not silently
-    update across profile boundaries."""
+    """A licensure_id that belongs to a different provider must 404, not silently
+    update across provider boundaries."""
     my_provider_id = await _seed_provider_for(
         db_test_session_manager, user_id=logged_in_user.id
     )
@@ -658,7 +658,7 @@ async def test_owner_can_open_edit_form(
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user: User,
 ):
-    """Owner sees the edit form pre-filled with profile fields and any
+    """Owner sees the edit form pre-filled with provider fields and any
     existing credential sub-rows."""
     provider_id = await _seed_provider_for(
         db_test_session_manager,
@@ -697,7 +697,7 @@ async def test_owner_can_open_edit_form(
     )
 
 
-async def test_admin_can_open_edit_form_for_any_profile(
+async def test_admin_can_open_edit_form_for_any_provider(
     authenticated_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user: User,

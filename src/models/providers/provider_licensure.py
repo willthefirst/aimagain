@@ -17,7 +17,7 @@ def _ck(column: str, values: tuple[str, ...]) -> CheckConstraint:
 
 class ProviderLicensure(BaseModel):
     """One row per professional license held by a provider. CASCADE on the
-    parent FK keeps the credential list in lockstep with the profile."""
+    parent FK keeps the credential list in lockstep with the `Provider`."""
 
     __tablename__ = _TABLE
     __table_args__ = (

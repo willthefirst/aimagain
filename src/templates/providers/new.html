@@ -3,7 +3,7 @@
 {% block title %}Create provider{% endblock %}
 {% block content %}
 <h1>Create provider</h1>
-<p>Practice details only. Add licensures, education, and certifications after creating the profile.</p>
+<p>Practice details only. Add licensures, education, and certifications after creating the provider.</p>
 
 <form hx-post="/providers">
   <fieldset>
@@ -20,9 +20,9 @@
     {{ field_for(schema, "virtual_sessions", "Virtual sessions") }}
   </fieldset>
 
-  <input type="submit" value="Create profile" />
+  <input type="submit" value="Create provider" />
 </form>
 
 <hr />
-<a href="/providers">Back to profiles</a>
+<a href="/providers">Back to providers</a>
 {% endblock %}

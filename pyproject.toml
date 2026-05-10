@@ -98,7 +98,7 @@ markers = [
     "auth: contract pairs whose provider is `auth-api`",
     "users: contract pairs whose provider is `users-api`",
     "posts: contract pairs whose provider is `posts-api`",
-    "provider_profiles: contract pairs whose provider is `provider-profiles-api`",
+    "providers: contract pairs whose provider is `providers-api`",
 ]
 
 [tool.title-case-check]

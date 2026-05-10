@@ -1,7 +1,7 @@
 """Wire schemas for provider and its credential sub-entities.
 
 A `Provider` is a long-lived directory entry owned by a `User`
-(N:1 via `user_id` — a user may own zero, one, or many profiles). It
+(N:1 via `user_id` — a user may own zero, one, or many providers). It
 holds three credential lists —
 `ProviderLicensure`, `ProviderEducation`, `ProviderCertification` —
 each managed via its own endpoints in later issues. The wire surface
@@ -11,7 +11,7 @@ AuditSnapshot variants.
 `ProviderRead` and `ProviderAuditSnapshot` embed the
 sub-entity Read / AuditSnapshot lists. `ProviderUpdate` does
 **not** include nested lists — sub-entities are PATCHed via their own
-routes (added later), so a profile-level PATCH only touches the
+routes (added later), so a provider-level PATCH only touches the
 practice/availability fields.
 
 Controlled-vocabulary fields (state, license type, etc.) are typed as
@@ -217,7 +217,7 @@ class ProviderRead(BaseModel):
 
 
 class ProviderCreate(BaseModel):
-    """Create payload for a provider's directory profile. `user_id` is
+    """Create payload for a provider's directory provider. `user_id` is
     set by the route from the authenticated user, not accepted on the
     wire."""
 

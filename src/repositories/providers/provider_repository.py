@@ -21,22 +21,22 @@ class ProviderRepository(BaseRepository):
     # --- Provider reads --------------------------------------------
 
     async def get_by_id(self, provider_id: UUID) -> Provider | None:
-        """Retrieves a profile by id. Sub-table relationships are
+        """Retrieves a provider by id. Sub-table relationships are
         eager-loaded via `lazy="selectin"` on the model."""
         return await self._get_by_id(Provider, provider_id)
 
     async def get_by_user_id(self, user_id: UUID) -> Provider | None:
-        """Retrieves a profile owned by the given user. A user may own
-        multiple profiles; this returns whichever the DB hands back first
+        """Retrieves a provider owned by the given user. A user may own
+        multiple providers; this returns whichever the DB hands back first
         with no defined ordering, so callers needing a single canonical
-        profile should not rely on this method.
+        provider should not rely on this method.
         """
         stmt = select(Provider).filter(Provider.user_id == user_id)
         result = await self.session.execute(stmt)
         return result.scalars().first()
 
     async def list_for_user(self, user_id: UUID) -> Sequence[Provider]:
-        """Lists every profile owned by the given user, newest first."""
+        """Lists every provider owned by the given user, newest first."""
         stmt = (
             select(Provider)
             .filter(Provider.user_id == user_id)
@@ -51,9 +51,9 @@ class ProviderRepository(BaseRepository):
         license_type: str | None = None,
         issuing_state: str | None = None,
     ) -> Sequence[Provider]:
-        """Lists profiles, newest first. When a filter is set, joins
+        """Lists providers, newest first. When a filter is set, joins
         through `provider_licensures` and `.distinct()`s the parents so
-        a profile with multiple matching licensures appears once."""
+        a provider with multiple matching licensures appears once."""
         stmt = select(Provider)
         if license_type is not None or issuing_state is not None:
             stmt = stmt.join(
@@ -74,11 +74,11 @@ class ProviderRepository(BaseRepository):
     async def create_provider(self, user_id: UUID, **fields: Any) -> Provider:
         return await self._persist_new(Provider(user_id=user_id, **fields))
 
-    async def update_provider(self, profile: Provider, **fields: Any) -> Provider:
-        return await self._patch(profile, **fields)
+    async def update_provider(self, provider: Provider, **fields: Any) -> Provider:
+        return await self._patch(provider, **fields)
 
-    async def delete_provider(self, profile: Provider) -> None:
-        await self._delete(profile)
+    async def delete_provider(self, provider: Provider) -> None:
+        await self._delete(provider)
 
     # --- Licensure sub-table ----------------------------------------------
 
@@ -86,9 +86,11 @@ class ProviderRepository(BaseRepository):
         return await self._get_by_id(ProviderLicensure, licensure_id)
 
     async def add_licensure(
-        self, profile: Provider, **fields: Any
+        self, provider: Provider, **fields: Any
     ) -> ProviderLicensure:
-        return await self._add_child(profile, "licensures", ProviderLicensure(**fields))
+        return await self._add_child(
+            provider, "licensures", ProviderLicensure(**fields)
+        )
 
     async def update_licensure(
         self, licensure: ProviderLicensure, **fields: Any
@@ -104,9 +106,11 @@ class ProviderRepository(BaseRepository):
         return await self._get_by_id(ProviderEducation, education_id)
 
     async def add_education(
-        self, profile: Provider, **fields: Any
+        self, provider: Provider, **fields: Any
     ) -> ProviderEducation:
-        return await self._add_child(profile, "educations", ProviderEducation(**fields))
+        return await self._add_child(
+            provider, "educations", ProviderEducation(**fields)
+        )
 
     async def update_education(
         self, education: ProviderEducation, **fields: Any
@@ -124,10 +128,10 @@ class ProviderRepository(BaseRepository):
         return await self._get_by_id(ProviderCertification, certification_id)
 
     async def add_certification(
-        self, profile: Provider, **fields: Any
+        self, provider: Provider, **fields: Any
     ) -> ProviderCertification:
         return await self._add_child(
-            profile, "certifications", ProviderCertification(**fields)
+            provider, "certifications", ProviderCertification(**fields)
         )
 
     async def update_certification(

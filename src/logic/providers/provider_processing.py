@@ -1,18 +1,18 @@
-"""Provider-profile orchestration handlers.
+"""Provider-provider orchestration handlers.
 
-One file per resource family — the parent profile plus its three credential
+One file per resource family — the parent provider plus its three credential
 sub-tables (licensure, education, certification). Each mutation handler
 owns the transaction commit and writes a single audit row covering the
 mutation, per `RESOURCE_GRAMMAR.md:135` and the discipline enforced in
 `test_audit_discipline.py`.
 
-Authorization is uniform: a provider can mutate only their own profile and
+Authorization is uniform: a provider can mutate only their own provider and
 its sub-rows; a superuser can mutate any. Read handlers are open to any
 authenticated user.
 
 Sub-resource handlers also assert that the URL's `provider_id` matches the
-sub-row's `provider_id`. Without this, `/profiles/A/licensures/B` would
-silently mutate a licensure belonging to a different profile.
+sub-row's `provider_id`. Without this, `/providers/A/licensures/B` would
+silently mutate a licensure belonging to a different provider.
 """
 
 import logging
@@ -57,7 +57,7 @@ logger = logging.getLogger(__name__)
 # --- Audited-resource declarations ---------------------------------------
 
 
-PROFILE = AuditedResource(
+PROVIDER = AuditedResource(
     type="provider_profile",
     snapshot=make_snapshotter(ProviderAuditSnapshot),
     create=AuditAction.CREATE_PROVIDER,
@@ -90,24 +90,24 @@ CERTIFICATION = AuditedResource(
 async def _load_provider_or_404(
     provider_id: UUID, repo: ProviderRepository
 ) -> Provider:
-    profile = await repo.get_by_id(provider_id)
-    if profile is None:
+    provider = await repo.get_by_id(provider_id)
+    if provider is None:
         raise NotFoundError(detail="Provider not found")
-    return profile
+    return provider
 
 
 async def _load_subrow_or_404(getter, sub_id: UUID, parent_id: UUID, *, name: str):
     """Load a credential sub-row and verify its `provider_id` matches the
     URL's `provider_id`. 404 if missing or if the FK is for a different
-    parent — without this, `/profiles/A/licensures/B` would silently
-    mutate a sub-row owned by profile B."""
+    parent — without this, `/providers/A/licensures/B` would silently
+    mutate a sub-row owned by provider B."""
     row = await getter(sub_id)
     if row is None or row.provider_id != parent_id:
         raise NotFoundError(detail=f"{name} not found")
     return row
 
 
-# --- Profile handlers ----------------------------------------------------
+# --- Provider handlers ----------------------------------------------------
 
 
 async def handle_list_providers(
@@ -126,12 +126,12 @@ async def handle_list_providers(
     uniformity with the mount contract.
     """
     del requesting_user  # explicitly unused — public route
-    profiles = await repo.list_providers(
+    providers = await repo.list_providers(
         license_type=license_type, issuing_state=issuing_state
     )
     return {
         "request": request,
-        "profiles": profiles,
+        "providers": providers,
         "selected_license_type": license_type,
         "selected_issuing_state": issuing_state,
     }
@@ -143,19 +143,19 @@ async def handle_get_provider_detail(
     repo: ProviderRepository,
     requesting_user: User,
 ) -> dict[str, Any]:
-    """Loads any profile by id for the read-only detail page; 404 if missing.
+    """Loads any provider by id for the read-only detail page; 404 if missing.
 
     The repo's `get_by_id` eager-loads `licensures`, `educations`, and
     `certifications` via `lazy="selectin"`, so the template can render
     each sub-section without further queries.
     """
-    profile = await _load_provider_or_404(provider_id, repo)
-    can_edit = is_owner(profile, requesting_user, owner_attr="user_id") or is_admin(
+    provider = await _load_provider_or_404(provider_id, repo)
+    can_edit = is_owner(provider, requesting_user, owner_attr="user_id") or is_admin(
         requesting_user
     )
     return {
         "request": request,
-        "profile": profile,
+        "provider": provider,
         "current_user": requesting_user,
         "can_edit": can_edit,
     }
@@ -180,11 +180,11 @@ async def handle_list_user_providers(
     target_user = await user_repo.get_user_by_id(user_id)
     if target_user is None:
         raise NotFoundError(detail=f"User {user_id} not found")
-    profiles = await repo.list_for_user(user_id)
+    providers = await repo.list_for_user(user_id)
     return {
         "request": request,
         "target_user": target_user,
-        "profiles": profiles,
+        "providers": providers,
         "is_self": user_id == requesting_user.id,
         "current_user": requesting_user,
     }
@@ -199,7 +199,7 @@ async def handle_get_provider_form(
 
     `repo` is accepted for uniformity with the mount_form contract (every
     form handler gets the resource's primary repo) but not used here —
-    creating a profile doesn't need to load anything from the db.
+    creating a provider doesn't need to load anything from the db.
     """
     del repo  # explicitly unused
     return {
@@ -219,18 +219,18 @@ async def handle_get_provider_edit_form(
     repo: ProviderRepository,
     requesting_user: User,
 ) -> dict[str, Any]:
-    """Loads a profile for the edit-form page. 404 if missing, 403 if the
+    """Loads a provider for the edit-form page. 404 if missing, 403 if the
     requester is neither owner nor admin (mirrors `assert_owner_or_admin`).
 
     The repo's `get_by_id` eager-loads `licensures`, `educations`, and
     `certifications` via `lazy="selectin"`, so the template can render
     each sub-section without further queries.
     """
-    profile = await _load_provider_or_404(provider_id, repo)
+    provider = await _load_provider_or_404(provider_id, repo)
     assert_owner_or_admin(
-        profile, requesting_user, owner_attr="user_id", action="modify this provider"
+        provider, requesting_user, owner_attr="user_id", action="modify this provider"
     )
-    return {"request": request, "profile": profile, "current_user": requesting_user}
+    return {"request": request, "provider": provider, "current_user": requesting_user}
 
 
 async def handle_create_provider(
@@ -239,17 +239,17 @@ async def handle_create_provider(
     audit_repo: AuditRepository,
     requesting_user: User,
 ) -> Provider:
-    """Creates a profile owned by the requesting user plus any inline
-    credential sub-rows. A user may own zero, one, or many profiles —
-    nothing here rejects a second create. One `CREATE_PROVIDER_PROFILE`
+    """Creates a provider owned by the requesting user plus any inline
+    credential sub-rows. A user may own zero, one, or many providers —
+    nothing here rejects a second create. One `CREATE_PROVIDER`
     audit row is written whose `after` snapshot includes the inline
     sub-rows — the snapshot schema embeds the nested credential lists,
     so a single row captures the full create.
     """
-    profile_fields = payload.model_dump(
+    provider_fields = payload.model_dump(
         exclude={"licensures", "educations", "certifications"}
     )
-    created = await repo.create_provider(user_id=requesting_user.id, **profile_fields)
+    created = await repo.create_provider(user_id=requesting_user.id, **provider_fields)
 
     for licensure in payload.licensures:
         await repo.add_licensure(created, **licensure.model_dump())
@@ -263,7 +263,7 @@ async def handle_create_provider(
         audit_repo,
         actor=requesting_user,
         target=created,
-        resource=PROFILE,
+        resource=PROVIDER,
         verb="create",
     ):
         pass
@@ -277,22 +277,22 @@ async def handle_update_provider(
     audit_repo: AuditRepository,
     requesting_user: User,
 ) -> Provider:
-    """Patches practice/availability fields on the profile. Owner-or-admin only."""
-    profile = await _load_provider_or_404(provider_id, repo)
+    """Patches practice/availability fields on the provider. Owner-or-admin only."""
+    provider = await _load_provider_or_404(provider_id, repo)
     assert_owner_or_admin(
-        profile, requesting_user, owner_attr="user_id", action="modify this provider"
+        provider, requesting_user, owner_attr="user_id", action="modify this provider"
     )
 
     async with mutate(
         repo,
         audit_repo,
         actor=requesting_user,
-        target=profile,
-        resource=PROFILE,
+        target=provider,
+        resource=PROVIDER,
         verb="update",
     ):
-        await repo.update_provider(profile, **payload.model_dump(exclude_unset=True))
-    return profile
+        await repo.update_provider(provider, **payload.model_dump(exclude_unset=True))
+    return provider
 
 
 async def handle_delete_provider(
@@ -301,27 +301,27 @@ async def handle_delete_provider(
     audit_repo: AuditRepository,
     requesting_user: User,
 ) -> None:
-    """Hard-deletes the profile (sub-rows cascade). Owner-or-admin only.
+    """Hard-deletes the provider (sub-rows cascade). Owner-or-admin only.
 
     The audit row is recorded before the delete fires so the actor FK is
-    still valid; `before` captures the full profile including sub-rows.
+    still valid; `before` captures the full provider including sub-rows.
     No per-sub-row audit rows — the parent's nested snapshot is the
     durable record.
     """
-    profile = await _load_provider_or_404(provider_id, repo)
+    provider = await _load_provider_or_404(provider_id, repo)
     assert_owner_or_admin(
-        profile, requesting_user, owner_attr="user_id", action="modify this provider"
+        provider, requesting_user, owner_attr="user_id", action="modify this provider"
     )
 
     async with mutate(
         repo,
         audit_repo,
         actor=requesting_user,
-        target=profile,
-        resource=PROFILE,
+        target=provider,
+        resource=PROVIDER,
         verb="delete",
     ):
-        await repo.delete_provider(profile)
+        await repo.delete_provider(provider)
 
 
 # --- Sub-row CRUD helpers ------------------------------------------------
@@ -375,12 +375,12 @@ async def _handle_subrow_create(
     requesting_user: User,
     spec: _SubrowSpec,
 ) -> Any:
-    profile = await _load_provider_or_404(provider_id, repo)
+    provider = await _load_provider_or_404(provider_id, repo)
     assert_owner_or_admin(
-        profile, requesting_user, owner_attr="user_id", action="modify this provider"
+        provider, requesting_user, owner_attr="user_id", action="modify this provider"
     )
 
-    created = await getattr(repo, spec.add)(profile, **payload.model_dump())
+    created = await getattr(repo, spec.add)(provider, **payload.model_dump())
     async with mutate(
         repo,
         audit_repo,
@@ -403,13 +403,13 @@ async def _handle_subrow_update(
     requesting_user: User,
     spec: _SubrowSpec,
 ) -> Any:
-    profile = await _load_provider_or_404(provider_id, repo)
+    provider = await _load_provider_or_404(provider_id, repo)
     assert_owner_or_admin(
-        profile, requesting_user, owner_attr="user_id", action="modify this provider"
+        provider, requesting_user, owner_attr="user_id", action="modify this provider"
     )
 
     row = await _load_subrow_or_404(
-        getattr(repo, spec.get_by_id), child_id, profile.id, name=spec.display_name
+        getattr(repo, spec.get_by_id), child_id, provider.id, name=spec.display_name
     )
     async with mutate(
         repo,
@@ -432,13 +432,13 @@ async def _handle_subrow_delete(
     requesting_user: User,
     spec: _SubrowSpec,
 ) -> None:
-    profile = await _load_provider_or_404(provider_id, repo)
+    provider = await _load_provider_or_404(provider_id, repo)
     assert_owner_or_admin(
-        profile, requesting_user, owner_attr="user_id", action="modify this provider"
+        provider, requesting_user, owner_attr="user_id", action="modify this provider"
     )
 
     row = await _load_subrow_or_404(
-        getattr(repo, spec.get_by_id), child_id, profile.id, name=spec.display_name
+        getattr(repo, spec.get_by_id), child_id, provider.id, name=spec.display_name
     )
     async with mutate(
         repo,
