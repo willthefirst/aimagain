@@ -173,23 +173,28 @@ Use HTMX for progressive enhancement of forms and interactions:
 
 ### Template context pattern
 
-Standard context structure passed from routes:
+Handlers pass **only resource-specific data**. Chrome scalars (`is_authenticated`, `is_admin`, `current_username`, `current_user_id`) and dev globals (`is_development`, livereload port) are merged in automatically by [`APIResponse.html_response`](../api/common/responses.py) — handlers never compute or pass them.
+
+The merge order (later tiers overwrite earlier ones):
+
+1. The caller's `context` dict — page data only.
+2. Dev/global context from `core.templating.get_template_context()`.
+3. Chrome scalars from `base_context(current_user)`.
+
+Because chrome overwrites the caller, a handler cannot accidentally lie about identity (e.g. pass `is_admin=True` for a non-admin viewer). The chrome scalars are *primitives*, not the `User` object, so templates can't reach into identity fields directly. See [`api/common/responses.py`](../api/common/responses.py) for `base_context()` and `html_response()`.
+
+In practice a handler returns:
 
 ```python
-# In route/processing function
-def prepare_template_context(request: Request, user: User, data: Any) -> dict:
-    """Standard context preparation for templates."""
-    return {
-        "request": request,          # Required by FastAPI templates
-        "current_user": user,        # Current authenticated user
-        "is_authenticated": bool(user), # Authentication status
-        **get_template_context(),    # Include environment context (safe development-only features)
-
-        # Page-specific data
-        "page_title": "Page Title",
-        "main_data": data,           # Primary page data
-    }
+return APIResponse.html_response(
+    template_name="users/list.html",
+    context={"users": users},     # page data only
+    request=request,
+    current_user=user,            # drives chrome scalars
+)
 ```
+
+For the canonical example, read [`api/routes/users.py`](../api/routes/users.py).
 
 ## Common template issues and solutions
 
