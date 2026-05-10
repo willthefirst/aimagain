@@ -205,14 +205,14 @@ async def get_by_id(self, provider_id: UUID) -> Provider | None:
 async def create_provider(self, user_id: UUID, **fields) -> Provider:
     return await self._persist_new(Provider(user_id=user_id, **fields))
 
-async def add_licensure(self, profile, **fields) -> ProviderLicensure:
-    return await self._add_child(profile, "licensures", ProviderLicensure(**fields))
+async def add_licensure(self, provider, **fields) -> ProviderLicensure:
+    return await self._add_child(provider, "licensures", ProviderLicensure(**fields))
 
-async def update_provider(self, profile, **fields) -> Provider:
-    return await self._patch(profile, **fields)
+async def update_provider(self, provider, **fields) -> Provider:
+    return await self._patch(provider, **fields)
 
-async def delete_provider(self, profile) -> None:
-    await self._delete(profile)
+async def delete_provider(self, provider) -> None:
+    await self._delete(provider)
 ```
 
 ## Common issues and solutions
@@ -290,7 +290,7 @@ Colocated tests live alongside the repositories:
 
 - `test_audit_repository.py` — exercises append-only writes, FK `SET NULL` on actor delete, and list-by-resource ordering against the in-memory test DB.
 - `test_post_repository.py` — exercises parent + detail create/update/delete for every registered kind (`client_referral`, `provider_availability`), including a raw-SQL DELETE that proves the FK CASCADE fires (not just the ORM cascade). Also covers the `posts.kind` CHECK constraint rejecting unregistered kinds (including the retired `note` kind). Relies on `PRAGMA foreign_keys = ON` being set globally by the test engine fixture. Detail-row construction goes through `make_<kind>_detail` factories in [`tests/helpers.py`](../../tests/helpers.py) so spec-required fields are filled with valid defaults; tests override only what they're asserting on. Per-kind dispatch in `_attach_detail` and `update_post` is registry-driven via `REGISTERED_KINDS` / `KIND_BY_DETAIL_MODEL` from [`src/models/posts/post_kinds.py`](../models/posts/post_kinds.py); the registry-consistency tests live with the registry, not here.
-- `test_provider_repository.py` — exercises profile CRUD, cascade delete (parent + sub-rows gone in one shot), `list_providers` filtering through licensures (license_type, issuing_state, AND-composed, `.distinct()` de-dup), and CRUD round-trips for each sub-table (licensure, education, certification). Sub-row construction uses `make_provider_*` factories in [`tests/helpers.py`](../../tests/helpers.py).
+- `test_provider_repository.py` — exercises `Provider` CRUD, cascade delete (parent + sub-rows gone in one shot), `list_providers` filtering through licensures (license_type, issuing_state, AND-composed, `.distinct()` de-dup), and CRUD round-trips for each sub-table (licensure, education, certification). Sub-row construction uses `make_provider_*` factories in [`tests/helpers.py`](../../tests/helpers.py).
 
 When adding a new repository method, extend (or create) `src/repositories/test_<repo_name>.py` and exercise it via the `db_test_session_manager` fixture from [`tests/fixtures.py`](../../tests/fixtures.py).
 

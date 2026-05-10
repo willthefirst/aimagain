@@ -279,7 +279,7 @@ class NewEntity(BaseModel):
 
 **Why**: SQLAlchemy's flush-ordering graph is built from `relationship()` declarations, not raw FK columns. Without a relationship at either end, the unit of work has no signal to flush parent before child. SQLite's `PRAGMA foreign_keys = ON` (set in `tests/fixtures.py`) then rejects the out-of-order INSERT.
 
-**Solution**: Add `relationship(...)` at one end of every domain-edge FK — either the child's many-to-one (`profile.user`) or the parent's collection (`user.profiles`); either is enough to fix flush ordering. The exception is denormalized historical references (e.g. `audit_log.actor_id`) — those go on the `ALLOWED_BARE_FKS` allowlist in `test_fk_relationship_coverage.py` with a one-line justification.
+**Solution**: Add `relationship(...)` at one end of every domain-edge FK — either the child's many-to-one (`provider.user`) or the parent's collection (`user.providers`); either is enough to fix flush ordering. The exception is denormalized historical references (e.g. `audit_log.actor_id`) — those go on the `ALLOWED_BARE_FKS` allowlist in `test_fk_relationship_coverage.py` with a one-line justification.
 
 ```python
 # Bad - bare FK; flush order is undefined, single-transaction seeds may fail

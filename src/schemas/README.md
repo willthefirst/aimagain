@@ -236,7 +236,7 @@ UserUpdate
 Colocated tests live inside each cluster directory:
 
 - `posts/test_post.py` — exercises the kind-discriminated `PostCreate`/`PostUpdate` unions: explicit-kind variants, the `extra="forbid"` boundary (rejects `owner_id`, unknown fields, cross-kind field bleed), per-kind whitespace stripping, ZIP regex, controlled-vocabulary rejection, and the partial-update at-least-one-field rule. Also covers `post_audit_snapshot` flattening through the right detail relationship for each registered kind, and the `test_schema_literals_match_model_tuples` guardrail that asserts the `Literal[*TUPLE]` types here stay aligned with the source-of-truth tuples in `src/models/enums.py`.
-- `providers/test_provider.py` — covers the four provider entities (profile + licensure + education + certification): controlled-vocabulary rejection, `extra="forbid"` rejection, the at-least-one-field rule on each Update variant, `ProviderRead.model_validate` round-trip on a nested dict, and the `test_schema_literals_match_model_tuples` guardrail aligning `Literal[*TUPLE]` types with `src/models/enums.py`.
+- `providers/test_provider.py` — covers the four provider entities (`Provider` + licensure + education + certification): controlled-vocabulary rejection, `extra="forbid"` rejection, the at-least-one-field rule on each Update variant, `ProviderRead.model_validate` round-trip on a nested dict, and the `test_schema_literals_match_model_tuples` guardrail aligning `Literal[*TUPLE]` types with `src/models/enums.py`.
 
 Add `src/schemas/<entity>/test_<file>.py` when a schema has non-trivial validators or computed fields whose behavior isn't obvious from the field definitions.
 
