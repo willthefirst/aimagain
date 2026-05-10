@@ -19,18 +19,19 @@ from uuid import UUID
 from fastapi import Request
 
 from src.api.common.exceptions import NotFoundError
-from src.logic.audit import AuditAction, make_snapshotter, record_audit
+from src.api.common.specs.user_favorite import FAVORITE_ENTITY
+from src.logic.audit import record_audit
 from src.models import User, UserFavorite
 from src.repositories.audit_repository import AuditRepository
 from src.repositories.favorites.user_favorite_repository import UserFavoriteRepository
 from src.repositories.providers.provider_repository import ProviderRepository
-from src.schemas.favorites.user_favorite import UserFavoriteAuditSnapshot
 
 logger = logging.getLogger(__name__)
 
-_snapshot_favorite = make_snapshotter(UserFavoriteAuditSnapshot)
-
-_RESOURCE_TYPE = "user_favorite"
+# Audit binding (resource_type, snapshot, verb→action map) lives on
+# the spec — see `src/api/common/specs/user_favorite.py`. Handlers
+# read it via `FAVORITE_ENTITY.edge_audit`.
+_EDGE_AUDIT = FAVORITE_ENTITY.edge_audit
 
 
 async def handle_add_favorite(
@@ -64,11 +65,11 @@ async def handle_add_favorite(
     await record_audit(
         audit_repo,
         actor_id=requesting_user.id,
-        resource_type=_RESOURCE_TYPE,
+        resource_type=_EDGE_AUDIT.resource_type,
         resource_id=favorite.id,
-        action=AuditAction.ADD_FAVORITE,
+        action=_EDGE_AUDIT.action_for("add"),
         before=None,
-        after=_snapshot_favorite(favorite),
+        after=_EDGE_AUDIT.snapshot(favorite),
     )
     await repo.session.commit()
     logger.info(f"Handler: user {requesting_user.id} favorited provider {provider_id}")
@@ -94,15 +95,15 @@ async def handle_remove_favorite(
     if favorite is None:
         return
 
-    before = _snapshot_favorite(favorite)
+    before = _EDGE_AUDIT.snapshot(favorite)
     favorite_id = favorite.id
     await repo.delete_favorite(favorite)
     await record_audit(
         audit_repo,
         actor_id=requesting_user.id,
-        resource_type=_RESOURCE_TYPE,
+        resource_type=_EDGE_AUDIT.resource_type,
         resource_id=favorite_id,
-        action=AuditAction.REMOVE_FAVORITE,
+        action=_EDGE_AUDIT.action_for("remove"),
         before=before,
         after=None,
     )
