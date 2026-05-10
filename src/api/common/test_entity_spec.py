@@ -11,7 +11,9 @@ import pytest
 from pydantic import BaseModel, TypeAdapter
 
 from src.api.common.entity_spec import (
+    EdgeAudit,
     EntitySpec,
+    M2NRelation,
     RouteSet,
     StateAxis,
     Templates,
@@ -223,6 +225,65 @@ def test_parent_with_routes_constructs():
         routes=RouteSet(delete=True),
     )
     assert child.parent is parent
+
+
+# --- New A4: EdgeAudit, M2NRelation, audit/edge_audit exclusivity --------
+
+
+def _edge_audit() -> EdgeAudit:
+    return EdgeAudit(
+        resource_type="widget_edge",
+        snapshot=lambda obj: {"id": "x"},
+        actions={
+            "add": AuditAction.ADD_FAVORITE,
+            "remove": AuditAction.REMOVE_FAVORITE,
+        },
+    )
+
+
+def test_edge_audit_action_for_verb():
+    """`EdgeAudit.action_for(verb)` dispatches against the `actions` map."""
+    edge = _edge_audit()
+    assert edge.action_for("add") == AuditAction.ADD_FAVORITE
+    assert edge.action_for("remove") == AuditAction.REMOVE_FAVORITE
+
+
+def test_edge_audit_action_for_missing_verb_raises():
+    """Asking for an unmapped verb is a programming error — KeyError loud."""
+    edge = _edge_audit()
+    with pytest.raises(KeyError):
+        edge.action_for("update")
+
+
+def test_edge_audit_and_audit_mutually_exclusive():
+    """An entity is either CRUD-shaped or edge-shaped, not both."""
+    with pytest.raises(ValueError, match="mutually exclusive"):
+        _make_spec(audit=_dummy_audit(), edge_audit=_edge_audit())
+
+
+def test_edge_audit_alone_constructs():
+    spec = _make_spec(edge_audit=_edge_audit())
+    assert spec.audit is None
+    assert spec.edge_audit is not None
+
+
+def test_m2n_relation_holds_endpoints_and_join_shape():
+    user_spec = _make_spec(name="user", url_collection="users", id_param="user_id")
+    provider_spec = _make_spec(
+        name="provider", url_collection="providers", id_param="provider_id"
+    )
+    relation = M2NRelation(
+        from_entity=user_spec,
+        to_entity=provider_spec,
+        join_table="user_favorites",
+        from_attr="user_id",
+        to_attr="provider_id",
+    )
+    spec = _make_spec(relation=relation)
+    assert spec.relation is relation
+    assert spec.relation.from_entity is user_spec
+    assert spec.relation.to_entity is provider_spec
+    assert spec.relation.join_table == "user_favorites"
 
 
 def test_discriminator_defaults_to_none():

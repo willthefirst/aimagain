@@ -86,6 +86,48 @@ class Templates:
 
 
 @dataclass(frozen=True, slots=True)
+class EdgeAudit:
+    """Audit binding for entities with non-CRUD verbs.
+
+    `AuditedResource` assumes a `(create, update, delete)` triple,
+    which fits CRUD-shaped resources. Edge entities (M:N joins like
+    `UserFavorite`) typically have `(add, remove)` verbs and immutable
+    edges — no update verb exists. `EdgeAudit` declares the persisted
+    `resource_type` string, the snapshot callable, and a verb→action
+    map; handlers read both fields and call ``record_audit()`` directly.
+
+    Mutually exclusive with `EntitySpec.audit` — an entity is either
+    CRUD-shaped or edge-shaped, not both. Construction-time validation
+    enforces it.
+    """
+
+    resource_type: str
+    snapshot: Callable[[Any], dict]
+    actions: dict[str, AuditAction]
+
+    def action_for(self, verb: str) -> AuditAction:
+        return self.actions[verb]
+
+
+@dataclass(frozen=True, slots=True)
+class M2NRelation:
+    """Declarative many-to-many relationship.
+
+    The two endpoints are `EntitySpec` references; the join table
+    stores the edges. Phase 1 captures the shape so the spec is the
+    canonical declaration of "this entity is the M:N edge between
+    X and Y." Phase 2 framework code can read this to auto-mount
+    add/remove edges and the related-list query.
+    """
+
+    from_entity: "EntitySpec"
+    to_entity: "EntitySpec"
+    join_table: str
+    from_attr: str
+    to_attr: str
+
+
+@dataclass(frozen=True, slots=True)
 class RelatedListSubresource:
     """A `GET /<entity>/{id}/<child.collection>` related-list subresource.
 
@@ -152,7 +194,14 @@ class EntitySpec:
     write_authz: Callable[..., None] | None = None
 
     # Audit --------------------------------------------------------------
+    # `audit` and `edge_audit` are mutually exclusive — CRUD-shaped
+    # entities use `AuditedResource`; edge entities (M:N joins) use
+    # `EdgeAudit`. Construction-time validation enforces it.
     audit: AuditedResource | None = None
+    edge_audit: EdgeAudit | None = None
+
+    # M:N relationships --------------------------------------------------
+    relation: M2NRelation | None = None
 
     # Body adapters + projection ----------------------------------------
     create_adapter: TypeAdapter | None = None
@@ -231,6 +280,15 @@ class EntitySpec:
                 f"EntitySpec({self.name!r}) declares parent="
                 f"{self.parent.name!r} but no routes are opted in — "
                 "the subentity would be unreachable."
+            )
+        # CRUD-shaped vs edge-shaped audit binding is an either/or
+        # choice; declaring both would be ambiguous and almost
+        # certainly a misconfiguration.
+        if self.audit is not None and self.edge_audit is not None:
+            raise ValueError(
+                f"EntitySpec({self.name!r}) declares both `audit` and "
+                "`edge_audit`; they are mutually exclusive — CRUD-shaped "
+                "entities use AuditedResource, edge entities use EdgeAudit."
             )
 
     def _has_any_route(self) -> bool:
