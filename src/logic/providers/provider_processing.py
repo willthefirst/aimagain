@@ -58,7 +58,7 @@ logger = logging.getLogger(__name__)
 
 
 PROVIDER = AuditedResource(
-    type="provider_profile",
+    type="provider",
     snapshot=make_snapshotter(ProviderAuditSnapshot),
     create=AuditAction.CREATE_PROVIDER,
     update=AuditAction.UPDATE_PROVIDER,

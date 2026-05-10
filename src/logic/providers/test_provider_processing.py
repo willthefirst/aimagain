@@ -362,7 +362,7 @@ async def test_create_provider_persists_row_and_writes_audit(
 
     rows = await _audit_rows_for(
         db_test_session_manager,
-        resource_type="provider_profile",
+        resource_type="provider",
         resource_id=created.id,
     )
     assert len(rows) == 1
@@ -399,7 +399,7 @@ async def test_create_provider_with_inline_children_captures_them_in_audit(
 
     rows = await _audit_rows_for(
         db_test_session_manager,
-        resource_type="provider_profile",
+        resource_type="provider",
         resource_id=created.id,
     )
     assert len(rows) == 1
@@ -471,7 +471,7 @@ async def test_update_provider_updates_fields_and_writes_audit(
     assert updated.practice_name == "New Name"
     rows = await _audit_rows_for(
         db_test_session_manager,
-        resource_type="provider_profile",
+        resource_type="provider",
         resource_id=provider_id,
     )
     assert len(rows) == 1
@@ -521,7 +521,7 @@ async def test_update_provider_succeeds_for_superuser(
     assert updated.practice_name == "By Admin"
     rows = await _audit_rows_for(
         db_test_session_manager,
-        resource_type="provider_profile",
+        resource_type="provider",
         resource_id=provider_id,
     )
     assert rows[0].actor_id == admin.id
@@ -573,7 +573,7 @@ async def test_delete_provider_removes_row_and_writes_audit(
 
     rows = await _audit_rows_for(
         db_test_session_manager,
-        resource_type="provider_profile",
+        resource_type="provider",
         resource_id=provider_id,
     )
     assert len(rows) == 1
