@@ -9,18 +9,27 @@ mount functions end-to-end. Validates that:
     equivalents.
   - Misconfigurations (missing `write_user_dep`, sub-resource specs
     until slice 8) raise at mount time, not at request time.
+
+Handlers in these tests use real repository types (`UserRepository`,
+`AuditRepository`, etc.) as type annotations so the signature-synthesis
+machinery in the mount layer can resolve them via the registry in
+`src.repositories.dependencies`. The actual instances injected at call
+time come from `app.dependency_overrides` substitutions that return
+`SimpleNamespace` stubs — the test doesn't need a real DB, just to
+observe the kwargs that reach the handler.
 """
 
 from types import SimpleNamespace
-from typing import Literal
-from uuid import uuid4
+from typing import Any, Literal
+from uuid import UUID, uuid4
 
 import pytest
-from fastapi import APIRouter, FastAPI
+from fastapi import APIRouter, FastAPI, Request
 from fastapi.testclient import TestClient
 from pydantic import BaseModel
 
 from src.api.common.resource_routes import (
+    MountError,
     QueryParam,
     ResourceSpec,
     mount_delete,
@@ -30,26 +39,114 @@ from src.api.common.resource_routes import (
     mount_related_list,
     mount_state_axis,
 )
+from src.models import User
+from src.repositories.audit_repository import AuditRepository
+from src.repositories.dependencies import get_audit_repository
+from src.repositories.users.user_repository import UserRepository
 
 
-def _build_app(spec: ResourceSpec, captured: dict) -> FastAPI:
+def _override_audit(app: FastAPI, *, stub: Any = None) -> SimpleNamespace:
+    """Substitute `get_audit_repository` with a stub returning a
+    `SimpleNamespace` so a test app can satisfy `audit_repo: AuditRepository`
+    without a real DB session. Returns the stub the resolver returns so
+    callers can identity-check it in assertions."""
+    sentinel = stub if stub is not None else SimpleNamespace(name="audit_repo")
+    app.dependency_overrides[get_audit_repository] = lambda: sentinel
+    return sentinel
+
+
+def _build_delete_app(spec: ResourceSpec, captured: dict) -> FastAPI:
     """Mount `mount_delete` for `spec` and capture every handler call into
     `captured`. Stub deps return predictable sentinels so kwargs are
     inspectable in assertions."""
+    id_param = spec.id_param
 
-    async def delete_handler(**kwargs):
-        captured.update(kwargs)
+    async def delete_handler(
+        repo: UserRepository,
+        audit_repo: AuditRepository,
+        requesting_user: User,
+        **path_kwargs: UUID,
+    ):
+        captured["repo"] = repo
+        captured["audit_repo"] = audit_repo
+        captured["requesting_user"] = requesting_user
+        captured.update(path_kwargs)
+
+    # The synthesis introspects the handler signature for known param
+    # names. Path params come in via `**path_kwargs` here because the
+    # tests parameterize `id_param` and we can't statically declare a
+    # name that varies; so we explicitly tell the synthesis about it via
+    # a wrapper handler whose signature names the actual param.
+    # (Production handlers spell out e.g. `user_id: UUID` directly.)
+    handler = _name_path_params(
+        delete_handler, [id_param] + [s.id_param for s in _ancestors(spec)]
+    )
 
     app = FastAPI()
-    router = APIRouter(prefix=f"/{spec.collection}")
-    mount_delete(
-        router,
-        spec,
-        handler=delete_handler,
-        audit_repo_dep=lambda: SimpleNamespace(name="audit_repo"),
+    router = APIRouter(
+        prefix=(
+            f"/{spec.collection}"
+            if spec.parent is None
+            else f"/{_topmost(spec).collection}"
+        )
     )
+    _override_audit(app)
+    mount_delete(router, spec, handler=handler)
     app.include_router(router)
     return app
+
+
+def _ancestors(spec: ResourceSpec) -> list[ResourceSpec]:
+    out: list[ResourceSpec] = []
+    s = spec.parent
+    while s is not None:
+        out.append(s)
+        s = s.parent
+    return out
+
+
+def _topmost(spec: ResourceSpec) -> ResourceSpec:
+    s = spec
+    while s.parent is not None:
+        s = s.parent
+    return s
+
+
+def _name_path_params(handler, path_names: list[str]):
+    """Wrap `handler` so it accepts `path_names` as explicit typed
+    parameters. Used by parametric tests where the path-param name is
+    derived from the spec rather than literal."""
+    import inspect as _inspect
+
+    orig_sig = _inspect.signature(handler)
+    new_params = []
+    for name in path_names:
+        new_params.append(
+            _inspect.Parameter(
+                name=name,
+                kind=_inspect.Parameter.POSITIONAL_OR_KEYWORD,
+                annotation=UUID,
+            )
+        )
+    for p in orig_sig.parameters.values():
+        if p.kind == _inspect.Parameter.VAR_KEYWORD:
+            continue
+        new_params.append(p)
+    new_params.append(
+        _inspect.Parameter(
+            name="__path_kwargs__",
+            kind=_inspect.Parameter.VAR_KEYWORD,
+        )
+    )
+
+    async def wrapper(**kwargs):
+        path_kwargs = {n: kwargs.pop(n) for n in path_names if n in kwargs}
+        return await handler(**kwargs, **path_kwargs)
+
+    wrapper.__signature__ = _inspect.Signature(parameters=new_params)  # type: ignore[attr-defined]
+    wrapper.__name__ = handler.__name__
+    wrapper.__module__ = handler.__module__
+    return wrapper
 
 
 def test_mount_delete_returns_204_with_hx_redirect_default():
@@ -60,7 +157,7 @@ def test_mount_delete_returns_204_with_hx_redirect_default():
         write_user_dep=lambda: SimpleNamespace(id=uuid4(), is_superuser=True),
     )
     captured: dict = {}
-    client = TestClient(_build_app(spec, captured))
+    client = TestClient(_build_delete_app(spec, captured))
 
     widget_id = uuid4()
     resp = client.delete(f"/widgets/{widget_id}")
@@ -77,7 +174,7 @@ def test_mount_delete_passes_id_under_spec_kwarg_name():
         write_user_dep=lambda: SimpleNamespace(id=uuid4(), is_superuser=True),
     )
     captured: dict = {}
-    client = TestClient(_build_app(spec, captured))
+    client = TestClient(_build_delete_app(spec, captured))
 
     gadget_id = uuid4()
     resp = client.delete(f"/gadgets/{gadget_id}")
@@ -101,7 +198,7 @@ def test_mount_delete_uses_custom_redirect_callable():
         delete_redirect=custom_redirect,
     )
     captured: dict = {}
-    client = TestClient(_build_app(spec, captured))
+    client = TestClient(_build_delete_app(spec, captured))
 
     sprocket_id = uuid4()
     resp = client.delete(f"/sprockets/{sprocket_id}")
@@ -114,10 +211,7 @@ def test_mount_delete_subresource_path_includes_parent_id():
     """A child ResourceSpec with `parent=` mounts the path under the
     parent's id-param. Handler receives both ids by their declared kwarg
     names. The router prefix carries the topmost ancestor's collection."""
-    captured = {}
-
-    async def delete_handler(**kwargs):
-        captured.update(kwargs)
+    captured: dict = {}
 
     parent = ResourceSpec(
         collection="parents",
@@ -134,13 +228,21 @@ def test_mount_delete_subresource_path_includes_parent_id():
     )
 
     app = FastAPI()
-    router = APIRouter(prefix="/parents")  # topmost collection lives in prefix
-    mount_delete(
-        router,
-        child,
-        handler=delete_handler,
-        audit_repo_dep=lambda: SimpleNamespace(name="audit_repo"),
-    )
+    router = APIRouter(prefix="/parents")
+    _override_audit(app)
+
+    async def delete_handler(
+        parent_id: UUID,
+        child_id: UUID,
+        repo: UserRepository,
+        audit_repo: AuditRepository,
+        requesting_user: User,
+    ):
+        captured["parent_id"] = parent_id
+        captured["child_id"] = child_id
+        captured["repo"] = repo
+
+    mount_delete(router, child, handler=delete_handler)
     app.include_router(router)
     client = TestClient(app)
 
@@ -149,8 +251,8 @@ def test_mount_delete_subresource_path_includes_parent_id():
     resp = client.delete(f"/parents/{parent_id}/children/{child_id}")
 
     assert resp.status_code == 204
-    assert str(captured["parent_id"]) == str(parent_id)
-    assert str(captured["child_id"]) == str(child_id)
+    assert captured["parent_id"] == parent_id
+    assert captured["child_id"] == child_id
     assert captured["repo"].name == "child_repo"
 
 
@@ -200,25 +302,27 @@ def test_mount_delete_requires_write_user_dep():
         # write_user_dep intentionally omitted
     )
     router = APIRouter()
+
+    async def stub(
+        widget_id: UUID,
+        repo: UserRepository,
+        audit_repo: AuditRepository,
+        requesting_user: User,
+    ):
+        pass
+
     with pytest.raises(ValueError, match="write_user_dep"):
-        mount_delete(
-            router,
-            spec,
-            handler=lambda **_: None,
-            audit_repo_dep=lambda: None,
-        )
+        mount_delete(router, spec, handler=stub)
 
 
-def _build_read_app(
-    spec: ResourceSpec, list_handler, detail_handler, *, detail_extra=()
-):
-    """Mount mount_list + mount_detail and return a TestClient. Handlers
+def _build_read_app(spec: ResourceSpec, list_handler, detail_handler):
+    """Mount mount_list + mount_detail and return a FastAPI app. Handlers
     return a context dict that the templating layer can render against
     a stub template."""
     app = FastAPI()
     router = APIRouter(prefix=f"/{spec.collection}")
     mount_list(router, spec, handler=list_handler)
-    mount_detail(router, spec, handler=detail_handler, extra_repo_deps=detail_extra)
+    mount_detail(router, spec, handler=detail_handler)
     app.include_router(router)
     return app
 
@@ -226,11 +330,20 @@ def _build_read_app(
 def test_mount_list_renders_template_with_handler_context(monkeypatch):
     captured = {}
 
-    async def list_handler(**kwargs):
-        captured.update(kwargs)
+    async def list_handler(
+        request: Request,
+        repo: UserRepository,
+        requesting_user: User,
+    ):
+        captured["repo"] = repo
+        captured["requesting_user"] = requesting_user
         return {"users": ["alice", "bob"]}
 
-    async def detail_handler(**kwargs):
+    async def detail_handler(
+        widget_id: UUID,
+        repo: UserRepository,
+        requesting_user: User,
+    ):
         return {}
 
     spec = ResourceSpec(
@@ -266,20 +379,30 @@ def test_mount_list_renders_template_with_handler_context(monkeypatch):
     assert captured["repo"].name == "widget_repo"
 
 
-def test_mount_detail_injects_extra_repo_deps_under_derived_name(monkeypatch):
-    """`get_widget_repository` → `widget_repo` kwarg. Confirms the
-    derived-kwarg-name convention reaches the handler."""
-    captured = {}
+def test_mount_detail_injects_extra_typed_repo_from_registry(monkeypatch):
+    """A handler asks for a typed repo (e.g. `audit_repo: AuditRepository`),
+    and the synthesis resolves it via the registry in
+    `src.repositories.dependencies`. No `extra_repo_deps` wiring on the
+    mount call — the handler's signature IS the contract."""
+    captured: dict = {}
 
-    async def list_handler(**kwargs):
+    async def list_handler(
+        request: Request,
+        repo: UserRepository,
+        requesting_user: User,
+    ):
         return {}
 
-    async def detail_handler(**kwargs):
-        captured.update(kwargs)
-        return {"widget": kwargs.get("widget_id")}
-
-    def get_audit_repository():
-        return SimpleNamespace(name="audit_repo")
+    async def detail_handler(
+        gadget_id: UUID,
+        repo: UserRepository,
+        audit_repo: AuditRepository,
+        requesting_user: User,
+    ):
+        captured["gadget_id"] = gadget_id
+        captured["repo"] = repo
+        captured["audit_repo"] = audit_repo
+        return {"widget": gadget_id}
 
     spec = ResourceSpec(
         collection="gadgets",
@@ -299,19 +422,21 @@ def test_mount_detail_injects_extra_repo_deps_under_derived_name(monkeypatch):
         ),
     )
 
-    client = TestClient(
-        _build_read_app(
-            spec, list_handler, detail_handler, detail_extra=(get_audit_repository,)
-        )
-    )
+    app = FastAPI()
+    router = APIRouter(prefix="/gadgets")
+    _override_audit(app)
+    mount_list(router, spec, handler=list_handler)
+    mount_detail(router, spec, handler=detail_handler)
+    app.include_router(router)
+    client = TestClient(app)
+
     gadget_id = uuid4()
     resp = client.get(f"/gadgets/{gadget_id}")
 
     assert resp.status_code == 200
-    assert "audit_repo" in captured  # derived from `get_audit_repository`
-    assert captured["audit_repo"].name == "audit_repo"
-    assert "gadget_id" in captured
-    assert str(captured["gadget_id"]) == str(gadget_id)
+    assert captured["audit_repo"].name == "audit_repo"  # via registry → override
+    assert captured["gadget_id"] == gadget_id
+    assert captured["repo"].name == "gadget_repo"
 
 
 def test_mount_list_requires_list_template():
@@ -323,8 +448,12 @@ def test_mount_list_requires_list_template():
         # list_template intentionally omitted
     )
     router = APIRouter()
+
+    async def stub(request: Request, repo: UserRepository, requesting_user: User):
+        return {}
+
     with pytest.raises(ValueError, match="list_template"):
-        mount_list(router, spec, handler=lambda **_: {})
+        mount_list(router, spec, handler=stub)
 
 
 def test_mount_detail_requires_detail_template():
@@ -335,25 +464,40 @@ def test_mount_detail_requires_detail_template():
         read_user_dep=lambda: None,
     )
     router = APIRouter()
+
+    async def stub(widget_id: UUID, repo: UserRepository, requesting_user: User):
+        return {}
+
     with pytest.raises(ValueError, match="detail_template"):
-        mount_detail(router, spec, handler=lambda **_: {})
+        mount_detail(router, spec, handler=stub)
 
 
-def test_extra_repo_deps_must_be_named_get_x_repository():
+def test_mount_raises_when_handler_asks_for_unregistered_repo_type():
+    """If a handler param's type is not in the registry, the mount fails
+    at registration with a clear `MountError`. Converts late 500s into
+    early startup errors."""
+
+    class _SomeUnregisteredRepo:
+        pass
+
+    async def stub(
+        widget_id: UUID,
+        repo: UserRepository,
+        weird_repo: _SomeUnregisteredRepo,
+        requesting_user: User,
+    ):
+        return {}
+
     spec = ResourceSpec(
         collection="widgets",
         id_param="widget_id",
         repo_dep=lambda: None,
         read_user_dep=lambda: None,
-        list_template="widgets/list.html",
         detail_template="widgets/detail.html",
     )
-    badly_named = lambda: None  # noqa: E731 — anonymous lambda has no usable __name__
     router = APIRouter()
-    with pytest.raises(ValueError, match="get_<entity>_repository"):
-        mount_detail(
-            router, spec, handler=lambda **_: {}, extra_repo_deps=(badly_named,)
-        )
+    with pytest.raises(MountError, match="_SomeUnregisteredRepo"):
+        mount_detail(router, spec, handler=stub)
 
 
 def _stub_html_response(monkeypatch):
@@ -408,8 +552,13 @@ def test_mount_form_edit_route_at_id_form_path(monkeypatch):
     """on_existing=True mounts GET /<collection>/{id}/form, passes id to handler."""
     captured_handler: dict = {}
 
-    async def form_handler(**kwargs):
-        captured_handler.update(kwargs)
+    async def form_handler(
+        request: Request,
+        gadget_id: UUID,
+        repo: UserRepository,
+        requesting_user: User,
+    ):
+        captured_handler["gadget_id"] = gadget_id
         return {}
 
     spec = ResourceSpec(
@@ -495,8 +644,15 @@ def test_mount_list_passes_query_params_to_handler(monkeypatch):
     """Each `QueryParam` reaches the handler under its declared name."""
     captured = {}
 
-    async def list_handler(**kwargs):
-        captured.update(kwargs)
+    async def list_handler(
+        request: Request,
+        repo: UserRepository,
+        requesting_user: User,
+        kind: str | None,
+        active: bool,
+    ):
+        captured["kind"] = kind
+        captured["active"] = active
         return {"items": []}
 
     spec = ResourceSpec(
@@ -529,11 +685,16 @@ def test_mount_list_passes_query_params_to_handler(monkeypatch):
 
 def test_mount_list_public_skips_auth_dep(monkeypatch):
     """`public=True` overrides the spec's read_user_dep; handler still
-    receives `requesting_user=None` for kwarg uniformity."""
+    receives `requesting_user=None` for kwarg uniformity. Handler must
+    declare `requesting_user: User | None` to opt in to the public path."""
     captured = {}
 
-    async def list_handler(**kwargs):
-        captured.update(kwargs)
+    async def list_handler(
+        request: Request,
+        repo: UserRepository,
+        requesting_user: User | None,
+    ):
+        captured["requesting_user"] = requesting_user
         return {"items": []}
 
     def required_user():
@@ -563,8 +724,12 @@ def test_mount_form_query_param_drives_handler_template_choice(monkeypatch):
     `template_name` in context picks the rendered template — the existing
     precedence chain handles polymorphic-by-query forms."""
 
-    async def form_handler(**kwargs):
-        kind = kwargs["kind"]
+    async def form_handler(
+        request: Request,
+        repo: UserRepository,
+        requesting_user: User,
+        kind: str,
+    ):
         return {"template_name": f"widgets/{kind}.html"}
 
     spec = ResourceSpec(
@@ -597,8 +762,13 @@ def test_mount_detail_singleton_alias_sources_id_from_session(monkeypatch):
     captured = {}
     session_user_id = uuid4()
 
-    async def detail_handler(**kwargs):
-        captured.update(kwargs)
+    async def detail_handler(
+        widget_id: UUID,
+        repo: UserRepository,
+        requesting_user: User,
+    ):
+        captured["widget_id"] = widget_id
+        captured["requesting_user"] = requesting_user
         return {"x": 1}
 
     spec = ResourceSpec(
@@ -639,8 +809,14 @@ def test_mount_related_list_singleton_alias_sources_id_from_session(monkeypatch)
     captured = {}
     session_user_id = uuid4()
 
-    async def list_handler(**kwargs):
-        captured.update(kwargs)
+    async def list_handler(
+        request: Request,
+        parent_id: UUID,
+        repo: UserRepository,
+        requesting_user: User,
+    ):
+        captured["parent_id"] = parent_id
+        captured["requesting_user"] = requesting_user
         return {"items": []}
 
     parent = ResourceSpec(
@@ -678,12 +854,18 @@ def test_mount_related_list_singleton_alias_sources_id_from_session(monkeypatch)
 
 def test_mount_related_list_path_under_parent_id(monkeypatch):
     """`mount_related_list` mounts GET /<parent>/{parent_id}/<child>. The
-    handler is invoked with the parent id under parent_spec.id_param,
-    `repo` from the *child* spec, and any extra_repo_deps."""
+    handler is invoked with the parent id under parent_spec.id_param and
+    `repo` is the *child's* repo (the handler returns children)."""
     captured = {}
 
-    async def list_handler(**kwargs):
-        captured.update(kwargs)
+    async def list_handler(
+        request: Request,
+        parent_id: UUID,
+        repo: UserRepository,
+        requesting_user: User,
+    ):
+        captured["parent_id"] = parent_id
+        captured["repo"] = repo
         return {"profiles": []}
 
     parent = ResourceSpec(
@@ -750,13 +932,13 @@ class _AxisBody(BaseModel):
 def _build_state_axis_app(spec: ResourceSpec, handler, *, axis_name="toggle", **kwargs):
     app = FastAPI()
     router = APIRouter(prefix=f"/{spec.collection}")
+    _override_audit(app)
     mount_state_axis(
         router,
         spec,
         handler=handler,
         axis_name=axis_name,
         body_schema=_AxisBody,
-        audit_repo_dep=lambda: SimpleNamespace(name="audit_repo"),
         **kwargs,
     )
     app.include_router(router)
@@ -768,9 +950,18 @@ def test_mount_state_axis_happy_path_returns_hx_refresh_with_projected_body():
     response_to_dict, returns 200 + HX-Refresh + projected body."""
     captured: dict = {}
 
-    async def handler(**kwargs):
-        captured.update(kwargs)
-        return SimpleNamespace(id=kwargs["widget_id"], name="w1", state="on")
+    async def handler(
+        widget_id: UUID,
+        payload: _AxisBody,
+        repo: UserRepository,
+        audit_repo: AuditRepository,
+        requesting_user: User,
+    ):
+        captured["widget_id"] = widget_id
+        captured["payload"] = payload
+        captured["repo"] = repo
+        captured["audit_repo"] = audit_repo
+        return SimpleNamespace(id=widget_id, name="w1", state="on")
 
     spec = ResourceSpec(
         collection="widgets",
@@ -791,7 +982,7 @@ def test_mount_state_axis_happy_path_returns_hx_refresh_with_projected_body():
     body = resp.json()
     assert body == {"id": str(widget_id), "name": "w1", "state": "on"}
     # Handler received id under the spec's id_param + the validated payload.
-    assert str(captured["widget_id"]) == str(widget_id)
+    assert captured["widget_id"] == widget_id
     assert isinstance(captured["payload"], _AxisBody)
     assert captured["payload"].state == "on"
     assert captured["repo"].name == "repo"
@@ -799,7 +990,13 @@ def test_mount_state_axis_happy_path_returns_hx_refresh_with_projected_body():
 
 
 def test_mount_state_axis_invalid_body_returns_422():
-    async def handler(**kwargs):
+    async def handler(
+        widget_id: UUID,
+        payload: _AxisBody,
+        repo: UserRepository,
+        audit_repo: AuditRepository,
+        requesting_user: User,
+    ):
         raise AssertionError("handler should not be called for invalid body")
 
     spec = ResourceSpec(
@@ -816,8 +1013,14 @@ def test_mount_state_axis_invalid_body_returns_422():
 def test_mount_state_axis_path_includes_axis_name():
     """Wrong axis segment ⇒ 404 (route not registered under that path)."""
 
-    async def handler(**kwargs):
-        return SimpleNamespace(id=uuid4())
+    async def handler(
+        widget_id: UUID,
+        payload: _AxisBody,
+        repo: UserRepository,
+        audit_repo: AuditRepository,
+        requesting_user: User,
+    ):
+        return SimpleNamespace(id=widget_id)
 
     spec = ResourceSpec(
         collection="widgets",
@@ -842,14 +1045,23 @@ def test_mount_state_axis_requires_write_user_dep():
         # write_user_dep intentionally omitted
     )
     router = APIRouter()
+
+    async def stub(
+        widget_id: UUID,
+        payload: _AxisBody,
+        repo: UserRepository,
+        audit_repo: AuditRepository,
+        requesting_user: User,
+    ):
+        pass
+
     with pytest.raises(ValueError, match="write_user_dep"):
         mount_state_axis(
             router,
             spec,
-            handler=lambda **_: None,
+            handler=stub,
             axis_name="toggle",
             body_schema=_AxisBody,
-            audit_repo_dep=lambda: None,
         )
 
 
@@ -857,8 +1069,14 @@ def test_mount_state_axis_no_response_to_dict_returns_empty_body():
     """Without `response_to_dict`, the body is `{}` — handler still runs
     and the HX-Refresh header still fires."""
 
-    async def handler(**kwargs):
-        return SimpleNamespace(id=kwargs["widget_id"])
+    async def handler(
+        widget_id: UUID,
+        payload: _AxisBody,
+        repo: UserRepository,
+        audit_repo: AuditRepository,
+        requesting_user: User,
+    ):
+        return SimpleNamespace(id=widget_id)
 
     spec = ResourceSpec(
         collection="widgets",
@@ -879,7 +1097,12 @@ def test_mount_delete_404_propagates_from_handler():
 
     from src.api.common.exceptions import NotFoundError
 
-    async def raising_handler(**kwargs):
+    async def raising_handler(
+        widget_id: UUID,
+        repo: UserRepository,
+        audit_repo: AuditRepository,
+        requesting_user: User,
+    ):
         raise NotFoundError(detail="missing")
 
     spec = ResourceSpec(
@@ -890,12 +1113,8 @@ def test_mount_delete_404_propagates_from_handler():
     )
     app = FastAPI()
     router = APIRouter(prefix=f"/{spec.collection}")
-    mount_delete(
-        router,
-        spec,
-        handler=raising_handler,
-        audit_repo_dep=lambda: SimpleNamespace(name="audit_repo"),
-    )
+    _override_audit(app)
+    mount_delete(router, spec, handler=raising_handler)
     app.include_router(router)
     client = TestClient(app)
 

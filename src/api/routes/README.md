@@ -35,14 +35,8 @@ USER_SPEC = ResourceSpec(
 )
 
 mount_list(router, USER_SPEC, handler=handle_list_users)
-mount_detail(
-    router, USER_SPEC, handler=handle_get_user_detail,
-    extra_repo_deps=(get_provider_repository,),  # multi-repo handler
-)
-mount_delete(
-    router, USER_SPEC, handler=handle_delete_user,
-    audit_repo_dep=get_audit_repository,
-)
+mount_detail(router, USER_SPEC, handler=handle_get_user_detail)
+mount_delete(router, USER_SPEC, handler=handle_delete_user)
 ```
 
 The full grammar (knobs, mount kwargs, polymorphism via handler-context, sub-resources) is documented in [`api/common/README.md`](../common/README.md#unified-resource-grammar).
@@ -144,9 +138,9 @@ mount_list(router, <ENTITY>_SPEC, handler=handle_list_<entity>)
 mount_detail(router, <ENTITY>_SPEC, handler=handle_get_<entity>_detail)
 mount_form(router, <ENTITY>_SPEC, handler=handle_get_<entity>_form, template="<entities>/new.html")
 mount_form(router, <ENTITY>_SPEC, handler=handle_get_<entity>_edit_form, template="<entities>/edit.html", on_existing=True)
-mount_create(router, <ENTITY>_SPEC, handler=handle_create_<entity>, audit_repo_dep=get_audit_repository)
-mount_update(router, <ENTITY>_SPEC, handler=handle_update_<entity>, audit_repo_dep=get_audit_repository)
-mount_delete(router, <ENTITY>_SPEC, handler=handle_delete_<entity>, audit_repo_dep=get_audit_repository)
+mount_create(router, <ENTITY>_SPEC, handler=handle_create_<entity>)
+mount_update(router, <ENTITY>_SPEC, handler=handle_update_<entity>)
+mount_delete(router, <ENTITY>_SPEC, handler=handle_delete_<entity>)
 ```
 
 2. Register the router in `src/main.py`. (Order matters when literal segments would shadow parametric ones — e.g. `/me/*` must be registered before the `/users` router.)
@@ -170,9 +164,9 @@ LICENSURE_SPEC = ResourceSpec(
     read_to_dict=_licensure_read_dict,
     parent=PROVIDER_SPEC,
 )
-mount_create(router, LICENSURE_SPEC, handler=handle_create_licensure, audit_repo_dep=get_audit_repository)
-mount_update(router, LICENSURE_SPEC, handler=handle_update_licensure, audit_repo_dep=get_audit_repository)
-mount_delete(router, LICENSURE_SPEC, handler=handle_delete_licensure, audit_repo_dep=get_audit_repository)
+mount_create(router, LICENSURE_SPEC, handler=handle_create_licensure)
+mount_update(router, LICENSURE_SPEC, handler=handle_update_licensure)
+mount_delete(router, LICENSURE_SPEC, handler=handle_delete_licensure)
 ```
 
 The handler receives both `provider_id=` and `licensure_id=` (plus `payload=`, `repo=`, `audit_repo=`, `requesting_user=`).

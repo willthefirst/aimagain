@@ -111,12 +111,7 @@ USER_SPEC = ResourceSpec(
     write_user_dep=current_admin_user,
 )
 
-mount_delete(
-    router,
-    USER_SPEC,
-    handler=handle_delete_user,
-    audit_repo_dep=get_audit_repository,
-)
+mount_delete(router, USER_SPEC, handler=handle_delete_user)
 ```
 
 ### Why this shape
@@ -126,17 +121,20 @@ mount_delete(
 - **Sub-resources nest via `parent`.** A child `ResourceSpec` carrying `parent=parent_spec` produces paths like `/providers/{provider_id}/licensures/{licensure_id}` — same `mount_create`/`mount_update`/`mount_delete` functions as top-level resources. The router's prefix is the topmost ancestor's collection (e.g. `APIRouter(prefix="/providers")`); the mount walks the parent chain to build the rest of the path. Handler kwargs include every parent id by its declared `id_param` name (`provider_id=...`, then the resource's own id).
 - **Polymorphic resources via handler-driven knobs.** Posts dispatch templates by `kind`; the route doesn't need to. The handler returns a `template_name` in its context dict and the mount honors it. This keeps the spec's shape stable even when the resource's behavior is polymorphic — `mount_form` for `GET /posts/{id}/form` uses this in slice 7. The grammar isn't infinitely flexible though: `GET /posts/form?kind=X` (where the *query param* picks the template) stays bespoke because mount_form's contract doesn't carry query params, and widening it for one case would bloat every spec.
 
-### Handler signatures
+### Handler signatures drive dep wiring
 
-Mount functions invoke handlers with a fixed shape so the spec can plumb args generically. Every handler the mounts call expects:
+The mount layer reads each handler's **typed signature** and synthesizes a FastAPI route function that pairs every parameter with the right source. There is no per-mount `extra_repo_deps` / `audit_repo_dep` wiring — the handler's annotations are the contract.
 
-- **`<id_param>=<UUID>`** for routes with an id in the path (detail/update/delete), under the per-resource kwarg name declared in the spec (`user_id`, `post_id`, ...).
-- **`repo=<primary repo>`** for the resource's primary repository, sourced from `spec.repo_dep`.
-- **`audit_repo=<AuditRepository>`** for mutation handlers, sourced from `audit_repo_dep` passed to the mount call (it's a layer-wide concern, not a per-resource knob).
-- **`requesting_user=<User>`** for any handler that gates on auth, sourced from `spec.read_user_dep` or `spec.write_user_dep`.
-- **`payload=<validated body>`** for create/update handlers (slices 6–7).
+Synthesis recognizes:
 
-Secondary repos (e.g. `user_repo: UserRepository` in the multi-repo `handle_list_user_providers`) keep their typed name per the [logic-layer convention](../../logic/README.md#handler-kwarg-naming) and arrive via `spec.extra_repo_deps`.
+- **`<id_param>: UUID`** (and any parent ids for sub-resources) — bound from the URL path.
+- **`repo: <RepoType>`** — `Depends(spec.repo_dep)`. The annotation is informational; the spec is the source of truth for which resolver to call.
+- **`audit_repo: AuditRepository`** and any other **`<name>: <RepoType>`** — resolved via the type→resolver registry in [`src/repositories/dependencies.py`](../../repositories/dependencies.py). Adding a new repo type means adding one entry to `_REPO_TYPE_RESOLVERS`.
+- **`requesting_user: User`** — `Depends(spec.read_user_dep)` on reads, `Depends(spec.write_user_dep)` on writes. Declare as **`User | None`** for routes that may run anonymously (e.g. `mount_list(..., public=True)`).
+- **`payload: <PydanticType>`** — parsed from the request body via the spec's `create_adapter` / `update_adapter` (or the mount's `body_schema` for `mount_state_axis`).
+- **Query params** — declared in the mount's `query_params=` tuple; the handler param's name must match `QueryParam.name`.
+
+Forgetting to register a new repo type in `_REPO_TYPE_RESOLVERS` raises `MountError` at app startup with a message naming the unresolved type — the failure mode is loud and immediate.
 
 ### What's mounted today
 
@@ -150,22 +148,23 @@ Secondary repos (e.g. `user_repo: UserRepository` in the multi-repo `handle_list
 | `mount_state_axis` | Landed (#302) | `users` (PUT /{id}/activation) |
 | Sub-resource via `parent=` | Landed (slice 8 / #253) | `licensures`, `educations`, `certifications` (under providers) |
 
-### Multi-repo handlers: `extra_repo_deps`
+### Multi-repo handlers
 
-Some handlers need more than the resource's primary repo — e.g. `handle_get_user_detail` takes both the user repo (the primary) and the provider repo (to embed the owned-providers list on the user-detail page). The mount that needs them passes them via the `extra_repo_deps` kwarg:
+Some handlers need more than the resource's primary repo — e.g. `handle_get_user_detail` takes both the user repo (the primary) and the provider repo (to embed the owned-providers list on the user-detail page). Just declare each as a typed parameter:
 
 ```python
-mount_detail(
-    router,
-    USER_SPEC,
-    handler=handle_get_user_detail,
-    extra_repo_deps=(get_provider_repository,),
-)
+async def handle_get_user_detail(
+    request: Request,
+    user_id: UUID,
+    repo: UserRepository,
+    provider_repo: ProviderRepository,
+    requesting_user: User,
+) -> dict: ...
+
+mount_detail(router, USER_SPEC, handler=handle_get_user_detail)
 ```
 
-The mount derives the kwarg name from the dep callable: `get_provider_repository` → `provider_repo` (strip `get_` prefix, replace `_repository` suffix with `_repo`). The handler must take the same name. If the dep doesn't follow the `get_<entity>_repository` convention, the mount raises at registration time — silent name-mismatches would be a request-time bug.
-
-`extra_repo_deps` is per-mount, not per-spec, because different mounts on the same resource often need different extras (the list view doesn't need provider_repo even though the detail view does).
+The mount introspects the signature and resolves `provider_repo` via the type registry — no `extra_repo_deps=` wiring on the call. Adding a new repo to an existing handler is a one-line change in the handler's signature; the mount picks it up automatically.
 
 ### Query-param mounts
 
@@ -200,7 +199,6 @@ For the kind-picks-template case, the handler returns `template_name=...` in its
 ```python
 mount_detail(
     router, USER_SPEC, handler=handle_get_user_detail,
-    extra_repo_deps=(get_provider_repository,),
     singleton_alias=("me", current_active_user),
 )
 # Mounts BOTH GET /users/{user_id} AND GET /users/me; same handler with
@@ -210,7 +208,6 @@ mount_related_list(
     router, parent_spec=USER_SPEC, child_spec=PROVIDER_SPEC,
     handler=handle_list_user_providers,
     template="users/providers_list.html",
-    extra_repo_deps=(get_user_repository,),
     singleton_alias=("me", current_active_user),
 )
 # Mounts /users/{user_id}/providers AND /users/me/providers.

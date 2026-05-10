@@ -27,7 +27,7 @@ from src.logic.posts.post_processing import (
     handle_update_post,
 )
 from src.models import POST_KIND_NAMES, POST_KINDS
-from src.repositories.dependencies import get_audit_repository, get_post_repository
+from src.repositories.dependencies import get_post_repository
 from src.schemas.posts.post import post_create_adapter, post_update_adapter
 
 posts_api_router = APIRouter(prefix="/posts")
@@ -111,12 +111,6 @@ mount_detail(router, POST_SPEC, handler=handle_get_post_detail)
 
 
 # Mutations — methods differ from the GETs above so order is independent.
-mount_create(
-    router, POST_SPEC, handler=handle_create_post, audit_repo_dep=get_audit_repository
-)
-mount_update(
-    router, POST_SPEC, handler=handle_update_post, audit_repo_dep=get_audit_repository
-)
-mount_delete(
-    router, POST_SPEC, handler=handle_delete_post, audit_repo_dep=get_audit_repository
-)
+mount_create(router, POST_SPEC, handler=handle_create_post)
+mount_update(router, POST_SPEC, handler=handle_update_post)
+mount_delete(router, POST_SPEC, handler=handle_delete_post)
