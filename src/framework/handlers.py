@@ -826,12 +826,34 @@ async def handle_list(
         context key for the items list.
       - ``spec.list_exclude_self`` — when True, drops the viewer from
         the result set via the repo method's ``exclude_self`` kwarg.
+      - ``spec.list_order_by`` — column expression for the framework
+        default (``BaseRepository.list_default``); used when the repo
+        has no bespoke ``list_<collection>`` method.
+
+    Dispatch: prefers ``repo.list_<collection>(**filter_values)`` when
+    that method exists on the repo (entities with joins / custom
+    filters like providers). Otherwise falls through to
+    ``repo.list_default(spec.model, order_by=spec.list_order_by, ...)``
+    so trivial list-by-creation-time / list-by-name entities don't
+    need a per-entity wrapper.
     """
-    list_method = getattr(repo, f"list_{spec.url_collection}")
     list_kwargs: dict[str, Any] = dict(filter_values)
     if spec.list_exclude_self and requesting_user is not None:
         list_kwargs["exclude_self"] = requesting_user
-    items = await list_method(**list_kwargs)
+    list_method = getattr(repo, f"list_{spec.url_collection}", None)
+    if list_method is not None:
+        items = await list_method(**list_kwargs)
+    else:
+        if spec.list_order_by is None:
+            raise ValueError(
+                f"handle_list: spec {spec.name!r} has no list_order_by and "
+                f"no bespoke list_{spec.url_collection!s} method on the "
+                "repo — either declare list_order_by on the spec or add a "
+                f"list_{spec.url_collection!s}() method to the repo."
+            )
+        items = await repo.list_default(
+            spec.model, order_by=spec.list_order_by, **list_kwargs
+        )
 
     context: dict[str, Any] = {
         "request": request,

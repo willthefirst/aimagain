@@ -1,12 +1,11 @@
-from typing import Sequence
-
-from sqlalchemy import select
-
 from src.framework.base_repository import BaseRepository
-from src.models import Post
 
 
 class PostRepository(BaseRepository):
-    async def list_posts(self) -> Sequence[Post]:
-        """Lists all posts, newest first. Detail relationships are eager-loaded."""
-        return await self._list(select(Post).order_by(Post.created_at.desc()))
+    """Posts have no bespoke read/write methods today — listing falls
+    through to `BaseRepository.list_default(Post, order_by=Post.created_at.desc())`
+    via `handle_list` (`POST_ENTITY.list_order_by`), and create/update/
+    delete go through the public aliases on `BaseRepository`. The class
+    exists so dep injection can resolve a typed repo and per-test
+    fixtures can subclass it.
+    """

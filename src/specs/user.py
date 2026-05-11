@@ -60,6 +60,7 @@ USER_ENTITY: Final[EntitySpec] = EntitySpec(
     private_field_predicate=is_self_or_admin,
     public_fields=("id", "username"),
     list_exclude_self=True,
+    list_order_by=User.username,
     routes=RouteSet(list=True, detail=True, delete=True),
     # The user-list page is for *other* users; admins can't delete their
     # own account via this endpoint, and the activation state-axis has

@@ -1,5 +1,3 @@
-from typing import Sequence
-
 from sqlalchemy import select
 
 from src.framework.base_repository import BaseRepository
@@ -18,24 +16,6 @@ class UserRepository(BaseRepository):
         stmt = select(User).filter(User.email == email)
         result = await self.session.execute(stmt)
         return result.scalars().first()
-
-    async def list_users(
-        self,
-        *,
-        exclude_self: User | None = None,
-    ) -> Sequence[User]:
-        """Lists users, optionally excluding the requesting viewer.
-
-        The kwarg name `exclude_self` is the convention `handle_list`
-        passes for entities opting into `spec.list_exclude_self=True`.
-        """
-        stmt = select(User)
-
-        if exclude_self:
-            stmt = stmt.filter(User.id != exclude_self.id)
-
-        stmt = stmt.order_by(User.username)
-        return await self._list(stmt)
 
     async def delete_user(self, user: User) -> None:
         """Hard-deletes the user row; the caller commits."""

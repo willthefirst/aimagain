@@ -49,6 +49,7 @@ POST_ENTITY: Final[EntitySpec] = EntitySpec(
     create_adapter=post_create_adapter,
     update_adapter=post_update_adapter,
     read_schema=post_read_adapter,
+    list_order_by=Post.created_at.desc(),
     routes=RouteSet(
         list=True,
         detail=True,
