@@ -57,15 +57,6 @@ EDUCATION = EDUCATION_ENTITY.audit
 CERTIFICATION = CERTIFICATION_ENTITY.audit
 
 
-async def _load_provider_or_404(
-    provider_id: UUID, repo: ProviderRepository
-) -> Provider:
-    provider = await repo.get_by_id(provider_id)
-    if provider is None:
-        raise NotFoundError(detail="Provider not found")
-    return provider
-
-
 # --- Provider handlers ----------------------------------------------------
 
 
@@ -96,39 +87,28 @@ async def handle_list_providers(
     }
 
 
-async def handle_get_provider_detail(
-    request: Request,
-    provider_id: UUID,
-    repo: ProviderRepository,
+async def provider_detail_extras(
+    *,
+    target: Provider,
+    requesting_user: User | None,
     user_favorite_repo: UserFavoriteRepository,
-    requesting_user: User,
+    **_: Any,
 ) -> dict[str, Any]:
-    """Loads any provider by id for the read-only detail page; 404 if missing.
+    """Per-viewer detail extras for `make_detail_handler(PROVIDER_ENTITY)`.
 
-    The repo's `get_by_id` eager-loads `licensures`, `educations`, and
-    `certifications` via `lazy="selectin"`, so the template can render
-    each sub-section without further queries.
-
-    Per-viewer derived fields live in the context dict, not on `provider`
-    itself — `is_favorited` is a property of the (viewer, provider) pair,
-    not of the provider. Same shape as `can_edit`. Anonymous viewers
-    (`requesting_user is None`) get `is_favorited=False` without a DB
-    round-trip.
+    `is_favorited` is a property of the (viewer, provider) pair, not of
+    the provider — it lives in context, not on the model. Anonymous
+    viewers (`requesting_user is None` for a hypothetical public detail)
+    get `False` without a DB round-trip; today `PROVIDER_ENTITY.read_user_dep`
+    forces auth, but the None-check keeps the helper safe if that ever
+    changes.
     """
-    provider = await _load_provider_or_404(provider_id, repo)
-    can_edit = PROVIDER_ENTITY.can_write(provider, requesting_user)
     if requesting_user is None:
-        is_favorited = False
-    else:
-        is_favorited = await user_favorite_repo.is_favorited(
-            user_id=requesting_user.id, provider_id=provider.id
-        )
+        return {"is_favorited": False}
     return {
-        "request": request,
-        "provider": provider,
-        "current_user": requesting_user,
-        "can_edit": can_edit,
-        "is_favorited": is_favorited,
+        "is_favorited": await user_favorite_repo.is_favorited(
+            user_id=requesting_user.id, provider_id=target.id
+        )
     }
 
 

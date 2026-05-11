@@ -14,12 +14,14 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from starlette.requests import Request
 
 from src.api.common.exceptions import ForbiddenError, NotFoundError
+from src.api.common.specs.provider import PROVIDER_ENTITY
+from src.logic._generic import handle_detail
 from src.logic.audit import AuditAction
 from src.logic.providers.provider_processing import (
     handle_create_provider,
-    handle_get_provider_detail,
     handle_list_providers,
     handle_list_user_providers,
+    provider_detail_extras,
 )
 from src.models import (
     AuditLog,
@@ -189,13 +191,14 @@ async def test_get_provider_detail_returns_context(
     provider_id, *_ = await _seed_provider(db_test_session_manager, user_id=user.id)
 
     async with db_test_session_manager() as session:
-        repo = ProviderRepository(session)
-        context = await handle_get_provider_detail(
+        context = await handle_detail(
+            PROVIDER_ENTITY,
             request=_fake_request(),
-            provider_id=provider_id,
-            repo=repo,
-            user_favorite_repo=UserFavoriteRepository(session),
+            target_id=provider_id,
+            repo=ProviderRepository(session),
             requesting_user=user,
+            extras=provider_detail_extras,
+            extra_kwargs={"user_favorite_repo": UserFavoriteRepository(session)},
         )
         assert context["provider"].id == provider_id
         assert context["current_user"] is user
@@ -214,14 +217,15 @@ async def test_get_provider_detail_404_for_unknown_id(
 ):
     user = await _seed_user(db_test_session_manager)
     async with db_test_session_manager() as session:
-        repo = ProviderRepository(session)
         with pytest.raises(NotFoundError):
-            await handle_get_provider_detail(
+            await handle_detail(
+                PROVIDER_ENTITY,
                 request=_fake_request(),
-                provider_id=uuid.uuid4(),
-                repo=repo,
-                user_favorite_repo=UserFavoriteRepository(session),
+                target_id=uuid.uuid4(),
+                repo=ProviderRepository(session),
                 requesting_user=user,
+                extras=provider_detail_extras,
+                extra_kwargs={"user_favorite_repo": UserFavoriteRepository(session)},
             )
 
 
@@ -239,12 +243,14 @@ async def test_get_provider_detail_is_favorited_true_when_self_favorited(
         await session.commit()
 
     async with db_test_session_manager() as session:
-        context = await handle_get_provider_detail(
+        context = await handle_detail(
+            PROVIDER_ENTITY,
             request=_fake_request(),
-            provider_id=provider_id,
+            target_id=provider_id,
             repo=ProviderRepository(session),
-            user_favorite_repo=UserFavoriteRepository(session),
             requesting_user=user,
+            extras=provider_detail_extras,
+            extra_kwargs={"user_favorite_repo": UserFavoriteRepository(session)},
         )
         assert context["is_favorited"] is True
 
@@ -253,17 +259,21 @@ async def test_get_provider_detail_is_favorited_false_for_anonymous_viewer(
     db_test_session_manager: async_sessionmaker[AsyncSession],
 ):
     """A `None` `requesting_user` never sees `is_favorited=True` — the
-    flag is meaningless without an actor."""
+    flag is meaningless without an actor. Today `PROVIDER_ENTITY.read_user_dep`
+    forces auth so this branch is defensive; the test pins the contract
+    in case the read dep ever loosens."""
     other = await _seed_user(db_test_session_manager)
     provider_id, *_ = await _seed_provider(db_test_session_manager, user_id=other.id)
 
     async with db_test_session_manager() as session:
-        context = await handle_get_provider_detail(
+        context = await handle_detail(
+            PROVIDER_ENTITY,
             request=_fake_request(),
-            provider_id=provider_id,
+            target_id=provider_id,
             repo=ProviderRepository(session),
-            user_favorite_repo=UserFavoriteRepository(session),
             requesting_user=None,
+            extras=provider_detail_extras,
+            extra_kwargs={"user_favorite_repo": UserFavoriteRepository(session)},
         )
         assert context["is_favorited"] is False
 

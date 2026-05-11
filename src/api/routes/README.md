@@ -130,13 +130,15 @@ from src.api.common.specs.<entity> import <ENTITY>_ENTITY
 from src.logic._generic import (
     make_create_handler,
     make_delete_handler,
+    make_detail_handler,
     make_edit_form_handler,
     make_update_handler,
 )
 from src.logic.<entity>.<entity>_processing import (
-    handle_get_<entity>_detail,
     handle_list_<entity>,
-    # ... plus any bespoke handlers that don't fit the generic ritual
+    # ... plus any bespoke handlers that don't fit the generic ritual,
+    # plus any per-entity `*_detail_extras` callable supplied to
+    # `make_detail_handler` for viewer-pair / projection state.
 )
 
 <entity>_api_router = APIRouter(prefix="/<entities>")
@@ -146,13 +148,14 @@ _handle_create_<entity> = make_create_handler(<ENTITY>_ENTITY)
 _handle_update_<entity> = make_update_handler(<ENTITY>_ENTITY)
 _handle_delete_<entity> = make_delete_handler(<ENTITY>_ENTITY)
 _handle_get_<entity>_edit_form = make_edit_form_handler(<ENTITY>_ENTITY)
+_handle_get_<entity>_detail = make_detail_handler(<ENTITY>_ENTITY)  # pass extras=/extra_repos= for per-viewer state
 
 mount_entity(
     router,
     <ENTITY>_ENTITY,
     handlers={
         "list": handle_list_<entity>,
-        "detail": handle_get_<entity>_detail,
+        "detail": _handle_get_<entity>_detail,
         "create": _handle_create_<entity>,
         "update": _handle_update_<entity>,
         "delete": _handle_delete_<entity>,

@@ -1,4 +1,5 @@
 import logging
+from typing import Any
 from uuid import UUID
 
 from fastapi import Request
@@ -54,48 +55,40 @@ async def handle_list_users(
     }
 
 
-async def handle_get_user_detail(
-    request: Request,
-    user_id: UUID,
-    repo: UserRepository,
+async def user_detail_extras(
+    *,
+    target: User,
+    requesting_user: User | None,
     provider_repo: ProviderRepository,
-    requesting_user: User,
-):
-    """Loads a single user for the detail page along with the providers
-    they own; 404s if the user is missing. Provider data is already
-    publicly available via `GET /providers`, so the embedded list is gated
-    only by the existing user-detail auth (any active user)."""
-    target = await repo.get_user_by_id(user_id)
-    if target is None:
-        raise NotFoundError(detail="User not found")
+    **_: Any,
+) -> dict[str, Any]:
+    """Per-viewer detail extras for `make_detail_handler(USER_ENTITY)`.
 
-    providers = await provider_repo.list_for_user(user_id)
-
-    # Admin actions never apply to the viewer's own profile, so the
-    # self-guard composes with the admin check at flag-computation time;
-    # the partial just checks the flag.
+    Adds the providers the target owns, viewer-derived flags
+    (`is_self`, `can_admin_actions`, `can_view_private`), and a
+    private-field projection bound under `target_user`. Templates read
+    `target_user`, not the raw `user` key the framework base context
+    binds — the projection is what carries the omit-private-fields
+    guarantee, so binding it under the template-facing name is
+    defense-in-depth: a forgotten template guard can re-leak; a
+    missing dict key can't.
+    """
+    providers = await provider_repo.list_for_user(target.id)
     is_self = requesting_user is not None and target.id == requesting_user.id
-    can_admin_actions = is_admin(requesting_user) and not is_self
-    can_view_private = USER_ENTITY.private_field_predicate(requesting_user, target)
-
-    # Project target_user into a dict that omits private fields for
-    # viewers outside the predicate. Defense in depth: a forgotten
-    # template guard can re-leak; a missing dict key can't.
-    target_view = project_view(
-        target,
-        public_fields=("id", "username"),
-        actor=requesting_user,
-        private_fields=USER_ENTITY.private_fields,
-        private_field_predicate=USER_ENTITY.private_field_predicate,
-    )
-
     return {
-        "request": request,
-        "target_user": target_view,
         "providers": providers,
-        "current_user": requesting_user,
-        "can_admin_actions": can_admin_actions,
-        "can_view_private": can_view_private,
+        "is_self": is_self,
+        "can_admin_actions": is_admin(requesting_user) and not is_self,
+        "can_view_private": USER_ENTITY.private_field_predicate(
+            requesting_user, target
+        ),
+        "target_user": project_view(
+            target,
+            public_fields=("id", "username"),
+            actor=requesting_user,
+            private_fields=USER_ENTITY.private_fields,
+            private_field_predicate=USER_ENTITY.private_field_predicate,
+        ),
     }
 
 

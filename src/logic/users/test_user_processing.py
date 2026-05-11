@@ -2,9 +2,9 @@
 
 The user-detail projection is a security claim — `target_view` must omit
 `email`, `is_active`, `is_verified` from any viewer who isn't the user
-themselves or an admin. The docstring on `handle_get_user_detail` calls
-this defense in depth: a forgotten template guard can re-leak; a missing
-dict key can't. These tests pin that invariant so the dict shape is the
+themselves or an admin. The `user_detail_extras` callable carries this
+guarantee: a forgotten template guard can re-leak; a missing dict key
+can't. These tests pin that invariant so the dict shape is the
 load-bearing surface, independent of any template.
 
 Self-target guards on `handle_set_user_activation` and `handle_delete_user`
@@ -19,10 +19,12 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from starlette.requests import Request
 
 from src.api.common.exceptions import ForbiddenError
+from src.api.common.specs.user import USER_ENTITY
+from src.logic._generic import handle_detail
 from src.logic.users.user_processing import (
     handle_delete_user,
-    handle_get_user_detail,
     handle_set_user_activation,
+    user_detail_extras,
 )
 from src.models import User
 from src.repositories.audit_repository import AuditRepository
@@ -61,12 +63,14 @@ async def test_get_user_detail_excludes_private_fields_from_stranger(
     stranger = await _seed_user(db_test_session_manager)
 
     async with db_test_session_manager() as session:
-        context = await handle_get_user_detail(
+        context = await handle_detail(
+            USER_ENTITY,
             request=_fake_request(),
-            user_id=target.id,
+            target_id=target.id,
             repo=UserRepository(session),
-            provider_repo=ProviderRepository(session),
             requesting_user=stranger,
+            extras=user_detail_extras,
+            extra_kwargs={"provider_repo": ProviderRepository(session)},
         )
 
     target_view = context["target_user"]
@@ -84,12 +88,14 @@ async def test_get_user_detail_includes_private_fields_for_self(
     target = await _seed_user(db_test_session_manager)
 
     async with db_test_session_manager() as session:
-        context = await handle_get_user_detail(
+        context = await handle_detail(
+            USER_ENTITY,
             request=_fake_request(),
-            user_id=target.id,
+            target_id=target.id,
             repo=UserRepository(session),
-            provider_repo=ProviderRepository(session),
             requesting_user=target,
+            extras=user_detail_extras,
+            extra_kwargs={"provider_repo": ProviderRepository(session)},
         )
 
     target_view = context["target_user"]
@@ -107,12 +113,14 @@ async def test_get_user_detail_includes_private_fields_for_admin(
     admin = await _seed_user(db_test_session_manager, is_superuser=True)
 
     async with db_test_session_manager() as session:
-        context = await handle_get_user_detail(
+        context = await handle_detail(
+            USER_ENTITY,
             request=_fake_request(),
-            user_id=target.id,
+            target_id=target.id,
             repo=UserRepository(session),
-            provider_repo=ProviderRepository(session),
             requesting_user=admin,
+            extras=user_detail_extras,
+            extra_kwargs={"provider_repo": ProviderRepository(session)},
         )
 
     target_view = context["target_user"]
