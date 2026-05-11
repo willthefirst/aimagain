@@ -21,7 +21,7 @@ from typing import Final
 from src.api.common.entity_spec import EntitySpec, RouteSet, Templates
 from src.api.common.resource_routes import QueryParam
 from src.auth_config import current_active_user
-from src.logic._authz import assert_owner_or_admin
+from src.logic._authz import assert_owner_or_admin, is_owner_or_admin
 from src.logic.audit import AuditAction, AuditedResource, make_snapshotter
 from src.models import Provider
 from src.repositories.dependencies import get_provider_repository
@@ -62,6 +62,7 @@ PROVIDER_ENTITY: Final[EntitySpec] = EntitySpec(
     read_user_dep=current_active_user,
     write_user_dep=current_active_user,
     write_authz=assert_owner_or_admin,
+    can_write=is_owner_or_admin,
     audit=PROVIDER_AUDITED_RESOURCE,
     create_adapter=provider_create_adapter,
     update_adapter=provider_update_adapter,

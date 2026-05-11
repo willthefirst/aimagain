@@ -200,6 +200,15 @@ class EntitySpec:
     read_user_dep: Callable[..., Any] | None = None
     write_user_dep: Callable[..., Any] | None = None
     write_authz: Callable[..., None] | None = None
+    # Predicate form of `write_authz` — non-raising boolean returning
+    # True iff the user is allowed to mutate the target. Bound directly
+    # to detail-handler context flags (`can_edit = entity.can_write(
+    # target, user)`) so handlers don't re-derive the composition.
+    # Convention: where `write_authz` is set, `can_write` carries the
+    # same rule (e.g. both are `assert_owner_or_admin` / `is_owner_or_admin`
+    # for owner-or-admin entities). Not validator-enforced — a spec test
+    # asserts the pair on each entity.
+    can_write: Callable[..., bool] | None = None
 
     # Audit --------------------------------------------------------------
     # `audit` and `edge_audit` are mutually exclusive — CRUD-shaped

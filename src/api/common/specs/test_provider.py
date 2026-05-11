@@ -6,7 +6,7 @@ Asserts the spec declares the right things — not that CRUD works
 
 from src.api.common.entity_spec import RouteSet
 from src.api.common.specs.provider import PROVIDER_ENTITY
-from src.logic._authz import assert_owner_or_admin
+from src.logic._authz import assert_owner_or_admin, is_owner_or_admin
 from src.logic.audit import AuditAction
 from src.models import Provider
 from src.schemas.providers.provider import (
@@ -88,6 +88,12 @@ def test_read_to_dict_returns_provider_read_shape():
 
 def test_write_authz_is_assert_owner_or_admin():
     assert PROVIDER_ENTITY.write_authz is assert_owner_or_admin
+
+
+def test_can_write_is_is_owner_or_admin():
+    """Predicate sibling of `write_authz` — read by detail handlers for
+    `can_edit` flags so the rule lives in exactly one place."""
+    assert PROVIDER_ENTITY.can_write is is_owner_or_admin
 
 
 # --- List filters --------------------------------------------------------

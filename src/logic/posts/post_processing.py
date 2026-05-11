@@ -5,7 +5,6 @@ from fastapi import Request
 
 from src.api.common.exceptions import NotFoundError
 from src.api.common.specs.post import POST_ENTITY
-from src.logic._authz import is_admin, is_owner
 from src.models import POST_KINDS, User
 from src.repositories.posts.post_repository import PostRepository
 from src.schemas.posts.post import (
@@ -53,9 +52,10 @@ async def handle_get_post_detail(
 ):
     """Loads a single post for the detail page; 404s if missing.
 
-    Computes `can_edit` (owner-or-admin) so the owner-actions partial
-    can render based on a single named flag instead of re-deriving the
-    rule against `current_user`.
+    `can_edit` is the post's owner-or-admin predicate, read from
+    `POST_ENTITY.can_write` so the rule lives in exactly one place
+    (the spec); the asserting form on the same spec
+    (`POST_ENTITY.write_authz`) gates mutations.
     """
     post = await repo.get_post_by_id(post_id)
     if post is None:
@@ -65,7 +65,7 @@ async def handle_get_post_detail(
         "request": request,
         "post": post,
         "current_user": requesting_user,
-        "can_edit": is_owner(post, requesting_user) or is_admin(requesting_user),
+        "can_edit": POST_ENTITY.can_write(post, requesting_user),
     }
 
 

@@ -26,7 +26,6 @@ from src.api.common.specs.provider import PROVIDER_ENTITY
 from src.api.common.specs.provider_certification import CERTIFICATION_ENTITY
 from src.api.common.specs.provider_education import EDUCATION_ENTITY
 from src.api.common.specs.provider_licensure import LICENSURE_ENTITY
-from src.logic._authz import is_admin, is_owner
 from src.logic.audit import mutate
 from src.models import (
     Provider,
@@ -117,7 +116,7 @@ async def handle_get_provider_detail(
     round-trip.
     """
     provider = await _load_provider_or_404(provider_id, repo)
-    can_edit = is_owner(provider, requesting_user) or is_admin(requesting_user)
+    can_edit = PROVIDER_ENTITY.can_write(provider, requesting_user)
     if requesting_user is None:
         is_favorited = False
     else:

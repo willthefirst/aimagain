@@ -309,6 +309,7 @@ Per-entity instances at `src/api/common/specs/<entity>.py` carry:
 - **Identity** — `name`, `url_collection`, `id_param`, `model`, `owner_attr`.
 - **Ownership chain** — `parent: EntitySpec | None` for owned subentities (the three provider credential entities set `parent=PROVIDER_ENTITY`).
 - **FastAPI deps** — `repo_dep`, `read_user_dep`, `write_user_dep`. `read_user_dep=None` declares a public read.
+- **Write authorization** — `write_authz: Callable[..., None] | None` is the raising form (consumed by mutation handlers in the generic CRUD framework); `can_write: Callable[..., bool] | None` is the predicate sibling (bound to detail-handler `can_edit` flags so the rule isn't re-derived in handler bodies). Convention: where both are set, they encode the same rule (e.g. `assert_owner_or_admin` + `is_owner_or_admin` for owner-or-admin entities); a spec-correctness test pins the pair on each entity.
 - **Audit binding** — exactly one of: `audit: AuditedResource` for CRUD-shaped entities, or `edge_audit: EdgeAudit` for non-CRUD edges (favorites uses `edge_audit` with the `(add, remove)` verb map). Mutually exclusive; construction-time validation enforces.
 - **Visibility** — `private_fields`, `private_field_predicate` (the projection rule from #304).
 - **Route opt-ins** — `routes: RouteSet` flags: `list`, `detail`, `create`, `update`, `delete`, `form_new`, `form_edit`. Phase 1 reads these for documentation + spec-correctness tests; `mount_entity` (added in phase 2) consumes them at mount time.
