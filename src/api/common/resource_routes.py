@@ -835,12 +835,18 @@ def _owned_factory_makers() -> dict[str, Callable[..., Callable[..., Awaitable[A
     }
 
 
+_TOP_LEVEL_AUTO_BIND_VERBS = ("detail", "create", "update", "delete", "form_edit")
+
+
 def mount_entity(
     router: Any,
     entity: Any,  # `EntitySpec` — imported lazily to avoid a cycle
     *,
     handlers: dict[str, Callable[..., Awaitable[Any]]],
     owned_subentities: tuple[Any, ...] = (),
+    module: str | None = None,
+    detail_extras: Callable[..., Awaitable[dict[str, Any]]] | None = None,
+    detail_extra_repos: tuple[tuple[str, type], ...] = (),
 ) -> None:
     """Spec-driven dispatcher for an entity's full route surface.
 
@@ -866,17 +872,107 @@ def mount_entity(
         mutations are entirely standard. Supplying the explicit key
         still works and overrides the default.
 
+    Top-level entities get the same factory fallback for their
+    standard-CRUD verbs (`detail`, `create`, `update`, `delete`,
+    `form_edit`): when `routes.<verb>=True` and the handlers dict
+    omits the verb, `mount_entity` builds the handler from
+    ``make_<verb>_handler(entity)`` and stitches it onto the route
+    file's module so the `_resolve_handler` lookup (and contract-test
+    monkey-patches at ``<routes module>._handle_<verb>_<entity>``)
+    flow through. `module=__name__` is required from the route file
+    whenever auto-binding triggers; missing it raises at mount time.
+    Detail handlers that need entity-specific per-viewer state pass
+    `detail_extras=` + `detail_extra_repos=` directly (they can't
+    live on the spec without an import cycle — handlers in
+    `src/logic/<entity>/` import the spec, so the spec can't import
+    them back).
+
     Validates loudly at mount time:
       - Every opted-in route / state-axis / subresource must have a
-        handler. Missing keys raise `KeyError` from the handlers
-        dict.
+        handler — either explicit in the handlers dict, or via
+        factory auto-bind for the standard-CRUD verbs. Missing both
+        raises `KeyError`.
       - Extra handler keys not consumed by any spec entry raise
         `ValueError` — catches typos and stale handler bindings the
         spec used to declare.
+      - `detail_extras` / `detail_extra_repos` set when `routes.detail`
+        is False, or when `"detail"` is in `handlers` (explicit
+        handler would silently win): raises at mount time.
       - `owned_subentities[i].parent` must equal `entity` (catches a
         passed-in spec from the wrong family).
     """
     spec = entity.to_resource_spec()
+
+    # Validate detail_extras configuration ------------------------------
+    if (detail_extras is not None or detail_extra_repos) and not entity.routes.detail:
+        raise ValueError(
+            f"mount_entity({entity.name!r}): detail_extras/detail_extra_repos "
+            "given but routes.detail is False — the extras would never run."
+        )
+    if detail_extra_repos and detail_extras is None:
+        raise ValueError(
+            f"mount_entity({entity.name!r}): detail_extra_repos set but "
+            "detail_extras is None — the typed-repo kwargs would have no "
+            "consumer."
+        )
+    if detail_extras is not None and "detail" in handlers:
+        raise ValueError(
+            f"mount_entity({entity.name!r}): both detail_extras and an "
+            "explicit handlers['detail'] supplied — pick one. Extras are "
+            "for the factory-built path; an explicit handler owns its own."
+        )
+
+    # Auto-bind top-level CRUD verbs --------------------------------------
+    # Same factory-fallback shape as the owned-subentity branch below: any
+    # opted-in standard-CRUD verb without an explicit handler is built from
+    # `make_<verb>_handler(entity)` and stitched onto the route module so
+    # `<routes module>._handle_<verb>_<entity>` is a real attribute. That's
+    # the path contract-test monkey-patches use.
+    auto_bound: dict[str, Callable[..., Awaitable[Any]]] = {}
+    needs_auto_bind = any(
+        getattr(entity.routes, v) and v not in handlers
+        for v in _TOP_LEVEL_AUTO_BIND_VERBS
+    )
+    if needs_auto_bind:
+        if module is None:
+            missing = [
+                v
+                for v in _TOP_LEVEL_AUTO_BIND_VERBS
+                if getattr(entity.routes, v) and v not in handlers
+            ]
+            raise ValueError(
+                f"mount_entity({entity.name!r}): routes opted into "
+                f"{missing} without explicit handlers, but `module=` was "
+                "not supplied. Pass `module=__name__` from the route file "
+                "so factory-built handlers can be bound at "
+                "<module>.<name> for contract-test patching."
+            )
+        import sys
+
+        factory_makers = _owned_factory_makers()
+        mod = sys.modules[module]
+        for verb in _TOP_LEVEL_AUTO_BIND_VERBS:
+            if not getattr(entity.routes, verb):
+                continue
+            if verb in handlers:
+                continue
+            maker = factory_makers[verb]
+            if verb == "detail":
+                built = maker(
+                    entity, extras=detail_extras, extra_repos=detail_extra_repos
+                )
+            else:
+                built = maker(entity)
+            built.__module__ = module
+            built.__qualname__ = built.__name__
+            setattr(mod, built.__name__, built)
+            auto_bound[verb] = built
+
+    # Lookup order: explicit handlers win over auto-bound factories.
+    effective_handlers: dict[str, Callable[..., Awaitable[Any]]] = {
+        **auto_bound,
+        **handlers,
+    }
 
     consumed: set[str] = set()
 
@@ -889,12 +985,12 @@ def mount_entity(
         mount_list(
             router,
             spec,
-            handler=handlers["list"],
+            handler=effective_handlers["list"],
             query_params=tuple(entity.filters),
         )
         consumed.add("list")
     if entity.routes.create:
-        mount_create(router, spec, handler=handlers["create"])
+        mount_create(router, spec, handler=effective_handlers["create"])
         consumed.add("create")
     if entity.routes.form_new:
         query_params: tuple[QueryParam, ...] = ()
@@ -909,7 +1005,7 @@ def mount_entity(
         mount_form(
             router,
             spec,
-            handler=handlers["form_new"],
+            handler=effective_handlers["form_new"],
             template=entity.templates.form_new,
             query_params=query_params,
         )
@@ -918,7 +1014,7 @@ def mount_entity(
         mount_form(
             router,
             spec,
-            handler=handlers["form_edit"],
+            handler=effective_handlers["form_edit"],
             on_existing=True,
             template=entity.templates.form_edit,
         )
@@ -927,22 +1023,22 @@ def mount_entity(
         mount_detail(
             router,
             spec,
-            handler=handlers["detail"],
+            handler=effective_handlers["detail"],
             singleton_alias=entity.singleton_alias,
         )
         consumed.add("detail")
     if entity.routes.update:
-        mount_update(router, spec, handler=handlers["update"])
+        mount_update(router, spec, handler=effective_handlers["update"])
         consumed.add("update")
     if entity.routes.delete:
-        mount_delete(router, spec, handler=handlers["delete"])
+        mount_delete(router, spec, handler=effective_handlers["delete"])
         consumed.add("delete")
 
     for axis in entity.state_axes:
         mount_state_axis(
             router,
             spec,
-            handler=handlers[axis.name],
+            handler=effective_handlers[axis.name],
             axis_name=axis.name,
             body_schema=axis.body_schema,
             response_to_dict=axis.response_to_dict,
@@ -955,7 +1051,7 @@ def mount_entity(
             router,
             parent_spec=spec,
             child_spec=sub.child_spec,
-            handler=handlers[key],
+            handler=effective_handlers[key],
             template=sub.template,
             singleton_alias=sub.singleton_alias,
         )

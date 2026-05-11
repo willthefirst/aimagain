@@ -1490,6 +1490,237 @@ def test_mount_entity_owned_subentity_no_default_factory_raises():
         mount_entity(None, parent, handlers={}, owned_subentities=(child,))
 
 
+# --- top-level factory auto-bind ----------------------------------------
+
+
+def _capture_top_level_mounts():
+    """Stub the per-verb mount helpers + return captured (name, kwargs) list."""
+    import src.api.common.resource_routes as rr
+
+    captured: list[tuple[str, dict]] = []
+    originals: dict[str, Any] = {}
+    for fn_name in (
+        "mount_list",
+        "mount_detail",
+        "mount_create",
+        "mount_update",
+        "mount_delete",
+        "mount_form",
+    ):
+        originals[fn_name] = getattr(rr, fn_name)
+        setattr(
+            rr,
+            fn_name,
+            lambda *a, _n=fn_name, **k: captured.append((_n, k)),
+        )
+
+    def restore():
+        for n, orig in originals.items():
+            setattr(rr, n, orig)
+
+    return captured, restore
+
+
+def test_mount_entity_top_level_auto_binds_factory_handlers():
+    """An opted-in standard-CRUD verb (`update`, `delete`, `form_edit`)
+    with no entry in handlers gets a `make_<verb>_handler(entity)` build,
+    stitched onto `module` as `<module>._handle_<verb>_<entity>`."""
+    from pydantic import TypeAdapter
+
+    spec = _EntitySpec(
+        name="widget",
+        url_collection="widgets",
+        id_param="widget_id",
+        model=SimpleNamespace,
+        audit=_stub_audit(),
+        routes=_RouteSet(update=True, delete=True, form_edit=True),
+        create_adapter=TypeAdapter(_AxisBody),
+        update_adapter=TypeAdapter(_AxisBody),
+        templates=_Templates(form_edit="w/edit.html"),
+    )
+
+    captured, restore = _capture_top_level_mounts()
+    try:
+        mount_entity(None, spec, handlers={}, module=__name__)
+    finally:
+        restore()
+
+    by_mount = {n: k for n, k in captured}
+    assert by_mount["mount_update"]["handler"].__name__ == "_handle_update_widget"
+    assert by_mount["mount_delete"]["handler"].__name__ == "_handle_delete_widget"
+    assert by_mount["mount_form"]["handler"].__name__ == "_handle_get_widget_edit_form"
+
+    # The built handlers are stitched onto this test module so
+    # `_resolve_handler` (and contract-test monkey-patches) find them via
+    # `getattr(sys.modules[fn.__module__], fn.__name__)`.
+    import sys
+
+    mod = sys.modules[__name__]
+    assert getattr(mod, "_handle_update_widget").__module__ == __name__
+    assert getattr(mod, "_handle_delete_widget").__module__ == __name__
+
+
+def test_mount_entity_explicit_handler_overrides_top_level_auto_bind():
+    """An explicit `handlers[verb]` for a standard-CRUD verb wins over
+    the factory default — bespoke handlers (self-guard delete, inline-
+    credentials create) keep working."""
+    from pydantic import TypeAdapter
+
+    spec = _EntitySpec(
+        name="widget",
+        url_collection="widgets",
+        id_param="widget_id",
+        model=SimpleNamespace,
+        audit=_stub_audit(),
+        routes=_RouteSet(update=True, delete=True),
+        update_adapter=TypeAdapter(_AxisBody),
+    )
+
+    async def bespoke_delete(**_kw):  # pragma: no cover
+        return None
+
+    captured, restore = _capture_top_level_mounts()
+    try:
+        mount_entity(
+            None,
+            spec,
+            handlers={"delete": bespoke_delete},
+            module=__name__,
+        )
+    finally:
+        restore()
+
+    by_mount = {n: k for n, k in captured}
+    assert by_mount["mount_delete"]["handler"] is bespoke_delete
+    assert by_mount["mount_update"]["handler"].__name__ == "_handle_update_widget"
+
+
+def test_mount_entity_top_level_auto_bind_requires_module():
+    """Auto-bind needs `module=__name__` from the route file so the
+    built handler can be stitched into the module's namespace —
+    otherwise contract-test patches at `<routes module>._handle_<verb>`
+    won't resolve to the patched version."""
+    spec = _EntitySpec(
+        name="widget",
+        url_collection="widgets",
+        id_param="widget_id",
+        model=SimpleNamespace,
+        audit=_stub_audit(),
+        routes=_RouteSet(delete=True),
+    )
+    with pytest.raises(ValueError, match="module="):
+        mount_entity(None, spec, handlers={})
+
+
+def test_mount_entity_detail_extras_threaded_to_factory():
+    """`detail_extras=` and `detail_extra_repos=` flow into
+    `make_detail_handler` so the built detail handler invokes the
+    entity-specific per-viewer callable (and the synthesis adds the
+    typed-repo kwargs to the signature)."""
+    sentinel_extras = lambda *a, **kw: {}  # noqa: E731
+
+    spec = _EntitySpec(
+        name="widget",
+        url_collection="widgets",
+        id_param="widget_id",
+        model=SimpleNamespace,
+        audit=_stub_audit(),
+        routes=_RouteSet(detail=True),
+        templates=_Templates(detail="w/detail.html"),
+    )
+
+    captured, restore = _capture_top_level_mounts()
+    try:
+        mount_entity(
+            None,
+            spec,
+            handlers={},
+            module=__name__,
+            detail_extras=sentinel_extras,
+            detail_extra_repos=(("user_favorite_repo", UserRepository),),
+        )
+    finally:
+        restore()
+
+    detail_handler = next(k["handler"] for n, k in captured if n == "mount_detail")
+    # `make_detail_handler` records extras via closure; check the
+    # synthesized signature carries the extra-repo param.
+    import inspect
+
+    params = inspect.signature(detail_handler).parameters
+    assert "user_favorite_repo" in params
+
+
+def test_mount_entity_detail_extras_with_explicit_handler_raises():
+    """`detail_extras=` is for the factory-built path; supplying it
+    alongside an explicit handler is ambiguous (the handler owns its
+    own extras) — surface at mount time."""
+    spec = _EntitySpec(
+        name="widget",
+        url_collection="widgets",
+        id_param="widget_id",
+        model=SimpleNamespace,
+        audit=_stub_audit(),
+        routes=_RouteSet(detail=True),
+        templates=_Templates(detail="w/detail.html"),
+    )
+
+    async def my_detail(**_kw):  # pragma: no cover
+        return {}
+
+    with pytest.raises(ValueError, match="detail_extras"):
+        mount_entity(
+            None,
+            spec,
+            handlers={"detail": my_detail},
+            module=__name__,
+            detail_extras=lambda *a, **k: {},
+        )
+
+
+def test_mount_entity_detail_extras_without_detail_route_raises():
+    """Declaring extras for a non-detailed entity is a typo / dead code
+    — extras would never run. Fail loudly at mount time."""
+    spec = _EntitySpec(
+        name="widget",
+        url_collection="widgets",
+        id_param="widget_id",
+        model=SimpleNamespace,
+        audit=_stub_audit(),
+        routes=_RouteSet(),  # detail off
+    )
+    with pytest.raises(ValueError, match="routes.detail is False"):
+        mount_entity(
+            None,
+            spec,
+            handlers={},
+            module=__name__,
+            detail_extras=lambda *a, **k: {},
+        )
+
+
+def test_mount_entity_detail_extra_repos_without_extras_raises():
+    """`detail_extra_repos` without `detail_extras` is dead config — the
+    typed-repo kwargs would have no consumer. Catch at mount time."""
+    spec = _EntitySpec(
+        name="widget",
+        url_collection="widgets",
+        id_param="widget_id",
+        model=SimpleNamespace,
+        audit=_stub_audit(),
+        routes=_RouteSet(detail=True),
+        templates=_Templates(detail="w/detail.html"),
+    )
+    with pytest.raises(ValueError, match="detail_extra_repos"):
+        mount_entity(
+            None,
+            spec,
+            handlers={},
+            module=__name__,
+            detail_extra_repos=(("x", UserRepository),),
+        )
+
+
 def test_mount_delete_404_propagates_from_handler():
     """If the handler raises NotFoundError, the route surfaces it as 404
     (decorator translation). Confirms the mount doesn't swallow exceptions."""

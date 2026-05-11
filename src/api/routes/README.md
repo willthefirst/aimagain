@@ -121,51 +121,39 @@ If a future case suggests the grammar should grow to fit one of these (e.g. a se
 
 2. **Add a spec-correctness test** at `src/api/common/specs/test_<entity>.py` asserting the spec declares the right values (audit type, owner_attr, route flags, etc.).
 
-3. **Create the route file** `<resource>.py`. Bind the framework factories (or write bespoke handlers) and call `mount_entity`:
+3. **Create the route file** `<resource>.py`. Call `mount_entity` with `module=__name__`; framework verbs auto-bind to `make_<verb>_handler(<ENTITY>_ENTITY)` and get stitched onto the route module as `_handle_<verb>_<entity>` for contract-test patches. Only bespoke handlers (and `list` / `form_new`, which have no factory defaults) need explicit `handlers` entries.
 
 ```python
 from src.api.common import BaseRouter
 from src.api.common.resource_routes import mount_entity
 from src.api.common.specs.<entity> import <ENTITY>_ENTITY
-from src.logic._generic import (
-    make_create_handler,
-    make_delete_handler,
-    make_detail_handler,
-    make_edit_form_handler,
-    make_update_handler,
-)
 from src.logic.<entity>.<entity>_processing import (
     handle_list_<entity>,
     # ... plus any bespoke handlers that don't fit the generic ritual,
-    # plus any per-entity `*_detail_extras` callable supplied to
-    # `make_detail_handler` for viewer-pair / projection state.
+    # plus any per-entity `*_detail_extras` callable supplied via
+    # `detail_extras=` for viewer-pair / projection state.
 )
 
 <entity>_api_router = APIRouter(prefix="/<entities>")
 router = BaseRouter(router=<entity>_api_router, default_tags=["<entities>"])
-
-_handle_create_<entity> = make_create_handler(<ENTITY>_ENTITY)
-_handle_update_<entity> = make_update_handler(<ENTITY>_ENTITY)
-_handle_delete_<entity> = make_delete_handler(<ENTITY>_ENTITY)
-_handle_get_<entity>_edit_form = make_edit_form_handler(<ENTITY>_ENTITY)
-_handle_get_<entity>_detail = make_detail_handler(<ENTITY>_ENTITY)  # pass extras=/extra_repos= for per-viewer state
 
 mount_entity(
     router,
     <ENTITY>_ENTITY,
     handlers={
         "list": handle_list_<entity>,
-        "detail": _handle_get_<entity>_detail,
-        "create": _handle_create_<entity>,
-        "update": _handle_update_<entity>,
-        "delete": _handle_delete_<entity>,
         "form_new": handle_get_<entity>_form,
-        "form_edit": _handle_get_<entity>_edit_form,
+        # detail / create / update / delete / form_edit auto-bound from
+        # make_<verb>_handler(<ENTITY>_ENTITY); add explicit entries here
+        # only for verbs whose entity needs a bespoke handler.
     },
+    # detail_extras=<entity>_detail_extras,                  # if per-viewer state
+    # detail_extra_repos=(("<name>_repo", <Repo>),),         # typed deps for extras
+    module=__name__,
 )
 ```
 
-The `_handle_<verb>_<entity>` named module attributes exist so contract tests can patch them; an inline `partial(handle_<verb>, ENTITY)` would lose that affordance.
+Auto-bound handlers expose the same `_handle_<verb>_<entity>` attribute on the route module that hand-written bindings used to — contract tests patching `src.api.routes.<entity>._handle_<verb>_<entity>` resolve through the mount layer's `_resolve_handler` either way.
 
 4. Register the router in `src/main.py`. Order matters when literal segments would shadow parametric ones (e.g. `/me/*` aliases mount before parametric `/{id}` paths within the same router via `singleton_alias=` on the related subresource).
 
