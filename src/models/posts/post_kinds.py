@@ -7,12 +7,16 @@ labels the route/template layers render for the kind.
 
 Adding a kind requires:
 
-1. A new entry in `POST_KINDS` here.
+1. A new entry in `POST_KINDS` here — only the identity tuple (name,
+   detail_model, detail_relationship, list_label) is required; template
+   paths default to ``posts/new_<name>.html`` / ``posts/edit_<name>.html``.
 2. A new detail model under `src/models/posts/<kind>_detail.py`, plus a
    `relationship(...)` line on `Post`.
 3. The four Pydantic variant classes in `src/schemas/post.py`
    (Read, Create, Update, AuditSnapshot).
-4. The `posts/new_<kind>.html` and `posts/edit_<kind>.html` templates.
+4. The `posts/new_<kind>.html` and `posts/edit_<kind>.html` templates
+   (the conventional names — declare an explicit `create_template=` /
+   `edit_template=` on the spec only when the file path diverges).
 5. An Alembic migration that creates the detail table and widens the
    `posts.kind` CHECK.
 
@@ -44,15 +48,29 @@ from .provider_availability_detail import ProviderAvailabilityDetail
 
 @dataclass(frozen=True)
 class PostKindSpec:
-    """Per-kind metadata. See module docstring for the registration contract."""
+    """Per-kind metadata. See module docstring for the registration contract.
+
+    Template paths default by convention: ``posts/new_<name>.html`` for
+    `create_template` and ``posts/edit_<name>.html`` for `edit_template`.
+    Specs only declare an explicit path when the file diverges from the
+    convention; today none does. The convention plus the directory listing
+    under `src/templates/posts/` is the single source of truth for what
+    templates a kind ships.
+    """
 
     name: str
     detail_model: type
     detail_relationship: str
     detail_fields: tuple[str, ...]
     list_label: str
-    create_template: str
-    edit_template: str
+    create_template: str | None = None
+    edit_template: str | None = None
+
+    def __post_init__(self) -> None:
+        if self.create_template is None:
+            object.__setattr__(self, "create_template", f"posts/new_{self.name}.html")
+        if self.edit_template is None:
+            object.__setattr__(self, "edit_template", f"posts/edit_{self.name}.html")
 
 
 def _detail_fields(detail_model: type) -> tuple[str, ...]:
@@ -80,8 +98,6 @@ POST_KINDS: Final[DiscriminatorRegistry[PostKindSpec]] = DiscriminatorRegistry(
             detail_relationship="client_referral_detail",
             detail_fields=_detail_fields(ClientReferralDetail),
             list_label="client referral",
-            create_template="posts/new_client_referral.html",
-            edit_template="posts/edit_client_referral.html",
         ),
         "provider_availability": PostKindSpec(
             name="provider_availability",
@@ -89,8 +105,6 @@ POST_KINDS: Final[DiscriminatorRegistry[PostKindSpec]] = DiscriminatorRegistry(
             detail_relationship="provider_availability_detail",
             detail_fields=_detail_fields(ProviderAvailabilityDetail),
             list_label="provider availability",
-            create_template="posts/new_provider_availability.html",
-            edit_template="posts/edit_provider_availability.html",
         ),
     },
 )

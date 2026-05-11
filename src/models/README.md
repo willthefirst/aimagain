@@ -78,7 +78,7 @@ Every cross-cutting site reads from `POST_KINDS`:
 
 - `Post.__table_args__` builds its `CheckConstraint` from `POST_KINDS.check_sql()` — the SQL is derived from `POST_KINDS.names`.
 - The route's `Literal[*POST_KIND_NAMES]` for `GET /posts/form?kind=…` is derived.
-- The form-template selection in `src/api/routes/posts.py` reads `spec.create_template` / `spec.edit_template`.
+- The form-template selection reads `spec.create_template` / `spec.edit_template`, which default to `posts/new_<name>.html` / `posts/edit_<name>.html` by convention — a new kind doesn't need to restate them.
 - `src/repositories/post_repository.py:_attach_detail` looks up by detail-class via `POST_KIND_BY_DETAIL_MODEL`; `update_post` writes to `spec.detail_relationship` for the post's kind.
 - `src/logic/post_processing.py:handle_create_post` and `handle_update_post` dispatch via `POST_KINDS[payload.kind]` instead of `isinstance` ladders.
 - `src/schemas/post.py:_flatten_post_to_dict` reads the relationship + field tuple from the registry (so `PostRead`, `PostAuditSnapshot` flatten through it).

@@ -16,6 +16,8 @@ from src.models import (
     POST_KINDS,
     Post,
 )
+from src.models.posts.client_referral_detail import ClientReferralDetail
+from src.models.posts.post_kinds import PostKindSpec
 
 
 def test_kind_names_matches_registered_kinds():
@@ -74,6 +76,34 @@ def test_each_spec_detail_relationship_matches_kind_name():
     every kind agrees, asserting it catches typos."""
     for kind, spec in POST_KINDS.items():
         assert spec.detail_relationship == f"{kind}_detail"
+
+
+def test_template_paths_default_by_convention():
+    """`create_template` / `edit_template` are derived from the kind
+    name when not explicitly set, following
+    `posts/new_<name>.html` / `posts/edit_<name>.html`. Adding a kind
+    therefore only needs the identity tuple — the template paths
+    follow automatically (the templates themselves still need to exist
+    on disk, but the registry entry doesn't restate them)."""
+    for kind, spec in POST_KINDS.items():
+        assert spec.create_template == f"posts/new_{kind}.html"
+        assert spec.edit_template == f"posts/edit_{kind}.html"
+
+
+def test_explicit_template_paths_override_convention():
+    """A spec that needs a non-conventional path can still declare one
+    — passing `create_template="..."` skips the default."""
+    spec = PostKindSpec(
+        name="weird",
+        detail_model=ClientReferralDetail,
+        detail_relationship="weird_detail",
+        detail_fields=(),
+        list_label="weird",
+        create_template="posts/custom_create.html",
+    )
+    # Override sticks; the unset edit_template still defaults.
+    assert spec.create_template == "posts/custom_create.html"
+    assert spec.edit_template == "posts/edit_weird.html"
 
 
 def test_detail_fields_match_model_columns():
