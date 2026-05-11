@@ -1,43 +1,29 @@
-"""Spec-correctness suite for `FAVORITE_ENTITY`."""
+"""Entity-specific facts for `FAVORITE_ENTITY` (M:N edge entity).
 
-from src.api.common.entity_spec import M2NRelation, RouteSet
+Universal invariants live in `test_spec_conformance.py`. This file pins
+what's unique to favorites: the `EdgeAudit` verb→action map, the
+`M2NRelation` endpoints and join-table shape, and the list-template
+declaration (edges live outside `RouteSet`).
+"""
+
+from src.api.common.entity_spec import M2NRelation
 from src.api.common.specs.provider import PROVIDER_ENTITY
 from src.api.common.specs.user import USER_ENTITY
 from src.api.common.specs.user_favorite import FAVORITE_EDGE_AUDIT, FAVORITE_ENTITY
 from src.logic.audit import AuditAction
-from src.models import UserFavorite
-
-# --- Identity ------------------------------------------------------------
-
-
-def test_identity_fields():
-    assert FAVORITE_ENTITY.name == "user_favorite"
-    assert FAVORITE_ENTITY.url_collection == "favorites"
-    assert FAVORITE_ENTITY.id_param == "favorite_id"
-    assert FAVORITE_ENTITY.model is UserFavorite
-
-
-def test_owner_attr_defaults_to_owner_id():
-    """Default applies even though favorites doesn't currently use it —
-    the spec stays uniform across entities."""
-    assert FAVORITE_ENTITY.owner_attr == "owner_id"
-
 
 # --- Audit binding (edge variant) ----------------------------------------
 
 
-def test_audit_is_none_edge_audit_is_set():
-    """Favorites uses `edge_audit`, not `audit` — the two are mutually
-    exclusive on `EntitySpec`."""
-    assert FAVORITE_ENTITY.audit is None
+def test_edge_audit_identity():
+    """The edge_audit lives at the module-level `FAVORITE_EDGE_AUDIT`
+    binding so handlers can import it directly. Pinned identity rather
+    than equality so a rebuild can't silently swap it."""
     assert FAVORITE_ENTITY.edge_audit is FAVORITE_EDGE_AUDIT
 
 
-def test_edge_audit_resource_type():
-    assert FAVORITE_ENTITY.edge_audit.resource_type == "user_favorite"
-
-
 def test_edge_audit_actions():
+    """Favorites has (add, remove), not (create, update, delete)."""
     assert FAVORITE_ENTITY.edge_audit.action_for("add") == AuditAction.ADD_FAVORITE
     assert (
         FAVORITE_ENTITY.edge_audit.action_for("remove") == AuditAction.REMOVE_FAVORITE
@@ -47,14 +33,6 @@ def test_edge_audit_actions():
 def test_edge_audit_snapshot_callable():
     """Snapshot validates the row through `UserFavoriteAuditSnapshot`."""
     assert callable(FAVORITE_ENTITY.edge_audit.snapshot)
-
-
-# --- Routes (all opt-out) ------------------------------------------------
-
-
-def test_routes_all_disabled():
-    """Favorites uses no `mount_*` helper; route file is hand-rolled."""
-    assert FAVORITE_ENTITY.routes == RouteSet()
 
 
 # --- Relation ------------------------------------------------------------
@@ -76,9 +54,13 @@ def test_relation_is_M2NRelation():
     assert isinstance(FAVORITE_ENTITY.relation, M2NRelation)
 
 
-# --- Templates -----------------------------------------------------------
+# --- Edge entity templates ----------------------------------------------
 
 
-def test_templates():
+def test_list_template_is_set_for_handrolled_route():
+    """The route file is hand-rolled (`routes.list` stays False); the
+    list template is read directly from the spec by `mount_edge_routes`.
+    The conformance suite generalizes "templates.list set without
+    routes.list True implies an M2NRelation"; this test pins the
+    favorites-specific template name."""
     assert FAVORITE_ENTITY.templates.list == "favorites/list.html"
-    assert FAVORITE_ENTITY.templates.detail is None

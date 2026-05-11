@@ -1,118 +1,23 @@
-"""Spec-correctness suite for `PROVIDER_ENTITY`.
+"""Entity-specific facts for `PROVIDER_ENTITY`.
 
-Asserts the spec declares the right things — not that CRUD works
-(those tests live at the route/logic layers).
+Universal invariants (identity, audit-type, templates, `to_resource_spec()`
+round-trip, etc.) live in `test_spec_conformance.py`. This file pins
+what's unique to providers: list filters, the post-mutation redirects,
+the auth_policy expansion, and the per-viewer extras binding.
 """
 
-from pydantic import TypeAdapter
-
-from src.api.common.entity_spec import RouteSet
+from src.api.common.entity_spec import OWNER_OR_ADMIN
 from src.api.common.specs.provider import PROVIDER_ENTITY
-from src.logic._authz import assert_owner_or_admin, is_owner_or_admin
-from src.logic.audit import AuditAction
-from src.models import Provider
-from src.schemas.providers.provider import (
-    ProviderCreate,
-    ProviderUpdate,
-)
 
-# --- Identity ------------------------------------------------------------
+# --- Authorization (provider-specific) -----------------------------------
 
 
-def test_identity_fields():
-    assert PROVIDER_ENTITY.name == "provider"
-    assert PROVIDER_ENTITY.url_collection == "providers"
-    assert PROVIDER_ENTITY.id_param == "provider_id"
-    assert PROVIDER_ENTITY.model is Provider
-
-
-def test_owner_attr_defaults_to_owner_id():
-    """Providers track ownership via `Provider.owner_id` — the default."""
-    assert PROVIDER_ENTITY.owner_attr == "owner_id"
-
-
-def test_no_parent():
-    """Providers are top-level; the three credential subentities link
-    upward via `parent=PROVIDER_ENTITY` instead."""
-    assert PROVIDER_ENTITY.parent is None
-
-
-# --- Audit binding -------------------------------------------------------
-
-
-def test_audit_type_is_provider():
-    assert PROVIDER_ENTITY.audit is not None
-    assert PROVIDER_ENTITY.audit.type == "provider"
-
-
-def test_audit_actions_match_crud_enum():
-    assert PROVIDER_ENTITY.audit.create == AuditAction.CREATE_PROVIDER
-    assert PROVIDER_ENTITY.audit.update == AuditAction.UPDATE_PROVIDER
-    assert PROVIDER_ENTITY.audit.delete == AuditAction.DELETE_PROVIDER
-
-
-# --- Routes opt-in -------------------------------------------------------
-
-
-def test_routes_opted_in():
-    """Providers exposes full CRUD + both form pages — confirmed
-    against the mount calls in `src/api/routes/providers.py`."""
-    assert PROVIDER_ENTITY.routes == RouteSet(
-        list=True,
-        detail=True,
-        create=True,
-        update=True,
-        delete=True,
-        form_new=True,
-        form_edit=True,
-    )
-
-
-# --- Adapters + read_to_dict ---------------------------------------------
-
-
-def test_adapters_wrap_the_schema_classes():
-    """Specs pass Pydantic classes directly; the constructor wraps each
-    in `TypeAdapter(...)`. The wrapping behavior itself is unit-tested
-    in `test_entity_spec.py`; here we just confirm the spec carries the
-    right schema classes."""
-    assert isinstance(PROVIDER_ENTITY.create_adapter, TypeAdapter)
-    assert isinstance(PROVIDER_ENTITY.update_adapter, TypeAdapter)
-    assert _adapter_target_class(PROVIDER_ENTITY.create_adapter) is ProviderCreate
-    assert _adapter_target_class(PROVIDER_ENTITY.update_adapter) is ProviderUpdate
-
-
-def _adapter_target_class(adapter: TypeAdapter) -> type:
-    """Walk a TypeAdapter's core_schema to find the underlying model class.
-    `PartialUpdate`-derived schemas have an outer `function-after` wrapper
-    from the inherited model_validator; plain `BaseModel` subclasses
-    expose `cls` at the top level."""
-    schema = adapter.core_schema
-    while schema.get("type") != "model":
-        schema = schema["schema"]
-    return schema["cls"]
-
-
-def test_read_to_dict_returns_provider_read_shape():
-    """`read_to_dict` round-trips a Provider through `ProviderRead`."""
-    assert PROVIDER_ENTITY.read_to_dict is not None
-    # We can't easily construct a real Provider here; verify the
-    # callable is wired by name and exists. Round-trip behavior is
-    # covered by route-level tests.
-    assert callable(PROVIDER_ENTITY.read_to_dict)
-
-
-# --- Authorization -------------------------------------------------------
-
-
-def test_write_authz_is_assert_owner_or_admin():
-    assert PROVIDER_ENTITY.write_authz is assert_owner_or_admin
-
-
-def test_can_write_is_is_owner_or_admin():
-    """Predicate sibling of `write_authz` — read by detail handlers for
-    `can_edit` flags so the rule lives in exactly one place."""
-    assert PROVIDER_ENTITY.can_write is is_owner_or_admin
+def test_auth_policy_is_owner_or_admin():
+    """Pinned identity of the sentinel — `OWNER_OR_ADMIN` is the
+    `AuthzPolicy(assert_owner_or_admin, is_owner_or_admin)` pair and
+    a future spec mistakenly setting `auth_policy=AUTHENTICATED` (when
+    AuthDeps lands) would silently widen mutation access."""
+    assert PROVIDER_ENTITY.auth_policy is OWNER_OR_ADMIN
 
 
 # --- List filters --------------------------------------------------------
@@ -127,13 +32,9 @@ def test_filters_are_license_type_and_issuing_state():
 
 
 def test_create_and_update_redirect_to_edit_form():
-    assert PROVIDER_ENTITY.create_redirect is not None
-    assert PROVIDER_ENTITY.update_redirect is not None
-    # Both point at the parent edit-form path.
-    target = PROVIDER_ENTITY.create_redirect(provider_id="abc-123")
-    assert target == "/providers/abc-123/form"
-    target = PROVIDER_ENTITY.update_redirect(provider_id="abc-123")
-    assert target == "/providers/abc-123/form"
+    target = "/providers/abc-123/form"
+    assert PROVIDER_ENTITY.create_redirect(provider_id="abc-123") == target
+    assert PROVIDER_ENTITY.update_redirect(provider_id="abc-123") == target
 
 
 def test_delete_redirect_unset():
@@ -142,28 +43,12 @@ def test_delete_redirect_unset():
     assert PROVIDER_ENTITY.delete_redirect is None
 
 
-# --- Templates -----------------------------------------------------------
+# --- Extras binding ------------------------------------------------------
 
 
-def test_templates():
-    assert PROVIDER_ENTITY.templates.list == "providers/list.html"
-    assert PROVIDER_ENTITY.templates.detail == "providers/detail.html"
-
-
-# --- Bridge --------------------------------------------------------------
-
-
-def test_to_resource_spec_round_trips_what_mounts_read():
-    rs = PROVIDER_ENTITY.to_resource_spec()
-    assert rs.collection == "providers"
-    assert rs.id_param == "provider_id"
-    assert rs.repo_dep is PROVIDER_ENTITY.repo_dep
-    assert rs.audit_resource is PROVIDER_ENTITY.audit
-    assert rs.read_user_dep is PROVIDER_ENTITY.read_user_dep
-    assert rs.write_user_dep is PROVIDER_ENTITY.write_user_dep
-    assert rs.write_authz is assert_owner_or_admin
-    assert rs.create_adapter is PROVIDER_ENTITY.create_adapter
-    assert rs.update_adapter is PROVIDER_ENTITY.update_adapter
-    assert rs.list_template == "providers/list.html"
-    assert rs.detail_template == "providers/detail.html"
-    assert rs.parent is None
+def test_detail_extras_path_points_at_provider_detail_extras():
+    """Pinning the dotted path so a callable rename surfaces here."""
+    assert (
+        PROVIDER_ENTITY.detail_extras_path
+        == "src.logic.providers.provider_processing.provider_detail_extras"
+    )
