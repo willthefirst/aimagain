@@ -73,4 +73,9 @@ FAVORITE_ENTITY: Final[EntitySpec] = EntitySpec(
     # introduce edge-specific flags + mount helpers.
     routes=RouteSet(),
     templates=Templates(list="favorites/list.html"),
+    # Favorites' URLs nest under the requesting user: the edge is
+    # self-only and routes live at `/users/me/favorites/...` rather than
+    # `/<url_collection>/...`. Every other entity leaves `prefix_override`
+    # unset; the default is `f"/{url_collection}"`.
+    prefix_override="/users/me/favorites",
 )

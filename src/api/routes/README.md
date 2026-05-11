@@ -27,7 +27,7 @@ For the standard CRUD verbs (create / update / delete), the route file binds han
 **Example**: a typical route file with the unified grammar (users):
 
 ```python
-from src.api.common import BaseRouter
+from src.api.common import make_entity_router
 from src.api.common.resource_routes import mount_entity
 from src.api.common.specs.user import USER_ENTITY
 from src.logic.providers.provider_processing import handle_list_user_providers
@@ -38,8 +38,8 @@ from src.logic.users.user_processing import (
     handle_set_user_activation,
 )
 
-users_api_router = APIRouter(prefix="/users")
-router = BaseRouter(router=users_api_router, default_tags=["users"])
+router = make_entity_router(USER_ENTITY)
+users_api_router = router.router  # re-exported for `main.py`
 
 mount_entity(
     router,
@@ -124,7 +124,7 @@ If a future case suggests the grammar should grow to fit one of these (e.g. a se
 3. **Create the route file** `<resource>.py`. Call `mount_entity`; framework verbs auto-bind to `make_<verb>_handler(<ENTITY>_ENTITY)` and get stitched onto the route module as `_handle_<verb>_<entity>` (target module auto-detected from the caller frame) for contract-test patches. Only bespoke handlers (and `list` / `form_new`, which have no factory defaults) need explicit `handlers` entries.
 
 ```python
-from src.api.common import BaseRouter
+from src.api.common import make_entity_router
 from src.api.common.resource_routes import mount_entity
 from src.api.common.specs.<entity> import <ENTITY>_ENTITY
 from src.logic.<entity>.<entity>_processing import (
@@ -135,8 +135,8 @@ from src.logic.<entity>.<entity>_processing import (
     # mount time.
 )
 
-<entity>_api_router = APIRouter(prefix="/<entities>")
-router = BaseRouter(router=<entity>_api_router, default_tags=["<entities>"])
+router = make_entity_router(<ENTITY>_ENTITY)
+<entity>_api_router = router.router  # re-exported for `main.py`
 
 mount_entity(
     router,

@@ -1,6 +1,6 @@
 # This file makes src/api/common a Python package
 
-from .base_router import BaseRouter
+from .base_router import BaseRouter, make_entity_router
 from .decorators import handle_route_errors
 from .exceptions import (
     APIException,
@@ -27,6 +27,7 @@ __all__ = [
     "ForbiddenError",
     "handle_fastapi_users_error",
     "BaseRouter",
+    "make_entity_router",
     "created_response",
     "deleted_response",
     "parse_and_validate_form",

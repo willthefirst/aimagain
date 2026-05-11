@@ -1,15 +1,10 @@
-import logging
-
-from fastapi import APIRouter
-
-from src.api.common import BaseRouter
+from src.api.common import make_entity_router
 from src.api.common.resource_routes import mount_entity
 from src.api.common.specs.post import POST_ENTITY
 from src.logic.posts.post_processing import handle_get_post_form
 
-posts_api_router = APIRouter(prefix="/posts")
-router = BaseRouter(router=posts_api_router, default_tags=["posts"])
-logger = logging.getLogger(__name__)
+router = make_entity_router(POST_ENTITY)
+posts_api_router = router.router
 
 
 # Every standard verb (list, detail, create, update, delete, form_edit)

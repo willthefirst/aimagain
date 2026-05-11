@@ -1,8 +1,4 @@
-import logging
-
-from fastapi import APIRouter
-
-from src.api.common import BaseRouter
+from src.api.common import make_entity_router
 from src.api.common.resource_routes import mount_entity
 from src.api.common.specs.provider import PROVIDER_ENTITY
 from src.api.common.specs.provider_certification import CERTIFICATION_ENTITY
@@ -10,9 +6,8 @@ from src.api.common.specs.provider_education import EDUCATION_ENTITY
 from src.api.common.specs.provider_licensure import LICENSURE_ENTITY
 from src.logic.providers.provider_processing import handle_get_provider_form
 
-providers_api_router = APIRouter(prefix="/providers")
-router = BaseRouter(router=providers_api_router, default_tags=["providers"])
-logger = logging.getLogger(__name__)
+router = make_entity_router(PROVIDER_ENTITY)
+providers_api_router = router.router
 
 
 # Only `form_new` stays bespoke (the create-form template needs the

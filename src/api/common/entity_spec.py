@@ -349,6 +349,14 @@ class EntitySpec:
     # Templates ----------------------------------------------------------
     templates: Templates = field(default_factory=Templates)
 
+    # Route-prefix override --------------------------------------------
+    # Default route prefix is ``f"/{url_collection}"`` (e.g. ``/users``).
+    # Favorites is the only entity whose URL doesn't fit the convention
+    # — its routes live under ``/users/me/favorites`` — so it sets this
+    # field. Other entities leave it ``None`` and the default applies.
+    # Consumed by ``make_entity_router(entity)`` in ``base_router.py``.
+    prefix_override: str | None = None
+
     # Detail singleton alias (e.g. `/users/me`) -------------------------
     # `mount_detail`'s `singleton_alias=` kwarg — additionally mounts
     # `GET /<collection>/<alias>` whose id is sourced from a session
