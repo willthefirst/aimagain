@@ -18,7 +18,7 @@ Read by:
 
 from typing import Final
 
-from src.api.common.entity_spec import EntitySpec, RouteSet
+from src.api.common.entity_spec import EntitySpec, Redirects, RouteSet
 from src.api.common.resource_routes import QueryParam
 from src.auth_config import current_active_user
 from src.logic._authz import assert_owner_or_admin, is_owner_or_admin
@@ -31,11 +31,10 @@ from src.schemas.providers.provider import (
     provider_update_adapter,
 )
 
-
-def _provider_form_redirect(*, provider_id, **_) -> str:
-    """After create or update, redirect to the edit form so the user
-    can keep editing the parent + its credentials."""
-    return f"/providers/{provider_id}/form"
+# After create or update, redirect to the edit form so the user can
+# keep editing the parent + its credentials. The same callable is reused
+# by the three credential subentities (their parent is this provider).
+_provider_form_redirect = Redirects.to_edit_form("providers", "provider_id")
 
 
 PROVIDER_ENTITY: Final[EntitySpec] = EntitySpec(

@@ -20,7 +20,7 @@ Read by:
 
 from typing import Final
 
-from src.api.common.entity_spec import EntitySpec, RouteSet
+from src.api.common.entity_spec import EntitySpec, Redirects, RouteSet
 from src.auth_config import current_active_user
 from src.logic._authz import assert_owner_or_admin, is_owner_or_admin
 from src.models import POST_KINDS, Post
@@ -31,11 +31,6 @@ from src.schemas.posts.post import (
     post_read_adapter,
     post_update_adapter,
 )
-
-
-def _post_update_redirect(*, post_id, **_) -> str:
-    return f"/posts/{post_id}"
-
 
 POST_ENTITY: Final[EntitySpec] = EntitySpec(
     name="post",
@@ -61,6 +56,6 @@ POST_ENTITY: Final[EntitySpec] = EntitySpec(
         form_new=True,
         form_edit=True,
     ),
-    update_redirect=_post_update_redirect,
+    update_redirect=Redirects.to_detail("posts", "post_id"),
     discriminator=POST_KINDS,
 )

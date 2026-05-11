@@ -14,6 +14,7 @@ from src.api.common.entity_spec import (
     EdgeAudit,
     EntitySpec,
     M2NRelation,
+    Redirects,
     RouteSet,
     StateAxis,
     Templates,
@@ -375,6 +376,29 @@ def test_audit_action_stem_without_snapshot_raises():
     stem is only consumed when the constructor builds from a snapshot."""
     with pytest.raises(ValueError, match="audit_action_stem"):
         _make_spec(audit_action_stem="licensure")
+
+
+def test_redirects_to_edit_form_picks_id_from_named_kwarg():
+    """Reads `kwargs[id_param]` so the same callable serves owned
+    subentities whose URL kwargs include both parent + own ids."""
+    redirect = Redirects.to_edit_form("providers", "provider_id")
+    assert (
+        redirect(provider_id="abc-123", licensure_id="ignored")
+        == "/providers/abc-123/form"
+    )
+
+
+def test_redirects_to_detail_formats_canonical_path():
+    redirect = Redirects.to_detail("posts", "post_id")
+    assert redirect(post_id="xyz-9") == "/posts/xyz-9"
+
+
+def test_redirects_to_edit_form_missing_kwarg_raises_keyerror():
+    """A misconfigured spec (wrong id_param) fails loudly at request
+    time rather than silently producing a malformed URL."""
+    redirect = Redirects.to_edit_form("providers", "provider_id")
+    with pytest.raises(KeyError, match="provider_id"):
+        redirect(some_other_id="abc")
 
 
 def test_templates_default_by_convention_for_opted_in_verbs():
