@@ -8,11 +8,21 @@ axis, the providers related-list, the private-fields tuple, the
 `/users/me` singleton alias, and the per-viewer detail extras binding.
 """
 
-from src.api.common.entity_spec import RelatedListSubresource
+from src.api.common.entity_spec import ADMIN_FOR_WRITE, RelatedListSubresource
 from src.api.common.specs.user import USER_ENTITY
 from src.logic._authz import is_self_or_admin
 from src.logic.audit import AuditAction
 from src.schemas.users.user import UserActivationUpdate
+
+# --- Auth deps (security-visible) ----------------------------------------
+
+
+def test_auth_deps_is_admin_for_write():
+    """Pinned identity — `ADMIN_FOR_WRITE` is the only sentinel where
+    writes require admin. A future spec accidentally setting
+    `auth_deps=AUTHENTICATED` would silently widen mutation access."""
+    assert USER_ENTITY.auth_deps is ADMIN_FOR_WRITE
+
 
 # --- Visibility (security-visible) ---------------------------------------
 

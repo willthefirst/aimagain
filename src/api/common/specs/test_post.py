@@ -6,12 +6,16 @@ posts: the discriminator binding (polymorphic registry), the update
 redirect to the detail page, and the list-extras binding.
 """
 
-from src.api.common.entity_spec import OWNER_OR_ADMIN
+from src.api.common.entity_spec import AUTHENTICATED, OWNER_OR_ADMIN
 from src.api.common.specs.post import POST_ENTITY
 from src.models import POST_KINDS
 from src.schemas.posts.post import post_create_adapter, post_update_adapter
 
-# --- Authorization (post-specific) ---------------------------------------
+# --- Auth deps + authorization (post-specific) ---------------------------
+
+
+def test_auth_deps_is_authenticated():
+    assert POST_ENTITY.auth_deps is AUTHENTICATED
 
 
 def test_auth_policy_is_owner_or_admin():

@@ -13,9 +13,13 @@ through it.
 
 from pydantic import BaseModel, TypeAdapter
 
-from src.api.common.entity_spec import OWNER_OR_ADMIN, EntitySpec, RouteSet
+from src.api.common.entity_spec import (
+    AUTHENTICATED,
+    OWNER_OR_ADMIN,
+    EntitySpec,
+    RouteSet,
+)
 from src.api.common.specs.provider import PROVIDER_ENTITY, _provider_form_redirect
-from src.auth_config import current_active_user
 from src.repositories.dependencies import get_provider_repository
 
 
@@ -50,7 +54,7 @@ def make_provider_credential_entity(
         model=model,
         parent=PROVIDER_ENTITY,
         repo_dep=get_provider_repository,
-        write_user_dep=current_active_user,
+        auth_deps=AUTHENTICATED,
         auth_policy=OWNER_OR_ADMIN,
         audit_action_stem=audit_stem,
         create_adapter=create_adapter,

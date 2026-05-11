@@ -31,9 +31,33 @@ from typing import Any, Callable
 from pydantic import BaseModel, TypeAdapter
 
 from src.api.common.resource_routes import QueryParam, ResourceSpec
+from src.auth_config import current_active_user, current_admin_user
 from src.logic._authz import assert_owner_or_admin, is_owner_or_admin
 from src.logic.audit import AuditAction, AuditedResource, make_audited_resource
 from src.models._polymorphic import DiscriminatorRegistry
+
+
+@dataclass(frozen=True, slots=True)
+class AuthDeps:
+    """Paired FastAPI auth dependencies for read vs. write routes.
+
+    Every CRUD-shaped entity in the codebase picks from a small set of
+    auth-dep patterns:
+
+      - ``AUTHENTICATED`` — both reads and writes require any active
+        user (provider, post, the three provider credentials, favorites).
+      - ``ADMIN_FOR_WRITE`` — reads allow any active user, writes
+        require admin (users).
+
+    Hand-wired ``read_user_dep`` / ``write_user_dep`` still works for
+    one-off cases (none today). Mutually exclusive with ``AuthDeps``.
+
+    Mirrors the ``AuthzPolicy`` / ``OWNER_OR_ADMIN`` pattern that
+    collapsed the per-target authz pair onto one sentinel.
+    """
+
+    read: Callable[..., Any] | None
+    write: Callable[..., Any] | None
 
 
 @dataclass(frozen=True, slots=True)
@@ -252,6 +276,12 @@ class EntitySpec:
     # matched callables. Mutually exclusive with the hand-wired form.
     can_write: Callable[..., bool] | None = None
     auth_policy: "AuthzPolicy | None" = None
+    # `auth_deps` is the declarative pair for `read_user_dep` /
+    # `write_user_dep` (FastAPI auth deps used at the *route* level —
+    # distinct from `auth_policy` which is the per-target check inside
+    # the handler). Mutually exclusive with hand-wired
+    # `read_user_dep`/`write_user_dep`.
+    auth_deps: "AuthDeps | None" = None
 
     # Audit --------------------------------------------------------------
     # `audit` and `edge_audit` are mutually exclusive — CRUD-shaped
@@ -487,6 +517,21 @@ class EntitySpec:
         if self.auth_policy is not None:
             object.__setattr__(self, "write_authz", self.auth_policy.write_authz)
             object.__setattr__(self, "can_write", self.auth_policy.can_write)
+        # `auth_deps` mirrors `auth_policy`: the constructor expands the
+        # paired declaration into the two slot fields. Mutually exclusive
+        # with hand-wired `read_user_dep` / `write_user_dep`.
+        if self.auth_deps is not None and (
+            self.read_user_dep is not None or self.write_user_dep is not None
+        ):
+            raise ValueError(
+                f"EntitySpec({self.name!r}) declares `auth_deps` plus "
+                "an explicit `read_user_dep` / `write_user_dep`; they "
+                "are mutually exclusive — pass the pair via `auth_deps` "
+                "or set the two deps explicitly."
+            )
+        if self.auth_deps is not None:
+            object.__setattr__(self, "read_user_dep", self.auth_deps.read)
+            object.__setattr__(self, "write_user_dep", self.auth_deps.write)
         # Validate extras bindings: a path requires an opted-in route
         # (otherwise the extras would never run); typed-repo kwargs
         # require a callable consumer (otherwise the kwargs are dead).
@@ -636,6 +681,20 @@ class EntitySpec:
 OWNER_OR_ADMIN: AuthzPolicy = AuthzPolicy(
     write_authz=assert_owner_or_admin,
     can_write=is_owner_or_admin,
+)
+
+
+# Canonical `AuthDeps` sentinels for the two route-level auth-dep
+# patterns the codebase uses. Specs that follow either pattern declare
+# `auth_deps=<sentinel>` and the constructor expands the pair onto
+# `read_user_dep` / `write_user_dep`.
+AUTHENTICATED: AuthDeps = AuthDeps(
+    read=current_active_user,
+    write=current_active_user,
+)
+ADMIN_FOR_WRITE: AuthDeps = AuthDeps(
+    read=current_active_user,
+    write=current_admin_user,
 )
 
 

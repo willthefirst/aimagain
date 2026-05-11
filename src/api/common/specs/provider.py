@@ -18,9 +18,14 @@ Read by:
 
 from typing import Final
 
-from src.api.common.entity_spec import OWNER_OR_ADMIN, EntitySpec, Redirects, RouteSet
+from src.api.common.entity_spec import (
+    AUTHENTICATED,
+    OWNER_OR_ADMIN,
+    EntitySpec,
+    Redirects,
+    RouteSet,
+)
 from src.api.common.resource_routes import QueryParam
-from src.auth_config import current_active_user
 from src.models import Provider
 from src.repositories.dependencies import get_provider_repository
 from src.repositories.favorites.user_favorite_repository import UserFavoriteRepository
@@ -44,8 +49,7 @@ PROVIDER_ENTITY: Final[EntitySpec] = EntitySpec(
     # `owner_attr` defaults to "owner_id" — providers track their
     # owning user via Provider.owner_id.
     repo_dep=get_provider_repository,
-    read_user_dep=current_active_user,
-    write_user_dep=current_active_user,
+    auth_deps=AUTHENTICATED,
     auth_policy=OWNER_OR_ADMIN,
     create_adapter=ProviderCreate,
     update_adapter=ProviderUpdate,
