@@ -1,4 +1,4 @@
-"""Tests for `src/api/common/resource_routes.py`.
+"""Tests for `src/framework/resource_routes.py`.
 
 Mounts a tiny stub resource against a FastAPI app and exercises the
 mount functions end-to-end. Validates that:
@@ -13,7 +13,7 @@ mount functions end-to-end. Validates that:
 Handlers in these tests use real repository types (`UserRepository`,
 `AuditRepository`, etc.) as type annotations so the signature-synthesis
 machinery in the mount layer can resolve them via the registry in
-`src.repositories.dependencies`. The actual instances injected at call
+`src.framework.dependencies`. The actual instances injected at call
 time come from `app.dependency_overrides` substitutions that return
 `SimpleNamespace` stubs — the test doesn't need a real DB, just to
 observe the kwargs that reach the handler.
@@ -28,7 +28,9 @@ from fastapi import APIRouter, FastAPI, Request
 from fastapi.testclient import TestClient
 from pydantic import BaseModel
 
-from src.api.common.resource_routes import (
+from src.framework.audit_repository import AuditRepository
+from src.framework.dependencies import get_audit_repository
+from src.framework.resource_routes import (
     MountError,
     QueryParam,
     ResourceSpec,
@@ -40,8 +42,6 @@ from src.api.common.resource_routes import (
     mount_state_axis,
 )
 from src.models import User
-from src.repositories.audit_repository import AuditRepository
-from src.repositories.dependencies import get_audit_repository
 from src.repositories.users.user_repository import UserRepository
 
 
@@ -366,7 +366,7 @@ def test_mount_list_renders_template_with_handler_context(monkeypatch):
         return JSONResponse({"ok": True})
 
     monkeypatch.setattr(
-        "src.api.common.resource_routes.APIResponse.html_response",
+        "src.framework.resource_routes.APIResponse.html_response",
         staticmethod(fake_html_response),
     )
 
@@ -382,7 +382,7 @@ def test_mount_list_renders_template_with_handler_context(monkeypatch):
 def test_mount_detail_injects_extra_typed_repo_from_registry(monkeypatch):
     """A handler asks for a typed repo (e.g. `audit_repo: AuditRepository`),
     and the synthesis resolves it via the registry in
-    `src.repositories.dependencies`. No `extra_repo_deps` wiring on the
+    `src.framework.dependencies`. No `extra_repo_deps` wiring on the
     mount call — the handler's signature IS the contract."""
     captured: dict = {}
 
@@ -414,7 +414,7 @@ def test_mount_detail_injects_extra_typed_repo_from_registry(monkeypatch):
     )
 
     monkeypatch.setattr(
-        "src.api.common.resource_routes.APIResponse.html_response",
+        "src.framework.resource_routes.APIResponse.html_response",
         staticmethod(
             lambda *, template_name, context, request, current_user=None: __import__(
                 "fastapi"
@@ -515,7 +515,7 @@ def _stub_html_response(monkeypatch):
         return JSONResponse({"ok": True})
 
     monkeypatch.setattr(
-        "src.api.common.resource_routes.APIResponse.html_response",
+        "src.framework.resource_routes.APIResponse.html_response",
         staticmethod(fake),
     )
     return captured
@@ -1094,16 +1094,16 @@ def test_mount_state_axis_no_response_to_dict_returns_empty_body():
 # --- mount_entity dispatcher tests ---------------------------------------
 
 
-from src.api.common.entity_spec import EntitySpec as _EntitySpec  # noqa: E402
-from src.api.common.entity_spec import (  # noqa: E402
+from src.framework.audit import AuditAction as _AuditAction  # noqa: E402
+from src.framework.audit import AuditedResource as _AuditedResource  # noqa: E402
+from src.framework.entity_spec import EntitySpec as _EntitySpec  # noqa: E402
+from src.framework.entity_spec import (  # noqa: E402
     RelatedListSubresource as _RelatedSub,
 )
-from src.api.common.entity_spec import RouteSet as _RouteSet  # noqa: E402
-from src.api.common.entity_spec import StateAxis as _StateAxis  # noqa: E402
-from src.api.common.entity_spec import Templates as _Templates  # noqa: E402
-from src.api.common.resource_routes import mount_entity  # noqa: E402
-from src.logic.audit import AuditAction as _AuditAction  # noqa: E402
-from src.logic.audit import AuditedResource as _AuditedResource  # noqa: E402
+from src.framework.entity_spec import RouteSet as _RouteSet  # noqa: E402
+from src.framework.entity_spec import StateAxis as _StateAxis  # noqa: E402
+from src.framework.entity_spec import Templates as _Templates  # noqa: E402
+from src.framework.resource_routes import mount_entity  # noqa: E402
 
 
 def _stub_axis_handler():
@@ -1137,7 +1137,7 @@ def test_mount_entity_skips_routes_not_opted_in():
     """`mount_entity` only mounts the verbs `entity.routes` opts into.
     With everything False, no helpers are called."""
     calls = []
-    import src.api.common.resource_routes as rr
+    import src.framework.resource_routes as rr
 
     monkeys = []
     for fn_name in (
@@ -1175,7 +1175,7 @@ def test_mount_entity_skips_routes_not_opted_in():
 def test_mount_entity_dispatches_each_opted_in_verb():
     """`RouteSet` flags drive dispatch to the matching mount helpers."""
     calls = []
-    import src.api.common.resource_routes as rr
+    import src.framework.resource_routes as rr
 
     monkeys = []
     for fn_name in (
@@ -1249,7 +1249,7 @@ def test_mount_entity_dispatches_each_opted_in_verb():
 
 def test_mount_entity_dispatches_state_axes():
     calls = []
-    import src.api.common.resource_routes as rr
+    import src.framework.resource_routes as rr
 
     orig = rr.mount_state_axis
     rr.mount_state_axis = lambda *a, **k: calls.append(k)
@@ -1277,7 +1277,7 @@ def test_mount_entity_dispatches_state_axes():
 
 def test_mount_entity_dispatches_related_list_subresources():
     calls = []
-    import src.api.common.resource_routes as rr
+    import src.framework.resource_routes as rr
 
     orig = rr.mount_related_list
     rr.mount_related_list = lambda *a, **k: calls.append(k)
@@ -1306,7 +1306,7 @@ def test_mount_entity_state_axis_resolves_handler_path():
     """When a state axis declares `handler_path` and `handlers` omits the
     key, `mount_entity` resolves the dotted path via importlib."""
     calls = []
-    import src.api.common.resource_routes as rr
+    import src.framework.resource_routes as rr
 
     orig = rr.mount_state_axis
     rr.mount_state_axis = lambda *a, **k: calls.append(k)
@@ -1323,7 +1323,7 @@ def test_mount_entity_state_axis_resolves_handler_path():
                     body_schema=_AxisBody,
                     action=_AuditAction.SET_USER_ACTIVATION,
                     handler_path=(
-                        "src.api.common.test_resource_routes._stub_axis_handler"
+                        "src.framework.test_resource_routes._stub_axis_handler"
                     ),
                 ),
             ),
@@ -1338,7 +1338,7 @@ def test_mount_entity_state_axis_resolves_handler_path():
 def test_mount_entity_state_axis_explicit_handler_wins_over_path():
     """An explicit handler in `handlers={}` overrides the spec's path."""
     calls = []
-    import src.api.common.resource_routes as rr
+    import src.framework.resource_routes as rr
 
     orig = rr.mount_state_axis
     rr.mount_state_axis = lambda *a, **k: calls.append(k)
@@ -1359,7 +1359,7 @@ def test_mount_entity_state_axis_explicit_handler_wins_over_path():
                     body_schema=_AxisBody,
                     action=_AuditAction.SET_USER_ACTIVATION,
                     handler_path=(
-                        "src.api.common.test_resource_routes._stub_axis_handler"
+                        "src.framework.test_resource_routes._stub_axis_handler"
                     ),
                 ),
             ),
@@ -1382,7 +1382,7 @@ def test_mount_entity_handler_path_missing_attr_raises_clear_error():
                 name="activation",
                 body_schema=_AxisBody,
                 action=_AuditAction.SET_USER_ACTIVATION,
-                handler_path=("src.api.common.test_resource_routes._missing_handler"),
+                handler_path=("src.framework.test_resource_routes._missing_handler"),
             ),
         ),
     )
@@ -1400,7 +1400,7 @@ def test_mount_entity_extra_handler_keys_raises_value_error():
         audit=_stub_audit(),
         routes=_RouteSet(list=True),
     )
-    import src.api.common.resource_routes as rr
+    import src.framework.resource_routes as rr
 
     orig = rr.mount_list
     rr.mount_list = lambda *a, **k: None
@@ -1469,7 +1469,7 @@ def test_mount_entity_owned_subentity_auto_binds_default_factory():
     )
 
     captured: list[Callable[..., Any]] = []
-    import src.api.common.resource_routes as rr
+    import src.framework.resource_routes as rr
 
     originals = {}
     for fn_name in ("mount_create", "mount_update", "mount_delete"):
@@ -1521,7 +1521,7 @@ def test_mount_entity_owned_subentity_explicit_handler_overrides_default():
         return None
 
     captured: list[Callable[..., Any]] = []
-    import src.api.common.resource_routes as rr
+    import src.framework.resource_routes as rr
 
     originals = {}
     for fn_name in ("mount_create", "mount_update", "mount_delete"):
@@ -1554,7 +1554,7 @@ def test_mount_entity_owned_subentity_explicit_handler_overrides_default():
 
 def _capture_top_level_mounts():
     """Stub the per-verb mount helpers + return captured (name, kwargs) list."""
-    import src.api.common.resource_routes as rr
+    import src.framework.resource_routes as rr
 
     captured: list[tuple[str, dict]] = []
     originals: dict[str, Any] = {}
@@ -1802,7 +1802,7 @@ def test_mount_delete_404_propagates_from_handler():
     """If the handler raises NotFoundError, the route surfaces it as 404
     (decorator translation). Confirms the mount doesn't swallow exceptions."""
 
-    from src.api.common.exceptions import NotFoundError
+    from src.framework.exceptions import NotFoundError
 
     async def raising_handler(
         widget_id: UUID,

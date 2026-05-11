@@ -20,7 +20,8 @@ Read by:
 
 from typing import Final
 
-from src.api.common.entity_spec import (
+from src.framework.dependencies import get_post_repository
+from src.framework.entity_spec import (
     AUTHENTICATED,
     OWNER_OR_ADMIN,
     EntitySpec,
@@ -28,7 +29,6 @@ from src.api.common.entity_spec import (
     RouteSet,
 )
 from src.models import POST_KINDS, Post
-from src.repositories.dependencies import get_post_repository
 from src.schemas.posts.post import (
     post_audit_snapshot,
     post_create_adapter,

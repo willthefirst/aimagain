@@ -10,7 +10,10 @@ from types import SimpleNamespace
 import pytest
 from pydantic import BaseModel, ConfigDict, TypeAdapter
 
-from src.api.common.entity_spec import (
+from src.auth_config import current_active_user, current_admin_user
+from src.framework.audit import AuditAction, AuditedResource, make_snapshotter
+from src.framework.authz import assert_owner_or_admin, is_owner_or_admin
+from src.framework.entity_spec import (
     ADMIN_FOR_WRITE,
     AUTHENTICATED,
     OWNER_OR_ADMIN,
@@ -24,9 +27,6 @@ from src.api.common.entity_spec import (
     StateAxis,
     Templates,
 )
-from src.auth_config import current_active_user, current_admin_user
-from src.logic._authz import assert_owner_or_admin, is_owner_or_admin
-from src.logic.audit import AuditAction, AuditedResource, make_snapshotter
 
 
 class _DummyBody(BaseModel):

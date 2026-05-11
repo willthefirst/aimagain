@@ -24,7 +24,9 @@ mount helpers later; A4 doesn't.
 
 from typing import Final
 
-from src.api.common.entity_spec import (
+from src.framework.audit import AuditAction, make_snapshotter
+from src.framework.dependencies import get_user_favorite_repository
+from src.framework.entity_spec import (
     AUTHENTICATED,
     EdgeAudit,
     EntitySpec,
@@ -32,9 +34,7 @@ from src.api.common.entity_spec import (
     RouteSet,
     Templates,
 )
-from src.logic.audit import AuditAction, make_snapshotter
 from src.models import UserFavorite
-from src.repositories.dependencies import get_user_favorite_repository
 from src.schemas.favorites.user_favorite import UserFavoriteAuditSnapshot
 from src.specs.provider import PROVIDER_ENTITY
 from src.specs.user import USER_ENTITY

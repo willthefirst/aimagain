@@ -6,13 +6,13 @@ from selectolax.parser import HTMLParser
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from src.framework.audit_repository import AuditRepository
 from src.models import (
     ClientReferralDetail,
     Post,
     ProviderAvailabilityDetail,
     User,
 )
-from src.repositories.audit_repository import AuditRepository
 from tests.helpers import (
     client_referral_payload,
     create_test_user,

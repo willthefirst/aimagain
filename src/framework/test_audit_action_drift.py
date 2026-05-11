@@ -16,7 +16,7 @@ the reverse: an enum member with no spec home is dead weight and a
 sign of stale code.
 """
 
-from src.logic.audit import AuditAction
+from src.framework.audit import AuditAction
 from src.specs.post import POST_ENTITY
 from src.specs.provider import PROVIDER_ENTITY
 from src.specs.provider_certification import CERTIFICATION_ENTITY

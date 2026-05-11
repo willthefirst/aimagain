@@ -24,14 +24,14 @@ from uuid import UUID
 from fastapi import Request
 from pydantic import BaseModel
 
-from src.api.common.entity_spec import EntitySpec
-from src.api.common.exceptions import BadRequestError, ForbiddenError, NotFoundError
-from src.api.common.projections import project_view
-from src.logic._authz import is_admin
-from src.logic.audit import mutate
+from src.framework.audit import mutate
+from src.framework.audit_repository import AuditRepository
+from src.framework.authz import is_admin
+from src.framework.base_repository import BaseRepository
+from src.framework.entity_spec import EntitySpec
+from src.framework.exceptions import BadRequestError, ForbiddenError, NotFoundError
+from src.framework.projections import project_view
 from src.models import User
-from src.repositories.audit_repository import AuditRepository
-from src.repositories.base import BaseRepository
 
 
 async def handle_delete(
@@ -343,7 +343,7 @@ async def handle_update(
 #
 # Each `make_<verb>_handler` factory fabricates a callable with a typed
 # signature so the route mount layer's introspection
-# (`src/api/common/resource_routes.py`) can bind URL path params, body
+# (`src/framework/resource_routes.py`) can bind URL path params, body
 # adapters, query filters, and `Depends` to the right handler kwargs.
 # The six verbs (delete/create/update/edit_form/detail/list) used to be
 # six near-identical 80-line factories — the differences are entirely

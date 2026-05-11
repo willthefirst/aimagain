@@ -1,4 +1,4 @@
-"""Tests for `src/api/common/responses.py` helpers."""
+"""Tests for `src/framework/responses.py` helpers."""
 
 import json
 import uuid

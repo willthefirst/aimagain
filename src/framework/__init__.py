@@ -1,4 +1,4 @@
-# This file makes src/api/common a Python package
+# Convenience re-exports for the most-used framework symbols.
 
 from .base_router import BaseRouter, make_entity_router
 from .decorators import handle_route_errors

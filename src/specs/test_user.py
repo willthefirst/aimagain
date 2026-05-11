@@ -8,9 +8,9 @@ axis, the providers related-list, the private-fields tuple, the
 `/users/me` singleton alias, and the per-viewer detail extras binding.
 """
 
-from src.api.common.entity_spec import ADMIN_FOR_WRITE, RelatedListSubresource
-from src.logic._authz import is_self_or_admin
-from src.logic.audit import AuditAction
+from src.framework.audit import AuditAction
+from src.framework.authz import is_self_or_admin
+from src.framework.entity_spec import ADMIN_FOR_WRITE, RelatedListSubresource
 from src.schemas.users.user import UserActivationAuditSnapshot, UserActivationUpdate
 from src.specs.user import USER_ENTITY
 

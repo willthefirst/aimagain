@@ -84,7 +84,7 @@ def test_html_pattern_marker_propagates():
 
 
 def test_zip_text_alias_carries_pattern_in_real_schema():
-    """End-to-end: the `ZipText` alias in `src/schemas/_validators.py`
+    """End-to-end: the `ZipText` alias in `src/framework/schema_validators.py`
     is the production wiring this prototype targets. If someone removes
     the `HtmlPattern` marker on `ZipText`, the form's client-side
     validation silently drops — catch it here."""

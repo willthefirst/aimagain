@@ -13,9 +13,10 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from starlette.requests import Request
 
-from src.api.common.exceptions import ForbiddenError, NotFoundError
-from src.logic._generic import handle_create, handle_detail, handle_list
-from src.logic.audit import AuditAction
+from src.framework.audit import AuditAction
+from src.framework.audit_repository import AuditRepository
+from src.framework.exceptions import ForbiddenError, NotFoundError
+from src.framework.handlers import handle_create, handle_detail, handle_list
 from src.logic.providers.provider_processing import (
     handle_list_user_providers,
     provider_detail_extras,
@@ -25,7 +26,6 @@ from src.models import (
     ProviderLicensure,
     User,
 )
-from src.repositories.audit_repository import AuditRepository
 from src.repositories.favorites.user_favorite_repository import UserFavoriteRepository
 from src.repositories.providers.provider_repository import ProviderRepository
 from src.repositories.users.user_repository import UserRepository

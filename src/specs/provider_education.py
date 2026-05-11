@@ -6,7 +6,7 @@ factory (parent chain, subrow-CRUD-only routes, parent-form redirect).
 
 from typing import Final
 
-from src.api.common.entity_spec import EntitySpec
+from src.framework.entity_spec import EntitySpec
 from src.models import ProviderEducation
 from src.schemas.providers.provider import (
     ProviderEducationCreate,

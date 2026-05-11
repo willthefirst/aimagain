@@ -12,7 +12,7 @@ snapshotter for audit before/after captures.
 import uuid
 from datetime import datetime
 
-from src.schemas._validators import ReadProjection
+from src.framework.schema_validators import ReadProjection
 
 
 class UserFavoriteAuditSnapshot(ReadProjection):

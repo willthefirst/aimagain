@@ -11,9 +11,9 @@ from types import SimpleNamespace
 from fastapi import APIRouter
 from pydantic import BaseModel
 
-from src.api.common.base_router import BaseRouter, make_entity_router
-from src.api.common.entity_spec import AUTHENTICATED, EntitySpec, RouteSet
-from src.logic.audit import AuditAction, AuditedResource, make_snapshotter
+from src.framework.audit import AuditAction, AuditedResource, make_snapshotter
+from src.framework.base_router import BaseRouter, make_entity_router
+from src.framework.entity_spec import AUTHENTICATED, EntitySpec, RouteSet
 
 
 class _DummyBody(BaseModel):

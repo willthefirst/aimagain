@@ -19,13 +19,13 @@ from fastapi import Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.db import get_db_session
+from src.repositories.favorites.user_favorite_repository import UserFavoriteRepository
+from src.repositories.posts.post_repository import PostRepository
+from src.repositories.providers.provider_repository import ProviderRepository
+from src.repositories.users.user_repository import UserRepository
 
 from .audit_repository import AuditRepository
-from .base import BaseRepository
-from .favorites.user_favorite_repository import UserFavoriteRepository
-from .posts.post_repository import PostRepository
-from .providers.provider_repository import ProviderRepository
-from .users.user_repository import UserRepository
+from .base_repository import BaseRepository
 
 _CAMEL_TO_SNAKE_RE = re.compile(r"(?<!^)(?=[A-Z])")
 
@@ -66,7 +66,7 @@ _REPO_TYPES: tuple[type[BaseRepository], ...] = (
 
 
 # Type → resolver registry consumed by the mount-layer signature
-# synthesis (see ``src/api/common/resource_routes.py``). A handler param
+# synthesis (see ``src/framework/resource_routes.py``). A handler param
 # typed ``repo: ProviderRepository`` resolves to
 # ``Depends(_REPO_TYPE_RESOLVERS[ProviderRepository])`` automatically.
 _REPO_TYPE_RESOLVERS: dict[type, Callable[..., Any]] = {
@@ -75,7 +75,7 @@ _REPO_TYPE_RESOLVERS: dict[type, Callable[..., Any]] = {
 
 
 # Public symbols — direct bindings to the generated resolvers so spec
-# files can ``from src.repositories.dependencies import get_X_repository``
+# files can ``from src.framework.dependencies import get_X_repository``
 # the same way they always have.
 get_user_repository = _REPO_TYPE_RESOLVERS[UserRepository]
 get_post_repository = _REPO_TYPE_RESOLVERS[PostRepository]
@@ -103,5 +103,5 @@ def resolver_for(repo_type: type) -> Callable[..., Any]:
         raise UnknownRepoTypeError(
             f"No Depends resolver registered for repository type "
             f"{repo_type!r}. Add an entry to `_REPO_TYPES` in "
-            f"src/repositories/dependencies.py."
+            f"src/framework/dependencies.py."
         ) from None

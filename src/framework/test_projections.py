@@ -1,10 +1,10 @@
-"""Tests for `src/api/common/projections.py`."""
+"""Tests for `src/framework/projections.py`."""
 
 from types import SimpleNamespace
 
 import pytest
 
-from src.api.common.projections import project_view
+from src.framework.projections import project_view
 
 
 def test_project_view_no_private_fields_returns_only_public():

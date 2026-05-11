@@ -6,6 +6,7 @@ from selectolax.parser import HTMLParser
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from src.framework.audit_repository import AuditRepository
 from src.models import (
     Provider,
     ProviderCertification,
@@ -13,7 +14,6 @@ from src.models import (
     ProviderLicensure,
     User,
 )
-from src.repositories.audit_repository import AuditRepository
 from tests.helpers import (
     create_test_user,
     make_provider,

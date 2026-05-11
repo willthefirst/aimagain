@@ -30,15 +30,15 @@ from typing import Any, Callable
 
 from pydantic import BaseModel, TypeAdapter
 
-from src.api.common.resource_routes import QueryParam, ResourceSpec
 from src.auth_config import current_active_user, current_admin_user
-from src.logic._authz import assert_owner_or_admin, is_owner_or_admin
-from src.logic.audit import (
+from src.framework.audit import (
     AuditAction,
     AuditedResource,
     make_audited_resource,
     make_snapshotter,
 )
+from src.framework.authz import assert_owner_or_admin, is_owner_or_admin
+from src.framework.resource_routes import QueryParam, ResourceSpec
 from src.models._polymorphic import DiscriminatorRegistry
 
 
@@ -131,7 +131,7 @@ class StateAxis:
     `audit_snapshot` is the Pydantic class used to project a row into
     the audit log's `before`/`after` JSON for this axis. The spec's
     `__post_init__` builds the snapshotter once via
-    :func:`src.logic.audit.make_snapshotter` and stores it on
+    :func:`src.framework.audit.make_snapshotter` and stores it on
     ``audit_snapshot_fn`` so the handler reads
     ``axis.audit_snapshot_fn(target)`` instead of building its own
     module-level snapshotter. Matches the CRUD-side
@@ -808,7 +808,7 @@ class EntitySpec:
 
 # Canonical `AuthzPolicy` sentinel for owner-or-admin entities. Pairs
 # the raising form (`assert_owner_or_admin`) with the predicate form
-# (`is_owner_or_admin`) defined in `src/logic/_authz.py`. Specs that
+# (`is_owner_or_admin`) defined in `src/framework/authz.py`. Specs that
 # follow this rule (provider, post, all three credentials) declare
 # `auth_policy=OWNER_OR_ADMIN` and the constructor expands the pair.
 #

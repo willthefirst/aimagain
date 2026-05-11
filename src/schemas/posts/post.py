@@ -21,7 +21,7 @@ schema's accepted values stay in lockstep with the DB CHECK
 constraints. Free-text fields (city, ZIP, descriptions, optional
 modality strings) use the `StrippedText`, `ZipText`, and
 `StrippedOptionalText` aliases from
-[`src/schemas/_validators.py`](_validators.py) so the cleaning rule
+[`src/framework/schema_validators.py`](_validators.py) so the cleaning rule
 lives in one place and attaches to the field type rather than
 per-class `@field_validator` methods. The Update variants reuse the
 same aliases as `T | None`; Pydantic skips the AfterValidator on the
@@ -44,6 +44,14 @@ from pydantic import (
     model_validator,
 )
 
+from src.framework.schema_validators import (
+    PartialUpdate,
+    ReadProjection,
+    StrippedOptionalText,
+    StrippedText,
+    WirePayload,
+    ZipText,
+)
 from src.models import POST_KINDS
 from src.models.enums import (
     CLIENT_AGE_GROUPS,
@@ -54,14 +62,6 @@ from src.models.enums import (
     LOCATION_AVAILABILITY_OPTIONS,
     TREATMENT_SETTINGS,
     US_STATES,
-)
-from src.schemas._validators import (
-    PartialUpdate,
-    ReadProjection,
-    StrippedOptionalText,
-    StrippedText,
-    WirePayload,
-    ZipText,
 )
 
 

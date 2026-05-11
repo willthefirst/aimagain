@@ -1,4 +1,4 @@
-"""Framework tests for `src/logic/_generic.py`.
+"""Framework tests for `src/framework/handlers.py`.
 
 These pin the generic handler behavior against fixture specs and
 fixture models — independent of any production entity. The per-entity
@@ -20,10 +20,10 @@ from uuid import UUID, uuid4
 
 import pytest
 
-from src.api.common.entity_spec import EntitySpec, RouteSet
-from src.api.common.exceptions import ForbiddenError, NotFoundError
-from src.logic._generic import handle_delete, make_delete_handler
-from src.logic.audit import AuditAction, AuditedResource
+from src.framework.audit import AuditAction, AuditedResource
+from src.framework.entity_spec import EntitySpec, RouteSet
+from src.framework.exceptions import ForbiddenError, NotFoundError
+from src.framework.handlers import handle_delete, make_delete_handler
 
 # --- Fixture model + repo --------------------------------------------------
 
@@ -533,8 +533,8 @@ from typing import Any as _Any
 
 from pydantic import BaseModel as _BaseModel
 
-from src.api.common.entity_spec import RelatedListSubresource  # noqa: F401
-from src.logic._generic import handle_create, make_create_handler
+from src.framework.entity_spec import RelatedListSubresource  # noqa: F401
+from src.framework.handlers import handle_create, make_create_handler
 from src.models._polymorphic import DiscriminatorRegistry
 
 
@@ -957,8 +957,8 @@ def test_make_create_handler_name_includes_entity():
 # --- handle_update framework tests ---------------------------------------
 
 
-from src.api.common.exceptions import BadRequestError  # noqa: E402
-from src.logic._generic import handle_update, make_update_handler  # noqa: E402
+from src.framework.exceptions import BadRequestError  # noqa: E402
+from src.framework.handlers import handle_update, make_update_handler  # noqa: E402
 
 
 def _update_fake_repo() -> _FakeRepo:
@@ -1367,7 +1367,7 @@ def test_make_update_handler_name_includes_entity():
 # --- handle_get_edit_form framework tests --------------------------------
 
 
-from src.logic._generic import (  # noqa: E402
+from src.framework.handlers import (  # noqa: E402
     handle_get_edit_form,
     make_edit_form_handler,
 )
@@ -1568,7 +1568,7 @@ async def test_make_edit_form_handler_delegates_to_handle_get_edit_form():
 # --- handle_get_new_form framework tests ---------------------------------
 
 
-from src.logic._generic import (  # noqa: E402
+from src.framework.handlers import (  # noqa: E402
     handle_get_new_form,
     make_new_form_handler,
 )
@@ -1763,7 +1763,7 @@ async def test_make_new_form_handler_delegates_to_handle_get_new_form():
 # --- handle_detail framework tests ---------------------------------------
 
 
-from src.logic._generic import handle_detail, make_detail_handler  # noqa: E402
+from src.framework.handlers import handle_detail, make_detail_handler  # noqa: E402
 
 
 def _can_edit_for_owner(obj, user) -> bool:
@@ -2018,7 +2018,7 @@ async def test_handle_list_returns_items_under_url_collection():
         async def list_widgets(self, **_kwargs):
             return [row_a, row_b]
 
-    from src.logic._generic import handle_list
+    from src.framework.handlers import handle_list
 
     context = await handle_list(
         spec,
@@ -2040,7 +2040,7 @@ async def test_handle_list_echoes_filter_values_as_selected():
         async def list_widgets(self, **kwargs):
             return []
 
-    from src.logic._generic import handle_list
+    from src.framework.handlers import handle_list
 
     context = await handle_list(
         spec,
@@ -2063,7 +2063,7 @@ async def test_handle_list_threads_filter_values_into_repo_call():
             captured.update(kwargs)
             return []
 
-    from src.logic._generic import handle_list
+    from src.framework.handlers import handle_list
 
     await handle_list(
         spec,
@@ -2087,7 +2087,7 @@ async def test_handle_list_extras_merges_into_context():
     async def extras(*, items, **_):
         return {"extra_count": len(items), "current_user": "overridden"}
 
-    from src.logic._generic import handle_list
+    from src.framework.handlers import handle_list
 
     context = await handle_list(
         spec,
@@ -2104,8 +2104,8 @@ async def test_handle_list_extras_merges_into_context():
 def test_make_list_handler_signature_includes_filters_and_repos():
     """The factory must synthesize a typed signature so mount_list's
     introspection wires the filter query params and the typed repos."""
-    from src.api.common.entity_spec import QueryParam
-    from src.logic._generic import make_list_handler
+    from src.framework.entity_spec import QueryParam
+    from src.framework.handlers import make_list_handler
 
     spec = EntitySpec(
         name="widget",
@@ -2402,7 +2402,7 @@ async def test_handle_list_injects_can_admin_actions():
         async def list_widgets(self, **_):
             return []
 
-    from src.logic._generic import handle_list
+    from src.framework.handlers import handle_list
 
     admin_ctx = await handle_list(
         spec,
@@ -2451,7 +2451,7 @@ async def test_handle_list_passes_exclude_self_when_spec_opts_in():
             captured.append(kwargs)
             return []
 
-    from src.logic._generic import handle_list
+    from src.framework.handlers import handle_list
 
     viewer = SimpleNamespace(id=uuid4(), is_superuser=False)
     await handle_list(
@@ -2485,7 +2485,7 @@ async def test_handle_list_omits_exclude_self_when_spec_opts_out():
             captured.append(kwargs)
             return []
 
-    from src.logic._generic import handle_list
+    from src.framework.handlers import handle_list
 
     await handle_list(
         spec,
@@ -2578,7 +2578,7 @@ async def test_handle_list_merges_static_context():
         async def list_widgets(self, **_):
             return []
 
-    from src.logic._generic import handle_list
+    from src.framework.handlers import handle_list
 
     context = await handle_list(
         spec,
@@ -2713,7 +2713,7 @@ def test_delete_forbid_self_requires_delete_route():
 async def test_state_axis_forbid_self_wrapper_rejects_self_target():
     """The `forbid_self` axis flag wraps the resolved handler so a
     self-target invocation raises 403 before the inner handler runs."""
-    from src.api.common.resource_routes import _wrap_state_axis_with_self_guard
+    from src.framework.resource_routes import _wrap_state_axis_with_self_guard
 
     inner_called = False
 
@@ -2736,7 +2736,7 @@ async def test_state_axis_forbid_self_wrapper_rejects_self_target():
 @pytest.mark.asyncio
 async def test_state_axis_forbid_self_wrapper_lets_other_targets_through():
     """The wrapper is a no-op when target_id != requesting_user.id."""
-    from src.api.common.resource_routes import _wrap_state_axis_with_self_guard
+    from src.framework.resource_routes import _wrap_state_axis_with_self_guard
 
     inner_called = False
 

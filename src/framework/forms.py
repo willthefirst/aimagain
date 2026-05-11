@@ -2,7 +2,7 @@
 
 These helpers are the cross-cutting glue between FastAPI's request object
 and the Pydantic schemas used by the logic layer. Per
-`src/api/common/README.md`, this module is the home for any HTTP-adapter
+`src/framework/README.md`, this module is the home for any HTTP-adapter
 primitive that two or more route modules would otherwise import from each
 other (the same smell #157 catches one layer over).
 """

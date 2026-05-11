@@ -18,14 +18,15 @@ Read by:
 
 from typing import Final
 
-from src.api.common.entity_spec import (
+from src.framework.dependencies import get_provider_repository
+from src.framework.entity_spec import (
     AUTHENTICATED,
     OWNER_OR_ADMIN,
     EntitySpec,
     Redirects,
     RouteSet,
 )
-from src.api.common.resource_routes import QueryParam
+from src.framework.resource_routes import QueryParam
 from src.models import Provider
 from src.models.enums import (
     CERTIFICATION_TYPES,
@@ -35,7 +36,6 @@ from src.models.enums import (
     LICENSE_TYPES,
     LICENSE_TYPES_LABELS,
 )
-from src.repositories.dependencies import get_provider_repository
 from src.repositories.favorites.user_favorite_repository import UserFavoriteRepository
 from src.schemas.providers.provider import (
     ProviderCreate,

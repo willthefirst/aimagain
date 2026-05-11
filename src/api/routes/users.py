@@ -1,5 +1,5 @@
-from src.api.common import make_entity_router
-from src.api.common.resource_routes import mount_entity
+from src.framework import make_entity_router
+from src.framework.resource_routes import mount_entity
 from src.specs.user import USER_ENTITY
 
 router = make_entity_router(USER_ENTITY)

@@ -3,7 +3,7 @@ from typing import Literal
 from fastapi_users import schemas
 from pydantic import BaseModel, EmailStr
 
-from src.schemas._validators import ReadProjection
+from src.framework.schema_validators import ReadProjection
 
 
 class UserRead(schemas.BaseUser):

@@ -18,10 +18,10 @@ from uuid import UUID
 
 from fastapi import Request
 
-from src.api.common.exceptions import NotFoundError
-from src.logic.audit import record_audit
+from src.framework.audit import record_audit
+from src.framework.audit_repository import AuditRepository
+from src.framework.exceptions import NotFoundError
 from src.models import Provider, User, UserFavorite
-from src.repositories.audit_repository import AuditRepository
 from src.repositories.favorites.user_favorite_repository import UserFavoriteRepository
 from src.repositories.providers.provider_repository import ProviderRepository
 from src.specs.user_favorite import FAVORITE_ENTITY

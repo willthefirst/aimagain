@@ -18,7 +18,7 @@ import pytest
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from starlette.requests import Request
 
-from src.logic._generic import handle_detail
+from src.framework.handlers import handle_detail
 from src.logic.users.user_processing import user_detail_extras
 from src.models import User
 from src.repositories.providers.provider_repository import ProviderRepository

@@ -1,6 +1,6 @@
 """Authorization helpers shared across logic-layer handlers.
 
-The leading-underscore filename matches `src/schemas/_validators.py` —
+The leading-underscore filename matches `src/framework/schema_validators.py` —
 shared infra at the layer's parent level, importable from every cluster.
 
 The boolean predicates (`is_admin`, `is_owner`, `is_owner_or_admin`)
@@ -14,12 +14,12 @@ re-derive the composition.
 
 The two forms always pair, so specs declare them together via
 `EntitySpec.auth_policy=OWNER_OR_ADMIN` — the sentinel lives next to
-`AuthzPolicy` in `src/api/common/entity_spec.py` (importing the
+`AuthzPolicy` in `src/framework/entity_spec.py` (importing the
 callables defined here) so the spec-side dataclass and its canonical
 instance stay co-located without forcing a circular import.
 """
 
-from src.api.common.exceptions import ForbiddenError
+from src.framework.exceptions import ForbiddenError
 from src.models import User
 
 
