@@ -1076,10 +1076,13 @@ def mount_entity(
         consumed.add("delete")
 
     for axis in entity.state_axes:
+        handler = _resolve_spec_bound_handler(
+            entity, effective_handlers, key=axis.name, handler_path=axis.handler_path
+        )
         mount_state_axis(
             router,
             spec,
-            handler=effective_handlers[axis.name],
+            handler=handler,
             axis_name=axis.name,
             body_schema=axis.body_schema,
             response_to_dict=axis.response_to_dict,
@@ -1088,11 +1091,14 @@ def mount_entity(
 
     for sub in entity.subresources:
         key = sub.child_spec.collection
+        handler = _resolve_spec_bound_handler(
+            entity, effective_handlers, key=key, handler_path=sub.handler_path
+        )
         mount_related_list(
             router,
             parent_spec=spec,
             child_spec=sub.child_spec,
-            handler=effective_handlers[key],
+            handler=handler,
             template=sub.template,
             singleton_alias=sub.singleton_alias,
         )
@@ -1208,6 +1214,60 @@ def _parent_path_param_pairs(spec: ResourceSpec) -> tuple[tuple[str, type], ...]
         s = s.parent
     out.reverse()
     return tuple(out)
+
+
+def _resolve_spec_bound_handler(
+    entity: Any,
+    effective_handlers: dict[str, Callable[..., Any]],
+    *,
+    key: str,
+    handler_path: str | None,
+) -> Callable[..., Any]:
+    """Pick the handler for a state-axis or related-list subresource.
+
+    Precedence:
+
+    1. Explicit handler in `mount_entity(handlers=...)` — overrides
+       anything declared on the spec (covers tests, hand-rolled cases,
+       and entities that haven't been migrated to `handler_path`).
+    2. `handler_path` declared on the spec — resolved lazily via
+       `importlib.import_module` + `getattr`. Keeps the layer
+       direction intact (`specs` never statically imports `logic`).
+    3. Neither → raise a clear error naming the entity and the key.
+    """
+    if key in effective_handlers:
+        return effective_handlers[key]
+    if handler_path is not None:
+        import importlib
+
+        module_path, _, attr = handler_path.rpartition(".")
+        if not module_path:
+            raise ValueError(
+                f"mount_entity({entity.name!r}): handler_path "
+                f"{handler_path!r} for {key!r} is not a dotted path "
+                "(expected `pkg.module.attr`)."
+            )
+        try:
+            module = importlib.import_module(module_path)
+        except ImportError as exc:
+            raise ImportError(
+                f"mount_entity({entity.name!r}): could not import "
+                f"{module_path!r} to resolve handler_path "
+                f"{handler_path!r} for {key!r}: {exc}"
+            ) from exc
+        try:
+            return getattr(module, attr)
+        except AttributeError as exc:
+            raise AttributeError(
+                f"mount_entity({entity.name!r}): module "
+                f"{module_path!r} has no attribute {attr!r} "
+                f"(handler_path {handler_path!r} for {key!r})."
+            ) from exc
+    raise KeyError(
+        f"mount_entity({entity.name!r}): no handler for {key!r} — "
+        f"supply it in `handlers={{{key!r}: ...}}` or set "
+        "`handler_path=` on the spec entry."
+    )
 
 
 def _resolve_handler(fn: Callable[..., Any]) -> Callable[..., Any]:

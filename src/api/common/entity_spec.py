@@ -26,7 +26,7 @@ structurally.
 """
 
 from dataclasses import dataclass, field
-from typing import Any, Awaitable, Callable
+from typing import Any, Callable
 
 from pydantic import BaseModel, TypeAdapter
 
@@ -85,17 +85,25 @@ class RouteSet:
 class StateAxis:
     """One state-axis subresource on an entity (e.g. `activation` on `user`).
 
-    `handler` and `response_to_dict` are intentionally optional in
-    phase 1: the route file passes the handler directly to
-    `mount_state_axis`, because importing logic handlers into the
-    spec module would invert the usual layer direction. Phase 2 will
-    populate `handler` once the import direction is sorted.
+    `handler_path` is the dotted import path of the handler the route
+    layer should bind to this axis (e.g.
+    ``"src.logic.users.user_processing.handle_set_user_activation"``).
+    `mount_entity` resolves it via `importlib.import_module` + `getattr`
+    at mount time, which is *after* both the spec module and the logic
+    module have been imported — so the spec module never imports from
+    `src.logic`, preserving the layer direction.
+
+    Carrying it as a string (not a callable) sidesteps the import
+    cycle that previously forced the route file to pass the handler
+    via `handlers={"activation": ...}`. Specs that pre-date this knob
+    can leave it unset and pass the handler explicitly; the explicit
+    handler wins.
     """
 
     name: str
     body_schema: type[BaseModel]
     action: AuditAction
-    handler: Callable[..., Awaitable[Any]] | None = None
+    handler_path: str | None = None
     response_to_dict: Callable[[Any], dict] | None = None
 
 
@@ -171,13 +179,17 @@ class RelatedListSubresource:
     either a hand-rolled inline `ResourceSpec(...)` or from
     ``<CHILD_ENTITY>.to_resource_spec()`` once the child is migrated.
 
-    `handler` is omitted for the same reason as `StateAxis.handler`:
-    the route file binds it at mount time.
+    `handler_path` is the dotted import path of the handler bound to
+    this related-list (same shape as `StateAxis.handler_path`).
+    `mount_entity` resolves it via `importlib.import_module` +
+    `getattr` at mount time — strings preserve the layer direction
+    (`specs` never imports `logic`). Specs that don't set it can pass
+    the handler explicitly via `mount_entity(..., handlers={...})`.
     """
 
     child_spec: ResourceSpec
     template: str
-    handler: Callable[..., Awaitable[Any]] | None = None
+    handler_path: str | None = None
     singleton_alias: tuple[str, Callable[..., Any]] | None = None
 
 

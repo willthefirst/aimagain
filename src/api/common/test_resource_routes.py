@@ -1106,6 +1106,12 @@ from src.logic.audit import AuditAction as _AuditAction  # noqa: E402
 from src.logic.audit import AuditedResource as _AuditedResource  # noqa: E402
 
 
+def _stub_axis_handler():
+    """Module-level callable that `test_mount_entity_state_axis_resolves_handler_path`
+    targets via `handler_path` to exercise the importlib resolver."""
+    return None
+
+
 def _stub_audit() -> _AuditedResource:
     return _AuditedResource(
         type="thing",
@@ -1283,6 +1289,94 @@ def test_mount_entity_dispatches_related_list_subresources():
         rr.mount_related_list = orig
     assert len(calls) == 1
     assert calls[0]["template"] == "x/list.html"
+
+
+def test_mount_entity_state_axis_resolves_handler_path():
+    """When a state axis declares `handler_path` and `handlers` omits the
+    key, `mount_entity` resolves the dotted path via importlib."""
+    calls = []
+    import src.api.common.resource_routes as rr
+
+    orig = rr.mount_state_axis
+    rr.mount_state_axis = lambda *a, **k: calls.append(k)
+    try:
+        spec = _EntitySpec(
+            name="thing",
+            url_collection="things",
+            id_param="thing_id",
+            model=SimpleNamespace,
+            audit=_stub_audit(),
+            state_axes=(
+                _StateAxis(
+                    name="activation",
+                    body_schema=_AxisBody,
+                    action=_AuditAction.SET_USER_ACTIVATION,
+                    handler_path=(
+                        "src.api.common.test_resource_routes._stub_axis_handler"
+                    ),
+                ),
+            ),
+        )
+        mount_entity(None, spec, handlers={})
+    finally:
+        rr.mount_state_axis = orig
+    assert len(calls) == 1
+    assert calls[0]["handler"] is _stub_axis_handler
+
+
+def test_mount_entity_state_axis_explicit_handler_wins_over_path():
+    """An explicit handler in `handlers={}` overrides the spec's path."""
+    calls = []
+    import src.api.common.resource_routes as rr
+
+    orig = rr.mount_state_axis
+    rr.mount_state_axis = lambda *a, **k: calls.append(k)
+
+    def explicit():
+        return None
+
+    try:
+        spec = _EntitySpec(
+            name="thing",
+            url_collection="things",
+            id_param="thing_id",
+            model=SimpleNamespace,
+            audit=_stub_audit(),
+            state_axes=(
+                _StateAxis(
+                    name="activation",
+                    body_schema=_AxisBody,
+                    action=_AuditAction.SET_USER_ACTIVATION,
+                    handler_path=(
+                        "src.api.common.test_resource_routes._stub_axis_handler"
+                    ),
+                ),
+            ),
+        )
+        mount_entity(None, spec, handlers={"activation": explicit})
+    finally:
+        rr.mount_state_axis = orig
+    assert calls[0]["handler"] is explicit
+
+
+def test_mount_entity_handler_path_missing_attr_raises_clear_error():
+    spec = _EntitySpec(
+        name="thing",
+        url_collection="things",
+        id_param="thing_id",
+        model=SimpleNamespace,
+        audit=_stub_audit(),
+        state_axes=(
+            _StateAxis(
+                name="activation",
+                body_schema=_AxisBody,
+                action=_AuditAction.SET_USER_ACTIVATION,
+                handler_path=("src.api.common.test_resource_routes._missing_handler"),
+            ),
+        ),
+    )
+    with pytest.raises(AttributeError, match="_missing_handler"):
+        mount_entity(None, spec, handlers={})
 
 
 def test_mount_entity_missing_handler_raises_key_error():
