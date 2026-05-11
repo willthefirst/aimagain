@@ -341,6 +341,13 @@ class EntitySpec:
     # always see a `TypeAdapter` after construction.
     create_adapter: type[BaseModel] | TypeAdapter | None = None
     update_adapter: type[BaseModel] | TypeAdapter | None = None
+    # The original Pydantic class when `create_adapter` / `update_adapter`
+    # was passed as a class (set by `__post_init__` before wrapping in
+    # `TypeAdapter`); `None` when the adapter arrived pre-built (posts'
+    # discriminated union). Form-render handlers read this so templates
+    # using `field_for(schema, ...)` see a class with `model_fields`.
+    create_adapter_class: type[BaseModel] | None = None
+    update_adapter_class: type[BaseModel] | None = None
     # Prefer `read_schema=<BaseModel | TypeAdapter>` over a hand-built
     # `read_to_dict=...` — the constructor synthesizes the projection
     # callable. Mutually exclusive.
@@ -530,9 +537,18 @@ class EntitySpec:
         # downstream mounts (which expect an adapter) get one regardless
         # of which form the spec was constructed with. Discriminated-union
         # adapters (posts) arrive pre-built and pass through unchanged.
+        # When a plain class was passed, the original is remembered as
+        # `<field>_class` so form templates that introspect `model_fields`
+        # (via `field_for(schema, ...)`) can read the unwrapped class.
         for field_name in ("create_adapter", "update_adapter"):
             current = getattr(self, field_name)
-            if current is not None and not isinstance(current, TypeAdapter):
+            class_attr = f"{field_name}_class"
+            if current is None:
+                object.__setattr__(self, class_attr, None)
+            elif isinstance(current, TypeAdapter):
+                object.__setattr__(self, class_attr, None)
+            else:
+                object.__setattr__(self, class_attr, current)
                 object.__setattr__(self, field_name, TypeAdapter(current))
         # `routes.create=True` without a create adapter would crash at
         # first request — `mount_create` already raises here, but

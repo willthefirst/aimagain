@@ -29,9 +29,6 @@ from src.models import (
 from src.repositories.favorites.user_favorite_repository import UserFavoriteRepository
 from src.repositories.providers.provider_repository import ProviderRepository
 from src.repositories.users.user_repository import UserRepository
-from src.schemas.providers.provider import (
-    ProviderCreate,
-)
 
 logger = logging.getLogger(__name__)
 
@@ -90,27 +87,4 @@ async def handle_list_user_providers(
         "providers": providers,
         "is_self": user_id == requesting_user.id,
         "current_user": requesting_user,
-    }
-
-
-async def handle_get_provider_form(
-    request: Request,
-    requesting_user: User,
-    repo: ProviderRepository | None = None,
-) -> dict[str, Any]:
-    """Builds the template context for the create-provider form.
-
-    `repo` is accepted for uniformity with the mount_form contract (every
-    form handler gets the resource's primary repo) but not used here —
-    creating a provider doesn't need to load anything from the db.
-    """
-    del repo  # explicitly unused
-    return {
-        "request": request,
-        "current_user": requesting_user,
-        # `providers/form_new.html` calls `field_for(schema, ...)` against
-        # this Pydantic class; pass it explicitly rather than via a
-        # core-level Jinja global so schemas stay opt-in per template
-        # (and core doesn't need to import schemas).
-        "schema": ProviderCreate,
     }
