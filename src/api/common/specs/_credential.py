@@ -11,8 +11,6 @@ shared shape; the three spec modules pass the per-credential pieces
 through it.
 """
 
-from typing import Any
-
 from pydantic import BaseModel, TypeAdapter
 
 from src.api.common.entity_spec import EntitySpec, RouteSet
@@ -42,12 +40,9 @@ def make_provider_credential_entity(
     (which is `"provider_licensure"`) so the stem is passed explicitly
     via the spec's `audit_action_stem`.
     `snapshot_schema` is the Pydantic schema used for audit before/after
-    snapshots; `read_schema` is the response shape for `PATCH` (consumed
-    via `read_to_dict`).
+    snapshots; `read_schema` is the response shape for `PATCH` (the
+    spec's constructor synthesizes `read_to_dict` from it).
     """
-
-    def read_to_dict(row: Any) -> dict:
-        return read_schema.model_validate(row).model_dump(mode="json")
 
     return EntitySpec(
         name=name,
@@ -63,7 +58,7 @@ def make_provider_credential_entity(
         audit_action_stem=audit_stem,
         create_adapter=create_adapter,
         update_adapter=update_adapter,
-        read_to_dict=read_to_dict,
+        read_schema=read_schema,
         # Subrow CRUD only — sub-rows aren't independently listed or
         # detailed (they only appear in the parent provider's pages).
         routes=RouteSet(create=True, update=True, delete=True),

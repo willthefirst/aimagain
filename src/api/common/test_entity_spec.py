@@ -8,7 +8,7 @@ here. Per-entity correctness assertions (e.g. "user audit type is
 from types import SimpleNamespace
 
 import pytest
-from pydantic import BaseModel, TypeAdapter
+from pydantic import BaseModel, ConfigDict, TypeAdapter
 
 from src.api.common.entity_spec import (
     EdgeAudit,
@@ -23,6 +23,17 @@ from src.logic.audit import AuditAction, AuditedResource, make_snapshotter
 
 class _DummyBody(BaseModel):
     flag: bool
+
+
+class _DummyRead(BaseModel):
+    """Same shape as `_DummyBody` but with `from_attributes` enabled so
+    `model_validate` accepts ORM-like objects. Used by the read_schema
+    tests; kept separate so the body-form tests keep checking the
+    strict input shape."""
+
+    flag: bool
+
+    model_config = ConfigDict(from_attributes=True)
 
 
 def _dummy_audit() -> AuditedResource:
@@ -333,6 +344,30 @@ def test_audit_action_stem_overrides_name():
         audit_action_stem="licensure",
     )
     assert spec.audit.create == AuditAction.CREATE_LICENSURE
+
+
+def test_read_schema_builds_projection_from_basemodel():
+    """`read_schema=<BaseModel>` synthesizes a callable that validates
+    through the schema and dumps a JSON-mode dict."""
+    spec = _make_spec(read_schema=_DummyRead)
+    assert spec.read_to_dict is not None
+    projected = spec.read_to_dict(SimpleNamespace(flag=True))
+    assert projected == {"flag": True}
+
+
+def test_read_schema_builds_projection_from_type_adapter():
+    """`read_schema=<TypeAdapter>` (for discriminated unions, e.g. posts)
+    routes through `adapter.validate_python` instead."""
+    adapter = TypeAdapter(_DummyRead)
+    spec = _make_spec(read_schema=adapter)
+    assert spec.read_to_dict is not None
+    projected = spec.read_to_dict(SimpleNamespace(flag=False))
+    assert projected == {"flag": False}
+
+
+def test_read_schema_and_read_to_dict_mutually_exclusive():
+    with pytest.raises(ValueError, match="mutually exclusive"):
+        _make_spec(read_schema=_DummyRead, read_to_dict=lambda obj: {})
 
 
 def test_audit_action_stem_without_snapshot_raises():
