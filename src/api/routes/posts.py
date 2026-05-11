@@ -1,18 +1,9 @@
 import logging
-from typing import Literal
 
 from fastapi import APIRouter
 
 from src.api.common import BaseRouter
-from src.api.common.resource_routes import (
-    QueryParam,
-    mount_create,
-    mount_delete,
-    mount_detail,
-    mount_form,
-    mount_list,
-    mount_update,
-)
+from src.api.common.resource_routes import mount_entity
 from src.api.common.specs.post import POST_ENTITY
 from src.logic._generic import (
     make_create_handler,
@@ -31,70 +22,35 @@ router = BaseRouter(router=posts_api_router, default_tags=["posts"])
 logger = logging.getLogger(__name__)
 
 
-# `POST_ENTITY` is the single declaration of identity (audit binding,
-# adapters, redirects, route flags, templates, polymorphism). The mount
-# helpers still consume `ResourceSpec`, so we bridge via
-# `to_resource_spec()`.
-POST_SPEC = POST_ENTITY.to_resource_spec()
+def _named(handler, name):
+    """Give a factory-built handler a stable module attribute so
+    contract-test patches at `src.api.routes.posts._handle_<verb>_post`
+    flow through the mount layer's `_resolve_handler`."""
+    handler.__name__ = name
+    handler.__qualname__ = name
+    handler.__module__ = __name__
+    return handler
 
 
-# Route registration order matters: literal segments and longer paths must
-# be registered before the more general `/{post_id}` so FastAPI doesn't
-# match `form` as a UUID. The order below mirrors the path specificity.
-
-# GET /posts — list page.
-mount_list(router, POST_SPEC, handler=handle_list_posts)
+_handle_create_post = _named(make_create_handler(POST_ENTITY), "_handle_create_post")
+_handle_update_post = _named(make_update_handler(POST_ENTITY), "_handle_update_post")
+_handle_delete_post = _named(make_delete_handler(POST_ENTITY), "_handle_delete_post")
 
 
-# GET /posts/form?kind=<X> — `kind` query param picks the per-kind create
-# template at request time. The handler returns `template_name` in the
-# context dict; mount_form's three-source resolution picks it up. The
-# kind Literal is built from the spec's discriminator binding so the
-# spec is the source of truth for which kinds are valid.
-_post_kind_names = POST_ENTITY.discriminator.names
-mount_form(
+mount_entity(
     router,
-    POST_SPEC,
-    handler=handle_get_post_form,
-    query_params=(
-        QueryParam(
-            "kind",
-            Literal[*_post_kind_names],
-            _post_kind_names[0],
-            description="Which post kind's create form to render.",
-        ),
-    ),
+    POST_ENTITY,
+    handlers={
+        "list": handle_list_posts,
+        "detail": handle_get_post_detail,
+        # All three mutations are framework-generated; posts is fully
+        # spec-driven for CRUD. The form handlers stay custom because
+        # they return `template_name` in context for per-kind template
+        # dispatch.
+        "create": _handle_create_post,
+        "update": _handle_update_post,
+        "delete": _handle_delete_post,
+        "form_new": handle_get_post_form,
+        "form_edit": handle_get_post_edit_form,
+    },
 )
-
-
-# GET /posts/{post_id}/form — handler returns `template_name` in context
-# so mount_form picks the right kind-specific edit template at request time.
-mount_form(
-    router,
-    POST_SPEC,
-    handler=handle_get_post_edit_form,
-    on_existing=True,
-)
-
-
-# GET /posts/{post_id} — detail page. Registered after /form and /{id}/form
-# so literal segments take precedence.
-mount_detail(router, POST_SPEC, handler=handle_get_post_detail)
-
-
-# Mutations — methods differ from the GETs above so order is independent.
-# Generic create: `make_create_handler` reads the spec's discriminator
-# to dispatch by `payload.kind` and build the right detail row.
-_handle_create_post = make_create_handler(POST_ENTITY)
-_handle_create_post.__module__ = __name__
-mount_create(router, POST_SPEC, handler=_handle_create_post)
-# Generic update: kind-invariant + detail-row patch via spec.discriminator.
-_handle_update_post = make_update_handler(POST_ENTITY)
-_handle_update_post.__module__ = __name__
-mount_update(router, POST_SPEC, handler=_handle_update_post)
-# Named module-level attribute so test monkeypatching (contract tests)
-# can target `src.api.routes.posts._handle_delete_post` and the mount
-# layer's `_resolve_handler` picks up the patched version.
-_handle_delete_post = make_delete_handler(POST_ENTITY)
-_handle_delete_post.__module__ = __name__
-mount_delete(router, POST_SPEC, handler=_handle_delete_post)

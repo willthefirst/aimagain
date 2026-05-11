@@ -1091,6 +1091,274 @@ def test_mount_state_axis_no_response_to_dict_returns_empty_body():
     assert resp.headers["HX-Refresh"] == "true"
 
 
+# --- mount_entity dispatcher tests ---------------------------------------
+
+
+from src.api.common.entity_spec import EntitySpec as _EntitySpec  # noqa: E402
+from src.api.common.entity_spec import (  # noqa: E402
+    RelatedListSubresource as _RelatedSub,
+)
+from src.api.common.entity_spec import RouteSet as _RouteSet  # noqa: E402
+from src.api.common.entity_spec import StateAxis as _StateAxis  # noqa: E402
+from src.api.common.entity_spec import Templates as _Templates  # noqa: E402
+from src.api.common.resource_routes import mount_entity  # noqa: E402
+from src.logic.audit import AuditAction as _AuditAction  # noqa: E402
+from src.logic.audit import AuditedResource as _AuditedResource  # noqa: E402
+
+
+def _stub_audit() -> _AuditedResource:
+    return _AuditedResource(
+        type="thing",
+        snapshot=lambda obj: {"id": "x"},
+        create=_AuditAction.CREATE_USER,
+        update=_AuditAction.UPDATE_USER,
+        delete=_AuditAction.DELETE_USER,
+    )
+
+
+def test_mount_entity_skips_routes_not_opted_in():
+    """`mount_entity` only mounts the verbs `entity.routes` opts into.
+    With everything False, no helpers are called."""
+    calls = []
+    import src.api.common.resource_routes as rr
+
+    monkeys = []
+    for fn_name in (
+        "mount_list",
+        "mount_detail",
+        "mount_create",
+        "mount_update",
+        "mount_delete",
+        "mount_form",
+        "mount_state_axis",
+        "mount_related_list",
+    ):
+        orig = getattr(rr, fn_name)
+
+        def _capture(*args, _name=fn_name, **kw):
+            calls.append(_name)
+
+        monkeys.append((fn_name, orig))
+        setattr(rr, fn_name, _capture)
+    try:
+        spec = _EntitySpec(
+            name="thing",
+            url_collection="things",
+            id_param="thing_id",
+            model=SimpleNamespace,
+            audit=_stub_audit(),
+        )
+        mount_entity(None, spec, handlers={})
+    finally:
+        for n, orig in monkeys:
+            setattr(rr, n, orig)
+    assert calls == []  # nothing opted in → nothing dispatched
+
+
+def test_mount_entity_dispatches_each_opted_in_verb():
+    """`RouteSet` flags drive dispatch to the matching mount helpers."""
+    calls = []
+    import src.api.common.resource_routes as rr
+
+    monkeys = []
+    for fn_name in (
+        "mount_list",
+        "mount_detail",
+        "mount_create",
+        "mount_update",
+        "mount_delete",
+        "mount_form",
+    ):
+        orig = getattr(rr, fn_name)
+        setattr(
+            rr,
+            fn_name,
+            lambda *a, _n=fn_name, **k: calls.append((_n, k)),
+        )
+        monkeys.append((fn_name, orig))
+    try:
+        from pydantic import TypeAdapter
+
+        spec = _EntitySpec(
+            name="thing",
+            url_collection="things",
+            id_param="thing_id",
+            model=SimpleNamespace,
+            audit=_stub_audit(),
+            routes=_RouteSet(
+                list=True,
+                detail=True,
+                create=True,
+                update=True,
+                delete=True,
+                form_new=True,
+                form_edit=True,
+            ),
+            create_adapter=TypeAdapter(_AxisBody),
+            update_adapter=TypeAdapter(_AxisBody),
+            templates=_Templates(
+                list="t/list.html",
+                detail="t/detail.html",
+                form_new="t/new.html",
+                form_edit="t/edit.html",
+            ),
+        )
+        mount_entity(
+            None,
+            spec,
+            handlers={
+                "list": lambda: None,
+                "detail": lambda: None,
+                "create": lambda: None,
+                "update": lambda: None,
+                "delete": lambda: None,
+                "form_new": lambda: None,
+                "form_edit": lambda: None,
+            },
+        )
+    finally:
+        for n, orig in monkeys:
+            setattr(rr, n, orig)
+
+    names = [c[0] for c in calls]
+    assert "mount_list" in names
+    assert "mount_detail" in names
+    assert "mount_create" in names
+    assert "mount_update" in names
+    assert "mount_delete" in names
+    # form_new + form_edit both → mount_form (twice)
+    assert names.count("mount_form") == 2
+
+
+def test_mount_entity_dispatches_state_axes():
+    calls = []
+    import src.api.common.resource_routes as rr
+
+    orig = rr.mount_state_axis
+    rr.mount_state_axis = lambda *a, **k: calls.append(k)
+    try:
+        spec = _EntitySpec(
+            name="thing",
+            url_collection="things",
+            id_param="thing_id",
+            model=SimpleNamespace,
+            audit=_stub_audit(),
+            state_axes=(
+                _StateAxis(
+                    name="activation",
+                    body_schema=_AxisBody,
+                    action=_AuditAction.SET_USER_ACTIVATION,
+                ),
+            ),
+        )
+        mount_entity(None, spec, handlers={"activation": lambda: None})
+    finally:
+        rr.mount_state_axis = orig
+    assert len(calls) == 1
+    assert calls[0]["axis_name"] == "activation"
+
+
+def test_mount_entity_dispatches_related_list_subresources():
+    calls = []
+    import src.api.common.resource_routes as rr
+
+    orig = rr.mount_related_list
+    rr.mount_related_list = lambda *a, **k: calls.append(k)
+    try:
+        child_spec = ResourceSpec(
+            collection="children",
+            id_param="child_id",
+            repo_dep=lambda: None,
+        )
+        spec = _EntitySpec(
+            name="parent",
+            url_collection="parents",
+            id_param="parent_id",
+            model=SimpleNamespace,
+            audit=_stub_audit(),
+            subresources=(_RelatedSub(child_spec=child_spec, template="x/list.html"),),
+        )
+        mount_entity(None, spec, handlers={"children": lambda: None})
+    finally:
+        rr.mount_related_list = orig
+    assert len(calls) == 1
+    assert calls[0]["template"] == "x/list.html"
+
+
+def test_mount_entity_missing_handler_raises_key_error():
+    """If a route is opted in but the handler is missing → KeyError."""
+    spec = _EntitySpec(
+        name="thing",
+        url_collection="things",
+        id_param="thing_id",
+        model=SimpleNamespace,
+        audit=_stub_audit(),
+        routes=_RouteSet(list=True),
+    )
+    import src.api.common.resource_routes as rr
+
+    orig = rr.mount_list
+    rr.mount_list = lambda *a, **k: None
+    try:
+        with pytest.raises(KeyError):
+            mount_entity(None, spec, handlers={})  # missing "list"
+    finally:
+        rr.mount_list = orig
+
+
+def test_mount_entity_extra_handler_keys_raises_value_error():
+    """Typos in handler keys are caught at mount time, not silently no-op."""
+    spec = _EntitySpec(
+        name="thing",
+        url_collection="things",
+        id_param="thing_id",
+        model=SimpleNamespace,
+        audit=_stub_audit(),
+        routes=_RouteSet(list=True),
+    )
+    import src.api.common.resource_routes as rr
+
+    orig = rr.mount_list
+    rr.mount_list = lambda *a, **k: None
+    try:
+        with pytest.raises(ValueError, match="not consumed"):
+            mount_entity(
+                None,
+                spec,
+                handlers={"list": lambda: None, "lsit": lambda: None},
+            )
+    finally:
+        rr.mount_list = orig
+
+
+def test_mount_entity_owned_subentity_parent_mismatch_raises():
+    """Catches a passed-in owned subentity whose `parent` is wrong entity."""
+    other_parent = _EntitySpec(
+        name="other",
+        url_collection="others",
+        id_param="other_id",
+        model=SimpleNamespace,
+    )
+    child = _EntitySpec(
+        name="part",
+        url_collection="parts",
+        id_param="part_id",
+        model=SimpleNamespace,
+        parent=other_parent,
+        routes=_RouteSet(delete=True),
+        audit=_stub_audit(),
+    )
+    correct_parent = _EntitySpec(
+        name="thing",
+        url_collection="things",
+        id_param="thing_id",
+        model=SimpleNamespace,
+        audit=_stub_audit(),
+    )
+    with pytest.raises(ValueError, match="parent"):
+        mount_entity(None, correct_parent, handlers={}, owned_subentities=(child,))
+
+
 def test_mount_delete_404_propagates_from_handler():
     """If the handler raises NotFoundError, the route surfaces it as 404
     (decorator translation). Confirms the mount doesn't swallow exceptions."""

@@ -3,14 +3,7 @@ import logging
 from fastapi import APIRouter
 
 from src.api.common import BaseRouter
-from src.api.common.resource_routes import (
-    mount_create,
-    mount_delete,
-    mount_detail,
-    mount_form,
-    mount_list,
-    mount_update,
-)
+from src.api.common.resource_routes import mount_entity
 from src.api.common.specs.provider import PROVIDER_ENTITY
 from src.api.common.specs.provider_certification import CERTIFICATION_ENTITY
 from src.api.common.specs.provider_education import EDUCATION_ENTITY
@@ -33,88 +26,48 @@ router = BaseRouter(router=providers_api_router, default_tags=["providers"])
 logger = logging.getLogger(__name__)
 
 
-# All four route-level ResourceSpecs are derived from their EntitySpecs.
-# The entity specs in `src/api/common/specs/` are the single declaration
-# of identity (audit binding, adapters, redirects, filters, route flags,
-# templates); the mount helpers still consume `ResourceSpec`, so we
-# bridge via `to_resource_spec()`.
-PROVIDER_SPEC = PROVIDER_ENTITY.to_resource_spec()
-LICENSURE_SPEC = LICENSURE_ENTITY.to_resource_spec()
-EDUCATION_SPEC = EDUCATION_ENTITY.to_resource_spec()
-CERTIFICATION_SPEC = CERTIFICATION_ENTITY.to_resource_spec()
+# Named module-level attributes for framework-built handlers so
+# contract-test patches (e.g. `src.api.routes.providers._handle_update_provider`)
+# flow through the mount layer's `_resolve_handler`. The `__module__`
+# is rebound so `_resolve_handler` looks up against this module.
+def _named(handler, name):
+    handler.__name__ = name
+    handler.__qualname__ = name
+    handler.__module__ = __name__
+    return handler
 
 
-# --- Provider collection routes ------------------------------------------
-
-# GET /providers — authenticated listing with optional license_type /
-# issuing_state filters. The filter shape is declared on the entity spec
-# so the canonical declaration lives upstream of the mount call.
-mount_list(
-    router,
-    PROVIDER_SPEC,
-    handler=handle_list_providers,
-    query_params=PROVIDER_ENTITY.filters,
+_handle_update_provider = _named(
+    make_update_handler(PROVIDER_ENTITY), "_handle_update_provider"
 )
-
-# POST /providers — owner inferred from session.
-mount_create(router, PROVIDER_SPEC, handler=handle_create_provider)
-
-
-# --- Form routes --------------------------------------------------------
-# Mounted before `/{provider_id}` so the literal `form` segment is not
-# parsed as a UUID. Two form templates: `new.html` (create) and
-# `edit.html` (edit, identifies the provider from the URL id).
-mount_form(
-    router,
-    PROVIDER_SPEC,
-    handler=handle_get_provider_form,
-    template="providers/new.html",
-)
-mount_form(
-    router,
-    PROVIDER_SPEC,
-    handler=handle_get_provider_edit_form,
-    template="providers/edit.html",
-    on_existing=True,
+_handle_delete_provider = _named(
+    make_delete_handler(PROVIDER_ENTITY), "_handle_delete_provider"
 )
 
 
-# --- Provider item routes ------------------------------------------------
-
-# GET /providers/{provider_id} — detail page. The `is_favorited` per-viewer
-# flag (computed in the handler against `UserFavoriteRepository`) lives in
-# the template context; the handler's typed signature is enough — the
-# mount's signature synthesis resolves the favorites repo via the type
-# registry, no explicit wiring needed.
-mount_detail(router, PROVIDER_SPEC, handler=handle_get_provider_detail)
-
-
-# PATCH /providers/{provider_id} — partial update, owner-or-admin.
-# Named module-level attribute so contract-test patches target
-# `src.api.routes.providers._handle_update_provider`.
-_handle_update_provider = make_update_handler(PROVIDER_ENTITY)
-_handle_update_provider.__module__ = __name__
-mount_update(router, PROVIDER_SPEC, handler=_handle_update_provider)
-# DELETE /providers/{provider_id} — hard delete, sub-rows cascade.
-# Generic delete: `make_delete_handler` builds a callable from the entity
-# spec (audit binding + write_authz). See `src/logic/_generic.py`.
-mount_delete(router, PROVIDER_SPEC, handler=make_delete_handler(PROVIDER_ENTITY))
-
-
-# --- Sub-resource CRUD (licensure / education / certification) ----------
-# Each sub-resource's spec carries `parent=PROVIDER_ENTITY` (resolved on
-# the entity spec), so `to_resource_spec()` produces a `ResourceSpec`
-# whose `parent` is a derived `PROVIDER_SPEC`. The mount functions walk
-# that parent chain to build paths like
-# `/{provider_id}/licensures/{licensure_id}` and inject parent ids into
-# the handler under their declared kwarg names.
-
-
-for _spec, _entity in (
-    (LICENSURE_SPEC, LICENSURE_ENTITY),
-    (EDUCATION_SPEC, EDUCATION_ENTITY),
-    (CERTIFICATION_SPEC, CERTIFICATION_ENTITY),
-):
-    mount_create(router, _spec, handler=make_create_handler(_entity))
-    mount_update(router, _spec, handler=make_update_handler(_entity))
-    mount_delete(router, _spec, handler=make_delete_handler(_entity))
+mount_entity(
+    router,
+    PROVIDER_ENTITY,
+    handlers={
+        "list": handle_list_providers,
+        "detail": handle_get_provider_detail,
+        # Bespoke create (inline credentials append); other verbs are
+        # generic factory-built.
+        "create": handle_create_provider,
+        "update": _handle_update_provider,
+        "delete": _handle_delete_provider,
+        "form_new": handle_get_provider_form,
+        "form_edit": handle_get_provider_edit_form,
+        # Owned-subentity verbs, keyed by `<owned.name>.<verb>`.
+        "provider_licensure.create": make_create_handler(LICENSURE_ENTITY),
+        "provider_licensure.update": make_update_handler(LICENSURE_ENTITY),
+        "provider_licensure.delete": make_delete_handler(LICENSURE_ENTITY),
+        "provider_education.create": make_create_handler(EDUCATION_ENTITY),
+        "provider_education.update": make_update_handler(EDUCATION_ENTITY),
+        "provider_education.delete": make_delete_handler(EDUCATION_ENTITY),
+        "provider_certification.create": make_create_handler(CERTIFICATION_ENTITY),
+        "provider_certification.update": make_update_handler(CERTIFICATION_ENTITY),
+        "provider_certification.delete": make_delete_handler(CERTIFICATION_ENTITY),
+    },
+    owned_subentities=(LICENSURE_ENTITY, EDUCATION_ENTITY, CERTIFICATION_ENTITY),
+)
