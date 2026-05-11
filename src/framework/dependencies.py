@@ -20,7 +20,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.db import get_db_session
 from src.domain.favorites.repository import UserFavoriteRepository
-from src.domain.posts.repository import PostRepository
 from src.domain.providers.repository import ProviderRepository
 from src.domain.users.repository import UserRepository
 
@@ -58,7 +57,7 @@ def _make_repo_resolver(cls: type[BaseRepository]) -> Callable[..., Any]:
 # it is built from this tuple.
 _REPO_TYPES: tuple[type[BaseRepository], ...] = (
     UserRepository,
-    PostRepository,
+    BaseRepository,
     AuditRepository,
     ProviderRepository,
     UserFavoriteRepository,
@@ -78,7 +77,7 @@ _REPO_TYPE_RESOLVERS: dict[type, Callable[..., Any]] = {
 # files can ``from src.framework.dependencies import get_X_repository``
 # the same way they always have.
 get_user_repository = _REPO_TYPE_RESOLVERS[UserRepository]
-get_post_repository = _REPO_TYPE_RESOLVERS[PostRepository]
+get_base_repository = _REPO_TYPE_RESOLVERS[BaseRepository]
 get_audit_repository = _REPO_TYPE_RESOLVERS[AuditRepository]
 get_provider_repository = _REPO_TYPE_RESOLVERS[ProviderRepository]
 get_user_favorite_repository = _REPO_TYPE_RESOLVERS[UserFavoriteRepository]

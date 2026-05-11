@@ -1,9 +1,12 @@
-"""Tests for `PostRepository`.
+"""Tests for `Post` persistence invariants.
 
-Exercises the parent + per-kind-detail invariants the repository owns:
-create persists both rows in one flush, update writes per-kind fields to
-the correct detail row, delete cascades the detail via the FK. Covered
-for `kind='client_referral'` and `kind='provider_availability'`.
+Exercises the parent + per-kind-detail invariants the polymorphic-create
+path owns: create persists both rows in one flush, update writes per-kind
+fields to the correct detail row, delete cascades the detail via the FK.
+Covered for `kind='client_referral'` and `kind='provider_availability'`.
+
+Posts have no bespoke repo class — these tests drive `BaseRepository`
+directly, which is what the framework injects for the post route.
 """
 
 import uuid
@@ -14,7 +17,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from sqlalchemy.types import Uuid
 
-from src.domain.posts.repository import PostRepository
+from src.framework.base_repository import BaseRepository
 from src.models import ClientReferralDetail, Post, ProviderAvailabilityDetail
 from tests.helpers import (
     create_test_user,
@@ -56,7 +59,7 @@ async def test_raw_sql_delete_post_cascades_via_fk(
     owner = await _seed_owner(db_test_session_manager)
 
     async with db_test_session_manager() as session:
-        repo = PostRepository(session)
+        repo = BaseRepository(session)
         created = await _create_post(
             repo,
             Post(kind="client_referral", owner_id=owner.id),
@@ -98,7 +101,7 @@ async def test_create_post_persists_parent_and_client_referral_detail(
     owner = await _seed_owner(db_test_session_manager)
 
     async with db_test_session_manager() as session:
-        repo = PostRepository(session)
+        repo = BaseRepository(session)
         post = Post(kind="client_referral", owner_id=owner.id)
         detail = make_client_referral_detail(description="needs placement")
         created = await _create_post(repo, post, detail)
@@ -134,7 +137,7 @@ async def test_update_post_writes_to_client_referral_detail(
     owner = await _seed_owner(db_test_session_manager)
 
     async with db_test_session_manager() as session:
-        repo = PostRepository(session)
+        repo = BaseRepository(session)
         created = await _create_post(
             repo,
             Post(kind="client_referral", owner_id=owner.id),
@@ -144,7 +147,7 @@ async def test_update_post_writes_to_client_referral_detail(
         post_id = created.id
 
     async with db_test_session_manager() as session:
-        repo = PostRepository(session)
+        repo = BaseRepository(session)
         post = await repo.get_by_model_id(Post, post_id)
         # Detail fields live on the detail row; framework's handle_update
         # (B3) reads `kind_spec.detail_relationship` to pick the right
@@ -174,7 +177,7 @@ async def test_delete_post_cascades_client_referral_detail(
     owner = await _seed_owner(db_test_session_manager)
 
     async with db_test_session_manager() as session:
-        repo = PostRepository(session)
+        repo = BaseRepository(session)
         created = await _create_post(
             repo,
             Post(kind="client_referral", owner_id=owner.id),
@@ -184,7 +187,7 @@ async def test_delete_post_cascades_client_referral_detail(
         post_id = created.id
 
     async with db_test_session_manager() as session:
-        repo = PostRepository(session)
+        repo = BaseRepository(session)
         post = await repo.get_by_model_id(Post, post_id)
         await repo.delete(post)
         await session.commit()
@@ -219,7 +222,7 @@ async def test_create_post_persists_parent_and_provider_availability_detail(
     owner = await _seed_owner(db_test_session_manager)
 
     async with db_test_session_manager() as session:
-        repo = PostRepository(session)
+        repo = BaseRepository(session)
         post = Post(kind="provider_availability", owner_id=owner.id)
         detail = make_provider_availability_detail(practice_name="Acme Health")
         created = await _create_post(repo, post, detail)
@@ -255,7 +258,7 @@ async def test_update_post_writes_to_provider_availability_detail(
     owner = await _seed_owner(db_test_session_manager)
 
     async with db_test_session_manager() as session:
-        repo = PostRepository(session)
+        repo = BaseRepository(session)
         created = await _create_post(
             repo,
             Post(kind="provider_availability", owner_id=owner.id),
@@ -265,7 +268,7 @@ async def test_update_post_writes_to_provider_availability_detail(
         post_id = created.id
 
     async with db_test_session_manager() as session:
-        repo = PostRepository(session)
+        repo = BaseRepository(session)
         post = await repo.get_by_model_id(Post, post_id)
         await repo.patch(
             post.provider_availability_detail, practice_name="Acme Renamed"
@@ -295,7 +298,7 @@ async def test_delete_post_cascades_provider_availability_detail(
     owner = await _seed_owner(db_test_session_manager)
 
     async with db_test_session_manager() as session:
-        repo = PostRepository(session)
+        repo = BaseRepository(session)
         created = await _create_post(
             repo,
             Post(kind="provider_availability", owner_id=owner.id),
@@ -305,7 +308,7 @@ async def test_delete_post_cascades_provider_availability_detail(
         post_id = created.id
 
     async with db_test_session_manager() as session:
-        repo = PostRepository(session)
+        repo = BaseRepository(session)
         post = await repo.get_by_model_id(Post, post_id)
         await repo.delete(post)
         await session.commit()
@@ -344,7 +347,7 @@ async def test_post_with_unknown_kind_violates_check_constraint(
     owner = await _seed_owner(db_test_session_manager)
 
     async with db_test_session_manager() as session:
-        repo = PostRepository(session)
+        repo = BaseRepository(session)
         post = Post(kind="not_a_kind", owner_id=owner.id)
         with pytest.raises(IntegrityError):
             await _create_post(repo, post, make_client_referral_detail(description="d"))
@@ -358,7 +361,7 @@ async def test_retired_note_kind_violates_check_constraint(
     owner = await _seed_owner(db_test_session_manager)
 
     async with db_test_session_manager() as session:
-        repo = PostRepository(session)
+        repo = BaseRepository(session)
         post = Post(kind="note", owner_id=owner.id)
         with pytest.raises(IntegrityError):
             await _create_post(repo, post, make_client_referral_detail(description="d"))
