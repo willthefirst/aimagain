@@ -11,7 +11,7 @@ import uuid
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from src.models import User
+from src.models import AuditLog, User
 from src.repositories.audit_repository import AuditRepository
 from tests.helpers import create_test_user
 
@@ -95,38 +95,6 @@ async def test_record_accepts_null_after_for_delete(
 
         assert row.before == {"username": "old"}
         assert row.after is None
-
-
-async def test_get_by_id_returns_row(
-    db_test_session_manager: async_sessionmaker[AsyncSession],
-):
-    actor = create_test_user(username=f"actor-{uuid.uuid4()}")
-
-    async with db_test_session_manager() as session:
-        async with session.begin():
-            session.add(actor)
-
-    async with db_test_session_manager() as session:
-        repo = AuditRepository(session)
-        written = await repo.record(
-            actor_id=actor.id,
-            resource_type="post",
-            resource_id=uuid.uuid4(),
-            action="create_post",
-        )
-        await session.commit()
-
-        fetched = await repo.get_by_id(written.id)
-        assert fetched is not None
-        assert fetched.id == written.id
-
-
-async def test_get_by_id_returns_none_for_unknown_id(
-    db_test_session_manager: async_sessionmaker[AsyncSession],
-):
-    async with db_test_session_manager() as session:
-        repo = AuditRepository(session)
-        assert await repo.get_by_id(uuid.uuid4()) is None
 
 
 async def test_list_for_resource_returns_oldest_first(
@@ -240,6 +208,6 @@ async def test_actor_set_null_when_user_deleted(
 
     async with db_test_session_manager() as session:
         repo = AuditRepository(session)
-        fetched = await repo.get_by_id(written.id)
+        fetched = await repo.get_by_model_id(AuditLog, written.id)
         assert fetched is not None  # row not deleted
         assert fetched.actor_id is None  # actor reference nulled

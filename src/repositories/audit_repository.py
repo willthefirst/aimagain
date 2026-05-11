@@ -45,10 +45,6 @@ class AuditRepository(BaseRepository):
             )
         )
 
-    async def get_by_id(self, audit_id: UUID) -> AuditLog | None:
-        """Look up a single audit row. Primarily for tests."""
-        return await self._get_by_id(AuditLog, audit_id)
-
     async def list_for_resource(
         self, *, resource_type: str, resource_id: UUID
     ) -> Sequence[AuditLog]:

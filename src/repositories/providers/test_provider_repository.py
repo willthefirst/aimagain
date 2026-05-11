@@ -429,21 +429,21 @@ async def test_licensure_crud_round_trip(
 
     async with db_test_session_manager() as session:
         repo = ProviderRepository(session)
-        found = await repo.get_licensure_by_id(licensure_id)
+        found = await repo.get_by_model_id(ProviderLicensure, licensure_id)
         assert found is not None
         await repo.patch(found, license_number="L-2")
         await session.commit()
 
     async with db_test_session_manager() as session:
         repo = ProviderRepository(session)
-        found = await repo.get_licensure_by_id(licensure_id)
+        found = await repo.get_by_model_id(ProviderLicensure, licensure_id)
         assert found.license_number == "L-2"
         await repo.delete(found)
         await session.commit()
 
     async with db_test_session_manager() as session:
         repo = ProviderRepository(session)
-        assert await repo.get_licensure_by_id(licensure_id) is None
+        assert await repo.get_by_model_id(ProviderLicensure, licensure_id) is None
 
 
 async def test_education_crud_round_trip(
@@ -471,21 +471,21 @@ async def test_education_crud_round_trip(
 
     async with db_test_session_manager() as session:
         repo = ProviderRepository(session)
-        found = await repo.get_education_by_id(education_id)
+        found = await repo.get_by_model_id(ProviderEducation, education_id)
         assert found is not None
         await repo.patch(found, institution="State U Renamed")
         await session.commit()
 
     async with db_test_session_manager() as session:
         repo = ProviderRepository(session)
-        found = await repo.get_education_by_id(education_id)
+        found = await repo.get_by_model_id(ProviderEducation, education_id)
         assert found.institution == "State U Renamed"
         await repo.delete(found)
         await session.commit()
 
     async with db_test_session_manager() as session:
         repo = ProviderRepository(session)
-        assert await repo.get_education_by_id(education_id) is None
+        assert await repo.get_by_model_id(ProviderEducation, education_id) is None
 
 
 async def test_certification_crud_round_trip(
@@ -513,18 +513,18 @@ async def test_certification_crud_round_trip(
 
     async with db_test_session_manager() as session:
         repo = ProviderRepository(session)
-        found = await repo.get_certification_by_id(cert_id)
+        found = await repo.get_by_model_id(ProviderCertification, cert_id)
         assert found is not None
         await repo.patch(found, certifying_body="Updated Body")
         await session.commit()
 
     async with db_test_session_manager() as session:
         repo = ProviderRepository(session)
-        found = await repo.get_certification_by_id(cert_id)
+        found = await repo.get_by_model_id(ProviderCertification, cert_id)
         assert found.certifying_body == "Updated Body"
         await repo.delete(found)
         await session.commit()
 
     async with db_test_session_manager() as session:
         repo = ProviderRepository(session)
-        assert await repo.get_certification_by_id(cert_id) is None
+        assert await repo.get_by_model_id(ProviderCertification, cert_id) is None

@@ -145,7 +145,7 @@ async def test_update_post_writes_to_client_referral_detail(
 
     async with db_test_session_manager() as session:
         repo = PostRepository(session)
-        post = await repo.get_post_by_id(post_id)
+        post = await repo.get_by_model_id(Post, post_id)
         # Detail fields live on the detail row; framework's handle_update
         # (B3) reads `kind_spec.detail_relationship` to pick the right
         # target. At the repo level we just patch the detail directly.
@@ -185,7 +185,7 @@ async def test_delete_post_cascades_client_referral_detail(
 
     async with db_test_session_manager() as session:
         repo = PostRepository(session)
-        post = await repo.get_post_by_id(post_id)
+        post = await repo.get_by_model_id(Post, post_id)
         await repo.delete(post)
         await session.commit()
 
@@ -266,7 +266,7 @@ async def test_update_post_writes_to_provider_availability_detail(
 
     async with db_test_session_manager() as session:
         repo = PostRepository(session)
-        post = await repo.get_post_by_id(post_id)
+        post = await repo.get_by_model_id(Post, post_id)
         await repo.patch(
             post.provider_availability_detail, practice_name="Acme Renamed"
         )
@@ -306,7 +306,7 @@ async def test_delete_post_cascades_provider_availability_detail(
 
     async with db_test_session_manager() as session:
         repo = PostRepository(session)
-        post = await repo.get_post_by_id(post_id)
+        post = await repo.get_by_model_id(Post, post_id)
         await repo.delete(post)
         await session.commit()
 
