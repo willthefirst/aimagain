@@ -23,7 +23,7 @@ from uuid import UUID
 from pydantic import BaseModel
 
 from src.api.common.entity_spec import EntitySpec
-from src.api.common.exceptions import NotFoundError
+from src.api.common.exceptions import BadRequestError, NotFoundError
 from src.logic.audit import mutate
 from src.models import User
 from src.repositories.audit_repository import AuditRepository
@@ -203,6 +203,112 @@ async def handle_create(
     return created
 
 
+async def handle_update(
+    spec: EntitySpec,
+    *,
+    target_id: UUID,
+    payload: BaseModel,
+    repo: BaseRepository,
+    audit_repo: AuditRepository,
+    requesting_user: User,
+    parent_id: UUID | None = None,
+) -> Any:
+    """Generic update handler driven by `spec`.
+
+    Performs the standard update ritual: load target → optional
+    parent-FK verification + write_authz → polymorphic kind-invariant
+    check → audited patch via `mutate(verb="update")`.
+
+    Three paths:
+
+    1. **Owned-subentity** (`spec.parent` set) — parent loaded,
+       FK matched against the child's persisted parent_id,
+       `write_authz` on parent, partial-patch via `exclude_unset`.
+    2. **Polymorphic** (`spec.discriminator` set) — payload's
+       discriminator value must equal the target's persisted value
+       (kind cannot change via PATCH); only the detail row is
+       patched (parent's kind/owner_attr are immutable post-create);
+       fields read from `kind_spec.detail_fields` (no `exclude_unset`
+       — the schema's optionality is what makes the wire-shape work).
+    3. **Standard top-level** — partial-patch via `exclude_unset`.
+
+    All three audit via `mutate(verb="update")` so the audit row
+    captures before/after snapshots and the transaction commits.
+
+    Reads from the spec:
+      - `spec.audit` — required.
+      - `spec.parent` — picks the subentity path.
+      - `spec.discriminator` — picks the polymorphic path; kind
+        invariant enforced via `BadRequestError`.
+      - `spec.write_authz` — invoked on target (top-level) or parent
+        (subentity).
+      - `spec.model` — target class.
+    """
+    if spec.audit is None:
+        raise ValueError(
+            f"handle_update: spec {spec.name!r} has no audit binding; "
+            "update operations must be audited."
+        )
+
+    target = await repo.get_by_model_id(spec.model, target_id)
+    if target is None:
+        raise NotFoundError(detail=f"{spec.name.capitalize()} not found")
+
+    if spec.parent is not None:
+        if parent_id is None:
+            raise ValueError(
+                f"handle_update: spec {spec.name!r} has parent "
+                f"{spec.parent.name!r} but no parent_id was supplied."
+            )
+        parent_fk_attr = f"{spec.parent.name}_id"
+        if getattr(target, parent_fk_attr) != parent_id:
+            raise NotFoundError(detail=f"{spec.name.capitalize()} not found")
+        parent = await repo.get_by_model_id(spec.parent.model, parent_id)
+        if parent is None:
+            raise NotFoundError(detail=f"{spec.parent.name.capitalize()} not found")
+        if spec.write_authz is not None:
+            spec.write_authz(parent, requesting_user, action=f"update this {spec.name}")
+    else:
+        if spec.write_authz is not None:
+            spec.write_authz(target, requesting_user, action=f"update this {spec.name}")
+
+    if spec.discriminator is not None:
+        payload_kind = payload.kind
+        target_kind = getattr(target, spec.discriminator.column)
+        if payload_kind != target_kind:
+            raise BadRequestError(
+                detail=(
+                    f"payload kind {payload_kind!r} does not match {spec.name} "
+                    f"kind {target_kind!r}; kind cannot be changed via PATCH"
+                )
+            )
+        kind_spec = spec.discriminator[target_kind]
+        detail = getattr(target, kind_spec.detail_relationship)
+        update_fields = {f: getattr(payload, f) for f in kind_spec.detail_fields}
+        async with mutate(
+            repo,
+            audit_repo,
+            actor=requesting_user,
+            target=target,
+            resource=spec.audit,
+            verb="update",
+        ):
+            await repo.patch(detail, **update_fields)
+        return target
+
+    update_fields = payload.model_dump(exclude_unset=True)
+    async with mutate(
+        repo,
+        audit_repo,
+        actor=requesting_user,
+        target=target,
+        resource=spec.audit,
+        verb="update",
+    ):
+        await repo.patch(target, **update_fields)
+    return target
+
+
 def make_delete_handler(spec: EntitySpec):
     """Build a `mount_delete`-compatible handler from `spec`.
 
@@ -357,5 +463,83 @@ def make_create_handler(spec: EntitySpec):
 
     _handler.__signature__ = inspect.Signature(parameters=sig_params)  # type: ignore[attr-defined]
     _handler.__name__ = f"_handle_create_{spec.name}"
+    _handler.__qualname__ = _handler.__name__
+    return _handler
+
+
+def make_update_handler(spec: EntitySpec):
+    """Build a `mount_update`-compatible handler from `spec`.
+
+    Mirrors `make_delete_handler` / `make_create_handler`: synthesizes
+    a typed signature so `mount_update`'s introspection binds URL
+    path params + `Depends` correctly. The returned callable
+    delegates to `handle_update(spec, ...)`.
+
+    Synthesized parameters:
+      - `parent_id: UUID` — present only for owned subentities.
+      - `<id_param>: UUID` — the target's id from the URL.
+      - `payload: BaseModel` — request body (parsed by the mount
+        via `spec.update_adapter`).
+      - `repo`, `audit_repo`, `requesting_user` — standard deps.
+    """
+    id_param = spec.id_param
+    parent_id_param = spec.parent.id_param if spec.parent is not None else None
+
+    sig_params: list[inspect.Parameter] = []
+    if parent_id_param is not None:
+        sig_params.append(
+            inspect.Parameter(
+                parent_id_param,
+                inspect.Parameter.POSITIONAL_OR_KEYWORD,
+                annotation=UUID,
+            )
+        )
+    sig_params.append(
+        inspect.Parameter(
+            id_param, inspect.Parameter.POSITIONAL_OR_KEYWORD, annotation=UUID
+        )
+    )
+    sig_params.append(
+        inspect.Parameter(
+            "payload",
+            inspect.Parameter.POSITIONAL_OR_KEYWORD,
+            annotation=BaseModel,
+        )
+    )
+    sig_params.append(
+        inspect.Parameter(
+            "repo",
+            inspect.Parameter.POSITIONAL_OR_KEYWORD,
+            annotation=BaseRepository,
+        )
+    )
+    sig_params.append(
+        inspect.Parameter(
+            "audit_repo",
+            inspect.Parameter.POSITIONAL_OR_KEYWORD,
+            annotation=AuditRepository,
+        )
+    )
+    sig_params.append(
+        inspect.Parameter(
+            "requesting_user",
+            inspect.Parameter.POSITIONAL_OR_KEYWORD,
+            annotation=User,
+        )
+    )
+
+    async def _handler(**kwargs: Any) -> Any:
+        return await handle_update(
+            spec,
+            target_id=kwargs[id_param],
+            payload=kwargs["payload"],
+            parent_id=(kwargs[parent_id_param] if parent_id_param else None),
+            repo=kwargs["repo"],
+            audit_repo=kwargs["audit_repo"],
+            requesting_user=kwargs["requesting_user"],
+        )
+
+    _handler.__signature__ = inspect.Signature(parameters=sig_params)  # type: ignore[attr-defined]
+    _handler.__name__ = f"_handle_update_{spec.name}"
     _handler.__qualname__ = _handler.__name__
     return _handler

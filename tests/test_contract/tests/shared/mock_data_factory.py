@@ -192,8 +192,13 @@ class MockDataFactory:
             educations=[],
             certifications=[],
         )
+        # After B3 (#330) the per-entity `handle_update_provider` is gone;
+        # the route binds `make_update_handler(PROVIDER_ENTITY)` and
+        # assigns it to the module-level `_handle_update_provider` attr
+        # so contract patches retarget here. The mount layer's
+        # `_resolve_handler` reads from `__module__`.
         return {
-            "src.logic.providers.provider_processing.handle_update_provider": {
+            "src.api.routes.providers._handle_update_provider": {
                 "return_value_config": stub_provider
             }
         }

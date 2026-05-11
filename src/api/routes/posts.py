@@ -14,13 +14,16 @@ from src.api.common.resource_routes import (
     mount_update,
 )
 from src.api.common.specs.post import POST_ENTITY
-from src.logic._generic import make_create_handler, make_delete_handler
+from src.logic._generic import (
+    make_create_handler,
+    make_delete_handler,
+    make_update_handler,
+)
 from src.logic.posts.post_processing import (
     handle_get_post_detail,
     handle_get_post_edit_form,
     handle_get_post_form,
     handle_list_posts,
-    handle_update_post,
 )
 
 posts_api_router = APIRouter(prefix="/posts")
@@ -85,7 +88,10 @@ mount_detail(router, POST_SPEC, handler=handle_get_post_detail)
 _handle_create_post = make_create_handler(POST_ENTITY)
 _handle_create_post.__module__ = __name__
 mount_create(router, POST_SPEC, handler=_handle_create_post)
-mount_update(router, POST_SPEC, handler=handle_update_post)
+# Generic update: kind-invariant + detail-row patch via spec.discriminator.
+_handle_update_post = make_update_handler(POST_ENTITY)
+_handle_update_post.__module__ = __name__
+mount_update(router, POST_SPEC, handler=_handle_update_post)
 # Named module-level attribute so test monkeypatching (contract tests)
 # can target `src.api.routes.posts._handle_delete_post` and the mount
 # layer's `_resolve_handler` picks up the patched version.

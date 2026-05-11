@@ -71,9 +71,6 @@ class ProviderRepository(BaseRepository):
     async def create_provider(self, user_id: UUID, **fields: Any) -> Provider:
         return await self._persist_new(Provider(owner_id=user_id, **fields))
 
-    async def update_provider(self, provider: Provider, **fields: Any) -> Provider:
-        return await self._patch(provider, **fields)
-
     # --- Licensure sub-table ----------------------------------------------
 
     async def get_licensure_by_id(self, licensure_id: UUID) -> ProviderLicensure | None:
@@ -86,11 +83,6 @@ class ProviderRepository(BaseRepository):
             provider, "licensures", ProviderLicensure(**fields)
         )
 
-    async def update_licensure(
-        self, licensure: ProviderLicensure, **fields: Any
-    ) -> ProviderLicensure:
-        return await self._patch(licensure, **fields)
-
     # --- Education sub-table ----------------------------------------------
 
     async def get_education_by_id(self, education_id: UUID) -> ProviderEducation | None:
@@ -102,11 +94,6 @@ class ProviderRepository(BaseRepository):
         return await self._add_child(
             provider, "educations", ProviderEducation(**fields)
         )
-
-    async def update_education(
-        self, education: ProviderEducation, **fields: Any
-    ) -> ProviderEducation:
-        return await self._patch(education, **fields)
 
     # --- Certification sub-table ------------------------------------------
 
@@ -121,8 +108,3 @@ class ProviderRepository(BaseRepository):
         return await self._add_child(
             provider, "certifications", ProviderCertification(**fields)
         )
-
-    async def update_certification(
-        self, cert: ProviderCertification, **fields: Any
-    ) -> ProviderCertification:
-        return await self._patch(cert, **fields)
