@@ -57,14 +57,16 @@ async def test_create_provider_persists_row(
 
     async with db_test_session_manager() as session:
         repo = ProviderRepository(session)
-        created = await repo.create_provider(
-            user_id=user.id,
-            practice_name="Acme Health",
-            location_city="Springfield",
-            location_state="IL",
-            location_zip="62701",
-            in_person_sessions="yes",
-            virtual_sessions="no",
+        created = await repo.create(
+            Provider(
+                owner_id=user.id,
+                practice_name="Acme Health",
+                location_city="Springfield",
+                location_state="IL",
+                location_zip="62701",
+                in_person_sessions="yes",
+                virtual_sessions="no",
+            )
         )
         await session.commit()
         provider_id = created.id
@@ -87,14 +89,16 @@ async def test_get_by_id_finds_created_provider(
 
     async with db_test_session_manager() as session:
         repo = ProviderRepository(session)
-        created = await repo.create_provider(
-            user_id=user.id,
-            practice_name="Acme",
-            location_city="Springfield",
-            location_state="IL",
-            location_zip="62701",
-            in_person_sessions="yes",
-            virtual_sessions="no",
+        created = await repo.create(
+            Provider(
+                owner_id=user.id,
+                practice_name="Acme",
+                location_city="Springfield",
+                location_state="IL",
+                location_zip="62701",
+                in_person_sessions="yes",
+                virtual_sessions="no",
+            )
         )
         await session.commit()
         provider_id = created.id
@@ -113,14 +117,16 @@ async def test_get_by_user_id_finds_created_provider(
 
     async with db_test_session_manager() as session:
         repo = ProviderRepository(session)
-        await repo.create_provider(
-            user_id=user.id,
-            practice_name="Acme",
-            location_city="Springfield",
-            location_state="IL",
-            location_zip="62701",
-            in_person_sessions="yes",
-            virtual_sessions="no",
+        await repo.create(
+            Provider(
+                owner_id=user.id,
+                practice_name="Acme",
+                location_city="Springfield",
+                location_state="IL",
+                location_zip="62701",
+                in_person_sessions="yes",
+                virtual_sessions="no",
+            )
         )
         await session.commit()
 
@@ -138,14 +144,16 @@ async def test_update_provider_changes_fields_visible_on_refetch(
 
     async with db_test_session_manager() as session:
         repo = ProviderRepository(session)
-        created = await repo.create_provider(
-            user_id=user.id,
-            practice_name="Original",
-            location_city="Springfield",
-            location_state="IL",
-            location_zip="62701",
-            in_person_sessions="yes",
-            virtual_sessions="no",
+        created = await repo.create(
+            Provider(
+                owner_id=user.id,
+                practice_name="Original",
+                location_city="Springfield",
+                location_state="IL",
+                location_zip="62701",
+                in_person_sessions="yes",
+                virtual_sessions="no",
+            )
         )
         await session.commit()
         provider_id = created.id

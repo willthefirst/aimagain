@@ -150,18 +150,21 @@ class MockDataFactory:
 
     @classmethod
     def create_provider_create_dependency_config(cls) -> Dict[str, Any]:
-        """Mock for `handle_create_provider`.
+        """Mock for the factory-built `_handle_create_provider`.
 
         The route under test (`POST /providers`) reads `id` off
         the handler's return value to build the response body and the
         `Location` / `HX-Redirect` headers. A `SimpleNamespace` exposing
-        `id` is sufficient.
+        `id` is sufficient. The framework stitches the auto-bound
+        handler onto the route module, so contract patches target
+        `src.api.routes.providers._handle_create_provider` (not the
+        old bespoke handler in `provider_processing`).
         """
         stub_provider = SimpleNamespace(
             id=UUID("33333333-3333-3333-3333-333333333333"),
         )
         return {
-            "src.logic.providers.provider_processing.handle_create_provider": {
+            "src.api.routes.providers._handle_create_provider": {
                 "return_value_config": stub_provider
             }
         }

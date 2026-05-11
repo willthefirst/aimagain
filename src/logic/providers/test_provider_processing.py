@@ -15,10 +15,9 @@ from starlette.requests import Request
 
 from src.api.common.exceptions import ForbiddenError, NotFoundError
 from src.api.common.specs.provider import PROVIDER_ENTITY
-from src.logic._generic import handle_detail, handle_list
+from src.logic._generic import handle_create, handle_detail, handle_list
 from src.logic.audit import AuditAction
 from src.logic.providers.provider_processing import (
-    handle_create_provider,
     handle_list_user_providers,
     provider_detail_extras,
 )
@@ -393,11 +392,12 @@ async def test_list_user_providers_404_when_target_user_missing(
             )
 
 
-# --- handle_create_provider ----------------------------------------------
+# --- handle_create (provider, via the generic framework) -----------------
 
 
-# NOTE: `handle_create_provider` stays bespoke (inline credentials append);
-# the framework's `handle_create` doesn't cover this shape. Test stays.
+# Provider create goes through the framework's `handle_create`. The
+# inline-children loop now lives in `_generic.py`, driven by
+# `PROVIDER_ENTITY.children`.
 async def test_create_provider_persists_row_and_writes_audit(
     db_test_session_manager: async_sessionmaker[AsyncSession],
 ):
@@ -407,7 +407,13 @@ async def test_create_provider_persists_row_and_writes_audit(
     async with db_test_session_manager() as session:
         repo = ProviderRepository(session)
         audit_repo = AuditRepository(session)
-        created = await handle_create_provider(payload, repo, audit_repo, user)
+        created = await handle_create(
+            PROVIDER_ENTITY,
+            payload=payload,
+            repo=repo,
+            audit_repo=audit_repo,
+            requesting_user=user,
+        )
 
     assert created.owner_id == user.id
     assert created.practice_name == "Acme Health"
@@ -447,7 +453,13 @@ async def test_create_provider_with_inline_children_captures_them_in_audit(
     async with db_test_session_manager() as session:
         repo = ProviderRepository(session)
         audit_repo = AuditRepository(session)
-        created = await handle_create_provider(payload, repo, audit_repo, user)
+        created = await handle_create(
+            PROVIDER_ENTITY,
+            payload=payload,
+            repo=repo,
+            audit_repo=audit_repo,
+            requesting_user=user,
+        )
 
     rows = await _audit_rows_for(
         db_test_session_manager,
@@ -488,11 +500,12 @@ async def test_create_provider_allows_multiple_per_user(
     async with db_test_session_manager() as session:
         repo = ProviderRepository(session)
         audit_repo = AuditRepository(session)
-        second = await handle_create_provider(
-            _provider_create_payload(practice_name="Second Practice"),
-            repo,
-            audit_repo,
-            user,
+        second = await handle_create(
+            PROVIDER_ENTITY,
+            payload=_provider_create_payload(practice_name="Second Practice"),
+            repo=repo,
+            audit_repo=audit_repo,
+            requesting_user=user,
         )
 
     assert second.id != first_id

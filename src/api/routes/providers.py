@@ -9,7 +9,6 @@ from src.api.common.specs.provider_certification import CERTIFICATION_ENTITY
 from src.api.common.specs.provider_education import EDUCATION_ENTITY
 from src.api.common.specs.provider_licensure import LICENSURE_ENTITY
 from src.logic.providers.provider_processing import (
-    handle_create_provider,
     handle_get_provider_form,
     provider_detail_extras,
 )
@@ -20,22 +19,18 @@ router = BaseRouter(router=providers_api_router, default_tags=["providers"])
 logger = logging.getLogger(__name__)
 
 
-# Bespoke handlers (create — inline credentials append, form_new) stay
-# explicit. The detail handler takes a per-viewer `is_favorited` extras
-# callable; the list handler is now framework-built via
-# `make_list_handler(PROVIDER_ENTITY)` — `selected_<filter>` echoes
-# come from the generic context build. Update / delete / form_edit are
-# framework-built and stitched onto this module (auto-detected from the
-# caller frame) for contract-test patches at
-# `src.api.routes.providers._handle_<verb>_provider`. Owned credential
-# subentities (licensure, education, certification) auto-bind their own
-# create/update/delete factories — same path through `mount_entity`'s
-# owned-subentity branch.
+# Only `form_new` stays bespoke (the create-form template needs the
+# Pydantic class as a Jinja field-resolver). Every other verb auto-binds:
+# `create` reads `PROVIDER_ENTITY.children` to append inline credential
+# rows; `list` echoes filter selections; detail/update/delete/form_edit
+# go through the standard factories. Owned credential subentities
+# (licensure, education, certification) self-register on
+# `PROVIDER_ENTITY.children` and pick up the same auto-bind for their
+# create / update / delete factories.
 mount_entity(
     router,
     PROVIDER_ENTITY,
     handlers={
-        "create": handle_create_provider,
         "form_new": handle_get_provider_form,
     },
     detail_extras=provider_detail_extras,
