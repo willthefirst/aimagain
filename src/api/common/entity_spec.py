@@ -458,3 +458,50 @@ class EntitySpec:
             if axis.name == name:
                 return axis
         raise KeyError(f"EntitySpec({self.name!r}) has no state axis named {name!r}")
+
+
+class Redirects:
+    """Canned redirect-callable factories for the `*_redirect` spec fields.
+
+    `EntitySpec.create_redirect` / `update_redirect` / `delete_redirect`
+    are callables receiving every path param the route binds as kwargs
+    (parent ids for sub-resources + the entity's own id after create /
+    update). The two shapes that occur in this codebase are:
+
+      - "send the user to the edit form" — providers + credentials all
+        redirect to `/providers/{provider_id}/form`.
+      - "send the user to the detail page" — posts redirect to
+        `/posts/{post_id}` after update.
+
+    Both factories take `collection` + `id_param` strings (so a spec
+    can self-reference via literals, sidestepping the closure-over-
+    not-yet-built-spec problem) and return a `**kwargs`-accepting
+    callable that picks the right kwarg out and formats the URL.
+    """
+
+    @staticmethod
+    def to_edit_form(collection: str, id_param: str) -> Callable[..., str]:
+        """Build a redirect callable producing ``/<collection>/{id}/form``.
+
+        Reads the id from ``kwargs[id_param]``. Used by providers
+        (post-create / post-update redirect to their own edit form) and
+        by all three credential subentities (which redirect to the
+        parent provider's edit form — `id_param` is the parent's).
+        """
+
+        def _redirect(**kwargs: Any) -> str:
+            return f"/{collection}/{kwargs[id_param]}/form"
+
+        return _redirect
+
+    @staticmethod
+    def to_detail(collection: str, id_param: str) -> Callable[..., str]:
+        """Build a redirect callable producing ``/<collection>/{id}``.
+
+        Used by posts (post-update redirects to the detail page).
+        """
+
+        def _redirect(**kwargs: Any) -> str:
+            return f"/{collection}/{kwargs[id_param]}"
+
+        return _redirect
