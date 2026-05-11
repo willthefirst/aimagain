@@ -27,6 +27,14 @@ from src.api.common.entity_spec import (
 )
 from src.api.common.resource_routes import QueryParam
 from src.models import Provider
+from src.models.enums import (
+    CERTIFICATION_TYPES,
+    CERTIFICATION_TYPES_LABELS,
+    EDUCATION_TYPES,
+    EDUCATION_TYPES_LABELS,
+    LICENSE_TYPES,
+    LICENSE_TYPES_LABELS,
+)
 from src.repositories.dependencies import get_provider_repository
 from src.repositories.favorites.user_favorite_repository import UserFavoriteRepository
 from src.schemas.providers.provider import (
@@ -72,4 +80,18 @@ PROVIDER_ENTITY: Final[EntitySpec] = EntitySpec(
     # Per-viewer detail extras live on the spec — see `EntitySpec`.
     detail_extras_path="src.logic.providers.provider_processing.provider_detail_extras",
     detail_extras_repos=(("user_favorite_repo", UserFavoriteRepository),),
+    # Provider templates render credential-type display labels and the
+    # tuples behind the filter/select dropdowns. Tying them to the spec
+    # (instead of Jinja globals) means a new credential-type tuple
+    # doesn't need an edit in `core/templating.py`. The labels are
+    # provider-specific — posts and other entities don't read them —
+    # so they belong here, not in shared template-global infrastructure.
+    static_context={
+        "LICENSE_TYPES": LICENSE_TYPES,
+        "LICENSE_TYPES_LABELS": LICENSE_TYPES_LABELS,
+        "EDUCATION_TYPES": EDUCATION_TYPES,
+        "EDUCATION_TYPES_LABELS": EDUCATION_TYPES_LABELS,
+        "CERTIFICATION_TYPES": CERTIFICATION_TYPES,
+        "CERTIFICATION_TYPES_LABELS": CERTIFICATION_TYPES_LABELS,
+    },
 )

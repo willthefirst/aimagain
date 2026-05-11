@@ -43,12 +43,13 @@ _env.globals.update(
     CLIENT_REFERRAL_SERVICE_LABELS=enums.CLIENT_REFERRAL_SERVICE_LABELS,
     TREATMENT_SETTINGS=enums.TREATMENT_SETTINGS,
     TREATMENT_SETTINGS_LABELS=enums.TREATMENT_SETTINGS_LABELS,
-    LICENSE_TYPES=enums.LICENSE_TYPES,
-    LICENSE_TYPES_LABELS=enums.LICENSE_TYPES_LABELS,
-    EDUCATION_TYPES=enums.EDUCATION_TYPES,
-    EDUCATION_TYPES_LABELS=enums.EDUCATION_TYPES_LABELS,
-    CERTIFICATION_TYPES=enums.CERTIFICATION_TYPES,
-    CERTIFICATION_TYPES_LABELS=enums.CERTIFICATION_TYPES_LABELS,
+    # `LICENSE_TYPES`, `EDUCATION_TYPES`, `CERTIFICATION_TYPES` and
+    # their `_LABELS` are provider-only — they flow into the context
+    # via `PROVIDER_ENTITY.static_context` (merged by `handle_detail` /
+    # `handle_list` / `handle_get_edit_form`) so the spec is the single
+    # binding site. `register_choice_labels(...)` for those tuples
+    # stays below (the form-rendering macro looks up labels by tuple
+    # identity, not by Jinja global).
     # Pydantic-driven field rendering: `field_for(schema, name, label)`
     # in `_shared/form_fields.html` calls `field_spec(schema, name)` to
     # derive the form's HTML attributes (required, choices, pattern,
