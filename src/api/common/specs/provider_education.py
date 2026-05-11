@@ -8,7 +8,6 @@ from typing import Final
 
 from src.api.common.entity_spec import EntitySpec
 from src.api.common.specs._credential import make_provider_credential_entity
-from src.logic.audit import AuditAction
 from src.models import ProviderEducation
 from src.schemas.providers.provider import (
     ProviderEducationAuditSnapshot,
@@ -22,11 +21,7 @@ EDUCATION_ENTITY: Final[EntitySpec] = make_provider_credential_entity(
     url_collection="educations",
     id_param="education_id",
     model=ProviderEducation,
-    audit_actions=(
-        AuditAction.CREATE_EDUCATION,
-        AuditAction.UPDATE_EDUCATION,
-        AuditAction.DELETE_EDUCATION,
-    ),
+    audit_stem="education",
     snapshot_schema=ProviderEducationAuditSnapshot,
     read_schema=ProviderEducationRead,
     create_adapter=education_create_adapter,

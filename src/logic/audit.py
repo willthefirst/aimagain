@@ -102,16 +102,13 @@ Verb = Literal["create", "update", "delete"]
 class AuditedResource:
     """Declarative bundle for a CRUD-shaped audited resource.
 
-    Module-level constants are the intended use:
+    Module-level constants are the intended use. The
+    `make_audited_resource(name, snapshot_schema)` factory derives the
+    create/update/delete `AuditAction` triple from the name by
+    convention (`CREATE_<NAME.upper()>`, ...), so callers don't retype
+    the enum stems:
 
-        PROVIDER = AuditedResource(
-            type="provider",
-            snapshot=lambda obj: ProviderAuditSnapshot
-                .model_validate(obj).model_dump(mode="json"),
-            create=AuditAction.CREATE_PROVIDER,
-            update=AuditAction.UPDATE_PROVIDER,
-            delete=AuditAction.DELETE_PROVIDER,
-        )
+        PROVIDER = make_audited_resource("provider", ProviderAuditSnapshot)
 
     Each handler then calls `record_audit_for(audit_repo, resource=PROVIDER,
     verb="update", ...)` instead of typing `resource_type=`, `action=`, and
@@ -129,6 +126,51 @@ class AuditedResource:
 
     def action_for(self, verb: Verb) -> AuditAction:
         return getattr(self, verb)
+
+
+def make_audited_resource(
+    name: str,
+    snapshot: Callable[[Any], dict[str, Any]] | type[BaseModel],
+    *,
+    action_stem: str | None = None,
+) -> AuditedResource:
+    """Build an `AuditedResource` from a name + snapshot.
+
+    The create/update/delete `AuditAction` members are looked up by
+    convention: `CREATE_<STEM>`, `UPDATE_<STEM>`, `DELETE_<STEM>` where
+    `<STEM>` defaults to `name.upper()`. Entities whose enum stems
+    diverge from `name` pass `action_stem` explicitly (e.g. the
+    `provider_licensure` entity's actions are `CREATE_LICENSURE`,
+    not `CREATE_PROVIDER_LICENSURE`).
+
+    `snapshot` may be either a callable (used as-is) or a Pydantic
+    schema class (wrapped via `make_snapshotter`). The two-form input
+    matches the two callsites: most specs pass a schema class; posts
+    pass a hand-rolled discriminated-union snapshot callable.
+
+    Raises `ValueError` at import time if any of the three derived
+    `AuditAction` members is missing — the failure surfaces before
+    serving traffic.
+    """
+    stem = (action_stem or name).upper()
+    if isinstance(snapshot, type) and issubclass(snapshot, BaseModel):
+        snapshot_fn: Callable[[Any], dict[str, Any]] = make_snapshotter(snapshot)
+    else:
+        snapshot_fn = snapshot  # type: ignore[assignment]
+    try:
+        return AuditedResource(
+            type=name,
+            snapshot=snapshot_fn,
+            create=AuditAction[f"CREATE_{stem}"],
+            update=AuditAction[f"UPDATE_{stem}"],
+            delete=AuditAction[f"DELETE_{stem}"],
+        )
+    except KeyError as exc:
+        raise ValueError(
+            f"make_audited_resource({name!r}): AuditAction has no member "
+            f"matching CREATE_{stem}/UPDATE_{stem}/DELETE_{stem}. Add the "
+            "members to AuditAction or pass action_stem= explicitly."
+        ) from exc
 
 
 async def record_audit(
