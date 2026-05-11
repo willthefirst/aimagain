@@ -38,9 +38,7 @@ from datetime import datetime
 from typing import Annotated, Literal, Union
 
 from pydantic import (
-    BaseModel,
     BeforeValidator,
-    ConfigDict,
     Field,
     TypeAdapter,
     model_validator,
@@ -59,8 +57,10 @@ from src.models.enums import (
 )
 from src.schemas._validators import (
     PartialUpdate,
+    ReadProjection,
     StrippedOptionalText,
     StrippedText,
+    WirePayload,
     ZipText,
 )
 
@@ -136,13 +136,11 @@ def _flatten_post_to_dict(post) -> dict | None:
 # --- Read projections ---------------------------------------------------
 
 
-class _PostReadBase(BaseModel):
+class _PostReadBase(ReadProjection):
     id: uuid.UUID
     owner_id: uuid.UUID
     created_at: datetime
     updated_at: datetime
-
-    model_config = ConfigDict(from_attributes=True)
 
     @model_validator(mode="before")
     @classmethod
@@ -205,7 +203,7 @@ post_read_adapter: TypeAdapter = TypeAdapter(PostRead)
 # bleed is rejected by the discriminated union one level up.
 
 
-class ClientReferralCreate(BaseModel):
+class ClientReferralCreate(WirePayload):
     """Create payload for `kind='client_referral'`. Field set follows the
     client-referral intake form."""
 
@@ -223,10 +221,8 @@ class ClientReferralCreate(BaseModel):
     services_psychotherapy_modality: StrippedOptionalText = None
     insurance: Literal[*INSURANCE_OPTIONS]
 
-    model_config = ConfigDict(extra="forbid")
 
-
-class ProviderAvailabilityCreate(BaseModel):
+class ProviderAvailabilityCreate(WirePayload):
     """Create payload for `kind='provider_availability'`. Field set follows
     the provider-availability intake form."""
 
@@ -254,8 +250,6 @@ class ProviderAvailabilityCreate(BaseModel):
     payment_situation: Literal[*INSURANCE_OPTIONS]
     sliding_scale: bool
     cost: StrippedOptionalText = None
-
-    model_config = ConfigDict(extra="forbid")
 
 
 PostCreate = Annotated[
@@ -340,10 +334,8 @@ post_update_adapter: TypeAdapter = TypeAdapter(PostUpdate)
 # --- Audit snapshots ----------------------------------------------------
 
 
-class _PostAuditSnapshotBase(BaseModel):
+class _PostAuditSnapshotBase(ReadProjection):
     owner_id: uuid.UUID
-
-    model_config = ConfigDict(from_attributes=True)
 
     @model_validator(mode="before")
     @classmethod

@@ -35,8 +35,6 @@ import uuid
 from datetime import date, datetime
 from typing import Annotated, Literal
 
-from pydantic import BaseModel, ConfigDict
-
 from src.core.form_fields import HtmlPattern
 from src.models.enums import (
     CERTIFICATION_TYPES,
@@ -45,10 +43,16 @@ from src.models.enums import (
     LOCATION_AVAILABILITY_OPTIONS,
     US_STATES,
 )
-from src.schemas._validators import PartialUpdate, StrippedText, ZipText
+from src.schemas._validators import (
+    PartialUpdate,
+    ReadProjection,
+    StrippedText,
+    WirePayload,
+    ZipText,
+)
 
 
-class _ProviderSubrowBase(BaseModel):
+class _ProviderSubrowBase(ReadProjection):
     """Common fields for every provider sub-row Read schema (licensure /
     education / certification). Subclasses add entity-specific fields.
 
@@ -61,8 +65,6 @@ class _ProviderSubrowBase(BaseModel):
     created_at: datetime
     updated_at: datetime
 
-    model_config = ConfigDict(from_attributes=True)
-
 
 # --- ProviderLicensure --------------------------------------------------
 
@@ -74,13 +76,11 @@ class ProviderLicensureRead(_ProviderSubrowBase):
     expiration_date: date | None = None
 
 
-class ProviderLicensureCreate(BaseModel):
+class ProviderLicensureCreate(WirePayload):
     license_type: Literal[*LICENSE_TYPES]
     license_number: StrippedText
     issuing_state: Literal[*US_STATES]
     expiration_date: date | None = None
-
-    model_config = ConfigDict(extra="forbid")
 
 
 class ProviderLicensureUpdate(PartialUpdate):
@@ -106,15 +106,13 @@ class ProviderEducationRead(_ProviderSubrowBase):
     month_completed: str | None = None
 
 
-class ProviderEducationCreate(BaseModel):
+class ProviderEducationCreate(WirePayload):
     education_type: Literal[*EDUCATION_TYPES]
     institution: StrippedText
     # `month_completed` is a "YYYY-MM" string per the model — month
     # precision only. Format validation is intentionally deferred to a
     # later issue once the form contract is settled.
     month_completed: str | None = None
-
-    model_config = ConfigDict(extra="forbid")
 
 
 class ProviderEducationUpdate(PartialUpdate):
@@ -135,12 +133,10 @@ class ProviderCertificationRead(_ProviderSubrowBase):
     expiration_date: date | None = None
 
 
-class ProviderCertificationCreate(BaseModel):
+class ProviderCertificationCreate(WirePayload):
     certification_type: Literal[*CERTIFICATION_TYPES]
     certifying_body: StrippedText
     expiration_date: date | None = None
-
-    model_config = ConfigDict(extra="forbid")
 
 
 class ProviderCertificationUpdate(PartialUpdate):
@@ -155,7 +151,7 @@ ProviderCertificationAuditSnapshot = ProviderCertificationRead
 # --- Provider ----------------------------------------------------
 
 
-class ProviderRead(BaseModel):
+class ProviderRead(ReadProjection):
     id: uuid.UUID
     owner_id: uuid.UUID
     created_at: datetime
@@ -170,10 +166,8 @@ class ProviderRead(BaseModel):
     educations: list[ProviderEducationRead] = []
     certifications: list[ProviderCertificationRead] = []
 
-    model_config = ConfigDict(from_attributes=True)
 
-
-class ProviderCreate(BaseModel):
+class ProviderCreate(WirePayload):
     """Create payload for a provider's directory provider. `owner_id` is
     set by the route from the authenticated user, not accepted on the
     wire."""
@@ -193,8 +187,6 @@ class ProviderCreate(BaseModel):
     licensures: list[ProviderLicensureCreate] = []
     educations: list[ProviderEducationCreate] = []
     certifications: list[ProviderCertificationCreate] = []
-
-    model_config = ConfigDict(extra="forbid")
 
 
 class ProviderUpdate(PartialUpdate):

@@ -1,18 +1,27 @@
-"""Tests for the `PartialUpdate` base class.
+"""Tests for the `WirePayload`, `ReadProjection`, and `PartialUpdate` bases.
 
-The validator's behavior on each concrete entity Update schema is
-covered by the per-cluster test files (`schemas/providers/test_provider.py`,
-`schemas/posts/test_post.py`). These tests pin the base class itself
-so a regression that broke every concrete Update at once would be
-caught here, where the cause lives.
+Each base's behavior on a concrete entity schema is covered by the
+per-cluster test files (`schemas/providers/test_provider.py`,
+`schemas/posts/test_post.py`). These tests pin the bases themselves so
+a regression that broke every concrete schema at once would be caught
+here, where the cause lives.
 """
 
+from types import SimpleNamespace
 from typing import ClassVar
 
 import pytest
 from pydantic import ValidationError
 
-from src.schemas._validators import PartialUpdate
+from src.schemas._validators import PartialUpdate, ReadProjection, WirePayload
+
+
+class _AWirePayload(WirePayload):
+    a: int
+
+
+class _AReadProjection(ReadProjection):
+    a: int
 
 
 class _AnUpdate(PartialUpdate):
@@ -25,6 +34,23 @@ class _DiscriminatedUpdate(PartialUpdate):
 
     kind: str
     a: int | None = None
+
+
+def test_wire_payload_rejects_unknown_field():
+    """`extra="forbid"` — unknown fields 422 instead of being dropped."""
+    with pytest.raises(ValidationError):
+        _AWirePayload(a=1, unknown="value")
+
+
+def test_wire_payload_accepts_known_field():
+    assert _AWirePayload(a=1).a == 1
+
+
+def test_read_projection_validates_from_orm_like_object():
+    """`from_attributes=True` — read attributes off any attr-bag."""
+    obj = SimpleNamespace(a=42)
+    instance = _AReadProjection.model_validate(obj)
+    assert instance.a == 42
 
 
 def test_partial_update_rejects_empty_patch():
