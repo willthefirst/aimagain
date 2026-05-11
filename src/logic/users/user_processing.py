@@ -4,10 +4,10 @@ from uuid import UUID
 
 from fastapi import Request
 
-from src.api.common.exceptions import ForbiddenError, NotFoundError
+from src.api.common.exceptions import NotFoundError
 from src.api.common.projections import project_view
 from src.api.common.specs.user import USER_ENTITY
-from src.logic._authz import is_admin
+from src.logic._authz import forbid_self_action, is_admin
 from src.logic.audit import make_snapshotter, mutate, record_audit
 from src.models import User
 from src.repositories.audit_repository import AuditRepository
@@ -108,10 +108,11 @@ async def handle_set_user_activation(
     target = await repo.get_user_by_id(user_id)
     if target is None:
         raise NotFoundError(detail="User not found")
-    if target.id == requesting_user.id:
-        raise ForbiddenError(
-            detail="Admins cannot change their own activation state here"
-        )
+    forbid_self_action(
+        target,
+        requesting_user,
+        detail="Admins cannot change their own activation state here",
+    )
 
     is_active = payload.state == "active"
     logger.info(
@@ -149,8 +150,11 @@ async def handle_delete_user(
     target = await repo.get_user_by_id(user_id)
     if target is None:
         raise NotFoundError(detail="User not found")
-    if target.id == requesting_user.id:
-        raise ForbiddenError(detail="Admins cannot delete their own account here")
+    forbid_self_action(
+        target,
+        requesting_user,
+        detail="Admins cannot delete their own account here",
+    )
 
     logger.info(f"Handler: admin {requesting_user.id} hard-deleting user {target.id}")
     async with mutate(

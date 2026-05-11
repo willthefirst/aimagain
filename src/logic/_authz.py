@@ -65,6 +65,21 @@ def is_self_or_admin(actor: User | None, target) -> bool:
     return actor.id == target.id or actor.is_superuser
 
 
+def forbid_self_action(target, actor: User, *, detail: str) -> None:
+    """Raise `ForbiddenError` if `actor` is operating on themselves.
+
+    For admin-only mutations whose target is a `User` row, the route's
+    `current_admin_user` dep already blocks non-admins — but an admin
+    could still aim the verb at their own account. The product rule is
+    that admins cannot self-mutate via these endpoints; this helper is
+    the single place that rule is expressed. `detail` is the full
+    error message so each call can phrase the action naturally
+    (activation, deletion, …).
+    """
+    if target.id == actor.id:
+        raise ForbiddenError(detail=detail)
+
+
 def assert_owner_or_admin(
     obj,
     user: User,
