@@ -33,7 +33,12 @@ from pydantic import BaseModel, TypeAdapter
 from src.api.common.resource_routes import QueryParam, ResourceSpec
 from src.auth_config import current_active_user, current_admin_user
 from src.logic._authz import assert_owner_or_admin, is_owner_or_admin
-from src.logic.audit import AuditAction, AuditedResource, make_audited_resource
+from src.logic.audit import (
+    AuditAction,
+    AuditedResource,
+    make_audited_resource,
+    make_snapshotter,
+)
 from src.models._polymorphic import DiscriminatorRegistry
 
 
@@ -122,6 +127,17 @@ class StateAxis:
     via `handlers={"activation": ...}`. Specs that pre-date this knob
     can leave it unset and pass the handler explicitly; the explicit
     handler wins.
+
+    `audit_snapshot` is the Pydantic class used to project a row into
+    the audit log's `before`/`after` JSON for this axis. The spec's
+    `__post_init__` builds the snapshotter once via
+    :func:`src.logic.audit.make_snapshotter` and stores it on
+    ``audit_snapshot_fn`` so the handler reads
+    ``axis.audit_snapshot_fn(target)`` instead of building its own
+    module-level snapshotter. Matches the CRUD-side
+    ``audit_snapshot → audit`` flow on ``EntitySpec`` — state axes are
+    now declaratively complete (body shape + audit action + audit
+    snapshot all live on the axis).
     """
 
     name: str
@@ -129,6 +145,12 @@ class StateAxis:
     action: AuditAction
     handler_path: str | None = None
     response_to_dict: Callable[[Any], dict] | None = None
+    audit_snapshot: type[BaseModel] | None = None
+    # Derived: populated by `EntitySpec.__post_init__` via
+    # `object.__setattr__` after wrapping `audit_snapshot` in
+    # `make_snapshotter`. Handlers consume this directly to capture
+    # before/after JSON for the audit row.
+    audit_snapshot_fn: Callable[[Any], dict[str, Any]] | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -410,6 +432,28 @@ class EntitySpec:
                 f"EntitySpec({self.name!r}) declares duplicate state-axis "
                 f"names: {axis_names}"
             )
+        # Build the audit snapshotter for each axis that declares an
+        # `audit_snapshot` schema. Mirrors the CRUD-side
+        # `audit_snapshot → audit` flow above: the schema lives on the
+        # declarative pair (axis), the constructor wraps it once via
+        # `make_snapshotter`, and handlers read `axis.audit_snapshot_fn`
+        # instead of binding their own module-level snapshotter.
+        # Declaring `audit_snapshot_fn` directly alongside `audit_snapshot`
+        # is ambiguous — pick one.
+        for axis in self.state_axes:
+            if axis.audit_snapshot is not None and axis.audit_snapshot_fn is not None:
+                raise ValueError(
+                    f"EntitySpec({self.name!r}) state-axis {axis.name!r} "
+                    "declares both `audit_snapshot` and `audit_snapshot_fn`; "
+                    "they are mutually exclusive — pass the schema via "
+                    "`audit_snapshot` and let the spec build the callable."
+                )
+            if axis.audit_snapshot is not None:
+                object.__setattr__(
+                    axis,
+                    "audit_snapshot_fn",
+                    make_snapshotter(axis.audit_snapshot),
+                )
         # Wrap a plain Pydantic class in `TypeAdapter(...)` so the
         # downstream mounts (which expect an adapter) get one regardless
         # of which form the spec was constructed with. Discriminated-union
