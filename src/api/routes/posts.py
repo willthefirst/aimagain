@@ -83,4 +83,9 @@ mount_detail(router, POST_SPEC, handler=handle_get_post_detail)
 # Mutations — methods differ from the GETs above so order is independent.
 mount_create(router, POST_SPEC, handler=handle_create_post)
 mount_update(router, POST_SPEC, handler=handle_update_post)
-mount_delete(router, POST_SPEC, handler=make_delete_handler(POST_ENTITY))
+# Named module-level attribute so test monkeypatching (contract tests)
+# can target `src.api.routes.posts._handle_delete_post` and the mount
+# layer's `_resolve_handler` picks up the patched version.
+_handle_delete_post = make_delete_handler(POST_ENTITY)
+_handle_delete_post.__module__ = __name__
+mount_delete(router, POST_SPEC, handler=_handle_delete_post)
