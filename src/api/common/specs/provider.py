@@ -18,10 +18,9 @@ Read by:
 
 from typing import Final
 
-from src.api.common.entity_spec import EntitySpec, Redirects, RouteSet
+from src.api.common.entity_spec import OWNER_OR_ADMIN, EntitySpec, Redirects, RouteSet
 from src.api.common.resource_routes import QueryParam
 from src.auth_config import current_active_user
-from src.logic._authz import assert_owner_or_admin, is_owner_or_admin
 from src.models import Provider
 from src.repositories.dependencies import get_provider_repository
 from src.schemas.providers.provider import (
@@ -47,8 +46,7 @@ PROVIDER_ENTITY: Final[EntitySpec] = EntitySpec(
     repo_dep=get_provider_repository,
     read_user_dep=current_active_user,
     write_user_dep=current_active_user,
-    write_authz=assert_owner_or_admin,
-    can_write=is_owner_or_admin,
+    auth_policy=OWNER_OR_ADMIN,
     audit_snapshot=ProviderAuditSnapshot,
     create_adapter=provider_create_adapter,
     update_adapter=provider_update_adapter,

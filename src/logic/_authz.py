@@ -11,6 +11,12 @@ by mutation handlers); the predicate is bound directly to
 `EntitySpec.can_write` for use in template-context flags
 (`can_edit = entity.can_write(target, user)`) so detail handlers don't
 re-derive the composition.
+
+The two forms always pair, so specs declare them together via
+`EntitySpec.auth_policy=OWNER_OR_ADMIN` — the sentinel lives next to
+`AuthzPolicy` in `src/api/common/entity_spec.py` (importing the
+callables defined here) so the spec-side dataclass and its canonical
+instance stay co-located without forcing a circular import.
 """
 
 from src.api.common.exceptions import ForbiddenError
