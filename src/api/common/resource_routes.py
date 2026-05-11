@@ -803,6 +803,162 @@ def mount_related_list(
     router.get(path)(route_fn)
 
 
+def mount_entity(
+    router: Any,
+    entity: Any,  # `EntitySpec` — imported lazily to avoid a cycle
+    *,
+    handlers: dict[str, Callable[..., Awaitable[Any]]],
+    owned_subentities: tuple[Any, ...] = (),
+) -> None:
+    """Spec-driven dispatcher for an entity's full route surface.
+
+    Reads `entity.routes`, `entity.state_axes`, `entity.subresources`,
+    `entity.templates`, `entity.filters`, `entity.discriminator`, and
+    `entity.singleton_alias` and calls the appropriate underlying
+    `mount_*` helpers. The existing helpers stay unchanged; this is
+    dispatch glue.
+
+    `handlers` maps a verb-or-name to a callable:
+
+      - One per `RouteSet` flag that is `True`: `"list"`, `"detail"`,
+        `"create"`, `"update"`, `"delete"`, `"form_new"`, `"form_edit"`.
+      - One per `state_axes[i].name` (e.g. `"activation"`).
+      - One per `subresources[i].child_spec.collection` (e.g.
+        `"providers"` for the user → providers related list).
+      - For each `owned_subentities[i]`: one per opted-in verb keyed
+        `f"{owned.name}.{verb}"` (e.g. `"provider_licensure.create"`).
+
+    Validates loudly at mount time:
+      - Every opted-in route / state-axis / subresource must have a
+        handler. Missing keys raise `KeyError` from the handlers
+        dict.
+      - Extra handler keys not consumed by any spec entry raise
+        `ValueError` — catches typos and stale handler bindings the
+        spec used to declare.
+      - `owned_subentities[i].parent` must equal `entity` (catches a
+        passed-in spec from the wrong family).
+    """
+    spec = entity.to_resource_spec()
+
+    consumed: set[str] = set()
+
+    # Registration order matters: literal-segment paths (`/form`,
+    # `/{id}/form`) must register before the parametric `/{id}` path
+    # so FastAPI doesn't try to parse `form` as a UUID. The order
+    # below mirrors the route-file ordering each entity used pre-B4.
+
+    if entity.routes.list:
+        mount_list(
+            router,
+            spec,
+            handler=handlers["list"],
+            query_params=tuple(entity.filters),
+        )
+        consumed.add("list")
+    if entity.routes.create:
+        mount_create(router, spec, handler=handlers["create"])
+        consumed.add("create")
+    if entity.routes.form_new:
+        query_params: tuple[QueryParam, ...] = ()
+        if entity.discriminator is not None:
+            # Polymorphic entities' create-form `?kind=` query param
+            # derives its Literal universe from the discriminator
+            # registry — single source of truth for the kind names.
+            from typing import Literal
+
+            names = entity.discriminator.names
+            query_params = (QueryParam("kind", Literal[*names], names[0]),)
+        mount_form(
+            router,
+            spec,
+            handler=handlers["form_new"],
+            template=entity.templates.form_new,
+            query_params=query_params,
+        )
+        consumed.add("form_new")
+    if entity.routes.form_edit:
+        mount_form(
+            router,
+            spec,
+            handler=handlers["form_edit"],
+            on_existing=True,
+            template=entity.templates.form_edit,
+        )
+        consumed.add("form_edit")
+    if entity.routes.detail:
+        mount_detail(
+            router,
+            spec,
+            handler=handlers["detail"],
+            singleton_alias=entity.singleton_alias,
+        )
+        consumed.add("detail")
+    if entity.routes.update:
+        mount_update(router, spec, handler=handlers["update"])
+        consumed.add("update")
+    if entity.routes.delete:
+        mount_delete(router, spec, handler=handlers["delete"])
+        consumed.add("delete")
+
+    for axis in entity.state_axes:
+        mount_state_axis(
+            router,
+            spec,
+            handler=handlers[axis.name],
+            axis_name=axis.name,
+            body_schema=axis.body_schema,
+            response_to_dict=axis.response_to_dict,
+        )
+        consumed.add(axis.name)
+
+    for sub in entity.subresources:
+        key = sub.child_spec.collection
+        mount_related_list(
+            router,
+            parent_spec=spec,
+            child_spec=sub.child_spec,
+            handler=handlers[key],
+            template=sub.template,
+            singleton_alias=sub.singleton_alias,
+        )
+        consumed.add(key)
+
+    # Owned-subentity recursion: each child entity gets its own
+    # `mount_entity` call with its own slice of the handlers dict
+    # (keyed by `<owned.name>.<verb>`).
+    for owned in owned_subentities:
+        if owned.parent is not entity:
+            raise ValueError(
+                f"mount_entity: owned_subentity {owned.name!r} has "
+                f"parent {owned.parent.name if owned.parent else None!r}, "
+                f"not {entity.name!r}"
+            )
+        owned_handlers: dict[str, Callable[..., Awaitable[Any]]] = {}
+        for verb in (
+            "list",
+            "detail",
+            "create",
+            "update",
+            "delete",
+            "form_new",
+            "form_edit",
+        ):
+            if getattr(owned.routes, verb):
+                k = f"{owned.name}.{verb}"
+                owned_handlers[verb] = handlers[k]
+                consumed.add(k)
+        mount_entity(router, owned, handlers=owned_handlers)
+
+    # Typo detection — surface stale keys at mount time.
+    extras = set(handlers) - consumed
+    if extras:
+        raise ValueError(
+            f"mount_entity({entity.name!r}): handler keys not consumed "
+            f"by any spec entry: {sorted(extras)}. Check for typos or "
+            "stale bindings."
+        )
+
+
 def _walk_parent_chain(spec: ResourceSpec) -> list[ResourceSpec]:
     """Return ancestors top-to-bottom including ``spec`` itself.
 

@@ -79,10 +79,18 @@ class StateAxis:
 
 @dataclass(frozen=True, slots=True)
 class Templates:
-    """Static Jinja paths for the entity's read views."""
+    """Static Jinja paths for the entity's views.
+
+    `form_new` and `form_edit` correspond to the two `mount_form`
+    variants (create form / edit form). Posts uses neither (handler
+    returns `template_name` in context for per-kind dispatch);
+    providers uses both.
+    """
 
     list: str | None = None
     detail: str | None = None
+    form_new: str | None = None
+    form_edit: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -240,6 +248,13 @@ class EntitySpec:
 
     # Templates ----------------------------------------------------------
     templates: Templates = field(default_factory=Templates)
+
+    # Detail singleton alias (e.g. `/users/me`) -------------------------
+    # `mount_detail`'s `singleton_alias=` kwarg — additionally mounts
+    # `GET /<collection>/<alias>` whose id is sourced from a session
+    # dep instead of the URL. Used by users (`/users/me`); other
+    # entities leave as None.
+    singleton_alias: tuple[str, Callable[..., Any]] | None = None
 
     def __post_init__(self) -> None:
         # Mirror `ResourceSpec.__post_init__` — declaring private fields

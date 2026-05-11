@@ -84,5 +84,7 @@ PROVIDER_ENTITY: Final[EntitySpec] = EntitySpec(
     templates=Templates(
         list="providers/list.html",
         detail="providers/detail.html",
+        form_new="providers/new.html",
+        form_edit="providers/edit.html",
     ),
 )

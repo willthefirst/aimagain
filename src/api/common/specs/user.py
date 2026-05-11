@@ -82,4 +82,6 @@ USER_ENTITY: Final[EntitySpec] = EntitySpec(
         list="users/list.html",
         detail="users/detail.html",
     ),
+    # `/users/me` — detail page id sourced from the session.
+    singleton_alias=("me", current_active_user),
 )
