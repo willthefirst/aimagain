@@ -31,8 +31,30 @@ from typing import Any, Awaitable, Callable
 from pydantic import BaseModel, TypeAdapter
 
 from src.api.common.resource_routes import QueryParam, ResourceSpec
+from src.logic._authz import assert_owner_or_admin, is_owner_or_admin
 from src.logic.audit import AuditAction, AuditedResource, make_audited_resource
 from src.models._polymorphic import DiscriminatorRegistry
+
+
+@dataclass(frozen=True, slots=True)
+class AuthzPolicy:
+    """Paired raising + predicate forms of a single authorization rule.
+
+    Every entity that mutates by per-target rule (rather than a flat
+    route-level admin dep) needs both the raising form (`write_authz`,
+    consumed by mutation handlers) and the predicate form (`can_write`,
+    bound to detail-handler `can_edit` flags). The two always encode the
+    same rule, but historically each spec wired them independently and a
+    spec-correctness test pinned the pair on each entity.
+
+    `AuthzPolicy` carries the pair as one declaration. Specs set
+    `auth_policy=OWNER_OR_ADMIN` and `EntitySpec.__post_init__` expands
+    it to populate `write_authz` + `can_write` with the matched
+    callables.
+    """
+
+    write_authz: Callable[..., None]
+    can_write: Callable[..., bool]
 
 
 @dataclass(frozen=True, slots=True)
@@ -211,9 +233,13 @@ class EntitySpec:
     # target, user)`) so handlers don't re-derive the composition.
     # Convention: where `write_authz` is set, `can_write` carries the
     # same rule (e.g. both are `assert_owner_or_admin` / `is_owner_or_admin`
-    # for owner-or-admin entities). Not validator-enforced — a spec test
-    # asserts the pair on each entity.
+    # for owner-or-admin entities).
+    #
+    # Prefer `auth_policy=<AuthzPolicy>` over hand-wiring the two — the
+    # constructor expands the policy to populate both fields with the
+    # matched callables. Mutually exclusive with the hand-wired form.
     can_write: Callable[..., bool] | None = None
+    auth_policy: "AuthzPolicy | None" = None
 
     # Audit --------------------------------------------------------------
     # `audit` and `edge_audit` are mutually exclusive — CRUD-shaped
@@ -369,6 +395,22 @@ class EntitySpec:
                 "schema/adapter via `read_schema` and let the spec build "
                 "the projection callable."
             )
+        # `auth_policy` is the declarative pair. Both raw fields stay
+        # supported for the rare entity whose write_authz + can_write
+        # don't share a sentinel (none today). Declaring both forms is
+        # ambiguous — the caller almost certainly forgot to drop one.
+        if self.auth_policy is not None and (
+            self.write_authz is not None or self.can_write is not None
+        ):
+            raise ValueError(
+                f"EntitySpec({self.name!r}) declares `auth_policy` plus "
+                "an explicit `write_authz` / `can_write`; they are "
+                "mutually exclusive — pass the pair via `auth_policy` or "
+                "set the two callables explicitly."
+            )
+        if self.auth_policy is not None:
+            object.__setattr__(self, "write_authz", self.auth_policy.write_authz)
+            object.__setattr__(self, "can_write", self.auth_policy.can_write)
         if self.read_schema is not None:
             schema = self.read_schema
             if isinstance(schema, TypeAdapter):
@@ -458,6 +500,24 @@ class EntitySpec:
             if axis.name == name:
                 return axis
         raise KeyError(f"EntitySpec({self.name!r}) has no state axis named {name!r}")
+
+
+# Canonical `AuthzPolicy` sentinel for owner-or-admin entities. Pairs
+# the raising form (`assert_owner_or_admin`) with the predicate form
+# (`is_owner_or_admin`) defined in `src/logic/_authz.py`. Specs that
+# follow this rule (provider, post, all three credentials) declare
+# `auth_policy=OWNER_OR_ADMIN` and the constructor expands the pair.
+#
+# The sentinel lives next to `AuthzPolicy` (not in `_authz.py`) because
+# `_authz.py` would otherwise import this module — `entity_spec` is
+# imported via `resource_routes` → `responses` → `_authz` early in the
+# load order, and adding the reverse edge would close the cycle. Keeping
+# the import direction `entity_spec → _authz` matches the layer matrix
+# (api.common may read from logic primitives) and is import-cycle-safe.
+OWNER_OR_ADMIN: AuthzPolicy = AuthzPolicy(
+    write_authz=assert_owner_or_admin,
+    can_write=is_owner_or_admin,
+)
 
 
 class Redirects:

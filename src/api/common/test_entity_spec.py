@@ -11,6 +11,8 @@ import pytest
 from pydantic import BaseModel, ConfigDict, TypeAdapter
 
 from src.api.common.entity_spec import (
+    OWNER_OR_ADMIN,
+    AuthzPolicy,
     EdgeAudit,
     EntitySpec,
     M2NRelation,
@@ -19,6 +21,7 @@ from src.api.common.entity_spec import (
     StateAxis,
     Templates,
 )
+from src.logic._authz import assert_owner_or_admin, is_owner_or_admin
 from src.logic.audit import AuditAction, AuditedResource, make_snapshotter
 
 
@@ -376,6 +379,52 @@ def test_audit_action_stem_without_snapshot_raises():
     stem is only consumed when the constructor builds from a snapshot."""
     with pytest.raises(ValueError, match="audit_action_stem"):
         _make_spec(audit_action_stem="licensure")
+
+
+def test_owner_or_admin_sentinel_pairs_assert_and_predicate():
+    """The single import that specs grab. Pinning the pair here is the
+    structural prevention that used to require a per-entity test."""
+    assert OWNER_OR_ADMIN.write_authz is assert_owner_or_admin
+    assert OWNER_OR_ADMIN.can_write is is_owner_or_admin
+
+
+def test_auth_policy_expands_to_write_authz_and_can_write():
+    """`auth_policy=POLICY` populates both fields with the matched callables."""
+    spec = _make_spec(auth_policy=OWNER_OR_ADMIN)
+    assert spec.write_authz is assert_owner_or_admin
+    assert spec.can_write is is_owner_or_admin
+
+
+def test_auth_policy_and_write_authz_mutually_exclusive():
+    with pytest.raises(ValueError, match="mutually exclusive"):
+        _make_spec(
+            auth_policy=OWNER_OR_ADMIN,
+            write_authz=assert_owner_or_admin,
+        )
+
+
+def test_auth_policy_and_can_write_mutually_exclusive():
+    with pytest.raises(ValueError, match="mutually exclusive"):
+        _make_spec(
+            auth_policy=OWNER_OR_ADMIN,
+            can_write=is_owner_or_admin,
+        )
+
+
+def test_custom_authz_policy_can_be_declared():
+    """`AuthzPolicy` is a public dataclass — future rules (e.g. an
+    `OWNER_ONLY` variant) just bind a new instance."""
+
+    def _custom_assert(obj, user, **k):
+        return None
+
+    def _custom_can(obj, user):
+        return True
+
+    policy = AuthzPolicy(write_authz=_custom_assert, can_write=_custom_can)
+    spec = _make_spec(auth_policy=policy)
+    assert spec.write_authz is _custom_assert
+    assert spec.can_write is _custom_can
 
 
 def test_redirects_to_edit_form_picks_id_from_named_kwarg():
