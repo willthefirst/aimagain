@@ -20,10 +20,6 @@ from src.logic.providers.provider_processing import (
     handle_create_education,
     handle_create_licensure,
     handle_create_provider,
-    handle_delete_certification,
-    handle_delete_education,
-    handle_delete_licensure,
-    handle_delete_provider,
     handle_get_provider_detail,
     handle_list_providers,
     handle_list_user_providers,
@@ -34,9 +30,6 @@ from src.logic.providers.provider_processing import (
 )
 from src.models import (
     AuditLog,
-    Provider,
-    ProviderCertification,
-    ProviderEducation,
     ProviderLicensure,
     User,
 )
@@ -596,59 +589,6 @@ async def test_update_provider_404_for_unknown_id(
             )
 
 
-# --- handle_delete_provider ----------------------------------------------
-
-
-# PHASE2_REDUNDANT: framework-shaped — generic mount_delete + audit row.
-async def test_delete_provider_removes_row_and_writes_audit(
-    db_test_session_manager: async_sessionmaker[AsyncSession],
-):
-    user = await _seed_user(db_test_session_manager)
-    provider_id, licensure_id, *_ = await _seed_provider(
-        db_test_session_manager, user_id=user.id, with_licensure=True
-    )
-
-    async with db_test_session_manager() as session:
-        repo = ProviderRepository(session)
-        audit_repo = AuditRepository(session)
-        await handle_delete_provider(provider_id, repo, audit_repo, user)
-
-    # Provider and cascaded sub-row both gone.
-    async with db_test_session_manager() as session:
-        assert (
-            await session.execute(select(Provider).filter(Provider.id == provider_id))
-        ).scalars().first() is None
-        assert (
-            await session.execute(
-                select(ProviderLicensure).filter(ProviderLicensure.id == licensure_id)
-            )
-        ).scalars().first() is None
-
-    rows = await _audit_rows_for(
-        db_test_session_manager,
-        resource_type="provider",
-        resource_id=provider_id,
-    )
-    assert len(rows) == 1
-    assert rows[0].action == AuditAction.DELETE_PROVIDER
-    assert rows[0].after is None
-    assert len(rows[0].before["licensures"]) == 1
-
-
-async def test_delete_provider_403_for_non_owner(
-    db_test_session_manager: async_sessionmaker[AsyncSession],
-):
-    owner = await _seed_user(db_test_session_manager)
-    intruder = await _seed_user(db_test_session_manager)
-    provider_id, *_ = await _seed_provider(db_test_session_manager, user_id=owner.id)
-
-    async with db_test_session_manager() as session:
-        repo = ProviderRepository(session)
-        audit_repo = AuditRepository(session)
-        with pytest.raises(ForbiddenError):
-            await handle_delete_provider(provider_id, repo, audit_repo, intruder)
-
-
 # --- Licensure handlers -------------------------------------------------
 
 
@@ -763,36 +703,6 @@ async def test_update_licensure_404_when_sub_row_belongs_to_other_provider(
             )
 
 
-# PHASE2_REDUNDANT: framework-shaped — subrow mount_delete + audit shape.
-async def test_delete_licensure_removes_row_and_audits(
-    db_test_session_manager: async_sessionmaker[AsyncSession],
-):
-    user = await _seed_user(db_test_session_manager)
-    provider_id, licensure_id, *_ = await _seed_provider(
-        db_test_session_manager, user_id=user.id, with_licensure=True
-    )
-
-    async with db_test_session_manager() as session:
-        repo = ProviderRepository(session)
-        audit_repo = AuditRepository(session)
-        await handle_delete_licensure(provider_id, licensure_id, repo, audit_repo, user)
-
-    async with db_test_session_manager() as session:
-        assert (
-            await session.execute(
-                select(ProviderLicensure).filter(ProviderLicensure.id == licensure_id)
-            )
-        ).scalars().first() is None
-
-    rows = await _audit_rows_for(
-        db_test_session_manager,
-        resource_type="provider_licensure",
-        resource_id=licensure_id,
-    )
-    assert rows[0].action == AuditAction.DELETE_LICENSURE
-    assert rows[0].after is None
-
-
 # --- Education + certification smoke tests ------------------------------
 
 
@@ -851,33 +761,6 @@ async def test_update_education_audits(
     assert rows[0].action == AuditAction.UPDATE_EDUCATION
 
 
-async def test_delete_education_removes_and_audits(
-    db_test_session_manager: async_sessionmaker[AsyncSession],
-):
-    user = await _seed_user(db_test_session_manager)
-    provider_id, _, education_id, _ = await _seed_provider(
-        db_test_session_manager, user_id=user.id, with_education=True
-    )
-
-    async with db_test_session_manager() as session:
-        repo = ProviderRepository(session)
-        audit_repo = AuditRepository(session)
-        await handle_delete_education(provider_id, education_id, repo, audit_repo, user)
-
-    async with db_test_session_manager() as session:
-        assert (
-            await session.execute(
-                select(ProviderEducation).filter(ProviderEducation.id == education_id)
-            )
-        ).scalars().first() is None
-    rows = await _audit_rows_for(
-        db_test_session_manager,
-        resource_type="provider_education",
-        resource_id=education_id,
-    )
-    assert rows[0].action == AuditAction.DELETE_EDUCATION
-
-
 async def test_create_certification_attaches_and_audits(
     db_test_session_manager: async_sessionmaker[AsyncSession],
 ):
@@ -933,34 +816,3 @@ async def test_update_certification_audits(
         resource_id=certification_id,
     )
     assert rows[0].action == AuditAction.UPDATE_CERTIFICATION
-
-
-async def test_delete_certification_removes_and_audits(
-    db_test_session_manager: async_sessionmaker[AsyncSession],
-):
-    user = await _seed_user(db_test_session_manager)
-    provider_id, _, _, certification_id = await _seed_provider(
-        db_test_session_manager, user_id=user.id, with_certification=True
-    )
-
-    async with db_test_session_manager() as session:
-        repo = ProviderRepository(session)
-        audit_repo = AuditRepository(session)
-        await handle_delete_certification(
-            provider_id, certification_id, repo, audit_repo, user
-        )
-
-    async with db_test_session_manager() as session:
-        assert (
-            await session.execute(
-                select(ProviderCertification).filter(
-                    ProviderCertification.id == certification_id
-                )
-            )
-        ).scalars().first() is None
-    rows = await _audit_rows_for(
-        db_test_session_manager,
-        resource_type="provider_certification",
-        resource_id=certification_id,
-    )
-    assert rows[0].action == AuditAction.DELETE_CERTIFICATION

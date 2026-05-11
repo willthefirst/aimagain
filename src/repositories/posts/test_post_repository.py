@@ -168,7 +168,7 @@ async def test_delete_post_cascades_client_referral_detail(
     async with db_test_session_manager() as session:
         repo = PostRepository(session)
         post = await repo.get_post_by_id(post_id)
-        await repo.delete_post(post)
+        await repo.delete(post)
         await session.commit()
 
     async with db_test_session_manager() as session:
@@ -285,7 +285,7 @@ async def test_delete_post_cascades_provider_availability_detail(
     async with db_test_session_manager() as session:
         repo = PostRepository(session)
         post = await repo.get_post_by_id(post_id)
-        await repo.delete_post(post)
+        await repo.delete(post)
         await session.commit()
 
     async with db_test_session_manager() as session:

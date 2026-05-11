@@ -375,53 +375,6 @@ async def test_admin_patch_audit_actor_is_admin_not_owner(
 # --- Delete (DELETE) -----------------------------------------------------
 
 
-# PHASE2_REDUNDANT: framework-shaped — admin override on mount_delete.
-async def test_admin_can_delete_anyone_post(
-    authenticated_client: AsyncClient,
-    db_test_session_manager: async_sessionmaker[AsyncSession],
-    logged_in_user: User,
-):
-    """An admin can hard-delete a post owned by another user."""
-    await promote_to_admin(db_test_session_manager, logged_in_user.email)
-    other = create_test_user(username=f"other-{uuid.uuid4()}")
-    post = _client_referral_post(description="d", owner_id=other.id)
-    async with db_test_session_manager() as session:
-        async with session.begin():
-            session.add(other)
-            session.add(post)
-
-    response = await authenticated_client.delete(f"/posts/{post.id}")
-    assert response.status_code == 204
-
-    async with db_test_session_manager() as session:
-        result = await session.execute(select(Post).filter(Post.id == post.id))
-        assert result.scalars().first() is None
-
-
-# PHASE2_REDUNDANT: framework-shaped — write_authz binding on mount_delete.
-async def test_non_owner_cannot_delete_post(
-    authenticated_client: AsyncClient,
-    db_test_session_manager: async_sessionmaker[AsyncSession],
-    logged_in_user: User,
-):
-    """A non-owner non-admin gets 403 and the post is preserved."""
-    other = create_test_user(username=f"other-{uuid.uuid4()}")
-    post = _client_referral_post(description="orig", owner_id=other.id)
-    async with db_test_session_manager() as session:
-        async with session.begin():
-            session.add(other)
-            session.add(post)
-
-    response = await authenticated_client.delete(f"/posts/{post.id}")
-    assert response.status_code == 403
-
-    async with db_test_session_manager() as session:
-        result = await session.execute(select(Post).filter(Post.id == post.id))
-        refreshed = result.scalars().first()
-        assert refreshed is not None
-        assert refreshed.client_referral_detail.description == "orig"
-
-
 async def test_admin_delete_audit_actor_is_admin_not_owner(
     authenticated_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],

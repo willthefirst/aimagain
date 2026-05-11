@@ -199,7 +199,7 @@ async def test_delete_provider_cascades_licensures(
         repo = ProviderRepository(session)
         provider = await repo.get_by_id(provider_id)
         assert provider is not None
-        await repo.delete_provider(provider)
+        await repo.delete(provider)
         await session.commit()
 
     async with db_test_session_manager() as session:
@@ -440,7 +440,7 @@ async def test_licensure_crud_round_trip(
         repo = ProviderRepository(session)
         found = await repo.get_licensure_by_id(licensure_id)
         assert found.license_number == "L-2"
-        await repo.delete_licensure(found)
+        await repo.delete(found)
         await session.commit()
 
     async with db_test_session_manager() as session:
@@ -482,7 +482,7 @@ async def test_education_crud_round_trip(
         repo = ProviderRepository(session)
         found = await repo.get_education_by_id(education_id)
         assert found.institution == "State U Renamed"
-        await repo.delete_education(found)
+        await repo.delete(found)
         await session.commit()
 
     async with db_test_session_manager() as session:
@@ -524,7 +524,7 @@ async def test_certification_crud_round_trip(
         repo = ProviderRepository(session)
         found = await repo.get_certification_by_id(cert_id)
         assert found.certifying_body == "Updated Body"
-        await repo.delete_certification(found)
+        await repo.delete(found)
         await session.commit()
 
     async with db_test_session_manager() as session:

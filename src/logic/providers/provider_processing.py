@@ -286,33 +286,6 @@ async def handle_update_provider(
     return provider
 
 
-async def handle_delete_provider(
-    provider_id: UUID,
-    repo: ProviderRepository,
-    audit_repo: AuditRepository,
-    requesting_user: User,
-) -> None:
-    """Hard-deletes the provider (sub-rows cascade). Owner-or-admin only.
-
-    The audit row is recorded before the delete fires so the actor FK is
-    still valid; `before` captures the full provider including sub-rows.
-    No per-sub-row audit rows — the parent's nested snapshot is the
-    durable record.
-    """
-    provider = await _load_provider_or_404(provider_id, repo)
-    assert_owner_or_admin(provider, requesting_user, action="modify this provider")
-
-    async with mutate(
-        repo,
-        audit_repo,
-        actor=requesting_user,
-        target=provider,
-        resource=PROVIDER,
-        verb="delete",
-    ):
-        await repo.delete_provider(provider)
-
-
 # --- Sub-row CRUD helpers ------------------------------------------------
 # Three private helpers parameterized by `_SubrowSpec` cover the nine public
 # sub-row handlers below. Each public handler is a thin wrapper that
@@ -324,7 +297,6 @@ class _SubrowSpec:
     resource: AuditedResource
     add: str
     update: str
-    delete: str
     get_by_id: str
     display_name: str
 
@@ -333,7 +305,6 @@ _LICENSURE_SPEC = _SubrowSpec(
     resource=LICENSURE,
     add="add_licensure",
     update="update_licensure",
-    delete="delete_licensure",
     get_by_id="get_licensure_by_id",
     display_name="Licensure",
 )
@@ -341,7 +312,6 @@ _EDUCATION_SPEC = _SubrowSpec(
     resource=EDUCATION,
     add="add_education",
     update="update_education",
-    delete="delete_education",
     get_by_id="get_education_by_id",
     display_name="Education entry",
 )
@@ -349,7 +319,6 @@ _CERTIFICATION_SPEC = _SubrowSpec(
     resource=CERTIFICATION,
     add="add_certification",
     update="update_certification",
-    delete="delete_certification",
     get_by_id="get_certification_by_id",
     display_name="Certification",
 )
@@ -408,32 +377,6 @@ async def _handle_subrow_update(
     return row
 
 
-async def _handle_subrow_delete(
-    *,
-    provider_id: UUID,
-    child_id: UUID,
-    repo: ProviderRepository,
-    audit_repo: AuditRepository,
-    requesting_user: User,
-    spec: _SubrowSpec,
-) -> None:
-    provider = await _load_provider_or_404(provider_id, repo)
-    assert_owner_or_admin(provider, requesting_user, action="modify this provider")
-
-    row = await _load_subrow_or_404(
-        getattr(repo, spec.get_by_id), child_id, provider.id, name=spec.display_name
-    )
-    async with mutate(
-        repo,
-        audit_repo,
-        actor=requesting_user,
-        target=row,
-        resource=spec.resource,
-        verb="delete",
-    ):
-        await getattr(repo, spec.delete)(row)
-
-
 # --- Licensure handlers --------------------------------------------------
 
 
@@ -466,23 +409,6 @@ async def handle_update_licensure(
         provider_id=provider_id,
         child_id=licensure_id,
         payload=payload,
-        repo=repo,
-        audit_repo=audit_repo,
-        requesting_user=requesting_user,
-        spec=_LICENSURE_SPEC,
-    )
-
-
-async def handle_delete_licensure(
-    provider_id: UUID,
-    licensure_id: UUID,
-    repo: ProviderRepository,
-    audit_repo: AuditRepository,
-    requesting_user: User,
-) -> None:
-    await _handle_subrow_delete(
-        provider_id=provider_id,
-        child_id=licensure_id,
         repo=repo,
         audit_repo=audit_repo,
         requesting_user=requesting_user,
@@ -529,23 +455,6 @@ async def handle_update_education(
     )
 
 
-async def handle_delete_education(
-    provider_id: UUID,
-    education_id: UUID,
-    repo: ProviderRepository,
-    audit_repo: AuditRepository,
-    requesting_user: User,
-) -> None:
-    await _handle_subrow_delete(
-        provider_id=provider_id,
-        child_id=education_id,
-        repo=repo,
-        audit_repo=audit_repo,
-        requesting_user=requesting_user,
-        spec=_EDUCATION_SPEC,
-    )
-
-
 # --- Certification handlers ----------------------------------------------
 
 
@@ -578,23 +487,6 @@ async def handle_update_certification(
         provider_id=provider_id,
         child_id=certification_id,
         payload=payload,
-        repo=repo,
-        audit_repo=audit_repo,
-        requesting_user=requesting_user,
-        spec=_CERTIFICATION_SPEC,
-    )
-
-
-async def handle_delete_certification(
-    provider_id: UUID,
-    certification_id: UUID,
-    repo: ProviderRepository,
-    audit_repo: AuditRepository,
-    requesting_user: User,
-) -> None:
-    await _handle_subrow_delete(
-        provider_id=provider_id,
-        child_id=certification_id,
         repo=repo,
         audit_repo=audit_repo,
         requesting_user=requesting_user,

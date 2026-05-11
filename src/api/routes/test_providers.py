@@ -408,18 +408,6 @@ async def test_delete_provider_returns_204_and_cascades(
         ).scalars().first() is None
 
 
-# PHASE2_REDUNDANT: framework-shaped — write_authz binding on mount_delete.
-async def test_delete_provider_returns_403_if_not_owner(
-    authenticated_client: AsyncClient,
-    db_test_session_manager: async_sessionmaker[AsyncSession],
-    logged_in_user: User,
-):
-    _, other_provider_id = await _seed_other_user_with_provider(db_test_session_manager)
-
-    response = await authenticated_client.delete(f"/providers/{other_provider_id}")
-    assert response.status_code == 403
-
-
 # --- Licensure sub-resource ---------------------------------------------
 
 
@@ -519,35 +507,6 @@ async def test_patch_licensure_returns_404_for_mismatched_provider(
         data={"license_number": "stolen"},
     )
     assert response.status_code == 404
-
-
-# PHASE2_REDUNDANT: framework-shaped — mount_delete subrow happy path.
-async def test_delete_licensure_returns_204(
-    authenticated_client: AsyncClient,
-    db_test_session_manager: async_sessionmaker[AsyncSession],
-    logged_in_user: User,
-):
-    provider_id = await _seed_provider_for(
-        db_test_session_manager, user_id=logged_in_user.id
-    )
-    licensure = make_provider_licensure(provider_id=provider_id)
-    async with db_test_session_manager() as session:
-        async with session.begin():
-            session.add(licensure)
-        await session.refresh(licensure)
-        licensure_id = licensure.id
-
-    response = await authenticated_client.delete(
-        f"/providers/{provider_id}/licensures/{licensure_id}"
-    )
-    assert response.status_code == 204
-
-    async with db_test_session_manager() as session:
-        assert (
-            await session.execute(
-                select(ProviderLicensure).filter(ProviderLicensure.id == licensure_id)
-            )
-        ).scalars().first() is None
 
 
 # --- Education / certification happy paths ------------------------------
