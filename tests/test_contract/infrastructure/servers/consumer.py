@@ -148,7 +148,7 @@ def _setup_post_owner_actions_stub(app: FastAPI) -> None:
 
 
 def _setup_provider_create_form_stub(app: FastAPI) -> None:
-    """Mount a stub page that renders the real `providers/new.html`
+    """Mount a stub page that renders the real `providers/form_new.html`
     template, so the create-form's HTMX submit is exercised without
     needing a database. The contract surface is the form's `POST
     /providers` request shape; what we render here is the same
@@ -167,7 +167,7 @@ def _setup_provider_create_form_stub(app: FastAPI) -> None:
             is_superuser=False,
         )
         return APIResponse.html_response(
-            template_name="providers/new.html",
+            template_name="providers/form_new.html",
             # `schema` is what the template's `field_for` macro
             # introspects to derive each control — same key the
             # production `handle_get_provider_form` puts in context.
@@ -177,7 +177,7 @@ def _setup_provider_create_form_stub(app: FastAPI) -> None:
 
 
 def _setup_provider_edit_form_stub(app: FastAPI) -> None:
-    """Mount a stub page that renders the real `providers/edit.html`
+    """Mount a stub page that renders the real `providers/form_edit.html`
     template with a hardcoded provider, so the practice-fields PATCH form is
     exercised without needing a database. The contract surface is the form's
     `PATCH /providers/{id}` request shape.
@@ -207,7 +207,7 @@ def _setup_provider_edit_form_stub(app: FastAPI) -> None:
             is_superuser=False,
         )
         return APIResponse.html_response(
-            template_name="providers/edit.html",
+            template_name="providers/form_edit.html",
             context={"provider": provider, "current_user": current_user},
             request=request,
         )

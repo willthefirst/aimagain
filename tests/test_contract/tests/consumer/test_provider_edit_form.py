@@ -1,7 +1,7 @@
 """Consumer contract: editing the practice fields on the provider edit form.
 
 Verifies that the practice-fields HTMX form rendered by
-`templates/providers/edit.html` (mounted via the
+`templates/providers/form_edit.html` (mounted via the
 `provider_edit_form` stub on the consumer server) issues a
 `PATCH /providers/{id}` form-encoded request with at least the
 `practice_name` field. The contract surface is the form wiring (method,

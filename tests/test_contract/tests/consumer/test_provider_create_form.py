@@ -1,7 +1,7 @@
 """Consumer contract: filling and submitting the provider create form.
 
 Verifies that the HTMX-decorated form rendered by
-`templates/providers/new.html` (mounted via the
+`templates/providers/form_new.html` (mounted via the
 `provider_create_form` stub on the consumer server) issues a
 `POST /providers` form-encoded request with the practice and
 availability fields the route's `ProviderCreate` schema expects.

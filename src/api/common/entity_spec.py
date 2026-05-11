@@ -85,6 +85,11 @@ class Templates:
     variants (create form / edit form). Posts uses neither (handler
     returns `template_name` in context for per-kind dispatch);
     providers uses both.
+
+    Per-field `None` means "default by convention" — `EntitySpec.__post_init__`
+    fills it with ``f"{url_collection}/{verb}.html"`` for any verb the
+    entity opts into via `RouteSet`. Specs only declare a field when the
+    path diverges from the convention (no current entity does).
     """
 
     list: str | None = None
@@ -314,6 +319,22 @@ class EntitySpec:
                 "`edge_audit`; they are mutually exclusive — CRUD-shaped "
                 "entities use AuditedResource, edge entities use EdgeAudit."
             )
+        # Default templates by convention: any opted-in verb whose
+        # `templates.<verb>` field is None gets `<url_collection>/<verb>.html`.
+        # Specs only declare a path when it diverges from this default.
+        # Non-opted-in verbs stay `None` so `test_user_favorite` (which
+        # asserts `detail is None` for the edge entity) still holds.
+        resolved = {
+            "list": self.templates.list,
+            "detail": self.templates.detail,
+            "form_new": self.templates.form_new,
+            "form_edit": self.templates.form_edit,
+        }
+        for verb in resolved:
+            if resolved[verb] is None and getattr(self.routes, verb, False):
+                resolved[verb] = f"{self.url_collection}/{verb}.html"
+        if any(resolved[v] != getattr(self.templates, v) for v in resolved):
+            object.__setattr__(self, "templates", Templates(**resolved))
 
     def _has_any_route(self) -> bool:
         r = self.routes

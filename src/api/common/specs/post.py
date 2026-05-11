@@ -20,7 +20,7 @@ Read by:
 
 from typing import Final
 
-from src.api.common.entity_spec import EntitySpec, RouteSet, Templates
+from src.api.common.entity_spec import EntitySpec, RouteSet
 from src.auth_config import current_active_user
 from src.logic._authz import assert_owner_or_admin, is_owner_or_admin
 from src.logic.audit import AuditedResource, make_audited_resource
@@ -85,8 +85,4 @@ POST_ENTITY: Final[EntitySpec] = EntitySpec(
     ),
     update_redirect=_post_update_redirect,
     discriminator=POST_KINDS,
-    templates=Templates(
-        list="posts/list.html",
-        detail="posts/detail.html",
-    ),
 )

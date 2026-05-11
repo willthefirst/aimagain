@@ -319,7 +319,7 @@ Per-entity instances at `src/api/common/specs/<entity>.py` carry:
 - **Route opt-ins** — `routes: RouteSet` flags: `list`, `detail`, `create`, `update`, `delete`, `form_new`, `form_edit`. Phase 1 reads these for documentation + spec-correctness tests; `mount_entity` (added in phase 2) consumes them at mount time.
 - **State axes** — `state_axes: tuple[StateAxis, ...]` (axis name, body schema, audit action, response projection).
 - **Related-list subresources** — `subresources: tuple[RelatedListSubresource, ...]` (child spec, template, optional `singleton_alias`).
-- **Templates** — `templates: Templates` for the list and detail views.
+- **Templates** — `templates: Templates` for the list/detail/form_new/form_edit views. Each field defaults by convention to `f"{url_collection}/{verb}.html"` for any verb the entity opts into via `RouteSet`. Specs only declare a path when it diverges from the convention (no current entity does).
 - **Body adapters + redirects** — `create_adapter`, `update_adapter`, `read_to_dict`, `create_redirect`, `update_redirect`, `delete_redirect`.
 - **List filters** — `filters: tuple[QueryParam, ...]` (providers declares `license_type` + `issuing_state`; the route layer threads them to `mount_list`).
 - **Polymorphism** — `discriminator: DiscriminatorRegistry[Any] | None`. Posts sets this to `POST_KINDS`; phase-2 generic `handle_create` / `handle_update` dispatches via the registry to find the per-kind detail model.
