@@ -96,11 +96,11 @@ Common utilities handle concerns that span multiple routes and domains.
 
 ### The shape
 
-A resource declares its identity once as an `EntitySpec` in `src/api/common/specs/<entity>.py` (carries collection name, id param, primary repo, audit binding, auth deps, schemas, templates, redirect targets, route opt-ins, state axes, subresources, filters, discriminator binding, M:N relation). The route file derives a `ResourceSpec` from the entity spec via `.to_resource_spec()` and passes a handlers dict to `mount_entity`, which reads the spec's `routes` flags + `state_axes` + `subresources` and calls the right underlying `mount_*` helper for each:
+A resource declares its identity once as an `EntitySpec` in `src/specs/<entity>.py` (carries collection name, id param, primary repo, audit binding, auth deps, schemas, templates, redirect targets, route opt-ins, state axes, subresources, filters, discriminator binding, M:N relation). The route file derives a `ResourceSpec` from the entity spec via `.to_resource_spec()` and passes a handlers dict to `mount_entity`, which reads the spec's `routes` flags + `state_axes` + `subresources` and calls the right underlying `mount_*` helper for each:
 
 ```python
 from src.api.common.resource_routes import mount_entity
-from src.api.common.specs.user import USER_ENTITY
+from src.specs.user import USER_ENTITY
 from src.logic._generic import make_delete_handler
 from src.logic.providers.provider_processing import handle_list_user_providers
 from src.logic.users.user_processing import (
@@ -305,7 +305,7 @@ Per-mount docstrings in `resource_routes.py` are the canonical reference for req
 
 ### What it captures
 
-Per-entity instances at `src/api/common/specs/<entity>.py` carry:
+Per-entity instances at `src/specs/<entity>.py` carry:
 
 - **Identity** — `name`, `url_collection`, `id_param`, `model`, `owner_attr`.
 - **Ownership chain** — `parent: EntitySpec | None` for owned subentities (the three provider credential entities set `parent=PROVIDER_ENTITY`).
@@ -352,7 +352,7 @@ detail = spec.detail_model(...)
 
 ### Spec is metadata-only; handlers stay at the call site
 
-`StateAxis.handler` and `RelatedListSubresource.handler` exist as fields but stay `None` by convention. Including a handler reference would mean `api.common.specs.<entity>` importing from `src.logic.<entity>`, which is the opposite of the usual layer direction and creates a circular import with handlers that themselves read from the spec. Route files supply the handler in the `mount_entity` handlers dict (or, equivalently, in the matching individual `mount_*` call for the rare entity that doesn't use `mount_entity`).
+`StateAxis.handler` and `RelatedListSubresource.handler` exist as fields but stay `None` by convention. Including a handler reference would mean `specs.<entity>` importing from `src.logic.<entity>`, which is the opposite of the usual layer direction and creates a circular import with handlers that themselves read from the spec. Route files supply the handler in the `mount_entity` handlers dict (or, equivalently, in the matching individual `mount_*` call for the rare entity that doesn't use `mount_entity`).
 
 This is a deliberate design call, not a phase-1 deferral. The framework-generic CRUD handlers (`handle_create` / `handle_update` / `handle_delete`) read the spec at call time, not at module-import time; they sidestep the cycle.
 

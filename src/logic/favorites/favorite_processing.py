@@ -19,17 +19,17 @@ from uuid import UUID
 from fastapi import Request
 
 from src.api.common.exceptions import NotFoundError
-from src.api.common.specs.user_favorite import FAVORITE_ENTITY
 from src.logic.audit import record_audit
 from src.models import Provider, User, UserFavorite
 from src.repositories.audit_repository import AuditRepository
 from src.repositories.favorites.user_favorite_repository import UserFavoriteRepository
 from src.repositories.providers.provider_repository import ProviderRepository
+from src.specs.user_favorite import FAVORITE_ENTITY
 
 logger = logging.getLogger(__name__)
 
 # Audit binding (resource_type, snapshot, verb→action map) lives on
-# the spec — see `src/api/common/specs/user_favorite.py`. Handlers
+# the spec — see `src/specs/user_favorite.py`. Handlers
 # read it via `FAVORITE_ENTITY.edge_audit`.
 _EDGE_AUDIT = FAVORITE_ENTITY.edge_audit
 

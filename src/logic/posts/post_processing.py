@@ -1,12 +1,12 @@
 import logging
 
-from src.api.common.specs.post import POST_ENTITY
 from src.schemas.posts.post import (
     ClientReferralCreate,
     ClientReferralUpdate,
     ProviderAvailabilityCreate,
     ProviderAvailabilityUpdate,
 )
+from src.specs.post import POST_ENTITY
 
 logger = logging.getLogger(__name__)
 

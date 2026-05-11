@@ -24,14 +24,14 @@ from pydantic import BaseModel, TypeAdapter
 
 from src.api.common.entity_spec import EntitySpec
 from src.api.common.resource_routes import ResourceSpec
-from src.api.common.specs.post import POST_ENTITY
-from src.api.common.specs.provider import PROVIDER_ENTITY
-from src.api.common.specs.provider_certification import CERTIFICATION_ENTITY
-from src.api.common.specs.provider_education import EDUCATION_ENTITY
-from src.api.common.specs.provider_licensure import LICENSURE_ENTITY
-from src.api.common.specs.user import USER_ENTITY
-from src.api.common.specs.user_favorite import FAVORITE_ENTITY
 from src.logic.audit import AuditAction
+from src.specs.post import POST_ENTITY
+from src.specs.provider import PROVIDER_ENTITY
+from src.specs.provider_certification import CERTIFICATION_ENTITY
+from src.specs.provider_education import EDUCATION_ENTITY
+from src.specs.provider_licensure import LICENSURE_ENTITY
+from src.specs.user import USER_ENTITY
+from src.specs.user_favorite import FAVORITE_ENTITY
 
 # Canonical registry of every entity spec the codebase declares today.
 # Order matches the source-tree walk order; tests should not depend on

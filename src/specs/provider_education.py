@@ -7,13 +7,13 @@ factory (parent chain, subrow-CRUD-only routes, parent-form redirect).
 from typing import Final
 
 from src.api.common.entity_spec import EntitySpec
-from src.api.common.specs._credential import make_provider_credential_entity
 from src.models import ProviderEducation
 from src.schemas.providers.provider import (
     ProviderEducationCreate,
     ProviderEducationRead,
     ProviderEducationUpdate,
 )
+from src.specs._credential import make_provider_credential_entity
 
 EDUCATION_ENTITY: Final[EntitySpec] = make_provider_credential_entity(
     name="provider_education",

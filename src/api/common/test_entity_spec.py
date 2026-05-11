@@ -2,7 +2,7 @@
 
 These assert the framework-level invariants — no entity is exercised
 here. Per-entity correctness assertions (e.g. "user audit type is
-'user'") live in `src/api/common/specs/test_<entity>.py`.
+'user'") live in `src/specs/test_<entity>.py`.
 """
 
 from types import SimpleNamespace

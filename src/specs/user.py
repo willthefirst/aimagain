@@ -11,8 +11,8 @@ Read by:
     for the activation audit row.
 
 The related-list subresource references `PROVIDER_ENTITY` from
-`src.api.common.specs.provider` — the cross-spec reference stays
-inside `api/common/specs/` so the layer-direction inversion that
+`src.specs.provider` — the cross-spec reference stays
+inside `specs/` so the layer-direction inversion that
 A1 documented (`api/common -> api/routes`) is resolved.
 """
 
@@ -25,7 +25,6 @@ from src.api.common.entity_spec import (
     RouteSet,
     StateAxis,
 )
-from src.api.common.specs.provider import PROVIDER_ENTITY
 from src.auth_config import current_active_user
 from src.logic._authz import is_self_or_admin
 from src.logic.audit import AuditAction
@@ -37,6 +36,7 @@ from src.schemas.users.user import (
     UserActivationUpdate,
     UserAuditSnapshot,
 )
+from src.specs.provider import PROVIDER_ENTITY
 
 
 def _activation_response_to_dict(user: User) -> dict:

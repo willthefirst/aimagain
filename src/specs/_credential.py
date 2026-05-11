@@ -19,8 +19,8 @@ from src.api.common.entity_spec import (
     EntitySpec,
     RouteSet,
 )
-from src.api.common.specs.provider import PROVIDER_ENTITY, _provider_form_redirect
 from src.repositories.dependencies import get_provider_repository
+from src.specs.provider import PROVIDER_ENTITY, _provider_form_redirect
 
 
 def make_provider_credential_entity(

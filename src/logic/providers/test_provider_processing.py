@@ -14,7 +14,6 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from starlette.requests import Request
 
 from src.api.common.exceptions import ForbiddenError, NotFoundError
-from src.api.common.specs.provider import PROVIDER_ENTITY
 from src.logic._generic import handle_create, handle_detail, handle_list
 from src.logic.audit import AuditAction
 from src.logic.providers.provider_processing import (
@@ -36,6 +35,7 @@ from src.schemas.providers.provider import (
     ProviderEducationCreate,
     ProviderLicensureCreate,
 )
+from src.specs.provider import PROVIDER_ENTITY
 from tests.helpers import (
     create_test_user,
     make_provider,

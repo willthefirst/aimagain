@@ -13,13 +13,13 @@ the mount helpers) and `src/logic/providers/provider_processing.py`
 from typing import Final
 
 from src.api.common.entity_spec import EntitySpec
-from src.api.common.specs._credential import make_provider_credential_entity
 from src.models import ProviderLicensure
 from src.schemas.providers.provider import (
     ProviderLicensureCreate,
     ProviderLicensureRead,
     ProviderLicensureUpdate,
 )
+from src.specs._credential import make_provider_credential_entity
 
 LICENSURE_ENTITY: Final[EntitySpec] = make_provider_credential_entity(
     name="provider_licensure",

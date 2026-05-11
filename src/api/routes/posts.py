@@ -1,6 +1,6 @@
 from src.api.common import make_entity_router
 from src.api.common.resource_routes import mount_entity
-from src.api.common.specs.post import POST_ENTITY
+from src.specs.post import POST_ENTITY
 
 router = make_entity_router(POST_ENTITY)
 posts_api_router = router.router

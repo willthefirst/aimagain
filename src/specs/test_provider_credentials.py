@@ -11,10 +11,10 @@ every mutation, and the audit-action-stem override (the entity's
 
 import pytest
 
-from src.api.common.specs.provider import PROVIDER_ENTITY
-from src.api.common.specs.provider_certification import CERTIFICATION_ENTITY
-from src.api.common.specs.provider_education import EDUCATION_ENTITY
-from src.api.common.specs.provider_licensure import LICENSURE_ENTITY
+from src.specs.provider import PROVIDER_ENTITY
+from src.specs.provider_certification import CERTIFICATION_ENTITY
+from src.specs.provider_education import EDUCATION_ENTITY
+from src.specs.provider_licensure import LICENSURE_ENTITY
 
 CREDENTIALS = [
     pytest.param(LICENSURE_ENTITY, "licensure", id="licensure"),

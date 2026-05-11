@@ -9,10 +9,10 @@ axis, the providers related-list, the private-fields tuple, the
 """
 
 from src.api.common.entity_spec import ADMIN_FOR_WRITE, RelatedListSubresource
-from src.api.common.specs.user import USER_ENTITY
 from src.logic._authz import is_self_or_admin
 from src.logic.audit import AuditAction
 from src.schemas.users.user import UserActivationAuditSnapshot, UserActivationUpdate
+from src.specs.user import USER_ENTITY
 
 # --- Auth deps (security-visible) ----------------------------------------
 

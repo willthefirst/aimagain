@@ -16,8 +16,8 @@ behavior.
 
 The dataclass intentionally stops short of carrying handler
 references on its state-axis / subresource descriptors: the spec
-sits in `src/api/common/specs/` and pulling handlers in would mean
-`api.common.specs` importing `src.logic.<entity>`, which is the
+sits in `src/specs/` and pulling handlers in would mean
+`specs` importing `src.logic.<entity>`, which is the
 opposite of the usual layer direction and creates an import cycle
 with handlers that read from the spec. Phase 1 keeps the spec as
 *metadata*; route files supply the handler in the matching
@@ -260,7 +260,7 @@ class EntitySpec:
         helpers, plus direct lookup for state-axis / subresource
         shape and list-filter declarations.
       - Spec-correctness tests
-        (`src/api/common/specs/test_<entity>.py`) that assert the
+        (`src/specs/test_<entity>.py`) that assert the
         spec declares the right things.
 
     Construction validates pairings that would otherwise leak
