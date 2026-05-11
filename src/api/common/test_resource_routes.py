@@ -1286,24 +1286,27 @@ def test_mount_entity_dispatches_related_list_subresources():
 
 
 def test_mount_entity_missing_handler_raises_key_error():
-    """If a route is opted in but the handler is missing → KeyError."""
+    """If a route is opted in but the handler is missing → KeyError.
+    Uses `form_new` because every standard CRUD verb has a default
+    factory now (list / detail / create / update / delete / form_edit
+    auto-bind); only `form_new` requires an explicit handler."""
     spec = _EntitySpec(
         name="thing",
         url_collection="things",
         id_param="thing_id",
         model=SimpleNamespace,
         audit=_stub_audit(),
-        routes=_RouteSet(list=True),
+        routes=_RouteSet(form_new=True),
     )
     import src.api.common.resource_routes as rr
 
-    orig = rr.mount_list
-    rr.mount_list = lambda *a, **k: None
+    orig = rr.mount_form
+    rr.mount_form = lambda *a, **k: None
     try:
         with pytest.raises(KeyError):
-            mount_entity(None, spec, handlers={})  # missing "list"
+            mount_entity(None, spec, handlers={})  # missing "form_new"
     finally:
-        rr.mount_list = orig
+        rr.mount_form = orig
 
 
 def test_mount_entity_extra_handler_keys_raises_value_error():
@@ -1467,8 +1470,8 @@ def test_mount_entity_owned_subentity_explicit_handler_overrides_default():
 
 def test_mount_entity_owned_subentity_no_default_factory_raises():
     """Opting an owned subentity into a verb without a default factory
-    (e.g. `list`, `form_new`) requires an explicit handler — missing
-    one raises `KeyError` at mount time."""
+    (only `form_new` today; every standard CRUD verb has one) requires
+    an explicit handler — missing one raises `KeyError` at mount time."""
     parent = _EntitySpec(
         name="parent",
         url_collection="parents",
@@ -1483,8 +1486,8 @@ def test_mount_entity_owned_subentity_no_default_factory_raises():
         model=SimpleNamespace,
         parent=parent,
         audit=_stub_audit(),
-        routes=_RouteSet(list=True),
-        templates=_Templates(list="x/list.html"),
+        routes=_RouteSet(form_new=True),
+        templates=_Templates(form_new="x/form.html"),
     )
     with pytest.raises(KeyError, match="no default factory"):
         mount_entity(None, parent, handlers={}, owned_subentities=(child,))

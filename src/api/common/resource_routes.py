@@ -814,15 +814,15 @@ def _owned_factory_makers() -> dict[str, Callable[..., Callable[..., Awaitable[A
     logic module has finished initializing.
 
     Only verbs whose factory delegates to a standard ritual appear
-    here. ``list`` and ``form_new`` have no defaults because their
-    bespoke knobs (custom repo query / template selection) make
-    auto-binding unsafe.
+    here. ``form_new`` has no default because its template-selection
+    knob is bespoke per entity.
     """
     from src.logic._generic import (
         make_create_handler,
         make_delete_handler,
         make_detail_handler,
         make_edit_form_handler,
+        make_list_handler,
         make_update_handler,
     )
 
@@ -832,10 +832,18 @@ def _owned_factory_makers() -> dict[str, Callable[..., Callable[..., Awaitable[A
         "delete": make_delete_handler,
         "detail": make_detail_handler,
         "form_edit": make_edit_form_handler,
+        "list": make_list_handler,
     }
 
 
-_TOP_LEVEL_AUTO_BIND_VERBS = ("detail", "create", "update", "delete", "form_edit")
+_TOP_LEVEL_AUTO_BIND_VERBS = (
+    "list",
+    "detail",
+    "create",
+    "update",
+    "delete",
+    "form_edit",
+)
 
 
 def _detect_caller_module() -> str:
@@ -870,6 +878,8 @@ def mount_entity(
     owned_subentities: tuple[Any, ...] = (),
     detail_extras: Callable[..., Awaitable[dict[str, Any]]] | None = None,
     detail_extra_repos: tuple[tuple[str, type], ...] = (),
+    list_extras: Callable[..., Awaitable[dict[str, Any]]] | None = None,
+    list_extra_repos: tuple[tuple[str, type], ...] = (),
 ) -> None:
     """Spec-driven dispatcher for an entity's full route surface.
 
@@ -944,6 +954,24 @@ def mount_entity(
             "explicit handlers['detail'] supplied — pick one. Extras are "
             "for the factory-built path; an explicit handler owns its own."
         )
+    # Validate list_extras configuration — same shape as detail_extras.
+    if (list_extras is not None or list_extra_repos) and not entity.routes.list:
+        raise ValueError(
+            f"mount_entity({entity.name!r}): list_extras/list_extra_repos "
+            "given but routes.list is False — the extras would never run."
+        )
+    if list_extra_repos and list_extras is None:
+        raise ValueError(
+            f"mount_entity({entity.name!r}): list_extra_repos set but "
+            "list_extras is None — the typed-repo kwargs would have no "
+            "consumer."
+        )
+    if list_extras is not None and "list" in handlers:
+        raise ValueError(
+            f"mount_entity({entity.name!r}): both list_extras and an "
+            "explicit handlers['list'] supplied — pick one. Extras are "
+            "for the factory-built path; an explicit handler owns its own."
+        )
 
     # Auto-bind top-level CRUD verbs --------------------------------------
     # Same factory-fallback shape as the owned-subentity branch below: any
@@ -972,6 +1000,8 @@ def mount_entity(
                 built = maker(
                     entity, extras=detail_extras, extra_repos=detail_extra_repos
                 )
+            elif verb == "list":
+                built = maker(entity, extras=list_extras, extra_repos=list_extra_repos)
             else:
                 built = maker(entity)
             built.__module__ = module
