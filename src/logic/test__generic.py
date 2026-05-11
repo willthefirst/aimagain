@@ -2431,3 +2431,133 @@ def test_static_context_default_is_empty_dict():
     """Default is empty; absent declaration means no extra keys land."""
     spec = _top_level_spec()
     assert spec.static_context == {}
+
+
+# --- delete_forbid_self ---------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_handle_delete_rejects_self_when_flag_set():
+    """`delete_forbid_self=True` blocks the request with 403 if the URL
+    target id equals the requesting user's id. Same logic that used to
+    live in `handle_delete_user` (bespoke), now framework-driven."""
+    spec = EntitySpec(
+        name="widget",
+        url_collection="widgets",
+        id_param="widget_id",
+        model=_FixtureRow,
+        audit=_audit(),
+        routes=RouteSet(delete=True),
+        delete_forbid_self=True,
+    )
+    actor_id = uuid4()
+    repo = _FakeRepo()
+    repo.seed(_FixtureRow, _FixtureRow(id=actor_id))
+    audit_repo = _FakeAuditRepo()
+    actor = _user(id_=actor_id, is_superuser=True)
+
+    with pytest.raises(ForbiddenError):
+        await handle_delete(
+            spec,
+            target_id=actor_id,
+            repo=repo,
+            audit_repo=audit_repo,
+            requesting_user=actor,
+        )
+    # Nothing deleted, no audit row written.
+    assert repo.deleted == []
+    assert audit_repo.calls == []
+
+
+@pytest.mark.asyncio
+async def test_handle_delete_allows_non_self_when_flag_set():
+    """The flag fires only on self-target — admins can still delete
+    other users' rows."""
+    spec = EntitySpec(
+        name="widget",
+        url_collection="widgets",
+        id_param="widget_id",
+        model=_FixtureRow,
+        audit=_audit(),
+        routes=RouteSet(delete=True),
+        delete_forbid_self=True,
+    )
+    target_id = uuid4()
+    repo = _FakeRepo()
+    repo.seed(_FixtureRow, _FixtureRow(id=target_id))
+
+    await handle_delete(
+        spec,
+        target_id=target_id,
+        repo=repo,
+        audit_repo=_FakeAuditRepo(),
+        requesting_user=_user(is_superuser=True),
+    )
+    assert len(repo.deleted) == 1
+
+
+def test_delete_forbid_self_requires_delete_route():
+    """`delete_forbid_self` is consumed only by handle_delete — without
+    a delete route the flag would be dead."""
+    with pytest.raises(ValueError, match="routes.delete"):
+        EntitySpec(
+            name="widget",
+            url_collection="widgets",
+            id_param="widget_id",
+            model=_FixtureRow,
+            audit=_audit(),
+            delete_forbid_self=True,
+            routes=RouteSet(detail=True),
+        )
+
+
+# --- StateAxis.forbid_self (mount-time wrapper) --------------------------
+
+
+@pytest.mark.asyncio
+async def test_state_axis_forbid_self_wrapper_rejects_self_target():
+    """The `forbid_self` axis flag wraps the resolved handler so a
+    self-target invocation raises 403 before the inner handler runs."""
+    from src.api.common.resource_routes import _wrap_state_axis_with_self_guard
+
+    inner_called = False
+
+    async def inner(*, widget_id, requesting_user, payload):
+        nonlocal inner_called
+        inner_called = True
+        return None
+
+    wrapped = _wrap_state_axis_with_self_guard(
+        inner, id_param="widget_id", axis_name="activation"
+    )
+    actor_id = uuid4()
+    actor = _user(id_=actor_id)
+
+    with pytest.raises(ForbiddenError, match="activation"):
+        await wrapped(widget_id=actor_id, requesting_user=actor, payload=None)
+    assert inner_called is False
+
+
+@pytest.mark.asyncio
+async def test_state_axis_forbid_self_wrapper_lets_other_targets_through():
+    """The wrapper is a no-op when target_id != requesting_user.id."""
+    from src.api.common.resource_routes import _wrap_state_axis_with_self_guard
+
+    inner_called = False
+
+    async def inner(*, widget_id, requesting_user, payload):
+        nonlocal inner_called
+        inner_called = True
+        return "ok"
+
+    wrapped = _wrap_state_axis_with_self_guard(
+        inner, id_param="widget_id", axis_name="activation"
+    )
+
+    result = await wrapped(
+        widget_id=uuid4(),
+        requesting_user=_user(),
+        payload=None,
+    )
+    assert result == "ok"
+    assert inner_called is True

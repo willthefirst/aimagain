@@ -4,8 +4,7 @@ from uuid import UUID
 
 from src.api.common.exceptions import NotFoundError
 from src.api.common.specs.user import USER_ENTITY
-from src.logic._authz import forbid_self_action
-from src.logic.audit import mutate, record_audit
+from src.logic.audit import record_audit
 from src.models import User
 from src.repositories.audit_repository import AuditRepository
 from src.repositories.providers.provider_repository import ProviderRepository
@@ -43,17 +42,15 @@ async def handle_set_user_activation(
     """Admin-only: set a user's activation state. Writes an audit row in the
     same transaction.
 
-    Self-guard lives here so direct API calls can't bypass the template's
-    `{% if %}` hide. The route's `current_admin_user` dep blocks non-admins.
+    The self-target guard is spec-driven — `USER_ENTITY.state_axis(
+    "activation").forbid_self=True` makes the framework wrap this
+    handler with the 403 check before invoking it, so this handler is
+    free of self-target boilerplate. The route's `current_admin_user`
+    dep blocks non-admins.
     """
     target = await repo.get_user_by_id(user_id)
     if target is None:
         raise NotFoundError(detail="User not found")
-    forbid_self_action(
-        target,
-        requesting_user,
-        detail="Admins cannot change their own activation state here",
-    )
 
     is_active = payload.state == "active"
     logger.info(
@@ -74,37 +71,3 @@ async def handle_set_user_activation(
     )
     await repo.session.commit()
     return updated
-
-
-async def handle_delete_user(
-    user_id: UUID,
-    repo: UserRepository,
-    audit_repo: AuditRepository,
-    requesting_user: User,
-) -> None:
-    """Admin-only: hard-delete a user row. Writes an audit row in the same
-    transaction; `before` captures the soon-to-be-gone state, `after` is None.
-
-    Self-delete is forbidden (the actor is never the target), so writing the
-    audit row after the delete fires is safe — the actor row stays around
-    for the FK and `mutate()` captures `target.id` up front.
-    """
-    target = await repo.get_user_by_id(user_id)
-    if target is None:
-        raise NotFoundError(detail="User not found")
-    forbid_self_action(
-        target,
-        requesting_user,
-        detail="Admins cannot delete their own account here",
-    )
-
-    logger.info(f"Handler: admin {requesting_user.id} hard-deleting user {target.id}")
-    async with mutate(
-        repo,
-        audit_repo,
-        actor=requesting_user,
-        target=target,
-        resource=USER_ENTITY.audit,
-        verb="delete",
-    ):
-        await repo.delete_user(target)

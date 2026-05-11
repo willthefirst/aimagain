@@ -25,7 +25,7 @@ from fastapi import Request
 from pydantic import BaseModel
 
 from src.api.common.entity_spec import EntitySpec
-from src.api.common.exceptions import BadRequestError, NotFoundError
+from src.api.common.exceptions import BadRequestError, ForbiddenError, NotFoundError
 from src.api.common.projections import project_view
 from src.logic._authz import is_admin
 from src.logic.audit import mutate
@@ -75,6 +75,15 @@ async def handle_delete(
     target = await repo.get_by_model_id(spec.model, target_id)
     if target is None:
         raise NotFoundError(detail=f"{spec.name.capitalize()} not found")
+
+    # Self-target guard for user-shaped entities — the comparison only
+    # matches when `target.id` IS the requesting user's id (i.e. the row
+    # is a user). For owned resources, target.id is a row UUID, so the
+    # comparison is harmless. See `EntitySpec.delete_forbid_self`.
+    if spec.delete_forbid_self and target.id == requesting_user.id:
+        raise ForbiddenError(
+            detail=f"Cannot delete your own {spec.name} via this endpoint"
+        )
 
     if spec.parent is not None:
         if parent_id is None:

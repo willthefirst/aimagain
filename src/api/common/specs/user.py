@@ -61,6 +61,11 @@ USER_ENTITY: Final[EntitySpec] = EntitySpec(
     public_fields=("id", "username"),
     list_exclude_self=True,
     routes=RouteSet(list=True, detail=True, delete=True),
+    # The user-list page is for *other* users; admins can't delete their
+    # own account via this endpoint, and the activation state-axis has
+    # the same self-target guard. Both are spec-declared so the user
+    # cluster doesn't carry hand-written self-target boilerplate.
+    delete_forbid_self=True,
     state_axes=(
         StateAxis(
             name="activation",
@@ -69,6 +74,7 @@ USER_ENTITY: Final[EntitySpec] = EntitySpec(
             response_to_dict=_activation_response_to_dict,
             handler_path=("src.logic.users.user_processing.handle_set_user_activation"),
             audit_snapshot=UserActivationAuditSnapshot,
+            forbid_self=True,
         ),
     ),
     subresources=(

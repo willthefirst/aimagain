@@ -151,6 +151,15 @@ class StateAxis:
     # `make_snapshotter`. Handlers consume this directly to capture
     # before/after JSON for the audit row.
     audit_snapshot_fn: Callable[[Any], dict[str, Any]] | None = None
+    # When True, the framework rejects the request with 403 if the
+    # URL's target id equals the requesting user's id — preventing an
+    # admin from mutating their own state via this axis. Meaningful
+    # for user-shaped entities where the row IS the user; for owned
+    # resources the comparison never matches so the flag is a no-op.
+    # Wrapping happens in `mount_entity` before the handler is passed
+    # to `mount_state_axis`, so the per-entity handler stays free of
+    # the boilerplate.
+    forbid_self: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -362,6 +371,15 @@ class EntitySpec:
     # opt-in repo must accept.
     list_exclude_self: bool = False
 
+    # Delete-route self guard ------------------------------------------
+    # When True, `handle_delete` rejects the request with 403 if the
+    # URL's target id equals the requesting user's id — preventing an
+    # admin from deleting their own account. Symmetric to
+    # `StateAxis.forbid_self`. Meaningful for user-shaped entities; on
+    # owned resources the comparison never matches (target.id is a
+    # row UUID, not a user id) so the flag is a no-op.
+    delete_forbid_self: bool = False
+
     # List-page filters --------------------------------------------------
     filters: tuple[QueryParam, ...] = ()
 
@@ -470,6 +488,13 @@ class EntitySpec:
             raise ValueError(
                 f"EntitySpec({self.name!r}) sets list_exclude_self=True but "
                 "routes.list is False — the flag would never apply."
+            )
+        # `delete_forbid_self` is consumed only by `handle_delete`; if no
+        # delete route is opted in, the flag is dead.
+        if self.delete_forbid_self and not self.routes.delete:
+            raise ValueError(
+                f"EntitySpec({self.name!r}) sets delete_forbid_self=True but "
+                "routes.delete is False — the flag would never apply."
             )
         # State-axis names must be unique; route mounting iterates by
         # name, so duplicates would shadow each other silently.
