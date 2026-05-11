@@ -74,6 +74,8 @@ def test_activation_axis_shape():
     assert axis.action == AuditAction.SET_USER_ACTIVATION
     assert axis.audit_snapshot is UserActivationAuditSnapshot
     assert axis.audit_snapshot_fn is not None  # built by spec __post_init__
+    # Activation must self-guard: admins can't flip their own state.
+    assert axis.forbid_self is True
     sample = axis.response_to_dict(
         type(
             "Sample",
@@ -82,6 +84,12 @@ def test_activation_axis_shape():
         )()
     )
     assert sample == {"id": "abc-123", "username": "u", "is_active": True}
+
+
+def test_delete_forbid_self_is_true():
+    """`/users/{me}` deletion via DELETE is blocked at the framework
+    level — admins cannot delete their own account."""
+    assert USER_ENTITY.delete_forbid_self is True
 
 
 def test_state_axes_has_exactly_activation():

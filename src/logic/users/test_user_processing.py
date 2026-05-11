@@ -2,14 +2,14 @@
 
 The user-detail projection is a security claim — `target_view` must omit
 `email`, `is_active`, `is_verified` from any viewer who isn't the user
-themselves or an admin. The `user_detail_extras` callable carries this
-guarantee: a forgotten template guard can re-leak; a missing dict key
-can't. These tests pin that invariant so the dict shape is the
-load-bearing surface, independent of any template.
+themselves or an admin. The auto-injected `target_user` projection on
+`handle_detail` carries this guarantee from `USER_ENTITY.public_fields`
+/ `private_fields` / `private_field_predicate`; the extras callable
+just adds the owned-providers list. These tests pin the dict shape so
+the security invariant holds independent of any template.
 
-Self-target guards on `handle_set_user_activation` and `handle_delete_user`
-are pinned here too — direct API callers can't bypass the template's
-`{% if %}` hide.
+Self-target guards (delete + activation) are spec-declared and
+framework-enforced — pinned in `src/logic/test__generic.py`.
 """
 
 import uuid
@@ -18,19 +18,12 @@ import pytest
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from starlette.requests import Request
 
-from src.api.common.exceptions import ForbiddenError
 from src.api.common.specs.user import USER_ENTITY
 from src.logic._generic import handle_detail
-from src.logic.users.user_processing import (
-    handle_delete_user,
-    handle_set_user_activation,
-    user_detail_extras,
-)
+from src.logic.users.user_processing import user_detail_extras
 from src.models import User
-from src.repositories.audit_repository import AuditRepository
 from src.repositories.providers.provider_repository import ProviderRepository
 from src.repositories.users.user_repository import UserRepository
-from src.schemas.users.user import UserActivationUpdate
 from tests.helpers import create_test_user
 
 pytestmark = pytest.mark.asyncio
@@ -130,39 +123,10 @@ async def test_get_user_detail_includes_private_fields_for_admin(
     assert context["can_view_private"] is True
 
 
-# --- Self-target guards on activation / delete ---------------------------
-
-
-async def test_set_user_activation_rejects_self_target(
-    db_test_session_manager: async_sessionmaker[AsyncSession],
-):
-    """An admin cannot flip their own activation via this handler — the
-    self-guard lives in logic so direct API calls can't bypass the
-    template's `{% if %}` hide."""
-    admin = await _seed_user(db_test_session_manager, is_superuser=True)
-
-    async with db_test_session_manager() as session:
-        with pytest.raises(ForbiddenError):
-            await handle_set_user_activation(
-                user_id=admin.id,
-                payload=UserActivationUpdate(state="deactivated"),
-                repo=UserRepository(session),
-                audit_repo=AuditRepository(session),
-                requesting_user=admin,
-            )
-
-
-async def test_delete_user_rejects_self_target(
-    db_test_session_manager: async_sessionmaker[AsyncSession],
-):
-    """An admin cannot hard-delete themselves via this handler."""
-    admin = await _seed_user(db_test_session_manager, is_superuser=True)
-
-    async with db_test_session_manager() as session:
-        with pytest.raises(ForbiddenError):
-            await handle_delete_user(
-                user_id=admin.id,
-                repo=UserRepository(session),
-                audit_repo=AuditRepository(session),
-                requesting_user=admin,
-            )
+# Self-target guards on `delete` and the `activation` state-axis are
+# spec-declared (`USER_ENTITY.delete_forbid_self=True`,
+# `state_axis("activation").forbid_self=True`); the framework enforces
+# them, so the rejection behavior is pinned in `src/logic/test__generic.py`
+# (for `handle_delete`) and the framework-wrapper test for state-axis
+# self-guards. No user-level direct-handler tests needed — the handler
+# itself no longer has the boilerplate to test.

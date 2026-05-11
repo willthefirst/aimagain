@@ -1,7 +1,6 @@
 from src.api.common import make_entity_router
 from src.api.common.resource_routes import mount_entity
 from src.api.common.specs.user import USER_ENTITY
-from src.logic.users.user_processing import handle_delete_user
 
 router = make_entity_router(USER_ENTITY)
 # Re-export the underlying APIRouter under the historic name so
@@ -10,13 +9,14 @@ router = make_entity_router(USER_ENTITY)
 users_api_router = router.router
 
 
-# `handle_delete_user` stays bespoke (self-guard on delete). List, detail,
-# state-axis (`activation`), related-list subresource (`providers`), and
-# per-viewer detail extras (`user_detail_extras` + the provider repo it
-# needs) all live on `USER_ENTITY` — resolved at mount time via the spec's
-# dotted `*_path` strings so `specs/user.py` never imports `src.logic`.
-mount_entity(
-    router,
-    USER_ENTITY,
-    handlers={"delete": handle_delete_user},
-)
+# Every verb is factory-built or spec-resolved:
+#   - list / detail / delete — auto-bound from `make_<verb>_handler(USER_ENTITY)`.
+#     `delete` honors `USER_ENTITY.delete_forbid_self=True` for the
+#     "admin can't delete self" rule.
+#   - activation — state-axis handler resolved via the spec's
+#     `handler_path`; the framework wraps it with the `forbid_self`
+#     self-target guard declared on the axis.
+#   - providers — related-list subresource, same `handler_path` path.
+# Detail extras (`user_detail_extras` + the provider repo it needs)
+# live on the spec via `detail_extras_path`.
+mount_entity(router, USER_ENTITY, handlers={})

@@ -44,6 +44,7 @@ from uuid import UUID
 from fastapi import Depends, Query, Request, status
 from pydantic import BaseModel, TypeAdapter
 
+from src.api.common.exceptions import ForbiddenError
 from src.api.common.forms import parse_and_validate_form, parse_and_validate_json
 from src.api.common.responses import (
     APIResponse,
@@ -1244,6 +1245,10 @@ def mount_entity(
         handler = _resolve_spec_bound_handler(
             entity, effective_handlers, key=axis.name, handler_path=axis.handler_path
         )
+        if axis.forbid_self:
+            handler = _wrap_state_axis_with_self_guard(
+                handler, id_param=spec.id_param, axis_name=axis.name
+            )
         mount_state_axis(
             router,
             spec,
@@ -1379,6 +1384,47 @@ def _parent_path_param_pairs(spec: ResourceSpec) -> tuple[tuple[str, type], ...]
         s = s.parent
     out.reverse()
     return tuple(out)
+
+
+def _wrap_state_axis_with_self_guard(
+    handler: Callable[..., Awaitable[Any]],
+    *,
+    id_param: str,
+    axis_name: str,
+) -> Callable[..., Awaitable[Any]]:
+    """Wrap a state-axis handler so the framework rejects self-target
+    invocations with 403 before invoking the entity's mutation logic.
+
+    The comparison is `kwargs[id_param] == requesting_user.id`, which
+    only matches on user-shaped entities (where the URL's target id IS
+    a user id). For owned resources, target_id is a row UUID, so the
+    comparison is a no-op — the flag's documented scope.
+
+    The wrapper preserves the handler's signature via `__wrapped__` so
+    `inspect.signature` (used by `_synthesize_route_fn`) still sees the
+    real parameters.
+    """
+
+    async def _self_guard(*args: Any, **kwargs: Any) -> Any:
+        target_id = kwargs.get(id_param)
+        requesting_user = kwargs.get("requesting_user")
+        if (
+            target_id is not None
+            and requesting_user is not None
+            and target_id == requesting_user.id
+        ):
+            raise ForbiddenError(
+                detail=f"Cannot change your own {axis_name} via this endpoint"
+            )
+        # Resolve through `_resolve_handler` so contract-test monkey-
+        # patches against the inner handler's home module take effect
+        # — same mechanism `_call_handler_with` uses for the outer
+        # handler. Without this, the closure-captured reference would
+        # bypass the patch.
+        return await _resolve_handler(handler)(*args, **kwargs)
+
+    _self_guard.__wrapped__ = handler  # type: ignore[attr-defined]
+    return _self_guard
 
 
 def _resolve_spec_bound_handler(
