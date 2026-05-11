@@ -173,7 +173,9 @@ The `_handle_<verb>_<entity>` named module attributes exist so contract tests ca
 
 ### Adding a sub-resource
 
-Declare the child entity with `parent=PARENT_ENTITY` on its spec (see `specs/provider_licensure.py` etc.). Pass the child entity through `owned_subentities=` on the parent's `mount_entity` call; the dispatcher walks the chain to build paths like `/providers/{provider_id}/licensures/{licensure_id}` and route handlers under keys prefixed by the child's name:
+Declare the child entity with `parent=PARENT_ENTITY` on its spec (see `specs/provider_licensure.py` etc.). Pass the child entity through `owned_subentities=` on the parent's `mount_entity` call; the dispatcher walks the chain to build paths like `/providers/{provider_id}/licensures/{licensure_id}`.
+
+For each opted-in verb on the child, `mount_entity` looks for `handlers["<child.name>.<verb>"]`; if absent and the verb has a default CRUD factory (`create`, `update`, `delete`, `detail`, `form_edit`), it auto-binds `make_<verb>_handler(child)`. Common case — credentials' subrow CRUD is entirely standard:
 
 ```python
 mount_entity(
@@ -181,14 +183,15 @@ mount_entity(
     PROVIDER_ENTITY,
     handlers={
         # ... parent handlers ...
-        "licensure.create": _handle_create_licensure,
-        "licensure.update": _handle_update_licensure,
-        "licensure.delete": _handle_delete_licensure,
-        # ... ditto for education / certification ...
+        # No `licensure.*` / `education.*` / `certification.*` entries needed:
+        # mount_entity auto-binds make_create_handler / make_update_handler /
+        # make_delete_handler for each opted-in verb on each owned subentity.
     },
     owned_subentities=(LICENSURE_ENTITY, EDUCATION_ENTITY, CERTIFICATION_ENTITY),
 )
 ```
+
+Supply `handlers["<child.name>.<verb>"]` only when the child needs a bespoke handler for that verb (e.g. a subentity create with side effects). Verbs without a default factory (`list`, `form_new`) always require an explicit entry — auto-binding would need bespoke knobs (custom repo query / template selection) that can't be inferred.
 
 Each factory-built handler receives both `provider_id=` and the child id (e.g. `licensure_id=`), plus `payload=`, `repo=`, `audit_repo=`, `requesting_user=`.
 
