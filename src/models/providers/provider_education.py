@@ -1,18 +1,13 @@
-from sqlalchemy import CheckConstraint, Column, ForeignKey, Text
+from functools import partial
+
+from sqlalchemy import Column, ForeignKey, Text
 from sqlalchemy.types import Uuid
 
 from ..base import BaseModel
-from ..enums import EDUCATION_TYPES, check_in_tuple_sql
+from ..enums import EDUCATION_TYPES, named_check_in
 
 _TABLE = "provider_educations"
-
-
-def _ck(column: str, values: tuple[str, ...]) -> CheckConstraint:
-    """`column IN (values)` CHECK named `ck_<table>_<column>`."""
-    return CheckConstraint(
-        check_in_tuple_sql(column, values),
-        name=f"ck_{_TABLE}_{column}",
-    )
+_ck = partial(named_check_in, _TABLE)
 
 
 class ProviderEducation(BaseModel):

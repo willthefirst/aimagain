@@ -303,3 +303,20 @@ def check_in_tuple_sql(column: str, values: tuple[str, ...]) -> str:
     so it's not safe for arbitrary future values."""
     quoted = ", ".join("'" + v.replace("'", "''") + "'" for v in values)
     return f"{column} IN ({quoted})"
+
+
+def named_check_in(
+    table: str, column: str, values: tuple[str, ...]
+) -> "CheckConstraint":
+    """`column IN (values)` CHECK named `ck_<table>_<column>`.
+
+    Centralizes the per-model `_ck` boilerplate every entity using a
+    controlled-vocabulary column was restating. Models import this
+    directly instead of redeclaring a local closure over `_TABLE`.
+    """
+    from sqlalchemy import CheckConstraint
+
+    return CheckConstraint(
+        check_in_tuple_sql(column, values),
+        name=f"ck_{table}_{column}",
+    )

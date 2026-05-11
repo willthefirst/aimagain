@@ -1,19 +1,14 @@
-from sqlalchemy import CheckConstraint, Column, ForeignKey, Text
+from functools import partial
+
+from sqlalchemy import Column, ForeignKey, Text
 from sqlalchemy.orm import relationship
 from sqlalchemy.types import Uuid
 
 from ..base import BaseModel
-from ..enums import LOCATION_AVAILABILITY_OPTIONS, US_STATES, check_in_tuple_sql
+from ..enums import LOCATION_AVAILABILITY_OPTIONS, US_STATES, named_check_in
 
 _TABLE = "providers"
-
-
-def _ck(column: str, values: tuple[str, ...]) -> CheckConstraint:
-    """`column IN (values)` CHECK named `ck_<table>_<column>`."""
-    return CheckConstraint(
-        check_in_tuple_sql(column, values),
-        name=f"ck_{_TABLE}_{column}",
-    )
+_ck = partial(named_check_in, _TABLE)
 
 
 class Provider(BaseModel):
