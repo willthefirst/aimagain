@@ -219,6 +219,19 @@ def test_auth_policy_expands_to_write_authz_and_can_write(
     assert spec.can_write is spec.auth_policy.can_write
 
 
+@_PARAM_ALL
+def test_auth_deps_expands_to_read_and_write_user_dep(
+    spec: EntitySpec,
+) -> None:
+    """When ``auth_deps`` is set, the constructor populates
+    ``read_user_dep`` and ``write_user_dep`` from it. Sibling rule to
+    ``auth_policy``'s expansion."""
+    if spec.auth_deps is None:
+        pytest.skip(f"{spec.name!r} uses no AuthDeps sentinel")
+    assert spec.read_user_dep is spec.auth_deps.read
+    assert spec.write_user_dep is spec.auth_deps.write
+
+
 # --- Parent / children registry ------------------------------------------
 
 

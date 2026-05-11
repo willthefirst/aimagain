@@ -19,13 +19,14 @@ A1 documented (`api/common -> api/routes`) is resolved.
 from typing import Final
 
 from src.api.common.entity_spec import (
+    ADMIN_FOR_WRITE,
     EntitySpec,
     RelatedListSubresource,
     RouteSet,
     StateAxis,
 )
 from src.api.common.specs.provider import PROVIDER_ENTITY
-from src.auth_config import current_active_user, current_admin_user
+from src.auth_config import current_active_user
 from src.logic._authz import is_self_or_admin
 from src.logic.audit import AuditAction
 from src.models import User
@@ -49,8 +50,7 @@ USER_ENTITY: Final[EntitySpec] = EntitySpec(
     model=User,
     owner_attr=None,  # the resource *is* the user; not owned by another user
     repo_dep=get_user_repository,
-    read_user_dep=current_active_user,
-    write_user_dep=current_admin_user,
+    auth_deps=ADMIN_FOR_WRITE,
     audit_snapshot=UserAuditSnapshot,
     private_fields=("email", "is_active", "is_verified"),
     private_field_predicate=is_self_or_admin,

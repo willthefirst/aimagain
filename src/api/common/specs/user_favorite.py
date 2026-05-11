@@ -25,6 +25,7 @@ mount helpers later; A4 doesn't.
 from typing import Final
 
 from src.api.common.entity_spec import (
+    AUTHENTICATED,
     EdgeAudit,
     EntitySpec,
     M2NRelation,
@@ -33,7 +34,6 @@ from src.api.common.entity_spec import (
 )
 from src.api.common.specs.provider import PROVIDER_ENTITY
 from src.api.common.specs.user import USER_ENTITY
-from src.auth_config import current_active_user
 from src.logic.audit import AuditAction, make_snapshotter
 from src.models import UserFavorite
 from src.repositories.dependencies import get_user_favorite_repository
@@ -59,8 +59,7 @@ FAVORITE_ENTITY: Final[EntitySpec] = EntitySpec(
     id_param="favorite_id",
     model=UserFavorite,
     repo_dep=get_user_favorite_repository,
-    read_user_dep=current_active_user,
-    write_user_dep=current_active_user,
+    auth_deps=AUTHENTICATED,
     edge_audit=FAVORITE_EDGE_AUDIT,
     relation=M2NRelation(
         from_entity=USER_ENTITY,

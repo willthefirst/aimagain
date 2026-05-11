@@ -6,17 +6,23 @@ what's unique to providers: list filters, the post-mutation redirects,
 the auth_policy expansion, and the per-viewer extras binding.
 """
 
-from src.api.common.entity_spec import OWNER_OR_ADMIN
+from src.api.common.entity_spec import AUTHENTICATED, OWNER_OR_ADMIN
 from src.api.common.specs.provider import PROVIDER_ENTITY
 
-# --- Authorization (provider-specific) -----------------------------------
+# --- Auth deps + authorization (provider-specific) -----------------------
+
+
+def test_auth_deps_is_authenticated():
+    """Providers expose CRUD to any active user; per-target write rules
+    live in `auth_policy`."""
+    assert PROVIDER_ENTITY.auth_deps is AUTHENTICATED
 
 
 def test_auth_policy_is_owner_or_admin():
-    """Pinned identity of the sentinel — `OWNER_OR_ADMIN` is the
-    `AuthzPolicy(assert_owner_or_admin, is_owner_or_admin)` pair and
-    a future spec mistakenly setting `auth_policy=AUTHENTICATED` (when
-    AuthDeps lands) would silently widen mutation access."""
+    """Pinned identity of the sentinel. The pair-of-callables in
+    `OWNER_OR_ADMIN` is the only `AuthzPolicy` instance that enforces
+    "owner-or-admin"; a future refactor swapping it would silently
+    change the mutation rule."""
     assert PROVIDER_ENTITY.auth_policy is OWNER_OR_ADMIN
 
 

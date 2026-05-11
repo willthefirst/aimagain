@@ -11,7 +11,10 @@ import pytest
 from pydantic import BaseModel, ConfigDict, TypeAdapter
 
 from src.api.common.entity_spec import (
+    ADMIN_FOR_WRITE,
+    AUTHENTICATED,
     OWNER_OR_ADMIN,
+    AuthDeps,
     AuthzPolicy,
     EdgeAudit,
     EntitySpec,
@@ -21,6 +24,7 @@ from src.api.common.entity_spec import (
     StateAxis,
     Templates,
 )
+from src.auth_config import current_active_user, current_admin_user
 from src.logic._authz import assert_owner_or_admin, is_owner_or_admin
 from src.logic.audit import AuditAction, AuditedResource, make_snapshotter
 
@@ -506,6 +510,47 @@ def test_auth_policy_and_can_write_mutually_exclusive():
             auth_policy=OWNER_OR_ADMIN,
             can_write=is_owner_or_admin,
         )
+
+
+def test_authenticated_sentinel_expands_to_both_deps():
+    """`auth_deps=AUTHENTICATED` populates both fields with
+    `current_active_user`. Mirrors the `auth_policy` shape."""
+    spec = _make_spec(auth_deps=AUTHENTICATED)
+    assert spec.read_user_dep is current_active_user
+    assert spec.write_user_dep is current_active_user
+
+
+def test_admin_for_write_sentinel_expands():
+    """`auth_deps=ADMIN_FOR_WRITE` keeps reads open to any active user
+    but elevates writes to admin-only — the user-entity pattern."""
+    spec = _make_spec(auth_deps=ADMIN_FOR_WRITE)
+    assert spec.read_user_dep is current_active_user
+    assert spec.write_user_dep is current_admin_user
+
+
+def test_auth_deps_and_read_user_dep_mutually_exclusive():
+    with pytest.raises(ValueError, match="mutually exclusive"):
+        _make_spec(
+            auth_deps=AUTHENTICATED,
+            read_user_dep=current_active_user,
+        )
+
+
+def test_auth_deps_and_write_user_dep_mutually_exclusive():
+    with pytest.raises(ValueError, match="mutually exclusive"):
+        _make_spec(
+            auth_deps=AUTHENTICATED,
+            write_user_dep=current_active_user,
+        )
+
+
+def test_custom_auth_deps_can_be_declared():
+    """`AuthDeps` is a public dataclass — future patterns (e.g. an
+    `ANONYMOUS_READ` variant) just bind a new instance."""
+    deps = AuthDeps(read=None, write=current_admin_user)
+    spec = _make_spec(auth_deps=deps)
+    assert spec.read_user_dep is None
+    assert spec.write_user_dep is current_admin_user
 
 
 def test_custom_authz_policy_can_be_declared():

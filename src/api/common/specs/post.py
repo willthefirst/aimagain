@@ -20,8 +20,13 @@ Read by:
 
 from typing import Final
 
-from src.api.common.entity_spec import OWNER_OR_ADMIN, EntitySpec, Redirects, RouteSet
-from src.auth_config import current_active_user
+from src.api.common.entity_spec import (
+    AUTHENTICATED,
+    OWNER_OR_ADMIN,
+    EntitySpec,
+    Redirects,
+    RouteSet,
+)
 from src.models import POST_KINDS, Post
 from src.repositories.dependencies import get_post_repository
 from src.schemas.posts.post import (
@@ -38,8 +43,7 @@ POST_ENTITY: Final[EntitySpec] = EntitySpec(
     model=Post,
     # `owner_attr` defaults to "owner_id" — posts track their owner via Post.owner_id.
     repo_dep=get_post_repository,
-    read_user_dep=current_active_user,
-    write_user_dep=current_active_user,
+    auth_deps=AUTHENTICATED,
     auth_policy=OWNER_OR_ADMIN,
     audit_snapshot=post_audit_snapshot,
     create_adapter=post_create_adapter,
