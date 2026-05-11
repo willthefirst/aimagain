@@ -148,6 +148,11 @@ class BaseRepository:
         coherent for the post-mutation audit snapshot."""
         return await self._add_child(parent, collection, child)
 
+    async def patch(self, obj: Any, **fields: Any) -> Any:
+        """Public alias for `_patch`. Used by `handle_update` — applies
+        non-`None` fields, flushes, refreshes."""
+        return await self._patch(obj, **fields)
+
     async def create_polymorphic(
         self, parent: Any, detail: Any, *, detail_relationship: str
     ) -> Any:

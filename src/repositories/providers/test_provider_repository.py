@@ -154,9 +154,7 @@ async def test_update_provider_changes_fields_visible_on_refetch(
         repo = ProviderRepository(session)
         provider = await repo.get_by_id(provider_id)
         assert provider is not None
-        await repo.update_provider(
-            provider, practice_name="Renamed", location_city="Chicago"
-        )
+        await repo.patch(provider, practice_name="Renamed", location_city="Chicago")
         await session.commit()
 
     async with db_test_session_manager() as session:
@@ -433,7 +431,7 @@ async def test_licensure_crud_round_trip(
         repo = ProviderRepository(session)
         found = await repo.get_licensure_by_id(licensure_id)
         assert found is not None
-        await repo.update_licensure(found, license_number="L-2")
+        await repo.patch(found, license_number="L-2")
         await session.commit()
 
     async with db_test_session_manager() as session:
@@ -475,7 +473,7 @@ async def test_education_crud_round_trip(
         repo = ProviderRepository(session)
         found = await repo.get_education_by_id(education_id)
         assert found is not None
-        await repo.update_education(found, institution="State U Renamed")
+        await repo.patch(found, institution="State U Renamed")
         await session.commit()
 
     async with db_test_session_manager() as session:
@@ -517,7 +515,7 @@ async def test_certification_crud_round_trip(
         repo = ProviderRepository(session)
         found = await repo.get_certification_by_id(cert_id)
         assert found is not None
-        await repo.update_certification(found, certifying_body="Updated Body")
+        await repo.patch(found, certifying_body="Updated Body")
         await session.commit()
 
     async with db_test_session_manager() as session:

@@ -939,3 +939,413 @@ def test_make_create_handler_name_includes_entity():
     )
     handler = make_create_handler(spec)
     assert handler.__name__ == "_handle_create_widget"
+
+
+# --- handle_update framework tests ---------------------------------------
+
+
+from src.api.common.exceptions import BadRequestError  # noqa: E402
+from src.logic._generic import handle_update, make_update_handler  # noqa: E402
+
+
+def _update_fake_repo() -> _FakeRepo:
+    """`_FakeRepo` extended with `patch` for the framework's update path."""
+    repo = _create_fake_repo()  # already has create / add_child / create_polymorphic
+    patched: list[tuple[_Any, dict]] = []
+    repo.patched = patched  # type: ignore[attr-defined]
+
+    async def patch(obj, **fields):
+        applied = {}
+        for k, v in fields.items():
+            if v is None:
+                continue
+            setattr(obj, k, v)
+            applied[k] = v
+        patched.append((obj, applied))
+        return obj
+
+    repo.patch = patch  # type: ignore[assignment]
+    return repo
+
+
+class _UpdatePayload(_BaseModel):
+    practice_name: str | None = None
+    location_city: str | None = None
+
+
+@pytest.mark.asyncio
+async def test_update_top_level_partial_patch_via_exclude_unset():
+    """`exclude_unset` — only explicitly-set fields are patched."""
+    spec = EntitySpec(
+        name="widget",
+        url_collection="widgets",
+        id_param="widget_id",
+        model=_AnyRow,
+        audit=_audit(),
+    )
+    repo = _update_fake_repo()
+    target_id = uuid4()
+    target = _AnyRow(id=target_id, practice_name="Old", location_city="OldCity")
+    repo.seed(_AnyRow, target)
+    audit_repo = _FakeAuditRepo()
+
+    await handle_update(
+        spec,
+        target_id=target_id,
+        payload=_UpdatePayload(practice_name="New"),  # location_city unset
+        repo=repo,
+        audit_repo=audit_repo,
+        requesting_user=SimpleNamespace(id=uuid4()),
+    )
+
+    assert target.practice_name == "New"
+    assert target.location_city == "OldCity"  # unchanged
+    assert len(audit_repo.calls) == 1
+    # Verify only one field made it into the patch dict.
+    patched_obj, applied = repo.patched[0]
+    assert patched_obj is target
+    assert applied == {"practice_name": "New"}
+
+
+@pytest.mark.asyncio
+async def test_update_invokes_write_authz_against_target():
+    seen = []
+
+    def authz(obj, user, *, action):
+        seen.append((obj, action))
+
+    spec = EntitySpec(
+        name="widget",
+        url_collection="widgets",
+        id_param="widget_id",
+        model=_AnyRow,
+        write_authz=authz,
+        audit=_audit(),
+    )
+    repo = _update_fake_repo()
+    target_id = uuid4()
+    target = _AnyRow(id=target_id)
+    repo.seed(_AnyRow, target)
+
+    await handle_update(
+        spec,
+        target_id=target_id,
+        payload=_UpdatePayload(),
+        repo=repo,
+        audit_repo=_FakeAuditRepo(),
+        requesting_user=SimpleNamespace(id=uuid4()),
+    )
+
+    assert len(seen) == 1
+    assert seen[0][0] is target
+    assert "update this widget" in seen[0][1]
+
+
+@pytest.mark.asyncio
+async def test_update_subentity_happy_path():
+    """Subentity: parent loaded, FK matched, write_authz on parent, detail patched."""
+    seen_authz = []
+
+    def authz(obj, user, *, action):
+        seen_authz.append(obj)
+
+    parent_spec = _parent_spec()
+    spec = EntitySpec(
+        name="part",
+        url_collection="parts",
+        id_param="part_id",
+        model=_AnyRow,
+        parent=parent_spec,
+        audit=_audit(),
+        write_authz=authz,
+        routes=RouteSet(update=True),
+        update_adapter=__import__("pydantic").TypeAdapter(_UpdatePayload),
+    )
+    repo = _update_fake_repo()
+    parent_id = uuid4()
+    parent_obj = _ParentRow(id=parent_id)
+    repo.seed(parent_spec.model, parent_obj)
+    child_id = uuid4()
+    child = _AnyRow(id=child_id, parent_id=parent_id, practice_name="Old")
+    repo.seed(_AnyRow, child)
+
+    await handle_update(
+        spec,
+        target_id=child_id,
+        parent_id=parent_id,
+        payload=_UpdatePayload(practice_name="New"),
+        repo=repo,
+        audit_repo=_FakeAuditRepo(),
+        requesting_user=SimpleNamespace(id=uuid4()),
+    )
+
+    assert seen_authz == [parent_obj]
+    assert child.practice_name == "New"
+
+
+@pytest.mark.asyncio
+async def test_update_subentity_parent_fk_mismatch_404():
+    parent_spec = _parent_spec()
+    spec = EntitySpec(
+        name="part",
+        url_collection="parts",
+        id_param="part_id",
+        model=_AnyRow,
+        parent=parent_spec,
+        audit=_audit(),
+        routes=RouteSet(update=True),
+        update_adapter=__import__("pydantic").TypeAdapter(_UpdatePayload),
+    )
+    repo = _update_fake_repo()
+    parent_id = uuid4()
+    other_parent_id = uuid4()
+    child_id = uuid4()
+    repo.seed(parent_spec.model, _ParentRow(id=parent_id))
+    repo.seed(parent_spec.model, _ParentRow(id=other_parent_id))
+    repo.seed(_AnyRow, _AnyRow(id=child_id, parent_id=parent_id))
+
+    with pytest.raises(NotFoundError):
+        await handle_update(
+            spec,
+            target_id=child_id,
+            parent_id=other_parent_id,
+            payload=_UpdatePayload(),
+            repo=repo,
+            audit_repo=_FakeAuditRepo(),
+            requesting_user=SimpleNamespace(id=uuid4()),
+        )
+
+
+# --- Polymorphic update --------------------------------------------------
+
+
+class _RedUpdatePayload(_BaseModel):
+    kind: str
+    redness: int | None = None
+
+
+class _BlueUpdatePayload(_BaseModel):
+    kind: str
+    blueness: int | None = None
+
+
+@pytest.mark.asyncio
+async def test_update_polymorphic_patches_detail_row():
+    """Payload kind matches target kind; detail row patched, parent not."""
+    registry = DiscriminatorRegistry(
+        column="kind",
+        specs={
+            "red": _FixtureKindSpec(
+                kind="red",
+                detail_model=_RedDetail,
+                detail_fields=("redness",),
+                detail_relationship="red_detail",
+            ),
+            "blue": _FixtureKindSpec(
+                kind="blue",
+                detail_model=_BlueDetail,
+                detail_fields=("blueness",),
+                detail_relationship="blue_detail",
+            ),
+        },
+    )
+    spec = EntitySpec(
+        name="painting",
+        url_collection="paintings",
+        id_param="painting_id",
+        model=_AnyRow,
+        audit=_audit(),
+        discriminator=registry,
+    )
+    repo = _update_fake_repo()
+    target_id = uuid4()
+    detail = _RedDetail(redness=3)
+    target = _AnyRow(id=target_id, kind="red", red_detail=detail)
+    repo.seed(_AnyRow, target)
+
+    await handle_update(
+        spec,
+        target_id=target_id,
+        payload=_RedUpdatePayload(kind="red", redness=99),
+        repo=repo,
+        audit_repo=_FakeAuditRepo(),
+        requesting_user=SimpleNamespace(id=uuid4()),
+    )
+
+    assert detail.redness == 99
+
+
+@pytest.mark.asyncio
+async def test_update_polymorphic_kind_mismatch_raises_bad_request():
+    registry = DiscriminatorRegistry(
+        column="kind",
+        specs={
+            "red": _FixtureKindSpec(
+                kind="red",
+                detail_model=_RedDetail,
+                detail_fields=("redness",),
+                detail_relationship="red_detail",
+            ),
+            "blue": _FixtureKindSpec(
+                kind="blue",
+                detail_model=_BlueDetail,
+                detail_fields=("blueness",),
+                detail_relationship="blue_detail",
+            ),
+        },
+    )
+    spec = EntitySpec(
+        name="painting",
+        url_collection="paintings",
+        id_param="painting_id",
+        model=_AnyRow,
+        audit=_audit(),
+        discriminator=registry,
+    )
+    repo = _update_fake_repo()
+    target_id = uuid4()
+    target = _AnyRow(id=target_id, kind="red", red_detail=_RedDetail())
+    repo.seed(_AnyRow, target)
+    audit_repo = _FakeAuditRepo()
+
+    with pytest.raises(BadRequestError):
+        await handle_update(
+            spec,
+            target_id=target_id,
+            payload=_BlueUpdatePayload(kind="blue", blueness=5),
+            repo=repo,
+            audit_repo=audit_repo,
+            requesting_user=SimpleNamespace(id=uuid4()),
+        )
+
+    # No audit, no commit on the kind-mismatch path.
+    assert audit_repo.calls == []
+    assert repo.session.commits == 0
+
+
+# --- Error / edge cases --------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_update_target_not_found():
+    spec = EntitySpec(
+        name="widget",
+        url_collection="widgets",
+        id_param="widget_id",
+        model=_AnyRow,
+        audit=_audit(),
+    )
+    with pytest.raises(NotFoundError):
+        await handle_update(
+            spec,
+            target_id=uuid4(),
+            payload=_UpdatePayload(),
+            repo=_update_fake_repo(),
+            audit_repo=_FakeAuditRepo(),
+            requesting_user=SimpleNamespace(id=uuid4()),
+        )
+
+
+@pytest.mark.asyncio
+async def test_update_write_authz_raises_no_audit_no_commit():
+    def authz(obj, user, *, action):
+        raise ForbiddenError(detail="nope")
+
+    spec = EntitySpec(
+        name="widget",
+        url_collection="widgets",
+        id_param="widget_id",
+        model=_AnyRow,
+        write_authz=authz,
+        audit=_audit(),
+    )
+    repo = _update_fake_repo()
+    target_id = uuid4()
+    repo.seed(_AnyRow, _AnyRow(id=target_id))
+    audit_repo = _FakeAuditRepo()
+
+    with pytest.raises(ForbiddenError):
+        await handle_update(
+            spec,
+            target_id=target_id,
+            payload=_UpdatePayload(),
+            repo=repo,
+            audit_repo=audit_repo,
+            requesting_user=SimpleNamespace(id=uuid4()),
+        )
+
+    assert repo.patched == []
+    assert audit_repo.calls == []
+    assert repo.session.commits == 0
+
+
+@pytest.mark.asyncio
+async def test_update_no_audit_binding_raises():
+    spec = EntitySpec(
+        name="widget",
+        url_collection="widgets",
+        id_param="widget_id",
+        model=_AnyRow,
+        audit=None,
+    )
+    with pytest.raises(ValueError, match="audit"):
+        await handle_update(
+            spec,
+            target_id=uuid4(),
+            payload=_UpdatePayload(),
+            repo=_update_fake_repo(),
+            audit_repo=_FakeAuditRepo(),
+            requesting_user=SimpleNamespace(id=uuid4()),
+        )
+
+
+# --- make_update_handler factory ------------------------------------------
+
+
+def test_make_update_handler_top_level_signature():
+    spec = EntitySpec(
+        name="widget",
+        url_collection="widgets",
+        id_param="widget_id",
+        model=_AnyRow,
+        audit=_audit(),
+    )
+    handler = make_update_handler(spec)
+    sig = inspect.signature(handler)
+    assert set(sig.parameters) == {
+        "widget_id",
+        "payload",
+        "repo",
+        "audit_repo",
+        "requesting_user",
+    }
+
+
+def test_make_update_handler_subentity_includes_parent_id():
+    parent_spec = _parent_spec()
+    spec = EntitySpec(
+        name="part",
+        url_collection="parts",
+        id_param="part_id",
+        model=_AnyRow,
+        parent=parent_spec,
+        audit=_audit(),
+        routes=RouteSet(update=True),
+        update_adapter=__import__("pydantic").TypeAdapter(_UpdatePayload),
+    )
+    handler = make_update_handler(spec)
+    sig = inspect.signature(handler)
+    assert "parent_id" in sig.parameters
+    assert "part_id" in sig.parameters
+
+
+def test_make_update_handler_name_includes_entity():
+    spec = EntitySpec(
+        name="widget",
+        url_collection="widgets",
+        id_param="widget_id",
+        model=_AnyRow,
+        audit=_audit(),
+    )
+    handler = make_update_handler(spec)
+    assert handler.__name__ == "_handle_update_widget"

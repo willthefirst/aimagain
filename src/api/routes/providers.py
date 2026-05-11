@@ -15,17 +15,17 @@ from src.api.common.specs.provider import PROVIDER_ENTITY
 from src.api.common.specs.provider_certification import CERTIFICATION_ENTITY
 from src.api.common.specs.provider_education import EDUCATION_ENTITY
 from src.api.common.specs.provider_licensure import LICENSURE_ENTITY
-from src.logic._generic import make_create_handler, make_delete_handler
+from src.logic._generic import (
+    make_create_handler,
+    make_delete_handler,
+    make_update_handler,
+)
 from src.logic.providers.provider_processing import (
     handle_create_provider,
     handle_get_provider_detail,
     handle_get_provider_edit_form,
     handle_get_provider_form,
     handle_list_providers,
-    handle_update_certification,
-    handle_update_education,
-    handle_update_licensure,
-    handle_update_provider,
 )
 
 providers_api_router = APIRouter(prefix="/providers")
@@ -89,8 +89,12 @@ mount_form(
 mount_detail(router, PROVIDER_SPEC, handler=handle_get_provider_detail)
 
 
-# PATCH /providers/{provider_id} — partial update, owner-or-admin (handler enforces).
-mount_update(router, PROVIDER_SPEC, handler=handle_update_provider)
+# PATCH /providers/{provider_id} — partial update, owner-or-admin.
+# Named module-level attribute so contract-test patches target
+# `src.api.routes.providers._handle_update_provider`.
+_handle_update_provider = make_update_handler(PROVIDER_ENTITY)
+_handle_update_provider.__module__ = __name__
+mount_update(router, PROVIDER_SPEC, handler=_handle_update_provider)
 # DELETE /providers/{provider_id} — hard delete, sub-rows cascade.
 # Generic delete: `make_delete_handler` builds a callable from the entity
 # spec (audit binding + write_authz). See `src/logic/_generic.py`.
@@ -106,11 +110,11 @@ mount_delete(router, PROVIDER_SPEC, handler=make_delete_handler(PROVIDER_ENTITY)
 # the handler under their declared kwarg names.
 
 
-for _spec, _entity, _update in (
-    (LICENSURE_SPEC, LICENSURE_ENTITY, handle_update_licensure),
-    (EDUCATION_SPEC, EDUCATION_ENTITY, handle_update_education),
-    (CERTIFICATION_SPEC, CERTIFICATION_ENTITY, handle_update_certification),
+for _spec, _entity in (
+    (LICENSURE_SPEC, LICENSURE_ENTITY),
+    (EDUCATION_SPEC, EDUCATION_ENTITY),
+    (CERTIFICATION_SPEC, CERTIFICATION_ENTITY),
 ):
     mount_create(router, _spec, handler=make_create_handler(_entity))
-    mount_update(router, _spec, handler=_update)
+    mount_update(router, _spec, handler=make_update_handler(_entity))
     mount_delete(router, _spec, handler=make_delete_handler(_entity))

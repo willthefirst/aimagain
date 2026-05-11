@@ -16,12 +16,10 @@ silently mutate a licensure belonging to a different provider.
 """
 
 import logging
-from dataclasses import dataclass
 from typing import Any
 from uuid import UUID
 
 from fastapi import Request
-from pydantic import BaseModel
 
 from src.api.common.exceptions import ForbiddenError, NotFoundError
 from src.api.common.specs.provider import PROVIDER_ENTITY
@@ -29,12 +27,9 @@ from src.api.common.specs.provider_certification import CERTIFICATION_ENTITY
 from src.api.common.specs.provider_education import EDUCATION_ENTITY
 from src.api.common.specs.provider_licensure import LICENSURE_ENTITY
 from src.logic._authz import assert_owner_or_admin, is_admin, is_owner
-from src.logic.audit import AuditedResource, mutate
+from src.logic.audit import mutate
 from src.models import (
     Provider,
-    ProviderCertification,
-    ProviderEducation,
-    ProviderLicensure,
     User,
 )
 from src.repositories.audit_repository import AuditRepository
@@ -42,11 +37,7 @@ from src.repositories.favorites.user_favorite_repository import UserFavoriteRepo
 from src.repositories.providers.provider_repository import ProviderRepository
 from src.repositories.users.user_repository import UserRepository
 from src.schemas.providers.provider import (
-    ProviderCertificationUpdate,
     ProviderCreate,
-    ProviderEducationUpdate,
-    ProviderLicensureUpdate,
-    ProviderUpdate,
 )
 
 logger = logging.getLogger(__name__)
@@ -74,17 +65,6 @@ async def _load_provider_or_404(
     if provider is None:
         raise NotFoundError(detail="Provider not found")
     return provider
-
-
-async def _load_subrow_or_404(getter, sub_id: UUID, parent_id: UUID, *, name: str):
-    """Load a credential sub-row and verify its `provider_id` matches the
-    URL's `provider_id`. 404 if missing or if the FK is for a different
-    parent — without this, `/providers/A/licensures/B` would silently
-    mutate a sub-row owned by provider B."""
-    row = await getter(sub_id)
-    if row is None or row.provider_id != parent_id:
-        raise NotFoundError(detail=f"{name} not found")
-    return row
 
 
 # --- Provider handlers ----------------------------------------------------
@@ -258,158 +238,3 @@ async def handle_create_provider(
     ):
         pass
     return created
-
-
-async def handle_update_provider(
-    provider_id: UUID,
-    payload: ProviderUpdate,
-    repo: ProviderRepository,
-    audit_repo: AuditRepository,
-    requesting_user: User,
-) -> Provider:
-    """Patches practice/availability fields on the provider. Owner-or-admin only."""
-    provider = await _load_provider_or_404(provider_id, repo)
-    assert_owner_or_admin(provider, requesting_user, action="modify this provider")
-
-    async with mutate(
-        repo,
-        audit_repo,
-        actor=requesting_user,
-        target=provider,
-        resource=PROVIDER,
-        verb="update",
-    ):
-        await repo.update_provider(provider, **payload.model_dump(exclude_unset=True))
-    return provider
-
-
-# --- Sub-row CRUD helpers ------------------------------------------------
-# Three private helpers parameterized by `_SubrowSpec` cover the nine public
-# sub-row handlers below. Each public handler is a thin wrapper that
-# preserves its existing signature so route callers and tests don't change.
-
-
-@dataclass(frozen=True)
-class _SubrowSpec:
-    resource: AuditedResource
-    add: str
-    update: str
-    get_by_id: str
-    display_name: str
-
-
-_LICENSURE_SPEC = _SubrowSpec(
-    resource=LICENSURE,
-    add="add_licensure",
-    update="update_licensure",
-    get_by_id="get_licensure_by_id",
-    display_name="Licensure",
-)
-_EDUCATION_SPEC = _SubrowSpec(
-    resource=EDUCATION,
-    add="add_education",
-    update="update_education",
-    get_by_id="get_education_by_id",
-    display_name="Education entry",
-)
-_CERTIFICATION_SPEC = _SubrowSpec(
-    resource=CERTIFICATION,
-    add="add_certification",
-    update="update_certification",
-    get_by_id="get_certification_by_id",
-    display_name="Certification",
-)
-
-
-async def _handle_subrow_update(
-    *,
-    provider_id: UUID,
-    child_id: UUID,
-    payload: BaseModel,
-    repo: ProviderRepository,
-    audit_repo: AuditRepository,
-    requesting_user: User,
-    spec: _SubrowSpec,
-) -> Any:
-    provider = await _load_provider_or_404(provider_id, repo)
-    assert_owner_or_admin(provider, requesting_user, action="modify this provider")
-
-    row = await _load_subrow_or_404(
-        getattr(repo, spec.get_by_id), child_id, provider.id, name=spec.display_name
-    )
-    async with mutate(
-        repo,
-        audit_repo,
-        actor=requesting_user,
-        target=row,
-        resource=spec.resource,
-        verb="update",
-    ):
-        await getattr(repo, spec.update)(row, **payload.model_dump(exclude_unset=True))
-    return row
-
-
-# --- Licensure handlers --------------------------------------------------
-
-
-async def handle_update_licensure(
-    provider_id: UUID,
-    licensure_id: UUID,
-    payload: ProviderLicensureUpdate,
-    repo: ProviderRepository,
-    audit_repo: AuditRepository,
-    requesting_user: User,
-) -> ProviderLicensure:
-    return await _handle_subrow_update(
-        provider_id=provider_id,
-        child_id=licensure_id,
-        payload=payload,
-        repo=repo,
-        audit_repo=audit_repo,
-        requesting_user=requesting_user,
-        spec=_LICENSURE_SPEC,
-    )
-
-
-# --- Education handlers --------------------------------------------------
-
-
-async def handle_update_education(
-    provider_id: UUID,
-    education_id: UUID,
-    payload: ProviderEducationUpdate,
-    repo: ProviderRepository,
-    audit_repo: AuditRepository,
-    requesting_user: User,
-) -> ProviderEducation:
-    return await _handle_subrow_update(
-        provider_id=provider_id,
-        child_id=education_id,
-        payload=payload,
-        repo=repo,
-        audit_repo=audit_repo,
-        requesting_user=requesting_user,
-        spec=_EDUCATION_SPEC,
-    )
-
-
-# --- Certification handlers ----------------------------------------------
-
-
-async def handle_update_certification(
-    provider_id: UUID,
-    certification_id: UUID,
-    payload: ProviderCertificationUpdate,
-    repo: ProviderRepository,
-    audit_repo: AuditRepository,
-    requesting_user: User,
-) -> ProviderCertification:
-    return await _handle_subrow_update(
-        provider_id=provider_id,
-        child_id=certification_id,
-        payload=payload,
-        repo=repo,
-        audit_repo=audit_repo,
-        requesting_user=requesting_user,
-        spec=_CERTIFICATION_SPEC,
-    )
