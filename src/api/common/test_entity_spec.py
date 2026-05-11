@@ -304,6 +304,41 @@ def test_discriminator_accepts_registry_instance():
     assert spec.discriminator.names == ("a", "b")
 
 
+def test_templates_default_by_convention_for_opted_in_verbs():
+    """Each opted-in verb whose template path is unset gets
+    ``<url_collection>/<verb>.html`` by convention."""
+    spec = _make_spec(
+        routes=RouteSet(list=True, detail=True),
+    )
+    assert spec.templates.list == "widgets/list.html"
+    assert spec.templates.detail == "widgets/detail.html"
+    # Non-opted-in verbs stay None — favorites relies on this for its
+    # edge entity (routes all off, only `list` declared explicitly).
+    assert spec.templates.form_new is None
+    assert spec.templates.form_edit is None
+
+
+def test_templates_explicit_overrides_convention():
+    """An explicit template path is preserved verbatim."""
+    spec = _make_spec(
+        routes=RouteSet(list=True),
+        templates=Templates(list="custom/list.html"),
+    )
+    assert spec.templates.list == "custom/list.html"
+
+
+def test_templates_explicit_value_for_non_opted_in_verb_preserved():
+    """Favorites declares `templates.list` without `routes.list=True` —
+    the explicit declaration must not be wiped out by the default-only
+    path."""
+    spec = _make_spec(
+        routes=RouteSet(),
+        templates=Templates(list="favorites/list.html"),
+    )
+    assert spec.templates.list == "favorites/list.html"
+    assert spec.templates.detail is None
+
+
 def test_to_resource_spec_walks_parent_chain():
     """`to_resource_spec()` on a child propagates the parent chain so
     the mount layer can build nested paths."""

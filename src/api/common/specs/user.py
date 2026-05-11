@@ -23,7 +23,6 @@ from src.api.common.entity_spec import (
     RelatedListSubresource,
     RouteSet,
     StateAxis,
-    Templates,
 )
 from src.api.common.specs.provider import PROVIDER_ENTITY
 from src.auth_config import current_active_user, current_admin_user
@@ -73,10 +72,6 @@ USER_ENTITY: Final[EntitySpec] = EntitySpec(
             template="users/providers_list.html",
             singleton_alias=("me", current_active_user),
         ),
-    ),
-    templates=Templates(
-        list="users/list.html",
-        detail="users/detail.html",
     ),
     # `/users/me` — detail page id sourced from the session.
     singleton_alias=("me", current_active_user),

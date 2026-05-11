@@ -2,7 +2,7 @@
 
 {# Confirm-then-delete button. Renders an `hx-delete` button with an
 `hx-confirm` dialog. Used by owner/admin action partials and by inline
-sub-resource list rows (e.g. providers/edit.html licensure delete). #}
+sub-resource list rows (e.g. providers/form_edit.html licensure delete). #}
 {% macro confirm_delete_button(url, confirm_message, label="Delete") -%}
 <button type="button" hx-delete="{{ url }}" hx-confirm="{{ confirm_message }}">{{ label }}</button>
 {%- endmacro %}

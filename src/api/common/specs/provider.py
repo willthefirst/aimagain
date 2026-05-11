@@ -18,7 +18,7 @@ Read by:
 
 from typing import Final
 
-from src.api.common.entity_spec import EntitySpec, RouteSet, Templates
+from src.api.common.entity_spec import EntitySpec, RouteSet
 from src.api.common.resource_routes import QueryParam
 from src.auth_config import current_active_user
 from src.logic._authz import assert_owner_or_admin, is_owner_or_admin
@@ -78,10 +78,4 @@ PROVIDER_ENTITY: Final[EntitySpec] = EntitySpec(
     ),
     create_redirect=_provider_form_redirect,
     update_redirect=_provider_form_redirect,
-    templates=Templates(
-        list="providers/list.html",
-        detail="providers/detail.html",
-        form_new="providers/new.html",
-        form_edit="providers/edit.html",
-    ),
 )
