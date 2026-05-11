@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Request
 
-from src.api.common import APIResponse, BaseRouter
+from src.framework import APIResponse, BaseRouter
 
 # Standardized router initialization
 auth_pages_api_router = APIRouter(prefix="/auth")

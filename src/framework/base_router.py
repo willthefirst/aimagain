@@ -2,10 +2,10 @@ from typing import TYPE_CHECKING, Any, Callable, List, Optional
 
 from fastapi import APIRouter, Depends
 
-from src.api.common.decorators import handle_route_errors, log_route_call
+from src.framework.decorators import handle_route_errors, log_route_call
 
 if TYPE_CHECKING:
-    from src.api.common.entity_spec import EntitySpec
+    from src.framework.entity_spec import EntitySpec
 
 
 class BaseRouter:

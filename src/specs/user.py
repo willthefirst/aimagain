@@ -18,18 +18,18 @@ A1 documented (`api/common -> api/routes`) is resolved.
 
 from typing import Final
 
-from src.api.common.entity_spec import (
+from src.auth_config import current_active_user
+from src.framework.audit import AuditAction
+from src.framework.authz import is_self_or_admin
+from src.framework.dependencies import get_user_repository
+from src.framework.entity_spec import (
     ADMIN_FOR_WRITE,
     EntitySpec,
     RelatedListSubresource,
     RouteSet,
     StateAxis,
 )
-from src.auth_config import current_active_user
-from src.logic._authz import is_self_or_admin
-from src.logic.audit import AuditAction
 from src.models import User
-from src.repositories.dependencies import get_user_repository
 from src.repositories.providers.provider_repository import ProviderRepository
 from src.schemas.users.user import (
     UserActivationAuditSnapshot,

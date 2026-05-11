@@ -12,7 +12,7 @@ the mount helpers) and `src/logic/providers/provider_processing.py`
 
 from typing import Final
 
-from src.api.common.entity_spec import EntitySpec
+from src.framework.entity_spec import EntitySpec
 from src.models import ProviderLicensure
 from src.schemas.providers.provider import (
     ProviderLicensureCreate,

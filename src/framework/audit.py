@@ -39,8 +39,8 @@ from uuid import UUID
 
 from pydantic import BaseModel
 
+from src.framework.audit_repository import AuditRepository
 from src.models import AuditLog, User
-from src.repositories.audit_repository import AuditRepository
 
 logger = logging.getLogger(__name__)
 

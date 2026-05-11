@@ -3,7 +3,7 @@ from typing import Any
 from fastapi import Response, status
 from fastapi.responses import JSONResponse
 
-from src.logic._authz import is_admin
+from src.framework.authz import is_admin
 from src.models import User
 
 
@@ -16,7 +16,7 @@ def base_context(user: User | None) -> dict:
     and tests can render the chrome with literals rather than
     constructing a User.
 
-    `is_admin` is computed via `src.logic._authz.is_admin` so the rule
+    `is_admin` is computed via `src.framework.authz.is_admin` so the rule
     has a single home; templates never re-derive it.
     """
     return {

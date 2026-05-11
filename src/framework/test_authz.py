@@ -1,18 +1,18 @@
-"""Tests for `src/logic/_authz.py`."""
+"""Tests for `src/framework/authz.py`."""
 
 import uuid
 from types import SimpleNamespace
 
 import pytest
 
-from src.api.common.exceptions import ForbiddenError
-from src.logic._authz import (
+from src.framework.authz import (
     assert_owner_or_admin,
     is_admin,
     is_owner,
     is_owner_or_admin,
     is_self_or_admin,
 )
+from src.framework.exceptions import ForbiddenError
 
 
 def _user(*, is_superuser: bool = False, id_=None):

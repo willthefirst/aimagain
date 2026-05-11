@@ -16,7 +16,7 @@ What's derived today:
     lookup against `register_choice_labels()` calls (see
     `src/core/templating.py`).
   - `pattern` / `maxlength` — from any `HtmlPattern` marker attached to
-    an `Annotated[...]` alias in `src/schemas/_validators.py`. The
+    an `Annotated[...]` alias in `src/framework/schema_validators.py`. The
     schema's regex validator stays the source of truth; the marker
     just exposes a *form* rendering of the same constraint.
   - Default `kind="text"` for everything else.
@@ -45,7 +45,7 @@ from pydantic import BaseModel
 @dataclass(frozen=True)
 class HtmlPattern:
     """Annotation marker carrying HTML pattern/maxlength hints for an
-    `Annotated[...]` alias in `src/schemas/_validators.py`.
+    `Annotated[...]` alias in `src/framework/schema_validators.py`.
 
     The schema's validator is the authoritative constraint; this marker
     exposes a form-side rendering of the same constraint so the

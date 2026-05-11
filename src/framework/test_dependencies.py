@@ -9,9 +9,9 @@ class.
 
 import pytest
 
-from src.repositories import dependencies as deps
-from src.repositories.audit_repository import AuditRepository
-from src.repositories.dependencies import (
+from src.framework import dependencies as deps
+from src.framework.audit_repository import AuditRepository
+from src.framework.dependencies import (
     _REPO_TYPE_RESOLVERS,
     _REPO_TYPES,
     UnknownRepoTypeError,

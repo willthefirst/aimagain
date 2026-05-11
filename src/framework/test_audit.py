@@ -11,7 +11,7 @@ import pytest
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from src.logic.audit import (
+from src.framework.audit import (
     AuditAction,
     AuditedResource,
     make_audited_resource,
@@ -19,8 +19,8 @@ from src.logic.audit import (
     mutate,
     record_audit,
 )
+from src.framework.audit_repository import AuditRepository
 from src.models import AuditLog
-from src.repositories.audit_repository import AuditRepository
 from src.repositories.posts.post_repository import PostRepository
 from tests.helpers import create_test_user
 

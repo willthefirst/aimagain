@@ -3,9 +3,8 @@ from uuid import UUID
 
 from sqlalchemy import select
 
+from src.framework.base_repository import BaseRepository
 from src.models import Provider, ProviderLicensure
-
-from ..base import BaseRepository
 
 
 class ProviderRepository(BaseRepository):

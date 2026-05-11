@@ -14,8 +14,8 @@ Audit and commit are owned by the logic-layer handlers, not the mount
 helper.
 """
 
-from src.api.common import make_entity_router
-from src.api.common.resource_routes import mount_edge_routes
+from src.framework import make_entity_router
+from src.framework.resource_routes import mount_edge_routes
 from src.logic.favorites.favorite_processing import (
     handle_add_favorite,
     handle_list_my_favorites,

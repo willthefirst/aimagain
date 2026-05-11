@@ -21,7 +21,7 @@ from uuid import UUID
 
 from fastapi import Request
 
-from src.api.common.exceptions import ForbiddenError, NotFoundError
+from src.framework.exceptions import ForbiddenError, NotFoundError
 from src.models import (
     Provider,
     User,

@@ -128,7 +128,7 @@ class BaseRepository:
     # --- Public framework-facing primitives ----------------------------
     # The protected primitives above are intended for intra-cluster
     # repository methods. Cross-cluster framework code (the generic
-    # handlers in `src/logic/_generic.py`) reaches in via the public
+    # handlers in `src/framework/handlers.py`) reaches in via the public
     # aliases below — same behavior, the underscore convention stays
     # intact for intra-cluster usage.
 

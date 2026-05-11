@@ -11,7 +11,7 @@ from sqlalchemy import select
 
 from src.models import AuditLog
 
-from .base import BaseRepository
+from .base_repository import BaseRepository
 
 
 class AuditRepository(BaseRepository):

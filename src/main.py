@@ -5,10 +5,10 @@ from datetime import datetime
 from fastapi import FastAPI, HTTPException, Request, status
 from fastapi.responses import JSONResponse, RedirectResponse
 
-from src.api.common.middleware import StripEmptyQueryParamsMiddleware
 from src.api.routes import auth_routes
 from src.auth_config import auth_backend, fastapi_users
 from src.db import check_database_health
+from src.framework.middleware import StripEmptyQueryParamsMiddleware
 from src.schemas.users.user import UserRead
 
 from .api.routes import auth_pages, favorites, posts, providers, users
@@ -51,7 +51,7 @@ app = FastAPI(title="Bedlam Connect", lifespan=lifespan)
 
 # Strip empty query-string pairs at request entry so HTML-form
 # submissions ("Apply" with no filter selected → `?x=`) behave the same
-# as omitting the param. See `src/api/common/middleware.py` for the
+# as omitting the param. See `src/framework/middleware.py` for the
 # full convention rationale.
 app.add_middleware(StripEmptyQueryParamsMiddleware)
 

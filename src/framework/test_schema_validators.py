@@ -13,7 +13,7 @@ from typing import ClassVar
 import pytest
 from pydantic import ValidationError
 
-from src.schemas._validators import PartialUpdate, ReadProjection, WirePayload
+from src.framework.schema_validators import PartialUpdate, ReadProjection, WirePayload
 
 
 class _AWirePayload(WirePayload):

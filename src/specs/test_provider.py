@@ -6,7 +6,7 @@ what's unique to providers: list filters, the post-mutation redirects,
 the auth_policy expansion, and the per-viewer extras binding.
 """
 
-from src.api.common.entity_spec import AUTHENTICATED, OWNER_OR_ADMIN
+from src.framework.entity_spec import AUTHENTICATED, OWNER_OR_ADMIN
 from src.specs.provider import PROVIDER_ENTITY
 
 # --- Auth deps + authorization (provider-specific) -----------------------

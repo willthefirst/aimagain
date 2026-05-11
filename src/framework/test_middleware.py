@@ -1,4 +1,4 @@
-"""Tests for `src/api/common/middleware.py`."""
+"""Tests for `src/framework/middleware.py`."""
 
 from .middleware import _strip_empty_pairs
 

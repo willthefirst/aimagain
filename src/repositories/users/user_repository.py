@@ -2,9 +2,8 @@ from typing import Sequence
 
 from sqlalchemy import select
 
+from src.framework.base_repository import BaseRepository
 from src.models import User
-
-from ..base import BaseRepository
 
 
 class UserRepository(BaseRepository):

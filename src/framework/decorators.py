@@ -4,7 +4,7 @@ from functools import wraps
 from fastapi import HTTPException, status
 from fastapi_users import exceptions as fastapi_users_exceptions
 
-from src.api.common.exceptions import handle_fastapi_users_error
+from src.framework.exceptions import handle_fastapi_users_error
 
 logger = logging.getLogger(__name__)
 

@@ -13,13 +13,13 @@ through it.
 
 from pydantic import BaseModel, TypeAdapter
 
-from src.api.common.entity_spec import (
+from src.framework.dependencies import get_provider_repository
+from src.framework.entity_spec import (
     AUTHENTICATED,
     OWNER_OR_ADMIN,
     EntitySpec,
     RouteSet,
 )
-from src.repositories.dependencies import get_provider_repository
 from src.specs.provider import PROVIDER_ENTITY, _provider_form_redirect
 
 

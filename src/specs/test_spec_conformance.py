@@ -22,9 +22,9 @@ test file needs writing.
 import pytest
 from pydantic import BaseModel, TypeAdapter
 
-from src.api.common.entity_spec import EntitySpec
-from src.api.common.resource_routes import ResourceSpec
-from src.logic.audit import AuditAction
+from src.framework.audit import AuditAction
+from src.framework.entity_spec import EntitySpec
+from src.framework.resource_routes import ResourceSpec
 from src.specs.post import POST_ENTITY
 from src.specs.provider import PROVIDER_ENTITY
 from src.specs.provider_certification import CERTIFICATION_ENTITY

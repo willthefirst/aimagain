@@ -44,16 +44,16 @@ from uuid import UUID
 from fastapi import Depends, Query, Request, status
 from pydantic import BaseModel, TypeAdapter
 
-from src.api.common.exceptions import ForbiddenError
-from src.api.common.forms import parse_and_validate_form, parse_and_validate_json
-from src.api.common.responses import (
+from src.framework.audit import AuditedResource
+from src.framework.dependencies import UnknownRepoTypeError, resolver_for
+from src.framework.exceptions import ForbiddenError
+from src.framework.forms import parse_and_validate_form, parse_and_validate_json
+from src.framework.responses import (
     APIResponse,
     created_response,
     deleted_response,
     updated_response,
 )
-from src.logic.audit import AuditedResource
-from src.repositories.dependencies import UnknownRepoTypeError, resolver_for
 
 _UNSET = object()
 
@@ -129,7 +129,7 @@ class ResourceSpec:
       (Additional repos beyond ``repo_dep`` are not declared on the
         spec — handlers spell each one out as a typed parameter and
         the mount layer resolves it via the type→resolver registry in
-        ``src.repositories.dependencies``.)
+        ``src.framework.dependencies``.)
       create_redirect / update_redirect / delete_redirect: callables
         receiving the path params + (for create/update) the resource id,
         returning the ``HX-Redirect`` URL. ``None`` means use a sensible
@@ -138,7 +138,7 @@ class ResourceSpec:
         viewers for whom ``private_field_predicate(actor, target)`` is
         true. Empty tuple means no field-level gating; the resource is
         either fully public or fully gated by the route's auth dep.
-        Read by ``src.api.common.projections.project_view`` so the
+        Read by ``src.framework.projections.project_view`` so the
         gating rule can be applied uniformly anywhere a view dict is
         built. Declaring private fields without a predicate raises at
         construction time.
@@ -180,7 +180,7 @@ class ResourceSpec:
     def __post_init__(self) -> None:
         # Field-level visibility metadata: `private_fields` names the
         # attributes gated by `private_field_predicate(actor, target)`.
-        # Read by `src.api.common.projections.project_view` (and any
+        # Read by `src.framework.projections.project_view` (and any
         # future layer — JSON endpoint, audit snapshot, OpenAPI doc —
         # that needs to know which fields are private). Declaring fields
         # without a predicate would silently leak them, so require both
@@ -266,7 +266,7 @@ def mount_list(
     The handler's typed signature drives dep wiring: parameters named
     `repo`, `requesting_user`, and any additional repo-typed params
     (resolved via the type registry in
-    ``src.repositories.dependencies``) are bound automatically. Each
+    ``src.framework.dependencies``) are bound automatically. Each
     ``query_params`` entry is added to the route as a FastAPI
     ``Query(...)`` and passed to the handler under its declared name.
     The handler returns a context dict; the mount renders
@@ -335,7 +335,7 @@ def mount_detail(
     The handler's typed signature drives dep wiring: ``request``, the
     resource id under ``spec.id_param``, ``repo``, ``requesting_user``,
     and any extra repos (resolved via the type registry in
-    ``src.repositories.dependencies``) are bound automatically. The
+    ``src.framework.dependencies``) are bound automatically. The
     handler returns a context dict; the mount renders
     ``spec.detail_template`` with it.
 
@@ -768,7 +768,7 @@ def mount_edge_routes(
     # every mutation handler takes. Imported lazily to avoid a cycle
     # with repositories.dependencies (which imports from this module's
     # cluster mate `entity_spec`).
-    from src.repositories.dependencies import get_audit_repository
+    from src.framework.dependencies import get_audit_repository
 
     @router.get("", name=f"{entity.name}:list")
     async def _list_route(  # noqa: F811 — closure, not re-exported
@@ -972,8 +972,8 @@ def _owned_factory_makers() -> dict[str, Callable[..., Callable[..., Awaitable[A
     """Lazy-import the generic CRUD-framework factories for owned subentities.
 
     Imported on demand to avoid a module-import cycle: this module is
-    imported by ``src.api.common.entity_spec`` (for ``ResourceSpec`` and
-    ``QueryParam``), and ``src.logic._generic`` imports ``EntitySpec``.
+    imported by ``src.framework.entity_spec`` (for ``ResourceSpec`` and
+    ``QueryParam``), and ``src.framework.handlers`` imports ``EntitySpec``.
     Doing the import inside ``mount_entity``'s owned-subentity branch
     breaks the cycle — by the time we reach this code at runtime, the
     logic module has finished initializing.
@@ -983,7 +983,7 @@ def _owned_factory_makers() -> dict[str, Callable[..., Callable[..., Awaitable[A
     per-kind ``create_template`` and the spec-injected ``?kind=``
     query param to pick the template at request time.
     """
-    from src.logic._generic import (
+    from src.framework.handlers import (
         make_create_handler,
         make_delete_handler,
         make_detail_handler,
@@ -1285,7 +1285,7 @@ def mount_entity(
     # (keyed by `<owned.name>.<verb>`).
     #
     # For verbs whose generic CRUD-framework factory exists
-    # (`make_<verb>_handler` in `src.logic._generic`), we auto-bind a
+    # (`make_<verb>_handler` in `src.framework.handlers`), we auto-bind a
     # factory-built handler when the explicit key is absent — the
     # default case for credential-style subentities whose mutations
     # are entirely standard. Supplying the explicit key still works

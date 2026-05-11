@@ -5,11 +5,11 @@ from fastapi_users import models
 from fastapi_users.manager import BaseUserManager
 from fastapi_users.router.common import ErrorCode, ErrorModel
 
-from src.api.common import BaseRouter
 from src.auth_config import get_user_manager
+from src.framework import BaseRouter
+from src.framework.audit_repository import AuditRepository
+from src.framework.dependencies import get_audit_repository
 from src.logic.auth.auth_processing import handle_registration
-from src.repositories.audit_repository import AuditRepository
-from src.repositories.dependencies import get_audit_repository
 from src.schemas.users.user import UserCreate, UserRead
 
 # router = APIRouter() # Old raw APIRouter

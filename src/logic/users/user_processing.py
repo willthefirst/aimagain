@@ -2,10 +2,10 @@ import logging
 from typing import Any
 from uuid import UUID
 
-from src.api.common.exceptions import NotFoundError
-from src.logic.audit import record_audit
+from src.framework.audit import record_audit
+from src.framework.audit_repository import AuditRepository
+from src.framework.exceptions import NotFoundError
 from src.models import User
-from src.repositories.audit_repository import AuditRepository
 from src.repositories.providers.provider_repository import ProviderRepository
 from src.repositories.users.user_repository import UserRepository
 from src.schemas.users.user import UserActivationUpdate

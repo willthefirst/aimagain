@@ -29,7 +29,7 @@ from pathlib import Path
 
 import pytest
 
-LOGIC_DIR = Path(__file__).parent
+LOGIC_DIR = Path(__file__).parent.parent / "logic"
 PROCESSING_FILES = sorted(LOGIC_DIR.rglob("*_processing.py"))
 
 

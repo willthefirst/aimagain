@@ -48,7 +48,7 @@ def test_shared_parent_file_import_is_allowed(tmp_path: Path) -> None:
     _build_layer(src, "logic", ["posts", "providers"], parent_files=["audit.py"])
     f = _write(
         src / "logic" / "posts" / "post_processing.py",
-        "from src.logic.audit import record_audit\n",
+        "from src.framework.audit import record_audit\n",
     )
 
     assert find_violations([f], src) == []
@@ -161,7 +161,7 @@ def test_module_starting_with_underscore_is_not_a_cluster(tmp_path: Path) -> Non
 
     f = _write(
         src / "schemas" / "posts" / "post.py",
-        "from src.schemas._validators import StrippedText\n",
+        "from src.framework.schema_validators import StrippedText\n",
     )
 
     assert find_violations([f], src) == []

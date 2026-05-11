@@ -1,5 +1,5 @@
-from src.api.common import make_entity_router
-from src.api.common.resource_routes import mount_entity
+from src.framework import make_entity_router
+from src.framework.resource_routes import mount_entity
 from src.specs.provider import PROVIDER_ENTITY
 from src.specs.provider_certification import CERTIFICATION_ENTITY
 from src.specs.provider_education import EDUCATION_ENTITY

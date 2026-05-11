@@ -5,8 +5,8 @@ from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from src.framework.audit_repository import AuditRepository
 from src.models import AuditLog, User
-from src.repositories.audit_repository import AuditRepository
 
 # Mark all tests in this module as async
 pytestmark = pytest.mark.asyncio
