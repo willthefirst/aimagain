@@ -131,16 +131,21 @@ class MockDataFactory:
 
     @classmethod
     def create_post_delete_dependency_config(cls) -> Dict[str, Any]:
-        """Mock for `handle_delete_post`.
+        """Mock for the generic delete handler bound to posts.
 
-        The route under test (`DELETE /posts/{id}`) discards the handler
-        return value and emits a 204 with `HX-Redirect: /posts`, so `None`
-        is a valid mock return.
+        After the phase-2 B1 migration (#326), `handle_delete_post` no
+        longer exists; the route file binds
+        `make_delete_handler(POST_ENTITY)` and assigns it to the
+        module-level `_handle_delete_post` attribute so test patches
+        can target it (the mount layer's `_resolve_handler` reads
+        from the handler's `__module__`).
+
+        The route under test (`DELETE /posts/{id}`) discards the
+        handler return value and emits a 204 with
+        `HX-Redirect: /posts`, so `None` is a valid mock return.
         """
         return {
-            "src.logic.posts.post_processing.handle_delete_post": {
-                "return_value_config": None
-            }
+            "src.api.routes.posts._handle_delete_post": {"return_value_config": None}
         }
 
     @classmethod
