@@ -25,9 +25,9 @@ from src.models import Provider
 from src.repositories.dependencies import get_provider_repository
 from src.schemas.providers.provider import (
     ProviderAuditSnapshot,
+    ProviderCreate,
     ProviderRead,
-    provider_create_adapter,
-    provider_update_adapter,
+    ProviderUpdate,
 )
 
 # After create or update, redirect to the edit form so the user can
@@ -48,8 +48,8 @@ PROVIDER_ENTITY: Final[EntitySpec] = EntitySpec(
     write_user_dep=current_active_user,
     auth_policy=OWNER_OR_ADMIN,
     audit_snapshot=ProviderAuditSnapshot,
-    create_adapter=provider_create_adapter,
-    update_adapter=provider_update_adapter,
+    create_adapter=ProviderCreate,
+    update_adapter=ProviderUpdate,
     read_schema=ProviderRead,
     routes=RouteSet(
         list=True,

@@ -11,9 +11,9 @@ from src.api.common.specs._credential import make_provider_credential_entity
 from src.models import ProviderCertification
 from src.schemas.providers.provider import (
     ProviderCertificationAuditSnapshot,
+    ProviderCertificationCreate,
     ProviderCertificationRead,
-    certification_create_adapter,
-    certification_update_adapter,
+    ProviderCertificationUpdate,
 )
 
 CERTIFICATION_ENTITY: Final[EntitySpec] = make_provider_credential_entity(
@@ -24,6 +24,6 @@ CERTIFICATION_ENTITY: Final[EntitySpec] = make_provider_credential_entity(
     audit_stem="certification",
     snapshot_schema=ProviderCertificationAuditSnapshot,
     read_schema=ProviderCertificationRead,
-    create_adapter=certification_create_adapter,
-    update_adapter=certification_update_adapter,
+    create_adapter=ProviderCertificationCreate,
+    update_adapter=ProviderCertificationUpdate,
 )

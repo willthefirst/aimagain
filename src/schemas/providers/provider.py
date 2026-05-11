@@ -30,7 +30,7 @@ import uuid
 from datetime import date, datetime
 from typing import Annotated, Literal
 
-from pydantic import BaseModel, ConfigDict, TypeAdapter
+from pydantic import BaseModel, ConfigDict
 
 from src.core.form_fields import HtmlPattern
 from src.models.enums import (
@@ -81,17 +81,11 @@ class ProviderLicensureCreate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
 
-licensure_create_adapter: TypeAdapter = TypeAdapter(ProviderLicensureCreate)
-
-
 class ProviderLicensureUpdate(PartialUpdate):
     license_type: Literal[*LICENSE_TYPES] | None = None
     license_number: StrippedText | None = None
     issuing_state: Literal[*US_STATES] | None = None
     expiration_date: date | None = None
-
-
-licensure_update_adapter: TypeAdapter = TypeAdapter(ProviderLicensureUpdate)
 
 
 class ProviderLicensureAuditSnapshot(_ProviderSubrowBase):
@@ -121,16 +115,10 @@ class ProviderEducationCreate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
 
-education_create_adapter: TypeAdapter = TypeAdapter(ProviderEducationCreate)
-
-
 class ProviderEducationUpdate(PartialUpdate):
     education_type: Literal[*EDUCATION_TYPES] | None = None
     institution: StrippedText | None = None
     month_completed: str | None = None
-
-
-education_update_adapter: TypeAdapter = TypeAdapter(ProviderEducationUpdate)
 
 
 class ProviderEducationAuditSnapshot(_ProviderSubrowBase):
@@ -156,16 +144,10 @@ class ProviderCertificationCreate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
 
-certification_create_adapter: TypeAdapter = TypeAdapter(ProviderCertificationCreate)
-
-
 class ProviderCertificationUpdate(PartialUpdate):
     certification_type: Literal[*CERTIFICATION_TYPES] | None = None
     certifying_body: StrippedText | None = None
     expiration_date: date | None = None
-
-
-certification_update_adapter: TypeAdapter = TypeAdapter(ProviderCertificationUpdate)
 
 
 class ProviderCertificationAuditSnapshot(_ProviderSubrowBase):
@@ -219,9 +201,6 @@ class ProviderCreate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
 
-provider_create_adapter: TypeAdapter = TypeAdapter(ProviderCreate)
-
-
 class ProviderUpdate(PartialUpdate):
     """Partial update of practice/availability fields only. Sub-entity
     lists (licensures, educations, certifications) are managed via
@@ -233,9 +212,6 @@ class ProviderUpdate(PartialUpdate):
     location_zip: ZipText | None = None
     in_person_sessions: Literal[*LOCATION_AVAILABILITY_OPTIONS] | None = None
     virtual_sessions: Literal[*LOCATION_AVAILABILITY_OPTIONS] | None = None
-
-
-provider_update_adapter: TypeAdapter = TypeAdapter(ProviderUpdate)
 
 
 class ProviderAuditSnapshot(BaseModel):

@@ -261,8 +261,13 @@ class EntitySpec:
     relation: M2NRelation | None = None
 
     # Body adapters + projection ----------------------------------------
-    create_adapter: TypeAdapter | None = None
-    update_adapter: TypeAdapter | None = None
+    # Accept either a plain Pydantic class or a pre-built `TypeAdapter`.
+    # Specs over a single class pass the class directly (the constructor
+    # wraps it in `TypeAdapter(...)` once); specs over a discriminated
+    # union pass the prebuilt adapter (posts). Mounts that consume these
+    # always see a `TypeAdapter` after construction.
+    create_adapter: type[BaseModel] | TypeAdapter | None = None
+    update_adapter: type[BaseModel] | TypeAdapter | None = None
     # Prefer `read_schema=<BaseModel | TypeAdapter>` over a hand-built
     # `read_to_dict=...` — the constructor synthesizes the projection
     # callable. Mutually exclusive.
@@ -326,6 +331,14 @@ class EntitySpec:
                 f"EntitySpec({self.name!r}) declares duplicate state-axis "
                 f"names: {axis_names}"
             )
+        # Wrap a plain Pydantic class in `TypeAdapter(...)` so the
+        # downstream mounts (which expect an adapter) get one regardless
+        # of which form the spec was constructed with. Discriminated-union
+        # adapters (posts) arrive pre-built and pass through unchanged.
+        for field_name in ("create_adapter", "update_adapter"):
+            current = getattr(self, field_name)
+            if current is not None and not isinstance(current, TypeAdapter):
+                object.__setattr__(self, field_name, TypeAdapter(current))
         # `routes.create=True` without a create adapter would crash at
         # first request — `mount_create` already raises here, but
         # surfacing the misconfiguration at spec-construction time is
