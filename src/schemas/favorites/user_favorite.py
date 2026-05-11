@@ -10,22 +10,18 @@ AuditSnapshot is structurally identical and used for audit before/after.
 import uuid
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict
+from src.schemas._validators import ReadProjection
 
 
-class UserFavoriteRead(BaseModel):
+class UserFavoriteRead(ReadProjection):
     id: uuid.UUID
     user_id: uuid.UUID
     provider_id: uuid.UUID
     created_at: datetime
 
-    model_config = ConfigDict(from_attributes=True)
 
-
-class UserFavoriteAuditSnapshot(BaseModel):
+class UserFavoriteAuditSnapshot(ReadProjection):
     id: uuid.UUID
     user_id: uuid.UUID
     provider_id: uuid.UUID
     created_at: datetime
-
-    model_config = ConfigDict(from_attributes=True)

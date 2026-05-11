@@ -94,23 +94,43 @@ def assert_any_field_set(
         raise ValueError("at least one editable field must be provided")
 
 
-class PartialUpdate(BaseModel):
+class WirePayload(BaseModel):
+    """Base for Create / state-axis-body wire schemas.
+
+    Carries ``ConfigDict(extra="forbid")`` so unknown fields 422 instead
+    of being silently dropped. PATCH/Update variants inherit
+    :class:`PartialUpdate` instead — it owns the same config plus the
+    at-least-one-field rule.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+
+class ReadProjection(BaseModel):
+    """Base for Read / AuditSnapshot variants.
+
+    Carries ``ConfigDict(from_attributes=True)`` so
+    ``schema.model_validate(orm_obj)`` reads attributes off SQLAlchemy
+    rows (and any other attr-bag) without each schema redeclaring the
+    knob.
+    """
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class PartialUpdate(WirePayload):
     """Base class for PATCH/Update wire schemas.
 
-    Owns the two pieces every Update variant repeated by hand:
-
-      - ``model_config = ConfigDict(extra="forbid")`` — unknown fields 422.
-      - A post-validation hook that calls ``assert_any_field_set(self,
-        exclude=cls.at_least_one_field_exclude)`` so a PATCH with every
-        field absent rejects with a clear message.
+    Extends :class:`WirePayload` (so ``extra="forbid"`` carries through)
+    with a post-validation hook that calls
+    ``assert_any_field_set(self, exclude=cls.at_least_one_field_exclude)``
+    so a PATCH with every field absent rejects with a clear message.
 
     Discriminated-union Updates (posts) override ``at_least_one_field_exclude``
     to ``frozenset({"kind"})`` so the always-present discriminator
     doesn't count toward "at least one editable field." Non-discriminated
     Updates leave the default empty set.
     """
-
-    model_config = ConfigDict(extra="forbid")
 
     # `ClassVar` so pydantic treats this as a class-level configuration
     # knob, not a model field. Discriminated-union Updates (posts) set
