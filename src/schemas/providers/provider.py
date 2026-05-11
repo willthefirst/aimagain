@@ -30,7 +30,7 @@ import uuid
 from datetime import date, datetime
 from typing import Annotated, Literal
 
-from pydantic import BaseModel, ConfigDict, TypeAdapter, model_validator
+from pydantic import BaseModel, ConfigDict, TypeAdapter
 
 from src.core.form_fields import HtmlPattern
 from src.models.enums import (
@@ -40,7 +40,7 @@ from src.models.enums import (
     LOCATION_AVAILABILITY_OPTIONS,
     US_STATES,
 )
-from src.schemas._validators import StrippedText, ZipText, assert_any_field_set
+from src.schemas._validators import PartialUpdate, StrippedText, ZipText
 
 
 class _ProviderSubrowBase(BaseModel):
@@ -84,18 +84,11 @@ class ProviderLicensureCreate(BaseModel):
 licensure_create_adapter: TypeAdapter = TypeAdapter(ProviderLicensureCreate)
 
 
-class ProviderLicensureUpdate(BaseModel):
+class ProviderLicensureUpdate(PartialUpdate):
     license_type: Literal[*LICENSE_TYPES] | None = None
     license_number: StrippedText | None = None
     issuing_state: Literal[*US_STATES] | None = None
     expiration_date: date | None = None
-
-    model_config = ConfigDict(extra="forbid")
-
-    @model_validator(mode="after")
-    def _at_least_one_field(self) -> "ProviderLicensureUpdate":
-        assert_any_field_set(self)
-        return self
 
 
 licensure_update_adapter: TypeAdapter = TypeAdapter(ProviderLicensureUpdate)
@@ -131,17 +124,10 @@ class ProviderEducationCreate(BaseModel):
 education_create_adapter: TypeAdapter = TypeAdapter(ProviderEducationCreate)
 
 
-class ProviderEducationUpdate(BaseModel):
+class ProviderEducationUpdate(PartialUpdate):
     education_type: Literal[*EDUCATION_TYPES] | None = None
     institution: StrippedText | None = None
     month_completed: str | None = None
-
-    model_config = ConfigDict(extra="forbid")
-
-    @model_validator(mode="after")
-    def _at_least_one_field(self) -> "ProviderEducationUpdate":
-        assert_any_field_set(self)
-        return self
 
 
 education_update_adapter: TypeAdapter = TypeAdapter(ProviderEducationUpdate)
@@ -173,17 +159,10 @@ class ProviderCertificationCreate(BaseModel):
 certification_create_adapter: TypeAdapter = TypeAdapter(ProviderCertificationCreate)
 
 
-class ProviderCertificationUpdate(BaseModel):
+class ProviderCertificationUpdate(PartialUpdate):
     certification_type: Literal[*CERTIFICATION_TYPES] | None = None
     certifying_body: StrippedText | None = None
     expiration_date: date | None = None
-
-    model_config = ConfigDict(extra="forbid")
-
-    @model_validator(mode="after")
-    def _at_least_one_field(self) -> "ProviderCertificationUpdate":
-        assert_any_field_set(self)
-        return self
 
 
 certification_update_adapter: TypeAdapter = TypeAdapter(ProviderCertificationUpdate)
@@ -243,7 +222,7 @@ class ProviderCreate(BaseModel):
 provider_create_adapter: TypeAdapter = TypeAdapter(ProviderCreate)
 
 
-class ProviderUpdate(BaseModel):
+class ProviderUpdate(PartialUpdate):
     """Partial update of practice/availability fields only. Sub-entity
     lists (licensures, educations, certifications) are managed via
     their own endpoints, so this schema does not accept them."""
@@ -254,13 +233,6 @@ class ProviderUpdate(BaseModel):
     location_zip: ZipText | None = None
     in_person_sessions: Literal[*LOCATION_AVAILABILITY_OPTIONS] | None = None
     virtual_sessions: Literal[*LOCATION_AVAILABILITY_OPTIONS] | None = None
-
-    model_config = ConfigDict(extra="forbid")
-
-    @model_validator(mode="after")
-    def _at_least_one_field(self) -> "ProviderUpdate":
-        assert_any_field_set(self)
-        return self
 
 
 provider_update_adapter: TypeAdapter = TypeAdapter(ProviderUpdate)

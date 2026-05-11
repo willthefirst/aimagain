@@ -16,9 +16,9 @@ anything used by exactly one schema module today.
 """
 
 import re
-from typing import Annotated
+from typing import Annotated, ClassVar
 
-from pydantic import AfterValidator, BaseModel
+from pydantic import AfterValidator, BaseModel, ConfigDict, model_validator
 
 from src.core.form_fields import HtmlPattern
 
@@ -92,3 +92,33 @@ def assert_any_field_set(
     fields = type(model).model_fields
     if all(getattr(model, name) is None for name in fields if name not in exclude):
         raise ValueError("at least one editable field must be provided")
+
+
+class PartialUpdate(BaseModel):
+    """Base class for PATCH/Update wire schemas.
+
+    Owns the two pieces every Update variant repeated by hand:
+
+      - ``model_config = ConfigDict(extra="forbid")`` — unknown fields 422.
+      - A post-validation hook that calls ``assert_any_field_set(self,
+        exclude=cls.at_least_one_field_exclude)`` so a PATCH with every
+        field absent rejects with a clear message.
+
+    Discriminated-union Updates (posts) override ``at_least_one_field_exclude``
+    to ``frozenset({"kind"})`` so the always-present discriminator
+    doesn't count toward "at least one editable field." Non-discriminated
+    Updates leave the default empty set.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    # `ClassVar` so pydantic treats this as a class-level configuration
+    # knob, not a model field. Discriminated-union Updates (posts) set
+    # it to `frozenset({"kind"})`; non-discriminated ones inherit the
+    # empty default.
+    at_least_one_field_exclude: ClassVar[frozenset[str]] = frozenset()
+
+    @model_validator(mode="after")
+    def _assert_any_field_set(self) -> "PartialUpdate":
+        assert_any_field_set(self, exclude=type(self).at_least_one_field_exclude)
+        return self

@@ -58,10 +58,10 @@ from src.models.enums import (
     US_STATES,
 )
 from src.schemas._validators import (
+    PartialUpdate,
     StrippedOptionalText,
     StrippedText,
     ZipText,
-    assert_any_field_set,
 )
 
 
@@ -280,10 +280,12 @@ post_create_adapter: TypeAdapter = TypeAdapter(PostCreate)
 # Create and Update.
 
 
-_UPDATE_DISCRIMINATOR_EXCLUDE = frozenset({"kind"})
+class ClientReferralUpdate(PartialUpdate):
+    # `kind` is the discriminator, always required on the wire; the
+    # `PartialUpdate` "at least one field" rule excludes it via
+    # `at_least_one_field_exclude`.
+    at_least_one_field_exclude = frozenset({"kind"})
 
-
-class ClientReferralUpdate(BaseModel):
     kind: Literal["client_referral"]
     location_city: StrippedText | None = None
     location_state: Literal[*US_STATES] | None = None
@@ -301,15 +303,10 @@ class ClientReferralUpdate(BaseModel):
     services_psychotherapy_modality: StrippedOptionalText = None
     insurance: Literal[*INSURANCE_OPTIONS] | None = None
 
-    model_config = ConfigDict(extra="forbid")
 
-    @model_validator(mode="after")
-    def _at_least_one_field(self) -> "ClientReferralUpdate":
-        assert_any_field_set(self, exclude=_UPDATE_DISCRIMINATOR_EXCLUDE)
-        return self
+class ProviderAvailabilityUpdate(PartialUpdate):
+    at_least_one_field_exclude = frozenset({"kind"})
 
-
-class ProviderAvailabilityUpdate(BaseModel):
     kind: Literal["provider_availability"]
     practice_name: StrippedText | None = None
     available_providers: StrippedText | None = None
@@ -331,13 +328,6 @@ class ProviderAvailabilityUpdate(BaseModel):
     payment_situation: Literal[*INSURANCE_OPTIONS] | None = None
     sliding_scale: bool | None = None
     cost: StrippedOptionalText = None
-
-    model_config = ConfigDict(extra="forbid")
-
-    @model_validator(mode="after")
-    def _at_least_one_field(self) -> "ProviderAvailabilityUpdate":
-        assert_any_field_set(self, exclude=_UPDATE_DISCRIMINATOR_EXCLUDE)
-        return self
 
 
 PostUpdate = Annotated[
