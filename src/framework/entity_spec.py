@@ -378,6 +378,18 @@ class EntitySpec:
     # opt-in repo must accept.
     list_exclude_self: bool = False
 
+    # List default ordering --------------------------------------------
+    # SQLAlchemy column expression (e.g. `User.username` or
+    # `Post.created_at.desc()`) consumed by `BaseRepository.list_default`
+    # — the framework's fallback when an entity has no bespoke
+    # `list_<collection>` repo method. Required when `routes.list=True`
+    # AND no custom `list_<collection>` exists on the repo; either
+    # provide the ordering here or write the bespoke method. Specs whose
+    # repo defines `list_<collection>` (e.g. providers, with its
+    # licensure-join filter) leave this `None` and the bespoke method
+    # owns ordering inline.
+    list_order_by: Any = None
+
     # Delete-route self guard ------------------------------------------
     # When True, `handle_delete` rejects the request with 403 if the
     # URL's target id equals the requesting user's id — preventing an

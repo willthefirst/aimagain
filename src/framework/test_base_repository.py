@@ -210,3 +210,53 @@ async def test_count_respects_distinct_with_join(
 
     assert total == 1
     assert len(rows) == 1
+
+
+# --- list_default ---------------------------------------------------------
+
+
+async def test_list_default_orders_by_column(
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+):
+    """`list_default` honors the `order_by` argument exactly. Specs pass
+    `User.username` / `Post.created_at.desc()` / etc. — whatever the
+    entity needs."""
+    await _seed_users(db_test_session_manager, ["c", "a", "b"])
+
+    async with db_test_session_manager() as session:
+        repo = BaseRepository(session)
+        rows = await repo.list_default(User, order_by=User.username)
+
+    assert [u.username for u in rows] == ["a", "b", "c"]
+
+
+async def test_list_default_exclude_self_filters_target_user(
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+):
+    """`exclude_self` drops the row whose id matches `exclude_self.id`.
+    The viewer-filtering pattern `handle_list` uses for entities with
+    `spec.list_exclude_self=True`."""
+    users = await _seed_users(db_test_session_manager, ["a", "b", "c"])
+    viewer = users[0]
+
+    async with db_test_session_manager() as session:
+        repo = BaseRepository(session)
+        rows = await repo.list_default(
+            User, order_by=User.username, exclude_self=viewer
+        )
+
+    assert [u.username for u in rows] == ["b", "c"]
+
+
+async def test_list_default_none_exclude_self_returns_everyone(
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+):
+    """`exclude_self=None` (the default) skips the filter — anonymous
+    viewers see every row."""
+    await _seed_users(db_test_session_manager, ["a", "b"])
+
+    async with db_test_session_manager() as session:
+        repo = BaseRepository(session)
+        rows = await repo.list_default(User, order_by=User.username)
+
+    assert len(rows) == 2

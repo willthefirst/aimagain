@@ -2499,6 +2499,75 @@ async def test_handle_list_omits_exclude_self_when_spec_opts_out():
     assert "exclude_self" not in captured[0]
 
 
+@pytest.mark.asyncio
+async def test_handle_list_falls_back_to_list_default_when_no_bespoke_method():
+    """When the repo has no `list_<collection>` method, `handle_list`
+    falls through to `BaseRepository.list_default(spec.model,
+    order_by=spec.list_order_by, **kwargs)` — the framework default
+    for trivial listings."""
+    spec = EntitySpec(
+        name="widget",
+        url_collection="widgets",
+        id_param="widget_id",
+        model=_FixtureRow,
+        audit=_audit(),
+        routes=RouteSet(list=True),
+        list_order_by="ORDER_BY_SENTINEL",
+    )
+    captured: dict = {}
+
+    class _DefaultOnlyRepo:
+        async def list_default(self, model, *, order_by, **kwargs):
+            captured["model"] = model
+            captured["order_by"] = order_by
+            captured["kwargs"] = kwargs
+            return []
+
+    from src.framework.handlers import handle_list
+
+    await handle_list(
+        spec,
+        request=SimpleNamespace(),
+        repo=_DefaultOnlyRepo(),
+        requesting_user=None,
+        filter_values={},
+    )
+
+    assert captured["model"] is _FixtureRow
+    assert captured["order_by"] == "ORDER_BY_SENTINEL"
+    assert captured["kwargs"] == {}
+
+
+@pytest.mark.asyncio
+async def test_handle_list_fallback_raises_when_no_order_by():
+    """No bespoke list method AND no `list_order_by` is a misconfiguration.
+    The framework can't pick an ordering for the caller, so it raises a
+    clear error instead of executing a random-order list."""
+    spec = EntitySpec(
+        name="widget",
+        url_collection="widgets",
+        id_param="widget_id",
+        model=_FixtureRow,
+        audit=_audit(),
+        routes=RouteSet(list=True),
+    )
+
+    class _DefaultOnlyRepo:
+        async def list_default(self, model, *, order_by, **kwargs):  # pragma: no cover
+            return []
+
+    from src.framework.handlers import handle_list
+
+    with pytest.raises(ValueError, match="list_order_by"):
+        await handle_list(
+            spec,
+            request=SimpleNamespace(),
+            repo=_DefaultOnlyRepo(),
+            requesting_user=None,
+            filter_values={},
+        )
+
+
 # --- Spec construction-time validation -----------------------------------
 
 

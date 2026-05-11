@@ -160,6 +160,31 @@ class BaseRepository:
         non-`None` fields, flushes, refreshes."""
         return await self._patch(obj, **fields)
 
+    async def list_default(
+        self,
+        model: type[M],
+        *,
+        order_by: Any,
+        exclude_self: Any = None,
+    ) -> Sequence[M]:
+        """Framework fallback for `handle_list` when an entity has no
+        bespoke `list_<collection>` repo method.
+
+        `model` and `order_by` come from the entity's `EntitySpec`
+        (`spec.model`, `spec.list_order_by`). `exclude_self` is the
+        viewer threading `handle_list` passes when `spec.list_exclude_self`
+        is True — `None` skips the filter.
+
+        Entities whose listing needs joins, custom filters, or
+        ``.distinct()`` write a bespoke ``list_<collection>`` and the
+        framework picks that up instead.
+        """
+        stmt = select(model)
+        if exclude_self is not None:
+            stmt = stmt.filter(model.id != exclude_self.id)
+        stmt = stmt.order_by(order_by)
+        return await self._list(stmt)
+
     async def create_polymorphic(
         self, parent: Any, detail: Any, *, detail_relationship: str
     ) -> Any:
