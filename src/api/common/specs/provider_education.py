@@ -10,7 +10,6 @@ from src.api.common.entity_spec import EntitySpec
 from src.api.common.specs._credential import make_provider_credential_entity
 from src.models import ProviderEducation
 from src.schemas.providers.provider import (
-    ProviderEducationAuditSnapshot,
     ProviderEducationCreate,
     ProviderEducationRead,
     ProviderEducationUpdate,
@@ -22,7 +21,6 @@ EDUCATION_ENTITY: Final[EntitySpec] = make_provider_credential_entity(
     id_param="education_id",
     model=ProviderEducation,
     audit_stem="education",
-    snapshot_schema=ProviderEducationAuditSnapshot,
     read_schema=ProviderEducationRead,
     create_adapter=ProviderEducationCreate,
     update_adapter=ProviderEducationUpdate,

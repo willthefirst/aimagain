@@ -353,7 +353,10 @@ def test_audit_action_stem_overrides_name():
 def test_read_schema_builds_projection_from_basemodel():
     """`read_schema=<BaseModel>` synthesizes a callable that validates
     through the schema and dumps a JSON-mode dict."""
-    spec = _make_spec(read_schema=_DummyRead)
+    # `audit=` set explicitly so the spec doesn't try to default
+    # `audit_snapshot` from `read_schema` and fail on the synthetic
+    # `widget` name (no `CREATE_WIDGET` enum member).
+    spec = _make_spec(read_schema=_DummyRead, audit=_dummy_audit())
     assert spec.read_to_dict is not None
     projected = spec.read_to_dict(SimpleNamespace(flag=True))
     assert projected == {"flag": True}
@@ -371,7 +374,26 @@ def test_read_schema_builds_projection_from_type_adapter():
 
 def test_read_schema_and_read_to_dict_mutually_exclusive():
     with pytest.raises(ValueError, match="mutually exclusive"):
-        _make_spec(read_schema=_DummyRead, read_to_dict=lambda obj: {})
+        _make_spec(
+            read_schema=_DummyRead,
+            read_to_dict=lambda obj: {},
+            audit=_dummy_audit(),
+        )
+
+
+def test_audit_snapshot_defaults_to_read_schema_when_basemodel():
+    """If a spec provides `read_schema=<BaseModel>` and no explicit
+    `audit_snapshot`/`audit`, the constructor uses the read schema as
+    the audit snapshot. Mirrors the codebase convention: provider and
+    its credential sub-rows declare a `Read` schema that doubles as the
+    audit-row projection."""
+    spec = _make_spec(
+        name="provider_licensure",
+        read_schema=_DummyRead,
+        audit_action_stem="licensure",
+    )
+    assert spec.audit is not None
+    assert spec.audit.create == AuditAction.CREATE_LICENSURE
 
 
 def test_audit_action_stem_without_snapshot_raises():

@@ -24,7 +24,6 @@ from src.auth_config import current_active_user
 from src.models import Provider
 from src.repositories.dependencies import get_provider_repository
 from src.schemas.providers.provider import (
-    ProviderAuditSnapshot,
     ProviderCreate,
     ProviderRead,
     ProviderUpdate,
@@ -47,7 +46,6 @@ PROVIDER_ENTITY: Final[EntitySpec] = EntitySpec(
     read_user_dep=current_active_user,
     write_user_dep=current_active_user,
     auth_policy=OWNER_OR_ADMIN,
-    audit_snapshot=ProviderAuditSnapshot,
     create_adapter=ProviderCreate,
     update_adapter=ProviderUpdate,
     read_schema=ProviderRead,

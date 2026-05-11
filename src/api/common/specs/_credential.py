@@ -26,7 +26,6 @@ def make_provider_credential_entity(
     id_param: str,
     model: type,
     audit_stem: str,
-    snapshot_schema: type[BaseModel],
     read_schema: type[BaseModel],
     create_adapter: type[BaseModel] | TypeAdapter,
     update_adapter: type[BaseModel] | TypeAdapter,
@@ -38,9 +37,10 @@ def make_provider_credential_entity(
     triple) — the credential enum stems diverge from the entity `name`
     (which is `"provider_licensure"`) so the stem is passed explicitly
     via the spec's `audit_action_stem`.
-    `snapshot_schema` is the Pydantic schema used for audit before/after
-    snapshots; `read_schema` is the response shape for `PATCH` (the
-    spec's constructor synthesizes `read_to_dict` from it).
+    `read_schema` is the response shape for `PATCH`; the spec
+    constructor synthesizes `read_to_dict` from it and defaults
+    `audit_snapshot` to it as well (credential audit snapshots are
+    byte-identical to their read projection).
     """
 
     return EntitySpec(
@@ -52,7 +52,6 @@ def make_provider_credential_entity(
         repo_dep=get_provider_repository,
         write_user_dep=current_active_user,
         auth_policy=OWNER_OR_ADMIN,
-        audit_snapshot=snapshot_schema,
         audit_action_stem=audit_stem,
         create_adapter=create_adapter,
         update_adapter=update_adapter,
