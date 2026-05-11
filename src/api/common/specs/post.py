@@ -28,26 +28,9 @@ from src.repositories.dependencies import get_post_repository
 from src.schemas.posts.post import (
     post_audit_snapshot,
     post_create_adapter,
+    post_read_adapter,
     post_update_adapter,
 )
-
-
-def _post_read_to_dict(post: Post) -> dict:
-    """Per-kind flat response body for `PATCH /posts/{id}`.
-
-    The wire shape mirrors the POST/GET projection's flat fields so
-    HTMX clients don't have to know about parent/detail. Per-kind
-    detail relationship + fields come from `POST_KINDS`; reading
-    them here rather than in the route file keeps the projection
-    co-located with the spec it serves.
-    """
-    spec = POST_KINDS[post.kind]
-    detail = getattr(post, spec.detail_relationship)
-    return {
-        "id": str(post.id),
-        "kind": post.kind,
-        **{f: getattr(detail, f) for f in spec.detail_fields},
-    }
 
 
 def _post_update_redirect(*, post_id, **_) -> str:
@@ -68,7 +51,7 @@ POST_ENTITY: Final[EntitySpec] = EntitySpec(
     audit_snapshot=post_audit_snapshot,
     create_adapter=post_create_adapter,
     update_adapter=post_update_adapter,
-    read_to_dict=_post_read_to_dict,
+    read_schema=post_read_adapter,
     routes=RouteSet(
         list=True,
         detail=True,

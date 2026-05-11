@@ -237,7 +237,11 @@ class EntitySpec:
     # Body adapters + projection ----------------------------------------
     create_adapter: TypeAdapter | None = None
     update_adapter: TypeAdapter | None = None
+    # Prefer `read_schema=<BaseModel | TypeAdapter>` over a hand-built
+    # `read_to_dict=...` — the constructor synthesizes the projection
+    # callable. Mutually exclusive.
     read_to_dict: Callable[[Any], dict] | None = None
+    read_schema: type[BaseModel] | TypeAdapter | None = None
 
     # Visibility ---------------------------------------------------------
     private_fields: tuple[str, ...] = ()
@@ -353,6 +357,31 @@ class EntitySpec:
                 action_stem=self.audit_action_stem,
             )
             object.__setattr__(self, "audit", built)
+        # `read_schema` is the declarative form of `read_to_dict`: the
+        # constructor synthesizes a callable that validates an ORM row
+        # through the schema/adapter and dumps it to a JSON-mode dict.
+        # The two forms are mutually exclusive; declaring both means the
+        # caller forgot to drop one.
+        if self.read_schema is not None and self.read_to_dict is not None:
+            raise ValueError(
+                f"EntitySpec({self.name!r}) declares both `read_schema` and "
+                "`read_to_dict`; they are mutually exclusive — pass the "
+                "schema/adapter via `read_schema` and let the spec build "
+                "the projection callable."
+            )
+        if self.read_schema is not None:
+            schema = self.read_schema
+            if isinstance(schema, TypeAdapter):
+
+                def _projection(obj: Any, _adapter: TypeAdapter = schema) -> dict:
+                    return _adapter.validate_python(obj).model_dump(mode="json")
+
+            else:
+
+                def _projection(obj: Any, _cls: type[BaseModel] = schema) -> dict:
+                    return _cls.model_validate(obj).model_dump(mode="json")
+
+            object.__setattr__(self, "read_to_dict", _projection)
         # Default templates by convention: any opted-in verb whose
         # `templates.<verb>` field is None gets `<url_collection>/<verb>.html`.
         # Specs only declare a path when it diverges from this default.

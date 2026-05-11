@@ -32,10 +32,6 @@ from src.schemas.providers.provider import (
 )
 
 
-def _provider_read_to_dict(provider: Provider) -> dict:
-    return ProviderRead.model_validate(provider).model_dump(mode="json")
-
-
 def _provider_form_redirect(*, provider_id, **_) -> str:
     """After create or update, redirect to the edit form so the user
     can keep editing the parent + its credentials."""
@@ -57,7 +53,7 @@ PROVIDER_ENTITY: Final[EntitySpec] = EntitySpec(
     audit_snapshot=ProviderAuditSnapshot,
     create_adapter=provider_create_adapter,
     update_adapter=provider_update_adapter,
-    read_to_dict=_provider_read_to_dict,
+    read_schema=ProviderRead,
     routes=RouteSet(
         list=True,
         detail=True,
