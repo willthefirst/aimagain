@@ -28,8 +28,8 @@ def make_provider_credential_entity(
     audit_stem: str,
     snapshot_schema: type[BaseModel],
     read_schema: type[BaseModel],
-    create_adapter: TypeAdapter,
-    update_adapter: TypeAdapter,
+    create_adapter: type[BaseModel] | TypeAdapter,
+    update_adapter: type[BaseModel] | TypeAdapter,
 ) -> EntitySpec:
     """Build a credential-subentity `EntitySpec` from its varying pieces.
 

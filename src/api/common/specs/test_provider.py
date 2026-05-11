@@ -4,14 +4,16 @@ Asserts the spec declares the right things — not that CRUD works
 (those tests live at the route/logic layers).
 """
 
+from pydantic import TypeAdapter
+
 from src.api.common.entity_spec import RouteSet
 from src.api.common.specs.provider import PROVIDER_ENTITY
 from src.logic._authz import assert_owner_or_admin, is_owner_or_admin
 from src.logic.audit import AuditAction
 from src.models import Provider
 from src.schemas.providers.provider import (
-    provider_create_adapter,
-    provider_update_adapter,
+    ProviderCreate,
+    ProviderUpdate,
 )
 
 # --- Identity ------------------------------------------------------------
@@ -69,9 +71,26 @@ def test_routes_opted_in():
 # --- Adapters + read_to_dict ---------------------------------------------
 
 
-def test_adapters_are_the_canonical_ones():
-    assert PROVIDER_ENTITY.create_adapter is provider_create_adapter
-    assert PROVIDER_ENTITY.update_adapter is provider_update_adapter
+def test_adapters_wrap_the_schema_classes():
+    """Specs pass Pydantic classes directly; the constructor wraps each
+    in `TypeAdapter(...)`. The wrapping behavior itself is unit-tested
+    in `test_entity_spec.py`; here we just confirm the spec carries the
+    right schema classes."""
+    assert isinstance(PROVIDER_ENTITY.create_adapter, TypeAdapter)
+    assert isinstance(PROVIDER_ENTITY.update_adapter, TypeAdapter)
+    assert _adapter_target_class(PROVIDER_ENTITY.create_adapter) is ProviderCreate
+    assert _adapter_target_class(PROVIDER_ENTITY.update_adapter) is ProviderUpdate
+
+
+def _adapter_target_class(adapter: TypeAdapter) -> type:
+    """Walk a TypeAdapter's core_schema to find the underlying model class.
+    `PartialUpdate`-derived schemas have an outer `function-after` wrapper
+    from the inherited model_validator; plain `BaseModel` subclasses
+    expose `cls` at the top level."""
+    schema = adapter.core_schema
+    while schema.get("type") != "model":
+        schema = schema["schema"]
+    return schema["cls"]
 
 
 def test_read_to_dict_returns_provider_read_shape():
@@ -143,8 +162,8 @@ def test_to_resource_spec_round_trips_what_mounts_read():
     assert rs.read_user_dep is PROVIDER_ENTITY.read_user_dep
     assert rs.write_user_dep is PROVIDER_ENTITY.write_user_dep
     assert rs.write_authz is assert_owner_or_admin
-    assert rs.create_adapter is provider_create_adapter
-    assert rs.update_adapter is provider_update_adapter
+    assert rs.create_adapter is PROVIDER_ENTITY.create_adapter
+    assert rs.update_adapter is PROVIDER_ENTITY.update_adapter
     assert rs.list_template == "providers/list.html"
     assert rs.detail_template == "providers/detail.html"
     assert rs.parent is None

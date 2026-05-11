@@ -388,6 +388,35 @@ def test_owner_or_admin_sentinel_pairs_assert_and_predicate():
     assert OWNER_OR_ADMIN.can_write is is_owner_or_admin
 
 
+def test_create_adapter_wraps_a_class():
+    """Passing a Pydantic class is the declarative form — constructor
+    wraps it in `TypeAdapter(...)` once so downstream mounts always see
+    an adapter regardless of which form the spec used."""
+    spec = _make_spec(create_adapter=_DummyBody)
+    assert isinstance(spec.create_adapter, TypeAdapter)
+    assert spec.create_adapter.core_schema["cls"] is _DummyBody
+
+
+def test_update_adapter_wraps_a_class():
+    spec = _make_spec(update_adapter=_DummyBody)
+    assert isinstance(spec.update_adapter, TypeAdapter)
+    assert spec.update_adapter.core_schema["cls"] is _DummyBody
+
+
+def test_create_adapter_passes_prebuilt_type_adapter_through():
+    """Discriminated-union adapters (posts) arrive pre-built. The
+    constructor must not re-wrap; identity is preserved."""
+    pre_built = TypeAdapter(_DummyBody)
+    spec = _make_spec(create_adapter=pre_built)
+    assert spec.create_adapter is pre_built
+
+
+def test_update_adapter_passes_prebuilt_type_adapter_through():
+    pre_built = TypeAdapter(_DummyBody)
+    spec = _make_spec(update_adapter=pre_built)
+    assert spec.update_adapter is pre_built
+
+
 def test_auth_policy_expands_to_write_authz_and_can_write():
     """`auth_policy=POLICY` populates both fields with the matched callables."""
     spec = _make_spec(auth_policy=OWNER_OR_ADMIN)

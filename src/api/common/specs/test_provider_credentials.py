@@ -8,6 +8,7 @@ test modules.
 """
 
 import pytest
+from pydantic import TypeAdapter
 
 from src.api.common.entity_spec import RouteSet
 from src.api.common.specs.provider import PROVIDER_ENTITY
@@ -18,12 +19,12 @@ from src.logic._authz import assert_owner_or_admin, is_owner_or_admin
 from src.logic.audit import AuditAction
 from src.models import ProviderCertification, ProviderEducation, ProviderLicensure
 from src.schemas.providers.provider import (
-    certification_create_adapter,
-    certification_update_adapter,
-    education_create_adapter,
-    education_update_adapter,
-    licensure_create_adapter,
-    licensure_update_adapter,
+    ProviderCertificationCreate,
+    ProviderCertificationUpdate,
+    ProviderEducationCreate,
+    ProviderEducationUpdate,
+    ProviderLicensureCreate,
+    ProviderLicensureUpdate,
 )
 
 CREDENTIALS = [
@@ -38,8 +39,8 @@ CREDENTIALS = [
             AuditAction.UPDATE_LICENSURE,
             AuditAction.DELETE_LICENSURE,
         ),
-        licensure_create_adapter,
-        licensure_update_adapter,
+        ProviderLicensureCreate,
+        ProviderLicensureUpdate,
         id="licensure",
     ),
     pytest.param(
@@ -53,8 +54,8 @@ CREDENTIALS = [
             AuditAction.UPDATE_EDUCATION,
             AuditAction.DELETE_EDUCATION,
         ),
-        education_create_adapter,
-        education_update_adapter,
+        ProviderEducationCreate,
+        ProviderEducationUpdate,
         id="education",
     ),
     pytest.param(
@@ -68,8 +69,8 @@ CREDENTIALS = [
             AuditAction.UPDATE_CERTIFICATION,
             AuditAction.DELETE_CERTIFICATION,
         ),
-        certification_create_adapter,
-        certification_update_adapter,
+        ProviderCertificationCreate,
+        ProviderCertificationUpdate,
         id="certification",
     ),
 ]
@@ -153,21 +154,39 @@ def test_routes_opted_in(
 
 
 @pytest.mark.parametrize(
-    "entity,name,url_collection,id_param,model,audit_actions,create_adapter,update_adapter",
+    "entity,name,url_collection,id_param,model,audit_actions,create_cls,update_cls",
     CREDENTIALS,
 )
-def test_adapters_are_the_canonical_ones(
+def test_adapters_wrap_the_schema_classes(
     entity,
     name,
     url_collection,
     id_param,
     model,
     audit_actions,
-    create_adapter,
-    update_adapter,
+    create_cls,
+    update_cls,
 ):
-    assert entity.create_adapter is create_adapter
-    assert entity.update_adapter is update_adapter
+    """Specs pass Pydantic classes; the spec constructor wraps each in
+    `TypeAdapter(...)`. Verify the resulting adapter targets the right
+    class — the wrapping behavior itself is unit-tested in
+    `test_entity_spec.py`."""
+    assert isinstance(entity.create_adapter, TypeAdapter)
+    assert isinstance(entity.update_adapter, TypeAdapter)
+    assert _adapter_target_class(entity.create_adapter) is create_cls
+    assert _adapter_target_class(entity.update_adapter) is update_cls
+
+
+def _adapter_target_class(adapter: TypeAdapter) -> type:
+    """Walk a TypeAdapter's core_schema to find the underlying model
+    class. PartialUpdate-derived schemas inherit a `model_validator`
+    which wraps the model in a `function-after` schema; the inner
+    schema carries the `cls`. Plain `BaseModel` subclasses have it at
+    the top level."""
+    schema = adapter.core_schema
+    while schema.get("type") != "model":
+        schema = schema["schema"]
+    return schema["cls"]
 
 
 @pytest.mark.parametrize(
