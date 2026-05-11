@@ -14,6 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from src.logic.audit import (
     AuditAction,
     AuditedResource,
+    make_audited_resource,
     make_snapshotter,
     mutate,
     record_audit,
@@ -51,6 +52,69 @@ def test_make_snapshotter_returns_json_mode_dict():
         "name": "foo",
         "when": "2026-01-01T12:00:00",
     }
+
+
+# --- make_audited_resource() --------------------------------------------
+
+
+def test_make_audited_resource_derives_actions_from_name():
+    """Default path: stem = name.upper(), actions looked up by convention."""
+    resource = make_audited_resource("user", _ExampleSnapshot)
+    assert resource.type == "user"
+    assert resource.create is AuditAction.CREATE_USER
+    assert resource.update is AuditAction.UPDATE_USER
+    assert resource.delete is AuditAction.DELETE_USER
+
+
+def test_make_audited_resource_wraps_schema_class_via_snapshotter():
+    """A Pydantic schema class is wrapped so the snapshot callable behaves
+    identically to one built via `make_snapshotter` directly."""
+
+    class _Row:
+        def __init__(self):
+            self.id = uuid.uuid4()
+            self.name = "foo"
+            self.when = datetime(2026, 1, 1, 12, 0, 0)
+
+    resource = make_audited_resource("user", _ExampleSnapshot)
+    row = _Row()
+    assert resource.snapshot(row) == {
+        "id": str(row.id),
+        "name": "foo",
+        "when": "2026-01-01T12:00:00",
+    }
+
+
+def test_make_audited_resource_accepts_prebuilt_callable():
+    """Posts' audit-snapshot is a hand-rolled discriminated-union callable
+    rather than a single Pydantic class; the factory accepts it as-is."""
+    sentinel = {"shape": "custom"}
+
+    def _snap(_obj):
+        return sentinel
+
+    resource = make_audited_resource("post", _snap)
+    assert resource.snapshot(object()) is sentinel
+    assert resource.create is AuditAction.CREATE_POST
+
+
+def test_make_audited_resource_honors_action_stem_override():
+    """`provider_licensure` -> `CREATE_LICENSURE` etc. — entity name and
+    enum stem diverge, so the caller passes `action_stem` explicitly."""
+    resource = make_audited_resource(
+        "provider_licensure", _ExampleSnapshot, action_stem="licensure"
+    )
+    assert resource.type == "provider_licensure"
+    assert resource.create is AuditAction.CREATE_LICENSURE
+    assert resource.update is AuditAction.UPDATE_LICENSURE
+    assert resource.delete is AuditAction.DELETE_LICENSURE
+
+
+def test_make_audited_resource_raises_on_missing_action():
+    """Surfacing the missing-member case at import time beats a runtime
+    KeyError from inside a mutation."""
+    with pytest.raises(ValueError, match="CREATE_NONEXISTENT"):
+        make_audited_resource("nonexistent", _ExampleSnapshot)
 
 
 async def test_record_audit_round_trips_through_repo(

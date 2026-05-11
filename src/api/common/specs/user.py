@@ -28,17 +28,13 @@ from src.api.common.entity_spec import (
 from src.api.common.specs.provider import PROVIDER_ENTITY
 from src.auth_config import current_active_user, current_admin_user
 from src.logic._authz import is_self_or_admin
-from src.logic.audit import AuditAction, AuditedResource, make_snapshotter
+from src.logic.audit import AuditAction, AuditedResource, make_audited_resource
 from src.models import User
 from src.repositories.dependencies import get_user_repository
 from src.schemas.users.user import UserActivationUpdate, UserAuditSnapshot
 
-USER_AUDITED_RESOURCE: Final[AuditedResource] = AuditedResource(
-    type="user",
-    snapshot=make_snapshotter(UserAuditSnapshot),
-    create=AuditAction.CREATE_USER,
-    update=AuditAction.UPDATE_USER,
-    delete=AuditAction.DELETE_USER,
+USER_AUDITED_RESOURCE: Final[AuditedResource] = make_audited_resource(
+    "user", UserAuditSnapshot
 )
 
 

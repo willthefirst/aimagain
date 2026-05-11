@@ -19,7 +19,7 @@ from src.api.common.entity_spec import EntitySpec, RouteSet
 from src.api.common.specs.provider import PROVIDER_ENTITY, _provider_form_redirect
 from src.auth_config import current_active_user
 from src.logic._authz import assert_owner_or_admin, is_owner_or_admin
-from src.logic.audit import AuditAction, AuditedResource, make_snapshotter
+from src.logic.audit import make_audited_resource
 from src.repositories.dependencies import get_provider_repository
 
 
@@ -29,7 +29,7 @@ def make_provider_credential_entity(
     url_collection: str,
     id_param: str,
     model: type,
-    audit_actions: tuple[AuditAction, AuditAction, AuditAction],
+    audit_stem: str,
     snapshot_schema: type[BaseModel],
     read_schema: type[BaseModel],
     create_adapter: TypeAdapter,
@@ -37,18 +37,17 @@ def make_provider_credential_entity(
 ) -> EntitySpec:
     """Build a credential-subentity `EntitySpec` from its varying pieces.
 
-    `audit_actions` is a `(create, update, delete)` triple of
-    `AuditAction` enum values. `snapshot_schema` is the Pydantic
-    schema used for audit before/after snapshots; `read_schema` is
-    the response shape for `PATCH` (consumed via `read_to_dict`).
+    `audit_stem` is the `AuditAction` enum stem (e.g. `"licensure"` for
+    the `CREATE_LICENSURE` / `UPDATE_LICENSURE` / `DELETE_LICENSURE`
+    triple) — the credential enum stems diverge from the entity `name`
+    (which is `"provider_licensure"`) so the stem is passed explicitly.
+    `snapshot_schema` is the Pydantic schema used for audit before/after
+    snapshots; `read_schema` is the response shape for `PATCH` (consumed
+    via `read_to_dict`).
     """
 
-    audited_resource = AuditedResource(
-        type=name,
-        snapshot=make_snapshotter(snapshot_schema),
-        create=audit_actions[0],
-        update=audit_actions[1],
-        delete=audit_actions[2],
+    audited_resource = make_audited_resource(
+        name, snapshot_schema, action_stem=audit_stem
     )
 
     def read_to_dict(row: Any) -> dict:

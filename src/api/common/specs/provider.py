@@ -22,7 +22,7 @@ from src.api.common.entity_spec import EntitySpec, RouteSet, Templates
 from src.api.common.resource_routes import QueryParam
 from src.auth_config import current_active_user
 from src.logic._authz import assert_owner_or_admin, is_owner_or_admin
-from src.logic.audit import AuditAction, AuditedResource, make_snapshotter
+from src.logic.audit import AuditedResource, make_audited_resource
 from src.models import Provider
 from src.repositories.dependencies import get_provider_repository
 from src.schemas.providers.provider import (
@@ -32,12 +32,8 @@ from src.schemas.providers.provider import (
     provider_update_adapter,
 )
 
-PROVIDER_AUDITED_RESOURCE: Final[AuditedResource] = AuditedResource(
-    type="provider",
-    snapshot=make_snapshotter(ProviderAuditSnapshot),
-    create=AuditAction.CREATE_PROVIDER,
-    update=AuditAction.UPDATE_PROVIDER,
-    delete=AuditAction.DELETE_PROVIDER,
+PROVIDER_AUDITED_RESOURCE: Final[AuditedResource] = make_audited_resource(
+    "provider", ProviderAuditSnapshot
 )
 
 

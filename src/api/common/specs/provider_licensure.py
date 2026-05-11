@@ -14,7 +14,6 @@ from typing import Final
 
 from src.api.common.entity_spec import EntitySpec
 from src.api.common.specs._credential import make_provider_credential_entity
-from src.logic.audit import AuditAction
 from src.models import ProviderLicensure
 from src.schemas.providers.provider import (
     ProviderLicensureAuditSnapshot,
@@ -28,11 +27,7 @@ LICENSURE_ENTITY: Final[EntitySpec] = make_provider_credential_entity(
     url_collection="licensures",
     id_param="licensure_id",
     model=ProviderLicensure,
-    audit_actions=(
-        AuditAction.CREATE_LICENSURE,
-        AuditAction.UPDATE_LICENSURE,
-        AuditAction.DELETE_LICENSURE,
-    ),
+    audit_stem="licensure",
     snapshot_schema=ProviderLicensureAuditSnapshot,
     read_schema=ProviderLicensureRead,
     create_adapter=licensure_create_adapter,

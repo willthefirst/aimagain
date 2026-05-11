@@ -23,7 +23,7 @@ from typing import Final
 from src.api.common.entity_spec import EntitySpec, RouteSet, Templates
 from src.auth_config import current_active_user
 from src.logic._authz import assert_owner_or_admin, is_owner_or_admin
-from src.logic.audit import AuditAction, AuditedResource
+from src.logic.audit import AuditedResource, make_audited_resource
 from src.models import POST_KINDS, Post
 from src.repositories.dependencies import get_post_repository
 from src.schemas.posts.post import (
@@ -32,12 +32,8 @@ from src.schemas.posts.post import (
     post_update_adapter,
 )
 
-POST_AUDITED_RESOURCE: Final[AuditedResource] = AuditedResource(
-    type="post",
-    snapshot=post_audit_snapshot,
-    create=AuditAction.CREATE_POST,
-    update=AuditAction.UPDATE_POST,
-    delete=AuditAction.DELETE_POST,
+POST_AUDITED_RESOURCE: Final[AuditedResource] = make_audited_resource(
+    "post", post_audit_snapshot
 )
 
 
