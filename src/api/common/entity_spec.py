@@ -314,6 +314,15 @@ class EntitySpec:
     # entities leave as None.
     singleton_alias: tuple[str, Callable[..., Any]] | None = None
 
+    # Owned-subentity registry. Populated in __post_init__: when a spec
+    # is constructed with `parent=<P>`, the child appends itself to
+    # `P._children` (in-place mutation; the frozen dataclass guarantees
+    # only forbids field reassignment, not list mutation). Exposed via
+    # the `children` property as an immutable tuple.
+    _children: list["EntitySpec"] = field(
+        default_factory=list, repr=False, compare=False
+    )
+
     def __post_init__(self) -> None:
         # Mirror `ResourceSpec.__post_init__` — declaring private fields
         # without a predicate would silently leak them.
@@ -362,6 +371,12 @@ class EntitySpec:
                 f"{self.parent.name!r} but no routes are opted in — "
                 "the subentity would be unreachable."
             )
+        # Register this child with its parent's owned-subentity list
+        # so `parent.children` reflects the construction order. List
+        # mutation on a frozen dataclass is permitted (we never reassign
+        # `_children`, just mutate the existing list in place).
+        if self.parent is not None:
+            self.parent._children.append(self)
         # CRUD-shaped vs edge-shaped audit binding is an either/or
         # choice; declaring both would be ambiguous and almost
         # certainly a misconfiguration.
@@ -465,6 +480,20 @@ class EntitySpec:
             or r.form_new
             or r.form_edit
         )
+
+    @property
+    def children(self) -> tuple["EntitySpec", ...]:
+        """Owned-subentity specs whose ``parent`` is this entity.
+
+        Populated automatically as children declare ``parent=self``;
+        order matches the children's construction order. Returned as a
+        tuple so callers cannot mutate the underlying registry.
+
+        Consumers: ``handle_create_provider`` derives the inline-credential
+        loop from ``PROVIDER_ENTITY.children`` instead of restating
+        the (collection, model) pairs.
+        """
+        return tuple(self._children)
 
     def to_resource_spec(self) -> ResourceSpec:
         """Derive a `ResourceSpec` for the mount helpers.

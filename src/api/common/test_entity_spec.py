@@ -417,6 +417,52 @@ def test_update_adapter_passes_prebuilt_type_adapter_through():
     assert spec.update_adapter is pre_built
 
 
+def test_children_registry_populates_in_construction_order():
+    """A spec with ``parent=<P>`` appends itself to ``P.children``.
+    Order matches construction order, exposed as an immutable tuple."""
+    parent = _make_spec(name="parent", url_collection="parents", id_param="parent_id")
+    child_a = _make_spec(
+        name="child_a",
+        url_collection="child_as",
+        id_param="child_a_id",
+        parent=parent,
+        routes=RouteSet(create=True),
+        create_adapter=_DummyBody,
+    )
+    child_b = _make_spec(
+        name="child_b",
+        url_collection="child_bs",
+        id_param="child_b_id",
+        parent=parent,
+        routes=RouteSet(create=True),
+        create_adapter=_DummyBody,
+    )
+    assert parent.children == (child_a, child_b)
+
+
+def test_children_returns_immutable_tuple():
+    """Callers cannot leak through `parent.children` to mutate the
+    underlying registry list."""
+    parent = _make_spec(
+        name="parent2", url_collection="parents2", id_param="parent2_id"
+    )
+    _make_spec(
+        name="child_x",
+        url_collection="child_xs",
+        id_param="child_x_id",
+        parent=parent,
+        routes=RouteSet(create=True),
+        create_adapter=_DummyBody,
+    )
+    children = parent.children
+    assert isinstance(children, tuple)
+
+
+def test_top_level_spec_has_no_children():
+    spec = _make_spec(name="lonely", url_collection="lonelies", id_param="lonely_id")
+    assert spec.children == ()
+
+
 def test_auth_policy_expands_to_write_authz_and_can_write():
     """`auth_policy=POLICY` populates both fields with the matched callables."""
     spec = _make_spec(auth_policy=OWNER_OR_ADMIN)
