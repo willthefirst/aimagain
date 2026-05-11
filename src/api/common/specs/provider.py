@@ -23,6 +23,7 @@ from src.api.common.resource_routes import QueryParam
 from src.auth_config import current_active_user
 from src.models import Provider
 from src.repositories.dependencies import get_provider_repository
+from src.repositories.favorites.user_favorite_repository import UserFavoriteRepository
 from src.schemas.providers.provider import (
     ProviderCreate,
     ProviderRead,
@@ -64,4 +65,7 @@ PROVIDER_ENTITY: Final[EntitySpec] = EntitySpec(
     ),
     create_redirect=_provider_form_redirect,
     update_redirect=_provider_form_redirect,
+    # Per-viewer detail extras live on the spec — see `EntitySpec`.
+    detail_extras_path="src.logic.providers.provider_processing.provider_detail_extras",
+    detail_extras_repos=(("user_favorite_repo", UserFavoriteRepository),),
 )

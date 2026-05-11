@@ -129,9 +129,10 @@ from src.api.common.resource_routes import mount_entity
 from src.api.common.specs.<entity> import <ENTITY>_ENTITY
 from src.logic.<entity>.<entity>_processing import (
     handle_list_<entity>,
-    # ... plus any bespoke handlers that don't fit the generic ritual,
-    # plus any per-entity `*_detail_extras` callable supplied via
-    # `detail_extras=` for viewer-pair / projection state.
+    # ... plus any bespoke handlers that don't fit the generic ritual.
+    # Per-viewer / per-list extras don't import here — they live on the
+    # spec as `detail_extras_path` / `list_extras_path` and resolve at
+    # mount time.
 )
 
 <entity>_api_router = APIRouter(prefix="/<entities>")
@@ -147,8 +148,6 @@ mount_entity(
         # make_<verb>_handler(<ENTITY>_ENTITY); add explicit entries here
         # only for verbs whose entity needs a bespoke handler.
     },
-    # detail_extras=<entity>_detail_extras,                  # if per-viewer state
-    # detail_extra_repos=(("<name>_repo", <Repo>),),         # typed deps for extras
 )
 ```
 
