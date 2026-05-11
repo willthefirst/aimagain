@@ -16,9 +16,6 @@ from starlette.requests import Request
 from src.api.common.exceptions import ForbiddenError, NotFoundError
 from src.logic.audit import AuditAction
 from src.logic.providers.provider_processing import (
-    handle_create_certification,
-    handle_create_education,
-    handle_create_licensure,
     handle_create_provider,
     handle_get_provider_detail,
     handle_list_providers,
@@ -388,7 +385,8 @@ async def test_list_user_providers_404_when_target_user_missing(
 # --- handle_create_provider ----------------------------------------------
 
 
-# PHASE2_REDUNDANT: framework-shaped — generic mount_create + audit row.
+# NOTE: `handle_create_provider` stays bespoke (inline credentials append);
+# the framework's `handle_create` doesn't cover this shape. Test stays.
 async def test_create_provider_persists_row_and_writes_audit(
     db_test_session_manager: async_sessionmaker[AsyncSession],
 ):
@@ -592,59 +590,6 @@ async def test_update_provider_404_for_unknown_id(
 # --- Licensure handlers -------------------------------------------------
 
 
-# PHASE2_REDUNDANT: framework-shaped — subrow mount_create + parent-chain audit.
-async def test_create_licensure_attaches_to_provider_and_audits(
-    db_test_session_manager: async_sessionmaker[AsyncSession],
-):
-    user = await _seed_user(db_test_session_manager)
-    provider_id, *_ = await _seed_provider(db_test_session_manager, user_id=user.id)
-
-    async with db_test_session_manager() as session:
-        repo = ProviderRepository(session)
-        audit_repo = AuditRepository(session)
-        created = await handle_create_licensure(
-            provider_id,
-            ProviderLicensureCreate(
-                license_type="lcsw", license_number="L-99", issuing_state="IL"
-            ),
-            repo,
-            audit_repo,
-            user,
-        )
-
-    assert created.provider_id == provider_id
-    assert created.license_number == "L-99"
-    rows = await _audit_rows_for(
-        db_test_session_manager,
-        resource_type="provider_licensure",
-        resource_id=created.id,
-    )
-    assert len(rows) == 1
-    assert rows[0].action == AuditAction.CREATE_LICENSURE
-
-
-async def test_create_licensure_403_for_non_owner(
-    db_test_session_manager: async_sessionmaker[AsyncSession],
-):
-    owner = await _seed_user(db_test_session_manager)
-    intruder = await _seed_user(db_test_session_manager)
-    provider_id, *_ = await _seed_provider(db_test_session_manager, user_id=owner.id)
-
-    async with db_test_session_manager() as session:
-        repo = ProviderRepository(session)
-        audit_repo = AuditRepository(session)
-        with pytest.raises(ForbiddenError):
-            await handle_create_licensure(
-                provider_id,
-                ProviderLicensureCreate(
-                    license_type="lcsw", license_number="L-99", issuing_state="IL"
-                ),
-                repo,
-                audit_repo,
-                intruder,
-            )
-
-
 # PHASE2_REDUNDANT: framework-shaped — subrow mount_update + before/after audit shape.
 async def test_update_licensure_audits_before_after(
     db_test_session_manager: async_sessionmaker[AsyncSession],
@@ -706,32 +651,6 @@ async def test_update_licensure_404_when_sub_row_belongs_to_other_provider(
 # --- Education + certification smoke tests ------------------------------
 
 
-async def test_create_education_attaches_and_audits(
-    db_test_session_manager: async_sessionmaker[AsyncSession],
-):
-    user = await _seed_user(db_test_session_manager)
-    provider_id, *_ = await _seed_provider(db_test_session_manager, user_id=user.id)
-
-    async with db_test_session_manager() as session:
-        repo = ProviderRepository(session)
-        audit_repo = AuditRepository(session)
-        created = await handle_create_education(
-            provider_id,
-            ProviderEducationCreate(education_type="phd", institution="Some U"),
-            repo,
-            audit_repo,
-            user,
-        )
-
-    assert created.provider_id == provider_id
-    rows = await _audit_rows_for(
-        db_test_session_manager,
-        resource_type="provider_education",
-        resource_id=created.id,
-    )
-    assert rows[0].action == AuditAction.CREATE_EDUCATION
-
-
 async def test_update_education_audits(
     db_test_session_manager: async_sessionmaker[AsyncSession],
 ):
@@ -759,34 +678,6 @@ async def test_update_education_audits(
         resource_id=education_id,
     )
     assert rows[0].action == AuditAction.UPDATE_EDUCATION
-
-
-async def test_create_certification_attaches_and_audits(
-    db_test_session_manager: async_sessionmaker[AsyncSession],
-):
-    user = await _seed_user(db_test_session_manager)
-    provider_id, *_ = await _seed_provider(db_test_session_manager, user_id=user.id)
-
-    async with db_test_session_manager() as session:
-        repo = ProviderRepository(session)
-        audit_repo = AuditRepository(session)
-        created = await handle_create_certification(
-            provider_id,
-            ProviderCertificationCreate(
-                certification_type="emdr", certifying_body="EMDRIA"
-            ),
-            repo,
-            audit_repo,
-            user,
-        )
-
-    assert created.provider_id == provider_id
-    rows = await _audit_rows_for(
-        db_test_session_manager,
-        resource_type="provider_certification",
-        resource_id=created.id,
-    )
-    assert rows[0].action == AuditAction.CREATE_CERTIFICATION
 
 
 async def test_update_certification_audits(

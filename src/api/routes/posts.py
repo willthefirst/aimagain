@@ -14,9 +14,8 @@ from src.api.common.resource_routes import (
     mount_update,
 )
 from src.api.common.specs.post import POST_ENTITY
-from src.logic._generic import make_delete_handler
+from src.logic._generic import make_create_handler, make_delete_handler
 from src.logic.posts.post_processing import (
-    handle_create_post,
     handle_get_post_detail,
     handle_get_post_edit_form,
     handle_get_post_form,
@@ -81,7 +80,11 @@ mount_detail(router, POST_SPEC, handler=handle_get_post_detail)
 
 
 # Mutations — methods differ from the GETs above so order is independent.
-mount_create(router, POST_SPEC, handler=handle_create_post)
+# Generic create: `make_create_handler` reads the spec's discriminator
+# to dispatch by `payload.kind` and build the right detail row.
+_handle_create_post = make_create_handler(POST_ENTITY)
+_handle_create_post.__module__ = __name__
+mount_create(router, POST_SPEC, handler=_handle_create_post)
 mount_update(router, POST_SPEC, handler=handle_update_post)
 # Named module-level attribute so test monkeypatching (contract tests)
 # can target `src.api.routes.posts._handle_delete_post` and the mount

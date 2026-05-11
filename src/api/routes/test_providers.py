@@ -15,10 +15,7 @@ from src.models import (
 )
 from src.repositories.audit_repository import AuditRepository
 from tests.helpers import (
-    certification_payload,
     create_test_user,
-    education_payload,
-    licensure_payload,
     make_provider,
     make_provider_certification,
     make_provider_education,
@@ -411,54 +408,6 @@ async def test_delete_provider_returns_204_and_cascades(
 # --- Licensure sub-resource ---------------------------------------------
 
 
-# PHASE2_REDUNDANT: framework-shaped — mount_create subrow happy path.
-async def test_create_licensure_happy_path(
-    authenticated_client: AsyncClient,
-    db_test_session_manager: async_sessionmaker[AsyncSession],
-    logged_in_user: User,
-):
-    provider_id = await _seed_provider_for(
-        db_test_session_manager, user_id=logged_in_user.id
-    )
-
-    response = await authenticated_client.post(
-        f"/providers/{provider_id}/licensures",
-        data=licensure_payload(license_number="L-99999"),
-    )
-
-    assert response.status_code == 201
-    new_id = uuid.UUID(response.json()["id"])
-    assert response.headers["HX-Redirect"] == f"/providers/{provider_id}/form"
-
-    async with db_test_session_manager() as session:
-        persisted = (
-            (
-                await session.execute(
-                    select(ProviderLicensure).filter(ProviderLicensure.id == new_id)
-                )
-            )
-            .scalars()
-            .first()
-        )
-        assert persisted is not None
-        assert persisted.license_number == "L-99999"
-        assert persisted.provider_id == provider_id
-
-
-async def test_create_licensure_returns_403_if_not_owner(
-    authenticated_client: AsyncClient,
-    db_test_session_manager: async_sessionmaker[AsyncSession],
-    logged_in_user: User,
-):
-    _, other_provider_id = await _seed_other_user_with_provider(db_test_session_manager)
-
-    response = await authenticated_client.post(
-        f"/providers/{other_provider_id}/licensures",
-        data=licensure_payload(),
-    )
-    assert response.status_code == 403
-
-
 # PHASE2_REDUNDANT: framework-shaped — mount_update subrow happy path.
 async def test_patch_licensure_updates_fields(
     authenticated_client: AsyncClient,
@@ -510,72 +459,6 @@ async def test_patch_licensure_returns_404_for_mismatched_provider(
 
 
 # --- Education / certification happy paths ------------------------------
-
-
-# PHASE2_REDUNDANT: framework-shaped — mount_create subrow happy path (education).
-async def test_create_education_happy_path(
-    authenticated_client: AsyncClient,
-    db_test_session_manager: async_sessionmaker[AsyncSession],
-    logged_in_user: User,
-):
-    provider_id = await _seed_provider_for(
-        db_test_session_manager, user_id=logged_in_user.id
-    )
-
-    response = await authenticated_client.post(
-        f"/providers/{provider_id}/educations",
-        data=education_payload(institution="Test U"),
-    )
-
-    assert response.status_code == 201
-    new_id = uuid.UUID(response.json()["id"])
-
-    async with db_test_session_manager() as session:
-        persisted = (
-            (
-                await session.execute(
-                    select(ProviderEducation).filter(ProviderEducation.id == new_id)
-                )
-            )
-            .scalars()
-            .first()
-        )
-        assert persisted is not None
-        assert persisted.institution == "Test U"
-
-
-# PHASE2_REDUNDANT: framework-shaped — mount_create subrow happy path (certification).
-async def test_create_certification_happy_path(
-    authenticated_client: AsyncClient,
-    db_test_session_manager: async_sessionmaker[AsyncSession],
-    logged_in_user: User,
-):
-    provider_id = await _seed_provider_for(
-        db_test_session_manager, user_id=logged_in_user.id
-    )
-
-    response = await authenticated_client.post(
-        f"/providers/{provider_id}/certifications",
-        data=certification_payload(certifying_body="Test Cert Body"),
-    )
-
-    assert response.status_code == 201
-    new_id = uuid.UUID(response.json()["id"])
-
-    async with db_test_session_manager() as session:
-        persisted = (
-            (
-                await session.execute(
-                    select(ProviderCertification).filter(
-                        ProviderCertification.id == new_id
-                    )
-                )
-            )
-            .scalars()
-            .first()
-        )
-        assert persisted is not None
-        assert persisted.certifying_body == "Test Cert Body"
 
 
 # --- Create form page (GET /providers/form) ----------------------

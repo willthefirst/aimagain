@@ -510,3 +510,432 @@ def test_make_delete_handler_name_includes_entity():
     spec = _top_level_spec()
     handler = make_delete_handler(spec)
     assert handler.__name__ == "_handle_delete_widget"
+
+
+# --- handle_create framework tests ---------------------------------------
+
+
+from dataclasses import dataclass as _dc
+from typing import Any as _Any
+
+from pydantic import BaseModel as _BaseModel
+
+from src.api.common.entity_spec import RelatedListSubresource  # noqa: F401
+from src.logic._generic import handle_create, make_create_handler
+from src.models._polymorphic import DiscriminatorRegistry
+
+
+class _AnyRow:
+    """Flexible fixture row used by create tests — accepts any kwargs."""
+
+    def __init__(self, **kwargs):
+        for k, v in kwargs.items():
+            setattr(self, k, v)
+        if not hasattr(self, "id"):
+            self.id = uuid4()
+
+
+def _create_fake_repo() -> _FakeRepo:
+    """Returns a `_FakeRepo` extended with `create` / `add_child` /
+    `create_polymorphic` for the new framework path."""
+    repo = _FakeRepo()
+    created_rows: list[_Any] = []
+    added_children: list[tuple[_Any, str, _Any]] = []
+    created_polymorphic: list[tuple[_Any, _Any, str]] = []
+    repo.created_rows = created_rows  # type: ignore[attr-defined]
+    repo.added_children = added_children  # type: ignore[attr-defined]
+    repo.created_polymorphic = created_polymorphic  # type: ignore[attr-defined]
+
+    async def create(obj):
+        if not hasattr(obj, "id"):
+            obj.id = uuid4()
+        created_rows.append(obj)
+        return obj
+
+    async def add_child(parent, collection, child):
+        if not hasattr(child, "id"):
+            child.id = uuid4()
+        added_children.append((parent, collection, child))
+        # Mimic the real method: append to parent's collection so
+        # snapshots see it.
+        bucket = getattr(parent, collection, None)
+        if bucket is None:
+            bucket = []
+            setattr(parent, collection, bucket)
+        bucket.append(child)
+        return child
+
+    async def create_polymorphic(parent, detail, *, detail_relationship):
+        if not hasattr(parent, "id"):
+            parent.id = uuid4()
+        setattr(parent, detail_relationship, detail)
+        created_polymorphic.append((parent, detail, detail_relationship))
+        return parent
+
+    repo.create = create  # type: ignore[assignment]
+    repo.add_child = add_child  # type: ignore[assignment]
+    repo.create_polymorphic = create_polymorphic  # type: ignore[assignment]
+    return repo
+
+
+class _StandardPayload(_BaseModel):
+    practice_name: str = "Acme"
+    location_city: str = "NYC"
+
+
+@pytest.mark.asyncio
+async def test_create_top_level_persists_and_audits():
+    """Standard create: instance built from payload + owner column set,
+    persisted, audit row written."""
+    audit_used = _audit()
+    spec = EntitySpec(
+        name="widget",
+        url_collection="widgets",
+        id_param="widget_id",
+        model=_AnyRow,
+        audit=audit_used,
+    )
+    repo = _create_fake_repo()
+    audit_repo = _FakeAuditRepo()
+    user = SimpleNamespace(id=uuid4())
+
+    created = await handle_create(
+        spec,
+        payload=_StandardPayload(practice_name="P", location_city="C"),
+        repo=repo,
+        audit_repo=audit_repo,
+        requesting_user=user,
+    )
+
+    assert created.practice_name == "P"
+    assert created.location_city == "C"
+    assert created.owner_id == user.id
+    assert len(repo.created_rows) == 1
+    assert len(audit_repo.calls) == 1
+    assert audit_repo.calls[0]["action"] == audit_used.create
+
+
+@pytest.mark.asyncio
+async def test_create_top_level_without_owner_attr():
+    """When `owner_attr=None` (e.g. users — resource IS the user) the
+    framework doesn't try to set an owner column."""
+    spec = EntitySpec(
+        name="widget",
+        url_collection="widgets",
+        id_param="widget_id",
+        model=_AnyRow,
+        owner_attr=None,
+        audit=_audit(),
+    )
+    repo = _create_fake_repo()
+    user = SimpleNamespace(id=uuid4())
+
+    created = await handle_create(
+        spec,
+        payload=_StandardPayload(),
+        repo=repo,
+        audit_repo=_FakeAuditRepo(),
+        requesting_user=user,
+    )
+
+    # Owner column never assigned (would have been "owner_id" by default).
+    assert not hasattr(created, "owner_id")
+
+
+@pytest.mark.asyncio
+async def test_create_subentity_appended_to_parent_and_audited():
+    """Owned-subentity create: parent loaded, write_authz on parent,
+    child instantiated + appended via `add_child`, audit on child."""
+    seen_authz = []
+
+    def authz(obj, user, *, action):
+        seen_authz.append((obj, action))
+
+    parent_spec = _parent_spec()
+    spec = EntitySpec(
+        name="part",
+        url_collection="parts",
+        id_param="part_id",
+        model=_AnyRow,
+        parent=parent_spec,
+        audit=_audit(),
+        write_authz=authz,
+        routes=RouteSet(create=True),
+        create_adapter=__import__("pydantic").TypeAdapter(_StandardPayload),
+    )
+    repo = _create_fake_repo()
+    parent_id = uuid4()
+    parent_obj = _ParentRow(id=parent_id)
+    repo.seed(parent_spec.model, parent_obj)
+    audit_repo = _FakeAuditRepo()
+    user = SimpleNamespace(id=uuid4())
+
+    created = await handle_create(
+        spec,
+        payload=_StandardPayload(),
+        parent_id=parent_id,
+        repo=repo,
+        audit_repo=audit_repo,
+        requesting_user=user,
+    )
+
+    assert len(seen_authz) == 1
+    assert seen_authz[0][0] is parent_obj  # against parent
+    assert len(repo.added_children) == 1
+    assert repo.added_children[0][0] is parent_obj
+    assert repo.added_children[0][1] == "parts"  # collection = url_collection
+    assert repo.added_children[0][2] is created
+    assert len(audit_repo.calls) == 1
+
+
+@pytest.mark.asyncio
+async def test_create_subentity_parent_not_found():
+    parent_spec = _parent_spec()
+    spec = EntitySpec(
+        name="part",
+        url_collection="parts",
+        id_param="part_id",
+        model=_AnyRow,
+        parent=parent_spec,
+        audit=_audit(),
+        routes=RouteSet(create=True),
+        create_adapter=__import__("pydantic").TypeAdapter(_StandardPayload),
+    )
+    repo = _create_fake_repo()  # empty
+    with pytest.raises(NotFoundError):
+        await handle_create(
+            spec,
+            payload=_StandardPayload(),
+            parent_id=uuid4(),
+            repo=repo,
+            audit_repo=_FakeAuditRepo(),
+            requesting_user=SimpleNamespace(id=uuid4()),
+        )
+
+
+@pytest.mark.asyncio
+async def test_create_subentity_missing_parent_id_raises():
+    parent_spec = _parent_spec()
+    spec = EntitySpec(
+        name="part",
+        url_collection="parts",
+        id_param="part_id",
+        model=_AnyRow,
+        parent=parent_spec,
+        audit=_audit(),
+        routes=RouteSet(create=True),
+        create_adapter=__import__("pydantic").TypeAdapter(_StandardPayload),
+    )
+    with pytest.raises(ValueError, match="parent"):
+        await handle_create(
+            spec,
+            payload=_StandardPayload(),
+            parent_id=None,
+            repo=_create_fake_repo(),
+            audit_repo=_FakeAuditRepo(),
+            requesting_user=SimpleNamespace(id=uuid4()),
+        )
+
+
+# --- Polymorphic create --------------------------------------------------
+
+
+@_dc(frozen=True)
+class _FixtureKindSpec:
+    """Stands in for `PostKindSpec` — just the framework-required attrs."""
+
+    kind: str
+    detail_model: type
+    detail_fields: tuple[str, ...]
+    detail_relationship: str
+
+
+class _RedKindPayload(_BaseModel):
+    kind: str
+    redness: int = 0
+
+
+class _BlueKindPayload(_BaseModel):
+    kind: str
+    blueness: int = 0
+
+
+class _RedDetail:
+    def __init__(self, redness: int = 0):
+        self.redness = redness
+
+
+class _BlueDetail:
+    def __init__(self, blueness: int = 0):
+        self.blueness = blueness
+
+
+@pytest.mark.asyncio
+async def test_create_polymorphic_dispatches_via_discriminator():
+    """The payload's `kind` picks the kind_spec; parent has the
+    discriminator column set; detail built from kind_spec.detail_fields."""
+    registry = DiscriminatorRegistry(
+        column="kind",
+        specs={
+            "red": _FixtureKindSpec(
+                kind="red",
+                detail_model=_RedDetail,
+                detail_fields=("redness",),
+                detail_relationship="red_detail",
+            ),
+            "blue": _FixtureKindSpec(
+                kind="blue",
+                detail_model=_BlueDetail,
+                detail_fields=("blueness",),
+                detail_relationship="blue_detail",
+            ),
+        },
+    )
+    spec = EntitySpec(
+        name="painting",
+        url_collection="paintings",
+        id_param="painting_id",
+        model=_AnyRow,
+        audit=_audit(),
+        discriminator=registry,
+    )
+    repo = _create_fake_repo()
+    user = SimpleNamespace(id=uuid4())
+
+    created_red = await handle_create(
+        spec,
+        payload=_RedKindPayload(kind="red", redness=7),
+        repo=repo,
+        audit_repo=_FakeAuditRepo(),
+        requesting_user=user,
+    )
+
+    # Parent has discriminator column set + owner.
+    assert created_red.kind == "red"
+    assert created_red.owner_id == user.id
+    # Detail attached at the kind_spec.detail_relationship.
+    assert isinstance(created_red.red_detail, _RedDetail)
+    assert created_red.red_detail.redness == 7
+    assert len(repo.created_polymorphic) == 1
+
+    # And the other kind goes through the same path.
+    created_blue = await handle_create(
+        spec,
+        payload=_BlueKindPayload(kind="blue", blueness=11),
+        repo=repo,
+        audit_repo=_FakeAuditRepo(),
+        requesting_user=user,
+    )
+    assert created_blue.kind == "blue"
+    assert created_blue.blue_detail.blueness == 11
+
+
+# --- Error / edge cases --------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_create_no_audit_binding_raises():
+    spec = EntitySpec(
+        name="widget",
+        url_collection="widgets",
+        id_param="widget_id",
+        model=_AnyRow,
+        audit=None,
+    )
+    with pytest.raises(ValueError, match="audit"):
+        await handle_create(
+            spec,
+            payload=_StandardPayload(),
+            repo=_create_fake_repo(),
+            audit_repo=_FakeAuditRepo(),
+            requesting_user=SimpleNamespace(id=uuid4()),
+        )
+
+
+@pytest.mark.asyncio
+async def test_create_subentity_write_authz_raises_rolls_back():
+    def authz(obj, user, *, action):
+        raise ForbiddenError(detail="nope")
+
+    parent_spec = _parent_spec()
+    spec = EntitySpec(
+        name="part",
+        url_collection="parts",
+        id_param="part_id",
+        model=_AnyRow,
+        parent=parent_spec,
+        audit=_audit(),
+        write_authz=authz,
+        routes=RouteSet(create=True),
+        create_adapter=__import__("pydantic").TypeAdapter(_StandardPayload),
+    )
+    repo = _create_fake_repo()
+    parent_id = uuid4()
+    repo.seed(parent_spec.model, _ParentRow(id=parent_id))
+    audit_repo = _FakeAuditRepo()
+
+    with pytest.raises(ForbiddenError):
+        await handle_create(
+            spec,
+            payload=_StandardPayload(),
+            parent_id=parent_id,
+            repo=repo,
+            audit_repo=audit_repo,
+            requesting_user=SimpleNamespace(id=uuid4()),
+        )
+
+    # Nothing added, no audit, no commit.
+    assert repo.added_children == []
+    assert audit_repo.calls == []
+    assert repo.session.commits == 0
+
+
+# --- make_create_handler factory ------------------------------------------
+
+
+def test_make_create_handler_top_level_signature():
+    spec = EntitySpec(
+        name="widget",
+        url_collection="widgets",
+        id_param="widget_id",
+        model=_AnyRow,
+        audit=_audit(),
+    )
+    handler = make_create_handler(spec)
+    sig = inspect.signature(handler)
+    assert set(sig.parameters) == {
+        "payload",
+        "repo",
+        "audit_repo",
+        "requesting_user",
+    }
+
+
+def test_make_create_handler_subentity_includes_parent_id():
+    parent_spec = _parent_spec()
+    spec = EntitySpec(
+        name="part",
+        url_collection="parts",
+        id_param="part_id",
+        model=_AnyRow,
+        parent=parent_spec,
+        audit=_audit(),
+        routes=RouteSet(create=True),
+        create_adapter=__import__("pydantic").TypeAdapter(_StandardPayload),
+    )
+    handler = make_create_handler(spec)
+    sig = inspect.signature(handler)
+    assert "parent_id" in sig.parameters
+    assert "payload" in sig.parameters
+
+
+def test_make_create_handler_name_includes_entity():
+    spec = EntitySpec(
+        name="widget",
+        url_collection="widgets",
+        id_param="widget_id",
+        model=_AnyRow,
+        audit=_audit(),
+    )
+    handler = make_create_handler(spec)
+    assert handler.__name__ == "_handle_create_widget"
