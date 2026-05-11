@@ -240,7 +240,7 @@ Migrated route files compose the individual `mount_*` helpers through `mount_ent
 - `entity.filters` — passed as `query_params=` to `mount_list`.
 - `entity.discriminator` — if set, the form-new mount auto-derives `Literal[*entity.discriminator.names]` for the `?kind=` query param.
 - `entity.read_user_dep` — `None` means public read; `mount_list` is called with `public=True`.
-- `owned_subentities` — a tuple of child `EntitySpec`s whose `parent` is `entity`. Each is mounted recursively via the same dispatcher; the handlers dict for an owned subentity is keyed `f"{owned.name}.{verb}"` (e.g. `"licensure.create"`).
+- `owned_subentities` — a tuple of child `EntitySpec`s whose `parent` is `entity`. Each is mounted recursively via the same dispatcher; the handlers dict for an owned subentity is keyed `f"{owned.name}.{verb}"` (e.g. `"licensure.create"`). For verbs that match the standard CRUD-framework factories (`create`, `update`, `delete`, `detail`, `form_edit`), the explicit key is optional — `mount_entity` falls back to `make_<verb>_handler(owned)`, which is the common case for subentities whose mutations are entirely standard. Verbs without a default factory (`list`, `form_new`) still require an explicit entry; supplying any explicit key overrides the factory default.
 
 The handlers dict is validated at mount time: every opted-in flag / state axis / subresource must have a matching key, and any extra keys raise (typo detection). Missing entries fail loudly at app startup.
 

@@ -1359,6 +1359,137 @@ def test_mount_entity_owned_subentity_parent_mismatch_raises():
         mount_entity(None, correct_parent, handlers={}, owned_subentities=(child,))
 
 
+def test_mount_entity_owned_subentity_auto_binds_default_factory():
+    """Standard CRUD verbs on an owned subentity bind to
+    `make_<verb>_handler(child)` when no explicit
+    `<owned.name>.<verb>` key is supplied."""
+    from pydantic import TypeAdapter
+
+    parent = _EntitySpec(
+        name="parent",
+        url_collection="parents",
+        id_param="parent_id",
+        model=SimpleNamespace,
+        audit=_stub_audit(),
+    )
+    child = _EntitySpec(
+        name="child",
+        url_collection="children",
+        id_param="child_id",
+        model=SimpleNamespace,
+        parent=parent,
+        audit=_stub_audit(),
+        create_adapter=TypeAdapter(_AxisBody),
+        update_adapter=TypeAdapter(_AxisBody),
+        routes=_RouteSet(create=True, update=True, delete=True),
+    )
+
+    captured: list[Callable[..., Any]] = []
+    import src.api.common.resource_routes as rr
+
+    originals = {}
+    for fn_name in ("mount_create", "mount_update", "mount_delete"):
+        originals[fn_name] = getattr(rr, fn_name)
+        setattr(
+            rr,
+            fn_name,
+            lambda *a, _n=fn_name, **k: captured.append((_n, k.get("handler"))),
+        )
+    try:
+        mount_entity(None, parent, handlers={}, owned_subentities=(child,))
+    finally:
+        for n, orig in originals.items():
+            setattr(rr, n, orig)
+
+    handler_names = {n: h.__name__ for n, h in captured}
+    assert handler_names == {
+        "mount_create": "_handle_create_child",
+        "mount_update": "_handle_update_child",
+        "mount_delete": "_handle_delete_child",
+    }
+
+
+def test_mount_entity_owned_subentity_explicit_handler_overrides_default():
+    """An explicit `<owned.name>.<verb>` key wins over the
+    auto-bound factory default."""
+    from pydantic import TypeAdapter
+
+    parent = _EntitySpec(
+        name="parent",
+        url_collection="parents",
+        id_param="parent_id",
+        model=SimpleNamespace,
+        audit=_stub_audit(),
+    )
+    child = _EntitySpec(
+        name="child",
+        url_collection="children",
+        id_param="child_id",
+        model=SimpleNamespace,
+        parent=parent,
+        audit=_stub_audit(),
+        create_adapter=TypeAdapter(_AxisBody),
+        update_adapter=TypeAdapter(_AxisBody),
+        routes=_RouteSet(create=True, update=True, delete=True),
+    )
+
+    async def bespoke_create(**_kw):  # pragma: no cover
+        return None
+
+    captured: list[Callable[..., Any]] = []
+    import src.api.common.resource_routes as rr
+
+    originals = {}
+    for fn_name in ("mount_create", "mount_update", "mount_delete"):
+        originals[fn_name] = getattr(rr, fn_name)
+        setattr(
+            rr,
+            fn_name,
+            lambda *a, _n=fn_name, **k: captured.append((_n, k.get("handler"))),
+        )
+    try:
+        mount_entity(
+            None,
+            parent,
+            handlers={"child.create": bespoke_create},
+            owned_subentities=(child,),
+        )
+    finally:
+        for n, orig in originals.items():
+            setattr(rr, n, orig)
+
+    by_mount = dict(captured)
+    assert by_mount["mount_create"] is bespoke_create
+    # update + delete fall back to factory defaults.
+    assert by_mount["mount_update"].__name__ == "_handle_update_child"
+    assert by_mount["mount_delete"].__name__ == "_handle_delete_child"
+
+
+def test_mount_entity_owned_subentity_no_default_factory_raises():
+    """Opting an owned subentity into a verb without a default factory
+    (e.g. `list`, `form_new`) requires an explicit handler — missing
+    one raises `KeyError` at mount time."""
+    parent = _EntitySpec(
+        name="parent",
+        url_collection="parents",
+        id_param="parent_id",
+        model=SimpleNamespace,
+        audit=_stub_audit(),
+    )
+    child = _EntitySpec(
+        name="child",
+        url_collection="children",
+        id_param="child_id",
+        model=SimpleNamespace,
+        parent=parent,
+        audit=_stub_audit(),
+        routes=_RouteSet(list=True),
+        templates=_Templates(list="x/list.html"),
+    )
+    with pytest.raises(KeyError, match="no default factory"):
+        mount_entity(None, parent, handlers={}, owned_subentities=(child,))
+
+
 def test_mount_delete_404_propagates_from_handler():
     """If the handler raises NotFoundError, the route surfaces it as 404
     (decorator translation). Confirms the mount doesn't swallow exceptions."""

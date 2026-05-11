@@ -9,7 +9,6 @@ from src.api.common.specs.provider_certification import CERTIFICATION_ENTITY
 from src.api.common.specs.provider_education import EDUCATION_ENTITY
 from src.api.common.specs.provider_licensure import LICENSURE_ENTITY
 from src.logic._generic import (
-    make_create_handler,
     make_delete_handler,
     make_detail_handler,
     make_edit_form_handler,
@@ -58,6 +57,10 @@ _handle_get_provider_detail = _named(
 )
 
 
+# Owned-subentity verbs (credentials' create/update/delete) get
+# auto-bound by `mount_entity` from `make_<verb>_handler(child)` — see
+# the dispatcher's owned-subentity branch. No explicit `provider_<x>.<verb>`
+# entries needed unless the verb wants a bespoke handler.
 mount_entity(
     router,
     PROVIDER_ENTITY,
@@ -73,16 +76,6 @@ mount_entity(
         "delete": _handle_delete_provider,
         "form_new": handle_get_provider_form,
         "form_edit": _handle_get_provider_edit_form,
-        # Owned-subentity verbs, keyed by `<owned.name>.<verb>`.
-        "provider_licensure.create": make_create_handler(LICENSURE_ENTITY),
-        "provider_licensure.update": make_update_handler(LICENSURE_ENTITY),
-        "provider_licensure.delete": make_delete_handler(LICENSURE_ENTITY),
-        "provider_education.create": make_create_handler(EDUCATION_ENTITY),
-        "provider_education.update": make_update_handler(EDUCATION_ENTITY),
-        "provider_education.delete": make_delete_handler(EDUCATION_ENTITY),
-        "provider_certification.create": make_create_handler(CERTIFICATION_ENTITY),
-        "provider_certification.update": make_update_handler(CERTIFICATION_ENTITY),
-        "provider_certification.delete": make_delete_handler(CERTIFICATION_ENTITY),
     },
     owned_subentities=(LICENSURE_ENTITY, EDUCATION_ENTITY, CERTIFICATION_ENTITY),
 )

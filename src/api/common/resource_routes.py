@@ -803,6 +803,38 @@ def mount_related_list(
     router.get(path)(route_fn)
 
 
+def _owned_factory_makers() -> dict[str, Callable[..., Callable[..., Awaitable[Any]]]]:
+    """Lazy-import the generic CRUD-framework factories for owned subentities.
+
+    Imported on demand to avoid a module-import cycle: this module is
+    imported by ``src.api.common.entity_spec`` (for ``ResourceSpec`` and
+    ``QueryParam``), and ``src.logic._generic`` imports ``EntitySpec``.
+    Doing the import inside ``mount_entity``'s owned-subentity branch
+    breaks the cycle — by the time we reach this code at runtime, the
+    logic module has finished initializing.
+
+    Only verbs whose factory delegates to a standard ritual appear
+    here. ``list`` and ``form_new`` have no defaults because their
+    bespoke knobs (custom repo query / template selection) make
+    auto-binding unsafe.
+    """
+    from src.logic._generic import (
+        make_create_handler,
+        make_delete_handler,
+        make_detail_handler,
+        make_edit_form_handler,
+        make_update_handler,
+    )
+
+    return {
+        "create": make_create_handler,
+        "update": make_update_handler,
+        "delete": make_delete_handler,
+        "detail": make_detail_handler,
+        "form_edit": make_edit_form_handler,
+    }
+
+
 def mount_entity(
     router: Any,
     entity: Any,  # `EntitySpec` — imported lazily to avoid a cycle
@@ -827,6 +859,12 @@ def mount_entity(
         `"providers"` for the user → providers related list).
       - For each `owned_subentities[i]`: one per opted-in verb keyed
         `f"{owned.name}.{verb}"` (e.g. `"provider_licensure.create"`).
+        Verbs that match the generic CRUD-framework factories
+        (`create`, `update`, `delete`, `detail`, `form_edit`) fall
+        back to ``make_<verb>_handler(owned)`` when no explicit key
+        is supplied — the common case for subentities whose
+        mutations are entirely standard. Supplying the explicit key
+        still works and overrides the default.
 
     Validates loudly at mount time:
       - Every opted-in route / state-axis / subresource must have a
@@ -926,6 +964,15 @@ def mount_entity(
     # Owned-subentity recursion: each child entity gets its own
     # `mount_entity` call with its own slice of the handlers dict
     # (keyed by `<owned.name>.<verb>`).
+    #
+    # For verbs whose generic CRUD-framework factory exists
+    # (`make_<verb>_handler` in `src.logic._generic`), we auto-bind a
+    # factory-built handler when the explicit key is absent — the
+    # default case for credential-style subentities whose mutations
+    # are entirely standard. Supplying the explicit key still works
+    # and overrides the default; that's the escape hatch for
+    # subentities that need bespoke creates / updates / deletes.
+    factory_makers = _owned_factory_makers() if owned_subentities else {}
     for owned in owned_subentities:
         if owned.parent is not entity:
             raise ValueError(
@@ -943,10 +990,21 @@ def mount_entity(
             "form_new",
             "form_edit",
         ):
-            if getattr(owned.routes, verb):
-                k = f"{owned.name}.{verb}"
+            if not getattr(owned.routes, verb):
+                continue
+            k = f"{owned.name}.{verb}"
+            if k in handlers:
                 owned_handlers[verb] = handlers[k]
                 consumed.add(k)
+            elif verb in factory_makers:
+                owned_handlers[verb] = factory_makers[verb](owned)
+            else:
+                raise KeyError(
+                    f"mount_entity({entity.name!r}): owned subentity "
+                    f"{owned.name!r} opts into {verb!r} but no handler "
+                    f"was supplied at handlers[{k!r}] and no default "
+                    "factory exists for this verb."
+                )
         mount_entity(router, owned, handlers=owned_handlers)
 
     # Typo detection — surface stale keys at mount time.
