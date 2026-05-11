@@ -73,9 +73,6 @@ class ProviderRepository(BaseRepository):
 
     # --- Licensure sub-table ----------------------------------------------
 
-    async def get_licensure_by_id(self, licensure_id: UUID) -> ProviderLicensure | None:
-        return await self._get_by_id(ProviderLicensure, licensure_id)
-
     async def add_licensure(
         self, provider: Provider, **fields: Any
     ) -> ProviderLicensure:
@@ -85,9 +82,6 @@ class ProviderRepository(BaseRepository):
 
     # --- Education sub-table ----------------------------------------------
 
-    async def get_education_by_id(self, education_id: UUID) -> ProviderEducation | None:
-        return await self._get_by_id(ProviderEducation, education_id)
-
     async def add_education(
         self, provider: Provider, **fields: Any
     ) -> ProviderEducation:
@@ -96,11 +90,6 @@ class ProviderRepository(BaseRepository):
         )
 
     # --- Certification sub-table ------------------------------------------
-
-    async def get_certification_by_id(
-        self, certification_id: UUID
-    ) -> ProviderCertification | None:
-        return await self._get_by_id(ProviderCertification, certification_id)
 
     async def add_certification(
         self, provider: Provider, **fields: Any

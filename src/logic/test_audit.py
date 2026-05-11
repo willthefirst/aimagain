@@ -19,6 +19,7 @@ from src.logic.audit import (
     mutate,
     record_audit,
 )
+from src.models import AuditLog
 from src.repositories.audit_repository import AuditRepository
 from src.repositories.posts.post_repository import PostRepository
 from tests.helpers import create_test_user
@@ -141,7 +142,7 @@ async def test_record_audit_round_trips_through_repo(
         )
         await session.commit()
 
-        fetched = await repo.get_by_id(row.id)
+        fetched = await repo.get_by_model_id(AuditLog, row.id)
         assert fetched is not None
         assert fetched.action == AuditAction.CREATE_POST
         assert fetched.before is None
