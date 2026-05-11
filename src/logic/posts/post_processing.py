@@ -1,4 +1,5 @@
 import logging
+from typing import Any
 
 from fastapi import Request
 
@@ -23,23 +24,11 @@ PostUpdatePayload = ClientReferralUpdate | ProviderAvailabilityUpdate
 POST = POST_ENTITY.audit
 
 
-async def handle_list_posts(
-    request: Request,
-    repo: PostRepository,
-    requesting_user: User,
-):
-    """Loads all posts (newest first) and returns the template context.
-
-    Includes the registered post kinds in the context so the list page
-    can render its per-kind "New X" links from a single source of truth.
-    """
-    posts = await repo.list_posts()
-    return {
-        "request": request,
-        "posts": posts,
-        "current_user": requesting_user,
-        "post_kinds": list(POST_KINDS.values()),
-    }
+async def post_list_extras(**_: Any) -> dict[str, Any]:
+    """Per-list extras for `make_list_handler(POST_ENTITY)`. Includes the
+    registered post kinds in the context so the list page can render its
+    per-kind 'New X' links from a single source of truth."""
+    return {"post_kinds": list(POST_KINDS.values())}
 
 
 async def handle_get_post_form(

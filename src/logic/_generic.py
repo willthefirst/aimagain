@@ -785,3 +785,149 @@ def make_detail_handler(
     _handler.__name__ = f"_handle_get_{spec.name}_detail"
     _handler.__qualname__ = _handler.__name__
     return _handler
+
+
+async def handle_list(
+    spec: EntitySpec,
+    *,
+    request: Request,
+    repo: BaseRepository,
+    requesting_user: User | None,
+    filter_values: dict[str, Any],
+    extras: Callable[..., Awaitable[dict[str, Any]]] | None = None,
+    extra_kwargs: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Generic list handler driven by `spec`.
+
+    Calls ``getattr(repo, f"list_{spec.url_collection}")(**filter_values)``
+    — the per-entity repo method whose name is fixed by convention.
+    Returns the standard list-page context: ``request``, ``current_user``,
+    the items bound under ``spec.url_collection`` (e.g. ``"providers"``),
+    and a ``selected_<name>`` echo for each filter value so the filter
+    form can preselect the active selection.
+
+    ``extras`` is the per-entity post-fetch customization hook (matches
+    ``handle_detail``'s ``extras`` shape). It receives ``items``,
+    ``request``, ``requesting_user``, ``filter_values``, plus any
+    ``extra_kwargs``. Its returned dict merges into the context with
+    last-write-wins semantics; entities can override the base bindings
+    (no current entity does).
+
+    Reads from the spec:
+      - ``spec.url_collection`` — picks the repo method name and the
+        context key for the items list.
+    """
+    list_method = getattr(repo, f"list_{spec.url_collection}")
+    items = await list_method(**filter_values)
+
+    context: dict[str, Any] = {
+        "request": request,
+        spec.url_collection: items,
+        "current_user": requesting_user,
+    }
+    # Filter echo — the list page's filter form preselects the active
+    # value by reading ``selected_<name>`` from the context.
+    for fname, fvalue in filter_values.items():
+        context[f"selected_{fname}"] = fvalue
+
+    if extras is not None:
+        extras_kwargs: dict[str, Any] = {
+            "items": items,
+            "request": request,
+            "requesting_user": requesting_user,
+            "filter_values": filter_values,
+        }
+        if extra_kwargs:
+            extras_kwargs.update(extra_kwargs)
+        context.update(await extras(**extras_kwargs))
+
+    return context
+
+
+def make_list_handler(
+    spec: EntitySpec,
+    *,
+    extras: Callable[..., Awaitable[dict[str, Any]]] | None = None,
+    extra_repos: tuple[tuple[str, type], ...] = (),
+):
+    """Build a `mount_list`-compatible handler from `spec`.
+
+    Mirrors :func:`make_detail_handler`: synthesizes a typed signature
+    so `mount_list`'s introspection wires the URL filter query params,
+    primary repo, and `requesting_user` correctly. Delegates to
+    :func:`handle_list`.
+
+    Synthesized parameters:
+      - ``request: Request`` — for template rendering.
+      - One parameter per ``spec.filters`` entry — name + annotation +
+        default come straight from the ``QueryParam`` declaration.
+      - ``repo: BaseRepository`` — resolved via ``spec.repo_dep``.
+      - ``requesting_user: User | None`` — resolved via
+        ``spec.read_user_dep`` (Optional so public-list entities work
+        without per-entity glue).
+      - One parameter per ``extra_repos`` entry, same shape as
+        ``make_detail_handler``.
+
+    The extras callable, if provided, receives ``items``, ``request``,
+    ``requesting_user``, ``filter_values``, plus each ``extra_repos``
+    entry by name.
+    """
+    sig_params: list[inspect.Parameter] = [
+        inspect.Parameter(
+            "request",
+            inspect.Parameter.POSITIONAL_OR_KEYWORD,
+            annotation=Request,
+        ),
+    ]
+    filter_names: list[str] = []
+    for qp in spec.filters:
+        sig_params.append(
+            inspect.Parameter(
+                qp.name,
+                inspect.Parameter.POSITIONAL_OR_KEYWORD,
+                annotation=qp.annotation,
+            )
+        )
+        filter_names.append(qp.name)
+    sig_params.append(
+        inspect.Parameter(
+            "repo",
+            inspect.Parameter.POSITIONAL_OR_KEYWORD,
+            annotation=BaseRepository,
+        )
+    )
+    sig_params.append(
+        inspect.Parameter(
+            "requesting_user",
+            inspect.Parameter.POSITIONAL_OR_KEYWORD,
+            annotation=User | None,
+        )
+    )
+    for name, repo_type in extra_repos:
+        sig_params.append(
+            inspect.Parameter(
+                name,
+                inspect.Parameter.POSITIONAL_OR_KEYWORD,
+                annotation=repo_type,
+            )
+        )
+
+    extra_repo_names = tuple(name for name, _ in extra_repos)
+
+    async def _handler(**kwargs: Any) -> dict[str, Any]:
+        filter_values = {name: kwargs[name] for name in filter_names}
+        extra_kwargs = {name: kwargs[name] for name in extra_repo_names}
+        return await handle_list(
+            spec,
+            request=kwargs["request"],
+            repo=kwargs["repo"],
+            requesting_user=kwargs["requesting_user"],
+            filter_values=filter_values,
+            extras=extras,
+            extra_kwargs=extra_kwargs if extra_kwargs else None,
+        )
+
+    _handler.__signature__ = inspect.Signature(parameters=sig_params)  # type: ignore[attr-defined]
+    _handler.__name__ = f"_handle_list_{spec.name}"
+    _handler.__qualname__ = _handler.__name__
+    return _handler

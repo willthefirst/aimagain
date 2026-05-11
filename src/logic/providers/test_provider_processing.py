@@ -15,11 +15,10 @@ from starlette.requests import Request
 
 from src.api.common.exceptions import ForbiddenError, NotFoundError
 from src.api.common.specs.provider import PROVIDER_ENTITY
-from src.logic._generic import handle_detail
+from src.logic._generic import handle_detail, handle_list
 from src.logic.audit import AuditAction
 from src.logic.providers.provider_processing import (
     handle_create_provider,
-    handle_list_providers,
     handle_list_user_providers,
     provider_detail_extras,
 )
@@ -153,7 +152,13 @@ async def test_list_providers_returns_persisted_rows(
 
     async with db_test_session_manager() as session:
         repo = ProviderRepository(session)
-        context = await handle_list_providers(request=_fake_request(), repo=repo)
+        context = await handle_list(
+            PROVIDER_ENTITY,
+            request=_fake_request(),
+            repo=repo,
+            requesting_user=None,
+            filter_values={"license_type": None, "issuing_state": None},
+        )
         assert len(context["providers"]) == 2
         assert context["selected_license_type"] is None
         assert context["selected_issuing_state"] is None
@@ -177,8 +182,12 @@ async def test_list_providers_filters_by_license_type(
 
     async with db_test_session_manager() as session:
         repo = ProviderRepository(session)
-        context = await handle_list_providers(
-            request=_fake_request(), repo=repo, license_type="lcsw"
+        context = await handle_list(
+            PROVIDER_ENTITY,
+            request=_fake_request(),
+            repo=repo,
+            requesting_user=None,
+            filter_values={"license_type": "lcsw", "issuing_state": None},
         )
         assert [p.id for p in context["providers"]] == [provider_a]
         assert context["selected_license_type"] == "lcsw"

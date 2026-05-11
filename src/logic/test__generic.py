@@ -1794,3 +1794,129 @@ async def test_make_detail_handler_delegates_to_handle_detail():
     assert context["widget"] is target
     assert context["extra_flag"] is True
     assert captured["side_repo"] is side_repo
+
+
+# --- handle_list / make_list_handler --------------------------------------
+
+
+async def test_handle_list_returns_items_under_url_collection():
+    """The framework binds the list under `spec.url_collection`, not
+    `spec.name` — the existing list templates read `{{ widgets }}` etc."""
+    spec = _top_level_spec()
+    row_a = _FixtureRow(id=uuid4())
+    row_b = _FixtureRow(id=uuid4())
+
+    class _ListRepo:
+        async def list_widgets(self, **_kwargs):
+            return [row_a, row_b]
+
+    from src.logic._generic import handle_list
+
+    context = await handle_list(
+        spec,
+        request=SimpleNamespace(),
+        repo=_ListRepo(),
+        requesting_user=None,
+        filter_values={},
+    )
+    assert context["widgets"] == [row_a, row_b]
+    assert context["current_user"] is None
+
+
+async def test_handle_list_echoes_filter_values_as_selected():
+    """For each filter passed in, the context carries `selected_<name>`
+    so the filter form can preselect the active value."""
+    spec = _top_level_spec()
+
+    class _ListRepo:
+        async def list_widgets(self, **kwargs):
+            return []
+
+    from src.logic._generic import handle_list
+
+    context = await handle_list(
+        spec,
+        request=SimpleNamespace(),
+        repo=_ListRepo(),
+        requesting_user=None,
+        filter_values={"kind": "alpha", "state": None},
+    )
+    assert context["selected_kind"] == "alpha"
+    assert context["selected_state"] is None
+
+
+async def test_handle_list_threads_filter_values_into_repo_call():
+    """The repo receives every `filter_values` entry as a kwarg."""
+    spec = _top_level_spec()
+    captured: dict = {}
+
+    class _ListRepo:
+        async def list_widgets(self, **kwargs):
+            captured.update(kwargs)
+            return []
+
+    from src.logic._generic import handle_list
+
+    await handle_list(
+        spec,
+        request=SimpleNamespace(),
+        repo=_ListRepo(),
+        requesting_user=None,
+        filter_values={"kind": "beta"},
+    )
+    assert captured == {"kind": "beta"}
+
+
+async def test_handle_list_extras_merges_into_context():
+    """`extras` is post-fetch; its return dict layers over the base
+    context (last-write-wins — same semantics as handle_detail)."""
+    spec = _top_level_spec()
+
+    class _ListRepo:
+        async def list_widgets(self, **_):
+            return ["a", "b"]
+
+    async def extras(*, items, **_):
+        return {"extra_count": len(items), "current_user": "overridden"}
+
+    from src.logic._generic import handle_list
+
+    context = await handle_list(
+        spec,
+        request=SimpleNamespace(),
+        repo=_ListRepo(),
+        requesting_user=None,
+        filter_values={},
+        extras=extras,
+    )
+    assert context["extra_count"] == 2
+    assert context["current_user"] == "overridden"
+
+
+def test_make_list_handler_signature_includes_filters_and_repos():
+    """The factory must synthesize a typed signature so mount_list's
+    introspection wires the filter query params and the typed repos."""
+    from src.api.common.entity_spec import QueryParam
+    from src.logic._generic import make_list_handler
+
+    spec = EntitySpec(
+        name="widget",
+        url_collection="widgets",
+        id_param="widget_id",
+        model=_FixtureRow,
+        audit=_audit(),
+        filters=(QueryParam("kind", str | None, None),),
+    )
+
+    class _SideRepo:
+        pass
+
+    handler = make_list_handler(spec, extra_repos=(("side_repo", _SideRepo),))
+    sig = inspect.signature(handler)
+    names = list(sig.parameters)
+    assert "request" in names
+    assert "kind" in names
+    assert "repo" in names
+    assert "requesting_user" in names
+    assert "side_repo" in names
+    assert handler.__name__ == "_handle_list_widget"
