@@ -31,7 +31,7 @@ from typing import Any, Awaitable, Callable
 from pydantic import BaseModel, TypeAdapter
 
 from src.api.common.resource_routes import QueryParam, ResourceSpec
-from src.logic.audit import AuditAction, AuditedResource
+from src.logic.audit import AuditAction, AuditedResource, make_audited_resource
 from src.models._polymorphic import DiscriminatorRegistry
 
 
@@ -219,7 +219,16 @@ class EntitySpec:
     # `audit` and `edge_audit` are mutually exclusive — CRUD-shaped
     # entities use `AuditedResource`; edge entities (M:N joins) use
     # `EdgeAudit`. Construction-time validation enforces it.
+    #
+    # For CRUD entities, prefer `audit_snapshot=<Schema>` (+ optional
+    # `audit_action_stem=...`) over a hand-built `audit=...` — the
+    # constructor calls `make_audited_resource(name, audit_snapshot,
+    # action_stem=audit_action_stem)` once at import time and stores the
+    # result on `audit`. The two forms are mutually exclusive: declare
+    # `audit_snapshot` xor `audit`.
     audit: AuditedResource | None = None
+    audit_snapshot: type[BaseModel] | Callable[[Any], dict] | None = None
+    audit_action_stem: str | None = None
     edge_audit: EdgeAudit | None = None
 
     # M:N relationships --------------------------------------------------
@@ -319,6 +328,31 @@ class EntitySpec:
                 "`edge_audit`; they are mutually exclusive — CRUD-shaped "
                 "entities use AuditedResource, edge entities use EdgeAudit."
             )
+        # `audit_snapshot` is the declarative form: the constructor
+        # builds `audit` from name + schema (+ optional action_stem).
+        # Declaring both forms is ambiguous; the user picked one and
+        # forgot the other, almost certainly.
+        if self.audit_snapshot is not None and self.audit is not None:
+            raise ValueError(
+                f"EntitySpec({self.name!r}) declares both `audit_snapshot` "
+                "and `audit`; they are mutually exclusive — pass the "
+                "schema/callable via `audit_snapshot` and let the spec "
+                "build the AuditedResource, or build it explicitly via "
+                "`audit=`."
+            )
+        if self.audit_action_stem is not None and self.audit_snapshot is None:
+            raise ValueError(
+                f"EntitySpec({self.name!r}) sets `audit_action_stem=` "
+                f"{self.audit_action_stem!r} but no `audit_snapshot` — "
+                "the stem is only consumed when building from a snapshot."
+            )
+        if self.audit_snapshot is not None:
+            built = make_audited_resource(
+                self.name,
+                self.audit_snapshot,
+                action_stem=self.audit_action_stem,
+            )
+            object.__setattr__(self, "audit", built)
         # Default templates by convention: any opted-in verb whose
         # `templates.<verb>` field is None gets `<url_collection>/<verb>.html`.
         # Specs only declare a path when it diverges from this default.
