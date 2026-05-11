@@ -2,12 +2,9 @@ import logging
 from typing import Any
 from uuid import UUID
 
-from fastapi import Request
-
 from src.api.common.exceptions import NotFoundError
-from src.api.common.projections import project_view
 from src.api.common.specs.user import USER_ENTITY
-from src.logic._authz import forbid_self_action, is_admin
+from src.logic._authz import forbid_self_action
 from src.logic.audit import mutate, record_audit
 from src.models import User
 from src.repositories.audit_repository import AuditRepository
@@ -18,73 +15,22 @@ from src.schemas.users.user import UserActivationUpdate
 logger = logging.getLogger(__name__)
 
 
-async def handle_list_users(
-    request: Request,
-    repo: UserRepository,
-    requesting_user: User,
-):
-    """
-    Handles the core logic for listing users.
-
-    Args:
-        request: The FastAPI request object.
-        repo: The user repository dependency.
-        requesting_user: The currently authenticated user.
-
-    Returns:
-        A dictionary containing the context for the template.
-
-    Raises:
-        Exception: Propagates exceptions from the repository layer.
-    """
-    users_list = await repo.list_users(exclude_user=requesting_user)
-
-    # `list_users` excludes the viewer, so every row is some other user;
-    # admin-actions visibility reduces to a single flag for the whole
-    # list rather than a per-row computation.
-    return {
-        "request": request,
-        "users": users_list,
-        "current_user": requesting_user,
-        "can_admin_actions": is_admin(requesting_user),
-    }
-
-
 async def user_detail_extras(
     *,
     target: User,
-    requesting_user: User | None,
     provider_repo: ProviderRepository,
     **_: Any,
 ) -> dict[str, Any]:
     """Per-viewer detail extras for `make_detail_handler(USER_ENTITY)`.
 
-    Adds the providers the target owns, viewer-derived flags
-    (`is_self`, `can_admin_actions`, `can_view_private`), and a
-    private-field projection bound under `target_user`. Templates read
-    `target_user`, not the raw `user` key the framework base context
-    binds — the projection is what carries the omit-private-fields
-    guarantee, so binding it under the template-facing name is
-    defense-in-depth: a forgotten template guard can re-leak; a
-    missing dict key can't.
+    Fetches the providers the target owns. Viewer-derived flags
+    (`is_self`, `can_admin_actions`, `can_view_private`) and the
+    `target_user` projection are framework-injected by `handle_detail`
+    from `USER_ENTITY.public_fields` / `private_fields` /
+    `private_field_predicate` — defense-in-depth (a forgotten template
+    guard can re-leak; a missing dict key can't) is preserved.
     """
-    providers = await provider_repo.list_for_user(target.id)
-    is_self = requesting_user is not None and target.id == requesting_user.id
-    return {
-        "providers": providers,
-        "is_self": is_self,
-        "can_admin_actions": is_admin(requesting_user) and not is_self,
-        "can_view_private": USER_ENTITY.private_field_predicate(
-            requesting_user, target
-        ),
-        "target_user": project_view(
-            target,
-            public_fields=("id", "username"),
-            actor=requesting_user,
-            private_fields=USER_ENTITY.private_fields,
-            private_field_predicate=USER_ENTITY.private_field_predicate,
-        ),
-    }
+    return {"providers": await provider_repo.list_for_user(target.id)}
 
 
 async def handle_set_user_activation(

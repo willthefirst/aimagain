@@ -30,10 +30,15 @@ from src.logic.audit import AuditAction, AuditedResource
 
 @dataclass
 class _FixtureRow:
-    """Stand-in ORM row: just needs `id` plus optional parent FK column."""
+    """Stand-in ORM row: just needs `id` plus optional parent FK column.
+
+    `owner_id` defaults to None so tests that don't care about ownership
+    can ignore it; the spec's default `owner_attr="owner_id"` reads it
+    in `handle_detail`'s `is_self` derivation."""
 
     id: UUID
     parent_id: UUID | None = None
+    owner_id: UUID | None = None
     # Counters so tests can detect commit / delete / audit fired.
     _deleted: bool = False
 
@@ -117,6 +122,14 @@ class _ParentRow:
         self.id = id
 
 
+def _user(*, id_: UUID | None = None, is_superuser: bool = False) -> SimpleNamespace:
+    """User-stub factory that always carries `is_superuser`. Mirrors the
+    same-named helper in `test__authz.py`. The framework's auto-injection
+    of `can_admin_actions` reads `user.is_superuser`, so every stub the
+    detail/list handlers see needs the field present."""
+    return SimpleNamespace(id=id_ or uuid4(), is_superuser=is_superuser)
+
+
 # --- Fixture audit + write_authz ------------------------------------------
 
 
@@ -184,7 +197,7 @@ async def test_top_level_delete_happy_path():
     spec = _top_level_spec(write_authz=None)
     repo = _FakeRepo()
     audit_repo = _FakeAuditRepo()
-    user = SimpleNamespace(id=uuid4())
+    user = _user()
     target_id = uuid4()
     repo.seed(_FixtureRow, _FixtureRow(id=target_id))
 
@@ -219,7 +232,7 @@ async def test_top_level_delete_invokes_write_authz_against_target():
     target_id = uuid4()
     target = _FixtureRow(id=target_id)
     repo.seed(_FixtureRow, target)
-    user = SimpleNamespace(id=uuid4())
+    user = _user()
 
     await handle_delete(
         spec,
@@ -247,7 +260,7 @@ async def test_subentity_delete_happy_path():
     repo.seed(parent_spec.model, _ParentRow(id=parent_id))
     repo.seed(child_spec.model, _FixtureRow(id=child_id, parent_id=parent_id))
     audit_repo = _FakeAuditRepo()
-    user = SimpleNamespace(id=uuid4())
+    user = _user()
 
     await handle_delete(
         child_spec,
@@ -287,7 +300,7 @@ async def test_subentity_write_authz_runs_against_parent():
         parent_id=parent_id,
         repo=repo,
         audit_repo=_FakeAuditRepo(),
-        requesting_user=SimpleNamespace(id=uuid4()),
+        requesting_user=_user(),
     )
 
     assert len(seen) == 1
@@ -307,7 +320,7 @@ async def test_target_not_found_raises_not_found():
             target_id=uuid4(),
             repo=repo,
             audit_repo=_FakeAuditRepo(),
-            requesting_user=SimpleNamespace(id=uuid4()),
+            requesting_user=_user(),
         )
     assert repo.deleted == []
 
@@ -332,7 +345,7 @@ async def test_subentity_parent_fk_mismatch_raises_not_found():
             parent_id=other_parent_id,  # different parent
             repo=repo,
             audit_repo=_FakeAuditRepo(),
-            requesting_user=SimpleNamespace(id=uuid4()),
+            requesting_user=_user(),
         )
 
 
@@ -352,7 +365,7 @@ async def test_subentity_parent_not_found_raises_not_found():
             parent_id=parent_id,
             repo=repo,
             audit_repo=_FakeAuditRepo(),
-            requesting_user=SimpleNamespace(id=uuid4()),
+            requesting_user=_user(),
         )
 
 
@@ -372,7 +385,7 @@ async def test_subentity_without_parent_id_raises_value_error():
             parent_id=None,
             repo=repo,
             audit_repo=_FakeAuditRepo(),
-            requesting_user=SimpleNamespace(id=uuid4()),
+            requesting_user=_user(),
         )
 
 
@@ -396,7 +409,7 @@ async def test_write_authz_raises_propagates_no_audit_no_commit():
             target_id=target_id,
             repo=repo,
             audit_repo=audit_repo,
-            requesting_user=SimpleNamespace(id=uuid4()),
+            requesting_user=_user(),
         )
 
     assert repo.deleted == []
@@ -421,7 +434,7 @@ async def test_delete_raises_propagates_no_audit_no_commit():
             target_id=target_id,
             repo=repo,
             audit_repo=audit_repo,
-            requesting_user=SimpleNamespace(id=uuid4()),
+            requesting_user=_user(),
         )
 
     assert audit_repo.calls == []
@@ -448,7 +461,7 @@ async def test_no_audit_binding_raises_value_error():
             target_id=target_id,
             repo=repo,
             audit_repo=_FakeAuditRepo(),
-            requesting_user=SimpleNamespace(id=uuid4()),
+            requesting_user=_user(),
         )
 
 
@@ -468,7 +481,7 @@ async def test_no_write_authz_skips_auth_check():
         target_id=target_id,
         repo=repo,
         audit_repo=_FakeAuditRepo(),
-        requesting_user=SimpleNamespace(id=uuid4()),
+        requesting_user=_user(),
     )
 
     assert len(repo.deleted) == 1
@@ -597,7 +610,7 @@ async def test_create_top_level_persists_and_audits():
     )
     repo = _create_fake_repo()
     audit_repo = _FakeAuditRepo()
-    user = SimpleNamespace(id=uuid4())
+    user = _user()
 
     created = await handle_create(
         spec,
@@ -628,7 +641,7 @@ async def test_create_top_level_without_owner_attr():
         audit=_audit(),
     )
     repo = _create_fake_repo()
-    user = SimpleNamespace(id=uuid4())
+    user = _user()
 
     created = await handle_create(
         spec,
@@ -668,7 +681,7 @@ async def test_create_subentity_appended_to_parent_and_audited():
     parent_obj = _ParentRow(id=parent_id)
     repo.seed(parent_spec.model, parent_obj)
     audit_repo = _FakeAuditRepo()
-    user = SimpleNamespace(id=uuid4())
+    user = _user()
 
     created = await handle_create(
         spec,
@@ -709,7 +722,7 @@ async def test_create_subentity_parent_not_found():
             parent_id=uuid4(),
             repo=repo,
             audit_repo=_FakeAuditRepo(),
-            requesting_user=SimpleNamespace(id=uuid4()),
+            requesting_user=_user(),
         )
 
 
@@ -733,7 +746,7 @@ async def test_create_subentity_missing_parent_id_raises():
             parent_id=None,
             repo=_create_fake_repo(),
             audit_repo=_FakeAuditRepo(),
-            requesting_user=SimpleNamespace(id=uuid4()),
+            requesting_user=_user(),
         )
 
 
@@ -800,7 +813,7 @@ async def test_create_polymorphic_dispatches_via_discriminator():
         discriminator=registry,
     )
     repo = _create_fake_repo()
-    user = SimpleNamespace(id=uuid4())
+    user = _user()
 
     created_red = await handle_create(
         spec,
@@ -848,7 +861,7 @@ async def test_create_no_audit_binding_raises():
             payload=_StandardPayload(),
             repo=_create_fake_repo(),
             audit_repo=_FakeAuditRepo(),
-            requesting_user=SimpleNamespace(id=uuid4()),
+            requesting_user=_user(),
         )
 
 
@@ -881,7 +894,7 @@ async def test_create_subentity_write_authz_raises_rolls_back():
             parent_id=parent_id,
             repo=repo,
             audit_repo=audit_repo,
-            requesting_user=SimpleNamespace(id=uuid4()),
+            requesting_user=_user(),
         )
 
     # Nothing added, no audit, no commit.
@@ -995,7 +1008,7 @@ async def test_update_top_level_partial_patch_via_exclude_unset():
         payload=_UpdatePayload(practice_name="New"),  # location_city unset
         repo=repo,
         audit_repo=audit_repo,
-        requesting_user=SimpleNamespace(id=uuid4()),
+        requesting_user=_user(),
     )
 
     assert target.practice_name == "New"
@@ -1033,7 +1046,7 @@ async def test_update_invokes_write_authz_against_target():
         payload=_UpdatePayload(),
         repo=repo,
         audit_repo=_FakeAuditRepo(),
-        requesting_user=SimpleNamespace(id=uuid4()),
+        requesting_user=_user(),
     )
 
     assert len(seen) == 1
@@ -1076,7 +1089,7 @@ async def test_update_subentity_happy_path():
         payload=_UpdatePayload(practice_name="New"),
         repo=repo,
         audit_repo=_FakeAuditRepo(),
-        requesting_user=SimpleNamespace(id=uuid4()),
+        requesting_user=_user(),
     )
 
     assert seen_authz == [parent_obj]
@@ -1112,7 +1125,7 @@ async def test_update_subentity_parent_fk_mismatch_404():
             payload=_UpdatePayload(),
             repo=repo,
             audit_repo=_FakeAuditRepo(),
-            requesting_user=SimpleNamespace(id=uuid4()),
+            requesting_user=_user(),
         )
 
 
@@ -1169,7 +1182,7 @@ async def test_update_polymorphic_patches_detail_row():
         payload=_RedUpdatePayload(kind="red", redness=99),
         repo=repo,
         audit_repo=_FakeAuditRepo(),
-        requesting_user=SimpleNamespace(id=uuid4()),
+        requesting_user=_user(),
     )
 
     assert detail.redness == 99
@@ -1215,7 +1228,7 @@ async def test_update_polymorphic_kind_mismatch_raises_bad_request():
             payload=_BlueUpdatePayload(kind="blue", blueness=5),
             repo=repo,
             audit_repo=audit_repo,
-            requesting_user=SimpleNamespace(id=uuid4()),
+            requesting_user=_user(),
         )
 
     # No audit, no commit on the kind-mismatch path.
@@ -1242,7 +1255,7 @@ async def test_update_target_not_found():
             payload=_UpdatePayload(),
             repo=_update_fake_repo(),
             audit_repo=_FakeAuditRepo(),
-            requesting_user=SimpleNamespace(id=uuid4()),
+            requesting_user=_user(),
         )
 
 
@@ -1271,7 +1284,7 @@ async def test_update_write_authz_raises_no_audit_no_commit():
             payload=_UpdatePayload(),
             repo=repo,
             audit_repo=audit_repo,
-            requesting_user=SimpleNamespace(id=uuid4()),
+            requesting_user=_user(),
         )
 
     assert repo.patched == []
@@ -1295,7 +1308,7 @@ async def test_update_no_audit_binding_raises():
             payload=_UpdatePayload(),
             repo=_update_fake_repo(),
             audit_repo=_FakeAuditRepo(),
-            requesting_user=SimpleNamespace(id=uuid4()),
+            requesting_user=_user(),
         )
 
 
@@ -1385,7 +1398,7 @@ async def test_edit_form_top_level_happy_path():
     target_id = uuid4()
     target = _FixtureRow(id=target_id)
     repo.seed(_FixtureRow, target)
-    user = SimpleNamespace(id=uuid4())
+    user = _user()
     request = SimpleNamespace()
 
     context = await handle_get_edit_form(
@@ -1415,7 +1428,7 @@ async def test_edit_form_invokes_write_authz_against_target():
     target = _FixtureRow(id=target_id)
     repo = _FakeRepo()
     repo.seed(_FixtureRow, target)
-    user = SimpleNamespace(id=uuid4())
+    user = _user()
 
     await handle_get_edit_form(
         spec,
@@ -1441,7 +1454,7 @@ async def test_edit_form_target_not_found_raises_not_found():
             request=SimpleNamespace(),
             target_id=uuid4(),
             repo=repo,
-            requesting_user=SimpleNamespace(id=uuid4()),
+            requesting_user=_user(),
         )
 
 
@@ -1460,7 +1473,7 @@ async def test_edit_form_write_authz_raises_propagates():
             request=SimpleNamespace(),
             target_id=target_id,
             repo=repo,
-            requesting_user=SimpleNamespace(id=uuid4()),
+            requesting_user=_user(),
         )
 
 
@@ -1493,7 +1506,7 @@ async def test_edit_form_polymorphic_returns_kind_template():
         request=SimpleNamespace(),
         target_id=target_id,
         repo=repo,
-        requesting_user=SimpleNamespace(id=uuid4()),
+        requesting_user=_user(),
     )
 
     assert context["painting"] is target
@@ -1537,7 +1550,7 @@ async def test_make_edit_form_handler_delegates_to_handle_get_edit_form():
     target = _FixtureRow(id=target_id)
     repo = _FakeRepo()
     repo.seed(_FixtureRow, target)
-    user = SimpleNamespace(id=uuid4())
+    user = _user()
     request = SimpleNamespace()
 
     handler = make_edit_form_handler(spec)
@@ -1571,7 +1584,7 @@ async def test_detail_top_level_happy_path():
     target = _FixtureRow(id=target_id)
     repo = _FakeRepo()
     repo.seed(_FixtureRow, target)
-    user = SimpleNamespace(id=uuid4())
+    user = _user()
 
     context = await handle_detail(
         spec,
@@ -1599,8 +1612,8 @@ async def test_detail_populates_can_edit_from_can_write():
     )
     target_id = uuid4()
     owner_id = uuid4()
-    owner = SimpleNamespace(id=owner_id)
-    stranger = SimpleNamespace(id=uuid4())
+    owner = _user(id_=owner_id)
+    stranger = _user()
 
     # _FixtureRow doesn't have owner_id; simulate by setattr.
     target = _FixtureRow(id=target_id)
@@ -1650,7 +1663,7 @@ async def test_detail_extras_merges_into_context():
         request=SimpleNamespace(),
         target_id=target_id,
         repo=repo,
-        requesting_user=SimpleNamespace(id=uuid4()),
+        requesting_user=_user(),
         extras=extras,
     )
 
@@ -1680,7 +1693,7 @@ async def test_detail_extras_receives_extra_kwargs():
         request=SimpleNamespace(),
         target_id=target_id,
         repo=repo,
-        requesting_user=SimpleNamespace(id=uuid4()),
+        requesting_user=_user(),
         extras=extras,
         extra_kwargs={"side_repo": side_repo},
     )
@@ -1699,7 +1712,7 @@ async def test_detail_target_not_found_raises_not_found():
             request=SimpleNamespace(),
             target_id=uuid4(),
             repo=repo,
-            requesting_user=SimpleNamespace(id=uuid4()),
+            requesting_user=_user(),
         )
 
 
@@ -1787,7 +1800,7 @@ async def test_make_detail_handler_delegates_to_handle_detail():
         request=SimpleNamespace(),
         widget_id=target_id,
         repo=repo,
-        requesting_user=SimpleNamespace(id=uuid4()),
+        requesting_user=_user(),
         side_repo=side_repo,
     )
 
@@ -1920,3 +1933,404 @@ def test_make_list_handler_signature_includes_filters_and_repos():
     assert "requesting_user" in names
     assert "side_repo" in names
     assert handler.__name__ == "_handle_list_widget"
+
+
+# --- Viewer-flag + projection auto-injection (handle_detail) -------------
+
+
+def _is_self_or_admin(actor, target) -> bool:
+    """Stand-in `private_field_predicate`: viewer is self or admin."""
+    if actor is None:
+        return False
+    if getattr(actor, "is_superuser", False):
+        return True
+    subject_id = getattr(target, "owner_id", None) or getattr(target, "id", None)
+    return getattr(actor, "id", None) == subject_id
+
+
+@pytest.mark.asyncio
+async def test_detail_injects_is_self_for_owned_resource():
+    """`is_self` compares `target.<owner_attr>` to viewer.id when
+    `spec.owner_attr` is set (the owned-resource rule)."""
+    spec = EntitySpec(
+        name="widget",
+        url_collection="widgets",
+        id_param="widget_id",
+        model=_FixtureRow,
+        owner_attr="owner_id",
+        audit=_audit(),
+    )
+    target_id = uuid4()
+    owner_id = uuid4()
+    target = _FixtureRow(id=target_id)
+    target.owner_id = owner_id  # type: ignore[attr-defined]
+    repo = _FakeRepo()
+    repo.seed(_FixtureRow, target)
+
+    owner = SimpleNamespace(id=owner_id, is_superuser=False)
+    stranger = SimpleNamespace(id=uuid4(), is_superuser=False)
+
+    owner_ctx = await handle_detail(
+        spec,
+        request=SimpleNamespace(),
+        target_id=target_id,
+        repo=repo,
+        requesting_user=owner,
+    )
+    stranger_ctx = await handle_detail(
+        spec,
+        request=SimpleNamespace(),
+        target_id=target_id,
+        repo=repo,
+        requesting_user=stranger,
+    )
+    anon_ctx = await handle_detail(
+        spec,
+        request=SimpleNamespace(),
+        target_id=target_id,
+        repo=repo,
+        requesting_user=None,
+    )
+
+    assert owner_ctx["is_self"] is True
+    assert stranger_ctx["is_self"] is False
+    assert anon_ctx["is_self"] is False
+
+
+@pytest.mark.asyncio
+async def test_detail_injects_is_self_for_user_like_resource():
+    """When `owner_attr=None` (the resource IS the user), `is_self`
+    reduces to `target.id == viewer.id`."""
+    spec = EntitySpec(
+        name="widget",
+        url_collection="widgets",
+        id_param="widget_id",
+        model=_FixtureRow,
+        owner_attr=None,
+        audit=_audit(),
+    )
+    target_id = uuid4()
+    target = _FixtureRow(id=target_id)
+    repo = _FakeRepo()
+    repo.seed(_FixtureRow, target)
+
+    self_viewer = SimpleNamespace(id=target_id, is_superuser=False)
+    other_viewer = SimpleNamespace(id=uuid4(), is_superuser=False)
+
+    self_ctx = await handle_detail(
+        spec,
+        request=SimpleNamespace(),
+        target_id=target_id,
+        repo=repo,
+        requesting_user=self_viewer,
+    )
+    other_ctx = await handle_detail(
+        spec,
+        request=SimpleNamespace(),
+        target_id=target_id,
+        repo=repo,
+        requesting_user=other_viewer,
+    )
+
+    assert self_ctx["is_self"] is True
+    assert other_ctx["is_self"] is False
+
+
+@pytest.mark.asyncio
+async def test_detail_injects_can_admin_actions_excludes_self():
+    """`can_admin_actions` is `is_admin(viewer) and not is_self` —
+    admins lose the flag on their own row so they can't act on themselves."""
+    spec = EntitySpec(
+        name="widget",
+        url_collection="widgets",
+        id_param="widget_id",
+        model=_FixtureRow,
+        owner_attr=None,
+        audit=_audit(),
+    )
+    target_id = uuid4()
+    target = _FixtureRow(id=target_id)
+    repo = _FakeRepo()
+    repo.seed(_FixtureRow, target)
+
+    admin = SimpleNamespace(id=uuid4(), is_superuser=True)
+    self_admin = SimpleNamespace(id=target_id, is_superuser=True)
+    plain = SimpleNamespace(id=uuid4(), is_superuser=False)
+
+    admin_ctx = await handle_detail(
+        spec,
+        request=SimpleNamespace(),
+        target_id=target_id,
+        repo=repo,
+        requesting_user=admin,
+    )
+    self_admin_ctx = await handle_detail(
+        spec,
+        request=SimpleNamespace(),
+        target_id=target_id,
+        repo=repo,
+        requesting_user=self_admin,
+    )
+    plain_ctx = await handle_detail(
+        spec,
+        request=SimpleNamespace(),
+        target_id=target_id,
+        repo=repo,
+        requesting_user=plain,
+    )
+
+    assert admin_ctx["can_admin_actions"] is True
+    assert self_admin_ctx["can_admin_actions"] is False
+    assert plain_ctx["can_admin_actions"] is False
+
+
+@pytest.mark.asyncio
+async def test_detail_injects_can_view_private_when_predicate_set():
+    """`can_view_private` is the spec's `private_field_predicate`
+    evaluated against (viewer, target). Absent when no predicate."""
+    spec_with = EntitySpec(
+        name="widget",
+        url_collection="widgets",
+        id_param="widget_id",
+        model=_FixtureRow,
+        private_fields=("secret",),
+        private_field_predicate=_is_self_or_admin,
+        audit=_audit(),
+    )
+    spec_without = _top_level_spec()  # no private_field_predicate
+    target_id = uuid4()
+    target = _FixtureRow(id=target_id)
+    repo = _FakeRepo()
+    repo.seed(_FixtureRow, target)
+
+    self_viewer = SimpleNamespace(id=target_id, is_superuser=False)
+    stranger = SimpleNamespace(id=uuid4(), is_superuser=False)
+
+    self_ctx = await handle_detail(
+        spec_with,
+        request=SimpleNamespace(),
+        target_id=target_id,
+        repo=repo,
+        requesting_user=self_viewer,
+    )
+    stranger_ctx = await handle_detail(
+        spec_with,
+        request=SimpleNamespace(),
+        target_id=target_id,
+        repo=repo,
+        requesting_user=stranger,
+    )
+    without_ctx = await handle_detail(
+        spec_without,
+        request=SimpleNamespace(),
+        target_id=target_id,
+        repo=repo,
+        requesting_user=stranger,
+    )
+
+    assert self_ctx["can_view_private"] is True
+    assert stranger_ctx["can_view_private"] is False
+    assert "can_view_private" not in without_ctx
+
+
+@pytest.mark.asyncio
+async def test_detail_injects_target_projection_when_public_fields_set():
+    """`target_<name>` is a `project_view` dict gated by the spec's
+    predicate. Omits private fields for non-privileged viewers."""
+    spec = EntitySpec(
+        name="widget",
+        url_collection="widgets",
+        id_param="widget_id",
+        model=_FixtureRow,
+        public_fields=("id",),
+        private_fields=("parent_id",),
+        private_field_predicate=_is_self_or_admin,
+        audit=_audit(),
+    )
+    target_id = uuid4()
+    parent_id = uuid4()
+    target = _FixtureRow(id=target_id, parent_id=parent_id)
+    repo = _FakeRepo()
+    repo.seed(_FixtureRow, target)
+
+    self_viewer = SimpleNamespace(id=target_id, is_superuser=False)
+    stranger = SimpleNamespace(id=uuid4(), is_superuser=False)
+
+    self_ctx = await handle_detail(
+        spec,
+        request=SimpleNamespace(),
+        target_id=target_id,
+        repo=repo,
+        requesting_user=self_viewer,
+    )
+    stranger_ctx = await handle_detail(
+        spec,
+        request=SimpleNamespace(),
+        target_id=target_id,
+        repo=repo,
+        requesting_user=stranger,
+    )
+
+    assert self_ctx["target_widget"] == {"id": target_id, "parent_id": parent_id}
+    assert stranger_ctx["target_widget"] == {"id": target_id}
+
+
+@pytest.mark.asyncio
+async def test_detail_no_projection_when_public_fields_unset():
+    """Without `public_fields`, no `target_<name>` key is injected."""
+    spec = _top_level_spec()
+    target_id = uuid4()
+    repo = _FakeRepo()
+    repo.seed(_FixtureRow, _FixtureRow(id=target_id))
+
+    context = await handle_detail(
+        spec,
+        request=SimpleNamespace(),
+        target_id=target_id,
+        repo=repo,
+        requesting_user=SimpleNamespace(id=uuid4(), is_superuser=False),
+    )
+
+    assert "target_widget" not in context
+
+
+# --- Viewer-flag + exclude-self auto-injection (handle_list) -------------
+
+
+@pytest.mark.asyncio
+async def test_handle_list_injects_can_admin_actions():
+    """`can_admin_actions` is `is_admin(viewer)` on list pages (no
+    `is_self` semantics — every row is some other entity)."""
+    spec = _top_level_spec()
+
+    class _ListRepo:
+        async def list_widgets(self, **_):
+            return []
+
+    from src.logic._generic import handle_list
+
+    admin_ctx = await handle_list(
+        spec,
+        request=SimpleNamespace(),
+        repo=_ListRepo(),
+        requesting_user=SimpleNamespace(id=uuid4(), is_superuser=True),
+        filter_values={},
+    )
+    plain_ctx = await handle_list(
+        spec,
+        request=SimpleNamespace(),
+        repo=_ListRepo(),
+        requesting_user=SimpleNamespace(id=uuid4(), is_superuser=False),
+        filter_values={},
+    )
+    anon_ctx = await handle_list(
+        spec,
+        request=SimpleNamespace(),
+        repo=_ListRepo(),
+        requesting_user=None,
+        filter_values={},
+    )
+
+    assert admin_ctx["can_admin_actions"] is True
+    assert plain_ctx["can_admin_actions"] is False
+    assert anon_ctx["can_admin_actions"] is False
+
+
+@pytest.mark.asyncio
+async def test_handle_list_passes_exclude_self_when_spec_opts_in():
+    """`list_exclude_self=True` threads `exclude_self=requesting_user`
+    into the repo's list method. Anonymous viewers skip the kwarg."""
+    spec = EntitySpec(
+        name="widget",
+        url_collection="widgets",
+        id_param="widget_id",
+        model=_FixtureRow,
+        audit=_audit(),
+        routes=RouteSet(list=True),
+        list_exclude_self=True,
+    )
+    captured: list[dict] = []
+
+    class _ListRepo:
+        async def list_widgets(self, **kwargs):
+            captured.append(kwargs)
+            return []
+
+    from src.logic._generic import handle_list
+
+    viewer = SimpleNamespace(id=uuid4(), is_superuser=False)
+    await handle_list(
+        spec,
+        request=SimpleNamespace(),
+        repo=_ListRepo(),
+        requesting_user=viewer,
+        filter_values={},
+    )
+    await handle_list(
+        spec,
+        request=SimpleNamespace(),
+        repo=_ListRepo(),
+        requesting_user=None,
+        filter_values={},
+    )
+
+    assert captured[0] == {"exclude_self": viewer}
+    assert captured[1] == {}
+
+
+@pytest.mark.asyncio
+async def test_handle_list_omits_exclude_self_when_spec_opts_out():
+    """Without `list_exclude_self=True`, the repo call carries no
+    `exclude_self` kwarg — existing entities are unaffected."""
+    spec = _top_level_spec()
+    captured: list[dict] = []
+
+    class _ListRepo:
+        async def list_widgets(self, **kwargs):
+            captured.append(kwargs)
+            return []
+
+    from src.logic._generic import handle_list
+
+    await handle_list(
+        spec,
+        request=SimpleNamespace(),
+        repo=_ListRepo(),
+        requesting_user=SimpleNamespace(id=uuid4(), is_superuser=False),
+        filter_values={"kind": "alpha"},
+    )
+
+    assert captured[0] == {"kind": "alpha"}
+    assert "exclude_self" not in captured[0]
+
+
+# --- Spec construction-time validation -----------------------------------
+
+
+def test_public_fields_without_predicate_rejected():
+    """Declaring `public_fields` without a `private_field_predicate`
+    would let the projection silently pass every private field."""
+    with pytest.raises(ValueError, match="private_field_predicate"):
+        EntitySpec(
+            name="widget",
+            url_collection="widgets",
+            id_param="widget_id",
+            model=_FixtureRow,
+            public_fields=("id",),
+            audit=_audit(),
+        )
+
+
+def test_list_exclude_self_requires_list_route():
+    """`list_exclude_self` is only consumed by handle_list — without a
+    list route the flag would be dead."""
+    with pytest.raises(ValueError, match="routes.list"):
+        EntitySpec(
+            name="widget",
+            url_collection="widgets",
+            id_param="widget_id",
+            model=_FixtureRow,
+            audit=_audit(),
+            list_exclude_self=True,
+            routes=RouteSet(detail=True),
+        )

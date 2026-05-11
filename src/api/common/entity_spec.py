@@ -341,9 +341,26 @@ class EntitySpec:
     # Visibility ---------------------------------------------------------
     private_fields: tuple[str, ...] = ()
     private_field_predicate: Callable[..., bool] | None = None
+    # When set, `handle_detail` auto-binds `target_<name>` in the template
+    # context to a `project_view` dict using these as the public fields
+    # and the spec's `private_fields` / `private_field_predicate` for
+    # gating. The split between `public_fields` (per-view shape) and
+    # `private_fields` (gated-by-predicate) mirrors `project_view`'s own
+    # signature: spec declares *what is private*; `public_fields` declares
+    # *which view this is*. Requires `private_field_predicate` to be set.
+    public_fields: tuple[str, ...] = ()
 
     # Route opt-ins ------------------------------------------------------
     routes: RouteSet = field(default_factory=RouteSet)
+
+    # List-page viewer filtering ----------------------------------------
+    # When True, `handle_list` passes `exclude_self=requesting_user` to
+    # the entity's `list_<collection>` repo method, dropping the viewer
+    # from the result set. Anonymous viewers see the full list. Only
+    # meaningful for entities whose rows are users (currently just
+    # `user`); the kwarg name `exclude_self` is the convention every
+    # opt-in repo must accept.
+    list_exclude_self: bool = False
 
     # List-page filters --------------------------------------------------
     filters: tuple[QueryParam, ...] = ()
@@ -423,6 +440,22 @@ class EntitySpec:
                 f"EntitySpec({self.name!r}) declares private_fields="
                 f"{self.private_fields!r} but no private_field_predicate — "
                 "private fields cannot be gated without a predicate."
+            )
+        # `public_fields` drives the `target_<name>` projection in
+        # `handle_detail`; without a predicate the gating step would
+        # silently allow every private field through.
+        if self.public_fields and self.private_field_predicate is None:
+            raise ValueError(
+                f"EntitySpec({self.name!r}) declares public_fields="
+                f"{self.public_fields!r} but no private_field_predicate — "
+                "the projection cannot gate private fields without one."
+            )
+        # `list_exclude_self` is consumed only by `handle_list`; if no
+        # list route is opted in, the flag is dead.
+        if self.list_exclude_self and not self.routes.list:
+            raise ValueError(
+                f"EntitySpec({self.name!r}) sets list_exclude_self=True but "
+                "routes.list is False — the flag would never apply."
             )
         # State-axis names must be unique; route mounting iterates by
         # name, so duplicates would shadow each other silently.
