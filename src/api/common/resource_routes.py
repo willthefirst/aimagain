@@ -838,13 +838,36 @@ def _owned_factory_makers() -> dict[str, Callable[..., Callable[..., Awaitable[A
 _TOP_LEVEL_AUTO_BIND_VERBS = ("detail", "create", "update", "delete", "form_edit")
 
 
+def _detect_caller_module() -> str:
+    """Return `__name__` of the first frame outside this module.
+
+    `mount_entity` is called from a route file like
+    `src/api/routes/<entity>.py`; that's where factory-built handlers
+    must be stitched so the contract-test patch path
+    `src.api.routes.<entity>._handle_<verb>_<entity>` resolves. Walks
+    up the stack past this module's own frames (and any intermediate
+    decorator/wrapper frames inside this module) so the detection is
+    robust to internal call chains.
+    """
+    import inspect
+
+    this_module = __name__
+    for frame_info in inspect.stack()[1:]:
+        caller = frame_info.frame.f_globals.get("__name__")
+        if caller and caller != this_module:
+            return caller
+    raise RuntimeError(
+        "mount_entity could not detect a caller module — every frame "
+        "above the call belongs to this module, which shouldn't happen."
+    )
+
+
 def mount_entity(
     router: Any,
     entity: Any,  # `EntitySpec` — imported lazily to avoid a cycle
     *,
     handlers: dict[str, Callable[..., Awaitable[Any]]],
     owned_subentities: tuple[Any, ...] = (),
-    module: str | None = None,
     detail_extras: Callable[..., Awaitable[dict[str, Any]]] | None = None,
     detail_extra_repos: tuple[tuple[str, type], ...] = (),
 ) -> None:
@@ -879,8 +902,8 @@ def mount_entity(
     ``make_<verb>_handler(entity)`` and stitches it onto the route
     file's module so the `_resolve_handler` lookup (and contract-test
     monkey-patches at ``<routes module>._handle_<verb>_<entity>``)
-    flow through. `module=__name__` is required from the route file
-    whenever auto-binding triggers; missing it raises at mount time.
+    flow through. The target module is auto-detected from the
+    `mount_entity` caller's frame — route files don't pass `module=`.
     Detail handlers that need entity-specific per-viewer state pass
     `detail_extras=` + `detail_extra_repos=` directly (they can't
     live on the spec without an import cycle — handlers in
@@ -934,21 +957,9 @@ def mount_entity(
         for v in _TOP_LEVEL_AUTO_BIND_VERBS
     )
     if needs_auto_bind:
-        if module is None:
-            missing = [
-                v
-                for v in _TOP_LEVEL_AUTO_BIND_VERBS
-                if getattr(entity.routes, v) and v not in handlers
-            ]
-            raise ValueError(
-                f"mount_entity({entity.name!r}): routes opted into "
-                f"{missing} without explicit handlers, but `module=` was "
-                "not supplied. Pass `module=__name__` from the route file "
-                "so factory-built handlers can be bound at "
-                "<module>.<name> for contract-test patching."
-            )
         import sys
 
+        module = _detect_caller_module()
         factory_makers = _owned_factory_makers()
         mod = sys.modules[module]
         for verb in _TOP_LEVEL_AUTO_BIND_VERBS:

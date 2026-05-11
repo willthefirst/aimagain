@@ -18,11 +18,11 @@ logger = logging.getLogger(__name__)
 # Every standard CRUD verb (detail, create, update, delete, form_edit) is
 # factory-built — `mount_entity` reads `POST_ENTITY.routes`, calls the
 # matching `make_<verb>_handler(POST_ENTITY)`, and stitches the result
-# onto this module so contract-test patches at
-# `src.api.routes.posts._handle_<verb>_post` resolve through
-# `_resolve_handler`. The bespoke handlers stay in `handlers={}` — list
-# (filtering shape) and form_new (`?kind=` template dispatch via the
-# polymorphic discriminator).
+# onto this module (auto-detected from the caller frame) so
+# contract-test patches at `src.api.routes.posts._handle_<verb>_post`
+# resolve through `_resolve_handler`. The bespoke handlers stay in
+# `handlers={}` — list (filtering shape) and form_new (`?kind=`
+# template dispatch via the polymorphic discriminator).
 mount_entity(
     router,
     POST_ENTITY,
@@ -30,5 +30,4 @@ mount_entity(
         "list": handle_list_posts,
         "form_new": handle_get_post_form,
     },
-    module=__name__,
 )
