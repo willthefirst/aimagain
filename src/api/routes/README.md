@@ -121,7 +121,7 @@ If a future case suggests the grammar should grow to fit one of these (e.g. a se
 
 2. **Add a spec-correctness test** at `src/api/common/specs/test_<entity>.py` asserting the spec declares the right values (audit type, owner_attr, route flags, etc.).
 
-3. **Create the route file** `<resource>.py`. Call `mount_entity` with `module=__name__`; framework verbs auto-bind to `make_<verb>_handler(<ENTITY>_ENTITY)` and get stitched onto the route module as `_handle_<verb>_<entity>` for contract-test patches. Only bespoke handlers (and `list` / `form_new`, which have no factory defaults) need explicit `handlers` entries.
+3. **Create the route file** `<resource>.py`. Call `mount_entity`; framework verbs auto-bind to `make_<verb>_handler(<ENTITY>_ENTITY)` and get stitched onto the route module as `_handle_<verb>_<entity>` (target module auto-detected from the caller frame) for contract-test patches. Only bespoke handlers (and `list` / `form_new`, which have no factory defaults) need explicit `handlers` entries.
 
 ```python
 from src.api.common import BaseRouter
@@ -149,7 +149,6 @@ mount_entity(
     },
     # detail_extras=<entity>_detail_extras,                  # if per-viewer state
     # detail_extra_repos=(("<name>_repo", <Repo>),),         # typed deps for extras
-    module=__name__,
 )
 ```
 

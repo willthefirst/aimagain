@@ -232,7 +232,7 @@ The mount registers the alias path BEFORE the parametric one within the same rou
 
 ### `mount_entity` dispatcher
 
-Migrated route files compose the individual `mount_*` helpers through `mount_entity(router, entity, *, handlers, owned_subentities=(), module=None, detail_extras=None, detail_extra_repos=())`. The dispatcher reads:
+Migrated route files compose the individual `mount_*` helpers through `mount_entity(router, entity, *, handlers, owned_subentities=(), detail_extras=None, detail_extra_repos=())`. The dispatcher reads:
 
 - `entity.routes` (the `RouteSet` opt-in flags) — fires `mount_list` / `mount_detail` / `mount_create` / `mount_update` / `mount_delete` / `mount_form` (new and edit) for each `True` flag.
 - `entity.state_axes` — one `mount_state_axis` call per axis, threading `axis.body_schema`, `axis.action`, `axis.response_to_dict` from the spec.
@@ -242,7 +242,7 @@ Migrated route files compose the individual `mount_*` helpers through `mount_ent
 - `entity.read_user_dep` — `None` means public read; `mount_list` is called with `public=True`.
 - `owned_subentities` — a tuple of child `EntitySpec`s whose `parent` is `entity`. Each is mounted recursively via the same dispatcher; the handlers dict for an owned subentity is keyed `f"{owned.name}.{verb}"` (e.g. `"licensure.create"`). For verbs that match the standard CRUD-framework factories (`create`, `update`, `delete`, `detail`, `form_edit`), the explicit key is optional — `mount_entity` falls back to `make_<verb>_handler(owned)`, which is the common case for subentities whose mutations are entirely standard. Verbs without a default factory (`list`, `form_new`) still require an explicit entry; supplying any explicit key overrides the factory default.
 
-**Top-level CRUD verbs follow the same auto-bind path as owned subentities.** When a top-level entity opts into `detail` / `create` / `update` / `delete` / `form_edit` and the matching key is *absent* from `handlers`, `mount_entity` builds the handler from `make_<verb>_handler(entity)` and stitches it onto the route file's module as `_handle_<verb>_<entity>` (e.g. `_handle_update_provider`). That's the path contract-test monkey-patches at `src.api.routes.<entity>._handle_<verb>_<entity>` resolve through; setting `__module__` on the built handler lets the mount layer's `_resolve_handler` find the patched version via `getattr(sys.modules[__module__], __name__)`. `module=__name__` is required from the route file whenever auto-bind triggers; missing it raises at mount time. Bespoke verbs (e.g. `handle_delete_user`'s self-guard, `handle_create_provider`'s inline credentials append) stay explicit in the handlers dict and override the factory default.
+**Top-level CRUD verbs follow the same auto-bind path as owned subentities.** When a top-level entity opts into `detail` / `create` / `update` / `delete` / `form_edit` and the matching key is *absent* from `handlers`, `mount_entity` builds the handler from `make_<verb>_handler(entity)` and stitches it onto the route file's module as `_handle_<verb>_<entity>` (e.g. `_handle_update_provider`). That's the path contract-test monkey-patches at `src.api.routes.<entity>._handle_<verb>_<entity>` resolve through; setting `__module__` on the built handler lets the mount layer's `_resolve_handler` find the patched version via `getattr(sys.modules[__module__], __name__)`. The target module is auto-detected from the `mount_entity` caller's frame, so route files don't pass `module=`. Bespoke verbs (e.g. `handle_delete_user`'s self-guard, `handle_create_provider`'s inline credentials append) stay explicit in the handlers dict and override the factory default.
 
 `detail_extras=` and `detail_extra_repos=` flow through to `make_detail_handler` when auto-binding the detail handler. They live on the `mount_entity` call site (route file) rather than on the spec because `provider_detail_extras` / `user_detail_extras` themselves import their `<ENTITY>_ENTITY` — placing them on the spec would close the cycle. Validators raise at mount time if `detail_extras` is set without `routes.detail=True`, alongside an explicit `handlers["detail"]`, or `detail_extra_repos` without a `detail_extras` consumer.
 
@@ -285,7 +285,6 @@ mount_entity(
     detail_extras=provider_detail_extras,           # supplies `is_favorited` per (viewer, provider) pair
     detail_extra_repos=(("user_favorite_repo", UserFavoriteRepository),),
     owned_subentities=(LICENSURE_ENTITY, EDUCATION_ENTITY, CERTIFICATION_ENTITY),
-    module=__name__,
 )
 ```
 

@@ -1541,7 +1541,7 @@ def test_mount_entity_top_level_auto_binds_factory_handlers():
 
     captured, restore = _capture_top_level_mounts()
     try:
-        mount_entity(None, spec, handlers={}, module=__name__)
+        mount_entity(None, spec, handlers={})
     finally:
         restore()
 
@@ -1550,8 +1550,9 @@ def test_mount_entity_top_level_auto_binds_factory_handlers():
     assert by_mount["mount_delete"]["handler"].__name__ == "_handle_delete_widget"
     assert by_mount["mount_form"]["handler"].__name__ == "_handle_get_widget_edit_form"
 
-    # The built handlers are stitched onto this test module so
-    # `_resolve_handler` (and contract-test monkey-patches) find them via
+    # The built handlers are stitched onto this test module (auto-detected
+    # from the caller frame) so `_resolve_handler` (and contract-test
+    # monkey-patches) find them via
     # `getattr(sys.modules[fn.__module__], fn.__name__)`.
     import sys
 
@@ -1585,7 +1586,6 @@ def test_mount_entity_explicit_handler_overrides_top_level_auto_bind():
             None,
             spec,
             handlers={"delete": bespoke_delete},
-            module=__name__,
         )
     finally:
         restore()
@@ -1595,21 +1595,32 @@ def test_mount_entity_explicit_handler_overrides_top_level_auto_bind():
     assert by_mount["mount_update"]["handler"].__name__ == "_handle_update_widget"
 
 
-def test_mount_entity_top_level_auto_bind_requires_module():
-    """Auto-bind needs `module=__name__` from the route file so the
-    built handler can be stitched into the module's namespace —
-    otherwise contract-test patches at `<routes module>._handle_<verb>`
-    won't resolve to the patched version."""
+def test_mount_entity_top_level_auto_bind_detects_caller_module():
+    """Auto-bind walks the call stack to find the caller's `__name__`
+    and stitches the built handler into that module's namespace, so
+    contract-test patches at `<routes module>._handle_<verb>` resolve
+    to the patched version without route files passing `module=`."""
     spec = _EntitySpec(
-        name="widget",
-        url_collection="widgets",
-        id_param="widget_id",
+        name="gadget",
+        url_collection="gadgets",
+        id_param="gadget_id",
         model=SimpleNamespace,
         audit=_stub_audit(),
         routes=_RouteSet(delete=True),
     )
-    with pytest.raises(ValueError, match="module="):
+    captured, restore = _capture_top_level_mounts()
+    try:
         mount_entity(None, spec, handlers={})
+    finally:
+        restore()
+
+    import sys
+
+    mod = sys.modules[__name__]
+    built = getattr(mod, "_handle_delete_gadget")
+    assert built.__module__ == __name__
+    by_mount = {n: k for n, k in captured}
+    assert by_mount["mount_delete"]["handler"] is built
 
 
 def test_mount_entity_detail_extras_threaded_to_factory():
@@ -1635,7 +1646,6 @@ def test_mount_entity_detail_extras_threaded_to_factory():
             None,
             spec,
             handlers={},
-            module=__name__,
             detail_extras=sentinel_extras,
             detail_extra_repos=(("user_favorite_repo", UserRepository),),
         )
@@ -1673,7 +1683,6 @@ def test_mount_entity_detail_extras_with_explicit_handler_raises():
             None,
             spec,
             handlers={"detail": my_detail},
-            module=__name__,
             detail_extras=lambda *a, **k: {},
         )
 
@@ -1694,7 +1703,6 @@ def test_mount_entity_detail_extras_without_detail_route_raises():
             None,
             spec,
             handlers={},
-            module=__name__,
             detail_extras=lambda *a, **k: {},
         )
 
@@ -1716,7 +1724,6 @@ def test_mount_entity_detail_extra_repos_without_extras_raises():
             None,
             spec,
             handlers={},
-            module=__name__,
             detail_extra_repos=(("x", UserRepository),),
         )
 

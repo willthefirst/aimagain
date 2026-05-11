@@ -25,7 +25,8 @@ logger = logging.getLogger(__name__)
 # stay explicit; the detail handler takes a per-viewer `is_favorited`
 # extras callable. Update / delete / form_edit are framework-built by
 # `mount_entity` via `make_<verb>_handler(PROVIDER_ENTITY)` and stitched
-# onto this module for contract-test patches at
+# onto this module (auto-detected from the caller frame) for
+# contract-test patches at
 # `src.api.routes.providers._handle_<verb>_provider`. Owned credential
 # subentities (licensure, education, certification) auto-bind their own
 # create/update/delete factories — same path through `mount_entity`'s
@@ -41,5 +42,4 @@ mount_entity(
     detail_extras=provider_detail_extras,
     detail_extra_repos=(("user_favorite_repo", UserFavoriteRepository),),
     owned_subentities=(LICENSURE_ENTITY, EDUCATION_ENTITY, CERTIFICATION_ENTITY),
-    module=__name__,
 )

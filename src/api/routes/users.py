@@ -42,5 +42,4 @@ mount_entity(
     },
     detail_extras=user_detail_extras,
     detail_extra_repos=(("provider_repo", ProviderRepository),),
-    module=__name__,
 )
