@@ -8,11 +8,11 @@ from src.api.common.specs.post import POST_ENTITY
 from src.logic._generic import (
     make_create_handler,
     make_delete_handler,
+    make_edit_form_handler,
     make_update_handler,
 )
 from src.logic.posts.post_processing import (
     handle_get_post_detail,
-    handle_get_post_edit_form,
     handle_get_post_form,
     handle_list_posts,
 )
@@ -35,6 +35,9 @@ def _named(handler, name):
 _handle_create_post = _named(make_create_handler(POST_ENTITY), "_handle_create_post")
 _handle_update_post = _named(make_update_handler(POST_ENTITY), "_handle_update_post")
 _handle_delete_post = _named(make_delete_handler(POST_ENTITY), "_handle_delete_post")
+_handle_get_post_edit_form = _named(
+    make_edit_form_handler(POST_ENTITY), "_handle_get_post_edit_form"
+)
 
 
 mount_entity(
@@ -43,14 +46,15 @@ mount_entity(
     handlers={
         "list": handle_list_posts,
         "detail": handle_get_post_detail,
-        # All three mutations are framework-generated; posts is fully
-        # spec-driven for CRUD. The form handlers stay custom because
-        # they return `template_name` in context for per-kind template
-        # dispatch.
+        # All three mutations and the edit form are framework-generated;
+        # the framework reads `POST_ENTITY.discriminator[kind].edit_template`
+        # for per-kind template dispatch. The create form stays bespoke
+        # because its `?kind=` Query default and template lookup need
+        # the handler-context approach.
         "create": _handle_create_post,
         "update": _handle_update_post,
         "delete": _handle_delete_post,
         "form_new": handle_get_post_form,
-        "form_edit": handle_get_post_edit_form,
+        "form_edit": _handle_get_post_edit_form,
     },
 )

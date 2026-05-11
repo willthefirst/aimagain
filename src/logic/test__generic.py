@@ -1349,3 +1349,204 @@ def test_make_update_handler_name_includes_entity():
     )
     handler = make_update_handler(spec)
     assert handler.__name__ == "_handle_update_widget"
+
+
+# --- handle_get_edit_form framework tests --------------------------------
+
+
+from src.logic._generic import (  # noqa: E402
+    handle_get_edit_form,
+    make_edit_form_handler,
+)
+
+
+@_dc(frozen=True)
+class _FixtureEditKindSpec:
+    """Stands in for `PostKindSpec` — only the `edit_template` attr is
+    load-bearing for the edit-form path."""
+
+    edit_template: str
+
+
+class _PolyRow:
+    """Stand-in polymorphic parent: has an `id` and a `kind` column."""
+
+    def __init__(self, id: UUID, kind: str):
+        self.id = id
+        self.kind = kind
+
+
+@pytest.mark.asyncio
+async def test_edit_form_top_level_happy_path():
+    """Load target, no write_authz, returns context with entity under
+    `spec.name`. No `template_name` for non-polymorphic entities."""
+    spec = _top_level_spec(write_authz=None)
+    repo = _FakeRepo()
+    target_id = uuid4()
+    target = _FixtureRow(id=target_id)
+    repo.seed(_FixtureRow, target)
+    user = SimpleNamespace(id=uuid4())
+    request = SimpleNamespace()
+
+    context = await handle_get_edit_form(
+        spec,
+        request=request,
+        target_id=target_id,
+        repo=repo,
+        requesting_user=user,
+    )
+
+    assert context["request"] is request
+    assert context["widget"] is target  # bound under spec.name
+    assert context["current_user"] is user
+    assert "template_name" not in context
+
+
+@pytest.mark.asyncio
+async def test_edit_form_invokes_write_authz_against_target():
+    """`write_authz` is called against the target with action text."""
+    calls = []
+
+    def authz(obj, user, *, action):
+        calls.append((obj, user, action))
+
+    spec = _top_level_spec(write_authz=authz)
+    target_id = uuid4()
+    target = _FixtureRow(id=target_id)
+    repo = _FakeRepo()
+    repo.seed(_FixtureRow, target)
+    user = SimpleNamespace(id=uuid4())
+
+    await handle_get_edit_form(
+        spec,
+        request=SimpleNamespace(),
+        target_id=target_id,
+        repo=repo,
+        requesting_user=user,
+    )
+
+    assert len(calls) == 1
+    assert calls[0][0] is target
+    assert calls[0][1] is user
+    assert "edit this widget" in calls[0][2]
+
+
+@pytest.mark.asyncio
+async def test_edit_form_target_not_found_raises_not_found():
+    spec = _top_level_spec()
+    repo = _FakeRepo()
+    with pytest.raises(NotFoundError):
+        await handle_get_edit_form(
+            spec,
+            request=SimpleNamespace(),
+            target_id=uuid4(),
+            repo=repo,
+            requesting_user=SimpleNamespace(id=uuid4()),
+        )
+
+
+@pytest.mark.asyncio
+async def test_edit_form_write_authz_raises_propagates():
+    def authz(obj, user, *, action):
+        raise ForbiddenError(detail="nope")
+
+    spec = _top_level_spec(write_authz=authz)
+    target_id = uuid4()
+    repo = _FakeRepo()
+    repo.seed(_FixtureRow, _FixtureRow(id=target_id))
+    with pytest.raises(ForbiddenError):
+        await handle_get_edit_form(
+            spec,
+            request=SimpleNamespace(),
+            target_id=target_id,
+            repo=repo,
+            requesting_user=SimpleNamespace(id=uuid4()),
+        )
+
+
+@pytest.mark.asyncio
+async def test_edit_form_polymorphic_returns_kind_template():
+    """For polymorphic entities, the context carries `template_name`
+    derived from the discriminator-registry entry's `edit_template`."""
+    registry = DiscriminatorRegistry(
+        column="kind",
+        specs={
+            "red": _FixtureEditKindSpec(edit_template="paintings/edit_red.html"),
+            "blue": _FixtureEditKindSpec(edit_template="paintings/edit_blue.html"),
+        },
+    )
+    spec = EntitySpec(
+        name="painting",
+        url_collection="paintings",
+        id_param="painting_id",
+        model=_PolyRow,
+        audit=_audit(),
+        discriminator=registry,
+    )
+    target_id = uuid4()
+    target = _PolyRow(id=target_id, kind="blue")
+    repo = _FakeRepo()
+    repo.seed(_PolyRow, target)
+
+    context = await handle_get_edit_form(
+        spec,
+        request=SimpleNamespace(),
+        target_id=target_id,
+        repo=repo,
+        requesting_user=SimpleNamespace(id=uuid4()),
+    )
+
+    assert context["painting"] is target
+    assert context["template_name"] == "paintings/edit_blue.html"
+
+
+# --- make_edit_form_handler factory ---------------------------------------
+
+
+def test_make_edit_form_handler_signature():
+    spec = EntitySpec(
+        name="widget",
+        url_collection="widgets",
+        id_param="widget_id",
+        model=_FixtureRow,
+        audit=_audit(),
+    )
+    handler = make_edit_form_handler(spec)
+    sig = inspect.signature(handler)
+    assert set(sig.parameters) == {"request", "widget_id", "repo", "requesting_user"}
+
+
+def test_make_edit_form_handler_name_includes_entity():
+    spec = EntitySpec(
+        name="widget",
+        url_collection="widgets",
+        id_param="widget_id",
+        model=_FixtureRow,
+        audit=_audit(),
+    )
+    handler = make_edit_form_handler(spec)
+    assert handler.__name__ == "_handle_get_widget_edit_form"
+
+
+@pytest.mark.asyncio
+async def test_make_edit_form_handler_delegates_to_handle_get_edit_form():
+    """The factory-built handler invokes `handle_get_edit_form` with the
+    spec bound and the URL/dep-resolved kwargs forwarded."""
+    spec = _top_level_spec(write_authz=None)
+    target_id = uuid4()
+    target = _FixtureRow(id=target_id)
+    repo = _FakeRepo()
+    repo.seed(_FixtureRow, target)
+    user = SimpleNamespace(id=uuid4())
+    request = SimpleNamespace()
+
+    handler = make_edit_form_handler(spec)
+    context = await handler(
+        request=request,
+        widget_id=target_id,
+        repo=repo,
+        requesting_user=user,
+    )
+
+    assert context["widget"] is target
+    assert context["current_user"] is user

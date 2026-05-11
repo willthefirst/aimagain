@@ -26,7 +26,7 @@ from src.api.common.specs.provider import PROVIDER_ENTITY
 from src.api.common.specs.provider_certification import CERTIFICATION_ENTITY
 from src.api.common.specs.provider_education import EDUCATION_ENTITY
 from src.api.common.specs.provider_licensure import LICENSURE_ENTITY
-from src.logic._authz import assert_owner_or_admin, is_admin, is_owner
+from src.logic._authz import is_admin, is_owner
 from src.logic.audit import mutate
 from src.models import (
     Provider,
@@ -183,24 +183,6 @@ async def handle_get_provider_form(
         # (and core doesn't need to import schemas).
         "schema": ProviderCreate,
     }
-
-
-async def handle_get_provider_edit_form(
-    request: Request,
-    provider_id: UUID,
-    repo: ProviderRepository,
-    requesting_user: User,
-) -> dict[str, Any]:
-    """Loads a provider for the edit-form page. 404 if missing, 403 if the
-    requester is neither owner nor admin (mirrors `assert_owner_or_admin`).
-
-    The repo's `get_by_id` eager-loads `licensures`, `educations`, and
-    `certifications` via `lazy="selectin"`, so the template can render
-    each sub-section without further queries.
-    """
-    provider = await _load_provider_or_404(provider_id, repo)
-    assert_owner_or_admin(provider, requesting_user, action="modify this provider")
-    return {"request": request, "provider": provider, "current_user": requesting_user}
 
 
 async def handle_create_provider(

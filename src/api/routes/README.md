@@ -127,7 +127,12 @@ If a future case suggests the grammar should grow to fit one of these (e.g. a se
 from src.api.common import BaseRouter
 from src.api.common.resource_routes import mount_entity
 from src.api.common.specs.<entity> import <ENTITY>_ENTITY
-from src.logic._generic import make_create_handler, make_delete_handler, make_update_handler
+from src.logic._generic import (
+    make_create_handler,
+    make_delete_handler,
+    make_edit_form_handler,
+    make_update_handler,
+)
 from src.logic.<entity>.<entity>_processing import (
     handle_get_<entity>_detail,
     handle_list_<entity>,
@@ -140,6 +145,7 @@ router = BaseRouter(router=<entity>_api_router, default_tags=["<entities>"])
 _handle_create_<entity> = make_create_handler(<ENTITY>_ENTITY)
 _handle_update_<entity> = make_update_handler(<ENTITY>_ENTITY)
 _handle_delete_<entity> = make_delete_handler(<ENTITY>_ENTITY)
+_handle_get_<entity>_edit_form = make_edit_form_handler(<ENTITY>_ENTITY)
 
 mount_entity(
     router,
@@ -151,7 +157,7 @@ mount_entity(
         "update": _handle_update_<entity>,
         "delete": _handle_delete_<entity>,
         "form_new": handle_get_<entity>_form,
-        "form_edit": handle_get_<entity>_edit_form,
+        "form_edit": _handle_get_<entity>_edit_form,
     },
 )
 ```

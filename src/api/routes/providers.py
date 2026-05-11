@@ -11,12 +11,12 @@ from src.api.common.specs.provider_licensure import LICENSURE_ENTITY
 from src.logic._generic import (
     make_create_handler,
     make_delete_handler,
+    make_edit_form_handler,
     make_update_handler,
 )
 from src.logic.providers.provider_processing import (
     handle_create_provider,
     handle_get_provider_detail,
-    handle_get_provider_edit_form,
     handle_get_provider_form,
     handle_list_providers,
 )
@@ -43,6 +43,9 @@ _handle_update_provider = _named(
 _handle_delete_provider = _named(
     make_delete_handler(PROVIDER_ENTITY), "_handle_delete_provider"
 )
+_handle_get_provider_edit_form = _named(
+    make_edit_form_handler(PROVIDER_ENTITY), "_handle_get_provider_edit_form"
+)
 
 
 mount_entity(
@@ -57,7 +60,7 @@ mount_entity(
         "update": _handle_update_provider,
         "delete": _handle_delete_provider,
         "form_new": handle_get_provider_form,
-        "form_edit": handle_get_provider_edit_form,
+        "form_edit": _handle_get_provider_edit_form,
         # Owned-subentity verbs, keyed by `<owned.name>.<verb>`.
         "provider_licensure.create": make_create_handler(LICENSURE_ENTITY),
         "provider_licensure.update": make_update_handler(LICENSURE_ENTITY),
