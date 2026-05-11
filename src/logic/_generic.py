@@ -187,10 +187,27 @@ async def handle_create(
         )
 
     else:
-        instance = spec.model(**payload.model_dump())
+        # Inline-child collections (e.g. provider's licensures /
+        # educations / certifications) come in on the payload alongside
+        # the parent's own fields. Exclude them from the parent
+        # constructor, persist the parent, then append each child via
+        # `repo.add_child` so the in-memory state stays coherent for
+        # the audit after-snapshot. Empty `spec.children` is the common
+        # case (most entities have no inline children) and the loop is
+        # a no-op.
+        inline_collections = tuple(c.url_collection for c in spec.children)
+        parent_fields = payload.model_dump(exclude=set(inline_collections))
+        instance = spec.model(**parent_fields)
         if spec.owner_attr is not None:
             setattr(instance, spec.owner_attr, requesting_user.id)
         created = await repo.create(instance)
+        for child_spec in spec.children:
+            for item in getattr(payload, child_spec.url_collection, []) or []:
+                await repo.add_child(
+                    created,
+                    child_spec.url_collection,
+                    child_spec.model(**item.model_dump()),
+                )
 
     async with mutate(
         repo,

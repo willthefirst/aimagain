@@ -210,7 +210,7 @@ async def handle_create_entity(data, user, repo: [Entity]Repository):
 When *not* to delegate:
 
 - `get_X_by_<field>` lookups that are not by primary key — write them out (e.g. `ProviderRepository.list_providers` filtering through `ProviderLicensure`).
-- Custom multi-step writes — e.g. `handle_create_provider` (the bespoke parent-create handler) appends initial credential sub-rows after the parent persists. Standard CRUD verbs go through the framework instead.
+- Custom multi-step writes that the generic framework can't subsume (edge add/remove for `UserFavorite`, idempotency rules). Inline-child append on parent-create *is* covered by the framework's `handle_create` walking `spec.children`.
 
 ```python
 # Typical resource repo today — only methods with custom query patterns:
@@ -235,7 +235,7 @@ async def list_providers(
     return await self._list(stmt.order_by(Provider.created_at.desc()))
 ```
 
-Per-entity `create_X` / `update_X` / `delete_X` wrapper methods have been removed for non-bespoke entities — the generic CRUD framework calls the public aliases above directly. Bespoke handlers (provider create with nested credentials, edge operations) drive their entity-specific writes through the same public aliases: `handle_create_provider` loops over a `(collection, Model)` table and calls `repo.add_child(parent, collection, Model(**fields))` for each inline credential row, so adding a fourth credential kind is a one-line table entry rather than a fourth `add_X` method on the repo.
+Per-entity `create_X` / `update_X` / `delete_X` wrapper methods have been removed — the generic CRUD framework calls `BaseRepository.create` / `patch` / `delete` directly. Bespoke handlers (edge add/remove) drive their entity-specific writes through the same public aliases. Inline-child append on parent-create (provider's credential lists) is the framework's job: `handle_create` walks `spec.children` and calls `repo.add_child(parent, collection, Model(**fields))` per child. Adding a fourth credential is a one-file change (the new spec), not an edit here.
 
 ## Common issues and solutions
 

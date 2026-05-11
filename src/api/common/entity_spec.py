@@ -489,9 +489,11 @@ class EntitySpec:
         order matches the children's construction order. Returned as a
         tuple so callers cannot mutate the underlying registry.
 
-        Consumers: ``handle_create_provider`` derives the inline-credential
-        loop from ``PROVIDER_ENTITY.children`` instead of restating
-        the (collection, model) pairs.
+        Consumers: the generic ``handle_create`` walks
+        ``spec.children`` so the standard top-level create path appends
+        inline-child rows automatically (providers' credential lists).
+        Adding a fourth credential is a one-file change (the new spec)
+        with no edit to the create handler.
         """
         return tuple(self._children)
 

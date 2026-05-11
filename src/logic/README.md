@@ -157,8 +157,10 @@ async def handle_some_operation(
 For the standard CRUD verbs (create / update / delete), the default is to bind a factory-built handler from `_generic.py` (see [`api/common/README.md`](../api/common/README.md#generic-crud-handler-factories) for the route-file wiring). Write a bespoke handler in the entity's cluster only when the verb has rules that don't fit the standard ritual:
 
 - `handle_delete_user` is bespoke because of the self-guard ("admins can't delete their own account here").
-- `handle_create_provider` is bespoke because it appends initial credential sub-rows from the inline payload after the parent persists — a nested-write shape no other entity exercises.
+- `handle_list_users` is bespoke because the `exclude_user=requesting_user` filter doesn't fit the framework's "URL filter only" model.
 - `handle_add_favorite` / `handle_remove_favorite` are bespoke because they're M:N edge mutations with idempotent semantics + non-CRUD audit (`edge_audit` instead of `audit`).
+
+Nested-write creates (providers' inline credential rows) are handled by the generic `handle_create` walking `spec.children` — no entity needs a bespoke create handler just for that shape.
 
 Bespoke handlers still use the shared primitives — `mutate(...)` for CRUD-shaped mutations, `record_audit(...)` for non-CRUD audits, `assert_owner_or_admin` for the owner check, the spec's `audit` / `edge_audit` / `private_fields` declarations. They just orchestrate the entity-specific steps the framework can't subsume.
 

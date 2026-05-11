@@ -242,7 +242,7 @@ Migrated route files compose the individual `mount_*` helpers through `mount_ent
 - `entity.read_user_dep` — `None` means public read; `mount_list` is called with `public=True`.
 - `owned_subentities` — a tuple of child `EntitySpec`s whose `parent` is `entity`. Each is mounted recursively via the same dispatcher; the handlers dict for an owned subentity is keyed `f"{owned.name}.{verb}"` (e.g. `"licensure.create"`). For verbs that match the standard CRUD-framework factories (`create`, `update`, `delete`, `detail`, `form_edit`), the explicit key is optional — `mount_entity` falls back to `make_<verb>_handler(owned)`, which is the common case for subentities whose mutations are entirely standard. Verbs without a default factory (`list`, `form_new`) still require an explicit entry; supplying any explicit key overrides the factory default.
 
-**Top-level standard verbs follow the same auto-bind path as owned subentities.** When a top-level entity opts into `list` / `detail` / `create` / `update` / `delete` / `form_edit` and the matching key is *absent* from `handlers`, `mount_entity` builds the handler from `make_<verb>_handler(entity)` and stitches it onto the route file's module as `_handle_<verb>_<entity>` (e.g. `_handle_update_provider`, `_handle_list_post`). That's the path contract-test monkey-patches at `src.api.routes.<entity>._handle_<verb>_<entity>` resolve through; setting `__module__` on the built handler lets the mount layer's `_resolve_handler` find the patched version via `getattr(sys.modules[__module__], __name__)`. The target module is auto-detected from the `mount_entity` caller's frame, so route files don't pass `module=`. Bespoke verbs (e.g. `handle_delete_user`'s self-guard, `handle_create_provider`'s inline credentials append, `handle_list_users`'s self-exclude) stay explicit in the handlers dict and override the factory default. The only verb that has no default factory is `form_new` — its template-selection knob is too entity-specific to auto-bind (posts dispatches by `?kind=`).
+**Top-level standard verbs follow the same auto-bind path as owned subentities.** When a top-level entity opts into `list` / `detail` / `create` / `update` / `delete` / `form_edit` and the matching key is *absent* from `handlers`, `mount_entity` builds the handler from `make_<verb>_handler(entity)` and stitches it onto the route file's module as `_handle_<verb>_<entity>` (e.g. `_handle_update_provider`, `_handle_list_post`). That's the path contract-test monkey-patches at `src.api.routes.<entity>._handle_<verb>_<entity>` resolve through; setting `__module__` on the built handler lets the mount layer's `_resolve_handler` find the patched version via `getattr(sys.modules[__module__], __name__)`. The target module is auto-detected from the `mount_entity` caller's frame, so route files don't pass `module=`. Bespoke verbs (e.g. `handle_delete_user`'s self-guard, `handle_list_users`'s self-exclude) stay explicit in the handlers dict and override the factory default. The only verb that has no default factory is `form_new` — its template-selection knob is too entity-specific to auto-bind (posts dispatches by `?kind=`; providers needs the `ProviderCreate` schema class in context). Inline-child appends on create (providers' credential rows) come from the generic `handle_create` walking `spec.children`.
 
 `detail_extras=` / `detail_extra_repos=` and `list_extras=` / `list_extra_repos=` flow through to `make_detail_handler` / `make_list_handler` when auto-binding the respective handlers. They live on the `mount_entity` call site (route file) rather than on the spec because `provider_detail_extras` / `post_list_extras` themselves import their `<ENTITY>_ENTITY` — placing them on the spec would close the cycle. Validators raise at mount time if extras are set without the matching `routes.<verb>=True`, alongside an explicit `handlers[<verb>]`, or extras-repos without an extras-callable consumer.
 
@@ -266,21 +266,20 @@ And matching `make_<verb>_handler(spec)` factory functions (`make_create_handler
 ```python
 # in src/api/routes/providers.py
 from src.logic.providers.provider_processing import (
-    handle_create_provider,           # bespoke (inline credentials append)
     handle_get_provider_form,
-    handle_list_providers,
     provider_detail_extras,
 )
 from src.repositories.favorites.user_favorite_repository import UserFavoriteRepository
 
-# update / delete / form_edit auto-bound to make_<verb>_handler(PROVIDER_ENTITY)
-# via `mount_entity`; bespoke entries stay explicit in handlers.
+# list / detail / create / update / delete / form_edit auto-bind via
+# make_<verb>_handler(PROVIDER_ENTITY). Only form_new stays explicit
+# (the create-form template needs the ProviderCreate schema class in
+# its context). Owned credential subentities self-register on
+# PROVIDER_ENTITY.children and auto-bind their own CRUD.
 mount_entity(
     router,
     PROVIDER_ENTITY,
     handlers={
-        "list": handle_list_providers,
-        "create": handle_create_provider,           # bespoke (inline credentials append)
         "form_new": handle_get_provider_form,
     },
     detail_extras=provider_detail_extras,           # supplies `is_favorited` per (viewer, provider) pair
@@ -292,8 +291,10 @@ mount_entity(
 **When to use factory vs. bespoke handler.** Use the factory when the verb does the standard load → auth → mutate → audit ritual. Write a bespoke handler when the entity has rules that don't fit:
 
 - `handle_delete_user` is bespoke because of the self-guard (admin can't delete self).
-- `handle_create_provider` is bespoke because it appends initial credential sub-rows from the inline payload after the parent persists.
+- `handle_list_users` is bespoke because of the `exclude_user=requesting_user` filter (doesn't fit the "URL filter only" model).
 - `handle_add_favorite` / `handle_remove_favorite` are bespoke because they're M:N edge mutations, not CRUD.
+
+Inline-child append on create (providers' credential rows on parent-create) is handled by the generic `handle_create` walking `spec.children` — no entity needs a bespoke create handler just for nested writes.
 
 Bespoke handlers still use `mutate(...)` for audit + commit; they just own the orchestration their entity needs.
 

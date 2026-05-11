@@ -1,4 +1,4 @@
-from typing import Any, Sequence
+from typing import Sequence
 from uuid import UUID
 
 from sqlalchemy import select
@@ -62,6 +62,6 @@ class ProviderRepository(BaseRepository):
         return await self._list(stmt)
 
     # --- Provider mutations ----------------------------------------
-
-    async def create_provider(self, user_id: UUID, **fields: Any) -> Provider:
-        return await self._persist_new(Provider(owner_id=user_id, **fields))
+    # The framework's `handle_create` calls `repo.create(Provider(...))`
+    # (the public alias on `BaseRepository`) directly — no `create_provider`
+    # wrapper needed. Inline credential rows append via `repo.add_child`.

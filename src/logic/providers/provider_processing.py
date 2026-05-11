@@ -21,20 +21,11 @@ from uuid import UUID
 
 from fastapi import Request
 
-# Importing the credential spec modules registers their `parent=PROVIDER_ENTITY`
-# children on `PROVIDER_ENTITY.children` via the EntitySpec post-init
-# registry — referenced by `handle_create_provider`'s inline-credential loop.
-import src.api.common.specs.provider_certification  # noqa: F401
-import src.api.common.specs.provider_education  # noqa: F401
-import src.api.common.specs.provider_licensure  # noqa: F401
 from src.api.common.exceptions import ForbiddenError, NotFoundError
-from src.api.common.specs.provider import PROVIDER_ENTITY
-from src.logic.audit import mutate
 from src.models import (
     Provider,
     User,
 )
-from src.repositories.audit_repository import AuditRepository
 from src.repositories.favorites.user_favorite_repository import UserFavoriteRepository
 from src.repositories.providers.provider_repository import ProviderRepository
 from src.repositories.users.user_repository import UserRepository
@@ -43,11 +34,6 @@ from src.schemas.providers.provider import (
 )
 
 logger = logging.getLogger(__name__)
-
-
-# The audit binding lives on `PROVIDER_ENTITY.audit`; this re-export
-# keeps the handler body's `resource=PROVIDER` shape without churn.
-PROVIDER = PROVIDER_ENTITY.audit
 
 
 # --- Provider handlers ----------------------------------------------------
@@ -128,44 +114,3 @@ async def handle_get_provider_form(
         # (and core doesn't need to import schemas).
         "schema": ProviderCreate,
     }
-
-
-async def handle_create_provider(
-    payload: ProviderCreate,
-    repo: ProviderRepository,
-    audit_repo: AuditRepository,
-    requesting_user: User,
-) -> Provider:
-    """Creates a provider owned by the requesting user plus any inline
-    credential sub-rows. A user may own zero, one, or many providers —
-    nothing here rejects a second create. One `CREATE_PROVIDER`
-    audit row is written whose `after` snapshot includes the inline
-    sub-rows — the snapshot schema embeds the nested credential lists,
-    so a single row captures the full create.
-    """
-    # Inline-credential kinds derive from the parent → children registry
-    # on `PROVIDER_ENTITY`: each owned-credential spec registers itself
-    # when its module is imported. Adding a fourth credential is now a
-    # single new spec file — no edit here.
-    inline_collections = tuple(
-        child.url_collection for child in PROVIDER_ENTITY.children
-    )
-    provider_fields = payload.model_dump(exclude=set(inline_collections))
-    created = await repo.create_provider(user_id=requesting_user.id, **provider_fields)
-
-    for child in PROVIDER_ENTITY.children:
-        for item in getattr(payload, child.url_collection):
-            await repo.add_child(
-                created, child.url_collection, child.model(**item.model_dump())
-            )
-
-    async with mutate(
-        repo,
-        audit_repo,
-        actor=requesting_user,
-        target=created,
-        resource=PROVIDER,
-        verb="create",
-    ):
-        pass
-    return created
