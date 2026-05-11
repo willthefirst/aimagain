@@ -48,7 +48,7 @@ async def handle_set_user_activation(
     free of self-target boilerplate. The route's `current_admin_user`
     dep blocks non-admins.
     """
-    target = await repo.get_by_id(user_id)
+    target = await repo.get_by_model_id(User, user_id)
     if target is None:
         raise NotFoundError(detail="User not found")
 

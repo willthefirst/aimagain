@@ -11,11 +11,6 @@ from ..base import BaseRepository
 class ProviderRepository(BaseRepository):
     # --- Provider reads --------------------------------------------
 
-    async def get_by_id(self, provider_id: UUID) -> Provider | None:
-        """Retrieves a provider by id. Sub-table relationships are
-        eager-loaded via `lazy="selectin"` on the model."""
-        return await self._get_by_id(Provider, provider_id)
-
     async def get_by_user_id(self, user_id: UUID) -> Provider | None:
         """Retrieves a provider owned by the given user. A user may own
         multiple providers; this returns whichever the DB hands back first

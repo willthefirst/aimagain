@@ -20,14 +20,19 @@ from sqlalchemy import Select, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 T = TypeVar("T")
+M = TypeVar("M")
 
 
 class BaseRepository:
     def __init__(self, session: AsyncSession):
         self.session = session
 
-    async def _get_by_id(self, model: type[Any], obj_id: UUID) -> Any | None:
-        """Fetch a single row by primary key. Returns `None` if missing."""
+    async def _get_by_id(self, model: type[M], obj_id: UUID) -> M | None:
+        """Fetch a single row by primary key. Returns `None` if missing.
+
+        Generic over the model class: `_get_by_id(User, id)` returns
+        `User | None`, verified by the type checker via `M`.
+        """
         stmt = select(model).filter(model.id == obj_id)
         result = await self.session.execute(stmt)
         return result.scalars().first()
@@ -127,9 +132,11 @@ class BaseRepository:
     # aliases below — same behavior, the underscore convention stays
     # intact for intra-cluster usage.
 
-    async def get_by_model_id(self, model: type[Any], obj_id: UUID) -> Any | None:
+    async def get_by_model_id(self, model: type[M], obj_id: UUID) -> M | None:
         """Public alias for `_get_by_id`. Used by generic framework
-        handlers that need to fetch any model by primary key."""
+        handlers and per-entity call sites that need a typed fetch by
+        primary key — `get_by_model_id(User, id)` returns `User | None`.
+        """
         return await self._get_by_id(model, obj_id)
 
     async def delete(self, obj: Any) -> None:

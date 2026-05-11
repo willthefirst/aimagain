@@ -1,5 +1,4 @@
 from typing import Sequence
-from uuid import UUID
 
 from sqlalchemy import select
 
@@ -9,10 +8,6 @@ from ..base import BaseRepository
 
 
 class UserRepository(BaseRepository):
-    async def get_by_id(self, user_id: UUID) -> User | None:
-        """Retrieves a user by their ID."""
-        return await self._get_by_id(User, user_id)
-
     async def get_user_by_username(self, username: str) -> User | None:
         """Retrieves a user by their username."""
         stmt = select(User).filter(User.username == username)
