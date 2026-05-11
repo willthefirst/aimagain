@@ -23,17 +23,12 @@ from typing import Final
 from src.api.common.entity_spec import EntitySpec, RouteSet
 from src.auth_config import current_active_user
 from src.logic._authz import assert_owner_or_admin, is_owner_or_admin
-from src.logic.audit import AuditedResource, make_audited_resource
 from src.models import POST_KINDS, Post
 from src.repositories.dependencies import get_post_repository
 from src.schemas.posts.post import (
     post_audit_snapshot,
     post_create_adapter,
     post_update_adapter,
-)
-
-POST_AUDITED_RESOURCE: Final[AuditedResource] = make_audited_resource(
-    "post", post_audit_snapshot
 )
 
 
@@ -70,7 +65,7 @@ POST_ENTITY: Final[EntitySpec] = EntitySpec(
     write_user_dep=current_active_user,
     write_authz=assert_owner_or_admin,
     can_write=is_owner_or_admin,
-    audit=POST_AUDITED_RESOURCE,
+    audit_snapshot=post_audit_snapshot,
     create_adapter=post_create_adapter,
     update_adapter=post_update_adapter,
     read_to_dict=_post_read_to_dict,

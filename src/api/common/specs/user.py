@@ -27,14 +27,10 @@ from src.api.common.entity_spec import (
 from src.api.common.specs.provider import PROVIDER_ENTITY
 from src.auth_config import current_active_user, current_admin_user
 from src.logic._authz import is_self_or_admin
-from src.logic.audit import AuditAction, AuditedResource, make_audited_resource
+from src.logic.audit import AuditAction
 from src.models import User
 from src.repositories.dependencies import get_user_repository
 from src.schemas.users.user import UserActivationUpdate, UserAuditSnapshot
-
-USER_AUDITED_RESOURCE: Final[AuditedResource] = make_audited_resource(
-    "user", UserAuditSnapshot
-)
 
 
 def _activation_response_to_dict(user: User) -> dict:
@@ -54,7 +50,7 @@ USER_ENTITY: Final[EntitySpec] = EntitySpec(
     repo_dep=get_user_repository,
     read_user_dep=current_active_user,
     write_user_dep=current_admin_user,
-    audit=USER_AUDITED_RESOURCE,
+    audit_snapshot=UserAuditSnapshot,
     private_fields=("email", "is_active", "is_verified"),
     private_field_predicate=is_self_or_admin,
     routes=RouteSet(list=True, detail=True, delete=True),

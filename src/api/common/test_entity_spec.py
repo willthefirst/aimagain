@@ -304,6 +304,44 @@ def test_discriminator_accepts_registry_instance():
     assert spec.discriminator.names == ("a", "b")
 
 
+def test_audit_snapshot_builds_audited_resource_from_schema():
+    """`audit_snapshot=<schema>` triggers `make_audited_resource(name, schema)`
+    at construction time so each CRUD entity doesn't repeat the call."""
+    spec = _make_spec(
+        name="user",  # picks the existing CREATE_USER/UPDATE_USER/DELETE_USER enum members
+        audit_snapshot=_DummyBody,
+    )
+    assert spec.audit is not None
+    assert spec.audit.type == "user"
+    assert spec.audit.create == AuditAction.CREATE_USER
+    assert spec.audit.update == AuditAction.UPDATE_USER
+    assert spec.audit.delete == AuditAction.DELETE_USER
+
+
+def test_audit_snapshot_and_audit_mutually_exclusive():
+    with pytest.raises(ValueError, match="mutually exclusive"):
+        _make_spec(audit=_dummy_audit(), audit_snapshot=_DummyBody)
+
+
+def test_audit_action_stem_overrides_name():
+    """Credential entities' enum stems diverge from `name` (e.g.
+    `provider_licensure` → `CREATE_LICENSURE`). `audit_action_stem`
+    feeds straight into `make_audited_resource`."""
+    spec = _make_spec(
+        name="provider_licensure",
+        audit_snapshot=_DummyBody,
+        audit_action_stem="licensure",
+    )
+    assert spec.audit.create == AuditAction.CREATE_LICENSURE
+
+
+def test_audit_action_stem_without_snapshot_raises():
+    """Setting the stem without a snapshot is a misconfiguration — the
+    stem is only consumed when the constructor builds from a snapshot."""
+    with pytest.raises(ValueError, match="audit_action_stem"):
+        _make_spec(audit_action_stem="licensure")
+
+
 def test_templates_default_by_convention_for_opted_in_verbs():
     """Each opted-in verb whose template path is unset gets
     ``<url_collection>/<verb>.html`` by convention."""
