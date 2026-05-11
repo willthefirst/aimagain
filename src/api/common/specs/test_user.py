@@ -12,7 +12,7 @@ from src.api.common.entity_spec import ADMIN_FOR_WRITE, RelatedListSubresource
 from src.api.common.specs.user import USER_ENTITY
 from src.logic._authz import is_self_or_admin
 from src.logic.audit import AuditAction
-from src.schemas.users.user import UserActivationUpdate
+from src.schemas.users.user import UserActivationAuditSnapshot, UserActivationUpdate
 
 # --- Auth deps (security-visible) ----------------------------------------
 
@@ -55,6 +55,8 @@ def test_activation_axis_shape():
     axis = USER_ENTITY.state_axis("activation")
     assert axis.body_schema is UserActivationUpdate
     assert axis.action == AuditAction.SET_USER_ACTIVATION
+    assert axis.audit_snapshot is UserActivationAuditSnapshot
+    assert axis.audit_snapshot_fn is not None  # built by spec __post_init__
     sample = axis.response_to_dict(
         type(
             "Sample",

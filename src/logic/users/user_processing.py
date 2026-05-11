@@ -8,19 +8,14 @@ from src.api.common.exceptions import NotFoundError
 from src.api.common.projections import project_view
 from src.api.common.specs.user import USER_ENTITY
 from src.logic._authz import forbid_self_action, is_admin
-from src.logic.audit import make_snapshotter, mutate, record_audit
+from src.logic.audit import mutate, record_audit
 from src.models import User
 from src.repositories.audit_repository import AuditRepository
 from src.repositories.providers.provider_repository import ProviderRepository
 from src.repositories.users.user_repository import UserRepository
-from src.schemas.users.user import (
-    UserActivationAuditSnapshot,
-    UserActivationUpdate,
-)
+from src.schemas.users.user import UserActivationUpdate
 
 logger = logging.getLogger(__name__)
-
-_snapshot_user_activation = make_snapshotter(UserActivationAuditSnapshot)
 
 
 async def handle_list_users(
@@ -118,9 +113,10 @@ async def handle_set_user_activation(
     logger.info(
         f"Handler: admin {requesting_user.id} setting activation={payload.state} on user {target.id}"
     )
-    before = _snapshot_user_activation(target)
-    updated = await repo.set_user_activation(target, is_active=is_active)
     activation_axis = USER_ENTITY.state_axis("activation")
+    snapshot = activation_axis.audit_snapshot_fn
+    before = snapshot(target)
+    updated = await repo.set_user_activation(target, is_active=is_active)
     await record_audit(
         audit_repo,
         actor_id=requesting_user.id,
@@ -128,7 +124,7 @@ async def handle_set_user_activation(
         resource_id=updated.id,
         action=activation_axis.action,
         before=before,
-        after=_snapshot_user_activation(updated),
+        after=snapshot(updated),
     )
     await repo.session.commit()
     return updated

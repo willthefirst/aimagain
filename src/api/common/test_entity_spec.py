@@ -90,6 +90,56 @@ def test_no_private_fields_no_predicate_constructs():
     assert spec.private_field_predicate is None
 
 
+def test_state_axis_audit_snapshot_builds_fn():
+    """`StateAxis.audit_snapshot` is the schema; the spec's
+    `__post_init__` wraps it in `make_snapshotter` once and stores the
+    result on `audit_snapshot_fn`. Mirrors the CRUD-side flow."""
+    spec = _make_spec(
+        state_axes=(
+            StateAxis(
+                name="flip",
+                body_schema=_DummyBody,
+                action=AuditAction.SET_USER_ACTIVATION,
+                audit_snapshot=_DummyRead,
+            ),
+        )
+    )
+    axis = spec.state_axis("flip")
+    assert axis.audit_snapshot_fn is not None
+    # Snapshot validates an attribute-bag through `_DummyRead` and
+    # returns a JSON-mode dict.
+    sample = SimpleNamespace(flag=True)
+    assert axis.audit_snapshot_fn(sample) == {"flag": True}
+
+
+def test_state_axis_audit_snapshot_and_fn_mutually_exclusive():
+    with pytest.raises(ValueError, match="mutually exclusive"):
+        _make_spec(
+            state_axes=(
+                StateAxis(
+                    name="flip",
+                    body_schema=_DummyBody,
+                    action=AuditAction.SET_USER_ACTIVATION,
+                    audit_snapshot=_DummyRead,
+                    audit_snapshot_fn=lambda _obj: {},
+                ),
+            )
+        )
+
+
+def test_state_axis_without_audit_snapshot_leaves_fn_none():
+    spec = _make_spec(
+        state_axes=(
+            StateAxis(
+                name="flip",
+                body_schema=_DummyBody,
+                action=AuditAction.SET_USER_ACTIVATION,
+            ),
+        )
+    )
+    assert spec.state_axis("flip").audit_snapshot_fn is None
+
+
 def test_duplicate_state_axis_names_raises():
     """Two axes with the same name would shadow each other at mount time."""
     axis_a = StateAxis(

@@ -32,7 +32,11 @@ from src.logic.audit import AuditAction
 from src.models import User
 from src.repositories.dependencies import get_user_repository
 from src.repositories.providers.provider_repository import ProviderRepository
-from src.schemas.users.user import UserActivationUpdate, UserAuditSnapshot
+from src.schemas.users.user import (
+    UserActivationAuditSnapshot,
+    UserActivationUpdate,
+    UserAuditSnapshot,
+)
 
 
 def _activation_response_to_dict(user: User) -> dict:
@@ -62,6 +66,7 @@ USER_ENTITY: Final[EntitySpec] = EntitySpec(
             action=AuditAction.SET_USER_ACTIVATION,
             response_to_dict=_activation_response_to_dict,
             handler_path=("src.logic.users.user_processing.handle_set_user_activation"),
+            audit_snapshot=UserActivationAuditSnapshot,
         ),
     ),
     subresources=(
