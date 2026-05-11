@@ -79,16 +79,12 @@ A repository does not import from a peer cluster's repository; if logic needs to
 from typing import Sequence
 from uuid import UUID
 from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from src.models import [Entity]
 from ..base import BaseRepository
 
 class [Entity]Repository(BaseRepository):
-    def __init__(self, session: AsyncSession):
-        super().__init__(session)
-
     async def get_[entity]_by_id(self, [entity]_id: UUID) -> [Entity] | None:
         """Retrieves a [entity] by its ID."""
         stmt = select([Entity]).filter([Entity].id == [entity]_id)
