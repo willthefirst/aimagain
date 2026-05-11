@@ -119,3 +119,20 @@ class BaseRepository:
         SQLAlchemy and FK configuration."""
         await self.session.delete(obj)
         await self.session.flush()
+
+    # --- Public framework-facing primitives ----------------------------
+    # The protected primitives above are intended for intra-cluster
+    # repository methods. Cross-cluster framework code (the generic
+    # handlers in `src/logic/_generic.py`) reaches in via the public
+    # aliases below — same behavior, the underscore convention stays
+    # intact for intra-cluster usage.
+
+    async def get_by_model_id(self, model: type[Any], obj_id: UUID) -> Any | None:
+        """Public alias for `_get_by_id`. Used by generic framework
+        handlers that need to fetch any model by primary key."""
+        return await self._get_by_id(model, obj_id)
+
+    async def delete(self, obj: Any) -> None:
+        """Public alias for `_delete`. Used by generic framework
+        handlers (e.g. `handle_delete`)."""
+        await self._delete(obj)

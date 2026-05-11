@@ -198,33 +198,3 @@ async def handle_update_post(
             **{f: getattr(payload, f) for f in spec.detail_fields},
         )
     return post
-
-
-async def handle_delete_post(
-    post_id: UUID,
-    repo: PostRepository,
-    audit_repo: AuditRepository,
-    requesting_user: User,
-) -> None:
-    """Hard-deletes a post owned by the requesting user (or any post, if the
-    requester is a superuser). Writes an audit row capturing the pre-delete
-    state in `before` (with `after=None`) in the same transaction; commits
-    on success.
-
-    404 if missing, 403 if not authorized.
-    """
-    post = await repo.get_post_by_id(post_id)
-    if post is None:
-        raise NotFoundError(detail="Post not found")
-
-    assert_owner_or_admin(post, requesting_user, action="delete this post")
-
-    async with mutate(
-        repo,
-        audit_repo,
-        actor=requesting_user,
-        target=post,
-        resource=POST,
-        verb="delete",
-    ):
-        await repo.delete_post(post)

@@ -74,9 +74,6 @@ class ProviderRepository(BaseRepository):
     async def update_provider(self, provider: Provider, **fields: Any) -> Provider:
         return await self._patch(provider, **fields)
 
-    async def delete_provider(self, provider: Provider) -> None:
-        await self._delete(provider)
-
     # --- Licensure sub-table ----------------------------------------------
 
     async def get_licensure_by_id(self, licensure_id: UUID) -> ProviderLicensure | None:
@@ -94,9 +91,6 @@ class ProviderRepository(BaseRepository):
     ) -> ProviderLicensure:
         return await self._patch(licensure, **fields)
 
-    async def delete_licensure(self, licensure: ProviderLicensure) -> None:
-        await self._delete(licensure)
-
     # --- Education sub-table ----------------------------------------------
 
     async def get_education_by_id(self, education_id: UUID) -> ProviderEducation | None:
@@ -113,9 +107,6 @@ class ProviderRepository(BaseRepository):
         self, education: ProviderEducation, **fields: Any
     ) -> ProviderEducation:
         return await self._patch(education, **fields)
-
-    async def delete_education(self, education: ProviderEducation) -> None:
-        await self._delete(education)
 
     # --- Certification sub-table ------------------------------------------
 
@@ -135,6 +126,3 @@ class ProviderRepository(BaseRepository):
         self, cert: ProviderCertification, **fields: Any
     ) -> ProviderCertification:
         return await self._patch(cert, **fields)
-
-    async def delete_certification(self, cert: ProviderCertification) -> None:
-        await self._delete(cert)
