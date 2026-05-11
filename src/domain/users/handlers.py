@@ -59,7 +59,7 @@ async def handle_set_user_activation(
     activation_axis = USER_ENTITY.state_axis("activation")
     snapshot = activation_axis.audit_snapshot_fn
     before = snapshot(target)
-    updated = await repo.set_user_activation(target, is_active=is_active)
+    updated = await repo.patch(target, is_active=is_active)
     await record_audit(
         audit_repo,
         actor_id=requesting_user.id,

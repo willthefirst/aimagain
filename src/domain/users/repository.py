@@ -37,14 +37,6 @@ class UserRepository(BaseRepository):
         stmt = stmt.order_by(User.username)
         return await self._list(stmt)
 
-    async def set_user_activation(self, user: User, *, is_active: bool) -> User:
-        """Sets `is_active` on the user and flushes; the caller commits."""
-        user.is_active = is_active
-        self.session.add(user)
-        await self.session.flush()
-        await self.session.refresh(user)
-        return user
-
     async def delete_user(self, user: User) -> None:
         """Hard-deletes the user row; the caller commits."""
         await self._delete(user)
