@@ -2,7 +2,6 @@ from typing import Sequence
 from uuid import UUID
 
 from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.models import Provider, ProviderLicensure
 
@@ -10,9 +9,6 @@ from ..base import BaseRepository
 
 
 class ProviderRepository(BaseRepository):
-    def __init__(self, session: AsyncSession):
-        super().__init__(session)
-
     # --- Provider reads --------------------------------------------
 
     async def get_by_id(self, provider_id: UUID) -> Provider | None:
