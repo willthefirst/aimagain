@@ -232,7 +232,7 @@ The mount registers the alias path BEFORE the parametric one within the same rou
 
 ### `mount_entity` dispatcher
 
-Migrated route files compose the individual `mount_*` helpers through `mount_entity(router, entity, *, handlers, owned_subentities=(), detail_extras=None, detail_extra_repos=())`. The dispatcher reads:
+Migrated route files compose the individual `mount_*` helpers through `mount_entity(router, entity, *, handlers, owned_subentities=())`. The dispatcher reads:
 
 - `entity.routes` (the `RouteSet` opt-in flags) — fires `mount_list` / `mount_detail` / `mount_create` / `mount_update` / `mount_delete` / `mount_form` (new and edit) for each `True` flag.
 - `entity.state_axes` — one `mount_state_axis` call per axis, threading `axis.body_schema`, `axis.action`, `axis.response_to_dict` from the spec.
@@ -244,7 +244,7 @@ Migrated route files compose the individual `mount_*` helpers through `mount_ent
 
 **Top-level standard verbs follow the same auto-bind path as owned subentities.** When a top-level entity opts into `list` / `detail` / `create` / `update` / `delete` / `form_edit` and the matching key is *absent* from `handlers`, `mount_entity` builds the handler from `make_<verb>_handler(entity)` and stitches it onto the route file's module as `_handle_<verb>_<entity>` (e.g. `_handle_update_provider`, `_handle_list_post`). That's the path contract-test monkey-patches at `src.api.routes.<entity>._handle_<verb>_<entity>` resolve through; setting `__module__` on the built handler lets the mount layer's `_resolve_handler` find the patched version via `getattr(sys.modules[__module__], __name__)`. The target module is auto-detected from the `mount_entity` caller's frame, so route files don't pass `module=`. Bespoke verbs (e.g. `handle_delete_user`'s self-guard, `handle_list_users`'s self-exclude) stay explicit in the handlers dict and override the factory default. The only verb that has no default factory is `form_new` — its template-selection knob is too entity-specific to auto-bind (posts dispatches by `?kind=`; providers needs the `ProviderCreate` schema class in context). Inline-child appends on create (providers' credential rows) come from the generic `handle_create` walking `spec.children`.
 
-`detail_extras=` / `detail_extra_repos=` and `list_extras=` / `list_extra_repos=` flow through to `make_detail_handler` / `make_list_handler` when auto-binding the respective handlers. They live on the `mount_entity` call site (route file) rather than on the spec because `provider_detail_extras` / `post_list_extras` themselves import their `<ENTITY>_ENTITY` — placing them on the spec would close the cycle. Validators raise at mount time if extras are set without the matching `routes.<verb>=True`, alongside an explicit `handlers[<verb>]`, or extras-repos without an extras-callable consumer.
+Per-viewer / per-list extras live on `EntitySpec` as `detail_extras_path` / `list_extras_path` — dotted import paths to the extras callable, resolved lazily at mount time via `importlib.import_module` + `getattr` (same machinery `StateAxis.handler_path` uses). The late-binding sidesteps the import cycle that previously forced the extras callables to live on the `mount_entity` call site: the logic module is only imported when `mount_entity` runs, which is after both the spec module and the logic module have finished initializing. Typed repo kwargs the extras callable receives are declared on the spec as `detail_extras_repos` / `list_extras_repos` (real classes — repositories live below specs in the import order, so the type-class import is cycle-safe). Spec construction validates the pairings: extras_path requires the matching `routes.<verb>=True`, extras_repos requires extras_path. `mount_entity` additionally rejects `detail_extras_path` alongside an explicit `handlers["detail"]` (the explicit handler would silently win).
 
 The handlers dict is validated at mount time: every opted-in flag / state axis / subresource must have a matching key (explicit or auto-bound for standard CRUD verbs), and any extra keys raise (typo detection). Missing entries fail loudly at app startup.
 
@@ -265,25 +265,22 @@ And matching `make_<verb>_handler(spec)` factory functions (`make_create_handler
 
 ```python
 # in src/api/routes/providers.py
-from src.logic.providers.provider_processing import (
-    handle_get_provider_form,
-    provider_detail_extras,
-)
-from src.repositories.favorites.user_favorite_repository import UserFavoriteRepository
+from src.logic.providers.provider_processing import handle_get_provider_form
 
 # list / detail / create / update / delete / form_edit auto-bind via
 # make_<verb>_handler(PROVIDER_ENTITY). Only form_new stays explicit
 # (the create-form template needs the ProviderCreate schema class in
-# its context). Owned credential subentities self-register on
-# PROVIDER_ENTITY.children and auto-bind their own CRUD.
+# its context). Per-viewer detail extras (`provider_detail_extras`)
+# and the typed repo it needs (`user_favorite_repo: UserFavoriteRepository`)
+# live on PROVIDER_ENTITY's `detail_extras_path` / `detail_extras_repos`
+# fields — resolved lazily at mount time. Owned credential subentities
+# self-register on PROVIDER_ENTITY.children and auto-bind their own CRUD.
 mount_entity(
     router,
     PROVIDER_ENTITY,
     handlers={
         "form_new": handle_get_provider_form,
     },
-    detail_extras=provider_detail_extras,           # supplies `is_favorited` per (viewer, provider) pair
-    detail_extra_repos=(("user_favorite_repo", UserFavoriteRepository),),
     owned_subentities=(LICENSURE_ENTITY, EDUCATION_ENTITY, CERTIFICATION_ENTITY),
 )
 ```

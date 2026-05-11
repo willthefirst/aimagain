@@ -1040,18 +1040,15 @@ def mount_entity(
     *,
     handlers: dict[str, Callable[..., Awaitable[Any]]],
     owned_subentities: tuple[Any, ...] = (),
-    detail_extras: Callable[..., Awaitable[dict[str, Any]]] | None = None,
-    detail_extra_repos: tuple[tuple[str, type], ...] = (),
-    list_extras: Callable[..., Awaitable[dict[str, Any]]] | None = None,
-    list_extra_repos: tuple[tuple[str, type], ...] = (),
 ) -> None:
     """Spec-driven dispatcher for an entity's full route surface.
 
     Reads `entity.routes`, `entity.state_axes`, `entity.subresources`,
-    `entity.templates`, `entity.filters`, `entity.discriminator`, and
-    `entity.singleton_alias` and calls the appropriate underlying
-    `mount_*` helpers. The existing helpers stay unchanged; this is
-    dispatch glue.
+    `entity.templates`, `entity.filters`, `entity.discriminator`,
+    `entity.singleton_alias`, and the `entity.detail_extras_path` /
+    `entity.list_extras_path` extras bindings, and calls the appropriate
+    underlying `mount_*` helpers. The existing helpers stay unchanged;
+    this is dispatch glue.
 
     `handlers` maps a verb-or-name to a callable:
 
@@ -1078,11 +1075,16 @@ def mount_entity(
     monkey-patches at ``<routes module>._handle_<verb>_<entity>``)
     flow through. The target module is auto-detected from the
     `mount_entity` caller's frame — route files don't pass `module=`.
-    Detail handlers that need entity-specific per-viewer state pass
-    `detail_extras=` + `detail_extra_repos=` directly (they can't
-    live on the spec without an import cycle — handlers in
-    `src/logic/<entity>/` import the spec, so the spec can't import
-    them back).
+
+    Per-viewer / per-list extras (e.g. provider's `is_favorited` flag,
+    posts' `post_kinds` list) live on the spec as `detail_extras_path`
+    / `list_extras_path` — dotted-string imports resolved lazily at
+    mount time (same machinery `StateAxis.handler_path` uses). The
+    `detail_extras_repos` / `list_extras_repos` fields declare typed
+    repo kwargs the extras callable receives. The pair lives on the
+    spec because the late-binding sidesteps the import cycle (handlers
+    in `src/logic/<entity>/` import the spec, so the spec can't
+    statically import them back).
 
     Validates loudly at mount time:
       - Every opted-in route / state-axis / subresource must have a
@@ -1092,50 +1094,43 @@ def mount_entity(
       - Extra handler keys not consumed by any spec entry raise
         `ValueError` — catches typos and stale handler bindings the
         spec used to declare.
-      - `detail_extras` / `detail_extra_repos` set when `routes.detail`
-        is False, or when `"detail"` is in `handlers` (explicit
-        handler would silently win): raises at mount time.
+      - Declaring `detail_extras_path` alongside an explicit
+        `handlers["detail"]` (explicit handler would silently win):
+        raises at mount time. (Routes-opt-in and repos-without-path
+        checks happen at spec construction.)
       - `owned_subentities[i].parent` must equal `entity` (catches a
         passed-in spec from the wrong family).
     """
     spec = entity.to_resource_spec()
 
-    # Validate detail_extras configuration ------------------------------
-    if (detail_extras is not None or detail_extra_repos) and not entity.routes.detail:
+    # The path/handler pairing is the only check that can't live in
+    # `EntitySpec.__post_init__` — `handlers` arrive at the mount call,
+    # not at spec construction.
+    if entity.detail_extras_path is not None and "detail" in handlers:
         raise ValueError(
-            f"mount_entity({entity.name!r}): detail_extras/detail_extra_repos "
-            "given but routes.detail is False — the extras would never run."
+            f"mount_entity({entity.name!r}): spec declares "
+            "detail_extras_path alongside an explicit "
+            "handlers['detail'] — pick one. Extras are for the "
+            "factory-built path; an explicit handler owns its own."
         )
-    if detail_extra_repos and detail_extras is None:
+    if entity.list_extras_path is not None and "list" in handlers:
         raise ValueError(
-            f"mount_entity({entity.name!r}): detail_extra_repos set but "
-            "detail_extras is None — the typed-repo kwargs would have no "
-            "consumer."
+            f"mount_entity({entity.name!r}): spec declares "
+            "list_extras_path alongside an explicit handlers['list'] "
+            "— pick one. Extras are for the factory-built path; an "
+            "explicit handler owns its own."
         )
-    if detail_extras is not None and "detail" in handlers:
-        raise ValueError(
-            f"mount_entity({entity.name!r}): both detail_extras and an "
-            "explicit handlers['detail'] supplied — pick one. Extras are "
-            "for the factory-built path; an explicit handler owns its own."
-        )
-    # Validate list_extras configuration — same shape as detail_extras.
-    if (list_extras is not None or list_extra_repos) and not entity.routes.list:
-        raise ValueError(
-            f"mount_entity({entity.name!r}): list_extras/list_extra_repos "
-            "given but routes.list is False — the extras would never run."
-        )
-    if list_extra_repos and list_extras is None:
-        raise ValueError(
-            f"mount_entity({entity.name!r}): list_extra_repos set but "
-            "list_extras is None — the typed-repo kwargs would have no "
-            "consumer."
-        )
-    if list_extras is not None and "list" in handlers:
-        raise ValueError(
-            f"mount_entity({entity.name!r}): both list_extras and an "
-            "explicit handlers['list'] supplied — pick one. Extras are "
-            "for the factory-built path; an explicit handler owns its own."
-        )
+
+    detail_extras = (
+        _resolve_dotted_path(entity, entity.detail_extras_path, "detail_extras_path")
+        if entity.detail_extras_path is not None
+        else None
+    )
+    list_extras = (
+        _resolve_dotted_path(entity, entity.list_extras_path, "list_extras_path")
+        if entity.list_extras_path is not None
+        else None
+    )
 
     # Auto-bind top-level CRUD verbs --------------------------------------
     # Same factory-fallback shape as the owned-subentity branch below: any
@@ -1162,10 +1157,16 @@ def mount_entity(
             maker = factory_makers[verb]
             if verb == "detail":
                 built = maker(
-                    entity, extras=detail_extras, extra_repos=detail_extra_repos
+                    entity,
+                    extras=detail_extras,
+                    extra_repos=entity.detail_extras_repos,
                 )
             elif verb == "list":
-                built = maker(entity, extras=list_extras, extra_repos=list_extra_repos)
+                built = maker(
+                    entity,
+                    extras=list_extras,
+                    extra_repos=entity.list_extras_repos,
+                )
             else:
                 built = maker(entity)
             built.__module__ = module
@@ -1402,36 +1403,54 @@ def _resolve_spec_bound_handler(
     if key in effective_handlers:
         return effective_handlers[key]
     if handler_path is not None:
-        import importlib
-
-        module_path, _, attr = handler_path.rpartition(".")
-        if not module_path:
-            raise ValueError(
-                f"mount_entity({entity.name!r}): handler_path "
-                f"{handler_path!r} for {key!r} is not a dotted path "
-                "(expected `pkg.module.attr`)."
-            )
-        try:
-            module = importlib.import_module(module_path)
-        except ImportError as exc:
-            raise ImportError(
-                f"mount_entity({entity.name!r}): could not import "
-                f"{module_path!r} to resolve handler_path "
-                f"{handler_path!r} for {key!r}: {exc}"
-            ) from exc
-        try:
-            return getattr(module, attr)
-        except AttributeError as exc:
-            raise AttributeError(
-                f"mount_entity({entity.name!r}): module "
-                f"{module_path!r} has no attribute {attr!r} "
-                f"(handler_path {handler_path!r} for {key!r})."
-            ) from exc
+        return _resolve_dotted_path(entity, handler_path, key)
     raise KeyError(
         f"mount_entity({entity.name!r}): no handler for {key!r} — "
         f"supply it in `handlers={{{key!r}: ...}}` or set "
         "`handler_path=` on the spec entry."
     )
+
+
+def _resolve_dotted_path(entity: Any, dotted_path: str, field_label: str) -> Any:
+    """Import `pkg.module.attr` lazily and return the attribute.
+
+    Used by `_resolve_spec_bound_handler` (state-axis / subresource
+    handler bindings) and by the extras-path resolution in
+    `mount_entity`. The shared helper sidesteps the import cycle the
+    spec-driven late-binding pattern was built to avoid:
+    `api.common.specs.<entity>` declares the dotted path as a string,
+    and `src.logic.<entity>` (the module that *contains* the attribute)
+    is only imported at mount time — long after both modules have
+    finished initializing.
+
+    `field_label` is what gets named in errors (e.g. `"activation"` for
+    a state-axis handler, `"detail_extras_path"` for the spec field).
+    """
+    import importlib
+
+    module_path, _, attr = dotted_path.rpartition(".")
+    if not module_path:
+        raise ValueError(
+            f"mount_entity({entity.name!r}): {field_label} "
+            f"{dotted_path!r} is not a dotted path "
+            "(expected `pkg.module.attr`)."
+        )
+    try:
+        module = importlib.import_module(module_path)
+    except ImportError as exc:
+        raise ImportError(
+            f"mount_entity({entity.name!r}): could not import "
+            f"{module_path!r} to resolve {field_label} "
+            f"{dotted_path!r}: {exc}"
+        ) from exc
+    try:
+        return getattr(module, attr)
+    except AttributeError as exc:
+        raise AttributeError(
+            f"mount_entity({entity.name!r}): module "
+            f"{module_path!r} has no attribute {attr!r} "
+            f"({field_label} {dotted_path!r})."
+        ) from exc
 
 
 def _resolve_handler(fn: Callable[..., Any]) -> Callable[..., Any]:

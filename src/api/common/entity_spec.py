@@ -326,6 +326,26 @@ class EntitySpec:
     # entities leave as None.
     singleton_alias: tuple[str, Callable[..., Any]] | None = None
 
+    # Detail / list extras (per-viewer / per-list customization) --------
+    # `detail_extras_path` and `list_extras_path` are dotted import paths
+    # (e.g. `"src.logic.users.user_processing.user_detail_extras"`) to the
+    # per-viewer extras callable consumed by `make_detail_handler` /
+    # `make_list_handler`. The path is resolved lazily via
+    # `importlib.import_module` + `getattr` at mount time, *after* both
+    # the spec module and the logic module have been imported — so the
+    # spec module never has to import from `src.logic.<entity>`, which
+    # would close the cycle (logic modules import from the spec). Same
+    # late-binding trick `StateAxis.handler_path` already uses.
+    #
+    # `detail_extras_repos` / `list_extras_repos` declare typed repo
+    # kwargs the extras callable receives. Repository classes live below
+    # specs in the import order, so the type-class import is cycle-safe
+    # and the field carries real classes (not strings).
+    detail_extras_path: str | None = None
+    detail_extras_repos: tuple[tuple[str, type], ...] = ()
+    list_extras_path: str | None = None
+    list_extras_repos: tuple[tuple[str, type], ...] = ()
+
     # Owned-subentity registry. Populated in __post_init__: when a spec
     # is constructed with `parent=<P>`, the child appends itself to
     # `P._children` (in-place mutation; the frozen dataclass guarantees
@@ -467,6 +487,33 @@ class EntitySpec:
         if self.auth_policy is not None:
             object.__setattr__(self, "write_authz", self.auth_policy.write_authz)
             object.__setattr__(self, "can_write", self.auth_policy.can_write)
+        # Validate extras bindings: a path requires an opted-in route
+        # (otherwise the extras would never run); typed-repo kwargs
+        # require a callable consumer (otherwise the kwargs are dead).
+        # Validation lives here (not in `mount_entity`) so the
+        # misconfiguration surfaces at spec-construction time.
+        if self.detail_extras_path is not None and not self.routes.detail:
+            raise ValueError(
+                f"EntitySpec({self.name!r}) declares detail_extras_path but "
+                "routes.detail is False — the extras would never run."
+            )
+        if self.detail_extras_repos and self.detail_extras_path is None:
+            raise ValueError(
+                f"EntitySpec({self.name!r}) declares detail_extras_repos but "
+                "no detail_extras_path — the typed-repo kwargs would have "
+                "no consumer."
+            )
+        if self.list_extras_path is not None and not self.routes.list:
+            raise ValueError(
+                f"EntitySpec({self.name!r}) declares list_extras_path but "
+                "routes.list is False — the extras would never run."
+            )
+        if self.list_extras_repos and self.list_extras_path is None:
+            raise ValueError(
+                f"EntitySpec({self.name!r}) declares list_extras_repos but "
+                "no list_extras_path — the typed-repo kwargs would have "
+                "no consumer."
+            )
         if self.read_schema is not None:
             schema = self.read_schema
             if isinstance(schema, TypeAdapter):

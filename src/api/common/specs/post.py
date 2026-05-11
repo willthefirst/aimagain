@@ -56,4 +56,5 @@ POST_ENTITY: Final[EntitySpec] = EntitySpec(
     ),
     update_redirect=Redirects.to_detail("posts", "post_id"),
     discriminator=POST_KINDS,
+    list_extras_path="src.logic.posts.post_processing.post_list_extras",
 )

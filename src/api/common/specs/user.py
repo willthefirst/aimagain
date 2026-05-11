@@ -30,6 +30,7 @@ from src.logic._authz import is_self_or_admin
 from src.logic.audit import AuditAction
 from src.models import User
 from src.repositories.dependencies import get_user_repository
+from src.repositories.providers.provider_repository import ProviderRepository
 from src.schemas.users.user import UserActivationUpdate, UserAuditSnapshot
 
 
@@ -75,4 +76,9 @@ USER_ENTITY: Final[EntitySpec] = EntitySpec(
     ),
     # `/users/me` — detail page id sourced from the session.
     singleton_alias=("me", current_active_user),
+    # Per-viewer detail extras live on the spec via the same late-bind
+    # dotted-path trick the state-axis / subresource handlers use —
+    # `specs/user.py` never statically imports `src.logic.users`.
+    detail_extras_path="src.logic.users.user_processing.user_detail_extras",
+    detail_extras_repos=(("provider_repo", ProviderRepository),),
 )

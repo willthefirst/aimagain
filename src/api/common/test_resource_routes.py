@@ -1112,6 +1112,17 @@ def _stub_axis_handler():
     return None
 
 
+async def _stub_detail_extras(**_kw):
+    """Module-level extras callable targeted via `detail_extras_path` in
+    `test_mount_entity_detail_extras_threaded_to_factory`. Real attribute
+    (not a lambda) so `importlib.import_module` + `getattr` can find it."""
+    return {}
+
+
+async def _stub_list_extras(**_kw):
+    return {}
+
+
 def _stub_audit() -> _AuditedResource:
     return _AuditedResource(
         type="thing",
@@ -1721,12 +1732,10 @@ def test_mount_entity_top_level_auto_bind_detects_caller_module():
 
 
 def test_mount_entity_detail_extras_threaded_to_factory():
-    """`detail_extras=` and `detail_extra_repos=` flow into
-    `make_detail_handler` so the built detail handler invokes the
-    entity-specific per-viewer callable (and the synthesis adds the
-    typed-repo kwargs to the signature)."""
-    sentinel_extras = lambda *a, **kw: {}  # noqa: E731
-
+    """`detail_extras_path` on the spec resolves via `importlib` at
+    mount time and threads into `make_detail_handler`; the synthesis
+    adds the typed-repo kwargs (from `detail_extras_repos`) to the
+    built handler's signature."""
     spec = _EntitySpec(
         name="widget",
         url_collection="widgets",
@@ -1735,23 +1744,17 @@ def test_mount_entity_detail_extras_threaded_to_factory():
         audit=_stub_audit(),
         routes=_RouteSet(detail=True),
         templates=_Templates(detail="w/detail.html"),
+        detail_extras_path=f"{__name__}._stub_detail_extras",
+        detail_extras_repos=(("user_favorite_repo", UserRepository),),
     )
 
     captured, restore = _capture_top_level_mounts()
     try:
-        mount_entity(
-            None,
-            spec,
-            handlers={},
-            detail_extras=sentinel_extras,
-            detail_extra_repos=(("user_favorite_repo", UserRepository),),
-        )
+        mount_entity(None, spec, handlers={})
     finally:
         restore()
 
     detail_handler = next(k["handler"] for n, k in captured if n == "mount_detail")
-    # `make_detail_handler` records extras via closure; check the
-    # synthesized signature carries the extra-repo param.
     import inspect
 
     params = inspect.signature(detail_handler).parameters
@@ -1759,9 +1762,9 @@ def test_mount_entity_detail_extras_threaded_to_factory():
 
 
 def test_mount_entity_detail_extras_with_explicit_handler_raises():
-    """`detail_extras=` is for the factory-built path; supplying it
-    alongside an explicit handler is ambiguous (the handler owns its
-    own extras) — surface at mount time."""
+    """`detail_extras_path` is for the factory-built path; declaring it
+    on the spec alongside an explicit `handlers["detail"]` is ambiguous
+    (the explicit handler would silently win) — surface at mount time."""
     spec = _EntitySpec(
         name="widget",
         url_collection="widgets",
@@ -1770,59 +1773,78 @@ def test_mount_entity_detail_extras_with_explicit_handler_raises():
         audit=_stub_audit(),
         routes=_RouteSet(detail=True),
         templates=_Templates(detail="w/detail.html"),
+        detail_extras_path=f"{__name__}._stub_detail_extras",
     )
 
     async def my_detail(**_kw):  # pragma: no cover
         return {}
 
-    with pytest.raises(ValueError, match="detail_extras"):
+    with pytest.raises(ValueError, match="detail_extras_path"):
         mount_entity(
             None,
             spec,
             handlers={"detail": my_detail},
-            detail_extras=lambda *a, **k: {},
         )
 
 
-def test_mount_entity_detail_extras_without_detail_route_raises():
-    """Declaring extras for a non-detailed entity is a typo / dead code
-    — extras would never run. Fail loudly at mount time."""
-    spec = _EntitySpec(
-        name="widget",
-        url_collection="widgets",
-        id_param="widget_id",
-        model=SimpleNamespace,
-        audit=_stub_audit(),
-        routes=_RouteSet(),  # detail off
-    )
+def test_spec_detail_extras_without_detail_route_raises():
+    """Declaring extras_path on a spec whose routes.detail is False is
+    dead config — the extras would never run. Surfaces at spec
+    construction time (loud and immediate)."""
     with pytest.raises(ValueError, match="routes.detail is False"):
-        mount_entity(
-            None,
-            spec,
-            handlers={},
-            detail_extras=lambda *a, **k: {},
+        _EntitySpec(
+            name="widget",
+            url_collection="widgets",
+            id_param="widget_id",
+            model=SimpleNamespace,
+            audit=_stub_audit(),
+            routes=_RouteSet(),  # detail off
+            detail_extras_path=f"{__name__}._stub_detail_extras",
         )
 
 
-def test_mount_entity_detail_extra_repos_without_extras_raises():
-    """`detail_extra_repos` without `detail_extras` is dead config — the
-    typed-repo kwargs would have no consumer. Catch at mount time."""
+def test_spec_detail_extras_repos_without_path_raises():
+    """`detail_extras_repos` without `detail_extras_path` is dead config
+    — the typed-repo kwargs would have no consumer. Surfaces at spec
+    construction time."""
+    with pytest.raises(ValueError, match="detail_extras_repos"):
+        _EntitySpec(
+            name="widget",
+            url_collection="widgets",
+            id_param="widget_id",
+            model=SimpleNamespace,
+            audit=_stub_audit(),
+            routes=_RouteSet(detail=True),
+            templates=_Templates(detail="w/detail.html"),
+            detail_extras_repos=(("x", UserRepository),),
+        )
+
+
+def test_spec_list_extras_path_threaded_to_factory():
+    """`list_extras_path` resolves via importlib and threads into
+    `make_list_handler`."""
+    from pydantic import TypeAdapter
+
     spec = _EntitySpec(
         name="widget",
         url_collection="widgets",
         id_param="widget_id",
         model=SimpleNamespace,
         audit=_stub_audit(),
-        routes=_RouteSet(detail=True),
-        templates=_Templates(detail="w/detail.html"),
+        routes=_RouteSet(list=True),
+        templates=_Templates(list="w/list.html"),
+        list_extras_path=f"{__name__}._stub_list_extras",
+        # `repo.list_widgets` would be called; no need to wire a stub,
+        # we just want to verify the auto-bind succeeds.
     )
-    with pytest.raises(ValueError, match="detail_extra_repos"):
-        mount_entity(
-            None,
-            spec,
-            handlers={},
-            detail_extra_repos=(("x", UserRepository),),
-        )
+    del TypeAdapter  # silence unused import linters
+    captured, restore = _capture_top_level_mounts()
+    try:
+        mount_entity(None, spec, handlers={})
+    finally:
+        restore()
+    list_handler = next(k["handler"] for n, k in captured if n == "mount_list")
+    assert list_handler.__name__ == "_handle_list_widget"
 
 
 def test_mount_delete_404_propagates_from_handler():
