@@ -423,6 +423,20 @@ class EntitySpec:
     list_extras_path: str | None = None
     list_extras_repos: tuple[tuple[str, type], ...] = ()
 
+    # Static context bindings -------------------------------------------
+    # Constant key→value pairs that `handle_detail` / `handle_list` merge
+    # into the template context after the framework's auto-injected keys
+    # and before the entity's extras callable runs. Use this for values
+    # that are computed once at spec-construction time (registry tuples,
+    # enum lists, feature flags) — anything dynamic stays on the extras
+    # callable. Posts uses this for `post_kinds` so its list page renders
+    # per-kind "New X" links without a dedicated extras callable.
+    #
+    # The dict is shared by reference, so values should be immutable
+    # (tuples / frozen lists / plain enums). Spec consumers read from
+    # `entity.static_context` but never mutate.
+    static_context: dict[str, Any] = field(default_factory=dict)
+
     # Owned-subentity registry. Populated in __post_init__: when a spec
     # is constructed with `parent=<P>`, the child appends itself to
     # `P._children` (in-place mutation; the frozen dataclass guarantees

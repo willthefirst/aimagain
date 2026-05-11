@@ -8,11 +8,11 @@ posts_api_router = router.router
 
 
 # Every standard verb (list, detail, create, update, delete, form_edit)
-# is factory-built. `list` auto-binds via `make_list_handler(POST_ENTITY)`
-# with `post_list_extras` (declared on the spec via `list_extras_path`)
-# adding the registered `post_kinds` to the context so the list page
-# can render its per-kind 'New X' links. `form_new` stays bespoke for
-# the `?kind=` template dispatch.
+# is factory-built. `list` auto-binds via `make_list_handler(POST_ENTITY)`;
+# the `post_kinds` tuple the list page reads for its per-kind 'New X'
+# links comes from `POST_ENTITY.static_context`, merged into the context
+# by the generic `handle_list`. `form_new` stays bespoke for the
+# `?kind=` template dispatch.
 mount_entity(
     router,
     POST_ENTITY,

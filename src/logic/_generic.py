@@ -601,6 +601,9 @@ async def handle_detail(
         the predicate evaluated against `(viewer, target)`.
       - `target_<name>` — when `spec.public_fields` is set, a
         `project_view` dict with private fields gated by the predicate.
+      - Entries from `spec.static_context` — spec-declared constants
+        (registry tuples, enum lists) merged before extras so the
+        callable can still override.
 
     `extras` is the entity's per-detail customization callable. It
     receives the loaded target plus `request`, `requesting_user`, and
@@ -660,6 +663,12 @@ async def handle_detail(
             private_field_predicate=spec.private_field_predicate,
         )
 
+    # Spec-declared constants — merged before extras so an extras
+    # callable can still override (last-write-wins, matching the
+    # framework's existing precedence rule).
+    if spec.static_context:
+        context.update(spec.static_context)
+
     if extras is not None:
         extras_kwargs = {
             "target": target,
@@ -717,7 +726,9 @@ async def handle_list(
     sets ``list_exclude_self=True``, the viewer is dropped from the
     result set by passing ``exclude_self=requesting_user`` to the repo
     method (the repo method must accept that kwarg; anonymous viewers
-    skip the filter and see the full list).
+    skip the filter and see the full list). Entries from
+    ``spec.static_context`` (constants like posts' ``post_kinds`` tuple)
+    merge into the context after the filter echo and before extras.
 
     ``extras`` is the per-entity post-fetch customization hook (matches
     ``handle_detail``'s ``extras`` shape). It receives ``items``,
@@ -748,6 +759,10 @@ async def handle_list(
     # value by reading ``selected_<name>`` from the context.
     for fname, fvalue in filter_values.items():
         context[f"selected_{fname}"] = fvalue
+
+    # Spec-declared constants — same merge precedence as handle_detail.
+    if spec.static_context:
+        context.update(spec.static_context)
 
     if extras is not None:
         extras_kwargs: dict[str, Any] = {

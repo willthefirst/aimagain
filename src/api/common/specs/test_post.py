@@ -64,11 +64,17 @@ def test_discriminator_names_match_registry():
     assert POST_ENTITY.discriminator.names == POST_KINDS.names
 
 
-# --- Extras binding ------------------------------------------------------
+# --- Static context ------------------------------------------------------
 
 
-def test_list_extras_path_points_at_post_list_extras():
-    assert (
-        POST_ENTITY.list_extras_path
-        == "src.logic.posts.post_processing.post_list_extras"
-    )
+def test_static_context_carries_post_kinds():
+    """The list page reads `post_kinds` from context to render the
+    per-kind 'New X' links. Sourcing it from the spec means a registry
+    edit doesn't require a code edit anywhere else."""
+    assert POST_ENTITY.static_context == {"post_kinds": list(POST_KINDS.values())}
+
+
+def test_list_extras_path_unset():
+    """Posts no longer needs a list_extras callable — `post_kinds` lives
+    on `static_context` and the framework merges it directly."""
+    assert POST_ENTITY.list_extras_path is None

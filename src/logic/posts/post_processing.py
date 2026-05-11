@@ -1,5 +1,4 @@
 import logging
-from typing import Any
 
 from fastapi import Request
 
@@ -22,13 +21,6 @@ PostUpdatePayload = ClientReferralUpdate | ProviderAvailabilityUpdate
 # Audit binding lives on the spec (single declaration). Re-exported as
 # `POST` so handler bodies can keep their `resource=POST` shape.
 POST = POST_ENTITY.audit
-
-
-async def post_list_extras(**_: Any) -> dict[str, Any]:
-    """Per-list extras for `make_list_handler(POST_ENTITY)`. Includes the
-    registered post kinds in the context so the list page can render its
-    per-kind 'New X' links from a single source of truth."""
-    return {"post_kinds": list(POST_KINDS.values())}
 
 
 async def handle_get_post_form(
