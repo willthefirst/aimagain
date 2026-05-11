@@ -242,7 +242,7 @@ Migrated route files compose the individual `mount_*` helpers through `mount_ent
 - `entity.read_user_dep` — `None` means public read; `mount_list` is called with `public=True`.
 - `owned_subentities` — a tuple of child `EntitySpec`s whose `parent` is `entity`. Each is mounted recursively via the same dispatcher; the handlers dict for an owned subentity is keyed `f"{owned.name}.{verb}"` (e.g. `"licensure.create"`). For verbs that match the standard CRUD-framework factories (`create`, `update`, `delete`, `detail`, `form_edit`), the explicit key is optional — `mount_entity` falls back to `make_<verb>_handler(owned)`, which is the common case for subentities whose mutations are entirely standard. Verbs without a default factory (`list`, `form_new`) still require an explicit entry; supplying any explicit key overrides the factory default.
 
-**Top-level standard verbs follow the same auto-bind path as owned subentities.** When a top-level entity opts into `list` / `detail` / `create` / `update` / `delete` / `form_edit` and the matching key is *absent* from `handlers`, `mount_entity` builds the handler from `make_<verb>_handler(entity)` and stitches it onto the route file's module as `_handle_<verb>_<entity>` (e.g. `_handle_update_provider`, `_handle_list_post`). That's the path contract-test monkey-patches at `src.api.routes.<entity>._handle_<verb>_<entity>` resolve through; setting `__module__` on the built handler lets the mount layer's `_resolve_handler` find the patched version via `getattr(sys.modules[__module__], __name__)`. The target module is auto-detected from the `mount_entity` caller's frame, so route files don't pass `module=`. Bespoke verbs (e.g. `handle_delete_user`'s self-guard, `handle_list_users`'s self-exclude) stay explicit in the handlers dict and override the factory default. The only verb that has no default factory is `form_new` — its template-selection knob is too entity-specific to auto-bind (posts dispatches by `?kind=`; providers needs the `ProviderCreate` schema class in context). Inline-child appends on create (providers' credential rows) come from the generic `handle_create` walking `spec.children`.
+**Top-level standard verbs follow the same auto-bind path as owned subentities.** When a top-level entity opts into `list` / `detail` / `create` / `update` / `delete` / `form_edit` and the matching key is *absent* from `handlers`, `mount_entity` builds the handler from `make_<verb>_handler(entity)` and stitches it onto the route file's module as `_handle_<verb>_<entity>` (e.g. `_handle_update_provider`, `_handle_list_post`). That's the path contract-test monkey-patches at `src.api.routes.<entity>._handle_<verb>_<entity>` resolve through; setting `__module__` on the built handler lets the mount layer's `_resolve_handler` find the patched version via `getattr(sys.modules[__module__], __name__)`. The target module is auto-detected from the `mount_entity` caller's frame, so route files don't pass `module=`. Bespoke verbs (e.g. `handle_delete_user`'s self-guard) stay explicit in the handlers dict and override the factory default. The only verb that has no default factory is `form_new` — its template-selection knob is too entity-specific to auto-bind (posts dispatches by `?kind=`; providers needs the `ProviderCreate` schema class in context). Inline-child appends on create (providers' credential rows) come from the generic `handle_create` walking `spec.children`.
 
 Per-viewer / per-list extras live on `EntitySpec` as `detail_extras_path` / `list_extras_path` — dotted import paths to the extras callable, resolved lazily at mount time via `importlib.import_module` + `getattr` (same machinery `StateAxis.handler_path` uses). The late-binding sidesteps the import cycle that previously forced the extras callables to live on the `mount_entity` call site: the logic module is only imported when `mount_entity` runs, which is after both the spec module and the logic module have finished initializing. Typed repo kwargs the extras callable receives are declared on the spec as `detail_extras_repos` / `list_extras_repos` (real classes — repositories live below specs in the import order, so the type-class import is cycle-safe). Spec construction validates the pairings: extras_path requires the matching `routes.<verb>=True`, extras_repos requires extras_path. `mount_entity` additionally rejects `detail_extras_path` alongside an explicit `handlers["detail"]` (the explicit handler would silently win).
 
@@ -257,8 +257,8 @@ For the standard CRUD verbs (create / update / delete) plus the detail and edit-
 - `handle_create(spec, *, payload, repo, audit_repo, requesting_user, parent_id=None)` — load (subentity case) / instantiate (standard case) / dispatch on `spec.discriminator` for polymorphic entities; persist; audit via `mutate(verb="create")`.
 - `handle_update(spec, *, target_id, payload, repo, audit_repo, requesting_user, parent_id=None)` — load → write_authz → polymorphic kind-invariant check → patch via `mutate(verb="update")`.
 - `handle_delete(spec, *, target_id, repo, audit_repo, requesting_user, parent_id=None)` — load → write_authz → audited delete via `mutate(verb="delete")`.
-- `handle_detail(spec, *, request, target_id, repo, requesting_user, extras=None, extra_kwargs=None)` — load → optional `can_edit` from `spec.can_write` → optional entity-specific extras callable for per-viewer / per-pair / related-collection state. The extras callable receives `target`, `request`, `requesting_user`, plus any `extra_kwargs`; its return dict merges into the context (last-write-wins, so extras can override the base `spec.name` binding — e.g. users binds under `target_user` for the projected view).
-- `handle_list(spec, *, request, repo, requesting_user, filter_values, extras=None, extra_kwargs=None)` — call `repo.list_<url_collection>(**filter_values)` by convention → base context binds items under `spec.url_collection` plus `selected_<filter>` echoes for the filter form → optional extras callable. Extras receives `items`, `request`, `requesting_user`, `filter_values`, plus any `extra_kwargs`.
+- `handle_detail(spec, *, request, target_id, repo, requesting_user, extras=None, extra_kwargs=None)` — load → optional `can_edit` from `spec.can_write` → auto-inject viewer-derived keys (`is_self`, `can_admin_actions`, plus `can_view_private` when `spec.private_field_predicate` is set and `target_<name>` projection when `spec.public_fields` is set) → optional entity-specific extras callable for per-viewer / per-pair / related-collection state. The extras callable receives `target`, `request`, `requesting_user`, plus any `extra_kwargs`; its return dict merges into the context (last-write-wins, so extras can override any framework-injected key). The auto-injection means an entity that just needs viewer flags + projection can leave `extras=None` entirely.
+- `handle_list(spec, *, request, repo, requesting_user, filter_values, extras=None, extra_kwargs=None)` — call `repo.list_<url_collection>(**filter_values)` by convention (threading `exclude_self=requesting_user` into the call when `spec.list_exclude_self=True`) → base context binds items under `spec.url_collection`, `can_admin_actions` from `is_admin(viewer)`, plus `selected_<filter>` echoes for the filter form → optional extras callable. Extras receives `items`, `request`, `requesting_user`, `filter_values`, plus any `extra_kwargs`.
 - `handle_get_edit_form(spec, *, request, target_id, repo, requesting_user)` — load → write_authz → context dict binding the entity under `spec.name`. For polymorphic entities, populates `template_name` from `spec.discriminator[kind].edit_template` so `mount_form`'s template-precedence renders the per-kind edit page.
 
 And matching `make_<verb>_handler(spec)` factory functions (`make_create_handler`, `make_update_handler`, `make_delete_handler`, `make_detail_handler`, `make_edit_form_handler`) that build callables with synthesized signatures so `mount_*` introspection (per #316) wires the right deps. `make_detail_handler` additionally accepts `extras=` (the pure-function hook) and `extra_repos=` (typed-repo params the synthesis adds to the signature so the registry resolves them). Route files don't call the factories directly today — `mount_entity` invokes them under the hood for any standard-CRUD verb the entity opts into without supplying an explicit handler (see [`mount_entity`](#mount_entity-dispatcher)). The built handlers are stitched onto the route module as `_handle_<verb>_<spec.name>` so contract tests can patch via the same path that worked before auto-binding landed:
@@ -288,8 +288,9 @@ mount_entity(
 **When to use factory vs. bespoke handler.** Use the factory when the verb does the standard load → auth → mutate → audit ritual. Write a bespoke handler when the entity has rules that don't fit:
 
 - `handle_delete_user` is bespoke because of the self-guard (admin can't delete self).
-- `handle_list_users` is bespoke because of the `exclude_user=requesting_user` filter (doesn't fit the "URL filter only" model).
 - `handle_add_favorite` / `handle_remove_favorite` are bespoke because they're M:N edge mutations, not CRUD.
+
+(`handle_list_users` *used to* be bespoke for its self-exclude filter; the framework now reads that off `spec.list_exclude_self` and threads `exclude_self=requesting_user` into the repo's list method, so the user-list path goes through the generic factory like every other entity.)
 
 Inline-child append on create (providers' credential rows on parent-create) is handled by the generic `handle_create` walking `spec.children` — no entity needs a bespoke create handler just for nested writes.
 
@@ -314,7 +315,8 @@ Per-entity instances at `src/api/common/specs/<entity>.py` carry:
 - **FastAPI deps** — `repo_dep`, `read_user_dep`, `write_user_dep`. `read_user_dep=None` declares a public read.
 - **Write authorization** — prefer `auth_policy=<AuthzPolicy>` over the hand-wired `write_authz` + `can_write` pair. `AuthzPolicy` carries the raising form (consumed by mutation handlers) and the predicate sibling (bound to detail-handler `can_edit` flags) as one declaration; the constructor expands the policy to populate both fields. The canonical sentinel `OWNER_OR_ADMIN` (defined in `entity_spec.py` alongside `AuthzPolicy`) pairs `assert_owner_or_admin` + `is_owner_or_admin` — used by provider, post, and the three credentials. The hand-wired form (`write_authz=` and/or `can_write=` directly) stays accepted for one-off rules but is mutually exclusive with `auth_policy`.
 - **Audit binding** — exactly one of: `audit_snapshot: type[BaseModel] | Callable` (+ optional `audit_action_stem`) for CRUD-shaped entities — the constructor calls `make_audited_resource(name, snapshot, action_stem=stem)` and stores the result on `audit`; or `edge_audit: EdgeAudit` for non-CRUD edges (favorites uses `edge_audit` with the `(add, remove)` verb map). Hand-built `audit=<AuditedResource>` is still accepted but mutually exclusive with `audit_snapshot`; specs should prefer the declarative form. Construction-time validation enforces all three exclusivity rules.
-- **Visibility** — `private_fields`, `private_field_predicate` (the projection rule from #304).
+- **Visibility** — `private_fields`, `private_field_predicate` (the projection rule from #304), plus `public_fields` (the always-visible shape on detail pages). When `public_fields` is set, `handle_detail` auto-binds `target_<name>` to a `project_view` dict gated by the predicate — entities no longer hand-roll the projection in their detail-extras callable.
+- **List-page viewer filtering** — `list_exclude_self: bool`. When True, `handle_list` threads `exclude_self=requesting_user` into the repo's list method so the viewer is dropped from the result set (anonymous viewers see the full list). Used by `user` (the user-list page is for *other* users).
 - **Route opt-ins** — `routes: RouteSet` flags: `list`, `detail`, `create`, `update`, `delete`, `form_new`, `form_edit`. Phase 1 reads these for documentation + spec-correctness tests; `mount_entity` (added in phase 2) consumes them at mount time.
 - **State axes** — `state_axes: tuple[StateAxis, ...]` (axis name, body schema, audit action, response projection).
 - **Related-list subresources** — `subresources: tuple[RelatedListSubresource, ...]` (child spec, template, optional `singleton_alias`).
@@ -327,30 +329,24 @@ Per-entity instances at `src/api/common/specs/<entity>.py` carry:
 ### How layers read from it
 
 ```python
-# Route file: a single mount_entity call consumes the spec.
+# Route file: a single mount_entity call consumes the spec. Standard CRUD
+# verbs auto-bind to the framework factories; only bespoke verbs (self-
+# guard on delete, state axes, related-list subresources) appear in
+# `handlers=`.
 mount_entity(
     router,
     USER_ENTITY,
-    handlers={
-        "list": handle_list_users,
-        "detail": handle_get_user_detail,
-        "delete": handle_delete_user,
-        "providers": handle_list_user_providers,
-        "activation": handle_set_user_activation,
-    },
+    handlers={"delete": handle_delete_user},
 )
 
 # Logic-layer handler: read audit + visibility primitives.
 async with mutate(repo, audit_repo, ..., resource=USER_ENTITY.audit, verb="delete"):
     await repo.delete(target)
 
-view = project_view(
-    target,
-    public_fields=("id", "username"),
-    actor=requesting_user,
-    private_fields=USER_ENTITY.private_fields,
-    private_field_predicate=USER_ENTITY.private_field_predicate,
-)
+# `target_user` projection is framework-injected by `handle_detail`
+# (see `public_fields` + `private_field_predicate` on USER_ENTITY).
+# Direct `project_view(...)` use survives where a handler needs an
+# ad-hoc shape; the spec-driven path is the default.
 
 # Polymorphic dispatch (posts): the discriminator is on the spec.
 spec = POST_ENTITY.discriminator[payload.kind]

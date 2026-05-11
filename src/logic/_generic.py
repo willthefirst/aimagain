@@ -26,6 +26,8 @@ from pydantic import BaseModel
 
 from src.api.common.entity_spec import EntitySpec
 from src.api.common.exceptions import BadRequestError, NotFoundError
+from src.api.common.projections import project_view
+from src.logic._authz import is_admin
 from src.logic.audit import mutate
 from src.models import User
 from src.repositories.audit_repository import AuditRepository
@@ -584,26 +586,39 @@ async def handle_detail(
     """Generic detail handler driven by `spec`.
 
     Performs: load target → 404 → compute `can_edit` from
-    `spec.can_write` (when set) → merge entity-specific extras via the
-    callable hook. The base context binds the entity under `spec.name`
-    (e.g. `"post"`, `"provider"`) so existing templates that read
-    `{{ post }}` / `{{ provider }}` keep working without per-entity
-    glue.
+    `spec.can_write` (when set) → inject viewer-derived flags +
+    `target_<name>` projection from spec metadata → merge
+    entity-specific extras via the callable hook. The base context binds
+    the entity under `spec.name` (e.g. `"post"`, `"provider"`) so
+    existing templates that read `{{ post }}` / `{{ provider }}` keep
+    working without per-entity glue.
+
+    Viewer-derived keys, always injected before extras run:
+      - `is_self` — viewer is the subject (`target.<owner_attr or 'id'>
+        == requesting_user.id`).
+      - `can_admin_actions` — `is_admin(viewer) and not is_self`.
+      - `can_view_private` — when `spec.private_field_predicate` is set,
+        the predicate evaluated against `(viewer, target)`.
+      - `target_<name>` — when `spec.public_fields` is set, a
+        `project_view` dict with private fields gated by the predicate.
 
     `extras` is the entity's per-detail customization callable. It
     receives the loaded target plus `request`, `requesting_user`, and
     any keyword args in `extra_kwargs` (the route layer passes typed
     repos this way — e.g. `user_favorite_repo` for provider detail).
     The dict it returns is merged into the base context with
-    last-write-wins semantics; entities can override the base
-    `spec.name` binding (e.g. users binds under `target_user` for the
-    projected view).
+    last-write-wins semantics; entities can override any framework-
+    injected key.
 
     Reads from the spec:
       - `spec.model` — class fetched via `repo.get_by_model_id`.
       - `spec.can_write` — when set, populates `can_edit` in context.
         Always accepts `User | None`; entities whose detail page is
         public (`read_user_dep=None`) pass `requesting_user=None`.
+      - `spec.owner_attr` — drives the `is_self` comparison.
+      - `spec.private_field_predicate` — drives `can_view_private` and
+        gates the `target_<name>` projection.
+      - `spec.public_fields` — declares the projection shape.
     """
     target = await repo.get_by_model_id(spec.model, target_id)
     if target is None:
@@ -616,6 +631,34 @@ async def handle_detail(
     }
     if spec.can_write is not None:
         context["can_edit"] = spec.can_write(target, requesting_user)
+
+    # Viewer-derived flags. `subject_attr` is the attribute on `target`
+    # whose value equals `requesting_user.id` when the viewer IS the
+    # subject — for `owner_attr=None` (users — the row IS the user), the
+    # rule reduces to `target.id == viewer.id`; for owned resources
+    # (provider, post), it uses the owner FK. The uniform rule lets every
+    # entity inherit `is_self` / `can_admin_actions` without per-entity glue.
+    subject_attr = spec.owner_attr or "id"
+    is_self = (
+        requesting_user is not None
+        and getattr(target, subject_attr) == requesting_user.id
+    )
+    context["is_self"] = is_self
+    context["can_admin_actions"] = is_admin(requesting_user) and not is_self
+
+    if spec.private_field_predicate is not None:
+        context["can_view_private"] = bool(
+            spec.private_field_predicate(requesting_user, target)
+        )
+
+    if spec.public_fields:
+        context[f"target_{spec.name}"] = project_view(
+            target,
+            public_fields=spec.public_fields,
+            actor=requesting_user,
+            private_fields=spec.private_fields,
+            private_field_predicate=spec.private_field_predicate,
+        )
 
     if extras is not None:
         extras_kwargs = {
@@ -668,24 +711,38 @@ async def handle_list(
     and a ``selected_<name>`` echo for each filter value so the filter
     form can preselect the active selection.
 
+    ``can_admin_actions`` is auto-injected from
+    ``is_admin(requesting_user)`` — list-level templates that show
+    admin-only actions read it without per-entity glue. When the spec
+    sets ``list_exclude_self=True``, the viewer is dropped from the
+    result set by passing ``exclude_self=requesting_user`` to the repo
+    method (the repo method must accept that kwarg; anonymous viewers
+    skip the filter and see the full list).
+
     ``extras`` is the per-entity post-fetch customization hook (matches
     ``handle_detail``'s ``extras`` shape). It receives ``items``,
     ``request``, ``requesting_user``, ``filter_values``, plus any
     ``extra_kwargs``. Its returned dict merges into the context with
-    last-write-wins semantics; entities can override the base bindings
-    (no current entity does).
+    last-write-wins semantics; entities can override any framework-
+    injected key.
 
     Reads from the spec:
       - ``spec.url_collection`` — picks the repo method name and the
         context key for the items list.
+      - ``spec.list_exclude_self`` — when True, drops the viewer from
+        the result set via the repo method's ``exclude_self`` kwarg.
     """
     list_method = getattr(repo, f"list_{spec.url_collection}")
-    items = await list_method(**filter_values)
+    list_kwargs: dict[str, Any] = dict(filter_values)
+    if spec.list_exclude_self and requesting_user is not None:
+        list_kwargs["exclude_self"] = requesting_user
+    items = await list_method(**list_kwargs)
 
     context: dict[str, Any] = {
         "request": request,
         spec.url_collection: items,
         "current_user": requesting_user,
+        "can_admin_actions": is_admin(requesting_user),
     }
     # Filter echo — the list page's filter form preselects the active
     # value by reading ``selected_<name>`` from the context.

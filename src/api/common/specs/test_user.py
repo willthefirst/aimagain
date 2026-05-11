@@ -38,6 +38,23 @@ def test_private_field_predicate_is_self_or_admin():
     assert USER_ENTITY.private_field_predicate is is_self_or_admin
 
 
+def test_public_fields_drive_detail_projection():
+    """`handle_detail` projects `target_user` from these fields, gated
+    by `private_field_predicate`. Changing this tuple changes what
+    unprivileged viewers see on the user detail page."""
+    assert USER_ENTITY.public_fields == ("id", "username")
+
+
+# --- List filtering ------------------------------------------------------
+
+
+def test_list_excludes_self():
+    """`/users` drops the viewer from the result set — the user-list
+    page is for *other* users. Threaded via the repo's `exclude_self`
+    kwarg by the generic `handle_list`."""
+    assert USER_ENTITY.list_exclude_self is True
+
+
 # --- Owner-attr semantics (user-specific) --------------------------------
 
 

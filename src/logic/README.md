@@ -23,7 +23,7 @@ async def handle_list_users(
     requesting_user: User,
 ) -> dict:
     """Orchestrate user listing."""
-    users_list = await repo.list_users(exclude_user=requesting_user)
+    users_list = await repo.list_users(exclude_self=requesting_user)
     return {"users": users_list, "current_user": requesting_user}
 ```
 
@@ -52,7 +52,7 @@ async def handle_list_users(
     requesting_user: User,
 ):
     """Orchestrate user listing with filtering logic"""
-    users_list = await repo.list_users(exclude_user=requesting_user)
+    users_list = await repo.list_users(exclude_self=requesting_user)
     return {"users": users_list, "current_user": requesting_user}
 ```
 
@@ -157,14 +157,18 @@ async def handle_some_operation(
 For the standard CRUD verbs (create / update / delete), the default is to bind a factory-built handler from `_generic.py` (see [`api/common/README.md`](../api/common/README.md#generic-crud-handler-factories) for the route-file wiring). Write a bespoke handler in the entity's cluster only when the verb has rules that don't fit the standard ritual:
 
 - `handle_delete_user` is bespoke because of the self-guard ("admins can't delete their own account here").
-- `handle_list_users` is bespoke because the `exclude_user=requesting_user` filter doesn't fit the framework's "URL filter only" model.
 - `handle_add_favorite` / `handle_remove_favorite` are bespoke because they're M:N edge mutations with idempotent semantics + non-CRUD audit (`edge_audit` instead of `audit`).
 
 Nested-write creates (providers' inline credential rows) are handled by the generic `handle_create` walking `spec.children` — no entity needs a bespoke create handler just for that shape.
 
 Bespoke handlers still use the shared primitives — `mutate(...)` for CRUD-shaped mutations, `record_audit(...)` for non-CRUD audits, `assert_owner_or_admin` for the owner check, the spec's `audit` / `edge_audit` / `private_fields` declarations. They just orchestrate the entity-specific steps the framework can't subsume.
 
-Read handlers (`handle_list_*`, `handle_get_*_detail`, `handle_get_*_form`) stay bespoke today — each has enough per-page variation (cross-entity loads, per-viewer derived fields, filter forwarding, kind-based template selection) that generalization would add more spec axes than it would collapse.
+Read handlers go through the generic `handle_detail` / `handle_list` factories; entity-specific work — fetching related rows, computing per-page flags the framework doesn't derive — lives in a small `<entity>_detail_extras` / `<entity>_list_extras` callable bound via the spec's `*_extras_path`. The framework already injects:
+
+- **Detail**: `is_self` (viewer is the subject — comparison uses `spec.owner_attr or "id"`), `can_admin_actions` (`is_admin(viewer) and not is_self`), `can_view_private` (from `spec.private_field_predicate`), and `target_<name>` (a `project_view` dict gated by the predicate, present when `spec.public_fields` is set).
+- **List**: `can_admin_actions` (`is_admin(viewer)`). When `spec.list_exclude_self=True`, the viewer is dropped from results via the repo method's `exclude_self` kwarg (anonymous viewers see the full list).
+
+Extras callables therefore shrink to **only** the entity-specific fetches (e.g. `user_detail_extras` returns the providers the target owns; `provider_detail_extras` returns the `is_favorited` pair flag). Form handlers (`handle_get_*_form`) stay bespoke — kind-based template selection is too per-entity to generalize today.
 
 ### Error handling pattern
 
@@ -234,7 +238,7 @@ async def handle_get_users(request: Request) -> JSONResponse:
 
 # Good - return data for route to handle
 async def handle_get_users(repo: UserRepository, requesting_user: User):
-    users = await repo.list_users(exclude_user=requesting_user)
+    users = await repo.list_users(exclude_self=requesting_user)
     return {"users": users, "current_user": requesting_user}
 ```
 

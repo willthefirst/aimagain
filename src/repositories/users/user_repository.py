@@ -32,13 +32,17 @@ class UserRepository(BaseRepository):
     async def list_users(
         self,
         *,
-        exclude_user: User | None = None,
+        exclude_self: User | None = None,
     ) -> Sequence[User]:
-        """Lists users, optionally excluding a user."""
+        """Lists users, optionally excluding the requesting viewer.
+
+        The kwarg name `exclude_self` is the convention `handle_list`
+        passes for entities opting into `spec.list_exclude_self=True`.
+        """
         stmt = select(User)
 
-        if exclude_user:
-            stmt = stmt.filter(User.id != exclude_user.id)
+        if exclude_self:
+            stmt = stmt.filter(User.id != exclude_self.id)
 
         stmt = stmt.order_by(User.username)
         return await self._list(stmt)

@@ -30,27 +30,20 @@ For the standard CRUD verbs (create / update / delete), the route file binds han
 from src.api.common import make_entity_router
 from src.api.common.resource_routes import mount_entity
 from src.api.common.specs.user import USER_ENTITY
-from src.logic.providers.provider_processing import handle_list_user_providers
-from src.logic.users.user_processing import (
-    handle_delete_user,             # bespoke (self-guard)
-    handle_get_user_detail,
-    handle_list_users,
-    handle_set_user_activation,
-)
+from src.logic.users.user_processing import handle_delete_user
 
 router = make_entity_router(USER_ENTITY)
 users_api_router = router.router  # re-exported for `main.py`
 
+# Standard CRUD verbs (list/detail/delete) auto-bind to the framework
+# factories; state-axis (`activation`) and related-list (`providers`)
+# handlers are resolved at mount time via the spec's `handler_path`
+# strings. Only verbs whose orchestration falls outside the generic
+# ritual stay explicit — here, `delete` for its self-guard.
 mount_entity(
     router,
     USER_ENTITY,
-    handlers={
-        "list": handle_list_users,
-        "detail": handle_get_user_detail,
-        "delete": handle_delete_user,
-        "providers": handle_list_user_providers,        # related-list subresource
-        "activation": handle_set_user_activation,       # state-axis verb
-    },
+    handlers={"delete": handle_delete_user},
 )
 ```
 

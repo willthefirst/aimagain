@@ -127,7 +127,7 @@ async def handle_list_[entity](
     repo: [Entity]Repository,
     requesting_user: User,
 ):
-    items = await repo.list_[entity](exclude_user=requesting_user)
+    items = await repo.list_[entity](exclude_self=requesting_user)
     return {"items": items, "current_user": requesting_user}
 ```
 

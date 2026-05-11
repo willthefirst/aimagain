@@ -58,6 +58,8 @@ USER_ENTITY: Final[EntitySpec] = EntitySpec(
     audit_snapshot=UserAuditSnapshot,
     private_fields=("email", "is_active", "is_verified"),
     private_field_predicate=is_self_or_admin,
+    public_fields=("id", "username"),
+    list_exclude_self=True,
     routes=RouteSet(list=True, detail=True, delete=True),
     state_axes=(
         StateAxis(
