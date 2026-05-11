@@ -92,38 +92,41 @@ Common utilities handle concerns that span multiple routes and domains.
 
 ## Unified resource grammar
 
-`resource_routes.py` is the in-progress home for a unified `ResourceSpec` + opt-in `mount_*` grammar that covers every CRUD-shaped route. It's being built incrementally in 10 slices (see issues with the `refactor` label whose titles start with "Slice"); today only `mount_delete` is wired up and exercised by `users.py`.
+`resource_routes.py` is the home for the unified `ResourceSpec` + opt-in `mount_*` grammar that covers every CRUD-shaped route. Every mount helper (`mount_list`, `mount_detail`, `mount_create`, `mount_update`, `mount_delete`, `mount_form`, `mount_state_axis`, `mount_related_list`) is landed and in use. After the EntitySpec rollout (#317 phase 1 + #326–#332 phase 2), migrated route files compose them through the higher-level `mount_entity` dispatcher rather than calling each helper individually — see [`mount_entity`](#mount_entity-dispatcher) below.
 
 ### The shape
 
-A resource declares a single `ResourceSpec` describing its **identity** — collection name, id param, primary repo, audit bundle, auth deps, schemas, templates, redirect targets. The route file then **opts in** to the operations it wants to expose by calling the corresponding mount function:
+A resource declares its identity once as an `EntitySpec` in `src/api/common/specs/<entity>.py` (carries collection name, id param, primary repo, audit binding, auth deps, schemas, templates, redirect targets, route opt-ins, state axes, subresources, filters, discriminator binding, M:N relation). The route file derives a `ResourceSpec` from the entity spec via `.to_resource_spec()` and passes a handlers dict to `mount_entity`, which reads the spec's `routes` flags + `state_axes` + `subresources` and calls the right underlying `mount_*` helper for each:
 
 ```python
-# Migrated entities (users) — read the spec from api/common/specs/<entity>.py:
-from src.api.common.resource_routes import mount_delete
+from src.api.common.resource_routes import mount_entity
 from src.api.common.specs.user import USER_ENTITY
-from src.logic.users.user_processing import handle_delete_user
+from src.logic._generic import make_delete_handler
+from src.logic.providers.provider_processing import handle_list_user_providers
+from src.logic.users.user_processing import (
+    handle_delete_user,                # bespoke (self-guard)
+    handle_get_user_detail,
+    handle_list_users,
+    handle_set_user_activation,
+)
 
 users_api_router = APIRouter(prefix="/users")
 router = BaseRouter(router=users_api_router, default_tags=["users"])
 
-USER_SPEC = USER_ENTITY.to_resource_spec()
-mount_delete(router, USER_SPEC, handler=handle_delete_user)
-
-# Unmigrated entities (providers, posts, …) — declare ResourceSpec inline:
-from src.api.common.resource_routes import ResourceSpec, mount_delete
-from src.logic.providers.provider_processing import PROVIDER, handle_delete_provider
-
-PROVIDER_SPEC = ResourceSpec(
-    collection="providers",
-    id_param="provider_id",
-    repo_dep=get_provider_repository,
-    audit_resource=PROVIDER,              # AuditedResource bundle from logic
-    read_user_dep=current_active_user,
-    write_user_dep=current_active_user,
+mount_entity(
+    router,
+    USER_ENTITY,
+    handlers={
+        "list": handle_list_users,
+        "detail": handle_get_user_detail,
+        "delete": handle_delete_user,                 # bespoke handler
+        "providers": handle_list_user_providers,      # related-list subresource
+        "activation": handle_set_user_activation,     # state-axis verb
+    },
 )
-mount_delete(router, PROVIDER_SPEC, handler=handle_delete_provider)
 ```
+
+The underlying `mount_*` helpers stay available for entities whose URL shape doesn't fit `mount_entity`'s dispatch — favorites' M:N edge add/remove is the current example; its route file hand-rolls POST/DELETE without `mount_entity` because no edge mount helper exists.
 
 ### Why this shape
 
@@ -149,15 +152,16 @@ Forgetting to register a new repo type in `_REPO_TYPE_RESOLVERS` raises `MountEr
 
 ### What's mounted today
 
-| Mount | Status | Resources using it |
-| --- | --- | --- |
-| `mount_delete` | Landed (slice 3 / #248) | `users` (DELETE) |
-| `mount_list` / `mount_detail` | Landed (slice 4 / #249) | `users` (GET / and GET /{id}) |
-| `mount_form` | Landed (slice 5 / #250) | `providers` (GET /form, GET /{id}/form); `posts` (edit form via handler-returned template_name) |
-| `mount_create` / `mount_update` | Landed (slice 6 / #251) | `providers`, `posts`, `licensures`, `educations`, `certifications` |
-| `mount_related_list` | Landed (slice 9 / #254) | `users` (GET /{id}/providers) |
-| `mount_state_axis` | Landed (#302) | `users` (PUT /{id}/activation) |
-| Sub-resource via `parent=` | Landed (slice 8 / #253) | `licensures`, `educations`, `certifications` (under providers) |
+| Mount helper | Used by (post-`mount_entity`) |
+| --- | --- |
+| `mount_list` / `mount_detail` | every migrated entity (users, providers, posts) |
+| `mount_create` / `mount_update` | providers, posts, the three provider-owned credential subentities |
+| `mount_delete` | users (bespoke handler), providers, posts, credential subentities (factory-built handlers) |
+| `mount_form` | providers (new + edit), posts (new + edit; posts derive the `?kind=` Literal from `entity.discriminator.names`) |
+| `mount_related_list` | users (GET `/{id}/providers`) |
+| `mount_state_axis` | users (PUT `/{id}/activation`) |
+| Sub-resource via `parent=` on the spec | credential subentities (mounted via `mount_entity(..., owned_subentities=(...))`) |
+| Hand-rolled (no mount helper fits) | favorites' POST/DELETE on `/users/me/favorites/{provider_id}` — M:N edge add/remove |
 
 ### Multi-repo handlers
 
@@ -226,42 +230,108 @@ mount_related_list(
 
 The mount registers the alias path BEFORE the parametric one within the same router so FastAPI matches `/users/me` against the literal alias instead of trying to parse `me` as a UUID against `/users/{user_id}`.
 
+### `mount_entity` dispatcher
+
+Migrated route files compose the individual `mount_*` helpers through `mount_entity(router, entity, *, handlers, owned_subentities=())`. The dispatcher reads:
+
+- `entity.routes` (the `RouteSet` opt-in flags) — fires `mount_list` / `mount_detail` / `mount_create` / `mount_update` / `mount_delete` / `mount_form` (new and edit) for each `True` flag.
+- `entity.state_axes` — one `mount_state_axis` call per axis, threading `axis.body_schema`, `axis.action`, `axis.response_to_dict` from the spec.
+- `entity.subresources` — one `mount_related_list` call per `RelatedListSubresource` declaration.
+- `entity.filters` — passed as `query_params=` to `mount_list`.
+- `entity.discriminator` — if set, the form-new mount auto-derives `Literal[*entity.discriminator.names]` for the `?kind=` query param.
+- `entity.read_user_dep` — `None` means public read; `mount_list` is called with `public=True`.
+- `owned_subentities` — a tuple of child `EntitySpec`s whose `parent` is `entity`. Each is mounted recursively via the same dispatcher; the handlers dict for an owned subentity is keyed `f"{owned.name}.{verb}"` (e.g. `"licensure.create"`).
+
+The handlers dict is validated at mount time: every opted-in flag / state axis / subresource must have a matching key, and any extra keys raise (typo detection). Missing entries fail loudly at app startup.
+
+`mount_entity` is dispatch glue — it doesn't change behavior, it just composes the existing mount helpers from one declaration. The individual `mount_*` functions stay the right tool for entities whose URL shape doesn't fit the standard set (favorites' edge POST/DELETE).
+
+### Generic CRUD handler factories
+
+For the standard CRUD verbs (create / update / delete), the `src/logic/_generic.py` module provides:
+
+- `handle_create(spec, *, payload, repo, audit_repo, requesting_user, parent_id=None)` — load (subentity case) / instantiate (standard case) / dispatch on `spec.discriminator` for polymorphic entities; persist; audit via `mutate(verb="create")`.
+- `handle_update(spec, *, target_id, payload, repo, audit_repo, requesting_user, parent_id=None)` — load → write_authz → polymorphic kind-invariant check → patch via `mutate(verb="update")`.
+- `handle_delete(spec, *, target_id, repo, audit_repo, requesting_user, parent_id=None)` — load → write_authz → audited delete via `mutate(verb="delete")`.
+
+And matching `make_<verb>_handler(spec)` factory functions that build callables with synthesized signatures so `mount_*` introspection (per #316) wires the right deps. The route file binds each factory-built callable to a named module attribute (`_handle_<verb>_<spec.name>`) so contract tests can patch it:
+
+```python
+# in src/api/routes/providers.py
+from src.logic._generic import make_create_handler, make_delete_handler, make_update_handler
+
+_handle_create_provider = make_create_handler(PROVIDER_ENTITY)
+_handle_update_provider = make_update_handler(PROVIDER_ENTITY)
+_handle_delete_provider = make_delete_handler(PROVIDER_ENTITY)
+
+mount_entity(
+    router,
+    PROVIDER_ENTITY,
+    handlers={
+        ...
+        "create": handle_create_provider,           # bespoke (inline credentials append)
+        "update": _handle_update_provider,          # framework factory
+        "delete": _handle_delete_provider,          # framework factory
+        ...
+    },
+)
+```
+
+**When to use factory vs. bespoke handler.** Use the factory when the verb does the standard load → auth → mutate → audit ritual. Write a bespoke handler when the entity has rules that don't fit:
+
+- `handle_delete_user` is bespoke because of the self-guard (admin can't delete self).
+- `handle_create_provider` is bespoke because it appends initial credential sub-rows from the inline payload after the parent persists.
+- `handle_add_favorite` / `handle_remove_favorite` are bespoke because they're M:N edge mutations, not CRUD.
+
+Bespoke handlers still use `mutate(...)` for audit + commit; they just own the orchestration their entity needs.
+
+The framework code itself lives in `src/logic/_generic.py` — see [`src/logic/README.md`](../../logic/README.md) for its place in the logic layer's shared tier alongside `_authz.py` and `audit.py`. The public framework-facing methods on `BaseRepository` (`get_by_model_id`, `create`, `delete`, `patch`, `add_child`, `create_polymorphic`) are documented in [`src/repositories/README.md`](../../repositories/README.md).
+
 ### Per-mount references
 
 Per-mount docstrings in `resource_routes.py` are the canonical reference for required spec fields and exact handler kwargs.
 
 ## `EntitySpec`
 
-`entity_spec.py` defines `EntitySpec`, the **upstream declaration** of a domain entity. Where `ResourceSpec` (above) is what the mount helpers consume, `EntitySpec` is the single declaration the rest of the codebase reads from. Today (phase 1 of #317) only `users` uses this pattern; other entities still declare `ResourceSpec` inline in their route files and `AuditedResource` next to their handlers.
+`entity_spec.py` defines `EntitySpec`, the **upstream declaration** of a domain entity. Where `ResourceSpec` (above) is what the mount helpers consume, `EntitySpec` is the single declaration the rest of the codebase reads from. Phase 1 of #317 is complete — every entity in the codebase (`users`, `providers` + its three credential subentities, `posts`, `user_favorite`) is load-bearing on its spec.
 
 ### What it captures
 
 Per-entity instances at `src/api/common/specs/<entity>.py` carry:
 
 - **Identity** — `name`, `url_collection`, `id_param`, `model`, `owner_attr`.
-- **FastAPI deps** — `repo_dep`, `read_user_dep`, `write_user_dep`.
-- **Audit binding** — `audit: AuditedResource` (the same dataclass logic-layer mutations have always used).
+- **Ownership chain** — `parent: EntitySpec | None` for owned subentities (the three provider credential entities set `parent=PROVIDER_ENTITY`).
+- **FastAPI deps** — `repo_dep`, `read_user_dep`, `write_user_dep`. `read_user_dep=None` declares a public read.
+- **Audit binding** — exactly one of: `audit: AuditedResource` for CRUD-shaped entities, or `edge_audit: EdgeAudit` for non-CRUD edges (favorites uses `edge_audit` with the `(add, remove)` verb map). Mutually exclusive; construction-time validation enforces.
 - **Visibility** — `private_fields`, `private_field_predicate` (the projection rule from #304).
-- **Route opt-ins** — `routes: RouteSet` flags for which mounts the route file makes.
+- **Route opt-ins** — `routes: RouteSet` flags: `list`, `detail`, `create`, `update`, `delete`, `form_new`, `form_edit`. Phase 1 reads these for documentation + spec-correctness tests; `mount_entity` (added in phase 2) consumes them at mount time.
 - **State axes** — `state_axes: tuple[StateAxis, ...]` (axis name, body schema, audit action, response projection).
 - **Related-list subresources** — `subresources: tuple[RelatedListSubresource, ...]` (child spec, template, optional `singleton_alias`).
 - **Templates** — `templates: Templates` for the list and detail views.
+- **Body adapters + redirects** — `create_adapter`, `update_adapter`, `read_to_dict`, `create_redirect`, `update_redirect`, `delete_redirect`.
+- **List filters** — `filters: tuple[QueryParam, ...]` (providers declares `license_type` + `issuing_state`; the route layer threads them to `mount_list`).
+- **Polymorphism** — `discriminator: DiscriminatorRegistry[Any] | None`. Posts sets this to `POST_KINDS`; phase-2 generic `handle_create` / `handle_update` dispatches via the registry to find the per-kind detail model.
+- **M:N relationships** — `relation: M2NRelation | None`. Favorites declares the User → Provider join via `user_favorites`.
 
 ### How layers read from it
 
 ```python
-# Route file: derive a ResourceSpec for the mount helpers.
-USER_SPEC = USER_ENTITY.to_resource_spec()
-mount_list(router, USER_SPEC, handler=handle_list_users)
-
-axis = USER_ENTITY.state_axis("activation")
-mount_state_axis(router, USER_SPEC, handler=handle_set_user_activation,
-                 axis_name=axis.name, body_schema=axis.body_schema,
-                 response_to_dict=axis.response_to_dict)
+# Route file: a single mount_entity call consumes the spec.
+mount_entity(
+    router,
+    USER_ENTITY,
+    handlers={
+        "list": handle_list_users,
+        "detail": handle_get_user_detail,
+        "delete": handle_delete_user,
+        "providers": handle_list_user_providers,
+        "activation": handle_set_user_activation,
+    },
+)
 
 # Logic-layer handler: read audit + visibility primitives.
 async with mutate(repo, audit_repo, ..., resource=USER_ENTITY.audit, verb="delete"):
-    await repo.delete_user(target)
+    await repo.delete(target)
 
 view = project_view(
     target,
@@ -270,15 +340,21 @@ view = project_view(
     private_fields=USER_ENTITY.private_fields,
     private_field_predicate=USER_ENTITY.private_field_predicate,
 )
+
+# Polymorphic dispatch (posts): the discriminator is on the spec.
+spec = POST_ENTITY.discriminator[payload.kind]
+detail = spec.detail_model(...)
 ```
 
-### Phase-1 caveat: handler references are *not* on the spec
+### Spec is metadata-only; handlers stay at the call site
 
-`StateAxis.handler` and `RelatedListSubresource.handler` exist as fields but stay `None` in phase 1. Including a handler reference would mean `api.common.specs.<entity>` importing from `src.logic.<entity>`, which is the opposite of the usual layer direction and creates a circular import with handlers that themselves read from the spec. Phase 1 keeps the spec **metadata-only**; route files supply the handler in the matching `mount_*` call. Phase 2 will revisit when the cycle is broken structurally.
+`StateAxis.handler` and `RelatedListSubresource.handler` exist as fields but stay `None` by convention. Including a handler reference would mean `api.common.specs.<entity>` importing from `src.logic.<entity>`, which is the opposite of the usual layer direction and creates a circular import with handlers that themselves read from the spec. Route files supply the handler in the `mount_entity` handlers dict (or, equivalently, in the matching individual `mount_*` call for the rare entity that doesn't use `mount_entity`).
+
+This is a deliberate design call, not a phase-1 deferral. The framework-generic CRUD handlers (`handle_create` / `handle_update` / `handle_delete`) read the spec at call time, not at module-import time; they sidestep the cycle.
 
 ### Cross-entity references
 
-`RelatedListSubresource.child_spec` is a `ResourceSpec`, not an `EntitySpec`, so a migrated parent can reference an unmigrated child. The users spec points at `PROVIDER_SPEC` (declared inline in `api/routes/providers.py`); a future PR migrating providers will retarget this to `PROVIDER_ENTITY`.
+`M2NRelation.from_entity` and `to_entity` are `EntitySpec` instances; favorites references `USER_ENTITY` + `PROVIDER_ENTITY` directly. `RelatedListSubresource.child_spec` is a `ResourceSpec` (the bridge type the mount helpers consume); the users spec calls `PROVIDER_ENTITY.to_resource_spec()` to produce one.
 
 ### What's *not* meant for this grammar
 
