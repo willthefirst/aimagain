@@ -55,7 +55,6 @@ def _make_test_post(owner: User, *, description: str | None = None) -> Post:
 # --- Listing -------------------------------------------------------------
 
 
-# PHASE2_REDUNDANT: framework-shaped — mount_list empty state.
 async def test_list_posts_empty(
     authenticated_client: AsyncClient,
     logged_in_user: User,
@@ -133,7 +132,6 @@ async def test_list_posts_orders_newest_first(
 # --- Update (PATCH) ------------------------------------------------------
 
 
-# PHASE2_REDUNDANT: framework-shaped — write_authz binding on mount_update.
 async def test_non_owner_cannot_patch_post(
     authenticated_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],
@@ -159,7 +157,6 @@ async def test_non_owner_cannot_patch_post(
         assert refreshed.client_referral_detail.description == "orig"
 
 
-# PHASE2_REDUNDANT: framework-shaped — admin override on mount_update.
 async def test_admin_can_patch_anyone_post(
     authenticated_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],
