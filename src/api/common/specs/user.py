@@ -60,6 +60,7 @@ USER_ENTITY: Final[EntitySpec] = EntitySpec(
             body_schema=UserActivationUpdate,
             action=AuditAction.SET_USER_ACTIVATION,
             response_to_dict=_activation_response_to_dict,
+            handler_path=("src.logic.users.user_processing.handle_set_user_activation"),
         ),
     ),
     subresources=(
@@ -67,6 +68,9 @@ USER_ENTITY: Final[EntitySpec] = EntitySpec(
             child_spec=PROVIDER_ENTITY.to_resource_spec(),
             template="users/providers_list.html",
             singleton_alias=("me", current_active_user),
+            handler_path=(
+                "src.logic.providers.provider_processing.handle_list_user_providers"
+            ),
         ),
     ),
     # `/users/me` — detail page id sourced from the session.
