@@ -21,17 +21,17 @@ from uuid import UUID
 
 from fastapi import Request
 
+# Importing the credential spec modules registers their `parent=PROVIDER_ENTITY`
+# children on `PROVIDER_ENTITY.children` via the EntitySpec post-init
+# registry — referenced by `handle_create_provider`'s inline-credential loop.
+import src.api.common.specs.provider_certification  # noqa: F401
+import src.api.common.specs.provider_education  # noqa: F401
+import src.api.common.specs.provider_licensure  # noqa: F401
 from src.api.common.exceptions import ForbiddenError, NotFoundError
 from src.api.common.specs.provider import PROVIDER_ENTITY
-from src.api.common.specs.provider_certification import CERTIFICATION_ENTITY
-from src.api.common.specs.provider_education import EDUCATION_ENTITY
-from src.api.common.specs.provider_licensure import LICENSURE_ENTITY
 from src.logic.audit import mutate
 from src.models import (
     Provider,
-    ProviderCertification,
-    ProviderEducation,
-    ProviderLicensure,
     User,
 )
 from src.repositories.audit_repository import AuditRepository
@@ -45,31 +45,9 @@ from src.schemas.providers.provider import (
 logger = logging.getLogger(__name__)
 
 
-# --- Audited-resource bindings -------------------------------------------
-#
-# The four declarations themselves now live in
-# `src/api/common/specs/<entity>.py`; these module-level constants are
-# thin re-exports so handler bodies can keep their existing
-# `resource=PROVIDER` / `resource=LICENSURE` shape without churn. The
-# spec is the source of truth.
-
-
+# The audit binding lives on `PROVIDER_ENTITY.audit`; this re-export
+# keeps the handler body's `resource=PROVIDER` shape without churn.
 PROVIDER = PROVIDER_ENTITY.audit
-LICENSURE = LICENSURE_ENTITY.audit
-EDUCATION = EDUCATION_ENTITY.audit
-CERTIFICATION = CERTIFICATION_ENTITY.audit
-
-
-# Inline-credential kinds appended on provider create. Each tuple pairs
-# the Provider relationship name (also the `url_collection` on the
-# credential's spec) with the ORM model class. Driven by a single
-# `repo.add_child(...)` loop in `handle_create_provider` so adding a
-# fourth credential kind is one line here, not a fourth repo method.
-_INLINE_CREDENTIAL_KINDS: tuple[tuple[str, type], ...] = (
-    ("licensures", ProviderLicensure),
-    ("educations", ProviderEducation),
-    ("certifications", ProviderCertification),
-)
 
 
 # --- Provider handlers ----------------------------------------------------
@@ -165,14 +143,21 @@ async def handle_create_provider(
     sub-rows — the snapshot schema embeds the nested credential lists,
     so a single row captures the full create.
     """
-    provider_fields = payload.model_dump(
-        exclude={"licensures", "educations", "certifications"}
+    # Inline-credential kinds derive from the parent → children registry
+    # on `PROVIDER_ENTITY`: each owned-credential spec registers itself
+    # when its module is imported. Adding a fourth credential is now a
+    # single new spec file — no edit here.
+    inline_collections = tuple(
+        child.url_collection for child in PROVIDER_ENTITY.children
     )
+    provider_fields = payload.model_dump(exclude=set(inline_collections))
     created = await repo.create_provider(user_id=requesting_user.id, **provider_fields)
 
-    for collection, Model in _INLINE_CREDENTIAL_KINDS:
-        for item in getattr(payload, collection):
-            await repo.add_child(created, collection, Model(**item.model_dump()))
+    for child in PROVIDER_ENTITY.children:
+        for item in getattr(payload, child.url_collection):
+            await repo.add_child(
+                created, child.url_collection, child.model(**item.model_dump())
+            )
 
     async with mutate(
         repo,
