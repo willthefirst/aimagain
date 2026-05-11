@@ -5,11 +5,16 @@ A `Provider` is a long-lived directory entry owned by a `User`
 holds three credential lists —
 `ProviderLicensure`, `ProviderEducation`, `ProviderCertification` —
 each managed via its own endpoints in later issues. The wire surface
-mirrors that shape: each entity has Read / Create / Update /
-AuditSnapshot variants.
+mirrors that shape: each entity has Read / Create / Update variants.
 
-`ProviderRead` and `ProviderAuditSnapshot` embed the
-sub-entity Read / AuditSnapshot lists. `ProviderUpdate` does
+`AuditSnapshot` variants are byte-identical to `Read` for every provider
+schema — same fields, same `from_attributes`. Rather than declare two
+classes per entity, the `*AuditSnapshot` symbols are aliases to the
+`*Read` siblings. Audit-row JSON shape is unchanged. Posts and users
+genuinely diverge between Read and AuditSnapshot (id omitted from the
+audit row) and keep distinct classes — see those modules.
+
+`ProviderRead` embeds the sub-entity Read lists. `ProviderUpdate` does
 **not** include nested lists — sub-entities are PATCHed via their own
 routes (added later), so a provider-level PATCH only touches the
 practice/availability fields.
@@ -44,14 +49,11 @@ from src.schemas._validators import PartialUpdate, StrippedText, ZipText
 
 
 class _ProviderSubrowBase(BaseModel):
-    """Common fields for every provider sub-row Read and AuditSnapshot
-    schema (licensure / education / certification). Subclasses add
-    entity-specific fields.
+    """Common fields for every provider sub-row Read schema (licensure /
+    education / certification). Subclasses add entity-specific fields.
 
-    The two surfaces are structurally identical here (same FK column,
-    same timestamps, same `from_attributes` config), so they share one
-    base — unlike `_PostReadBase` / `_PostAuditSnapshotBase` in the post
-    cluster, which differ because Read carries a flattening validator.
+    The credential AuditSnapshot variants are aliases to the matching
+    Read class (see module docstring); both surfaces share this base.
     """
 
     id: uuid.UUID
@@ -88,11 +90,11 @@ class ProviderLicensureUpdate(PartialUpdate):
     expiration_date: date | None = None
 
 
-class ProviderLicensureAuditSnapshot(_ProviderSubrowBase):
-    license_type: str
-    license_number: str
-    issuing_state: str
-    expiration_date: date | None = None
+# The provider-credential AuditSnapshots are byte-identical to their
+# Read siblings — same base, same fields, same `from_attributes`. The
+# alias keeps the public symbol stable for spec imports while folding
+# the duplicated class into one declaration.
+ProviderLicensureAuditSnapshot = ProviderLicensureRead
 
 
 # --- ProviderEducation --------------------------------------------------
@@ -121,10 +123,7 @@ class ProviderEducationUpdate(PartialUpdate):
     month_completed: str | None = None
 
 
-class ProviderEducationAuditSnapshot(_ProviderSubrowBase):
-    education_type: str
-    institution: str
-    month_completed: str | None = None
+ProviderEducationAuditSnapshot = ProviderEducationRead
 
 
 # --- ProviderCertification ----------------------------------------------
@@ -150,10 +149,7 @@ class ProviderCertificationUpdate(PartialUpdate):
     expiration_date: date | None = None
 
 
-class ProviderCertificationAuditSnapshot(_ProviderSubrowBase):
-    certification_type: str
-    certifying_body: str
-    expiration_date: date | None = None
+ProviderCertificationAuditSnapshot = ProviderCertificationRead
 
 
 # --- Provider ----------------------------------------------------
@@ -214,19 +210,7 @@ class ProviderUpdate(PartialUpdate):
     virtual_sessions: Literal[*LOCATION_AVAILABILITY_OPTIONS] | None = None
 
 
-class ProviderAuditSnapshot(BaseModel):
-    id: uuid.UUID
-    owner_id: uuid.UUID
-    created_at: datetime
-    updated_at: datetime
-    practice_name: str
-    location_city: str
-    location_state: str
-    location_zip: str
-    in_person_sessions: str
-    virtual_sessions: str
-    licensures: list[ProviderLicensureAuditSnapshot] = []
-    educations: list[ProviderEducationAuditSnapshot] = []
-    certifications: list[ProviderCertificationAuditSnapshot] = []
-
-    model_config = ConfigDict(from_attributes=True)
+# Provider's AuditSnapshot is byte-identical to ProviderRead once the
+# credential AuditSnapshot aliases land — the nested list types collapse
+# to the same classes. Alias keeps the symbol stable for the spec import.
+ProviderAuditSnapshot = ProviderRead
