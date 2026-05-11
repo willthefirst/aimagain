@@ -10,6 +10,7 @@ from src.logic._authz import (
     assert_owner_or_admin,
     is_admin,
     is_owner,
+    is_owner_or_admin,
     is_self_or_admin,
 )
 
@@ -54,8 +55,8 @@ def test_is_owner_non_matching_id():
 
 
 def test_is_owner_admin_is_not_automatic_owner():
-    """`is_owner` checks ownership only; admin-override is the caller's
-    job to compose (`is_owner(...) or is_admin(...)`)."""
+    """`is_owner` checks ownership only; admin-override is the
+    `is_owner_or_admin` composition's job, not `is_owner`'s."""
     u = _user(is_superuser=True)
     obj = SimpleNamespace(owner_id=uuid.uuid4())
     assert is_owner(obj, u) is False
@@ -65,6 +66,38 @@ def test_is_owner_custom_owner_attr():
     u = _user()
     obj = SimpleNamespace(user_id=u.id)
     assert is_owner(obj, u, owner_attr="user_id") is True
+
+
+# --- is_owner_or_admin -----------------------------------------------------
+
+
+def test_is_owner_or_admin_none_user():
+    obj = SimpleNamespace(owner_id=uuid.uuid4())
+    assert is_owner_or_admin(obj, None) is False
+
+
+def test_is_owner_or_admin_owner_passes():
+    u = _user()
+    obj = SimpleNamespace(owner_id=u.id)
+    assert is_owner_or_admin(obj, u) is True
+
+
+def test_is_owner_or_admin_admin_passes_even_if_not_owner():
+    admin = _user(is_superuser=True)
+    obj = SimpleNamespace(owner_id=uuid.uuid4())
+    assert is_owner_or_admin(obj, admin) is True
+
+
+def test_is_owner_or_admin_stranger_fails():
+    u = _user()
+    obj = SimpleNamespace(owner_id=uuid.uuid4())
+    assert is_owner_or_admin(obj, u) is False
+
+
+def test_is_owner_or_admin_custom_owner_attr():
+    u = _user()
+    obj = SimpleNamespace(user_id=u.id)
+    assert is_owner_or_admin(obj, u, owner_attr="user_id") is True
 
 
 # --- is_self_or_admin ------------------------------------------------------

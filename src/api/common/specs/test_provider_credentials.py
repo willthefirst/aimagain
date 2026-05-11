@@ -14,7 +14,7 @@ from src.api.common.specs.provider import PROVIDER_ENTITY
 from src.api.common.specs.provider_certification import CERTIFICATION_ENTITY
 from src.api.common.specs.provider_education import EDUCATION_ENTITY
 from src.api.common.specs.provider_licensure import LICENSURE_ENTITY
-from src.logic._authz import assert_owner_or_admin
+from src.logic._authz import assert_owner_or_admin, is_owner_or_admin
 from src.logic.audit import AuditAction
 from src.models import ProviderCertification, ProviderEducation, ProviderLicensure
 from src.schemas.providers.provider import (
@@ -185,6 +185,25 @@ def test_write_authz_is_assert_owner_or_admin(
     update_adapter,
 ):
     assert entity.write_authz is assert_owner_or_admin
+
+
+@pytest.mark.parametrize(
+    "entity,name,url_collection,id_param,model,audit_actions,create_adapter,update_adapter",
+    CREDENTIALS,
+)
+def test_can_write_is_is_owner_or_admin(
+    entity,
+    name,
+    url_collection,
+    id_param,
+    model,
+    audit_actions,
+    create_adapter,
+    update_adapter,
+):
+    """Predicate sibling of `write_authz` — read by detail handlers for
+    `can_edit` flags so the rule lives in exactly one place."""
+    assert entity.can_write is is_owner_or_admin
 
 
 @pytest.mark.parametrize(
