@@ -18,11 +18,11 @@ import pytest
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from starlette.requests import Request
 
+from src.domain.providers.repository import ProviderRepository
+from src.domain.users.handlers import user_detail_extras
+from src.domain.users.repository import UserRepository
 from src.framework.handlers import handle_detail
-from src.logic.users.user_processing import user_detail_extras
 from src.models import User
-from src.repositories.providers.provider_repository import ProviderRepository
-from src.repositories.users.user_repository import UserRepository
 from src.specs.user import USER_ENTITY
 from tests.helpers import create_test_user
 

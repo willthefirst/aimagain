@@ -23,6 +23,17 @@ from typing import get_args
 import pytest
 from pydantic import ValidationError
 
+from src.domain.posts.schema import (
+    ClientReferralCreate,
+    ClientReferralRead,
+    ClientReferralUpdate,
+    ProviderAvailabilityCreate,
+    ProviderAvailabilityRead,
+    ProviderAvailabilityUpdate,
+    post_audit_snapshot,
+    post_create_adapter,
+    post_update_adapter,
+)
 from src.models.enums import (
     CLIENT_AGE_GROUP_LABELS,
     CLIENT_AGE_GROUPS,
@@ -37,17 +48,6 @@ from src.models.enums import (
     LOCATION_AVAILABILITY_LABELS,
     LOCATION_AVAILABILITY_OPTIONS,
     US_STATES,
-)
-from src.schemas.posts.post import (
-    ClientReferralCreate,
-    ClientReferralRead,
-    ClientReferralUpdate,
-    ProviderAvailabilityCreate,
-    ProviderAvailabilityRead,
-    ProviderAvailabilityUpdate,
-    post_audit_snapshot,
-    post_create_adapter,
-    post_update_adapter,
 )
 from tests.helpers import client_referral_payload, provider_availability_payload
 

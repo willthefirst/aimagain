@@ -6,13 +6,13 @@ factory (parent chain, subrow-CRUD-only routes, parent-form redirect).
 
 from typing import Final
 
-from src.framework.entity_spec import EntitySpec
-from src.models import ProviderCertification
-from src.schemas.providers.provider import (
+from src.domain.providers.schema import (
     ProviderCertificationCreate,
     ProviderCertificationRead,
     ProviderCertificationUpdate,
 )
+from src.framework.entity_spec import EntitySpec
+from src.models import ProviderCertification
 from src.specs._credential import make_provider_credential_entity
 
 CERTIFICATION_ENTITY: Final[EntitySpec] = make_provider_credential_entity(

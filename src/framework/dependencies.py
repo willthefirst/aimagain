@@ -19,10 +19,10 @@ from fastapi import Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.db import get_db_session
-from src.repositories.favorites.user_favorite_repository import UserFavoriteRepository
-from src.repositories.posts.post_repository import PostRepository
-from src.repositories.providers.provider_repository import ProviderRepository
-from src.repositories.users.user_repository import UserRepository
+from src.domain.favorites.repository import UserFavoriteRepository
+from src.domain.posts.repository import PostRepository
+from src.domain.providers.repository import ProviderRepository
+from src.domain.users.repository import UserRepository
 
 from .audit_repository import AuditRepository
 from .base_repository import BaseRepository

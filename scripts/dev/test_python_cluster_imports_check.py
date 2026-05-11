@@ -34,10 +34,10 @@ def _build_layer(
 
 def test_same_cluster_absolute_import_is_allowed(tmp_path: Path) -> None:
     src = tmp_path / "src"
-    _build_layer(src, "logic", ["posts", "providers"], parent_files=["audit.py"])
+    _build_layer(src, "models", ["posts", "providers"], parent_files=["audit.py"])
     f = _write(
-        src / "logic" / "posts" / "post_processing.py",
-        "from src.logic.posts._placeholder import x\n",
+        src / "models" / "posts" / "post_processing.py",
+        "from src.models.posts._placeholder import x\n",
     )
 
     assert find_violations([f], src) == []
@@ -45,9 +45,9 @@ def test_same_cluster_absolute_import_is_allowed(tmp_path: Path) -> None:
 
 def test_shared_parent_file_import_is_allowed(tmp_path: Path) -> None:
     src = tmp_path / "src"
-    _build_layer(src, "logic", ["posts", "providers"], parent_files=["audit.py"])
+    _build_layer(src, "models", ["posts", "providers"], parent_files=["audit.py"])
     f = _write(
-        src / "logic" / "posts" / "post_processing.py",
+        src / "models" / "posts" / "post_processing.py",
         "from src.framework.audit import record_audit\n",
     )
 
@@ -57,11 +57,10 @@ def test_shared_parent_file_import_is_allowed(tmp_path: Path) -> None:
 def test_cross_layer_import_is_out_of_scope(tmp_path: Path) -> None:
     """Cross-layer imports are not enforced by this check (only within-layer)."""
     src = tmp_path / "src"
-    _build_layer(src, "logic", ["posts"])
-    _build_layer(src, "repositories", ["providers"])
+    _build_layer(src, "models", ["posts", "providers"])
     f = _write(
-        src / "logic" / "posts" / "post_processing.py",
-        "from src.repositories.providers.repo import X\n",
+        src / "models" / "posts" / "post_model.py",
+        "from src.domain.providers.repository import X\n",
     )
 
     assert find_violations([f], src) == []
@@ -69,17 +68,17 @@ def test_cross_layer_import_is_out_of_scope(tmp_path: Path) -> None:
 
 def test_cross_cluster_absolute_import_is_flagged(tmp_path: Path) -> None:
     src = tmp_path / "src"
-    _build_layer(src, "logic", ["posts", "providers"], parent_files=["audit.py"])
+    _build_layer(src, "models", ["posts", "providers"], parent_files=["audit.py"])
     f = _write(
-        src / "logic" / "posts" / "post_processing.py",
-        "from src.logic.providers.handler import x\n",
+        src / "models" / "posts" / "post_processing.py",
+        "from src.models.providers.handler import x\n",
     )
 
     violations = find_violations([f], src)
 
     assert len(violations) == 1
     v = violations[0]
-    assert v.importer_layer == "logic"
+    assert v.importer_layer == "models"
     assert v.importer_cluster == "posts"
     assert v.target_cluster == "providers"
     assert "posts/ → providers/" in v.message()
@@ -88,9 +87,9 @@ def test_cross_cluster_absolute_import_is_flagged(tmp_path: Path) -> None:
 def test_relative_dot_import_is_same_cluster(tmp_path: Path) -> None:
     """`from .x import y` from inside a cluster resolves within the same cluster."""
     src = tmp_path / "src"
-    _build_layer(src, "logic", ["posts"])
+    _build_layer(src, "models", ["posts"])
     f = _write(
-        src / "logic" / "posts" / "post_processing.py",
+        src / "models" / "posts" / "post_processing.py",
         "from .helpers import h\n",
     )
 
@@ -102,9 +101,9 @@ def test_relative_double_dot_import_to_sibling_cluster_is_flagged(
 ) -> None:
     """`from ..providers.x import y` walks to a sibling cluster."""
     src = tmp_path / "src"
-    _build_layer(src, "logic", ["posts", "providers"])
+    _build_layer(src, "models", ["posts", "providers"])
     f = _write(
-        src / "logic" / "posts" / "post_processing.py",
+        src / "models" / "posts" / "post_processing.py",
         "from ..providers.handler import x\n",
     )
 
@@ -117,9 +116,9 @@ def test_relative_double_dot_import_to_sibling_cluster_is_flagged(
 def test_relative_double_dot_to_shared_is_allowed(tmp_path: Path) -> None:
     """`from ..base import` from a clustered file walks to the layer's parent — fine."""
     src = tmp_path / "src"
-    _build_layer(src, "repositories", ["posts"], parent_files=["base.py"])
+    _build_layer(src, "models", ["posts"], parent_files=["base.py"])
     f = _write(
-        src / "repositories" / "posts" / "post_repository.py",
+        src / "models" / "posts" / "post_repository.py",
         "from ..base import BaseRepository\n",
     )
 
@@ -130,11 +129,11 @@ def test_parent_level_file_is_not_lint_subject(tmp_path: Path) -> None:
     """Files at the layer's parent level have no cluster — they are the shared tier
     and may import anywhere in the layer (audit.py orchestrates across clusters)."""
     src = tmp_path / "src"
-    _build_layer(src, "logic", ["posts", "providers"], parent_files=["audit.py"])
+    _build_layer(src, "models", ["posts", "providers"], parent_files=["audit.py"])
     f = _write(
-        src / "logic" / "audit.py",
-        "from src.logic.posts.handler import x\n"
-        "from src.logic.providers.handler import y\n",
+        src / "models" / "audit.py",
+        "from src.models.posts.handler import x\n"
+        "from src.models.providers.handler import y\n",
     )
 
     assert find_violations([f], src) == []
@@ -153,14 +152,14 @@ def test_unclustered_layer_is_skipped(tmp_path: Path) -> None:
 def test_module_starting_with_underscore_is_not_a_cluster(tmp_path: Path) -> None:
     """Auto-discovery skips dunder/underscore directories — `__pycache__` etc."""
     src = tmp_path / "src"
-    layer_root = src / "schemas"
+    layer_root = src / "models"
     layer_root.mkdir(parents=True)
     (layer_root / "__pycache__").mkdir()
-    _write(layer_root / "_validators.py", "")
+    _write(layer_root / "_shared.py", "")
     _write(layer_root / "posts" / "_placeholder.py", "")
 
     f = _write(
-        src / "schemas" / "posts" / "post.py",
+        src / "models" / "posts" / "schema.py",
         "from src.framework.schema_validators import StrippedText\n",
     )
 
@@ -169,9 +168,9 @@ def test_module_starting_with_underscore_is_not_a_cluster(tmp_path: Path) -> Non
 
 def test_multiple_violations_in_one_file(tmp_path: Path) -> None:
     src = tmp_path / "src"
-    _build_layer(src, "logic", ["posts", "providers", "users"])
-    body = "from src.logic.providers.x import a\n" "from src.logic.users.y import b\n"
-    f = _write(src / "logic" / "posts" / "post_processing.py", body)
+    _build_layer(src, "models", ["posts", "providers", "users"])
+    body = "from src.models.providers.x import a\n" "from src.models.users.y import b\n"
+    f = _write(src / "models" / "posts" / "post_processing.py", body)
 
     violations = find_violations([f], src)
 

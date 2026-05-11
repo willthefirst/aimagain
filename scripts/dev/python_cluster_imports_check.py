@@ -6,10 +6,18 @@ type. A file under ``src/<layer>/<cluster>/`` may import from its own
 cluster or from any parent-level (shared) module in the same layer; it
 may NOT import from a sibling cluster directory in the same layer.
 
-Today this applies to ``src/models/``, ``src/schemas/``, ``src/repositories/``,
-and ``src/logic/`` — the layers that have been clustered. ``src/api/``
-and ``src/core/`` aren't clustered (single file or single directory per
-entity is the layer's natural shape there) and are skipped.
+Today this applies to ``src/models/`` only. Models are pure data
+shape — a model file in one cluster has no business importing
+from a sibling cluster (FKs reference each other via SQLAlchemy
+strings, not Python imports). The rule is strict here.
+
+``src/domain/`` is intentionally NOT in this list: per-entity
+handlers, repositories, and schemas legitimately reach across
+clusters for shared types (e.g. ``users/handlers.py`` needs
+``providers/repository.ProviderRepository`` to fetch a user's
+providers). Handler-to-handler cross-cluster imports inside
+``domain/`` are still discouraged, but the discipline rests on
+code review, not this rule.
 
 Imports we recognize:
   - absolute:  ``from src.<layer>.<cluster>.<file> import X``
@@ -17,12 +25,9 @@ Imports we recognize:
                ``from ..<cluster>.<file> import X`` (file at cluster level)
   - bare-package: ``from src.<layer>.<cluster> import X``
 
-Cross-layer imports (e.g. ``from src.repositories.posts...`` inside
-``src/logic/providers/``) are out of scope for this check — the
-within-layer rule is what matches the templates rule. A separate rule
-about cross-layer cluster discipline (e.g. logic/posts may only depend
-on repositories/posts, not repositories/providers) could be added if
-it earns its keep; it's not enforced here today.
+Cross-tree imports (e.g. ``from src.models.posts...`` inside
+``src/domain/providers/``) are out of scope for this check — the
+within-tree rule is what matches the templates rule.
 
 Usage:
     python scripts/dev/python_cluster_imports_check.py            # check all clustered layers
@@ -41,7 +46,7 @@ from typing import Iterable
 # Layers whose direct subdirectories we treat as clusters. Each layer's
 # parent-level files (anything not inside a cluster directory) are the
 # shared tier. Add a layer here when it grows cluster directories.
-_CLUSTERED_LAYERS = ("models", "schemas", "repositories", "logic")
+_CLUSTERED_LAYERS = ("models",)
 
 
 @dataclass(frozen=True)

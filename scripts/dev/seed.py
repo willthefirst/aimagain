@@ -19,8 +19,8 @@ from sqlalchemy import select
 
 from src.auth_config import UserManager
 from src.db import async_session_maker
+from src.domain.users.schema import UserCreate
 from src.models import Post, User
-from src.schemas.user import UserCreate
 
 SHARED_PASSWORD = "password"
 

@@ -6,10 +6,10 @@ from fastapi_users import models
 from fastapi_users.manager import BaseUserManager, UserManagerDependency
 
 from src.auth_config import get_user_manager
+from src.domain.users.schema import UserAuditSnapshot, UserCreate, UserRead
 from src.framework.audit import AuditAction, make_snapshotter, record_audit
 from src.framework.audit_repository import AuditRepository
 from src.framework.dependencies import get_audit_repository
-from src.schemas.users.user import UserAuditSnapshot, UserCreate, UserRead
 
 logger = logging.getLogger(__name__)
 

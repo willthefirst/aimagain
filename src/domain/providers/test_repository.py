@@ -14,6 +14,7 @@ import pytest
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from src.domain.providers.repository import ProviderRepository
 from src.models import (
     Provider,
     ProviderCertification,
@@ -21,7 +22,6 @@ from src.models import (
     ProviderLicensure,
     User,
 )
-from src.repositories.providers.provider_repository import ProviderRepository
 from tests.helpers import (
     create_test_user,
     make_provider,

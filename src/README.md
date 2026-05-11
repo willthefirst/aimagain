@@ -1,248 +1,82 @@
-# Source code: Core application architecture
+# Source code: three buckets
 
-The `src/` directory contains the complete implementation of the application, organized using a **layered architecture** pattern that separates concerns across API, business logic, data access, and presentation layers. Currently this is a bare-bones skeleton with user authentication and basic user routes, ready to be extended with new features.
+The `src/` tree is organized into three top-level concepts, each named for what's in it:
 
-## Core philosophy: Clean layered architecture
+- **`specs/`** — one file per domain entity, declaring its identity as an `EntitySpec`. The specs ARE the business surface of the application: which entities exist, what their URL grammar is, how they audit, who can write them, what their schemas are, what state axes they expose. Read by every other layer.
+- **`framework/`** — the domain-agnostic library that turns spec data into a working HTTP app. The dispatch helpers (`mount_entity`, the generic `handle_*` family), the audit framework, repository primitives, auth predicates, response/forms/projections helpers — everything that doesn't know what a "user" or "post" is.
+- **`domain/<entity>/`** — per-entity helpers that earn their keep but don't belong on the spec. Each cluster has `handlers.py` (bespoke business logic the framework can't subsume), `repository.py` (custom SQL with joins / per-column lookups that aren't expressible as a generic primitive), and `schema.py` (the Pydantic types specs reference).
 
-This codebase follows a **clean architecture** approach where dependencies flow inward toward the core business logic, making the application maintainable, testable, and easy to understand.
+Supporting trees:
 
-### What we do
+- **`api/routes/`** — thin route files. Each one calls `mount_entity(router, <ENTITY>_ENTITY, handlers={...})` and adds the rare hand-written endpoint (auth flows, `/me/*` singletons, M:N edges).
+- **`models/`** — SQLAlchemy classes. Still clustered per entity (`models/users/`, `models/posts/`, etc.) because models are pure data shape with no orchestration.
+- **`templates/`** — Jinja2 templates, clustered per entity.
+- **`core/`** — small utilities that don't depend on anything else (config, form-field markers, templating engine setup).
+- **`middleware/`** — currently empty; reserved for ASGI middleware. Active middleware lives in [`framework/middleware.py`](framework/middleware.py).
+- **`main.py`**, **`db.py`**, **`auth_config.py`** — application entry point, database setup, auth setup.
 
-- **Layer separation**: Clear boundaries between API, logic, repositories, and models
-- **Dependency injection**: Repositories are injected rather than directly instantiated
-- **Domain-driven design**: Business logic is encapsulated in `logic/<entity>_processing.py` `handle_*` functions
-- **Schema validation**: All API inputs/outputs are validated using Pydantic schemas
-- **Database abstraction**: Repository pattern abstracts database operations
+## How the three buckets relate
 
-**Example**: Adding a new feature follows the pattern:
+```
+specs/             ← declare what exists
+   ↓
+framework/         ← reads specs, generates dispatch, provides shared primitives
+   ↓
+domain/<entity>/   ← per-entity helpers + bespoke handlers, picked up by framework
 
-```python
-# 1. define the data model
-class NewFeature(Base):
-    __tablename__ = "new_features"
-    # ... fields
-
-# 2. create repository for data access
-class NewFeatureRepository(BaseRepository[NewFeature]):
-    # ... data access methods
-
-# 3. implement business logic as a handler in logic/
-async def handle_create_new_feature(
-    data: NewFeatureCreate,
-    user: User,
-    repo: NewFeatureRepository,
-) -> NewFeature:
-    feature = await repo.create(data, owner_id=user.id)
-    await repo.session.commit()  # logic owns the commit
-    return feature
-
-# 4. add API routes
-@router.post("/new-features")
-async def create_new_feature(
-    data: NewFeatureCreate,
-    user: User = Depends(current_active_user),
-    repo: NewFeatureRepository = Depends(get_new_feature_repository),
-):
-    return await handle_create_new_feature(data, user, repo)
+api/routes/        ← thin glue; calls mount_entity(spec) once
 ```
 
-### What we don't do
+A spec is read at three sites:
 
-- **Direct database access from routes**: All database operations go through repositories
-- **Business logic in API routes**: Routes only handle HTTP concerns, business logic stays in services
-- **Circular dependencies**: Each layer only depends on layers below it
-- **Mixed concerns**: Templates, API logic, and business logic are kept separate
+1. **Route mounting** — `mount_entity(router, USER_ENTITY, handlers={...})` reads `routes`, `state_axes`, `subresources`, `auth_deps`, `auth_policy`, `audit`, etc. and binds the right `mount_*` helper for each opted-in verb.
+2. **Generic handlers** — `handle_create(spec)` / `handle_update` / `handle_delete` / `handle_detail` / `handle_list` in `framework/handlers.py` consult `spec.audit`, `spec.write_authz`, `spec.model`, `spec.list_exclude_self`, `spec.parent`, etc. for the framework-owned work.
+3. **Bespoke handlers** — domain handlers (e.g. `handle_set_user_activation` in `domain/users/handlers.py`) read `USER_ENTITY.state_axis("activation").action`, `USER_ENTITY.audit.type`, etc. so per-handler audit/state declarations stay in one place.
 
-**Example**: Don't put business logic directly in routes:
+## Adding a new domain entity
 
-```python
-# Bad - business logic in route
-@router.post("/[entities]")
-async def create_entity(data: dict, session: AsyncSession = Depends(get_db_session)):
-    # Complex validation and business logic here
-    new_entity = Entity(**data)
-    session.add(new_entity)
-    # ... more business logic
-    return new_entity
+The work is concentrated. For each step, also add or extend the colocated `test_*.py`.
 
-# Good - delegate to a logic handler that owns the commit
-@router.post("/[entities]")
-async def create_entity(
-    data: EntityCreate,
-    user: User = Depends(current_active_user),
-    repo: EntityRepository = Depends(get_entity_repository),
-):
-    return await handle_create_entity(data, user, repo)
-```
+0. **Read [`api/routes/RESOURCE_GRAMMAR.md`](api/routes/RESOURCE_GRAMMAR.md) first.** URL shape, PUT-vs-PATCH rule, subresource convention.
+1. **Model** — define the SQLAlchemy class in [`models/<entity>/`](models/README.md).
+2. **Migration** — generate an Alembic migration. See [`../alembic/README.md`](../alembic/README.md).
+3. **Domain cluster** — create `domain/<entity>/` with `schema.py` (Pydantic types), `repository.py` (only methods with custom SQL — the framework calls `BaseRepository`'s public aliases for the standard shapes; see [`framework/README.md`](framework/README.md)), and `handlers.py` for bespoke business logic the framework can't subsume (custom auth, multi-step writes, edge mutations).
+4. **Spec** — declare `<ENTITY>_ENTITY: EntitySpec` in [`src/specs/<entity>.py`](specs/) carrying identity, audit binding, route opt-ins, write_authz, body adapters, templates, filters, discriminator (for polymorphism), parent (for owned subentities), private-field visibility, state axes, related-list subresources, M:N relations. Add a colocated `test_<entity>.py` asserting the spec declares the right values.
+5. **Route** — create `api/routes/<entity>.py` and call `mount_entity(router, <ENTITY>_ENTITY, handlers={...}, owned_subentities=(...))` once. The dispatcher stitches factory-built handlers onto the route module (auto-detected from the caller frame) as `_handle_<verb>_<entity>` so contract-test patches resolve through it. See [`api/routes/README.md`](api/routes/README.md).
+6. **Template (if rendering HTML)** — add the Jinja2 template in [`templates/<entity>/`](templates/README.md).
 
-## Architecture: Simple layered design
+For polymorphic entities (`Post` / `kind`), see [`models/posts/post_kinds.py`](models/posts/post_kinds.py). The spec sets `discriminator=<registry>` and the framework's `handle_create` / `handle_update` dispatch through it automatically.
 
-**API -> Logic -> Repositories -> Database**
+## Error handling
 
-- **API** handles HTTP requests and responses
-- **Logic** contains business logic, orchestration, and owns the transaction commit
-- **Repositories** handle database operations
-- **Database** stores the data
+Domain handlers raise the API exception subclasses directly — `NotFoundError`, `ForbiddenError`, `BadRequestError`, etc. from [`framework/exceptions.py`](framework/exceptions.py). Those are `HTTPException` subclasses, so the `@handle_route_errors` decorator passes them through unchanged. fastapi-users exceptions raised during registration/auth get translated by `handle_fastapi_users_error`. Everything else becomes a generic 500.
 
-Everything else (schemas, models, templates) supports these main layers. There is no `services/` layer — see [Error handling](#error-handling) below for how domain errors flow.
+There is no separate domain-error hierarchy. If a future entity needs a domain-error type that isn't a 1:1 fit, add it next to where it's raised; don't reintroduce a top-level hierarchy.
 
-## Layer responsibilities matrix
+## Import discipline
 
-**Rule:** each layer may only import from layers listed in its `Dependencies` column. Crossing the table upward (e.g. a repository importing a logic module) is a layering violation — fix the design, don't add the import.
+The structure encodes the dependency direction:
 
-| Layer            | Status   | Responsibility                                              | Example Files       | Dependencies                          |
-| ---------------- | -------- | ----------------------------------------------------------- | ------------------- | ------------------------------------- |
-| **API**          | active   | HTTP handling, routing, validation                          | `api/routes/*.py`   | Logic, Repositories, Schemas          |
-| **Logic**        | active   | Business logic, orchestration, transaction commit           | `logic/*.py`        | Repositories, Schemas, Models, API common exceptions + pure helpers (projections) |
-| **Repositories** | active   | Data access, queries                                        | `repositories/*.py` | Models, Database                      |
-| **Models**       | active   | Database schema, relationships                              | `models/*.py`       | SQLAlchemy                            |
-| **Schemas**      | active   | Request/response validation                                 | `schemas/*.py`      | Pydantic, Models (enums + registries only), Core (`form_fields.HtmlPattern` marker only) |
-| **Middleware**   | empty    | Cross-cutting concerns                                      | `middleware/*.py`   | FastAPI                               |
-| **Core**         | active   | Configuration, utilities                                    | `core/*.py`         | None                                  |
+- **`specs/` is read-only for consumers.** Files in `specs/` import models, schemas (for adapters), and framework types — never from `domain/<entity>/` directly. Per-entity callables that specs need to reference (state-axis handlers, detail-extras callables) are declared as dotted-path strings (`handler_path`, `detail_extras_path`) and resolved lazily by the framework at mount time. This keeps `specs → domain` from closing a cycle with `domain → specs`.
+- **`framework/` does not import from `specs/` or `domain/`.** The framework is generic; specs are the input, domain code is the consumer. Framework code reads specs *via parameters*, not via imports.
+- **`domain/<entity>/` may import from `framework/`, `specs/`, `models/`, and from another `domain/<other>/` cluster when it needs that entity's type** (e.g. `domain/users/handlers.py` reads `domain/providers/repository.ProviderRepository` to fetch a user's providers). Cross-entity handler-to-handler imports are discouraged but not lint-enforced — the layer collapse made cross-entity type references frequent enough that an automated rule would mostly produce false positives.
+- **`api/routes/` may import from anywhere** but is intentionally thin — one `mount_entity(...)` call per file plus the rare hand-written endpoint.
+- **`models/` follows the strict cluster rule** (enforced by [`../scripts/dev/python_cluster_imports_check.py`](../scripts/dev/python_cluster_imports_check.py)): a model file in one cluster may not import from a sibling cluster. Cross-entity FKs reference each other via SQLAlchemy strings, not Python imports.
 
-### Error handling
+## Where things are
 
-Logic-layer `handle_*` functions raise the API exception subclasses directly — `NotFoundError`, `ForbiddenError`, `BadRequestError`, etc. from [`src/api/common/exceptions.py`](api/common/exceptions.py). Those are `HTTPException` subclasses, so the `@handle_route_errors` decorator passes them through unchanged. fastapi-users exceptions raised during registration/auth get translated by `handle_fastapi_users_error`. Everything else becomes a generic 500.
-
-There is no separate domain-error hierarchy (e.g. `ServiceError`, `BusinessRuleError`). An earlier scaffold of that pattern lived under `src/services/exceptions.py` but was never raised by any logic handler — it was deleted in the cleanup that closed issue #107. If a future entity needs a domain-error type that isn't a 1:1 fit for the existing API exceptions, add it next to where it's raised; don't reintroduce a top-level hierarchy.
-
-## Domain entities and the cluster pattern
-
-The layer matrix above is one axis of the architecture; the other is the **domain entity**. Every domain entity has a 1:1 directory presence at each layer that touches it, and every layer has a *shared tier* at the parent level for genuinely cross-entity infrastructure. The directory listing IS the entity registry — `ls src/<layer>/` is the source of truth for what entities exist.
-
-**The import rule.** A file in `<layer>/<entity>/` may import from its own cluster and from the layer's shared tier (anything at `<layer>/`'s parent level). Cross-cluster imports (a file in cluster A importing from cluster B) are forbidden — fix the design or hoist the shared piece into the parent. Two lint checks enforce this:
-
-- [`scripts/dev/template_imports_check.py`](../scripts/dev/template_imports_check.py) — Jinja `{% extends/include/from/import %}` directives across `src/templates/`.
-- [`scripts/dev/python_cluster_imports_check.py`](../scripts/dev/python_cluster_imports_check.py) — Python `from ...` imports across the clustered Python layers. Cluster directories are auto-discovered (any subdirectory with `.py` files) so new entities and new clusters pick up the rule for free.
-
-Both run as part of `dev lint` and as pre-commit hooks scoped to the relevant file globs.
-
-**Documentation locality.** Parent READMEs describe the layer's contract — what a repository is, what it depends on, what the shared tier provides — but do not enumerate which entities currently exist or list per-entity contents. Entity-specific facts live in the cluster's own README (`<layer>/<entity>/README.md`); when an entity has nothing surprising to say at a layer, no cluster README is required. This is the [grammar-not-alphabet rule](../CLAUDE.md#grammar-not-alphabet) applied to README content.
-
-## Directory structure
-
-**Core files** at `src/`:
-
-- `main.py` - FastAPI application entry point
-- `db.py` - Database configuration and sessions
-- `auth_config.py` - Authentication setup (FastAPI-Users with JWT cookies)
-
-**Layers** (each with its own README describing the layer's contract):
-
-- `api/` - HTTP API layer
-- `logic/` - Business logic, orchestration, transaction commit
-- `repositories/` - Data access
-- `models/` - Database models
-- `schemas/` - Request/response validation (Pydantic)
-- `templates/` - HTML templates (Jinja2 + HTMX)
-- `middleware/` - Cross-cutting concerns
-- `core/` - Configuration, utilities
-
-Each clustered layer has the shape `<layer>/<entity>/...` for entity-specific code plus parent-level files for the shared tier; see the layer's README for its contract.
-
-## Implementation patterns
-
-### Adding a new domain entity
-
-This is the cross-module checklist. The detailed step-by-step (with code snippets) for each layer lives in that layer's own README — follow the links so the recipe stays a single source of truth (see [`../CLAUDE.md`](../CLAUDE.md)). For each step, also add or extend the colocated `test_*.py` and update the relevant README — see [Domain entities and the cluster pattern](#domain-entities-and-the-cluster-pattern) for whether entity-specific docs go in the layer's parent README or in a `<layer>/<entity>/README.md`. Where the layer is already clustered (`templates/`, partly `models/`), create the entity's cluster directory and its README; where the layer is still flat, follow the `<entity>_<role>.py` file convention.
-
-0. **Read [`api/routes/RESOURCE_GRAMMAR.md`](api/routes/RESOURCE_GRAMMAR.md) first.** It dictates the URL shape, the PUT-vs-PATCH rule, the optional publication-lifecycle pattern, and the subresource conventions every resource MUST follow. Decide whether the resource adopts the publication lifecycle, then identify state axes, field clusters, and any subresources you'll need before touching the layers below.
-1. **Model** — define the SQLAlchemy class. See [`models/README.md`](models/README.md#implementation-patterns).
-2. **Migration** — generate and run an Alembic migration for the new table. See [`../alembic/README.md`](../alembic/README.md).
-3. **Schema** — add Pydantic request/response shapes. See [`schemas/README.md`](schemas/README.md#implementation-patterns).
-4. **Repository** — add custom data-access methods (the standard CRUD shapes are handled by the framework via `BaseRepository`'s public aliases — see [`repositories/README.md`](repositories/README.md#crud-primitives-on-baserepository)).
-5. **Entity spec** — declare `<ENTITY>_ENTITY: EntitySpec` in [`src/specs/<entity>.py`](api/common/README.md#entityspec). Carries identity, audit binding, route opt-ins, write_authz, body adapters, templates, filters, discriminator (for polymorphism), parent (for owned subentities), private-field visibility, state axes, related-list subresources, M:N relations. Add a colocated `test_<entity>.py` asserting the spec declares the right values.
-6. **Logic** — write bespoke `handle_*` functions in `src/logic/<entity>/<entity>_processing.py` *only* for verbs that have rules the generic framework can't subsume (custom auth predicates beyond `write_authz`, multi-step writes, edge mutations). The standard create / update / delete shape is provided by [`src/logic/_generic.py`](logic/README.md) — `mount_entity` auto-binds `make_<verb>_handler(<ENTITY>_ENTITY)` for any opted-in standard verb without an explicit handler. Raise the API exceptions from [`src/api/common/exceptions.py`](api/common/exceptions.py) directly (`NotFoundError`, `ForbiddenError`, etc.) — see [Error handling](#error-handling).
-7. **Route** — create `src/api/routes/<entity>.py` and call `mount_entity(router, <ENTITY>_ENTITY, handlers={...}, owned_subentities=(...))` once. The dispatcher stitches factory-built handlers onto the route module (auto-detected from the caller frame) as `_handle_<verb>_<entity>` so contract-test patches resolve through it. See [`api/routes/README.md`](api/routes/README.md#implementation-patterns).
-8. **Template (if rendering HTML)** — add the Jinja2 template. See [`templates/README.md`](templates/README.md).
-
-For entities with a discriminator-based polymorphic shape (like `Post` / `kind`), see [`models/posts/post_kinds.py`](models/posts/post_kinds.py) for the registry pattern. The entity's `EntitySpec` then sets `discriminator=<your-registry>`, and the framework's `handle_create` / `handle_update` automatically dispatch through it to find the per-kind detail model. Adding a new discriminator value is a one-file change in the registry plus the per-variant Pydantic classes and templates — no edits in routes, repositories, or logic.
-
-### Dependency injection pattern
-
-Repositories use dependency injection through FastAPI's `Depends()`. Routes inject the repository, then call the logic handler — there is no service layer in between for current entities.
-
-```python
-# In repositories/dependencies.py
-async def get_user_repository(
-    session: AsyncSession = Depends(get_db_session),
-) -> UserRepository:
-    return UserRepository(session)
-
-# In API routes — route injects the repo and calls the logic handler
-@router.get("/users")
-async def list_users(
-    user: User = Depends(current_active_user),
-    user_repo: UserRepository = Depends(get_user_repository),
-):
-    return await handle_list_users(user_repo, requesting_user=user)
-```
-
-## Common issues and solutions
-
-### Issue: Circular imports between layers
-
-**Problem**: Trying to import logic from repositories, or models from API routes the wrong way.
-**Solution**: Always import from lower layers only. Use dependency injection for higher-layer dependencies.
-
-```python
-# Bad - importing from higher layer
-from ..logic.user_processing import handle_list_users  # In a repository
-
-# Good - inject dependency
-class UserRepository:
-    def __init__(self, session: AsyncSession):
-        self.session = session
-```
-
-### Issue: Business logic in API routes
-
-**Problem**: Complex validation or business rules directly in route handlers
-**Solution**: Move all business logic to a `handle_*` function in `logic/`, keep routes thin
-
-```python
-# Bad - business logic in route
-@router.post("/[entities]")
-async def create_entity(data: dict, session: AsyncSession = Depends()):
-    if not data.get("name"):
-        raise HTTPException(400, "Name required")
-    # ... more business logic
-
-# Good - delegate to logic handler
-@router.post("/[entities]")
-async def create_entity(
-    data: EntityCreate,  # Schema handles validation
-    user: User = Depends(current_active_user),
-    repo: EntityRepository = Depends(get_entity_repository),
-):
-    return await handle_create_entity(data, user, repo)  # logic handler owns the commit
-```
-
-### Issue: Direct database access from routes
-
-**Problem**: Using database session directly in API routes
-**Solution**: Always go through the repository layer for data access; routes call into `logic/` for anything beyond a trivial fetch.
-
-```python
-# Bad - direct database access
-@router.get("/users/{user_id}")
-async def get_user(user_id: int, session: AsyncSession = Depends()):
-    user = await session.get(User, user_id)
-    return user
-
-# Good - use repository (and logic if there is real orchestration)
-@router.get("/users/{user_id}")
-async def get_user(
-    user_id: UUID,
-    user_repo: UserRepository = Depends(get_user_repository),
-):
-    return await user_repo.get_by_id(user_id)
-```
-
-## Related documentation
-
-- [API Layer Documentation](api/README.md) - HTTP routes and validation patterns
-- [Logic Layer Documentation](logic/README.md) - Business logic, orchestration, transaction commits
-- [Models Documentation](models/README.md) - Database schema and relationships
-- [Repository Pattern Documentation](repositories/README.md) - Data access patterns
-- [Testing Strategy](../tests/README.md) - How to test each layer
+| You're looking for                                              | It's at                                                              |
+| --------------------------------------------------------------- | -------------------------------------------------------------------- |
+| Declarations of every entity                                    | [`specs/`](specs/) — one file per entity                             |
+| `EntitySpec` dataclass + its friends                            | [`framework/entity_spec.py`](framework/entity_spec.py)               |
+| Route mounting helpers (`mount_entity`, `mount_*`)              | [`framework/resource_routes.py`](framework/resource_routes.py)       |
+| Generic handlers (`handle_create`, `handle_list`, ...)          | [`framework/handlers.py`](framework/handlers.py)                     |
+| `BaseRepository` primitives (`_list`, `_count`, `patch`, ...)   | [`framework/base_repository.py`](framework/base_repository.py)       |
+| Audit framework (`mutate`, `record_audit`, `AuditAction`)       | [`framework/audit.py`](framework/audit.py)                           |
+| Auth predicates (`is_owner_or_admin`, `is_admin`)               | [`framework/authz.py`](framework/authz.py)                           |
+| Per-entity handlers (the bespoke ones)                          | [`domain/<entity>/handlers.py`](domain/)                             |
+| Per-entity custom queries                                       | [`domain/<entity>/repository.py`](domain/)                           |
+| Per-entity Pydantic shapes                                      | [`domain/<entity>/schema.py`](domain/)                               |
+| Route files (one per entity, thin)                              | [`api/routes/<entity>.py`](api/routes/)                              |
+| Jinja templates                                                 | [`templates/<entity>/`](templates/)                                  |
+| SQLAlchemy classes                                              | [`models/<entity>/`](models/)                                        |

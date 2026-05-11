@@ -14,8 +14,8 @@ import pytest
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from src.domain.favorites.repository import UserFavoriteRepository
 from src.models import User, UserFavorite
-from src.repositories.favorites.user_favorite_repository import UserFavoriteRepository
 from tests.helpers import create_test_user, make_provider
 
 pytestmark = pytest.mark.asyncio

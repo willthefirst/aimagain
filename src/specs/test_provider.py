@@ -56,7 +56,7 @@ def test_detail_extras_path_points_at_provider_detail_extras():
     """Pinning the dotted path so a callable rename surfaces here."""
     assert (
         PROVIDER_ENTITY.detail_extras_path
-        == "src.logic.providers.provider_processing.provider_detail_extras"
+        == "src.domain.providers.handlers.provider_detail_extras"
     )
 
 

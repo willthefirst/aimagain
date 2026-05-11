@@ -19,14 +19,7 @@ from typing import get_args
 import pytest
 from pydantic import ValidationError
 
-from src.models.enums import (
-    CERTIFICATION_TYPES,
-    EDUCATION_TYPES,
-    LICENSE_TYPES,
-    LOCATION_AVAILABILITY_OPTIONS,
-    US_STATES,
-)
-from src.schemas.providers.provider import (
+from src.domain.providers.schema import (
     ProviderCertificationCreate,
     ProviderCertificationUpdate,
     ProviderCreate,
@@ -36,6 +29,13 @@ from src.schemas.providers.provider import (
     ProviderLicensureUpdate,
     ProviderRead,
     ProviderUpdate,
+)
+from src.models.enums import (
+    CERTIFICATION_TYPES,
+    EDUCATION_TYPES,
+    LICENSE_TYPES,
+    LOCATION_AVAILABILITY_OPTIONS,
+    US_STATES,
 )
 
 

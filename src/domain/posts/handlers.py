@@ -1,6 +1,6 @@
 import logging
 
-from src.schemas.posts.post import (
+from src.domain.posts.schema import (
     ClientReferralCreate,
     ClientReferralUpdate,
     ProviderAvailabilityCreate,

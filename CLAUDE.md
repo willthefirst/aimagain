@@ -4,18 +4,18 @@ This file is the contract between you (the AI agent) and this codebase. Read it 
 
 ## Architecture in one line
 
-The code under `src/` is organized by **layer**, not by feature; each layer is a subdirectory of `src/`. A new entity typically touches every layer. See [`src/README.md`](src/README.md) for layer responsibilities, the dependency rules between layers, and the cluster pattern that organizes entities within each layer.
+The code under `src/` is organized into three top-level buckets: **`specs/`** (entity declarations — the business surface), **`framework/`** (domain-agnostic library), and **`domain/<entity>/`** (per-entity bespoke helpers — handlers + repository + schema collocated). A new entity adds one spec file and one domain cluster. See [`src/README.md`](src/README.md) for how the buckets relate and the import discipline between them.
 
 ## Definition of done
 
-For any code change in `src/<layer>/`, the change is **not done** until all four are true:
+For any code change in `src/`, the change is **not done** until all four are true:
 
 1. The code change itself is in.
-2. The colocated `src/<layer>/README.md` reflects new/changed/removed behavior — or you have explicitly verified it is still accurate.
-3. The change has test coverage that pins what changed — colocated `src/<layer>/test_*.py` for clusters with non-obvious logic, route-level tests under `src/api/routes/test_*.py` for thin pass-through clusters. See the layer READMEs (`src/logic/README.md`, `src/repositories/README.md`) for the per-layer judgment.
+2. The relevant README reflects new/changed/removed behavior — or you have explicitly verified it is still accurate. (Top-level: [`src/README.md`](src/README.md). Per-bucket: [`src/framework/README.md`](src/framework/README.md). Per-entity: [`src/domain/<entity>/README.md`](src/domain/) when one exists.)
+3. The change has test coverage that pins what changed — colocated `test_*.py` in the same directory as the changed code (framework changes get `src/framework/test_*.py`; domain changes get `src/domain/<entity>/test_*.py`; route-level smoke tests under `src/api/routes/test_*.py` for thin pass-through.)
 4. `dev test` passes and `dev lint` passes.
 
-If a layer has no README or no test file yet, **create them as part of the change**. Don't defer.
+If a relevant README or test file doesn't exist yet, **create it as part of the change**. Don't defer.
 
 A Stop hook checks the diff at end-of-turn and surfaces a reminder when source files change without their README/test. The hook is a soft prompt, not a hard block — but ignoring it should be a deliberate decision (e.g. typo fix, log message tweak), not an oversight.
 
@@ -26,8 +26,9 @@ A Stop hook checks the diff at end-of-turn and surfaces a reminder when source f
 Each fact has exactly **one home**: the README closest to the code or config that the fact describes. Other docs link to it; they never restate it.
 
 - The CLI's command list is exposed by `dev --help` and `dev <command> --help`, generated from the argparse definitions in [`scripts/dev_cli.py`](scripts/dev_cli.py). Every other doc that wants to mention a command links to `dev --help`, not a hand-maintained restatement.
-- The layered architecture lives in [`src/README.md`](src/README.md). The root README and layer READMEs link there, not duplicate it.
-- A layer's behavior, conventions, and tests live in `src/<layer>/README.md`. Cross-references go upward via links.
+- The three-bucket architecture lives in [`src/README.md`](src/README.md). Other READMEs link there, not duplicate it.
+- Framework behavior, conventions, and tests live in [`src/framework/README.md`](src/framework/README.md). Cross-references go upward via links.
+- Per-entity facts (cardinality decisions, polymorphism, audit quirks) live in `src/domain/<entity>/README.md` when an entity has something non-obvious to say.
 - Migrations live in [`alembic/README.md`](alembic/README.md). Deployment in [`deployment/README.md`](deployment/README.md). Testing conventions in [`tests/README.md`](tests/README.md).
 
 If you find a fact stated in two places, **one of them is wrong** — even if both currently agree, they will drift. Pick the one closest to the code, leave it there, and replace the other with a link. The Stop hook only catches drift between code and its colocated README/test; cross-cutting drift (e.g. CLI commands documented in the root README) can only be prevented by not duplicating in the first place.
@@ -36,48 +37,49 @@ If you find a fact stated in two places, **one of them is wrong** — even if bo
 
 A parent README expresses the **grammar** of what's in the directory below it — the shape, the rules, the contract every child must follow. It does not enumerate the **alphabet** — the specific entities, files, or counts that exist today.
 
-A grammar is stable across churn: "every cluster directory represents one domain entity; cluster files may import from same cluster + the layer's shared tier." An alphabet drifts every time you add or rename an entity: "currently we have posts, providers, users, auth, audit." The directory listing IS the alphabet — `ls src/<layer>/` is the source of truth for what entities exist.
+A grammar is stable across churn: "every `domain/<entity>/` directory holds the per-entity helpers (handlers + repository + schema) for one domain entity; specs and the framework read from but do not depend on per-entity code." An alphabet drifts every time you add or rename an entity: "currently we have posts, providers, users, auth, favorites." The directory listing IS the alphabet — `ls src/specs/` and `ls src/domain/` are the source of truth for what entities exist.
 
 A useful tell: when you write "currently X" in a parent README, you're describing alphabet. Replace with the grammar (what role X plays for *any* entity) and a pointer to the directory. When you write "always", "must", or "may", you're describing grammar — keep it.
 
-The same rule applies recursively. A cluster's own README (`<layer>/<entity>/README.md`) is the right home for facts about that specific entity — there, the entity *is* the subject, not part of an alphabet. The parent points down to clusters; clusters describe themselves; the parent doesn't restate them.
+The same rule applies recursively. An entity's own README (`domain/<entity>/README.md`) is the right home for facts about that specific entity — there, the entity *is* the subject, not part of an alphabet. The parent points down to entities; entities describe themselves; the parent doesn't restate them.
 
 This complements the [single-source-of-truth rule](#one-source-of-truth--link-dont-copy): that rule says facts have one home; this rule says parent READMEs prefer rules over rosters.
 
 **Default to not creating a new README.** A README earns its existence by documenting something `ls` and the code can't:
 
 - A non-obvious pattern (registry-driven dispatch, polymorphic discriminator, cardinality decision).
-- A deliberate deviation from the layer's grammar.
+- A deliberate deviation from the bucket's grammar.
 - A constraint or contract that spans files in non-obvious ways.
 
-If the only thing a candidate README would say is enumerate-what-`ls`-shows or restate-the-layer-rules, don't write it. Empty or aspirational READMEs are net-negative — they tell the next reader to expect content that isn't load-bearing.
+If the only thing a candidate README would say is enumerate-what-`ls`-shows or restate-the-bucket-rules, don't write it. Empty or aspirational READMEs are net-negative — they tell the next reader to expect content that isn't load-bearing.
 
 ## Where to look
 
 | Topic | Where it lives |
 | --- | --- |
-| Architecture, layer responsibilities, dependency rules | [`src/README.md`](src/README.md) |
+| Architecture, three-bucket layout, import discipline | [`src/README.md`](src/README.md) |
+| Framework behavior (EntitySpec, mount helpers, generic handlers) | [`src/framework/README.md`](src/framework/README.md) |
 | Resource URL grammar, lifecycle, subresource conventions | [`src/api/routes/RESOURCE_GRAMMAR.md`](src/api/routes/RESOURCE_GRAMMAR.md) |
 | CLI commands (`dev ...`) | `dev --help` (source: [`scripts/dev_cli.py`](scripts/dev_cli.py)) |
 | Testing conventions, fixtures | [`tests/README.md`](tests/README.md) |
 | Database migrations | [`alembic/README.md`](alembic/README.md) |
 | Deployment | [`deployment/README.md`](deployment/README.md) |
-| A specific layer's behavior | `src/<layer>/README.md` |
+| Per-entity quirks | `src/domain/<entity>/README.md` when one exists |
 
 Pre-commit hooks run lint automatically — don't bypass with `--no-verify`.
 
 ## When in doubt
 
-1. Read [`src/README.md`](src/README.md) for layer responsibilities and what may import what.
-2. Read the README of the layer you're changing, plus the layers it depends on.
-3. If a single change forces edits across most layers (model + schema + repo + service + route), follow the entity checklist in [`src/README.md`](src/README.md#adding-a-new-domain-entity) — that's expected for new entities, not a smell.
+1. Read [`src/README.md`](src/README.md) for the three-bucket layout and what may import what.
+2. Read [`src/framework/README.md`](src/framework/README.md) if you're touching the dispatch helpers, generic handlers, or audit framework.
+3. If a single change adds a new entity, follow the entity checklist in [`src/README.md`](src/README.md#adding-a-new-domain-entity) — one spec file + one domain cluster + one route file.
 4. **Before adding or modifying a resource type**, read [`src/api/routes/RESOURCE_GRAMMAR.md`](src/api/routes/RESOURCE_GRAMMAR.md) first. It's the prescriptive contract for URL shape, lifecycle states, and subresource conventions.
 5. **Before adding or moving a route**, run `dev routes [prefix]` to see every handler currently mounted. Catches router shadowing before tests do. Full CLI list: `dev --help` (source: [`scripts/dev_cli.py`](scripts/dev_cli.py)).
-6. **Before changing a wire or storage contract**, do the contract-surface check below. The layer matrix tells you *which layers* a change touches; this tells you *which contracts* it touches.
+6. **Before changing a wire or storage contract**, do the contract-surface check below.
 
 ## Before implementing a multi-layer change: contract-surface check
 
-Layer-by-layer planning catches "did I update every file?" — it does *not* catch "did I just break every existing client?" That second question is what this section is for.
+Bucket-by-bucket planning catches "did I update every file?" — it does *not* catch "did I just break every existing client?" That second question is what this section is for.
 
 Before writing code on any change that modifies a schema, route, template, or persisted format, write a short pre-implementation note that answers three questions. Five minutes; no plan-mode session needed.
 
@@ -92,7 +94,7 @@ Before writing code on any change that modifies a schema, route, template, or pe
 
 3. **For each breaking surface, who decides?** If the breakage is scoped (only internal callers, only your tests) you can absorb it. If it leaks past your boundary (HTML forms, external API consumers, persisted data already in production) **surface the choice to the user explicitly** before implementing — *"this changes X for existing clients; OK, or do you want me to prep first?"* Don't decide silently inside the implementation.
 
-4. **Which other READMEs reference symbols, files, or paths I'm renaming, deleting, or changing?** Layer-by-layer planning catches *which layers a change touches*; it doesn't catch *which other layers' READMEs reference the symbols being changed*. For each renamed or removed identifier, run:
+4. **Which other READMEs reference symbols, files, or paths I'm renaming, deleting, or changing?** Bucket-by-bucket planning catches *which buckets a change touches*; it doesn't catch *which other READMEs reference the symbols being changed*. For each renamed or removed identifier, run:
 
    ```bash
    grep -rn "<old-name>" $(find . -name README.md -not -path './.claude/*' -not -path './.pytest_cache/*')
@@ -104,7 +106,7 @@ The cost of skipping this check is one end-of-PR realization that you took the w
 
 ## Plan mode
 
-Use `/plan` when a change touches multiple layers or introduces new resources/routes — the Explore + Plan overhead pays off when a wrong direction is expensive. Skip it for typo fixes, single-file refactors, README polish, and anything you can describe in one sentence.
+Use `/plan` when a change touches multiple buckets or introduces new resources/routes — the Explore + Plan overhead pays off when a wrong direction is expensive. Skip it for typo fixes, single-file refactors, README polish, and anything you can describe in one sentence.
 
 ## Per-PR retrospective
 

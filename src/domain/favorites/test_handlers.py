@@ -20,17 +20,17 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from starlette.requests import Request
 
-from src.framework.audit import AuditAction
-from src.framework.audit_repository import AuditRepository
-from src.framework.exceptions import NotFoundError
-from src.logic.favorites.favorite_processing import (
+from src.domain.favorites.handlers import (
     handle_add_favorite,
     handle_list_my_favorites,
     handle_remove_favorite,
 )
+from src.domain.favorites.repository import UserFavoriteRepository
+from src.domain.providers.repository import ProviderRepository
+from src.framework.audit import AuditAction
+from src.framework.audit_repository import AuditRepository
+from src.framework.exceptions import NotFoundError
 from src.models import AuditLog, User, UserFavorite
-from src.repositories.favorites.user_favorite_repository import UserFavoriteRepository
-from src.repositories.providers.provider_repository import ProviderRepository
 from tests.helpers import create_test_user, make_provider
 
 pytestmark = pytest.mark.asyncio
