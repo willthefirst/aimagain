@@ -20,6 +20,8 @@ import inspect
 from typing import Any
 from uuid import UUID
 
+from pydantic import BaseModel
+
 from src.api.common.entity_spec import EntitySpec
 from src.api.common.exceptions import NotFoundError
 from src.logic.audit import mutate
@@ -103,6 +105,104 @@ async def handle_delete(
         await repo.delete(target)
 
 
+async def handle_create(
+    spec: EntitySpec,
+    *,
+    payload: BaseModel,
+    repo: BaseRepository,
+    audit_repo: AuditRepository,
+    requesting_user: User,
+    parent_id: UUID | None = None,
+) -> Any:
+    """Generic create handler driven by `spec`.
+
+    Performs the standard create ritual across three shapes:
+
+    1. **Owned-subentity** (`spec.parent` set) — parent loaded,
+       `write_authz` invoked against the parent, child instantiated
+       from the payload's field dict, appended via
+       `repo.add_child(parent, spec.url_collection, child)` so the
+       parent's in-memory state stays coherent for the audit snapshot.
+    2. **Polymorphic top-level** (`spec.discriminator` set) — the
+       payload's discriminator value picks a `KindSpec` from the
+       registry; the parent is instantiated with the discriminator
+       column + owner, the detail row is built from
+       `KindSpec.detail_fields`, and both persist in one flush via
+       `repo.create_polymorphic`.
+    3. **Standard top-level** — parent instantiated from the payload's
+       field dict + owner column (when `spec.owner_attr` is set);
+       persisted via `repo.create`.
+
+    Across all three, the created row is wrapped in
+    `mutate(verb="create")` so the audit row is captured and the
+    transaction commits. Entities with bespoke create flows (e.g.
+    providers' inline credential-list append) keep custom handlers.
+
+    Reads from the spec:
+      - `spec.audit` — required for the audit row.
+      - `spec.parent` — picks the subentity path.
+      - `spec.discriminator` — picks the polymorphic path.
+      - `spec.write_authz` — invoked on parent for subentity creates.
+        Top-level creates are gated only by the route's
+        `write_user_dep` (no per-object check applies to a not-yet-
+        created row).
+      - `spec.owner_attr` — column on the parent set to
+        `requesting_user.id` when not None.
+      - `spec.model` — class instantiated for the parent.
+      - `spec.url_collection` — name of the parent's relationship
+        attribute for owned-subentity creates (convention).
+    """
+    if spec.audit is None:
+        raise ValueError(
+            f"handle_create: spec {spec.name!r} has no audit binding; "
+            "create operations must be audited."
+        )
+
+    if spec.parent is not None:
+        if parent_id is None:
+            raise ValueError(
+                f"handle_create: spec {spec.name!r} has parent "
+                f"{spec.parent.name!r} but no parent_id was supplied."
+            )
+        parent = await repo.get_by_model_id(spec.parent.model, parent_id)
+        if parent is None:
+            raise NotFoundError(detail=f"{spec.parent.name.capitalize()} not found")
+        if spec.write_authz is not None:
+            spec.write_authz(parent, requesting_user, action=f"create this {spec.name}")
+        child = spec.model(**payload.model_dump())
+        created = await repo.add_child(parent, spec.url_collection, child)
+
+    elif spec.discriminator is not None:
+        kind = payload.kind
+        kind_spec = spec.discriminator[kind]
+        detail = kind_spec.detail_model(
+            **{f: getattr(payload, f) for f in kind_spec.detail_fields}
+        )
+        parent_obj = spec.model(**{spec.discriminator.column: kind})
+        if spec.owner_attr is not None:
+            setattr(parent_obj, spec.owner_attr, requesting_user.id)
+        created = await repo.create_polymorphic(
+            parent_obj, detail, detail_relationship=kind_spec.detail_relationship
+        )
+
+    else:
+        instance = spec.model(**payload.model_dump())
+        if spec.owner_attr is not None:
+            setattr(instance, spec.owner_attr, requesting_user.id)
+        created = await repo.create(instance)
+
+    async with mutate(
+        repo,
+        audit_repo,
+        actor=requesting_user,
+        target=created,
+        resource=spec.audit,
+        verb="create",
+    ):
+        pass  # mutation already happened; `mutate` captures after-snapshot
+    return created
+
+
 def make_delete_handler(spec: EntitySpec):
     """Build a `mount_delete`-compatible handler from `spec`.
 
@@ -177,5 +277,85 @@ def make_delete_handler(spec: EntitySpec):
 
     _handler.__signature__ = inspect.Signature(parameters=sig_params)  # type: ignore[attr-defined]
     _handler.__name__ = f"_handle_delete_{spec.name}"
+    _handler.__qualname__ = _handler.__name__
+    return _handler
+
+
+def make_create_handler(spec: EntitySpec):
+    """Build a `mount_create`-compatible handler from `spec`.
+
+    Mirrors `make_delete_handler`: synthesizes a typed signature that
+    `mount_create`'s introspection (in
+    `src/api/common/resource_routes.py`) recognizes. The returned
+    callable delegates to `handle_create(spec, ...)`.
+
+    Synthesized parameters:
+      - `parent_id: UUID` — present only for owned subentities.
+      - `payload: BaseModel` — the mount layer parses the request body
+        via `spec.create_adapter`; the framework dispatches by
+        `payload.kind` if the entity is polymorphic.
+      - `repo: BaseRepository`, `audit_repo: AuditRepository`,
+        `requesting_user: User` — standard deps the mount wires via
+        `spec.repo_dep`, the type registry, and `spec.write_user_dep`.
+
+    Returns a callable whose `__name__` is
+    `_handle_create_<spec.name>` so stack traces stay readable.
+    Route files assign the result to `_handle_create_<entity>` as a
+    module-level attribute so contract-test patches (which target
+    `<routes module>._handle_create_<entity>`) flow through the
+    mount layer's `_resolve_handler`.
+    """
+    parent_id_param = spec.parent.id_param if spec.parent is not None else None
+
+    sig_params: list[inspect.Parameter] = []
+    if parent_id_param is not None:
+        sig_params.append(
+            inspect.Parameter(
+                parent_id_param,
+                inspect.Parameter.POSITIONAL_OR_KEYWORD,
+                annotation=UUID,
+            )
+        )
+    sig_params.append(
+        inspect.Parameter(
+            "payload",
+            inspect.Parameter.POSITIONAL_OR_KEYWORD,
+            annotation=BaseModel,
+        )
+    )
+    sig_params.append(
+        inspect.Parameter(
+            "repo",
+            inspect.Parameter.POSITIONAL_OR_KEYWORD,
+            annotation=BaseRepository,
+        )
+    )
+    sig_params.append(
+        inspect.Parameter(
+            "audit_repo",
+            inspect.Parameter.POSITIONAL_OR_KEYWORD,
+            annotation=AuditRepository,
+        )
+    )
+    sig_params.append(
+        inspect.Parameter(
+            "requesting_user",
+            inspect.Parameter.POSITIONAL_OR_KEYWORD,
+            annotation=User,
+        )
+    )
+
+    async def _handler(**kwargs: Any) -> Any:
+        return await handle_create(
+            spec,
+            payload=kwargs["payload"],
+            parent_id=(kwargs[parent_id_param] if parent_id_param else None),
+            repo=kwargs["repo"],
+            audit_repo=kwargs["audit_repo"],
+            requesting_user=kwargs["requesting_user"],
+        )
+
+    _handler.__signature__ = inspect.Signature(parameters=sig_params)  # type: ignore[attr-defined]
+    _handler.__name__ = f"_handle_create_{spec.name}"
     _handler.__qualname__ = _handler.__name__
     return _handler

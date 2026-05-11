@@ -136,3 +136,26 @@ class BaseRepository:
         """Public alias for `_delete`. Used by generic framework
         handlers (e.g. `handle_delete`)."""
         await self._delete(obj)
+
+    async def create(self, obj: Any) -> Any:
+        """Public alias for `_persist_new`. Used by `handle_create`."""
+        return await self._persist_new(obj)
+
+    async def add_child(self, parent: Any, collection: str, child: Any) -> Any:
+        """Public alias for `_add_child`. Used by `handle_create` on
+        owned subentities — appends `child` to
+        `parent.<collection>` so the parent's in-memory state stays
+        coherent for the post-mutation audit snapshot."""
+        return await self._add_child(parent, collection, child)
+
+    async def create_polymorphic(
+        self, parent: Any, detail: Any, *, detail_relationship: str
+    ) -> Any:
+        """Persist a polymorphic parent + its per-kind detail row in one
+        flush. Lifts the post-repo's `_attach_detail` flow into the
+        base so any polymorphic entity gets it for free; the
+        kind-to-relationship binding lives on the entity's
+        `DiscriminatorRegistry` (`spec.discriminator[kind].detail_relationship`).
+        """
+        setattr(parent, detail_relationship, detail)
+        return await self._persist_new(parent)

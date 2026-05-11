@@ -15,11 +15,8 @@ from src.api.common.specs.provider import PROVIDER_ENTITY
 from src.api.common.specs.provider_certification import CERTIFICATION_ENTITY
 from src.api.common.specs.provider_education import EDUCATION_ENTITY
 from src.api.common.specs.provider_licensure import LICENSURE_ENTITY
-from src.logic._generic import make_delete_handler
+from src.logic._generic import make_create_handler, make_delete_handler
 from src.logic.providers.provider_processing import (
-    handle_create_certification,
-    handle_create_education,
-    handle_create_licensure,
     handle_create_provider,
     handle_get_provider_detail,
     handle_get_provider_edit_form,
@@ -109,26 +106,11 @@ mount_delete(router, PROVIDER_SPEC, handler=make_delete_handler(PROVIDER_ENTITY)
 # the handler under their declared kwarg names.
 
 
-for _spec, _entity, _create, _update in (
-    (
-        LICENSURE_SPEC,
-        LICENSURE_ENTITY,
-        handle_create_licensure,
-        handle_update_licensure,
-    ),
-    (
-        EDUCATION_SPEC,
-        EDUCATION_ENTITY,
-        handle_create_education,
-        handle_update_education,
-    ),
-    (
-        CERTIFICATION_SPEC,
-        CERTIFICATION_ENTITY,
-        handle_create_certification,
-        handle_update_certification,
-    ),
+for _spec, _entity, _update in (
+    (LICENSURE_SPEC, LICENSURE_ENTITY, handle_update_licensure),
+    (EDUCATION_SPEC, EDUCATION_ENTITY, handle_update_education),
+    (CERTIFICATION_SPEC, CERTIFICATION_ENTITY, handle_update_certification),
 ):
-    mount_create(router, _spec, handler=_create)
+    mount_create(router, _spec, handler=make_create_handler(_entity))
     mount_update(router, _spec, handler=_update)
     mount_delete(router, _spec, handler=make_delete_handler(_entity))

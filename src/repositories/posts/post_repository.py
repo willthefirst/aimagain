@@ -4,28 +4,9 @@ from uuid import UUID
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.models import (
-    POST_KIND_BY_DETAIL_MODEL,
-    POST_KINDS,
-    ClientReferralDetail,
-    Post,
-    ProviderAvailabilityDetail,
-)
+from src.models import POST_KINDS, Post
 
 from ..base import BaseRepository
-
-PostDetail = ClientReferralDetail | ProviderAvailabilityDetail
-
-
-def _attach_detail(post: Post, detail: PostDetail) -> None:
-    """Wire a fresh detail row up to its parent on the right relationship.
-
-    The detail-class-to-relationship mapping is the registry in
-    `src/models/posts/post_kinds.py` — adding a new kind there is enough."""
-    spec = POST_KIND_BY_DETAIL_MODEL.get(type(detail))
-    if spec is None:
-        raise TypeError(f"unsupported detail type: {type(detail).__name__}")
-    setattr(post, spec.detail_relationship, detail)
 
 
 class PostRepository(BaseRepository):
@@ -40,17 +21,6 @@ class PostRepository(BaseRepository):
     async def list_posts(self) -> Sequence[Post]:
         """Lists all posts, newest first. Detail relationships are eager-loaded."""
         return await self._list(select(Post).order_by(Post.created_at.desc()))
-
-    async def create_post(self, post: Post, detail: PostDetail) -> Post:
-        """Persists a new post + its per-kind detail in one flush; the
-        caller commits.
-
-        The detail's `post_id` is wired up via the appropriate
-        `*_detail` relationship (chosen by `_attach_detail` based on the
-        detail's type). CASCADE on the FK keeps lifetimes locked together.
-        """
-        _attach_detail(post, detail)
-        return await self._persist_new(post)
 
     async def update_post(self, post: Post, **detail_fields: Any) -> Post:
         """Mutates the per-kind detail fields that were provided and flushes;

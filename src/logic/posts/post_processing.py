@@ -123,37 +123,6 @@ async def handle_get_post_edit_form(
     }
 
 
-async def handle_create_post(
-    payload: PostCreatePayload,
-    repo: PostRepository,
-    audit_repo: AuditRepository,
-    requesting_user: User,
-) -> Post:
-    """Creates a post owned by the requesting user; writes an audit row in
-    the same transaction; commits on success.
-
-    Dispatches via the `POST_KINDS` registry: the `kind` discriminator
-    on the payload picks the spec, and the spec's `detail_model` +
-    `detail_fields` build the right detail row. Adding a new kind means
-    a registry entry — no edits here.
-    """
-    spec = POST_KINDS[payload.kind]
-    post = Post(kind=payload.kind, owner_id=requesting_user.id)
-    detail = spec.detail_model(**{f: getattr(payload, f) for f in spec.detail_fields})
-
-    created = await repo.create_post(post, detail)
-    async with mutate(
-        repo,
-        audit_repo,
-        actor=requesting_user,
-        target=created,
-        resource=POST,
-        verb="create",
-    ):
-        pass
-    return created
-
-
 async def handle_update_post(
     post_id: UUID,
     payload: PostUpdatePayload,

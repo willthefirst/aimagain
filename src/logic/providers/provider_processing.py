@@ -42,12 +42,9 @@ from src.repositories.favorites.user_favorite_repository import UserFavoriteRepo
 from src.repositories.providers.provider_repository import ProviderRepository
 from src.repositories.users.user_repository import UserRepository
 from src.schemas.providers.provider import (
-    ProviderCertificationCreate,
     ProviderCertificationUpdate,
     ProviderCreate,
-    ProviderEducationCreate,
     ProviderEducationUpdate,
-    ProviderLicensureCreate,
     ProviderLicensureUpdate,
     ProviderUpdate,
 )
@@ -324,31 +321,6 @@ _CERTIFICATION_SPEC = _SubrowSpec(
 )
 
 
-async def _handle_subrow_create(
-    *,
-    provider_id: UUID,
-    payload: BaseModel,
-    repo: ProviderRepository,
-    audit_repo: AuditRepository,
-    requesting_user: User,
-    spec: _SubrowSpec,
-) -> Any:
-    provider = await _load_provider_or_404(provider_id, repo)
-    assert_owner_or_admin(provider, requesting_user, action="modify this provider")
-
-    created = await getattr(repo, spec.add)(provider, **payload.model_dump())
-    async with mutate(
-        repo,
-        audit_repo,
-        actor=requesting_user,
-        target=created,
-        resource=spec.resource,
-        verb="create",
-    ):
-        pass
-    return created
-
-
 async def _handle_subrow_update(
     *,
     provider_id: UUID,
@@ -380,23 +352,6 @@ async def _handle_subrow_update(
 # --- Licensure handlers --------------------------------------------------
 
 
-async def handle_create_licensure(
-    provider_id: UUID,
-    payload: ProviderLicensureCreate,
-    repo: ProviderRepository,
-    audit_repo: AuditRepository,
-    requesting_user: User,
-) -> ProviderLicensure:
-    return await _handle_subrow_create(
-        provider_id=provider_id,
-        payload=payload,
-        repo=repo,
-        audit_repo=audit_repo,
-        requesting_user=requesting_user,
-        spec=_LICENSURE_SPEC,
-    )
-
-
 async def handle_update_licensure(
     provider_id: UUID,
     licensure_id: UUID,
@@ -419,23 +374,6 @@ async def handle_update_licensure(
 # --- Education handlers --------------------------------------------------
 
 
-async def handle_create_education(
-    provider_id: UUID,
-    payload: ProviderEducationCreate,
-    repo: ProviderRepository,
-    audit_repo: AuditRepository,
-    requesting_user: User,
-) -> ProviderEducation:
-    return await _handle_subrow_create(
-        provider_id=provider_id,
-        payload=payload,
-        repo=repo,
-        audit_repo=audit_repo,
-        requesting_user=requesting_user,
-        spec=_EDUCATION_SPEC,
-    )
-
-
 async def handle_update_education(
     provider_id: UUID,
     education_id: UUID,
@@ -456,23 +394,6 @@ async def handle_update_education(
 
 
 # --- Certification handlers ----------------------------------------------
-
-
-async def handle_create_certification(
-    provider_id: UUID,
-    payload: ProviderCertificationCreate,
-    repo: ProviderRepository,
-    audit_repo: AuditRepository,
-    requesting_user: User,
-) -> ProviderCertification:
-    return await _handle_subrow_create(
-        provider_id=provider_id,
-        payload=payload,
-        repo=repo,
-        audit_repo=audit_repo,
-        requesting_user=requesting_user,
-        spec=_CERTIFICATION_SPEC,
-    )
 
 
 async def handle_update_certification(
