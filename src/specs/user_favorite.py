@@ -32,12 +32,12 @@ from src.api.common.entity_spec import (
     RouteSet,
     Templates,
 )
-from src.api.common.specs.provider import PROVIDER_ENTITY
-from src.api.common.specs.user import USER_ENTITY
 from src.logic.audit import AuditAction, make_snapshotter
 from src.models import UserFavorite
 from src.repositories.dependencies import get_user_favorite_repository
 from src.schemas.favorites.user_favorite import UserFavoriteAuditSnapshot
+from src.specs.provider import PROVIDER_ENTITY
+from src.specs.user import USER_ENTITY
 
 FAVORITE_EDGE_AUDIT: Final[EdgeAudit] = EdgeAudit(
     resource_type="user_favorite",

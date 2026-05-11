@@ -7,10 +7,10 @@ declaration (edges live outside `RouteSet`).
 """
 
 from src.api.common.entity_spec import M2NRelation
-from src.api.common.specs.provider import PROVIDER_ENTITY
-from src.api.common.specs.user import USER_ENTITY
-from src.api.common.specs.user_favorite import FAVORITE_EDGE_AUDIT, FAVORITE_ENTITY
 from src.logic.audit import AuditAction
+from src.specs.provider import PROVIDER_ENTITY
+from src.specs.user import USER_ENTITY
+from src.specs.user_favorite import FAVORITE_EDGE_AUDIT, FAVORITE_ENTITY
 
 # --- Audit binding (edge variant) ----------------------------------------
 

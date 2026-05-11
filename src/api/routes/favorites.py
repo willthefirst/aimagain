@@ -16,12 +16,12 @@ helper.
 
 from src.api.common import make_entity_router
 from src.api.common.resource_routes import mount_edge_routes
-from src.api.common.specs.user_favorite import FAVORITE_ENTITY
 from src.logic.favorites.favorite_processing import (
     handle_add_favorite,
     handle_list_my_favorites,
     handle_remove_favorite,
 )
+from src.specs.user_favorite import FAVORITE_ENTITY
 
 router = make_entity_router(FAVORITE_ENTITY)
 favorites_api_router = router.router

@@ -7,9 +7,9 @@ redirect to the detail page, and the list-extras binding.
 """
 
 from src.api.common.entity_spec import AUTHENTICATED, OWNER_OR_ADMIN
-from src.api.common.specs.post import POST_ENTITY
 from src.models import POST_KINDS
 from src.schemas.posts.post import post_create_adapter, post_update_adapter
+from src.specs.post import POST_ENTITY
 
 # --- Auth deps + authorization (post-specific) ---------------------------
 

@@ -8,7 +8,7 @@ The `api/routes/` directory contains **domain-specific route handlers** that def
 
 Routes are **ultra-thin HTTP adapters** that handle request parsing, delegate to processing logic, and format responses while being organized by business domains for maintainability.
 
-CRUD-shaped routes use the **`EntitySpec` declaration + `mount_entity` dispatcher**. Each entity declares its identity once in [`src/api/common/specs/<entity>.py`](../common/README.md#entityspec) (carries `routes` opt-in flags, audit binding, state axes, subresources, filters, discriminator, templates, etc.) and the route file calls `mount_entity(router, ENTITY, handlers={...})`. The dispatcher reads the spec and fires the right underlying `mount_*` helper for each opted-in verb. Sub-resources nest via the child entity's `parent=PARENT_ENTITY` field and are passed through `owned_subentities=` on the dispatcher. Routes that don't fit the grammar (auth flows, `/me/*` singletons, M:N edge add/remove, utility endpoints) stay hand-written — see [Bespoke routes](#bespoke-routes) below.
+CRUD-shaped routes use the **`EntitySpec` declaration + `mount_entity` dispatcher**. Each entity declares its identity once in [`src/specs/<entity>.py`](../common/README.md#entityspec) (carries `routes` opt-in flags, audit binding, state axes, subresources, filters, discriminator, templates, etc.) and the route file calls `mount_entity(router, ENTITY, handlers={...})`. The dispatcher reads the spec and fires the right underlying `mount_*` helper for each opted-in verb. Sub-resources nest via the child entity's `parent=PARENT_ENTITY` field and are passed through `owned_subentities=` on the dispatcher. Routes that don't fit the grammar (auth flows, `/me/*` singletons, M:N edge add/remove, utility endpoints) stay hand-written — see [Bespoke routes](#bespoke-routes) below.
 
 The underlying `mount_*` helpers (`mount_list`, `mount_detail`, `mount_create`, `mount_update`, `mount_delete`, `mount_form`, `mount_state_axis`, `mount_related_list`) remain available for entities whose URL shape `mount_entity` can't handle — favorites' M:N edge POST/DELETE is the only current example. Every other entity (users, providers + 3 credential subentities, posts) composes through `mount_entity`.
 
@@ -18,7 +18,7 @@ For the standard CRUD verbs (create / update / delete), the route file binds han
 
 - **Domain organization**: one route file per resource, named after the resource.
 - **Thin route handlers**: Routes only handle HTTP concerns; business logic stays in `logic/`.
-- **`EntitySpec` + `mount_entity` for CRUD**: Declare the spec once in `api/common/specs/`, call `mount_entity(router, ENTITY, handlers={...})`. The route file becomes a manifest, not a hand-rolled CRUD wall.
+- **`EntitySpec` + `mount_entity` for CRUD**: Declare the spec once in `specs/`, call `mount_entity(router, ENTITY, handlers={...})`. The route file becomes a manifest, not a hand-rolled CRUD wall.
 - **Hand-written for the routes that don't fit**: Auth flows, singletons, M:N edge add/remove, utility endpoints stay explicit — the grammar is for resource-shaped routes, not protocols.
 - **Consistent delegation**: All routes delegate to processing functions in `logic/`.
 - **Standardized patterns**: BaseRouter wraps every route with error handling and logging.
@@ -29,7 +29,7 @@ For the standard CRUD verbs (create / update / delete), the route file binds han
 ```python
 from src.api.common import make_entity_router
 from src.api.common.resource_routes import mount_entity
-from src.api.common.specs.user import USER_ENTITY
+from src.specs.user import USER_ENTITY
 from src.logic.users.user_processing import handle_delete_user
 
 router = make_entity_router(USER_ENTITY)
@@ -110,16 +110,16 @@ If a future case suggests the grammar should grow to fit one of these (e.g. a se
 
 ### Adding a CRUD-shaped resource (the common case)
 
-1. **Declare the spec** at `src/api/common/specs/<entity>.py`. The spec carries every per-entity declaration (identity, audit binding, route opt-ins, write_authz, body adapters, redirects, filters, templates, etc.). See existing examples in `specs/` — `user.py` (simplest), `provider.py` (with filters + form pages), `post.py` (with discriminator), `user_favorite.py` (edge / M:N).
+1. **Declare the spec** at `src/specs/<entity>.py`. The spec carries every per-entity declaration (identity, audit binding, route opt-ins, write_authz, body adapters, redirects, filters, templates, etc.). See existing examples in `specs/` — `user.py` (simplest), `provider.py` (with filters + form pages), `post.py` (with discriminator), `user_favorite.py` (edge / M:N).
 
-2. **Add a spec-correctness test** at `src/api/common/specs/test_<entity>.py` asserting the spec declares the right values (audit type, owner_attr, route flags, etc.).
+2. **Add a spec-correctness test** at `src/specs/test_<entity>.py` asserting the spec declares the right values (audit type, owner_attr, route flags, etc.).
 
 3. **Create the route file** `<resource>.py`. Call `mount_entity`; framework verbs auto-bind to `make_<verb>_handler(<ENTITY>_ENTITY)` and get stitched onto the route module as `_handle_<verb>_<entity>` (target module auto-detected from the caller frame) for contract-test patches. Only bespoke handlers need explicit `handlers` entries.
 
 ```python
 from src.api.common import make_entity_router
 from src.api.common.resource_routes import mount_entity
-from src.api.common.specs.<entity> import <ENTITY>_ENTITY
+from src.specs.<entity> import <ENTITY>_ENTITY
 # Per-viewer / per-list extras don't import here — they live on the
 # spec as `detail_extras_path` / `list_extras_path` and resolve at
 # mount time. Bespoke handlers (only when the entity needs them)

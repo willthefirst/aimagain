@@ -1,9 +1,9 @@
 from src.api.common import make_entity_router
 from src.api.common.resource_routes import mount_entity
-from src.api.common.specs.provider import PROVIDER_ENTITY
-from src.api.common.specs.provider_certification import CERTIFICATION_ENTITY
-from src.api.common.specs.provider_education import EDUCATION_ENTITY
-from src.api.common.specs.provider_licensure import LICENSURE_ENTITY
+from src.specs.provider import PROVIDER_ENTITY
+from src.specs.provider_certification import CERTIFICATION_ENTITY
+from src.specs.provider_education import EDUCATION_ENTITY
+from src.specs.provider_licensure import LICENSURE_ENTITY
 
 router = make_entity_router(PROVIDER_ENTITY)
 providers_api_router = router.router

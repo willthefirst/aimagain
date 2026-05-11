@@ -1470,7 +1470,7 @@ def _resolve_dotted_path(entity: Any, dotted_path: str, field_label: str) -> Any
     handler bindings) and by the extras-path resolution in
     `mount_entity`. The shared helper sidesteps the import cycle the
     spec-driven late-binding pattern was built to avoid:
-    `api.common.specs.<entity>` declares the dotted path as a string,
+    `specs.<entity>` declares the dotted path as a string,
     and `src.logic.<entity>` (the module that *contains* the attribute)
     is only imported at mount time — long after both modules have
     finished initializing.

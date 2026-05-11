@@ -5,12 +5,12 @@ Read by:
     mount helpers and reads the list filters from `.filters`.
   - `src/logic/providers/provider_processing.py` — reads
     `PROVIDER_ENTITY.audit` for the `mutate(...)` resource binding.
-  - `src/api/common/specs/provider_licensure.py` /
+  - `src/specs/provider_licensure.py` /
     `provider_education.py` / `provider_certification.py` — set
     ``parent=PROVIDER_ENTITY`` so the mount layer's parent-chain
     machinery builds nested paths like
     ``/providers/{provider_id}/licensures/{licensure_id}``.
-  - `src/api/common/specs/user.py` — the related-list subresource
+  - `src/specs/user.py` — the related-list subresource
     `RelatedListSubresource(child_spec=PROVIDER_ENTITY.to_resource_spec(), ...)`
     on the user spec; closes the `api/common -> api/routes`
     inversion documented in A1 (#317).
