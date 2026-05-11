@@ -5,7 +5,7 @@ from fastapi import Request
 
 from src.api.common.exceptions import NotFoundError
 from src.api.common.specs.post import POST_ENTITY
-from src.logic._authz import assert_owner_or_admin, is_admin, is_owner
+from src.logic._authz import is_admin, is_owner
 from src.models import POST_KINDS, User
 from src.repositories.posts.post_repository import PostRepository
 from src.schemas.posts.post import (
@@ -90,32 +90,4 @@ async def handle_get_post_form(
         "request": request,
         "current_user": requesting_user,
         "template_name": POST_KINDS[chosen_kind].create_template,
-    }
-
-
-async def handle_get_post_edit_form(
-    request: Request,
-    post_id: UUID,
-    repo: PostRepository,
-    requesting_user: User,
-):
-    """Loads a post for the edit-form page. 404 if missing, 403 if the
-    requester is neither owner nor admin (mirrors `handle_update_post`).
-
-    Returns ``template_name`` in the context so `mount_form` renders the
-    kind-specific edit template (each post kind has its own edit page).
-    The mount pops ``template_name`` before rendering so it doesn't leak
-    into the Jinja context.
-    """
-    post = await repo.get_post_by_id(post_id)
-    if post is None:
-        raise NotFoundError(detail="Post not found")
-
-    assert_owner_or_admin(post, requesting_user, action="edit this post")
-
-    return {
-        "request": request,
-        "post": post,
-        "current_user": requesting_user,
-        "template_name": POST_KINDS[post.kind].edit_template,
     }

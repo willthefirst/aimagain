@@ -20,6 +20,7 @@ import inspect
 from typing import Any
 from uuid import UUID
 
+from fastapi import Request
 from pydantic import BaseModel
 
 from src.api.common.entity_spec import EntitySpec
@@ -541,5 +542,106 @@ def make_update_handler(spec: EntitySpec):
 
     _handler.__signature__ = inspect.Signature(parameters=sig_params)  # type: ignore[attr-defined]
     _handler.__name__ = f"_handle_update_{spec.name}"
+    _handler.__qualname__ = _handler.__name__
+    return _handler
+
+
+async def handle_get_edit_form(
+    spec: EntitySpec,
+    *,
+    request: Request,
+    target_id: UUID,
+    repo: BaseRepository,
+    requesting_user: User,
+) -> dict[str, Any]:
+    """Generic edit-form handler driven by `spec`.
+
+    Performs: load target → 404 → write_authz → return template context
+    binding the entity under `spec.name` (so existing templates' variable
+    names — `provider`, `post` — keep working without per-entity glue).
+
+    For polymorphic entities (`spec.discriminator` set), returns
+    `template_name` in the context using `kind_spec.edit_template` so
+    `mount_form`'s template precedence renders the per-kind edit page.
+    Entities with bespoke edit-form rules keep custom handlers.
+
+    Reads from the spec:
+      - `spec.model` — class fetched via `repo.get_by_model_id`.
+      - `spec.write_authz` — invoked against the target. `None` skips
+        the gate (matches the `handle_update`/`handle_delete` shape).
+      - `spec.discriminator` — if set, populates `template_name` from
+        the discriminator-registry entry's `edit_template` attribute.
+    """
+    target = await repo.get_by_model_id(spec.model, target_id)
+    if target is None:
+        raise NotFoundError(detail=f"{spec.name.capitalize()} not found")
+    if spec.write_authz is not None:
+        spec.write_authz(target, requesting_user, action=f"edit this {spec.name}")
+
+    context: dict[str, Any] = {
+        "request": request,
+        spec.name: target,
+        "current_user": requesting_user,
+    }
+    if spec.discriminator is not None:
+        kind = getattr(target, spec.discriminator.column)
+        context["template_name"] = spec.discriminator[kind].edit_template
+    return context
+
+
+def make_edit_form_handler(spec: EntitySpec):
+    """Build a `mount_form(on_existing=True)`-compatible handler from `spec`.
+
+    Mirrors `make_update_handler` / `make_delete_handler`: synthesizes a
+    typed signature that `mount_form`'s introspection recognizes, then
+    delegates to `handle_get_edit_form(spec, ...)`.
+
+    Synthesized parameters:
+      - `request: Request` — bound by the mount synthesis to the FastAPI
+        request object (used by template rendering).
+      - `<id_param>: UUID` — the target's id from the URL.
+      - `repo: BaseRepository` — resolved via `spec.repo_dep`.
+      - `requesting_user: User` — resolved via `spec.read_user_dep`.
+
+    Returns a callable whose `__name__` is
+    `_handle_get_<spec.name>_edit_form` so stack traces stay readable;
+    route files typically rebind `__module__` so contract-test patches
+    against `<routes module>._handle_get_<entity>_edit_form` flow
+    through the mount layer's `_resolve_handler`.
+    """
+    id_param = spec.id_param
+
+    sig_params: list[inspect.Parameter] = [
+        inspect.Parameter(
+            "request",
+            inspect.Parameter.POSITIONAL_OR_KEYWORD,
+            annotation=Request,
+        ),
+        inspect.Parameter(
+            id_param, inspect.Parameter.POSITIONAL_OR_KEYWORD, annotation=UUID
+        ),
+        inspect.Parameter(
+            "repo",
+            inspect.Parameter.POSITIONAL_OR_KEYWORD,
+            annotation=BaseRepository,
+        ),
+        inspect.Parameter(
+            "requesting_user",
+            inspect.Parameter.POSITIONAL_OR_KEYWORD,
+            annotation=User,
+        ),
+    ]
+
+    async def _handler(**kwargs: Any) -> dict[str, Any]:
+        return await handle_get_edit_form(
+            spec,
+            request=kwargs["request"],
+            target_id=kwargs[id_param],
+            repo=kwargs["repo"],
+            requesting_user=kwargs["requesting_user"],
+        )
+
+    _handler.__signature__ = inspect.Signature(parameters=sig_params)  # type: ignore[attr-defined]
+    _handler.__name__ = f"_handle_get_{spec.name}_edit_form"
     _handler.__qualname__ = _handler.__name__
     return _handler
