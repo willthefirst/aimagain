@@ -17,6 +17,7 @@ custom shapes stay custom.
 """
 
 import inspect
+from dataclasses import dataclass
 from typing import Any, Awaitable, Callable
 from uuid import UUID
 
@@ -327,240 +328,194 @@ async def handle_update(
     return target
 
 
-def make_delete_handler(spec: EntitySpec):
-    """Build a `mount_delete`-compatible handler from `spec`.
+# --- Spec-driven factory infrastructure ---------------------------------
+#
+# Each `make_<verb>_handler` factory fabricates a callable with a typed
+# signature so the route mount layer's introspection
+# (`src/api/common/resource_routes.py`) can bind URL path params, body
+# adapters, query filters, and `Depends` to the right handler kwargs.
+# The six verbs (delete/create/update/edit_form/detail/list) used to be
+# six near-identical 80-line factories — the differences are entirely
+# *which* of the standard params each shape includes. `_FactoryShape`
+# encodes that, and `_make_factory_handler` builds the signature +
+# wrapper once. The six public factories below are thin wrappers that
+# pair their `handle_*` function with a pre-baked shape.
 
-    The mount layer's signature synthesis (`src/api/common/resource_routes.py`)
-    binds URL path params to handler kwargs by name. For the generic
-    `handle_delete` to be mountable, the route file needs a callable
-    whose signature names the spec's id_param (and the parent's
-    id_param for subentities) — generic `**kwargs` wouldn't bind.
 
-    This factory fabricates that signature dynamically and returns a
-    wrapper that delegates to `handle_delete(spec, ...)`. Each route
-    file does:
+@dataclass(frozen=True, slots=True)
+class _FactoryShape:
+    """Declarative shape of one verb's factory-built handler.
 
-        _handle_delete_provider = make_delete_handler(PROVIDER_ENTITY)
-        mount_delete(router, PROVIDER_SPEC, handler=_handle_delete_provider)
+    `name_template` carries a single `{name}` placeholder filled with
+    `spec.name` to produce the `__name__` (e.g. `_handle_delete_widget`).
+    The booleans toggle which standard params appear in the
+    synthesized signature and which kwargs the wrapper forwards to
+    `handle_*(spec, ...)`.
+    """
 
-    The wrapper's `__name__` is `_handle_delete_<spec.name>` so stack
-    traces stay readable. The synthesized signature carries typed
-    parameters that `mount_delete`'s introspection recognizes: the
-    id param (and parent id, if any) as `UUID`, plus `repo`,
-    `audit_repo`, `requesting_user` to drive the standard dep
-    wiring.
+    name_template: str
+    include_request: bool = False
+    include_target_id: bool = False
+    include_parent_id: bool = False
+    include_payload: bool = False
+    include_audit_repo: bool = False
+    include_filters: bool = False
+    accepts_extras: bool = False
+    user_optional: bool = False
+
+
+_DELETE_SHAPE = _FactoryShape(
+    name_template="_handle_delete_{name}",
+    include_target_id=True,
+    include_parent_id=True,
+    include_audit_repo=True,
+)
+_CREATE_SHAPE = _FactoryShape(
+    name_template="_handle_create_{name}",
+    include_payload=True,
+    include_parent_id=True,
+    include_audit_repo=True,
+)
+_UPDATE_SHAPE = _FactoryShape(
+    name_template="_handle_update_{name}",
+    include_target_id=True,
+    include_payload=True,
+    include_parent_id=True,
+    include_audit_repo=True,
+)
+_EDIT_FORM_SHAPE = _FactoryShape(
+    name_template="_handle_get_{name}_edit_form",
+    include_request=True,
+    include_target_id=True,
+)
+_DETAIL_SHAPE = _FactoryShape(
+    name_template="_handle_get_{name}_detail",
+    include_request=True,
+    include_target_id=True,
+    accepts_extras=True,
+    user_optional=True,
+)
+_LIST_SHAPE = _FactoryShape(
+    name_template="_handle_list_{name}",
+    include_request=True,
+    include_filters=True,
+    accepts_extras=True,
+    user_optional=True,
+)
+
+
+def _param(name: str, annotation: Any) -> inspect.Parameter:
+    return inspect.Parameter(
+        name, inspect.Parameter.POSITIONAL_OR_KEYWORD, annotation=annotation
+    )
+
+
+def _make_factory_handler(
+    spec: EntitySpec,
+    shape: _FactoryShape,
+    handler_fn: Callable[..., Awaitable[Any]],
+    *,
+    extras: Callable[..., Awaitable[dict[str, Any]]] | None = None,
+    extra_repos: tuple[tuple[str, type], ...] = (),
+):
+    """Build the wrapper that the mount layer will introspect + call.
+
+    Walks `shape` to assemble the signature and the forwarding logic.
+    `handler_fn` is the corresponding `handle_<verb>` to delegate to;
+    `extras` / `extra_repos` are read by the detail/list shapes only.
     """
     id_param = spec.id_param
     parent_id_param = spec.parent.id_param if spec.parent is not None else None
+    filter_names = (
+        tuple(qp.name for qp in spec.filters) if shape.include_filters else ()
+    )
+    extra_repo_names = tuple(name for name, _ in extra_repos)
 
     sig_params: list[inspect.Parameter] = []
-    if parent_id_param is not None:
-        sig_params.append(
-            inspect.Parameter(
-                parent_id_param,
-                inspect.Parameter.POSITIONAL_OR_KEYWORD,
-                annotation=UUID,
-            )
-        )
-    sig_params.append(
-        inspect.Parameter(
-            id_param, inspect.Parameter.POSITIONAL_OR_KEYWORD, annotation=UUID
-        )
-    )
-    sig_params.append(
-        inspect.Parameter(
-            "repo",
-            inspect.Parameter.POSITIONAL_OR_KEYWORD,
-            annotation=BaseRepository,
-        )
-    )
-    sig_params.append(
-        inspect.Parameter(
-            "audit_repo",
-            inspect.Parameter.POSITIONAL_OR_KEYWORD,
-            annotation=AuditRepository,
-        )
-    )
-    sig_params.append(
-        inspect.Parameter(
-            "requesting_user",
-            inspect.Parameter.POSITIONAL_OR_KEYWORD,
-            annotation=User,
-        )
-    )
+    if shape.include_request:
+        sig_params.append(_param("request", Request))
+    if shape.include_parent_id and parent_id_param is not None:
+        sig_params.append(_param(parent_id_param, UUID))
+    if shape.include_target_id:
+        sig_params.append(_param(id_param, UUID))
+    if shape.include_filters:
+        for qp in spec.filters:
+            sig_params.append(_param(qp.name, qp.annotation))
+    if shape.include_payload:
+        sig_params.append(_param("payload", BaseModel))
+    sig_params.append(_param("repo", BaseRepository))
+    if shape.include_audit_repo:
+        sig_params.append(_param("audit_repo", AuditRepository))
+    user_ann = User | None if shape.user_optional else User
+    sig_params.append(_param("requesting_user", user_ann))
+    for name, repo_type in extra_repos:
+        sig_params.append(_param(name, repo_type))
 
-    async def _handler(**kwargs: Any) -> None:
-        return await handle_delete(
-            spec,
-            target_id=kwargs[id_param],
-            parent_id=(kwargs[parent_id_param] if parent_id_param else None),
-            repo=kwargs["repo"],
-            audit_repo=kwargs["audit_repo"],
-            requesting_user=kwargs["requesting_user"],
-        )
+    async def _handler(**kwargs: Any) -> Any:
+        call_kwargs: dict[str, Any] = {
+            "repo": kwargs["repo"],
+            "requesting_user": kwargs["requesting_user"],
+        }
+        if shape.include_request:
+            call_kwargs["request"] = kwargs["request"]
+        if shape.include_target_id:
+            call_kwargs["target_id"] = kwargs[id_param]
+        if shape.include_parent_id:
+            call_kwargs["parent_id"] = (
+                kwargs[parent_id_param] if parent_id_param else None
+            )
+        if shape.include_payload:
+            call_kwargs["payload"] = kwargs["payload"]
+        if shape.include_audit_repo:
+            call_kwargs["audit_repo"] = kwargs["audit_repo"]
+        if shape.include_filters:
+            call_kwargs["filter_values"] = {n: kwargs[n] for n in filter_names}
+        if shape.accepts_extras:
+            collected = {n: kwargs[n] for n in extra_repo_names}
+            call_kwargs["extras"] = extras
+            call_kwargs["extra_kwargs"] = collected if collected else None
+        return await handler_fn(spec, **call_kwargs)
 
     _handler.__signature__ = inspect.Signature(parameters=sig_params)  # type: ignore[attr-defined]
-    _handler.__name__ = f"_handle_delete_{spec.name}"
+    _handler.__name__ = shape.name_template.format(name=spec.name)
     _handler.__qualname__ = _handler.__name__
     return _handler
+
+
+def make_delete_handler(spec: EntitySpec):
+    """Build a `mount_delete`-compatible handler from `spec`.
+
+    Synthesizes a typed signature that `mount_delete`'s introspection
+    recognizes (id param + parent id for subentities, plus `repo`,
+    `audit_repo`, `requesting_user`) and delegates to
+    `handle_delete(spec, ...)`. The wrapper's `__name__` is
+    `_handle_delete_<spec.name>` so stack traces stay readable; route
+    files assign the result to that module-level attribute so
+    contract-test patches against `<routes module>._handle_delete_<entity>`
+    flow through the mount layer's `_resolve_handler`.
+    """
+    return _make_factory_handler(spec, _DELETE_SHAPE, handle_delete)
 
 
 def make_create_handler(spec: EntitySpec):
     """Build a `mount_create`-compatible handler from `spec`.
 
-    Mirrors `make_delete_handler`: synthesizes a typed signature that
-    `mount_create`'s introspection (in
-    `src/api/common/resource_routes.py`) recognizes. The returned
-    callable delegates to `handle_create(spec, ...)`.
-
-    Synthesized parameters:
-      - `parent_id: UUID` — present only for owned subentities.
-      - `payload: BaseModel` — the mount layer parses the request body
-        via `spec.create_adapter`; the framework dispatches by
-        `payload.kind` if the entity is polymorphic.
-      - `repo: BaseRepository`, `audit_repo: AuditRepository`,
-        `requesting_user: User` — standard deps the mount wires via
-        `spec.repo_dep`, the type registry, and `spec.write_user_dep`.
-
-    Returns a callable whose `__name__` is
-    `_handle_create_<spec.name>` so stack traces stay readable.
-    Route files assign the result to `_handle_create_<entity>` as a
-    module-level attribute so contract-test patches (which target
-    `<routes module>._handle_create_<entity>`) flow through the
-    mount layer's `_resolve_handler`.
+    Synthesized parameters: `parent_id` (subentities only), `payload`,
+    `repo`, `audit_repo`, `requesting_user`. Delegates to
+    `handle_create(spec, ...)`; the framework dispatches by
+    `payload.kind` when `spec.discriminator` is set.
     """
-    parent_id_param = spec.parent.id_param if spec.parent is not None else None
-
-    sig_params: list[inspect.Parameter] = []
-    if parent_id_param is not None:
-        sig_params.append(
-            inspect.Parameter(
-                parent_id_param,
-                inspect.Parameter.POSITIONAL_OR_KEYWORD,
-                annotation=UUID,
-            )
-        )
-    sig_params.append(
-        inspect.Parameter(
-            "payload",
-            inspect.Parameter.POSITIONAL_OR_KEYWORD,
-            annotation=BaseModel,
-        )
-    )
-    sig_params.append(
-        inspect.Parameter(
-            "repo",
-            inspect.Parameter.POSITIONAL_OR_KEYWORD,
-            annotation=BaseRepository,
-        )
-    )
-    sig_params.append(
-        inspect.Parameter(
-            "audit_repo",
-            inspect.Parameter.POSITIONAL_OR_KEYWORD,
-            annotation=AuditRepository,
-        )
-    )
-    sig_params.append(
-        inspect.Parameter(
-            "requesting_user",
-            inspect.Parameter.POSITIONAL_OR_KEYWORD,
-            annotation=User,
-        )
-    )
-
-    async def _handler(**kwargs: Any) -> Any:
-        return await handle_create(
-            spec,
-            payload=kwargs["payload"],
-            parent_id=(kwargs[parent_id_param] if parent_id_param else None),
-            repo=kwargs["repo"],
-            audit_repo=kwargs["audit_repo"],
-            requesting_user=kwargs["requesting_user"],
-        )
-
-    _handler.__signature__ = inspect.Signature(parameters=sig_params)  # type: ignore[attr-defined]
-    _handler.__name__ = f"_handle_create_{spec.name}"
-    _handler.__qualname__ = _handler.__name__
-    return _handler
+    return _make_factory_handler(spec, _CREATE_SHAPE, handle_create)
 
 
 def make_update_handler(spec: EntitySpec):
     """Build a `mount_update`-compatible handler from `spec`.
 
-    Mirrors `make_delete_handler` / `make_create_handler`: synthesizes
-    a typed signature so `mount_update`'s introspection binds URL
-    path params + `Depends` correctly. The returned callable
-    delegates to `handle_update(spec, ...)`.
-
-    Synthesized parameters:
-      - `parent_id: UUID` — present only for owned subentities.
-      - `<id_param>: UUID` — the target's id from the URL.
-      - `payload: BaseModel` — request body (parsed by the mount
-        via `spec.update_adapter`).
-      - `repo`, `audit_repo`, `requesting_user` — standard deps.
+    Synthesized parameters: `parent_id` (subentities only), the
+    target's id from the URL, `payload`, `repo`, `audit_repo`,
+    `requesting_user`. Delegates to `handle_update(spec, ...)`.
     """
-    id_param = spec.id_param
-    parent_id_param = spec.parent.id_param if spec.parent is not None else None
-
-    sig_params: list[inspect.Parameter] = []
-    if parent_id_param is not None:
-        sig_params.append(
-            inspect.Parameter(
-                parent_id_param,
-                inspect.Parameter.POSITIONAL_OR_KEYWORD,
-                annotation=UUID,
-            )
-        )
-    sig_params.append(
-        inspect.Parameter(
-            id_param, inspect.Parameter.POSITIONAL_OR_KEYWORD, annotation=UUID
-        )
-    )
-    sig_params.append(
-        inspect.Parameter(
-            "payload",
-            inspect.Parameter.POSITIONAL_OR_KEYWORD,
-            annotation=BaseModel,
-        )
-    )
-    sig_params.append(
-        inspect.Parameter(
-            "repo",
-            inspect.Parameter.POSITIONAL_OR_KEYWORD,
-            annotation=BaseRepository,
-        )
-    )
-    sig_params.append(
-        inspect.Parameter(
-            "audit_repo",
-            inspect.Parameter.POSITIONAL_OR_KEYWORD,
-            annotation=AuditRepository,
-        )
-    )
-    sig_params.append(
-        inspect.Parameter(
-            "requesting_user",
-            inspect.Parameter.POSITIONAL_OR_KEYWORD,
-            annotation=User,
-        )
-    )
-
-    async def _handler(**kwargs: Any) -> Any:
-        return await handle_update(
-            spec,
-            target_id=kwargs[id_param],
-            payload=kwargs["payload"],
-            parent_id=(kwargs[parent_id_param] if parent_id_param else None),
-            repo=kwargs["repo"],
-            audit_repo=kwargs["audit_repo"],
-            requesting_user=kwargs["requesting_user"],
-        )
-
-    _handler.__signature__ = inspect.Signature(parameters=sig_params)  # type: ignore[attr-defined]
-    _handler.__name__ = f"_handle_update_{spec.name}"
-    _handler.__qualname__ = _handler.__name__
-    return _handler
+    return _make_factory_handler(spec, _UPDATE_SHAPE, handle_update)
 
 
 async def handle_get_edit_form(
@@ -609,59 +564,11 @@ async def handle_get_edit_form(
 def make_edit_form_handler(spec: EntitySpec):
     """Build a `mount_form(on_existing=True)`-compatible handler from `spec`.
 
-    Mirrors `make_update_handler` / `make_delete_handler`: synthesizes a
-    typed signature that `mount_form`'s introspection recognizes, then
-    delegates to `handle_get_edit_form(spec, ...)`.
-
-    Synthesized parameters:
-      - `request: Request` — bound by the mount synthesis to the FastAPI
-        request object (used by template rendering).
-      - `<id_param>: UUID` — the target's id from the URL.
-      - `repo: BaseRepository` — resolved via `spec.repo_dep`.
-      - `requesting_user: User` — resolved via `spec.read_user_dep`.
-
-    Returns a callable whose `__name__` is
-    `_handle_get_<spec.name>_edit_form` so stack traces stay readable;
-    route files typically rebind `__module__` so contract-test patches
-    against `<routes module>._handle_get_<entity>_edit_form` flow
-    through the mount layer's `_resolve_handler`.
+    Synthesized parameters: `request`, the target's id from the URL,
+    `repo`, `requesting_user`. Delegates to
+    `handle_get_edit_form(spec, ...)`.
     """
-    id_param = spec.id_param
-
-    sig_params: list[inspect.Parameter] = [
-        inspect.Parameter(
-            "request",
-            inspect.Parameter.POSITIONAL_OR_KEYWORD,
-            annotation=Request,
-        ),
-        inspect.Parameter(
-            id_param, inspect.Parameter.POSITIONAL_OR_KEYWORD, annotation=UUID
-        ),
-        inspect.Parameter(
-            "repo",
-            inspect.Parameter.POSITIONAL_OR_KEYWORD,
-            annotation=BaseRepository,
-        ),
-        inspect.Parameter(
-            "requesting_user",
-            inspect.Parameter.POSITIONAL_OR_KEYWORD,
-            annotation=User,
-        ),
-    ]
-
-    async def _handler(**kwargs: Any) -> dict[str, Any]:
-        return await handle_get_edit_form(
-            spec,
-            request=kwargs["request"],
-            target_id=kwargs[id_param],
-            repo=kwargs["repo"],
-            requesting_user=kwargs["requesting_user"],
-        )
-
-    _handler.__signature__ = inspect.Signature(parameters=sig_params)  # type: ignore[attr-defined]
-    _handler.__name__ = f"_handle_get_{spec.name}_edit_form"
-    _handler.__qualname__ = _handler.__name__
-    return _handler
+    return _make_factory_handler(spec, _EDIT_FORM_SHAPE, handle_get_edit_form)
 
 
 async def handle_detail(
@@ -731,77 +638,15 @@ def make_detail_handler(
 ):
     """Build a `mount_detail`-compatible handler from `spec`.
 
-    Mirrors the CRUD factories. Synthesizes a typed signature that
-    `mount_detail`'s introspection wires correctly (path id → URL,
-    repos → registry resolvers, requesting_user → spec.read_user_dep).
-    Delegates to `handle_detail(spec, ...)`, passing the extras
-    callable through verbatim.
-
-    Synthesized parameters:
-      - `request: Request` — for template rendering.
-      - `<id_param>: UUID` — the target's id from the URL.
-      - `repo: BaseRepository` — resolved via `spec.repo_dep`.
-      - `requesting_user: User | None` — resolved via
-        `spec.read_user_dep`; declared as Optional so public-detail
-        entities (no read user dep) work without per-entity glue.
-      - One parameter per `extra_repos` entry. Each tuple is
-        `(name, type)` — the synthesis introspects the type to find a
-        registry resolver, so the mount layer wires the dep just like
-        `_call_handler_with` does for hand-written multi-repo handlers
-        (e.g. `handle_get_user_detail`'s `provider_repo`).
-
-    The extras callable, if provided, receives `target`, `request`,
-    `requesting_user`, plus each `extra_repos` entry by name.
+    Synthesized parameters: `request`, the target's id from the URL,
+    `repo`, `requesting_user: User | None`, plus one parameter per
+    `extra_repos` entry. Delegates to `handle_detail(spec, ...)` with
+    the `extras` callable passed through and `extra_repos` collected
+    into `extra_kwargs`.
     """
-    id_param = spec.id_param
-
-    sig_params: list[inspect.Parameter] = [
-        inspect.Parameter(
-            "request",
-            inspect.Parameter.POSITIONAL_OR_KEYWORD,
-            annotation=Request,
-        ),
-        inspect.Parameter(
-            id_param, inspect.Parameter.POSITIONAL_OR_KEYWORD, annotation=UUID
-        ),
-        inspect.Parameter(
-            "repo",
-            inspect.Parameter.POSITIONAL_OR_KEYWORD,
-            annotation=BaseRepository,
-        ),
-        inspect.Parameter(
-            "requesting_user",
-            inspect.Parameter.POSITIONAL_OR_KEYWORD,
-            annotation=User | None,
-        ),
-    ]
-    for name, repo_type in extra_repos:
-        sig_params.append(
-            inspect.Parameter(
-                name,
-                inspect.Parameter.POSITIONAL_OR_KEYWORD,
-                annotation=repo_type,
-            )
-        )
-
-    extra_repo_names = tuple(name for name, _ in extra_repos)
-
-    async def _handler(**kwargs: Any) -> dict[str, Any]:
-        extra_kwargs = {name: kwargs[name] for name in extra_repo_names}
-        return await handle_detail(
-            spec,
-            request=kwargs["request"],
-            target_id=kwargs[id_param],
-            repo=kwargs["repo"],
-            requesting_user=kwargs["requesting_user"],
-            extras=extras,
-            extra_kwargs=extra_kwargs if extra_kwargs else None,
-        )
-
-    _handler.__signature__ = inspect.Signature(parameters=sig_params)  # type: ignore[attr-defined]
-    _handler.__name__ = f"_handle_get_{spec.name}_detail"
-    _handler.__qualname__ = _handler.__name__
-    return _handler
+    return _make_factory_handler(
+        spec, _DETAIL_SHAPE, handle_detail, extras=extras, extra_repos=extra_repos
+    )
 
 
 async def handle_list(
@@ -869,82 +714,12 @@ def make_list_handler(
 ):
     """Build a `mount_list`-compatible handler from `spec`.
 
-    Mirrors :func:`make_detail_handler`: synthesizes a typed signature
-    so `mount_list`'s introspection wires the URL filter query params,
-    primary repo, and `requesting_user` correctly. Delegates to
-    :func:`handle_list`.
-
-    Synthesized parameters:
-      - ``request: Request`` — for template rendering.
-      - One parameter per ``spec.filters`` entry — name + annotation +
-        default come straight from the ``QueryParam`` declaration.
-      - ``repo: BaseRepository`` — resolved via ``spec.repo_dep``.
-      - ``requesting_user: User | None`` — resolved via
-        ``spec.read_user_dep`` (Optional so public-list entities work
-        without per-entity glue).
-      - One parameter per ``extra_repos`` entry, same shape as
-        ``make_detail_handler``.
-
-    The extras callable, if provided, receives ``items``, ``request``,
-    ``requesting_user``, ``filter_values``, plus each ``extra_repos``
-    entry by name.
+    Synthesized parameters: `request`, one parameter per
+    `spec.filters` entry, `repo`, `requesting_user: User | None`, and
+    one parameter per `extra_repos` entry. Delegates to
+    `handle_list(spec, ...)` with the filter values collected into
+    `filter_values` and `extra_repos` collected into `extra_kwargs`.
     """
-    sig_params: list[inspect.Parameter] = [
-        inspect.Parameter(
-            "request",
-            inspect.Parameter.POSITIONAL_OR_KEYWORD,
-            annotation=Request,
-        ),
-    ]
-    filter_names: list[str] = []
-    for qp in spec.filters:
-        sig_params.append(
-            inspect.Parameter(
-                qp.name,
-                inspect.Parameter.POSITIONAL_OR_KEYWORD,
-                annotation=qp.annotation,
-            )
-        )
-        filter_names.append(qp.name)
-    sig_params.append(
-        inspect.Parameter(
-            "repo",
-            inspect.Parameter.POSITIONAL_OR_KEYWORD,
-            annotation=BaseRepository,
-        )
+    return _make_factory_handler(
+        spec, _LIST_SHAPE, handle_list, extras=extras, extra_repos=extra_repos
     )
-    sig_params.append(
-        inspect.Parameter(
-            "requesting_user",
-            inspect.Parameter.POSITIONAL_OR_KEYWORD,
-            annotation=User | None,
-        )
-    )
-    for name, repo_type in extra_repos:
-        sig_params.append(
-            inspect.Parameter(
-                name,
-                inspect.Parameter.POSITIONAL_OR_KEYWORD,
-                annotation=repo_type,
-            )
-        )
-
-    extra_repo_names = tuple(name for name, _ in extra_repos)
-
-    async def _handler(**kwargs: Any) -> dict[str, Any]:
-        filter_values = {name: kwargs[name] for name in filter_names}
-        extra_kwargs = {name: kwargs[name] for name in extra_repo_names}
-        return await handle_list(
-            spec,
-            request=kwargs["request"],
-            repo=kwargs["repo"],
-            requesting_user=kwargs["requesting_user"],
-            filter_values=filter_values,
-            extras=extras,
-            extra_kwargs=extra_kwargs if extra_kwargs else None,
-        )
-
-    _handler.__signature__ = inspect.Signature(parameters=sig_params)  # type: ignore[attr-defined]
-    _handler.__name__ = f"_handle_list_{spec.name}"
-    _handler.__qualname__ = _handler.__name__
-    return _handler
