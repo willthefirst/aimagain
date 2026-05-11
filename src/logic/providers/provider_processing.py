@@ -29,6 +29,9 @@ from src.api.common.specs.provider_licensure import LICENSURE_ENTITY
 from src.logic.audit import mutate
 from src.models import (
     Provider,
+    ProviderCertification,
+    ProviderEducation,
+    ProviderLicensure,
     User,
 )
 from src.repositories.audit_repository import AuditRepository
@@ -55,6 +58,18 @@ PROVIDER = PROVIDER_ENTITY.audit
 LICENSURE = LICENSURE_ENTITY.audit
 EDUCATION = EDUCATION_ENTITY.audit
 CERTIFICATION = CERTIFICATION_ENTITY.audit
+
+
+# Inline-credential kinds appended on provider create. Each tuple pairs
+# the Provider relationship name (also the `url_collection` on the
+# credential's spec) with the ORM model class. Driven by a single
+# `repo.add_child(...)` loop in `handle_create_provider` so adding a
+# fourth credential kind is one line here, not a fourth repo method.
+_INLINE_CREDENTIAL_KINDS: tuple[tuple[str, type], ...] = (
+    ("licensures", ProviderLicensure),
+    ("educations", ProviderEducation),
+    ("certifications", ProviderCertification),
+)
 
 
 # --- Provider handlers ----------------------------------------------------
@@ -182,12 +197,9 @@ async def handle_create_provider(
     )
     created = await repo.create_provider(user_id=requesting_user.id, **provider_fields)
 
-    for licensure in payload.licensures:
-        await repo.add_licensure(created, **licensure.model_dump())
-    for education in payload.educations:
-        await repo.add_education(created, **education.model_dump())
-    for certification in payload.certifications:
-        await repo.add_certification(created, **certification.model_dump())
+    for collection, Model in _INLINE_CREDENTIAL_KINDS:
+        for item in getattr(payload, collection):
+            await repo.add_child(created, collection, Model(**item.model_dump()))
 
     async with mutate(
         repo,

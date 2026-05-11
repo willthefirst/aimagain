@@ -235,7 +235,7 @@ async def list_providers(
     return await self._list(stmt.order_by(Provider.created_at.desc()))
 ```
 
-Per-entity `create_X` / `update_X` / `delete_X` wrapper methods have been removed for non-bespoke entities — the generic CRUD framework calls the public aliases above directly. Bespoke handlers (provider create with nested credentials, edge operations) still have their entity-specific repo methods (`add_licensure`, `add_education`, `add_certification`, etc.) for the steps the framework can't subsume.
+Per-entity `create_X` / `update_X` / `delete_X` wrapper methods have been removed for non-bespoke entities — the generic CRUD framework calls the public aliases above directly. Bespoke handlers (provider create with nested credentials, edge operations) drive their entity-specific writes through the same public aliases: `handle_create_provider` loops over a `(collection, Model)` table and calls `repo.add_child(parent, collection, Model(**fields))` for each inline credential row, so adding a fourth credential kind is a one-line table entry rather than a fourth `add_X` method on the repo.
 
 ## Common issues and solutions
 
