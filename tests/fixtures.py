@@ -12,11 +12,11 @@ from src.core.templating import templates  # Import the global templates object
 
 # Updated dependency imports from src.db
 from src.db import get_db_session, get_user_db
+from src.domain.users.schema import UserCreate  # Import UserCreate schema
 
 # Assuming your FastAPI app instance is in src.main
 from src.main import app
 from src.models import User, metadata  # Assuming your models define metadata
-from src.schemas.users.user import UserCreate  # Import UserCreate schema
 
 # REMOVED Depends import as it's not used in fixture overrides this way
 # from fastapi import Depends
@@ -195,7 +195,7 @@ async def logged_in_user(
     # The user was created in authenticated_client fixture
     # Fetch the user from the DB based on the known test email
     async with db_test_session_manager() as session:
-        from src.repositories.users.user_repository import UserRepository
+        from src.domain.users.repository import UserRepository
 
         user_repo = UserRepository(session)
         user = await user_repo.get_user_by_email("testuser@example.com")

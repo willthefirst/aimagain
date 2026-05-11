@@ -21,14 +21,14 @@ from uuid import UUID
 
 from fastapi import Request
 
+from src.domain.favorites.repository import UserFavoriteRepository
+from src.domain.providers.repository import ProviderRepository
+from src.domain.users.repository import UserRepository
 from src.framework.exceptions import ForbiddenError, NotFoundError
 from src.models import (
     Provider,
     User,
 )
-from src.repositories.favorites.user_favorite_repository import UserFavoriteRepository
-from src.repositories.providers.provider_repository import ProviderRepository
-from src.repositories.users.user_repository import UserRepository
 
 logger = logging.getLogger(__name__)
 

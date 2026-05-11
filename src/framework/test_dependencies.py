@@ -9,6 +9,10 @@ class.
 
 import pytest
 
+from src.domain.favorites.repository import UserFavoriteRepository
+from src.domain.posts.repository import PostRepository
+from src.domain.providers.repository import ProviderRepository
+from src.domain.users.repository import UserRepository
 from src.framework import dependencies as deps
 from src.framework.audit_repository import AuditRepository
 from src.framework.dependencies import (
@@ -22,10 +26,6 @@ from src.framework.dependencies import (
     get_user_repository,
     resolver_for,
 )
-from src.repositories.favorites.user_favorite_repository import UserFavoriteRepository
-from src.repositories.posts.post_repository import PostRepository
-from src.repositories.providers.provider_repository import ProviderRepository
-from src.repositories.users.user_repository import UserRepository
 
 
 def test_every_repo_type_has_a_resolver():

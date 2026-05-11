@@ -79,12 +79,12 @@ Every cross-cutting site reads from `POST_KINDS`:
 - `Post.__table_args__` builds its `CheckConstraint` from `POST_KINDS.check_sql()` — the SQL is derived from `POST_KINDS.names`.
 - The route's `Literal[*POST_KIND_NAMES]` for `GET /posts/form?kind=…` is derived.
 - The form-template selection reads `spec.create_template` / `spec.edit_template`, which default to `posts/new_<name>.html` / `posts/edit_<name>.html` by convention — a new kind doesn't need to restate them.
-- `src/repositories/post_repository.py:_attach_detail` looks up by detail-class via `POST_KIND_BY_DETAIL_MODEL`; `update_post` writes to `spec.detail_relationship` for the post's kind.
-- `src/logic/post_processing.py:handle_create_post` and `handle_update_post` dispatch via `POST_KINDS[payload.kind]` instead of `isinstance` ladders.
+- `src/domain/post_repository.py:_attach_detail` looks up by detail-class via `POST_KIND_BY_DETAIL_MODEL`; `update_post` writes to `spec.detail_relationship` for the post's kind.
+- `src/framework/post_processing.py:handle_create_post` and `handle_update_post` dispatch via `POST_KINDS[payload.kind]` instead of `isinstance` ladders.
 - `src/schemas/post.py:_flatten_post_to_dict` reads the relationship + field tuple from the registry (so `PostRead`, `PostAuditSnapshot` flatten through it).
 - `src/templates/posts/list.html` receives `post_kinds` in its context and renders the per-kind "New X" links from it.
 
-Adding a kind is therefore: (1) a registry entry in `posts/post_kinds.py`, (2) a new detail model file under `posts/` + a `relationship(...)` line on `Post`, (3) the four Pydantic variant classes in `src/schemas/post.py`, (4) the per-kind templates under `src/templates/posts/`, (5) an Alembic migration. Removing a kind is the inverse. No edits in routes, repositories, or logic — those layers are registry-driven. The consistency tests in [`posts/test_post_kinds.py`](posts/test_post_kinds.py) guard against re-encoding the kind set inline anywhere new.
+Adding a kind is therefore: (1) a registry entry in `posts/post_kinds.py`, (2) a new detail model file under `posts/` + a `relationship(...)` line on `Post`, (3) the four Pydantic variant classes in `src/domain/posts/schema.py`, (4) the per-kind templates under `src/templates/posts/`, (5) an Alembic migration. Removing a kind is the inverse. No edits in routes, repositories, or logic — those layers are registry-driven. The consistency tests in [`posts/test_post_kinds.py`](posts/test_post_kinds.py) guard against re-encoding the kind set inline anywhere new.
 
 ## Layer organization
 

@@ -13,27 +13,27 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from starlette.requests import Request
 
-from src.framework.audit import AuditAction
-from src.framework.audit_repository import AuditRepository
-from src.framework.exceptions import ForbiddenError, NotFoundError
-from src.framework.handlers import handle_create, handle_detail, handle_list
-from src.logic.providers.provider_processing import (
+from src.domain.favorites.repository import UserFavoriteRepository
+from src.domain.providers.handlers import (
     handle_list_user_providers,
     provider_detail_extras,
 )
-from src.models import (
-    AuditLog,
-    ProviderLicensure,
-    User,
-)
-from src.repositories.favorites.user_favorite_repository import UserFavoriteRepository
-from src.repositories.providers.provider_repository import ProviderRepository
-from src.repositories.users.user_repository import UserRepository
-from src.schemas.providers.provider import (
+from src.domain.providers.repository import ProviderRepository
+from src.domain.providers.schema import (
     ProviderCertificationCreate,
     ProviderCreate,
     ProviderEducationCreate,
     ProviderLicensureCreate,
+)
+from src.domain.users.repository import UserRepository
+from src.framework.audit import AuditAction
+from src.framework.audit_repository import AuditRepository
+from src.framework.exceptions import ForbiddenError, NotFoundError
+from src.framework.handlers import handle_create, handle_detail, handle_list
+from src.models import (
+    AuditLog,
+    ProviderLicensure,
+    User,
 )
 from src.specs.provider import PROVIDER_ENTITY
 from tests.helpers import (

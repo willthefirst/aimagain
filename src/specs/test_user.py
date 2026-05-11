@@ -8,10 +8,10 @@ axis, the providers related-list, the private-fields tuple, the
 `/users/me` singleton alias, and the per-viewer detail extras binding.
 """
 
+from src.domain.users.schema import UserActivationAuditSnapshot, UserActivationUpdate
 from src.framework.audit import AuditAction
 from src.framework.authz import is_self_or_admin
 from src.framework.entity_spec import ADMIN_FOR_WRITE, RelatedListSubresource
-from src.schemas.users.user import UserActivationAuditSnapshot, UserActivationUpdate
 from src.specs.user import USER_ENTITY
 
 # --- Auth deps (security-visible) ----------------------------------------
@@ -129,6 +129,5 @@ def test_detail_extras_path_points_at_user_detail_extras():
     the string here means a rename of the callable can't silently
     de-project the response."""
     assert (
-        USER_ENTITY.detail_extras_path
-        == "src.logic.users.user_processing.user_detail_extras"
+        USER_ENTITY.detail_extras_path == "src.domain.users.handlers.user_detail_extras"
     )

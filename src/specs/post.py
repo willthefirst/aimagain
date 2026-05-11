@@ -20,6 +20,12 @@ Read by:
 
 from typing import Final
 
+from src.domain.posts.schema import (
+    post_audit_snapshot,
+    post_create_adapter,
+    post_read_adapter,
+    post_update_adapter,
+)
 from src.framework.dependencies import get_post_repository
 from src.framework.entity_spec import (
     AUTHENTICATED,
@@ -29,12 +35,6 @@ from src.framework.entity_spec import (
     RouteSet,
 )
 from src.models import POST_KINDS, Post
-from src.schemas.posts.post import (
-    post_audit_snapshot,
-    post_create_adapter,
-    post_read_adapter,
-    post_update_adapter,
-)
 
 POST_ENTITY: Final[EntitySpec] = EntitySpec(
     name="post",

@@ -2,13 +2,13 @@ import logging
 from typing import Any
 from uuid import UUID
 
+from src.domain.providers.repository import ProviderRepository
+from src.domain.users.repository import UserRepository
+from src.domain.users.schema import UserActivationUpdate
 from src.framework.audit import record_audit
 from src.framework.audit_repository import AuditRepository
 from src.framework.exceptions import NotFoundError
 from src.models import User
-from src.repositories.providers.provider_repository import ProviderRepository
-from src.repositories.users.user_repository import UserRepository
-from src.schemas.users.user import UserActivationUpdate
 from src.specs.user import USER_ENTITY
 
 logger = logging.getLogger(__name__)

@@ -5,8 +5,8 @@ row in the same transaction as the mutation. The discipline is easy to
 forget on a new handler — this test makes "forgot the audit call" a CI
 failure instead of a code-review catch.
 
-The check parses each `*_processing.py` under `src/logic/` (recursively,
-so per-entity cluster directories are covered), walks every
+The check parses each `handlers.py` under `src/domain/` (recursively,
+so every per-entity cluster is covered), walks every
 `async def handle_*` function, and fails the test if the function calls
 `.commit()` without an audit-recording call. Three names satisfy the
 rule:
@@ -29,8 +29,8 @@ from pathlib import Path
 
 import pytest
 
-LOGIC_DIR = Path(__file__).parent.parent / "logic"
-PROCESSING_FILES = sorted(LOGIC_DIR.rglob("*_processing.py"))
+DOMAIN_DIR = Path(__file__).parent.parent / "domain"
+PROCESSING_FILES = sorted(DOMAIN_DIR.rglob("handlers.py"))
 
 
 def _has_call_named(node: ast.AST, name: str) -> bool:
@@ -115,7 +115,7 @@ def test_check_finds_handlers() -> None:
     """Sanity: at least one mutation handler must be discovered, otherwise
     the parametrize collected nothing and the discipline check is silently
     a no-op."""
-    assert len(HANDLERS) > 0, "no handle_* functions found in src/logic/"
+    assert len(HANDLERS) > 0, "no handle_* functions found in src/domain/"
 
 
 def test_at_least_one_handler_actually_audits() -> None:

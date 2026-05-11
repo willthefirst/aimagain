@@ -18,8 +18,8 @@ from types import SimpleNamespace
 from typing import Any, Dict
 from uuid import UUID, uuid4
 
+from src.domain.users.schema import UserRead
 from src.models import POST_KINDS
-from src.schemas.users.user import UserRead
 
 
 def make_post_stub(
@@ -124,7 +124,7 @@ class MockDataFactory:
             user_read = cls.create_user_read(is_active=False)
 
         return {
-            "src.logic.users.user_processing.handle_set_user_activation": {
+            "src.domain.users.handlers.handle_set_user_activation": {
                 "return_value_config": user_read
             }
         }

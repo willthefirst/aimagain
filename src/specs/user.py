@@ -19,6 +19,12 @@ A1 documented (`api/common -> api/routes`) is resolved.
 from typing import Final
 
 from src.auth_config import current_active_user
+from src.domain.providers.repository import ProviderRepository
+from src.domain.users.schema import (
+    UserActivationAuditSnapshot,
+    UserActivationUpdate,
+    UserAuditSnapshot,
+)
 from src.framework.audit import AuditAction
 from src.framework.authz import is_self_or_admin
 from src.framework.dependencies import get_user_repository
@@ -30,12 +36,6 @@ from src.framework.entity_spec import (
     StateAxis,
 )
 from src.models import User
-from src.repositories.providers.provider_repository import ProviderRepository
-from src.schemas.users.user import (
-    UserActivationAuditSnapshot,
-    UserActivationUpdate,
-    UserAuditSnapshot,
-)
 from src.specs.provider import PROVIDER_ENTITY
 
 
@@ -72,7 +72,7 @@ USER_ENTITY: Final[EntitySpec] = EntitySpec(
             body_schema=UserActivationUpdate,
             action=AuditAction.SET_USER_ACTIVATION,
             response_to_dict=_activation_response_to_dict,
-            handler_path=("src.logic.users.user_processing.handle_set_user_activation"),
+            handler_path=("src.domain.users.handlers.handle_set_user_activation"),
             audit_snapshot=UserActivationAuditSnapshot,
             forbid_self=True,
         ),
@@ -82,9 +82,7 @@ USER_ENTITY: Final[EntitySpec] = EntitySpec(
             child_spec=PROVIDER_ENTITY.to_resource_spec(),
             template="users/providers_list.html",
             singleton_alias=("me", current_active_user),
-            handler_path=(
-                "src.logic.providers.provider_processing.handle_list_user_providers"
-            ),
+            handler_path=("src.domain.providers.handlers.handle_list_user_providers"),
         ),
     ),
     # `/users/me` — detail page id sourced from the session.
@@ -92,6 +90,6 @@ USER_ENTITY: Final[EntitySpec] = EntitySpec(
     # Per-viewer detail extras live on the spec via the same late-bind
     # dotted-path trick the state-axis / subresource handlers use —
     # `specs/user.py` never statically imports `src.logic.users`.
-    detail_extras_path="src.logic.users.user_processing.user_detail_extras",
+    detail_extras_path="src.domain.users.handlers.user_detail_extras",
     detail_extras_repos=(("provider_repo", ProviderRepository),),
 )

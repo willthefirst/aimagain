@@ -18,6 +18,12 @@ Read by:
 
 from typing import Final
 
+from src.domain.favorites.repository import UserFavoriteRepository
+from src.domain.providers.schema import (
+    ProviderCreate,
+    ProviderRead,
+    ProviderUpdate,
+)
 from src.framework.dependencies import get_provider_repository
 from src.framework.entity_spec import (
     AUTHENTICATED,
@@ -35,12 +41,6 @@ from src.models.enums import (
     EDUCATION_TYPES_LABELS,
     LICENSE_TYPES,
     LICENSE_TYPES_LABELS,
-)
-from src.repositories.favorites.user_favorite_repository import UserFavoriteRepository
-from src.schemas.providers.provider import (
-    ProviderCreate,
-    ProviderRead,
-    ProviderUpdate,
 )
 
 # After create or update, redirect to the edit form so the user can
@@ -78,7 +78,7 @@ PROVIDER_ENTITY: Final[EntitySpec] = EntitySpec(
     create_redirect=_provider_form_redirect,
     update_redirect=_provider_form_redirect,
     # Per-viewer detail extras live on the spec — see `EntitySpec`.
-    detail_extras_path="src.logic.providers.provider_processing.provider_detail_extras",
+    detail_extras_path="src.domain.providers.handlers.provider_detail_extras",
     detail_extras_repos=(("user_favorite_repo", UserFavoriteRepository),),
     # Provider templates render credential-type display labels and the
     # tuples behind the filter/select dropdowns. Tying them to the spec

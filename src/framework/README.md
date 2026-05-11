@@ -1,6 +1,8 @@
-# API common: Shared utilities and standardized patterns
+# Framework: the domain-agnostic library
 
-The `api/common/` directory contains **shared utilities** for the API layer, implementing standardized patterns for error handling, logging, response formatting, and route management that ensure consistency across all API endpoints.
+The `framework/` directory contains every piece of code that turns spec data into a working HTTP app without knowing what a "user" or "post" is. Specs declare entities; this directory dispatches, audits, persists, projects, and renders for any spec the codebase points at it. Per-entity code lives in [`../domain/<entity>/`](../domain/); the canonical entity declarations live in [`../specs/`](../specs/).
+
+Inside this directory you'll find: the `EntitySpec` dataclass and its supporting types ([`entity_spec.py`](entity_spec.py)), the route-mount helpers and `mount_entity` dispatcher ([`resource_routes.py`](resource_routes.py), [`base_router.py`](base_router.py)), the generic create/update/delete/detail/list handlers ([`handlers.py`](handlers.py)), the audit framework ([`audit.py`](audit.py), [`audit_repository.py`](audit_repository.py)), the `BaseRepository` primitives plus the dependency-injection registry ([`base_repository.py`](base_repository.py), [`dependencies.py`](dependencies.py)), the auth predicates ([`authz.py`](authz.py)), and the cross-cutting HTTP plumbing ([`responses.py`](responses.py), [`forms.py`](forms.py), [`projections.py`](projections.py), [`exceptions.py`](exceptions.py), [`middleware.py`](middleware.py), [`decorators.py`](decorators.py)), plus reusable Pydantic field validators ([`schema_validators.py`](schema_validators.py)).
 
 ## Core philosophy: Standardized API patterns
 
@@ -17,7 +19,7 @@ Common utilities provide **consistent behavior** across all API routes through d
 **Example**: BaseRouter automatically applies error handling and logging:
 
 ```python
-from src.api.common import BaseRouter
+from src.framework import BaseRouter
 
 # Create router with automatic decorators
 users_router_instance = APIRouter()
@@ -99,7 +101,7 @@ Common utilities handle concerns that span multiple routes and domains.
 A resource declares its identity once as an `EntitySpec` in `src/specs/<entity>.py` (carries collection name, id param, primary repo, audit binding, auth deps, schemas, templates, redirect targets, route opt-ins, state axes, subresources, filters, discriminator binding, M:N relation). The route file derives a `ResourceSpec` from the entity spec via `.to_resource_spec()` and passes a handlers dict to `mount_entity`, which reads the spec's `routes` flags + `state_axes` + `subresources` and calls the right underlying `mount_*` helper for each:
 
 ```python
-from src.api.common.resource_routes import mount_entity
+from src.framework.resource_routes import mount_entity
 from src.specs.user import USER_ENTITY
 from src.logic._generic import make_delete_handler
 from src.logic.providers.provider_processing import handle_list_user_providers
@@ -143,7 +145,7 @@ Synthesis recognizes:
 
 - **`<id_param>: UUID`** (and any parent ids for sub-resources) — bound from the URL path.
 - **`repo: <RepoType>`** — `Depends(spec.repo_dep)`. The annotation is informational; the spec is the source of truth for which resolver to call.
-- **`audit_repo: AuditRepository`** and any other **`<name>: <RepoType>`** — resolved via the type→resolver registry in [`src/repositories/dependencies.py`](../../repositories/dependencies.py). Adding a new repo type means adding one entry to `_REPO_TYPE_RESOLVERS`.
+- **`audit_repo: AuditRepository`** and any other **`<name>: <RepoType>`** — resolved via the type→resolver registry in [`src/framework/dependencies.py`](../../repositories/dependencies.py). Adding a new repo type means adding one entry to `_REPO_TYPE_RESOLVERS`.
 - **`requesting_user: User`** — `Depends(spec.read_user_dep)` on reads, `Depends(spec.write_user_dep)` on writes. Declare as **`User | None`** for routes that may run anonymously (e.g. `mount_list(..., public=True)`).
 - **`payload: <PydanticType>`** — parsed from the request body via the spec's `create_adapter` / `update_adapter` (or the mount's `body_schema` for `mount_state_axis`).
 - **Query params** — declared in the mount's `query_params=` tuple; the handler param's name must match `QueryParam.name`.
@@ -254,7 +256,7 @@ The handlers dict is validated at mount time: every opted-in flag / state axis /
 
 ### Generic CRUD handler factories
 
-For the standard CRUD verbs (create / update / delete) plus the detail and edit-form reads, the `src/logic/_generic.py` module provides:
+For the standard CRUD verbs (create / update / delete) plus the detail and edit-form reads, the `src/framework/handlers.py` module provides:
 
 - `handle_create(spec, *, payload, repo, audit_repo, requesting_user, parent_id=None)` — load (subentity case) / instantiate (standard case) / dispatch on `spec.discriminator` for polymorphic entities; persist; audit via `mutate(verb="create")`.
 - `handle_update(spec, *, target_id, payload, repo, audit_repo, requesting_user, parent_id=None)` — load → write_authz → polymorphic kind-invariant check → patch via `mutate(verb="update")`.
@@ -293,7 +295,7 @@ Inline-child append on create (providers' credential rows on parent-create) is h
 
 Bespoke handlers still use `mutate(...)` for audit + commit; they just own the orchestration their entity needs.
 
-The framework code itself lives in `src/logic/_generic.py` — see [`src/logic/README.md`](../../logic/README.md) for its place in the logic layer's shared tier alongside `_authz.py` and `audit.py`. The public framework-facing methods on `BaseRepository` (`get_by_model_id`, `create`, `delete`, `patch`, `add_child`, `create_polymorphic`) are documented in [`src/repositories/README.md`](../../repositories/README.md).
+The framework code itself lives in `src/framework/handlers.py` — see [`src/framework/README.md`](../../logic/README.md) for its place in the logic layer's shared tier alongside `_authz.py` and `audit.py`. The public framework-facing methods on `BaseRepository` (`get_by_model_id`, `create`, `delete`, `patch`, `add_child`, `create_polymorphic`) are documented in [`src/domain/README.md`](../../repositories/README.md).
 
 ### Per-mount references
 
@@ -378,7 +380,7 @@ All route files use BaseRouter to get consistent behavior:
 ```python
 # In any route file
 from fastapi import APIRouter
-from src.api.common import BaseRouter
+from src.framework import BaseRouter
 
 # Create underlying apirouter
 users_router_instance = APIRouter()
@@ -405,7 +407,7 @@ async def list_users():
 Use `APIResponse.html_response` for HTML pages and the module-level `*_response` helpers for HTMX-driven mutations:
 
 ```python
-from src.api.common import (
+from src.framework import (
     APIResponse,
     created_response,
     deleted_response,
@@ -440,7 +442,7 @@ Logic-layer `handle_*` functions raise the API exception classes directly. They'
 
 ```python
 # logic/post_processing.py
-from src.api.common.exceptions import ForbiddenError, NotFoundError
+from src.framework.exceptions import ForbiddenError, NotFoundError
 
 async def handle_update_post(post_id, payload, post_repo, requesting_user):
     post = await post_repo.get_post_with_detail(post_id)
@@ -549,7 +551,7 @@ async def create_user(...):
 
 ### Decorators (applied automatically by baserouter)
 
-Both decorators are wrapped onto every endpoint by `BaseRouter`; route files don't import them directly. Logging covers entry/exit/error; error handling passes `HTTPException` through, translates fastapi-users exceptions, and converts anything unexpected into a 500. `handle_route_errors` is exported from `src.api.common` for tests that want to invoke it directly.
+Both decorators are wrapped onto every endpoint by `BaseRouter`; route files don't import them directly. Logging covers entry/exit/error; error handling passes `HTTPException` through, translates fastapi-users exceptions, and converts anything unexpected into a 500. `handle_route_errors` is exported from `src.framework` for tests that want to invoke it directly.
 
 ### Response utilities
 
@@ -570,7 +572,7 @@ APIResponse.html_response(template_name, context, request, current_user=None)
 ### Exception classes
 
 ```python
-# APIException subclasses exported from src.api.common, raised directly by logic handlers
+# APIException subclasses exported from src.framework, raised directly by logic handlers
 NotFoundError(detail)       # 404
 BadRequestError(detail)     # 400
 ForbiddenError(detail)      # 403
@@ -579,7 +581,7 @@ ForbiddenError(detail)      # 403
 handle_fastapi_users_error(fastapi_users_exception) -> APIException
 ```
 
-`exceptions.py` also defines `UnauthorizedError` (401) and `InternalServerError` (500), but they're not currently used by any handler and are not re-exported from `__init__.py`. Import them from `src.api.common.exceptions` directly if a future handler needs them.
+`exceptions.py` also defines `UnauthorizedError` (401) and `InternalServerError` (500), but they're not currently used by any handler and are not re-exported from `__init__.py`. Import them from `src.framework.exceptions` directly if a future handler needs them.
 
 ## Tests
 

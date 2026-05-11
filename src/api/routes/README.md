@@ -8,11 +8,11 @@ The `api/routes/` directory contains **domain-specific route handlers** that def
 
 Routes are **ultra-thin HTTP adapters** that handle request parsing, delegate to processing logic, and format responses while being organized by business domains for maintainability.
 
-CRUD-shaped routes use the **`EntitySpec` declaration + `mount_entity` dispatcher**. Each entity declares its identity once in [`src/specs/<entity>.py`](../common/README.md#entityspec) (carries `routes` opt-in flags, audit binding, state axes, subresources, filters, discriminator, templates, etc.) and the route file calls `mount_entity(router, ENTITY, handlers={...})`. The dispatcher reads the spec and fires the right underlying `mount_*` helper for each opted-in verb. Sub-resources nest via the child entity's `parent=PARENT_ENTITY` field and are passed through `owned_subentities=` on the dispatcher. Routes that don't fit the grammar (auth flows, `/me/*` singletons, M:N edge add/remove, utility endpoints) stay hand-written — see [Bespoke routes](#bespoke-routes) below.
+CRUD-shaped routes use the **`EntitySpec` declaration + `mount_entity` dispatcher**. Each entity declares its identity once in [`src/specs/<entity>.py`](../../framework/README.md#entityspec) (carries `routes` opt-in flags, audit binding, state axes, subresources, filters, discriminator, templates, etc.) and the route file calls `mount_entity(router, ENTITY, handlers={...})`. The dispatcher reads the spec and fires the right underlying `mount_*` helper for each opted-in verb. Sub-resources nest via the child entity's `parent=PARENT_ENTITY` field and are passed through `owned_subentities=` on the dispatcher. Routes that don't fit the grammar (auth flows, `/me/*` singletons, M:N edge add/remove, utility endpoints) stay hand-written — see [Bespoke routes](#bespoke-routes) below.
 
 The underlying `mount_*` helpers (`mount_list`, `mount_detail`, `mount_create`, `mount_update`, `mount_delete`, `mount_form`, `mount_state_axis`, `mount_related_list`) remain available for entities whose URL shape `mount_entity` can't handle — favorites' M:N edge POST/DELETE is the only current example. Every other entity (users, providers + 3 credential subentities, posts) composes through `mount_entity`.
 
-For the standard CRUD verbs (create / update / delete), the route file binds handlers built by `make_<verb>_handler(ENTITY)` from [`src/logic/_generic.py`](../../logic/README.md). Bespoke handlers are written only when the entity has rules that don't fit the standard load → auth → mutate → audit ritual (current examples: users' delete self-guard, providers' create with nested credential append, favorites' edge ops).
+For the standard CRUD verbs (create / update / delete), the route file binds handlers built by `make_<verb>_handler(ENTITY)` from [`src/framework/handlers.py`](../../logic/README.md). Bespoke handlers are written only when the entity has rules that don't fit the standard load → auth → mutate → audit ritual (current examples: users' delete self-guard, providers' create with nested credential append, favorites' edge ops).
 
 ### What we do
 
@@ -27,8 +27,8 @@ For the standard CRUD verbs (create / update / delete), the route file binds han
 **Example**: a typical route file with the unified grammar (users):
 
 ```python
-from src.api.common import make_entity_router
-from src.api.common.resource_routes import mount_entity
+from src.framework import make_entity_router
+from src.framework.resource_routes import mount_entity
 from src.specs.user import USER_ENTITY
 from src.logic.users.user_processing import handle_delete_user
 
@@ -47,7 +47,7 @@ mount_entity(
 )
 ```
 
-The full grammar (knobs, dispatch rules, the underlying mount helpers, factory functions for generic CRUD handlers) is documented in [`api/common/README.md`](../common/README.md#unified-resource-grammar).
+The full grammar (knobs, dispatch rules, the underlying mount helpers, factory functions for generic CRUD handlers) is documented in [`framework/README.md`](../../framework/README.md#unified-resource-grammar).
 
 ### What we don't do
 
@@ -88,7 +88,7 @@ Routes are organized by domain with consistent delegation patterns.
 - `auth_routes.py` and `auth_pages.py` are the JSON-API and HTML-page split for authentication; both follow the same delegation pattern as resource routes.
 - `__init__.py` re-exports the route modules.
 
-Singleton-alias routes like `/users/me` and `/users/me/providers` are mounted alongside their parametric counterparts via `singleton_alias=` on `mount_detail` / `mount_related_list` (see the [unified resource grammar](../common/README.md#singleton-aliases-eg-usersme)). They are not a separate route file.
+Singleton-alias routes like `/users/me` and `/users/me/providers` are mounted alongside their parametric counterparts via `singleton_alias=` on `mount_detail` / `mount_related_list` (see the [unified resource grammar](../../framework/README.md#singleton-aliases-eg-usersme)). They are not a separate route file.
 
 The URL shape every resource MUST follow is defined in [`RESOURCE_GRAMMAR.md`](RESOURCE_GRAMMAR.md). This README documents how routes are wired; the grammar documents what URLs and lifecycles a resource MUST present.
 
@@ -100,7 +100,7 @@ The unified grammar fits resource-shaped CRUD. Several existing routes intention
 |---|---|---|
 | `POST /auth/register` | `auth_routes.py` | Auth-flow protocol (token issuance, fastapi-users hooks). Not CRUD on a domain entity. |
 | `GET /auth/{register,login,forgot-password,reset-password/{token}}` | `auth_pages.py` | Pure form rendering, no resource. Could fit a hypothetical `mount_static_form` but not worth it for 4 routes. |
-| `GET /users/me`, `GET /users/me/providers` | `users.py` (mounted via `singleton_alias=`) | Singleton aliases — no parent id, session-sourced. Mounted as additional paths on the existing `mount_detail` / `mount_related_list` calls (which `mount_entity` invokes); see [`api/common/README.md`](../common/README.md#singleton-aliases-eg-usersme). |
+| `GET /users/me`, `GET /users/me/providers` | `users.py` (mounted via `singleton_alias=`) | Singleton aliases — no parent id, session-sourced. Mounted as additional paths on the existing `mount_detail` / `mount_related_list` calls (which `mount_entity` invokes); see [`framework/README.md`](../../framework/README.md#singleton-aliases-eg-usersme). |
 | `POST /users/me/favorites/{provider_id}`, `DELETE /users/me/favorites/{provider_id}`, `GET /users/me/favorites` | `favorites.py` | M:N edge add/remove — the codebase has no `mount_*` helper for edge mutations, so the whole route file is hand-rolled. `FAVORITE_ENTITY` carries `edge_audit` + `relation: M2NRelation` to document the binding, but no `mount_entity` call applies. |
 | `GET /`, `GET /health` | `main.py` | Utility endpoints. Not resource-shaped. |
 
@@ -117,8 +117,8 @@ If a future case suggests the grammar should grow to fit one of these (e.g. a se
 3. **Create the route file** `<resource>.py`. Call `mount_entity`; framework verbs auto-bind to `make_<verb>_handler(<ENTITY>_ENTITY)` and get stitched onto the route module as `_handle_<verb>_<entity>` (target module auto-detected from the caller frame) for contract-test patches. Only bespoke handlers need explicit `handlers` entries.
 
 ```python
-from src.api.common import make_entity_router
-from src.api.common.resource_routes import mount_entity
+from src.framework import make_entity_router
+from src.framework.resource_routes import mount_entity
 from src.specs.<entity> import <ENTITY>_ENTITY
 # Per-viewer / per-list extras don't import here — they live on the
 # spec as `detail_extras_path` / `list_extras_path` and resolve at
@@ -142,7 +142,7 @@ Auto-bound handlers expose the same `_handle_<verb>_<entity>` attribute on the r
 
 4. Register the router in `src/main.py`. Order matters when literal segments would shadow parametric ones (e.g. `/me/*` aliases mount before parametric `/{id}` paths within the same router via `singleton_alias=` on the related subresource).
 
-5. Add a colocated `test_<resource>.py`. Framework verbs are already covered by `src/logic/test__generic.py` + `src/api/common/test_resource_routes.py`; the route-level tests verify resource-specific behavior (bespoke handler logic, end-to-end happy paths, contract-test scenarios).
+5. Add a colocated `test_<resource>.py`. Framework verbs are already covered by `src/framework/test__generic.py` + `src/framework/test_resource_routes.py`; the route-level tests verify resource-specific behavior (bespoke handler logic, end-to-end happy paths, contract-test scenarios).
 
 ### Adding a sub-resource
 
@@ -173,7 +173,7 @@ Each factory-built handler receives both `provider_id=` and the child id (e.g. `
 All routes use BaseRouter for consistent behavior:
 
 ```python
-from src.api.common import BaseRouter
+from src.framework import BaseRouter
 
 # Wrap apirouter with baserouter for standardized features
 router = BaseRouter(
@@ -288,6 +288,6 @@ Pact contract pairs for HTML forms and HX-driven buttons live under [`tests/test
 
 ## Related documentation
 
-- [API Common](../common/README.md) - Shared API utilities and BaseRouter
+- [API Common](../../framework/README.md) - Shared API utilities and BaseRouter
 - [Logic Layer](../../logic/README.md) - Processing logic that routes delegate to
 - [API Layer](../README.md) - Overall API layer architecture
