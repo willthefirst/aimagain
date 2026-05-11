@@ -4,12 +4,7 @@ from uuid import UUID
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.models import (
-    Provider,
-    ProviderCertification,
-    ProviderEducation,
-    ProviderLicensure,
-)
+from src.models import Provider, ProviderLicensure
 
 from ..base import BaseRepository
 
@@ -70,30 +65,3 @@ class ProviderRepository(BaseRepository):
 
     async def create_provider(self, user_id: UUID, **fields: Any) -> Provider:
         return await self._persist_new(Provider(owner_id=user_id, **fields))
-
-    # --- Licensure sub-table ----------------------------------------------
-
-    async def add_licensure(
-        self, provider: Provider, **fields: Any
-    ) -> ProviderLicensure:
-        return await self._add_child(
-            provider, "licensures", ProviderLicensure(**fields)
-        )
-
-    # --- Education sub-table ----------------------------------------------
-
-    async def add_education(
-        self, provider: Provider, **fields: Any
-    ) -> ProviderEducation:
-        return await self._add_child(
-            provider, "educations", ProviderEducation(**fields)
-        )
-
-    # --- Certification sub-table ------------------------------------------
-
-    async def add_certification(
-        self, provider: Provider, **fields: Any
-    ) -> ProviderCertification:
-        return await self._add_child(
-            provider, "certifications", ProviderCertification(**fields)
-        )

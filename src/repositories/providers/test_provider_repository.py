@@ -418,11 +418,14 @@ async def test_licensure_crud_round_trip(
     async with db_test_session_manager() as session:
         repo = ProviderRepository(session)
         provider = await repo.get_by_id(provider_id)
-        licensure = await repo.add_licensure(
+        licensure = await repo.add_child(
             provider,
-            license_type="lcsw",
-            license_number="L-1",
-            issuing_state="IL",
+            "licensures",
+            ProviderLicensure(
+                license_type="lcsw",
+                license_number="L-1",
+                issuing_state="IL",
+            ),
         )
         await session.commit()
         licensure_id = licensure.id
@@ -461,10 +464,13 @@ async def test_education_crud_round_trip(
     async with db_test_session_manager() as session:
         repo = ProviderRepository(session)
         provider = await repo.get_by_id(provider_id)
-        education = await repo.add_education(
+        education = await repo.add_child(
             provider,
-            education_type="msw",
-            institution="State U",
+            "educations",
+            ProviderEducation(
+                education_type="msw",
+                institution="State U",
+            ),
         )
         await session.commit()
         education_id = education.id
@@ -503,10 +509,13 @@ async def test_certification_crud_round_trip(
     async with db_test_session_manager() as session:
         repo = ProviderRepository(session)
         provider = await repo.get_by_id(provider_id)
-        cert = await repo.add_certification(
+        cert = await repo.add_child(
             provider,
-            certification_type="emdr",
-            certifying_body="EMDRIA",
+            "certifications",
+            ProviderCertification(
+                certification_type="emdr",
+                certifying_body="EMDRIA",
+            ),
         )
         await session.commit()
         cert_id = cert.id
