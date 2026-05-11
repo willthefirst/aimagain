@@ -16,7 +16,6 @@ from src.api.common.entity_spec import EntitySpec
 from src.api.common.specs._credential import make_provider_credential_entity
 from src.models import ProviderLicensure
 from src.schemas.providers.provider import (
-    ProviderLicensureAuditSnapshot,
     ProviderLicensureCreate,
     ProviderLicensureRead,
     ProviderLicensureUpdate,
@@ -28,7 +27,6 @@ LICENSURE_ENTITY: Final[EntitySpec] = make_provider_credential_entity(
     id_param="licensure_id",
     model=ProviderLicensure,
     audit_stem="licensure",
-    snapshot_schema=ProviderLicensureAuditSnapshot,
     read_schema=ProviderLicensureRead,
     create_adapter=ProviderLicensureCreate,
     update_adapter=ProviderLicensureUpdate,

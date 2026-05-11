@@ -390,6 +390,22 @@ class EntitySpec:
         # builds `audit` from name + schema (+ optional action_stem).
         # Declaring both forms is ambiguous; the user picked one and
         # forgot the other, almost certainly.
+        # Default `audit_snapshot` from `read_schema` when the read schema
+        # is a Pydantic class and no audit binding has been declared. The
+        # codebase convention is that audit snapshots are byte-identical
+        # to the read projection except for entities that explicitly
+        # diverge (posts: discriminated-union flatten; users: omits id).
+        # Those entities still set `audit_snapshot=` explicitly.
+        # `TypeAdapter` adapters are skipped — posts' read schema is a
+        # discriminated-union adapter whose audit snapshot is a distinct
+        # callable.
+        if (
+            self.audit_snapshot is None
+            and self.audit is None
+            and isinstance(self.read_schema, type)
+            and issubclass(self.read_schema, BaseModel)
+        ):
+            object.__setattr__(self, "audit_snapshot", self.read_schema)
         if self.audit_snapshot is not None and self.audit is not None:
             raise ValueError(
                 f"EntitySpec({self.name!r}) declares both `audit_snapshot` "

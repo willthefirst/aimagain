@@ -7,12 +7,13 @@ holds three credential lists —
 each managed via its own endpoints in later issues. The wire surface
 mirrors that shape: each entity has Read / Create / Update variants.
 
-`AuditSnapshot` variants are byte-identical to `Read` for every provider
-schema — same fields, same `from_attributes`. Rather than declare two
-classes per entity, the `*AuditSnapshot` symbols are aliases to the
-`*Read` siblings. Audit-row JSON shape is unchanged. Posts and users
-genuinely diverge between Read and AuditSnapshot (id omitted from the
-audit row) and keep distinct classes — see those modules.
+Audit snapshots for every provider entity are byte-identical to the
+matching `Read` schema, so each `EntitySpec` reads its audit shape
+through `read_schema` directly — `EntitySpec.__post_init__` defaults
+`audit_snapshot` to `read_schema` when the latter is a Pydantic class.
+This module therefore declares no `*AuditSnapshot` symbols; posts and
+users genuinely diverge (kind-discriminated flatten / omitted id) and
+keep distinct classes — see those modules.
 
 `ProviderRead` embeds the sub-entity Read lists. `ProviderUpdate` does
 **not** include nested lists — sub-entities are PATCHed via their own
@@ -55,9 +56,7 @@ from src.schemas._validators import (
 class _ProviderSubrowBase(ReadProjection):
     """Common fields for every provider sub-row Read schema (licensure /
     education / certification). Subclasses add entity-specific fields.
-
-    The credential AuditSnapshot variants are aliases to the matching
-    Read class (see module docstring); both surfaces share this base.
+    Also serves as the audit-snapshot shape (see module docstring).
     """
 
     id: uuid.UUID
@@ -90,13 +89,6 @@ class ProviderLicensureUpdate(PartialUpdate):
     expiration_date: date | None = None
 
 
-# The provider-credential AuditSnapshots are byte-identical to their
-# Read siblings — same base, same fields, same `from_attributes`. The
-# alias keeps the public symbol stable for spec imports while folding
-# the duplicated class into one declaration.
-ProviderLicensureAuditSnapshot = ProviderLicensureRead
-
-
 # --- ProviderEducation --------------------------------------------------
 
 
@@ -121,9 +113,6 @@ class ProviderEducationUpdate(PartialUpdate):
     month_completed: str | None = None
 
 
-ProviderEducationAuditSnapshot = ProviderEducationRead
-
-
 # --- ProviderCertification ----------------------------------------------
 
 
@@ -143,9 +132,6 @@ class ProviderCertificationUpdate(PartialUpdate):
     certification_type: Literal[*CERTIFICATION_TYPES] | None = None
     certifying_body: StrippedText | None = None
     expiration_date: date | None = None
-
-
-ProviderCertificationAuditSnapshot = ProviderCertificationRead
 
 
 # --- Provider ----------------------------------------------------
@@ -200,9 +186,3 @@ class ProviderUpdate(PartialUpdate):
     location_zip: ZipText | None = None
     in_person_sessions: Literal[*LOCATION_AVAILABILITY_OPTIONS] | None = None
     virtual_sessions: Literal[*LOCATION_AVAILABILITY_OPTIONS] | None = None
-
-
-# Provider's AuditSnapshot is byte-identical to ProviderRead once the
-# credential AuditSnapshot aliases land — the nested list types collapse
-# to the same classes. Alias keeps the symbol stable for the spec import.
-ProviderAuditSnapshot = ProviderRead
