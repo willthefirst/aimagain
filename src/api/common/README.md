@@ -248,28 +248,37 @@ The handlers dict is validated at mount time: every opted-in flag / state axis /
 
 ### Generic CRUD handler factories
 
-For the standard CRUD verbs (create / update / delete) plus the edit-form read, the `src/logic/_generic.py` module provides:
+For the standard CRUD verbs (create / update / delete) plus the detail and edit-form reads, the `src/logic/_generic.py` module provides:
 
 - `handle_create(spec, *, payload, repo, audit_repo, requesting_user, parent_id=None)` — load (subentity case) / instantiate (standard case) / dispatch on `spec.discriminator` for polymorphic entities; persist; audit via `mutate(verb="create")`.
 - `handle_update(spec, *, target_id, payload, repo, audit_repo, requesting_user, parent_id=None)` — load → write_authz → polymorphic kind-invariant check → patch via `mutate(verb="update")`.
 - `handle_delete(spec, *, target_id, repo, audit_repo, requesting_user, parent_id=None)` — load → write_authz → audited delete via `mutate(verb="delete")`.
+- `handle_detail(spec, *, request, target_id, repo, requesting_user, extras=None, extra_kwargs=None)` — load → optional `can_edit` from `spec.can_write` → optional entity-specific extras callable for per-viewer / per-pair / related-collection state. The extras callable receives `target`, `request`, `requesting_user`, plus any `extra_kwargs`; its return dict merges into the context (last-write-wins, so extras can override the base `spec.name` binding — e.g. users binds under `target_user` for the projected view).
 - `handle_get_edit_form(spec, *, request, target_id, repo, requesting_user)` — load → write_authz → context dict binding the entity under `spec.name`. For polymorphic entities, populates `template_name` from `spec.discriminator[kind].edit_template` so `mount_form`'s template-precedence renders the per-kind edit page.
 
-And matching `make_<verb>_handler(spec)` factory functions (`make_create_handler`, `make_update_handler`, `make_delete_handler`, `make_edit_form_handler`) that build callables with synthesized signatures so `mount_*` introspection (per #316) wires the right deps. The route file binds each factory-built callable to a named module attribute (`_handle_<verb>_<spec.name>` / `_handle_get_<spec.name>_edit_form`) so contract tests can patch it:
+And matching `make_<verb>_handler(spec)` factory functions (`make_create_handler`, `make_update_handler`, `make_delete_handler`, `make_detail_handler`, `make_edit_form_handler`) that build callables with synthesized signatures so `mount_*` introspection (per #316) wires the right deps. `make_detail_handler` additionally accepts `extras=` (the pure-function hook) and `extra_repos=` (typed-repo params the synthesis adds to the signature so the registry resolves them). The route file binds each factory-built callable to a named module attribute (`_handle_<verb>_<spec.name>` / `_handle_get_<spec.name>_detail` / `_handle_get_<spec.name>_edit_form`) so contract tests can patch it:
 
 ```python
 # in src/api/routes/providers.py
 from src.logic._generic import (
     make_create_handler,
     make_delete_handler,
+    make_detail_handler,
     make_edit_form_handler,
     make_update_handler,
 )
+from src.logic.providers.provider_processing import provider_detail_extras
+from src.repositories.favorites.user_favorite_repository import UserFavoriteRepository
 
 _handle_create_provider = make_create_handler(PROVIDER_ENTITY)
 _handle_update_provider = make_update_handler(PROVIDER_ENTITY)
 _handle_delete_provider = make_delete_handler(PROVIDER_ENTITY)
 _handle_get_provider_edit_form = make_edit_form_handler(PROVIDER_ENTITY)
+_handle_get_provider_detail = make_detail_handler(
+    PROVIDER_ENTITY,
+    extras=provider_detail_extras,  # supplies `is_favorited` per (viewer, provider) pair
+    extra_repos=(("user_favorite_repo", UserFavoriteRepository),),
+)
 
 mount_entity(
     router,

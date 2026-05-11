@@ -11,15 +11,17 @@ from src.api.common.specs.provider_licensure import LICENSURE_ENTITY
 from src.logic._generic import (
     make_create_handler,
     make_delete_handler,
+    make_detail_handler,
     make_edit_form_handler,
     make_update_handler,
 )
 from src.logic.providers.provider_processing import (
     handle_create_provider,
-    handle_get_provider_detail,
     handle_get_provider_form,
     handle_list_providers,
+    provider_detail_extras,
 )
+from src.repositories.favorites.user_favorite_repository import UserFavoriteRepository
 
 providers_api_router = APIRouter(prefix="/providers")
 router = BaseRouter(router=providers_api_router, default_tags=["providers"])
@@ -46,6 +48,14 @@ _handle_delete_provider = _named(
 _handle_get_provider_edit_form = _named(
     make_edit_form_handler(PROVIDER_ENTITY), "_handle_get_provider_edit_form"
 )
+_handle_get_provider_detail = _named(
+    make_detail_handler(
+        PROVIDER_ENTITY,
+        extras=provider_detail_extras,
+        extra_repos=(("user_favorite_repo", UserFavoriteRepository),),
+    ),
+    "_handle_get_provider_detail",
+)
 
 
 mount_entity(
@@ -53,7 +63,9 @@ mount_entity(
     PROVIDER_ENTITY,
     handlers={
         "list": handle_list_providers,
-        "detail": handle_get_provider_detail,
+        # Detail is framework-built; `provider_detail_extras` injects the
+        # viewer-pair `is_favorited` flag via the extras hook.
+        "detail": _handle_get_provider_detail,
         # Bespoke create (inline credentials append); other verbs are
         # generic factory-built.
         "create": handle_create_provider,

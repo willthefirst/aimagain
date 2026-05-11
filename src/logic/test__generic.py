@@ -1550,3 +1550,247 @@ async def test_make_edit_form_handler_delegates_to_handle_get_edit_form():
 
     assert context["widget"] is target
     assert context["current_user"] is user
+
+
+# --- handle_detail framework tests ---------------------------------------
+
+
+from src.logic._generic import handle_detail, make_detail_handler  # noqa: E402
+
+
+def _can_edit_for_owner(obj, user) -> bool:
+    """Stand-in for `is_owner_or_admin` — predicate form of write_authz."""
+    return user is not None and getattr(obj, "owner_id", None) == user.id
+
+
+@pytest.mark.asyncio
+async def test_detail_top_level_happy_path():
+    """No can_write, no extras: load target, bind under spec.name."""
+    spec = _top_level_spec(write_authz=None)
+    target_id = uuid4()
+    target = _FixtureRow(id=target_id)
+    repo = _FakeRepo()
+    repo.seed(_FixtureRow, target)
+    user = SimpleNamespace(id=uuid4())
+
+    context = await handle_detail(
+        spec,
+        request=SimpleNamespace(),
+        target_id=target_id,
+        repo=repo,
+        requesting_user=user,
+    )
+
+    assert context["widget"] is target
+    assert context["current_user"] is user
+    assert "can_edit" not in context  # no can_write declared
+
+
+@pytest.mark.asyncio
+async def test_detail_populates_can_edit_from_can_write():
+    """When `spec.can_write` is set, `can_edit` is populated by calling it."""
+    spec = EntitySpec(
+        name="widget",
+        url_collection="widgets",
+        id_param="widget_id",
+        model=_FixtureRow,
+        can_write=_can_edit_for_owner,
+        audit=_audit(),
+    )
+    target_id = uuid4()
+    owner_id = uuid4()
+    owner = SimpleNamespace(id=owner_id)
+    stranger = SimpleNamespace(id=uuid4())
+
+    # _FixtureRow doesn't have owner_id; simulate by setattr.
+    target = _FixtureRow(id=target_id)
+    target.owner_id = owner_id  # type: ignore[attr-defined]
+    repo = _FakeRepo()
+    repo.seed(_FixtureRow, target)
+
+    owner_ctx = await handle_detail(
+        spec,
+        request=SimpleNamespace(),
+        target_id=target_id,
+        repo=repo,
+        requesting_user=owner,
+    )
+    assert owner_ctx["can_edit"] is True
+
+    stranger_ctx = await handle_detail(
+        spec,
+        request=SimpleNamespace(),
+        target_id=target_id,
+        repo=repo,
+        requesting_user=stranger,
+    )
+    assert stranger_ctx["can_edit"] is False
+
+
+@pytest.mark.asyncio
+async def test_detail_extras_merges_into_context():
+    """Extras callable's return dict merges into context, last-write-wins.
+
+    Tests can override the base `spec.name` binding via extras (e.g. user
+    binds under `target_user`)."""
+    spec = _top_level_spec(write_authz=None)
+    target_id = uuid4()
+    target = _FixtureRow(id=target_id)
+    repo = _FakeRepo()
+    repo.seed(_FixtureRow, target)
+
+    async def extras(*, target, request, requesting_user, **_):
+        return {
+            "extra_flag": True,
+            "widget": "projection",  # overrides base spec.name binding
+        }
+
+    context = await handle_detail(
+        spec,
+        request=SimpleNamespace(),
+        target_id=target_id,
+        repo=repo,
+        requesting_user=SimpleNamespace(id=uuid4()),
+        extras=extras,
+    )
+
+    assert context["extra_flag"] is True
+    assert context["widget"] == "projection"  # last-write-wins
+
+
+@pytest.mark.asyncio
+async def test_detail_extras_receives_extra_kwargs():
+    """`extra_kwargs` is forwarded to the extras callable, in addition to
+    `target` / `request` / `requesting_user`."""
+    spec = _top_level_spec(write_authz=None)
+    target_id = uuid4()
+    target = _FixtureRow(id=target_id)
+    repo = _FakeRepo()
+    repo.seed(_FixtureRow, target)
+    captured = {}
+
+    async def extras(*, target, request, requesting_user, side_repo, **_):
+        captured["target"] = target
+        captured["side_repo"] = side_repo
+        return {}
+
+    side_repo = object()
+    await handle_detail(
+        spec,
+        request=SimpleNamespace(),
+        target_id=target_id,
+        repo=repo,
+        requesting_user=SimpleNamespace(id=uuid4()),
+        extras=extras,
+        extra_kwargs={"side_repo": side_repo},
+    )
+
+    assert captured["target"] is target
+    assert captured["side_repo"] is side_repo
+
+
+@pytest.mark.asyncio
+async def test_detail_target_not_found_raises_not_found():
+    spec = _top_level_spec()
+    repo = _FakeRepo()
+    with pytest.raises(NotFoundError):
+        await handle_detail(
+            spec,
+            request=SimpleNamespace(),
+            target_id=uuid4(),
+            repo=repo,
+            requesting_user=SimpleNamespace(id=uuid4()),
+        )
+
+
+@pytest.mark.asyncio
+async def test_detail_anonymous_viewer_supported():
+    """`requesting_user=None` works — public-detail entities (no
+    read_user_dep) can pass None."""
+    spec = _top_level_spec(write_authz=None)
+    target_id = uuid4()
+    target = _FixtureRow(id=target_id)
+    repo = _FakeRepo()
+    repo.seed(_FixtureRow, target)
+
+    context = await handle_detail(
+        spec,
+        request=SimpleNamespace(),
+        target_id=target_id,
+        repo=repo,
+        requesting_user=None,
+    )
+
+    assert context["current_user"] is None
+
+
+# --- make_detail_handler factory -----------------------------------------
+
+
+def test_make_detail_handler_signature():
+    spec = _top_level_spec(write_authz=None)
+    handler = make_detail_handler(spec)
+    sig = inspect.signature(handler)
+    assert set(sig.parameters) == {
+        "request",
+        "widget_id",
+        "repo",
+        "requesting_user",
+    }
+
+
+def test_make_detail_handler_includes_extra_repos_in_signature():
+    """`extra_repos=` adds typed params so `mount_detail`'s introspection
+    wires them via the repo type registry — same shape as a hand-written
+    multi-repo detail handler."""
+
+    class _SideRepo:
+        pass
+
+    spec = _top_level_spec(write_authz=None)
+    handler = make_detail_handler(spec, extra_repos=(("side_repo", _SideRepo),))
+    sig = inspect.signature(handler)
+    assert "side_repo" in sig.parameters
+    assert sig.parameters["side_repo"].annotation is _SideRepo
+
+
+def test_make_detail_handler_name_includes_entity():
+    spec = _top_level_spec(write_authz=None)
+    handler = make_detail_handler(spec)
+    assert handler.__name__ == "_handle_get_widget_detail"
+
+
+@pytest.mark.asyncio
+async def test_make_detail_handler_delegates_to_handle_detail():
+    """The factory-built handler invokes `handle_detail` with the spec
+    bound and `extra_repos` forwarded into `extra_kwargs`."""
+    spec = _top_level_spec(write_authz=None)
+    target_id = uuid4()
+    target = _FixtureRow(id=target_id)
+    repo = _FakeRepo()
+    repo.seed(_FixtureRow, target)
+
+    class _SideRepo:
+        pass
+
+    side_repo = _SideRepo()
+    captured = {}
+
+    async def extras(*, target, request, requesting_user, side_repo, **_):
+        captured["side_repo"] = side_repo
+        return {"extra_flag": True}
+
+    handler = make_detail_handler(
+        spec, extras=extras, extra_repos=(("side_repo", _SideRepo),)
+    )
+    context = await handler(
+        request=SimpleNamespace(),
+        widget_id=target_id,
+        repo=repo,
+        requesting_user=SimpleNamespace(id=uuid4()),
+        side_repo=side_repo,
+    )
+
+    assert context["widget"] is target
+    assert context["extra_flag"] is True
+    assert captured["side_repo"] is side_repo

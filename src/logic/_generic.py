@@ -17,7 +17,7 @@ custom shapes stay custom.
 """
 
 import inspect
-from typing import Any
+from typing import Any, Awaitable, Callable
 from uuid import UUID
 
 from fastapi import Request
@@ -643,5 +643,145 @@ def make_edit_form_handler(spec: EntitySpec):
 
     _handler.__signature__ = inspect.Signature(parameters=sig_params)  # type: ignore[attr-defined]
     _handler.__name__ = f"_handle_get_{spec.name}_edit_form"
+    _handler.__qualname__ = _handler.__name__
+    return _handler
+
+
+async def handle_detail(
+    spec: EntitySpec,
+    *,
+    request: Request,
+    target_id: UUID,
+    repo: BaseRepository,
+    requesting_user: User | None,
+    extras: Callable[..., Awaitable[dict[str, Any]]] | None = None,
+    extra_kwargs: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Generic detail handler driven by `spec`.
+
+    Performs: load target → 404 → compute `can_edit` from
+    `spec.can_write` (when set) → merge entity-specific extras via the
+    callable hook. The base context binds the entity under `spec.name`
+    (e.g. `"post"`, `"provider"`) so existing templates that read
+    `{{ post }}` / `{{ provider }}` keep working without per-entity
+    glue.
+
+    `extras` is the entity's per-detail customization callable. It
+    receives the loaded target plus `request`, `requesting_user`, and
+    any keyword args in `extra_kwargs` (the route layer passes typed
+    repos this way — e.g. `user_favorite_repo` for provider detail).
+    The dict it returns is merged into the base context with
+    last-write-wins semantics; entities can override the base
+    `spec.name` binding (e.g. users binds under `target_user` for the
+    projected view).
+
+    Reads from the spec:
+      - `spec.model` — class fetched via `repo.get_by_model_id`.
+      - `spec.can_write` — when set, populates `can_edit` in context.
+        Always accepts `User | None`; entities whose detail page is
+        public (`read_user_dep=None`) pass `requesting_user=None`.
+    """
+    target = await repo.get_by_model_id(spec.model, target_id)
+    if target is None:
+        raise NotFoundError(detail=f"{spec.name.capitalize()} not found")
+
+    context: dict[str, Any] = {
+        "request": request,
+        spec.name: target,
+        "current_user": requesting_user,
+    }
+    if spec.can_write is not None:
+        context["can_edit"] = spec.can_write(target, requesting_user)
+
+    if extras is not None:
+        extras_kwargs = {
+            "target": target,
+            "request": request,
+            "requesting_user": requesting_user,
+        }
+        if extra_kwargs:
+            extras_kwargs.update(extra_kwargs)
+        context.update(await extras(**extras_kwargs))
+
+    return context
+
+
+def make_detail_handler(
+    spec: EntitySpec,
+    *,
+    extras: Callable[..., Awaitable[dict[str, Any]]] | None = None,
+    extra_repos: tuple[tuple[str, type], ...] = (),
+):
+    """Build a `mount_detail`-compatible handler from `spec`.
+
+    Mirrors the CRUD factories. Synthesizes a typed signature that
+    `mount_detail`'s introspection wires correctly (path id → URL,
+    repos → registry resolvers, requesting_user → spec.read_user_dep).
+    Delegates to `handle_detail(spec, ...)`, passing the extras
+    callable through verbatim.
+
+    Synthesized parameters:
+      - `request: Request` — for template rendering.
+      - `<id_param>: UUID` — the target's id from the URL.
+      - `repo: BaseRepository` — resolved via `spec.repo_dep`.
+      - `requesting_user: User | None` — resolved via
+        `spec.read_user_dep`; declared as Optional so public-detail
+        entities (no read user dep) work without per-entity glue.
+      - One parameter per `extra_repos` entry. Each tuple is
+        `(name, type)` — the synthesis introspects the type to find a
+        registry resolver, so the mount layer wires the dep just like
+        `_call_handler_with` does for hand-written multi-repo handlers
+        (e.g. `handle_get_user_detail`'s `provider_repo`).
+
+    The extras callable, if provided, receives `target`, `request`,
+    `requesting_user`, plus each `extra_repos` entry by name.
+    """
+    id_param = spec.id_param
+
+    sig_params: list[inspect.Parameter] = [
+        inspect.Parameter(
+            "request",
+            inspect.Parameter.POSITIONAL_OR_KEYWORD,
+            annotation=Request,
+        ),
+        inspect.Parameter(
+            id_param, inspect.Parameter.POSITIONAL_OR_KEYWORD, annotation=UUID
+        ),
+        inspect.Parameter(
+            "repo",
+            inspect.Parameter.POSITIONAL_OR_KEYWORD,
+            annotation=BaseRepository,
+        ),
+        inspect.Parameter(
+            "requesting_user",
+            inspect.Parameter.POSITIONAL_OR_KEYWORD,
+            annotation=User | None,
+        ),
+    ]
+    for name, repo_type in extra_repos:
+        sig_params.append(
+            inspect.Parameter(
+                name,
+                inspect.Parameter.POSITIONAL_OR_KEYWORD,
+                annotation=repo_type,
+            )
+        )
+
+    extra_repo_names = tuple(name for name, _ in extra_repos)
+
+    async def _handler(**kwargs: Any) -> dict[str, Any]:
+        extra_kwargs = {name: kwargs[name] for name in extra_repo_names}
+        return await handle_detail(
+            spec,
+            request=kwargs["request"],
+            target_id=kwargs[id_param],
+            repo=kwargs["repo"],
+            requesting_user=kwargs["requesting_user"],
+            extras=extras,
+            extra_kwargs=extra_kwargs if extra_kwargs else None,
+        )
+
+    _handler.__signature__ = inspect.Signature(parameters=sig_params)  # type: ignore[attr-defined]
+    _handler.__name__ = f"_handle_get_{spec.name}_detail"
     _handler.__qualname__ = _handler.__name__
     return _handler
