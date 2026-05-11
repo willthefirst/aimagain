@@ -236,7 +236,7 @@ async def get_user(
     user_id: UUID,
     user_repo: UserRepository = Depends(get_user_repository),
 ):
-    return await user_repo.get_user_by_id(user_id)
+    return await user_repo.get_by_id(user_id)
 ```
 
 ## Related documentation

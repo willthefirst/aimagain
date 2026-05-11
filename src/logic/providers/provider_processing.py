@@ -77,7 +77,7 @@ async def handle_list_user_providers(
         raise ForbiddenError(
             detail="Only the target user or an admin may view their providers"
         )
-    target_user = await user_repo.get_user_by_id(user_id)
+    target_user = await user_repo.get_by_id(user_id)
     if target_user is None:
         raise NotFoundError(detail=f"User {user_id} not found")
     providers = await repo.list_for_user(user_id)

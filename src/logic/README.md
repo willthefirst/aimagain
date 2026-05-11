@@ -70,7 +70,7 @@ There is no separate service layer — see [`../README.md`](../README.md) for th
 
 ```python
 async def handle_set_user_activation(user_id, payload, repo, requesting_user):
-    target = await repo.get_user_by_id(user_id)
+    target = await repo.get_by_id(user_id)
     ...
     updated = await repo.set_user_activation(target, is_active=...)
     await repo.session.commit()   # logic owns the commit
