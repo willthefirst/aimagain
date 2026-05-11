@@ -554,6 +554,8 @@ async def handle_get_edit_form(
         the gate (matches the `handle_update`/`handle_delete` shape).
       - `spec.discriminator` — if set, populates `template_name` from
         the discriminator-registry entry's `edit_template` attribute.
+      - `spec.static_context` — merged in for entities that declare
+        constants the form template reads (e.g. provider enum labels).
     """
     target = await repo.get_by_model_id(spec.model, target_id)
     if target is None:
@@ -566,6 +568,10 @@ async def handle_get_edit_form(
         spec.name: target,
         "current_user": requesting_user,
     }
+    # Spec-declared constants (enum labels, schema classes the form
+    # references, etc.) — same merge precedence as detail/list.
+    if spec.static_context:
+        context.update(spec.static_context)
     if spec.discriminator is not None:
         kind = getattr(target, spec.discriminator.column)
         context["template_name"] = spec.discriminator[kind].edit_template

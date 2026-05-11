@@ -58,3 +58,30 @@ def test_detail_extras_path_points_at_provider_detail_extras():
         PROVIDER_ENTITY.detail_extras_path
         == "src.logic.providers.provider_processing.provider_detail_extras"
     )
+
+
+# --- Static context (credential-type tuples + labels) -------------------
+
+
+def test_static_context_carries_credential_enums():
+    """Provider templates render credential-type display labels and
+    populate filter/select dropdowns from the matching tuples. Pinning
+    the keys here means a rename in `enums.py` surfaces in tests
+    before the page silently renders empty dropdowns."""
+    from src.models.enums import (
+        CERTIFICATION_TYPES,
+        CERTIFICATION_TYPES_LABELS,
+        EDUCATION_TYPES,
+        EDUCATION_TYPES_LABELS,
+        LICENSE_TYPES,
+        LICENSE_TYPES_LABELS,
+    )
+
+    assert PROVIDER_ENTITY.static_context == {
+        "LICENSE_TYPES": LICENSE_TYPES,
+        "LICENSE_TYPES_LABELS": LICENSE_TYPES_LABELS,
+        "EDUCATION_TYPES": EDUCATION_TYPES,
+        "EDUCATION_TYPES_LABELS": EDUCATION_TYPES_LABELS,
+        "CERTIFICATION_TYPES": CERTIFICATION_TYPES,
+        "CERTIFICATION_TYPES_LABELS": CERTIFICATION_TYPES_LABELS,
+    }
