@@ -2334,3 +2334,100 @@ def test_list_exclude_self_requires_list_route():
             list_exclude_self=True,
             routes=RouteSet(detail=True),
         )
+
+
+# --- static_context spec field --------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_handle_detail_merges_static_context():
+    """`spec.static_context` entries land in the detail context, after
+    auto-injected viewer keys and before extras run."""
+    spec = EntitySpec(
+        name="widget",
+        url_collection="widgets",
+        id_param="widget_id",
+        model=_FixtureRow,
+        audit=_audit(),
+        static_context={"widget_kinds": ("alpha", "beta")},
+    )
+    target_id = uuid4()
+    repo = _FakeRepo()
+    repo.seed(_FixtureRow, _FixtureRow(id=target_id))
+
+    context = await handle_detail(
+        spec,
+        request=SimpleNamespace(),
+        target_id=target_id,
+        repo=repo,
+        requesting_user=_user(),
+    )
+
+    assert context["widget_kinds"] == ("alpha", "beta")
+
+
+@pytest.mark.asyncio
+async def test_handle_list_merges_static_context():
+    """`spec.static_context` entries land in the list context, after the
+    base context and `selected_<filter>` echoes."""
+    spec = EntitySpec(
+        name="widget",
+        url_collection="widgets",
+        id_param="widget_id",
+        model=_FixtureRow,
+        audit=_audit(),
+        static_context={"widget_kinds": ("alpha", "beta")},
+    )
+
+    class _ListRepo:
+        async def list_widgets(self, **_):
+            return []
+
+    from src.logic._generic import handle_list
+
+    context = await handle_list(
+        spec,
+        request=SimpleNamespace(),
+        repo=_ListRepo(),
+        requesting_user=None,
+        filter_values={},
+    )
+
+    assert context["widget_kinds"] == ("alpha", "beta")
+
+
+@pytest.mark.asyncio
+async def test_extras_can_override_static_context():
+    """Extras runs after static_context merges in; last-write-wins lets
+    an entity-specific extras override a static value if needed."""
+    spec = EntitySpec(
+        name="widget",
+        url_collection="widgets",
+        id_param="widget_id",
+        model=_FixtureRow,
+        audit=_audit(),
+        static_context={"flag": "from-static"},
+    )
+    target_id = uuid4()
+    repo = _FakeRepo()
+    repo.seed(_FixtureRow, _FixtureRow(id=target_id))
+
+    async def extras(**_):
+        return {"flag": "from-extras"}
+
+    context = await handle_detail(
+        spec,
+        request=SimpleNamespace(),
+        target_id=target_id,
+        repo=repo,
+        requesting_user=_user(),
+        extras=extras,
+    )
+
+    assert context["flag"] == "from-extras"
+
+
+def test_static_context_default_is_empty_dict():
+    """Default is empty; absent declaration means no extra keys land."""
+    spec = _top_level_spec()
+    assert spec.static_context == {}
