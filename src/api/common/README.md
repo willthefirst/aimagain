@@ -110,8 +110,8 @@ from src.logic.users.user_processing import (
     handle_set_user_activation,
 )
 
-users_api_router = APIRouter(prefix="/users")
-router = BaseRouter(router=users_api_router, default_tags=["users"])
+router = make_entity_router(USER_ENTITY)
+users_api_router = router.router  # re-exported so `main.py` keeps resolving
 
 mount_entity(
     router,

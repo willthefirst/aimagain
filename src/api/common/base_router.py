@@ -1,8 +1,11 @@
-from typing import Any, Callable, List, Optional
+from typing import TYPE_CHECKING, Any, Callable, List, Optional
 
 from fastapi import APIRouter, Depends
 
 from src.api.common.decorators import handle_route_errors, log_route_call
+
+if TYPE_CHECKING:
+    from src.api.common.entity_spec import EntitySpec
 
 
 class BaseRouter:
@@ -98,6 +101,34 @@ class BaseRouter:
             return endpoint
 
         return decorator
+
+
+def make_entity_router(entity: "EntitySpec") -> BaseRouter:
+    """Build a `BaseRouter` for `entity` with prefix + tags derived from the spec.
+
+    The prefix is ``f"/{entity.url_collection}"`` by default; entities
+    whose URL doesn't fit the convention (favorites lives under
+    ``/users/me/favorites``) set ``prefix_override`` on the spec.
+    Default tags are ``[entity.url_collection]``.
+
+    Replaces the 4-line scaffold that every route file used to repeat:
+
+        users_api_router = APIRouter(prefix="/users")
+        router = BaseRouter(router=users_api_router, default_tags=["users"])
+
+    Route files now do ``router = make_entity_router(USER_ENTITY)``; the
+    underlying ``APIRouter`` is accessible as ``router.router`` for
+    ``app.include_router(...)`` in ``main.py``.
+    """
+    prefix = (
+        entity.prefix_override
+        if entity.prefix_override is not None
+        else f"/{entity.url_collection}"
+    )
+    return BaseRouter(
+        router=APIRouter(prefix=prefix),
+        default_tags=[entity.url_collection],
+    )
 
 
 # Example of how to use this BaseRouter:

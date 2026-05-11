@@ -1,8 +1,4 @@
-import logging
-
-from fastapi import APIRouter
-
-from src.api.common import BaseRouter
+from src.api.common import make_entity_router
 from src.api.common.resource_routes import mount_entity
 from src.api.common.specs.user import USER_ENTITY
 from src.logic.users.user_processing import (
@@ -10,9 +6,11 @@ from src.logic.users.user_processing import (
     handle_list_users,
 )
 
-users_api_router = APIRouter(prefix="/users")
-router = BaseRouter(router=users_api_router, default_tags=["users"])
-logger = logging.getLogger(__name__)
+router = make_entity_router(USER_ENTITY)
+# Re-export the underlying APIRouter under the historic name so
+# `main.py`'s `app.include_router(users.users_api_router, ...)` keeps
+# resolving without churn.
+users_api_router = router.router
 
 
 # `handle_delete_user` and `handle_list_users` are bespoke (self-guard

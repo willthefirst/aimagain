@@ -14,11 +14,7 @@ Audit and commit are owned by the logic-layer handlers, not the mount
 helper.
 """
 
-import logging
-
-from fastapi import APIRouter
-
-from src.api.common import BaseRouter
+from src.api.common import make_entity_router
 from src.api.common.resource_routes import mount_edge_routes
 from src.api.common.specs.user_favorite import FAVORITE_ENTITY
 from src.logic.favorites.favorite_processing import (
@@ -27,9 +23,8 @@ from src.logic.favorites.favorite_processing import (
     handle_remove_favorite,
 )
 
-favorites_api_router = APIRouter(prefix="/users/me/favorites")
-router = BaseRouter(router=favorites_api_router, default_tags=["favorites"])
-logger = logging.getLogger(__name__)
+router = make_entity_router(FAVORITE_ENTITY)
+favorites_api_router = router.router
 
 
 mount_edge_routes(
