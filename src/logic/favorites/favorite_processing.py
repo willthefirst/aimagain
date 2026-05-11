@@ -21,7 +21,7 @@ from fastapi import Request
 from src.api.common.exceptions import NotFoundError
 from src.api.common.specs.user_favorite import FAVORITE_ENTITY
 from src.logic.audit import record_audit
-from src.models import User, UserFavorite
+from src.models import Provider, User, UserFavorite
 from src.repositories.audit_repository import AuditRepository
 from src.repositories.favorites.user_favorite_repository import UserFavoriteRepository
 from src.repositories.providers.provider_repository import ProviderRepository
@@ -49,7 +49,7 @@ async def handle_add_favorite(
     404 if the target provider does not exist — keeps the existence of a
     deleted provider opaque to the favorites endpoint.
     """
-    provider = await provider_repo.get_by_id(provider_id)
+    provider = await provider_repo.get_by_model_id(Provider, provider_id)
     if provider is None:
         raise NotFoundError(detail="Provider not found")
 

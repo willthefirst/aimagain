@@ -105,7 +105,7 @@ async def test_get_by_id_finds_created_provider(
 
     async with db_test_session_manager() as session:
         repo = ProviderRepository(session)
-        found = await repo.get_by_id(provider_id)
+        found = await repo.get_by_model_id(Provider, provider_id)
         assert found is not None
         assert found.id == provider_id
 
@@ -160,7 +160,7 @@ async def test_update_provider_changes_fields_visible_on_refetch(
 
     async with db_test_session_manager() as session:
         repo = ProviderRepository(session)
-        provider = await repo.get_by_id(provider_id)
+        provider = await repo.get_by_model_id(Provider, provider_id)
         assert provider is not None
         await repo.patch(provider, practice_name="Renamed", location_city="Chicago")
         await session.commit()
@@ -203,7 +203,7 @@ async def test_delete_provider_cascades_licensures(
 
     async with db_test_session_manager() as session:
         repo = ProviderRepository(session)
-        provider = await repo.get_by_id(provider_id)
+        provider = await repo.get_by_model_id(Provider, provider_id)
         assert provider is not None
         await repo.delete(provider)
         await session.commit()
@@ -425,7 +425,7 @@ async def test_licensure_crud_round_trip(
 
     async with db_test_session_manager() as session:
         repo = ProviderRepository(session)
-        provider = await repo.get_by_id(provider_id)
+        provider = await repo.get_by_model_id(Provider, provider_id)
         licensure = await repo.add_child(
             provider,
             "licensures",
@@ -471,7 +471,7 @@ async def test_education_crud_round_trip(
 
     async with db_test_session_manager() as session:
         repo = ProviderRepository(session)
-        provider = await repo.get_by_id(provider_id)
+        provider = await repo.get_by_model_id(Provider, provider_id)
         education = await repo.add_child(
             provider,
             "educations",
@@ -516,7 +516,7 @@ async def test_certification_crud_round_trip(
 
     async with db_test_session_manager() as session:
         repo = ProviderRepository(session)
-        provider = await repo.get_by_id(provider_id)
+        provider = await repo.get_by_model_id(Provider, provider_id)
         cert = await repo.add_child(
             provider,
             "certifications",
