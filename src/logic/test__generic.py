@@ -1565,6 +1565,201 @@ async def test_make_edit_form_handler_delegates_to_handle_get_edit_form():
     assert context["current_user"] is user
 
 
+# --- handle_get_new_form framework tests ---------------------------------
+
+
+from src.logic._generic import (  # noqa: E402
+    handle_get_new_form,
+    make_new_form_handler,
+)
+
+
+class _FormSchema(_BaseModel):
+    name: str = ""
+
+
+@_dc(frozen=True)
+class _FixtureNewKindSpec:
+    """Stands in for `PostKindSpec` — only `create_template` is
+    load-bearing for the new-form path."""
+
+    create_template: str
+
+
+@pytest.mark.asyncio
+async def test_new_form_top_level_happy_path():
+    """Non-polymorphic: returns request + current_user + schema class."""
+    spec = EntitySpec(
+        name="widget",
+        url_collection="widgets",
+        id_param="widget_id",
+        model=_FixtureRow,
+        audit=_audit(),
+        create_adapter=_FormSchema,
+        routes=RouteSet(create=True, form_new=True),
+    )
+    user = _user()
+    request = SimpleNamespace()
+
+    context = await handle_get_new_form(spec, request=request, requesting_user=user)
+
+    assert context["request"] is request
+    assert context["current_user"] is user
+    # Bound from the unwrapped class so templates can read `model_fields`.
+    assert context["schema"] is _FormSchema
+    assert "template_name" not in context
+
+
+@pytest.mark.asyncio
+async def test_new_form_merges_static_context():
+    spec = EntitySpec(
+        name="widget",
+        url_collection="widgets",
+        id_param="widget_id",
+        model=_FixtureRow,
+        audit=_audit(),
+        create_adapter=_FormSchema,
+        routes=RouteSet(create=True, form_new=True),
+        static_context={"LABELS": {"a": "A"}},
+    )
+
+    context = await handle_get_new_form(
+        spec, request=SimpleNamespace(), requesting_user=_user()
+    )
+
+    assert context["LABELS"] == {"a": "A"}
+
+
+@pytest.mark.asyncio
+async def test_new_form_polymorphic_uses_kind_create_template():
+    """Polymorphic: template_name comes from
+    `spec.discriminator[kind].create_template`; no schema key (kind-specific
+    create templates handle their own field rendering)."""
+    registry = DiscriminatorRegistry(
+        column="kind",
+        specs={
+            "red": _FixtureNewKindSpec(create_template="paintings/new_red.html"),
+            "blue": _FixtureNewKindSpec(create_template="paintings/new_blue.html"),
+        },
+    )
+    spec = EntitySpec(
+        name="painting",
+        url_collection="paintings",
+        id_param="painting_id",
+        model=_PolyRow,
+        audit=_audit(),
+        discriminator=registry,
+    )
+
+    context = await handle_get_new_form(
+        spec,
+        request=SimpleNamespace(),
+        requesting_user=_user(),
+        kind="blue",
+    )
+
+    assert context["template_name"] == "paintings/new_blue.html"
+    assert "schema" not in context
+
+
+@pytest.mark.asyncio
+async def test_new_form_polymorphic_defaults_kind_to_first_registered():
+    registry = DiscriminatorRegistry(
+        column="kind",
+        specs={
+            "red": _FixtureNewKindSpec(create_template="paintings/new_red.html"),
+            "blue": _FixtureNewKindSpec(create_template="paintings/new_blue.html"),
+        },
+    )
+    spec = EntitySpec(
+        name="painting",
+        url_collection="paintings",
+        id_param="painting_id",
+        model=_PolyRow,
+        audit=_audit(),
+        discriminator=registry,
+    )
+
+    context = await handle_get_new_form(
+        spec, request=SimpleNamespace(), requesting_user=_user(), kind=None
+    )
+
+    assert context["template_name"] == "paintings/new_red.html"
+
+
+# --- make_new_form_handler factory ----------------------------------------
+
+
+def test_make_new_form_handler_signature_non_polymorphic():
+    spec = EntitySpec(
+        name="widget",
+        url_collection="widgets",
+        id_param="widget_id",
+        model=_FixtureRow,
+        audit=_audit(),
+        create_adapter=_FormSchema,
+        routes=RouteSet(create=True, form_new=True),
+    )
+    handler = make_new_form_handler(spec)
+    sig = inspect.signature(handler)
+    assert set(sig.parameters) == {"request", "requesting_user"}
+
+
+def test_make_new_form_handler_signature_polymorphic_includes_kind():
+    registry = DiscriminatorRegistry(
+        column="kind",
+        specs={"red": _FixtureNewKindSpec(create_template="x.html")},
+    )
+    spec = EntitySpec(
+        name="painting",
+        url_collection="paintings",
+        id_param="painting_id",
+        model=_PolyRow,
+        audit=_audit(),
+        discriminator=registry,
+    )
+    handler = make_new_form_handler(spec)
+    sig = inspect.signature(handler)
+    assert "kind" in sig.parameters
+    # `repo` is omitted — new-form doesn't load a target.
+    assert "repo" not in sig.parameters
+
+
+def test_make_new_form_handler_name_includes_entity():
+    spec = EntitySpec(
+        name="widget",
+        url_collection="widgets",
+        id_param="widget_id",
+        model=_FixtureRow,
+        audit=_audit(),
+        create_adapter=_FormSchema,
+        routes=RouteSet(create=True, form_new=True),
+    )
+    handler = make_new_form_handler(spec)
+    assert handler.__name__ == "_handle_get_widget_new_form"
+
+
+@pytest.mark.asyncio
+async def test_make_new_form_handler_delegates_to_handle_get_new_form():
+    spec = EntitySpec(
+        name="widget",
+        url_collection="widgets",
+        id_param="widget_id",
+        model=_FixtureRow,
+        audit=_audit(),
+        create_adapter=_FormSchema,
+        routes=RouteSet(create=True, form_new=True),
+    )
+    user = _user()
+    request = SimpleNamespace()
+
+    handler = make_new_form_handler(spec)
+    context = await handler(request=request, requesting_user=user)
+
+    assert context["schema"] is _FormSchema
+    assert context["current_user"] is user
+
+
 # --- handle_detail framework tests ---------------------------------------
 
 

@@ -373,6 +373,15 @@ class _FactoryShape:
     include_filters: bool = False
     accepts_extras: bool = False
     user_optional: bool = False
+    # The new-form path doesn't load a target and has nothing to do
+    # with `repo`, so the synthesized handler omits it; mount_form's
+    # introspection only passes kwargs the handler declares.
+    omit_repo: bool = False
+    # Polymorphic entities' create-form takes `?kind=` as a query
+    # param; when set, the synthesized handler declares `kind: str`
+    # so the mount layer forwards it. Non-polymorphic entities ignore
+    # this flag.
+    include_kind_for_polymorphic: bool = False
 
 
 _DELETE_SHAPE = _FactoryShape(
@@ -398,6 +407,12 @@ _EDIT_FORM_SHAPE = _FactoryShape(
     name_template="_handle_get_{name}_edit_form",
     include_request=True,
     include_target_id=True,
+)
+_NEW_FORM_SHAPE = _FactoryShape(
+    name_template="_handle_get_{name}_new_form",
+    include_request=True,
+    include_kind_for_polymorphic=True,
+    omit_repo=True,
 )
 _DETAIL_SHAPE = _FactoryShape(
     name_template="_handle_get_{name}_detail",
@@ -454,7 +469,10 @@ def _make_factory_handler(
             sig_params.append(_param(qp.name, qp.annotation))
     if shape.include_payload:
         sig_params.append(_param("payload", BaseModel))
-    sig_params.append(_param("repo", BaseRepository))
+    if shape.include_kind_for_polymorphic and spec.discriminator is not None:
+        sig_params.append(_param("kind", str))
+    if not shape.omit_repo:
+        sig_params.append(_param("repo", BaseRepository))
     if shape.include_audit_repo:
         sig_params.append(_param("audit_repo", AuditRepository))
     user_ann = User | None if shape.user_optional else User
@@ -464,9 +482,12 @@ def _make_factory_handler(
 
     async def _handler(**kwargs: Any) -> Any:
         call_kwargs: dict[str, Any] = {
-            "repo": kwargs["repo"],
             "requesting_user": kwargs["requesting_user"],
         }
+        if not shape.omit_repo:
+            call_kwargs["repo"] = kwargs["repo"]
+        if shape.include_kind_for_polymorphic and spec.discriminator is not None:
+            call_kwargs["kind"] = kwargs["kind"]
         if shape.include_request:
             call_kwargs["request"] = kwargs["request"]
         if shape.include_target_id:
@@ -586,6 +607,54 @@ def make_edit_form_handler(spec: EntitySpec):
     `handle_get_edit_form(spec, ...)`.
     """
     return _make_factory_handler(spec, _EDIT_FORM_SHAPE, handle_get_edit_form)
+
+
+async def handle_get_new_form(
+    spec: EntitySpec,
+    *,
+    request: Request,
+    requesting_user: User,
+    kind: str | None = None,
+) -> dict[str, Any]:
+    """Generic create-form handler driven by `spec`.
+
+    Returns a template context with `request`, `current_user`, and any
+    `spec.static_context` constants the form template reads (enum
+    labels, etc.). For non-polymorphic entities the create-adapter is
+    bound under `schema` so templates using `field_for(schema, ...)`
+    keep working without per-entity glue. For polymorphic entities
+    (`spec.discriminator` set), `template_name` is populated from the
+    discriminator-registry entry's `create_template` so `mount_form`'s
+    template precedence renders the per-kind create page; the
+    `?kind=` query param picks the entry, defaulting to the first
+    registered kind.
+    """
+    context: dict[str, Any] = {
+        "request": request,
+        "current_user": requesting_user,
+    }
+    if spec.static_context:
+        context.update(spec.static_context)
+    if spec.discriminator is not None:
+        chosen = kind or spec.discriminator.names[0]
+        context["template_name"] = spec.discriminator[chosen].create_template
+    elif spec.create_adapter_class is not None:
+        # Non-polymorphic create forms render fields via
+        # `field_for(schema, ...)` (reads `schema.model_fields`); the
+        # spec's `create_adapter` is the TypeAdapter wrapper, so we bind
+        # the underlying class instead.
+        context["schema"] = spec.create_adapter_class
+    return context
+
+
+def make_new_form_handler(spec: EntitySpec):
+    """Build a `mount_form(on_existing=False)`-compatible handler from `spec`.
+
+    Synthesized parameters: `request`, `requesting_user`, plus
+    `kind: str` for polymorphic entities (forwarded as the
+    `?kind=` query param). Delegates to `handle_get_new_form(spec, ...)`.
+    """
+    return _make_factory_handler(spec, _NEW_FORM_SHAPE, handle_get_new_form)
 
 
 async def handle_detail(

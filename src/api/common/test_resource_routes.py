@@ -1390,30 +1390,6 @@ def test_mount_entity_handler_path_missing_attr_raises_clear_error():
         mount_entity(None, spec, handlers={})
 
 
-def test_mount_entity_missing_handler_raises_key_error():
-    """If a route is opted in but the handler is missing → KeyError.
-    Uses `form_new` because every standard CRUD verb has a default
-    factory now (list / detail / create / update / delete / form_edit
-    auto-bind); only `form_new` requires an explicit handler."""
-    spec = _EntitySpec(
-        name="thing",
-        url_collection="things",
-        id_param="thing_id",
-        model=SimpleNamespace,
-        audit=_stub_audit(),
-        routes=_RouteSet(form_new=True),
-    )
-    import src.api.common.resource_routes as rr
-
-    orig = rr.mount_form
-    rr.mount_form = lambda *a, **k: None
-    try:
-        with pytest.raises(KeyError):
-            mount_entity(None, spec, handlers={})  # missing "form_new"
-    finally:
-        rr.mount_form = orig
-
-
 def test_mount_entity_extra_handler_keys_raises_value_error():
     """Typos in handler keys are caught at mount time, not silently no-op."""
     spec = _EntitySpec(
@@ -1571,31 +1547,6 @@ def test_mount_entity_owned_subentity_explicit_handler_overrides_default():
     # update + delete fall back to factory defaults.
     assert by_mount["mount_update"].__name__ == "_handle_update_child"
     assert by_mount["mount_delete"].__name__ == "_handle_delete_child"
-
-
-def test_mount_entity_owned_subentity_no_default_factory_raises():
-    """Opting an owned subentity into a verb without a default factory
-    (only `form_new` today; every standard CRUD verb has one) requires
-    an explicit handler — missing one raises `KeyError` at mount time."""
-    parent = _EntitySpec(
-        name="parent",
-        url_collection="parents",
-        id_param="parent_id",
-        model=SimpleNamespace,
-        audit=_stub_audit(),
-    )
-    child = _EntitySpec(
-        name="child",
-        url_collection="children",
-        id_param="child_id",
-        model=SimpleNamespace,
-        parent=parent,
-        audit=_stub_audit(),
-        routes=_RouteSet(form_new=True),
-        templates=_Templates(form_new="x/form.html"),
-    )
-    with pytest.raises(KeyError, match="no default factory"):
-        mount_entity(None, parent, handlers={}, owned_subentities=(child,))
 
 
 # --- top-level factory auto-bind ----------------------------------------

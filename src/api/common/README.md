@@ -197,8 +197,10 @@ mount_list(
 )
 
 # Polymorphic-by-query form — posts' ?kind=client_referral picks the template.
+# (`mount_entity` wires this automatically from `spec.discriminator`; the
+# direct-call form below is only relevant for hand-rolled mounts.)
 mount_form(
-    router, POST_SPEC, handler=handle_get_post_form,
+    router, POST_SPEC, handler=make_new_form_handler(POST_ENTITY),
     query_params=(QueryParam("kind", Literal[*POST_KIND_NAMES], POST_KIND_NAMES[0]),),
 )
 ```
@@ -240,9 +242,9 @@ Migrated route files compose the individual `mount_*` helpers through `mount_ent
 - `entity.filters` — passed as `query_params=` to `mount_list`.
 - `entity.discriminator` — if set, the form-new mount auto-derives `Literal[*entity.discriminator.names]` for the `?kind=` query param.
 - `entity.read_user_dep` — `None` means public read; `mount_list` is called with `public=True`.
-- `owned_subentities` — a tuple of child `EntitySpec`s whose `parent` is `entity`. Each is mounted recursively via the same dispatcher; the handlers dict for an owned subentity is keyed `f"{owned.name}.{verb}"` (e.g. `"licensure.create"`). For verbs that match the standard CRUD-framework factories (`create`, `update`, `delete`, `detail`, `form_edit`), the explicit key is optional — `mount_entity` falls back to `make_<verb>_handler(owned)`, which is the common case for subentities whose mutations are entirely standard. Verbs without a default factory (`list`, `form_new`) still require an explicit entry; supplying any explicit key overrides the factory default.
+- `owned_subentities` — a tuple of child `EntitySpec`s whose `parent` is `entity`. Each is mounted recursively via the same dispatcher; the handlers dict for an owned subentity is keyed `f"{owned.name}.{verb}"` (e.g. `"licensure.create"`). Every standard verb (`list`, `detail`, `create`, `update`, `delete`, `form_new`, `form_edit`) auto-binds via `make_<verb>_handler(owned)` when the explicit key is absent; supplying a key overrides the factory default.
 
-**Top-level standard verbs follow the same auto-bind path as owned subentities.** When a top-level entity opts into `list` / `detail` / `create` / `update` / `delete` / `form_edit` and the matching key is *absent* from `handlers`, `mount_entity` builds the handler from `make_<verb>_handler(entity)` and stitches it onto the route file's module as `_handle_<verb>_<entity>` (e.g. `_handle_update_provider`, `_handle_list_post`). That's the path contract-test monkey-patches at `src.api.routes.<entity>._handle_<verb>_<entity>` resolve through; setting `__module__` on the built handler lets the mount layer's `_resolve_handler` find the patched version via `getattr(sys.modules[__module__], __name__)`. The target module is auto-detected from the `mount_entity` caller's frame, so route files don't pass `module=`. Bespoke verbs (e.g. `handle_delete_user`'s self-guard) stay explicit in the handlers dict and override the factory default. The only verb that has no default factory is `form_new` — its template-selection knob is too entity-specific to auto-bind (posts dispatches by `?kind=`; providers needs the `ProviderCreate` schema class in context). Inline-child appends on create (providers' credential rows) come from the generic `handle_create` walking `spec.children`.
+**Top-level standard verbs follow the same auto-bind path as owned subentities.** When a top-level entity opts into any of `list` / `detail` / `create` / `update` / `delete` / `form_new` / `form_edit` and the matching key is *absent* from `handlers`, `mount_entity` builds the handler from `make_<verb>_handler(entity)` and stitches it onto the route file's module as `_handle_<verb>_<entity>` (e.g. `_handle_update_provider`, `_handle_list_post`). That's the path contract-test monkey-patches at `src.api.routes.<entity>._handle_<verb>_<entity>` resolve through; setting `__module__` on the built handler lets the mount layer's `_resolve_handler` find the patched version via `getattr(sys.modules[__module__], __name__)`. The target module is auto-detected from the `mount_entity` caller's frame, so route files don't pass `module=`. Bespoke verbs (e.g. `handle_delete_user`'s self-guard) stay explicit in the handlers dict and override the factory default. Inline-child appends on create (providers' credential rows) come from the generic `handle_create` walking `spec.children`.
 
 Per-viewer / per-list extras live on `EntitySpec` as `detail_extras_path` / `list_extras_path` — dotted import paths to the extras callable, resolved lazily at mount time via `importlib.import_module` + `getattr` (same machinery `StateAxis.handler_path` uses). The late-binding sidesteps the import cycle that previously forced the extras callables to live on the `mount_entity` call site: the logic module is only imported when `mount_entity` runs, which is after both the spec module and the logic module have finished initializing. Typed repo kwargs the extras callable receives are declared on the spec as `detail_extras_repos` / `list_extras_repos` (real classes — repositories live below specs in the import order, so the type-class import is cycle-safe). Spec construction validates the pairings: extras_path requires the matching `routes.<verb>=True`, extras_repos requires extras_path. `mount_entity` additionally rejects `detail_extras_path` alongside an explicit `handlers["detail"]` (the explicit handler would silently win).
 
@@ -260,17 +262,15 @@ For the standard CRUD verbs (create / update / delete) plus the detail and edit-
 - `handle_detail(spec, *, request, target_id, repo, requesting_user, extras=None, extra_kwargs=None)` — load → optional `can_edit` from `spec.can_write` → auto-inject viewer-derived keys (`is_self`, `can_admin_actions`, plus `can_view_private` when `spec.private_field_predicate` is set and `target_<name>` projection when `spec.public_fields` is set) → optional entity-specific extras callable for per-viewer / per-pair / related-collection state. The extras callable receives `target`, `request`, `requesting_user`, plus any `extra_kwargs`; its return dict merges into the context (last-write-wins, so extras can override any framework-injected key). The auto-injection means an entity that just needs viewer flags + projection can leave `extras=None` entirely.
 - `handle_list(spec, *, request, repo, requesting_user, filter_values, extras=None, extra_kwargs=None)` — call `repo.list_<url_collection>(**filter_values)` by convention (threading `exclude_self=requesting_user` into the call when `spec.list_exclude_self=True`) → base context binds items under `spec.url_collection`, `can_admin_actions` from `is_admin(viewer)`, plus `selected_<filter>` echoes for the filter form → optional extras callable. Extras receives `items`, `request`, `requesting_user`, `filter_values`, plus any `extra_kwargs`.
 - `handle_get_edit_form(spec, *, request, target_id, repo, requesting_user)` — load → write_authz → context dict binding the entity under `spec.name`. For polymorphic entities, populates `template_name` from `spec.discriminator[kind].edit_template` so `mount_form`'s template-precedence renders the per-kind edit page.
+- `handle_get_new_form(spec, *, request, requesting_user, kind=None)` — return template context with `request`, `current_user`, and any `spec.static_context` constants. For non-polymorphic entities binds `schema=spec.create_adapter` (templates render fields via `field_for(schema, ...)`); for polymorphic entities populates `template_name` from `spec.discriminator[kind].create_template`, defaulting `kind` to the first registered kind.
 
-And matching `make_<verb>_handler(spec)` factory functions (`make_create_handler`, `make_update_handler`, `make_delete_handler`, `make_detail_handler`, `make_edit_form_handler`) that build callables with synthesized signatures so `mount_*` introspection (per #316) wires the right deps. `make_detail_handler` additionally accepts `extras=` (the pure-function hook) and `extra_repos=` (typed-repo params the synthesis adds to the signature so the registry resolves them). Route files don't call the factories directly today — `mount_entity` invokes them under the hood for any standard-CRUD verb the entity opts into without supplying an explicit handler (see [`mount_entity`](#mount_entity-dispatcher)). The built handlers are stitched onto the route module as `_handle_<verb>_<spec.name>` so contract tests can patch via the same path that worked before auto-binding landed:
+And matching `make_<verb>_handler(spec)` factory functions (`make_create_handler`, `make_update_handler`, `make_delete_handler`, `make_detail_handler`, `make_edit_form_handler`, `make_new_form_handler`) that build callables with synthesized signatures so `mount_*` introspection (per #316) wires the right deps. `make_detail_handler` additionally accepts `extras=` (the pure-function hook) and `extra_repos=` (typed-repo params the synthesis adds to the signature so the registry resolves them). Route files don't call the factories directly today — `mount_entity` invokes them under the hood for any standard-CRUD verb the entity opts into without supplying an explicit handler (see [`mount_entity`](#mount_entity-dispatcher)). The built handlers are stitched onto the route module as `_handle_<verb>_<spec.name>` so contract tests can patch via the same path that worked before auto-binding landed:
 
 ```python
 # in src/api/routes/providers.py
-from src.logic.providers.provider_processing import handle_get_provider_form
-
-# list / detail / create / update / delete / form_edit auto-bind via
-# make_<verb>_handler(PROVIDER_ENTITY). Only form_new stays explicit
-# (the create-form template needs the ProviderCreate schema class in
-# its context). Per-viewer detail extras (`provider_detail_extras`)
+# Every verb auto-binds via make_<verb>_handler(PROVIDER_ENTITY). The
+# create form picks up `schema=ProviderCreate` from spec.create_adapter
+# automatically; per-viewer detail extras (`provider_detail_extras`)
 # and the typed repo it needs (`user_favorite_repo: UserFavoriteRepository`)
 # live on PROVIDER_ENTITY's `detail_extras_path` / `detail_extras_repos`
 # fields — resolved lazily at mount time. Owned credential subentities
@@ -278,9 +278,6 @@ from src.logic.providers.provider_processing import handle_get_provider_form
 mount_entity(
     router,
     PROVIDER_ENTITY,
-    handlers={
-        "form_new": handle_get_provider_form,
-    },
     owned_subentities=(LICENSURE_ENTITY, EDUCATION_ENTITY, CERTIFICATION_ENTITY),
 )
 ```

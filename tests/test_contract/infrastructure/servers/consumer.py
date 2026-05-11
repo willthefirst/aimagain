@@ -170,7 +170,8 @@ def _setup_provider_create_form_stub(app: FastAPI) -> None:
             template_name="providers/form_new.html",
             # `schema` is what the template's `field_for` macro
             # introspects to derive each control — same key the
-            # production `handle_get_provider_form` puts in context.
+            # production `make_new_form_handler` binds from
+            # `spec.create_adapter`.
             context={"current_user": current_user, "schema": ProviderCreate},
             request=request,
         )

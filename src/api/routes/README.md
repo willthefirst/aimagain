@@ -114,19 +114,16 @@ If a future case suggests the grammar should grow to fit one of these (e.g. a se
 
 2. **Add a spec-correctness test** at `src/api/common/specs/test_<entity>.py` asserting the spec declares the right values (audit type, owner_attr, route flags, etc.).
 
-3. **Create the route file** `<resource>.py`. Call `mount_entity`; framework verbs auto-bind to `make_<verb>_handler(<ENTITY>_ENTITY)` and get stitched onto the route module as `_handle_<verb>_<entity>` (target module auto-detected from the caller frame) for contract-test patches. Only bespoke handlers (and `list` / `form_new`, which have no factory defaults) need explicit `handlers` entries.
+3. **Create the route file** `<resource>.py`. Call `mount_entity`; framework verbs auto-bind to `make_<verb>_handler(<ENTITY>_ENTITY)` and get stitched onto the route module as `_handle_<verb>_<entity>` (target module auto-detected from the caller frame) for contract-test patches. Only bespoke handlers need explicit `handlers` entries.
 
 ```python
 from src.api.common import make_entity_router
 from src.api.common.resource_routes import mount_entity
 from src.api.common.specs.<entity> import <ENTITY>_ENTITY
-from src.logic.<entity>.<entity>_processing import (
-    handle_list_<entity>,
-    # ... plus any bespoke handlers that don't fit the generic ritual.
-    # Per-viewer / per-list extras don't import here — they live on the
-    # spec as `detail_extras_path` / `list_extras_path` and resolve at
-    # mount time.
-)
+# Per-viewer / per-list extras don't import here — they live on the
+# spec as `detail_extras_path` / `list_extras_path` and resolve at
+# mount time. Bespoke handlers (only when the entity needs them)
+# import here and pass via `handlers={...}`.
 
 router = make_entity_router(<ENTITY>_ENTITY)
 <entity>_api_router = router.router  # re-exported for `main.py`
@@ -134,13 +131,10 @@ router = make_entity_router(<ENTITY>_ENTITY)
 mount_entity(
     router,
     <ENTITY>_ENTITY,
-    handlers={
-        "list": handle_list_<entity>,
-        "form_new": handle_get_<entity>_form,
-        # detail / create / update / delete / form_edit auto-bound from
-        # make_<verb>_handler(<ENTITY>_ENTITY); add explicit entries here
-        # only for verbs whose entity needs a bespoke handler.
-    },
+    # list / detail / create / update / delete / form_new / form_edit
+    # all auto-bind from make_<verb>_handler(<ENTITY>_ENTITY); add an
+    # explicit `handlers={...}` entry here only for verbs whose entity
+    # needs a bespoke handler.
 )
 ```
 
@@ -154,7 +148,7 @@ Auto-bound handlers expose the same `_handle_<verb>_<entity>` attribute on the r
 
 Declare the child entity with `parent=PARENT_ENTITY` on its spec (see `specs/provider_licensure.py` etc.). Pass the child entity through `owned_subentities=` on the parent's `mount_entity` call; the dispatcher walks the chain to build paths like `/providers/{provider_id}/licensures/{licensure_id}`.
 
-For each opted-in verb on the child, `mount_entity` looks for `handlers["<child.name>.<verb>"]`; if absent and the verb has a default CRUD factory (`create`, `update`, `delete`, `detail`, `form_edit`), it auto-binds `make_<verb>_handler(child)`. Common case — credentials' subrow CRUD is entirely standard:
+For each opted-in verb on the child, `mount_entity` looks for `handlers["<child.name>.<verb>"]`; if absent and the verb has a default factory (`create`, `update`, `delete`, `detail`, `form_new`, `form_edit`, `list`), it auto-binds `make_<verb>_handler(child)`. Common case — credentials' subrow CRUD is entirely standard:
 
 ```python
 mount_entity(
@@ -170,7 +164,7 @@ mount_entity(
 )
 ```
 
-Supply `handlers["<child.name>.<verb>"]` only when the child needs a bespoke handler for that verb (e.g. a subentity create with side effects). Verbs without a default factory (`list`, `form_new`) always require an explicit entry — auto-binding would need bespoke knobs (custom repo query / template selection) that can't be inferred.
+Supply `handlers["<child.name>.<verb>"]` only when the child needs a bespoke handler for that verb (e.g. a subentity create with side effects).
 
 Each factory-built handler receives both `provider_id=` and the child id (e.g. `licensure_id=`), plus `payload=`, `repo=`, `audit_repo=`, `requesting_user=`.
 

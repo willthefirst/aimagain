@@ -978,9 +978,10 @@ def _owned_factory_makers() -> dict[str, Callable[..., Callable[..., Awaitable[A
     breaks the cycle — by the time we reach this code at runtime, the
     logic module has finished initializing.
 
-    Only verbs whose factory delegates to a standard ritual appear
-    here. ``form_new`` has no default because its template-selection
-    knob is bespoke per entity.
+    The factory map below covers every standard CRUD verb plus both
+    form verbs; polymorphic ``form_new`` uses the discriminator's
+    per-kind ``create_template`` and the spec-injected ``?kind=``
+    query param to pick the template at request time.
     """
     from src.logic._generic import (
         make_create_handler,
@@ -988,6 +989,7 @@ def _owned_factory_makers() -> dict[str, Callable[..., Callable[..., Awaitable[A
         make_detail_handler,
         make_edit_form_handler,
         make_list_handler,
+        make_new_form_handler,
         make_update_handler,
     )
 
@@ -997,6 +999,7 @@ def _owned_factory_makers() -> dict[str, Callable[..., Callable[..., Awaitable[A
         "delete": make_delete_handler,
         "detail": make_detail_handler,
         "form_edit": make_edit_form_handler,
+        "form_new": make_new_form_handler,
         "list": make_list_handler,
     }
 
@@ -1008,6 +1011,7 @@ _TOP_LEVEL_AUTO_BIND_VERBS = (
     "update",
     "delete",
     "form_edit",
+    "form_new",
 )
 
 
@@ -1039,7 +1043,7 @@ def mount_entity(
     router: Any,
     entity: Any,  # `EntitySpec` — imported lazily to avoid a cycle
     *,
-    handlers: dict[str, Callable[..., Awaitable[Any]]],
+    handlers: dict[str, Callable[..., Awaitable[Any]]] | None = None,
     owned_subentities: tuple[Any, ...] = (),
 ) -> None:
     """Spec-driven dispatcher for an entity's full route surface.
@@ -1103,6 +1107,8 @@ def mount_entity(
         passed-in spec from the wrong family).
     """
     spec = entity.to_resource_spec()
+    if handlers is None:
+        handlers = {}
 
     # The path/handler pairing is the only check that can't live in
     # `EntitySpec.__post_init__` — `handlers` arrive at the mount call,
