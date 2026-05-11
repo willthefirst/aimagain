@@ -11,7 +11,6 @@ import pytest
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from src.domain.posts.repository import PostRepository
 from src.framework.audit import (
     AuditAction,
     AuditedResource,
@@ -21,6 +20,7 @@ from src.framework.audit import (
     record_audit,
 )
 from src.framework.audit_repository import AuditRepository
+from src.framework.base_repository import BaseRepository
 from src.models import AuditLog
 from tests.helpers import create_test_user
 
@@ -239,7 +239,7 @@ async def test_mutate_does_not_commit_or_audit_when_body_raises(
 
     async with db_test_session_manager() as session:
         audit_repo = AuditRepository(session)
-        post_repo = PostRepository(session)
+        post_repo = BaseRepository(session)
 
         with pytest.raises(RuntimeError, match="boom"):
             async with mutate(

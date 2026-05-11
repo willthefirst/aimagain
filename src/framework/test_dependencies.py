@@ -10,17 +10,17 @@ class.
 import pytest
 
 from src.domain.favorites.repository import UserFavoriteRepository
-from src.domain.posts.repository import PostRepository
 from src.domain.providers.repository import ProviderRepository
 from src.domain.users.repository import UserRepository
 from src.framework import dependencies as deps
 from src.framework.audit_repository import AuditRepository
+from src.framework.base_repository import BaseRepository
 from src.framework.dependencies import (
     _REPO_TYPE_RESOLVERS,
     _REPO_TYPES,
     UnknownRepoTypeError,
     get_audit_repository,
-    get_post_repository,
+    get_base_repository,
     get_provider_repository,
     get_user_favorite_repository,
     get_user_repository,
@@ -38,7 +38,7 @@ def test_public_names_match_registry():
     to the generated resolvers — same callables, not lookalikes."""
     pairs = [
         (UserRepository, get_user_repository),
-        (PostRepository, get_post_repository),
+        (BaseRepository, get_base_repository),
         (AuditRepository, get_audit_repository),
         (ProviderRepository, get_provider_repository),
         (UserFavoriteRepository, get_user_favorite_repository),

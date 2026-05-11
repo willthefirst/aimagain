@@ -13,9 +13,6 @@ Read by:
   - `src/api/routes/posts.py` — derives `POST_SPEC` for the mount
     helpers and builds the form's kind Literal from
     ``POST_ENTITY.discriminator.names``.
-  - `src/logic/posts/post_processing.py` — reads `POST_ENTITY.audit`
-    for the `mutate(...)` resource binding (via a thin `POST`
-    re-export for handler ergonomics).
 """
 
 from typing import Final
@@ -26,7 +23,7 @@ from src.domain.posts.schema import (
     post_read_adapter,
     post_update_adapter,
 )
-from src.framework.dependencies import get_post_repository
+from src.framework.dependencies import get_base_repository
 from src.framework.entity_spec import (
     AUTHENTICATED,
     OWNER_OR_ADMIN,
@@ -42,7 +39,7 @@ POST_ENTITY: Final[EntitySpec] = EntitySpec(
     id_param="post_id",
     model=Post,
     # `owner_attr` defaults to "owner_id" — posts track their owner via Post.owner_id.
-    repo_dep=get_post_repository,
+    repo_dep=get_base_repository,
     auth_deps=AUTHENTICATED,
     auth_policy=OWNER_OR_ADMIN,
     audit_snapshot=post_audit_snapshot,
