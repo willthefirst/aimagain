@@ -78,6 +78,22 @@ def field_spec(schema_cls: type[BaseModel], name: str) -> dict[str, Any]:
     optional = _is_optional(annotation)
     inner = _strip_optional(annotation) if optional else annotation
 
+    # `list[Literal[*T]]` (with or without `| None`) is unambiguous —
+    # it IS a multi-select. No marker needed to disambiguate, unlike
+    # the `str` vs `str-as-textarea` case (`HtmlTextarea`).
+    if get_origin(inner) is list:
+        list_args = get_args(inner)
+        if len(list_args) == 1 and get_origin(list_args[0]) is Literal:
+            choices = list(get_args(list_args[0]))
+            labels = _CHOICE_LABELS.get(tuple(choices))
+            return {
+                "kind": "multi_select",
+                "name": name,
+                "required": not optional,
+                "choices": choices,
+                "labels": labels,
+            }
+
     if get_origin(inner) is Literal:
         choices = list(get_args(inner))
         labels = _CHOICE_LABELS.get(tuple(choices))

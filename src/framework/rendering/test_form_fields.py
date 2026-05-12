@@ -38,6 +38,9 @@ class _Sample(BaseModel):
     patterned: _PatternedString
     long_required: _LongText
     long_optional: _OptionalLongText = None
+    required_multi: list[Literal[*_COLORS]]
+    optional_multi: list[Literal[*_COLORS]] | None = None
+    unlabeled_multi: list[Literal[*_SIZES]]
 
 
 def test_required_text_field():
@@ -101,6 +104,32 @@ def test_optional_html_textarea_drops_required():
     spec = field_spec(_Sample, "long_optional")
     assert spec["kind"] == "textarea"
     assert spec["required"] is False
+
+
+def test_list_literal_field_renders_as_multi_select_with_labels():
+    spec = field_spec(_Sample, "required_multi")
+    assert spec == {
+        "kind": "multi_select",
+        "name": "required_multi",
+        "required": True,
+        "choices": list(_COLORS),
+        "labels": _COLOR_LABELS,
+    }
+
+
+def test_optional_list_literal_field_drops_required():
+    spec = field_spec(_Sample, "optional_multi")
+    assert spec["kind"] == "multi_select"
+    assert spec["required"] is False
+    assert spec["choices"] == list(_COLORS)
+
+
+def test_unlabeled_multi_select_returns_none_labels():
+    """Multi-select over a tuple registered without labels surfaces
+    `labels=None`, same fallback path as the single-select case."""
+    spec = field_spec(_Sample, "unlabeled_multi")
+    assert spec["kind"] == "multi_select"
+    assert spec["labels"] is None
 
 
 def test_zip_text_alias_carries_pattern_in_real_schema():
