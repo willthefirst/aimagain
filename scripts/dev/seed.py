@@ -109,10 +109,8 @@ FIXTURE_PROVIDER_AVAILABILITY: list[FixtureProviderAvailability] = [
             "in_person_sessions": "yes",
             "virtual_sessions": "no",
             "desired_times": [],
-            # TODO(issue-7): "therapeutic camp" doesn't fit; allied_health is closest.
-            "services": ["allied_health"],
-            # TODO(issue-7): day_program token not in vocab yet. Outpatient is closest.
-            "settings": ["outpatient"],
+            "services": ["group_therapy"],
+            "settings": ["day_program"],
             "treatment_modality": "Social skills, emotion regulation",
             "client_focus": "Middle schoolers with ASD.",
             "age_groups": ["children_6_10", "preteens_11_13"],
@@ -143,9 +141,12 @@ FIXTURE_PROVIDER_AVAILABILITY: list[FixtureProviderAvailability] = [
             "in_person_sessions": "yes",
             "virtual_sessions": "no",
             "desired_times": [],
-            # TODO(issue-7): peer + family groups not in vocab yet
-            # (group_therapy, family_therapy).
-            "services": ["psychotherapy", "medication_management"],
+            "services": [
+                "psychotherapy",
+                "medication_management",
+                "group_therapy",
+                "family_therapy",
+            ],
             "settings": ["iop"],
             "treatment_modality": "Comprehensive DBT",
             "client_focus": (
