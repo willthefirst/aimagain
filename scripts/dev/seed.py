@@ -82,9 +82,7 @@ FIXTURE_PROVIDER_AVAILABILITY: list[FixtureProviderAvailability] = [
                 "adults_25_64",
             ],
             "languages": ["en"],
-            # TODO(issue-6): true value is self_pay_only; not in vocab today.
-            # Best-fit placeholder.
-            "payment_situation": "out_of_network",
+            "payment_situation": "self_pay_only",
             "sliding_scale": False,
             "cost": "$250 - $600 per session",
         },
@@ -119,7 +117,7 @@ FIXTURE_PROVIDER_AVAILABILITY: list[FixtureProviderAvailability] = [
             "client_focus": "Middle schoolers with ASD.",
             "age_groups": ["children_6_10", "preteens_11_13"],
             "languages": ["en", "es"],
-            "payment_situation": "out_of_network",  # TODO(issue-6): true value is self_pay_only.
+            "payment_situation": "self_pay_only",
             "sliding_scale": True,
             "cost": "$2,500 / session",
             # TODO(issue-8): cohort dates ("May 25 & Jun 18, 2-week sessions, M-F 9-5")
@@ -157,9 +155,7 @@ FIXTURE_PROVIDER_AVAILABILITY: list[FixtureProviderAvailability] = [
             ),
             "age_groups": ["adolescents_14_18"],
             "languages": ["en", "es"],
-            # TODO(issue-6): true value is please_contact
-            # ("Yes — no MediCal, please contact").
-            "payment_situation": "in_network",
+            "payment_situation": "please_contact",
             "sliding_scale": True,
             "cost": "$4k/week",
             # TODO(issue-8): "M-F 8:30am-4:30pm, starts May 11"

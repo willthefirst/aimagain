@@ -78,6 +78,8 @@ INSURANCE_OPTIONS: Final[tuple[str, ...]] = (
     "in_network",
     "out_of_network",
     "in_and_out_of_network",
+    "self_pay_only",
+    "please_contact",
 )
 
 # Day × time-of-day grid for "when are you available". 21 tokens of the
@@ -153,6 +155,8 @@ INSURANCE_LABELS: Final[dict[str, str]] = {
     "in_network": "In-network",
     "out_of_network": "Out-of-network",
     "in_and_out_of_network": "In- and out-of-network",
+    "self_pay_only": "Self-pay only",
+    "please_contact": "Please contact",
 }
 # Per-axis labels for the desired-times grid. The form-render macro
 # uses these for the row (day) and column (slot) headers; per-cell

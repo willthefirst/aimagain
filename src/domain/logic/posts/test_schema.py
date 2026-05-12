@@ -355,6 +355,42 @@ def test_post_create_dispatches_provider_availability():
     assert p.sliding_scale is False
 
 
+@pytest.mark.parametrize(
+    "token",
+    [
+        "in_network",
+        "out_of_network",
+        "in_and_out_of_network",
+        "self_pay_only",
+        "please_contact",
+    ],
+)
+def test_post_create_provider_availability_accepts_all_insurance_tokens(token):
+    """All five `INSURANCE_OPTIONS` tokens validate after #438's vocab
+    widening (`self_pay_only`, `please_contact` were added)."""
+    p = post_create_adapter.validate_python(
+        provider_availability_payload(payment_situation=token)
+    )
+    assert p.payment_situation == token
+
+
+@pytest.mark.parametrize(
+    "token",
+    [
+        "in_network",
+        "out_of_network",
+        "in_and_out_of_network",
+        "self_pay_only",
+        "please_contact",
+    ],
+)
+def test_post_create_client_referral_accepts_all_insurance_tokens(token):
+    """CR's `insurance` shares the `INSURANCE_OPTIONS` vocab with PA;
+    widening propagates to both."""
+    p = post_create_adapter.validate_python(client_referral_payload(insurance=token))
+    assert p.insurance == token
+
+
 def test_post_create_provider_availability_default_languages():
     """`languages` defaults to ['en'] — keeps the submit-with-defaults case
     valid even though the field is required min-1 (#425)."""
