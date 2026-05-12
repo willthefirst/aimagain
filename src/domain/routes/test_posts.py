@@ -873,6 +873,25 @@ async def test_get_provider_availability_form_renders(
     assert kind_input.attributes.get("value") == "provider_availability"
 
 
+async def test_provider_availability_form_renders_free_text_fields(
+    authenticated_client: AsyncClient,
+    logged_in_user: User,
+):
+    """The three free-text fields render through `field_for` — `description`
+    and `referral_instructions` as `<textarea>` (driven by the `HtmlTextarea`
+    marker on the schema), `website` as `<input type=text>`. A regression
+    where `HtmlTextarea` stops being picked up would render the first two as
+    `<input>` and silently break the form."""
+    response = await authenticated_client.get("/posts/form?kind=provider_availability")
+    assert response.status_code == 200
+    tree = HTMLParser(response.text)
+    assert tree.css_first("textarea#description") is not None
+    assert tree.css_first("textarea#referral_instructions") is not None
+    website = tree.css_first("input#website")
+    assert website is not None
+    assert website.attributes.get("type", "text") == "text"
+
+
 async def test_list_renders_provider_availability_row(
     authenticated_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],
@@ -968,7 +987,7 @@ async def test_owner_can_patch_provider_availability_practice_name(
     body = response.json()
     assert body["kind"] == "provider_availability"
     assert body["practice_name"] == new_practice_name
-    assert "title" not in body and "body" not in body and "description" not in body
+    assert "title" not in body and "body" not in body
 
     async with db_test_session_manager() as session:
         result = await session.execute(select(Post).filter(Post.id == post.id))

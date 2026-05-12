@@ -15,11 +15,25 @@ values for the same field name. The form naturally encodes multiple
 checkboxes as `desired_times=monday_morning&desired_times=friday_evening`,
 which FastAPI/Pydantic parses as a list.
 #}
-{%- from "_shared/form_fields.html" import text_field, textarea_field, select_field, radio_bool_field, time_grid_field, multi_select_field -%}
-{%- macro provider_availability_form(hx_method, action, submit_label, post=None) -%}
+{%- from "_shared/form_fields.html" import text_field, textarea_field, select_field, radio_bool_field, time_grid_field, multi_select_field, field_for -%}
+{%- macro provider_availability_form(hx_method, action, submit_label, post=None, schema=None) -%}
 {%- set d = post.provider_availability_detail if post else None -%}
 <form hx-{{ hx_method }}="{{ action }}">
   <input type="hidden" name="kind" value="provider_availability" />
+
+  {# About: free-text core fields — description / referral / website.
+     These three are the canonical use of `field_for` in this form; every
+     other field below is still hand-wired pending a follow-up sweep.
+     `schema` is `ProviderAvailabilityCreate` (passed by the parent
+     template via the Jinja global of the same name) — Create-side
+     required-ness is the right input for both create and edit because
+     all three are optional in both. #}
+  <fieldset>
+    <legend>About</legend>
+    {{ field_for(schema, "description", "Description", current=d.description if d else None) }}
+    {{ field_for(schema, "referral_instructions", "Referral instructions", current=d.referral_instructions if d else None) }}
+    {{ field_for(schema, "website", "Website", current=d.website if d else None) }}
+  </fieldset>
 
   <fieldset>
     <legend>Provider information</legend>

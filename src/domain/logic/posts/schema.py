@@ -55,6 +55,7 @@ from src.domain.models.enums import (
     TREATMENT_SETTINGS,
     US_STATES,
 )
+from src.framework.rendering.form_fields import HtmlTextarea
 from src.framework.schema_validators import (
     PartialUpdate,
     ReadProjection,
@@ -63,6 +64,12 @@ from src.framework.schema_validators import (
     WirePayload,
     ZipText,
 )
+
+# `description` and `referral_instructions` on `provider_availability` are
+# free-form prose long enough to want a multi-line control. The marker
+# only affects form rendering (`field_for` picks `<textarea>` over
+# `<input>`); the validator chain is identical to `StrippedOptionalText`.
+TextareaOptional = Annotated[StrippedOptionalText, HtmlTextarea()]
 
 
 def _scalar_to_list(v):
@@ -166,6 +173,9 @@ class ClientReferralRead(_PostReadBase):
 
 class ProviderAvailabilityRead(_PostReadBase):
     kind: Literal["provider_availability"]
+    description: str | None = None
+    referral_instructions: str | None = None
+    website: str | None = None
     practice_name: str
     available_providers: str
     location_city: str
@@ -227,6 +237,11 @@ class ProviderAvailabilityCreate(WirePayload):
     the provider-availability intake form."""
 
     kind: Literal["provider_availability"]
+    # Optional initially — graduates to required in a later issue once
+    # seed posts confirm the shape works (#422).
+    description: TextareaOptional = None
+    referral_instructions: TextareaOptional = None
+    website: StrippedOptionalText = None
     practice_name: StrippedText
     available_providers: StrippedText
     location_city: StrippedText
@@ -302,6 +317,9 @@ class ProviderAvailabilityUpdate(PartialUpdate):
     at_least_one_field_exclude = frozenset({"kind"})
 
     kind: Literal["provider_availability"]
+    description: TextareaOptional = None
+    referral_instructions: TextareaOptional = None
+    website: StrippedOptionalText = None
     practice_name: StrippedText | None = None
     available_providers: StrippedText | None = None
     location_city: StrippedText | None = None
@@ -361,6 +379,9 @@ class ClientReferralAuditSnapshot(_PostAuditSnapshotBase):
 
 class ProviderAvailabilityAuditSnapshot(_PostAuditSnapshotBase):
     kind: Literal["provider_availability"]
+    description: str | None = None
+    referral_instructions: str | None = None
+    website: str | None = None
     practice_name: str
     available_providers: str
     location_city: str
