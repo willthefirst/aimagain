@@ -25,8 +25,8 @@ Provider availability: {{ post.provider_availability_detail.practice_name }}
     {% endif %}
     <dt>Age group</dt>
     <dd>{{ CLIENT_AGE_GROUP_LABELS[d.client_dem_ages] }}</dd>
-    <dt>Language preferred (non-English)</dt>
-    <dd>{{ LANGUAGE_PREFERRED_LABELS[d.language_preferred] }}</dd>
+    <dt>Languages</dt>
+    <dd>{% for l in d.languages %}{{ LANGUAGE_LABELS[l] }}{% if not loop.last %}, {% endif %}{% endfor %}</dd>
     <dt>Description</dt>
     <dd>{{ d.description }}</dd>
     {% if d.services %}

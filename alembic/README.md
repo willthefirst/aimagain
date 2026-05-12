@@ -22,6 +22,7 @@ Database migrations live here. Day-to-day operations go through the `dev migrate
 - **Schema only, not data.** Migrations change shape; data backfills go in separate scripts or in subsequent migrations explicitly authored to mutate data.
 - **Reversible by default.** A `downgrade()` that drops a column with data is data loss. For column removals or destructive changes, use a two-step migration: add-new + backfill, then a follow-up that removes-old after the backfill is verified.
 - **Descriptive messages.** `dev migrate generate "add user email_verified column"` beats `"changes"` — the message becomes the file name.
+- **Dropping a CHECK-constrained column on SQLite needs `batch_alter_table`.** A plain `op.drop_column(...)` against a column referenced by a named CHECK constraint will fail with `error in table … after drop column: no such column: <name>`. Wrap the drop in `with op.batch_alter_table(table) as batch_op:` and call `batch_op.drop_constraint("<ck_name>", type_="check")` + `batch_op.drop_column(...)` together — SQLite then rewrites the table cleanly. Examples: revisions `2bed07fb1d76`, `6e7b42cd3894`.
 
 ## Production deployment
 

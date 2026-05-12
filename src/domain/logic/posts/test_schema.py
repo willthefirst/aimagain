@@ -44,8 +44,6 @@ from src.domain.models.enums import (
     INSURANCE_LABELS,
     INSURANCE_OPTIONS,
     LANGUAGE_LABELS,
-    LANGUAGE_PREFERRED_LABELS,
-    LANGUAGE_PREFERRED_OPTIONS,
     LANGUAGES,
     LOCATION_AVAILABILITY_LABELS,
     LOCATION_AVAILABILITY_OPTIONS,
@@ -110,7 +108,6 @@ def test_post_create_client_referral_rejects_empty_description():
         "location_in_person",
         "location_virtual",
         "client_dem_ages",
-        "language_preferred",
         "description",
         "insurance",
     ],
@@ -125,6 +122,32 @@ def test_post_create_client_referral_requires_all_required_fields(missing_field)
 def test_post_create_client_referral_optional_fields_default_none():
     p = post_create_adapter.validate_python(client_referral_payload())
     assert p.services_psychotherapy_modality is None
+
+
+def test_post_create_client_referral_default_languages():
+    """`languages` defaults to ['en'] — keeps "submit with defaults" valid
+    even though the field is required min-1 (#428)."""
+    payload = client_referral_payload()
+    payload.pop("languages")
+    p = post_create_adapter.validate_python(payload)
+    assert p.languages == ["en"]
+
+
+def test_post_create_client_referral_accepts_multiple_languages():
+    p = post_create_adapter.validate_python(
+        client_referral_payload(languages=["en", "es"])
+    )
+    assert p.languages == ["en", "es"]
+
+
+def test_post_create_client_referral_rejects_empty_languages():
+    with pytest.raises(ValidationError):
+        post_create_adapter.validate_python(client_referral_payload(languages=[]))
+
+
+def test_post_create_client_referral_rejects_unknown_language_token():
+    with pytest.raises(ValidationError):
+        post_create_adapter.validate_python(client_referral_payload(languages=["xx"]))
 
 
 def test_post_create_client_referral_strips_optional_to_none():
@@ -533,7 +556,6 @@ def _literal_args(model_cls, field_name: str) -> tuple[str, ...]:
         (ClientReferralRead, "location_in_person", LOCATION_AVAILABILITY_OPTIONS),
         (ClientReferralRead, "location_virtual", LOCATION_AVAILABILITY_OPTIONS),
         (ClientReferralRead, "client_dem_ages", CLIENT_AGE_GROUPS),
-        (ClientReferralRead, "language_preferred", LANGUAGE_PREFERRED_OPTIONS),
         (ClientReferralRead, "insurance", INSURANCE_OPTIONS),
         (ProviderAvailabilityRead, "location_state", US_STATES),
         (ProviderAvailabilityRead, "in_person_sessions", LOCATION_AVAILABILITY_OPTIONS),
@@ -758,7 +780,6 @@ def test_post_update_services_rejects_unknown_token(kind):
     [
         (LOCATION_AVAILABILITY_OPTIONS, LOCATION_AVAILABILITY_LABELS),
         (CLIENT_AGE_GROUPS, CLIENT_AGE_GROUP_LABELS),
-        (LANGUAGE_PREFERRED_OPTIONS, LANGUAGE_PREFERRED_LABELS),
         (LANGUAGES, LANGUAGE_LABELS),
         (INSURANCE_OPTIONS, INSURANCE_LABELS),
         (DESIRED_TIME_SLOTS, DESIRED_TIME_SLOT_LABELS),

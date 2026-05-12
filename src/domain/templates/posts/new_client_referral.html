@@ -4,7 +4,7 @@
 {% block content %}
 <h1>New client referral</h1>
 <p>Per <code>notes/forms_spec.md</code>. No PII.</p>
-{{ client_referral_form("post", "/posts", "Create client referral") }}
+{{ client_referral_form("post", "/posts", "Create client referral", schema=client_referral_create_schema) }}
 
 <hr />
 <a href="/posts">Back to posts</a>
