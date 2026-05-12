@@ -4,6 +4,7 @@ from sqlalchemy import JSON, Column, ForeignKey, Text, text
 from sqlalchemy.types import Uuid
 
 from src.framework.persistence.base_model import Base
+from src.framework.persistence.mixins import LocationMixin
 
 from ..enums import (
     INSURANCE_OPTIONS,
@@ -16,8 +17,13 @@ _TABLE = "client_referral_details"
 _ck = partial(named_check_in, _TABLE)
 
 
-class ClientReferralDetail(Base):
-    """1:1 detail row for posts of kind = 'client_referral'."""
+class ClientReferralDetail(LocationMixin, Base):
+    """1:1 detail row for posts of kind = 'client_referral'.
+
+    Inherits ``(city, state, zip)`` location columns from
+    :class:`LocationMixin`; the ``location_state`` CHECK constraint stays
+    in ``__table_args__`` because CHECK names are table-prefixed.
+    """
 
     __tablename__ = _TABLE
     __table_args__ = (
@@ -33,10 +39,7 @@ class ClientReferralDetail(Base):
         primary_key=True,
     )
 
-    # Section 1 — client location
-    location_city = Column(Text, nullable=False)
-    location_state = Column(Text, nullable=False)
-    location_zip = Column(Text, nullable=False)
+    # Section 1 — client location (city/state/zip from LocationMixin)
     location_in_person = Column(Text, nullable=False)
     location_virtual = Column(Text, nullable=False)
     desired_times = Column(

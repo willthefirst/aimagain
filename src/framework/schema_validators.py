@@ -81,16 +81,44 @@ StrippedOptionalText = Annotated[str | None, AfterValidator(_strip_optional)]
 # --- At-least-one-field rule --------------------------------------------
 
 
+def _field_is_set(value) -> bool:
+    """Decide whether a field's value counts as "set" for the
+    at-least-one-field rule.
+
+    Non-``None`` values count. A nested :class:`BaseModel` value (the
+    typical case is :class:`~src.domain.logic.value_objects.location.LocationPartial`
+    on the provider / client-referral Update variants — #451) counts
+    only if at least one of *its* own fields is set; an all-``None``
+    partial value-object is treated as the no-op patch ``None`` it
+    semantically represents, so a PATCH that only sets
+    ``location_city: None`` (which flattens to a
+    ``LocationPartial(city=None)``) still fails the rule.
+    """
+    if value is None:
+        return False
+    if isinstance(value, BaseModel):
+        nested_fields = type(value).model_fields
+        return any(_field_is_set(getattr(value, name)) for name in nested_fields)
+    return True
+
+
 def assert_any_field_set(
     model: BaseModel, *, exclude: frozenset[str] = frozenset()
 ) -> None:
     """Raise `ValueError` if every field on `model` (excluding any name in
-    `exclude`) is `None`. Shared between every partial-update variant so
+    `exclude`) is unset. Shared between every partial-update variant so
     the rule lives in one place. Pass `exclude={"kind"}` (or similar) for
     discriminated-union Updates where the discriminator is always
-    required and shouldn't count toward "at least one editable field"."""
+    required and shouldn't count toward "at least one editable field".
+
+    "Unset" means ``None`` for scalar fields, and "every subfield
+    unset" for nested :class:`BaseModel` fields — see
+    :func:`_field_is_set` for the recursive rule.
+    """
     fields = type(model).model_fields
-    if all(getattr(model, name) is None for name in fields if name not in exclude):
+    if not any(
+        _field_is_set(getattr(model, name)) for name in fields if name not in exclude
+    ):
         raise ValueError("at least one editable field must be provided")
 
 

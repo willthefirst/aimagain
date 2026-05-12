@@ -46,7 +46,6 @@ from src.domain.models.enums import (
     LANGUAGES,
     LOCATION_AVAILABILITY_LABELS,
     LOCATION_AVAILABILITY_OPTIONS,
-    US_STATES,
 )
 from tests.helpers import client_referral_payload, provider_availability_payload
 
@@ -59,8 +58,11 @@ def test_post_create_dispatches_client_referral():
     assert isinstance(p, ClientReferralCreate)
     assert p.kind == "client_referral"
     assert p.description == "needs a clinician"
-    assert p.location_city == "Springfield"
-    assert p.location_state == "IL"
+    # Post-#451: ``(city, state, zip)`` live on the embedded
+    # :class:`Location` value object. The form/JSON wire shape stays
+    # flat — see ``test_post_create_client_referral_dump_keeps_flat_location``.
+    assert p.location.city == "Springfield"
+    assert p.location.state == "IL"
     assert p.insurance == "in_network"
 
 
@@ -90,7 +92,7 @@ def test_post_create_strips_surrounding_whitespace_client_referral():
         client_referral_payload(description="  help  ", location_city="  Boise  ")
     )
     assert p.description == "help"
-    assert p.location_city == "Boise"
+    assert p.location.city == "Boise"
 
 
 def test_post_create_client_referral_rejects_empty_description():
@@ -226,12 +228,16 @@ def test_post_update_client_referral_accepts_description():
 
 
 def test_post_update_client_referral_accepts_partial_other_field():
-    """Any one editable field is enough for a partial update."""
+    """Any one editable field is enough for a partial update. After
+    #451, ``location_city`` arrives flat and rolls into the nested
+    ``location: LocationPartial`` field; ``description`` stays absent
+    on this patch."""
     p = post_update_adapter.validate_python(
         {"kind": "client_referral", "location_city": "Boise"}
     )
     assert isinstance(p, ClientReferralUpdate)
-    assert p.location_city == "Boise"
+    assert p.location is not None
+    assert p.location.city == "Boise"
     assert p.description is None
 
 
@@ -662,16 +668,15 @@ def _literal_args(model_cls, field_name: str) -> tuple[str, ...]:
 @pytest.mark.parametrize(
     "model_cls,field,expected",
     [
-        # Read variants
-        (ClientReferralRead, "location_state", US_STATES),
+        # Read variants. ``location_state`` moved into the
+        # :class:`Location` value object in #451 — see the lockstep
+        # test in ``src/domain/logic/value_objects/test_location.py``.
         (ClientReferralRead, "location_in_person", LOCATION_AVAILABILITY_OPTIONS),
         (ClientReferralRead, "location_virtual", LOCATION_AVAILABILITY_OPTIONS),
         (ClientReferralRead, "insurance", INSURANCE_OPTIONS),
         # Create variants
-        (ClientReferralCreate, "location_state", US_STATES),
         (ClientReferralCreate, "insurance", INSURANCE_OPTIONS),
         # Update variants (Optional[Literal[*TUPLE]])
-        (ClientReferralUpdate, "location_state", US_STATES),
         (ClientReferralUpdate, "insurance", INSURANCE_OPTIONS),
     ],
 )

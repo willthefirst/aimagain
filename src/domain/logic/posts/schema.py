@@ -35,15 +35,22 @@ display label).
 
 import uuid
 from datetime import datetime
-from typing import Annotated, Literal, Union
+from typing import Annotated, Any, Literal, Union
 
 from pydantic import (
     BeforeValidator,
     Field,
     TypeAdapter,
+    model_serializer,
     model_validator,
 )
 
+from src.domain.logic.value_objects.location import (
+    Location,
+    LocationPartial,
+    flatten_location_on_dump,
+    gather_flat_location,
+)
 from src.domain.models import POST_KINDS
 from src.domain.models.enums import (
     CLIENT_AGE_GROUPS,
@@ -53,7 +60,6 @@ from src.domain.models.enums import (
     LANGUAGES,
     LOCATION_AVAILABILITY_OPTIONS,
     TREATMENT_SETTINGS,
-    US_STATES,
 )
 from src.framework.rendering.form_fields import HtmlTextarea, HtmlUrl
 from src.framework.schema_validators import (
@@ -62,7 +68,6 @@ from src.framework.schema_validators import (
     StrippedOptionalText,
     StrippedText,
     WirePayload,
-    ZipText,
 )
 
 # `description` and `referral_instructions` on `provider_availability` are
@@ -170,14 +175,17 @@ class _PostReadBase(ReadProjection):
     @model_validator(mode="before")
     @classmethod
     def _flatten_post(cls, data):
-        return _flatten_post_to_dict(data) or data
+        return gather_flat_location(_flatten_post_to_dict(data) or data)
 
 
 class ClientReferralRead(_PostReadBase):
     kind: Literal["client_referral"]
-    location_city: str
-    location_state: Literal[*US_STATES]
-    location_zip: str
+    # `(city, state, zip)` modeled as a single :class:`Location` value
+    # object (#451) but kept flat on the wire/JSON shape for backward
+    # compatibility — ``_flatten_post_to_dict`` produces a flat dict
+    # from the ORM, ``gather_flat_location`` then nests the three keys,
+    # and ``flatten_location_on_dump`` reverses on dump.
+    location: Location
     location_in_person: Literal[*LOCATION_AVAILABILITY_OPTIONS]
     location_virtual: Literal[*LOCATION_AVAILABILITY_OPTIONS]
     desired_times: DesiredTimesField = []
@@ -187,6 +195,14 @@ class ClientReferralRead(_PostReadBase):
     services: ServicesField = []
     treatment_modality: str | None = None
     insurance: Literal[*INSURANCE_OPTIONS]
+
+    # Flat-on-dump: keep ``location_city`` / ``location_state`` /
+    # ``location_zip`` at the top level of JSON responses (#451). The
+    # parent's ``_flatten_post`` already calls ``gather_flat_location``
+    # on the way in.
+    @model_serializer(mode="wrap")
+    def _flatten_location(self, handler):
+        return flatten_location_on_dump(self, handler(self))
 
 
 class ProviderAvailabilityRead(_PostReadBase):
@@ -225,12 +241,15 @@ post_read_adapter: TypeAdapter = TypeAdapter(PostRead)
 
 class ClientReferralCreate(WirePayload):
     """Create payload for `kind='client_referral'`. Field set follows the
-    client-referral intake form."""
+    client-referral intake form.
+
+    The ``(city, state, zip)`` triple is a single :class:`Location` value
+    object (#451); form posts still send the three keys flat at the top
+    level (``gather_flat_location`` rolls them into the nested block).
+    """
 
     kind: Literal["client_referral"]
-    location_city: StrippedText
-    location_state: Literal[*US_STATES]
-    location_zip: ZipText
+    location: Location
     location_in_person: Literal[*LOCATION_AVAILABILITY_OPTIONS]
     location_virtual: Literal[*LOCATION_AVAILABILITY_OPTIONS]
     desired_times: DesiredTimesField = []
@@ -245,6 +264,15 @@ class ClientReferralCreate(WirePayload):
     services: ServicesField = []
     treatment_modality: StrippedOptionalText = None
     insurance: Literal[*INSURANCE_OPTIONS]
+
+    @model_validator(mode="before")
+    @classmethod
+    def _gather_flat_location_cr_create(cls, data: Any) -> Any:
+        return gather_flat_location(data)
+
+    @model_serializer(mode="wrap")
+    def _flatten_location(self, handler):
+        return flatten_location_on_dump(self, handler(self))
 
 
 class ProviderAvailabilityCreate(WirePayload):
@@ -308,9 +336,9 @@ class ClientReferralUpdate(PartialUpdate):
     at_least_one_field_exclude = frozenset({"kind"})
 
     kind: Literal["client_referral"]
-    location_city: StrippedText | None = None
-    location_state: Literal[*US_STATES] | None = None
-    location_zip: ZipText | None = None
+    # See :class:`ClientReferralCreate` — flat on the wire, nested
+    # value object in Python, flat on dump (#451).
+    location: LocationPartial | None = None
     location_in_person: Literal[*LOCATION_AVAILABILITY_OPTIONS] | None = None
     location_virtual: Literal[*LOCATION_AVAILABILITY_OPTIONS] | None = None
     # `None` = leave unchanged (per `update_post`); `[]` = clear all
@@ -325,6 +353,15 @@ class ClientReferralUpdate(PartialUpdate):
     services: ServicesField | None = None
     treatment_modality: StrippedOptionalText = None
     insurance: Literal[*INSURANCE_OPTIONS] | None = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def _gather_flat_location_cr_update(cls, data: Any) -> Any:
+        return gather_flat_location(data)
+
+    @model_serializer(mode="wrap")
+    def _flatten_location(self, handler):
+        return flatten_location_on_dump(self, handler(self))
 
 
 class ProviderAvailabilityUpdate(PartialUpdate):
@@ -368,14 +405,15 @@ class _PostAuditSnapshotBase(ReadProjection):
     @model_validator(mode="before")
     @classmethod
     def _flatten_post(cls, data):
-        return _flatten_post_to_dict(data) or data
+        return gather_flat_location(_flatten_post_to_dict(data) or data)
 
 
 class ClientReferralAuditSnapshot(_PostAuditSnapshotBase):
     kind: Literal["client_referral"]
-    location_city: str
-    location_state: Literal[*US_STATES]
-    location_zip: str
+    # Mirrors :class:`ClientReferralRead` (#451). Audit ``before`` /
+    # ``after`` snapshots stay flat on the wire — the serializer
+    # unrolls the nested ``location`` block back to top-level keys.
+    location: Location
     location_in_person: Literal[*LOCATION_AVAILABILITY_OPTIONS]
     location_virtual: Literal[*LOCATION_AVAILABILITY_OPTIONS]
     desired_times: DesiredTimesField = []
@@ -385,6 +423,11 @@ class ClientReferralAuditSnapshot(_PostAuditSnapshotBase):
     services: ServicesField = []
     treatment_modality: str | None = None
     insurance: Literal[*INSURANCE_OPTIONS]
+
+    # Flat-on-dump (#451) — see :class:`ClientReferralRead`.
+    @model_serializer(mode="wrap")
+    def _flatten_location(self, handler):
+        return flatten_location_on_dump(self, handler(self))
 
 
 class ProviderAvailabilityAuditSnapshot(_PostAuditSnapshotBase):

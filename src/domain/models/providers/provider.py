@@ -5,6 +5,7 @@ from sqlalchemy.orm import relationship
 from sqlalchemy.types import Uuid
 
 from src.framework.persistence.base_model import BaseModel
+from src.framework.persistence.mixins import LocationMixin
 
 from ..enums import LOCATION_AVAILABILITY_OPTIONS, US_STATES, named_check_in
 
@@ -12,13 +13,17 @@ _TABLE = "providers"
 _ck = partial(named_check_in, _TABLE)
 
 
-class Provider(BaseModel):
+class Provider(LocationMixin, BaseModel):
     """Long-lived provider directory entry. Owns the provider's credential
     lists (licensures, educations, certifications) via cascade. A user may
     own multiple `Provider` rows — `uq_provider_profiles_user_id` was
     dropped in `8f20a93effc9` to allow it — so the `owner_id` FK is
     intentionally non-unique. Distinct from `ProviderAvailabilityDetail`,
     which is a per-Post detail row tied to one outreach `Post`.
+
+    Inherits the ``(city, state, zip)`` location columns from
+    :class:`LocationMixin`. The ``location_state`` CHECK constraint lives
+    in ``__table_args__`` below because CHECK names are table-prefixed.
     """
 
     __tablename__ = _TABLE
@@ -35,9 +40,6 @@ class Provider(BaseModel):
     )
     user = relationship("User")
     practice_name = Column(Text, nullable=False)
-    location_city = Column(Text, nullable=False)
-    location_state = Column(Text, nullable=False)
-    location_zip = Column(Text, nullable=False)
     in_person_sessions = Column(Text, nullable=False)
     virtual_sessions = Column(Text, nullable=False)
 
