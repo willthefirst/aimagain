@@ -8,7 +8,7 @@
   <fieldset>
     <legend>Filter</legend>
     {{ filter_select_field("license_type", "License type", LICENSE_TYPES, labels=LICENSE_TYPES_LABELS, current=selected_license_type) }}
-    {{ filter_select_field("issuing_state", "Issuing state", US_STATES, current=selected_issuing_state) }}
+    {{ filter_select_field("issuing_state", "Licensed in state", US_STATES, current=selected_issuing_state) }}
     <input type="submit" value="Apply" />
     <a href="/providers">Clear</a>
   </fieldset>
@@ -17,9 +17,13 @@
 {% if providers %}
 <ul class="providers-list">
   {%- for provider in providers %}
+  {%- set issuing_states = provider.licensures | map(attribute='issuing_state') | unique | sort | list -%}
   <li>
     <a href="/providers/{{ provider.id }}">{{ provider.practice_name }}</a>
     &mdash; {{ provider.location_city }}, {{ provider.location_state }}
+    {%- if issuing_states %}
+    <br /><small>Licensed in: {{ issuing_states | join(', ') }}</small>
+    {%- endif %}
   </li>
   {%- endfor %}
 </ul>

@@ -218,6 +218,43 @@ async def test_list_providers_renders_html(
     assert "Open House" in response.text
 
 
+async def test_list_providers_shows_licensure_states(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+):
+    """Each list row surfaces the provider's licensure issuing states so
+    matches against `?issuing_state=` are visually obvious — a CT-located
+    provider holding a CA license shows `Licensed in: CA, CT` and the
+    user can see why they appeared in a CA filter (#458 follow-up)."""
+    other = create_test_user(username=f"other-{uuid.uuid4()}")
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            session.add(other)
+    provider_id = await _seed_provider_for(
+        db_test_session_manager,
+        user_id=other.id,
+        practice_name="Multi-state Care",
+        location_state="CT",
+    )
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            session.add(
+                make_provider_licensure(
+                    provider_id=provider_id, license_type="lcsw", issuing_state="CA"
+                )
+            )
+            session.add(
+                make_provider_licensure(
+                    provider_id=provider_id, license_type="lpc", issuing_state="CT"
+                )
+            )
+
+    response = await authenticated_client.get("/providers")
+
+    assert response.status_code == 200
+    assert "Licensed in: CA, CT" in response.text
+
+
 async def test_list_providers_renders_empty_state(
     authenticated_client: AsyncClient,
 ):
