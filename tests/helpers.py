@@ -54,7 +54,7 @@ _CLIENT_REFERRAL_DEFAULTS: dict[str, Any] = {
     "location_in_person": "yes",
     "location_virtual": "no",
     "desired_times": [],
-    "client_dem_ages": "adults_25_64",
+    "client_dem_age_groups": ["adults_25_64"],
     "languages": ["en"],
     "description": "needs placement",
     "services": [],

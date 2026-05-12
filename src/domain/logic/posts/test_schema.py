@@ -107,7 +107,7 @@ def test_post_create_client_referral_rejects_empty_description():
         "location_zip",
         "location_in_person",
         "location_virtual",
-        "client_dem_ages",
+        "client_dem_age_groups",
         "description",
         "insurance",
     ],
@@ -150,6 +150,25 @@ def test_post_create_client_referral_rejects_unknown_language_token():
         post_create_adapter.validate_python(client_referral_payload(languages=["xx"]))
 
 
+def test_post_create_client_referral_accepts_multiple_age_groups():
+    """CR's `client_dem_age_groups` accepts a multi-bucket list (#432) —
+    the original single-valued `client_dem_ages` forced referrers to
+    pick one when a child straddled buckets."""
+    p = post_create_adapter.validate_python(
+        client_referral_payload(
+            client_dem_age_groups=["children_6_10", "preteens_11_13"]
+        )
+    )
+    assert p.client_dem_age_groups == ["children_6_10", "preteens_11_13"]
+
+
+def test_post_create_client_referral_rejects_empty_age_groups():
+    with pytest.raises(ValidationError):
+        post_create_adapter.validate_python(
+            client_referral_payload(client_dem_age_groups=[])
+        )
+
+
 def test_post_create_client_referral_strips_optional_to_none():
     p = post_create_adapter.validate_python(
         client_referral_payload(services_psychotherapy_modality="   ")
@@ -176,7 +195,7 @@ def test_post_create_client_referral_rejects_unknown_state():
 def test_post_create_client_referral_rejects_unknown_age_group():
     with pytest.raises(ValidationError):
         post_create_adapter.validate_python(
-            client_referral_payload(client_dem_ages="too_old")
+            client_referral_payload(client_dem_age_groups=["too_old"])
         )
 
 
@@ -447,11 +466,11 @@ def test_post_create_rejects_unknown_fields_on_provider_availability():
 
 
 def test_post_create_rejects_cross_kind_field_bleed():
-    """Cross-kind field bleed must not validate. `client_dem_ages` is
-    a client-referral-only field; it has no place in a PA payload."""
+    """Cross-kind field bleed must not validate. `client_dem_age_groups`
+    is a client-referral-only field; it has no place in a PA payload."""
     with pytest.raises(ValidationError):
         post_create_adapter.validate_python(
-            provider_availability_payload(client_dem_ages="adults_25_64")
+            provider_availability_payload(client_dem_age_groups=["adults_25_64"])
         )
 
 
@@ -594,7 +613,6 @@ def _literal_args(model_cls, field_name: str) -> tuple[str, ...]:
         (ClientReferralRead, "location_state", US_STATES),
         (ClientReferralRead, "location_in_person", LOCATION_AVAILABILITY_OPTIONS),
         (ClientReferralRead, "location_virtual", LOCATION_AVAILABILITY_OPTIONS),
-        (ClientReferralRead, "client_dem_ages", CLIENT_AGE_GROUPS),
         (ClientReferralRead, "insurance", INSURANCE_OPTIONS),
         (ProviderAvailabilityRead, "location_state", US_STATES),
         (ProviderAvailabilityRead, "in_person_sessions", LOCATION_AVAILABILITY_OPTIONS),
@@ -602,7 +620,6 @@ def _literal_args(model_cls, field_name: str) -> tuple[str, ...]:
         (ProviderAvailabilityRead, "payment_situation", INSURANCE_OPTIONS),
         # Create variants
         (ClientReferralCreate, "location_state", US_STATES),
-        (ClientReferralCreate, "client_dem_ages", CLIENT_AGE_GROUPS),
         (ClientReferralCreate, "insurance", INSURANCE_OPTIONS),
         (ProviderAvailabilityCreate, "payment_situation", INSURANCE_OPTIONS),
         # Update variants (Optional[Literal[*TUPLE]])

@@ -35,7 +35,7 @@ which FastAPI/Pydantic parses as a list.
 
   <fieldset>
     <legend>Demographics</legend>
-    {{ select_field("client_dem_ages", "Age group", CLIENT_AGE_GROUPS, labels=CLIENT_AGE_GROUP_LABELS, current=d.client_dem_ages if d else None, placeholder=true) }}
+    {{ field_for(schema, "client_dem_age_groups", "Age groups (select all that apply)", current=d.client_dem_age_groups if d else None) }}
     {{ field_for(schema, "languages", "Languages spoken", current=d.languages if d else None) }}
   </fieldset>
 
