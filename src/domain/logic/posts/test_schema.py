@@ -367,6 +367,29 @@ def test_post_create_provider_availability_accepts_new_services_tokens(token):
     assert p.services == [token]
 
 
+def test_post_create_provider_availability_accepts_schedule_text():
+    """`schedule_text` is the free-text companion to `desired_times` for
+    cohort dates / fixed program hours (#442)."""
+    p = post_create_adapter.validate_python(
+        provider_availability_payload(schedule_text="M-F 9am-5pm, starts May 11")
+    )
+    assert p.schedule_text == "M-F 9am-5pm, starts May 11"
+
+
+def test_post_create_provider_availability_schedule_text_strips_whitespace():
+    p = post_create_adapter.validate_python(
+        provider_availability_payload(schedule_text="   ")
+    )
+    assert p.schedule_text is None
+
+
+def test_post_update_provider_availability_accepts_schedule_text_only():
+    p = post_update_adapter.validate_python(
+        {"kind": "provider_availability", "schedule_text": "New cohort starts Jun 1"}
+    )
+    assert p.schedule_text == "New cohort starts Jun 1"
+
+
 def test_post_create_provider_availability_accepts_day_program_setting():
     """`day_program` setting added in #440 for program-style posts."""
     p = post_create_adapter.validate_python(

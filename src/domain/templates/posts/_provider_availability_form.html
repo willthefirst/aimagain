@@ -53,6 +53,7 @@ which FastAPI/Pydantic parses as a list.
     {{ select_field("in_person_sessions", "In-person sessions", LOCATION_AVAILABILITY_OPTIONS, labels=LOCATION_AVAILABILITY_LABELS, current=d.in_person_sessions if d else None, placeholder=true, required=false) }}
     {{ select_field("virtual_sessions", "Virtual sessions", LOCATION_AVAILABILITY_OPTIONS, labels=LOCATION_AVAILABILITY_LABELS, current=d.virtual_sessions if d else None, placeholder=true, required=false) }}
     {{ time_grid_field("desired_times", "Desired times (optional)", current=d.desired_times if d else None) }}
+    {{ field_for(schema, "schedule_text", "Schedule notes (e.g. start date, cohort dates, fixed program hours)", current=d.schedule_text if d else None) }}
   </fieldset>
 
   <fieldset>
