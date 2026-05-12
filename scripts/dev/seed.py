@@ -65,10 +65,7 @@ FIXTURE_PROVIDER_AVAILABILITY: list[FixtureProviderAvailability] = [
             ),
             "referral_instructions": "Contact via website to schedule an intake call.",
             "website": "katiereevesphd.com",
-            # TODO(issue-5): telehealth-only — no city/zip. Required today; relax in #5.
-            "location_city": "(telehealth only)",
             "location_state": "CA",
-            "location_zip": "00000",  # TODO(issue-5): placeholder; required today.
             "in_person_sessions": "no",
             "virtual_sessions": "yes",
             "desired_times": [],
@@ -111,8 +108,6 @@ FIXTURE_PROVIDER_AVAILABILITY: list[FixtureProviderAvailability] = [
             "website": "boohoocrybaby.com",
             "location_city": "Santa Clara",
             "location_state": "CA",
-            # TODO(issue-5): venue (fairgrounds) has no zip; required today.
-            "location_zip": "95050",
             "in_person_sessions": "yes",
             "virtual_sessions": "no",
             "desired_times": [],

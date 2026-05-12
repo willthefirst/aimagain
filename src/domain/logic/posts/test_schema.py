@@ -442,11 +442,7 @@ def test_post_create_provider_availability_rejects_empty_practice_name():
     [
         "practice_name",
         "available_providers",
-        "location_city",
         "location_state",
-        "location_zip",
-        "in_person_sessions",
-        "virtual_sessions",
         "client_focus",
         "age_groups",
         "payment_situation",
@@ -771,18 +767,41 @@ def test_post_create_services_rejects_unknown_token(payload_factory):
         post_create_adapter.validate_python(payload_factory(services=["telekinesis"]))
 
 
-def test_post_create_provider_availability_services_rejects_empty_list():
-    """PA's `services` is required-min-1; an explicit `[]` 422s."""
-    with pytest.raises(ValidationError):
-        post_create_adapter.validate_python(provider_availability_payload(services=[]))
+def test_post_create_provider_availability_services_accepts_empty_list():
+    """PA's `services` was required-min-1; #433 relaxed to optional. An
+    explicit `[]` validates."""
+    p = post_create_adapter.validate_python(provider_availability_payload(services=[]))
+    assert p.services == []
 
 
-def test_post_create_provider_availability_services_required():
-    """Omitting `services` entirely on PA also 422s — no default fallback."""
+def test_post_create_provider_availability_services_absent_defaults_empty():
+    """Omitting `services` entirely on PA falls back to `[]` per #433."""
     payload = provider_availability_payload()
     payload.pop("services")
-    with pytest.raises(ValidationError):
-        post_create_adapter.validate_python(payload)
+    p = post_create_adapter.validate_python(payload)
+    assert p.services == []
+
+
+def test_post_create_provider_availability_accepts_omitted_optional_fields():
+    """City, ZIP, sessions, services, settings are all optional after
+    #433 — telehealth-only and venue-based posts must be expressible."""
+    payload = provider_availability_payload()
+    for field in (
+        "location_city",
+        "location_zip",
+        "in_person_sessions",
+        "virtual_sessions",
+        "services",
+        "settings",
+    ):
+        payload.pop(field, None)
+    p = post_create_adapter.validate_python(payload)
+    assert p.location_city is None
+    assert p.location_zip is None
+    assert p.in_person_sessions is None
+    assert p.virtual_sessions is None
+    assert p.services == []
+    assert p.settings == []
 
 
 @pytest.mark.parametrize(
