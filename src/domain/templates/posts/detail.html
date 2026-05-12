@@ -59,11 +59,15 @@ Provider availability: {{ post.provider_availability_detail.practice_name }}
     <dd>{{ d.website }}</dd>
     {% endif %}
     <dt>Location</dt>
-    <dd>{{ d.location_city }}, {{ d.location_state }} {{ d.location_zip }}</dd>
+    <dd>{% if d.location_city %}{{ d.location_city }}, {% endif %}{{ d.location_state }}{% if d.location_zip %} {{ d.location_zip }}{% endif %}</dd>
+    {% if d.in_person_sessions %}
     <dt>In-person sessions</dt>
     <dd>{{ LOCATION_AVAILABILITY_LABELS[d.in_person_sessions] }}</dd>
+    {% endif %}
+    {% if d.virtual_sessions %}
     <dt>Virtual sessions</dt>
     <dd>{{ LOCATION_AVAILABILITY_LABELS[d.virtual_sessions] }}</dd>
+    {% endif %}
     {% if d.desired_times %}
     <dt>Desired times</dt>
     <dd>{% for slot in d.desired_times %}{{ DESIRED_TIME_SLOT_LABELS[slot] }}{% if not loop.last %}, {% endif %}{% endfor %}</dd>

@@ -190,15 +190,12 @@ class ProviderAvailabilityRead(_PostReadBase):
     website: str | None = None
     practice_name: str
     available_providers: str
-    location_city: str
+    location_city: str | None = None
     location_state: Literal[*US_STATES]
-    location_zip: str
-    in_person_sessions: Literal[*LOCATION_AVAILABILITY_OPTIONS]
-    virtual_sessions: Literal[*LOCATION_AVAILABILITY_OPTIONS]
+    location_zip: str | None = None
+    in_person_sessions: Literal[*LOCATION_AVAILABILITY_OPTIONS] | None = None
+    virtual_sessions: Literal[*LOCATION_AVAILABILITY_OPTIONS] | None = None
     desired_times: DesiredTimesField = []
-    # Read does not enforce min-1 — pre-services PA rows backfilled to
-    # `[]` by the migration would otherwise be unreadable. Min-1 lives
-    # on Create/Update only, where it actually prevents new violations.
     services: ServicesField = []
     settings: SettingsField = []
     treatment_modality: str | None = None
@@ -261,16 +258,19 @@ class ProviderAvailabilityCreate(WirePayload):
     website: StrippedOptionalText = None
     practice_name: StrippedText
     available_providers: StrippedText
-    location_city: StrippedText
+    # `location_state` stays required — only usable geographic filter axis.
+    # City / ZIP / session-format / services / settings all relax to
+    # optional here (#433): telehealth-only practices (Katie Reeves) have
+    # no city/ZIP; venue posts (Camp BooHoo) have placeholder ZIPs;
+    # services/settings vocabularies don't yet cover every post kind.
+    location_city: StrippedOptionalText = None
     location_state: Literal[*US_STATES]
-    location_zip: ZipText
-    in_person_sessions: Literal[*LOCATION_AVAILABILITY_OPTIONS]
-    virtual_sessions: Literal[*LOCATION_AVAILABILITY_OPTIONS]
+    location_zip: ZipText | None = None
+    in_person_sessions: Literal[*LOCATION_AVAILABILITY_OPTIONS] | None = None
+    virtual_sessions: Literal[*LOCATION_AVAILABILITY_OPTIONS] | None = None
     desired_times: DesiredTimesField = []
-    # Required min-1 on PA per spec — divergence from CR's optional
-    # `services`. No default: an absent field 422s, an empty list 422s.
-    services: RequiredServicesField
-    settings: RequiredSettingsField
+    services: ServicesField = []
+    settings: SettingsField = []
     treatment_modality: StrippedOptionalText = None
     client_focus: StrippedText
     # Required min-1 on the wire — replaces the old single-valued
@@ -408,14 +408,12 @@ class ProviderAvailabilityAuditSnapshot(_PostAuditSnapshotBase):
     website: str | None = None
     practice_name: str
     available_providers: str
-    location_city: str
+    location_city: str | None = None
     location_state: Literal[*US_STATES]
-    location_zip: str
-    in_person_sessions: Literal[*LOCATION_AVAILABILITY_OPTIONS]
-    virtual_sessions: Literal[*LOCATION_AVAILABILITY_OPTIONS]
+    location_zip: str | None = None
+    in_person_sessions: Literal[*LOCATION_AVAILABILITY_OPTIONS] | None = None
+    virtual_sessions: Literal[*LOCATION_AVAILABILITY_OPTIONS] | None = None
     desired_times: DesiredTimesField = []
-    # AuditSnapshot mirrors Read — no min-1 enforcement, so historic /
-    # backfilled rows can be projected without 422-ing the audit pipeline.
     services: ServicesField = []
     settings: SettingsField = []
     treatment_modality: str | None = None
