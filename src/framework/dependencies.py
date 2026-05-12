@@ -6,7 +6,7 @@ built once via :func:`_make_repo_resolver` rather than written by hand;
 adding a new repository class is a single entry in :data:`_REPO_TYPES`.
 
 The public ``get_<entity>_repository`` names exist as module-level
-bindings so spec files (``src/specs/<entity>.py``) keep
+bindings so spec files (``src/domain/specs/<entity>.py``) keep
 importing them directly. The type → resolver registry is built from
 the same source, so a generated resolver and its registry entry can't
 drift.

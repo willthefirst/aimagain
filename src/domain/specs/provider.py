@@ -1,16 +1,16 @@
 """`PROVIDER_ENTITY`: single declaration of the provider resource.
 
 Read by:
-  - `src/api/routes/providers.py` — derives `PROVIDER_SPEC` for the
+  - `src/domain/routes/providers.py` — derives `PROVIDER_SPEC` for the
     mount helpers and reads the list filters from `.filters`.
   - `src/logic/providers/provider_processing.py` — reads
     `PROVIDER_ENTITY.audit` for the `mutate(...)` resource binding.
-  - `src/specs/provider_licensure.py` /
+  - `src/domain/specs/provider_licensure.py` /
     `provider_education.py` / `provider_certification.py` — set
     ``parent=PROVIDER_ENTITY`` so the mount layer's parent-chain
     machinery builds nested paths like
     ``/providers/{provider_id}/licensures/{licensure_id}``.
-  - `src/specs/user.py` — the related-list subresource
+  - `src/domain/specs/user.py` — the related-list subresource
     `RelatedListSubresource(child_spec=PROVIDER_ENTITY.to_resource_spec(), ...)`
     on the user spec; closes the `api/common -> api/routes`
     inversion documented in A1 (#317).

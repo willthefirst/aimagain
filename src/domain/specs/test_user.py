@@ -105,7 +105,7 @@ def test_state_axes_has_exactly_activation():
 def test_subresources_has_related_providers_with_me_alias():
     """`/users/{id}/providers` and `/users/me/providers` are the
     related-list — confirmed against the mount calls in
-    `src/api/routes/users.py`."""
+    `src/domain/routes/users.py`."""
     assert len(USER_ENTITY.subresources) == 1
     sub = USER_ENTITY.subresources[0]
     assert isinstance(sub, RelatedListSubresource)

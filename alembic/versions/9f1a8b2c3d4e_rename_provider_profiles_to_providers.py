@@ -38,7 +38,7 @@ depends_on: Union[str, Sequence[str], None] = None
 
 # Verbatim CHECK SQL fragments — copied from 7dbd50c72096 so the rebuilt
 # constraints match the original universe exactly. Single source of truth
-# for the vocabularies still lives in `src/models/enums.py`; if those tuples
+# for the vocabularies still lives in `src/domain/models/enums.py`; if those tuples
 # ever change, follow the standard add-column / new-migration flow rather
 # than editing this file.
 _IN_PERSON_SESSIONS_CHECK = "in_person_sessions IN ('yes', 'no', 'please_contact')"

@@ -10,7 +10,7 @@ direct imports — only the route file's ``Literal[*kind names]`` for
 the form ``?kind=`` query param reads through the spec.
 
 Read by:
-  - `src/api/routes/posts.py` — derives `POST_SPEC` for the mount
+  - `src/domain/routes/posts.py` — derives `POST_SPEC` for the mount
     helpers and builds the form's kind Literal from
     ``POST_ENTITY.discriminator.names``.
 """
@@ -59,7 +59,7 @@ POST_ENTITY: Final[EntitySpec] = EntitySpec(
     update_redirect=Redirects.to_detail("posts", "post_id"),
     discriminator=POST_KINDS,
     # The list page renders per-kind "New X" links from this tuple —
-    # consumed by `src/templates/posts/list.html`. Computed once at
+    # consumed by `src/domain/templates/posts/list.html`. Computed once at
     # spec-construction time; the registry is immutable after import.
     static_context={"post_kinds": list(POST_KINDS.values())},
 )

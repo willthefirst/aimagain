@@ -1,4 +1,4 @@
-"""Tests for `src/core/templating.py`."""
+"""Tests for `src/framework/templating.py`."""
 
 from unittest.mock import patch
 

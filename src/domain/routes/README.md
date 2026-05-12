@@ -12,7 +12,7 @@ CRUD-shaped routes use the **`EntitySpec` declaration + `mount_entity` dispatche
 
 The underlying `mount_*` helpers (`mount_list`, `mount_detail`, `mount_create`, `mount_update`, `mount_delete`, `mount_form`, `mount_state_axis`, `mount_related_list`) remain available for entities whose URL shape `mount_entity` can't handle — favorites' M:N edge POST/DELETE is the only current example. Every other entity (users, providers + 3 credential subentities, posts) composes through `mount_entity`.
 
-For the standard CRUD verbs (create / update / delete), the route file binds handlers built by `make_<verb>_handler(ENTITY)` from [`src/framework/handlers.py`](../../logic/README.md). Bespoke handlers are written only when the entity has rules that don't fit the standard load → auth → mutate → audit ritual (current examples: users' delete self-guard, providers' create with nested credential append, favorites' edge ops).
+For the standard CRUD verbs (create / update / delete), the route file binds handlers built by `make_<verb>_handler(ENTITY)` from [`src/framework/handlers.py`](../../framework/handlers.py). Bespoke handlers are written only when the entity has rules that don't fit the standard load → auth → mutate → audit ritual (current examples: users' delete self-guard, providers' create with nested credential append, favorites' edge ops).
 
 ### What we do
 
@@ -288,6 +288,6 @@ Pact contract pairs for HTML forms and HX-driven buttons live under [`tests/test
 
 ## Related documentation
 
-- [API Common](../../framework/README.md) - Shared API utilities and BaseRouter
-- [Logic Layer](../../logic/README.md) - Processing logic that routes delegate to
-- [API Layer](../../README.md) - Overall API layer architecture
+- [Framework](../../framework/README.md) - Shared dispatch primitives + `BaseRouter`
+- [Per-entity logic](../logic/) - Bespoke handlers that routes delegate to
+- [Top-level architecture](../../README.md) - The `framework/` vs `domain/` split

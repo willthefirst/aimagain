@@ -9,7 +9,7 @@ Covers:
   `model_validate`, including sub-entity lists.
 - `test_schema_literals_match_model_tuples` guards that `Literal[*TUPLE]`
   types stay aligned with the source-of-truth tuples in
-  `src/models/enums.py`.
+  `src/domain/models/enums.py`.
 """
 
 import uuid
@@ -296,7 +296,7 @@ def _literal_args(model_cls, field_name: str) -> tuple[str, ...]:
 )
 def test_schema_literals_match_model_tuples(model_cls, field, expected):
     """Schema `Literal[*TUPLE]`s and DB CHECK universes must agree,
-    sourced from the tuples in `src/models/enums.py`. If you add or
+    sourced from the tuples in `src/domain/models/enums.py`. If you add or
     rename a vocabulary value, update both places (and the migration);
     this guardrail keeps them honest."""
     assert set(_literal_args(model_cls, field)) == set(expected)

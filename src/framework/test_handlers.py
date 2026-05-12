@@ -2,7 +2,7 @@
 
 These pin the generic handler behavior against fixture specs and
 fixture models — independent of any production entity. The per-entity
-spec-correctness suites (`src/specs/test_<entity>.py`)
+spec-correctness suites (`src/domain/specs/test_<entity>.py`)
 already prove each spec declares the right things; the framework
 test surface here proves the generic handler does the right work
 *given* a well-formed spec.

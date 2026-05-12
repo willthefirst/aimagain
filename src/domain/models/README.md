@@ -79,21 +79,21 @@ Every cross-cutting site reads from `POST_KINDS`:
 - `Post.__table_args__` builds its `CheckConstraint` from `POST_KINDS.check_sql()` — the SQL is derived from `POST_KINDS.names`.
 - The route's `Literal[*POST_KIND_NAMES]` for `GET /posts/form?kind=…` is derived.
 - The form-template selection reads `spec.create_template` / `spec.edit_template`, which default to `posts/new_<name>.html` / `posts/edit_<name>.html` by convention — a new kind doesn't need to restate them.
-- `src/domain/post_repository.py:_attach_detail` looks up by detail-class via `POST_KIND_BY_DETAIL_MODEL`; `update_post` writes to `spec.detail_relationship` for the post's kind.
-- `src/framework/post_processing.py:handle_create_post` and `handle_update_post` dispatch via `POST_KINDS[payload.kind]` instead of `isinstance` ladders.
-- `src/schemas/post.py:_flatten_post_to_dict` reads the relationship + field tuple from the registry (so `PostRead`, `PostAuditSnapshot` flatten through it).
+- `src/framework/base_repository.py:create_polymorphic` looks up by detail-class via `POST_KIND_BY_DETAIL_MODEL`; the framework's `handle_update` writes to `spec.detail_relationship` for the post's kind.
+- `src/framework/handlers.py:handle_create` and `handle_update` dispatch via `POST_KINDS[payload.kind]` instead of `isinstance` ladders.
+- `src/domain/logic/posts/schema.py:_flatten_post_to_dict` reads the relationship + field tuple from the registry (so `PostRead`, `PostAuditSnapshot` flatten through it).
 - `src/domain/templates/posts/list.html` receives `post_kinds` in its context and renders the per-kind "New X" links from it.
 
 Adding a kind is therefore: (1) a registry entry in `posts/post_kinds.py`, (2) a new detail model file under `posts/` + a `relationship(...)` line on `Post`, (3) the four Pydantic variant classes in `src/domain/logic/posts/schema.py`, (4) the per-kind templates under `src/domain/templates/posts/`, (5) an Alembic migration. Removing a kind is the inverse. No edits in routes, repositories, or logic — those layers are registry-driven. The consistency tests in [`posts/test_post_kinds.py`](posts/test_post_kinds.py) guard against re-encoding the kind set inline anywhere new.
 
 ## Layer organization
 
-Models follow the [cluster pattern](../../README.md#domain-entities-and-the-cluster-pattern):
+Models follow the per-entity cluster pattern declared in [`../../README.md`](../../README.md):
 
 - One cluster directory per domain entity (`<entity>/`). Each holds the SQLAlchemy table classes for that entity (parent table, sub-records, type registries if discriminator-based) plus colocated tests. Per-entity schema specifics, relationships, cascade behavior, and any "adding a variant" recipe live inside the cluster, with a `<entity>/README.md` describing what's there.
 - Parent-level shared tier:
   - `enums.py` — Controlled-vocabulary tuples + `*_LABELS` dicts + a `check_in_tuple_sql` helper that renders DB-level `CHECK` fragments from a tuple. The single source of truth that schemas (`Literal[*TUPLE]`), form macros (Jinja globals), and DB constraints all derive from. Lives at the parent level because 2+ clusters depend on it — and is a *leaf* (no internal imports), so any cluster can import from it without cycling back through cluster code.
-  - `__init__.py` — Re-exports model classes and constants, including `Base`, `BaseModel`, `metadata`, and `AuditLog` from [`src/framework/`](../../framework/) (the generic SQLAlchemy infra lives in the framework; the hub re-exports it for compatibility). External code should always import from `src.models` (e.g. `from src.models import Post, POST_KINDS`); the `__init__.py` keeps that surface stable across cluster moves.
+  - `__init__.py` — Re-exports model classes and constants, including `Base`, `BaseModel`, `metadata`, and `AuditLog` from [`src/framework/`](../../framework/) (the generic SQLAlchemy infra lives in the framework; the hub re-exports it for compatibility). External code should always import from `src.domain.models` (e.g. `from src.domain.models import Post, POST_KINDS`); the `__init__.py` keeps that surface stable across cluster moves.
 
 A model in cluster A does not import from cluster B; if two clusters need a shared primitive, hoist it to the parent level (the path `enums.py` took).
 
@@ -274,11 +274,10 @@ class Provider(BaseModel):
 
 Most other model behavior is exercised indirectly through repository and route tests. Add `src/domain/models/test_<model_name>.py` when a model carries non-trivial logic (computed fields, validators, custom `__init__`, etc.) that warrants direct coverage.
 
-When changing a model's schema, generate an Alembic migration as part of the same change — see [`../../CLAUDE.md`](../../CLAUDE.md).
+When changing a model's schema, generate an Alembic migration as part of the same change — see [`../../../CLAUDE.md`](../../../CLAUDE.md).
 
 ## Related documentation
 
-- [Repository Layer](../repositories/README.md) - Data access patterns that work with these models
-- [Logic Layer](../logic/README.md) - Business logic that operates on these domain entities
-- [Schemas Layer](../schemas/README.md) - Request/response validation for these models
-- [Main Architecture](../../README.md) - How models fit into the overall application architecture
+- [Per-entity logic](../logic/) - Repositories, handlers, and Pydantic schemas that operate on these models
+- [Routes](../routes/README.md) - HTTP entry points that exercise these models via handlers
+- [Top-level architecture](../../README.md) - How models fit into the `framework/` vs `domain/` split

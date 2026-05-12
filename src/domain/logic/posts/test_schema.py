@@ -10,7 +10,7 @@ Covers:
   kind through the right snapshot class.
 - `test_schema_literals_match_model_tuples` guards that the
   `Literal[*TUPLE]` types here stay aligned with the source-of-truth
-  tuples in `src/models/enums.py`.
+  tuples in `src/domain/models/enums.py`.
 - `test_labels_cover_their_tuples` guards that every value in a
   `*_OPTIONS`/`*_GROUPS` tuple has an entry in its sibling
   `*_LABELS` dict (consumed by the form-render macro).
@@ -489,7 +489,7 @@ def _literal_args(model_cls, field_name: str) -> tuple[str, ...]:
 )
 def test_schema_literals_match_model_tuples(model_cls, field, expected):
     """Schema `Literal[*TUPLE]`s and DB CHECK universes must agree,
-    sourced from the tuples in `src/models/enums.py`. If you add or
+    sourced from the tuples in `src/domain/models/enums.py`. If you add or
     rename a vocabulary value, update both places (and the migration);
     this guardrail keeps them honest."""
     assert set(_literal_args(model_cls, field)) == set(expected)
@@ -701,7 +701,7 @@ def test_post_update_services_rejects_unknown_token(kind):
     ],
 )
 def test_labels_cover_their_tuples(values, labels):
-    """Each `*_LABELS` dict in `src/models/enums.py` must have a
+    """Each `*_LABELS` dict in `src/domain/models/enums.py` must have a
     label for every value in its corresponding tuple. The form-render
     macro looks labels up by value; an unmapped value would render with
     a `KeyError` at request time. Catching it here keeps the failure

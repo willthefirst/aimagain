@@ -1,6 +1,6 @@
 # Posts templates
 
-Jinja templates for the post CRUD flows. HTMX-driven; forms submit form-encoded data via `hx-{post,patch}` (see [`_client_referral_form.html`](_client_referral_form.html) / [`_provider_availability_form.html`](_provider_availability_form.html)). Multi-checkbox fields (`desired_times`, `services`, `settings`) are normalized on the wire schema by `_scalar_to_list` in [`src/domain/logic/posts/schema.py`](../../schemas/posts/post.py).
+Jinja templates for the post CRUD flows. HTMX-driven; forms submit form-encoded data via `hx-{post,patch}` (see [`_client_referral_form.html`](_client_referral_form.html) / [`_provider_availability_form.html`](_provider_availability_form.html)). Multi-checkbox fields (`desired_times`, `services`, `settings`) are normalized on the wire schema by `_scalar_to_list` in [`src/domain/logic/posts/schema.py`](../../logic/posts/schema.py).
 
 ## Files
 

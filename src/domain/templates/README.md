@@ -61,19 +61,19 @@ Templates use inheritance for consistent layout and feature-specific customizati
 
 ## Layer organization
 
-Templates follow the [cluster pattern](../../README.md#domain-entities-and-the-cluster-pattern):
+Templates follow the per-entity cluster pattern declared in [`../../README.md`](../../README.md):
 
 - `base.html` at the parent — foundation template every page extends. Provides the HTMX setup and the site-wide nav.
 - `_shared/` at the parent — cross-resource macros importable by every cluster (see [Shared CRUD macros](#shared-crud-macros-_shared) below).
 - `<resource>/` — one cluster directory per domain entity. Each holds the templates for that resource's CRUD pages (`list.html`, `detail.html`, optional `new.html`/`edit.html` or per-kind variants) plus any cluster-local partials (filenames prefixed with `_`).
 
-Per-resource specifics — what fields the list shows, which partials a cluster has, route-to-template mapping — live in that resource's [api/routes/](../routes/) handler and (when worth writing down) in `<resource>/README.md`. This README documents the rules; the directory listing is the registry of resources.
+Per-resource specifics — what fields the list shows, which partials a cluster has, route-to-template mapping — live in that resource's [route file](../routes/) handler and (when worth writing down) in `<resource>/README.md`. This README documents the rules; the directory listing is the registry of resources.
 
 ### Reusable partial convention
 
 Files prefixed with `_` (e.g. `_admin_actions.html`) are **shared partials** intended to be `{% include %}`d from multiple full pages. They are not rendered directly by routes. The convention exists so that, e.g., adding a new admin button to `users/_admin_actions.html` automatically appears on both the user list and the user detail page without per-page edits.
 
-A partial documents its required context at the top in a `{# ... #}` comment, and guards its own rendering on a single named flag (`{% if can_edit %}`, `{% if can_admin_actions %}`). The handler computes the flag using the predicates in [`src/framework/authz.py`](../logic/_authz.py); partials never introspect `current_user` to decide visibility — that would scatter the authorization rule across templates. Backend authorization is enforced separately in the logic layer — the template guard is presentation only.
+A partial documents its required context at the top in a `{# ... #}` comment, and guards its own rendering on a single named flag (`{% if can_edit %}`, `{% if can_admin_actions %}`). The handler computes the flag using the predicates in [`src/framework/authz.py`](../../framework/authz.py); partials never introspect `current_user` to decide visibility — that would scatter the authorization rule across templates. Backend authorization is enforced separately in the logic layer — the template guard is presentation only.
 
 ### Shared CRUD macros (`_shared/`)
 
@@ -94,7 +94,7 @@ The labels-vs-tuple guardrail (`test_labels_cover_their_tuples`) lives alongside
 
 - `required` — from whether the field annotation is `T | None`.
 - `<select>` + choices — from `Literal[*TUPLE]`. Labels are resolved against the choice-tuple registry populated in [`src/framework/templating.py`](../../framework/templating.py).
-- `pattern` / `maxlength` — from any `HtmlPattern` marker attached to an `Annotated[...]` alias in [`src/framework/schema_validators.py`](../schemas/_validators.py). The schema's regex validator stays the source of truth; the marker exposes the same constraint to the `<input>`.
+- `pattern` / `maxlength` — from any `HtmlPattern` marker attached to an `Annotated[...]` alias in [`src/framework/schema_validators.py`](../../framework/schema_validators.py). The schema's regex validator stays the source of truth; the marker exposes the same constraint to the `<input>`.
 
 Use it instead of hand-restating the schema in HTML. Hand-rolled `text_field` / `select_field` calls are still appropriate when the form intentionally diverges from the schema (e.g. a filter `<select>` whose choices are the schema's `Literal` minus an "all" sentinel).
 
@@ -194,7 +194,7 @@ return APIResponse.html_response(
 )
 ```
 
-For the canonical example, read [`api/routes/users.py`](../routes/users.py).
+For the canonical example, read [`domain/routes/users.py`](../routes/users.py).
 
 ## Common template issues and solutions
 
@@ -273,10 +273,10 @@ async def test_user_list_template(client: AsyncClient, authenticated_user):
 
 ## Tests
 
-Templates are exercised indirectly by the route tests under [`../api/routes/`](../routes/) — they assert on the rendered HTML using `selectolax`. There is no separate test file at this directory level. When adding a new template, extend the relevant route test (or add one) to cover its rendering.
+Templates are exercised indirectly by the route tests under [`../routes/`](../routes/) — they assert on the rendered HTML using `selectolax`. There is no separate test file at this directory level. When adding a new template, extend the relevant route test (or add one) to cover its rendering.
 
 ## Related documentation
 
-- [API Routes](../routes/README.md) - Routes that render these templates
-- [Logic Layer](../logic/README.md) - Processing layer that prepares template context
-- [Core Layer](../../framework/README.md) - Template configuration and utilities
+- [Routes](../routes/README.md) - Routes that render these templates
+- [Per-entity logic](../logic/) - Handlers that prepare template context
+- [Framework](../../framework/README.md) - Template engine + base context configuration

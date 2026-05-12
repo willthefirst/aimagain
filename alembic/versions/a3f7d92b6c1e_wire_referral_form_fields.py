@@ -37,7 +37,7 @@ depends_on: Union[str, Sequence[str], None] = None
 
 # Inlined enum tuples — kept here so this migration is self-contained
 # and survives future renames of the model-layer constants. Mirrors the
-# tuples in `src/models/enums.py` at the time of authoring.
+# tuples in `src/domain/models/enums.py` at the time of authoring.
 _US_STATES = (
     "AL", "AK", "AZ", "AR", "CA", "CO", "CT", "DE", "DC", "FL",
     "GA", "HI", "ID", "IL", "IN", "IA", "KS", "KY", "LA", "ME",
@@ -71,7 +71,7 @@ _INSURANCE = ("in_network", "out_of_network", "in_and_out_of_network")
 
 def _check_in_tuple_sql(column: str, values: tuple[str, ...]) -> str:
     # SQL single-quote literals with `'` doubled. Mirrors
-    # `src.models.enums.check_in_tuple_sql`; kept local so the
+    # `src.domain.models.enums.check_in_tuple_sql`; kept local so the
     # migration stays self-contained.
     quoted = ", ".join("'" + v.replace("'", "''") + "'" for v in values)
     return f"{column} IN ({quoted})"
