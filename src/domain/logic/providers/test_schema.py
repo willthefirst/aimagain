@@ -33,6 +33,8 @@ from src.domain.logic.providers.schema import (
 from src.domain.models.enums import (
     CERTIFICATION_TYPES,
     EDUCATION_TYPES,
+    INSURANCE_CARRIER_LABELS,
+    INSURANCE_CARRIERS,
     LICENSE_TYPES,
     LOCATION_AVAILABILITY_OPTIONS,
     US_STATES,
@@ -161,6 +163,140 @@ def test_provider_create_rejects_non_5_digit_zip():
         ProviderCreate(**_provider_create_kwargs(location_zip="123"))
 
 
+def test_provider_create_defaults_insurance_fields_to_self_pay():
+    """Insurance posture (#449) defaults to self-pay-only: both Booleans
+    `False`, empty carrier list, no sliding scale, no cost — keeps the
+    cross-field invariant satisfied without forcing every caller to
+    specify the fields."""
+    p = ProviderCreate(**_provider_create_kwargs())
+    assert p.accepts_in_network is False
+    assert p.accepts_out_of_network is False
+    assert p.in_network_carriers == []
+    assert p.sliding_scale is False
+    assert p.cost is None
+
+
+def test_provider_create_accepts_in_network_with_carriers():
+    """`accepts_in_network=True` requires `in_network_carriers` non-empty;
+    the happy path passes through."""
+    p = ProviderCreate(
+        **_provider_create_kwargs(
+            accepts_in_network=True,
+            in_network_carriers=["aetna", "cigna"],
+        )
+    )
+    assert p.accepts_in_network is True
+    assert p.in_network_carriers == ["aetna", "cigna"]
+
+
+def test_provider_create_rejects_in_network_without_carriers():
+    """Cross-field rule: `accepts_in_network=True` + empty carrier list
+    must 422."""
+    with pytest.raises(ValidationError):
+        ProviderCreate(
+            **_provider_create_kwargs(
+                accepts_in_network=True,
+                in_network_carriers=[],
+            )
+        )
+
+
+def test_provider_create_rejects_carriers_without_in_network():
+    """Cross-field rule: a non-empty carrier list with
+    `accepts_in_network=False` must 422 — leaking carriers when not
+    accepting in-network is incoherent."""
+    with pytest.raises(ValidationError):
+        ProviderCreate(
+            **_provider_create_kwargs(
+                accepts_in_network=False,
+                in_network_carriers=["aetna"],
+            )
+        )
+
+
+def test_provider_create_rejects_unknown_carrier():
+    with pytest.raises(ValidationError):
+        ProviderCreate(
+            **_provider_create_kwargs(
+                accepts_in_network=True,
+                in_network_carriers=["not_a_real_carrier"],
+            )
+        )
+
+
+def test_provider_create_coerces_scalar_carrier_to_singleton_list():
+    """HTML form posts collapse a 1-checkbox-checked group to a scalar;
+    the shared `_scalar_to_list` BeforeValidator wraps that case before
+    the `Literal[*INSURANCE_CARRIERS]` member check fires."""
+    p = ProviderCreate(
+        **_provider_create_kwargs(
+            accepts_in_network=True,
+            in_network_carriers="aetna",
+        )
+    )
+    assert p.in_network_carriers == ["aetna"]
+
+
+def test_provider_update_rejects_in_network_without_carriers_when_both_set():
+    """Cross-field rule fires on Update only when *both* fields are in
+    the patch — patches that touch only one of the two pass through and
+    let the route handler reconcile with the persisted row."""
+    with pytest.raises(ValidationError):
+        ProviderUpdate(accepts_in_network=True, in_network_carriers=[])
+
+
+def test_provider_update_rejects_carriers_without_in_network_when_both_set():
+    with pytest.raises(ValidationError):
+        ProviderUpdate(accepts_in_network=False, in_network_carriers=["aetna"])
+
+
+def test_provider_update_accepts_in_network_only_without_validating_carriers():
+    """Patching only `accepts_in_network` (without the carrier list) is
+    allowed; the route handler is responsible for merging with the
+    persisted row."""
+    p = ProviderUpdate(accepts_in_network=True)
+    assert p.accepts_in_network is True
+    assert p.in_network_carriers is None
+
+
+def test_provider_update_accepts_carriers_only_without_validating_in_network():
+    """Symmetric: patching only the carrier list (without the Boolean)
+    is allowed."""
+    p = ProviderUpdate(in_network_carriers=["aetna"])
+    assert p.in_network_carriers == ["aetna"]
+    assert p.accepts_in_network is None
+
+
+def test_provider_create_accepts_cost_and_sliding_scale():
+    p = ProviderCreate(
+        **_provider_create_kwargs(
+            sliding_scale=True,
+            cost="$200 - $400 per session",
+        )
+    )
+    assert p.sliding_scale is True
+    assert p.cost == "$200 - $400 per session"
+
+
+def test_insurance_carriers_labels_cover_all_tokens():
+    """Every `INSURANCE_CARRIERS` token must have an entry in
+    `INSURANCE_CARRIER_LABELS` so the form-render macro can resolve a
+    label at request time. Mirrors the `test_labels_cover_their_tuples`
+    guardrail in `test_post.py`."""
+    assert set(INSURANCE_CARRIER_LABELS) == set(INSURANCE_CARRIERS)
+
+
+def test_provider_create_accepts_all_insurance_carriers():
+    """Every token in `INSURANCE_CARRIERS` validates on the wire."""
+    p = ProviderCreate(
+        **_provider_create_kwargs(
+            accepts_in_network=True,
+            in_network_carriers=list(INSURANCE_CARRIERS),
+        )
+    )
+    assert p.in_network_carriers == list(INSURANCE_CARRIERS)
+
+
 def test_provider_create_accepts_nested_credential_lists():
     p = ProviderCreate(
         **_provider_create_kwargs(),
@@ -210,6 +346,11 @@ def test_provider_read_validates_from_nested_dict():
         "location_zip": "83702",
         "in_person_sessions": "yes",
         "virtual_sessions": "no",
+        "accepts_in_network": False,
+        "accepts_out_of_network": False,
+        "in_network_carriers": [],
+        "sliding_scale": False,
+        "cost": None,
         "licensures": [
             {
                 "id": uuid.uuid4(),
@@ -285,6 +426,7 @@ def _literal_args(model_cls, field_name: str) -> tuple[str, ...]:
         (ProviderCreate, "location_state", US_STATES),
         (ProviderCreate, "in_person_sessions", LOCATION_AVAILABILITY_OPTIONS),
         (ProviderCreate, "virtual_sessions", LOCATION_AVAILABILITY_OPTIONS),
+        (ProviderCreate, "in_network_carriers", INSURANCE_CARRIERS),
         # Update variants (Optional[Literal[*TUPLE]])
         (ProviderLicensureUpdate, "license_type", LICENSE_TYPES),
         (ProviderLicensureUpdate, "issuing_state", US_STATES),
@@ -292,6 +434,10 @@ def _literal_args(model_cls, field_name: str) -> tuple[str, ...]:
         (ProviderCertificationUpdate, "certification_type", CERTIFICATION_TYPES),
         (ProviderUpdate, "location_state", US_STATES),
         (ProviderUpdate, "in_person_sessions", LOCATION_AVAILABILITY_OPTIONS),
+        # `ProviderUpdate.in_network_carriers` is
+        # `list[Literal[*T]] | None`; the `_literal_args` helper doesn't
+        # dig through the list-arm of the union, so the Create-variant
+        # entry above is the lockstep guardrail for the carrier vocab.
     ],
 )
 def test_schema_literals_match_model_tuples(model_cls, field, expected):

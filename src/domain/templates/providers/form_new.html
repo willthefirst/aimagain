@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{%- from "_shared/form_fields.html" import field_for -%}
+{%- from "_shared/form_fields.html" import field_for, radio_bool_field, text_field -%}
 {% block title %}Create provider{% endblock %}
 {% block content %}
 <h1>Create provider</h1>
@@ -18,6 +18,21 @@
     <legend>Session availability</legend>
     {{ field_for(schema, "in_person_sessions", "In-person sessions") }}
     {{ field_for(schema, "virtual_sessions", "Virtual sessions") }}
+  </fieldset>
+
+  {# Insurance & payment (#449). `accepts_in_network` /
+     `accepts_out_of_network` are orthogonal bool radios; carriers are a
+     multi-select rendered via `field_for` (the `list[Literal[*T]]`
+     annotation drives multi-select rendering). The cross-field rule
+     "carriers required-min-1 iff accepts_in_network=True" is enforced
+     server-side by `ProviderCreate`. #}
+  <fieldset>
+    <legend>Insurance &amp; payment</legend>
+    {{ radio_bool_field("accepts_in_network", "Accepts in-network?", required=false) }}
+    {{ field_for(schema, "in_network_carriers", "In-network carriers (required if accepts in-network)") }}
+    {{ radio_bool_field("accepts_out_of_network", "Accepts out-of-network?", required=false) }}
+    {{ radio_bool_field("sliding_scale", "Sliding scale?", required=false) }}
+    {{ text_field("cost", "Cost (optional, free text)", required=false) }}
   </fieldset>
 
   <input type="submit" value="Create provider" />

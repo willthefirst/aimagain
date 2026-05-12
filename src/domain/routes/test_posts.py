@@ -863,7 +863,17 @@ async def test_create_provider_availability_happy_path(
             persisted.provider_availability_detail.provider.practice_name
             == practice_name
         )
-        assert persisted.provider_availability_detail.sliding_scale is False
+        # Insurance posture / sliding-scale / cost live on Provider (#449),
+        # not PA. The linked Provider's defaults match the `make_provider`
+        # factory: self-pay-only, no carriers, no sliding scale.
+        assert (
+            persisted.provider_availability_detail.provider.accepts_in_network is False
+        )
+        assert (
+            persisted.provider_availability_detail.provider.accepts_out_of_network
+            is False
+        )
+        assert persisted.provider_availability_detail.provider.sliding_scale is False
         assert persisted.client_referral_detail is None
         assert persisted.owner_id == logged_in_user.id
 

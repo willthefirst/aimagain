@@ -1,30 +1,22 @@
-from functools import partial
-
-from sqlalchemy import JSON, Boolean, Column, ForeignKey, Text, text
+from sqlalchemy import JSON, Column, ForeignKey, Text, text
 from sqlalchemy.orm import relationship
 from sqlalchemy.types import Uuid
 
 from src.framework.persistence.base_model import Base
 
-from ..enums import (
-    INSURANCE_OPTIONS,
-    named_check_in,
-)
-
 _TABLE = "provider_availability_details"
-_ck = partial(named_check_in, _TABLE)
 
 
 class ProviderAvailabilityDetail(Base):
     """1:1 detail row for posts of kind = 'provider_availability'.
 
     Practice + location + delivery-format fields live on the linked
-    `Provider` via `provider_id` (#448); this row only carries fields
-    that are *per-announcement*, not steady-state practice properties.
+    `Provider` via `provider_id` (#448); insurance posture + sliding-scale
+    + cost moved to `Provider` in #449. This row only carries fields that
+    are *per-announcement*, not steady-state practice properties.
     """
 
     __tablename__ = _TABLE
-    __table_args__ = (_ck("payment_situation", INSURANCE_OPTIONS),)
 
     post_id = Column(
         Uuid(as_uuid=True),
@@ -59,11 +51,6 @@ class ProviderAvailabilityDetail(Base):
     languages = Column(
         JSON, nullable=False, server_default=text("'[\"en\"]'"), default=lambda: ["en"]
     )
-
-    # Section 5 — insurance
-    payment_situation = Column(Text, nullable=False)
-    sliding_scale = Column(Boolean, nullable=False)
-    cost = Column(Text, nullable=True)
 
     # Section 6 — about (free-text core fields)
     description = Column(Text, nullable=True)

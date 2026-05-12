@@ -175,6 +175,82 @@ async def test_update_provider_changes_fields_visible_on_refetch(
         assert row.location_city == "Chicago"
 
 
+async def test_insurance_fields_round_trip(
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+):
+    """The five #449 insurance/payment columns persist + read back."""
+    user = await _seed_user(db_test_session_manager)
+
+    async with db_test_session_manager() as session:
+        repo = ProviderRepository(session)
+        created = await repo.create(
+            Provider(
+                owner_id=user.id,
+                practice_name="Insurance Test",
+                location_city="Springfield",
+                location_state="IL",
+                location_zip="62701",
+                in_person_sessions="yes",
+                virtual_sessions="no",
+                accepts_in_network=True,
+                accepts_out_of_network=True,
+                in_network_carriers=["aetna", "cigna"],
+                sliding_scale=True,
+                cost="$200 - $400 per session",
+            )
+        )
+        await session.commit()
+        provider_id = created.id
+
+    async with db_test_session_manager() as session:
+        row = (
+            (await session.execute(select(Provider).filter(Provider.id == provider_id)))
+            .scalars()
+            .first()
+        )
+        assert row.accepts_in_network is True
+        assert row.accepts_out_of_network is True
+        assert row.in_network_carriers == ["aetna", "cigna"]
+        assert row.sliding_scale is True
+        assert row.cost == "$200 - $400 per session"
+
+
+async def test_insurance_fields_default_to_self_pay(
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+):
+    """Omitting the new columns falls back to the server defaults
+    (self-pay-only posture, empty carrier list, no sliding scale)."""
+    user = await _seed_user(db_test_session_manager)
+
+    async with db_test_session_manager() as session:
+        repo = ProviderRepository(session)
+        created = await repo.create(
+            Provider(
+                owner_id=user.id,
+                practice_name="Defaults Test",
+                location_city="Springfield",
+                location_state="IL",
+                location_zip="62701",
+                in_person_sessions="yes",
+                virtual_sessions="no",
+            )
+        )
+        await session.commit()
+        provider_id = created.id
+
+    async with db_test_session_manager() as session:
+        row = (
+            (await session.execute(select(Provider).filter(Provider.id == provider_id)))
+            .scalars()
+            .first()
+        )
+        assert row.accepts_in_network is False
+        assert row.accepts_out_of_network is False
+        assert row.in_network_carriers == []
+        assert row.sliding_scale is False
+        assert row.cost is None
+
+
 async def test_delete_provider_cascades_licensures(
     db_test_session_manager: async_sessionmaker[AsyncSession],
 ):

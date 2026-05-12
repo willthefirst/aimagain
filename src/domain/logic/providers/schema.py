@@ -36,9 +36,12 @@ import uuid
 from datetime import date, datetime
 from typing import Annotated, Literal
 
+from pydantic import BeforeValidator, model_validator
+
 from src.domain.models.enums import (
     CERTIFICATION_TYPES,
     EDUCATION_TYPES,
+    INSURANCE_CARRIERS,
     LICENSE_TYPES,
     LOCATION_AVAILABILITY_OPTIONS,
     US_STATES,
@@ -47,10 +50,29 @@ from src.framework.rendering.form_fields import HtmlPattern
 from src.framework.schema_validators import (
     PartialUpdate,
     ReadProjection,
+    StrippedOptionalText,
     StrippedText,
     WirePayload,
     ZipText,
 )
+
+
+def _scalar_to_list(v):
+    """Wrap a single string in a one-element list. HTML form posts collapse
+    a 1-checkbox-checked group to a scalar (htmx's `json-enc` only emits an
+    array when the same name appears 2+ times); this normalizes that
+    1-element case before the `Literal[*TUPLE]` member check fires. Mirrors
+    the helper in `src/domain/logic/posts/schema.py`."""
+    if isinstance(v, str):
+        return [v]
+    return v
+
+
+# `in_network_carriers` is a multi-checkbox group; scalar→singleton coercion
+# matches the pattern shared with PA/CR multi-select fields.
+InNetworkCarriersField = Annotated[
+    list[Literal[*INSURANCE_CARRIERS]], BeforeValidator(_scalar_to_list)
+]
 
 
 class _ProviderSubrowBase(ReadProjection):
@@ -148,9 +170,31 @@ class ProviderRead(ReadProjection):
     location_zip: str
     in_person_sessions: str
     virtual_sessions: str
+    accepts_in_network: bool
+    accepts_out_of_network: bool
+    in_network_carriers: list[str] = []
+    sliding_scale: bool
+    cost: str | None = None
     licensures: list[ProviderLicensureRead] = []
     educations: list[ProviderEducationRead] = []
     certifications: list[ProviderCertificationRead] = []
+
+
+def _check_in_network_carriers_invariant(
+    accepts_in_network: bool | None, in_network_carriers: list[str] | None
+) -> None:
+    """Cross-field rule (#449): if `accepts_in_network=True`, the carrier
+    list is required-min-1; if `False`, the list must be empty. Both
+    arguments are non-`None` when this fires."""
+    if accepts_in_network and not in_network_carriers:
+        raise ValueError(
+            "in_network_carriers must contain at least one carrier when "
+            "accepts_in_network is True"
+        )
+    if not accepts_in_network and in_network_carriers:
+        raise ValueError(
+            "in_network_carriers must be empty when accepts_in_network is False"
+        )
 
 
 class ProviderCreate(WirePayload):
@@ -170,9 +214,25 @@ class ProviderCreate(WirePayload):
     location_zip: ZipText
     in_person_sessions: Literal[*LOCATION_AVAILABILITY_OPTIONS]
     virtual_sessions: Literal[*LOCATION_AVAILABILITY_OPTIONS]
+    # Insurance posture (#449). `accepts_in_network` /
+    # `accepts_out_of_network` are orthogonal Booleans; the carrier list
+    # only applies when `accepts_in_network=True`. The cross-field rule
+    # is enforced by `_check_in_network_carriers` below.
+    accepts_in_network: bool = False
+    accepts_out_of_network: bool = False
+    in_network_carriers: InNetworkCarriersField = []
+    sliding_scale: bool = False
+    cost: StrippedOptionalText = None
     licensures: list[ProviderLicensureCreate] = []
     educations: list[ProviderEducationCreate] = []
     certifications: list[ProviderCertificationCreate] = []
+
+    @model_validator(mode="after")
+    def _check_in_network_carriers(self):
+        _check_in_network_carriers_invariant(
+            self.accepts_in_network, self.in_network_carriers
+        )
+        return self
 
 
 class ProviderUpdate(PartialUpdate):
@@ -186,3 +246,23 @@ class ProviderUpdate(PartialUpdate):
     location_zip: ZipText | None = None
     in_person_sessions: Literal[*LOCATION_AVAILABILITY_OPTIONS] | None = None
     virtual_sessions: Literal[*LOCATION_AVAILABILITY_OPTIONS] | None = None
+    accepts_in_network: bool | None = None
+    accepts_out_of_network: bool | None = None
+    in_network_carriers: InNetworkCarriersField | None = None
+    sliding_scale: bool | None = None
+    cost: StrippedOptionalText = None
+
+    @model_validator(mode="after")
+    def _check_in_network_carriers(self):
+        # Only enforce the cross-field rule when *both* fields are in the
+        # patch — otherwise the route handler would have to merge with the
+        # persisted row to know whether the invariant holds, which isn't
+        # easily reachable from the schema layer. Patches that only touch
+        # one of the two pass through; the other field's persisted value
+        # may make the invariant hold or not, but that's the caller's
+        # responsibility to keep coherent.
+        if self.accepts_in_network is not None and self.in_network_carriers is not None:
+            _check_in_network_carriers_invariant(
+                self.accepts_in_network, self.in_network_carriers
+            )
+        return self

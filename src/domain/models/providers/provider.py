@@ -1,6 +1,6 @@
 from functools import partial
 
-from sqlalchemy import Column, ForeignKey, Text
+from sqlalchemy import JSON, Boolean, Column, ForeignKey, Text, text
 from sqlalchemy.orm import relationship
 from sqlalchemy.types import Uuid
 
@@ -40,6 +40,27 @@ class Provider(BaseModel):
     location_zip = Column(Text, nullable=False)
     in_person_sessions = Column(Text, nullable=False)
     virtual_sessions = Column(Text, nullable=False)
+
+    # Insurance posture (#449). `accepts_in_network` and
+    # `accepts_out_of_network` are orthogonal Booleans — a practice may
+    # accept either, both, or neither (self-pay only). `in_network_carriers`
+    # is required-min-1 when `accepts_in_network=True`; must be empty
+    # otherwise. The cross-field rule is enforced in the wire schema
+    # (`ProviderCreate` / `ProviderUpdate`) — the model just records the
+    # state.
+    accepts_in_network = Column(
+        Boolean, nullable=False, server_default=text("0"), default=False
+    )
+    accepts_out_of_network = Column(
+        Boolean, nullable=False, server_default=text("0"), default=False
+    )
+    in_network_carriers = Column(
+        JSON, nullable=False, server_default=text("'[]'"), default=list
+    )
+    sliding_scale = Column(
+        Boolean, nullable=False, server_default=text("0"), default=False
+    )
+    cost = Column(Text, nullable=True)
 
     licensures = relationship(
         "ProviderLicensure",

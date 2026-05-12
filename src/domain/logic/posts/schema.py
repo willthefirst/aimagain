@@ -194,8 +194,9 @@ class ProviderAvailabilityRead(_PostReadBase):
     description: str | None = None
     referral_instructions: str | None = None
     website: str | None = None
-    # Practice + location + delivery-format live on the linked Provider
-    # (#448). Read projections expose the FK; templates dereference via
+    # Practice + location + delivery-format + insurance posture all live
+    # on the linked Provider (#448, #449). Read projections expose the
+    # FK; templates dereference via
     # `post.provider_availability_detail.provider.<field>`.
     provider_id: uuid.UUID
     desired_times: DesiredTimesField = []
@@ -205,9 +206,6 @@ class ProviderAvailabilityRead(_PostReadBase):
     treatment_modality: str | None = None
     age_groups: AgeGroupsField = []
     languages: LanguagesField = []
-    payment_situation: Literal[*INSURANCE_OPTIONS]
-    sliding_scale: bool
-    cost: str | None = None
 
 
 PostRead = Annotated[
@@ -279,9 +277,6 @@ class ProviderAvailabilityCreate(WirePayload):
     # `non_english_services` flag (#425). Defaults to `["en"]` so the
     # form's "submit with defaults" case still validates.
     languages: RequiredLanguagesField = ["en"]
-    payment_situation: Literal[*INSURANCE_OPTIONS]
-    sliding_scale: bool
-    cost: StrippedOptionalText = None
 
 
 PostCreate = Annotated[
@@ -355,9 +350,6 @@ class ProviderAvailabilityUpdate(PartialUpdate):
     # mirroring `services`. Clearing the list is intentionally not
     # supported.
     languages: RequiredLanguagesField | None = None
-    payment_situation: Literal[*INSURANCE_OPTIONS] | None = None
-    sliding_scale: bool | None = None
-    cost: StrippedOptionalText = None
 
 
 PostUpdate = Annotated[
@@ -410,9 +402,6 @@ class ProviderAvailabilityAuditSnapshot(_PostAuditSnapshotBase):
     treatment_modality: str | None = None
     age_groups: AgeGroupsField = []
     languages: LanguagesField = []
-    payment_situation: Literal[*INSURANCE_OPTIONS]
-    sliding_scale: bool
-    cost: str | None = None
 
 
 PostAuditSnapshot = Annotated[
