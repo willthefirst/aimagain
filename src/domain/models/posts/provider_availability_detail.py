@@ -38,13 +38,13 @@ class ProviderAvailabilityDetail(Base):
     available_providers = Column(Text, nullable=False)
 
     # Section 2 — location
-    location_city = Column(Text, nullable=False)
+    location_city = Column(Text, nullable=True)
     location_state = Column(Text, nullable=False)
-    location_zip = Column(Text, nullable=False)
+    location_zip = Column(Text, nullable=True)
 
     # Section 3 — availability
-    in_person_sessions = Column(Text, nullable=False)
-    virtual_sessions = Column(Text, nullable=False)
+    in_person_sessions = Column(Text, nullable=True)
+    virtual_sessions = Column(Text, nullable=True)
     desired_times = Column(
         JSON, nullable=False, server_default=text("'[]'"), default=list
     )
