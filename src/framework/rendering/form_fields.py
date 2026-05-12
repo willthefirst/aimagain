@@ -23,6 +23,17 @@ class HtmlPattern:
     maxlength: int | None = None
 
 
+@dataclass(frozen=True)
+class HtmlTextarea:
+    """Annotation marker that swaps `field_for`'s default `<input
+    type=text>` rendering for `<textarea>` on a string field. Free-text
+    fields long enough to want a multi-line control (descriptions,
+    instructions) reach for this; everything else stays text by default.
+    No payload — presence on the field's `Annotated[...]` metadata is
+    the signal.
+    """
+
+
 # Choice-tuple → label-dict registry, populated at startup by
 # `register_choice_labels()` from `src/framework/rendering/templating.py`. Lookup is
 # by tuple value (not identity) because `Literal[*TUPLE]` unpacks the
@@ -80,12 +91,22 @@ def field_spec(schema_cls: type[BaseModel], name: str) -> dict[str, Any]:
 
     pattern: str | None = None
     maxlength: int | None = None
+    is_textarea = False
     for marker in field.metadata:
         if isinstance(marker, HtmlPattern):
             if marker.pattern is not None:
                 pattern = marker.pattern
             if marker.maxlength is not None:
                 maxlength = marker.maxlength
+        elif isinstance(marker, HtmlTextarea):
+            is_textarea = True
+
+    if is_textarea:
+        return {
+            "kind": "textarea",
+            "name": name,
+            "required": not optional,
+        }
 
     return {
         "kind": "text",

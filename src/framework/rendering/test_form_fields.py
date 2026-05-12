@@ -12,6 +12,7 @@ from pydantic import BaseModel
 
 from src.framework.rendering.form_fields import (
     HtmlPattern,
+    HtmlTextarea,
     field_spec,
     register_choice_labels,
 )
@@ -24,6 +25,8 @@ _SIZES = ("s", "m", "l")
 register_choice_labels(_SIZES, None)
 
 _PatternedString = Annotated[str, HtmlPattern(pattern=r"\d{5}", maxlength=5)]
+_LongText = Annotated[str, HtmlTextarea()]
+_OptionalLongText = Annotated[str | None, HtmlTextarea()]
 
 
 class _Sample(BaseModel):
@@ -33,6 +36,8 @@ class _Sample(BaseModel):
     optional_choice: Literal[*_COLORS] | None = None
     unlabeled_choice: Literal[*_SIZES]
     patterned: _PatternedString
+    long_required: _LongText
+    long_optional: _OptionalLongText = None
 
 
 def test_required_text_field():
@@ -81,6 +86,21 @@ def test_html_pattern_marker_propagates():
     assert spec["kind"] == "text"
     assert spec["pattern"] == r"\d{5}"
     assert spec["maxlength"] == 5
+
+
+def test_html_textarea_marker_switches_kind():
+    spec = field_spec(_Sample, "long_required")
+    assert spec == {
+        "kind": "textarea",
+        "name": "long_required",
+        "required": True,
+    }
+
+
+def test_optional_html_textarea_drops_required():
+    spec = field_spec(_Sample, "long_optional")
+    assert spec["kind"] == "textarea"
+    assert spec["required"] is False
 
 
 def test_zip_text_alias_carries_pattern_in_real_schema():
