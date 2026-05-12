@@ -10,7 +10,7 @@ Jinja templating engine + form-rendering glue + per-viewer response projections.
 
 ## Schema-driven form rendering
 
-`field_for(schema, name, label, current=None, required=None)` (in `domain/templates/_shared/form_fields.html`) calls the `field_spec` Jinja global at render time to derive the form's HTML attributes from the schema. The schema's `Literal[*TUPLE]` becomes a `<select>`; an `Annotated[T, HtmlPattern(...)]` becomes `pattern` / `maxlength` on the `<input>`; an `Annotated[T, HtmlTextarea()]` becomes a `<textarea>`. Adding a value to a controlled-vocabulary tuple flows automatically to every form using these macros — no per-template edits.
+`field_for(schema, name, label, current=None, required=None)` (in `domain/templates/_shared/form_fields.html`) calls the `field_spec` Jinja global at render time to derive the form's HTML attributes from the schema. The schema's `Literal[*TUPLE]` becomes a `<select>`; `list[Literal[*TUPLE]]` becomes a multi-select checkbox group; an `Annotated[T, HtmlPattern(...)]` becomes `pattern` / `maxlength` on the `<input>`; an `Annotated[T, HtmlTextarea()]` becomes a `<textarea>`. Adding a value to a controlled-vocabulary tuple flows automatically to every form using these macros — no per-template edits.
 
 ## Tests
 

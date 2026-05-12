@@ -104,6 +104,8 @@ posts an empty array. #}
 {%- set is_required = spec.required if required is none else required -%}
 {%- if spec.kind == "select" -%}
 {{ select_field(name, label, spec.choices, labels=spec.labels, current=current, required=is_required, placeholder=true) }}
+{%- elif spec.kind == "multi_select" -%}
+{{ multi_select_field(name, label, spec.choices, labels=spec.labels, current=current) }}
 {%- elif spec.kind == "textarea" -%}
 {{ textarea_field(name, label, current=current, required=is_required) }}
 {%- elif spec.kind == "text" -%}
