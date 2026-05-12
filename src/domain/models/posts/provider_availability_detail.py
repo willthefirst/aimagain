@@ -35,7 +35,6 @@ class ProviderAvailabilityDetail(Base):
 
     # Section 1 — provider information
     practice_name = Column(Text, nullable=False)
-    available_providers = Column(Text, nullable=False)
 
     # Section 2 — location
     location_city = Column(Text, nullable=True)
@@ -57,7 +56,6 @@ class ProviderAvailabilityDetail(Base):
     services = Column(JSON, nullable=False, server_default=text("'[]'"), default=list)
     settings = Column(JSON, nullable=False, server_default=text("'[]'"), default=list)
     treatment_modality = Column(Text, nullable=True)
-    client_focus = Column(Text, nullable=False)
     age_groups = Column(JSON, nullable=False, server_default=text("'[]'"), default=list)
     languages = Column(
         JSON, nullable=False, server_default=text("'[\"en\"]'"), default=lambda: ["en"]

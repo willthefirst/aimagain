@@ -67,7 +67,6 @@ _PROVIDER_AVAILABILITY_DEFAULTS: dict[str, Any] = {
     "referral_instructions": None,
     "website": None,
     "practice_name": "Acme Health",
-    "available_providers": "Dr. Doe; Dr. Roe",
     "location_city": "Springfield",
     "location_state": "IL",
     "location_zip": "62701",
@@ -82,7 +81,6 @@ _PROVIDER_AVAILABILITY_DEFAULTS: dict[str, Any] = {
     # tests overriding `settings` can assume isn't already in the list.
     "settings": ["outpatient"],
     "treatment_modality": None,
-    "client_focus": "general adult outpatient",
     "age_groups": ["adults_25_64"],
     "languages": ["en"],
     "payment_situation": "in_network",

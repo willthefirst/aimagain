@@ -52,8 +52,6 @@ Provider availability: {{ post.provider_availability_detail.practice_name }}
   <dl>
     <dt>Practice name</dt>
     <dd>{{ d.practice_name }}</dd>
-    <dt>Available providers</dt>
-    <dd>{{ d.available_providers }}</dd>
     {% if d.website %}
     <dt>Website</dt>
     <dd>{{ d.website }}</dd>
@@ -84,8 +82,6 @@ Provider availability: {{ post.provider_availability_detail.practice_name }}
     <dt>Treatment modality</dt>
     <dd>{{ d.treatment_modality }}</dd>
     {% endif %}
-    <dt>Client focus</dt>
-    <dd>{{ d.client_focus }}</dd>
     <dt>Age groups</dt>
     <dd>{% for g in d.age_groups %}{{ CLIENT_AGE_GROUP_LABELS[g] }}{% if not loop.last %}, {% endif %}{% endfor %}</dd>
     <dt>Languages</dt>
