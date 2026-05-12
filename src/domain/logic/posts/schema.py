@@ -181,11 +181,11 @@ class ClientReferralRead(_PostReadBase):
     location_in_person: Literal[*LOCATION_AVAILABILITY_OPTIONS]
     location_virtual: Literal[*LOCATION_AVAILABILITY_OPTIONS]
     desired_times: DesiredTimesField = []
-    client_dem_age_groups: AgeGroupsField = []
+    age_groups: AgeGroupsField = []
     languages: LanguagesField = []
     description: str
     services: ServicesField = []
-    services_psychotherapy_modality: str | None = None
+    treatment_modality: str | None = None
     insurance: Literal[*INSURANCE_OPTIONS]
 
 
@@ -240,14 +240,14 @@ class ClientReferralCreate(WirePayload):
     desired_times: DesiredTimesField = []
     # Required min-1 on the wire — replaces the old single-valued
     # `client_dem_ages` (#432). Mirrors PA's `age_groups` (#430).
-    client_dem_age_groups: RequiredAgeGroupsField
+    age_groups: RequiredAgeGroupsField
     # Required min-1 on the wire — replaces the old yes/no
     # `language_preferred` flag (#428). Defaults to `["en"]` so the
     # form's "submit with defaults" case still validates.
     languages: RequiredLanguagesField = ["en"]
     description: StrippedText
     services: ServicesField = []
-    services_psychotherapy_modality: StrippedOptionalText = None
+    treatment_modality: StrippedOptionalText = None
     insurance: Literal[*INSURANCE_OPTIONS]
 
 
@@ -330,13 +330,13 @@ class ClientReferralUpdate(PartialUpdate):
     # selections. List-valued PATCH replaces the whole list — partial
     # add/remove is intentionally out of scope.
     desired_times: DesiredTimesField | None = None
-    client_dem_age_groups: RequiredAgeGroupsField | None = None
+    age_groups: RequiredAgeGroupsField | None = None
     # `None` = leave unchanged. `min_length=1` rejects an explicit `[]`,
     # mirroring PA's `languages` semantics.
     languages: RequiredLanguagesField | None = None
     description: StrippedText | None = None
     services: ServicesField | None = None
-    services_psychotherapy_modality: StrippedOptionalText = None
+    treatment_modality: StrippedOptionalText = None
     insurance: Literal[*INSURANCE_OPTIONS] | None = None
 
 
@@ -398,11 +398,11 @@ class ClientReferralAuditSnapshot(_PostAuditSnapshotBase):
     location_in_person: Literal[*LOCATION_AVAILABILITY_OPTIONS]
     location_virtual: Literal[*LOCATION_AVAILABILITY_OPTIONS]
     desired_times: DesiredTimesField = []
-    client_dem_age_groups: AgeGroupsField = []
+    age_groups: AgeGroupsField = []
     languages: LanguagesField = []
     description: str
     services: ServicesField = []
-    services_psychotherapy_modality: str | None = None
+    treatment_modality: str | None = None
     insurance: Literal[*INSURANCE_OPTIONS]
 
 

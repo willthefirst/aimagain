@@ -24,7 +24,7 @@ Provider availability: {{ post.provider_availability_detail.practice_name }}
     <dd>{% for slot in d.desired_times %}{{ DESIRED_TIME_SLOT_LABELS[slot] }}{% if not loop.last %}, {% endif %}{% endfor %}</dd>
     {% endif %}
     <dt>Age groups</dt>
-    <dd>{% for g in d.client_dem_age_groups %}{{ CLIENT_AGE_GROUP_LABELS[g] }}{% if not loop.last %}, {% endif %}{% endfor %}</dd>
+    <dd>{% for g in d.age_groups %}{{ CLIENT_AGE_GROUP_LABELS[g] }}{% if not loop.last %}, {% endif %}{% endfor %}</dd>
     <dt>Languages</dt>
     <dd>{% for l in d.languages %}{{ LANGUAGE_LABELS[l] }}{% if not loop.last %}, {% endif %}{% endfor %}</dd>
     <dt>Description</dt>
@@ -33,9 +33,9 @@ Provider availability: {{ post.provider_availability_detail.practice_name }}
     <dt>Services</dt>
     <dd>{% for s in d.services %}{{ CLIENT_REFERRAL_SERVICE_LABELS[s] }}{% if not loop.last %}, {% endif %}{% endfor %}</dd>
     {% endif %}
-    {% if d.services_psychotherapy_modality %}
+    {% if d.treatment_modality %}
     <dt>Psychotherapy modality</dt>
-    <dd>{{ d.services_psychotherapy_modality }}</dd>
+    <dd>{{ d.treatment_modality }}</dd>
     {% endif %}
     <dt>Insurance</dt>
     <dd>{{ INSURANCE_LABELS[d.insurance] }}</dd>

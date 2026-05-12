@@ -35,7 +35,7 @@ which FastAPI/Pydantic parses as a list.
 
   <fieldset>
     <legend>Demographics</legend>
-    {{ field_for(schema, "client_dem_age_groups", "Age groups (select all that apply)", current=d.client_dem_age_groups if d else None) }}
+    {{ field_for(schema, "age_groups", "Age groups (select all that apply)", current=d.age_groups if d else None) }}
     {{ field_for(schema, "languages", "Languages spoken", current=d.languages if d else None) }}
   </fieldset>
 
@@ -47,7 +47,7 @@ which FastAPI/Pydantic parses as a list.
   <fieldset>
     <legend>Services</legend>
     {{ multi_select_field("services", "Services (optional)", CLIENT_REFERRAL_SERVICES, labels=CLIENT_REFERRAL_SERVICE_LABELS, current=d.services if d else None) }}
-    {{ text_field("services_psychotherapy_modality", "Psychotherapy modality (optional, e.g. DBT, EMDR)", current=d.services_psychotherapy_modality if d else None, required=false) }}
+    {{ text_field("treatment_modality", "Psychotherapy modality (optional, e.g. DBT, EMDR)", current=d.treatment_modality if d else None, required=false) }}
   </fieldset>
 
   <fieldset>
