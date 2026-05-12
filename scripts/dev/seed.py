@@ -79,8 +79,11 @@ FIXTURE_PROVIDER_AVAILABILITY: list[FixtureProviderAvailability] = [
                 "Older teens and TAY with ADHD, anxiety, depression, self-harm, "
                 "and suicidality."
             ),
-            # TODO(issue-4): spans adolescents + young_adults + adults. Single-valued today.
-            "age_group": "adolescents_14_18",
+            "age_groups": [
+                "adolescents_14_18",
+                "young_adults_19_24",
+                "adults_25_64",
+            ],
             "languages": ["en"],
             # TODO(issue-6): true value is self_pay_only; not in vocab today.
             # Best-fit placeholder.
@@ -119,8 +122,7 @@ FIXTURE_PROVIDER_AVAILABILITY: list[FixtureProviderAvailability] = [
             "settings": ["outpatient"],
             "treatment_modality": "Social skills, emotion regulation",
             "client_focus": "Middle schoolers with ASD.",
-            # TODO(issue-4): middle school spans children_6_10 + preteens_11_13.
-            "age_group": "preteens_11_13",
+            "age_groups": ["children_6_10", "preteens_11_13"],
             "languages": ["en", "es"],
             "payment_situation": "out_of_network",  # TODO(issue-6): true value is self_pay_only.
             "sliding_scale": True,
@@ -158,9 +160,7 @@ FIXTURE_PROVIDER_AVAILABILITY: list[FixtureProviderAvailability] = [
                 "self-harm/suicidality with no immediate risk of harm to self "
                 "or others."
             ),
-            # TODO(issue-4): "high school" spans adolescents_14_18 + possibly
-            # young_adults_19_24.
-            "age_group": "adolescents_14_18",
+            "age_groups": ["adolescents_14_18"],
             "languages": ["en", "es"],
             # TODO(issue-6): true value is please_contact
             # ("Yes — no MediCal, please contact").

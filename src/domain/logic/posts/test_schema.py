@@ -365,6 +365,45 @@ def test_post_create_provider_availability_rejects_unknown_language_token():
         )
 
 
+def test_post_create_provider_availability_accepts_multiple_age_groups():
+    """`age_groups` accepts a multi-bucket list — Katie Reeves spans 3
+    buckets, that's the whole point of #430."""
+    p = post_create_adapter.validate_python(
+        provider_availability_payload(
+            age_groups=["adolescents_14_18", "young_adults_19_24", "adults_25_64"]
+        )
+    )
+    assert p.age_groups == [
+        "adolescents_14_18",
+        "young_adults_19_24",
+        "adults_25_64",
+    ]
+
+
+def test_post_create_provider_availability_rejects_empty_age_groups():
+    with pytest.raises(ValidationError):
+        post_create_adapter.validate_python(
+            provider_availability_payload(age_groups=[])
+        )
+
+
+def test_post_create_provider_availability_rejects_unknown_age_group_token():
+    with pytest.raises(ValidationError):
+        post_create_adapter.validate_python(
+            provider_availability_payload(age_groups=["not_a_bucket"])
+        )
+
+
+def test_post_update_provider_availability_accepts_age_groups_only():
+    p = post_update_adapter.validate_python(
+        {
+            "kind": "provider_availability",
+            "age_groups": ["young_adults_19_24", "adults_25_64"],
+        }
+    )
+    assert p.age_groups == ["young_adults_19_24", "adults_25_64"]
+
+
 def test_post_create_strips_surrounding_whitespace_provider_availability():
     p = post_create_adapter.validate_python(
         provider_availability_payload(practice_name="  Acme  ")
@@ -390,7 +429,7 @@ def test_post_create_provider_availability_rejects_empty_practice_name():
         "in_person_sessions",
         "virtual_sessions",
         "client_focus",
-        "age_group",
+        "age_groups",
         "payment_situation",
         "sliding_scale",
     ],
@@ -560,7 +599,6 @@ def _literal_args(model_cls, field_name: str) -> tuple[str, ...]:
         (ProviderAvailabilityRead, "location_state", US_STATES),
         (ProviderAvailabilityRead, "in_person_sessions", LOCATION_AVAILABILITY_OPTIONS),
         (ProviderAvailabilityRead, "virtual_sessions", LOCATION_AVAILABILITY_OPTIONS),
-        (ProviderAvailabilityRead, "age_group", CLIENT_AGE_GROUPS),
         (ProviderAvailabilityRead, "payment_situation", INSURANCE_OPTIONS),
         # Create variants
         (ClientReferralCreate, "location_state", US_STATES),
@@ -570,7 +608,6 @@ def _literal_args(model_cls, field_name: str) -> tuple[str, ...]:
         # Update variants (Optional[Literal[*TUPLE]])
         (ClientReferralUpdate, "location_state", US_STATES),
         (ClientReferralUpdate, "insurance", INSURANCE_OPTIONS),
-        (ProviderAvailabilityUpdate, "age_group", CLIENT_AGE_GROUPS),
     ],
 )
 def test_schema_literals_match_model_tuples(model_cls, field, expected):

@@ -923,6 +923,29 @@ async def test_provider_availability_form_renders_languages_multi_select(
     assert "Spanish" in response.text
 
 
+async def test_provider_availability_form_renders_age_groups_multi_select(
+    authenticated_client: AsyncClient,
+    logged_in_user: User,
+):
+    """`age_groups` renders as a 7-option multi-select checkbox group via
+    `field_for`'s `list[Literal[*T]]` arm (#430). First 7-option consumer
+    of the multi-select rails."""
+    response = await authenticated_client.get("/posts/form?kind=provider_availability")
+    assert response.status_code == 200
+    tree = HTMLParser(response.text)
+    boxes = tree.css('input[type="checkbox"][name="age_groups"]')
+    values = {b.attributes.get("value") for b in boxes}
+    assert values == {
+        "children_0_5",
+        "children_6_10",
+        "preteens_11_13",
+        "adolescents_14_18",
+        "young_adults_19_24",
+        "adults_25_64",
+        "older_adults_65_plus",
+    }
+
+
 async def test_list_renders_provider_availability_row(
     authenticated_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],

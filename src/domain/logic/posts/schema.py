@@ -111,6 +111,13 @@ LanguagesField = Annotated[list[Literal[*LANGUAGES]], BeforeValidator(_scalar_to
 # practice speaks at least one language, and the unfilterable "no
 # languages" state is meaningless. Mirrors services / settings.
 RequiredLanguagesField = Annotated[LanguagesField, Field(min_length=1)]
+AgeGroupsField = Annotated[
+    list[Literal[*CLIENT_AGE_GROUPS]], BeforeValidator(_scalar_to_list)
+]
+# `provider_availability.age_groups` is required-min-1 on the wire — every
+# practice serves at least one age bucket. Replaces the single-valued
+# `age_group` (#430).
+RequiredAgeGroupsField = Annotated[AgeGroupsField, Field(min_length=1)]
 
 
 # --- Shared flatten helper ----------------------------------------------
@@ -196,7 +203,7 @@ class ProviderAvailabilityRead(_PostReadBase):
     settings: SettingsField = []
     treatment_modality: str | None = None
     client_focus: str
-    age_group: Literal[*CLIENT_AGE_GROUPS]
+    age_groups: AgeGroupsField = []
     languages: LanguagesField = []
     payment_situation: Literal[*INSURANCE_OPTIONS]
     sliding_scale: bool
@@ -264,7 +271,10 @@ class ProviderAvailabilityCreate(WirePayload):
     settings: RequiredSettingsField
     treatment_modality: StrippedOptionalText = None
     client_focus: StrippedText
-    age_group: Literal[*CLIENT_AGE_GROUPS]
+    # Required min-1 on the wire — replaces the old single-valued
+    # `age_group` (#430). No default; every PA post must declare at
+    # least one bucket explicitly.
+    age_groups: RequiredAgeGroupsField
     # Required min-1 on the wire — replaces the old yes/no
     # `non_english_services` flag (#425). Defaults to `["en"]` so the
     # form's "submit with defaults" case still validates.
@@ -344,7 +354,7 @@ class ProviderAvailabilityUpdate(PartialUpdate):
     settings: RequiredSettingsField | None = None
     treatment_modality: StrippedOptionalText = None
     client_focus: StrippedText | None = None
-    age_group: Literal[*CLIENT_AGE_GROUPS] | None = None
+    age_groups: RequiredAgeGroupsField | None = None
     # `None` = leave unchanged. `min_length=1` rejects an explicit `[]`,
     # mirroring `services`. Clearing the list is intentionally not
     # supported.
@@ -408,7 +418,7 @@ class ProviderAvailabilityAuditSnapshot(_PostAuditSnapshotBase):
     settings: SettingsField = []
     treatment_modality: str | None = None
     client_focus: str
-    age_group: Literal[*CLIENT_AGE_GROUPS]
+    age_groups: AgeGroupsField = []
     languages: LanguagesField = []
     payment_situation: Literal[*INSURANCE_OPTIONS]
     sliding_scale: bool
