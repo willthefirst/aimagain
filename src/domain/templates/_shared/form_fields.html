@@ -35,6 +35,13 @@ canonical use.
 </label>
 {%- endmacro %}
 
+{% macro url_field(name, label, current=None, required=True) -%}
+<label for="{{ name }}">
+  {{ label }}
+  <input type="url" id="{{ name }}" name="{{ name }}"{% if current is not none %} value="{{ current }}"{% endif %}{% if required %} required{% endif %} />
+</label>
+{%- endmacro %}
+
 {% macro select_field(name, label, options, labels=None, current=None, required=True, placeholder=False) -%}
 <label for="{{ name }}">
   {{ label }}
@@ -117,6 +124,8 @@ posts an empty array. #}
 {{ multi_select_field(name, label, spec.choices, labels=spec.labels, current=current) }}
 {%- elif spec.kind == "textarea" -%}
 {{ textarea_field(name, label, current=current, required=is_required) }}
+{%- elif spec.kind == "url" -%}
+{{ url_field(name, label, current=current, required=is_required) }}
 {%- elif spec.kind == "text" -%}
 {{ text_field(name, label, current=current, required=is_required, pattern=spec.pattern, maxlength=spec.maxlength) }}
 {%- endif -%}

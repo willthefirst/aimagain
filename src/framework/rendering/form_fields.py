@@ -34,6 +34,17 @@ class HtmlTextarea:
     """
 
 
+@dataclass(frozen=True)
+class HtmlUrl:
+    """Annotation marker that swaps `field_for`'s default `<input
+    type=text>` rendering for `<input type=url>` on a string field.
+    Browsers gate submission on URL syntax, switch mobile keyboards to
+    a URL layout, and surface autofill differently. Same no-payload
+    shape as `HtmlTextarea` — presence on the `Annotated[...]` metadata
+    is the signal.
+    """
+
+
 # Choice-tuple → label-dict registry, populated at startup by
 # `register_choice_labels()` from `src/framework/rendering/templating.py`. Lookup is
 # by tuple value (not identity) because `Literal[*TUPLE]` unpacks the
@@ -108,6 +119,7 @@ def field_spec(schema_cls: type[BaseModel], name: str) -> dict[str, Any]:
     pattern: str | None = None
     maxlength: int | None = None
     is_textarea = False
+    is_url = False
     for marker in field.metadata:
         if isinstance(marker, HtmlPattern):
             if marker.pattern is not None:
@@ -116,10 +128,19 @@ def field_spec(schema_cls: type[BaseModel], name: str) -> dict[str, Any]:
                 maxlength = marker.maxlength
         elif isinstance(marker, HtmlTextarea):
             is_textarea = True
+        elif isinstance(marker, HtmlUrl):
+            is_url = True
 
     if is_textarea:
         return {
             "kind": "textarea",
+            "name": name,
+            "required": not optional,
+        }
+
+    if is_url:
+        return {
+            "kind": "url",
             "name": name,
             "required": not optional,
         }
