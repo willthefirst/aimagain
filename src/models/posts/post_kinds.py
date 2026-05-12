@@ -41,7 +41,8 @@ post-specific `PostKindSpec` shape and the registry instance.
 from dataclasses import dataclass
 from typing import Final
 
-from .._polymorphic import DiscriminatorRegistry
+from src.framework.polymorphic import DiscriminatorRegistry
+
 from .client_referral_detail import ClientReferralDetail
 from .provider_availability_detail import ProviderAvailabilityDetail
 

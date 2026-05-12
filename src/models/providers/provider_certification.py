@@ -3,7 +3,8 @@ from functools import partial
 from sqlalchemy import Column, Date, ForeignKey, Text
 from sqlalchemy.types import Uuid
 
-from ..base import BaseModel
+from src.framework.base_model import BaseModel
+
 from ..enums import CERTIFICATION_TYPES, named_check_in
 
 _TABLE = "provider_certifications"

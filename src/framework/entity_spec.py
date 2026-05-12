@@ -38,8 +38,8 @@ from src.framework.audit import (
     make_snapshotter,
 )
 from src.framework.authz import assert_owner_or_admin, is_owner_or_admin
+from src.framework.polymorphic import DiscriminatorRegistry
 from src.framework.resource_routes import QueryParam, ResourceSpec
-from src.models._polymorphic import DiscriminatorRegistry
 
 
 @dataclass(frozen=True, slots=True)
@@ -412,7 +412,7 @@ class EntitySpec:
     delete_redirect: Callable[..., str] | None = None
 
     # Polymorphism -------------------------------------------------------
-    # Bound to a `DiscriminatorRegistry` (`src.models._polymorphic`) for
+    # Bound to a `DiscriminatorRegistry` (`src.framework.polymorphic`) for
     # entities whose detail rows live in per-variant tables keyed on a
     # discriminator column. Phase 1 makes the binding load-bearing: the
     # route file reads `Literal[*entity.discriminator.names]` for the

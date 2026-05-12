@@ -535,7 +535,7 @@ from pydantic import BaseModel as _BaseModel
 
 from src.framework.entity_spec import RelatedListSubresource  # noqa: F401
 from src.framework.handlers import handle_create, make_create_handler
-from src.models._polymorphic import DiscriminatorRegistry
+from src.framework.polymorphic import DiscriminatorRegistry
 
 
 class _AnyRow:

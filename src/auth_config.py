@@ -10,8 +10,8 @@ from fastapi_users.authentication import (
 )
 from fastapi_users.db import SQLAlchemyUserDatabase
 
-from src.core.config import settings
 from src.db import get_user_db
+from src.framework.config import settings
 from src.models import User
 
 

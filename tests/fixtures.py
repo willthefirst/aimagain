@@ -8,11 +8,10 @@ from httpx import ASGITransport, AsyncClient
 from sqlalchemy import event
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
-from src.core.templating import templates  # Import the global templates object
-
 # Updated dependency imports from src.db
 from src.db import get_db_session, get_user_db
 from src.domain.users.schema import UserCreate  # Import UserCreate schema
+from src.framework.templating import templates  # Import the global templates object
 
 # Assuming your FastAPI app instance is in src.main
 from src.main import app

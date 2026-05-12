@@ -4,7 +4,8 @@ from sqlalchemy import Column, ForeignKey, Text
 from sqlalchemy.orm import relationship
 from sqlalchemy.types import Uuid
 
-from ..base import BaseModel
+from src.framework.base_model import BaseModel
+
 from ..enums import LOCATION_AVAILABILITY_OPTIONS, US_STATES, named_check_in
 
 _TABLE = "providers"

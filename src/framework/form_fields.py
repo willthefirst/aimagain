@@ -14,7 +14,7 @@ What's derived today:
   - `kind="select"` + `choices` + (optional) `labels` — for
     `Literal[*TUPLE]` fields. Labels are resolved by tuple-value
     lookup against `register_choice_labels()` calls (see
-    `src/core/templating.py`).
+    `src/framework/templating.py`).
   - `pattern` / `maxlength` — from any `HtmlPattern` marker attached to
     an `Annotated[...]` alias in `src/framework/schema_validators.py`. The
     schema's regex validator stays the source of truth; the marker
@@ -59,7 +59,7 @@ class HtmlPattern:
 
 
 # Choice-tuple → label-dict registry, populated at startup by
-# `register_choice_labels()` from `src/core/templating.py`. Lookup is
+# `register_choice_labels()` from `src/framework/templating.py`. Lookup is
 # by tuple value (not identity) because `Literal[*TUPLE]` unpacks the
 # source tuple into a fresh tuple inside `typing.Literal`'s args.
 _CHOICE_LABELS: dict[tuple, dict[str, str] | None] = {}

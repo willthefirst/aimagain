@@ -1,7 +1,7 @@
 from sqlalchemy import JSON, Column, ForeignKey, Text
 from sqlalchemy.types import Uuid
 
-from .base import BaseModel
+from .base_model import BaseModel
 
 
 class AuditLog(BaseModel):

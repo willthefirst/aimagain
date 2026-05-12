@@ -1,4 +1,4 @@
-"""Tests for `src/core/form_fields.py`.
+"""Tests for `src/framework/form_fields.py`.
 
 Covers what `field_spec` derives from a Pydantic field — required-ness,
 Literal → select, Annotated `HtmlPattern` markers — using a small
@@ -10,7 +10,7 @@ from typing import Annotated, Literal
 
 from pydantic import BaseModel
 
-from src.core.form_fields import (
+from src.framework.form_fields import (
     HtmlPattern,
     field_spec,
     register_choice_labels,

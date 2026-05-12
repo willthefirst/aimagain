@@ -1,10 +1,14 @@
-from typing import Any
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, Any
 
 from fastapi import Response, status
 from fastapi.responses import JSONResponse
 
 from src.framework.authz import is_admin
-from src.models import User
+
+if TYPE_CHECKING:
+    from src.models import User
 
 
 def base_context(user: User | None) -> dict:
@@ -49,7 +53,7 @@ class APIResponse:
         a handler can't accidentally pass `is_admin=True` for a non-admin
         viewer.
         """
-        from src.core.templating import get_template_context, templates
+        from src.framework.templating import get_template_context, templates
 
         merged_context = {
             **context,

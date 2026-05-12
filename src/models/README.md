@@ -72,7 +72,7 @@ Kinds today: `client_referral` (→ `client_referral_details`) and `provider_ava
 
 ### The `post_kinds` registry
 
-The set of allowed kinds — and the per-kind detail relationship + field metadata used across the codebase — lives in [`posts/post_kinds.py`](posts/post_kinds.py) as `POST_KINDS: DiscriminatorRegistry[PostKindSpec]`. The `DiscriminatorRegistry` machinery (names tuple, reverse-by-detail-model index, CHECK SQL generator) is the post-agnostic infrastructure in [`_polymorphic.py`](_polymorphic.py); `PostKindSpec` is the post-specific Spec dataclass that the registry holds. Any future polymorphic entity gets its own Spec dataclass and its own `DiscriminatorRegistry[…]` instance, sharing the bookkeeping.
+The set of allowed kinds — and the per-kind detail relationship + field metadata used across the codebase — lives in [`posts/post_kinds.py`](posts/post_kinds.py) as `POST_KINDS: DiscriminatorRegistry[PostKindSpec]`. The `DiscriminatorRegistry` machinery (names tuple, reverse-by-detail-model index, CHECK SQL generator) is the entity-agnostic infrastructure in [`src/framework/polymorphic.py`](../framework/polymorphic.py); `PostKindSpec` is the post-specific Spec dataclass that the registry holds. Any future polymorphic entity gets its own Spec dataclass and its own `DiscriminatorRegistry[…]` instance, sharing the bookkeeping.
 
 Every cross-cutting site reads from `POST_KINDS`:
 
@@ -92,11 +92,8 @@ Models follow the [cluster pattern](../README.md#domain-entities-and-the-cluster
 
 - One cluster directory per domain entity (`<entity>/`). Each holds the SQLAlchemy table classes for that entity (parent table, sub-records, type registries if discriminator-based) plus colocated tests. Per-entity schema specifics, relationships, cascade behavior, and any "adding a variant" recipe live inside the cluster, with a `<entity>/README.md` describing what's there.
 - Parent-level shared tier:
-  - `base.py` — `Base = declarative_base()` plus `BaseModel(Base)` with the common entity fields (`id` UUID PK, `created_at`, `updated_at`, `deleted_at`). Most domain entities inherit from `BaseModel`. The post-detail tables (`ClientReferralDetail`, `ProviderAvailabilityDetail`) inherit from `Base` directly: they have no surrogate `id` (their `post_id` PK doubles as the FK), no timestamps, no soft delete — their lifecycle is governed by FK CASCADE from the parent `Post`. The `from .base import Base` vs `from .base import BaseModel` line in each model file is the source of truth for which tier it sits in.
   - `enums.py` — Controlled-vocabulary tuples + `*_LABELS` dicts + a `check_in_tuple_sql` helper that renders DB-level `CHECK` fragments from a tuple. The single source of truth that schemas (`Literal[*TUPLE]`), form macros (Jinja globals), and DB constraints all derive from. Lives at the parent level because 2+ clusters depend on it — and is a *leaf* (no internal imports), so any cluster can import from it without cycling back through cluster code.
-  - `audit_log.py` — Append-only mutation record. See [`api/routes/RESOURCE_GRAMMAR.md`](../api/routes/RESOURCE_GRAMMAR.md).
-  - `__init__.py` — Re-exports model classes and constants. External code should always import from `src.models` (e.g. `from src.models import Post, POST_KINDS`); the `__init__.py` keeps that surface stable across cluster moves.
-  - `_polymorphic.py` — `DiscriminatorRegistry[S]`, the generic bookkeeping for any polymorphic-entity discriminator (names tuple, reverse index, CHECK SQL fragment). Imported directly by entity registries (`from src.models._polymorphic import DiscriminatorRegistry`); not re-exported through `__init__.py` because it's shared infrastructure, not a domain symbol. Today's only consumer is `posts/post_kinds.py`; a second polymorphic entity would add its own Spec dataclass + `DiscriminatorRegistry[…]` instance and reuse the same bookkeeping.
+  - `__init__.py` — Re-exports model classes and constants, including `Base`, `BaseModel`, `metadata`, and `AuditLog` from [`src/framework/`](../framework/) (the generic SQLAlchemy infra lives in the framework; the hub re-exports it for compatibility). External code should always import from `src.models` (e.g. `from src.models import Post, POST_KINDS`); the `__init__.py` keeps that surface stable across cluster moves.
 
 A model in cluster A does not import from cluster B; if two clusters need a shared primitive, hoist it to the parent level (the path `enums.py` took).
 
@@ -110,7 +107,7 @@ A model in cluster A does not import from cluster B; if two clusters need a shar
 from sqlalchemy import Column, ForeignKey, Text, Boolean
 from sqlalchemy.orm import relationship
 from sqlalchemy.types import Uuid
-from .base import BaseModel
+from src.framework.base_model import BaseModel
 
 class NewEntity(BaseModel):
     __tablename__ = "new_entities"
