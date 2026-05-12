@@ -72,6 +72,10 @@ Provider availability: {{ post.provider_availability_detail.practice_name }}
     <dt>Desired times</dt>
     <dd>{% for slot in d.desired_times %}{{ DESIRED_TIME_SLOT_LABELS[slot] }}{% if not loop.last %}, {% endif %}{% endfor %}</dd>
     {% endif %}
+    {% if d.schedule_text %}
+    <dt>Schedule notes</dt>
+    <dd>{{ d.schedule_text }}</dd>
+    {% endif %}
     {% if d.services %}
     <dt>Services</dt>
     <dd>{% for s in d.services %}{{ CLIENT_REFERRAL_SERVICE_LABELS[s] }}{% if not loop.last %}, {% endif %}{% endfor %}</dd>

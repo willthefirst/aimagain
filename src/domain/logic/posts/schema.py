@@ -196,6 +196,7 @@ class ProviderAvailabilityRead(_PostReadBase):
     in_person_sessions: Literal[*LOCATION_AVAILABILITY_OPTIONS] | None = None
     virtual_sessions: Literal[*LOCATION_AVAILABILITY_OPTIONS] | None = None
     desired_times: DesiredTimesField = []
+    schedule_text: str | None = None
     services: ServicesField = []
     settings: SettingsField = []
     treatment_modality: str | None = None
@@ -269,6 +270,9 @@ class ProviderAvailabilityCreate(WirePayload):
     in_person_sessions: Literal[*LOCATION_AVAILABILITY_OPTIONS] | None = None
     virtual_sessions: Literal[*LOCATION_AVAILABILITY_OPTIONS] | None = None
     desired_times: DesiredTimesField = []
+    # Free-text companion to `desired_times` for cohort dates / fixed
+    # program hours (#442). Single-line input; not a textarea.
+    schedule_text: StrippedOptionalText = None
     services: ServicesField = []
     settings: SettingsField = []
     treatment_modality: StrippedOptionalText = None
@@ -349,6 +353,7 @@ class ProviderAvailabilityUpdate(PartialUpdate):
     in_person_sessions: Literal[*LOCATION_AVAILABILITY_OPTIONS] | None = None
     virtual_sessions: Literal[*LOCATION_AVAILABILITY_OPTIONS] | None = None
     desired_times: DesiredTimesField | None = None
+    schedule_text: StrippedOptionalText = None
     # `None` = leave unchanged; `min_length=1` rejects an explicit `[]`.
     # Clearing services entirely is intentionally not supported on PA —
     # the wire invariant is min-1.
@@ -414,6 +419,7 @@ class ProviderAvailabilityAuditSnapshot(_PostAuditSnapshotBase):
     in_person_sessions: Literal[*LOCATION_AVAILABILITY_OPTIONS] | None = None
     virtual_sessions: Literal[*LOCATION_AVAILABILITY_OPTIONS] | None = None
     desired_times: DesiredTimesField = []
+    schedule_text: str | None = None
     services: ServicesField = []
     settings: SettingsField = []
     treatment_modality: str | None = None

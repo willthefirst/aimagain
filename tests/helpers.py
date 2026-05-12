@@ -74,6 +74,7 @@ _PROVIDER_AVAILABILITY_DEFAULTS: dict[str, Any] = {
     "in_person_sessions": "yes",
     "virtual_sessions": "no",
     "desired_times": [],
+    "schedule_text": None,
     # PA requires min-1 service on the wire — pick a stable default that
     # tests overriding `services` can assume isn't already in the list.
     "services": ["evaluation"],

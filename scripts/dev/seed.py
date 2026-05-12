@@ -109,6 +109,7 @@ FIXTURE_PROVIDER_AVAILABILITY: list[FixtureProviderAvailability] = [
             "in_person_sessions": "yes",
             "virtual_sessions": "no",
             "desired_times": [],
+            "schedule_text": "May 25 & Jun 18 cohorts; 2-week sessions; M-F 9am–5pm",
             "services": ["group_therapy"],
             "settings": ["day_program"],
             "treatment_modality": "Social skills, emotion regulation",
@@ -118,7 +119,6 @@ FIXTURE_PROVIDER_AVAILABILITY: list[FixtureProviderAvailability] = [
             "payment_situation": "self_pay_only",
             "sliding_scale": True,
             "cost": "$2,500 / session",
-            # TODO(issue-8): cohort dates ("May 25 & Jun 18, 2-week sessions, M-F 9-5")
         },
     },
     {
@@ -141,6 +141,7 @@ FIXTURE_PROVIDER_AVAILABILITY: list[FixtureProviderAvailability] = [
             "in_person_sessions": "yes",
             "virtual_sessions": "no",
             "desired_times": [],
+            "schedule_text": "M-F 8:30am–4:30pm; current cohort starts May 11",
             "services": [
                 "psychotherapy",
                 "medication_management",
@@ -159,7 +160,6 @@ FIXTURE_PROVIDER_AVAILABILITY: list[FixtureProviderAvailability] = [
             "payment_situation": "please_contact",
             "sliding_scale": True,
             "cost": "$4k/week",
-            # TODO(issue-8): "M-F 8:30am-4:30pm, starts May 11"
         },
     },
 ]

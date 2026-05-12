@@ -48,6 +48,10 @@ class ProviderAvailabilityDetail(Base):
     desired_times = Column(
         JSON, nullable=False, server_default=text("'[]'"), default=list
     )
+    # Companion to `desired_times` for cohort dates / fixed program hours
+    # (#442). The grid handles "what times of the week am I open"; this
+    # captions "May 25 cohort, M-F 9-5". Both can coexist.
+    schedule_text = Column(Text, nullable=True)
 
     # Section 4 — featured services
     services = Column(JSON, nullable=False, server_default=text("'[]'"), default=list)
