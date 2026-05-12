@@ -1,7 +1,8 @@
 {# Form-field render macros.
 
-Each macro emits one labelled field (label + control + line breaks) so
-per-kind form partials read as a flat field list rather than HTML
+Each macro emits one labelled field — Pico CSS styles `<label>` and
+its nested control as a block, so no `<br>` between fields is needed.
+Per-kind form partials read as a flat field list rather than HTML
 boilerplate. The `<select>` and bool-radio macros iterate over a
 controlled-vocabulary tuple from `src/models/enums.py` (registered
 as Jinja globals in `src/core/templating.py`) and look display labels up
@@ -21,25 +22,31 @@ canonical use.
 #}
 
 {% macro text_field(name, label, current=None, required=True, pattern=None, maxlength=None) -%}
-<label for="{{ name }}">{{ label }}:</label><br />
-<input type="text" id="{{ name }}" name="{{ name }}"{% if current is not none %} value="{{ current }}"{% endif %}{% if pattern %} pattern="{{ pattern }}"{% endif %}{% if maxlength %} maxlength="{{ maxlength }}"{% endif %}{% if required %} required{% endif %} /><br /><br />
+<label for="{{ name }}">
+  {{ label }}
+  <input type="text" id="{{ name }}" name="{{ name }}"{% if current is not none %} value="{{ current }}"{% endif %}{% if pattern %} pattern="{{ pattern }}"{% endif %}{% if maxlength %} maxlength="{{ maxlength }}"{% endif %}{% if required %} required{% endif %} />
+</label>
 {%- endmacro %}
 
 {% macro textarea_field(name, label, current=None, required=True) -%}
-<label for="{{ name }}">{{ label }}:</label><br />
-<textarea id="{{ name }}" name="{{ name }}"{% if required %} required{% endif %}>{{ current or "" }}</textarea><br /><br />
+<label for="{{ name }}">
+  {{ label }}
+  <textarea id="{{ name }}" name="{{ name }}"{% if required %} required{% endif %}>{{ current or "" }}</textarea>
+</label>
 {%- endmacro %}
 
 {% macro select_field(name, label, options, labels=None, current=None, required=True, placeholder=False) -%}
-<label for="{{ name }}">{{ label }}:</label><br />
-<select id="{{ name }}" name="{{ name }}"{% if required %} required{% endif %}>
-  {%- if placeholder and not current %}
-  <option value="" disabled selected>--</option>
-  {%- endif %}
-  {%- for v in options %}
-  <option value="{{ v }}"{% if current == v %} selected{% endif %}>{{ labels[v] if labels else v }}</option>
-  {%- endfor %}
-</select><br /><br />
+<label for="{{ name }}">
+  {{ label }}
+  <select id="{{ name }}" name="{{ name }}"{% if required %} required{% endif %}>
+    {%- if placeholder and not current %}
+    <option value="" disabled selected>--</option>
+    {%- endif %}
+    {%- for v in options %}
+    <option value="{{ v }}"{% if current == v %} selected{% endif %}>{{ labels[v] if labels else v }}</option>
+    {%- endfor %}
+  </select>
+</label>
 {%- endmacro %}
 
 {# Filter-form variant of `select_field`. Two differences from the
@@ -50,13 +57,15 @@ canonical use.
    filter is applied); the matching option is preselected, otherwise
    the "any" option is. #}
 {% macro filter_select_field(name, label, options, labels=None, current=None, any_label="Any") -%}
-<label for="{{ name }}">{{ label }}:</label><br />
-<select id="{{ name }}" name="{{ name }}">
-  <option value=""{% if not current %} selected{% endif %}>{{ any_label }}</option>
-  {%- for v in options %}
-  <option value="{{ v }}"{% if current == v %} selected{% endif %}>{{ labels[v] if labels else v }}</option>
-  {%- endfor %}
-</select><br /><br />
+<label for="{{ name }}">
+  {{ label }}
+  <select id="{{ name }}" name="{{ name }}">
+    <option value=""{% if not current %} selected{% endif %}>{{ any_label }}</option>
+    {%- for v in options %}
+    <option value="{{ v }}"{% if current == v %} selected{% endif %}>{{ labels[v] if labels else v }}</option>
+    {%- endfor %}
+  </select>
+</label>
 {%- endmacro %}
 
 {% macro radio_bool_field(name, label, current=None, required=True) -%}
@@ -64,7 +73,7 @@ canonical use.
   <legend>{{ label }}</legend>
   <label><input type="radio" name="{{ name }}" value="true"{% if current is sameas true %} checked{% endif %}{% if required %} required{% endif %} /> Yes</label>
   <label><input type="radio" name="{{ name }}" value="false"{% if current is sameas false %} checked{% endif %}{% if required %} required{% endif %} /> No</label>
-</fieldset><br />
+</fieldset>
 {%- endmacro %}
 
 {# Flat checkbox list driven by a controlled-vocabulary tuple. All
@@ -82,9 +91,9 @@ the upcoming `settings` field on `provider_availability` reuses it. #}
   <label>
     <input type="checkbox" name="{{ name }}" value="{{ v }}"{% if v in selected %} checked{% endif %} />
     {{ labels[v] if labels else v }}
-  </label><br />
+  </label>
   {%- endfor %}
-</fieldset><br />
+</fieldset>
 {%- endmacro %}
 
 {# Day × time-of-day checkbox grid. Renders one checkbox per
@@ -143,5 +152,5 @@ posts an empty array. #}
       {%- endfor %}
     </tbody>
   </table>
-</fieldset><br />
+</fieldset>
 {%- endmacro %}
