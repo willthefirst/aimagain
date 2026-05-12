@@ -3,7 +3,7 @@
 {% block title %}Edit provider availability{% endblock %}
 {% block content %}
 <h1>Edit provider availability</h1>
-{{ provider_availability_form("patch", "/posts/" ~ post.id, "Save changes", post=post) }}
+{{ provider_availability_form("patch", "/posts/" ~ post.id, "Save changes", post=post, schema=provider_availability_create_schema) }}
 
 <hr />
 <a href="/posts/{{ post.id }}">Cancel</a>

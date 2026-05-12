@@ -1,6 +1,7 @@
 from fastapi.templating import Jinja2Templates
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
+from src.domain.logic.posts.schema import ProviderAvailabilityCreate
 from src.domain.models import enums
 from src.framework.config import settings
 from src.framework.rendering.form_fields import field_spec, register_choice_labels
@@ -58,6 +59,15 @@ _env.globals.update(
     # core → schemas import direction clean (see layer matrix in
     # `src/README.md`).
     field_spec=field_spec,
+    # Polymorphic posts have no single create-schema (the top-level
+    # adapter is a discriminated union); the per-kind route handler
+    # can't inject a `schema` context var without per-kind plumbing in
+    # `PostKindSpec`, which would close an import cycle (post_kinds →
+    # schema → models → post_kinds). Exposing the kind-specific
+    # `*Create` schemas as Jinja globals lets the kind's form templates
+    # pass the right schema to `field_for` without context-routing
+    # changes. Per-kind form templates pick which to pass.
+    provider_availability_create_schema=ProviderAvailabilityCreate,
 )
 
 # Register the choice-tuple → labels-dict mapping that `field_spec`

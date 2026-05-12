@@ -65,3 +65,8 @@ class ProviderAvailabilityDetail(Base):
     payment_situation = Column(Text, nullable=False)
     sliding_scale = Column(Boolean, nullable=False)
     cost = Column(Text, nullable=True)
+
+    # Section 6 — about (free-text core fields)
+    description = Column(Text, nullable=True)
+    referral_instructions = Column(Text, nullable=True)
+    website = Column(Text, nullable=True)

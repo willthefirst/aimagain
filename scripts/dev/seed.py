@@ -57,6 +57,14 @@ FIXTURE_PROVIDER_AVAILABILITY: list[FixtureProviderAvailability] = [
         "detail": {
             "practice_name": "Katie Reeves, PhD",
             "available_providers": "Katie Reeves, PhD",
+            "description": (
+                "Solo private practice offering psychotherapy and medication "
+                "management for older teens and transitional-age youth. "
+                "Immediate availability for new patients. 25-minute med-"
+                "management visits and 50-minute therapy sessions."
+            ),
+            "referral_instructions": "Contact via website to schedule an intake call.",
+            "website": "katiereevesphd.com",
             # TODO(issue-5): telehealth-only — no city/zip. Required today; relax in #5.
             "location_city": "(telehealth only)",
             "location_state": "CA",
@@ -67,13 +75,9 @@ FIXTURE_PROVIDER_AVAILABILITY: list[FixtureProviderAvailability] = [
             "services": ["psychotherapy", "medication_management"],
             "settings": ["outpatient"],
             "treatment_modality": "Psychodynamic, control-mastery",
-            # TODO(issue-2): the lead pitch ("immediate availability for new
-            # patients...") belongs in `description`, not `client_focus`. Folded
-            # for now.
             "client_focus": (
-                "Older teens / TAY with ADHD, anxiety, depression, self-harm, "
-                "suicidality. Immediate availability for new patients; 25-min "
-                "(med management only) or 50-min sessions."
+                "Older teens and TAY with ADHD, anxiety, depression, self-harm, "
+                "and suicidality."
             ),
             # TODO(issue-4): spans adolescents + young_adults + adults. Single-valued today.
             "age_group": "adolescents_14_18",
@@ -83,8 +87,6 @@ FIXTURE_PROVIDER_AVAILABILITY: list[FixtureProviderAvailability] = [
             "payment_situation": "out_of_network",
             "sliding_scale": False,
             "cost": "$250 - $600 per session",
-            # TODO(issue-2): website=katiereevesphd.com
-            # TODO(issue-2): referral_instructions
         },
     },
     {
@@ -93,6 +95,17 @@ FIXTURE_PROVIDER_AVAILABILITY: list[FixtureProviderAvailability] = [
             "practice_name": "Camp BooHoo",
             # TODO(issue-9): may drop available_providers.
             "available_providers": "Camp BooHoo staff",
+            "description": (
+                "Therapeutic summer camp focused on social skills and emotion "
+                "regulation for middle schoolers with ASD. Two 2-week cohorts "
+                "(May 25 and Jun 18), M-F 9am-5pm at the Santa Clara County "
+                "Fairgrounds."
+            ),
+            "referral_instructions": (
+                "Visit our website to download the intake packet, then email "
+                "campbooohoo@example.com to reserve a cohort spot."
+            ),
+            "website": "boohoocrybaby.com",
             "location_city": "Santa Clara",
             "location_state": "CA",
             # TODO(issue-5): venue (fairgrounds) has no zip; required today.
@@ -105,19 +118,13 @@ FIXTURE_PROVIDER_AVAILABILITY: list[FixtureProviderAvailability] = [
             # TODO(issue-7): day_program token not in vocab yet. Outpatient is closest.
             "settings": ["outpatient"],
             "treatment_modality": "Social skills, emotion regulation",
-            # TODO(issue-2): the camp pitch belongs in description.
-            "client_focus": (
-                "Middle schoolers with ASD focused on social skills and "
-                "emotion regulation."
-            ),
+            "client_focus": "Middle schoolers with ASD.",
             # TODO(issue-4): middle school spans children_6_10 + preteens_11_13.
             "age_group": "preteens_11_13",
             "non_english_services": "yes",  # TODO(issue-3): replace with languages=["en", "es"].
             "payment_situation": "out_of_network",  # TODO(issue-6): true value is self_pay_only.
             "sliding_scale": True,
             "cost": "$2,500 / session",
-            # TODO(issue-2): website=boohoocrybaby.com
-            # TODO(issue-2): referral_instructions
             # TODO(issue-8): cohort dates ("May 25 & Jun 18, 2-week sessions, M-F 9-5")
         },
     },
@@ -126,6 +133,15 @@ FIXTURE_PROVIDER_AVAILABILITY: list[FixtureProviderAvailability] = [
         "detail": {
             "practice_name": "RISE IOP at CHC",
             "available_providers": "RISE program staff",
+            "description": (
+                "RISE is a Comprehensive DBT intensive outpatient program for "
+                "high school students with high acuity. Two last-minute "
+                "openings; new cohort starts May 11. M-F 8:30am-4:30pm."
+            ),
+            "referral_instructions": (
+                "Please contact the program coordinator for intake details."
+            ),
+            "website": "CHC.rise.org",
             "location_city": "Palo Alto",
             "location_state": "CA",
             "location_zip": "94304",
@@ -137,7 +153,6 @@ FIXTURE_PROVIDER_AVAILABILITY: list[FixtureProviderAvailability] = [
             "services": ["psychotherapy", "medication_management"],
             "settings": ["iop"],
             "treatment_modality": "Comprehensive DBT",
-            # TODO(issue-2): the IOP pitch belongs in description.
             "client_focus": (
                 "High school students with high acuity, including "
                 "self-harm/suicidality with no immediate risk of harm to self "
@@ -152,8 +167,6 @@ FIXTURE_PROVIDER_AVAILABILITY: list[FixtureProviderAvailability] = [
             "payment_situation": "in_network",
             "sliding_scale": True,
             "cost": "$4k/week",
-            # TODO(issue-2): website=CHC.rise.org
-            # TODO(issue-2): referral_instructions
             # TODO(issue-8): "M-F 8:30am-4:30pm, starts May 11"
         },
     },

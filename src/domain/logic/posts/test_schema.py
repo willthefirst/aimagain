@@ -362,11 +362,58 @@ def test_post_create_rejects_unknown_fields_on_provider_availability():
 
 
 def test_post_create_rejects_cross_kind_field_bleed():
-    """Cross-kind field bleed must not validate."""
+    """Cross-kind field bleed must not validate. `client_dem_ages` is
+    a client-referral-only field; it has no place in a PA payload."""
     with pytest.raises(ValidationError):
         post_create_adapter.validate_python(
-            provider_availability_payload(description="d")
+            provider_availability_payload(client_dem_ages="adults_25_64")
         )
+
+
+def test_post_create_provider_availability_accepts_free_text_fields():
+    """`description`, `referral_instructions`, `website` round-trip through
+    the Create schema."""
+    p = post_create_adapter.validate_python(
+        provider_availability_payload(
+            description="Lead narrative pitch.",
+            referral_instructions="Email the intake coordinator.",
+            website="example.com",
+        )
+    )
+    assert p.description == "Lead narrative pitch."
+    assert p.referral_instructions == "Email the intake coordinator."
+    assert p.website == "example.com"
+
+
+def test_post_create_provider_availability_free_text_fields_default_none():
+    """All three new fields are optional; absent → None."""
+    payload = provider_availability_payload()
+    for field in ("description", "referral_instructions", "website"):
+        payload.pop(field, None)
+    p = post_create_adapter.validate_python(payload)
+    assert p.description is None
+    assert p.referral_instructions is None
+    assert p.website is None
+
+
+def test_post_create_provider_availability_strips_free_text_whitespace():
+    p = post_create_adapter.validate_python(
+        provider_availability_payload(
+            description="  trim me  ",
+            referral_instructions="   ",
+        )
+    )
+    assert p.description == "trim me"
+    # Whitespace-only collapses to None per StrippedOptionalText.
+    assert p.referral_instructions is None
+
+
+def test_post_update_provider_availability_accepts_description_only():
+    """A PATCH that only sets `description` is a valid partial update."""
+    p = post_update_adapter.validate_python(
+        {"kind": "provider_availability", "description": "Updated pitch."}
+    )
+    assert p.description == "Updated pitch."
 
 
 def test_post_update_provider_availability_accepts_practice_name():

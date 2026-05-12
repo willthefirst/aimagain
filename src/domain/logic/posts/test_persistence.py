@@ -252,6 +252,78 @@ async def test_create_post_persists_parent_and_provider_availability_detail(
         assert detail_row.practice_name == "Acme Health"
 
 
+async def test_create_post_round_trips_free_text_fields(
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+):
+    """`description`, `referral_instructions`, `website` persist + read back."""
+    owner = await _seed_owner(db_test_session_manager)
+
+    async with db_test_session_manager() as session:
+        repo = BaseRepository(session)
+        detail = make_provider_availability_detail(
+            description="Lead pitch",
+            referral_instructions="Email the coordinator",
+            website="example.com",
+        )
+        created = await _create_post(
+            repo,
+            Post(kind="provider_availability", owner_id=owner.id),
+            detail,
+        )
+        await session.commit()
+        post_id = created.id
+
+    async with db_test_session_manager() as session:
+        detail_row = (
+            (
+                await session.execute(
+                    select(ProviderAvailabilityDetail).filter(
+                        ProviderAvailabilityDetail.post_id == post_id
+                    )
+                )
+            )
+            .scalars()
+            .first()
+        )
+        assert detail_row.description == "Lead pitch"
+        assert detail_row.referral_instructions == "Email the coordinator"
+        assert detail_row.website == "example.com"
+
+
+async def test_create_post_free_text_fields_default_null(
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+):
+    """Omitting the three new fields persists them as NULL — additive
+    columns must not break a row that doesn't supply them."""
+    owner = await _seed_owner(db_test_session_manager)
+
+    async with db_test_session_manager() as session:
+        repo = BaseRepository(session)
+        created = await _create_post(
+            repo,
+            Post(kind="provider_availability", owner_id=owner.id),
+            make_provider_availability_detail(practice_name="No-extras"),
+        )
+        await session.commit()
+        post_id = created.id
+
+    async with db_test_session_manager() as session:
+        detail_row = (
+            (
+                await session.execute(
+                    select(ProviderAvailabilityDetail).filter(
+                        ProviderAvailabilityDetail.post_id == post_id
+                    )
+                )
+            )
+            .scalars()
+            .first()
+        )
+        assert detail_row.description is None
+        assert detail_row.referral_instructions is None
+        assert detail_row.website is None
+
+
 async def test_update_post_writes_to_provider_availability_detail(
     db_test_session_manager: async_sessionmaker[AsyncSession],
 ):

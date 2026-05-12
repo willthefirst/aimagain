@@ -63,6 +63,9 @@ _CLIENT_REFERRAL_DEFAULTS: dict[str, Any] = {
 }
 
 _PROVIDER_AVAILABILITY_DEFAULTS: dict[str, Any] = {
+    "description": None,
+    "referral_instructions": None,
+    "website": None,
     "practice_name": "Acme Health",
     "available_providers": "Dr. Doe; Dr. Roe",
     "location_city": "Springfield",

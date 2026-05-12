@@ -4,7 +4,7 @@
 {% block content %}
 <h1>New provider availability</h1>
 <p>Per <code>notes/forms_spec.md</code>. No PII.</p>
-{{ provider_availability_form("post", "/posts", "Create provider availability") }}
+{{ provider_availability_form("post", "/posts", "Create provider availability", schema=provider_availability_create_schema) }}
 
 <hr />
 <a href="/posts">Back to posts</a>

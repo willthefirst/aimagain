@@ -46,11 +46,18 @@ Provider availability: {{ post.provider_availability_detail.practice_name }}
 <h1>Provider availability</h1>
 <p>by <a href="/users/{{ post.owner_id }}">{{ post.owner.username }}</a></p>
 <div class="post-body">
+  {% if d.description %}
+  <p class="post-description">{{ d.description }}</p>
+  {% endif %}
   <dl>
     <dt>Practice name</dt>
     <dd>{{ d.practice_name }}</dd>
     <dt>Available providers</dt>
     <dd>{{ d.available_providers }}</dd>
+    {% if d.website %}
+    <dt>Website</dt>
+    <dd>{{ d.website }}</dd>
+    {% endif %}
     <dt>Location</dt>
     <dd>{{ d.location_city }}, {{ d.location_state }} {{ d.location_zip }}</dd>
     <dt>In-person sessions</dt>
@@ -84,6 +91,12 @@ Provider availability: {{ post.provider_availability_detail.practice_name }}
     <dd>{{ d.cost }}</dd>
     {% endif %}
   </dl>
+  {% if d.referral_instructions %}
+  <section class="post-referral-instructions">
+    <h2>How to refer</h2>
+    <p>{{ d.referral_instructions }}</p>
+  </section>
+  {% endif %}
 </div>
 {% endif %}
 
