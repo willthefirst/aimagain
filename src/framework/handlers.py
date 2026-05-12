@@ -24,6 +24,7 @@ from uuid import UUID
 from fastapi import Request
 from pydantic import BaseModel
 
+from src.domain.models import User
 from src.framework.audit import mutate
 from src.framework.audit_repository import AuditRepository
 from src.framework.authz import is_admin
@@ -31,7 +32,6 @@ from src.framework.base_repository import BaseRepository
 from src.framework.entity_spec import EntitySpec
 from src.framework.exceptions import BadRequestError, ForbiddenError, NotFoundError
 from src.framework.projections import project_view
-from src.models import User
 
 
 async def handle_delete(

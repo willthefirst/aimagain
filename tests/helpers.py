@@ -6,7 +6,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 # Need ORM models
-from src.models import (
+from src.domain.models import (
     ClientReferralDetail,
     Provider,
     ProviderAvailabilityDetail,

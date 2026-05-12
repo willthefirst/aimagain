@@ -1019,9 +1019,9 @@ def _detect_caller_module() -> str:
     """Return `__name__` of the first frame outside this module.
 
     `mount_entity` is called from a route file like
-    `src/api/routes/<entity>.py`; that's where factory-built handlers
+    `src/domain/routes/<entity>.py`; that's where factory-built handlers
     must be stitched so the contract-test patch path
-    `src.api.routes.<entity>._handle_<verb>_<entity>` resolves. Walks
+    `src.domain.routes.<entity>._handle_<verb>_<entity>` resolves. Walks
     up the stack past this module's own frames (and any intermediate
     decorator/wrapper frames inside this module) so the detection is
     robust to internal call chains.

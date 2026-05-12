@@ -16,14 +16,14 @@ the reverse: an enum member with no spec home is dead weight and a
 sign of stale code.
 """
 
+from src.domain.specs.post import POST_ENTITY
+from src.domain.specs.provider import PROVIDER_ENTITY
+from src.domain.specs.provider_certification import CERTIFICATION_ENTITY
+from src.domain.specs.provider_education import EDUCATION_ENTITY
+from src.domain.specs.provider_licensure import LICENSURE_ENTITY
+from src.domain.specs.user import USER_ENTITY
+from src.domain.specs.user_favorite import FAVORITE_ENTITY
 from src.framework.audit import AuditAction
-from src.specs.post import POST_ENTITY
-from src.specs.provider import PROVIDER_ENTITY
-from src.specs.provider_certification import CERTIFICATION_ENTITY
-from src.specs.provider_education import EDUCATION_ENTITY
-from src.specs.provider_licensure import LICENSURE_ENTITY
-from src.specs.user import USER_ENTITY
-from src.specs.user_favorite import FAVORITE_ENTITY
 
 # All CRUD-shaped specs whose `audit` binding should account for a
 # `CREATE_<STEM>`/`UPDATE_<STEM>`/`DELETE_<STEM>` triple.

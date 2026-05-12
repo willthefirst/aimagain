@@ -14,8 +14,8 @@ import pytest
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from src.domain.models import Provider, ProviderLicensure, User
 from src.framework.base_repository import BaseRepository
-from src.models import Provider, ProviderLicensure, User
 from tests.helpers import create_test_user, make_provider, make_provider_licensure
 
 pytestmark = pytest.mark.asyncio

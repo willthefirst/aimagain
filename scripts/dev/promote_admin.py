@@ -18,7 +18,7 @@ import sys
 from sqlalchemy import select
 
 from src.db import async_session_maker
-from src.models import User
+from src.domain.models import User
 
 
 async def set_admin(email: str, revoke: bool) -> int:

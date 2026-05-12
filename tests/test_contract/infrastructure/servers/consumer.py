@@ -13,9 +13,9 @@ from typing import Optional
 import uvicorn
 from fastapi import FastAPI, Request
 
-from src.api.routes import auth_pages
 from src.auth_config import current_active_user, current_admin_user
-from src.domain.providers.schema import ProviderCreate
+from src.domain.logic.providers.schema import ProviderCreate
+from src.domain.routes import auth_pages
 from src.framework import APIResponse
 
 from ..utilities.mocks import MockAuthManager, create_mock_user

@@ -10,7 +10,7 @@ import pytest
 from sqlalchemy import select
 
 from scripts.dev import promote_admin
-from src.models import User
+from src.domain.models import User
 from tests.fixtures import async_test_sessionmaker
 from tests.helpers import create_test_user
 

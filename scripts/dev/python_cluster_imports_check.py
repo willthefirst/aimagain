@@ -2,31 +2,32 @@
 """Forbid cross-cluster Python imports inside layered directories.
 
 Companion to ``template_imports_check.py``: same rule, different file
-type. A file under ``src/<layer>/<cluster>/`` may import from its own
-cluster or from any parent-level (shared) module in the same layer; it
-may NOT import from a sibling cluster directory in the same layer.
+type. A file under ``src/domain/<layer>/<cluster>/`` may import from
+its own cluster or from any parent-level (shared) module in the same
+layer; it may NOT import from a sibling cluster directory in the same
+layer.
 
-Today this applies to ``src/models/`` only. Models are pure data
-shape — a model file in one cluster has no business importing
+Today this applies to ``src/domain/models/`` only. Models are pure
+data shape — a model file in one cluster has no business importing
 from a sibling cluster (FKs reference each other via SQLAlchemy
 strings, not Python imports). The rule is strict here.
 
-``src/domain/`` is intentionally NOT in this list: per-entity
+``src/domain/logic/`` is intentionally NOT in this list: per-entity
 handlers, repositories, and schemas legitimately reach across
 clusters for shared types (e.g. ``users/handlers.py`` needs
 ``providers/repository.ProviderRepository`` to fetch a user's
 providers). Handler-to-handler cross-cluster imports inside
-``domain/`` are still discouraged, but the discipline rests on
+``logic/`` are still discouraged, but the discipline rests on
 code review, not this rule.
 
 Imports we recognize:
-  - absolute:  ``from src.<layer>.<cluster>.<file> import X``
+  - absolute:  ``from src.domain.<layer>.<cluster>.<file> import X``
   - relative:  ``from .<cluster>.<file> import X`` (file at layer root)
                ``from ..<cluster>.<file> import X`` (file at cluster level)
-  - bare-package: ``from src.<layer>.<cluster> import X``
+  - bare-package: ``from src.domain.<layer>.<cluster> import X``
 
-Cross-tree imports (e.g. ``from src.models.posts...`` inside
-``src/domain/providers/``) are out of scope for this check — the
+Cross-tree imports (e.g. ``from src.domain.models.posts...`` inside
+``src/domain/logic/providers/``) are out of scope for this check — the
 within-tree rule is what matches the templates rule.
 
 Usage:
@@ -120,7 +121,7 @@ def _file_position(file: Path, src_root: Path) -> tuple[str, str | None]:
 # Patterns we recognize. Group 1 captures the layer-or-relative-marker;
 # group 2 captures what comes after.
 _ABS_RE = re.compile(
-    r"^\s*from\s+src\.(\w+)\.(\w+)(?:\.\w+)*\s+import\b",
+    r"^\s*from\s+src\.domain\.(\w+)\.(\w+)(?:\.\w+)*\s+import\b",
 )
 _REL_RE = re.compile(
     r"^\s*from\s+(\.+)(\w+)(?:\.\w+)*\s+import\b",
@@ -215,7 +216,7 @@ def main(argv: list[str] | None = None) -> int:
     )
     args = parser.parse_args(argv)
 
-    src_root = _project_root() / "src"
+    src_root = _project_root() / "src" / "domain"
     files = _collect_files(args.paths, src_root)
     violations = find_violations(files, src_root)
 
@@ -225,8 +226,8 @@ def main(argv: list[str] | None = None) -> int:
             print(f"  {v.message()}", file=sys.stderr)
         print(
             "\nA shared piece belongs at the layer's parent level "
-            "(e.g. src/framework/audit.py, src/models/enums.py). See "
-            "src/README.md → 'Domain entities and the cluster pattern'.",
+            "(e.g. src/framework/audit.py, src/domain/models/enums.py). "
+            "See src/README.md → 'Domain entities and the cluster pattern'.",
             file=sys.stderr,
         )
         return 1

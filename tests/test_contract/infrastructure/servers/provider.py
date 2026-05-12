@@ -12,8 +12,8 @@ from fastapi_users.db import SQLAlchemyUserDatabase
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from src.db import get_db_session, get_user_db
+from src.domain.models import User, metadata
 from src.main import app
-from src.models import User, metadata
 
 from ..utilities.mocks import (
     MockAuthManager,

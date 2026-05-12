@@ -37,7 +37,7 @@ def test_same_cluster_absolute_import_is_allowed(tmp_path: Path) -> None:
     _build_layer(src, "models", ["posts", "providers"], parent_files=["audit.py"])
     f = _write(
         src / "models" / "posts" / "post_processing.py",
-        "from src.models.posts._placeholder import x\n",
+        "from src.domain.models.posts._placeholder import x\n",
     )
 
     assert find_violations([f], src) == []
@@ -60,7 +60,7 @@ def test_cross_layer_import_is_out_of_scope(tmp_path: Path) -> None:
     _build_layer(src, "models", ["posts", "providers"])
     f = _write(
         src / "models" / "posts" / "post_model.py",
-        "from src.domain.providers.repository import X\n",
+        "from src.domain.logic.providers.repository import X\n",
     )
 
     assert find_violations([f], src) == []
@@ -71,7 +71,7 @@ def test_cross_cluster_absolute_import_is_flagged(tmp_path: Path) -> None:
     _build_layer(src, "models", ["posts", "providers"], parent_files=["audit.py"])
     f = _write(
         src / "models" / "posts" / "post_processing.py",
-        "from src.models.providers.handler import x\n",
+        "from src.domain.models.providers.handler import x\n",
     )
 
     violations = find_violations([f], src)
@@ -132,8 +132,8 @@ def test_parent_level_file_is_not_lint_subject(tmp_path: Path) -> None:
     _build_layer(src, "models", ["posts", "providers"], parent_files=["audit.py"])
     f = _write(
         src / "models" / "audit.py",
-        "from src.models.posts.handler import x\n"
-        "from src.models.providers.handler import y\n",
+        "from src.domain.models.posts.handler import x\n"
+        "from src.domain.models.providers.handler import y\n",
     )
 
     assert find_violations([f], src) == []
@@ -144,7 +144,7 @@ def test_unclustered_layer_is_skipped(tmp_path: Path) -> None:
     src = tmp_path / "src"
     api = src / "api" / "routes"
     api.mkdir(parents=True)
-    f = _write(api / "posts.py", "from src.api.routes.providers import x\n")
+    f = _write(api / "posts.py", "from src.domain.routes.providers import x\n")
 
     assert find_violations([f], src) == []
 
@@ -169,7 +169,10 @@ def test_module_starting_with_underscore_is_not_a_cluster(tmp_path: Path) -> Non
 def test_multiple_violations_in_one_file(tmp_path: Path) -> None:
     src = tmp_path / "src"
     _build_layer(src, "models", ["posts", "providers", "users"])
-    body = "from src.models.providers.x import a\n" "from src.models.users.y import b\n"
+    body = (
+        "from src.domain.models.providers.x import a\n"
+        "from src.domain.models.users.y import b\n"
+    )
     f = _write(src / "models" / "posts" / "post_processing.py", body)
 
     violations = find_violations([f], src)
