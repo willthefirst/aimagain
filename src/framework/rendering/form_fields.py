@@ -81,13 +81,70 @@ def _strip_optional(annotation: Any) -> Any:
     return Union[args]  # type: ignore[return-value]
 
 
+def _resolve_field(schema_cls: type[BaseModel], name: str) -> tuple[Any, bool]:
+    """Look up a field by name on a Pydantic schema. Returns
+    ``(FieldInfo, parent_optional)``.
+
+    Direct match wins. If ``name`` isn't a top-level field but contains
+    an underscore, try to interpret it as ``<parent>_<sub>`` where
+    ``parent`` is a top-level field whose annotation is a nested
+    :class:`BaseModel` (or ``BaseModel | None`` for partial-update
+    variants). This is how flat form field names like ``location_city``
+    resolve into the embedded ``location: Location`` value object on
+    the provider / client-referral schemas (#451) — the form template
+    keeps passing ``field_for(schema, 'location_city', ...)`` and we
+    silently route into the sub-model.
+
+    ``parent_optional`` is the optional-ness of the parent field (the
+    embedding ``location`` field on the update variants is
+    ``LocationPartial | None``); the caller composes it with the
+    sub-field's own optional-ness so a required sub-field on an
+    optional parent renders as optional.
+    """
+    fields = schema_cls.model_fields
+    if name in fields:
+        return fields[name], False
+    if "_" not in name:
+        raise KeyError(name)
+    parent_name, _, sub_name = name.partition("_")
+    while parent_name:
+        if parent_name in fields:
+            parent_field = fields[parent_name]
+            parent_anno = parent_field.annotation
+            parent_optional = _is_optional(parent_anno)
+            inner_parent = (
+                _strip_optional(parent_anno) if parent_optional else parent_anno
+            )
+            if isinstance(inner_parent, type) and issubclass(inner_parent, BaseModel):
+                if sub_name in inner_parent.model_fields:
+                    return inner_parent.model_fields[sub_name], parent_optional
+            break
+        # Fall back to trying longer prefixes (e.g. a field literally
+        # named ``foo_bar`` shadows a nested ``foo.bar`` lookup). Walk
+        # right one underscore at a time.
+        idx = sub_name.find("_")
+        if idx == -1:
+            break
+        parent_name = f"{parent_name}_{sub_name[:idx]}"
+        sub_name = sub_name[idx + 1 :]
+    raise KeyError(name)
+
+
 def field_spec(schema_cls: type[BaseModel], name: str) -> dict[str, Any]:
     """Return the rendering spec for `schema_cls.<name>`. See module
-    docstring for what's derived."""
-    field = schema_cls.model_fields[name]
+    docstring for what's derived.
+
+    ``name`` may be a flat path like ``location_city`` that resolves
+    through a top-level field whose annotation is a nested
+    :class:`BaseModel` (see :func:`_resolve_field`). The rendered
+    ``<input name=...>`` keeps the flat ``name`` — the schema's
+    ``model_validator(mode="before")`` re-nests it before validation,
+    so the wire/HTML contract stays the same as before #451.
+    """
+    field, parent_optional = _resolve_field(schema_cls, name)
     annotation = field.annotation
-    optional = _is_optional(annotation)
-    inner = _strip_optional(annotation) if optional else annotation
+    optional = parent_optional or _is_optional(annotation)
+    inner = _strip_optional(annotation) if _is_optional(annotation) else annotation
 
     # `list[Literal[*T]]` (with or without `| None`) is unambiguous —
     # it IS a multi-select. No marker needed to disambiguate, unlike

@@ -113,8 +113,16 @@ async def handle_create(
     elif spec.discriminator is not None:
         kind = payload.kind
         kind_spec = spec.discriminator[kind]
+        # Read detail fields off the serialized dump, not via
+        # ``getattr``, so wire-flat / schema-nested fields (e.g. the
+        # post-#451 ``location: Location`` value object on
+        # :class:`ClientReferralCreate`, which serializes back to flat
+        # ``location_city`` / ``location_state`` / ``location_zip`` keys
+        # via ``flatten_location_on_dump``) line up with the ORM
+        # model's flat columns enumerated in ``detail_fields``.
+        dump = payload.model_dump()
         detail = kind_spec.detail_model(
-            **{f: getattr(payload, f) for f in kind_spec.detail_fields}
+            **{f: dump[f] for f in kind_spec.detail_fields if f in dump}
         )
         parent_obj = spec.model(**{spec.discriminator.column: kind})
         if spec.owner_attr is not None:
@@ -209,7 +217,15 @@ async def handle_update(
             )
         kind_spec = spec.discriminator[target_kind]
         detail = getattr(target, kind_spec.detail_relationship)
-        update_fields = {f: getattr(payload, f) for f in kind_spec.detail_fields}
+        # ``model_dump(exclude_unset=True)`` picks up only the fields
+        # the client touched and — via the schema's flatten-on-dump
+        # ``model_serializer`` (post-#451) — re-projects any nested
+        # value-object fields (e.g. ``location: LocationPartial``)
+        # back to the flat column names ``detail_fields`` enumerates.
+        # Restrict to ``detail_fields`` so the discriminator (``kind``)
+        # and any other top-level keys never reach ``repo.patch``.
+        dump = payload.model_dump(exclude_unset=True)
+        update_fields = {f: dump[f] for f in kind_spec.detail_fields if f in dump}
         async with mutate(
             repo,
             audit_repo,

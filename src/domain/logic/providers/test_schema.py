@@ -46,7 +46,14 @@ def _now() -> datetime:
 
 
 def _provider_create_kwargs(**overrides):
-    """Minimum-valid kwargs for `ProviderCreate`."""
+    """Minimum-valid kwargs for `ProviderCreate`.
+
+    Location keys stay flat on the wire (form posts send
+    ``location_city`` / ``location_state`` / ``location_zip`` at the
+    top level — #451). The ``ProviderCreate`` schema's
+    ``gather_flat_location`` pre-validator rolls them into the nested
+    ``location`` value object before validation.
+    """
     base = {
         "practice_name": "Sunrise Counseling",
         "location_city": "Boise",
@@ -143,10 +150,14 @@ def test_update_requires_at_least_one_field(model_cls):
 
 def test_provider_update_accepts_single_field():
     """Sanity check: setting one field is enough — the rule fires only
-    when *every* field is `None`."""
+    when *every* field is `None`. Post-#451 ``location`` is itself a
+    nested :class:`LocationPartial`; when no location subkey is
+    supplied the field stays ``None`` (the gather pre-validator only
+    creates the nested block when a flat ``location_<sub>`` key is
+    present)."""
     upd = ProviderUpdate(practice_name="New Name")
     assert upd.practice_name == "New Name"
-    assert upd.location_city is None
+    assert upd.location is None
 
 
 # --- Create payload smoke tests -----------------------------------------
@@ -423,7 +434,6 @@ def _literal_args(model_cls, field_name: str) -> tuple[str, ...]:
         (ProviderLicensureCreate, "issuing_state", US_STATES),
         (ProviderEducationCreate, "education_type", EDUCATION_TYPES),
         (ProviderCertificationCreate, "certification_type", CERTIFICATION_TYPES),
-        (ProviderCreate, "location_state", US_STATES),
         (ProviderCreate, "in_person_sessions", LOCATION_AVAILABILITY_OPTIONS),
         (ProviderCreate, "virtual_sessions", LOCATION_AVAILABILITY_OPTIONS),
         (ProviderCreate, "in_network_carriers", INSURANCE_CARRIERS),
@@ -432,12 +442,16 @@ def _literal_args(model_cls, field_name: str) -> tuple[str, ...]:
         (ProviderLicensureUpdate, "issuing_state", US_STATES),
         (ProviderEducationUpdate, "education_type", EDUCATION_TYPES),
         (ProviderCertificationUpdate, "certification_type", CERTIFICATION_TYPES),
-        (ProviderUpdate, "location_state", US_STATES),
         (ProviderUpdate, "in_person_sessions", LOCATION_AVAILABILITY_OPTIONS),
         # `ProviderUpdate.in_network_carriers` is
         # `list[Literal[*T]] | None`; the `_literal_args` helper doesn't
         # dig through the list-arm of the union, so the Create-variant
         # entry above is the lockstep guardrail for the carrier vocab.
+        #
+        # `location_state` moved into the :class:`Location` value object
+        # in #451 — the `Location.state` lockstep test in
+        # ``src/domain/logic/value_objects/test_location.py`` covers it
+        # for every embedding schema at once.
     ],
 )
 def test_schema_literals_match_model_tuples(model_cls, field, expected):
