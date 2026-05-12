@@ -10,7 +10,8 @@ env:
   IMAGE_NAME: ${{ github.repository }}
   PYTHON_VERSION: '3.11'
   DATABASE_URL: sqlite+aiosqlite:///./test.db
-  SECRET: test-secret-key-for-ci-only
+  # Padded to >=32 chars; PyJWT warns on shorter HMAC keys for SHA256.
+  SECRET: test-secret-key-for-ci-only-padded-to-32-bytes
   ALGORITHM: HS256
   ACCESS_TOKEN_EXPIRE_MINUTES: 60
 
