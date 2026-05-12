@@ -6,7 +6,6 @@ from sqlalchemy.types import Uuid
 from src.framework.persistence.base_model import Base
 
 from ..enums import (
-    CLIENT_AGE_GROUPS,
     INSURANCE_OPTIONS,
     LOCATION_AVAILABILITY_OPTIONS,
     US_STATES,
@@ -25,7 +24,6 @@ class ClientReferralDetail(Base):
         _ck("location_state", US_STATES),
         _ck("location_in_person", LOCATION_AVAILABILITY_OPTIONS),
         _ck("location_virtual", LOCATION_AVAILABILITY_OPTIONS),
-        _ck("client_dem_ages", CLIENT_AGE_GROUPS),
         _ck("insurance", INSURANCE_OPTIONS),
     )
 
@@ -46,7 +44,9 @@ class ClientReferralDetail(Base):
     )
 
     # Section 2 — demographics
-    client_dem_ages = Column(Text, nullable=False)
+    client_dem_age_groups = Column(
+        JSON, nullable=False, server_default=text("'[]'"), default=list
+    )
     languages = Column(
         JSON, nullable=False, server_default=text("'[\"en\"]'"), default=lambda: ["en"]
     )
