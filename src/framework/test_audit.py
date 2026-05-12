@@ -24,7 +24,10 @@ from src.framework.audit_repository import AuditRepository
 from src.framework.base_repository import BaseRepository
 from tests.helpers import create_test_user
 
-pytestmark = pytest.mark.asyncio
+# No module-level `pytestmark = pytest.mark.asyncio` — `asyncio_mode =
+# "auto"` in pyproject.toml already auto-marks async test functions,
+# and applying the mark to the module triggers a warning on every sync
+# test in this file.
 
 
 class _ExampleSnapshot(BaseModel):

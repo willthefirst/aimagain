@@ -201,6 +201,10 @@ class DevCommands:
 class TestCommands:
     """Test-related commands."""
 
+    # Tell pytest not to try collecting this class — the `Test` prefix
+    # makes it look like a test class, but it's the CLI command handler.
+    __test__ = False
+
     # Shortcut aliases for test paths. `dev test contract` expands to the full
     # path because `tests/test_contract` is excluded from default `pytest`
     # collection (`addopts` in `pyproject.toml`) and a regression in #100
