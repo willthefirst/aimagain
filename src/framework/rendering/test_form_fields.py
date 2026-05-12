@@ -13,6 +13,7 @@ from pydantic import BaseModel
 from src.framework.rendering.form_fields import (
     HtmlPattern,
     HtmlTextarea,
+    HtmlUrl,
     field_spec,
     register_choice_labels,
 )
@@ -27,6 +28,8 @@ register_choice_labels(_SIZES, None)
 _PatternedString = Annotated[str, HtmlPattern(pattern=r"\d{5}", maxlength=5)]
 _LongText = Annotated[str, HtmlTextarea()]
 _OptionalLongText = Annotated[str | None, HtmlTextarea()]
+_UrlText = Annotated[str, HtmlUrl()]
+_OptionalUrlText = Annotated[str | None, HtmlUrl()]
 
 
 class _Sample(BaseModel):
@@ -38,6 +41,8 @@ class _Sample(BaseModel):
     patterned: _PatternedString
     long_required: _LongText
     long_optional: _OptionalLongText = None
+    url_required: _UrlText
+    url_optional: _OptionalUrlText = None
     required_multi: list[Literal[*_COLORS]]
     optional_multi: list[Literal[*_COLORS]] | None = None
     unlabeled_multi: list[Literal[*_SIZES]]
@@ -103,6 +108,21 @@ def test_html_textarea_marker_switches_kind():
 def test_optional_html_textarea_drops_required():
     spec = field_spec(_Sample, "long_optional")
     assert spec["kind"] == "textarea"
+    assert spec["required"] is False
+
+
+def test_html_url_marker_switches_kind():
+    spec = field_spec(_Sample, "url_required")
+    assert spec == {
+        "kind": "url",
+        "name": "url_required",
+        "required": True,
+    }
+
+
+def test_optional_html_url_drops_required():
+    spec = field_spec(_Sample, "url_optional")
+    assert spec["kind"] == "url"
     assert spec["required"] is False
 
 
