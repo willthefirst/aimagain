@@ -1,5 +1,13 @@
+import os
+
 from fastapi.templating import Jinja2Templates
-from jinja2 import Environment, FileSystemLoader, select_autoescape
+from jinja2 import (
+    ChoiceLoader,
+    Environment,
+    FileSystemLoader,
+    PrefixLoader,
+    select_autoescape,
+)
 
 from src.framework.config import settings
 from src.framework.form_fields import field_spec, register_choice_labels
@@ -7,8 +15,36 @@ from src.models import enums
 
 auto_reload = settings.ENVIRONMENT == "development"
 
+
+def _entity_template_loaders() -> dict:
+    """Discover per-entity template dirs at `src/entities/<name>/templates/`.
+
+    Returned dict maps each entity name to a `FileSystemLoader` rooted at
+    its templates directory; the calling `PrefixLoader` exposes them as
+    `<name>/<file>.html` so spec strings like `Templates(list="favorites/list.html")`
+    keep working without restating the entity prefix on every template name.
+
+    Auto-discovery is per-startup; the entities tree is stable across a
+    single process so the directory scan happens once.
+    """
+    loaders: dict = {}
+    entities_root = "src/entities"
+    if not os.path.isdir(entities_root):
+        return loaders
+    for name in sorted(os.listdir(entities_root)):
+        templates_dir = os.path.join(entities_root, name, "templates")
+        if os.path.isdir(templates_dir):
+            loaders[name] = FileSystemLoader(templates_dir)
+    return loaders
+
+
 _env = Environment(
-    loader=FileSystemLoader("src/templates"),
+    loader=ChoiceLoader(
+        [
+            FileSystemLoader("src/templates"),
+            PrefixLoader(_entity_template_loaders()),
+        ]
+    ),
     autoescape=select_autoescape(["html", "xml"]),
     auto_reload=auto_reload,
 )

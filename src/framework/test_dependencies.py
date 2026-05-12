@@ -9,9 +9,9 @@ class.
 
 import pytest
 
-from src.domain.favorites.repository import UserFavoriteRepository
 from src.domain.providers.repository import ProviderRepository
 from src.domain.users.repository import UserRepository
+from src.entities.favorites.repository import UserFavoriteRepository
 from src.framework import dependencies as deps
 from src.framework.audit_repository import AuditRepository
 from src.framework.base_repository import BaseRepository

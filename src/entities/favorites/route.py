@@ -14,14 +14,14 @@ Audit and commit are owned by the logic-layer handlers, not the mount
 helper.
 """
 
-from src.domain.favorites.handlers import (
+from src.entities.favorites.handlers import (
     handle_add_favorite,
     handle_list_my_favorites,
     handle_remove_favorite,
 )
+from src.entities.favorites.spec import FAVORITE_ENTITY
 from src.framework import make_entity_router
 from src.framework.resource_routes import mount_edge_routes
-from src.specs.user_favorite import FAVORITE_ENTITY
 
 router = make_entity_router(FAVORITE_ENTITY)
 favorites_api_router = router.router
