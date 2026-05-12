@@ -12,16 +12,11 @@ from src.framework import BaseRouter
 from src.framework.audit.repository import AuditRepository
 from src.framework.persistence.dependencies import get_audit_repository
 
-# router = APIRouter() # Old raw APIRouter
-# Standardized router initialization
-auth_api_router = APIRouter()  # Create standard APIRouter first
-router = BaseRouter(
-    router=auth_api_router, default_tags=["auth"]
-)  # Wrap with BaseRouter
+auth_api_router = APIRouter()
+router = BaseRouter(router=auth_api_router, default_tags=["auth"])
 
 logger = logging.getLogger(__name__)
 
-# TODO: let's get this pattern to either be standard everywhere or not. unify how routes do responses.
 register_responses = {
     status.HTTP_400_BAD_REQUEST: {
         "model": ErrorModel,
@@ -77,10 +72,6 @@ async def register_request_handler(
     user_manager: BaseUserManager[models.UP, models.ID] = Depends(get_user_manager),
     audit_repo: AuditRepository = Depends(get_audit_repository),
 ):
-    """
-    Handles the core logic for user registration, delegated from the route handler.
-    Relies on @handle_route_errors decorator (via BaseRouter) for exception handling.
-    """
     logger.debug(f"Handling registration for email: {request_data.email}")
     result = await handle_registration(
         request_data=request_data,

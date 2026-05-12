@@ -1,20 +1,4 @@
-"""Generic framework handlers driven by `EntitySpec`.
-
-Phase 2 of #317 introduces generation: framework code reads from
-`EntitySpec` and does the work that today is hand-written per-entity.
-This module is the framework's home in the logic layer; the
-underscore-prefix filename matches `_authz.py` (shared infrastructure
-at the parent tier of `logic/`, importable from every cluster).
-
-B1 (#326) adds `handle_delete` — the smallest verb. Subsequent
-B-PRs will add `handle_create`, `handle_update`, etc., each following
-the same shape: read knobs from the spec, perform the standard
-ritual, delegate non-standard work back to the entity.
-
-Entities with bespoke pre/post-rules keep their custom handlers and
-do not call into here. The framework is for the *standard* shape;
-custom shapes stay custom.
-"""
+"""Generic dispatch handlers driven by EntitySpec."""
 
 import inspect
 from dataclasses import dataclass
@@ -43,29 +27,7 @@ async def handle_delete(
     requesting_user: User,
     parent_id: UUID | None = None,
 ) -> None:
-    """Generic delete handler driven by `spec`.
-
-    Performs the standard delete ritual: load target → optional
-    parent-FK verification + parent-existence load (owned subentities)
-    → write_authz check → audited delete via `mutate(verb="delete")`.
-
-    Reads from the spec:
-      - `spec.model` — the SQLAlchemy class used to fetch the target
-        (and parent, for owned subentities) via
-        `repo.get_by_model_id`.
-      - `spec.parent` — if set, the subentity convention is enforced:
-        `parent_id` must be supplied, the child's FK column
-        (`<parent.name>_id`) must equal `parent_id`, and the parent
-        row must exist. `write_authz` runs against the parent (auth
-        follows the ownership chain).
-      - `spec.write_authz` — invoked against the target (top-level)
-        or parent (subentity). `None` skips the check.
-      - `spec.audit` — passed to `mutate(...)` as the resource binding.
-        Required (delete must be audited).
-
-    Entities with bespoke pre-delete rules (e.g. users' self-guard)
-    keep their custom handlers and do not call this function.
-    """
+    """Generic delete handler driven by `spec`."""
     if spec.audit is None:
         raise ValueError(
             f"handle_delete: spec {spec.name!r} has no audit binding; "
@@ -127,44 +89,7 @@ async def handle_create(
     requesting_user: User,
     parent_id: UUID | None = None,
 ) -> Any:
-    """Generic create handler driven by `spec`.
-
-    Performs the standard create ritual across three shapes:
-
-    1. **Owned-subentity** (`spec.parent` set) — parent loaded,
-       `write_authz` invoked against the parent, child instantiated
-       from the payload's field dict, appended via
-       `repo.add_child(parent, spec.url_collection, child)` so the
-       parent's in-memory state stays coherent for the audit snapshot.
-    2. **Polymorphic top-level** (`spec.discriminator` set) — the
-       payload's discriminator value picks a `KindSpec` from the
-       registry; the parent is instantiated with the discriminator
-       column + owner, the detail row is built from
-       `KindSpec.detail_fields`, and both persist in one flush via
-       `repo.create_polymorphic`.
-    3. **Standard top-level** — parent instantiated from the payload's
-       field dict + owner column (when `spec.owner_attr` is set);
-       persisted via `repo.create`.
-
-    Across all three, the created row is wrapped in
-    `mutate(verb="create")` so the audit row is captured and the
-    transaction commits. Entities with bespoke create flows (e.g.
-    providers' inline credential-list append) keep custom handlers.
-
-    Reads from the spec:
-      - `spec.audit` — required for the audit row.
-      - `spec.parent` — picks the subentity path.
-      - `spec.discriminator` — picks the polymorphic path.
-      - `spec.write_authz` — invoked on parent for subentity creates.
-        Top-level creates are gated only by the route's
-        `write_user_dep` (no per-object check applies to a not-yet-
-        created row).
-      - `spec.owner_attr` — column on the parent set to
-        `requesting_user.id` when not None.
-      - `spec.model` — class instantiated for the parent.
-      - `spec.url_collection` — name of the parent's relationship
-        attribute for owned-subentity creates (convention).
-    """
+    """Generic create handler driven by `spec`."""
     if spec.audit is None:
         raise ValueError(
             f"handle_create: spec {spec.name!r} has no audit binding; "
@@ -229,7 +154,7 @@ async def handle_create(
         resource=spec.audit,
         verb="create",
     ):
-        pass  # mutation already happened; `mutate` captures after-snapshot
+        pass
     return created
 
 
@@ -243,37 +168,7 @@ async def handle_update(
     requesting_user: User,
     parent_id: UUID | None = None,
 ) -> Any:
-    """Generic update handler driven by `spec`.
-
-    Performs the standard update ritual: load target → optional
-    parent-FK verification + write_authz → polymorphic kind-invariant
-    check → audited patch via `mutate(verb="update")`.
-
-    Three paths:
-
-    1. **Owned-subentity** (`spec.parent` set) — parent loaded,
-       FK matched against the child's persisted parent_id,
-       `write_authz` on parent, partial-patch via `exclude_unset`.
-    2. **Polymorphic** (`spec.discriminator` set) — payload's
-       discriminator value must equal the target's persisted value
-       (kind cannot change via PATCH); only the detail row is
-       patched (parent's kind/owner_attr are immutable post-create);
-       fields read from `kind_spec.detail_fields` (no `exclude_unset`
-       — the schema's optionality is what makes the wire-shape work).
-    3. **Standard top-level** — partial-patch via `exclude_unset`.
-
-    All three audit via `mutate(verb="update")` so the audit row
-    captures before/after snapshots and the transaction commits.
-
-    Reads from the spec:
-      - `spec.audit` — required.
-      - `spec.parent` — picks the subentity path.
-      - `spec.discriminator` — picks the polymorphic path; kind
-        invariant enforced via `BadRequestError`.
-      - `spec.write_authz` — invoked on target (top-level) or parent
-        (subentity).
-      - `spec.model` — target class.
-    """
+    """Generic update handler driven by `spec`."""
     if spec.audit is None:
         raise ValueError(
             f"handle_update: spec {spec.name!r} has no audit binding; "
@@ -339,30 +234,16 @@ async def handle_update(
     return target
 
 
-# --- Spec-driven factory infrastructure ---------------------------------
-#
 # Each `make_<verb>_handler` factory fabricates a callable with a typed
-# signature so the route mount layer's introspection
-# (`src/framework/dispatch/resource_routes.py`) can bind URL path params, body
-# adapters, query filters, and `Depends` to the right handler kwargs.
-# The six verbs (delete/create/update/edit_form/detail/list) used to be
-# six near-identical 80-line factories — the differences are entirely
-# *which* of the standard params each shape includes. `_FactoryShape`
-# encodes that, and `_make_factory_handler` builds the signature +
-# wrapper once. The six public factories below are thin wrappers that
-# pair their `handle_*` function with a pre-baked shape.
+# signature so the route mount layer's introspection can bind URL path
+# params, body adapters, query filters, and `Depends` to the right
+# handler kwargs. `_FactoryShape` encodes the per-verb differences and
+# `_make_factory_handler` builds the signature + wrapper once.
 
 
 @dataclass(frozen=True, slots=True)
 class _FactoryShape:
-    """Declarative shape of one verb's factory-built handler.
-
-    `name_template` carries a single `{name}` placeholder filled with
-    `spec.name` to produce the `__name__` (e.g. `_handle_delete_widget`).
-    The booleans toggle which standard params appear in the
-    synthesized signature and which kwargs the wrapper forwards to
-    `handle_*(spec, ...)`.
-    """
+    """Declarative shape of one verb's factory-built handler."""
 
     name_template: str
     include_request: bool = False
@@ -373,14 +254,10 @@ class _FactoryShape:
     include_filters: bool = False
     accepts_extras: bool = False
     user_optional: bool = False
-    # The new-form path doesn't load a target and has nothing to do
-    # with `repo`, so the synthesized handler omits it; mount_form's
-    # introspection only passes kwargs the handler declares.
+    # The new-form path doesn't load a target, so the synthesized
+    # handler omits `repo`; mount_form passes only declared kwargs.
     omit_repo: bool = False
-    # Polymorphic entities' create-form takes `?kind=` as a query
-    # param; when set, the synthesized handler declares `kind: str`
-    # so the mount layer forwards it. Non-polymorphic entities ignore
-    # this flag.
+    # Polymorphic entities' create-form takes `?kind=` as a query param.
     include_kind_for_polymorphic: bool = False
 
 
@@ -444,12 +321,7 @@ def _make_factory_handler(
     extras: Callable[..., Awaitable[dict[str, Any]]] | None = None,
     extra_repos: tuple[tuple[str, type], ...] = (),
 ):
-    """Build the wrapper that the mount layer will introspect + call.
-
-    Walks `shape` to assemble the signature and the forwarding logic.
-    `handler_fn` is the corresponding `handle_<verb>` to delegate to;
-    `extras` / `extra_repos` are read by the detail/list shapes only.
-    """
+    """Build the wrapper the mount layer introspects and calls."""
     id_param = spec.id_param
     parent_id_param = spec.parent.id_param if spec.parent is not None else None
     filter_names = (
@@ -515,38 +387,14 @@ def _make_factory_handler(
 
 
 def make_delete_handler(spec: EntitySpec):
-    """Build a `mount_delete`-compatible handler from `spec`.
-
-    Synthesizes a typed signature that `mount_delete`'s introspection
-    recognizes (id param + parent id for subentities, plus `repo`,
-    `audit_repo`, `requesting_user`) and delegates to
-    `handle_delete(spec, ...)`. The wrapper's `__name__` is
-    `_handle_delete_<spec.name>` so stack traces stay readable; route
-    files assign the result to that module-level attribute so
-    contract-test patches against `<routes module>._handle_delete_<entity>`
-    flow through the mount layer's `_resolve_handler`.
-    """
     return _make_factory_handler(spec, _DELETE_SHAPE, handle_delete)
 
 
 def make_create_handler(spec: EntitySpec):
-    """Build a `mount_create`-compatible handler from `spec`.
-
-    Synthesized parameters: `parent_id` (subentities only), `payload`,
-    `repo`, `audit_repo`, `requesting_user`. Delegates to
-    `handle_create(spec, ...)`; the framework dispatches by
-    `payload.kind` when `spec.discriminator` is set.
-    """
     return _make_factory_handler(spec, _CREATE_SHAPE, handle_create)
 
 
 def make_update_handler(spec: EntitySpec):
-    """Build a `mount_update`-compatible handler from `spec`.
-
-    Synthesized parameters: `parent_id` (subentities only), the
-    target's id from the URL, `payload`, `repo`, `audit_repo`,
-    `requesting_user`. Delegates to `handle_update(spec, ...)`.
-    """
     return _make_factory_handler(spec, _UPDATE_SHAPE, handle_update)
 
 
@@ -558,26 +406,7 @@ async def handle_get_edit_form(
     repo: BaseRepository,
     requesting_user: User,
 ) -> dict[str, Any]:
-    """Generic edit-form handler driven by `spec`.
-
-    Performs: load target → 404 → write_authz → return template context
-    binding the entity under `spec.name` (so existing templates' variable
-    names — `provider`, `post` — keep working without per-entity glue).
-
-    For polymorphic entities (`spec.discriminator` set), returns
-    `template_name` in the context using `kind_spec.edit_template` so
-    `mount_form`'s template precedence renders the per-kind edit page.
-    Entities with bespoke edit-form rules keep custom handlers.
-
-    Reads from the spec:
-      - `spec.model` — class fetched via `repo.get_by_model_id`.
-      - `spec.write_authz` — invoked against the target. `None` skips
-        the gate (matches the `handle_update`/`handle_delete` shape).
-      - `spec.discriminator` — if set, populates `template_name` from
-        the discriminator-registry entry's `edit_template` attribute.
-      - `spec.static_context` — merged in for entities that declare
-        constants the form template reads (e.g. provider enum labels).
-    """
+    """Generic edit-form handler driven by `spec`."""
     target = await repo.get_by_model_id(spec.model, target_id)
     if target is None:
         raise NotFoundError(detail=f"{spec.name.capitalize()} not found")
@@ -600,12 +429,6 @@ async def handle_get_edit_form(
 
 
 def make_edit_form_handler(spec: EntitySpec):
-    """Build a `mount_form(on_existing=True)`-compatible handler from `spec`.
-
-    Synthesized parameters: `request`, the target's id from the URL,
-    `repo`, `requesting_user`. Delegates to
-    `handle_get_edit_form(spec, ...)`.
-    """
     return _make_factory_handler(spec, _EDIT_FORM_SHAPE, handle_get_edit_form)
 
 
@@ -616,19 +439,7 @@ async def handle_get_new_form(
     requesting_user: User,
     kind: str | None = None,
 ) -> dict[str, Any]:
-    """Generic create-form handler driven by `spec`.
-
-    Returns a template context with `request`, `current_user`, and any
-    `spec.static_context` constants the form template reads (enum
-    labels, etc.). For non-polymorphic entities the create-adapter is
-    bound under `schema` so templates using `field_for(schema, ...)`
-    keep working without per-entity glue. For polymorphic entities
-    (`spec.discriminator` set), `template_name` is populated from the
-    discriminator-registry entry's `create_template` so `mount_form`'s
-    template precedence renders the per-kind create page; the
-    `?kind=` query param picks the entry, defaulting to the first
-    registered kind.
-    """
+    """Generic create-form handler driven by `spec`."""
     context: dict[str, Any] = {
         "request": request,
         "current_user": requesting_user,
@@ -648,12 +459,6 @@ async def handle_get_new_form(
 
 
 def make_new_form_handler(spec: EntitySpec):
-    """Build a `mount_form(on_existing=False)`-compatible handler from `spec`.
-
-    Synthesized parameters: `request`, `requesting_user`, plus
-    `kind: str` for polymorphic entities (forwarded as the
-    `?kind=` query param). Delegates to `handle_get_new_form(spec, ...)`.
-    """
     return _make_factory_handler(spec, _NEW_FORM_SHAPE, handle_get_new_form)
 
 
@@ -667,46 +472,8 @@ async def handle_detail(
     extras: Callable[..., Awaitable[dict[str, Any]]] | None = None,
     extra_kwargs: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
-    """Generic detail handler driven by `spec`.
-
-    Performs: load target → 404 → compute `can_edit` from
-    `spec.can_write` (when set) → inject viewer-derived flags +
-    `target_<name>` projection from spec metadata → merge
-    entity-specific extras via the callable hook. The base context binds
-    the entity under `spec.name` (e.g. `"post"`, `"provider"`) so
-    existing templates that read `{{ post }}` / `{{ provider }}` keep
-    working without per-entity glue.
-
-    Viewer-derived keys, always injected before extras run:
-      - `is_self` — viewer is the subject (`target.<owner_attr or 'id'>
-        == requesting_user.id`).
-      - `can_admin_actions` — `is_admin(viewer) and not is_self`.
-      - `can_view_private` — when `spec.private_field_predicate` is set,
-        the predicate evaluated against `(viewer, target)`.
-      - `target_<name>` — when `spec.public_fields` is set, a
-        `project_view` dict with private fields gated by the predicate.
-      - Entries from `spec.static_context` — spec-declared constants
-        (registry tuples, enum lists) merged before extras so the
-        callable can still override.
-
-    `extras` is the entity's per-detail customization callable. It
-    receives the loaded target plus `request`, `requesting_user`, and
-    any keyword args in `extra_kwargs` (the route layer passes typed
-    repos this way — e.g. `user_favorite_repo` for provider detail).
-    The dict it returns is merged into the base context with
-    last-write-wins semantics; entities can override any framework-
-    injected key.
-
-    Reads from the spec:
-      - `spec.model` — class fetched via `repo.get_by_model_id`.
-      - `spec.can_write` — when set, populates `can_edit` in context.
-        Always accepts `User | None`; entities whose detail page is
-        public (`read_user_dep=None`) pass `requesting_user=None`.
-      - `spec.owner_attr` — drives the `is_self` comparison.
-      - `spec.private_field_predicate` — drives `can_view_private` and
-        gates the `target_<name>` projection.
-      - `spec.public_fields` — declares the projection shape.
-    """
+    """Generic detail handler driven by `spec`; merges spec-driven
+    context with the entity's `extras` callable (last-write-wins)."""
     target = await repo.get_by_model_id(spec.model, target_id)
     if target is None:
         raise NotFoundError(detail=f"{spec.name.capitalize()} not found")
@@ -772,14 +539,6 @@ def make_detail_handler(
     extras: Callable[..., Awaitable[dict[str, Any]]] | None = None,
     extra_repos: tuple[tuple[str, type], ...] = (),
 ):
-    """Build a `mount_detail`-compatible handler from `spec`.
-
-    Synthesized parameters: `request`, the target's id from the URL,
-    `repo`, `requesting_user: User | None`, plus one parameter per
-    `extra_repos` entry. Delegates to `handle_detail(spec, ...)` with
-    the `extras` callable passed through and `extra_repos` collected
-    into `extra_kwargs`.
-    """
     return _make_factory_handler(
         spec, _DETAIL_SHAPE, handle_detail, extras=extras, extra_repos=extra_repos
     )
@@ -795,48 +554,9 @@ async def handle_list(
     extras: Callable[..., Awaitable[dict[str, Any]]] | None = None,
     extra_kwargs: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
-    """Generic list handler driven by `spec`.
-
-    Calls ``getattr(repo, f"list_{spec.url_collection}")(**filter_values)``
-    — the per-entity repo method whose name is fixed by convention.
-    Returns the standard list-page context: ``request``, ``current_user``,
-    the items bound under ``spec.url_collection`` (e.g. ``"providers"``),
-    and a ``selected_<name>`` echo for each filter value so the filter
-    form can preselect the active selection.
-
-    ``can_admin_actions`` is auto-injected from
-    ``is_admin(requesting_user)`` — list-level templates that show
-    admin-only actions read it without per-entity glue. When the spec
-    sets ``list_exclude_self=True``, the viewer is dropped from the
-    result set by passing ``exclude_self=requesting_user`` to the repo
-    method (the repo method must accept that kwarg; anonymous viewers
-    skip the filter and see the full list). Entries from
-    ``spec.static_context`` (constants like posts' ``post_kinds`` tuple)
-    merge into the context after the filter echo and before extras.
-
-    ``extras`` is the per-entity post-fetch customization hook (matches
-    ``handle_detail``'s ``extras`` shape). It receives ``items``,
-    ``request``, ``requesting_user``, ``filter_values``, plus any
-    ``extra_kwargs``. Its returned dict merges into the context with
-    last-write-wins semantics; entities can override any framework-
-    injected key.
-
-    Reads from the spec:
-      - ``spec.url_collection`` — picks the repo method name and the
-        context key for the items list.
-      - ``spec.list_exclude_self`` — when True, drops the viewer from
-        the result set via the repo method's ``exclude_self`` kwarg.
-      - ``spec.list_order_by`` — column expression for the framework
-        default (``BaseRepository.list_default``); used when the repo
-        has no bespoke ``list_<collection>`` method.
-
-    Dispatch: prefers ``repo.list_<collection>(**filter_values)`` when
-    that method exists on the repo (entities with joins / custom
-    filters like providers). Otherwise falls through to
-    ``repo.list_default(spec.model, order_by=spec.list_order_by, ...)``
-    so trivial list-by-creation-time / list-by-name entities don't
-    need a per-entity wrapper.
-    """
+    """Generic list handler driven by `spec`; prefers
+    ``repo.list_<collection>`` and falls through to ``repo.list_default``
+    when the bespoke method doesn't exist."""
     list_kwargs: dict[str, Any] = dict(filter_values)
     if spec.list_exclude_self and requesting_user is not None:
         list_kwargs["exclude_self"] = requesting_user
@@ -890,14 +610,6 @@ def make_list_handler(
     extras: Callable[..., Awaitable[dict[str, Any]]] | None = None,
     extra_repos: tuple[tuple[str, type], ...] = (),
 ):
-    """Build a `mount_list`-compatible handler from `spec`.
-
-    Synthesized parameters: `request`, one parameter per
-    `spec.filters` entry, `repo`, `requesting_user: User | None`, and
-    one parameter per `extra_repos` entry. Delegates to
-    `handle_list(spec, ...)` with the filter values collected into
-    `filter_values` and `extra_repos` collected into `extra_kwargs`.
-    """
     return _make_factory_handler(
         spec, _LIST_SHAPE, handle_list, extras=extras, extra_repos=extra_repos
     )

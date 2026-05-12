@@ -1,20 +1,4 @@
-"""Drift guard: every `AuditAction` member is justified by a spec.
-
-`AuditAction` values are persisted forever, so the enum stays
-hand-typed (we don't generate it). But every member should be either:
-
-  - Derived from a CRUD spec's `audit_action_stem` (or its `name`
-    when the stem isn't overridden) → `CREATE_<STEM>` /
-    `UPDATE_<STEM>` / `DELETE_<STEM>`.
-  - Declared on an edge spec's `edge_audit.actions`.
-  - Declared on a CRUD spec's `state_axes[i].action`.
-  - Justified by the auth bespoke allow-list (`REGISTER`).
-
-`make_audited_resource` already raises at import time when a spec
-references a missing member (forward direction). This test enforces
-the reverse: an enum member with no spec home is dead weight and a
-sign of stale code.
-"""
+"""Drift guard: every `AuditAction` member is justified by a spec."""
 
 from src.domain.specs.post import POST_ENTITY
 from src.domain.specs.provider import PROVIDER_ENTITY

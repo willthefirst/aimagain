@@ -1,29 +1,4 @@
-"""`EntitySpec`: single declaration of a domain entity.
-
-Phase 1 of the migration described in #317. The migration is
-incremental — A1 (#317) introduced the abstraction against `users`,
-A2 (#320) extended it to the providers vertical (Provider + three
-owned subentities), and later A-series PRs will add the remaining
-clusters.
-
-`EntitySpec` is the single source of truth that layer-level sites
-read **from** for migrated entities. The mount helpers still consume
-`ResourceSpec`; an entity spec derives one via
-:meth:`EntitySpec.to_resource_spec`. Phase 2 (a later track) will
-introduce generation that binds directly against `EntitySpec`;
-phase 1 just makes the declarations load-bearing without changing any
-behavior.
-
-The dataclass intentionally stops short of carrying handler
-references on its state-axis / subresource descriptors: the spec
-sits in `src/domain/specs/` and pulling handlers in would mean
-`specs` importing `src.logic.<entity>`, which is the
-opposite of the usual layer direction and creates an import cycle
-with handlers that read from the spec. Phase 1 keeps the spec as
-*metadata*; route files supply the handler in the matching
-`mount_*` call. Phase 2 can revisit once the cycle is broken
-structurally.
-"""
+"""EntitySpec: the single declaration every framework consumer reads."""
 
 from dataclasses import dataclass, field
 from typing import Any, Callable
@@ -44,22 +19,7 @@ from src.framework.persistence.polymorphic import DiscriminatorRegistry
 
 @dataclass(frozen=True, slots=True)
 class AuthDeps:
-    """Paired FastAPI auth dependencies for read vs. write routes.
-
-    Every CRUD-shaped entity in the codebase picks from a small set of
-    auth-dep patterns:
-
-      - ``AUTHENTICATED`` — both reads and writes require any active
-        user (provider, post, the three provider credentials, favorites).
-      - ``ADMIN_FOR_WRITE`` — reads allow any active user, writes
-        require admin (users).
-
-    Hand-wired ``read_user_dep`` / ``write_user_dep`` still works for
-    one-off cases (none today). Mutually exclusive with ``AuthDeps``.
-
-    Mirrors the ``AuthzPolicy`` / ``OWNER_OR_ADMIN`` pattern that
-    collapsed the per-target authz pair onto one sentinel.
-    """
+    """Paired FastAPI auth dependencies for read vs. write routes."""
 
     read: Callable[..., Any] | None
     write: Callable[..., Any] | None
@@ -67,20 +27,7 @@ class AuthDeps:
 
 @dataclass(frozen=True, slots=True)
 class AuthzPolicy:
-    """Paired raising + predicate forms of a single authorization rule.
-
-    Every entity that mutates by per-target rule (rather than a flat
-    route-level admin dep) needs both the raising form (`write_authz`,
-    consumed by mutation handlers) and the predicate form (`can_write`,
-    bound to detail-handler `can_edit` flags). The two always encode the
-    same rule, but historically each spec wired them independently and a
-    spec-correctness test pinned the pair on each entity.
-
-    `AuthzPolicy` carries the pair as one declaration. Specs set
-    `auth_policy=OWNER_OR_ADMIN` and `EntitySpec.__post_init__` expands
-    it to populate `write_authz` + `can_write` with the matched
-    callables.
-    """
+    """Paired raising + predicate forms of a single authorization rule."""
 
     write_authz: Callable[..., None]
     can_write: Callable[..., bool]
@@ -88,18 +35,7 @@ class AuthzPolicy:
 
 @dataclass(frozen=True, slots=True)
 class RouteSet:
-    """Per-entity opt-in flags for which `mount_*` calls a route file makes.
-
-    Phase 1 reads these for documentation / test purposes only —
-    route files still call the mounts explicitly. Phase 2 will use
-    them to drive auto-mounting.
-
-    `form_new` and `form_edit` are separate because providers (the
-    first migrated entity that uses forms) mounts two `mount_form`
-    calls — one for the create form (no entity id), one for the edit
-    form (`on_existing=True`). A single `form` flag couldn't
-    distinguish.
-    """
+    """Per-entity opt-in flags for which `mount_*` calls a route file makes."""
 
     list: bool = False
     detail: bool = False
@@ -114,30 +50,9 @@ class RouteSet:
 class StateAxis:
     """One state-axis subresource on an entity (e.g. `activation` on `user`).
 
-    `handler_path` is the dotted import path of the handler the route
-    layer should bind to this axis (e.g.
-    ``"src.domain.logic.users.handlers.handle_set_user_activation"``).
-    `mount_entity` resolves it via `importlib.import_module` + `getattr`
-    at mount time, which is *after* both the spec module and the logic
-    module have been imported — so the spec module never imports from
-    `src.logic`, preserving the layer direction.
-
-    Carrying it as a string (not a callable) sidesteps the import
-    cycle that previously forced the route file to pass the handler
-    via `handlers={"activation": ...}`. Specs that pre-date this knob
-    can leave it unset and pass the handler explicitly; the explicit
-    handler wins.
-
-    `audit_snapshot` is the Pydantic class used to project a row into
-    the audit log's `before`/`after` JSON for this axis. The spec's
-    `__post_init__` builds the snapshotter once via
-    :func:`src.framework.audit.make_snapshotter` and stores it on
-    ``audit_snapshot_fn`` so the handler reads
-    ``axis.audit_snapshot_fn(target)`` instead of building its own
-    module-level snapshotter. Matches the CRUD-side
-    ``audit_snapshot → audit`` flow on ``EntitySpec`` — state axes are
-    now declaratively complete (body shape + audit action + audit
-    snapshot all live on the axis).
+    `handler_path` is a dotted import path (not a callable) so the spec
+    module never imports from `src.logic`, preserving layer direction;
+    `mount_entity` resolves it lazily via `importlib`.
     """
 
     name: str
@@ -250,32 +165,8 @@ class RelatedListSubresource:
 
 @dataclass(frozen=True, slots=True)
 class EntitySpec:
-    """Declarative identity of a domain entity.
-
-    Read by:
-      - Logic-layer handlers, for audit bindings and visibility rules
-        (`USER_ENTITY.audit`, `USER_ENTITY.private_fields`,
-        `USER_ENTITY.private_field_predicate`).
-      - Route files, via :meth:`to_resource_spec` for the `mount_*`
-        helpers, plus direct lookup for state-axis / subresource
-        shape and list-filter declarations.
-      - Spec-correctness tests
-        (`src/domain/specs/test_<entity>.py`) that assert the
-        spec declares the right things.
-
-    Construction validates pairings that would otherwise leak
-    silently — for instance, `private_fields` without a predicate
-    would silently leak the fields, `routes.create=True` without a
-    `create_adapter` would crash at first request rather than at
-    startup. Failing at import time is loud and immediate.
-
-    Owned subentities (sub-resources whose URL nests under a parent —
-    `/providers/{provider_id}/licensures/...`) set ``parent`` to
-    their parent's `EntitySpec`. :meth:`to_resource_spec` walks the
-    chain so the derived `ResourceSpec` carries
-    ``parent=parent_entity.to_resource_spec()`` — the mount layer's
-    parent-chain machinery handles path building from there.
-    """
+    """Declarative identity of a domain entity. `__post_init__`
+    validates pairings that would otherwise leak silently at runtime."""
 
     # Identity ------------------------------------------------------------
     name: str
@@ -851,23 +742,7 @@ ADMIN_FOR_WRITE: AuthDeps = AuthDeps(
 
 
 class Redirects:
-    """Canned redirect-callable factories for the `*_redirect` spec fields.
-
-    `EntitySpec.create_redirect` / `update_redirect` / `delete_redirect`
-    are callables receiving every path param the route binds as kwargs
-    (parent ids for sub-resources + the entity's own id after create /
-    update). The two shapes that occur in this codebase are:
-
-      - "send the user to the edit form" — providers + credentials all
-        redirect to `/providers/{provider_id}/form`.
-      - "send the user to the detail page" — posts redirect to
-        `/posts/{post_id}` after update.
-
-    Both factories take `collection` + `id_param` strings (so a spec
-    can self-reference via literals, sidestepping the closure-over-
-    not-yet-built-spec problem) and return a `**kwargs`-accepting
-    callable that picks the right kwarg out and formats the URL.
-    """
+    """Canned redirect-callable factories for the `*_redirect` spec fields."""
 
     @staticmethod
     def to_edit_form(collection: str, id_param: str) -> Callable[..., str]:

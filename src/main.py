@@ -13,7 +13,6 @@ from src.framework.http.middleware import StripEmptyQueryParamsMiddleware
 
 from .domain.routes import auth_pages, favorites, posts, providers, users
 
-# Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -31,12 +30,10 @@ logging.getLogger("uvicorn.access").addFilter(_HealthAccessFilter())
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Application lifespan manager for startup and shutdown events."""
     import os
 
-    # Startup
     try:
-        # In provider test mode, skip table check since tables are managed separately
+        # PROVIDER_TEST_MODE manages tables separately, so skip the check.
         skip_table_check = os.getenv("PROVIDER_TEST_MODE") == "true"
         await check_database_health(skip_table_check=skip_table_check)
     except Exception as e:
@@ -58,21 +55,15 @@ app.add_middleware(StripEmptyQueryParamsMiddleware)
 
 @app.exception_handler(HTTPException)
 async def unauthorized_exception_handler(request: Request, exc: HTTPException):
-    """
-    Custom exception handler for 401 Unauthorized errors.
-    Redirects to login page for browser requests, returns JSON for API requests.
-    """
+    """Redirect HTML 401s to /auth/login; pass JSON 401s through."""
     if exc.status_code == status.HTTP_401_UNAUTHORIZED:
-        # Check if the request accepts HTML (browser request)
         accept_header = request.headers.get("accept", "")
         if "text/html" in accept_header:
-            # Redirect to login page for browser requests with original URL as 'next' parameter
             original_url = request.url.path
             return RedirectResponse(
                 url=f"/auth/login?next={original_url}", status_code=302
             )
 
-    # For API requests or other status codes, return the original JSON response
     return JSONResponse(status_code=exc.status_code, content={"detail": exc.detail})
 
 
@@ -117,5 +108,4 @@ app.include_router(favorites.favorites_api_router, tags=["favorites"])
 
 @app.get("/health")
 async def health_check():
-    """Health check endpoint for Docker and load balancers."""
     return {"status": "healthy", "timestamp": datetime.utcnow().isoformat()}

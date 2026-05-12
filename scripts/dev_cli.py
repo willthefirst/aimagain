@@ -1,9 +1,5 @@
 #!/usr/bin/env python3
-"""
-Development CLI.
-
-This CLI provides convenient commands for common development tasks.
-"""
+"""Development CLI."""
 
 import argparse
 import subprocess
@@ -11,7 +7,6 @@ import sys
 from pathlib import Path
 from typing import List, Optional
 
-# Constants
 DOCKER_COMPOSE_DEV_FILE = "docker-compose.dev.yml"
 ENV_TEMPLATE = """# Development environment variables
 # Copy this file to .env and customize as needed
@@ -38,13 +33,10 @@ def _resolve_project_root() -> Path:
 
 
 class CLIRunner:
-    """Handles command execution and common utilities."""
-
     def __init__(self):
         self.project_root = _resolve_project_root()
 
     def run_command(self, cmd: List[str], cwd: Optional[Path] = None) -> int:
-        """Run a command and return its exit code."""
         if cwd is None:
             cwd = self.project_root
 
@@ -62,7 +54,6 @@ class CLIRunner:
             return 1
 
     def is_dev_container_running(self, service_name: str) -> bool:
-        """Check if a docker compose service has any running containers."""
         result = subprocess.run(
             [
                 "docker",
@@ -82,11 +73,7 @@ class CLIRunner:
     def wrap_for_compose(
         self, service_name: str, container_cmd: List[str]
     ) -> List[str]:
-        """Wrap a command to run inside the dev container.
-
-        Uses `docker compose exec` if the service is already running, otherwise
-        falls back to `docker compose run --rm --no-deps` for one-off invocations.
-        """
+        """Use `exec` when the service is running; `run --rm --no-deps` otherwise."""
         if self.is_dev_container_running(service_name):
             return [
                 "docker",
@@ -111,8 +98,6 @@ class CLIRunner:
         ]
 
     def check_docker_installation(self) -> bool:
-        """Check if Docker and Docker Compose are available."""
-        # Check Docker
         try:
             result = subprocess.run(
                 ["docker", "--version"], capture_output=True, text=True
@@ -131,7 +116,6 @@ class CLIRunner:
             )
             return False
 
-        # Check Docker Compose
         try:
             result = subprocess.run(
                 ["docker", "compose", "version"], capture_output=True, text=True
@@ -148,13 +132,10 @@ class CLIRunner:
 
 
 class DevCommands:
-    """Development environment commands."""
-
     def __init__(self, runner: CLIRunner):
         self.runner = runner
 
     def up(self, build: bool = False, detach: bool = False) -> int:
-        """Start the development environment."""
         print("🛠️ Starting development environment...")
 
         cmd = ["docker", "compose", "-f", DOCKER_COMPOSE_DEV_FILE, "up"]
@@ -166,7 +147,6 @@ class DevCommands:
         return self.runner.run_command(cmd)
 
     def down(self, volumes: bool = False) -> int:
-        """Stop the development environment."""
         print("🛑 Stopping development environment...")
 
         cmd = ["docker", "compose", "-f", DOCKER_COMPOSE_DEV_FILE, "down"]
@@ -176,7 +156,6 @@ class DevCommands:
         return self.runner.run_command(cmd)
 
     def logs(self, follow: bool = False, service: Optional[str] = None) -> int:
-        """Show logs from the development environment."""
         print("📋 Showing development environment logs...")
 
         cmd = ["docker", "compose", "-f", DOCKER_COMPOSE_DEV_FILE, "logs"]
@@ -188,7 +167,6 @@ class DevCommands:
         return self.runner.run_command(cmd)
 
     def restart(self, service: Optional[str] = None) -> int:
-        """Restart the development environment."""
         print("🔄 Restarting development environment...")
 
         cmd = ["docker", "compose", "-f", DOCKER_COMPOSE_DEV_FILE, "restart"]
@@ -199,8 +177,6 @@ class DevCommands:
 
 
 class TestCommands:
-    """Test-related commands."""
-
     # Tell pytest not to try collecting this class — the `Test` prefix
     # makes it look like a test class, but it's the CLI command handler.
     __test__ = False
@@ -222,7 +198,6 @@ class TestCommands:
         keywords: Optional[str] = None,
         paths: Optional[List[str]] = None,
     ) -> int:
-        """Run tests with specified options."""
         print("🧪 Running tests...")
 
         cmd = ["pytest"]
@@ -241,13 +216,10 @@ class TestCommands:
 
 
 class QualityCommands:
-    """Code quality and linting commands."""
-
     def __init__(self, runner: CLIRunner):
         self.runner = runner
 
     def lint(self) -> int:
-        """Run all linting checks."""
         print("🔍 Running linting checks...")
 
         checks = [
@@ -285,7 +257,6 @@ class QualityCommands:
         return exit_code
 
     def fmt(self) -> int:
-        """Auto-fix formatting by running black and isort in write mode."""
         print("🎨 Applying formatters...")
 
         steps = [
@@ -309,15 +280,12 @@ class QualityCommands:
 
 
 class SeedCommands:
-    """Database seeding commands."""
-
     SERVICE_NAME = "bedlam-connect-dev"
 
     def __init__(self, runner: CLIRunner):
         self.runner = runner
 
     def seed(self) -> int:
-        """Seed the dev database with fixture users."""
         # `dev seed` runs in a one-off `docker compose run --no-deps` container
         # that bypasses start-dev.sh, so migrations must be applied explicitly
         # here — otherwise a freshly added revision crashes seed against a
@@ -343,8 +311,6 @@ class SeedCommands:
 
 
 class MigrateCommands:
-    """Database migration commands (host mode)."""
-
     def __init__(self, runner: CLIRunner):
         self.runner = runner
 
@@ -370,8 +336,6 @@ class MigrateCommands:
 
 
 class PromoteAdminCommands:
-    """Promote / revoke admin status by email."""
-
     SERVICE_NAME = "bedlam-connect-dev"
 
     def __init__(self, runner: CLIRunner):
@@ -386,22 +350,11 @@ class PromoteAdminCommands:
 
 
 class RoutesCommands:
-    """Route inspection commands."""
-
     def __init__(self, runner: CLIRunner):
         self.runner = runner
 
     def list_routes(self, prefix: Optional[str] = None) -> int:
-        """Print every HTTP route registered on `src.main:app`.
-
-        Useful for spotting router shadowing — when two `include_router`
-        calls register handlers for the same path and the second one is
-        silently ignored. Without this, the only way to discover a conflict
-        is by failing tests at runtime.
-
-        Output groups routes by their path prefix (first segment) and prints
-        each as `METHOD /path  →  module.handler`.
-        """
+        """Print every HTTP route — surfaces router shadowing."""
         # Importing the FastAPI app evaluates all decorators, so DATABASE_URL
         # must be set. Use a local sqlite default to keep `dev routes`
         # runnable in a fresh checkout.
@@ -464,27 +417,21 @@ class RoutesCommands:
 
 
 class SetupCommands:
-    """Environment setup commands."""
-
     def __init__(self, runner: CLIRunner):
         self.runner = runner
 
     def setup(self) -> int:
-        """Set up the development environment."""
         print("🔧 Setting up development environment...")
 
-        # Check Docker installation
         if not self.runner.check_docker_installation():
             return 1
 
-        # Check compose file
         dev_compose_file = self.runner.project_root / DOCKER_COMPOSE_DEV_FILE
         if not dev_compose_file.exists():
             print(f"❌ Development compose file not found: {dev_compose_file}")
             return 1
         print(f"✅ Development compose file found: {dev_compose_file}")
 
-        # Create .env file if it doesn't exist
         env_file = self.runner.project_root / ".env"
         if not env_file.exists():
             print("📝 Creating .env template...")

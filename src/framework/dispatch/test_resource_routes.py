@@ -1,23 +1,5 @@
-"""Tests for `src/framework/dispatch/resource_routes.py`.
-
-Mounts a tiny stub resource against a FastAPI app and exercises the
-mount functions end-to-end. Validates that:
-  - Path params use the per-resource `id_param` name from the spec.
-  - Handlers receive `repo`, `audit_repo`, `requesting_user`, and the
-    resource id under its declared kwarg name.
-  - Response shape (status, HX-Redirect) matches the hand-written
-    equivalents.
-  - Misconfigurations (missing `write_user_dep`, sub-resource specs
-    until slice 8) raise at mount time, not at request time.
-
-Handlers in these tests use real repository types (`UserRepository`,
-`AuditRepository`, etc.) as type annotations so the signature-synthesis
-machinery in the mount layer can resolve them via the registry in
-`src.framework.dependencies`. The actual instances injected at call
-time come from `app.dependency_overrides` substitutions that return
-`SimpleNamespace` stubs — the test doesn't need a real DB, just to
-observe the kwargs that reach the handler.
-"""
+"""End-to-end tests for `src/framework/dispatch/resource_routes.py`:
+mount tiny stubs, observe kwargs that reach each handler."""
 
 from types import SimpleNamespace
 from typing import Any, Literal

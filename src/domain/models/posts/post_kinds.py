@@ -1,42 +1,4 @@
-"""Single source of truth for post kinds.
-
-`POST_KINDS` registers each kind's name, its per-kind detail
-SQLAlchemy model, the relationship attribute on `Post` that points at
-that detail, the detail row's user-facing fields, and the templates and
-labels the route/template layers render for the kind.
-
-Adding a kind requires:
-
-1. A new entry in `POST_KINDS` here — only the identity tuple (name,
-   detail_model, detail_relationship, list_label) is required; template
-   paths default to ``posts/new_<name>.html`` / ``posts/edit_<name>.html``.
-2. A new detail model under `src/domain/models/posts/<kind>_detail.py`, plus a
-   `relationship(...)` line on `Post`.
-3. The four Pydantic variant classes in `src/schemas/post.py`
-   (Read, Create, Update, AuditSnapshot).
-4. The `posts/new_<kind>.html` and `posts/edit_<kind>.html` templates
-   (the conventional names — declare an explicit `create_template=` /
-   `edit_template=` on the spec only when the file path diverges).
-5. An Alembic migration that creates the detail table and widens the
-   `posts.kind` CHECK.
-
-After that, every cross-cutting site reads from this registry: the
-model's `CheckConstraint`, the route's `Literal` for the form `?kind=`
-query parameter, the create/edit form-template dicts, the per-kind
-flatten in `_patch_response_body` and `_flatten_post_to_dict`, the
-repository's `_attach_detail` and `update_post`, and both logic-layer
-dispatch ladders (`handle_create_post`, `handle_update_post`).
-
-Removing a kind is the inverse: delete the registry entry, the detail
-model + relationship, the four Pydantic classes, the templates, and ship
-a migration that drops the detail table and narrows the CHECK. No edits
-in routes, repositories, or logic.
-
-The bookkeeping (names tuple, reverse-by-detail-model index, CHECK SQL
-generator) is provided by the generic `DiscriminatorRegistry` in
-`src/domain/models/_polymorphic.py`; this module only declares the
-post-specific `PostKindSpec` shape and the registry instance.
-"""
+"""POST_KINDS registry — see ./README.md for the cross-cutting consumer list."""
 
 from dataclasses import dataclass
 from typing import Final

@@ -32,13 +32,11 @@ def _enable_sqlite_foreign_keys(dbapi_connection, connection_record):
     cursor.close()
 
 
-# Dependency to get the raw SQLAlchemy AsyncSession
 async def get_db_session() -> AsyncGenerator[AsyncSession, None]:
     async with async_session_maker() as session:
         yield session
 
 
-# Dependency to get the FastAPI Users database adapter
 async def get_user_db(
     session: AsyncSession = Depends(get_db_session),
 ) -> SQLAlchemyUserDatabase[User, Any]:
@@ -46,27 +44,20 @@ async def get_user_db(
 
 
 async def check_database_health(skip_table_check=False) -> bool:
-    """
-    Check if the database connection is working and all required tables exist.
-    Returns True if healthy, raises an exception if not.
-    """
+    """Verify connection plus presence of all metadata tables; raise if a migration is needed."""
     logger = logging.getLogger(__name__)
 
     try:
         async with async_session_maker() as session:
-            # Test basic connection
             await session.execute(text("SELECT 1"))
             logger.debug("Database connection successful")
 
-            # Skip table check if requested (for tests)
             if skip_table_check:
                 logger.debug("Skipping table existence check")
                 return True
 
-            # Check if all required tables exist
             expected_tables = set(metadata.tables.keys())
 
-            # Query for existing tables (SQLite specific)
             result = await session.execute(
                 text("SELECT name FROM sqlite_master WHERE type='table'")
             )

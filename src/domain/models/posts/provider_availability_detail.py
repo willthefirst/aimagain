@@ -19,31 +19,7 @@ _ck = partial(named_check_in, _TABLE)
 
 
 class ProviderAvailabilityDetail(Base):
-    """Per-kind detail row for posts of `kind = 'provider_availability'`.
-
-    `post_id` is both PK and FK to `posts.id`, enforcing 1:1 with the
-    parent. CASCADE on the FK keeps the detail row in lockstep with the
-    parent's lifecycle.
-
-    Field set follows the provider-availability intake form.
-    Enum-typed columns carry CHECK constraints rendered from the
-    tuples in `../enums.py` via `check_in_tuple_sql`. Where a concept
-    appears on both forms (`location_state`, `in_person_sessions`/
-    `virtual_sessions`, `age_group`, `non_english_services`,
-    `payment_situation`) the column types and vocabularies match the
-    corresponding `client_referral_details` columns.
-
-    The three JSON multi-select columns (`desired_times`, `services`,
-    `settings`) store `list[*]` of controlled-vocabulary tokens. Storing
-    as JSON (rather than child join tables) trades SQL set semantics for
-    simplicity — all fields are read-once, render-once with no SQL
-    queries against their members today. Vocabularies are enforced by
-    the Pydantic `Literal[*TUPLE]` on the wire schemas; SQL CHECKs
-    against JSON-array members are awkward in SQLite and intentionally
-    skipped. `services` and `settings` are required-min-1 on the wire
-    (the sibling `client_referral_details` schema allows `services` to
-    be empty, and has no `settings` field).
-    """
+    """1:1 detail row for posts of kind = 'provider_availability'."""
 
     __tablename__ = _TABLE
     __table_args__ = (
