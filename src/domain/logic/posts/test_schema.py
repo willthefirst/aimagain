@@ -357,6 +357,37 @@ def test_post_create_dispatches_provider_availability():
 
 @pytest.mark.parametrize(
     "token",
+    ["group_therapy", "family_therapy", "couples_therapy"],
+)
+def test_post_create_provider_availability_accepts_new_services_tokens(token):
+    """The three service tokens added in #440 validate on PA Create."""
+    p = post_create_adapter.validate_python(
+        provider_availability_payload(services=[token])
+    )
+    assert p.services == [token]
+
+
+def test_post_create_provider_availability_accepts_day_program_setting():
+    """`day_program` setting added in #440 for program-style posts."""
+    p = post_create_adapter.validate_python(
+        provider_availability_payload(settings=["day_program"])
+    )
+    assert p.settings == ["day_program"]
+
+
+@pytest.mark.parametrize(
+    "token",
+    ["group_therapy", "family_therapy", "couples_therapy"],
+)
+def test_post_create_client_referral_accepts_new_services_tokens(token):
+    """CR shares the `CLIENT_REFERRAL_SERVICES` vocab with PA; widening
+    propagates to both (#440)."""
+    p = post_create_adapter.validate_python(client_referral_payload(services=[token]))
+    assert p.services == [token]
+
+
+@pytest.mark.parametrize(
+    "token",
     [
         "in_network",
         "out_of_network",

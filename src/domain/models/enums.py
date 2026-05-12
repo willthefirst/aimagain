@@ -112,6 +112,9 @@ CLIENT_REFERRAL_SERVICES: Final[tuple[str, ...]] = (
     "psychotherapy",
     "case_management",
     "allied_health",
+    "group_therapy",
+    "family_therapy",
+    "couples_therapy",
 )
 
 # Treatment settings categories. `provider_availability` only; required-min-1.
@@ -121,6 +124,7 @@ TREATMENT_SETTINGS: Final[tuple[str, ...]] = (
     "crisis_care",
     "php",
     "residential",
+    "day_program",
 )
 
 
@@ -189,6 +193,9 @@ CLIENT_REFERRAL_SERVICE_LABELS: Final[dict[str, str]] = {
     "psychotherapy": "Psychotherapy",
     "case_management": "Case management",
     "allied_health": "Allied health",
+    "group_therapy": "Group therapy",
+    "family_therapy": "Family therapy",
+    "couples_therapy": "Couples therapy",
 }
 TREATMENT_SETTINGS_LABELS: Final[dict[str, str]] = {
     "outpatient": "Outpatient",
@@ -196,6 +203,7 @@ TREATMENT_SETTINGS_LABELS: Final[dict[str, str]] = {
     "crisis_care": "Crisis care",
     "php": "PHP",
     "residential": "Residential",
+    "day_program": "Day program",
 }
 
 LICENSE_TYPES: Final[tuple[str, ...]] = (
