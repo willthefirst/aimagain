@@ -24,14 +24,14 @@ from src.domain.logic.posts.schema import (
     post_update_adapter,
 )
 from src.domain.models import POST_KINDS, Post
-from src.framework.dependencies import get_base_repository
-from src.framework.entity_spec import (
+from src.framework.dispatch.entity_spec import (
     AUTHENTICATED,
     OWNER_OR_ADMIN,
     EntitySpec,
     Redirects,
     RouteSet,
 )
+from src.framework.persistence.dependencies import get_base_repository
 
 POST_ENTITY: Final[EntitySpec] = EntitySpec(
     name="post",

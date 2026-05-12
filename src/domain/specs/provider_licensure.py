@@ -19,7 +19,7 @@ from src.domain.logic.providers.schema import (
 )
 from src.domain.models import ProviderLicensure
 from src.domain.specs._credential import make_provider_credential_entity
-from src.framework.entity_spec import EntitySpec
+from src.framework.dispatch.entity_spec import EntitySpec
 
 LICENSURE_ENTITY: Final[EntitySpec] = make_provider_credential_entity(
     name="provider_licensure",

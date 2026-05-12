@@ -13,7 +13,7 @@ from src.domain.models import (
     ProviderLicensure,
     User,
 )
-from src.framework.audit_repository import AuditRepository
+from src.framework.audit.repository import AuditRepository
 from tests.helpers import (
     create_test_user,
     make_provider,

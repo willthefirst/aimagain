@@ -29,9 +29,9 @@ from src.domain.specs.provider_education import EDUCATION_ENTITY
 from src.domain.specs.provider_licensure import LICENSURE_ENTITY
 from src.domain.specs.user import USER_ENTITY
 from src.domain.specs.user_favorite import FAVORITE_ENTITY
-from src.framework.audit import AuditAction
-from src.framework.entity_spec import EntitySpec
-from src.framework.resource_routes import ResourceSpec
+from src.framework.audit.core import AuditAction
+from src.framework.dispatch.entity_spec import EntitySpec
+from src.framework.dispatch.resource_routes import ResourceSpec
 
 # Canonical registry of every entity spec the codebase declares today.
 # Order matches the source-tree walk order; tests should not depend on

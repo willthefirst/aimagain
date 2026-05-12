@@ -14,7 +14,7 @@ re-derive the composition.
 
 The two forms always pair, so specs declare them together via
 `EntitySpec.auth_policy=OWNER_OR_ADMIN` — the sentinel lives next to
-`AuthzPolicy` in `src/framework/entity_spec.py` (importing the
+`AuthzPolicy` in `src/framework/dispatch/entity_spec.py` (importing the
 callables defined here) so the spec-side dataclass and its canonical
 instance stay co-located without forcing a circular import.
 """
@@ -23,7 +23,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from src.framework.exceptions import ForbiddenError
+from src.framework.http.exceptions import ForbiddenError
 
 if TYPE_CHECKING:
     from src.domain.models import User

@@ -14,13 +14,13 @@ through it.
 from pydantic import BaseModel, TypeAdapter
 
 from src.domain.specs.provider import PROVIDER_ENTITY, _provider_form_redirect
-from src.framework.dependencies import get_provider_repository
-from src.framework.entity_spec import (
+from src.framework.dispatch.entity_spec import (
     AUTHENTICATED,
     OWNER_OR_ADMIN,
     EntitySpec,
     RouteSet,
 )
+from src.framework.persistence.dependencies import get_provider_repository
 
 
 def make_provider_credential_entity(

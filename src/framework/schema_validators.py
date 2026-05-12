@@ -20,7 +20,7 @@ from typing import Annotated, ClassVar
 
 from pydantic import AfterValidator, BaseModel, ConfigDict, model_validator
 
-from src.framework.form_fields import HtmlPattern
+from src.framework.rendering.form_fields import HtmlPattern
 
 # --- Field-cleaning helpers ---------------------------------------------
 #

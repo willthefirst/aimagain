@@ -7,7 +7,7 @@ the auth_policy expansion, and the per-viewer extras binding.
 """
 
 from src.domain.specs.provider import PROVIDER_ENTITY
-from src.framework.entity_spec import AUTHENTICATED, OWNER_OR_ADMIN
+from src.framework.dispatch.entity_spec import AUTHENTICATED, OWNER_OR_ADMIN
 
 # --- Auth deps + authorization (provider-specific) -----------------------
 

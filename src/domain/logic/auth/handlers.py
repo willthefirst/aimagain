@@ -7,9 +7,9 @@ from fastapi_users.manager import BaseUserManager, UserManagerDependency
 
 from src.auth_config import get_user_manager
 from src.domain.logic.users.schema import UserAuditSnapshot, UserCreate, UserRead
-from src.framework.audit import AuditAction, make_snapshotter, record_audit
-from src.framework.audit_repository import AuditRepository
-from src.framework.dependencies import get_audit_repository
+from src.framework.audit.core import AuditAction, make_snapshotter, record_audit
+from src.framework.audit.repository import AuditRepository
+from src.framework.persistence.dependencies import get_audit_repository
 
 logger = logging.getLogger(__name__)
 

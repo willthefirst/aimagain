@@ -1,16 +1,16 @@
 # Convenience re-exports for the most-used framework symbols.
 
-from .base_router import BaseRouter, make_entity_router
-from .decorators import handle_route_errors
-from .exceptions import (
+from .dispatch.base_router import BaseRouter, make_entity_router
+from .http.decorators import handle_route_errors
+from .http.exceptions import (
     APIException,
     BadRequestError,
     ForbiddenError,
     NotFoundError,
     handle_fastapi_users_error,
 )
-from .forms import parse_and_validate_form, parse_form_to_payload, validate_or_422
-from .responses import (
+from .http.forms import parse_and_validate_form, parse_form_to_payload, validate_or_422
+from .http.responses import (
     APIResponse,
     created_response,
     deleted_response,

@@ -226,7 +226,7 @@ def main(argv: list[str] | None = None) -> int:
             print(f"  {v.message()}", file=sys.stderr)
         print(
             "\nA shared piece belongs at the layer's parent level "
-            "(e.g. src/framework/audit.py, src/domain/models/enums.py). "
+            "(e.g. src/framework/audit/core.py, src/domain/models/enums.py). "
             "See src/README.md → 'Domain entities and the cluster pattern'.",
             file=sys.stderr,
         )

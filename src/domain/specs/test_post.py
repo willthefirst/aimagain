@@ -9,7 +9,7 @@ redirect to the detail page, and the list-extras binding.
 from src.domain.logic.posts.schema import post_create_adapter, post_update_adapter
 from src.domain.models import POST_KINDS
 from src.domain.specs.post import POST_ENTITY
-from src.framework.entity_spec import AUTHENTICATED, OWNER_OR_ADMIN
+from src.framework.dispatch.entity_spec import AUTHENTICATED, OWNER_OR_ADMIN
 
 # --- Auth deps + authorization (post-specific) ---------------------------
 

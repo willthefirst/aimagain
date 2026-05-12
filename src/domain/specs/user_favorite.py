@@ -28,9 +28,8 @@ from src.domain.logic.favorites.schema import UserFavoriteAuditSnapshot
 from src.domain.models import UserFavorite
 from src.domain.specs.provider import PROVIDER_ENTITY
 from src.domain.specs.user import USER_ENTITY
-from src.framework.audit import AuditAction, make_snapshotter
-from src.framework.dependencies import get_user_favorite_repository
-from src.framework.entity_spec import (
+from src.framework.audit.core import AuditAction, make_snapshotter
+from src.framework.dispatch.entity_spec import (
     AUTHENTICATED,
     EdgeAudit,
     EntitySpec,
@@ -38,6 +37,7 @@ from src.framework.entity_spec import (
     RouteSet,
     Templates,
 )
+from src.framework.persistence.dependencies import get_user_favorite_repository
 
 FAVORITE_EDGE_AUDIT: Final[EdgeAudit] = EdgeAudit(
     resource_type="user_favorite",

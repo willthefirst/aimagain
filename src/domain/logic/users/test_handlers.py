@@ -23,7 +23,7 @@ from src.domain.logic.users.handlers import user_detail_extras
 from src.domain.logic.users.repository import UserRepository
 from src.domain.models import User
 from src.domain.specs.user import USER_ENTITY
-from src.framework.handlers import handle_detail
+from src.framework.dispatch.handlers import handle_detail
 from tests.helpers import create_test_user
 
 pytestmark = pytest.mark.asyncio

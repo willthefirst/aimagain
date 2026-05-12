@@ -7,9 +7,9 @@ from src.domain.logic.users.repository import UserRepository
 from src.domain.logic.users.schema import UserActivationUpdate
 from src.domain.models import User
 from src.domain.specs.user import USER_ENTITY
-from src.framework.audit import record_audit
-from src.framework.audit_repository import AuditRepository
-from src.framework.exceptions import NotFoundError
+from src.framework.audit.core import record_audit
+from src.framework.audit.repository import AuditRepository
+from src.framework.http.exceptions import NotFoundError
 
 logger = logging.getLogger(__name__)
 

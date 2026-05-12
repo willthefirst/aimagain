@@ -81,7 +81,7 @@ CRUD templates pull from a single `_shared/` directory rather than duplicating t
 
 A template under `<resource>/` may only `{% extends %}` / `{% include %}` / `{% from %}` / `{% import %}` from: the project root (`base.html`), its own directory, or `_shared/`. Anything else is a layering smell — the partial is *de facto* shared and belongs in `_shared/`. The rule is enforced by `scripts/dev/template_imports_check.py`, which runs as part of `dev lint` and as a pre-commit hook.
 
-1. **`_shared/form_fields.html`** — field-render macros: `text_field`, `textarea_field`, `select_field`, `filter_select_field`, `radio_bool_field`, `multi_select_field`, `time_grid_field`, plus the schema-driven `field_for` (see below). Each emits a label + control + line-breaks. The `<select>` and checkbox macros iterate over a controlled-vocabulary tuple from [`src/domain/models/enums.py`](../models/enums.py) and look display labels up in the matching `*_LABELS` dict — both registered as Jinja globals in [`src/framework/templating.py`](../../framework/templating.py). Adding a value to a tuple flows automatically to every form using these macros. `select_field` is for create/edit forms (required by default; optional disabled-placeholder); `filter_select_field` is for filter forms on list pages (never required; leading "Any" option is selectable so users can clear filters).
+1. **`_shared/form_fields.html`** — field-render macros: `text_field`, `textarea_field`, `select_field`, `filter_select_field`, `radio_bool_field`, `multi_select_field`, `time_grid_field`, plus the schema-driven `field_for` (see below). Each emits a label + control + line-breaks. The `<select>` and checkbox macros iterate over a controlled-vocabulary tuple from [`src/domain/models/enums.py`](../models/enums.py) and look display labels up in the matching `*_LABELS` dict — both registered as Jinja globals in [`src/framework/rendering/templating.py`](../../framework/rendering/templating.py). Adding a value to a tuple flows automatically to every form using these macros. `select_field` is for create/edit forms (required by default; optional disabled-placeholder); `filter_select_field` is for filter forms on list pages (never required; leading "Any" option is selectable so users can clear filters).
 2. **`_shared/forms.html`** — `inline_add_form(action, legend, submit_label, method="post")`: single-fieldset form skeleton for sub-resource add forms. Forms with multiple fieldsets stay hand-rolled.
 3. **`_shared/sections.html`** — `list_or_empty(items, list_class, empty_message)`: `<ul>`-of-items or empty-state `<p>`. Caller passes the per-row `<li>` body via `{% call(item) %}…{% endcall %}`. The `<section>`/`<h2>` wrapper is left to the caller (varies too little to be worth abstracting).
 4. **`_shared/actions.html`** — `confirm_delete_button(url, confirm_message, label="Delete")`: HTMX `hx-delete` button with confirm dialog.
@@ -90,10 +90,10 @@ The labels-vs-tuple guardrail (`test_labels_cover_their_tuples`) lives alongside
 
 ### Schema-driven `field_for`
 
-`field_for(schema, name, label, current=None, required=None)` (in `_shared/form_fields.html`) renders one labelled control by introspecting the Pydantic schema rather than restating the schema's constraints in HTML. The route handler passes the Pydantic class through the template context (e.g. `"schema": ProviderCreate`); the macro calls the `field_spec` Jinja global (which points at [`src/framework/form_fields.py`](../../framework/form_fields.py)) to derive:
+`field_for(schema, name, label, current=None, required=None)` (in `_shared/form_fields.html`) renders one labelled control by introspecting the Pydantic schema rather than restating the schema's constraints in HTML. The route handler passes the Pydantic class through the template context (e.g. `"schema": ProviderCreate`); the macro calls the `field_spec` Jinja global (which points at [`src/framework/rendering/form_fields.py`](../../framework/rendering/form_fields.py)) to derive:
 
 - `required` — from whether the field annotation is `T | None`.
-- `<select>` + choices — from `Literal[*TUPLE]`. Labels are resolved against the choice-tuple registry populated in [`src/framework/templating.py`](../../framework/templating.py).
+- `<select>` + choices — from `Literal[*TUPLE]`. Labels are resolved against the choice-tuple registry populated in [`src/framework/rendering/templating.py`](../../framework/rendering/templating.py).
 - `pattern` / `maxlength` — from any `HtmlPattern` marker attached to an `Annotated[...]` alias in [`src/framework/schema_validators.py`](../../framework/schema_validators.py). The schema's regex validator stays the source of truth; the marker exposes the same constraint to the `<input>`.
 
 Use it instead of hand-restating the schema in HTML. Hand-rolled `text_field` / `select_field` calls are still appropriate when the form intentionally diverges from the schema (e.g. a filter `<select>` whose choices are the schema's `Literal` minus an "all" sentinel).
@@ -173,7 +173,7 @@ Use HTMX for progressive enhancement of forms and interactions:
 
 ### Template context pattern
 
-Handlers pass **only resource-specific data**. Chrome scalars (`is_authenticated`, `is_admin`, `current_username`, `current_user_id`) and dev globals (`is_development`, livereload port) are merged in automatically by [`APIResponse.html_response`](../../framework/responses.py) — handlers never compute or pass them.
+Handlers pass **only resource-specific data**. Chrome scalars (`is_authenticated`, `is_admin`, `current_username`, `current_user_id`) and dev globals (`is_development`, livereload port) are merged in automatically by [`APIResponse.html_response`](../../framework/http/responses.py) — handlers never compute or pass them.
 
 The merge order (later tiers overwrite earlier ones):
 
@@ -181,7 +181,7 @@ The merge order (later tiers overwrite earlier ones):
 2. Dev/global context from `core.templating.get_template_context()`.
 3. Chrome scalars from `base_context(current_user)`.
 
-Because chrome overwrites the caller, a handler cannot accidentally lie about identity (e.g. pass `is_admin=True` for a non-admin viewer). The chrome scalars are *primitives*, not the `User` object, so templates can't reach into identity fields directly. See [`framework/responses.py`](../../framework/responses.py) for `base_context()` and `html_response()`.
+Because chrome overwrites the caller, a handler cannot accidentally lie about identity (e.g. pass `is_admin=True` for a non-admin viewer). The chrome scalars are *primitives*, not the `User` object, so templates can't reach into identity fields directly. See [`framework/http/responses.py`](../../framework/http/responses.py) for `base_context()` and `html_response()`.
 
 In practice a handler returns:
 
