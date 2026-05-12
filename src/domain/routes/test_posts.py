@@ -521,12 +521,12 @@ async def test_client_referral_form_renders_age_groups_multi_select(
     authenticated_client: AsyncClient,
     logged_in_user: User,
 ):
-    """`client_dem_age_groups` on CR renders via the multi-select arm (#432),
+    """`age_groups` on CR renders via the multi-select arm (#432),
     mirroring PA's `age_groups` (#430)."""
     response = await authenticated_client.get("/posts/form?kind=client_referral")
     assert response.status_code == 200
     tree = HTMLParser(response.text)
-    boxes = tree.css('input[type="checkbox"][name="client_dem_age_groups"]')
+    boxes = tree.css('input[type="checkbox"][name="age_groups"]')
     values = {b.attributes.get("value") for b in boxes}
     assert values == {
         "children_0_5",

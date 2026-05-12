@@ -107,7 +107,7 @@ def test_post_create_client_referral_rejects_empty_description():
         "location_zip",
         "location_in_person",
         "location_virtual",
-        "client_dem_age_groups",
+        "age_groups",
         "description",
         "insurance",
     ],
@@ -121,7 +121,7 @@ def test_post_create_client_referral_requires_all_required_fields(missing_field)
 
 def test_post_create_client_referral_optional_fields_default_none():
     p = post_create_adapter.validate_python(client_referral_payload())
-    assert p.services_psychotherapy_modality is None
+    assert p.treatment_modality is None
 
 
 def test_post_create_client_referral_default_languages():
@@ -151,29 +151,25 @@ def test_post_create_client_referral_rejects_unknown_language_token():
 
 
 def test_post_create_client_referral_accepts_multiple_age_groups():
-    """CR's `client_dem_age_groups` accepts a multi-bucket list (#432) —
+    """CR's `age_groups` accepts a multi-bucket list (#432) —
     the original single-valued `client_dem_ages` forced referrers to
     pick one when a child straddled buckets."""
     p = post_create_adapter.validate_python(
-        client_referral_payload(
-            client_dem_age_groups=["children_6_10", "preteens_11_13"]
-        )
+        client_referral_payload(age_groups=["children_6_10", "preteens_11_13"])
     )
-    assert p.client_dem_age_groups == ["children_6_10", "preteens_11_13"]
+    assert p.age_groups == ["children_6_10", "preteens_11_13"]
 
 
 def test_post_create_client_referral_rejects_empty_age_groups():
     with pytest.raises(ValidationError):
-        post_create_adapter.validate_python(
-            client_referral_payload(client_dem_age_groups=[])
-        )
+        post_create_adapter.validate_python(client_referral_payload(age_groups=[]))
 
 
 def test_post_create_client_referral_strips_optional_to_none():
     p = post_create_adapter.validate_python(
-        client_referral_payload(services_psychotherapy_modality="   ")
+        client_referral_payload(treatment_modality="   ")
     )
-    assert p.services_psychotherapy_modality is None
+    assert p.treatment_modality is None
 
 
 def test_post_create_client_referral_rejects_invalid_zip():
@@ -195,7 +191,7 @@ def test_post_create_client_referral_rejects_unknown_state():
 def test_post_create_client_referral_rejects_unknown_age_group():
     with pytest.raises(ValidationError):
         post_create_adapter.validate_python(
-            client_referral_payload(client_dem_age_groups=["too_old"])
+            client_referral_payload(age_groups=["too_old"])
         )
 
 
@@ -550,11 +546,11 @@ def test_post_create_rejects_unknown_fields_on_provider_availability():
 
 
 def test_post_create_rejects_cross_kind_field_bleed():
-    """Cross-kind field bleed must not validate. `client_dem_age_groups`
+    """Cross-kind field bleed must not validate. `location_in_person`
     is a client-referral-only field; it has no place in a PA payload."""
     with pytest.raises(ValidationError):
         post_create_adapter.validate_python(
-            provider_availability_payload(client_dem_age_groups=["adults_25_64"])
+            provider_availability_payload(location_in_person="yes")
         )
 
 

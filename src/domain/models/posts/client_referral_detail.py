@@ -44,9 +44,7 @@ class ClientReferralDetail(Base):
     )
 
     # Section 2 — demographics
-    client_dem_age_groups = Column(
-        JSON, nullable=False, server_default=text("'[]'"), default=list
-    )
+    age_groups = Column(JSON, nullable=False, server_default=text("'[]'"), default=list)
     languages = Column(
         JSON, nullable=False, server_default=text("'[\"en\"]'"), default=lambda: ["en"]
     )
@@ -56,7 +54,7 @@ class ClientReferralDetail(Base):
 
     # Section 4 — services
     services = Column(JSON, nullable=False, server_default=text("'[]'"), default=list)
-    services_psychotherapy_modality = Column(Text, nullable=True)
+    treatment_modality = Column(Text, nullable=True)
 
     # Section 5 — insurance
     insurance = Column(Text, nullable=False)
