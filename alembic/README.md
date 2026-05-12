@@ -4,7 +4,7 @@ Database migrations live here. Day-to-day operations go through the `dev migrate
 
 ## Layout
 
-- `env.py` — migration environment. Reads `DATABASE_URL` from the env, normalizes async URLs to sync for Alembic compatibility (`sqlite+aiosqlite://` → `sqlite://`, `postgresql+asyncpg://` → `postgresql://`), imports `metadata` from `src.models` for autogeneration. Errors loudly if `DATABASE_URL` is unset and no URL is configured in `alembic.ini`.
+- `env.py` — migration environment. Reads `DATABASE_URL` from the env, normalizes async URLs to sync for Alembic compatibility (`sqlite+aiosqlite://` → `sqlite://`, `postgresql+asyncpg://` → `postgresql://`), imports `metadata` from `src.domain.models` for autogeneration. Errors loudly if `DATABASE_URL` is unset and no URL is configured in `alembic.ini`.
 - `script.py.mako` — Alembic's stock migration template.
 - `versions/` — migration files. `ls alembic/versions/` is the source of truth for what's been applied.
 - `../config/alembic.ini` — Alembic configuration (database URL, logging, file paths).

@@ -10,7 +10,7 @@ Adding a kind requires:
 1. A new entry in `POST_KINDS` here — only the identity tuple (name,
    detail_model, detail_relationship, list_label) is required; template
    paths default to ``posts/new_<name>.html`` / ``posts/edit_<name>.html``.
-2. A new detail model under `src/models/posts/<kind>_detail.py`, plus a
+2. A new detail model under `src/domain/models/posts/<kind>_detail.py`, plus a
    `relationship(...)` line on `Post`.
 3. The four Pydantic variant classes in `src/schemas/post.py`
    (Read, Create, Update, AuditSnapshot).
@@ -34,7 +34,7 @@ in routes, repositories, or logic.
 
 The bookkeeping (names tuple, reverse-by-detail-model index, CHECK SQL
 generator) is provided by the generic `DiscriminatorRegistry` in
-`src/models/_polymorphic.py`; this module only declares the
+`src/domain/models/_polymorphic.py`; this module only declares the
 post-specific `PostKindSpec` shape and the registry instance.
 """
 
@@ -55,7 +55,7 @@ class PostKindSpec:
     `create_template` and ``posts/edit_<name>.html`` for `edit_template`.
     Specs only declare an explicit path when the file diverges from the
     convention; today none does. The convention plus the directory listing
-    under `src/templates/posts/` is the single source of truth for what
+    under `src/domain/templates/posts/` is the single source of truth for what
     templates a kind ships.
     """
 

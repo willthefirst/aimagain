@@ -60,7 +60,7 @@ def main() -> int:
 
     # Group changes by their containing directory under src/.
     # Top-level files like src/main.py group under "src"; nested files
-    # like src/api/routes/auth.py group under "src/api/routes".
+    # like src/domain/routes/auth.py group under "src/domain/routes".
     by_module: dict[str, set[str]] = defaultdict(set)
     for path in changed:
         if not path.startswith("src/"):

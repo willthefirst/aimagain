@@ -4,15 +4,15 @@ This file is the contract between you (the AI agent) and this codebase. Read it 
 
 ## Architecture in one line
 
-The code under `src/` is organized into three top-level buckets: **`specs/`** (entity declarations — the business surface), **`framework/`** (domain-agnostic library), and **`domain/<entity>/`** (per-entity bespoke helpers — handlers + repository + schema collocated). A new entity adds one spec file and one domain cluster. See [`src/README.md`](src/README.md) for how the buckets relate and the import discipline between them.
+The code under `src/` is organized into two top-level buckets: **`framework/`** (domain-agnostic library) and **`domain/`** (everything entity-specific, layered into `specs/`, `models/`, `logic/`, `routes/`, `templates/`). A new entity adds one file/cluster in each layer it uses. See [`src/README.md`](src/README.md) for how the buckets relate and the import discipline between them.
 
 ## Definition of done
 
 For any code change in `src/`, the change is **not done** until all four are true:
 
 1. The code change itself is in.
-2. The relevant README reflects new/changed/removed behavior — or you have explicitly verified it is still accurate. (Top-level: [`src/README.md`](src/README.md). Per-bucket: [`src/framework/README.md`](src/framework/README.md). Per-entity: [`src/domain/<entity>/README.md`](src/domain/) when one exists.)
-3. The change has test coverage that pins what changed — colocated `test_*.py` in the same directory as the changed code (framework changes get `src/framework/test_*.py`; domain changes get `src/domain/<entity>/test_*.py`; route-level smoke tests under `src/api/routes/test_*.py` for thin pass-through.)
+2. The relevant README reflects new/changed/removed behavior — or you have explicitly verified it is still accurate. (Top-level: [`src/README.md`](src/README.md). Framework: [`src/framework/README.md`](src/framework/README.md). Per-layer under `src/domain/`: see [`src/domain/specs/`](src/domain/specs/), [`src/domain/models/README.md`](src/domain/models/README.md), [`src/domain/routes/README.md`](src/domain/routes/README.md), [`src/domain/templates/README.md`](src/domain/templates/README.md). Per-entity: `src/domain/logic/<entity>/README.md` when one exists.)
+3. The change has test coverage that pins what changed — colocated `test_*.py` in the same directory as the changed code (framework changes get `src/framework/test_*.py`; per-entity logic changes get `src/domain/logic/<entity>/test_*.py`; route-level smoke tests under `src/domain/routes/test_*.py` for thin pass-through.)
 4. `dev test` passes and `dev lint` passes.
 
 If a relevant README or test file doesn't exist yet, **create it as part of the change**. Don't defer.
@@ -26,9 +26,9 @@ A Stop hook checks the diff at end-of-turn and surfaces a reminder when source f
 Each fact has exactly **one home**: the README closest to the code or config that the fact describes. Other docs link to it; they never restate it.
 
 - The CLI's command list is exposed by `dev --help` and `dev <command> --help`, generated from the argparse definitions in [`scripts/dev_cli.py`](scripts/dev_cli.py). Every other doc that wants to mention a command links to `dev --help`, not a hand-maintained restatement.
-- The three-bucket architecture lives in [`src/README.md`](src/README.md). Other READMEs link there, not duplicate it.
+- The two-bucket architecture (`framework/` vs `domain/`) lives in [`src/README.md`](src/README.md). Other READMEs link there, not duplicate it.
 - Framework behavior, conventions, and tests live in [`src/framework/README.md`](src/framework/README.md). Cross-references go upward via links.
-- Per-entity facts (cardinality decisions, polymorphism, audit quirks) live in `src/domain/<entity>/README.md` when an entity has something non-obvious to say.
+- Per-entity facts (cardinality decisions, polymorphism, audit quirks) live in `src/domain/logic/<entity>/README.md` when an entity has something non-obvious to say.
 - Migrations live in [`alembic/README.md`](alembic/README.md). Deployment in [`deployment/README.md`](deployment/README.md). Testing conventions in [`tests/README.md`](tests/README.md).
 
 If you find a fact stated in two places, **one of them is wrong** — even if both currently agree, they will drift. Pick the one closest to the code, leave it there, and replace the other with a link. The Stop hook only catches drift between code and its colocated README/test; cross-cutting drift (e.g. CLI commands documented in the root README) can only be prevented by not duplicating in the first place.
@@ -37,11 +37,11 @@ If you find a fact stated in two places, **one of them is wrong** — even if bo
 
 A parent README expresses the **grammar** of what's in the directory below it — the shape, the rules, the contract every child must follow. It does not enumerate the **alphabet** — the specific entities, files, or counts that exist today.
 
-A grammar is stable across churn: "every `domain/<entity>/` directory holds the per-entity helpers (handlers + repository + schema) for one domain entity; specs and the framework read from but do not depend on per-entity code." An alphabet drifts every time you add or rename an entity: "currently we have posts, providers, users, auth, favorites." The directory listing IS the alphabet — `ls src/specs/` and `ls src/domain/` are the source of truth for what entities exist.
+A grammar is stable across churn: "every `domain/logic/<entity>/` directory holds the per-entity helpers (handlers + repository + schema) for one domain entity; specs and the framework read from but do not depend on per-entity code." An alphabet drifts every time you add or rename an entity: "currently we have posts, providers, users, auth, favorites." The directory listing IS the alphabet — `ls src/domain/specs/` and `ls src/domain/logic/` are the source of truth for what entities exist.
 
 A useful tell: when you write "currently X" in a parent README, you're describing alphabet. Replace with the grammar (what role X plays for *any* entity) and a pointer to the directory. When you write "always", "must", or "may", you're describing grammar — keep it.
 
-The same rule applies recursively. An entity's own README (`domain/<entity>/README.md`) is the right home for facts about that specific entity — there, the entity *is* the subject, not part of an alphabet. The parent points down to entities; entities describe themselves; the parent doesn't restate them.
+The same rule applies recursively. An entity's own README (`domain/logic/<entity>/README.md`) is the right home for facts about that specific entity — there, the entity *is* the subject, not part of an alphabet. The parent points down to entities; entities describe themselves; the parent doesn't restate them.
 
 This complements the [single-source-of-truth rule](#one-source-of-truth--link-dont-copy): that rule says facts have one home; this rule says parent READMEs prefer rules over rosters.
 
@@ -57,9 +57,9 @@ If the only thing a candidate README would say is enumerate-what-`ls`-shows or r
 
 | Topic | Where it lives |
 | --- | --- |
-| Architecture, three-bucket layout, import discipline | [`src/README.md`](src/README.md) |
+| Architecture, two-bucket layout, import discipline | [`src/README.md`](src/README.md) |
 | Framework behavior (EntitySpec, mount helpers, generic handlers) | [`src/framework/README.md`](src/framework/README.md) |
-| Resource URL grammar, lifecycle, subresource conventions | [`src/api/routes/RESOURCE_GRAMMAR.md`](src/api/routes/RESOURCE_GRAMMAR.md) |
+| Resource URL grammar, lifecycle, subresource conventions | [`src/domain/routes/RESOURCE_GRAMMAR.md`](src/domain/routes/RESOURCE_GRAMMAR.md) |
 | CLI commands (`dev ...`) | `dev --help` (source: [`scripts/dev_cli.py`](scripts/dev_cli.py)) |
 | Testing conventions, fixtures | [`tests/README.md`](tests/README.md) |
 | Database migrations | [`alembic/README.md`](alembic/README.md) |
@@ -70,10 +70,10 @@ Pre-commit hooks run lint automatically — don't bypass with `--no-verify`.
 
 ## When in doubt
 
-1. Read [`src/README.md`](src/README.md) for the three-bucket layout and what may import what.
+1. Read [`src/README.md`](src/README.md) for the two-bucket layout and what may import what.
 2. Read [`src/framework/README.md`](src/framework/README.md) if you're touching the dispatch helpers, generic handlers, or audit framework.
 3. If a single change adds a new entity, follow the entity checklist in [`src/README.md`](src/README.md#adding-a-new-domain-entity) — one spec file + one domain cluster + one route file.
-4. **Before adding or modifying a resource type**, read [`src/api/routes/RESOURCE_GRAMMAR.md`](src/api/routes/RESOURCE_GRAMMAR.md) first. It's the prescriptive contract for URL shape, lifecycle states, and subresource conventions.
+4. **Before adding or modifying a resource type**, read [`src/domain/routes/RESOURCE_GRAMMAR.md`](src/domain/routes/RESOURCE_GRAMMAR.md) first. It's the prescriptive contract for URL shape, lifecycle states, and subresource conventions.
 5. **Before adding or moving a route**, run `dev routes [prefix]` to see every handler currently mounted. Catches router shadowing before tests do. Full CLI list: `dev --help` (source: [`scripts/dev_cli.py`](scripts/dev_cli.py)).
 6. **Before changing a wire or storage contract**, do the contract-surface check below.
 

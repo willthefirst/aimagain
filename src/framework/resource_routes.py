@@ -640,7 +640,7 @@ def mount_state_axis(
     """Mount ``PUT /<collection>/{<id_param>}/<axis_name>``.
 
     Implements the state-axis subresource shape from
-    ``src/api/routes/RESOURCE_GRAMMAR.md`` (lines 44-51): a PUT that
+    ``src/domain/routes/RESOURCE_GRAMMAR.md`` (lines 44-51): a PUT that
     idempotently sets a state value on a resource. Distinct from
     ``mount_update`` (PATCH on the parent for ordinary fields) — the
     response uses ``HX-Refresh: true`` instead of ``HX-Redirect`` because

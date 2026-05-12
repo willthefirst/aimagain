@@ -21,7 +21,7 @@ routes (added later), so a provider-level PATCH only touches the
 practice/availability fields.
 
 Controlled-vocabulary fields (state, license type, etc.) are typed as
-`Literal[*TUPLE]` against the tuples in `src/models/enums.py` so
+`Literal[*TUPLE]` against the tuples in `src/domain/models/enums.py` so
 the schema's accepted values stay in lockstep with the DB CHECK
 constraints. Free-text fields reuse `StrippedText` and `ZipText` from
 [`src/framework/schema_validators.py`](_validators.py) — defining them once

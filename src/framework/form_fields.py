@@ -2,7 +2,7 @@
 
 `field_spec(schema_cls, name)` introspects a Pydantic schema's
 `FieldInfo` and returns a normalized dict the `field_for` Jinja macro
-(in `src/templates/_shared/form_fields.html`) dispatches on. The point
+(in `src/domain/templates/_shared/form_fields.html`) dispatches on. The point
 is to derive the form's HTML attributes from the same Pydantic field
 that validates the request — adding a `Literal[*US_STATES]` to the
 schema flows automatically to the form's `<select>`; tightening

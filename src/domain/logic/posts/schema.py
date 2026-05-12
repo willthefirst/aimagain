@@ -9,14 +9,14 @@ table. The wire surface mirrors that shape: `PostCreate` / `PostUpdate`
 union and returns a JSON-mode dump for the audit row.
 
 The per-kind detail relationship + fields live in
-[`src/models/posts/post_kinds.py`](../models/posts/post_kinds.py) — this module's
+[`src/domain/models/posts/post_kinds.py`](../models/posts/post_kinds.py) — this module's
 `_flatten_post_to_dict` reads from that registry. Adding a kind here
 means the four Pydantic variant classes (Read/Create/Update/
 AuditSnapshot) plus their entry in the discriminated unions; everything
 else flows from the registry.
 
 Controlled-vocabulary fields (state, age group, etc.) are typed as
-`Literal[*TUPLE]` against tuples in `src/models/enums.py` so the
+`Literal[*TUPLE]` against tuples in `src/domain/models/enums.py` so the
 schema's accepted values stay in lockstep with the DB CHECK
 constraints. Free-text fields (city, ZIP, descriptions, optional
 modality strings) use the `StrippedText`, `ZipText`, and

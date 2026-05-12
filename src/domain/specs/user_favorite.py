@@ -16,7 +16,7 @@ Phase 1 makes both declarations load-bearing: handlers in
 verb→action map from `FAVORITE_ENTITY.edge_audit` instead of bespoke
 module-level constants.
 
-The route file (`src/api/routes/favorites.py`) stays hand-rolled —
+The route file (`src/domain/routes/favorites.py`) stays hand-rolled —
 the codebase has no `mount_edge_*` helper today and `RouteSet`'s
 flags don't fit edge-shaped routes. Phase 2 may introduce edge
 mount helpers later; A4 doesn't.

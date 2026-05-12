@@ -1,6 +1,6 @@
 # Framework: the domain-agnostic library
 
-The `framework/` directory contains every piece of code that turns spec data into a working HTTP app without knowing what a "user" or "post" is. Specs declare entities; this directory dispatches, audits, persists, projects, and renders for any spec the codebase points at it. Per-entity code lives in [`../domain/<entity>/`](../domain/); the canonical entity declarations live in [`../specs/`](../specs/).
+The `framework/` directory contains every piece of code that turns spec data into a working HTTP app without knowing what a "user" or "post" is. Specs declare entities; this directory dispatches, audits, persists, projects, and renders for any spec the codebase points at it. Per-entity code lives in [`../domain/logic/<entity>/`](../domain/logic/); the canonical entity declarations live in [`../domain/specs/`](../domain/specs/).
 
 Inside this directory you'll find: the `EntitySpec` dataclass and its supporting types ([`entity_spec.py`](entity_spec.py)), the route-mount helpers and `mount_entity` dispatcher ([`resource_routes.py`](resource_routes.py), [`base_router.py`](base_router.py)), the generic create/update/delete/detail/list handlers ([`handlers.py`](handlers.py)), the audit framework ([`audit.py`](audit.py), [`audit_repository.py`](audit_repository.py)), the `BaseRepository` primitives plus the dependency-injection registry ([`base_repository.py`](base_repository.py), [`dependencies.py`](dependencies.py)), the auth predicates ([`authz.py`](authz.py)), and the cross-cutting HTTP plumbing ([`responses.py`](responses.py), [`forms.py`](forms.py), [`projections.py`](projections.py), [`exceptions.py`](exceptions.py), [`middleware.py`](middleware.py), [`decorators.py`](decorators.py)), plus reusable Pydantic field validators ([`schema_validators.py`](schema_validators.py)).
 
@@ -72,7 +72,7 @@ Common utilities handle concerns that span multiple routes and domains.
 | **Forms**       | Form-encoded request glue | `parse_form_to_payload` and `validate_or_422`                | Route handlers that accept form-encoded bodies |
 | **projections** | View-projection with field-level visibility | `project_view(obj, public_fields, actor, private_fields, private_field_predicate)` — gate fields per viewer | Handlers building per-viewer response dicts (user detail today) |
 | **resource_routes** | Unified `ResourceSpec` grammar | Declare a resource once, opt into the operations to expose via `mount_*`; sub-resources nest via `parent=` | Route files for any CRUD-shaped resource (top-level and sub-resource) |
-| **entity_spec** | `EntitySpec` — single declaration of a domain entity | Audit binding, private-field visibility, route opt-ins, state-axis shape, related-list subresources, templates, parent chain for owned subentities, write_authz, body adapters, list filters, redirects. `to_resource_spec()` bridges to the mount helpers. Phase 1 of #317. | Route files + logic-layer handlers for entities migrated to this pattern (today: `users`, `providers`, the three provider-owned credentials, `posts`, and `user_favorite`). Per-entity instances live in `specs/<entity>.py`. Phase 1 is now complete — every entity is load-bearing on its spec. |
+| **entity_spec** | `EntitySpec` — single declaration of a domain entity | Audit binding, private-field visibility, route opt-ins, state-axis shape, related-list subresources, templates, parent chain for owned subentities, write_authz, body adapters, list filters, redirects. `to_resource_spec()` bridges to the mount helpers. | Route files + per-entity handlers. Per-entity instances live in `../domain/specs/<entity>.py` — see [`../domain/specs/`](../domain/specs/). Every entity is load-bearing on its spec. |
 
 ## Directory structure
 
@@ -85,8 +85,7 @@ Common utilities handle concerns that span multiple routes and domains.
 - `forms.py` - HTTP-adapter primitives for request bodies: `parse_form_to_payload(request)` (form → dict, lists for repeated keys), `validate_or_422(adapter, payload_dict)` (run a `TypeAdapter`, translate `ValidationError` to 422 with `[{"loc","msg","type"}]`), and the back-to-back wrappers `parse_and_validate_form` / `parse_and_validate_json` (form-encoded vs. JSON body — state-axis subresources use the JSON variant). Home for any HTTP-adapter primitive that two or more route modules would otherwise import from each other.
 - `projections.py` - `project_view(obj, *, public_fields, actor, private_fields=(), private_field_predicate=None)` builds a dict of `public_fields` from `obj` and conditionally appends `private_fields` when `private_field_predicate(actor, obj)` is true. Used by handlers that gate fields per viewer (today: user detail, where `email` / `is_active` / `is_verified` are visible only to the user themselves or an admin). Defense in depth alongside template-level guards: omitting keys at projection time means a forgotten `{% if %}` cannot re-leak. `ResourceSpec.private_fields` / `private_field_predicate` store the same primitives as declarative metadata so future cross-layer readers (JSON endpoint, audit snapshot, OpenAPI doc) can read the rule without rediscovering it.
 - `resource_routes.py` - Unified `ResourceSpec` + opt-in `mount_*` grammar (covers top-level *and* sub-resource CRUD via `parent=`). See [Unified resource grammar](#unified-resource-grammar) below.
-- `entity_spec.py` - `EntitySpec` dataclass: single declaration of a domain entity's identity (CRUD audit via `AuditedResource`, non-CRUD audit via `EdgeAudit`, private-field visibility, route opt-ins, state-axis shape, related-list subresources, templates, owned-subentity `parent` chain, write_authz, body adapters, list filters, HX-Redirects, `discriminator` binding for polymorphic entities, `M2NRelation` for M:N edges). Per-entity instances live under `specs/<entity>.py` and are read by route files (via `to_resource_spec()` for the mount helpers) and logic-layer handlers (for audit and visibility primitives). See [`EntitySpec`](#entityspec) below. Phase 1 of #317 is complete — every entity is load-bearing on its spec.
-- `specs/` - Per-entity `EntitySpec` instances. One file per entity (today: `user.py`, `provider.py`, `provider_licensure.py`, `provider_education.py`, `provider_certification.py`, `post.py`, `user_favorite.py`). The three provider-credential specs share a factory in `_credential.py` since their `EntitySpec` shape is identical except for identity (name/model/id_param), audit-action enums, and schemas.
+- `entity_spec.py` - `EntitySpec` dataclass: single declaration of a domain entity's identity (CRUD audit via `AuditedResource`, non-CRUD audit via `EdgeAudit`, private-field visibility, route opt-ins, state-axis shape, related-list subresources, templates, owned-subentity `parent` chain, write_authz, body adapters, list filters, HX-Redirects, `discriminator` binding for polymorphic entities, `M2NRelation` for M:N edges). Per-entity instances live under [`../domain/specs/<entity>.py`](../domain/specs/) and are read by route files (via `to_resource_spec()` for the mount helpers) and per-entity handlers (for audit and visibility primitives). See [`EntitySpec`](#entityspec) below.
 
 **Package infrastructure:**
 
@@ -145,7 +144,7 @@ Synthesis recognizes:
 
 - **`<id_param>: UUID`** (and any parent ids for sub-resources) — bound from the URL path.
 - **`repo: <RepoType>`** — `Depends(spec.repo_dep)`. The annotation is informational; the spec is the source of truth for which resolver to call.
-- **`audit_repo: AuditRepository`** and any other **`<name>: <RepoType>`** — resolved via the type→resolver registry in [`src/framework/dependencies.py`](../../repositories/dependencies.py). Adding a new repo type means adding one entry to `_REPO_TYPE_RESOLVERS`.
+- **`audit_repo: AuditRepository`** and any other **`<name>: <RepoType>`** — resolved via the type→resolver registry in [`src/framework/dependencies.py`](dependencies.py). Adding a new repo type means adding one entry to `_REPO_TYPE_RESOLVERS`.
 - **`requesting_user: User`** — `Depends(spec.read_user_dep)` on reads, `Depends(spec.write_user_dep)` on writes. Declare as **`User | None`** for routes that may run anonymously (e.g. `mount_list(..., public=True)`).
 - **`payload: <PydanticType>`** — parsed from the request body via the spec's `create_adapter` / `update_adapter` (or the mount's `body_schema` for `mount_state_axis`).
 - **Query params** — declared in the mount's `query_params=` tuple; the handler param's name must match `QueryParam.name`.
@@ -295,7 +294,7 @@ Inline-child append on create (providers' credential rows on parent-create) is h
 
 Bespoke handlers still use `mutate(...)` for audit + commit; they just own the orchestration their entity needs.
 
-The framework code itself lives in `src/framework/handlers.py` — see [`src/framework/README.md`](../../logic/README.md) for its place in the logic layer's shared tier alongside `_authz.py` and `audit.py`. The public framework-facing methods on `BaseRepository` (`get_by_model_id`, `create`, `delete`, `patch`, `add_child`, `create_polymorphic`) are documented in [`src/domain/README.md`](../../repositories/README.md).
+The framework code lives in [`handlers.py`](handlers.py); the `BaseRepository` primitives (`get_by_model_id`, `create`, `delete`, `patch`, `add_child`, `create_polymorphic`) live in [`base_repository.py`](base_repository.py) — both are framework-shared infrastructure that every domain entity reads through.
 
 ### Per-mount references
 
@@ -454,7 +453,7 @@ async def handle_update_post(post_id, payload, post_repo, requesting_user):
     await post_repo.session.commit()
     return post
 
-# api/routes/posts.py
+# src/domain/routes/posts.py
 @router.put("/posts/{post_id}")
 async def update_post(post_id: UUID, payload: PostUpdate, ...):
     return await handle_update_post(post_id, payload, post_repo, current_user)
@@ -596,6 +595,6 @@ Route-level tests under `../routes/` exercise the mounts indirectly via the reso
 
 ## Related documentation
 
-- [Routes Layer](../routes/README.md) - Route organization and patterns using common utilities
-- [Logic Layer](../../logic/README.md) - Where the API exceptions in this package get raised
-- [API Layer](../README.md) - Overall API layer architecture
+- [Routes Layer](../domain/routes/README.md) - Route organization and patterns using common utilities
+- [Per-entity logic](../domain/logic/) - Where the API exceptions in this package get raised
+- [Top-level architecture](../README.md) - The `framework/` vs `domain/` split

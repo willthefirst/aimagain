@@ -28,7 +28,7 @@ class AuditRepository(BaseRepository):
         """Persist a new audit row and flush; the caller commits.
 
         The row's `created_at` (inherited from BaseModel) doubles as the
-        audit `at` field — see `src/models/audit_log.py`.
+        audit `at` field — see `src/domain/models/audit_log.py`.
         """
         return await self._persist_new(
             AuditLog(

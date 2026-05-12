@@ -224,7 +224,7 @@ Stop at any step where the answer is "not needed yet" — subresources are added
 3. **Identify field clusters.** Group by who-can-edit and what-rules-apply. Anything off the parent's rules → field-cluster subresource. Single value → `PUT`; multi-field → `PATCH`.
 4. **Decide if revisions are needed.** Only meaningful for lifecycle resources where destructive edits are unacceptable. Default: edit-in-place.
 5. **Wire the parent CRUD** per the grammar. Use the [adding a new domain entity](../../README.md#adding-a-new-domain-entity) cross-layer checklist.
-6. **Wire each subresource.** One file under `src/api/routes/`; own schema, service method, authz, audit hook, colocated test.
+6. **Wire each subresource.** One file under `src/domain/routes/`; own schema, service method, authz, audit hook, colocated test.
 7. **Wire the form pages** as needed. **Each `/form` gets a contract test pair** in `tests/test_contract/`.
 8. **Verify the disciplines.** Universal disciplines on every mutation. If lifecycle-adopting, also: visibility filter, schema split, `POST` forces draft, `DELETE` routes to archived.
 

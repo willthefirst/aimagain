@@ -24,7 +24,7 @@ Before this extraction the four model files were flat siblings of the rest of `s
 - `provider_licensure.py`, `provider_education.py`, `provider_certification.py` each carry a `provider_id` FK back to `providers` with `ondelete="CASCADE"` — they have no meaning without a parent `Provider`.
 - All four share the table-CHECK pattern (CHECK rendered from a tuple in `../enums.py` via `check_in_tuple_sql`).
 
-Pulling them into `providers/` makes the boundary explicit. The cross-cluster shared modules (the controlled-vocabulary tuples in [`../enums.py`](../enums.py), the `BaseModel` in [`../base.py`](../base.py)) stay at the parent level because the `posts/` cluster also consumes them.
+Pulling them into `providers/` makes the boundary explicit. The cross-cluster shared modules (the controlled-vocabulary tuples in [`../enums.py`](../enums.py), the `BaseModel` in [`src/framework/base_model.py`](../../../framework/base_model.py)) stay at the parent level because the `posts/` cluster also consumes them.
 
 ## Adding a new credential sub-record type
 
@@ -36,4 +36,4 @@ If the `Provider` directory entry needs a fourth credential category (e.g. board
 4. Add a controlled-vocabulary tuple + label dict to `../enums.py` if the new record introduces one.
 5. Generate an Alembic migration for the new table.
 
-The full cross-layer recipe (Pydantic schemas, repository, logic handler, route, template) for a new resource lives in [`../../README.md`](../../README.md#adding-a-new-domain-entity); the model-layer steps above are the slice that lives in this directory.
+The full cross-layer recipe (Pydantic schemas, repository, logic handler, route, template) for a new resource lives in [`src/README.md`](../../../README.md#adding-a-new-domain-entity); the model-layer steps above are the slice that lives in this directory.

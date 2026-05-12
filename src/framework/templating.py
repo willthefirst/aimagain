@@ -14,13 +14,13 @@ _env = Environment(
 )
 
 # Expose the controlled-vocabulary tuples (and matching display-label
-# dicts) from `src/models/enums.py` as Jinja globals so per-kind
+# dicts) from `src/domain/models/enums.py` as Jinja globals so per-kind
 # form templates iterate over the same values that the schema's
 # `Literal[*TUPLE]`s and the DB CHECK constraints render from. Adding a
 # value to a tuple in `enums.py` then shows up everywhere — schema,
 # DB, and form dropdown — without per-template edits. The label dicts
 # are looked up in the form-render macro
-# (`src/templates/_shared/form_fields.html`); the
+# (`src/domain/templates/_shared/form_fields.html`); the
 # `test_labels_cover_their_tuples` guardrail asserts every value in a
 # tuple has a label.
 _env.globals.update(

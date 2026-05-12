@@ -1,7 +1,7 @@
 """`USER_ENTITY`: the single declaration of the user resource.
 
 Read by:
-  - `src/api/routes/users.py` — derives `USER_SPEC` for the mount
+  - `src/domain/routes/users.py` — derives `USER_SPEC` for the mount
     helpers and reads the activation state-axis shape.
   - `src/logic/users/user_processing.py` — reads `USER_ENTITY.audit`
     for the `mutate(...)` resource binding,
@@ -11,7 +11,7 @@ Read by:
     for the activation audit row.
 
 The related-list subresource references `PROVIDER_ENTITY` from
-`src.specs.provider` — the cross-spec reference stays
+`src.domain.specs.provider` — the cross-spec reference stays
 inside `specs/` so the layer-direction inversion that
 A1 documented (`api/common -> api/routes`) is resolved.
 """

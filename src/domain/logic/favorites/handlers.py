@@ -29,7 +29,7 @@ from src.framework.exceptions import NotFoundError
 logger = logging.getLogger(__name__)
 
 # Audit binding (resource_type, snapshot, verb→action map) lives on
-# the spec — see `src/specs/user_favorite.py`. Handlers
+# the spec — see `src/domain/specs/user_favorite.py`. Handlers
 # read it via `FAVORITE_ENTITY.edge_audit`.
 _EDGE_AUDIT = FAVORITE_ENTITY.edge_audit
 

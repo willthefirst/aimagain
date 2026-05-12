@@ -5,7 +5,7 @@ Owned subentity of `Provider`: routes nest under
 identical to the other provider credentials — see `_credential.py`
 for the shared factory.
 
-Read by `src/api/routes/providers.py` (derives `LICENSURE_SPEC` for
+Read by `src/domain/routes/providers.py` (derives `LICENSURE_SPEC` for
 the mount helpers) and `src/logic/providers/provider_processing.py`
 (reads `LICENSURE_ENTITY.audit` for the `mutate(...)` binding).
 """
