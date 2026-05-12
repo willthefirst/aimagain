@@ -22,6 +22,7 @@ from src.framework.persistence.base_repository import BaseRepository
 from tests.helpers import (
     create_test_user,
     make_client_referral_detail,
+    make_provider,
     make_provider_availability_detail,
 )
 
@@ -34,6 +35,22 @@ async def _seed_owner(db_test_session_manager):
         async with session.begin():
             session.add(owner)
     return owner
+
+
+async def _seed_owner_and_provider(db_test_session_manager, **provider_overrides):
+    """Seed a User + a Provider owned by them. Returns `(owner, provider)`.
+
+    PA detail rows point at a Provider via `provider_id` FK (#448); persistence
+    tests that flush a `ProviderAvailabilityDetail` need a real provider row
+    in the DB to satisfy the FK.
+    """
+    owner = create_test_user(username=f"owner-{uuid.uuid4()}")
+    provider = make_provider(owner_id=owner.id, **provider_overrides)
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            session.add(owner)
+            session.add(provider)
+    return owner, provider
 
 
 async def _create_post(repo, post, detail):
@@ -219,12 +236,14 @@ async def test_delete_post_cascades_client_referral_detail(
 async def test_create_post_persists_parent_and_provider_availability_detail(
     db_test_session_manager: async_sessionmaker[AsyncSession],
 ):
-    owner = await _seed_owner(db_test_session_manager)
+    owner, provider = await _seed_owner_and_provider(
+        db_test_session_manager, practice_name="Acme Health"
+    )
 
     async with db_test_session_manager() as session:
         repo = BaseRepository(session)
         post = Post(kind="provider_availability", owner_id=owner.id)
-        detail = make_provider_availability_detail(practice_name="Acme Health")
+        detail = make_provider_availability_detail(provider_id=provider.id)
         created = await _create_post(repo, post, detail)
         await session.commit()
         post_id = created.id
@@ -249,18 +268,21 @@ async def test_create_post_persists_parent_and_provider_availability_detail(
         assert post_row is not None
         assert post_row.kind == "provider_availability"
         assert detail_row is not None
-        assert detail_row.practice_name == "Acme Health"
+        # Practice name lives on the linked Provider now (#448).
+        assert detail_row.provider_id == provider.id
+        assert detail_row.provider.practice_name == "Acme Health"
 
 
 async def test_create_post_round_trips_free_text_fields(
     db_test_session_manager: async_sessionmaker[AsyncSession],
 ):
     """`description`, `referral_instructions`, `website` persist + read back."""
-    owner = await _seed_owner(db_test_session_manager)
+    owner, provider = await _seed_owner_and_provider(db_test_session_manager)
 
     async with db_test_session_manager() as session:
         repo = BaseRepository(session)
         detail = make_provider_availability_detail(
+            provider_id=provider.id,
             description="Lead pitch",
             referral_instructions="Email the coordinator",
             website="example.com",
@@ -295,14 +317,16 @@ async def test_create_post_free_text_fields_default_null(
 ):
     """Omitting the three new fields persists them as NULL — additive
     columns must not break a row that doesn't supply them."""
-    owner = await _seed_owner(db_test_session_manager)
+    owner, provider = await _seed_owner_and_provider(
+        db_test_session_manager, practice_name="No-extras"
+    )
 
     async with db_test_session_manager() as session:
         repo = BaseRepository(session)
         created = await _create_post(
             repo,
             Post(kind="provider_availability", owner_id=owner.id),
-            make_provider_availability_detail(practice_name="No-extras"),
+            make_provider_availability_detail(provider_id=provider.id),
         )
         await session.commit()
         post_id = created.id
@@ -327,14 +351,16 @@ async def test_create_post_free_text_fields_default_null(
 async def test_update_post_writes_to_provider_availability_detail(
     db_test_session_manager: async_sessionmaker[AsyncSession],
 ):
-    owner = await _seed_owner(db_test_session_manager)
+    owner, provider = await _seed_owner_and_provider(db_test_session_manager)
 
     async with db_test_session_manager() as session:
         repo = BaseRepository(session)
         created = await _create_post(
             repo,
             Post(kind="provider_availability", owner_id=owner.id),
-            make_provider_availability_detail(practice_name="Acme"),
+            make_provider_availability_detail(
+                provider_id=provider.id, description="orig"
+            ),
         )
         await session.commit()
         post_id = created.id
@@ -342,8 +368,10 @@ async def test_update_post_writes_to_provider_availability_detail(
     async with db_test_session_manager() as session:
         repo = BaseRepository(session)
         post = await repo.get_by_model_id(Post, post_id)
+        # Practice-name lives on Provider post-#448, so this round-trips a
+        # remaining PA field (`description`) instead.
         await repo.patch(
-            post.provider_availability_detail, practice_name="Acme Renamed"
+            post.provider_availability_detail, description="new description"
         )
         await session.commit()
 
@@ -359,7 +387,7 @@ async def test_update_post_writes_to_provider_availability_detail(
             .scalars()
             .first()
         )
-        assert detail_row.practice_name == "Acme Renamed"
+        assert detail_row.description == "new description"
 
 
 async def test_delete_post_cascades_provider_availability_detail(
@@ -367,14 +395,16 @@ async def test_delete_post_cascades_provider_availability_detail(
 ):
     """Deleting a provider_availability parent removes its detail row via
     FK CASCADE."""
-    owner = await _seed_owner(db_test_session_manager)
+    owner, provider = await _seed_owner_and_provider(
+        db_test_session_manager, practice_name="Doomed"
+    )
 
     async with db_test_session_manager() as session:
         repo = BaseRepository(session)
         created = await _create_post(
             repo,
             Post(kind="provider_availability", owner_id=owner.id),
-            make_provider_availability_detail(practice_name="Doomed"),
+            make_provider_availability_detail(provider_id=provider.id),
         )
         await session.commit()
         post_id = created.id

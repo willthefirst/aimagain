@@ -1,14 +1,13 @@
 from functools import partial
 
 from sqlalchemy import JSON, Boolean, Column, ForeignKey, Text, text
+from sqlalchemy.orm import relationship
 from sqlalchemy.types import Uuid
 
 from src.framework.persistence.base_model import Base
 
 from ..enums import (
     INSURANCE_OPTIONS,
-    LOCATION_AVAILABILITY_OPTIONS,
-    US_STATES,
     named_check_in,
 )
 
@@ -17,15 +16,15 @@ _ck = partial(named_check_in, _TABLE)
 
 
 class ProviderAvailabilityDetail(Base):
-    """1:1 detail row for posts of kind = 'provider_availability'."""
+    """1:1 detail row for posts of kind = 'provider_availability'.
+
+    Practice + location + delivery-format fields live on the linked
+    `Provider` via `provider_id` (#448); this row only carries fields
+    that are *per-announcement*, not steady-state practice properties.
+    """
 
     __tablename__ = _TABLE
-    __table_args__ = (
-        _ck("location_state", US_STATES),
-        _ck("in_person_sessions", LOCATION_AVAILABILITY_OPTIONS),
-        _ck("virtual_sessions", LOCATION_AVAILABILITY_OPTIONS),
-        _ck("payment_situation", INSURANCE_OPTIONS),
-    )
+    __table_args__ = (_ck("payment_situation", INSURANCE_OPTIONS),)
 
     post_id = Column(
         Uuid(as_uuid=True),
@@ -33,17 +32,17 @@ class ProviderAvailabilityDetail(Base):
         primary_key=True,
     )
 
-    # Section 1 — provider information
-    practice_name = Column(Text, nullable=False)
-
-    # Section 2 — location
-    location_city = Column(Text, nullable=True)
-    location_state = Column(Text, nullable=False)
-    location_zip = Column(Text, nullable=True)
+    # FK to the practice this announcement is for. Practice name, location,
+    # and delivery format all live on the linked `Provider` — looked up via
+    # `provider.*` in templates and read projections.
+    provider_id = Column(
+        Uuid(as_uuid=True),
+        ForeignKey("providers.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    provider = relationship("Provider", lazy="selectin")
 
     # Section 3 — availability
-    in_person_sessions = Column(Text, nullable=True)
-    virtual_sessions = Column(Text, nullable=True)
     desired_times = Column(
         JSON, nullable=False, server_default=text("'[]'"), default=list
     )

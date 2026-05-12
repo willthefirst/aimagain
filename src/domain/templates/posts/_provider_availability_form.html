@@ -7,27 +7,23 @@ Used by both `posts/new_provider_availability.html` (create) and
   - `action`: the form submit URL
   - `submit_label`: the visible submit-button text
   - `post`: the persisted Post (for edit) or `None` (for create)
+  - `current_user`: the requesting User; `current_user.providers` is
+    the dropdown's option source (#448).
 
-Field set follows `notes/forms_spec.md` Form 2.
-
-The `desired_times` checkbox grid sends form-encoded data with multiple
-values for the same field name. The form naturally encodes multiple
-checkboxes as `desired_times=monday_morning&desired_times=friday_evening`,
-which FastAPI/Pydantic parses as a list.
+Practice + location + delivery format all live on the linked Provider
+via `provider_id` (#448) — this form is the *announcement*, not the
+practice. The wrapper templates `new_provider_availability.html` /
+`edit_provider_availability.html` redirect to the provider-create flow
+when `current_user.providers` is empty, so this macro always renders
+with at least one provider available.
 #}
 {%- from "_shared/form_fields.html" import text_field, textarea_field, select_field, radio_bool_field, time_grid_field, multi_select_field, field_for -%}
-{%- macro provider_availability_form(hx_method, action, submit_label, post=None, schema=None) -%}
+{%- macro provider_availability_form(hx_method, action, submit_label, post=None, schema=None, current_user=None) -%}
 {%- set d = post.provider_availability_detail if post else None -%}
 <form hx-{{ hx_method }}="{{ action }}">
   <input type="hidden" name="kind" value="provider_availability" />
 
-  {# About: free-text core fields — description / referral / website.
-     These three are the canonical use of `field_for` in this form; every
-     other field below is still hand-wired pending a follow-up sweep.
-     `schema` is `ProviderAvailabilityCreate` (passed by the parent
-     template via the Jinja global of the same name) — Create-side
-     required-ness is the right input for both create and edit because
-     all three are optional in both. #}
+  {# About: free-text core fields — description / referral / website. #}
   <fieldset>
     <legend>About</legend>
     {{ field_for(schema, "description", "Description", current=d.description if d else None) }}
@@ -36,21 +32,22 @@ which FastAPI/Pydantic parses as a list.
   </fieldset>
 
   <fieldset>
-    <legend>Provider information</legend>
-    {{ text_field("practice_name", "Practice name", current=d.practice_name if d else None) }}
-  </fieldset>
-
-  <fieldset>
-    <legend>Location</legend>
-    {{ text_field("location_city", "City (leave blank for telehealth-only)", current=d.location_city if d else None, required=false) }}
-    {{ select_field("location_state", "State", US_STATES, current=d.location_state if d else None, placeholder=true) }}
-    {{ text_field("location_zip", "ZIP (optional)", current=d.location_zip if d else None, pattern="\\d{5}", maxlength=5, required=false) }}
+    <legend>Provider</legend>
+    <label for="provider_id">
+      Which provider profile is this availability for?
+      <select id="provider_id" name="provider_id" required>
+        {%- if not d %}
+        <option value="" disabled selected>--</option>
+        {%- endif %}
+        {%- for p in current_user.providers %}
+        <option value="{{ p.id }}"{% if d and d.provider_id == p.id %} selected{% endif %}>{{ p.practice_name }}</option>
+        {%- endfor %}
+      </select>
+    </label>
   </fieldset>
 
   <fieldset>
     <legend>Availability</legend>
-    {{ select_field("in_person_sessions", "In-person sessions", LOCATION_AVAILABILITY_OPTIONS, labels=LOCATION_AVAILABILITY_LABELS, current=d.in_person_sessions if d else None, placeholder=true, required=false) }}
-    {{ select_field("virtual_sessions", "Virtual sessions", LOCATION_AVAILABILITY_OPTIONS, labels=LOCATION_AVAILABILITY_LABELS, current=d.virtual_sessions if d else None, placeholder=true, required=false) }}
     {{ time_grid_field("desired_times", "Desired times (optional)", current=d.desired_times if d else None) }}
     {{ field_for(schema, "schedule_text", "Schedule notes (e.g. start date, cohort dates, fixed program hours)", current=d.schedule_text if d else None) }}
   </fieldset>

@@ -3,8 +3,12 @@
 {% block title %}New provider availability{% endblock %}
 {% block content %}
 <h1>New provider availability</h1>
+{% if not current_user.providers %}
+<p>You need a provider profile before posting availability. <a href="/providers/form">Create your provider profile</a>, then return here.</p>
+{% else %}
 <p>Per <code>notes/forms_spec.md</code>. No PII.</p>
-{{ provider_availability_form("post", "/posts", "Create provider availability", schema=provider_availability_create_schema) }}
+{{ provider_availability_form("post", "/posts", "Create provider availability", schema=provider_availability_create_schema, current_user=current_user) }}
+{% endif %}
 
 <hr />
 <a href="/posts">Back to posts</a>

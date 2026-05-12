@@ -64,7 +64,9 @@ async def test_each_post_has_populated_detail_relationship(db_test_session_manag
         )
         details = list(result.scalars().all())
 
-    practice_names = {d.practice_name for d in details}
+    # Practice name lives on the linked Provider (#448); dereference via
+    # the FK relationship on the detail row.
+    practice_names = {d.provider.practice_name for d in details}
     assert practice_names == {"Katie Reeves, PhD", "Camp BooHoo", "RISE IOP at CHC"}
 
 

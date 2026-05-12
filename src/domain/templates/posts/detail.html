@@ -3,7 +3,7 @@
 {%- if post.kind == "client_referral" -%}
 Client referral
 {%- elif post.kind == "provider_availability" -%}
-Provider availability: {{ post.provider_availability_detail.practice_name }}
+Provider availability: {{ post.provider_availability_detail.provider.practice_name }}
 {%- endif -%}
 {% endblock %}
 {% block content %}
@@ -49,23 +49,20 @@ Provider availability: {{ post.provider_availability_detail.practice_name }}
   {% if d.description %}
   <p class="post-description">{{ d.description }}</p>
   {% endif %}
+  {% set p = d.provider %}
   <dl>
     <dt>Practice name</dt>
-    <dd>{{ d.practice_name }}</dd>
+    <dd><a href="/providers/{{ p.id }}">{{ p.practice_name }}</a></dd>
     {% if d.website %}
     <dt>Website</dt>
     <dd><a href="{{ d.website }}" target="_blank" rel="noopener noreferrer">{{ d.website }}</a></dd>
     {% endif %}
     <dt>Location</dt>
-    <dd>{% if d.location_city %}{{ d.location_city }}, {% endif %}{{ d.location_state }}{% if d.location_zip %} {{ d.location_zip }}{% endif %}</dd>
-    {% if d.in_person_sessions %}
+    <dd>{{ p.location_city }}, {{ p.location_state }} {{ p.location_zip }}</dd>
     <dt>In-person sessions</dt>
-    <dd>{{ LOCATION_AVAILABILITY_LABELS[d.in_person_sessions] }}</dd>
-    {% endif %}
-    {% if d.virtual_sessions %}
+    <dd>{{ LOCATION_AVAILABILITY_LABELS[p.in_person_sessions] }}</dd>
     <dt>Virtual sessions</dt>
-    <dd>{{ LOCATION_AVAILABILITY_LABELS[d.virtual_sessions] }}</dd>
-    {% endif %}
+    <dd>{{ LOCATION_AVAILABILITY_LABELS[p.virtual_sessions] }}</dd>
     {% if d.desired_times %}
     <dt>Desired times</dt>
     <dd>{% for slot in d.desired_times %}{{ DESIRED_TIME_SLOT_LABELS[slot] }}{% if not loop.last %}, {% endif %}{% endfor %}</dd>

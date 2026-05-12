@@ -66,12 +66,6 @@ _PROVIDER_AVAILABILITY_DEFAULTS: dict[str, Any] = {
     "description": None,
     "referral_instructions": None,
     "website": None,
-    "practice_name": "Acme Health",
-    "location_city": "Springfield",
-    "location_state": "IL",
-    "location_zip": "62701",
-    "in_person_sessions": "yes",
-    "virtual_sessions": "no",
     "desired_times": [],
     "schedule_text": None,
     # PA requires min-1 service on the wire — pick a stable default that
@@ -96,11 +90,19 @@ def client_referral_payload(**overrides: Any) -> dict[str, Any]:
     return {"kind": "client_referral", **_CLIENT_REFERRAL_DEFAULTS, **overrides}
 
 
+# Stub provider_id for schema-validation tests that never hit the DB.
+# Real round-trip tests pass an actual Provider's id via the kwarg.
+_STUB_PROVIDER_ID = uuid.UUID("00000000-0000-0000-0000-000000000001")
+
+
 def provider_availability_payload(**overrides: Any) -> dict[str, Any]:
     """Build a wire-valid `kind='provider_availability'` create/update payload.
-    Returns a fresh dict each call."""
+    Returns a fresh dict each call. `provider_id` defaults to a stub UUID
+    that passes Pydantic validation but does *not* exist in the DB —
+    tests that actually persist must pass a real provider_id override."""
     return {
         "kind": "provider_availability",
+        "provider_id": str(_STUB_PROVIDER_ID),
         **_PROVIDER_AVAILABILITY_DEFAULTS,
         **overrides,
     }
@@ -111,10 +113,15 @@ def make_client_referral_detail(**overrides: Any) -> ClientReferralDetail:
     return ClientReferralDetail(**{**_CLIENT_REFERRAL_DEFAULTS, **overrides})
 
 
-def make_provider_availability_detail(**overrides: Any) -> ProviderAvailabilityDetail:
-    """Build a `ProviderAvailabilityDetail` ORM row with spec-compliant defaults."""
+def make_provider_availability_detail(
+    *, provider_id: UUID, **overrides: Any
+) -> ProviderAvailabilityDetail:
+    """Build a `ProviderAvailabilityDetail` ORM row with spec-compliant
+    defaults. `provider_id` is a required kwarg — PA points at a Provider
+    (#448), and forgetting the FK should be a `TypeError` at construction
+    rather than a NOT NULL violation at flush."""
     return ProviderAvailabilityDetail(
-        **{**_PROVIDER_AVAILABILITY_DEFAULTS, **overrides}
+        provider_id=provider_id, **{**_PROVIDER_AVAILABILITY_DEFAULTS, **overrides}
     )
 
 
