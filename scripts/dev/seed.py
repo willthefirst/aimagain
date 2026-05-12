@@ -64,7 +64,7 @@ FIXTURE_PROVIDER_AVAILABILITY: list[FixtureProviderAvailability] = [
                 "management visits and 50-minute therapy sessions."
             ),
             "referral_instructions": "Contact via website to schedule an intake call.",
-            "website": "katiereevesphd.com",
+            "website": "https://katiereevesphd.com",
             "location_state": "CA",
             "in_person_sessions": "no",
             "virtual_sessions": "yes",
@@ -97,7 +97,7 @@ FIXTURE_PROVIDER_AVAILABILITY: list[FixtureProviderAvailability] = [
                 "Visit our website to download the intake packet, then email "
                 "campbooohoo@example.com to reserve a cohort spot."
             ),
-            "website": "boohoocrybaby.com",
+            "website": "https://boohoocrybaby.com",
             "location_city": "Santa Clara",
             "location_state": "CA",
             "in_person_sessions": "yes",
@@ -128,7 +128,7 @@ FIXTURE_PROVIDER_AVAILABILITY: list[FixtureProviderAvailability] = [
             "referral_instructions": (
                 "Please contact the program coordinator for intake details."
             ),
-            "website": "CHC.rise.org",
+            "website": "https://chc.rise.org",
             "location_city": "Palo Alto",
             "location_state": "CA",
             "location_zip": "94304",

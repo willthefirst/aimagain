@@ -915,9 +915,9 @@ async def test_provider_availability_form_renders_free_text_fields(
 ):
     """The three free-text fields render through `field_for` — `description`
     and `referral_instructions` as `<textarea>` (driven by the `HtmlTextarea`
-    marker on the schema), `website` as `<input type=text>`. A regression
-    where `HtmlTextarea` stops being picked up would render the first two as
-    `<input>` and silently break the form."""
+    marker on the schema), `website` as `<input type="url">` (driven by
+    `HtmlUrl` — #446). A regression where either marker stops being picked
+    up would render fields as the wrong control and silently break the form."""
     response = await authenticated_client.get("/posts/form?kind=provider_availability")
     assert response.status_code == 200
     tree = HTMLParser(response.text)
@@ -925,7 +925,7 @@ async def test_provider_availability_form_renders_free_text_fields(
     assert tree.css_first("textarea#referral_instructions") is not None
     website = tree.css_first("input#website")
     assert website is not None
-    assert website.attributes.get("type", "text") == "text"
+    assert website.attributes.get("type") == "url"
 
 
 async def test_provider_availability_form_renders_languages_multi_select(
