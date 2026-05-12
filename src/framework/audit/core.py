@@ -1,33 +1,7 @@
 """Audit-log helper for mutation handlers.
 
-Wraps `AuditRepository.record(...)` with the calling convention used by the
-handlers in `src/logic/`. Handlers call this once per mutation, **inside the
-same transaction** as the mutation itself — the discipline in
-`RESOURCE_GRAMMAR.md:135` requires the audit row to be durable iff the
-mutation is. The handler still owns the commit.
-
-`actor_id` is `None` for unauthenticated mutations (e.g. self-signup); the
-schema permits it.
-
-`AuditAction` is the closed vocabulary of mutation kinds. Add a member here
-when wiring `record_audit` into a new mutation handler; never reuse an
-existing value for a different semantic — values are persisted forever and
-existing rows depend on the meaning being stable.
-
-`AuditedResource` bundles the three things that always vary together for a
-CRUD-shaped resource: the persisted `resource_type` string, the
-create/update/delete `AuditAction` triple, and the snapshotter that builds
-the row's `before`/`after` JSON. Declare one per audited resource alongside
-your `handle_*` definitions and call `record_audit_for(...)` instead of
-re-typing the three constants at every callsite. Non-CRUD audits (register,
-set-activation, etc.) keep using `record_audit(...)` directly.
-
-`mutate(...)` is an async context manager that wraps the snapshot-before /
-mutate / record_audit / commit ritual. Inside the `async with` body the
-caller does the actual mutation; on a clean exit the context manager
-captures the post-mutation snapshot, records the audit row, and commits.
-On an exception the audit row is not written and no commit fires, so the
-transaction rolls back atomically.
+The audit row is written in the same transaction as the mutation itself
+— the row is durable iff the mutation is (RESOURCE_GRAMMAR.md:135).
 """
 
 import logging
@@ -48,14 +22,7 @@ logger = logging.getLogger(__name__)
 def make_snapshotter(
     schema_cls: type[BaseModel],
 ) -> Callable[[Any], dict[str, Any]]:
-    """Build a snapshotter that validates an ORM row through `schema_cls`
-    and returns a JSON-mode dict.
-
-    Used by `AuditedResource.snapshot` and by handlers calling
-    `record_audit(before=..., after=...)` directly. Centralizes the
-    `SchemaCls.model_validate(obj).model_dump(mode="json")` chain so
-    audit-row snapshots have one shape across the codebase.
-    """
+    """Build a snapshotter that validates `obj` through `schema_cls` to a JSON-mode dict."""
 
     def _snapshot(obj: Any) -> dict[str, Any]:
         return schema_cls.model_validate(obj).model_dump(mode="json")
@@ -64,12 +31,8 @@ def make_snapshotter(
 
 
 class AuditAction(str, Enum):
-    """Closed vocabulary of mutation actions recorded in the audit log.
-
-    Inherits from `str` so values serialize transparently into the
-    `audit_log.action` column and equality comparisons against raw strings
-    keep working (`AuditAction.CREATE_POST == "create_post"` is True).
-    """
+    """Closed vocabulary of mutation actions; `str` base lets values serialize
+    transparently and compare equal to raw strings (persisted forever)."""
 
     CREATE_POST = "create_post"
     UPDATE_POST = "update_post"
@@ -100,23 +63,7 @@ Verb = Literal["create", "update", "delete"]
 
 @dataclass(frozen=True, slots=True)
 class AuditedResource:
-    """Declarative bundle for a CRUD-shaped audited resource.
-
-    Module-level constants are the intended use. The
-    `make_audited_resource(name, snapshot_schema)` factory derives the
-    create/update/delete `AuditAction` triple from the name by
-    convention (`CREATE_<NAME.upper()>`, ...), so callers don't retype
-    the enum stems:
-
-        PROVIDER = make_audited_resource("provider", ProviderAuditSnapshot)
-
-    Each handler then calls `record_audit_for(audit_repo, resource=PROVIDER,
-    verb="update", ...)` instead of typing `resource_type=`, `action=`, and
-    a per-resource `_snapshot_X` wrapper at every callsite.
-
-    `AuditAction` membership is intentionally *not* derived from this dataclass:
-    enum values are persisted forever and must stay explicit.
-    """
+    """Declarative bundle for a CRUD-shaped audited resource."""
 
     type: str
     snapshot: Callable[[Any], dict[str, Any]]
@@ -134,24 +81,7 @@ def make_audited_resource(
     *,
     action_stem: str | None = None,
 ) -> AuditedResource:
-    """Build an `AuditedResource` from a name + snapshot.
-
-    The create/update/delete `AuditAction` members are looked up by
-    convention: `CREATE_<STEM>`, `UPDATE_<STEM>`, `DELETE_<STEM>` where
-    `<STEM>` defaults to `name.upper()`. Entities whose enum stems
-    diverge from `name` pass `action_stem` explicitly (e.g. the
-    `provider_licensure` entity's actions are `CREATE_LICENSURE`,
-    not `CREATE_PROVIDER_LICENSURE`).
-
-    `snapshot` may be either a callable (used as-is) or a Pydantic
-    schema class (wrapped via `make_snapshotter`). The two-form input
-    matches the two callsites: most specs pass a schema class; posts
-    pass a hand-rolled discriminated-union snapshot callable.
-
-    Raises `ValueError` at import time if any of the three derived
-    `AuditAction` members is missing — the failure surfaces before
-    serving traffic.
-    """
+    """Build an `AuditedResource` from a name + snapshot."""
     stem = (action_stem or name).upper()
     if isinstance(snapshot, type) and issubclass(snapshot, BaseModel):
         snapshot_fn: Callable[[Any], dict[str, Any]] = make_snapshotter(snapshot)
@@ -206,9 +136,7 @@ async def record_audit_for(
     before: dict[str, Any] | None = None,
     after: dict[str, Any] | None = None,
 ) -> AuditLog:
-    """Record an audit row for `resource` + `verb`, deriving `resource_type`
-    and `action` from the `AuditedResource` declaration. The caller still
-    supplies the snapshots and the actor."""
+    """Record an audit row for `resource` + `verb`."""
     return await record_audit(
         audit_repo,
         actor_id=actor_id,
@@ -230,26 +158,9 @@ async def mutate(
     resource: AuditedResource,
     verb: Verb,
 ):
-    """Wrap the snapshot-before / mutate / record_audit / commit ritual.
-
-    Use inside a mutation handler:
-
-        async with mutate(repo, audit_repo, actor=user, target=licensure,
-                          resource=LICENSURE, verb="update"):
-            await repo.update_licensure(licensure, **payload.model_dump(exclude_unset=True))
-
-    Snapshot timing:
-      - `before` is captured before yielding (None for `verb="create"`).
-      - `after` is captured after the body returns (None for `verb="delete"`).
-      - `target.id` is captured up-front so a delete still has it after
-        the row is gone.
-
-    Exceptions raised in the body propagate; the audit row and commit
-    are skipped, so the transaction rolls back atomically. This is the
-    load-bearing contract: a mutation that raises must not produce an
-    audit row, and an audit row must never be durable without its
-    matching mutation.
-    """
+    """Snapshot-before / mutate / record_audit / commit ritual. Exceptions
+    skip the audit row and commit so the transaction rolls back atomically —
+    an audit row must never be durable without its matching mutation."""
     target_id: UUID = target.id
     before = None if verb == "create" else resource.snapshot(target)
     yield

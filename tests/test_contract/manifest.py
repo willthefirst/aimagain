@@ -1,32 +1,5 @@
-"""Single source of truth for contract test pairs.
-
-Each `ContractPair` registers a consumer-provider Pact pair with all its
-scaffolding metadata. `KNOWN_PROVIDER_STATES` is derived from this list,
-and the provider verification tests parametrize off it — replacing the
-per-pair `BaseProviderVerification` subclasses that used to live in
-`tests/provider/test_*_verification.py`.
-
-Adding a contract pair requires:
-
-1. An entry in `CONTRACT_PAIRS` here.
-2. A consumer test under `tests/consumer/test_<pair>.py` that drives
-   the form/partial with Playwright.
-3. (Optionally) a per-pair `MockDataFactory.create_*_dependency_config`
-   classmethod, referenced as `handler_mocks_factory`.
-4. (If the consumer needs an HTML stub page that isn't already mounted)
-   a `_setup_*_stub` function in `infrastructure/servers/consumer.py`,
-   referenced as `consumer_setup_fn`.
-
-Adding a pair does NOT require:
-
-- editing the `KNOWN_PROVIDER_STATES` list — derived from this manifest.
-- editing the `tests/provider/test_<resource>_verification.py` file —
-  parametrized over `pairs_for_provider(...)`.
-
-Removing a pair: delete the manifest entry, the consumer test file,
-and any pair-specific bits in `MockDataFactory` / `consumer.py`. Nothing
-else.
-"""
+"""Contract test pair registry. `KNOWN_PROVIDER_STATES` is derived from
+`CONTRACT_PAIRS`; provider verification tests parametrize off it."""
 
 from dataclasses import dataclass
 from typing import Any, Callable, Optional

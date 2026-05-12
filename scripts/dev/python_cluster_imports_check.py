@@ -1,38 +1,8 @@
 #!/usr/bin/env python3
 """Forbid cross-cluster Python imports inside layered directories.
 
-Companion to ``template_imports_check.py``: same rule, different file
-type. A file under ``src/domain/<layer>/<cluster>/`` may import from
-its own cluster or from any parent-level (shared) module in the same
-layer; it may NOT import from a sibling cluster directory in the same
-layer.
-
-Today this applies to ``src/domain/models/`` only. Models are pure
-data shape — a model file in one cluster has no business importing
-from a sibling cluster (FKs reference each other via SQLAlchemy
-strings, not Python imports). The rule is strict here.
-
-``src/domain/logic/`` is intentionally NOT in this list: per-entity
-handlers, repositories, and schemas legitimately reach across
-clusters for shared types (e.g. ``users/handlers.py`` needs
-``providers/repository.ProviderRepository`` to fetch a user's
-providers). Handler-to-handler cross-cluster imports inside
-``logic/`` are still discouraged, but the discipline rests on
-code review, not this rule.
-
-Imports we recognize:
-  - absolute:  ``from src.domain.<layer>.<cluster>.<file> import X``
-  - relative:  ``from .<cluster>.<file> import X`` (file at layer root)
-               ``from ..<cluster>.<file> import X`` (file at cluster level)
-  - bare-package: ``from src.domain.<layer>.<cluster> import X``
-
-Cross-tree imports (e.g. ``from src.domain.models.posts...`` inside
-``src/domain/logic/providers/``) are out of scope for this check — the
-within-tree rule is what matches the templates rule.
-
-Usage:
-    python scripts/dev/python_cluster_imports_check.py            # check all clustered layers
-    python scripts/dev/python_cluster_imports_check.py path/a ... # check specific files
+Companion to ``template_imports_check.py`` (same rule, different file type).
+Applies to clusters listed in ``_CLUSTERED_LAYERS``.
 """
 
 from __future__ import annotations

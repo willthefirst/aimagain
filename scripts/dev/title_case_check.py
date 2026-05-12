@@ -1,28 +1,5 @@
 #!/usr/bin/env python3
-"""
-Title case checker for enforcing sentence case in documentation and templates.
-
-This script checks for titles that should be in sentence case and reports violations.
-It supports multiple file formats and allows for flexible exception handling.
-
-For HTML and Jinja files the checker parses the document with selectolax and
-lints only text inside a small allowlist of content elements (plus a few
-user-facing attribute values). It never inspects tag names, other attribute
-names, attribute values like ``style``/``href``/``class``, or content inside
-``<script>``/``<style>``/``<code>``/``<pre>``/``<kbd>`` — those structural
-distinctions are what the parser is for. This replaces the previous regex
-approach, which couldn't tell text nodes from attribute values and required
-hand-curated CSS-property allowlists to suppress false positives.
-
-Markdown files keep their existing line-based regex treatment — Markdown is
-mostly prose by default and the regex approach works well there.
-
-Usage:
-    python scripts/dev/title_case_check.py                    # Check all files
-python scripts/dev/title_case_check.py --fix              # Auto-fix violations
-python scripts/dev/title_case_check.py --check-only       # Only report, don't fix
-python scripts/dev/title_case_check.py templates/         # Check specific directory
-"""
+"""Lint headings/buttons/labels for sentence case across md/html/jinja."""
 
 import argparse
 import re
@@ -94,7 +71,6 @@ class TitleCaseChecker:
     # CSS/JS). The walker never descends into these.
     NEVER_DESCEND_TAGS = {"script", "style", "code", "pre", "kbd"}
 
-    # File extensions to check
     FILE_EXTENSIONS = {
         ".md": "markdown",
         ".markdown": "markdown",
@@ -104,7 +80,7 @@ class TitleCaseChecker:
         ".jinja2": "jinja",
     }
 
-    # Binary file extensions to silently skip without attempting to read
+    # Binary extensions silently skipped — never readable as text.
     BINARY_EXTENSIONS = {
         ".db",
         ".sqlite",
@@ -326,18 +302,9 @@ class TitleCaseChecker:
         return False
 
     def is_colon_pattern(self, text: str) -> bool:
-        """Check if text follows patterns that should be exempt from sentence case rules.
-
-        Exempt patterns:
-        - Document titles like "Something: A detailed explanation"
-        - Section headers like "Chapter 1: Introduction"
-        - Step-by-step instructions like "Step 1: Consumer test"
-        - But NOT simple field labels like "Name:", "Last Activity:", etc.
-        """
-        # Remove HTML tags for checking
+        """Exempt "Chapter 1: Foo", "Step 1: Foo", and titles with ≥3 words after the separator."""
         clean_text = re.sub(r"<[^>]+>", "", text).strip()
 
-        # Check if it contains a colon or dash with text on both sides
         for separator in [":", " - "]:
             if separator in clean_text:
                 parts = clean_text.split(separator, 1)
@@ -345,15 +312,11 @@ class TitleCaseChecker:
                     before_sep = parts[0].strip()
                     after_sep = parts[1].strip()
 
-                    # If both parts have content, check if this looks like a title pattern
                     if before_sep and after_sep:
-                        # Exempt if the part after the separator is substantial (more than just a few words)
-                        # This catches "Chapter 1: Introduction to the topic" but not "Name: John"
                         after_words = after_sep.split()
-                        if len(after_words) >= 3:  # At least 3 words after separator
+                        if len(after_words) >= 3:
                             return True
 
-                        # Also exempt if the before part looks like a chapter/section number
                         if re.match(
                             r"^(Chapter|Section|Part|Book)\s+\d+$",
                             before_sep,
@@ -361,43 +324,25 @@ class TitleCaseChecker:
                         ):
                             return True
 
-                        # Exempt step-by-step instruction patterns like "Step 1: Consumer test"
                         if re.match(r"^Step\s+\d+$", before_sep, re.IGNORECASE):
                             return True
 
         return False
 
     def remove_leading_emojis(self, text: str) -> str:
-        """Remove leading emojis from text for sentence case checking."""
-        # Emoji regex pattern - matches most common emoji ranges
         emoji_pattern = r"^[\U0001F600-\U0001F64F\U0001F300-\U0001F5FF\U0001F680-\U0001F6FF\U0001F1E0-\U0001F1FF\U00002600-\U000027BF\U0001F900-\U0001F9FF\U0001F018-\U0001F270\U0001F000-\U0001F02F\U0001F0A0-\U0001F0FF\U0001F100-\U0001F64F\U0001F170-\U0001F251\U0001F300-\U0001F5FF\U0001F600-\U0001F64F\U0001F680-\U0001F6FF\U0001F700-\U0001F77F\U0001F780-\U0001F7FF\U0001F800-\U0001F8FF\U0001F900-\U0001F9FF\U0001FA00-\U0001FA6F\U0001FA70-\U0001FAFF\U00002600-\U000027BF\U0001F018-\U0001F270\U0001F000-\U0001F02F\U0001F0A0-\U0001F0FF\U0001F100-\U0001F64F\U0001F170-\U0001F251]+\s*"
 
-        # Remove leading emojis and whitespace
         cleaned = re.sub(emoji_pattern, "", text)
         return cleaned
 
     def convert_to_sentence_case(self, text: str) -> str:
-        """Convert text to sentence case, preserving proper nouns and acronyms.
-
-        Handles multi-sentence input: each sentence (split on ``.!?`` followed
-        by whitespace) is converted independently and rejoined. This matters
-        for ``<p>`` content like "Forgot your password? Reset here", where
-        each clause carries its own capitalisation.
-        """
-        # Check if this is a colon pattern that should be exempt
+        """Sentence-case each clause, preserving proper nouns and acronyms."""
         if self.is_colon_pattern(text):
             return text
 
-        # Multi-sentence: split on sentence-ending punctuation followed by
-        # whitespace and convert each sentence independently. We split only
-        # when *both* sides look like a real sentence boundary: a letter
-        # before the punctuation (so "1. ssh to droplet" doesn't split on a
-        # numbering) AND an uppercase letter after the whitespace (so
-        # abbreviations like "vs. divergence" or mid-clause exclamations
-        # like "complete! all" don't split). This is conservative on
-        # purpose — false splits create noisy false positives, and the
-        # cases we actually need to handle (`?` before a capitalised CTA,
-        # `.` between two sentences with proper capitalisation) all match.
+        # Split only when a letter precedes the punctuation (so "1. foo"
+        # doesn't split on a numbering) AND an uppercase letter follows the
+        # whitespace (so "vs. divergence" or "complete! all" don't split).
         parts = re.split(r"(?<=[a-zA-Z][.!?])\s+(?=[A-Z])", text.strip())
         if len(parts) > 1:
             return " ".join(self._convert_single_sentence(p) for p in parts)
@@ -405,20 +350,15 @@ class TitleCaseChecker:
         return self._convert_single_sentence(text)
 
     def _convert_single_sentence(self, text: str) -> str:
-        """Convert a single-sentence string to sentence case."""
-        # Remove HTML tags for processing
         clean_text = re.sub(r"<[^>]+>", "", text).strip()
 
-        # If empty after cleaning, return original
         if not clean_text:
             return text
 
-        # Handle emojis at the beginning
         original_clean = clean_text
         clean_text_no_emoji = self.remove_leading_emojis(clean_text)
         emoji_prefix = original_clean[: len(original_clean) - len(clean_text_no_emoji)]
 
-        # Create a lookup map for proper capitalization
         capitalize_map = {word.upper(): word for word in self.ALWAYS_CAPITALIZE}
 
         words = clean_text_no_emoji.split()
@@ -428,15 +368,12 @@ class TitleCaseChecker:
         result_words = []
         for i, word in enumerate(words):
             # Backtick-wrapped code spans (`.env`, `BaseRepository`) are
-            # identifiers, not prose. Preserve verbatim and don't let any
-            # case rule touch them — including the "first word" rule,
-            # which would otherwise mangle a header opening with a span
-            # like ``` `.env` vs `.env.test` ```.
+            # identifiers, not prose — preserve verbatim, including for the
+            # first-word rule that would otherwise mangle "`.env` vs `.env.test`".
             if "`" in word:
                 result_words.append(word)
                 continue
 
-            # Remove punctuation for checking
             clean_word = re.sub(r"[^\w]", "", word)
 
             # HTTP methods: preserve when source is uppercase (doc style),
@@ -447,12 +384,10 @@ class TitleCaseChecker:
                 continue
 
             if i == 0:
-                # First word: capitalize first letter only, unless it's a special word
                 if not is_http_method and clean_word.upper() in capitalize_map:
                     proper_case = capitalize_map[clean_word.upper()]
                     result_words.append(word.replace(clean_word, proper_case))
                 else:
-                    # Capitalize only first letter
                     if clean_word:
                         new_word = word.replace(
                             clean_word, clean_word[0].upper() + clean_word[1:].lower()
@@ -461,7 +396,6 @@ class TitleCaseChecker:
                     else:
                         result_words.append(word)
             else:
-                # Other words: only capitalize if in ALWAYS_CAPITALIZE
                 if not is_http_method and clean_word.upper() in capitalize_map:
                     proper_case = capitalize_map[clean_word.upper()]
                     result_words.append(word.replace(clean_word, proper_case))
@@ -470,9 +404,7 @@ class TitleCaseChecker:
 
         sentence_case = emoji_prefix + " ".join(result_words)
 
-        # If original had HTML tags, try to preserve them
         if "<" in text and ">" in text:
-            # Simple approach: replace the clean text in the original
             return text.replace(original_clean, sentence_case)
 
         return sentence_case
@@ -511,7 +443,6 @@ class TitleCaseChecker:
                 except Exception:
                     return base_type
 
-            # Check if the file contains Jinja syntax or is in a templates directory
             if (
                 self._detect_jinja_syntax(content)
                 or "template" in str(file_path).lower()
@@ -872,7 +803,6 @@ class TitleCaseChecker:
             try:
                 for item in current_dir.iterdir():
                     if item.is_file():
-                        # Check if file should be processed
                         if not self.should_ignore_file(item):
                             violations = self.check_file(item)
                             all_violations.extend(violations)

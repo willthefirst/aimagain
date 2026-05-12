@@ -1,23 +1,4 @@
-"""Parametrized conformance suite for every `EntitySpec` in the codebase.
-
-The per-entity test files (``test_user.py``, ``test_provider.py``,
-``test_post.py``, ``test_user_favorite.py``, ``test_provider_credentials.py``)
-used to repeat the same identity / audit / template / round-trip
-assertions for every entity. Each assertion is mechanical — it reads
-from `EntitySpec` and checks that the value matches the spec's own
-declared convention. That made every new entity carry ~150 LOC of
-near-identical scaffolding.
-
-This module collects every entity into ``ALL_ENTITY_SPECS`` and
-parametrizes the universal invariants across them. The per-entity
-files now only assert entity-specific facts (state axes, discriminator,
-filters, redirects, M2NRelation endpoints) — anything that's *unique
-to that entity* and couldn't be expressed as a generic rule.
-
-Adding a new entity: append it to ``ALL_ENTITY_SPECS`` and the
-universal invariants apply automatically; only the entity-specific
-test file needs writing.
-"""
+"""Parametrized conformance suite for every `EntitySpec`."""
 
 import pytest
 from pydantic import BaseModel, TypeAdapter

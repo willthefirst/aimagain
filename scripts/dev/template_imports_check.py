@@ -1,20 +1,8 @@
 #!/usr/bin/env python3
 """Forbid cross-resource Jinja imports in src/domain/templates/.
 
-A template under ``src/domain/templates/<a>/`` may reference templates under:
-  - the project root (e.g. ``base.html``)
-  - its own directory ``<a>/...``
-  - ``_shared/...``
-
-Anything else — e.g. ``providers/edit.html`` doing ``{% from "posts/_form_macros.html" %}``
-— is a layering smell. The shared partial belongs in ``_shared/``; tracking issue #206.
-
-Recognized directives: ``{% extends "..." %}``, ``{% include "..." %}``,
-``{% from "..." import ... %}``, ``{% import "..." as ... %}``.
-
-Usage:
-    python scripts/dev/template_imports_check.py                # check all
-    python scripts/dev/template_imports_check.py path/a path/b  # check specific files
+A template under ``<a>/`` may only reference root, ``<a>/``, or ``_shared/``;
+anything else belongs in ``_shared/`` (#206).
 """
 
 from __future__ import annotations

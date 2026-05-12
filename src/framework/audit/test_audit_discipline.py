@@ -1,28 +1,4 @@
-"""Static check that mutation handlers obey the audit-log discipline.
-
-Per `RESOURCE_GRAMMAR.md:135`, every mutation handler MUST write an audit
-row in the same transaction as the mutation. The discipline is easy to
-forget on a new handler — this test makes "forgot the audit call" a CI
-failure instead of a code-review catch.
-
-The check parses each `handlers.py` under `src/domain/logic/`
-(recursively, so every per-entity cluster is covered), walks every
-`async def handle_*` function, and fails the test if the function calls
-`.commit()` without an audit-recording call. Three names satisfy the
-rule:
-
-  * `record_audit(...)` — the low-level helper, used by non-CRUD
-    mutations (register, set-activation).
-  * `record_audit_for(...)` — the resource-flavored helper used when
-    a handler doesn't fit the snapshot/mutate/audit/commit ritual.
-  * `mutate(...)` — the async context manager that wraps the ritual;
-    it calls `record_audit_for` and `session.commit()` internally, so a
-    handler that uses it never types `.commit()` directly. The check
-    treats a `mutate` call as satisfying the rule.
-
-Opt-out: add `audit-discipline-ignore` to the function's docstring with a
-brief reason. Use sparingly — the rule is the rule for a good reason.
-"""
+"""Static check that every mutation handler writes an audit row."""
 
 import ast
 from pathlib import Path

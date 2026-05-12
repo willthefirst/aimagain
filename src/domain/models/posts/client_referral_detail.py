@@ -19,28 +19,7 @@ _ck = partial(named_check_in, _TABLE)
 
 
 class ClientReferralDetail(Base):
-    """Per-kind detail row for posts of `kind = 'client_referral'`.
-
-    `post_id` is both PK and FK to `posts.id`, enforcing 1:1 with the
-    parent. CASCADE on the FK keeps the detail row in lockstep with the
-    parent's lifecycle.
-
-    Field set follows the client-referral intake form.
-    Enum-typed columns (`location_state`, `location_in_person`,
-    `location_virtual`, `client_dem_ages`, `language_preferred`,
-    `insurance`) carry CHECK constraints rendered from the tuples in
-    `../enums.py` via `check_in_tuple_sql`.
-
-    The two JSON multi-select columns (`desired_times`, `services`)
-    store `list[*]` of controlled-vocabulary tokens. Storing as JSON
-    (rather than child join tables) trades SQL set semantics for
-    simplicity — both fields are read-once, render-once with no SQL
-    queries against their members today. Vocabularies are enforced by
-    the Pydantic `Literal[*TUPLE]` on the wire schemas; SQL CHECKs
-    against JSON-array members are awkward in SQLite and intentionally
-    skipped. `services` is optional here (empty list allowed); the
-    sibling `provider_availability_details` schema requires min-1.
-    """
+    """1:1 detail row for posts of kind = 'client_referral'."""
 
     __tablename__ = _TABLE
     __table_args__ = (

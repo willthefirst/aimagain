@@ -1,39 +1,4 @@
-"""Schema-driven form-field rendering.
-
-`field_spec(schema_cls, name)` introspects a Pydantic schema's
-`FieldInfo` and returns a normalized dict the `field_for` Jinja macro
-(in `src/domain/templates/_shared/form_fields.html`) dispatches on. The point
-is to derive the form's HTML attributes from the same Pydantic field
-that validates the request — adding a `Literal[*US_STATES]` to the
-schema flows automatically to the form's `<select>`; tightening
-`ZipText`'s pattern updates the form's `pattern` attribute.
-
-What's derived today:
-
-  - `required` — from whether the field's annotation is `T | None`.
-  - `kind="select"` + `choices` + (optional) `labels` — for
-    `Literal[*TUPLE]` fields. Labels are resolved by tuple-value
-    lookup against `register_choice_labels()` calls (see
-    `src/framework/rendering/templating.py`).
-  - `pattern` / `maxlength` — from any `HtmlPattern` marker attached to
-    an `Annotated[...]` alias in `src/framework/schema_validators.py`. The
-    schema's regex validator stays the source of truth; the marker
-    just exposes a *form* rendering of the same constraint.
-  - Default `kind="text"` for everything else.
-
-What's deliberately NOT derived (yet):
-
-  - Field labels — the human label ("Practice name") is passed at the
-    call site. Keeps copy under template-author control.
-  - Multi-select / checkbox-grid / radio-bool — these have form-level
-    grouping (fieldset/legend) that the existing macros own; they
-    should be added once their schema-side shape (e.g. `list[Literal]`
-    + a discriminator metadata marker) is settled.
-  - `select_field` placeholder behavior — `field_for` always passes
-    `placeholder=true`, which suits create forms. Edit forms with
-    pre-filled `current` already suppress the placeholder inside
-    `select_field`.
-"""
+"""Schema-driven form-field rendering: Pydantic FieldInfo → dict for the `field_for` Jinja macro."""
 
 from dataclasses import dataclass
 from types import UnionType

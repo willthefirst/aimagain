@@ -1,23 +1,6 @@
-"""Authorization helpers shared across logic-layer handlers.
-
-The leading-underscore filename matches `src/framework/schema_validators.py` —
-shared infra at the layer's parent level, importable from every cluster.
-
-The boolean predicates (`is_admin`, `is_owner`, `is_owner_or_admin`)
-are the source of truth for the authorization rules. The asserting
-form (`assert_owner_or_admin`) wraps `is_owner_or_admin` for use as a
-single-callable in `EntitySpec.write_authz` (the raising form, consumed
-by mutation handlers); the predicate is bound directly to
-`EntitySpec.can_write` for use in template-context flags
-(`can_edit = entity.can_write(target, user)`) so detail handlers don't
-re-derive the composition.
-
-The two forms always pair, so specs declare them together via
-`EntitySpec.auth_policy=OWNER_OR_ADMIN` — the sentinel lives next to
-`AuthzPolicy` in `src/framework/dispatch/entity_spec.py` (importing the
-callables defined here) so the spec-side dataclass and its canonical
-instance stay co-located without forcing a circular import.
-"""
+"""Authorization helpers. The predicate forms are the source of truth;
+asserting forms wrap them so `write_authz` (raising) and `can_write`
+(predicate) stay derivable from one rule per spec."""
 
 from __future__ import annotations
 

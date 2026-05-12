@@ -9,30 +9,13 @@ from typing import Callable
 
 
 class StripEmptyQueryParamsMiddleware:
-    """Treat ``?key=`` (and ``?key`` with no ``=``) as if the key were
-    absent from the URL.
+    """Treat ``?key=`` (and bare ``?key``) as if the key were absent.
 
-    HTML forms submit every named field's current value, including
-    empty selections (``<select>`` whose selected option has
-    ``value=""``). Without this middleware, a route declaring
-    ``filter: str | None = None`` receives the empty string instead of
-    its declared default — the default only fires when FastAPI binds
-    no value for the parameter, and ``?filter=`` is "value bound to
-    empty string", not "value absent". Likewise a ``Literal[...]``
-    param with a default 422s on an empty submission instead of
-    falling back to the default.
-
-    Stripping empty pairs at the URL layer encodes the HTML-form
-    convention ("empty = no opinion") once, so every route's declared
-    default fires naturally and no per-handler coercion is needed.
-
-    The trade-off: a route can no longer distinguish "client sent
-    ``?x=`` deliberately" from "client omitted ``?x=``". If a future
-    route genuinely needs that distinction it should use a non-empty
-    sentinel value (``?x=__empty__``) and decode it explicitly — that
-    is the convention every other major API uses for the same
-    situation, since browsers can't be coaxed into omitting empty
-    fields without per-form JavaScript.
+    HTML forms submit every named field, including empty ``<select>``s
+    (``value=""``) — without this middleware FastAPI binds the empty
+    string instead of falling back to the route's declared default.
+    Trade-off: routes cannot distinguish "client sent empty" from "client
+    omitted"; use an explicit sentinel (``?x=__empty__``) if needed.
     """
 
     def __init__(self, app: Callable):
