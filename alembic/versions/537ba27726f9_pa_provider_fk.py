@@ -21,8 +21,16 @@ then drops `provider_id`. Lossy on session-format mismatches between
 the Provider's posture and the PA row's prior values (those values are
 gone; we restore from Provider).
 
+**Idempotency note**: SQLite DDL is non-transactional, so a previous
+partial run can leave the table in a half-applied state (e.g. column
+added but constraints/drops not yet executed). Each step below
+inspects the live schema and skips operations that have already been
+applied — both upgrade and downgrade are safe to re-run from any
+partial state without manual cleanup.
+
 """
 
+import uuid
 from typing import Sequence, Union
 
 import sqlalchemy as sa
@@ -36,128 +44,161 @@ branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
 
+_TABLE = "provider_availability_details"
+_OLD_COLUMNS = (
+    "practice_name",
+    "location_city",
+    "location_state",
+    "location_zip",
+    "in_person_sessions",
+    "virtual_sessions",
+)
+_OLD_CHECK_CONSTRAINTS = (
+    "ck_provider_availability_details_location_state",
+    "ck_provider_availability_details_in_person_sessions",
+    "ck_provider_availability_details_virtual_sessions",
+)
+
+
+def _column_names(bind, table_name):
+    return {c["name"] for c in sa.inspect(bind).get_columns(table_name)}
+
+
+def _check_constraint_names(bind, table_name):
+    return {c["name"] for c in sa.inspect(bind).get_check_constraints(table_name)}
+
+
+def _foreign_key_columns(bind, table_name):
+    return {
+        tuple(fk["constrained_columns"])
+        for fk in sa.inspect(bind).get_foreign_keys(table_name)
+    }
+
+
 def upgrade() -> None:
-    # 1) Add provider_id as nullable so the table stays valid through
-    # the backfill. FK + NOT NULL get tightened at the end.
-    with op.batch_alter_table("provider_availability_details") as batch_op:
-        batch_op.add_column(
-            sa.Column("provider_id", sa.Uuid(), nullable=True),
-        )
-
     bind = op.get_bind()
+    existing_cols = _column_names(bind, _TABLE)
 
-    # 2) Backfill — for each PA row, find or create a Provider for its
-    # owner with matching practice_name. Then set provider_id.
-    rows = bind.execute(sa.text("""
-            SELECT pad.post_id,
-                   p.owner_id,
-                   pad.practice_name,
-                   pad.location_city,
-                   pad.location_state,
-                   pad.location_zip,
-                   pad.in_person_sessions,
-                   pad.virtual_sessions
-            FROM provider_availability_details AS pad
-            JOIN posts AS p ON p.id = pad.post_id
-            """)).fetchall()
+    # 1) Add provider_id as nullable so the table stays valid through
+    # the backfill. Skip if a prior partial run already added it.
+    if "provider_id" not in existing_cols:
+        with op.batch_alter_table(_TABLE) as batch_op:
+            batch_op.add_column(sa.Column("provider_id", sa.Uuid(), nullable=True))
 
-    for row in rows:
-        post_id = row.post_id
-        owner_id = row.owner_id
-        practice_name = row.practice_name
-        # Look for an existing provider matching owner + practice_name.
-        existing = bind.execute(
-            sa.text("""
-                SELECT id FROM providers
-                WHERE owner_id = :owner_id AND practice_name = :practice_name
-                LIMIT 1
-                """),
-            {"owner_id": owner_id, "practice_name": practice_name},
-        ).fetchone()
-        if existing:
-            provider_id = existing.id
-        else:
-            # Create one. PA's relaxed columns (city/zip/sessions) might
-            # be NULL or unset — fill in conservative defaults so the
-            # Provider's NOT NULL constraints don't reject the insert.
-            import uuid
+    # Re-read column state so the backfill below knows what's still on
+    # the table (a partial run may have already dropped the old columns).
+    existing_cols = _column_names(bind, _TABLE)
+    has_old_columns = all(c in existing_cols for c in _OLD_COLUMNS)
 
-            provider_id = uuid.uuid4()
-            bind.execute(
+    # 2) Backfill — for each PA row missing a provider_id, find or
+    # create a Provider for its owner with matching practice_name and
+    # point at it. Idempotent: only NULL provider_id rows are touched,
+    # and the find branch is preferred over create so existing
+    # Providers are reused.
+    if has_old_columns:
+        rows = bind.execute(sa.text("""
+                SELECT pad.post_id,
+                       p.owner_id,
+                       pad.practice_name,
+                       pad.location_city,
+                       pad.location_state,
+                       pad.location_zip,
+                       pad.in_person_sessions,
+                       pad.virtual_sessions
+                FROM provider_availability_details AS pad
+                JOIN posts AS p ON p.id = pad.post_id
+                WHERE pad.provider_id IS NULL
+                """)).fetchall()
+
+        for row in rows:
+            existing = bind.execute(
                 sa.text("""
-                    INSERT INTO providers (
-                        id, owner_id, practice_name,
-                        location_city, location_state, location_zip,
-                        in_person_sessions, virtual_sessions,
-                        created_at, updated_at
-                    ) VALUES (
-                        :id, :owner_id, :practice_name,
-                        :location_city, :location_state, :location_zip,
-                        :in_person_sessions, :virtual_sessions,
-                        CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
-                    )
+                    SELECT id FROM providers
+                    WHERE owner_id = :owner_id AND practice_name = :practice_name
+                    LIMIT 1
                     """),
-                {
-                    "id": provider_id,
-                    "owner_id": owner_id,
-                    "practice_name": practice_name,
-                    "location_city": row.location_city or "(unspecified)",
-                    "location_state": row.location_state,
-                    "location_zip": row.location_zip or "00000",
-                    "in_person_sessions": row.in_person_sessions or "please_contact",
-                    "virtual_sessions": row.virtual_sessions or "please_contact",
-                },
+                {"owner_id": row.owner_id, "practice_name": row.practice_name},
+            ).fetchone()
+            if existing:
+                provider_id = existing.id
+            else:
+                provider_id = uuid.uuid4()
+                bind.execute(
+                    sa.text("""
+                        INSERT INTO providers (
+                            id, owner_id, practice_name,
+                            location_city, location_state, location_zip,
+                            in_person_sessions, virtual_sessions,
+                            created_at, updated_at
+                        ) VALUES (
+                            :id, :owner_id, :practice_name,
+                            :location_city, :location_state, :location_zip,
+                            :in_person_sessions, :virtual_sessions,
+                            CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+                        )
+                        """),
+                    {
+                        "id": provider_id,
+                        "owner_id": row.owner_id,
+                        "practice_name": row.practice_name,
+                        "location_city": row.location_city or "(unspecified)",
+                        "location_state": row.location_state,
+                        "location_zip": row.location_zip or "00000",
+                        "in_person_sessions": row.in_person_sessions
+                        or "please_contact",
+                        "virtual_sessions": row.virtual_sessions or "please_contact",
+                    },
+                )
+
+            bind.execute(
+                sa.text(
+                    "UPDATE provider_availability_details "
+                    "SET provider_id = :provider_id WHERE post_id = :post_id"
+                ),
+                {"provider_id": provider_id, "post_id": row.post_id},
             )
 
-        bind.execute(
-            sa.text(
-                "UPDATE provider_availability_details "
-                "SET provider_id = :provider_id WHERE post_id = :post_id"
-            ),
-            {"provider_id": provider_id, "post_id": post_id},
-        )
-
     # 3) Now that provider_id is populated everywhere, drop the now-
-    # redundant columns and tighten provider_id to NOT NULL + FK. The
-    # CHECK constraints on the soon-to-be-dropped columns have to come
-    # off first, otherwise SQLite's batch table rebuild trips over them.
-    with op.batch_alter_table("provider_availability_details") as batch_op:
-        batch_op.drop_constraint(
-            "ck_provider_availability_details_location_state", type_="check"
-        )
-        batch_op.drop_constraint(
-            "ck_provider_availability_details_in_person_sessions", type_="check"
-        )
-        batch_op.drop_constraint(
-            "ck_provider_availability_details_virtual_sessions", type_="check"
-        )
+    # redundant columns and tighten provider_id to NOT NULL + FK. Each
+    # operation is gated on whether the prior schema element is still
+    # present, so the block is safe to re-run from any partial state.
+    existing_checks = _check_constraint_names(bind, _TABLE)
+    existing_cols = _column_names(bind, _TABLE)
+    existing_fks = _foreign_key_columns(bind, _TABLE)
+
+    with op.batch_alter_table(_TABLE) as batch_op:
+        for ck in _OLD_CHECK_CONSTRAINTS:
+            if ck in existing_checks:
+                batch_op.drop_constraint(ck, type_="check")
+
         batch_op.alter_column("provider_id", nullable=False)
-        batch_op.create_foreign_key(
-            "fk_provider_availability_details_provider_id",
-            "providers",
-            ["provider_id"],
-            ["id"],
-            ondelete="CASCADE",
-        )
-        batch_op.drop_column("practice_name")
-        batch_op.drop_column("location_city")
-        batch_op.drop_column("location_state")
-        batch_op.drop_column("location_zip")
-        batch_op.drop_column("in_person_sessions")
-        batch_op.drop_column("virtual_sessions")
+
+        if ("provider_id",) not in existing_fks:
+            batch_op.create_foreign_key(
+                "fk_provider_availability_details_provider_id",
+                "providers",
+                ["provider_id"],
+                ["id"],
+                ondelete="CASCADE",
+            )
+
+        for col in _OLD_COLUMNS:
+            if col in existing_cols:
+                batch_op.drop_column(col)
 
 
 def downgrade() -> None:
-    # Re-add the six columns nullable, backfill from the linked
-    # Provider, then tighten state to NOT NULL. Drop provider_id last.
-    with op.batch_alter_table("provider_availability_details") as batch_op:
-        batch_op.add_column(sa.Column("practice_name", sa.TEXT(), nullable=True))
-        batch_op.add_column(sa.Column("location_city", sa.TEXT(), nullable=True))
-        batch_op.add_column(sa.Column("location_state", sa.TEXT(), nullable=True))
-        batch_op.add_column(sa.Column("location_zip", sa.TEXT(), nullable=True))
-        batch_op.add_column(sa.Column("in_person_sessions", sa.TEXT(), nullable=True))
-        batch_op.add_column(sa.Column("virtual_sessions", sa.TEXT(), nullable=True))
+    bind = op.get_bind()
+    existing_cols = _column_names(bind, _TABLE)
 
+    # Re-add any of the six columns that were dropped on the upgrade.
+    cols_to_add = [c for c in _OLD_COLUMNS if c not in existing_cols]
+    if cols_to_add:
+        with op.batch_alter_table(_TABLE) as batch_op:
+            for col in cols_to_add:
+                batch_op.add_column(sa.Column(col, sa.TEXT(), nullable=True))
+
+    # Backfill the re-added columns from the linked Provider.
     op.execute("""
         UPDATE provider_availability_details
         SET practice_name = (SELECT practice_name FROM providers WHERE providers.id = provider_availability_details.provider_id),
@@ -168,22 +209,32 @@ def downgrade() -> None:
             virtual_sessions = (SELECT virtual_sessions FROM providers WHERE providers.id = provider_availability_details.provider_id)
         """)
 
-    with op.batch_alter_table("provider_availability_details") as batch_op:
+    existing_checks = _check_constraint_names(bind, _TABLE)
+    existing_fks = _foreign_key_columns(bind, _TABLE)
+
+    with op.batch_alter_table(_TABLE) as batch_op:
         batch_op.alter_column("practice_name", nullable=False)
         batch_op.alter_column("location_state", nullable=False)
-        batch_op.create_check_constraint(
-            "ck_provider_availability_details_location_state",
-            "location_state IN ('AL', 'AK', 'AZ', 'AR', 'CA', 'CO', 'CT', 'DE', 'DC', 'FL', 'GA', 'HI', 'ID', 'IL', 'IN', 'IA', 'KS', 'KY', 'LA', 'ME', 'MD', 'MA', 'MI', 'MN', 'MS', 'MO', 'MT', 'NE', 'NV', 'NH', 'NJ', 'NM', 'NY', 'NC', 'ND', 'OH', 'OK', 'OR', 'PA', 'RI', 'SC', 'SD', 'TN', 'TX', 'UT', 'VT', 'VA', 'WA', 'WV', 'WI', 'WY')",
-        )
-        batch_op.create_check_constraint(
-            "ck_provider_availability_details_in_person_sessions",
-            "in_person_sessions IN ('yes', 'no', 'please_contact')",
-        )
-        batch_op.create_check_constraint(
-            "ck_provider_availability_details_virtual_sessions",
-            "virtual_sessions IN ('yes', 'no', 'please_contact')",
-        )
-        batch_op.drop_constraint(
-            "fk_provider_availability_details_provider_id", type_="foreignkey"
-        )
-        batch_op.drop_column("provider_id")
+
+        if "ck_provider_availability_details_location_state" not in existing_checks:
+            batch_op.create_check_constraint(
+                "ck_provider_availability_details_location_state",
+                "location_state IN ('AL', 'AK', 'AZ', 'AR', 'CA', 'CO', 'CT', 'DE', 'DC', 'FL', 'GA', 'HI', 'ID', 'IL', 'IN', 'IA', 'KS', 'KY', 'LA', 'ME', 'MD', 'MA', 'MI', 'MN', 'MS', 'MO', 'MT', 'NE', 'NV', 'NH', 'NJ', 'NM', 'NY', 'NC', 'ND', 'OH', 'OK', 'OR', 'PA', 'RI', 'SC', 'SD', 'TN', 'TX', 'UT', 'VT', 'VA', 'WA', 'WV', 'WI', 'WY')",
+            )
+        if "ck_provider_availability_details_in_person_sessions" not in existing_checks:
+            batch_op.create_check_constraint(
+                "ck_provider_availability_details_in_person_sessions",
+                "in_person_sessions IN ('yes', 'no', 'please_contact')",
+            )
+        if "ck_provider_availability_details_virtual_sessions" not in existing_checks:
+            batch_op.create_check_constraint(
+                "ck_provider_availability_details_virtual_sessions",
+                "virtual_sessions IN ('yes', 'no', 'please_contact')",
+            )
+
+        if ("provider_id",) in existing_fks:
+            batch_op.drop_constraint(
+                "fk_provider_availability_details_provider_id", type_="foreignkey"
+            )
+        if "provider_id" in _column_names(bind, _TABLE):
+            batch_op.drop_column("provider_id")
