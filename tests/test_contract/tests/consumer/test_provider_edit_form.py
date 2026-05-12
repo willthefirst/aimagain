@@ -57,6 +57,10 @@ async def test_consumer_provider_edit_form_submits(origin_with_routes: str, page
     # what the test changes. Other fields keep their stub values from the
     # consumer-server stub. The body shape is the contract; concrete values
     # are ergonomic for the verifier.
+    # The stub's insurance posture is self-pay-only (both Booleans False,
+    # no carriers, no sliding scale). The form pre-checks the "No" radio
+    # for each Boolean (since `current=False`) and renders `cost` as an
+    # empty text input — so all four values appear in the body.
     expected_request_body = (
         "practice_name=Bayside+Counseling"
         "&location_city=Brooklyn"
@@ -64,6 +68,10 @@ async def test_consumer_provider_edit_form_submits(origin_with_routes: str, page
         "&location_zip=11201"
         "&in_person_sessions=yes"
         "&virtual_sessions=please_contact"
+        "&accepts_in_network=false"
+        "&accepts_out_of_network=false"
+        "&sliding_scale=false"
+        "&cost="
     )
 
     (

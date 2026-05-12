@@ -77,9 +77,26 @@ LANGUAGES: Final[tuple[str, ...]] = ("en", "es")
 INSURANCE_OPTIONS: Final[tuple[str, ...]] = (
     "in_network",
     "out_of_network",
-    "in_and_out_of_network",
     "self_pay_only",
     "please_contact",
+)
+
+# Carrier vocabulary for `Provider.in_network_carriers` (#449). Decoupled
+# from `INSURANCE_OPTIONS` (which captures the in/out-of-network posture)
+# so the two concepts can vary independently. Required-min-1 when
+# `accepts_in_network=True`; must be empty otherwise.
+INSURANCE_CARRIERS: Final[tuple[str, ...]] = (
+    "aetna",
+    "anthem_bcbs",
+    "cigna",
+    "kaiser",
+    "magellan",
+    "medicare",
+    "medicaid",
+    "optum",
+    "tricare",
+    "united_healthcare",
+    "other",
 )
 
 # Day × time-of-day grid for "when are you available". 21 tokens of the
@@ -158,9 +175,21 @@ LANGUAGE_LABELS: Final[dict[str, str]] = {"en": "English", "es": "Spanish"}
 INSURANCE_LABELS: Final[dict[str, str]] = {
     "in_network": "In-network",
     "out_of_network": "Out-of-network",
-    "in_and_out_of_network": "In- and out-of-network",
     "self_pay_only": "Self-pay only",
     "please_contact": "Please contact",
+}
+INSURANCE_CARRIER_LABELS: Final[dict[str, str]] = {
+    "aetna": "Aetna",
+    "anthem_bcbs": "Anthem / BCBS",
+    "cigna": "Cigna",
+    "kaiser": "Kaiser",
+    "magellan": "Magellan",
+    "medicare": "Medicare",
+    "medicaid": "Medicaid",
+    "optum": "Optum",
+    "tricare": "Tricare",
+    "united_healthcare": "UnitedHealthcare",
+    "other": "Other",
 }
 # Per-axis labels for the desired-times grid. The form-render macro
 # uses these for the row (day) and column (slot) headers; per-cell

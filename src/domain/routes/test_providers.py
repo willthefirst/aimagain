@@ -495,6 +495,17 @@ async def test_get_provider_form_renders(
     assert virtual is not None
     assert len(in_person.css("option")) == 4
     assert len(virtual.css("option")) == 4
+    # Insurance & payment fieldset (#449). Bool fields render as radios;
+    # carrier multi-select renders one checkbox per `INSURANCE_CARRIERS`
+    # token.
+    assert tree.css_first('input[type="radio"][name="accepts_in_network"]') is not None
+    assert (
+        tree.css_first('input[type="radio"][name="accepts_out_of_network"]') is not None
+    )
+    assert tree.css_first('input[type="radio"][name="sliding_scale"]') is not None
+    assert tree.css_first('input[name="cost"]') is not None
+    carrier_boxes = tree.css('input[type="checkbox"][name="in_network_carriers"]')
+    assert len(carrier_boxes) == 11
 
 
 # --- Edit form page (GET /providers/{id}/form) -------------------

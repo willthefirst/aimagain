@@ -77,9 +77,6 @@ _PROVIDER_AVAILABILITY_DEFAULTS: dict[str, Any] = {
     "treatment_modality": None,
     "age_groups": ["adults_25_64"],
     "languages": ["en"],
-    "payment_situation": "in_network",
-    "sliding_scale": False,
-    "cost": None,
 }
 
 
@@ -141,6 +138,14 @@ _PROVIDER_DEFAULTS: dict[str, Any] = {
     "location_zip": "62701",
     "in_person_sessions": "yes",
     "virtual_sessions": "no",
+    # Insurance posture (#449). Self-pay-only / no-carriers default keeps
+    # the cross-field invariant satisfied without forcing every test to
+    # think about it.
+    "accepts_in_network": False,
+    "accepts_out_of_network": False,
+    "in_network_carriers": [],
+    "sliding_scale": False,
+    "cost": None,
 }
 
 _PROVIDER_LICENSURE_DEFAULTS: dict[str, Any] = {

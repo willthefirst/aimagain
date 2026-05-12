@@ -198,6 +198,14 @@ def _setup_provider_edit_form_stub(app: FastAPI) -> None:
             location_zip="11201",
             in_person_sessions="yes",
             virtual_sessions="please_contact",
+            # Insurance posture stub (#449). Self-pay-only / no carriers
+            # so the cross-field invariant holds and the form's "No"
+            # radios are pre-checked.
+            accepts_in_network=False,
+            accepts_out_of_network=False,
+            in_network_carriers=[],
+            sliding_scale=False,
+            cost=None,
             licensures=[],
             educations=[],
             certifications=[],

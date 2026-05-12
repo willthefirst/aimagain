@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{%- from "_shared/form_fields.html" import text_field, select_field -%}
+{%- from "_shared/form_fields.html" import text_field, select_field, radio_bool_field, multi_select_field -%}
 {%- from "_shared/forms.html" import inline_add_form -%}
 {%- from "_shared/sections.html" import list_or_empty -%}
 {%- from "_shared/actions.html" import confirm_delete_button -%}
@@ -21,6 +21,16 @@
       <legend>Session availability</legend>
       {{ select_field("in_person_sessions", "In-person sessions", LOCATION_AVAILABILITY_OPTIONS, labels=LOCATION_AVAILABILITY_LABELS, current=provider.in_person_sessions) }}
       {{ select_field("virtual_sessions", "Virtual sessions", LOCATION_AVAILABILITY_OPTIONS, labels=LOCATION_AVAILABILITY_LABELS, current=provider.virtual_sessions) }}
+    </fieldset>
+    {# Insurance & payment (#449). See `form_new.html` for the
+       cross-field rule on `in_network_carriers`. #}
+    <fieldset>
+      <legend>Insurance &amp; payment</legend>
+      {{ radio_bool_field("accepts_in_network", "Accepts in-network?", current=provider.accepts_in_network, required=false) }}
+      {{ multi_select_field("in_network_carriers", "In-network carriers (required if accepts in-network)", INSURANCE_CARRIERS, labels=INSURANCE_CARRIER_LABELS, current=provider.in_network_carriers) }}
+      {{ radio_bool_field("accepts_out_of_network", "Accepts out-of-network?", current=provider.accepts_out_of_network, required=false) }}
+      {{ radio_bool_field("sliding_scale", "Sliding scale?", current=provider.sliding_scale, required=false) }}
+      {{ text_field("cost", "Cost (optional, free text)", current=provider.cost, required=false) }}
     </fieldset>
     <input type="submit" value="Save practice details" />
   </form>

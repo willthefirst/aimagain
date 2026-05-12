@@ -28,7 +28,6 @@ from src.domain.logic.posts.schema import (
     ClientReferralRead,
     ClientReferralUpdate,
     ProviderAvailabilityCreate,
-    ProviderAvailabilityRead,
     ProviderAvailabilityUpdate,
     post_audit_snapshot,
     post_create_adapter,
@@ -345,7 +344,8 @@ def test_post_create_dispatches_provider_availability():
     p = post_create_adapter.validate_python(provider_availability_payload())
     assert isinstance(p, ProviderAvailabilityCreate)
     assert p.kind == "provider_availability"
-    assert p.sliding_scale is False
+    # Insurance posture moved to Provider in #449; PA no longer carries
+    # `sliding_scale` / `payment_situation` / `cost` on the wire.
 
 
 @pytest.mark.parametrize(
@@ -407,35 +407,25 @@ def test_post_create_client_referral_accepts_new_services_tokens(token):
     [
         "in_network",
         "out_of_network",
-        "in_and_out_of_network",
-        "self_pay_only",
-        "please_contact",
-    ],
-)
-def test_post_create_provider_availability_accepts_all_insurance_tokens(token):
-    """All five `INSURANCE_OPTIONS` tokens validate after #438's vocab
-    widening (`self_pay_only`, `please_contact` were added)."""
-    p = post_create_adapter.validate_python(
-        provider_availability_payload(payment_situation=token)
-    )
-    assert p.payment_situation == token
-
-
-@pytest.mark.parametrize(
-    "token",
-    [
-        "in_network",
-        "out_of_network",
-        "in_and_out_of_network",
         "self_pay_only",
         "please_contact",
     ],
 )
 def test_post_create_client_referral_accepts_all_insurance_tokens(token):
-    """CR's `insurance` shares the `INSURANCE_OPTIONS` vocab with PA;
-    widening propagates to both."""
+    """All four post-#449 `INSURANCE_OPTIONS` tokens validate on CR
+    (`in_and_out_of_network` was dropped because the composite is redundant
+    with the new orthogonal Provider booleans)."""
     p = post_create_adapter.validate_python(client_referral_payload(insurance=token))
     assert p.insurance == token
+
+
+def test_post_create_client_referral_rejects_retired_in_and_out_token():
+    """`in_and_out_of_network` was dropped from `INSURANCE_OPTIONS` in
+    #449; CR rows holding it were backfilled to `out_of_network`."""
+    with pytest.raises(ValidationError):
+        post_create_adapter.validate_python(
+            client_referral_payload(insurance="in_and_out_of_network")
+        )
 
 
 def test_post_create_provider_availability_default_languages():
@@ -511,8 +501,6 @@ def test_post_update_provider_availability_accepts_age_groups_only():
     [
         "provider_id",
         "age_groups",
-        "payment_situation",
-        "sliding_scale",
     ],
 )
 def test_post_create_provider_availability_requires_required_fields(missing_field):
@@ -582,12 +570,16 @@ def test_post_update_provider_availability_accepts_description_only():
     assert p.description == "Updated pitch."
 
 
-def test_post_update_provider_availability_accepts_sliding_scale_only():
+def test_post_update_provider_availability_accepts_provider_id_only():
+    """A PATCH that only repoints `provider_id` is a valid partial update.
+    Replaces the pre-#449 `sliding_scale`-only test, since insurance posture
+    now lives on Provider."""
+    new_provider_id = uuid.uuid4()
     p = post_update_adapter.validate_python(
-        {"kind": "provider_availability", "sliding_scale": True}
+        {"kind": "provider_availability", "provider_id": str(new_provider_id)}
     )
     assert isinstance(p, ProviderAvailabilityUpdate)
-    assert p.sliding_scale is True
+    assert p.provider_id == new_provider_id
 
 
 def test_post_update_provider_availability_strips_whitespace():
@@ -639,10 +631,12 @@ def test_audit_snapshot_for_provider_availability_post():
     assert snap["owner_id"] == str(owner_id)
     # Per #448, the audit row records the FK to the Provider, not the
     # dereferenced practice fields. Practice-name/location/sessions live
-    # on Provider now and are snapshotted via that entity's audit path.
+    # on Provider now (and insurance posture / sliding-scale / cost live
+    # there as of #449) — snapshotted via that entity's audit path.
     assert snap["provider_id"] == detail_attrs["provider_id"]
-    assert snap["sliding_scale"] is False
-    assert snap["cost"] is None
+    assert "sliding_scale" not in snap
+    assert "payment_situation" not in snap
+    assert "cost" not in snap
 
 
 # --- Schema-literal vs model-tuple guardrail ----------------------------
@@ -673,11 +667,9 @@ def _literal_args(model_cls, field_name: str) -> tuple[str, ...]:
         (ClientReferralRead, "location_in_person", LOCATION_AVAILABILITY_OPTIONS),
         (ClientReferralRead, "location_virtual", LOCATION_AVAILABILITY_OPTIONS),
         (ClientReferralRead, "insurance", INSURANCE_OPTIONS),
-        (ProviderAvailabilityRead, "payment_situation", INSURANCE_OPTIONS),
         # Create variants
         (ClientReferralCreate, "location_state", US_STATES),
         (ClientReferralCreate, "insurance", INSURANCE_OPTIONS),
-        (ProviderAvailabilityCreate, "payment_situation", INSURANCE_OPTIONS),
         # Update variants (Optional[Literal[*TUPLE]])
         (ClientReferralUpdate, "location_state", US_STATES),
         (ClientReferralUpdate, "insurance", INSURANCE_OPTIONS),

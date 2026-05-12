@@ -68,6 +68,11 @@ FIXTURE_PROVIDER_AVAILABILITY: list[FixtureProviderAvailability] = [
             "location_zip": "00000",
             "in_person_sessions": "no",
             "virtual_sessions": "yes",
+            "accepts_in_network": False,
+            "accepts_out_of_network": False,
+            "in_network_carriers": [],
+            "sliding_scale": False,
+            "cost": "$250 - $600 per session",
         },
         "detail": {
             "description": (
@@ -89,9 +94,6 @@ FIXTURE_PROVIDER_AVAILABILITY: list[FixtureProviderAvailability] = [
                 "adults_25_64",
             ],
             "languages": ["en"],
-            "payment_situation": "self_pay_only",
-            "sliding_scale": False,
-            "cost": "$250 - $600 per session",
         },
     },
     {
@@ -107,6 +109,11 @@ FIXTURE_PROVIDER_AVAILABILITY: list[FixtureProviderAvailability] = [
             "location_zip": "95050",
             "in_person_sessions": "yes",
             "virtual_sessions": "no",
+            "accepts_in_network": False,
+            "accepts_out_of_network": False,
+            "in_network_carriers": [],
+            "sliding_scale": True,
+            "cost": "$2,500 / session",
         },
         "detail": {
             "description": (
@@ -127,9 +134,6 @@ FIXTURE_PROVIDER_AVAILABILITY: list[FixtureProviderAvailability] = [
             "treatment_modality": "Social skills, emotion regulation",
             "age_groups": ["children_6_10", "preteens_11_13"],
             "languages": ["en", "es"],
-            "payment_situation": "self_pay_only",
-            "sliding_scale": True,
-            "cost": "$2,500 / session",
         },
     },
     {
@@ -141,6 +145,15 @@ FIXTURE_PROVIDER_AVAILABILITY: list[FixtureProviderAvailability] = [
             "location_zip": "94304",
             "in_person_sessions": "yes",
             "virtual_sessions": "no",
+            # Source says "no MediCal, please contact for carriers" — the
+            # carrier list itself is in `referral_instructions`. Use
+            # `other` as a placeholder so the in-network invariant
+            # (min-1 carrier when accepting in-network) holds.
+            "accepts_in_network": True,
+            "accepts_out_of_network": True,
+            "in_network_carriers": ["other"],
+            "sliding_scale": True,
+            "cost": "$4k/week",
         },
         "detail": {
             "description": (
@@ -166,9 +179,6 @@ FIXTURE_PROVIDER_AVAILABILITY: list[FixtureProviderAvailability] = [
             "treatment_modality": "Comprehensive DBT",
             "age_groups": ["adolescents_14_18"],
             "languages": ["en", "es"],
-            "payment_situation": "please_contact",
-            "sliding_scale": True,
-            "cost": "$4k/week",
         },
     },
 ]

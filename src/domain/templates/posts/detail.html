@@ -83,13 +83,23 @@ Provider availability: {{ post.provider_availability_detail.provider.practice_na
     <dd>{% for g in d.age_groups %}{{ CLIENT_AGE_GROUP_LABELS[g] }}{% if not loop.last %}, {% endif %}{% endfor %}</dd>
     <dt>Languages</dt>
     <dd>{% for l in d.languages %}{{ LANGUAGE_LABELS[l] }}{% if not loop.last %}, {% endif %}{% endfor %}</dd>
-    <dt>Payment situation</dt>
-    <dd>{{ INSURANCE_LABELS[d.payment_situation] }}</dd>
+    {# Insurance posture lives on the linked Provider (#449). #}
+    {% if p.accepts_in_network or p.accepts_out_of_network %}
+    <dt>Insurance accepted</dt>
+    <dd>
+      {% if p.accepts_in_network %}In-network ({% for c in p.in_network_carriers %}{{ INSURANCE_CARRIER_LABELS[c] }}{% if not loop.last %}, {% endif %}{% endfor %}){% endif %}
+      {% if p.accepts_in_network and p.accepts_out_of_network %} · {% endif %}
+      {% if p.accepts_out_of_network %}Out-of-network{% endif %}
+    </dd>
+    {% else %}
+    <dt>Insurance accepted</dt>
+    <dd>Self-pay only</dd>
+    {% endif %}
     <dt>Sliding scale</dt>
-    <dd>{{ "Yes" if d.sliding_scale else "No" }}</dd>
-    {% if d.cost %}
+    <dd>{{ "Yes" if p.sliding_scale else "No" }}</dd>
+    {% if p.cost %}
     <dt>Cost</dt>
-    <dd>{{ d.cost }}</dd>
+    <dd>{{ p.cost }}</dd>
     {% endif %}
   </dl>
   {% if d.referral_instructions %}
