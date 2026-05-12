@@ -4,8 +4,10 @@ Seed the database with fixture data for development.
 
 Idempotent:
   - Users are matched by email; existing rows are skipped.
+  - Providers are matched by (owner_id, practice_name); existing rows
+    are reused so PA fixtures can always point at a real Provider.
   - Provider-availability posts are matched by
-    (kind='provider_availability', owner_id, practice_name); existing
+    (kind='provider_availability', owner_id, provider_id); existing
     rows are skipped.
 
 All fixture users share the password `password`.
@@ -22,7 +24,7 @@ from sqlalchemy import select
 from src.auth_config import UserManager
 from src.db import async_session_maker
 from src.domain.logic.users.schema import UserCreate
-from src.domain.models import Post, ProviderAvailabilityDetail, User
+from src.domain.models import Post, Provider, ProviderAvailabilityDetail, User
 
 SHARED_PASSWORD = "password"
 
@@ -35,6 +37,7 @@ class FixtureUser(TypedDict):
 
 class FixtureProviderAvailability(TypedDict):
     owner_email: str
+    provider: dict[str, Any]
     detail: dict[str, Any]
 
 
@@ -46,16 +49,27 @@ FIXTURE_USERS: list[FixtureUser] = [
 
 
 # Real-world canonical examples that drive the schema-evolution work in
-# the issue series spawned by #420. Each `TODO(issue-N)` marker pins a
-# cell that doesn't fit today's schema and points at the follow-on PR
-# that will reshape both schema and seed together. Removing a marker
-# without that schema change is a regression — the markers are the
-# series' breadcrumb trail.
+# the issue series spawned by #420. Each fixture now declares its
+# Provider profile (practice + location + delivery format) alongside
+# the PA announcement (#448). The seed creates/reuses the Provider,
+# then points the PA's `provider_id` at it.
 FIXTURE_PROVIDER_AVAILABILITY: list[FixtureProviderAvailability] = [
     {
         "owner_email": "alice@example.com",
-        "detail": {
+        "provider": {
             "practice_name": "Katie Reeves, PhD",
+            # Telehealth-only practice — no city/ZIP in the source
+            # example. The Provider model still requires these fields,
+            # so we record placeholders documenting the telehealth
+            # posture; the announcement narrative covers the real
+            # delivery context.
+            "location_city": "(telehealth)",
+            "location_state": "CA",
+            "location_zip": "00000",
+            "in_person_sessions": "no",
+            "virtual_sessions": "yes",
+        },
+        "detail": {
             "description": (
                 "Solo private practice offering psychotherapy and medication "
                 "management for older teens and transitional-age youth with "
@@ -65,9 +79,6 @@ FIXTURE_PROVIDER_AVAILABILITY: list[FixtureProviderAvailability] = [
             ),
             "referral_instructions": "Contact via website to schedule an intake call.",
             "website": "https://katiereevesphd.com",
-            "location_state": "CA",
-            "in_person_sessions": "no",
-            "virtual_sessions": "yes",
             "desired_times": [],
             "services": ["psychotherapy", "medication_management"],
             "settings": ["outpatient"],
@@ -85,8 +96,19 @@ FIXTURE_PROVIDER_AVAILABILITY: list[FixtureProviderAvailability] = [
     },
     {
         "owner_email": "alice@example.com",
-        "detail": {
+        "provider": {
             "practice_name": "Camp BooHoo",
+            "location_city": "Santa Clara",
+            "location_state": "CA",
+            # Venue (fairgrounds) has no specific ZIP — keep the
+            # county-seat ZIP as a serviceable placeholder so the
+            # Provider's NOT NULL constraint stays satisfied; the
+            # narrative carries the real location info.
+            "location_zip": "95050",
+            "in_person_sessions": "yes",
+            "virtual_sessions": "no",
+        },
+        "detail": {
             "description": (
                 "Therapeutic summer camp focused on social skills and emotion "
                 "regulation for middle schoolers with ASD. Two 2-week cohorts "
@@ -98,10 +120,6 @@ FIXTURE_PROVIDER_AVAILABILITY: list[FixtureProviderAvailability] = [
                 "campbooohoo@example.com to reserve a cohort spot."
             ),
             "website": "https://boohoocrybaby.com",
-            "location_city": "Santa Clara",
-            "location_state": "CA",
-            "in_person_sessions": "yes",
-            "virtual_sessions": "no",
             "desired_times": [],
             "schedule_text": "May 25 & Jun 18 cohorts; 2-week sessions; M-F 9am–5pm",
             "services": ["group_therapy"],
@@ -116,8 +134,15 @@ FIXTURE_PROVIDER_AVAILABILITY: list[FixtureProviderAvailability] = [
     },
     {
         "owner_email": "alice@example.com",
-        "detail": {
+        "provider": {
             "practice_name": "RISE IOP at CHC",
+            "location_city": "Palo Alto",
+            "location_state": "CA",
+            "location_zip": "94304",
+            "in_person_sessions": "yes",
+            "virtual_sessions": "no",
+        },
+        "detail": {
             "description": (
                 "RISE is a Comprehensive DBT intensive outpatient program for "
                 "high school students with high acuity, including those with "
@@ -129,11 +154,6 @@ FIXTURE_PROVIDER_AVAILABILITY: list[FixtureProviderAvailability] = [
                 "Please contact the program coordinator for intake details."
             ),
             "website": "https://chc.rise.org",
-            "location_city": "Palo Alto",
-            "location_state": "CA",
-            "location_zip": "94304",
-            "in_person_sessions": "yes",
-            "virtual_sessions": "no",
             "desired_times": [],
             "schedule_text": "M-F 8:30am–4:30pm; current cohort starts May 11",
             "services": [
@@ -193,10 +213,11 @@ async def seed_users() -> tuple[int, int]:
 async def seed_provider_availability() -> tuple[int, int]:
     created = 0
     skipped = 0
+    providers_created = 0
 
     async with async_session_maker() as session:
         for fixture in FIXTURE_PROVIDER_AVAILABILITY:
-            practice_name = fixture["detail"]["practice_name"]
+            practice_name = fixture["provider"]["practice_name"]
             owner_result = await session.execute(
                 select(User).where(User.email == fixture["owner_email"])
             )
@@ -209,6 +230,25 @@ async def seed_provider_availability() -> tuple[int, int]:
                 skipped += 1
                 continue
 
+            # Find-or-create the Provider for this fixture's owner +
+            # practice_name. Reusing across reseeds keeps the FK stable.
+            provider_result = await session.execute(
+                select(Provider).where(
+                    Provider.owner_id == owner.id,
+                    Provider.practice_name == practice_name,
+                )
+            )
+            provider = provider_result.scalar_one_or_none()
+            if provider is None:
+                provider = Provider(owner_id=owner.id, **fixture["provider"])
+                session.add(provider)
+                await session.flush()
+                providers_created += 1
+                print(
+                    f"✅ Created provider '{practice_name}' "
+                    f"for {fixture['owner_email']}"
+                )
+
             existing = await session.execute(
                 select(Post)
                 .join(
@@ -218,7 +258,7 @@ async def seed_provider_availability() -> tuple[int, int]:
                 .where(
                     Post.kind == "provider_availability",
                     Post.owner_id == owner.id,
-                    ProviderAvailabilityDetail.practice_name == practice_name,
+                    ProviderAvailabilityDetail.provider_id == provider.id,
                 )
             )
             if existing.scalar_one_or_none() is not None:
@@ -231,7 +271,7 @@ async def seed_provider_availability() -> tuple[int, int]:
 
             post = Post(kind="provider_availability", owner_id=owner.id)
             post.provider_availability_detail = ProviderAvailabilityDetail(
-                **fixture["detail"]
+                provider_id=provider.id, **fixture["detail"]
             )
             session.add(post)
             print(f"✅ Created PA post '{practice_name}' by {fixture['owner_email']}")
@@ -239,6 +279,8 @@ async def seed_provider_availability() -> tuple[int, int]:
 
         await session.commit()
 
+    if providers_created:
+        print(f"   ({providers_created} provider profiles created)")
     return created, skipped
 
 

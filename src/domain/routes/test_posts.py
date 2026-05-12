@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from src.domain.models import (
     ClientReferralDetail,
     Post,
+    Provider,
     ProviderAvailabilityDetail,
     User,
 )
@@ -17,6 +18,7 @@ from tests.helpers import (
     client_referral_payload,
     create_test_user,
     make_client_referral_detail,
+    make_provider,
     make_provider_availability_detail,
     promote_to_admin,
     provider_availability_payload,
@@ -36,12 +38,25 @@ def _client_referral_post(*, description: str, owner_id, **overrides) -> Post:
     return post
 
 
-def _provider_availability_post(*, practice_name: str, owner_id, **overrides) -> Post:
-    """Build a `kind='provider_availability'` Post + its spec-compliant detail."""
+def _provider_availability_post(
+    *, practice_name: str, owner_id, provider: Provider | None = None, **overrides
+) -> Post:
+    """Build a `kind='provider_availability'` Post + its spec-compliant
+    detail + the linked Provider profile. The Provider is auto-created
+    with the given `practice_name` unless one is passed explicitly.
+    SQLAlchemy save-update cascade persists the Provider when the Post
+    is added to a session — callers do `session.add(post)` and the
+    Provider goes in too with the right FK order."""
+    if provider is None:
+        provider = make_provider(owner_id=owner_id, practice_name=practice_name)
+    if provider.id is None:
+        provider.id = uuid.uuid4()
     post = Post(kind="provider_availability", owner_id=owner_id)
-    post.provider_availability_detail = make_provider_availability_detail(
-        practice_name=practice_name, **overrides
-    )
+    detail = make_provider_availability_detail(provider_id=provider.id, **overrides)
+    # Wire the Provider through the relationship so save-update cascade
+    # persists it when the Post is added to a session.
+    detail.provider = provider
+    post.provider_availability_detail = detail
     return post
 
 
@@ -697,7 +712,8 @@ async def test_patch_provider_availability_with_client_referral_payload_does_not
         result = await session.execute(select(Post).filter(Post.id == post_id))
         refreshed = result.scalars().first()
         assert refreshed.kind == "provider_availability"
-        assert refreshed.provider_availability_detail.practice_name == original
+        # Practice name lives on the linked Provider post-#448; dereference.
+        assert refreshed.provider_availability_detail.provider.practice_name == original
         assert refreshed.client_referral_detail is None
 
     async with db_test_session_manager() as session:
@@ -725,7 +741,11 @@ async def test_patch_client_referral_with_provider_availability_payload_does_not
 
     response = await authenticated_client.patch(
         f"/posts/{post_id}",
-        data={"kind": "provider_availability", "practice_name": "hijack"},
+        # `description` is a valid PA Update field — schema passes; the 400
+        # comes from the post-validation kind-mismatch check, which is the
+        # behavior under test. (Practice name moved to Provider post-#448
+        # and is no longer a PA wire field, so it can't be used here.)
+        data={"kind": "provider_availability", "description": "hijack"},
     )
     assert response.status_code == 400
 
@@ -818,10 +838,16 @@ async def test_create_provider_availability_happy_path(
     """`POST /posts` with `kind='provider_availability'` persists with
     the right detail row + audit row."""
     practice_name = f"Acme-{uuid.uuid4()}"
+    # PA points at a Provider via `provider_id` (#448); seed one owned by
+    # the requesting user so the FK resolves at write time.
+    provider = make_provider(owner_id=logged_in_user.id, practice_name=practice_name)
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            session.add(provider)
 
     response = await authenticated_client.post(
         "/posts",
-        data=provider_availability_payload(practice_name=practice_name),
+        data=provider_availability_payload(provider_id=str(provider.id)),
     )
 
     assert response.status_code == 201
@@ -832,7 +858,11 @@ async def test_create_provider_availability_happy_path(
         persisted = result.scalars().first()
         assert persisted is not None
         assert persisted.kind == "provider_availability"
-        assert persisted.provider_availability_detail.practice_name == practice_name
+        assert persisted.provider_availability_detail.provider_id == provider.id
+        assert (
+            persisted.provider_availability_detail.provider.practice_name
+            == practice_name
+        )
         assert persisted.provider_availability_detail.sliding_scale is False
         assert persisted.client_referral_detail is None
         assert persisted.owner_id == logged_in_user.id
@@ -843,7 +873,7 @@ async def test_create_provider_availability_happy_path(
         assert len(rows) == 1
         assert rows[0].action == "create_post"
         assert rows[0].before is None
-        expected = provider_availability_payload(practice_name=practice_name)
+        expected = provider_availability_payload(provider_id=str(provider.id))
         expected.pop("kind")
         assert rows[0].after == {
             "kind": "provider_availability",
@@ -857,9 +887,18 @@ async def test_create_provider_availability_strips_whitespace(
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user: User,
 ):
+    """Whitespace stripping applies to PA's remaining free-text wire fields.
+    (Practice-name whitespace stripping is exercised on Provider post-#448.)"""
+    provider = make_provider(owner_id=logged_in_user.id)
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            session.add(provider)
+
     response = await authenticated_client.post(
         "/posts",
-        data=provider_availability_payload(practice_name="  Acme  "),
+        data=provider_availability_payload(
+            provider_id=str(provider.id), description="  Lead pitch  "
+        ),
     )
     assert response.status_code == 201
     new_id = uuid.UUID(response.json()["id"])
@@ -867,16 +906,13 @@ async def test_create_provider_availability_strips_whitespace(
     async with db_test_session_manager() as session:
         result = await session.execute(select(Post).filter(Post.id == new_id))
         persisted = result.scalars().first()
-        assert persisted.provider_availability_detail.practice_name == "Acme"
+        assert persisted.provider_availability_detail.description == "Lead pitch"
 
 
 @pytest.mark.parametrize(
     "payload",
     [
         {"kind": "provider_availability"},  # missing every required field
-        provider_availability_payload(practice_name=""),
-        provider_availability_payload(practice_name="   "),
-        provider_availability_payload(location_state="ZZ"),  # not a US state
         provider_availability_payload(payment_situation="cash_only"),
         provider_availability_payload(title="bleed"),  # cross-kind bleed
         provider_availability_payload(evil=True),  # unknown field
@@ -893,17 +929,25 @@ async def test_create_provider_availability_rejects_invalid_payload(
 
 async def test_get_provider_availability_form_renders(
     authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user: User,
 ):
     """`GET /posts/form?kind=provider_availability` renders the kind-specific
-    create form."""
+    create form. Per #448, the form needs the user to own at least one
+    Provider profile (otherwise it shows the create-a-provider stub)."""
+    provider = make_provider(owner_id=logged_in_user.id)
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            session.add(provider)
+
     response = await authenticated_client.get("/posts/form?kind=provider_availability")
     assert response.status_code == 200
     tree = HTMLParser(response.text)
     form = tree.css_first("form")
     assert form is not None
     assert form.attributes.get("hx-post") == "/posts"
-    assert tree.css_first("input#practice_name") is not None
+    # `provider_id` is now a <select> over the user's owned Providers (#448).
+    assert tree.css_first("select#provider_id") is not None
     kind_input = tree.css_first('input[name="kind"]')
     assert kind_input is not None
     assert kind_input.attributes.get("value") == "provider_availability"
@@ -911,6 +955,7 @@ async def test_get_provider_availability_form_renders(
 
 async def test_provider_availability_form_renders_free_text_fields(
     authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user: User,
 ):
     """The three free-text fields render through `field_for` — `description`
@@ -918,6 +963,11 @@ async def test_provider_availability_form_renders_free_text_fields(
     marker on the schema), `website` as `<input type="url">` (driven by
     `HtmlUrl` — #446). A regression where either marker stops being picked
     up would render fields as the wrong control and silently break the form."""
+    provider = make_provider(owner_id=logged_in_user.id)
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            session.add(provider)
+
     response = await authenticated_client.get("/posts/form?kind=provider_availability")
     assert response.status_code == 200
     tree = HTMLParser(response.text)
@@ -930,11 +980,17 @@ async def test_provider_availability_form_renders_free_text_fields(
 
 async def test_provider_availability_form_renders_languages_multi_select(
     authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user: User,
 ):
     """`languages` renders as a multi-select checkbox group via `field_for`'s
     new `list[Literal[*T]]` arm (#425). Confirms the schema-driven multi-
     select dispatch is wired end-to-end."""
+    provider = make_provider(owner_id=logged_in_user.id)
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            session.add(provider)
+
     response = await authenticated_client.get("/posts/form?kind=provider_availability")
     assert response.status_code == 200
     tree = HTMLParser(response.text)
@@ -947,11 +1003,17 @@ async def test_provider_availability_form_renders_languages_multi_select(
 
 async def test_provider_availability_form_renders_age_groups_multi_select(
     authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user: User,
 ):
     """`age_groups` renders as a 7-option multi-select checkbox group via
     `field_for`'s `list[Literal[*T]]` arm (#430). First 7-option consumer
     of the multi-select rails."""
+    provider = make_provider(owner_id=logged_in_user.id)
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            session.add(provider)
+
     response = await authenticated_client.get("/posts/form?kind=provider_availability")
     assert response.status_code == 200
     tree = HTMLParser(response.text)
@@ -1017,7 +1079,7 @@ async def test_owner_can_open_provider_availability_edit_form(
     logged_in_user: User,
 ):
     """The owner of a provider_availability sees the kind-specific edit
-    form pre-filled with the current practice name."""
+    form with the linked Provider preselected in the dropdown."""
     practice_name = f"Edit-{uuid.uuid4()}"
     post = _provider_availability_post(
         practice_name=practice_name, owner_id=logged_in_user.id
@@ -1032,43 +1094,49 @@ async def test_owner_can_open_provider_availability_edit_form(
     form = tree.css_first("form")
     assert form is not None
     assert form.attributes.get("hx-patch") == f"/posts/{post.id}"
-    practice_input = tree.css_first("input#practice_name")
-    assert practice_input is not None
-    assert practice_input.attributes.get("value") == practice_name
+    # The linked Provider's row appears as the selected `<option>` (#448).
+    provider_select = tree.css_first("select#provider_id")
+    assert provider_select is not None
+    selected = provider_select.css_first("option[selected]")
+    assert selected is not None
+    assert selected.text(strip=True) == practice_name
     kind_input = tree.css_first('input[name="kind"]')
     assert kind_input is not None
     assert kind_input.attributes.get("value") == "provider_availability"
 
 
-async def test_owner_can_patch_provider_availability_practice_name(
+async def test_owner_can_patch_provider_availability_description(
     authenticated_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user: User,
 ):
+    """Patch a PA field (`description`) and confirm round-trip + read body.
+    (Practice name moved to Provider post-#448 and is no longer a PA wire
+    field — the parallel test for renaming a practice lives on Provider.)"""
     post = _provider_availability_post(practice_name="orig", owner_id=logged_in_user.id)
     async with db_test_session_manager() as session:
         async with session.begin():
             session.add(post)
 
-    new_practice_name = f"Renamed-{uuid.uuid4()}"
+    new_description = f"Renamed-{uuid.uuid4()}"
     response = await authenticated_client.patch(
         f"/posts/{post.id}",
         data={
             "kind": "provider_availability",
-            "practice_name": new_practice_name,
+            "description": new_description,
         },
     )
     assert response.status_code == 200
     assert response.headers.get("HX-Redirect") == f"/posts/{post.id}"
     body = response.json()
     assert body["kind"] == "provider_availability"
-    assert body["practice_name"] == new_practice_name
+    assert body["description"] == new_description
     assert "title" not in body and "body" not in body
 
     async with db_test_session_manager() as session:
         result = await session.execute(select(Post).filter(Post.id == post.id))
         refreshed = result.scalars().first()
-        assert refreshed.provider_availability_detail.practice_name == new_practice_name
+        assert refreshed.provider_availability_detail.description == new_description
 
 
 async def test_owner_can_delete_provider_availability(
@@ -1114,10 +1182,14 @@ async def test_delete_provider_availability_writes_audit_row(
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user: User,
 ):
+    """Per #448 the PA audit snapshot records `provider_id` instead of the
+    six fields that moved to Provider (`practice_name`, `location_*`,
+    `*_sessions`)."""
     practice_name = f"doomed-{uuid.uuid4()}"
     post = _provider_availability_post(
         practice_name=practice_name, owner_id=logged_in_user.id
     )
+    provider_id = post.provider_availability_detail.provider_id
     async with db_test_session_manager() as session:
         async with session.begin():
             session.add(post)
@@ -1132,7 +1204,7 @@ async def test_delete_provider_availability_writes_audit_row(
         assert len(rows) == 1
         assert rows[0].action == "delete_post"
         assert rows[0].before == {
-            **provider_availability_payload(practice_name=practice_name),
+            **provider_availability_payload(provider_id=str(provider_id)),
             "owner_id": str(logged_in_user.id),
         }
         assert rows[0].after is None

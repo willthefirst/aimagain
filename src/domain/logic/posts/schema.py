@@ -194,12 +194,10 @@ class ProviderAvailabilityRead(_PostReadBase):
     description: str | None = None
     referral_instructions: str | None = None
     website: str | None = None
-    practice_name: str
-    location_city: str | None = None
-    location_state: Literal[*US_STATES]
-    location_zip: str | None = None
-    in_person_sessions: Literal[*LOCATION_AVAILABILITY_OPTIONS] | None = None
-    virtual_sessions: Literal[*LOCATION_AVAILABILITY_OPTIONS] | None = None
+    # Practice + location + delivery-format live on the linked Provider
+    # (#448). Read projections expose the FK; templates dereference via
+    # `post.provider_availability_detail.provider.<field>`.
+    provider_id: uuid.UUID
     desired_times: DesiredTimesField = []
     schedule_text: str | None = None
     services: ServicesField = []
@@ -261,17 +259,11 @@ class ProviderAvailabilityCreate(WirePayload):
     description: TextareaOptional = None
     referral_instructions: TextareaOptional = None
     website: UrlOptional = None
-    practice_name: StrippedText
-    # `location_state` stays required — only usable geographic filter axis.
-    # City / ZIP / session-format / services / settings all relax to
-    # optional here (#433): telehealth-only practices (Katie Reeves) have
-    # no city/ZIP; venue posts (Camp BooHoo) have placeholder ZIPs;
-    # services/settings vocabularies don't yet cover every post kind.
-    location_city: StrippedOptionalText = None
-    location_state: Literal[*US_STATES]
-    location_zip: ZipText | None = None
-    in_person_sessions: Literal[*LOCATION_AVAILABILITY_OPTIONS] | None = None
-    virtual_sessions: Literal[*LOCATION_AVAILABILITY_OPTIONS] | None = None
+    # FK to one of the requesting user's Provider profiles. The form
+    # restricts the dropdown to providers owned by the user; the route
+    # handler also verifies ownership at write time so a wire-level
+    # attacker can't reference another user's provider (#448).
+    provider_id: uuid.UUID
     desired_times: DesiredTimesField = []
     # Free-text companion to `desired_times` for cohort dates / fixed
     # program hours (#442). Single-line input; not a textarea.
@@ -347,12 +339,9 @@ class ProviderAvailabilityUpdate(PartialUpdate):
     description: TextareaOptional = None
     referral_instructions: TextareaOptional = None
     website: UrlOptional = None
-    practice_name: StrippedText | None = None
-    location_city: StrippedText | None = None
-    location_state: Literal[*US_STATES] | None = None
-    location_zip: ZipText | None = None
-    in_person_sessions: Literal[*LOCATION_AVAILABILITY_OPTIONS] | None = None
-    virtual_sessions: Literal[*LOCATION_AVAILABILITY_OPTIONS] | None = None
+    # FK to a Provider profile owned by the requesting user. `None` =
+    # leave unchanged. The route handler verifies ownership on update.
+    provider_id: uuid.UUID | None = None
     desired_times: DesiredTimesField | None = None
     schedule_text: StrippedOptionalText = None
     # `None` = leave unchanged; `min_length=1` rejects an explicit `[]`.
@@ -411,12 +400,9 @@ class ProviderAvailabilityAuditSnapshot(_PostAuditSnapshotBase):
     description: str | None = None
     referral_instructions: str | None = None
     website: str | None = None
-    practice_name: str
-    location_city: str | None = None
-    location_state: Literal[*US_STATES]
-    location_zip: str | None = None
-    in_person_sessions: Literal[*LOCATION_AVAILABILITY_OPTIONS] | None = None
-    virtual_sessions: Literal[*LOCATION_AVAILABILITY_OPTIONS] | None = None
+    # Audit row records the FK, not the dereferenced practice fields —
+    # standard pattern for relational audit snapshots.
+    provider_id: uuid.UUID
     desired_times: DesiredTimesField = []
     schedule_text: str | None = None
     services: ServicesField = []

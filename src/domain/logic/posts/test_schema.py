@@ -342,12 +342,9 @@ def test_audit_snapshot_unknown_kind_raises():
 
 
 def test_post_create_dispatches_provider_availability():
-    p = post_create_adapter.validate_python(
-        provider_availability_payload(practice_name="Acme Health")
-    )
+    p = post_create_adapter.validate_python(provider_availability_payload())
     assert isinstance(p, ProviderAvailabilityCreate)
     assert p.kind == "provider_availability"
-    assert p.practice_name == "Acme Health"
     assert p.sliding_scale is False
 
 
@@ -509,25 +506,10 @@ def test_post_update_provider_availability_accepts_age_groups_only():
     assert p.age_groups == ["young_adults_19_24", "adults_25_64"]
 
 
-def test_post_create_strips_surrounding_whitespace_provider_availability():
-    p = post_create_adapter.validate_python(
-        provider_availability_payload(practice_name="  Acme  ")
-    )
-    assert p.practice_name == "Acme"
-
-
-def test_post_create_provider_availability_rejects_empty_practice_name():
-    with pytest.raises(ValidationError):
-        post_create_adapter.validate_python(
-            provider_availability_payload(practice_name="   ")
-        )
-
-
 @pytest.mark.parametrize(
     "missing_field",
     [
-        "practice_name",
-        "location_state",
+        "provider_id",
         "age_groups",
         "payment_situation",
         "sliding_scale",
@@ -600,14 +582,6 @@ def test_post_update_provider_availability_accepts_description_only():
     assert p.description == "Updated pitch."
 
 
-def test_post_update_provider_availability_accepts_practice_name():
-    p = post_update_adapter.validate_python(
-        {"kind": "provider_availability", "practice_name": "Renamed"}
-    )
-    assert isinstance(p, ProviderAvailabilityUpdate)
-    assert p.practice_name == "Renamed"
-
-
 def test_post_update_provider_availability_accepts_sliding_scale_only():
     p = post_update_adapter.validate_python(
         {"kind": "provider_availability", "sliding_scale": True}
@@ -617,10 +591,12 @@ def test_post_update_provider_availability_accepts_sliding_scale_only():
 
 
 def test_post_update_provider_availability_strips_whitespace():
+    """`description` is a free-text PA field — whitespace stripping still
+    applies. (Practice-name stripping moved to Provider with #448.)"""
     p = post_update_adapter.validate_python(
-        {"kind": "provider_availability", "practice_name": "  Renamed  "}
+        {"kind": "provider_availability", "description": "  Renamed  "}
     )
-    assert p.practice_name == "Renamed"
+    assert p.description == "Renamed"
 
 
 def test_post_update_provider_availability_requires_at_least_one_field():
@@ -631,7 +607,7 @@ def test_post_update_provider_availability_requires_at_least_one_field():
 def test_post_update_provider_availability_rejects_whitespace_only():
     with pytest.raises(ValidationError):
         post_update_adapter.validate_python(
-            {"kind": "provider_availability", "practice_name": "   "}
+            {"kind": "provider_availability", "description": "   "}
         )
 
 
@@ -640,7 +616,7 @@ def test_post_update_provider_availability_rejects_unknown_field():
         post_update_adapter.validate_python(
             {
                 "kind": "provider_availability",
-                "practice_name": "Acme",
+                "description": "Acme",
                 "evil": True,
             }
         )
@@ -661,7 +637,10 @@ def test_audit_snapshot_for_provider_availability_post():
     snap = post_audit_snapshot(post)
     assert snap["kind"] == "provider_availability"
     assert snap["owner_id"] == str(owner_id)
-    assert snap["practice_name"] == detail_attrs["practice_name"]
+    # Per #448, the audit row records the FK to the Provider, not the
+    # dereferenced practice fields. Practice-name/location/sessions live
+    # on Provider now and are snapshotted via that entity's audit path.
+    assert snap["provider_id"] == detail_attrs["provider_id"]
     assert snap["sliding_scale"] is False
     assert snap["cost"] is None
 
@@ -694,9 +673,6 @@ def _literal_args(model_cls, field_name: str) -> tuple[str, ...]:
         (ClientReferralRead, "location_in_person", LOCATION_AVAILABILITY_OPTIONS),
         (ClientReferralRead, "location_virtual", LOCATION_AVAILABILITY_OPTIONS),
         (ClientReferralRead, "insurance", INSURANCE_OPTIONS),
-        (ProviderAvailabilityRead, "location_state", US_STATES),
-        (ProviderAvailabilityRead, "in_person_sessions", LOCATION_AVAILABILITY_OPTIONS),
-        (ProviderAvailabilityRead, "virtual_sessions", LOCATION_AVAILABILITY_OPTIONS),
         (ProviderAvailabilityRead, "payment_situation", INSURANCE_OPTIONS),
         # Create variants
         (ClientReferralCreate, "location_state", US_STATES),
@@ -867,23 +843,13 @@ def test_post_create_provider_availability_services_absent_defaults_empty():
 
 
 def test_post_create_provider_availability_accepts_omitted_optional_fields():
-    """City, ZIP, sessions, services, settings are all optional after
-    #433 — telehealth-only and venue-based posts must be expressible."""
+    """`services` and `settings` are optional on PA Create (#433) — omitting
+    them defaults to `[]`. (Practice/location/session fields moved to
+    Provider per #448 and are no longer wire fields on PA.)"""
     payload = provider_availability_payload()
-    for field in (
-        "location_city",
-        "location_zip",
-        "in_person_sessions",
-        "virtual_sessions",
-        "services",
-        "settings",
-    ):
+    for field in ("services", "settings"):
         payload.pop(field, None)
     p = post_create_adapter.validate_python(payload)
-    assert p.location_city is None
-    assert p.location_zip is None
-    assert p.in_person_sessions is None
-    assert p.virtual_sessions is None
     assert p.services == []
     assert p.settings == []
 
