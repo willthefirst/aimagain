@@ -122,7 +122,12 @@ def upgrade() -> None:
             if existing:
                 provider_id = existing.id
             else:
-                provider_id = uuid.uuid4()
+                # SQLite stores Uuid as CHAR(32) hex — the stdlib sqlite3
+                # driver can't bind a uuid.UUID object directly, so we
+                # produce the hex form ourselves. Using sa.text() bypasses
+                # SQLAlchemy's type adapter; values go straight to the
+                # DBAPI driver.
+                provider_id = uuid.uuid4().hex
                 bind.execute(
                     sa.text("""
                         INSERT INTO providers (
