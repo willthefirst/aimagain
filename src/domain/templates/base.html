@@ -1,17 +1,18 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
   <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="light dark" />
     <title>{% block title %}AI again{% endblock %}</title>
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css" />
     <script
       src="https://unpkg.com/htmx.org@2.0.4"
       integrity="sha384-HGfztofotfshcF7+8n44JQL2oJmowVChPTg48S+jvZoztPfvwD79OC/LTtG6dMp+"
       crossorigin="anonymous"></script>
     <script src="https://unpkg.com/htmx.org@2.0.4/dist/ext/json-enc.js"></script>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <style>
-      #primary-nav { list-style: none; padding: 0; display: flex; }
-      #primary-nav li { margin-right: 1rem; }
-    </style>
     {% block head %}{% endblock %} {% if is_development %}
     <!-- LiveReload script for development hot reloading -->
     <script>
@@ -27,16 +28,20 @@
   </head>
   <body>
     {% if is_authenticated %}
-    <nav aria-label="Primary">
-      <ul id="primary-nav">
-        <li><a href="/posts">Posts</a></li>
-        <li><a href="/users">Users</a></li>
-        <li><a href="/providers">Providers</a></li>
-        <li><a href="/users/me/favorites">Favorites</a></li>
-        <li><a href="/users/me">Me</a></li>
-      </ul>
-    </nav>
+    <header class="container">
+      <nav aria-label="Primary">
+        <ul id="primary-nav">
+          <li><a href="/posts">Posts</a></li>
+          <li><a href="/users">Users</a></li>
+          <li><a href="/providers">Providers</a></li>
+          <li><a href="/users/me/favorites">Favorites</a></li>
+          <li><a href="/users/me">Me</a></li>
+        </ul>
+      </nav>
+    </header>
     {% endif %}
-    {% block content %}{% endblock %}
+    <main class="container">
+      {% block content %}{% endblock %}
+    </main>
   </body>
 </html>
