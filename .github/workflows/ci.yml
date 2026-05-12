@@ -15,7 +15,7 @@ env:
   ACCESS_TOKEN_EXPIRE_MINUTES: 60
 
 jobs:
-  api-tests:
+  tests:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -42,15 +42,15 @@ jobs:
           echo "💡 To reproduce this locally, run: alembic -c config/alembic.ini upgrade head"
           echo "   Or use the development CLI: dev migrate up"
 
-      - name: Run API tests
-        run: dev test src/domain/routes --tb short -v
+      - name: Run tests
+        run: dev test --tb short -v
 
-      - name: Show API test failure help
+      - name: Show test failure help
         if: failure()
         run: |
-          echo "❌ API tests failed!"
-          echo "💡 To reproduce this locally, run: dev test src/domain/routes --tb short -v"
-          echo "   API tests are colocated under src/domain/routes/ (see tests/README.md)"
+          echo "❌ Tests failed!"
+          echo "💡 To reproduce this locally, run: dev test --tb short -v"
+          echo "   This runs the full default test suite (excludes contract tests; those run in the contract-tests job)."
 
   contract-tests:
     runs-on: ubuntu-latest
