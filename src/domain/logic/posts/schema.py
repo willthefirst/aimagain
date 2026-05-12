@@ -51,6 +51,7 @@ from src.domain.models.enums import (
     DESIRED_TIME_SLOTS,
     INSURANCE_OPTIONS,
     LANGUAGE_PREFERRED_OPTIONS,
+    LANGUAGES,
     LOCATION_AVAILABILITY_OPTIONS,
     TREATMENT_SETTINGS,
     US_STATES,
@@ -106,6 +107,11 @@ SettingsField = Annotated[
 # `provider_availability.settings` is required-min-1 on the wire; same
 # pattern as services.
 RequiredSettingsField = Annotated[SettingsField, Field(min_length=1)]
+LanguagesField = Annotated[list[Literal[*LANGUAGES]], BeforeValidator(_scalar_to_list)]
+# `provider_availability.languages` is required-min-1 on the wire — every
+# practice speaks at least one language, and the unfilterable "no
+# languages" state is meaningless. Mirrors services / settings.
+RequiredLanguagesField = Annotated[LanguagesField, Field(min_length=1)]
 
 
 # --- Shared flatten helper ----------------------------------------------
@@ -192,7 +198,7 @@ class ProviderAvailabilityRead(_PostReadBase):
     treatment_modality: str | None = None
     client_focus: str
     age_group: Literal[*CLIENT_AGE_GROUPS]
-    non_english_services: Literal[*LANGUAGE_PREFERRED_OPTIONS]
+    languages: LanguagesField = []
     payment_situation: Literal[*INSURANCE_OPTIONS]
     sliding_scale: bool
     cost: str | None = None
@@ -257,11 +263,10 @@ class ProviderAvailabilityCreate(WirePayload):
     treatment_modality: StrippedOptionalText = None
     client_focus: StrippedText
     age_group: Literal[*CLIENT_AGE_GROUPS]
-    # Optional + default per spec — provider form's "non-English services"
-    # is asymmetric with the client form's `language_preferred` (required,
-    # also defaults to "no"). Both default to "no"; only the
-    # required-ness differs.
-    non_english_services: Literal[*LANGUAGE_PREFERRED_OPTIONS] = "no"
+    # Required min-1 on the wire — replaces the old yes/no
+    # `non_english_services` flag (#425). Defaults to `["en"]` so the
+    # form's "submit with defaults" case still validates.
+    languages: RequiredLanguagesField = ["en"]
     payment_situation: Literal[*INSURANCE_OPTIONS]
     sliding_scale: bool
     cost: StrippedOptionalText = None
@@ -336,7 +341,10 @@ class ProviderAvailabilityUpdate(PartialUpdate):
     treatment_modality: StrippedOptionalText = None
     client_focus: StrippedText | None = None
     age_group: Literal[*CLIENT_AGE_GROUPS] | None = None
-    non_english_services: Literal[*LANGUAGE_PREFERRED_OPTIONS] | None = None
+    # `None` = leave unchanged. `min_length=1` rejects an explicit `[]`,
+    # mirroring `services`. Clearing the list is intentionally not
+    # supported.
+    languages: RequiredLanguagesField | None = None
     payment_situation: Literal[*INSURANCE_OPTIONS] | None = None
     sliding_scale: bool | None = None
     cost: StrippedOptionalText = None
@@ -397,7 +405,7 @@ class ProviderAvailabilityAuditSnapshot(_PostAuditSnapshotBase):
     treatment_modality: str | None = None
     client_focus: str
     age_group: Literal[*CLIENT_AGE_GROUPS]
-    non_english_services: Literal[*LANGUAGE_PREFERRED_OPTIONS]
+    languages: LanguagesField = []
     payment_situation: Literal[*INSURANCE_OPTIONS]
     sliding_scale: bool
     cost: str | None = None

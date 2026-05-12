@@ -892,6 +892,23 @@ async def test_provider_availability_form_renders_free_text_fields(
     assert website.attributes.get("type", "text") == "text"
 
 
+async def test_provider_availability_form_renders_languages_multi_select(
+    authenticated_client: AsyncClient,
+    logged_in_user: User,
+):
+    """`languages` renders as a multi-select checkbox group via `field_for`'s
+    new `list[Literal[*T]]` arm (#425). Confirms the schema-driven multi-
+    select dispatch is wired end-to-end."""
+    response = await authenticated_client.get("/posts/form?kind=provider_availability")
+    assert response.status_code == 200
+    tree = HTMLParser(response.text)
+    boxes = tree.css('input[type="checkbox"][name="languages"]')
+    values = {b.attributes.get("value") for b in boxes}
+    assert values == {"en", "es"}
+    assert "English" in response.text
+    assert "Spanish" in response.text
+
+
 async def test_list_renders_provider_availability_row(
     authenticated_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],

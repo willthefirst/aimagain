@@ -81,7 +81,7 @@ FIXTURE_PROVIDER_AVAILABILITY: list[FixtureProviderAvailability] = [
             ),
             # TODO(issue-4): spans adolescents + young_adults + adults. Single-valued today.
             "age_group": "adolescents_14_18",
-            "non_english_services": "no",  # TODO(issue-3): replace with languages=["en"].
+            "languages": ["en"],
             # TODO(issue-6): true value is self_pay_only; not in vocab today.
             # Best-fit placeholder.
             "payment_situation": "out_of_network",
@@ -121,7 +121,7 @@ FIXTURE_PROVIDER_AVAILABILITY: list[FixtureProviderAvailability] = [
             "client_focus": "Middle schoolers with ASD.",
             # TODO(issue-4): middle school spans children_6_10 + preteens_11_13.
             "age_group": "preteens_11_13",
-            "non_english_services": "yes",  # TODO(issue-3): replace with languages=["en", "es"].
+            "languages": ["en", "es"],
             "payment_situation": "out_of_network",  # TODO(issue-6): true value is self_pay_only.
             "sliding_scale": True,
             "cost": "$2,500 / session",
@@ -161,7 +161,7 @@ FIXTURE_PROVIDER_AVAILABILITY: list[FixtureProviderAvailability] = [
             # TODO(issue-4): "high school" spans adolescents_14_18 + possibly
             # young_adults_19_24.
             "age_group": "adolescents_14_18",
-            "non_english_services": "yes",  # TODO(issue-3): replace with languages=["en", "es"].
+            "languages": ["en", "es"],
             # TODO(issue-6): true value is please_contact
             # ("Yes — no MediCal, please contact").
             "payment_situation": "in_network",

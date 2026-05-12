@@ -80,8 +80,8 @@ Provider availability: {{ post.provider_availability_detail.practice_name }}
     <dd>{{ d.client_focus }}</dd>
     <dt>Age group</dt>
     <dd>{{ CLIENT_AGE_GROUP_LABELS[d.age_group] }}</dd>
-    <dt>Non-English services</dt>
-    <dd>{{ LANGUAGE_PREFERRED_LABELS[d.non_english_services] }}</dd>
+    <dt>Languages</dt>
+    <dd>{% for l in d.languages %}{{ LANGUAGE_LABELS[l] }}{% if not loop.last %}, {% endif %}{% endfor %}</dd>
     <dt>Payment situation</dt>
     <dd>{{ INSURANCE_LABELS[d.payment_situation] }}</dd>
     <dt>Sliding scale</dt>

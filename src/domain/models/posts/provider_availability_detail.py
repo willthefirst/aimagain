@@ -8,7 +8,6 @@ from src.framework.persistence.base_model import Base
 from ..enums import (
     CLIENT_AGE_GROUPS,
     INSURANCE_OPTIONS,
-    LANGUAGE_PREFERRED_OPTIONS,
     LOCATION_AVAILABILITY_OPTIONS,
     US_STATES,
     named_check_in,
@@ -27,7 +26,6 @@ class ProviderAvailabilityDetail(Base):
         _ck("in_person_sessions", LOCATION_AVAILABILITY_OPTIONS),
         _ck("virtual_sessions", LOCATION_AVAILABILITY_OPTIONS),
         _ck("age_group", CLIENT_AGE_GROUPS),
-        _ck("non_english_services", LANGUAGE_PREFERRED_OPTIONS),
         _ck("payment_situation", INSURANCE_OPTIONS),
     )
 
@@ -59,7 +57,9 @@ class ProviderAvailabilityDetail(Base):
     treatment_modality = Column(Text, nullable=True)
     client_focus = Column(Text, nullable=False)
     age_group = Column(Text, nullable=False)
-    non_english_services = Column(Text, nullable=False, server_default="no")
+    languages = Column(
+        JSON, nullable=False, server_default=text("'[\"en\"]'"), default=lambda: ["en"]
+    )
 
     # Section 5 — insurance
     payment_situation = Column(Text, nullable=False)

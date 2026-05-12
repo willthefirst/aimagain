@@ -43,8 +43,10 @@ from src.domain.models.enums import (
     DESIRED_TIME_SLOTS,
     INSURANCE_LABELS,
     INSURANCE_OPTIONS,
+    LANGUAGE_LABELS,
     LANGUAGE_PREFERRED_LABELS,
     LANGUAGE_PREFERRED_OPTIONS,
+    LANGUAGES,
     LOCATION_AVAILABILITY_LABELS,
     LOCATION_AVAILABILITY_OPTIONS,
     US_STATES,
@@ -311,12 +313,33 @@ def test_post_create_dispatches_provider_availability():
     assert p.sliding_scale is False
 
 
-def test_post_create_provider_availability_default_non_english_services():
-    """`non_english_services` is optional with a default of 'no'."""
+def test_post_create_provider_availability_default_languages():
+    """`languages` defaults to ['en'] — keeps the submit-with-defaults case
+    valid even though the field is required min-1 (#425)."""
     payload = provider_availability_payload()
-    payload.pop("non_english_services")
+    payload.pop("languages")
     p = post_create_adapter.validate_python(payload)
-    assert p.non_english_services == "no"
+    assert p.languages == ["en"]
+
+
+def test_post_create_provider_availability_accepts_multiple_languages():
+    p = post_create_adapter.validate_python(
+        provider_availability_payload(languages=["en", "es"])
+    )
+    assert p.languages == ["en", "es"]
+
+
+def test_post_create_provider_availability_rejects_empty_languages():
+    """`languages` is required min-1; an empty list 422s, mirroring services."""
+    with pytest.raises(ValidationError):
+        post_create_adapter.validate_python(provider_availability_payload(languages=[]))
+
+
+def test_post_create_provider_availability_rejects_unknown_language_token():
+    with pytest.raises(ValidationError):
+        post_create_adapter.validate_python(
+            provider_availability_payload(languages=["xx"])
+        )
 
 
 def test_post_create_strips_surrounding_whitespace_provider_availability():
@@ -516,17 +539,11 @@ def _literal_args(model_cls, field_name: str) -> tuple[str, ...]:
         (ProviderAvailabilityRead, "in_person_sessions", LOCATION_AVAILABILITY_OPTIONS),
         (ProviderAvailabilityRead, "virtual_sessions", LOCATION_AVAILABILITY_OPTIONS),
         (ProviderAvailabilityRead, "age_group", CLIENT_AGE_GROUPS),
-        (ProviderAvailabilityRead, "non_english_services", LANGUAGE_PREFERRED_OPTIONS),
         (ProviderAvailabilityRead, "payment_situation", INSURANCE_OPTIONS),
         # Create variants
         (ClientReferralCreate, "location_state", US_STATES),
         (ClientReferralCreate, "client_dem_ages", CLIENT_AGE_GROUPS),
         (ClientReferralCreate, "insurance", INSURANCE_OPTIONS),
-        (
-            ProviderAvailabilityCreate,
-            "non_english_services",
-            LANGUAGE_PREFERRED_OPTIONS,
-        ),
         (ProviderAvailabilityCreate, "payment_situation", INSURANCE_OPTIONS),
         # Update variants (Optional[Literal[*TUPLE]])
         (ClientReferralUpdate, "location_state", US_STATES),
@@ -742,6 +759,7 @@ def test_post_update_services_rejects_unknown_token(kind):
         (LOCATION_AVAILABILITY_OPTIONS, LOCATION_AVAILABILITY_LABELS),
         (CLIENT_AGE_GROUPS, CLIENT_AGE_GROUP_LABELS),
         (LANGUAGE_PREFERRED_OPTIONS, LANGUAGE_PREFERRED_LABELS),
+        (LANGUAGES, LANGUAGE_LABELS),
         (INSURANCE_OPTIONS, INSURANCE_LABELS),
         (DESIRED_TIME_SLOTS, DESIRED_TIME_SLOT_LABELS),
         (CLIENT_REFERRAL_SERVICES, CLIENT_REFERRAL_SERVICE_LABELS),
