@@ -83,7 +83,7 @@ _PROVIDER_AVAILABILITY_DEFAULTS: dict[str, Any] = {
     "treatment_modality": None,
     "client_focus": "general adult outpatient",
     "age_group": "adults_25_64",
-    "non_english_services": "no",
+    "languages": ["en"],
     "payment_situation": "in_network",
     "sliding_scale": False,
     "cost": None,

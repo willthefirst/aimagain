@@ -62,7 +62,7 @@ which FastAPI/Pydantic parses as a list.
     {{ text_field("treatment_modality", "Treatment modality (optional, e.g. DBT, EMDR)", current=d.treatment_modality if d else None, required=false) }}
     {{ textarea_field("client_focus", "Client focus (no PII)", current=d.client_focus if d else None) }}
     {{ select_field("age_group", "Age group", CLIENT_AGE_GROUPS, labels=CLIENT_AGE_GROUP_LABELS, current=d.age_group if d else None, placeholder=true) }}
-    {{ select_field("non_english_services", "Services offered in non-English language?", LANGUAGE_PREFERRED_OPTIONS, labels=LANGUAGE_PREFERRED_LABELS, current=(d.non_english_services if d else "no"), required=false) }}
+    {{ field_for(schema, "languages", "Languages spoken", current=d.languages if d else None) }}
   </fieldset>
 
   <fieldset>
