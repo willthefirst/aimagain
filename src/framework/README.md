@@ -83,7 +83,7 @@ Common utilities handle concerns that span multiple routes and domains.
 - `decorators.py` - Error handling and logging decorators applied to all routes
 - `exceptions.py` - `APIException` subclasses (`NotFoundError`, `ForbiddenError`, ...) raised by logic, plus the fastapi-users → HTTP translator
 - `forms.py` - HTTP-adapter primitives for request bodies: `parse_form_to_payload(request)` (form → dict, lists for repeated keys), `validate_or_422(adapter, payload_dict)` (run a `TypeAdapter`, translate `ValidationError` to 422 with `[{"loc","msg","type"}]`), and the back-to-back wrappers `parse_and_validate_form` / `parse_and_validate_json` (form-encoded vs. JSON body — state-axis subresources use the JSON variant). Home for any HTTP-adapter primitive that two or more route modules would otherwise import from each other.
-- `projections.py` - `project_view(obj, *, public_fields, actor, private_fields=(), private_field_predicate=None)` builds a dict of `public_fields` from `obj` and conditionally appends `private_fields` when `private_field_predicate(actor, obj)` is true. Used by handlers that gate fields per viewer (today: user detail, where `email` / `is_active` / `is_verified` are visible only to the user themselves or an admin). Defense in depth alongside template-level guards: omitting keys at projection time means a forgotten `{% if %}` cannot re-leak. `ResourceSpec.private_fields` / `private_field_predicate` store the same primitives as declarative metadata so future cross-layer readers (JSON endpoint, audit snapshot, OpenAPI doc) can read the rule without rediscovering it.
+- `projections.py` - `project_view(obj, *, public_fields, actor, private_fields=(), private_field_predicate=None)` builds a dict of `public_fields` from `obj` and conditionally appends `private_fields` when `private_field_predicate(actor, obj)` is true. Used by handlers that need to gate fields per viewer. Defense in depth alongside template-level guards: omitting keys at projection time means a forgotten `{% if %}` cannot re-leak. `EntitySpec.public_fields` / `private_fields` / `private_field_predicate` store the same primitives as declarative metadata so future cross-layer readers (JSON endpoint, audit snapshot, OpenAPI doc) can read the rule without rediscovering it.
 - `resource_routes.py` - Unified `ResourceSpec` + opt-in `mount_*` grammar (covers top-level *and* sub-resource CRUD via `parent=`). See [Unified resource grammar](#unified-resource-grammar) below.
 - `entity_spec.py` - `EntitySpec` dataclass: single declaration of a domain entity's identity (CRUD audit via `AuditedResource`, non-CRUD audit via `EdgeAudit`, private-field visibility, route opt-ins, state-axis shape, related-list subresources, templates, owned-subentity `parent` chain, write_authz, body adapters, list filters, HX-Redirects, `discriminator` binding for polymorphic entities, `M2NRelation` for M:N edges). Per-entity instances live under [`../domain/specs/<entity>.py`](../domain/specs/) and are read by route files (via `to_resource_spec()` for the mount helpers) and per-entity handlers (for audit and visibility primitives). See [`EntitySpec`](#entityspec) below.
 
@@ -151,18 +151,7 @@ Synthesis recognizes:
 
 Forgetting to register a new repo type in `_REPO_TYPE_RESOLVERS` raises `MountError` at app startup with a message naming the unresolved type — the failure mode is loud and immediate.
 
-### What's mounted today
-
-| Mount helper | Used by (post-`mount_entity`) |
-| --- | --- |
-| `mount_list` / `mount_detail` | every migrated entity (users, providers, posts) |
-| `mount_create` / `mount_update` | providers, posts, the three provider-owned credential subentities |
-| `mount_delete` | users (bespoke handler), providers, posts, credential subentities (factory-built handlers) |
-| `mount_form` | providers (new + edit), posts (new + edit; posts derive the `?kind=` Literal from `entity.discriminator.names`) |
-| `mount_related_list` | users (GET `/{id}/providers`) |
-| `mount_state_axis` | users (PUT `/{id}/activation`) |
-| Sub-resource via `parent=` on the spec | credential subentities (mounted via `mount_entity(..., owned_subentities=(...))`) |
-| Hand-rolled (no mount helper fits) | favorites' POST/DELETE on `/users/me/favorites/{provider_id}` — M:N edge add/remove |
+Which mount helpers an entity opts into is declared on its `EntitySpec` (the `RouteSet` flags, `state_axes`, `subresources`, and `relation` fields). To see the full set currently mounted across all entities, run `dev routes`.
 
 ### Multi-repo handlers
 
@@ -302,7 +291,7 @@ Per-mount docstrings in `resource_routes.py` are the canonical reference for req
 
 ## `EntitySpec`
 
-`entity_spec.py` defines `EntitySpec`, the **upstream declaration** of a domain entity. Where `ResourceSpec` (above) is what the mount helpers consume, `EntitySpec` is the single declaration the rest of the codebase reads from. Phase 1 of #317 is complete — every entity in the codebase (`users`, `providers` + its three credential subentities, `posts`, `user_favorite`) is load-bearing on its spec.
+`entity_spec.py` defines `EntitySpec`, the **upstream declaration** of a domain entity. Where `ResourceSpec` (above) is what the mount helpers consume, `EntitySpec` is the single declaration the rest of the codebase reads from. Every entity in [`../domain/specs/`](../domain/specs/) is load-bearing on its spec.
 
 ### What it captures
 

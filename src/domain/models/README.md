@@ -49,42 +49,17 @@ class User(BaseModel):
 
 Each model maps to a database table with explicit relationships managed by SQLAlchemy.
 
-## Domain entity matrix
+## Domain entities
 
-| Model        | Primary Purpose                                  | Key Fields                                                          | Unique Constraints |
-| ------------ | ------------------------------------------------ | ------------------------------------------------------------------- | ------------------ |
-| **User**     | Authentication and identity                      | username                                                            | username, email    |
-| **Post**     | User-authored content (parent of per-kind detail) | kind (CHECK `'client_referral', 'provider_availability'`), owner_id (FK) | —                  |
-| **ClientReferralDetail** | Per-kind detail for `kind='client_referral'` posts. Carries the full client-referral intake-form fields (location, demographics, description, services, insurance). Enum columns CHECK against tuples in [`enums.py`](enums.py); the `desired_times` and `services` multi-selects are JSON columns whose vocabularies are enforced by Pydantic on the wire (no SQL CHECK against array members). | post_id (PK + FK to posts, CASCADE), description, location_*, desired_times (JSON), client_dem_ages, language_preferred, services (JSON), services_psychotherapy_modality, insurance | — |
-| **ProviderAvailabilityDetail** | Per-kind detail for `kind='provider_availability'` posts. Carries the full provider-availability intake-form fields (provider info, location, availability, featured services, insurance). Enum columns CHECK against tuples in [`enums.py`](enums.py); the `desired_times`, `services`, and `settings` multi-selects are JSON columns whose vocabularies are enforced by Pydantic on the wire (no SQL CHECK against array members) — `services` and `settings` are required-min-1 on the wire here. | post_id (PK + FK to posts, CASCADE), practice_name, available_providers, location_*, in_person_sessions, virtual_sessions, desired_times (JSON), services (JSON), settings (JSON), treatment_modality, client_focus, age_group, non_english_services, payment_situation, sliding_scale, cost | — |
-| **Provider** | Long-lived directory entry for a provider — practice info, location, session-availability flags. Owns three credential lists (licensures, educations, certifications) via cascade. A user may own multiple `Provider` rows (`owner_id` is intentionally non-unique; see [`providers/README.md`](providers/README.md)). Distinct from `ProviderAvailabilityDetail` (which is per-`Post`); a `Provider` describes the provider themselves. Enum columns CHECK against `US_STATES` and `LOCATION_AVAILABILITY_OPTIONS` from [`enums.py`](enums.py). | owner_id (FK to users, CASCADE), practice_name, location_city, location_state, location_zip, in_person_sessions, virtual_sessions | — |
-| **ProviderLicensure** | One row per professional license held by a provider. CASCADE on the parent FK. `license_type` and `issuing_state` CHECK against `LICENSE_TYPES` and `US_STATES` from [`enums.py`](enums.py). See [`providers/README.md`](providers/README.md). | provider_id (FK to providers, CASCADE), license_type, license_number, issuing_state, expiration_date (Date, nullable) | — |
-| **ProviderEducation** | One row per educational credential held by a provider. CASCADE on the parent FK. `education_type` CHECKs against `EDUCATION_TYPES` from [`enums.py`](enums.py). `month_completed` is stored as a `"YYYY-MM"` string because the form captures month precision only. See [`providers/README.md`](providers/README.md). | provider_id (FK to providers, CASCADE), education_type, institution, month_completed (Text "YYYY-MM", nullable) | — |
-| **ProviderCertification** | One row per professional certification held by a provider. CASCADE on the parent FK. `certification_type` CHECKs against `CERTIFICATION_TYPES` from [`enums.py`](enums.py). See [`providers/README.md`](providers/README.md). | provider_id (FK to providers, CASCADE), certification_type, certifying_body, expiration_date (Date, nullable) | — |
-| **AuditLog** | Append-only mutation record (RESOURCE_GRAMMAR.md:135) | actor_id (FK, SET NULL), resource_type, resource_id, action, before/after (JSON) | —                  |
-| **UserFavorite** | Edge for the user→provider favorites M:N (a user may favorite many providers and a provider may be favorited by many users). Both FKs CASCADE so deleting either endpoint removes the edge. Surrogate `id` PK from `BaseModel` so audit rows reference a single UUID; the `(user_id, provider_id)` uniqueness pin lives in a named unique constraint. The `(user_id, created_at)` composite index supports the favorites listing query (newest-first per user). | user_id (FK to users, CASCADE), provider_id (FK to providers, CASCADE) | `(user_id, provider_id)` |
+The directory listing IS the registry: `ls .` shows every cluster + the shared parent-level files. Per-entity facts (fields, constraints, cascade behavior, parent/detail splits) live in each cluster's own README when there's something non-obvious to say.
 
-### Parent / per-kind-detail split
+### Polymorphic / per-kind detail (the post-shape)
 
-`Post` is the parent table for any post-shaped resource. It carries identity, ownership, timestamps, and a `kind` discriminator. Kind-specific fields live in their own detail table keyed by `post_id` (PK + FK with `ON DELETE CASCADE`).
+When an entity has multiple variants whose fields differ, the parent table carries identity + a discriminator column, and each variant's fields live in its own detail table keyed by `<parent>_id` (PK + FK with `ON DELETE CASCADE`). The registry of variants is a `DiscriminatorRegistry[<Spec>]` instance under the parent's cluster (e.g. [`posts/post_kinds.py`](posts/post_kinds.py) for `Post`). The framework's `handle_create` / `handle_update` dispatch through the registry; no `isinstance` ladders.
 
-Kinds today: `client_referral` (→ `client_referral_details`) and `provider_availability` (→ `provider_availability_details`). Both carry the scalar (single-value) fields from their respective intake forms plus the `desired_times` and `services` multi-selects (stored as JSON; vocabularies enforced on the wire by Pydantic; `services` is optional on CR, required-min-1 on PA). PA also carries the `settings` multi-select (required-min-1). The retired `note` kind (title + body) was removed once the two real kinds landed and the registry made the cleanup a one-line change. Detail rows have no `id` of their own — `post_id` is both PK and FK, enforcing 1:1.
+A new variant is: (1) a registry entry, (2) a new detail-model file in the cluster + a `relationship(...)` on the parent, (3) the matching Pydantic variants under `domain/logic/<entity>/schema.py`, (4) per-variant templates under `domain/templates/<entity>/`, (5) an Alembic migration. No edits in routes, repositories, or logic — those layers are registry-driven.
 
-### The `post_kinds` registry
-
-The set of allowed kinds — and the per-kind detail relationship + field metadata used across the codebase — lives in [`posts/post_kinds.py`](posts/post_kinds.py) as `POST_KINDS: DiscriminatorRegistry[PostKindSpec]`. The `DiscriminatorRegistry` machinery (names tuple, reverse-by-detail-model index, CHECK SQL generator) is the entity-agnostic infrastructure in [`src/framework/polymorphic.py`](../../framework/polymorphic.py); `PostKindSpec` is the post-specific Spec dataclass that the registry holds. Any future polymorphic entity gets its own Spec dataclass and its own `DiscriminatorRegistry[…]` instance, sharing the bookkeeping.
-
-Every cross-cutting site reads from `POST_KINDS`:
-
-- `Post.__table_args__` builds its `CheckConstraint` from `POST_KINDS.check_sql()` — the SQL is derived from `POST_KINDS.names`.
-- The route's `Literal[*POST_KIND_NAMES]` for `GET /posts/form?kind=…` is derived.
-- The form-template selection reads `spec.create_template` / `spec.edit_template`, which default to `posts/new_<name>.html` / `posts/edit_<name>.html` by convention — a new kind doesn't need to restate them.
-- `src/framework/base_repository.py:create_polymorphic` looks up by detail-class via `POST_KIND_BY_DETAIL_MODEL`; the framework's `handle_update` writes to `spec.detail_relationship` for the post's kind.
-- `src/framework/handlers.py:handle_create` and `handle_update` dispatch via `POST_KINDS[payload.kind]` instead of `isinstance` ladders.
-- `src/domain/logic/posts/schema.py:_flatten_post_to_dict` reads the relationship + field tuple from the registry (so `PostRead`, `PostAuditSnapshot` flatten through it).
-- `src/domain/templates/posts/list.html` receives `post_kinds` in its context and renders the per-kind "New X" links from it.
-
-Adding a kind is therefore: (1) a registry entry in `posts/post_kinds.py`, (2) a new detail model file under `posts/` + a `relationship(...)` line on `Post`, (3) the four Pydantic variant classes in `src/domain/logic/posts/schema.py`, (4) the per-kind templates under `src/domain/templates/posts/`, (5) an Alembic migration. Removing a kind is the inverse. No edits in routes, repositories, or logic — those layers are registry-driven. The consistency tests in [`posts/test_post_kinds.py`](posts/test_post_kinds.py) guard against re-encoding the kind set inline anywhere new.
+For the post-specific instance of the registry pattern (the full list of cross-cutting sites that read `POST_KINDS`, the discriminator-specific cleanup story), see [`posts/README.md`](posts/README.md).
 
 ## Layer organization
 
