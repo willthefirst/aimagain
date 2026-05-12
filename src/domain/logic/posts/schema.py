@@ -55,7 +55,7 @@ from src.domain.models.enums import (
     TREATMENT_SETTINGS,
     US_STATES,
 )
-from src.framework.rendering.form_fields import HtmlTextarea
+from src.framework.rendering.form_fields import HtmlTextarea, HtmlUrl
 from src.framework.schema_validators import (
     PartialUpdate,
     ReadProjection,
@@ -70,6 +70,12 @@ from src.framework.schema_validators import (
 # only affects form rendering (`field_for` picks `<textarea>` over
 # `<input>`); the validator chain is identical to `StrippedOptionalText`.
 TextareaOptional = Annotated[StrippedOptionalText, HtmlTextarea()]
+
+# `website` is a URL with the same `Stripped` cleaning chain — the
+# marker only swaps form rendering from `<input type=text>` to
+# `<input type=url>`. Schema-side validation stays the same; browser
+# gates submission on URL syntax client-side.
+UrlOptional = Annotated[StrippedOptionalText, HtmlUrl()]
 
 
 def _scalar_to_list(v):
@@ -254,7 +260,7 @@ class ProviderAvailabilityCreate(WirePayload):
     # seed posts confirm the shape works (#422).
     description: TextareaOptional = None
     referral_instructions: TextareaOptional = None
-    website: StrippedOptionalText = None
+    website: UrlOptional = None
     practice_name: StrippedText
     # `location_state` stays required — only usable geographic filter axis.
     # City / ZIP / session-format / services / settings all relax to
@@ -340,7 +346,7 @@ class ProviderAvailabilityUpdate(PartialUpdate):
     kind: Literal["provider_availability"]
     description: TextareaOptional = None
     referral_instructions: TextareaOptional = None
-    website: StrippedOptionalText = None
+    website: UrlOptional = None
     practice_name: StrippedText | None = None
     location_city: StrippedText | None = None
     location_state: Literal[*US_STATES] | None = None

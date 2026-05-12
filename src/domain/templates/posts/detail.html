@@ -54,7 +54,7 @@ Provider availability: {{ post.provider_availability_detail.practice_name }}
     <dd>{{ d.practice_name }}</dd>
     {% if d.website %}
     <dt>Website</dt>
-    <dd>{{ d.website }}</dd>
+    <dd><a href="{{ d.website }}" target="_blank" rel="noopener noreferrer">{{ d.website }}</a></dd>
     {% endif %}
     <dt>Location</dt>
     <dd>{% if d.location_city %}{{ d.location_city }}, {% endif %}{{ d.location_state }}{% if d.location_zip %} {{ d.location_zip }}{% endif %}</dd>
