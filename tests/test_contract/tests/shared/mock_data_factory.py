@@ -18,8 +18,8 @@ from types import SimpleNamespace
 from typing import Any, Dict
 from uuid import UUID, uuid4
 
-from src.domain.users.schema import UserRead
-from src.models import POST_KINDS
+from src.domain.logic.users.schema import UserRead
+from src.domain.models import POST_KINDS
 
 
 def make_post_stub(
@@ -104,7 +104,7 @@ class MockDataFactory:
             user_read = cls.create_user_read()
 
         return {
-            "src.api.routes.auth_routes.handle_registration": {
+            "src.domain.routes.auth_routes.handle_registration": {
                 "return_value_config": user_read
             }
         }
@@ -124,7 +124,7 @@ class MockDataFactory:
             user_read = cls.create_user_read(is_active=False)
 
         return {
-            "src.domain.users.handlers.handle_set_user_activation": {
+            "src.domain.logic.users.handlers.handle_set_user_activation": {
                 "return_value_config": user_read
             }
         }
@@ -145,7 +145,7 @@ class MockDataFactory:
         `HX-Redirect: /posts`, so `None` is a valid mock return.
         """
         return {
-            "src.api.routes.posts._handle_delete_post": {"return_value_config": None}
+            "src.domain.routes.posts._handle_delete_post": {"return_value_config": None}
         }
 
     @classmethod
@@ -157,14 +157,14 @@ class MockDataFactory:
         `Location` / `HX-Redirect` headers. A `SimpleNamespace` exposing
         `id` is sufficient. The framework stitches the auto-bound
         handler onto the route module, so contract patches target
-        `src.api.routes.providers._handle_create_provider` (not the
+        `src.domain.routes.providers._handle_create_provider` (not the
         old bespoke handler in `provider_processing`).
         """
         stub_provider = SimpleNamespace(
             id=UUID("33333333-3333-3333-3333-333333333333"),
         )
         return {
-            "src.api.routes.providers._handle_create_provider": {
+            "src.domain.routes.providers._handle_create_provider": {
                 "return_value_config": stub_provider
             }
         }
@@ -201,7 +201,7 @@ class MockDataFactory:
         # so contract patches retarget here. The mount layer's
         # `_resolve_handler` reads from `__module__`.
         return {
-            "src.api.routes.providers._handle_update_provider": {
+            "src.domain.routes.providers._handle_update_provider": {
                 "return_value_config": stub_provider
             }
         }

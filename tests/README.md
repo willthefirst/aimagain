@@ -1,6 +1,6 @@
 # Tests: Shared fixtures, helpers, and cross-module tests
 
-Most tests in this codebase are **colocated next to the source they cover** — e.g. `src/api/routes/test_auth_routes.py` lives next to `auth_routes.py`. This `tests/` directory holds the shared infrastructure that those colocated tests rely on, plus any cross-module integration tests.
+Most tests in this codebase are **colocated next to the source they cover** — e.g. `src/domain/routes/test_auth_routes.py` lives next to `auth_routes.py`. This `tests/` directory holds the shared infrastructure that those colocated tests rely on, plus any cross-module integration tests.
 
 ## Why colocation
 
@@ -39,7 +39,7 @@ Contract tests are excluded from default `dev test` runs (they bind ports and ne
 dev test tests/test_contract
 ```
 
-Per [`../src/api/routes/RESOURCE_GRAMMAR.md`](../src/api/routes/RESOURCE_GRAMMAR.md), every resource that exposes an HTML form gets a contract test pair.
+Per [`../src/domain/routes/RESOURCE_GRAMMAR.md`](../src/domain/routes/RESOURCE_GRAMMAR.md), every resource that exposes an HTML form gets a contract test pair.
 
 ## Running tests
 
@@ -48,13 +48,13 @@ Per [`../src/api/routes/RESOURCE_GRAMMAR.md`](../src/api/routes/RESOURCE_GRAMMAR
 dev test
 
 # Single colocated test file
-dev test src/api/routes/test_auth_routes.py
+dev test src/domain/routes/test_auth_routes.py
 
 # Match by keyword
 dev test -k login
 
 # Run only API-layer tests
-dev test src/api/
+dev test src/domain/
 ```
 
 `pytest` discovers `test_*.py` under both `tests/` and `src/` (configured via `testpaths = ["tests", "src"]` in `pyproject.toml`).

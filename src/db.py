@@ -9,7 +9,7 @@ from fastapi_users.db import SQLAlchemyUserDatabase
 from sqlalchemy import event, text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
-from .models import User, metadata
+from src.domain.models import User, metadata
 
 load_dotenv()
 

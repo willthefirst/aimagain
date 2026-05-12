@@ -98,11 +98,11 @@ Common utilities handle concerns that span multiple routes and domains.
 
 ### The shape
 
-A resource declares its identity once as an `EntitySpec` in `src/specs/<entity>.py` (carries collection name, id param, primary repo, audit binding, auth deps, schemas, templates, redirect targets, route opt-ins, state axes, subresources, filters, discriminator binding, M:N relation). The route file derives a `ResourceSpec` from the entity spec via `.to_resource_spec()` and passes a handlers dict to `mount_entity`, which reads the spec's `routes` flags + `state_axes` + `subresources` and calls the right underlying `mount_*` helper for each:
+A resource declares its identity once as an `EntitySpec` in `src/domain/specs/<entity>.py` (carries collection name, id param, primary repo, audit binding, auth deps, schemas, templates, redirect targets, route opt-ins, state axes, subresources, filters, discriminator binding, M:N relation). The route file derives a `ResourceSpec` from the entity spec via `.to_resource_spec()` and passes a handlers dict to `mount_entity`, which reads the spec's `routes` flags + `state_axes` + `subresources` and calls the right underlying `mount_*` helper for each:
 
 ```python
 from src.framework.resource_routes import mount_entity
-from src.specs.user import USER_ENTITY
+from src.domain.specs.user import USER_ENTITY
 from src.logic._generic import make_delete_handler
 from src.logic.providers.provider_processing import handle_list_user_providers
 from src.logic.users.user_processing import (
@@ -246,7 +246,7 @@ Migrated route files compose the individual `mount_*` helpers through `mount_ent
 - `entity.read_user_dep` — `None` means public read; `mount_list` is called with `public=True`.
 - `owned_subentities` — a tuple of child `EntitySpec`s whose `parent` is `entity`. Each is mounted recursively via the same dispatcher; the handlers dict for an owned subentity is keyed `f"{owned.name}.{verb}"` (e.g. `"licensure.create"`). Every standard verb (`list`, `detail`, `create`, `update`, `delete`, `form_new`, `form_edit`) auto-binds via `make_<verb>_handler(owned)` when the explicit key is absent; supplying a key overrides the factory default.
 
-**Top-level standard verbs follow the same auto-bind path as owned subentities.** When a top-level entity opts into any of `list` / `detail` / `create` / `update` / `delete` / `form_new` / `form_edit` and the matching key is *absent* from `handlers`, `mount_entity` builds the handler from `make_<verb>_handler(entity)` and stitches it onto the route file's module as `_handle_<verb>_<entity>` (e.g. `_handle_update_provider`, `_handle_list_post`). That's the path contract-test monkey-patches at `src.api.routes.<entity>._handle_<verb>_<entity>` resolve through; setting `__module__` on the built handler lets the mount layer's `_resolve_handler` find the patched version via `getattr(sys.modules[__module__], __name__)`. The target module is auto-detected from the `mount_entity` caller's frame, so route files don't pass `module=`. Bespoke verbs (e.g. `handle_delete_user`'s self-guard) stay explicit in the handlers dict and override the factory default. Inline-child appends on create (providers' credential rows) come from the generic `handle_create` walking `spec.children`.
+**Top-level standard verbs follow the same auto-bind path as owned subentities.** When a top-level entity opts into any of `list` / `detail` / `create` / `update` / `delete` / `form_new` / `form_edit` and the matching key is *absent* from `handlers`, `mount_entity` builds the handler from `make_<verb>_handler(entity)` and stitches it onto the route file's module as `_handle_<verb>_<entity>` (e.g. `_handle_update_provider`, `_handle_list_post`). That's the path contract-test monkey-patches at `src.domain.routes.<entity>._handle_<verb>_<entity>` resolve through; setting `__module__` on the built handler lets the mount layer's `_resolve_handler` find the patched version via `getattr(sys.modules[__module__], __name__)`. The target module is auto-detected from the `mount_entity` caller's frame, so route files don't pass `module=`. Bespoke verbs (e.g. `handle_delete_user`'s self-guard) stay explicit in the handlers dict and override the factory default. Inline-child appends on create (providers' credential rows) come from the generic `handle_create` walking `spec.children`.
 
 Per-viewer / per-list extras live on `EntitySpec` as `detail_extras_path` / `list_extras_path` — dotted import paths to the extras callable, resolved lazily at mount time via `importlib.import_module` + `getattr` (same machinery `StateAxis.handler_path` uses). The late-binding sidesteps the import cycle that previously forced the extras callables to live on the `mount_entity` call site: the logic module is only imported when `mount_entity` runs, which is after both the spec module and the logic module have finished initializing. Typed repo kwargs the extras callable receives are declared on the spec as `detail_extras_repos` / `list_extras_repos` (real classes — repositories live below specs in the import order, so the type-class import is cycle-safe). Spec construction validates the pairings: extras_path requires the matching `routes.<verb>=True`, extras_repos requires extras_path. `mount_entity` additionally rejects `detail_extras_path` alongside an explicit `handlers["detail"]` (the explicit handler would silently win).
 
@@ -269,7 +269,7 @@ For the standard CRUD verbs (create / update / delete) plus the detail and edit-
 And matching `make_<verb>_handler(spec)` factory functions (`make_create_handler`, `make_update_handler`, `make_delete_handler`, `make_detail_handler`, `make_edit_form_handler`, `make_new_form_handler`) that build callables with synthesized signatures so `mount_*` introspection (per #316) wires the right deps. `make_detail_handler` additionally accepts `extras=` (the pure-function hook) and `extra_repos=` (typed-repo params the synthesis adds to the signature so the registry resolves them). Route files don't call the factories directly today — `mount_entity` invokes them under the hood for any standard-CRUD verb the entity opts into without supplying an explicit handler (see [`mount_entity`](#mount_entity-dispatcher)). The built handlers are stitched onto the route module as `_handle_<verb>_<spec.name>` so contract tests can patch via the same path that worked before auto-binding landed:
 
 ```python
-# in src/api/routes/providers.py
+# in src/domain/routes/providers.py
 # Every verb auto-binds via make_<verb>_handler(PROVIDER_ENTITY). The
 # create form picks up `schema=ProviderCreate` from spec.create_adapter
 # automatically; per-viewer detail extras (`provider_detail_extras`)
@@ -307,7 +307,7 @@ Per-mount docstrings in `resource_routes.py` are the canonical reference for req
 
 ### What it captures
 
-Per-entity instances at `src/specs/<entity>.py` carry:
+Per-entity instances at `src/domain/specs/<entity>.py` carry:
 
 - **Identity** — `name`, `url_collection`, `id_param`, `model`, `owner_attr`.
 - **Ownership chain** — `parent: EntitySpec | None` for owned subentities (the three provider credential entities set `parent=PROVIDER_ENTITY`).

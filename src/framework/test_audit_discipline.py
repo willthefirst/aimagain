@@ -5,8 +5,8 @@ row in the same transaction as the mutation. The discipline is easy to
 forget on a new handler — this test makes "forgot the audit call" a CI
 failure instead of a code-review catch.
 
-The check parses each `handlers.py` under `src/domain/` (recursively,
-so every per-entity cluster is covered), walks every
+The check parses each `handlers.py` under `src/domain/logic/`
+(recursively, so every per-entity cluster is covered), walks every
 `async def handle_*` function, and fails the test if the function calls
 `.commit()` without an audit-recording call. Three names satisfy the
 rule:

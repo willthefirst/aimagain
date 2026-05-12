@@ -8,7 +8,7 @@ from fastapi.responses import JSONResponse
 from src.framework.authz import is_admin
 
 if TYPE_CHECKING:
-    from src.models import User
+    from src.domain.models import User
 
 
 def base_context(user: User | None) -> dict:

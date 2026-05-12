@@ -9,7 +9,7 @@ from uuid import UUID
 
 from sqlalchemy import select
 
-from src.models import AuditLog
+from src.domain.models import AuditLog
 
 from .base_repository import BaseRepository
 

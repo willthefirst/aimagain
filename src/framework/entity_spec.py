@@ -116,7 +116,7 @@ class StateAxis:
 
     `handler_path` is the dotted import path of the handler the route
     layer should bind to this axis (e.g.
-    ``"src.domain.users.handlers.handle_set_user_activation"``).
+    ``"src.domain.logic.users.handlers.handle_set_user_activation"``).
     `mount_entity` resolves it via `importlib.import_module` + `getattr`
     at mount time, which is *after* both the spec module and the logic
     module have been imported — so the spec module never imports from
@@ -442,7 +442,7 @@ class EntitySpec:
 
     # Detail / list extras (per-viewer / per-list customization) --------
     # `detail_extras_path` and `list_extras_path` are dotted import paths
-    # (e.g. `"src.domain.users.handlers.user_detail_extras"`) to the
+    # (e.g. `"src.domain.logic.users.handlers.user_detail_extras"`) to the
     # per-viewer extras callable consumed by `make_detail_handler` /
     # `make_list_handler`. The path is resolved lazily via
     # `importlib.import_module` + `getattr` at mount time, *after* both

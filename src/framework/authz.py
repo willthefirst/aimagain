@@ -26,7 +26,7 @@ from typing import TYPE_CHECKING
 from src.framework.exceptions import ForbiddenError
 
 if TYPE_CHECKING:
-    from src.models import User
+    from src.domain.models import User
 
 
 def is_admin(user: User | None) -> bool:

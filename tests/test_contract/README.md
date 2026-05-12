@@ -2,14 +2,14 @@
 
 Pact-based contract tests verify that the **shape of the conversation** between an HTML form (consumer) and the API endpoint it posts to (provider) stays in sync. They do **not** verify business behavior — that's what the colocated unit tests under `src/<layer>/test_*.py` are for.
 
-The current set of contract pairs lives in [`manifest.py`](manifest.py)'s `CONTRACT_PAIRS` — that's the registry. Per [`src/api/routes/RESOURCE_GRAMMAR.md`](../../src/api/routes/RESOURCE_GRAMMAR.md), every resource exposing an HTML form (or htmx-driven action partial) MUST have a contract pair; add new pairs there using the conventions below.
+The current set of contract pairs lives in [`manifest.py`](manifest.py)'s `CONTRACT_PAIRS` — that's the registry. Per [`src/domain/routes/RESOURCE_GRAMMAR.md`](../../src/domain/routes/RESOURCE_GRAMMAR.md), every resource exposing an HTML form (or htmx-driven action partial) MUST have a contract pair; add new pairs there using the conventions below.
 
 ## Why this directory exists outside the colocated convention
 
 The rest of the repo's tests live next to their source ([`tests/README.md`](../README.md)). Contract tests can't, because each test inherently spans **two** layers:
 
-- **Consumer side** lives with `src/templates/<form>.html` (and the `/form` page route in `src/api/routes/`).
-- **Provider side** lives with the API route handler in `src/api/routes/<resource>.py`.
+- **Consumer side** lives with `src/domain/templates/<form>.html` (and the `/form` page route in `src/domain/routes/`).
+- **Provider side** lives with the API route handler in `src/domain/routes/<resource>.py`.
 
 A single test asserts both ends agree, so it can't sit on either side without lying about its scope. `tests/test_contract/` is the documented exception. Everywhere else the colocation rule still applies.
 
@@ -70,17 +70,17 @@ Provider tests carry `pytest.mark.provider` (applied directly to the parametrize
 
 ## Adding a contract test pair
 
-When you add a new HTML form (per [`src/api/routes/RESOURCE_GRAMMAR.md`](../../src/api/routes/RESOURCE_GRAMMAR.md) — every form-bearing resource MUST have a contract test pair):
+When you add a new HTML form (per [`src/domain/routes/RESOURCE_GRAMMAR.md`](../../src/domain/routes/RESOURCE_GRAMMAR.md) — every form-bearing resource MUST have a contract test pair):
 
 1. **(If the consumer needs an HTML stub page)** add a flag to `ConsumerServerConfig` in `infrastructure/servers/consumer.py` and a `_setup_*_stub` function that mounts the page. Reference the setup function as the pair's `consumer_setup_fn` in step 3.
 2. **Add constants** for the API path, consumer/provider Pact names, and a unique Pact port to `constants.py`. (Provider states no longer need to be appended to `KNOWN_PROVIDER_STATES` separately — the manifest entry's `provider_state` is what drives that list.)
 3. **Add a `ContractPair` entry** to [`manifest.py`](manifest.py): consumer + provider names, port, `provider_state` string, `pytest_marks` tuple, and the optional `consumer_setup_fn` / `handler_mocks_factory` callables. The provider verification test under `tests/provider/test_<resource>_verification.py` parametrizes over `pairs_for_provider(provider_name)` automatically — no per-pair subclass needed.
 4. **Write the consumer test** (`tests/consumer/test_<resource>_form.py`) — drive the form with Playwright and assert the intercepted request matches a Pact expectation.
-5. **(If the route needs handler-level mocks)** add a `MockDataFactory.create_<resource>_dependency_config()` classmethod returning `{handler_path: {"return_value_config": ...}}`, and reference it as `handler_mocks_factory` on the manifest entry. For Post-shaped stubs, use `make_post_stub(kind, **field_overrides)` from `tests/shared/mock_data_factory.py` — it reads the per-kind detail relationship and field tuple from `POST_KINDS` in [`src/models/posts/post_kinds.py`](../../src/models/posts/post_kinds.py).
+5. **(If the route needs handler-level mocks)** add a `MockDataFactory.create_<resource>_dependency_config()` classmethod returning `{handler_path: {"return_value_config": ...}}`, and reference it as `handler_mocks_factory` on the manifest entry. For Post-shaped stubs, use `make_post_stub(kind, **field_overrides)` from `tests/shared/mock_data_factory.py` — it reads the per-kind detail relationship and field tuple from `POST_KINDS` in [`src/domain/models/posts/post_kinds.py`](../../src/domain/models/posts/post_kinds.py).
 6. **(If the provider name is new)** create `tests/provider/test_<resource>_verification.py` with a parametrized test function (see existing files as templates — they're 8 lines each, parametrized over `pairs_for_provider`).
 
 ## Related documentation
 
 - [`../../CLAUDE.md`](../../CLAUDE.md) — definition of done
-- [`../../src/api/routes/RESOURCE_GRAMMAR.md`](../../src/api/routes/RESOURCE_GRAMMAR.md) — resource conventions, including the "form-bearing resource → contract test pair" rule
+- [`../../src/domain/routes/RESOURCE_GRAMMAR.md`](../../src/domain/routes/RESOURCE_GRAMMAR.md) — resource conventions, including the "form-bearing resource → contract test pair" rule
 - [`../README.md`](../README.md) — colocated-test convention this directory is the exception to

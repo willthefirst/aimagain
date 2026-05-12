@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""Forbid cross-resource Jinja imports in src/templates/.
+"""Forbid cross-resource Jinja imports in src/domain/templates/.
 
-A template under ``src/templates/<a>/`` may reference templates under:
+A template under ``src/domain/templates/<a>/`` may reference templates under:
   - the project root (e.g. ``base.html``)
   - its own directory ``<a>/...``
   - ``_shared/...``
@@ -51,7 +51,7 @@ class Violation:
             f'{self.file}: {{% {self.directive} "{self.referenced}" %}} '
             f"crosses resource boundary "
             f"({self.importing_dir}/ → {self.referenced_dir}/). "
-            f"Relocate to src/templates/{SHARED_DIR}/."
+            f"Relocate to src/domain/templates/{SHARED_DIR}/."
         )
 
 
@@ -117,7 +117,7 @@ def _project_root() -> Path:
 
 
 def _default_templates_root() -> Path:
-    return _project_root() / "src" / "templates"
+    return _project_root() / "src" / "domain" / "templates"
 
 
 def _collect_files(paths: list[str], templates_root: Path) -> list[Path]:
@@ -138,7 +138,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "paths",
         nargs="*",
-        help="Files or directories to check. Defaults to src/templates/.",
+        help="Files or directories to check. Defaults to src/domain/templates/.",
     )
     args = parser.parse_args(argv)
 
@@ -151,8 +151,8 @@ def main(argv: list[str] | None = None) -> int:
         for v in violations:
             print(f"  {v.message()}", file=sys.stderr)
         print(
-            "\nA shared partial belongs in src/templates/_shared/. "
-            "See issue #206 / src/templates/README.md.",
+            "\nA shared partial belongs in src/domain/templates/_shared/. "
+            "See issue #206 / src/domain/templates/README.md.",
             file=sys.stderr,
         )
         return 1

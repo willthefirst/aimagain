@@ -28,7 +28,8 @@ from fastapi import APIRouter, FastAPI, Request
 from fastapi.testclient import TestClient
 from pydantic import BaseModel
 
-from src.domain.users.repository import UserRepository
+from src.domain.logic.users.repository import UserRepository
+from src.domain.models import User
 from src.framework.audit_repository import AuditRepository
 from src.framework.dependencies import get_audit_repository
 from src.framework.resource_routes import (
@@ -42,7 +43,6 @@ from src.framework.resource_routes import (
     mount_related_list,
     mount_state_axis,
 )
-from src.models import User
 
 
 def _override_audit(app: FastAPI, *, stub: Any = None) -> SimpleNamespace:
