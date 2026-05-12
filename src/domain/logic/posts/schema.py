@@ -50,7 +50,6 @@ from src.domain.models.enums import (
     CLIENT_REFERRAL_SERVICES,
     DESIRED_TIME_SLOTS,
     INSURANCE_OPTIONS,
-    LANGUAGE_PREFERRED_OPTIONS,
     LANGUAGES,
     LOCATION_AVAILABILITY_OPTIONS,
     TREATMENT_SETTINGS,
@@ -170,7 +169,7 @@ class ClientReferralRead(_PostReadBase):
     location_virtual: Literal[*LOCATION_AVAILABILITY_OPTIONS]
     desired_times: DesiredTimesField = []
     client_dem_ages: Literal[*CLIENT_AGE_GROUPS]
-    language_preferred: Literal[*LANGUAGE_PREFERRED_OPTIONS]
+    languages: LanguagesField = []
     description: str
     services: ServicesField = []
     services_psychotherapy_modality: str | None = None
@@ -231,7 +230,10 @@ class ClientReferralCreate(WirePayload):
     location_virtual: Literal[*LOCATION_AVAILABILITY_OPTIONS]
     desired_times: DesiredTimesField = []
     client_dem_ages: Literal[*CLIENT_AGE_GROUPS]
-    language_preferred: Literal[*LANGUAGE_PREFERRED_OPTIONS]
+    # Required min-1 on the wire — replaces the old yes/no
+    # `language_preferred` flag (#428). Defaults to `["en"]` so the
+    # form's "submit with defaults" case still validates.
+    languages: RequiredLanguagesField = ["en"]
     description: StrippedText
     services: ServicesField = []
     services_psychotherapy_modality: StrippedOptionalText = None
@@ -311,7 +313,9 @@ class ClientReferralUpdate(PartialUpdate):
     # add/remove is intentionally out of scope.
     desired_times: DesiredTimesField | None = None
     client_dem_ages: Literal[*CLIENT_AGE_GROUPS] | None = None
-    language_preferred: Literal[*LANGUAGE_PREFERRED_OPTIONS] | None = None
+    # `None` = leave unchanged. `min_length=1` rejects an explicit `[]`,
+    # mirroring PA's `languages` semantics.
+    languages: RequiredLanguagesField | None = None
     description: StrippedText | None = None
     services: ServicesField | None = None
     services_psychotherapy_modality: StrippedOptionalText = None
@@ -378,7 +382,7 @@ class ClientReferralAuditSnapshot(_PostAuditSnapshotBase):
     location_virtual: Literal[*LOCATION_AVAILABILITY_OPTIONS]
     desired_times: DesiredTimesField = []
     client_dem_ages: Literal[*CLIENT_AGE_GROUPS]
-    language_preferred: Literal[*LANGUAGE_PREFERRED_OPTIONS]
+    languages: LanguagesField = []
     description: str
     services: ServicesField = []
     services_psychotherapy_modality: str | None = None

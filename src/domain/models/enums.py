@@ -69,11 +69,10 @@ CLIENT_AGE_GROUPS: Final[tuple[str, ...]] = (
     "adults_25_64",
     "older_adults_65_plus",
 )
-LANGUAGE_PREFERRED_OPTIONS: Final[tuple[str, ...]] = ("no", "yes")
 # Spoken-language tokens used by the multi-valued `languages` field on
-# `provider_availability`. Tokens are ISO-639 codes; labels are the
-# English display names. The tuple starts minimal — covers every seed
-# example today — and grows as real posts demand more entries.
+# both post kinds. Tokens are ISO-639 codes; labels are the English
+# display names. The tuple starts minimal — covers every seed example
+# today — and grows as real posts demand more entries.
 LANGUAGES: Final[tuple[str, ...]] = ("en", "es")
 INSURANCE_OPTIONS: Final[tuple[str, ...]] = (
     "in_network",
@@ -149,7 +148,6 @@ CLIENT_AGE_GROUP_LABELS: Final[dict[str, str]] = {
     "adults_25_64": "Adults 25–64",
     "older_adults_65_plus": "Older adults 65+",
 }
-LANGUAGE_PREFERRED_LABELS: Final[dict[str, str]] = {"no": "No", "yes": "Yes"}
 LANGUAGE_LABELS: Final[dict[str, str]] = {"en": "English", "es": "Spanish"}
 INSURANCE_LABELS: Final[dict[str, str]] = {
     "in_network": "In-network",

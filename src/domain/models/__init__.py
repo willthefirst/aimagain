@@ -4,7 +4,6 @@ from src.framework.persistence.base_model import Base, BaseModel, metadata
 from .enums import (
     CLIENT_AGE_GROUPS,
     INSURANCE_OPTIONS,
-    LANGUAGE_PREFERRED_OPTIONS,
     LOCATION_AVAILABILITY_OPTIONS,
     US_STATES,
 )
@@ -31,7 +30,6 @@ __all__ = [
     "CLIENT_AGE_GROUPS",
     "ClientReferralDetail",
     "INSURANCE_OPTIONS",
-    "LANGUAGE_PREFERRED_OPTIONS",
     "LOCATION_AVAILABILITY_OPTIONS",
     "POST_KIND_BY_DETAIL_MODEL",
     "POST_KIND_NAMES",

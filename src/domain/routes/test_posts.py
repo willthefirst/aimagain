@@ -503,6 +503,20 @@ async def test_get_client_referral_form_renders(
     assert kind_input.attributes.get("value") == "client_referral"
 
 
+async def test_client_referral_form_renders_languages_multi_select(
+    authenticated_client: AsyncClient,
+    logged_in_user: User,
+):
+    """`languages` on CR renders via `field_for`'s multi_select arm (#428),
+    same shape as PA."""
+    response = await authenticated_client.get("/posts/form?kind=client_referral")
+    assert response.status_code == 200
+    tree = HTMLParser(response.text)
+    boxes = tree.css('input[type="checkbox"][name="languages"]')
+    values = {b.attributes.get("value") for b in boxes}
+    assert values == {"en", "es"}
+
+
 async def test_get_post_form_default_kind_is_client_referral(
     authenticated_client: AsyncClient,
     logged_in_user: User,

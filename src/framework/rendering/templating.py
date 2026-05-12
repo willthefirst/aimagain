@@ -1,7 +1,10 @@
 from fastapi.templating import Jinja2Templates
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
-from src.domain.logic.posts.schema import ProviderAvailabilityCreate
+from src.domain.logic.posts.schema import (
+    ClientReferralCreate,
+    ProviderAvailabilityCreate,
+)
 from src.domain.models import enums
 from src.framework.config import settings
 from src.framework.rendering.form_fields import field_spec, register_choice_labels
@@ -30,8 +33,6 @@ _env.globals.update(
     LOCATION_AVAILABILITY_LABELS=enums.LOCATION_AVAILABILITY_LABELS,
     CLIENT_AGE_GROUPS=enums.CLIENT_AGE_GROUPS,
     CLIENT_AGE_GROUP_LABELS=enums.CLIENT_AGE_GROUP_LABELS,
-    LANGUAGE_PREFERRED_OPTIONS=enums.LANGUAGE_PREFERRED_OPTIONS,
-    LANGUAGE_PREFERRED_LABELS=enums.LANGUAGE_PREFERRED_LABELS,
     LANGUAGES=enums.LANGUAGES,
     LANGUAGE_LABELS=enums.LANGUAGE_LABELS,
     INSURANCE_OPTIONS=enums.INSURANCE_OPTIONS,
@@ -70,6 +71,7 @@ _env.globals.update(
     # pass the right schema to `field_for` without context-routing
     # changes. Per-kind form templates pick which to pass.
     provider_availability_create_schema=ProviderAvailabilityCreate,
+    client_referral_create_schema=ClientReferralCreate,
 )
 
 # Register the choice-tuple → labels-dict mapping that `field_spec`
@@ -82,9 +84,6 @@ register_choice_labels(
     enums.LOCATION_AVAILABILITY_OPTIONS, enums.LOCATION_AVAILABILITY_LABELS
 )
 register_choice_labels(enums.CLIENT_AGE_GROUPS, enums.CLIENT_AGE_GROUP_LABELS)
-register_choice_labels(
-    enums.LANGUAGE_PREFERRED_OPTIONS, enums.LANGUAGE_PREFERRED_LABELS
-)
 register_choice_labels(enums.LANGUAGES, enums.LANGUAGE_LABELS)
 register_choice_labels(enums.INSURANCE_OPTIONS, enums.INSURANCE_LABELS)
 register_choice_labels(

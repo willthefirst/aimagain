@@ -3,7 +3,7 @@
 {% block title %}Edit client referral{% endblock %}
 {% block content %}
 <h1>Edit client referral</h1>
-{{ client_referral_form("patch", "/posts/" ~ post.id, "Save changes", post=post) }}
+{{ client_referral_form("patch", "/posts/" ~ post.id, "Save changes", post=post, schema=client_referral_create_schema) }}
 
 <hr />
 <a href="/posts/{{ post.id }}">Cancel</a>
