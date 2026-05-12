@@ -78,8 +78,8 @@ canonical use.
 {% macro radio_bool_field(name, label, current=None, required=True) -%}
 <fieldset>
   <legend>{{ label }}</legend>
-  <label><input type="radio" name="{{ name }}" value="true"{% if current is sameas true %} checked{% endif %}{% if required %} required{% endif %} /> Yes</label>
-  <label><input type="radio" name="{{ name }}" value="false"{% if current is sameas false %} checked{% endif %}{% if required %} required{% endif %} /> No</label>
+  <label><input type="radio" name="{{ name }}" value="true"{% if current is sameas true %} checked{% endif %}{% if required %} required{% endif %} />Yes</label>
+  <label><input type="radio" name="{{ name }}" value="false"{% if current is sameas false %} checked{% endif %}{% if required %} required{% endif %} />No</label>
 </fieldset>
 {%- endmacro %}
 
@@ -96,8 +96,7 @@ the upcoming `settings` field on `provider_availability` reuses it. #}
   <legend>{{ label }}</legend>
   {%- for v in options %}
   <label>
-    <input type="checkbox" name="{{ name }}" value="{{ v }}"{% if v in selected %} checked{% endif %} />
-    {{ labels[v] if labels else v }}
+    <input type="checkbox" name="{{ name }}" value="{{ v }}"{% if v in selected %} checked{% endif %} />{{ labels[v] if labels else v }}
   </label>
   {%- endfor %}
 </fieldset>
@@ -139,22 +138,19 @@ posts an empty array. #}
     <thead>
       <tr>
         <th></th>
-        {%- for part in DESIRED_TIME_PARTS %}
-        <th scope="col">{{ DESIRED_TIME_PART_LABELS[part] }}</th>
+        {%- for day in DESIRED_TIME_DAYS %}
+        <th scope="col">{{ DESIRED_TIME_DAY_LABELS[day] }}</th>
         {%- endfor %}
       </tr>
     </thead>
     <tbody>
-      {%- for day in DESIRED_TIME_DAYS %}
+      {%- for part in DESIRED_TIME_PARTS %}
       <tr>
-        <th scope="row">{{ DESIRED_TIME_DAY_LABELS[day] }}</th>
-        {%- for part in DESIRED_TIME_PARTS %}
+        <th scope="row">{{ DESIRED_TIME_PART_LABELS[part] }}</th>
+        {%- for day in DESIRED_TIME_DAYS %}
         {%- set token = day ~ "_" ~ part -%}
         <td>
-          <label>
-            <input type="checkbox" name="{{ name }}" value="{{ token }}"{% if token in selected %} checked{% endif %} />
-            <span class="visually-hidden">{{ DESIRED_TIME_DAY_LABELS[day] }} {{ DESIRED_TIME_PART_LABELS[part]|lower }}</span>
-          </label>
+          <input type="checkbox" name="{{ name }}" value="{{ token }}"{% if token in selected %} checked{% endif %} aria-label="{{ DESIRED_TIME_DAY_LABELS[day] }} {{ DESIRED_TIME_PART_LABELS[part]|lower }}" />
         </td>
         {%- endfor %}
       </tr>
