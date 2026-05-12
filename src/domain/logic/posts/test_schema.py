@@ -531,9 +531,7 @@ def test_post_create_provider_availability_rejects_empty_practice_name():
     "missing_field",
     [
         "practice_name",
-        "available_providers",
         "location_state",
-        "client_focus",
         "age_groups",
         "payment_situation",
         "sliding_scale",

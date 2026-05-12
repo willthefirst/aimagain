@@ -56,10 +56,10 @@ FIXTURE_PROVIDER_AVAILABILITY: list[FixtureProviderAvailability] = [
         "owner_email": "alice@example.com",
         "detail": {
             "practice_name": "Katie Reeves, PhD",
-            "available_providers": "Katie Reeves, PhD",
             "description": (
                 "Solo private practice offering psychotherapy and medication "
-                "management for older teens and transitional-age youth. "
+                "management for older teens and transitional-age youth with "
+                "ADHD, anxiety, depression, self-harm, and suicidality. "
                 "Immediate availability for new patients. 25-minute med-"
                 "management visits and 50-minute therapy sessions."
             ),
@@ -72,10 +72,6 @@ FIXTURE_PROVIDER_AVAILABILITY: list[FixtureProviderAvailability] = [
             "services": ["psychotherapy", "medication_management"],
             "settings": ["outpatient"],
             "treatment_modality": "Psychodynamic, control-mastery",
-            "client_focus": (
-                "Older teens and TAY with ADHD, anxiety, depression, self-harm, "
-                "and suicidality."
-            ),
             "age_groups": [
                 "adolescents_14_18",
                 "young_adults_19_24",
@@ -91,8 +87,6 @@ FIXTURE_PROVIDER_AVAILABILITY: list[FixtureProviderAvailability] = [
         "owner_email": "alice@example.com",
         "detail": {
             "practice_name": "Camp BooHoo",
-            # TODO(issue-9): may drop available_providers.
-            "available_providers": "Camp BooHoo staff",
             "description": (
                 "Therapeutic summer camp focused on social skills and emotion "
                 "regulation for middle schoolers with ASD. Two 2-week cohorts "
@@ -113,7 +107,6 @@ FIXTURE_PROVIDER_AVAILABILITY: list[FixtureProviderAvailability] = [
             "services": ["group_therapy"],
             "settings": ["day_program"],
             "treatment_modality": "Social skills, emotion regulation",
-            "client_focus": "Middle schoolers with ASD.",
             "age_groups": ["children_6_10", "preteens_11_13"],
             "languages": ["en", "es"],
             "payment_situation": "self_pay_only",
@@ -125,11 +118,12 @@ FIXTURE_PROVIDER_AVAILABILITY: list[FixtureProviderAvailability] = [
         "owner_email": "alice@example.com",
         "detail": {
             "practice_name": "RISE IOP at CHC",
-            "available_providers": "RISE program staff",
             "description": (
                 "RISE is a Comprehensive DBT intensive outpatient program for "
-                "high school students with high acuity. Two last-minute "
-                "openings; new cohort starts May 11. M-F 8:30am-4:30pm."
+                "high school students with high acuity, including those with "
+                "self-harm or suicidality at no immediate risk of harm to self "
+                "or others. Two last-minute openings; new cohort starts May 11. "
+                "M-F 8:30am-4:30pm."
             ),
             "referral_instructions": (
                 "Please contact the program coordinator for intake details."
@@ -150,11 +144,6 @@ FIXTURE_PROVIDER_AVAILABILITY: list[FixtureProviderAvailability] = [
             ],
             "settings": ["iop"],
             "treatment_modality": "Comprehensive DBT",
-            "client_focus": (
-                "High school students with high acuity, including "
-                "self-harm/suicidality with no immediate risk of harm to self "
-                "or others."
-            ),
             "age_groups": ["adolescents_14_18"],
             "languages": ["en", "es"],
             "payment_situation": "please_contact",

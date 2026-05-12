@@ -38,7 +38,6 @@ which FastAPI/Pydantic parses as a list.
   <fieldset>
     <legend>Provider information</legend>
     {{ text_field("practice_name", "Practice name", current=d.practice_name if d else None) }}
-    {{ text_field("available_providers", "Available providers", current=d.available_providers if d else None) }}
   </fieldset>
 
   <fieldset>
@@ -61,7 +60,6 @@ which FastAPI/Pydantic parses as a list.
     {{ multi_select_field("services", "Services (optional)", CLIENT_REFERRAL_SERVICES, labels=CLIENT_REFERRAL_SERVICE_LABELS, current=d.services if d else None) }}
     {{ multi_select_field("settings", "Treatment settings (optional)", TREATMENT_SETTINGS, labels=TREATMENT_SETTINGS_LABELS, current=d.settings if d else None) }}
     {{ text_field("treatment_modality", "Treatment modality (optional, e.g. DBT, EMDR)", current=d.treatment_modality if d else None, required=false) }}
-    {{ textarea_field("client_focus", "Client focus (no PII)", current=d.client_focus if d else None) }}
     {{ field_for(schema, "age_groups", "Age groups (select all that apply)", current=d.age_groups if d else None) }}
     {{ field_for(schema, "languages", "Languages spoken", current=d.languages if d else None) }}
   </fieldset>

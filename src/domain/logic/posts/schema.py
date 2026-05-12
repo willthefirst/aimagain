@@ -189,7 +189,6 @@ class ProviderAvailabilityRead(_PostReadBase):
     referral_instructions: str | None = None
     website: str | None = None
     practice_name: str
-    available_providers: str
     location_city: str | None = None
     location_state: Literal[*US_STATES]
     location_zip: str | None = None
@@ -200,7 +199,6 @@ class ProviderAvailabilityRead(_PostReadBase):
     services: ServicesField = []
     settings: SettingsField = []
     treatment_modality: str | None = None
-    client_focus: str
     age_groups: AgeGroupsField = []
     languages: LanguagesField = []
     payment_situation: Literal[*INSURANCE_OPTIONS]
@@ -258,7 +256,6 @@ class ProviderAvailabilityCreate(WirePayload):
     referral_instructions: TextareaOptional = None
     website: StrippedOptionalText = None
     practice_name: StrippedText
-    available_providers: StrippedText
     # `location_state` stays required — only usable geographic filter axis.
     # City / ZIP / session-format / services / settings all relax to
     # optional here (#433): telehealth-only practices (Katie Reeves) have
@@ -276,7 +273,6 @@ class ProviderAvailabilityCreate(WirePayload):
     services: ServicesField = []
     settings: SettingsField = []
     treatment_modality: StrippedOptionalText = None
-    client_focus: StrippedText
     # Required min-1 on the wire — replaces the old single-valued
     # `age_group` (#430). No default; every PA post must declare at
     # least one bucket explicitly.
@@ -346,7 +342,6 @@ class ProviderAvailabilityUpdate(PartialUpdate):
     referral_instructions: TextareaOptional = None
     website: StrippedOptionalText = None
     practice_name: StrippedText | None = None
-    available_providers: StrippedText | None = None
     location_city: StrippedText | None = None
     location_state: Literal[*US_STATES] | None = None
     location_zip: ZipText | None = None
@@ -360,7 +355,6 @@ class ProviderAvailabilityUpdate(PartialUpdate):
     services: RequiredServicesField | None = None
     settings: RequiredSettingsField | None = None
     treatment_modality: StrippedOptionalText = None
-    client_focus: StrippedText | None = None
     age_groups: RequiredAgeGroupsField | None = None
     # `None` = leave unchanged. `min_length=1` rejects an explicit `[]`,
     # mirroring `services`. Clearing the list is intentionally not
@@ -412,7 +406,6 @@ class ProviderAvailabilityAuditSnapshot(_PostAuditSnapshotBase):
     referral_instructions: str | None = None
     website: str | None = None
     practice_name: str
-    available_providers: str
     location_city: str | None = None
     location_state: Literal[*US_STATES]
     location_zip: str | None = None
@@ -423,7 +416,6 @@ class ProviderAvailabilityAuditSnapshot(_PostAuditSnapshotBase):
     services: ServicesField = []
     settings: SettingsField = []
     treatment_modality: str | None = None
-    client_focus: str
     age_groups: AgeGroupsField = []
     languages: LanguagesField = []
     payment_situation: Literal[*INSURANCE_OPTIONS]
