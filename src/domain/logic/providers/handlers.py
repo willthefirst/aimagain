@@ -28,7 +28,7 @@ from src.domain.models import (
     Provider,
     User,
 )
-from src.framework.exceptions import ForbiddenError, NotFoundError
+from src.framework.http.exceptions import ForbiddenError, NotFoundError
 
 logger = logging.getLogger(__name__)
 

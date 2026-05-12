@@ -12,7 +12,7 @@ from src.framework.authz import (
     is_owner_or_admin,
     is_self_or_admin,
 )
-from src.framework.exceptions import ForbiddenError
+from src.framework.http.exceptions import ForbiddenError
 
 
 def _user(*, is_superuser: bool = False, id_=None):

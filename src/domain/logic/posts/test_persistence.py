@@ -18,7 +18,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from sqlalchemy.types import Uuid
 
 from src.domain.models import ClientReferralDetail, Post, ProviderAvailabilityDetail
-from src.framework.base_repository import BaseRepository
+from src.framework.persistence.base_repository import BaseRepository
 from tests.helpers import (
     create_test_user,
     make_client_referral_detail,

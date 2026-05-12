@@ -27,16 +27,16 @@ from src.domain.logic.users.schema import (
 )
 from src.domain.models import User
 from src.domain.specs.provider import PROVIDER_ENTITY
-from src.framework.audit import AuditAction
+from src.framework.audit.core import AuditAction
 from src.framework.authz import is_self_or_admin
-from src.framework.dependencies import get_user_repository
-from src.framework.entity_spec import (
+from src.framework.dispatch.entity_spec import (
     ADMIN_FOR_WRITE,
     EntitySpec,
     RelatedListSubresource,
     RouteSet,
     StateAxis,
 )
+from src.framework.persistence.dependencies import get_user_repository
 
 
 def _activation_response_to_dict(user: User) -> dict:

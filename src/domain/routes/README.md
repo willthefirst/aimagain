@@ -12,7 +12,7 @@ CRUD-shaped routes use the **`EntitySpec` declaration + `mount_entity` dispatche
 
 The underlying `mount_*` helpers (`mount_list`, `mount_detail`, `mount_create`, `mount_update`, `mount_delete`, `mount_form`, `mount_state_axis`, `mount_related_list`) remain available for entities whose URL shape `mount_entity` can't handle — M:N edge add/remove is the canonical example. Otherwise an entity composes through `mount_entity`.
 
-For the standard CRUD verbs (create / update / delete), the route file binds handlers built by `make_<verb>_handler(ENTITY)` from [`src/framework/handlers.py`](../../framework/handlers.py). Bespoke handlers are written only when the entity has rules that don't fit the standard load → auth → mutate → audit ritual.
+For the standard CRUD verbs (create / update / delete), the route file binds handlers built by `make_<verb>_handler(ENTITY)` from [`src/framework/dispatch/handlers.py`](../../framework/dispatch/handlers.py). Bespoke handlers are written only when the entity has rules that don't fit the standard load → auth → mutate → audit ritual.
 
 ### What we do
 

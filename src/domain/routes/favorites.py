@@ -21,7 +21,7 @@ from src.domain.logic.favorites.handlers import (
 )
 from src.domain.specs.user_favorite import FAVORITE_ENTITY
 from src.framework import make_entity_router
-from src.framework.resource_routes import mount_edge_routes
+from src.framework.dispatch.resource_routes import mount_edge_routes
 
 router = make_entity_router(FAVORITE_ENTITY)
 favorites_api_router = router.router

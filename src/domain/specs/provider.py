@@ -33,15 +33,15 @@ from src.domain.models.enums import (
     LICENSE_TYPES,
     LICENSE_TYPES_LABELS,
 )
-from src.framework.dependencies import get_provider_repository
-from src.framework.entity_spec import (
+from src.framework.dispatch.entity_spec import (
     AUTHENTICATED,
     OWNER_OR_ADMIN,
     EntitySpec,
     Redirects,
     RouteSet,
 )
-from src.framework.resource_routes import QueryParam
+from src.framework.dispatch.resource_routes import QueryParam
+from src.framework.persistence.dependencies import get_provider_repository
 
 # After create or update, redirect to the edit form so the user can
 # keep editing the parent + its credentials. The same callable is reused

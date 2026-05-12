@@ -1,6 +1,6 @@
 from src.domain.specs.user import USER_ENTITY
 from src.framework import make_entity_router
-from src.framework.resource_routes import mount_entity
+from src.framework.dispatch.resource_routes import mount_entity
 
 router = make_entity_router(USER_ENTITY)
 # Re-export the underlying APIRouter under the historic name so

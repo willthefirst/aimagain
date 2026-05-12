@@ -2,7 +2,7 @@ from sqlalchemy import Column, ForeignKey, Index, UniqueConstraint
 from sqlalchemy.orm import relationship
 from sqlalchemy.types import Uuid
 
-from src.framework.base_model import BaseModel
+from src.framework.persistence.base_model import BaseModel
 
 
 class UserFavorite(BaseModel):

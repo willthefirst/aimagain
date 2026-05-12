@@ -9,8 +9,8 @@ declaration (edges live outside `RouteSet`).
 from src.domain.specs.provider import PROVIDER_ENTITY
 from src.domain.specs.user import USER_ENTITY
 from src.domain.specs.user_favorite import FAVORITE_EDGE_AUDIT, FAVORITE_ENTITY
-from src.framework.audit import AuditAction
-from src.framework.entity_spec import M2NRelation
+from src.framework.audit.core import AuditAction
+from src.framework.dispatch.entity_spec import M2NRelation
 
 # --- Audit binding (edge variant) ----------------------------------------
 

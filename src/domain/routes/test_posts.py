@@ -12,7 +12,7 @@ from src.domain.models import (
     ProviderAvailabilityDetail,
     User,
 )
-from src.framework.audit_repository import AuditRepository
+from src.framework.audit.repository import AuditRepository
 from tests.helpers import (
     client_referral_payload,
     create_test_user,

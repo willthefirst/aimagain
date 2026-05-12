@@ -37,7 +37,7 @@ domain/templates/<entity>/     ← Jinja templates
 A spec is read at three sites:
 
 1. **Route mounting** — `mount_entity(router, USER_ENTITY, handlers={...})` reads `routes`, `state_axes`, `subresources`, `auth_deps`, `auth_policy`, `audit`, etc. and binds the right `mount_*` helper for each opted-in verb.
-2. **Generic handlers** — `handle_create(spec)` / `handle_update` / `handle_delete` / `handle_detail` / `handle_list` in `framework/handlers.py` consult `spec.audit`, `spec.write_authz`, `spec.model`, `spec.list_exclude_self`, `spec.parent`, etc. for the framework-owned work.
+2. **Generic handlers** — `handle_create(spec)` / `handle_update` / `handle_delete` / `handle_detail` / `handle_list` in `framework/dispatch/handlers.py` consult `spec.audit`, `spec.write_authz`, `spec.model`, `spec.list_exclude_self`, `spec.parent`, etc. for the framework-owned work.
 3. **Bespoke handlers** — domain handlers (e.g. `handle_set_user_activation` in `domain/logic/users/handlers.py`) read `USER_ENTITY.state_axis("activation").action`, `USER_ENTITY.audit.type`, etc. so per-handler audit/state declarations stay in one place.
 
 ## Adding a new domain entity
@@ -56,7 +56,7 @@ For polymorphic entities (`Post` / `kind`), see [`domain/models/posts/post_kinds
 
 ## Error handling
 
-Domain handlers raise the API exception subclasses directly — `NotFoundError`, `ForbiddenError`, `BadRequestError`, etc. from [`framework/exceptions.py`](framework/exceptions.py). Those are `HTTPException` subclasses, so the `@handle_route_errors` decorator passes them through unchanged. fastapi-users exceptions raised during registration/auth get translated by `handle_fastapi_users_error`. Everything else becomes a generic 500.
+Domain handlers raise the API exception subclasses directly — `NotFoundError`, `ForbiddenError`, `BadRequestError`, etc. from [`framework/http/exceptions.py`](framework/http/exceptions.py). Those are `HTTPException` subclasses, so the `@handle_route_errors` decorator passes them through unchanged. fastapi-users exceptions raised during registration/auth get translated by `handle_fastapi_users_error`. Everything else becomes a generic 500.
 
 There is no separate domain-error hierarchy. If a future entity needs a domain-error type that isn't a 1:1 fit, add it next to where it's raised; don't reintroduce a top-level hierarchy.
 
@@ -75,11 +75,11 @@ The structure encodes the dependency direction:
 | You're looking for                                              | It's at                                                              |
 | --------------------------------------------------------------- | -------------------------------------------------------------------- |
 | Declarations of every entity                                    | [`domain/specs/`](domain/specs/) — one file per entity               |
-| `EntitySpec` dataclass + its friends                            | [`framework/entity_spec.py`](framework/entity_spec.py)               |
-| Route mounting helpers (`mount_entity`, `mount_*`)              | [`framework/resource_routes.py`](framework/resource_routes.py)       |
-| Generic handlers (`handle_create`, `handle_list`, ...)          | [`framework/handlers.py`](framework/handlers.py)                     |
-| `BaseRepository` primitives                                     | [`framework/base_repository.py`](framework/base_repository.py)       |
-| Audit framework (`mutate`, `record_audit`, `AuditAction`)       | [`framework/audit.py`](framework/audit.py)                           |
+| `EntitySpec` dataclass + its friends                            | [`framework/dispatch/entity_spec.py`](framework/dispatch/entity_spec.py)               |
+| Route mounting helpers (`mount_entity`, `mount_*`)              | [`framework/dispatch/resource_routes.py`](framework/dispatch/resource_routes.py)       |
+| Generic handlers (`handle_create`, `handle_list`, ...)          | [`framework/dispatch/handlers.py`](framework/dispatch/handlers.py)                     |
+| `BaseRepository` primitives                                     | [`framework/persistence/base_repository.py`](framework/persistence/base_repository.py)       |
+| Audit framework (`mutate`, `record_audit`, `AuditAction`)       | [`framework/audit/core.py`](framework/audit/core.py)                           |
 | Auth predicates (`is_owner_or_admin`, `is_admin`)               | [`framework/authz.py`](framework/authz.py)                           |
 | Per-entity handlers (the bespoke ones)                          | [`domain/logic/<entity>/handlers.py`](domain/logic/)                 |
 | Per-entity custom queries                                       | [`domain/logic/<entity>/repository.py`](domain/logic/)               |

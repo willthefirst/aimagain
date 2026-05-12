@@ -3,7 +3,7 @@ from src.domain.specs.provider_certification import CERTIFICATION_ENTITY
 from src.domain.specs.provider_education import EDUCATION_ENTITY
 from src.domain.specs.provider_licensure import LICENSURE_ENTITY
 from src.framework import make_entity_router
-from src.framework.resource_routes import mount_entity
+from src.framework.dispatch.resource_routes import mount_entity
 
 router = make_entity_router(PROVIDER_ENTITY)
 providers_api_router = router.router

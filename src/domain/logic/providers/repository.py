@@ -4,7 +4,7 @@ from uuid import UUID
 from sqlalchemy import select
 
 from src.domain.models import Provider, ProviderLicensure
-from src.framework.base_repository import BaseRepository
+from src.framework.persistence.base_repository import BaseRepository
 
 
 class ProviderRepository(BaseRepository):

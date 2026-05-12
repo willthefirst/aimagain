@@ -22,9 +22,9 @@ from src.domain.logic.favorites.repository import UserFavoriteRepository
 from src.domain.logic.providers.repository import ProviderRepository
 from src.domain.models import Provider, User, UserFavorite
 from src.domain.specs.user_favorite import FAVORITE_ENTITY
-from src.framework.audit import record_audit
-from src.framework.audit_repository import AuditRepository
-from src.framework.exceptions import NotFoundError
+from src.framework.audit.core import record_audit
+from src.framework.audit.repository import AuditRepository
+from src.framework.http.exceptions import NotFoundError
 
 logger = logging.getLogger(__name__)
 

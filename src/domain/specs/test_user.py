@@ -13,9 +13,9 @@ from src.domain.logic.users.schema import (
     UserActivationUpdate,
 )
 from src.domain.specs.user import USER_ENTITY
-from src.framework.audit import AuditAction
+from src.framework.audit.core import AuditAction
 from src.framework.authz import is_self_or_admin
-from src.framework.entity_spec import ADMIN_FOR_WRITE, RelatedListSubresource
+from src.framework.dispatch.entity_spec import ADMIN_FOR_WRITE, RelatedListSubresource
 
 # --- Auth deps (security-visible) ----------------------------------------
 

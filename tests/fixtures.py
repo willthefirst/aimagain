@@ -12,7 +12,9 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 from src.db import get_db_session, get_user_db
 from src.domain.logic.users.schema import UserCreate  # Import UserCreate schema
 from src.domain.models import User, metadata  # Assuming your models define metadata
-from src.framework.templating import templates  # Import the global templates object
+from src.framework.rendering.templating import (  # Import the global templates object
+    templates,
+)
 
 # Assuming your FastAPI app instance is in src.main
 from src.main import app

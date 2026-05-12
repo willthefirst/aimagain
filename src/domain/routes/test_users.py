@@ -9,7 +9,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from src.domain.models import AuditLog, User
-from src.framework.audit_repository import AuditRepository
+from src.framework.audit.repository import AuditRepository
 from tests.helpers import create_test_user, make_provider, promote_to_admin
 
 # Mark all tests in this module as async

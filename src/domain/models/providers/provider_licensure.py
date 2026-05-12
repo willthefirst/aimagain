@@ -3,7 +3,7 @@ from functools import partial
 from sqlalchemy import Column, Date, ForeignKey, Text
 from sqlalchemy.types import Uuid
 
-from src.framework.base_model import BaseModel
+from src.framework.persistence.base_model import BaseModel
 
 from ..enums import LICENSE_TYPES, US_STATES, named_check_in
 

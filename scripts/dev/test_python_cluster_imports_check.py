@@ -48,7 +48,7 @@ def test_shared_parent_file_import_is_allowed(tmp_path: Path) -> None:
     _build_layer(src, "models", ["posts", "providers"], parent_files=["audit.py"])
     f = _write(
         src / "models" / "posts" / "post_processing.py",
-        "from src.framework.audit import record_audit\n",
+        "from src.framework.audit.core import record_audit\n",
     )
 
     assert find_violations([f], src) == []

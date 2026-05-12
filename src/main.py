@@ -9,7 +9,7 @@ from src.auth_config import auth_backend, fastapi_users
 from src.db import check_database_health
 from src.domain.logic.users.schema import UserRead
 from src.domain.routes import auth_routes
-from src.framework.middleware import StripEmptyQueryParamsMiddleware
+from src.framework.http.middleware import StripEmptyQueryParamsMiddleware
 
 from .domain.routes import auth_pages, favorites, posts, providers, users
 
@@ -51,7 +51,7 @@ app = FastAPI(title="Bedlam Connect", lifespan=lifespan)
 
 # Strip empty query-string pairs at request entry so HTML-form
 # submissions ("Apply" with no filter selected → `?x=`) behave the same
-# as omitting the param. See `src/framework/middleware.py` for the
+# as omitting the param. See `src/framework/http/middleware.py` for the
 # full convention rationale.
 app.add_middleware(StripEmptyQueryParamsMiddleware)
 

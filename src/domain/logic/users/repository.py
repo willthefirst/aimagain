@@ -1,7 +1,7 @@
 from sqlalchemy import select
 
 from src.domain.models import User
-from src.framework.base_repository import BaseRepository
+from src.framework.persistence.base_repository import BaseRepository
 
 
 class UserRepository(BaseRepository):

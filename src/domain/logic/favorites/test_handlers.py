@@ -28,9 +28,9 @@ from src.domain.logic.favorites.handlers import (
 from src.domain.logic.favorites.repository import UserFavoriteRepository
 from src.domain.logic.providers.repository import ProviderRepository
 from src.domain.models import AuditLog, User, UserFavorite
-from src.framework.audit import AuditAction
-from src.framework.audit_repository import AuditRepository
-from src.framework.exceptions import NotFoundError
+from src.framework.audit.core import AuditAction
+from src.framework.audit.repository import AuditRepository
+from src.framework.http.exceptions import NotFoundError
 from tests.helpers import create_test_user, make_provider
 
 pytestmark = pytest.mark.asyncio
