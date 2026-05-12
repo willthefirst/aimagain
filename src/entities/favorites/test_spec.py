@@ -6,11 +6,11 @@ what's unique to favorites: the `EdgeAudit` verb→action map, the
 declaration (edges live outside `RouteSet`).
 """
 
+from src.entities.favorites.spec import FAVORITE_EDGE_AUDIT, FAVORITE_ENTITY
 from src.framework.audit import AuditAction
 from src.framework.entity_spec import M2NRelation
 from src.specs.provider import PROVIDER_ENTITY
 from src.specs.user import USER_ENTITY
-from src.specs.user_favorite import FAVORITE_EDGE_AUDIT, FAVORITE_ENTITY
 
 # --- Audit binding (edge variant) ----------------------------------------
 

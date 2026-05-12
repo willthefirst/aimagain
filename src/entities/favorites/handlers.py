@@ -18,13 +18,13 @@ from uuid import UUID
 
 from fastapi import Request
 
-from src.domain.favorites.repository import UserFavoriteRepository
 from src.domain.providers.repository import ProviderRepository
+from src.entities.favorites.repository import UserFavoriteRepository
+from src.entities.favorites.spec import FAVORITE_ENTITY
 from src.framework.audit import record_audit
 from src.framework.audit_repository import AuditRepository
 from src.framework.exceptions import NotFoundError
 from src.models import Provider, User, UserFavorite
-from src.specs.user_favorite import FAVORITE_ENTITY
 
 logger = logging.getLogger(__name__)
 

@@ -13,7 +13,6 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from starlette.requests import Request
 
-from src.domain.favorites.repository import UserFavoriteRepository
 from src.domain.providers.handlers import (
     handle_list_user_providers,
     provider_detail_extras,
@@ -26,6 +25,7 @@ from src.domain.providers.schema import (
     ProviderLicensureCreate,
 )
 from src.domain.users.repository import UserRepository
+from src.entities.favorites.repository import UserFavoriteRepository
 from src.framework.audit import AuditAction
 from src.framework.audit_repository import AuditRepository
 from src.framework.exceptions import ForbiddenError, NotFoundError

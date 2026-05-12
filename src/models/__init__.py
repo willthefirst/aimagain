@@ -1,3 +1,4 @@
+from src.entities.favorites.model import UserFavorite
 from src.framework.audit_log import AuditLog
 from src.framework.base_model import Base, BaseModel, metadata
 
@@ -8,7 +9,6 @@ from .enums import (
     LOCATION_AVAILABILITY_OPTIONS,
     US_STATES,
 )
-from .favorites.user_favorite import UserFavorite
 from .posts.client_referral_detail import ClientReferralDetail
 from .posts.post import Post
 from .posts.post_kinds import (

@@ -24,7 +24,7 @@ mount helpers later; A4 doesn't.
 
 from typing import Final
 
-from src.domain.favorites.schema import UserFavoriteAuditSnapshot
+from src.entities.favorites.schema import UserFavoriteAuditSnapshot
 from src.framework.audit import AuditAction, make_snapshotter
 from src.framework.dependencies import get_user_favorite_repository
 from src.framework.entity_spec import (
