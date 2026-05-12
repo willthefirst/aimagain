@@ -18,12 +18,12 @@ Read by:
 
 from typing import Final
 
+from src.domain.favorites.repository import UserFavoriteRepository
 from src.domain.providers.schema import (
     ProviderCreate,
     ProviderRead,
     ProviderUpdate,
 )
-from src.entities.favorites.repository import UserFavoriteRepository
 from src.framework.dependencies import get_provider_repository
 from src.framework.entity_spec import (
     AUTHENTICATED,

@@ -5,10 +5,8 @@ row in the same transaction as the mutation. The discipline is easy to
 forget on a new handler — this test makes "forgot the audit call" a CI
 failure instead of a code-review catch.
 
-The check parses each `handlers.py` under `src/domain/` and
-`src/entities/` (recursively, so every per-entity cluster is covered
-regardless of which directory the entity currently lives in during
-the in-flight `src/domain → src/entities` migration), walks every
+The check parses each `handlers.py` under `src/domain/` (recursively,
+so every per-entity cluster is covered), walks every
 `async def handle_*` function, and fails the test if the function calls
 `.commit()` without an audit-recording call. Three names satisfy the
 rule:
@@ -31,13 +29,8 @@ from pathlib import Path
 
 import pytest
 
-SRC_DIR = Path(__file__).parent.parent
-PROCESSING_FILES = sorted(
-    [
-        *(SRC_DIR / "domain").rglob("handlers.py"),
-        *(SRC_DIR / "entities").rglob("handlers.py"),
-    ]
-)
+DOMAIN_DIR = Path(__file__).parent.parent / "domain"
+PROCESSING_FILES = sorted(DOMAIN_DIR.rglob("handlers.py"))
 
 
 def _has_call_named(node: ast.AST, name: str) -> bool:

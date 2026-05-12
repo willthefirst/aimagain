@@ -1,57 +1,19 @@
-# Source code: two buckets (in-flight migration)
+# Source code: three buckets
 
-The `src/` tree is being reorganized into **two top-level buckets**:
+The `src/` tree is organized into three top-level concepts, each named for what's in it:
 
-- **`framework/`** — the domain-agnostic library that turns spec data into a working HTTP app. Dispatch helpers (`mount_entity`, the generic `handle_*` family), the audit framework, repository primitives, auth predicates, response/forms/projections helpers, the SQLAlchemy `Base` / `BaseModel` / `AuditLog` infra, the polymorphic discriminator registry, Jinja templating setup — everything that doesn't know what a "user" or "post" is.
-- **`entities/<entity>/`** — everything per-entity, fully colocated: spec, model, handlers, repository, schema, route, templates, tests. To delete an entity, delete one directory.
+- **`specs/`** — one file per domain entity, declaring its identity as an `EntitySpec`. The specs ARE the business surface of the application: which entities exist, what their URL grammar is, how they audit, who can write them, what their schemas are, what state axes they expose. Read by every other layer.
+- **`framework/`** — the domain-agnostic library that turns spec data into a working HTTP app. The dispatch helpers (`mount_entity`, the generic `handle_*` family), the audit framework, repository primitives, auth predicates, response/forms/projections helpers — everything that doesn't know what a "user" or "post" is.
+- **`domain/<entity>/`** — per-entity helpers that earn their keep but don't belong on the spec. Each cluster has `handlers.py` (bespoke business logic the framework can't subsume), `repository.py` (custom SQL with joins / per-column lookups that aren't expressible as a generic primitive), and `schema.py` (the Pydantic types specs reference).
 
-### Migration status
+Supporting trees:
 
-The codebase is mid-migration toward the two-bucket layout. Migrated entities live under `src/entities/`; pre-migration entities still live across the original four directories.
+- **`api/routes/`** — thin route files. Each one calls `mount_entity(router, <ENTITY>_ENTITY, handlers={...})` and adds the rare hand-written endpoint (auth flows, `/me/*` singletons, M:N edges).
+- **`models/`** — SQLAlchemy classes. Still clustered per entity (`models/users/`, `models/posts/`, etc.) because models are pure data shape with no orchestration.
+- **`templates/`** — Jinja2 templates, clustered per entity.
+- **`main.py`**, **`db.py`**, **`auth_config.py`** — application entry point, database setup, auth setup.
 
-- **Migrated:** `favorites` → [`src/entities/favorites/`](entities/favorites/).
-- **Pre-migration (will move):** `users`, `posts`, `providers` (+ credential subentities), `auth` — still split across `src/specs/`, `src/models/`, `src/domain/`, `src/api/routes/`, `src/templates/`.
-
-While the migration is in flight, both layouts work in parallel. Cross-entity imports always go through `src/models/__init__.py` (the model hub re-exports both shapes), so no callsite cares which side of the migration an entity is on.
-
-### Per-entity grammar (`src/entities/<entity>/`)
-
-Each entity cluster holds:
-
-| File | Role |
-| --- | --- |
-| `spec.py` | The `EntitySpec` declaration (was `src/specs/<entity>.py`). |
-| `model.py` (or `models/`) | SQLAlchemy class(es). Polymorphic entities use a `models/` subdir. |
-| `handlers.py` | Bespoke business-logic handlers. Omitted if the entity uses only framework-default handlers. |
-| `repository.py` | Custom-SQL repo class. Omitted if the entity uses `BaseRepository` directly. |
-| `schema.py` | Pydantic types the spec references. |
-| `route.py` | The thin route file — `mount_entity(...)` + the rare hand-rolled endpoint. |
-| `templates/*.html` | Jinja templates. Auto-discovered by [`src/framework/templating.py`](framework/templating.py)'s `PrefixLoader`; reference them as `<entity>/<name>.html`. |
-| `test_*.py` | Colocated tests for the above. |
-
-### Pre-migration buckets (transitional)
-
-These directories still exist and hold the not-yet-migrated entities. They will be deleted as the migration completes.
-
-- **`specs/`** — entity specs for not-yet-migrated entities.
-- **`models/<entity>/`** — SQLAlchemy classes for not-yet-migrated entities. Also still holds `enums.py` (controlled vocabularies referenced across multiple entities).
-- **`domain/<entity>/`** — per-entity helpers (`handlers.py`, `repository.py`, `schema.py`) for not-yet-migrated entities.
-- **`api/routes/<entity>.py`** — thin route files for not-yet-migrated entities.
-- **`templates/<entity>/`** — Jinja templates for not-yet-migrated entities (plus `_shared/` and `base.html` which stay here permanently).
-
-Loose entry points: **`main.py`**, **`db.py`**, **`auth_config.py`** — application entry point, database setup, auth setup. These may move into `framework/` or `entities/auth/` in a later migration step.
-
-## How the buckets relate
-
-```
-entities/<entity>/   ← declare what exists (spec.py) and how it behaves (handlers/repo/schema/route/templates)
-       ↓
-framework/           ← reads specs, generates dispatch, provides shared primitives
-```
-
-For migrated entities, every per-entity file lives in `entities/<entity>/`. For pre-migration entities, the same files are split across `specs/`, `models/<entity>/`, `domain/<entity>/`, `api/routes/`, and `templates/<entity>/`; the rules and diagrams below describe that transitional layout.
-
-The legacy split:
+## How the three buckets relate
 
 ```
 specs/             ← declare what exists
