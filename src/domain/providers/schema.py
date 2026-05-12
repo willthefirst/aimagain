@@ -36,7 +36,7 @@ import uuid
 from datetime import date, datetime
 from typing import Annotated, Literal
 
-from src.core.form_fields import HtmlPattern
+from src.framework.form_fields import HtmlPattern
 from src.framework.schema_validators import (
     PartialUpdate,
     ReadProjection,

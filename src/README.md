@@ -11,8 +11,6 @@ Supporting trees:
 - **`api/routes/`** — thin route files. Each one calls `mount_entity(router, <ENTITY>_ENTITY, handlers={...})` and adds the rare hand-written endpoint (auth flows, `/me/*` singletons, M:N edges).
 - **`models/`** — SQLAlchemy classes. Still clustered per entity (`models/users/`, `models/posts/`, etc.) because models are pure data shape with no orchestration.
 - **`templates/`** — Jinja2 templates, clustered per entity.
-- **`core/`** — small utilities that don't depend on anything else (config, form-field markers, templating engine setup).
-- **`middleware/`** — currently empty; reserved for ASGI middleware. Active middleware lives in [`framework/middleware.py`](framework/middleware.py).
 - **`main.py`**, **`db.py`**, **`auth_config.py`** — application entry point, database setup, auth setup.
 
 ## How the three buckets relate

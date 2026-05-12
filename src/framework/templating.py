@@ -1,8 +1,8 @@
 from fastapi.templating import Jinja2Templates
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
-from src.core.config import settings
-from src.core.form_fields import field_spec, register_choice_labels
+from src.framework.config import settings
+from src.framework.form_fields import field_spec, register_choice_labels
 from src.models import enums
 
 auto_reload = settings.ENVIRONMENT == "development"

@@ -2,7 +2,8 @@ from sqlalchemy import CheckConstraint, Column, ForeignKey, Text
 from sqlalchemy.orm import relationship
 from sqlalchemy.types import Uuid
 
-from ..base import BaseModel
+from src.framework.base_model import BaseModel
+
 from .post_kinds import POST_KINDS
 
 

@@ -19,8 +19,14 @@ callables defined here) so the spec-side dataclass and its canonical
 instance stay co-located without forcing a circular import.
 """
 
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
 from src.framework.exceptions import ForbiddenError
-from src.models import User
+
+if TYPE_CHECKING:
+    from src.models import User
 
 
 def is_admin(user: User | None) -> bool:

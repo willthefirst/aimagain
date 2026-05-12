@@ -3,7 +3,8 @@ from functools import partial
 from sqlalchemy import JSON, Column, ForeignKey, Text, text
 from sqlalchemy.types import Uuid
 
-from ..base import Base
+from src.framework.base_model import Base
+
 from ..enums import (
     CLIENT_AGE_GROUPS,
     INSURANCE_OPTIONS,

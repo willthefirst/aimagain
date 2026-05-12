@@ -9,7 +9,7 @@ from dataclasses import dataclass
 
 import pytest
 
-from src.models._polymorphic import DiscriminatorRegistry
+from src.framework.polymorphic import DiscriminatorRegistry
 
 
 @dataclass(frozen=True)

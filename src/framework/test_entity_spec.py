@@ -362,8 +362,8 @@ def test_discriminator_defaults_to_none():
 
 
 def test_discriminator_accepts_registry_instance():
-    """`DiscriminatorRegistry` from `src.models._polymorphic` plugs in."""
-    from src.models._polymorphic import DiscriminatorRegistry
+    """`DiscriminatorRegistry` from `src.framework.polymorphic` plugs in."""
+    from src.framework.polymorphic import DiscriminatorRegistry
 
     registry = DiscriminatorRegistry(
         column="kind", specs={"a": "spec-a", "b": "spec-b"}

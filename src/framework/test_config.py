@@ -1,4 +1,4 @@
-"""Tests for `src/core/config.py`."""
+"""Tests for `src/framework/config.py`."""
 
 import os
 from unittest.mock import patch

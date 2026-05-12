@@ -1,5 +1,6 @@
-from .audit_log import AuditLog
-from .base import Base, BaseModel, metadata
+from src.framework.audit_log import AuditLog
+from src.framework.base_model import Base, BaseModel, metadata
+
 from .enums import (
     CLIENT_AGE_GROUPS,
     INSURANCE_OPTIONS,
