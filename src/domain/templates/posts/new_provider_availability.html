@@ -10,6 +10,5 @@
 {{ provider_availability_form("post", "/posts", "Create provider availability", schema=provider_availability_create_schema, current_user=current_user) }}
 {% endif %}
 
-<hr />
-<a href="/posts">Back to posts</a>
+<p><a href="/posts" role="button" class="secondary outline">Back to posts</a></p>
 {% endblock %}

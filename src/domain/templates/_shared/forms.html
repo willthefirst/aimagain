@@ -1,9 +1,9 @@
 {# Form-skeleton macros for HTMX-driven CRUD forms. #}
 
 {# Single-fieldset add form. Wraps caller-supplied field markup in
-`<form><fieldset><legend>…</legend>{{ caller() }}</fieldset><input
-type="submit"></form>`. Used by sub-resource sections that have the
-same shape (legend + flat field list + submit button), e.g. the
+`<form><fieldset><legend>…</legend>{{ caller() }}</fieldset><button
+type="submit">…</button></form>`. Used by sub-resource sections that
+have the same shape (legend + flat field list + submit button), e.g. the
 licensure / education / certification add forms in providers/form_edit.html.
 
 Forms with multiple fieldsets or non-trivial structure should stay
@@ -23,6 +23,6 @@ Example:
     <legend>{{ legend }}</legend>
     {{ caller() }}
   </fieldset>
-  <input type="submit" value="{{ submit_label }}" />
+  <button type="submit">{{ submit_label }}</button>
 </form>
 {%- endmacro %}

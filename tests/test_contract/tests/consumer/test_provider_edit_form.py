@@ -103,7 +103,7 @@ async def test_consumer_provider_edit_form_submits(origin_with_routes: str, page
         await page.locator('input[name="practice_name"]').fill("Bayside Counseling")
         # Submit the practice-fields form (the first one on the page).
         await page.locator(
-            f'form[hx-patch="{PROVIDER_PATCH_API_PATH}"] input[type="submit"]'
+            f'form[hx-patch="{PROVIDER_PATCH_API_PATH}"] button[type="submit"]'
         ).click()
         await page.wait_for_timeout(NETWORK_TIMEOUT_MS)
 

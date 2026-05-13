@@ -3,12 +3,13 @@
 {% block content %}
 <h1>Posts</h1>
 
-<p>
-{%- for spec in post_kinds -%}
-{%- if not loop.first %} · {% endif -%}
-<a href="/posts/form?kind={{ spec.name }}">New {{ spec.list_label }}</a>
-{%- endfor %}
-</p>
+<nav aria-label="Create post">
+  <ul>
+  {%- for spec in post_kinds %}
+    <li><a href="/posts/form?kind={{ spec.name }}" role="button" class="outline">New {{ spec.list_label }}</a></li>
+  {%- endfor %}
+  </ul>
+</nav>
 
 {% if posts %}
 <ul id="post-list">
@@ -16,10 +17,10 @@
   <li>
     {% if post.kind == "client_referral" %}
     <a href="/posts/{{ post.id }}">{{ post.client_referral_detail.description | truncate(80) }}</a>
-    <span class="post-kind">[client referral]</span>
+    <small>[client referral]</small>
     {% elif post.kind == "provider_availability" %}
     <a href="/posts/{{ post.id }}">{{ post.provider_availability_detail.provider.practice_name }}</a>
-    <span class="post-kind">[provider availability]</span>
+    <small>[provider availability]</small>
     {% endif %}
     by <a href="/users/{{ post.owner_id }}">{{ post.owner.username }}</a>
   </li>
@@ -28,7 +29,4 @@
 {% else %}
 <p>No posts found.</p>
 {% endif %}
-
-<hr />
-<a href="/posts">Refresh list</a>
 {% endblock %}

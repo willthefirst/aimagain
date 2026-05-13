@@ -1,40 +1,43 @@
 {% extends "base.html" %}
 {% block title %}User: {{ target_user.username }}{% endblock %}
 {% block content %}
-<h1>{{ target_user.username }}</h1>
+<article>
+  <header>
+    <h1>{{ target_user.username }}</h1>
+  </header>
 
-{# Private rows (email, active, verified) are gated by `can_view_private`,
-   computed in handle_get_user_detail as `is_self OR is_admin(viewer)`.
-   The handler also omits these fields from the `target_user` projection
-   for non-authorized viewers, so a forgotten guard here cannot re-leak. #}
-{% if can_view_private %}
-<dl>
-  <dt>Email</dt><dd>{{ target_user.email }}</dd>
-  <dt>Active</dt><dd>{{ "yes" if target_user.is_active else "no" }}</dd>
-  <dt>Verified</dt><dd>{{ "yes" if target_user.is_verified else "no" }}</dd>
-</dl>
-{% endif %}
-
-{% include "users/_admin_actions.html" %}
-
-<hr />
-
-<section>
-  <h2>Providers</h2>
-  {% if providers %}
-  <ul id="user-detail-providers" class="providers-list">
-    {%- for provider in providers %}
-    <li>
-      <a href="/providers/{{ provider.id }}">{{ provider.practice_name }}</a>
-      &mdash; {{ provider.location_city }}, {{ provider.location_state }}
-    </li>
-    {%- endfor %}
-  </ul>
-  {% else %}
-  <p id="user-detail-providers-empty">No providers yet.</p>
+  {# Private rows (email, active, verified) are gated by `can_view_private`,
+     computed in handle_get_user_detail as `is_self OR is_admin(viewer)`.
+     The handler also omits these fields from the `target_user` projection
+     for non-authorized viewers, so a forgotten guard here cannot re-leak. #}
+  {% if can_view_private %}
+  <dl>
+    <dt>Email</dt><dd>{{ target_user.email }}</dd>
+    <dt>Active</dt><dd>{{ "yes" if target_user.is_active else "no" }}</dd>
+    <dt>Verified</dt><dd>{{ "yes" if target_user.is_verified else "no" }}</dd>
+  </dl>
   {% endif %}
-</section>
 
-<hr />
-<a href="/users">Back to users</a>
+  {% include "users/_admin_actions.html" %}
+
+  <section>
+    <h2>Providers</h2>
+    {% if providers %}
+    <ul id="user-detail-providers" class="providers-list">
+      {%- for provider in providers %}
+      <li>
+        <a href="/providers/{{ provider.id }}">{{ provider.practice_name }}</a>
+        &mdash; {{ provider.location_city }}, {{ provider.location_state }}
+      </li>
+      {%- endfor %}
+    </ul>
+    {% else %}
+    <p id="user-detail-providers-empty">No providers yet.</p>
+    {% endif %}
+  </section>
+
+  <footer>
+    <a href="/users" role="button" class="secondary outline">Back to users</a>
+  </footer>
+</article>
 {% endblock %}

@@ -32,7 +32,7 @@
       {{ radio_bool_field("sliding_scale", "Sliding scale?", current=provider.sliding_scale, required=false) }}
       {{ text_field("cost", "Cost (optional, free text)", current=provider.cost, required=false) }}
     </fieldset>
-    <input type="submit" value="Save practice details" />
+    <button type="submit">Save practice details</button>
   </form>
 </section>
 
@@ -94,6 +94,5 @@
   {% endcall %}
 </section>
 
-<hr />
-<a href="/providers">Back to providers</a>
+<p><a href="/providers" role="button" class="secondary outline">Back to providers</a></p>
 {% endblock %}

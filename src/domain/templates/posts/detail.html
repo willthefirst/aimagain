@@ -7,11 +7,13 @@ Provider availability: {{ post.provider_availability_detail.provider.practice_na
 {%- endif -%}
 {% endblock %}
 {% block content %}
+<article>
 {% if post.kind == "client_referral" %}
 {% set d = post.client_referral_detail %}
-<h1>Client referral</h1>
-<p>by <a href="/users/{{ post.owner_id }}">{{ post.owner.username }}</a></p>
-<div class="post-body">
+  <header>
+    <h1>Client referral</h1>
+    <p>by <a href="/users/{{ post.owner_id }}">{{ post.owner.username }}</a></p>
+  </header>
   <dl>
     <dt>Location</dt>
     <dd>{{ d.location_city }}, {{ d.location_state }} {{ d.location_zip }}</dd>
@@ -40,16 +42,16 @@ Provider availability: {{ post.provider_availability_detail.provider.practice_na
     <dt>Insurance</dt>
     <dd>{{ INSURANCE_LABELS[d.insurance] }}</dd>
   </dl>
-</div>
 {% elif post.kind == "provider_availability" %}
 {% set d = post.provider_availability_detail %}
-<h1>Provider availability</h1>
-<p>by <a href="/users/{{ post.owner_id }}">{{ post.owner.username }}</a></p>
-<div class="post-body">
+{% set p = d.provider %}
+  <header>
+    <h1>Provider availability</h1>
+    <p>by <a href="/users/{{ post.owner_id }}">{{ post.owner.username }}</a></p>
+  </header>
   {% if d.description %}
-  <p class="post-description">{{ d.description }}</p>
+  <p>{{ d.description }}</p>
   {% endif %}
-  {% set p = d.provider %}
   <dl>
     <dt>Practice name</dt>
     <dd><a href="/providers/{{ p.id }}">{{ p.practice_name }}</a></dd>
@@ -103,16 +105,16 @@ Provider availability: {{ post.provider_availability_detail.provider.practice_na
     {% endif %}
   </dl>
   {% if d.referral_instructions %}
-  <section class="post-referral-instructions">
+  <section>
     <h2>How to refer</h2>
     <p>{{ d.referral_instructions }}</p>
   </section>
   {% endif %}
-</div>
 {% endif %}
 
-{% include "posts/_owner_actions.html" %}
-
-<hr />
-<a href="/posts">Back to posts</a>
+  <footer>
+    {% include "posts/_owner_actions.html" %}
+    <a href="/posts" role="button" class="secondary outline">Back to posts</a>
+  </footer>
+</article>
 {% endblock %}
