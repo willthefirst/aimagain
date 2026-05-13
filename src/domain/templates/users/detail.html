@@ -1,6 +1,16 @@
 {% extends "base.html" %}
 {%- from "_shared/index_table.html" import index_table -%}
 {%- from "_shared/_provider_row.html" import provider_headers, provider_row -%}
+{%- from "_shared/_breadcrumb.html" import breadcrumb -%}
+
+{% block breadcrumb %}
+{%- if is_self -%}
+  {{ breadcrumb([("Me", None)]) }}
+{%- else -%}
+  {{ breadcrumb([("Users", "/users"), (target_user.username, None)]) }}
+{%- endif -%}
+{% endblock %}
+
 {% block content %}
 <article>
   <header>

@@ -1,4 +1,10 @@
 {% extends "base.html" %}
+{%- from "_shared/_breadcrumb.html" import breadcrumb -%}
+
+{% block breadcrumb %}
+{{ breadcrumb([("Providers", "/providers"), (provider.practice_name, None)]) }}
+{% endblock %}
+
 {% block content %}
 <article>
   <header>

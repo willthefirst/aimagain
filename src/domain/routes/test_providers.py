@@ -351,6 +351,42 @@ async def test_list_providers_treats_empty_filter_values_as_absent(
     assert len(rows) == 1, "Empty filter values should not exclude rows"
 
 
+# --- Chrome: nav active state + breadcrumb ------------------------------
+
+
+async def test_primary_nav_marks_providers_active_on_providers_index(
+    authenticated_client: AsyncClient,
+):
+    response = await authenticated_client.get("/providers")
+    assert response.status_code == 200
+    tree = HTMLParser(response.text)
+    providers_link = tree.css_first('#primary-nav a[href="/providers"]')
+    posts_link = tree.css_first('#primary-nav a[href="/posts"]')
+    assert providers_link is not None
+    assert providers_link.attributes.get("aria-current") == "page"
+    assert posts_link.attributes.get("aria-current") is None
+
+
+async def test_provider_detail_renders_breadcrumb(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user: User,
+):
+    provider_id = await _seed_provider_for(
+        db_test_session_manager,
+        user_id=logged_in_user.id,
+        practice_name="Crumb Therapy",
+    )
+    response = await authenticated_client.get(f"/providers/{provider_id}")
+    assert response.status_code == 200
+    tree = HTMLParser(response.text)
+    crumbs = tree.css("nav.breadcrumb li")
+    assert len(crumbs) == 2
+    assert crumbs[0].css_first("a").attributes.get("href") == "/providers"
+    assert crumbs[0].text(strip=True) == "Providers"
+    assert crumbs[1].text(strip=True) == "Crumb Therapy"
+
+
 # --- Provider update ------------------------------------------------------
 
 

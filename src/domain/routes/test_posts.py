@@ -277,6 +277,34 @@ async def test_list_rejects_unknown_kind(
     assert response.status_code == 422
 
 
+# --- Chrome: breadcrumb on post detail ----------------------------------
+
+
+async def test_post_detail_renders_breadcrumb(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user: User,
+):
+    """A client_referral detail page renders a `Posts > Client referral`
+    breadcrumb. The terminal entry is a `<span aria-current="page">`,
+    not a link."""
+    post = _client_referral_post(description="bread", owner_id=logged_in_user.id)
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            session.add(post)
+        await session.refresh(post)
+        post_id = post.id
+
+    response = await authenticated_client.get(f"/posts/{post_id}")
+    assert response.status_code == 200
+    tree = HTMLParser(response.text)
+    crumbs = tree.css("nav.breadcrumb li")
+    assert len(crumbs) == 2
+    assert crumbs[0].css_first("a").attributes.get("href") == "/posts"
+    assert crumbs[1].css_first("span[aria-current=page]") is not None
+    assert crumbs[1].text(strip=True) == "Client referral"
+
+
 # --- Edit form page (GET /posts/{id}/form) -------------------------------
 
 
