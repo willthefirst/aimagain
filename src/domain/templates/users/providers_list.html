@@ -1,6 +1,15 @@
 {% extends "base.html" %}
 {%- from "_shared/index_table.html" import index_table -%}
 {%- from "_shared/_provider_row.html" import provider_headers, provider_row -%}
+{%- from "_shared/_breadcrumb.html" import breadcrumb -%}
+
+{% block breadcrumb %}
+{%- if is_self -%}
+  {{ breadcrumb([("Me", "/users/me"), ("Providers", None)]) }}
+{%- else -%}
+  {{ breadcrumb([("Users", "/users"), (target_user.username, "/users/" ~ target_user.id), ("Providers", None)]) }}
+{%- endif -%}
+{% endblock %}
 
 {% block content %}
 {% if is_self %}

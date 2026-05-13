@@ -1,4 +1,14 @@
 {% extends "base.html" %}
+{%- from "_shared/_breadcrumb.html" import breadcrumb -%}
+
+{% block breadcrumb %}
+{%- if post.kind == "client_referral" -%}
+  {{ breadcrumb([("Posts", "/posts"), ("Client referral", None)]) }}
+{%- elif post.kind == "provider_availability" -%}
+  {{ breadcrumb([("Posts", "/posts"), (post.provider_availability_detail.provider.practice_name, None)]) }}
+{%- endif -%}
+{% endblock %}
+
 {% block content %}
 <article>
 {% if post.kind == "client_referral" %}

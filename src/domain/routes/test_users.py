@@ -338,6 +338,41 @@ async def test_detail_lists_owned_providers(
     assert hrefs == {f"/providers/{first.id}", f"/providers/{second.id}"}
 
 
+# --- Chrome: nav active state + breadcrumb ------------------------------
+
+
+async def test_primary_nav_marks_favorites_active_and_not_users(
+    authenticated_client: AsyncClient,
+):
+    """On `/users/me/favorites`, more-specific section wins: Favorites
+    is active and Users / Me are not — even though all three share the
+    `/users` URL prefix."""
+    response = await authenticated_client.get("/users/me/favorites")
+    assert response.status_code == 200
+    tree = HTMLParser(response.text)
+    favorites_link = tree.css_first('#primary-nav a[href="/users/me/favorites"]')
+    me_link = tree.css_first('#primary-nav a[href="/users/me"]')
+    users_link = tree.css_first('#primary-nav a[href="/users"]')
+    assert favorites_link.attributes.get("aria-current") == "page"
+    assert me_link.attributes.get("aria-current") is None
+    assert users_link.attributes.get("aria-current") is None
+
+
+async def test_users_me_detail_breadcrumb_says_me(
+    authenticated_client: AsyncClient,
+    logged_in_user: User,
+):
+    """The /users/me alias renders the user-detail page; its breadcrumb
+    says "Me" rather than "Users > {username}" since the viewer is
+    looking at themselves."""
+    response = await authenticated_client.get("/users/me")
+    assert response.status_code == 200
+    tree = HTMLParser(response.text)
+    crumbs = tree.css("nav.breadcrumb li")
+    assert len(crumbs) == 1
+    assert crumbs[0].text(strip=True) == "Me"
+
+
 # --- Activation endpoint -------------------------------------------------
 
 
