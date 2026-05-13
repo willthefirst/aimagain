@@ -1,21 +1,16 @@
 {% extends "base.html" %}
+{%- from "_shared/index_table.html" import index_table -%}
+{%- from "users/_columns.html" import user_headers, user_row -%}
 
 {% block content %}
 <h1>Users</h1>
 
-{% if users %}
-<ul id="user-list">
-  {% for user in users %}
-  <li{% if not user.is_active %} class="deactivated"{% endif %}>
-    <a href="/users/{{ user.id }}">{{ user.username }}</a>
-    {% if not user.is_active %} <small><em>(deactivated)</em></small>{% endif %}
-    {% with target_user = user %}
-      {% include "users/_admin_actions.html" %}
-    {% endwith %}
-  </li>
-  {% endfor %}
-</ul>
-{% else %}
-<p>No users found.</p>
-{% endif %}
+{{ index_table(
+  items=users,
+  headers=user_headers,
+  row=user_row,
+  empty="No users found.",
+  id="user-list",
+  row_kwargs={"can_admin_actions": can_admin_actions},
+) }}
 {% endblock %}
