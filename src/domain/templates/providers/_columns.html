@@ -1,57 +1,11 @@
-{# Column macros for the providers index table.
+{# Provider-specific filter form for the /providers index.
 
-The grammar is one cluster-local `_columns.html` per resource (see
-../README.md). Three macros — headers, row, filters — drive the
-provider table on /providers and (in a later PR) the owner-scoped
-/users/{id}/providers and /users/me/favorites listings.
-
-Required context for `provider_row`: just the row's `provider`.
-Per-viewer flags (e.g. `is_favorited`) join later as keyword args
-threaded through `index_table`'s `row_kwargs`.
-
-The Insurance cell composes the same posture summary used on the
-provider detail card (#449): "In-net" / "Out-net" / "Self-pay", with
-optional "+slide" when sliding scale is on. One enum-mapped value,
-not three. Sliding scale is intentionally folded in so the column is
-narrow.
+Row + header macros live in `_shared/_provider_row.html` because four
+pages across three clusters render them; the filters here are
+provider-specific (license_type / issuing_state are provider concepts)
+and only `/providers` uses them, so they stay cluster-local.
 #}
 {%- from "_shared/form_fields.html" import filter_select_field -%}
-
-{% macro provider_headers() -%}
-<th scope="col">Practice</th>
-<th scope="col">Location</th>
-<th scope="col">Licensed in</th>
-<th scope="col">Insurance</th>
-{%- endmacro %}
-
-{% macro provider_row(provider) -%}
-{%- set issuing_states = provider.licensures | map(attribute='issuing_state') | unique | sort | list -%}
-<tr data-row-id="{{ provider.id }}">
-  <td data-label="Practice" class="primary">
-    <a href="/providers/{{ provider.id }}">{{ provider.practice_name }}</a>
-  </td>
-  <td data-label="Location">{{ provider.location_city }}, {{ provider.location_state }}</td>
-  <td data-label="Licensed in">
-    {%- if issuing_states -%}
-      {{ issuing_states | join(', ') }}
-    {%- else -%}
-      &mdash;
-    {%- endif -%}
-  </td>
-  <td data-label="Insurance">
-    {%- if provider.accepts_in_network and provider.accepts_out_of_network -%}
-      In-net &amp; out-net
-    {%- elif provider.accepts_in_network -%}
-      In-net
-    {%- elif provider.accepts_out_of_network -%}
-      Out-net
-    {%- else -%}
-      Self-pay
-    {%- endif -%}
-    {%- if provider.sliding_scale %} <small>· sliding</small>{% endif -%}
-  </td>
-</tr>
-{%- endmacro %}
 
 {% macro provider_filters(selected_license_type, selected_issuing_state) -%}
 <form method="get" action="/providers">

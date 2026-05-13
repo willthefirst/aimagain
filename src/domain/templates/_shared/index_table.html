@@ -2,31 +2,41 @@
 
 Every `/<collection>` list page is filter-bar + table + per-row actions
 (see ../README.md). This macro wraps the table/empty-state branch so
-each list page is a thin wrapper around two cluster-local macros: one
-returning the `<th>` cells, one returning the `<tr>` row.
+each list page is a thin wrapper around two cluster-local (or shared)
+macros: one returning the `<th>` cells, one returning the `<tr>` row.
 
 Args:
   items:        iterable of model rows.
   headers:      zero-arg macro returning the `<th>` cells for `<thead>`.
-                See e.g. `providers/_columns.html`.
-  row:          one-arg macro `row(item)` returning the full `<tr>...</tr>`
-                — the row owns its own data attributes (`data-row-id`) and
-                per-cell `data-label` so tests select stably and a later
-                mobile-stack pattern can attach without re-templating.
-  empty:        text shown when `items` is empty.
+                See e.g. `_shared/_provider_row.html` for a shared
+                example, or `posts/_columns.html` for a cluster-local
+                one.
+  row:          one-arg macro `row(item, **row_kwargs)` returning the
+                full `<tr>...</tr>` — the row owns its own data
+                attributes (`data-row-id`) and per-cell `data-label` so
+                tests select stably and a later mobile-stack pattern
+                can attach without re-templating.
+  empty:        text shown when `items` is empty. Ignored when the
+                macro is invoked via `{% call %}` and the caller body
+                renders the empty branch itself (useful for empty
+                states with CTAs or per-viewer branches).
   id:           optional id for the `<table>` (lets tests scope to the
                 table for that page).
   row_kwargs:   passed to `row(item, **row_kwargs)` for per-viewer flags
-                (e.g. `is_favorited_lookup`) that the row macro needs but
-                that vary per-page. Default `{}` — most lists don't need it.
+                (e.g. `favorited_provider_ids`) that the row macro needs
+                but that vary per-page. Default `{}` — most lists don't
+                need it.
 
 Why a macro at all (vs. each list.html owning the table chrome): the
 empty-state branch and the wrapping `<div class="index-table">` are the
 load-bearing repeated structure — collapsing them here keeps every list
 honest about the empty-state contract (`<p class="index-empty">…`) so a
-single CSS rule styles every empty list the same way.
+single CSS rule styles every empty list the same way. Pages with rich
+empty states (CTA links, per-viewer branches) invoke the macro via
+`{% call %}` and provide their own `<p class="index-empty" id="…">`
+body.
 #}
-{% macro index_table(items, headers, row, empty, id=None, row_kwargs={}) -%}
+{% macro index_table(items, headers, row, empty=None, id=None, row_kwargs={}) -%}
 {% if items %}
 <div class="index-table">
   <table{% if id %} id="{{ id }}"{% endif %} role="grid">
@@ -38,7 +48,7 @@ single CSS rule styles every empty list the same way.
     </tbody>
   </table>
 </div>
-{% else %}
-<p class="index-empty">{{ empty }}</p>
-{% endif %}
+{%- else -%}
+{% if caller %}{{ caller() }}{% else %}<p class="index-empty">{{ empty }}</p>{% endif %}
+{%- endif %}
 {%- endmacro %}
