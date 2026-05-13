@@ -15,7 +15,7 @@ Read by:
     ``POST_ENTITY.discriminator.names``.
 """
 
-from typing import Final
+from typing import Final, Literal
 
 from src.domain.logic.posts.schema import (
     post_audit_snapshot,
@@ -31,7 +31,8 @@ from src.framework.dispatch.entity_spec import (
     Redirects,
     RouteSet,
 )
-from src.framework.persistence.dependencies import get_base_repository
+from src.framework.dispatch.resource_routes import QueryParam
+from src.framework.persistence.dependencies import get_post_repository
 
 POST_ENTITY: Final[EntitySpec] = EntitySpec(
     name="post",
@@ -39,7 +40,7 @@ POST_ENTITY: Final[EntitySpec] = EntitySpec(
     id_param="post_id",
     model=Post,
     # `owner_attr` defaults to "owner_id" — posts track their owner via Post.owner_id.
-    repo_dep=get_base_repository,
+    repo_dep=get_post_repository,
     auth_deps=AUTHENTICATED,
     auth_policy=OWNER_OR_ADMIN,
     audit_snapshot=post_audit_snapshot,
@@ -55,6 +56,16 @@ POST_ENTITY: Final[EntitySpec] = EntitySpec(
         delete=True,
         form_new=True,
         form_edit=True,
+    ),
+    # The seeking/offering tab strip on `/posts` filters by `kind`. FastAPI
+    # parses the param as a `Literal` of POST_KINDS names — invalid values
+    # 422 the same way any other filter does.
+    filters=(
+        QueryParam(
+            "kind",
+            Literal[*POST_KINDS.names] | None,  # type: ignore[valid-type]
+            None,
+        ),
     ),
     update_redirect=Redirects.to_detail("posts", "post_id"),
     discriminator=POST_KINDS,

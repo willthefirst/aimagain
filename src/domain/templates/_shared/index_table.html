@@ -26,6 +26,9 @@ Args:
                 (e.g. `favorited_provider_ids`) that the row macro needs
                 but that vary per-page. Default `{}` — most lists don't
                 need it.
+  header_kwargs: passed to `headers(**header_kwargs)`. Posts uses this to
+                hide the `Type` column on filtered tabs; most lists pass
+                nothing.
 
 Why a macro at all (vs. each list.html owning the table chrome): the
 empty-state branch and the wrapping `<div class="index-table">` are the
@@ -36,11 +39,11 @@ empty states (CTA links, per-viewer branches) invoke the macro via
 `{% call %}` and provide their own `<p class="index-empty" id="…">`
 body.
 #}
-{% macro index_table(items, headers, row, empty=None, id=None, row_kwargs={}) -%}
+{% macro index_table(items, headers, row, empty=None, id=None, row_kwargs={}, header_kwargs={}) -%}
 {% if items %}
 <div class="index-table">
   <table{% if id %} id="{{ id }}"{% endif %} role="grid">
-    <thead><tr>{{ headers() }}</tr></thead>
+    <thead><tr>{{ headers(**header_kwargs) }}</tr></thead>
     <tbody>
       {%- for item in items %}
 {{ row(item, **row_kwargs) }}
