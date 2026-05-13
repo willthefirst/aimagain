@@ -4,7 +4,8 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="color-scheme" content="light dark" />
-    <title>{% block title %}AI again{% endblock %}</title>
+    {# title-case-ignore: "Bedlam Connect" is a brand name #}
+    <title>Bedlam Connect</title>
     <link
       rel="stylesheet"
       href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css" />
@@ -64,6 +65,10 @@
     {% if is_authenticated %}
     <header class="container">
       <nav aria-label="Primary">
+        <ul>
+          {# title-case-ignore: "Bedlam Connect" is a brand name #}
+          <li><strong><a href="/" class="contrast">Bedlam Connect</a></strong></li>
+        </ul>
         <ul id="primary-nav">
           <li><a href="/posts">Posts</a></li>
           <li><a href="/users">Users</a></li>
