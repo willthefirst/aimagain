@@ -20,6 +20,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.db import get_db_session
 from src.domain.logic.favorites.repository import UserFavoriteRepository
+from src.domain.logic.posts.repository import PostRepository
 from src.domain.logic.providers.repository import ProviderRepository
 from src.domain.logic.users.repository import UserRepository
 from src.framework.audit.repository import AuditRepository
@@ -61,6 +62,7 @@ _REPO_TYPES: tuple[type[BaseRepository], ...] = (
     AuditRepository,
     ProviderRepository,
     UserFavoriteRepository,
+    PostRepository,
 )
 
 
@@ -81,6 +83,7 @@ get_base_repository = _REPO_TYPE_RESOLVERS[BaseRepository]
 get_audit_repository = _REPO_TYPE_RESOLVERS[AuditRepository]
 get_provider_repository = _REPO_TYPE_RESOLVERS[ProviderRepository]
 get_user_favorite_repository = _REPO_TYPE_RESOLVERS[UserFavoriteRepository]
+get_post_repository = _REPO_TYPE_RESOLVERS[PostRepository]
 
 
 class UnknownRepoTypeError(KeyError):

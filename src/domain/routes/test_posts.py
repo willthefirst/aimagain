@@ -102,7 +102,7 @@ async def test_list_posts_one_post(
 
     assert response.status_code == 200
     tree = HTMLParser(response.text)
-    items = tree.css("#post-list > li")
+    items = tree.css("#posts-table tbody tr")
     assert len(items) == 1
     item_text = items[0].text()
     assert description in item_text
@@ -138,7 +138,7 @@ async def test_list_posts_orders_newest_first(
     assert response.status_code == 200
 
     tree = HTMLParser(response.text)
-    items = tree.css("#post-list > li")
+    items = tree.css("#posts-table tbody tr")
     assert len(items) == 2
     assert newer.client_referral_detail.description in items[0].text()
     assert older.client_referral_detail.description in items[1].text()
@@ -207,6 +207,74 @@ async def test_list_page_links_to_create_forms(
     assert cr_link is not None
     pa_link = tree.css_first('a[href="/posts/form?kind=provider_availability"]')
     assert pa_link is not None
+
+
+# --- Kind tab strip ------------------------------------------------------
+
+
+async def test_list_page_renders_kind_tabs(
+    authenticated_client: AsyncClient,
+    logged_in_user: User,
+):
+    """All / Seeking / Offering tabs are rendered. With no `?kind=`, the
+    "All" tab carries `aria-current="page"`."""
+    response = await authenticated_client.get("/posts")
+    assert response.status_code == 200
+    tree = HTMLParser(response.text)
+    all_tab = tree.css_first('nav.post-tabs a[href="/posts"]')
+    seeking_tab = tree.css_first('nav.post-tabs a[href="/posts?kind=client_referral"]')
+    offering_tab = tree.css_first(
+        'nav.post-tabs a[href="/posts?kind=provider_availability"]'
+    )
+    assert all_tab is not None
+    assert seeking_tab is not None
+    assert offering_tab is not None
+    assert all_tab.attributes.get("aria-current") == "page"
+    assert seeking_tab.attributes.get("aria-current") is None
+
+
+async def test_list_filters_by_kind_seeking(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user: User,
+):
+    """`?kind=client_referral` keeps only seeking posts; the matching tab
+    becomes the active one."""
+    author = create_test_user(username=f"author-{uuid.uuid4()}")
+    referral = _client_referral_post(
+        description=f"ref-{uuid.uuid4()}", owner_id=author.id
+    )
+    availability = _provider_availability_post(
+        practice_name=f"clinic-{uuid.uuid4()}", owner_id=author.id
+    )
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            session.add(author)
+            session.add(availability.provider_availability_detail.provider)
+            session.add(referral)
+            session.add(availability)
+
+    response = await authenticated_client.get("/posts?kind=client_referral")
+    assert response.status_code == 200
+    tree = HTMLParser(response.text)
+    rows = tree.css("#posts-table tbody tr")
+    assert len(rows) == 1
+    assert rows[0].attributes.get("data-kind") == "client_referral"
+    # Active tab moved to Seeking.
+    seeking_tab = tree.css_first('nav.post-tabs a[href="/posts?kind=client_referral"]')
+    assert seeking_tab.attributes.get("aria-current") == "page"
+    # The Type column is hidden on a single-kind tab.
+    assert tree.css_first('#posts-table th[scope="col"]').text() == "Post"
+
+
+async def test_list_rejects_unknown_kind(
+    authenticated_client: AsyncClient,
+    logged_in_user: User,
+):
+    """An unknown `kind=` value is rejected as a 422 by FastAPI (the
+    `Literal[*POST_KINDS.names]` declaration on the spec)."""
+    response = await authenticated_client.get("/posts?kind=not_a_real_kind")
+    assert response.status_code == 422
 
 
 # --- Edit form page (GET /posts/{id}/form) -------------------------------
