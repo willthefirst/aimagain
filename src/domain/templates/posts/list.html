@@ -11,18 +11,69 @@
   </ul>
 </nav>
 
+{#- Per-card chips: a compact `<small>` line summarising the load-bearing
+    structured fields (age groups, languages, insurance posture). One
+    `<li>` per post wrapping an `<article>` keeps the `#post-list > li`
+    test selector intact while letting Pico's classless `<article>` style
+    the card. The card title links to /posts/{id}; no separate "View"
+    button keeps the list dense. -#}
 {% if posts %}
 <ul id="post-list">
   {% for post in posts %}
   <li>
-    {% if post.kind == "client_referral" %}
-    <a href="/posts/{{ post.id }}">{{ post.client_referral_detail.description | truncate(80) }}</a>
-    <small>[client referral]</small>
-    {% elif post.kind == "provider_availability" %}
-    <a href="/posts/{{ post.id }}">{{ post.provider_availability_detail.provider.practice_name }}</a>
-    <small>[provider availability]</small>
-    {% endif %}
-    <small>by <a href="/users/{{ post.owner_id }}">{{ post.owner.username }}</a></small>
+    <article>
+      {% if post.kind == "client_referral" %}
+      {% set d = post.client_referral_detail %}
+      <header>
+        <h3><a href="/posts/{{ post.id }}">Client referral</a> <small>&middot; {{ d.location_state }}</small></h3>
+        <small>client referral &middot; by <a href="/users/{{ post.owner_id }}">{{ post.owner.username }}</a></small>
+      </header>
+      <p>{{ d.description | truncate(160) }}</p>
+      <small>
+        {%- if d.age_groups -%}
+          {%- for g in d.age_groups[:2] -%}{{ CLIENT_AGE_GROUP_LABELS[g] }}{%- if not loop.last -%}, {% endif -%}{%- endfor -%}
+          {%- if d.age_groups | length > 2 %}, +{{ d.age_groups | length - 2 }} more{% endif %}
+          &middot;
+        {%- endif %}
+        {%- if d.languages %}
+          {%- for l in d.languages -%}{{ LANGUAGE_LABELS[l] }}{%- if not loop.last -%}, {% endif -%}{%- endfor %}
+          &middot;
+        {%- endif %}
+        {{ INSURANCE_LABELS[d.insurance] }}
+      </small>
+      {% elif post.kind == "provider_availability" %}
+      {% set d = post.provider_availability_detail %}
+      {% set p = d.provider %}
+      <header>
+        <h3><a href="/posts/{{ post.id }}">{{ p.practice_name }}</a> <small>&middot; {{ p.location_state }}</small></h3>
+        <small>provider availability &middot; by <a href="/users/{{ post.owner_id }}">{{ post.owner.username }}</a></small>
+      </header>
+      {% if d.description %}
+      <p>{{ d.description | truncate(160) }}</p>
+      {% endif %}
+      <small>
+        {%- if d.age_groups -%}
+          {%- for g in d.age_groups[:2] -%}{{ CLIENT_AGE_GROUP_LABELS[g] }}{%- if not loop.last -%}, {% endif -%}{%- endfor -%}
+          {%- if d.age_groups | length > 2 %}, +{{ d.age_groups | length - 2 }} more{% endif %}
+          &middot;
+        {%- endif %}
+        {%- if d.languages %}
+          {%- for l in d.languages -%}{{ LANGUAGE_LABELS[l] }}{%- if not loop.last -%}, {% endif -%}{%- endfor %}
+          &middot;
+        {%- endif %}
+        {%- if p.accepts_in_network and p.accepts_out_of_network -%}
+          In-network &amp; out-of-network
+        {%- elif p.accepts_in_network -%}
+          In-network
+        {%- elif p.accepts_out_of_network -%}
+          Out-of-network
+        {%- else -%}
+          Self-pay only
+        {%- endif %}
+        {%- if p.sliding_scale %} &middot; Sliding scale{% endif %}
+      </small>
+      {% endif %}
+    </article>
   </li>
   {% endfor %}
 </ul>
@@ -30,3 +81,5 @@
 <p>No posts found.</p>
 {% endif %}
 {% endblock %}
+</content>
+</invoke>
