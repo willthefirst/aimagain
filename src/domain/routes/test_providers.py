@@ -212,8 +212,8 @@ async def test_list_providers_renders_html(
     assert response.status_code == 200
     assert response.headers["content-type"].startswith("text/html")
     tree = HTMLParser(response.text)
-    items = tree.css("ul.providers-list li")
-    assert len(items) == 1
+    rows = tree.css("#providers-table tbody tr")
+    assert len(rows) == 1
     assert tree.css_first(f'a[href="/providers/{provider_id}"]') is not None
     assert "Open House" in response.text
 
@@ -222,10 +222,11 @@ async def test_list_providers_shows_licensure_states(
     authenticated_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],
 ):
-    """Each list row surfaces the provider's licensure issuing states so
-    matches against `?issuing_state=` are visually obvious — a CT-located
-    provider holding a CA license shows `Licensed in: CA, CT` and the
-    user can see why they appeared in a CA filter (#458 follow-up)."""
+    """Each list row surfaces the provider's licensure issuing states in
+    its "Licensed in" cell so matches against `?issuing_state=` are
+    visually obvious — a CT-located provider holding a CA license shows
+    `CA, CT` and the user can see why they appeared in a CA filter
+    (#458 follow-up)."""
     other = create_test_user(username=f"other-{uuid.uuid4()}")
     async with db_test_session_manager() as session:
         async with session.begin():
@@ -252,21 +253,26 @@ async def test_list_providers_shows_licensure_states(
     response = await authenticated_client.get("/providers")
 
     assert response.status_code == 200
-    assert "Licensed in: CA, CT" in response.text
+    tree = HTMLParser(response.text)
+    licensed_in_cell = tree.css_first(
+        f'tr[data-row-id="{provider_id}"] td[data-label="Licensed in"]'
+    )
+    assert licensed_in_cell is not None
+    assert licensed_in_cell.text(strip=True) == "CA, CT"
 
 
 async def test_list_providers_renders_empty_state(
     authenticated_client: AsyncClient,
 ):
     """With no persisted providers, the page renders a friendly empty
-    message instead of an empty `<ul>`. With no filter set, the filter
+    message instead of an empty `<table>`. With no filter set, the filter
     form's `<option value="">Any</option>` is the preselected entry on
     each `<select>` (the `filter_select_field` macro contract)."""
     response = await authenticated_client.get("/providers")
     assert response.status_code == 200
     assert "No providers found" in response.text
     tree = HTMLParser(response.text)
-    assert tree.css_first("ul.providers-list") is None
+    assert tree.css_first("#providers-table") is None
     for select_name in ("license_type", "issuing_state"):
         selected = tree.css_first(f'select[name="{select_name}"] option[selected]')
         assert selected is not None
@@ -308,8 +314,8 @@ async def test_list_providers_filters_by_license_type(
 
     assert response.status_code == 200
     tree = HTMLParser(response.text)
-    items = tree.css("ul.providers-list li")
-    assert len(items) == 1
+    rows = tree.css("#providers-table tbody tr")
+    assert len(rows) == 1
     assert tree.css_first(f'a[href="/providers/{provider_a}"]') is not None
     assert tree.css_first(f'a[href="/providers/{provider_b}"]') is None
     # Filter form preserves the active selection.
@@ -341,8 +347,8 @@ async def test_list_providers_treats_empty_filter_values_as_absent(
 
     assert response.status_code == 200
     tree = HTMLParser(response.text)
-    items = tree.css("ul.providers-list li")
-    assert len(items) == 1, "Empty filter values should not exclude rows"
+    rows = tree.css("#providers-table tbody tr")
+    assert len(rows) == 1, "Empty filter values should not exclude rows"
 
 
 # --- Provider update ------------------------------------------------------

@@ -1,37 +1,22 @@
 {% extends "base.html" %}
-{%- from "_shared/form_fields.html" import filter_select_field -%}
+{%- from "_shared/index_table.html" import index_table -%}
+{# `with context` so `provider_filters` can read the provider-specific
+   enum tuples (`LICENSE_TYPES`, `US_STATES`) that flow into the page
+   from `PROVIDER_ENTITY.static_context` (and `US_STATES` from the
+   Jinja globals); without it, macros run in an isolated scope and
+   the filter selects render empty. #}
+{%- from "providers/_columns.html" import provider_headers, provider_row, provider_filters with context -%}
 
 {% block content %}
 <h1>Providers</h1>
 
-<form method="get" action="/providers">
-  <fieldset>
-    <legend>Filter</legend>
-    <div class="grid">
-      {{ filter_select_field("license_type", "License type", LICENSE_TYPES, labels=LICENSE_TYPES_LABELS, current=selected_license_type) }}
-      {{ filter_select_field("issuing_state", "Licensed in state", US_STATES, current=selected_issuing_state) }}
-    </div>
-    <div class="grid inline">
-      <button type="submit">Apply</button>
-      <a href="/providers" role="button" class="secondary outline">Clear</a>
-    </div>
-  </fieldset>
-</form>
+{{ provider_filters(selected_license_type, selected_issuing_state) }}
 
-{% if providers %}
-<ul class="providers-list">
-  {%- for provider in providers %}
-  {%- set issuing_states = provider.licensures | map(attribute='issuing_state') | unique | sort | list -%}
-  <li>
-    <a href="/providers/{{ provider.id }}">{{ provider.practice_name }}</a>
-    &mdash; {{ provider.location_city }}, {{ provider.location_state }}
-    {%- if issuing_states %}
-    <br /><small>Licensed in: {{ issuing_states | join(', ') }}</small>
-    {%- endif %}
-  </li>
-  {%- endfor %}
-</ul>
-{% else %}
-<p>No providers found.</p>
-{% endif %}
+{{ index_table(
+  items=providers,
+  headers=provider_headers,
+  row=provider_row,
+  empty="No providers found.",
+  id="providers-table",
+) }}
 {% endblock %}
