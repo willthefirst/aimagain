@@ -45,7 +45,7 @@
       {%- for lic in provider.licensures %}
       <li>
         <strong>{{ LICENSE_TYPES_LABELS[lic.license_type] }}</strong>
-        &mdash; {{ lic.license_number }} ({{ lic.issuing_state }}){% if lic.expiration_date %}, expires {{ lic.expiration_date }}{% endif %}
+        <small>{{ lic.license_number }} ({{ lic.issuing_state }}){% if lic.expiration_date %}, expires {{ lic.expiration_date }}{% endif %}</small>
       </li>
       {%- endfor %}
     </ul>
@@ -54,37 +54,37 @@
     {% endif %}
   </section>
 
-  <section>
-    <h2>Education</h2>
+  <details>
+    <summary><strong>Education</strong></summary>
     {% if provider.educations %}
     <ul class="educations-list">
       {%- for edu in provider.educations %}
       <li>
         <strong>{{ EDUCATION_TYPES_LABELS[edu.education_type] }}</strong>
-        &mdash; {{ edu.institution }}{% if edu.month_completed %}, {{ edu.month_completed }}{% endif %}
+        <small>{{ edu.institution }}{% if edu.month_completed %}, {{ edu.month_completed }}{% endif %}</small>
       </li>
       {%- endfor %}
     </ul>
     {% else %}
     <p>No education entries listed.</p>
     {% endif %}
-  </section>
+  </details>
 
-  <section>
-    <h2>Certifications</h2>
+  <details>
+    <summary><strong>Certifications</strong></summary>
     {% if provider.certifications %}
     <ul class="certifications-list">
       {%- for cert in provider.certifications %}
       <li>
         <strong>{{ CERTIFICATION_TYPES_LABELS[cert.certification_type] }}</strong>
-        &mdash; {{ cert.certifying_body }}{% if cert.expiration_date %}, expires {{ cert.expiration_date }}{% endif %}
+        <small>{{ cert.certifying_body }}{% if cert.expiration_date %}, expires {{ cert.expiration_date }}{% endif %}</small>
       </li>
       {%- endfor %}
     </ul>
     {% else %}
     <p>No certifications listed.</p>
     {% endif %}
-  </section>
+  </details>
 
   <footer>
     {# Favorite toggle. `is_favorited` is a per-viewer flag computed by

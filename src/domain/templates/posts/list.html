@@ -22,7 +22,7 @@
     <a href="/posts/{{ post.id }}">{{ post.provider_availability_detail.provider.practice_name }}</a>
     <small>[provider availability]</small>
     {% endif %}
-    by <a href="/users/{{ post.owner_id }}">{{ post.owner.username }}</a>
+    <small>by <a href="/users/{{ post.owner_id }}">{{ post.owner.username }}</a></small>
   </li>
   {% endfor %}
 </ul>
