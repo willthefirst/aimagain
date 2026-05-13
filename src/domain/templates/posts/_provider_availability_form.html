@@ -61,6 +61,6 @@ with at least one provider available.
     {{ field_for(schema, "languages", "Languages spoken", current=d.languages if d else None) }}
   </fieldset>
 
-  <input type="submit" value="{{ submit_label }}" />
+  <button type="submit">{{ submit_label }}</button>
 </form>
 {%- endmacro -%}

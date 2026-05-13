@@ -14,7 +14,7 @@
 {%- from "_shared/actions.html" import confirm_delete_button -%}
 {% if can_edit %}
 <span class="owner-actions" data-post-id="{{ post.id }}">
-  <a href="/posts/{{ post.id }}/form">Edit</a>
+  <a href="/posts/{{ post.id }}/form" role="button" class="outline">Edit</a>
   {{ confirm_delete_button("/posts/" ~ post.id, "Permanently delete this post? This cannot be undone.") }}
 </span>
 {% endif %}

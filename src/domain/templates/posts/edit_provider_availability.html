@@ -5,6 +5,5 @@
 <h1>Edit provider availability</h1>
 {{ provider_availability_form("patch", "/posts/" ~ post.id, "Save changes", post=post, schema=provider_availability_create_schema, current_user=current_user) }}
 
-<hr />
-<a href="/posts/{{ post.id }}">Cancel</a>
+<p><a href="/posts/{{ post.id }}" role="button" class="secondary outline">Cancel</a></p>
 {% endblock %}

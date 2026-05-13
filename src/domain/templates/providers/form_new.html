@@ -35,9 +35,8 @@
     {{ text_field("cost", "Cost (optional, free text)", required=false) }}
   </fieldset>
 
-  <input type="submit" value="Create provider" />
+  <button type="submit">Create provider</button>
 </form>
 
-<hr />
-<a href="/providers">Back to providers</a>
+<p><a href="/providers" role="button" class="secondary outline">Back to providers</a></p>
 {% endblock %}

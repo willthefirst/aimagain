@@ -68,7 +68,7 @@ async def test_consumer_registration_form_interaction(
         await page.locator("#email").fill(TEST_EMAIL)
         await page.locator("#password").fill(TEST_PASSWORD)
         await page.locator("#username").fill(TEST_USERNAME)
-        await page.locator("input[type='submit']").click()
+        await page.locator("button[type='submit']").click()
         await page.wait_for_timeout(NETWORK_TIMEOUT_MS)
 
     # Pact verification happens automatically on context exit.

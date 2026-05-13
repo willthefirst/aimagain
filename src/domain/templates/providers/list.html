@@ -9,8 +9,10 @@
     <legend>Filter</legend>
     {{ filter_select_field("license_type", "License type", LICENSE_TYPES, labels=LICENSE_TYPES_LABELS, current=selected_license_type) }}
     {{ filter_select_field("issuing_state", "Licensed in state", US_STATES, current=selected_issuing_state) }}
-    <input type="submit" value="Apply" />
-    <a href="/providers">Clear</a>
+    <div class="grid">
+      <button type="submit">Apply</button>
+      <a href="/providers" role="button" class="secondary outline">Clear</a>
+    </div>
   </fieldset>
 </form>
 

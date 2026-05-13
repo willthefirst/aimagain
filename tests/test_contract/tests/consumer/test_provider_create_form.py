@@ -104,7 +104,7 @@ async def test_consumer_provider_create_form_submits(
         await page.locator('select[name="virtual_sessions"]').select_option(
             "please_contact"
         )
-        await page.locator("input[type='submit']").click()
+        await page.locator("button[type='submit']").click()
         await page.wait_for_timeout(NETWORK_TIMEOUT_MS)
 
     # Pact verification happens automatically on context exit.

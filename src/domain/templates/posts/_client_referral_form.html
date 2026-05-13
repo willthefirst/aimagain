@@ -55,6 +55,6 @@ which FastAPI/Pydantic parses as a list.
     {{ select_field("insurance", "Payment situation", INSURANCE_OPTIONS, labels=INSURANCE_LABELS, current=d.insurance if d else None, placeholder=true) }}
   </fieldset>
 
-  <input type="submit" value="{{ submit_label }}" />
+  <button type="submit">{{ submit_label }}</button>
 </form>
 {%- endmacro -%}

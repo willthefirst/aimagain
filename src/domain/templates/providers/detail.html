@@ -1,119 +1,118 @@
 {% extends "base.html" %}
 {% block title %}Provider: {{ provider.practice_name }}{% endblock %}
 {% block content %}
-<h1>{{ provider.practice_name }}</h1>
+<article>
+  <header>
+    <h1>{{ provider.practice_name }}</h1>
+  </header>
 
-{# `can_edit` is computed by handle_get_provider_detail; templates do
-   not re-derive authorization predicates inline. #}
+  {# `can_edit` is computed by handle_get_provider_detail; templates do
+     not re-derive authorization predicates inline. #}
 
-<section>
-  <h2>Practice</h2>
-  <dl>
-    <dt>Practice name</dt><dd>{{ provider.practice_name }}</dd>
-    <dt>City</dt><dd>{{ provider.location_city }}</dd>
-    <dt>State</dt><dd>{{ provider.location_state }}</dd>
-    <dt>ZIP</dt><dd>{{ provider.location_zip }}</dd>
-    <dt>In-person sessions</dt><dd>{{ LOCATION_AVAILABILITY_LABELS[provider.in_person_sessions] }}</dd>
-    <dt>Virtual sessions</dt><dd>{{ LOCATION_AVAILABILITY_LABELS[provider.virtual_sessions] }}</dd>
-    {% if provider.accepts_in_network or provider.accepts_out_of_network %}
-    <dt>Insurance accepted</dt>
-    <dd>
-      {% if provider.accepts_in_network %}In-network ({% for c in provider.in_network_carriers %}{{ INSURANCE_CARRIER_LABELS[c] }}{% if not loop.last %}, {% endif %}{% endfor %}){% endif %}
-      {% if provider.accepts_in_network and provider.accepts_out_of_network %} · {% endif %}
-      {% if provider.accepts_out_of_network %}Out-of-network{% endif %}
-    </dd>
+  <section>
+    <h2>Practice</h2>
+    <dl>
+      <dt>Practice name</dt><dd>{{ provider.practice_name }}</dd>
+      <dt>City</dt><dd>{{ provider.location_city }}</dd>
+      <dt>State</dt><dd>{{ provider.location_state }}</dd>
+      <dt>ZIP</dt><dd>{{ provider.location_zip }}</dd>
+      <dt>In-person sessions</dt><dd>{{ LOCATION_AVAILABILITY_LABELS[provider.in_person_sessions] }}</dd>
+      <dt>Virtual sessions</dt><dd>{{ LOCATION_AVAILABILITY_LABELS[provider.virtual_sessions] }}</dd>
+      {% if provider.accepts_in_network or provider.accepts_out_of_network %}
+      <dt>Insurance accepted</dt>
+      <dd>
+        {% if provider.accepts_in_network %}In-network ({% for c in provider.in_network_carriers %}{{ INSURANCE_CARRIER_LABELS[c] }}{% if not loop.last %}, {% endif %}{% endfor %}){% endif %}
+        {% if provider.accepts_in_network and provider.accepts_out_of_network %} · {% endif %}
+        {% if provider.accepts_out_of_network %}Out-of-network{% endif %}
+      </dd>
+      {% else %}
+      <dt>Insurance accepted</dt>
+      <dd>Self-pay only</dd>
+      {% endif %}
+      <dt>Sliding scale</dt>
+      <dd>{{ "Yes" if provider.sliding_scale else "No" }}</dd>
+      {% if provider.cost %}
+      <dt>Cost</dt>
+      <dd>{{ provider.cost }}</dd>
+      {% endif %}
+    </dl>
+  </section>
+
+  <section>
+    <h2>Licensures</h2>
+    {% if provider.licensures %}
+    <ul class="licensures-list">
+      {%- for lic in provider.licensures %}
+      <li>
+        <strong>{{ LICENSE_TYPES_LABELS[lic.license_type] }}</strong>
+        &mdash; {{ lic.license_number }} ({{ lic.issuing_state }}){% if lic.expiration_date %}, expires {{ lic.expiration_date }}{% endif %}
+      </li>
+      {%- endfor %}
+    </ul>
     {% else %}
-    <dt>Insurance accepted</dt>
-    <dd>Self-pay only</dd>
+    <p>No licensures listed.</p>
     {% endif %}
-    <dt>Sliding scale</dt>
-    <dd>{{ "Yes" if provider.sliding_scale else "No" }}</dd>
-    {% if provider.cost %}
-    <dt>Cost</dt>
-    <dd>{{ provider.cost }}</dd>
+  </section>
+
+  <section>
+    <h2>Education</h2>
+    {% if provider.educations %}
+    <ul class="educations-list">
+      {%- for edu in provider.educations %}
+      <li>
+        <strong>{{ EDUCATION_TYPES_LABELS[edu.education_type] }}</strong>
+        &mdash; {{ edu.institution }}{% if edu.month_completed %}, {{ edu.month_completed }}{% endif %}
+      </li>
+      {%- endfor %}
+    </ul>
+    {% else %}
+    <p>No education entries listed.</p>
     {% endif %}
-  </dl>
-</section>
+  </section>
 
-<hr />
+  <section>
+    <h2>Certifications</h2>
+    {% if provider.certifications %}
+    <ul class="certifications-list">
+      {%- for cert in provider.certifications %}
+      <li>
+        <strong>{{ CERTIFICATION_TYPES_LABELS[cert.certification_type] }}</strong>
+        &mdash; {{ cert.certifying_body }}{% if cert.expiration_date %}, expires {{ cert.expiration_date }}{% endif %}
+      </li>
+      {%- endfor %}
+    </ul>
+    {% else %}
+    <p>No certifications listed.</p>
+    {% endif %}
+  </section>
 
-<section>
-  <h2>Licensures</h2>
-  {% if provider.licensures %}
-  <ul class="licensures-list">
-    {%- for lic in provider.licensures %}
-    <li>
-      <strong>{{ LICENSE_TYPES_LABELS[lic.license_type] }}</strong>
-      &mdash; {{ lic.license_number }} ({{ lic.issuing_state }}){% if lic.expiration_date %}, expires {{ lic.expiration_date }}{% endif %}
-    </li>
-    {%- endfor %}
-  </ul>
-  {% else %}
-  <p>No licensures listed.</p>
-  {% endif %}
-</section>
+  <footer>
+    {# Favorite toggle. `is_favorited` is a per-viewer flag computed by
+       handle_get_provider_detail; templates do not re-derive it. The button
+       is hidden for anonymous viewers — there's no actor to attach the
+       edge to. #}
+    {% if is_authenticated %}
+    <span class="favorite-toggle">
+      {% if is_favorited %}
+      <button type="button"
+              class="secondary"
+              hx-delete="/users/me/favorites/{{ provider.id }}"
+              hx-confirm="Remove this provider from your favorites?">
+        Unfavorite
+      </button>
+      {% else %}
+      <button type="button"
+              hx-post="/users/me/favorites/{{ provider.id }}">
+        Favorite
+      </button>
+      {% endif %}
+    </span>
+    {% endif %}
 
-<hr />
-
-<section>
-  <h2>Education</h2>
-  {% if provider.educations %}
-  <ul class="educations-list">
-    {%- for edu in provider.educations %}
-    <li>
-      <strong>{{ EDUCATION_TYPES_LABELS[edu.education_type] }}</strong>
-      &mdash; {{ edu.institution }}{% if edu.month_completed %}, {{ edu.month_completed }}{% endif %}
-    </li>
-    {%- endfor %}
-  </ul>
-  {% else %}
-  <p>No education entries listed.</p>
-  {% endif %}
-</section>
-
-<hr />
-
-<section>
-  <h2>Certifications</h2>
-  {% if provider.certifications %}
-  <ul class="certifications-list">
-    {%- for cert in provider.certifications %}
-    <li>
-      <strong>{{ CERTIFICATION_TYPES_LABELS[cert.certification_type] }}</strong>
-      &mdash; {{ cert.certifying_body }}{% if cert.expiration_date %}, expires {{ cert.expiration_date }}{% endif %}
-    </li>
-    {%- endfor %}
-  </ul>
-  {% else %}
-  <p>No certifications listed.</p>
-  {% endif %}
-</section>
-
-<hr />
-
-{# Favorite toggle. `is_favorited` is a per-viewer flag computed by
-   handle_get_provider_detail; templates do not re-derive it. The button
-   is hidden for anonymous viewers — there's no actor to attach the
-   edge to. #}
-{% if is_authenticated %}
-<section class="favorite-toggle">
-  {% if is_favorited %}
-  <button type="button"
-          hx-delete="/users/me/favorites/{{ provider.id }}"
-          hx-confirm="Remove this provider from your favorites?">
-    Unfavorite
-  </button>
-  {% else %}
-  <button type="button"
-          hx-post="/users/me/favorites/{{ provider.id }}">
-    Favorite
-  </button>
-  {% endif %}
-</section>
-{% endif %}
-
-{% if can_edit %}
-<a href="/providers/{{ provider.id }}/form">Edit provider</a> |
-{% endif %}
-<a href="/providers">Back to providers</a>
+    {% if can_edit %}
+    <a href="/providers/{{ provider.id }}/form" role="button" class="outline">Edit provider</a>
+    {% endif %}
+    <a href="/providers" role="button" class="secondary outline">Back to providers</a>
+  </footer>
+</article>
 {% endblock %}
