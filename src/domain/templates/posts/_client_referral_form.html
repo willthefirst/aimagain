@@ -25,11 +25,15 @@ which FastAPI/Pydantic parses as a list.
 
   <fieldset>
     <legend>Client location</legend>
-    {{ text_field("location_city", "City", current=d.location_city if d else None) }}
-    {{ select_field("location_state", "State", US_STATES, current=d.location_state if d else None, placeholder=true) }}
-    {{ text_field("location_zip", "ZIP", current=d.location_zip if d else None, pattern="\\d{5}", maxlength=5) }}
-    {{ select_field("location_in_person", "In-person sessions", LOCATION_AVAILABILITY_OPTIONS, labels=LOCATION_AVAILABILITY_LABELS, current=d.location_in_person if d else None, placeholder=true) }}
-    {{ select_field("location_virtual", "Virtual sessions", LOCATION_AVAILABILITY_OPTIONS, labels=LOCATION_AVAILABILITY_LABELS, current=d.location_virtual if d else None, placeholder=true) }}
+    <div class="grid">
+      {{ text_field("location_city", "City", current=d.location_city if d else None) }}
+      {{ select_field("location_state", "State", US_STATES, current=d.location_state if d else None, placeholder=true) }}
+      {{ text_field("location_zip", "ZIP", current=d.location_zip if d else None, pattern="\\d{5}", maxlength=5) }}
+    </div>
+    <div class="grid">
+      {{ select_field("location_in_person", "In-person sessions", LOCATION_AVAILABILITY_OPTIONS, labels=LOCATION_AVAILABILITY_LABELS, current=d.location_in_person if d else None, placeholder=true) }}
+      {{ select_field("location_virtual", "Virtual sessions", LOCATION_AVAILABILITY_OPTIONS, labels=LOCATION_AVAILABILITY_LABELS, current=d.location_virtual if d else None, placeholder=true) }}
+    </div>
     {{ time_grid_field("desired_times", "Desired times (optional)", current=d.desired_times if d else None) }}
   </fieldset>
 
@@ -39,10 +43,7 @@ which FastAPI/Pydantic parses as a list.
     {{ field_for(schema, "languages", "Languages spoken", current=d.languages if d else None) }}
   </fieldset>
 
-  <fieldset>
-    <legend>Description</legend>
-    {{ textarea_field("description", "Description (no PII)", current=d.description if d else None) }}
-  </fieldset>
+  {{ textarea_field("description", "Description (no PII)", current=d.description if d else None) }}
 
   <fieldset>
     <legend>Services</legend>
@@ -50,10 +51,7 @@ which FastAPI/Pydantic parses as a list.
     {{ text_field("treatment_modality", "Psychotherapy modality (optional, e.g. DBT, EMDR)", current=d.treatment_modality if d else None, required=false) }}
   </fieldset>
 
-  <fieldset>
-    <legend>Insurance</legend>
-    {{ select_field("insurance", "Payment situation", INSURANCE_OPTIONS, labels=INSURANCE_LABELS, current=d.insurance if d else None, placeholder=true) }}
-  </fieldset>
+  {{ select_field("insurance", "Payment situation", INSURANCE_OPTIONS, labels=INSURANCE_LABELS, current=d.insurance if d else None, placeholder=true) }}
 
   <button type="submit">{{ submit_label }}</button>
 </form>

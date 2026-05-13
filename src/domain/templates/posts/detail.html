@@ -12,7 +12,7 @@ Provider availability: {{ post.provider_availability_detail.provider.practice_na
 {% set d = post.client_referral_detail %}
   <header>
     <h1>Client referral</h1>
-    <p>by <a href="/users/{{ post.owner_id }}">{{ post.owner.username }}</a></p>
+    <small>by <a href="/users/{{ post.owner_id }}">{{ post.owner.username }}</a></small>
   </header>
   <dl>
     <dt>Location</dt>
@@ -47,7 +47,7 @@ Provider availability: {{ post.provider_availability_detail.provider.practice_na
 {% set p = d.provider %}
   <header>
     <h1>Provider availability</h1>
-    <p>by <a href="/users/{{ post.owner_id }}">{{ post.owner.username }}</a></p>
+    <small>by <a href="/users/{{ post.owner_id }}">{{ post.owner.username }}</a></small>
   </header>
   {% if d.description %}
   <p>{{ d.description }}</p>

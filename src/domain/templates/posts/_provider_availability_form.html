@@ -23,27 +23,24 @@ with at least one provider available.
 <form hx-{{ hx_method }}="{{ action }}">
   <input type="hidden" name="kind" value="provider_availability" />
 
+  <label for="provider_id">
+    Which provider profile is this availability for?
+    <select id="provider_id" name="provider_id" required>
+      {%- if not d %}
+      <option value="" disabled selected>--</option>
+      {%- endif %}
+      {%- for p in current_user.providers %}
+      <option value="{{ p.id }}"{% if d and d.provider_id == p.id %} selected{% endif %}>{{ p.practice_name }}</option>
+      {%- endfor %}
+    </select>
+  </label>
+
   {# About: free-text core fields — description / referral / website. #}
   <fieldset>
     <legend>About</legend>
     {{ field_for(schema, "description", "Description", current=d.description if d else None) }}
     {{ field_for(schema, "referral_instructions", "Referral instructions", current=d.referral_instructions if d else None) }}
     {{ field_for(schema, "website", "Website", current=d.website if d else None) }}
-  </fieldset>
-
-  <fieldset>
-    <legend>Provider</legend>
-    <label for="provider_id">
-      Which provider profile is this availability for?
-      <select id="provider_id" name="provider_id" required>
-        {%- if not d %}
-        <option value="" disabled selected>--</option>
-        {%- endif %}
-        {%- for p in current_user.providers %}
-        <option value="{{ p.id }}"{% if d and d.provider_id == p.id %} selected{% endif %}>{{ p.practice_name }}</option>
-        {%- endfor %}
-      </select>
-    </label>
   </fieldset>
 
   <fieldset>
