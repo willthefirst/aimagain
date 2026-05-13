@@ -1,0 +1,53 @@
+{# Shared provider-row macros — used by every list of providers.
+
+Lives in `_shared/` rather than `providers/` because four templates
+across three clusters render the same row (`/providers`,
+`/users/me/favorites`, `/users/{id}/providers`, and the embedded
+"Providers" section on the user detail page). Cross-cluster template
+imports aren't allowed (see ../README.md "Layering rule"), so the
+shared shape goes here.
+
+`provider_filters` stays in `providers/_columns.html` — those filter
+fields are provider-specific and only the /providers index uses them.
+
+The Insurance cell composes the same posture summary used on the
+provider detail card (#449): "In-net" / "Out-net" / "Self-pay", with
+optional "· sliding" when sliding scale is on. Folded into one column
+so the table stays narrow.
+#}
+
+{% macro provider_headers() -%}
+<th scope="col">Practice</th>
+<th scope="col">Location</th>
+<th scope="col">Licensed in</th>
+<th scope="col">Insurance</th>
+{%- endmacro %}
+
+{% macro provider_row(provider) -%}
+{%- set issuing_states = provider.licensures | map(attribute='issuing_state') | unique | sort | list -%}
+<tr data-row-id="{{ provider.id }}">
+  <td data-label="Practice" class="primary">
+    <a href="/providers/{{ provider.id }}">{{ provider.practice_name }}</a>
+  </td>
+  <td data-label="Location">{{ provider.location_city }}, {{ provider.location_state }}</td>
+  <td data-label="Licensed in">
+    {%- if issuing_states -%}
+      {{ issuing_states | join(', ') }}
+    {%- else -%}
+      &mdash;
+    {%- endif -%}
+  </td>
+  <td data-label="Insurance">
+    {%- if provider.accepts_in_network and provider.accepts_out_of_network -%}
+      In-net &amp; out-net
+    {%- elif provider.accepts_in_network -%}
+      In-net
+    {%- elif provider.accepts_out_of_network -%}
+      Out-net
+    {%- else -%}
+      Self-pay
+    {%- endif -%}
+    {%- if provider.sliding_scale %} <small>· sliding</small>{% endif -%}
+  </td>
+</tr>
+{%- endmacro %}

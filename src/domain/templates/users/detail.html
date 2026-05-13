@@ -1,4 +1,6 @@
 {% extends "base.html" %}
+{%- from "_shared/index_table.html" import index_table -%}
+{%- from "_shared/_provider_row.html" import provider_headers, provider_row -%}
 {% block content %}
 <article>
   <header>
@@ -21,18 +23,14 @@
 
   <section>
     <h2>Providers</h2>
-    {% if providers %}
-    <ul id="user-detail-providers" class="providers-list">
-      {%- for provider in providers %}
-      <li>
-        <a href="/providers/{{ provider.id }}">{{ provider.practice_name }}</a>
-        &mdash; {{ provider.location_city }}, {{ provider.location_state }}
-      </li>
-      {%- endfor %}
-    </ul>
-    {% else %}
-    <p id="user-detail-providers-empty">No providers yet.</p>
-    {% endif %}
+    {% call index_table(
+      items=providers,
+      headers=provider_headers,
+      row=provider_row,
+      id="user-detail-providers",
+    ) %}
+    <p class="index-empty" id="user-detail-providers-empty">No providers yet.</p>
+    {% endcall %}
   </section>
 
   <footer>

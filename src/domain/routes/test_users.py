@@ -332,8 +332,8 @@ async def test_detail_lists_owned_providers(
     assert response.status_code == 200
     tree = HTMLParser(response.text)
     assert tree.css_first("#user-detail-providers-empty") is None
-    items = tree.css("#user-detail-providers > li")
-    assert len(items) == 2
+    rows = tree.css("#user-detail-providers tbody tr")
+    assert len(rows) == 2
     hrefs = {a.attributes.get("href") for a in tree.css("#user-detail-providers a")}
     assert hrefs == {f"/providers/{first.id}", f"/providers/{second.id}"}
 
@@ -616,7 +616,7 @@ async def test_get_user_providers_self(
     response = await authenticated_client.get(f"/users/{logged_in_user.id}/providers")
     assert response.status_code == 200
     tree = HTMLParser(response.text)
-    assert len(tree.css("#user-providers > li")) == 1
+    assert len(tree.css("#user-providers tbody tr")) == 1
 
 
 async def test_get_user_providers_admin_can_view_other(
@@ -640,7 +640,7 @@ async def test_get_user_providers_admin_can_view_other(
     heading = tree.css_first("#user-providers-heading")
     assert heading is not None
     assert target.username in heading.text()
-    assert len(tree.css("#user-providers > li")) == 1
+    assert len(tree.css("#user-providers tbody tr")) == 1
 
 
 async def test_get_user_providers_non_admin_forbidden_for_other(

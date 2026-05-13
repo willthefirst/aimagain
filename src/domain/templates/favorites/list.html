@@ -1,18 +1,18 @@
 {% extends "base.html" %}
+{%- from "_shared/index_table.html" import index_table -%}
+{%- from "_shared/_provider_row.html" import provider_headers, provider_row -%}
 
 {% block content %}
 <h1>My favorites</h1>
 
-{% if providers %}
-<ul class="favorites-list">
-  {%- for provider in providers %}
-  <li>
-    <a href="/providers/{{ provider.id }}">{{ provider.practice_name }}</a>
-    &mdash; {{ provider.location_city }}, {{ provider.location_state }}
-  </li>
-  {%- endfor %}
-</ul>
-{% else %}
-<p>No favorites yet. <a href="/providers">Browse providers</a> to add some.</p>
-{% endif %}
+{% call index_table(
+  items=providers,
+  headers=provider_headers,
+  row=provider_row,
+  id="favorites-table",
+) %}
+<p class="index-empty" id="favorites-empty">
+  No favorites yet. <a href="/providers">Browse providers</a> to add some.
+</p>
+{% endcall %}
 {% endblock %}
