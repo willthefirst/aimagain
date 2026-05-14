@@ -49,6 +49,24 @@
       nav.breadcrumb ol { list-style: none; padding: 0; margin: 0; display: flex; flex-wrap: wrap; gap: 0.25rem; }
       nav.breadcrumb li + li::before { content: "/"; padding-inline: 0.25rem; color: var(--pico-muted-color); }
       nav.breadcrumb [aria-current="page"] { color: var(--pico-muted-color); }
+      /* Index-page tables stay inside the viewport on narrow screens. The
+         `.index-table` wrapper (see `_shared/index_table.html`) scrolls
+         horizontally instead of pushing the body wide, so a 7-column table
+         on a phone shows a scroll-affordance rather than breaking layout. */
+      .index-table { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+      /* Index-page filter UI. Each filter renders as a `.filter-control`
+         cell that the inline script hides until the user adds it (or until
+         the URL preselects a value). The remove "×" is positioned in the
+         corner so the underlying `<label>` keeps its full click-target. */
+      .index-filters .filter-control { position: relative; }
+      .index-filters .filter-remove {
+        position: absolute; top: 0; right: 0;
+        background: transparent; border: 0; padding: 0 0.25rem;
+        font-size: 1.25rem; line-height: 1; color: var(--pico-muted-color);
+        cursor: pointer; width: auto; margin: 0;
+      }
+      .index-filters .filter-remove:hover { color: var(--pico-color); }
+      .index-filters .add-filter-row { margin-block-end: 0.5rem; max-width: 24rem; }
     </style>
     <script
       src="https://unpkg.com/htmx.org@2.0.4"

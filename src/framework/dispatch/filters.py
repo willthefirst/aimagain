@@ -21,6 +21,13 @@ bespoke ``list_<collection>`` method.
 See ``../README.md`` for the framework layer's overall contract and
 ``src/domain/templates/_shared/README.md`` for the macro that reads
 these objects.
+
+The rendering macro applies a default-minimal "add a filter" UX on
+top of any declared filter: a control is visible only when the URL
+preselected a value for it, and the others stay hidden behind an
+"Add filter" picker. Declaring more filters on a spec is therefore
+zero-cost for the default page view — adding a filter to the spec
+extends the picker, it doesn't clutter the default form.
 """
 
 from dataclasses import dataclass
