@@ -91,26 +91,3 @@ posture summary the provider table renders.
   {%- endif %}
 </tr>
 {%- endmacro %}
-
-{% macro post_kind_tabs(active_kind, post_kinds) -%}
-{# Server-rendered tab strip. Active tab gets `aria-current="page"`.
-   No JS — clicks issue a GET that re-runs the list query with the
-   new `kind=` filter. #}
-<nav aria-label="Post kind filter" class="post-tabs">
-  <ul>
-    <li>
-      <a href="/posts"{% if active_kind is none %} aria-current="page" class="contrast"{% endif %}>All</a>
-    </li>
-    {%- for spec in post_kinds %}
-    <li>
-      <a href="/posts?kind={{ spec.name }}"{% if active_kind == spec.name %} aria-current="page" class="contrast"{% endif %}>
-        {%- if spec.name == 'client_referral' -%}Seeking
-        {%- elif spec.name == 'provider_availability' -%}Offering
-        {%- else -%}{{ spec.list_label | capitalize }}
-        {%- endif -%}
-      </a>
-    </li>
-    {%- endfor %}
-  </ul>
-</nav>
-{%- endmacro %}

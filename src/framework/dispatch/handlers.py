@@ -13,6 +13,7 @@ from src.framework.audit.core import mutate
 from src.framework.audit.repository import AuditRepository
 from src.framework.authz import is_admin
 from src.framework.dispatch.entity_spec import EntitySpec
+from src.framework.dispatch.filters import Filter
 from src.framework.http.exceptions import BadRequestError, ForbiddenError, NotFoundError
 from src.framework.persistence.base_repository import BaseRepository
 from src.framework.rendering.projections import project_view
@@ -340,9 +341,17 @@ def _make_factory_handler(
     """Build the wrapper the mount layer introspects and calls."""
     id_param = spec.id_param
     parent_id_param = spec.parent.id_param if spec.parent is not None else None
-    filter_names = (
-        tuple(qp.name for qp in spec.filters) if shape.include_filters else ()
+    # `spec.filters` accepts raw `QueryParam` (legacy) or `Filter`
+    # subclasses (URL + UI metadata). Both expose the URL shape via the
+    # same `name` / `annotation` pair — `Filter` via `to_query_param()`.
+    # Normalize once so the rest of the factory only deals in
+    # `QueryParam`.
+    filter_query_params: tuple[Any, ...] = (
+        tuple(f.to_query_param() if isinstance(f, Filter) else f for f in spec.filters)
+        if shape.include_filters
+        else ()
     )
+    filter_names = tuple(qp.name for qp in filter_query_params)
     extra_repo_names = tuple(name for name, _ in extra_repos)
 
     sig_params: list[inspect.Parameter] = []
@@ -353,7 +362,7 @@ def _make_factory_handler(
     if shape.include_target_id:
         sig_params.append(_param(id_param, UUID))
     if shape.include_filters:
-        for qp in spec.filters:
+        for qp in filter_query_params:
             sig_params.append(_param(qp.name, qp.annotation))
     if shape.include_payload:
         sig_params.append(_param("payload", BaseModel))
@@ -601,6 +610,11 @@ async def handle_list(
     # value by reading ``selected_<name>`` from the context.
     for fname, fvalue in filter_values.items():
         context[f"selected_{fname}"] = fvalue
+    # Filter declarations — the ``_shared/index_filters.html`` macro
+    # iterates these to render one control per declared filter (only
+    # ``Filter`` instances are surfaced; raw ``QueryParam`` is URL-only
+    # with no UI metadata).
+    context["filters"] = tuple(f for f in spec.filters if isinstance(f, Filter))
 
     # Spec-declared constants — same merge precedence as handle_detail.
     if spec.static_context:

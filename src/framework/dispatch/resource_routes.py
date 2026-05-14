@@ -968,6 +968,22 @@ def mount_related_list(
     router.get(path)(route_fn)
 
 
+def _normalize_filters(filters: tuple[Any, ...]) -> tuple[QueryParam, ...]:
+    """Map each ``EntitySpec.filters`` entry to its ``QueryParam`` shape.
+
+    ``Filter`` instances carry UI metadata on top of the URL contract;
+    the mount layer only needs the URL side, so we call
+    ``to_query_param()`` on each. Raw ``QueryParam`` entries (the
+    legacy shape) pass through unchanged.
+
+    Kept local to this module so ``Filter`` stays an entity_spec-side
+    import — the route-mount layer just consumes a uniform tuple.
+    """
+    from src.framework.dispatch.filters import Filter
+
+    return tuple(f.to_query_param() if isinstance(f, Filter) else f for f in filters)
+
+
 def _owned_factory_makers() -> dict[str, Callable[..., Callable[..., Awaitable[Any]]]]:
     """Lazy-import the generic CRUD-framework factories for owned subentities.
 
@@ -1199,7 +1215,7 @@ def mount_entity(
             router,
             spec,
             handler=effective_handlers["list"],
-            query_params=tuple(entity.filters),
+            query_params=_normalize_filters(entity.filters),
         )
         consumed.add("list")
     if entity.routes.create:

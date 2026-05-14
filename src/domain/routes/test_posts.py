@@ -209,28 +209,42 @@ async def test_list_page_links_to_create_forms(
     assert pa_link is not None
 
 
-# --- Kind tab strip ------------------------------------------------------
+# --- Filter form ---------------------------------------------------------
 
 
-async def test_list_page_renders_kind_tabs(
+async def test_list_page_renders_filter_form(
     authenticated_client: AsyncClient,
     logged_in_user: User,
 ):
-    """All / Seeking / Offering tabs are rendered. With no `?kind=`, the
-    "All" tab carries `aria-current="page"`."""
+    """The shared `index_filters.html` macro renders `<select name="kind">`
+    + `<input type="search" name="q">` above the table. With no `?kind=`,
+    the kind `<select>`'s "Any" placeholder option is selected."""
     response = await authenticated_client.get("/posts")
     assert response.status_code == 200
     tree = HTMLParser(response.text)
-    all_tab = tree.css_first('nav.post-tabs a[href="/posts"]')
-    seeking_tab = tree.css_first('nav.post-tabs a[href="/posts?kind=client_referral"]')
-    offering_tab = tree.css_first(
-        'nav.post-tabs a[href="/posts?kind=provider_availability"]'
-    )
-    assert all_tab is not None
-    assert seeking_tab is not None
-    assert offering_tab is not None
-    assert all_tab.attributes.get("aria-current") == "page"
-    assert seeking_tab.attributes.get("aria-current") is None
+
+    form = tree.css_first("form.index-filters")
+    assert form is not None
+    assert form.attributes.get("action") == "/posts"
+
+    kind_select = tree.css_first('form.index-filters select[name="kind"]')
+    assert kind_select is not None
+    options = kind_select.css("option")
+    # Empty-string attribute values come back as `None` from selectolax;
+    # treat them as the "Any" placeholder slot.
+    values = [o.attributes.get("value") for o in options]
+    assert None in values  # "Any" placeholder (value="")
+    assert "client_referral" in values
+    assert "provider_availability" in values
+    # The "Any" placeholder is selected when no kind is in the URL.
+    # `<option selected>` is a valueless attribute — selectolax stores
+    # it as a `selected: None` key, so test for key presence.
+    any_option = next(o for o in options if o.attributes.get("value") is None)
+    assert "selected" in any_option.attributes
+    assert any_option.text().strip() == "Any"
+
+    q_input = tree.css_first('form.index-filters input[type="search"][name="q"]')
+    assert q_input is not None
 
 
 async def test_list_filters_by_kind_seeking(
@@ -238,8 +252,8 @@ async def test_list_filters_by_kind_seeking(
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user: User,
 ):
-    """`?kind=client_referral` keeps only seeking posts; the matching tab
-    becomes the active one."""
+    """`?kind=client_referral` keeps only seeking posts; the kind
+    `<select>` preselects the matching option."""
     author = create_test_user(username=f"author-{uuid.uuid4()}")
     referral = _client_referral_post(
         description=f"ref-{uuid.uuid4()}", owner_id=author.id
@@ -260,10 +274,11 @@ async def test_list_filters_by_kind_seeking(
     rows = tree.css("#posts-table tbody tr")
     assert len(rows) == 1
     assert rows[0].attributes.get("data-kind") == "client_referral"
-    # Active tab moved to Seeking.
-    seeking_tab = tree.css_first('nav.post-tabs a[href="/posts?kind=client_referral"]')
-    assert seeking_tab.attributes.get("aria-current") == "page"
-    # The Type column is hidden on a single-kind tab.
+    # The kind <select> preselects the seeking option.
+    options = tree.css('form.index-filters select[name="kind"] option')
+    selected_option = next(o for o in options if "selected" in o.attributes)
+    assert selected_option.attributes.get("value") == "client_referral"
+    # The Type column is hidden when a single kind is selected.
     assert tree.css_first('#posts-table th[scope="col"]').text() == "Post"
 
 
@@ -271,10 +286,83 @@ async def test_list_rejects_unknown_kind(
     authenticated_client: AsyncClient,
     logged_in_user: User,
 ):
-    """An unknown `kind=` value is rejected as a 422 by FastAPI (the
-    `Literal[*POST_KINDS.names]` declaration on the spec)."""
+    """An unknown `kind=` value is rejected as a 422 by FastAPI — the
+    `ChoiceFilter.value_type=Literal[*POST_KINDS.names]` declaration on
+    the spec keeps the tight validation the legacy `QueryParam` had."""
     response = await authenticated_client.get("/posts?kind=not_a_real_kind")
     assert response.status_code == 422
+
+
+async def test_list_filters_by_free_text_q_across_both_detail_tables(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user: User,
+):
+    """`?q=needle` finds posts whose description matches on either
+    `client_referral_detail` or `provider_availability_detail`."""
+    author = create_test_user(username=f"author-{uuid.uuid4()}")
+    seeking_match = _client_referral_post(
+        description="needle-in-seeking", owner_id=author.id
+    )
+    seeking_miss = _client_referral_post(
+        description="haystack-only-here", owner_id=author.id
+    )
+    offering_match = _provider_availability_post(
+        practice_name=f"clinic-{uuid.uuid4()}",
+        owner_id=author.id,
+        description="needle-in-offering",
+    )
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            session.add(author)
+            session.add(offering_match.provider_availability_detail.provider)
+            session.add(seeking_match)
+            session.add(seeking_miss)
+            session.add(offering_match)
+
+    response = await authenticated_client.get("/posts?q=needle")
+    assert response.status_code == 200
+    tree = HTMLParser(response.text)
+    rows = tree.css("#posts-table tbody tr")
+    # Both `needle-*` posts match across the polymorphic OR. The
+    # `haystack-*` seeker is filtered out.
+    assert len(rows) == 2
+    kinds = sorted(r.attributes.get("data-kind") for r in rows)
+    assert kinds == ["client_referral", "provider_availability"]
+    # `q` value is echoed back into the input so the form reflects the URL.
+    q_input = tree.css_first('form.index-filters input[name="q"]')
+    assert q_input.attributes.get("value") == "needle"
+
+
+async def test_list_combines_kind_and_q_with_and(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user: User,
+):
+    """`?kind=client_referral&q=needle` ANDs both predicates — only
+    seeking posts whose description matches."""
+    author = create_test_user(username=f"author-{uuid.uuid4()}")
+    seeking_match = _client_referral_post(
+        description="needle-seeking", owner_id=author.id
+    )
+    offering_with_needle = _provider_availability_post(
+        practice_name=f"clinic-{uuid.uuid4()}",
+        owner_id=author.id,
+        description="needle-offering",
+    )
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            session.add(author)
+            session.add(offering_with_needle.provider_availability_detail.provider)
+            session.add(seeking_match)
+            session.add(offering_with_needle)
+
+    response = await authenticated_client.get("/posts?kind=client_referral&q=needle")
+    assert response.status_code == 200
+    tree = HTMLParser(response.text)
+    rows = tree.css("#posts-table tbody tr")
+    assert len(rows) == 1
+    assert rows[0].attributes.get("data-kind") == "client_referral"
 
 
 # --- Chrome: breadcrumb on post detail ----------------------------------
