@@ -24,6 +24,13 @@ from src.domain.logic.posts.schema import (
     post_update_adapter,
 )
 from src.domain.models import POST_KINDS, Post
+from src.domain.models.enums import (
+    CLIENT_AGE_GROUP_LABELS,
+    CLIENT_AGE_GROUPS,
+    LANGUAGE_LABELS,
+    LANGUAGES,
+    US_STATES,
+)
 from src.framework.dispatch.entity_spec import (
     AUTHENTICATED,
     OWNER_OR_ADMIN,
@@ -57,14 +64,20 @@ POST_ENTITY: Final[EntitySpec] = EntitySpec(
         form_new=True,
         form_edit=True,
     ),
-    # Filter form above `/posts`. `kind` keeps the same URL contract
-    # (`?kind=client_referral` still works and still 422s on invalid
-    # values via the `Literal` value_type) but is now declared as a
-    # `ChoiceFilter` — the new `index_filters.html` macro reads the
-    # filter list off the context and renders a `<select>` instead of
-    # the legacy tab strip. `q` is the new free-text axis; the post
-    # repo `OR`s the predicate across both detail tables since the
-    # post body lives polymorphically.
+    # Filter form above `/posts` — one control per table column the
+    # user might want to narrow on. Order roughly matches the column
+    # order so the form reads top-to-bottom like the table.
+    #
+    # Polymorphic axes (state, city, age_group, language) OR across
+    # both detail tables in `PostRepository.list_posts`; the repo
+    # owns the SQL because the column set is post-specific.
+    # Two columns are deliberately *not* filterable yet:
+    #   * `created_at` — needs a `DateRangeFilter` type (not yet built).
+    #   * `insurance` — the vocabulary is asymmetric across kinds
+    #     (`client_referral_detail.insurance` enum vs. Provider's
+    #     `accepts_in_network`/`accepts_out_of_network`/`sliding_scale`
+    #     booleans). Needs a unified posture mapping before it can be
+    #     a single filter.
     filters=(
         ChoiceFilter(
             name="kind",
@@ -77,8 +90,36 @@ POST_ENTITY: Final[EntitySpec] = EntitySpec(
         ),
         TextFilter(
             name="q",
-            label="Search",
+            label="Description",
             placeholder="Search descriptions…",
+        ),
+        TextFilter(
+            name="posted_by",
+            label="Posted by",
+            placeholder="Username contains…",
+        ),
+        ChoiceFilter(
+            name="state",
+            label="State",
+            choices=tuple((s, s) for s in US_STATES),
+            multi=True,
+        ),
+        TextFilter(
+            name="city",
+            label="City",
+            placeholder="City contains…",
+        ),
+        ChoiceFilter(
+            name="age_group",
+            label="Age groups",
+            choices=tuple((v, CLIENT_AGE_GROUP_LABELS[v]) for v in CLIENT_AGE_GROUPS),
+            multi=True,
+        ),
+        ChoiceFilter(
+            name="language",
+            label="Languages",
+            choices=tuple((v, LANGUAGE_LABELS[v]) for v in LANGUAGES),
+            multi=True,
         ),
     ),
     update_redirect=Redirects.to_detail("posts", "post_id"),
