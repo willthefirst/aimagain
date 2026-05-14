@@ -31,7 +31,7 @@ from src.framework.dispatch.entity_spec import (
     Redirects,
     RouteSet,
 )
-from src.framework.dispatch.resource_routes import QueryParam
+from src.framework.dispatch.filters import ChoiceFilter, TextFilter
 from src.framework.persistence.dependencies import get_post_repository
 
 POST_ENTITY: Final[EntitySpec] = EntitySpec(
@@ -57,14 +57,28 @@ POST_ENTITY: Final[EntitySpec] = EntitySpec(
         form_new=True,
         form_edit=True,
     ),
-    # The seeking/offering tab strip on `/posts` filters by `kind`. FastAPI
-    # parses the param as a `Literal` of POST_KINDS names — invalid values
-    # 422 the same way any other filter does.
+    # Filter form above `/posts`. `kind` keeps the same URL contract
+    # (`?kind=client_referral` still works and still 422s on invalid
+    # values via the `Literal` value_type) but is now declared as a
+    # `ChoiceFilter` — the new `index_filters.html` macro reads the
+    # filter list off the context and renders a `<select>` instead of
+    # the legacy tab strip. `q` is the new free-text axis; the post
+    # repo `OR`s the predicate across both detail tables since the
+    # post body lives polymorphically.
     filters=(
-        QueryParam(
-            "kind",
-            Literal[*POST_KINDS.names] | None,  # type: ignore[valid-type]
-            None,
+        ChoiceFilter(
+            name="kind",
+            label="Type",
+            choices=(
+                ("client_referral", "Seeking"),
+                ("provider_availability", "Offering"),
+            ),
+            value_type=Literal[*POST_KINDS.names],  # type: ignore[valid-type]
+        ),
+        TextFilter(
+            name="q",
+            label="Search",
+            placeholder="Search descriptions…",
         ),
     ),
     update_redirect=Redirects.to_detail("posts", "post_id"),

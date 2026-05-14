@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {%- from "_shared/index_table.html" import index_table -%}
-{%- from "posts/_columns.html" import post_headers, post_row, post_kind_tabs with context -%}
+{%- from "_shared/index_filters.html" import index_filters -%}
+{%- from "posts/_columns.html" import post_headers, post_row with context -%}
 
 {% block content %}
 <h1>Posts</h1>
@@ -13,18 +14,24 @@
   </ul>
 </nav>
 
-{{ post_kind_tabs(selected_kind, post_kinds) }}
+{{ index_filters(
+  filters,
+  action="/posts",
+  values={"kind": selected_kind, "q": selected_q},
+) }}
 
+<div id="index-region">
 {{ index_table(
   items=posts,
   headers=post_headers,
   row=post_row,
   empty=(
-    "No posts match this filter." if selected_kind
+    "No posts match these filters." if (selected_kind or selected_q)
     else "No posts found."
   ),
   id="posts-table",
   row_kwargs={"active_kind": selected_kind},
   header_kwargs={"active_kind": selected_kind},
 ) }}
+</div>
 {% endblock %}

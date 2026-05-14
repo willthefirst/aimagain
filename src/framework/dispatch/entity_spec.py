@@ -13,6 +13,7 @@ from src.framework.audit.core import (
     make_snapshotter,
 )
 from src.framework.authz import assert_owner_or_admin, is_owner_or_admin
+from src.framework.dispatch.filters import Filter
 from src.framework.dispatch.resource_routes import QueryParam, ResourceSpec
 from src.framework.persistence.polymorphic import DiscriminatorRegistry
 
@@ -291,7 +292,13 @@ class EntitySpec:
     delete_forbid_self: bool = False
 
     # List-page filters --------------------------------------------------
-    filters: tuple[QueryParam, ...] = ()
+    # Each entry is either a raw ``QueryParam`` (URL-only declaration)
+    # or a ``Filter`` (URL + UI metadata for the
+    # ``_shared/index_filters.html`` macro). The mount layer normalizes
+    # both to ``QueryParam`` before handing them to FastAPI; the list
+    # handler echoes them into the template context so the macro can
+    # render the right control. See ``filters.py``.
+    filters: tuple[QueryParam | Filter, ...] = ()
 
     # State axes + subresources -----------------------------------------
     state_axes: tuple[StateAxis, ...] = ()
