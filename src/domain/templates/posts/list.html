@@ -17,15 +17,28 @@
 {{ index_filters(
   filters,
   action="/posts",
-  values={"kind": selected_kind, "q": selected_q},
+  values={
+    "kind": selected_kind,
+    "q": selected_q,
+    "posted_by": selected_posted_by,
+    "state": selected_state,
+    "city": selected_city,
+    "age_group": selected_age_group,
+    "language": selected_language,
+  },
 ) }}
+
+{%- set any_filter_active =
+  selected_kind or selected_q or selected_posted_by
+  or selected_state or selected_city
+  or selected_age_group or selected_language -%}
 
 {{ index_table(
   items=posts,
   headers=post_headers,
   row=post_row,
   empty=(
-    "No posts match these filters." if (selected_kind or selected_q)
+    "No posts match these filters." if any_filter_active
     else "No posts found."
   ),
   id="posts-table",

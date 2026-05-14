@@ -365,6 +365,229 @@ async def test_list_combines_kind_and_q_with_and(
     assert rows[0].attributes.get("data-kind") == "client_referral"
 
 
+# --- Per-column filters: posted_by / state / city / age_group / language ---
+
+
+async def test_list_filters_by_posted_by_username(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user: User,
+):
+    """`?posted_by=substr` filters by ILIKE on owner.username."""
+    alice = create_test_user(username=f"alice-{uuid.uuid4()}")
+    bob = create_test_user(username=f"bob-{uuid.uuid4()}")
+    alice_post = _client_referral_post(description="a", owner_id=alice.id)
+    bob_post = _client_referral_post(description="b", owner_id=bob.id)
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            session.add(alice)
+            session.add(bob)
+            session.add(alice_post)
+            session.add(bob_post)
+
+    response = await authenticated_client.get("/posts?posted_by=alice")
+    assert response.status_code == 200
+    tree = HTMLParser(response.text)
+    rows = tree.css("#posts-table tbody tr")
+    assert len(rows) == 1
+    assert rows[0].attributes.get("data-row-id") == str(alice_post.id)
+    # The text input echoes the URL value.
+    posted_by_input = tree.css_first('form.index-filters input[name="posted_by"]')
+    assert posted_by_input.attributes.get("value") == "alice"
+
+
+async def test_list_filters_by_state_across_polymorphic_paths(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user: User,
+):
+    """`?state=NY&state=NJ` matches both detail tables: seeking's
+    `client_referral_detail.location_state` and offering's
+    `provider_availability_detail.provider.location_state`."""
+    author = create_test_user(username=f"author-{uuid.uuid4()}")
+    seeking_ny = _client_referral_post(
+        description="seeking-ny", owner_id=author.id, location_state="NY"
+    )
+    seeking_ca = _client_referral_post(
+        description="seeking-ca", owner_id=author.id, location_state="CA"
+    )
+    offering_nj = _provider_availability_post(
+        practice_name=f"clinic-{uuid.uuid4()}",
+        owner_id=author.id,
+        provider=make_provider(
+            owner_id=author.id,
+            practice_name=f"clinic-{uuid.uuid4()}",
+            location_state="NJ",
+        ),
+    )
+    offering_tx = _provider_availability_post(
+        practice_name=f"clinic-{uuid.uuid4()}",
+        owner_id=author.id,
+        provider=make_provider(
+            owner_id=author.id,
+            practice_name=f"clinic-{uuid.uuid4()}",
+            location_state="TX",
+        ),
+    )
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            session.add(author)
+            session.add(offering_nj.provider_availability_detail.provider)
+            session.add(offering_tx.provider_availability_detail.provider)
+            session.add(seeking_ny)
+            session.add(seeking_ca)
+            session.add(offering_nj)
+            session.add(offering_tx)
+
+    response = await authenticated_client.get("/posts?state=NY&state=NJ")
+    assert response.status_code == 200
+    tree = HTMLParser(response.text)
+    rows = tree.css("#posts-table tbody tr")
+    row_ids = {r.attributes.get("data-row-id") for r in rows}
+    assert row_ids == {str(seeking_ny.id), str(offering_nj.id)}
+    # Both NY and NJ options are preselected in the multi-<select>.
+    options = tree.css('form.index-filters select[name="state"] option')
+    selected = {
+        o.attributes.get("value") for o in options if "selected" in o.attributes
+    }
+    assert selected == {"NY", "NJ"}
+
+
+async def test_list_filters_by_city_substring_across_polymorphic_paths(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user: User,
+):
+    """`?city=spring` ILIKE-matches `location_city` on both detail tables."""
+    author = create_test_user(username=f"author-{uuid.uuid4()}")
+    seeking_match = _client_referral_post(
+        description="s", owner_id=author.id, location_city="Springfield"
+    )
+    seeking_miss = _client_referral_post(
+        description="s", owner_id=author.id, location_city="Hartford"
+    )
+    offering_match = _provider_availability_post(
+        practice_name=f"clinic-{uuid.uuid4()}",
+        owner_id=author.id,
+        provider=make_provider(
+            owner_id=author.id,
+            practice_name=f"clinic-{uuid.uuid4()}",
+            location_city="Spring Hill",
+        ),
+    )
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            session.add(author)
+            session.add(offering_match.provider_availability_detail.provider)
+            session.add(seeking_match)
+            session.add(seeking_miss)
+            session.add(offering_match)
+
+    response = await authenticated_client.get("/posts?city=spring")
+    assert response.status_code == 200
+    tree = HTMLParser(response.text)
+    row_ids = {
+        r.attributes.get("data-row-id") for r in tree.css("#posts-table tbody tr")
+    }
+    assert row_ids == {str(seeking_match.id), str(offering_match.id)}
+
+
+async def test_list_filters_by_age_group_json_contains(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user: User,
+):
+    """`?age_group=adults_25_64` matches posts whose detail's
+    `age_groups` JSON array contains that token, on either side."""
+    author = create_test_user(username=f"author-{uuid.uuid4()}")
+    seeking_match = _client_referral_post(
+        description="s",
+        owner_id=author.id,
+        age_groups=["adults_25_64"],
+    )
+    seeking_miss = _client_referral_post(
+        description="s",
+        owner_id=author.id,
+        age_groups=["children_0_5"],
+    )
+    offering_match = _provider_availability_post(
+        practice_name=f"clinic-{uuid.uuid4()}",
+        owner_id=author.id,
+        age_groups=["adults_25_64", "older_adults_65_plus"],
+    )
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            session.add(author)
+            session.add(offering_match.provider_availability_detail.provider)
+            session.add(seeking_match)
+            session.add(seeking_miss)
+            session.add(offering_match)
+
+    response = await authenticated_client.get("/posts?age_group=adults_25_64")
+    assert response.status_code == 200
+    tree = HTMLParser(response.text)
+    row_ids = {
+        r.attributes.get("data-row-id") for r in tree.css("#posts-table tbody tr")
+    }
+    assert row_ids == {str(seeking_match.id), str(offering_match.id)}
+
+
+async def test_list_filters_by_language_json_contains(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user: User,
+):
+    """`?language=es` matches posts whose detail's `languages` JSON
+    array contains `"es"`. Tokens are double-quote-delimited so `"en"`
+    doesn't accidentally match a token like `"en_GB"`."""
+    author = create_test_user(username=f"author-{uuid.uuid4()}")
+    spanish_seeker = _client_referral_post(
+        description="s", owner_id=author.id, languages=["en", "es"]
+    )
+    english_only = _client_referral_post(
+        description="e", owner_id=author.id, languages=["en"]
+    )
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            session.add(author)
+            session.add(spanish_seeker)
+            session.add(english_only)
+
+    response = await authenticated_client.get("/posts?language=es")
+    assert response.status_code == 200
+    tree = HTMLParser(response.text)
+    rows = tree.css("#posts-table tbody tr")
+    assert len(rows) == 1
+    assert rows[0].attributes.get("data-row-id") == str(spanish_seeker.id)
+
+
+async def test_list_renders_one_control_per_declared_filter(
+    authenticated_client: AsyncClient,
+    logged_in_user: User,
+):
+    """The filter form has a `<label>` per declared filter on
+    POST_ENTITY. This is the exportable-pattern guarantee — adding a
+    Filter to the spec lights up a control on the page without any
+    template edit."""
+    response = await authenticated_client.get("/posts")
+    assert response.status_code == 200
+    tree = HTMLParser(response.text)
+    form = tree.css_first("form.index-filters")
+    assert form is not None
+    # Every Filter declared on POST_ENTITY appears once.
+    labels = {l.text().strip().split("\n")[0].strip() for l in form.css("label")}
+    expected = {
+        "Type",
+        "Description",
+        "Posted by",
+        "State",
+        "City",
+        "Age groups",
+        "Languages",
+    }
+    assert expected <= labels
+
+
 # --- Chrome: breadcrumb on post detail ----------------------------------
 
 
