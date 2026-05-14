@@ -247,6 +247,59 @@ async def test_list_page_renders_filter_form(
     assert q_input is not None
 
 
+async def test_list_page_starts_with_all_filters_hidden(
+    authenticated_client: AsyncClient,
+    logged_in_user: User,
+):
+    """Default-minimal landing: with no query string, every
+    `.filter-control` cell renders with the `hidden` attribute and the
+    "Add filter" picker advertises one option per declared filter.
+    `_shared/index_filters.html` only un-hides controls whose URL value
+    is truthy — landing on `/posts` un-hides nothing."""
+    response = await authenticated_client.get("/posts")
+    assert response.status_code == 200
+    tree = HTMLParser(response.text)
+    controls = tree.css("form.index-filters .filter-control")
+    assert controls, "expected one .filter-control per declared filter"
+    for c in controls:
+        assert "hidden" in c.attributes, (
+            f"filter '{c.attributes.get('data-filter-name')}' should be hidden "
+            "by default but the wrapper has no `hidden` attribute"
+        )
+    add_select = tree.css_first("form.index-filters .add-filter-select")
+    assert add_select is not None, "expected the .add-filter-select picker"
+    # The picker is populated client-side from the `.filter-control`
+    # cells; the server-side contract is that every hidden cell carries
+    # the metadata the JS reads (`data-filter-name`, `data-filter-label`).
+    for c in controls:
+        assert c.attributes.get("data-filter-name")
+        assert c.attributes.get("data-filter-label")
+
+
+async def test_list_page_only_unhides_url_active_filter(
+    authenticated_client: AsyncClient,
+    logged_in_user: User,
+):
+    """When `?kind=…` is on the URL, only the `kind` `.filter-control`
+    drops its `hidden` attribute — the rest stay collapsed behind the
+    "Add filter" picker. Round-trip guarantee: server-side rendering
+    keeps the active filter visible after Apply without JS."""
+    response = await authenticated_client.get("/posts?kind=client_referral")
+    assert response.status_code == 200
+    tree = HTMLParser(response.text)
+    by_name = {
+        c.attributes.get("data-filter-name"): c
+        for c in tree.css("form.index-filters .filter-control")
+    }
+    assert "hidden" not in by_name["kind"].attributes
+    for name, c in by_name.items():
+        if name == "kind":
+            continue
+        assert (
+            "hidden" in c.attributes
+        ), f"inactive filter '{name}' must stay hidden on /posts?kind=…"
+
+
 async def test_list_filters_by_kind_seeking(
     authenticated_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],

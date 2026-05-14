@@ -38,6 +38,12 @@ single CSS rule styles every empty list the same way. Pages with rich
 empty states (CTA links, per-viewer branches) invoke the macro via
 `{% call %}` and provide their own `<p class="index-empty" id="…">`
 body.
+
+The wrapping `<div class="index-table">` also owns the mobile-overflow
+behavior: the global `overflow-x: auto` rule in `base.html` scrolls
+wide tables horizontally inside the wrapper instead of pushing the
+viewport wide. Templates don't need per-page CSS — wrapping a row's
+cells in `<td data-label="…">` is enough.
 #}
 {% macro index_table(items, headers, row, empty=None, id=None, row_kwargs={}, header_kwargs={}) -%}
 {% if items %}
