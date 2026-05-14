@@ -2,51 +2,42 @@
 
 Given a tuple of `Filter` instances (declared on
 `EntitySpec.filters`, echoed into the list template context by
-`handle_list`) plus the route's URL, renders a single `<form
-method="get">` with one control per filter. HTMX swaps the
-`#index-region` on change so filtering is live without a full page
-reload; the form is also a working no-JS GET form — `hx-trigger` is
-additive, not load-bearing.
+`handle_list`) plus the route's URL, renders a plain
+`<form method="get">` with one control per filter. Mirrors the
+`providers/_columns.html::provider_filters` pattern: user changes
+controls, clicks Apply to submit, Clear links back to the bare
+collection URL. No HTMX — the form is a normal GET submission.
 
 Args:
   filters: tuple of `Filter` instances from the list context.
   action:  URL the form GETs (`/posts`, `/providers`, ...).
-  target:  CSS selector for HTMX to swap on change; defaults to
-           `#index-region` which `index_table.html` (and the page
-           wrapping it) owns as the swap target.
   values:  dict of `{filter.name: current_value}` — pass the page's
            `selected_*` values keyed by filter name so the macro
            preselects controls. The handler already echoes each
            filter value as `selected_<name>`; this macro receives it
            pre-collected so the template stays declarative.
 
-The macro is intentionally control-poor: one control per filter, a
-shared Apply/Clear pair (the Apply button is for no-JS submission;
-HTMX submits on change). Pico's `role="group"` joins the Apply/Clear
-row visually. Multi-value choice filters get `<select multiple>`
-with a `size` capped at the filter's declared size (Pico styles
-multi-select with a scroll once the list overflows).
+The macro renders one control per filter (`<input type="search">`
+for `TextFilter`, `<select>` / `<select multiple>` for
+`ChoiceFilter`) inside a `<fieldset><legend>Filter</legend>` —
+same chrome `provider_filters` uses so the two pages read the same.
 #}
 
-{% macro index_filters(filters, action, values, target="#index-region") -%}
+{% macro index_filters(filters, action, values) -%}
 {%- if filters %}
-<form
-  class="index-filters"
-  method="get"
-  action="{{ action }}"
-  hx-get="{{ action }}"
-  hx-target="{{ target }}"
-  hx-trigger="change, search delay:300ms from:input[type=search]"
-  hx-push-url="true">
-  <fieldset class="grid">
-    {%- for f in filters %}
-    {{ _filter_control(f, values.get(f.name)) }}
-    {%- endfor %}
+<form class="index-filters" method="get" action="{{ action }}">
+  <fieldset>
+    <legend>Filter</legend>
+    <div class="grid">
+      {%- for f in filters %}
+      {{ _filter_control(f, values.get(f.name)) }}
+      {%- endfor %}
+    </div>
+    <div class="grid inline">
+      <button type="submit">Apply</button>
+      <a href="{{ action }}" role="button" class="secondary outline">Clear</a>
+    </div>
   </fieldset>
-  <div role="group" class="grid inline">
-    <button type="submit">Apply</button>
-    <a href="{{ action }}" role="button" class="secondary outline">Clear</a>
-  </div>
 </form>
 {%- endif -%}
 {%- endmacro %}

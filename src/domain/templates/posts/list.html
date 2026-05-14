@@ -20,7 +20,6 @@
   values={"kind": selected_kind, "q": selected_q},
 ) }}
 
-<div id="index-region">
 {{ index_table(
   items=posts,
   headers=post_headers,
@@ -33,5 +32,4 @@
   row_kwargs={"active_kind": selected_kind},
   header_kwargs={"active_kind": selected_kind},
 ) }}
-</div>
 {% endblock %}
