@@ -54,6 +54,12 @@
       #posts-list > div > ul { padding: 0; margin: 0; list-style: none; }
       #posts-list > div > ul > li { display: inline; }
       #posts-list > div > ul > li + li::before { content: " · "; color: var(--pico-muted-color); }
+      /* Kind-chip color differentiation. `[data-kind-chip]` sits on the
+         <li> wrapper in the meta line (and on a <span> in the detail
+         header). Color the contained text so Seeking vs Providing reads
+         at a glance without a background or extra markup. */
+      [data-kind-chip="client_referral"] { color: darkorange; font-weight: 600; }
+      [data-kind-chip="provider_availability"] { color: darkcyan; font-weight: 600; }
       #posts-list > div > p {
         display: -webkit-box;
         -webkit-box-orient: vertical;

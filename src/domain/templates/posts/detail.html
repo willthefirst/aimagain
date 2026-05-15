@@ -29,7 +29,7 @@
     <hgroup>
       <h1>Seeking in {{ d.location_city }}, {{ d.location_state }}</h1>
       <p>
-        <mark data-kind-chip="client_referral">Seeking</mark>
+        <span data-kind-chip="client_referral">Seeking</span>
         <small>by <a href="/users/{{ post.owner_id }}">{{ post.owner.username }}</a> · {{ post.created_at | format_post_date }}</small>
       </p>
     </hgroup>
@@ -71,7 +71,7 @@
     <hgroup>
       <h1>{{ p.practice_name }}</h1>
       <p>
-        <mark data-kind-chip="provider_availability">Providing</mark>
+        <span data-kind-chip="provider_availability">Providing</span>
         <small>by <a href="/users/{{ post.owner_id }}">{{ post.owner.username }}</a> · {{ post.created_at | format_post_date }}</small>
       </p>
     </hgroup>
