@@ -67,6 +67,17 @@
       }
       .index-filters .filter-remove:hover { color: var(--pico-color); }
       .index-filters .add-filter-row { margin-block-end: 0.5rem; max-width: 24rem; }
+      /* Dense, Craigslist-style posts feed (`/posts`). Pico's default
+         `<ul>` is bullet + indent; the posts feed reads as a flat list,
+         not a nested document outline, so drop both. A faint
+         border-bottom on each row gives a scan-affordance without
+         framing each post as a card. The post-date stays a fixed width
+         so leading dates line up vertically across rows; everything
+         else flows inline. */
+      ul#posts-list { list-style: none; padding-left: 0; margin: 0; }
+      #posts-list > li { padding-block: 0.5rem; border-block-end: 1px solid var(--pico-muted-border-color); }
+      #posts-list > li:last-child { border-block-end: 0; }
+      #posts-list .post-date { display: inline-block; min-width: 4rem; color: var(--pico-muted-color); }
     </style>
     <script
       src="https://unpkg.com/htmx.org@2.0.4"

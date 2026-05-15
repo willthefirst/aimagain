@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {%- from "_shared/index_filters.html" import index_filters -%}
-{%- from "posts/_card.html" import post_card with context -%}
+{%- from "posts/_item.html" import post_item with context -%}
 
 {% block content %}
 <h1>Posts</h1>
@@ -33,11 +33,11 @@
   or selected_age_group or selected_language -%}
 
 {% if posts %}
-<section id="posts-list">
+<ul id="posts-list">
   {%- for post in posts %}
-  {{ post_card(post, active_kind=selected_kind) }}
+  {{ post_item(post, active_kind=selected_kind) }}
   {%- endfor %}
-</section>
+</ul>
 {% else %}
 <p class="index-empty">
   {% if any_filter_active %}No posts match these filters.{% else %}No posts found.{% endif %}
