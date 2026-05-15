@@ -2,42 +2,60 @@
 
 Posts are polymorphic — `client_referral` (Seeking) and
 `provider_availability` (Providing). The listings page is for fast
-scanning ("can I act on this?"), so each post renders as a single
-`<li>` of mostly text — Craigslist-shaped, not a card.
+scanning, so each post renders as a single `<li>` of pure semantic
+HTML — no classes, no card framing. The outer `<ul id="posts-list">`
+in `list.html` keeps Pico's default bullet/indent styling; this macro
+adds zero extra CSS.
 
-Format per row:
-  <date>  <kind chip>  <lead link>  <meta tail>
+Per-row shape:
 
-Lead text is the part that reads as "what is this post about":
-  * `client_referral`: the description (the seeker's words); when the
-    description is empty (defensive — required on the wire today), a
-    synthesized "Seeking in <city>, <state>" stands in.
-  * `provider_availability`: practice name in `<strong>`, optionally
-    followed by `— <description>` when the post carries one. The
-    practice name is the most-useful identifier for offerings; the
-    description elaborates *what* the practice is currently offering.
+    <li>
+      <small>{date}</small>
+      <mark>{Seeking|Providing}</mark>
+      <a>{lead text}</a>
+      <p>
+        <small>{location}</small>
+        <small>{format}</small>
+        <small>{ages}</small>
+        <small>{languages}</small>   (when non-default)
+        <small>{insurance}</small>
+      </p>
+    </li>
 
-The whole lead is one `<a>` so a click anywhere on the descriptive
-text opens the detail page. The meta tail (`<small>`) lists the same
-match axes the detail page expands into its `<dl>`.
+Two lines per row: title line + metadata line. Each metadata chunk is
+its own `<small>` element so a reader (or a tool) can parse them
+individually instead of splitting on a `·` separator. The metadata
+`<p>` is block-level by default, so the second line appears on its
+own line under the title with no custom CSS.
+
+**Lead text per kind.** This is the part most evocative of what the
+post is about:
+  * `client_referral` → the description (the seeker's own words,
+    truncated to 160 chars). Falls back to a synthesized
+    "Seeking in <city>, <state>" only when description is empty.
+  * `provider_availability` → `<strong>{practice_name}</strong>` plus
+    an em-dash + description (truncated to 120 chars) when one
+    exists. The practice name is the most-useful identifier; the
+    description elaborates.
 
 `active_kind` (passed via `row_kwargs`) hides the kind chip when the
-page is filtered to a single kind — it'd be constant for every row.
-Tests assert presence/absence via the `[data-kind-chip]` attribute.
-
-`format_post_date` (registered in
-[`src/framework/rendering/templating.py`](../../../framework/rendering/templating.py))
-renders `May 15` for current-year posts and `May 15, 2025` for older.
+page is filtered to a single kind — the chip would be constant for
+every row; tests assert presence/absence via the `[data-kind-chip]`
+attribute. The leading date renders via the `format_post_date`
+filter — see [`src/framework/rendering/templating.py`](../../../framework/rendering/templating.py).
 #}
 
-{% macro _meta_tokens(post) -%}
+{% macro _meta_chunks(post) %}
+{# Yields one `<small>` per metadata chunk, no separators.
+   The browser flows them inline within the meta `<p>`; whitespace
+   between elements is the visual delineation. #}
 {%- if post.kind == "client_referral" -%}
   {%- set d = post.client_referral_detail -%}
   {%- set city = d.location_city -%}
   {%- set state = d.location_state -%}
   {%- set in_person = d.location_in_person -%}
   {%- set virtual = d.location_virtual -%}
-  {%- set insurance -%}{{ INSURANCE_LABELS[d.insurance] }}{%- endset -%}
+  {%- set insurance_label = INSURANCE_LABELS[d.insurance] -%}
 {%- else -%}
   {%- set d = post.provider_availability_detail -%}
   {%- set p = d.provider -%}
@@ -45,35 +63,31 @@ renders `May 15` for current-year posts and `May 15, 2025` for older.
   {%- set state = p.location_state -%}
   {%- set in_person = p.in_person_sessions -%}
   {%- set virtual = p.virtual_sessions -%}
-  {%- set insurance -%}
+  {%- set insurance_label -%}
     {%- if p.accepts_in_network and p.accepts_out_of_network -%}In-network + Out-of-network
     {%- elif p.accepts_in_network -%}In-network
     {%- elif p.accepts_out_of_network -%}Out-of-network
     {%- else -%}Self-pay
     {%- endif -%}
-    {%- if p.sliding_scale %} · sliding{% endif -%}
+    {%- if p.sliding_scale %} (sliding){% endif -%}
   {%- endset -%}
 {%- endif -%}
-{%- set tokens = [] -%}
-{%- if city and state -%}{%- set _ = tokens.append(city ~ ", " ~ state) -%}{%- endif -%}
+{%- if city and state %}<small>{{ city }}, {{ state }}</small>{% endif %}
 {%- set fmt = [] -%}
 {%- if in_person == "yes" -%}{%- set _ = fmt.append("In-person") -%}{%- endif -%}
 {%- if virtual == "yes" -%}{%- set _ = fmt.append("Virtual") -%}{%- endif -%}
-{%- if fmt -%}{%- set _ = tokens.append(fmt | join(" + ")) -%}{%- endif -%}
-{%- if d.age_groups -%}
+{%- if fmt %}<small>{{ fmt | join(" + ") }}</small>{% endif %}
+{%- if d.age_groups %}
   {%- set ages = [] -%}
   {%- for g in d.age_groups[:2] -%}{%- set _ = ages.append(CLIENT_AGE_GROUP_LABELS[g]) -%}{%- endfor -%}
   {%- if d.age_groups | length > 2 -%}{%- set _ = ages.append("+" ~ (d.age_groups | length - 2)) -%}{%- endif -%}
-  {%- set _ = tokens.append(ages | join(", ")) -%}
-{%- endif -%}
-{%- if d.languages and not (d.languages | length == 1 and d.languages[0] == "en") -%}
+<small>{{ ages | join(", ") }}</small>{% endif %}
+{%- if d.languages and not (d.languages | length == 1 and d.languages[0] == "en") %}
   {%- set langs = [] -%}
   {%- for l in d.languages[:2] -%}{%- set _ = langs.append(LANGUAGE_LABELS[l]) -%}{%- endfor -%}
   {%- if d.languages | length > 2 -%}{%- set _ = langs.append("+" ~ (d.languages | length - 2)) -%}{%- endif -%}
-  {%- set _ = tokens.append(langs | join(", ")) -%}
-{%- endif -%}
-{%- set _ = tokens.append(insurance) -%}
-{{ tokens | join(" · ") }}
+<small>{{ langs | join(", ") }}</small>{% endif %}
+<small>{{ insurance_label }}</small>
 {%- endmacro %}
 
 {% macro post_item(post, active_kind=None) -%}
@@ -86,11 +100,11 @@ renders `May 15` for current-year posts and `May 15, 2025` for older.
   {%- set kind_label = "Providing" -%}
 {%- endif -%}
 <li data-row-id="{{ post.id }}" data-kind="{{ post.kind }}">
-  <small class="post-date">{{ post.created_at | format_post_date }}</small>
+  <small>{{ post.created_at | format_post_date }}</small>
   {%- if active_kind is none %}
   <mark data-kind-chip="{{ post.kind }}">{{ kind_label }}</mark>
   {%- endif %}
-  <a href="/posts/{{ post.id }}" class="post-lead">
+  <a href="/posts/{{ post.id }}">
     {%- if post.kind == "client_referral" -%}
       {%- if d.description -%}
         {{ d.description | truncate(160) }}
@@ -102,6 +116,6 @@ renders `May 15` for current-year posts and `May 15, 2025` for older.
       {%- if d.description %} — {{ d.description | truncate(120) }}{% endif -%}
     {%- endif -%}
   </a>
-  <small class="post-meta">· {{ _meta_tokens(post) }} · by <a href="/users/{{ post.owner_id }}">{{ post.owner.username }}</a></small>
+  <p>{{ _meta_chunks(post) }}</p>
 </li>
 {%- endmacro %}
