@@ -86,7 +86,8 @@
          all see it) — there's no backend `truncate()`. Selectors are
          scoped tightly by `#posts-list > li >` so the rules can't
          leak to lists or links elsewhere on the page. */
-      #posts-list > li { margin-block: 1.25rem; }
+      ul#posts-list { list-style: none; padding-inline-start: 0; }
+      #posts-list > li { list-style: none; margin-block: 1.75rem; }
       #posts-list > li > ul { padding: 0; margin: 0; list-style: none; }
       #posts-list > li > ul > li { display: inline; }
       #posts-list > li > ul > li + li::before { content: " · "; color: var(--pico-muted-color); }
