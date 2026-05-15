@@ -101,7 +101,7 @@ async def test_list_client_referral_item_shape(
     response = await authenticated_client.get("/posts")
     assert response.status_code == 200
     tree = HTMLParser(response.text)
-    item = tree.css_first("#posts-list > article")
+    item = tree.css_first("#posts-list > li")
     assert item is not None
     assert item.attributes.get("data-kind") == "client_referral"
 
@@ -153,7 +153,7 @@ async def test_list_client_referral_falls_back_to_synthesized_title(
     response = await authenticated_client.get("/posts")
     assert response.status_code == 200
     tree = HTMLParser(response.text)
-    lead = tree.css_first("#posts-list > article a")
+    lead = tree.css_first("#posts-list > li a")
     assert lead is not None
     assert lead.text(strip=True) == "Seeking in Boise, ID"
 
@@ -192,7 +192,7 @@ async def test_list_provider_availability_item_shape(
     response = await authenticated_client.get("/posts")
     assert response.status_code == 200
     tree = HTMLParser(response.text)
-    item = tree.css_first("#posts-list > article")
+    item = tree.css_first("#posts-list > li")
     assert item is not None
     assert item.attributes.get("data-kind") == "provider_availability"
 
@@ -242,7 +242,7 @@ async def test_list_lead_contains_full_description_no_backend_truncation(
     response = await authenticated_client.get("/posts")
     assert response.status_code == 200
     tree = HTMLParser(response.text)
-    lead = tree.css_first("#posts-list > article a")
+    lead = tree.css_first("#posts-list > li a")
     assert lead is not None
     assert lead.text(strip=True) == description
 
@@ -254,7 +254,7 @@ async def test_list_meta_is_an_inline_list_of_li_chunks(
 ):
     """Each metadata fact is its own `<li>` inside a nested `<ul>`
     after the title link — the inline-list pattern. The `·` visual
-    separator lives in CSS (`#posts-list > article > ul > li + li::before`)
+    separator lives in CSS (`#posts-list > li > ul > li + li::before`)
     rather than the markup, so the DOM text has no `·` glyphs. A
     regression that collapsed the chunks back into a single
     `·`-joined string (or onto the title line) would fail here.
@@ -282,7 +282,7 @@ async def test_list_meta_is_an_inline_list_of_li_chunks(
     response = await authenticated_client.get("/posts")
     assert response.status_code == 200
     tree = HTMLParser(response.text)
-    item = tree.css_first("#posts-list > article")
+    item = tree.css_first("#posts-list > li")
     assert item is not None
 
     # Metadata is a nested `<ul>` of `<li>` chunks above the title —
@@ -340,7 +340,7 @@ async def test_list_renders_readable_date_format(
     response = await authenticated_client.get("/posts")
     assert response.status_code == 200
     tree = HTMLParser(response.text)
-    item = tree.css_first("#posts-list > article")
+    item = tree.css_first("#posts-list > li")
     assert item is not None
     # First chunk of the meta `<ul>` is the leading date.
     date_cell = item.css_first("ul > li")
@@ -442,7 +442,7 @@ async def test_list_posts_one_post(
 
     assert response.status_code == 200
     tree = HTMLParser(response.text)
-    items = tree.css("#posts-list > article")
+    items = tree.css("#posts-list > li")
     assert len(items) == 1
     item_text = items[0].text()
     assert description in item_text
@@ -477,7 +477,7 @@ async def test_list_posts_orders_newest_first(
     assert response.status_code == 200
 
     tree = HTMLParser(response.text)
-    items = tree.css("#posts-list > article")
+    items = tree.css("#posts-list > li")
     assert len(items) == 2
     assert newer.client_referral_detail.description in items[0].text()
     assert older.client_referral_detail.description in items[1].text()
@@ -663,7 +663,7 @@ async def test_list_filters_by_kind_seeking(
     response = await authenticated_client.get("/posts?kind=client_referral")
     assert response.status_code == 200
     tree = HTMLParser(response.text)
-    rows = tree.css("#posts-list > article")
+    rows = tree.css("#posts-list > li")
     assert len(rows) == 1
     assert rows[0].attributes.get("data-kind") == "client_referral"
     # The kind <select> preselects the seeking option.
@@ -672,7 +672,7 @@ async def test_list_filters_by_kind_seeking(
     assert selected_option.attributes.get("value") == "client_referral"
     # The kind chip is hidden on the cards when a single kind is selected —
     # it would be constant for every card on this page.
-    assert tree.css("#posts-list > article [data-kind-chip]") == []
+    assert tree.css("#posts-list > li [data-kind-chip]") == []
 
 
 async def test_list_rejects_unknown_kind(
@@ -716,7 +716,7 @@ async def test_list_filters_by_free_text_q_across_both_detail_tables(
     response = await authenticated_client.get("/posts?q=needle")
     assert response.status_code == 200
     tree = HTMLParser(response.text)
-    rows = tree.css("#posts-list > article")
+    rows = tree.css("#posts-list > li")
     # Both `needle-*` posts match across the polymorphic OR. The
     # `haystack-*` seeker is filtered out.
     assert len(rows) == 2
@@ -753,7 +753,7 @@ async def test_list_combines_kind_and_q_with_and(
     response = await authenticated_client.get("/posts?kind=client_referral&q=needle")
     assert response.status_code == 200
     tree = HTMLParser(response.text)
-    rows = tree.css("#posts-list > article")
+    rows = tree.css("#posts-list > li")
     assert len(rows) == 1
     assert rows[0].attributes.get("data-kind") == "client_referral"
 
@@ -781,7 +781,7 @@ async def test_list_filters_by_posted_by_username(
     response = await authenticated_client.get("/posts?posted_by=alice")
     assert response.status_code == 200
     tree = HTMLParser(response.text)
-    rows = tree.css("#posts-list > article")
+    rows = tree.css("#posts-list > li")
     assert len(rows) == 1
     assert rows[0].attributes.get("data-row-id") == str(alice_post.id)
     # The text input echoes the URL value.
@@ -835,7 +835,7 @@ async def test_list_filters_by_state_across_polymorphic_paths(
     response = await authenticated_client.get("/posts?state=NY&state=NJ")
     assert response.status_code == 200
     tree = HTMLParser(response.text)
-    rows = tree.css("#posts-list > article")
+    rows = tree.css("#posts-list > li")
     row_ids = {r.attributes.get("data-row-id") for r in rows}
     assert row_ids == {str(seeking_ny.id), str(offering_nj.id)}
     # Both NY and NJ options are preselected in the multi-<select>.
@@ -879,9 +879,7 @@ async def test_list_filters_by_city_substring_across_polymorphic_paths(
     response = await authenticated_client.get("/posts?city=spring")
     assert response.status_code == 200
     tree = HTMLParser(response.text)
-    row_ids = {
-        r.attributes.get("data-row-id") for r in tree.css("#posts-list > article")
-    }
+    row_ids = {r.attributes.get("data-row-id") for r in tree.css("#posts-list > li")}
     assert row_ids == {str(seeking_match.id), str(offering_match.id)}
 
 
@@ -919,9 +917,7 @@ async def test_list_filters_by_age_group_json_contains(
     response = await authenticated_client.get("/posts?age_group=adults_25_64")
     assert response.status_code == 200
     tree = HTMLParser(response.text)
-    row_ids = {
-        r.attributes.get("data-row-id") for r in tree.css("#posts-list > article")
-    }
+    row_ids = {r.attributes.get("data-row-id") for r in tree.css("#posts-list > li")}
     assert row_ids == {str(seeking_match.id), str(offering_match.id)}
 
 
@@ -949,7 +945,7 @@ async def test_list_filters_by_language_json_contains(
     response = await authenticated_client.get("/posts?language=es")
     assert response.status_code == 200
     tree = HTMLParser(response.text)
-    rows = tree.css("#posts-list > article")
+    rows = tree.css("#posts-list > li")
     assert len(rows) == 1
     assert rows[0].attributes.get("data-row-id") == str(spanish_seeker.id)
 
