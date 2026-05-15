@@ -98,6 +98,16 @@
         line-clamp: 2;
         overflow: hidden;
       }
+      /* On narrow screens (below Pico's `md` breakpoint) the lead
+         wraps sooner, so 2 lines shows much less text. Bump the
+         clamp to 3 lines under 768px to keep about the same amount
+         of description visible per post. */
+      @media (max-width: 768px) {
+        #posts-list > li > p {
+          -webkit-line-clamp: 3;
+          line-clamp: 3;
+        }
+      }
     </style>
     <script
       src="https://unpkg.com/htmx.org@2.0.4"
