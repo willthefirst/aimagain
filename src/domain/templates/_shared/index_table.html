@@ -9,8 +9,7 @@ Args:
   items:        iterable of model rows.
   headers:      zero-arg macro returning the `<th>` cells for `<thead>`.
                 See e.g. `_shared/_provider_row.html` for a shared
-                example, or `posts/_columns.html` for a cluster-local
-                one.
+                example.
   row:          one-arg macro `row(item, **row_kwargs)` returning the
                 full `<tr>...</tr>` — the row owns its own data
                 attributes (`data-row-id`) and per-cell `data-label` so

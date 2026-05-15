@@ -25,7 +25,7 @@ Files prefixed with `_` are shared partials, `{% include %}`d from full pages �
 - `_provider_row.html` — `provider_headers()`, `provider_row(provider)`: the provider row shape, shared across `/providers`, `/users/me/favorites`, `/users/{id}/providers`, and the embedded `<section>Providers</section>` on `/users/{id}`. Lives in `_shared/` (not `providers/`) because cross-cluster template imports aren't allowed; provider-specific filter form stays in `providers/_columns.html` since only the /providers index uses it.
 - `_breadcrumb.html` — `breadcrumb(items)`: renders `<nav aria-label="Breadcrumb">` from a list of `(label, url)` tuples; the last entry is rendered as `<span aria-current="page">` rather than a link. Detail pages and nested-list pages fill the `{% block breadcrumb %}` slot in `base.html`; top-level list pages leave it empty.
 
-`index_table` also supports `header_kwargs={}` for headers that vary by page state — see `posts/_columns.html`, where `post_headers(active_kind=None)` hides the `Type` column on a single-kind tab.
+`index_table` also supports `header_kwargs={}` for headers that vary by page state. Not every list uses the table shape — `/posts` renders a Pico `<article>` card stack via `posts/_card.html::post_card(post, active_kind=None)` instead, since the polymorphic kinds need an information hierarchy (synthesized title, kind chip, meta line, description preview) the table can't express.
 
 `filter_select_field` (for list-page filters) is never required and offers a leading "Any" option so users can clear filters; `select_field` (for create/edit) is required by default with an optional disabled placeholder.
 

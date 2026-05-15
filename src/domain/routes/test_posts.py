@@ -70,6 +70,150 @@ def _make_test_post(owner: User, *, description: str | None = None) -> Post:
 # --- Listing -------------------------------------------------------------
 
 
+async def test_list_client_referral_card_shape(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user: User,
+):
+    """A `client_referral` renders as a Pico `<article>` card with:
+    a `Seeking` kind chip (`<mark data-kind-chip>`), a synthesized title
+    `Seeking in <city>, <state>` linking to the detail page, a `·`-joined
+    meta line, and a description preview. Pins the summary→detail
+    relationship: the card chip + title echo what `detail.html` renders
+    in its `<header>`."""
+    author = create_test_user(username=f"author-{uuid.uuid4()}")
+    description = f"card-{uuid.uuid4()}"
+    post = _client_referral_post(
+        description=description,
+        owner_id=author.id,
+        location_city="Seattle",
+        location_state="WA",
+        location_in_person="yes",
+        location_virtual="yes",
+        age_groups=["adolescents_14_18", "adults_25_64"],
+        languages=["en", "es"],
+        insurance="in_network",
+    )
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            session.add(author)
+            session.add(post)
+
+    response = await authenticated_client.get("/posts")
+    assert response.status_code == 200
+    tree = HTMLParser(response.text)
+    card = tree.css_first("#posts-list article")
+    assert card is not None
+    assert card.attributes.get("data-kind") == "client_referral"
+
+    # Kind chip: rendered when no `?kind=` filter is active.
+    chip = card.css_first("[data-kind-chip]")
+    assert chip is not None
+    assert chip.attributes.get("data-kind-chip") == "client_referral"
+    assert chip.text(strip=True) == "Seeking"
+
+    # Synthesized title links to the detail page.
+    title_link = card.css_first("h3 a")
+    assert title_link is not None
+    assert title_link.attributes.get("href") == f"/posts/{post.id}"
+    assert title_link.text(strip=True) == "Seeking in Seattle, WA"
+
+    # Meta line carries the location, format, ages, languages, insurance.
+    card_text = card.text()
+    assert "Seattle, WA" in card_text
+    assert "In-person + Virtual" in card_text
+    assert "Adolescents 14–18" in card_text  # en-dash
+    assert "English" in card_text and "Spanish" in card_text
+    assert "In-network" in card_text
+
+    # Description preview is rendered.
+    assert description in card_text
+
+
+async def test_list_provider_availability_card_shape(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user: User,
+):
+    """A `provider_availability` card uses the linked Provider's
+    `practice_name` as its title and renders an `Offering` chip."""
+    author = create_test_user(username=f"author-{uuid.uuid4()}")
+    practice_name = f"Practice-{uuid.uuid4()}"
+    post = _provider_availability_post(
+        practice_name=practice_name,
+        owner_id=author.id,
+        provider=make_provider(
+            owner_id=author.id,
+            practice_name=practice_name,
+            location_city="Portland",
+            location_state="OR",
+            in_person_sessions="yes",
+            virtual_sessions="no",
+            accepts_in_network=True,
+            accepts_out_of_network=False,
+            sliding_scale=True,
+        ),
+    )
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            session.add(author)
+            session.add(post.provider_availability_detail.provider)
+            session.add(post)
+
+    response = await authenticated_client.get("/posts")
+    assert response.status_code == 200
+    tree = HTMLParser(response.text)
+    card = tree.css_first("#posts-list article")
+    assert card is not None
+    assert card.attributes.get("data-kind") == "provider_availability"
+
+    chip = card.css_first("[data-kind-chip]")
+    assert chip is not None
+    assert chip.text(strip=True) == "Offering"
+
+    title_link = card.css_first("h3 a")
+    assert title_link is not None
+    assert title_link.text(strip=True) == practice_name
+
+    card_text = card.text()
+    assert "Portland, OR" in card_text
+    assert "In-person" in card_text
+    assert "In-network" in card_text
+    assert "sliding" in card_text
+
+
+async def test_detail_renders_kind_chip_and_synthesized_header(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user: User,
+):
+    """The detail page header echoes the card: kind chip + the same
+    synthesized title. The chip is a `<mark data-kind-chip>` so the
+    summary→detail relationship is testable as a single shape, not two
+    paraphrased copies."""
+    post = _client_referral_post(
+        description="header-echo",
+        owner_id=logged_in_user.id,
+        location_city="Boise",
+        location_state="ID",
+    )
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            session.add(post)
+        await session.refresh(post)
+        post_id = post.id
+
+    response = await authenticated_client.get(f"/posts/{post_id}")
+    assert response.status_code == 200
+    tree = HTMLParser(response.text)
+    h1 = tree.css_first("article > header h1")
+    assert h1 is not None
+    assert h1.text(strip=True) == "Seeking in Boise, ID"
+    chip = tree.css_first("article > header [data-kind-chip]")
+    assert chip is not None
+    assert chip.text(strip=True) == "Seeking"
+
+
 async def test_list_posts_empty(
     authenticated_client: AsyncClient,
     logged_in_user: User,
@@ -102,7 +246,7 @@ async def test_list_posts_one_post(
 
     assert response.status_code == 200
     tree = HTMLParser(response.text)
-    items = tree.css("#posts-table tbody tr")
+    items = tree.css("#posts-list article")
     assert len(items) == 1
     item_text = items[0].text()
     assert description in item_text
@@ -138,7 +282,7 @@ async def test_list_posts_orders_newest_first(
     assert response.status_code == 200
 
     tree = HTMLParser(response.text)
-    items = tree.css("#posts-table tbody tr")
+    items = tree.css("#posts-list article")
     assert len(items) == 2
     assert newer.client_referral_detail.description in items[0].text()
     assert older.client_referral_detail.description in items[1].text()
@@ -324,15 +468,16 @@ async def test_list_filters_by_kind_seeking(
     response = await authenticated_client.get("/posts?kind=client_referral")
     assert response.status_code == 200
     tree = HTMLParser(response.text)
-    rows = tree.css("#posts-table tbody tr")
+    rows = tree.css("#posts-list article")
     assert len(rows) == 1
     assert rows[0].attributes.get("data-kind") == "client_referral"
     # The kind <select> preselects the seeking option.
     options = tree.css('form.index-filters select[name="kind"] option')
     selected_option = next(o for o in options if "selected" in o.attributes)
     assert selected_option.attributes.get("value") == "client_referral"
-    # The Type column is hidden when a single kind is selected.
-    assert tree.css_first('#posts-table th[scope="col"]').text() == "Post"
+    # The kind chip is hidden on the cards when a single kind is selected —
+    # it would be constant for every card on this page.
+    assert tree.css("#posts-list article [data-kind-chip]") == []
 
 
 async def test_list_rejects_unknown_kind(
@@ -376,7 +521,7 @@ async def test_list_filters_by_free_text_q_across_both_detail_tables(
     response = await authenticated_client.get("/posts?q=needle")
     assert response.status_code == 200
     tree = HTMLParser(response.text)
-    rows = tree.css("#posts-table tbody tr")
+    rows = tree.css("#posts-list article")
     # Both `needle-*` posts match across the polymorphic OR. The
     # `haystack-*` seeker is filtered out.
     assert len(rows) == 2
@@ -413,7 +558,7 @@ async def test_list_combines_kind_and_q_with_and(
     response = await authenticated_client.get("/posts?kind=client_referral&q=needle")
     assert response.status_code == 200
     tree = HTMLParser(response.text)
-    rows = tree.css("#posts-table tbody tr")
+    rows = tree.css("#posts-list article")
     assert len(rows) == 1
     assert rows[0].attributes.get("data-kind") == "client_referral"
 
@@ -441,7 +586,7 @@ async def test_list_filters_by_posted_by_username(
     response = await authenticated_client.get("/posts?posted_by=alice")
     assert response.status_code == 200
     tree = HTMLParser(response.text)
-    rows = tree.css("#posts-table tbody tr")
+    rows = tree.css("#posts-list article")
     assert len(rows) == 1
     assert rows[0].attributes.get("data-row-id") == str(alice_post.id)
     # The text input echoes the URL value.
@@ -495,7 +640,7 @@ async def test_list_filters_by_state_across_polymorphic_paths(
     response = await authenticated_client.get("/posts?state=NY&state=NJ")
     assert response.status_code == 200
     tree = HTMLParser(response.text)
-    rows = tree.css("#posts-table tbody tr")
+    rows = tree.css("#posts-list article")
     row_ids = {r.attributes.get("data-row-id") for r in rows}
     assert row_ids == {str(seeking_ny.id), str(offering_nj.id)}
     # Both NY and NJ options are preselected in the multi-<select>.
@@ -539,9 +684,7 @@ async def test_list_filters_by_city_substring_across_polymorphic_paths(
     response = await authenticated_client.get("/posts?city=spring")
     assert response.status_code == 200
     tree = HTMLParser(response.text)
-    row_ids = {
-        r.attributes.get("data-row-id") for r in tree.css("#posts-table tbody tr")
-    }
+    row_ids = {r.attributes.get("data-row-id") for r in tree.css("#posts-list article")}
     assert row_ids == {str(seeking_match.id), str(offering_match.id)}
 
 
@@ -579,9 +722,7 @@ async def test_list_filters_by_age_group_json_contains(
     response = await authenticated_client.get("/posts?age_group=adults_25_64")
     assert response.status_code == 200
     tree = HTMLParser(response.text)
-    row_ids = {
-        r.attributes.get("data-row-id") for r in tree.css("#posts-table tbody tr")
-    }
+    row_ids = {r.attributes.get("data-row-id") for r in tree.css("#posts-list article")}
     assert row_ids == {str(seeking_match.id), str(offering_match.id)}
 
 
@@ -609,7 +750,7 @@ async def test_list_filters_by_language_json_contains(
     response = await authenticated_client.get("/posts?language=es")
     assert response.status_code == 200
     tree = HTMLParser(response.text)
-    rows = tree.css("#posts-table tbody tr")
+    rows = tree.css("#posts-list article")
     assert len(rows) == 1
     assert rows[0].attributes.get("data-row-id") == str(spanish_seeker.id)
 

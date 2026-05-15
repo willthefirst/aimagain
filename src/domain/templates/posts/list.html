@@ -1,7 +1,6 @@
 {% extends "base.html" %}
-{%- from "_shared/index_table.html" import index_table -%}
 {%- from "_shared/index_filters.html" import index_filters -%}
-{%- from "posts/_columns.html" import post_headers, post_row with context -%}
+{%- from "posts/_card.html" import post_card with context -%}
 
 {% block content %}
 <h1>Posts</h1>
@@ -33,16 +32,15 @@
   or selected_state or selected_city
   or selected_age_group or selected_language -%}
 
-{{ index_table(
-  items=posts,
-  headers=post_headers,
-  row=post_row,
-  empty=(
-    "No posts match these filters." if any_filter_active
-    else "No posts found."
-  ),
-  id="posts-table",
-  row_kwargs={"active_kind": selected_kind},
-  header_kwargs={"active_kind": selected_kind},
-) }}
+{% if posts %}
+<section id="posts-list">
+  {%- for post in posts %}
+  {{ post_card(post, active_kind=selected_kind) }}
+  {%- endfor %}
+</section>
+{% else %}
+<p class="index-empty">
+  {% if any_filter_active %}No posts match these filters.{% else %}No posts found.{% endif %}
+</p>
+{% endif %}
 {% endblock %}
