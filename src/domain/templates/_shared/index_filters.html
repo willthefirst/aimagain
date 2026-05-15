@@ -3,10 +3,10 @@
 Given a tuple of `Filter` instances (declared on
 `EntitySpec.filters`, echoed into the list template context by
 `handle_list`) plus the route's URL, renders a plain
-`<form method="get">` with one control per filter. Mirrors the
-`providers/_columns.html::provider_filters` pattern: user changes
+`<form method="get">` with one control per filter. User changes
 controls, clicks Apply to submit, Clear links back to the bare
-collection URL. No HTMX — the form is a normal GET submission.
+collection URL. No HTMX, no JS — the form is a normal GET submission,
+all filters visible at all times.
 
 Args:
   filters: tuple of `Filter` instances from the list context.
@@ -16,111 +16,20 @@ Args:
            preselects controls. The handler already echoes each
            filter value as `selected_<name>`; this macro receives it
            pre-collected so the template stays declarative.
-
-Default-minimal "add a filter" UI: every declared filter is
-rendered into the DOM, but a control is only visible when its
-`values` entry is truthy — i.e. the URL preselected it. Other
-filters render with the `hidden` attribute so the page starts with
-just the active filters plus an "Add filter" picker. Picking a
-filter from the `<select>` un-hides its control; the per-control
-"×" button hides it again and clears its inputs so the next Apply
-drops it from the URL. The selection state survives a round trip
-because the server re-renders based on `values`.
-
-With JavaScript disabled, the picker is invisible (the script
-unhides it once it's wired up) but every active filter still
-appears, so the page degrades to "shows what's in the URL." The
-form itself is a normal GET — Apply works without JS.
 #}
 
 {% macro index_filters(filters, action, values) -%}
 {%- if filters %}
-<form class="index-filters" method="get" action="{{ action }}" data-index-filters>
+<form class="index-filters" method="get" action="{{ action }}">
   <fieldset>
     <legend>Filter</legend>
-    <div class="add-filter-row" hidden>
-      <label>
-        Add a filter
-        <select class="add-filter-select" aria-label="Add a filter">
-          <option value="">…</option>
-        </select>
-      </label>
-    </div>
-    <div class="grid index-filters-controls">
-      {%- for f in filters %}
-      {%- set _v = values.get(f.name) -%}
-      <div class="filter-control" data-filter-name="{{ f.name }}" data-filter-label="{{ f.display_label }}"{% if not _v %} hidden{% endif %}>
-        {{ _filter_control(f, _v) }}
-        <button type="button" class="filter-remove" aria-label="Remove {{ f.display_label }} filter" title="Remove filter">&times;</button>
-      </div>
-      {%- endfor %}
-    </div>
-    <div class="grid inline">
-      <button type="submit">Apply</button>
-      <a href="{{ action }}" role="button" class="secondary outline">Clear</a>
-    </div>
+    {%- for f in filters %}
+    {{ _filter_control(f, values.get(f.name)) }}
+    {%- endfor %}
+    <button type="submit">Apply</button>
+    <a href="{{ action }}" role="button" class="secondary outline">Clear</a>
   </fieldset>
 </form>
-<script>
-  (function () {
-    var forms = document.querySelectorAll('form[data-index-filters]');
-    forms.forEach(function (form) {
-      var addRow = form.querySelector('.add-filter-row');
-      var addSelect = form.querySelector('.add-filter-select');
-      var controls = form.querySelectorAll('.filter-control');
-      if (!addRow || !addSelect || controls.length === 0) return;
-
-      function repopulate() {
-        var hiddenCount = 0;
-        // Rebuild the picker from scratch so the option order matches the
-        // declared filter order on the spec.
-        while (addSelect.options.length > 1) addSelect.remove(1);
-        controls.forEach(function (c) {
-          if (c.hidden) {
-            hiddenCount += 1;
-            var opt = document.createElement('option');
-            opt.value = c.dataset.filterName;
-            opt.textContent = c.dataset.filterLabel || c.dataset.filterName;
-            addSelect.appendChild(opt);
-          }
-        });
-        addRow.hidden = hiddenCount === 0;
-        addSelect.value = '';
-      }
-
-      addSelect.addEventListener('change', function () {
-        if (!addSelect.value) return;
-        var target = form.querySelector(
-          '.filter-control[data-filter-name="' + addSelect.value + '"]'
-        );
-        if (target) {
-          target.hidden = false;
-          var firstInput = target.querySelector('input, select');
-          if (firstInput) firstInput.focus();
-        }
-        repopulate();
-      });
-
-      controls.forEach(function (c) {
-        var btn = c.querySelector('.filter-remove');
-        if (!btn) return;
-        btn.addEventListener('click', function () {
-          c.querySelectorAll('input').forEach(function (i) {
-            if (i.type === 'checkbox' || i.type === 'radio') i.checked = false;
-            else i.value = '';
-          });
-          c.querySelectorAll('select').forEach(function (s) {
-            Array.from(s.options).forEach(function (o) { o.selected = false; });
-          });
-          c.hidden = true;
-          repopulate();
-        });
-      });
-
-      repopulate();
-    });
-  })();
-</script>
 {%- endif -%}
 {%- endmacro %}
 
