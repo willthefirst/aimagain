@@ -113,7 +113,7 @@ async def test_list_client_referral_item_shape(
 
     # Description is the link target — the lead text is the seeker's
     # own words, not a synthesized headline.
-    lead = item.css_first("a.post-lead")
+    lead = item.css_first("a")
     assert lead is not None
     assert lead.attributes.get("href") == f"/posts/{post.id}"
     assert lead.text(strip=True) == description
@@ -151,7 +151,7 @@ async def test_list_client_referral_falls_back_to_synthesized_title(
     response = await authenticated_client.get("/posts")
     assert response.status_code == 200
     tree = HTMLParser(response.text)
-    lead = tree.css_first("#posts-list > li a.post-lead")
+    lead = tree.css_first("#posts-list > li a")
     assert lead is not None
     assert lead.text(strip=True) == "Seeking in Boise, ID"
 
@@ -199,7 +199,7 @@ async def test_list_provider_availability_item_shape(
     assert chip.text(strip=True) == "Providing"
 
     # Practice name is in <strong> inside the lead link.
-    lead = item.css_first("a.post-lead")
+    lead = item.css_first("a")
     assert lead is not None
     assert lead.css_first("strong").text(strip=True) == practice_name
 
@@ -210,6 +210,64 @@ async def test_list_provider_availability_item_shape(
     assert "sliding" in item_text
 
 
+async def test_list_meta_is_a_separate_paragraph_of_small_chunks(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user: User,
+):
+    """Each metadata fact is its own `<small>` element inside a `<p>`
+    that follows the title link — no `·` separators, no inline trailing
+    `<small>` glued onto the title line. A regression that collapsed
+    the chunks back into one `<small>` joined by `·` (or onto the title
+    line) would fail here.
+
+    Also: no owner-username link in the listing row. The author lives
+    on the detail page; the listing reads as Craigslist, not as a feed
+    of posts-by-people."""
+    author = create_test_user(username=f"author-{uuid.uuid4()}")
+    post = _client_referral_post(
+        description="meta-shape",
+        owner_id=author.id,
+        location_city="Seattle",
+        location_state="WA",
+        location_in_person="yes",
+        location_virtual="no",
+        age_groups=["adolescents_14_18"],
+        languages=["en"],
+        insurance="in_network",
+    )
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            session.add(author)
+            session.add(post)
+
+    response = await authenticated_client.get("/posts")
+    assert response.status_code == 200
+    tree = HTMLParser(response.text)
+    item = tree.css_first("#posts-list > li")
+    assert item is not None
+
+    # The metadata lives in its own `<p>`; multiple `<small>` chunks,
+    # no `·` separator characters. (The title-line `<small>` for the
+    # date sits before the `<p>`, not inside it.)
+    meta = item.css_first("p")
+    assert meta is not None
+    meta_smalls = meta.css("small")
+    # Location + format + ages + insurance = 4 chunks. (English-only
+    # languages are dropped by the macro since `en` is the default.)
+    assert len(meta_smalls) == 4
+    rendered = [s.text(strip=True) for s in meta_smalls]
+    assert rendered == ["Seattle, WA", "In-person", "Adolescents 14–18", "In-network"]
+    # No `·` separator anywhere in the row.
+    assert "·" not in item.text()
+
+    # No owner-username link in the listing row — only the lead link.
+    links = item.css("a")
+    assert len(links) == 1
+    assert links[0].attributes.get("href") == f"/posts/{post.id}"
+    assert author.username not in item.text()
+
+
 async def test_list_renders_readable_date_format(
     authenticated_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],
@@ -217,7 +275,8 @@ async def test_list_renders_readable_date_format(
 ):
     """The leading date renders Craigslist-style (`May 15`) via the
     `format_post_date` Jinja filter — *not* the raw ISO `YYYY-MM-DD`
-    that `post.created_at.date()` produced before."""
+    that `post.created_at.date()` produced before. The date is the
+    first `<small>` direct child of the row, per the macro's layout."""
     from datetime import datetime, timezone
 
     author = create_test_user(username=f"author-{uuid.uuid4()}")
@@ -234,7 +293,8 @@ async def test_list_renders_readable_date_format(
     tree = HTMLParser(response.text)
     item = tree.css_first("#posts-list > li")
     assert item is not None
-    date_cell = item.css_first(".post-date")
+    # First `<small>` direct child of the row is the leading date.
+    date_cell = item.css_first("small")
     assert date_cell is not None
     rendered = date_cell.text(strip=True)
     # `May 15` for current-year posts; `May 15, 2025` once we cross a
@@ -337,7 +397,6 @@ async def test_list_posts_one_post(
     assert len(items) == 1
     item_text = items[0].text()
     assert description in item_text
-    assert other.username in item_text
     assert "No posts found" not in tree.body.text()
 
 
