@@ -33,11 +33,11 @@
   or selected_age_group or selected_language -%}
 
 {% if posts %}
-<section id="posts-list">
+<ul id="posts-list">
   {%- for post in posts %}
   {{ post_item(post, active_kind=selected_kind) }}
   {%- endfor %}
-</section>
+</ul>
 {% else %}
 <p class="index-empty">
   {% if any_filter_active %}No posts match these filters.{% else %}No posts found.{% endif %}

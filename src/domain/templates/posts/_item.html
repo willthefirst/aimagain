@@ -1,11 +1,11 @@
 {# Dense list-item macro for the posts index.
 
 Posts are polymorphic — `client_referral` (Seeking) and
-`provider_availability` (Providing). Each post renders as a Pico
-`<article>` card inside `<section id="posts-list">` — no classes,
-minimal CSS, all of it scoped under `#posts-list > article` in
-`base.html`. The `<article>` tag picks up Pico's default card
-styling (padding, rounded corners, faint background) for free.
+`provider_availability` (Providing). Each post renders as a plain
+`<li>` inside `<ul id="posts-list">` — Pico's default list styling
+(bullet + indent), with a `margin-block` on each `<li>` to give
+posts breathing room. No card frame, no row borders. All CSS lives
+in `base.html` scoped under `#posts-list > li`.
 
 The row is two lines: a meta `<ul>` above, a title `<p>` below.
 Meta carries every fact about the post — date, kind chunk (Seeking
@@ -94,7 +94,7 @@ the detail page for posture and carrier specifics.
   {%- set d = post.provider_availability_detail -%}
   {%- set p = d.provider -%}
 {%- endif -%}
-<article data-row-id="{{ post.id }}" data-kind="{{ post.kind }}">
+<li data-row-id="{{ post.id }}" data-kind="{{ post.kind }}">
   <ul>{{ _meta_chunks(post, active_kind=active_kind) }}</ul>
   <p>
     <a href="/posts/{{ post.id }}">
@@ -110,5 +110,5 @@ the detail page for posture and carrier specifics.
       {%- endif -%}
     </a>
   </p>
-</article>
+</li>
 {%- endmacro %}
