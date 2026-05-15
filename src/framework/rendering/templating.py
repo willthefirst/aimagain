@@ -1,3 +1,5 @@
+from datetime import date, datetime
+
 from fastapi.templating import Jinja2Templates
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
@@ -10,6 +12,30 @@ from src.framework.config import settings
 from src.framework.rendering.form_fields import field_spec, register_choice_labels
 
 auto_reload = settings.ENVIRONMENT == "development"
+
+
+def format_post_date(value: datetime | date | None) -> str:
+    """Craigslist-style short date — `May 15` for current-year posts,
+    `May 15, 2025` for older. Used by the posts list/detail templates so
+    the same timestamp reads the same way in both places.
+
+    `%-d` strips a leading zero from the day (`May 5`, not `May 05`).
+    Linux/macOS only; this app runs on neither Windows nor any platform
+    that needs `%#d`. If that changes, swap to `strftime('%b %d').lstrip('0')`.
+    """
+    if value is None:
+        return ""
+    if isinstance(value, datetime):
+        d = value.date()
+    elif isinstance(value, date):
+        d = value
+    else:
+        return ""
+    today = date.today()
+    if d.year == today.year:
+        return d.strftime("%b %-d")
+    return d.strftime("%b %-d, %Y")
+
 
 _env = Environment(
     loader=FileSystemLoader("src/domain/templates"),
@@ -96,6 +122,8 @@ register_choice_labels(enums.TREATMENT_SETTINGS, enums.TREATMENT_SETTINGS_LABELS
 register_choice_labels(enums.LICENSE_TYPES, enums.LICENSE_TYPES_LABELS)
 register_choice_labels(enums.EDUCATION_TYPES, enums.EDUCATION_TYPES_LABELS)
 register_choice_labels(enums.CERTIFICATION_TYPES, enums.CERTIFICATION_TYPES_LABELS)
+
+_env.filters["format_post_date"] = format_post_date
 
 templates = Jinja2Templates(env=_env)
 
