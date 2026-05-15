@@ -118,13 +118,15 @@ async def test_list_client_referral_item_shape(
     assert lead.attributes.get("href") == f"/posts/{post.id}"
     assert lead.text(strip=True) == description
 
-    # Meta tail carries the location, format, ages, languages, insurance.
+    # Meta tail carries the location, format, ages, languages.
+    # Insurance posture deliberately dropped from listing meta — it's
+    # noisy in a Craigslist-style feed; readers go to the detail page
+    # for in-network carriers + sliding-scale specifics.
     item_text = item.text()
     assert "Seattle, WA" in item_text
     assert "In-person + Virtual" in item_text
     assert "Adolescents 14–18" in item_text  # en-dash
     assert "English" in item_text and "Spanish" in item_text
-    assert "In-network" in item_text
 
 
 async def test_list_client_referral_falls_back_to_synthesized_title(
@@ -206,8 +208,43 @@ async def test_list_provider_availability_item_shape(
     item_text = item.text()
     assert "Portland, OR" in item_text
     assert "In-person" in item_text
-    assert "In-network" in item_text
-    assert "sliding" in item_text
+
+
+async def test_list_lead_contains_full_description_no_backend_truncation(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user: User,
+):
+    """The lead `<a>` contains the post's full description text — no
+    server-side `truncate()`. Visual clamping is CSS's job
+    (`-webkit-line-clamp: 2` on the title `<p>`), so long descriptions
+    stay in the DOM where `?q=` ILIKE filtering, search engines, and
+    screen readers can see them. A regression that re-introduced a
+    backend `truncate(N)` would silently lose text past N chars in
+    the DOM and break this test."""
+    author = create_test_user(username=f"author-{uuid.uuid4()}")
+    # Description longer than any plausible visual-clamp budget — if
+    # the backend truncates, this string won't appear intact in the DOM.
+    description = (
+        "Looking for a long-term outpatient therapist for a 17-year-old "
+        "(she/her) with complex PTSD, emerging self-injury, and a recent "
+        "psychiatric hospitalization. Mom is engaged and willing to do "
+        "family work. We need someone trauma-trained who can hold a frame "
+        "and ideally has DBT skills training to draw on. Aetna in-network "
+        "preferred but we can flex on insurance for the right fit."
+    )
+    post = _client_referral_post(description=description, owner_id=author.id)
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            session.add(author)
+            session.add(post)
+
+    response = await authenticated_client.get("/posts")
+    assert response.status_code == 200
+    tree = HTMLParser(response.text)
+    lead = tree.css_first("#posts-list > li a")
+    assert lead is not None
+    assert lead.text(strip=True) == description
 
 
 async def test_list_meta_is_an_inline_list_of_li_chunks(
@@ -248,15 +285,27 @@ async def test_list_meta_is_an_inline_list_of_li_chunks(
     item = tree.css_first("#posts-list > li")
     assert item is not None
 
-    # Metadata is a nested `<ul>` of `<li>` chunks — the inline-list
-    # pattern. The outer `#posts-list` `<ul>` keeps Pico-default
-    # bullets; the inner one is styled inline by CSS in base.html.
+    # Metadata is a nested `<ul>` of `<li>` chunks above the title —
+    # the inline-list pattern. Date and the kind chip both live in
+    # this list so the whole line reads uniformly. The outer
+    # `#posts-list` `<ul>` keeps Pico-default bullets; the inner one
+    # is styled inline by CSS in base.html.
     meta_chunks = item.css("ul > li")
-    # Location + format + ages + insurance = 4 chunks. (English-only
-    # languages are dropped by the macro since `en` is the default.)
-    assert len(meta_chunks) == 4
+    # date + Seeking + location + format + ages = 5 chunks.
+    # (English-only languages are dropped by the macro since `en` is
+    # the default; insurance is no longer in the listing meta —
+    # readers go to the detail page for that.)
+    assert len(meta_chunks) == 5
     rendered = [li.text(strip=True) for li in meta_chunks]
-    assert rendered == ["Seattle, WA", "In-person", "Adolescents 14–18", "In-network"]
+    # The first chunk is the formatted date — content depends on
+    # `now()`, so just check it's non-empty rather than pin a value.
+    assert rendered[0]
+    assert rendered[1:] == [
+        "Seeking",
+        "Seattle, WA",
+        "In-person",
+        "Adolescents 14–18",
+    ]
     # No `·` separator anywhere in the parsed DOM text — the glyph
     # lives in CSS `::before content`, not the HTML.
     assert "·" not in item.text()
@@ -276,7 +325,7 @@ async def test_list_renders_readable_date_format(
     """The leading date renders Craigslist-style (`May 15`) via the
     `format_post_date` Jinja filter — *not* the raw ISO `YYYY-MM-DD`
     that `post.created_at.date()` produced before. The date is the
-    first `<small>` direct child of the row, per the macro's layout."""
+    first chunk in the meta `<ul>`."""
     from datetime import datetime, timezone
 
     author = create_test_user(username=f"author-{uuid.uuid4()}")
@@ -293,8 +342,8 @@ async def test_list_renders_readable_date_format(
     tree = HTMLParser(response.text)
     item = tree.css_first("#posts-list > li")
     assert item is not None
-    # First `<small>` direct child of the row is the leading date.
-    date_cell = item.css_first("small")
+    # First chunk of the meta `<ul>` is the leading date.
+    date_cell = item.css_first("ul > li")
     assert date_cell is not None
     rendered = date_cell.text(strip=True)
     # `May 15` for current-year posts; `May 15, 2025` once we cross a
