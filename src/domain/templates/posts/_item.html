@@ -46,9 +46,11 @@ filter — see [`src/framework/rendering/templating.py`](../../../framework/rend
 #}
 
 {% macro _meta_chunks(post) %}
-{# Yields one `<small>` per metadata chunk, no separators.
-   The browser flows them inline within the meta `<p>`; whitespace
-   between elements is the visual delineation. #}
+{# Yields one `<li>` per metadata chunk, no separators in markup.
+   The wrapper `<ul>` in `post_item` flips display to inline (see the
+   `#posts-list ul` rule in `base.html`) and CSS `::before` inserts a
+   `·` between adjacent items — semantic-but-styled-inline, the same
+   shape `<nav><ul>` uses in Pico for its links. #}
 {%- if post.kind == "client_referral" -%}
   {%- set d = post.client_referral_detail -%}
   {%- set city = d.location_city -%}
@@ -72,22 +74,22 @@ filter — see [`src/framework/rendering/templating.py`](../../../framework/rend
     {%- if p.sliding_scale %} (sliding){% endif -%}
   {%- endset -%}
 {%- endif -%}
-{%- if city and state %}<small>{{ city }}, {{ state }}</small>{% endif %}
+{%- if city and state %}<li>{{ city }}, {{ state }}</li>{% endif %}
 {%- set fmt = [] -%}
 {%- if in_person == "yes" -%}{%- set _ = fmt.append("In-person") -%}{%- endif -%}
 {%- if virtual == "yes" -%}{%- set _ = fmt.append("Virtual") -%}{%- endif -%}
-{%- if fmt %}<small>{{ fmt | join(" + ") }}</small>{% endif %}
+{%- if fmt %}<li>{{ fmt | join(" + ") }}</li>{% endif %}
 {%- if d.age_groups %}
   {%- set ages = [] -%}
   {%- for g in d.age_groups[:2] -%}{%- set _ = ages.append(CLIENT_AGE_GROUP_LABELS[g]) -%}{%- endfor -%}
   {%- if d.age_groups | length > 2 -%}{%- set _ = ages.append("+" ~ (d.age_groups | length - 2)) -%}{%- endif -%}
-<small>{{ ages | join(", ") }}</small>{% endif %}
+<li>{{ ages | join(", ") }}</li>{% endif %}
 {%- if d.languages and not (d.languages | length == 1 and d.languages[0] == "en") %}
   {%- set langs = [] -%}
   {%- for l in d.languages[:2] -%}{%- set _ = langs.append(LANGUAGE_LABELS[l]) -%}{%- endfor -%}
   {%- if d.languages | length > 2 -%}{%- set _ = langs.append("+" ~ (d.languages | length - 2)) -%}{%- endif -%}
-<small>{{ langs | join(", ") }}</small>{% endif %}
-<small>{{ insurance_label }}</small>
+<li>{{ langs | join(", ") }}</li>{% endif %}
+<li>{{ insurance_label }}</li>
 {%- endmacro %}
 
 {% macro post_item(post, active_kind=None) -%}
@@ -116,6 +118,6 @@ filter — see [`src/framework/rendering/templating.py`](../../../framework/rend
       {%- if d.description %} — {{ d.description | truncate(120) }}{% endif -%}
     {%- endif -%}
   </a>
-  <p>{{ _meta_chunks(post) }}</p>
+  <ul>{{ _meta_chunks(post) }}</ul>
 </li>
 {%- endmacro %}
