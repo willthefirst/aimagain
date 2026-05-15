@@ -67,6 +67,18 @@
       }
       .index-filters .filter-remove:hover { color: var(--pico-color); }
       .index-filters .add-filter-row { margin-block-end: 0.5rem; max-width: 24rem; }
+      /* Posts feed — metadata inline list.
+         Each post `<li>` carries a nested `<ul>` of metadata facts
+         (location, format, ages, …). The outer `#posts-list <ul>` keeps
+         Pico's default bullet styling (one bullet per post). The inner
+         `<ul>` is the inline-list pattern: block-level wrapper drops
+         the second line under the title, `<li>` children flow inline,
+         and `::before` on adjacent siblings inserts a `·` separator
+         that lives in CSS rather than markup. Scoped tightly by
+         `> ul > li` so it can't leak to nested lists elsewhere. */
+      #posts-list > li > ul { padding: 0; list-style: none; }
+      #posts-list > li > ul > li { display: inline; }
+      #posts-list > li > ul > li + li::before { content: " · "; color: var(--pico-muted-color); }
     </style>
     <script
       src="https://unpkg.com/htmx.org@2.0.4"

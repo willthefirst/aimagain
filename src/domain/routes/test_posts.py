@@ -210,16 +210,17 @@ async def test_list_provider_availability_item_shape(
     assert "sliding" in item_text
 
 
-async def test_list_meta_is_a_separate_paragraph_of_small_chunks(
+async def test_list_meta_is_an_inline_list_of_li_chunks(
     authenticated_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user: User,
 ):
-    """Each metadata fact is its own `<small>` element inside a `<p>`
-    that follows the title link — no `·` separators, no inline trailing
-    `<small>` glued onto the title line. A regression that collapsed
-    the chunks back into one `<small>` joined by `·` (or onto the title
-    line) would fail here.
+    """Each metadata fact is its own `<li>` inside a nested `<ul>`
+    after the title link — the inline-list pattern. The `·` visual
+    separator lives in CSS (`#posts-list > li > ul > li + li::before`)
+    rather than the markup, so the DOM text has no `·` glyphs. A
+    regression that collapsed the chunks back into a single
+    `·`-joined string (or onto the title line) would fail here.
 
     Also: no owner-username link in the listing row. The author lives
     on the detail page; the listing reads as Craigslist, not as a feed
@@ -247,18 +248,17 @@ async def test_list_meta_is_a_separate_paragraph_of_small_chunks(
     item = tree.css_first("#posts-list > li")
     assert item is not None
 
-    # The metadata lives in its own `<p>`; multiple `<small>` chunks,
-    # no `·` separator characters. (The title-line `<small>` for the
-    # date sits before the `<p>`, not inside it.)
-    meta = item.css_first("p")
-    assert meta is not None
-    meta_smalls = meta.css("small")
+    # Metadata is a nested `<ul>` of `<li>` chunks — the inline-list
+    # pattern. The outer `#posts-list` `<ul>` keeps Pico-default
+    # bullets; the inner one is styled inline by CSS in base.html.
+    meta_chunks = item.css("ul > li")
     # Location + format + ages + insurance = 4 chunks. (English-only
     # languages are dropped by the macro since `en` is the default.)
-    assert len(meta_smalls) == 4
-    rendered = [s.text(strip=True) for s in meta_smalls]
+    assert len(meta_chunks) == 4
+    rendered = [li.text(strip=True) for li in meta_chunks]
     assert rendered == ["Seattle, WA", "In-person", "Adolescents 14–18", "In-network"]
-    # No `·` separator anywhere in the row.
+    # No `·` separator anywhere in the parsed DOM text — the glyph
+    # lives in CSS `::before content`, not the HTML.
     assert "·" not in item.text()
 
     # No owner-username link in the listing row — only the lead link.
