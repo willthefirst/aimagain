@@ -60,6 +60,12 @@
          at a glance without a background or extra markup. */
       [data-kind-chip="client_referral"] { color: darkorange; font-weight: 600; }
       [data-kind-chip="provider_availability"] { color: darkcyan; font-weight: 600; }
+      /* Filter-form collapsible summary: shrink to fit its text so the
+         disclosure caret sits next to "Filter" rather than at the far
+         right of a full-width row. Click target stays roomy enough; the
+         tight footprint also signals "this is a toggle, not a section
+         heading." */
+      .index-filters summary { width: fit-content; }
       #posts-list > div > p {
         display: -webkit-box;
         -webkit-box-orient: vertical;
