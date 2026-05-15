@@ -9,14 +9,34 @@
 {%- endif -%}
 {% endblock %}
 
+{# The detail page is the *unfold* of a card on /posts. Sections are
+   ordered by what a reader needs to decide whether to act on the post:
+   1. Header — kind chip, title, posted-by/posted-at (same identifiers
+      the card showed).
+   2. Description — full prose; promoted above the metadata grid
+      because it's what the card preview was teasing.
+   3. Match facts (`<dl>`) — the card's chip line, expanded: full age-
+      group list, languages, services, modality, full carrier list,
+      insurance posture, sliding scale, schedule.
+   4. Footer — for `provider_availability` the call-to-action (website
+      + referral instructions) and `_owner_actions.html`. For
+      `client_referral` just `_owner_actions.html` + back link. #}
 {% block content %}
 <article>
 {% if post.kind == "client_referral" %}
 {% set d = post.client_referral_detail %}
   <header>
-    <h1>Client referral</h1>
-    <small>by <a href="/users/{{ post.owner_id }}">{{ post.owner.username }}</a></small>
+    <hgroup>
+      <h1>Seeking in {{ d.location_city }}, {{ d.location_state }}</h1>
+      <p>
+        <mark data-kind-chip="client_referral">Seeking</mark>
+        <small>by <a href="/users/{{ post.owner_id }}">{{ post.owner.username }}</a> · {{ post.created_at.date() }}</small>
+      </p>
+    </hgroup>
   </header>
+
+  <p>{{ d.description }}</p>
+
   <dl>
     <dt>Location</dt>
     <dd>{{ d.location_city }}, {{ d.location_state }} {{ d.location_zip }}</dd>
@@ -32,8 +52,6 @@
     <dd>{% for g in d.age_groups %}{{ CLIENT_AGE_GROUP_LABELS[g] }}{% if not loop.last %}, {% endif %}{% endfor %}</dd>
     <dt>Languages</dt>
     <dd>{% for l in d.languages %}{{ LANGUAGE_LABELS[l] }}{% if not loop.last %}, {% endif %}{% endfor %}</dd>
-    <dt>Description</dt>
-    <dd>{{ d.description }}</dd>
     {% if d.services %}
     <dt>Services</dt>
     <dd>{% for s in d.services %}{{ CLIENT_REFERRAL_SERVICE_LABELS[s] }}{% if not loop.last %}, {% endif %}{% endfor %}</dd>
@@ -45,23 +63,27 @@
     <dt>Insurance</dt>
     <dd>{{ INSURANCE_LABELS[d.insurance] }}</dd>
   </dl>
+
 {% elif post.kind == "provider_availability" %}
 {% set d = post.provider_availability_detail %}
 {% set p = d.provider %}
   <header>
-    <h1>Provider availability</h1>
-    <small>by <a href="/users/{{ post.owner_id }}">{{ post.owner.username }}</a></small>
+    <hgroup>
+      <h1>{{ p.practice_name }}</h1>
+      <p>
+        <mark data-kind-chip="provider_availability">Offering</mark>
+        <small>by <a href="/users/{{ post.owner_id }}">{{ post.owner.username }}</a> · {{ post.created_at.date() }}</small>
+      </p>
+    </hgroup>
   </header>
+
   {% if d.description %}
   <p>{{ d.description }}</p>
   {% endif %}
+
   <dl>
-    <dt>Practice name</dt>
+    <dt>Practice</dt>
     <dd><a href="/providers/{{ p.id }}">{{ p.practice_name }}</a></dd>
-    {% if d.website %}
-    <dt>Website</dt>
-    <dd><a href="{{ d.website }}" target="_blank" rel="noopener noreferrer">{{ d.website }}</a></dd>
-    {% endif %}
     <dt>Location</dt>
     <dd>{{ p.location_city }}, {{ p.location_state }} {{ p.location_zip }}</dd>
     <dt>In-person sessions</dt>
@@ -107,10 +129,16 @@
     <dd>{{ p.cost }}</dd>
     {% endif %}
   </dl>
-  {% if d.referral_instructions %}
+
+  {% if d.referral_instructions or d.website %}
   <section>
     <h2>How to refer</h2>
+    {% if d.website %}
+    <p><a href="{{ d.website }}" target="_blank" rel="noopener noreferrer">{{ d.website }}</a></p>
+    {% endif %}
+    {% if d.referral_instructions %}
     <p>{{ d.referral_instructions }}</p>
+    {% endif %}
   </section>
   {% endif %}
 {% endif %}
