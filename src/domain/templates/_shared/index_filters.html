@@ -3,10 +3,15 @@
 Given a tuple of `Filter` instances (declared on
 `EntitySpec.filters`, echoed into the list template context by
 `handle_list`) plus the route's URL, renders a plain
-`<form method="get">` with one control per filter. User changes
-controls, clicks Apply to submit, Clear links back to the bare
-collection URL. No HTMX, no JS — the form is a normal GET submission,
-all filters visible at all times.
+`<form method="get">` whose body is wrapped in a `<details>` that
+collapses by default. User clicks "Filter" to expand, sets controls,
+clicks Apply to submit, Clear links back to the bare collection URL.
+No HTMX, no JS — the form is a normal GET submission, the
+collapsible is native HTML5.
+
+If any filter has a URL-active value, the `<details>` renders with
+the `open` attribute so the user lands seeing what's currently
+applied; otherwise it lands collapsed.
 
 Args:
   filters: tuple of `Filter` instances from the list context.
@@ -20,15 +25,16 @@ Args:
 
 {% macro index_filters(filters, action, values) -%}
 {%- if filters %}
+{%- set any_active = values.values() | select | list -%}
 <form class="index-filters" method="get" action="{{ action }}">
-  <fieldset>
-    <legend>Filter</legend>
+  <details{% if any_active %} open{% endif %}>
+    <summary>Filter</summary>
     {%- for f in filters %}
     {{ _filter_control(f, values.get(f.name)) }}
     {%- endfor %}
     <button type="submit">Apply</button>
     <a href="{{ action }}" role="button" class="secondary outline">Clear</a>
-  </fieldset>
+  </details>
 </form>
 {%- endif -%}
 {%- endmacro %}

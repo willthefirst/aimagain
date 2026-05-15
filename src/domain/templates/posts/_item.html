@@ -10,9 +10,10 @@ the line-clamp rule for the title `<p>`.
 
 The row is two lines: a meta `<ul>` above, a title `<p>` below.
 Meta carries every fact about the post — date, kind chunk (Seeking
-or Providing, wrapped in `<mark>` for emphasis), location, in-person
-/ virtual format, age groups, and languages when non-default — each
-chunk inside its own `<li><small>…</small></li>`. The inline-list
+or Providing — colored via the `[data-kind-chip]` attribute selector
+on the `<li>` wrapper), location, in-person / virtual format, age
+groups, and languages when non-default — each chunk inside its own
+`<li><small>…</small></li>`. The inline-list
 CSS in `base.html` flips the children to `display: inline` and
 inserts a `·` between adjacent siblings via `::before`, so the
 separator lives in CSS rather than markup. The title `<p>` is
@@ -69,7 +70,7 @@ the detail page for posture and carrier specifics.
 {%- endif -%}
 <li><small>{{ post.created_at | format_post_date }}</small></li>
 {%- if active_kind is none %}
-<li data-kind-chip="{{ post.kind }}"><small><mark>{{ kind_label }}</mark></small></li>
+<li data-kind-chip="{{ post.kind }}"><small>{{ kind_label }}</small></li>
 {%- endif -%}
 {%- if city and state %}<li><small>{{ city }}, {{ state }}</small></li>{% endif %}
 {%- set fmt = [] -%}
