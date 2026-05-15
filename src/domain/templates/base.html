@@ -28,20 +28,6 @@
         --pico-font-size-h3: 1.125rem;
         --pico-font-size-h4: 1rem;
       }
-      main.container.narrow { max-width: 40rem; }
-      /* Inline grid rows (e.g. Apply/Clear). Stops the row from stretching
-         to the full container width on wide viewports. */
-      .grid.inline { max-width: 24rem; }
-      /* Section dividers between fieldsets read as visual noise once the
-         legend itself is prominent. Pico draws fieldset borders; drop them
-         and lean on legend + spacing for grouping. */
-      fieldset { border: 0; padding: 0; margin-inline: 0; }
-      fieldset > legend { padding-inline: 0; font-weight: 600; }
-      /* `<dl>` rows are key-value pairs — tighten the row gap and inline
-         the dt so the column reads as a table, not a stack of paragraphs. */
-      dl { display: grid; grid-template-columns: max-content 1fr; column-gap: 1rem; row-gap: 0.25rem; }
-      dl > dt { margin: 0; font-weight: 600; }
-      dl > dd { margin: 0; }
       /* Breadcrumb trail above page content. Pico has no breadcrumb
          primitive, so the trail is a tight inline list with " / "
          separators rendered via CSS so the markup stays semantic. */
@@ -49,49 +35,26 @@
       nav.breadcrumb ol { list-style: none; padding: 0; margin: 0; display: flex; flex-wrap: wrap; gap: 0.25rem; }
       nav.breadcrumb li + li::before { content: "/"; padding-inline: 0.25rem; color: var(--pico-muted-color); }
       nav.breadcrumb [aria-current="page"] { color: var(--pico-muted-color); }
-      /* Index-page tables stay inside the viewport on narrow screens. The
-         `.index-table` wrapper (see `_shared/index_table.html`) scrolls
-         horizontally instead of pushing the body wide, so a 7-column table
-         on a phone shows a scroll-affordance rather than breaking layout. */
-      .index-table { overflow-x: auto; -webkit-overflow-scrolling: touch; }
-      /* Index-page filter UI. Each filter renders as a `.filter-control`
-         cell that the inline script hides until the user adds it (or until
-         the URL preselects a value). The remove "×" is positioned in the
-         corner so the underlying `<label>` keeps its full click-target. */
-      .index-filters .filter-control { position: relative; }
-      .index-filters .filter-remove {
-        position: absolute; top: 0; right: 0;
-        background: transparent; border: 0; padding: 0 0.25rem;
-        font-size: 1.25rem; line-height: 1; color: var(--pico-muted-color);
-        cursor: pointer; width: auto; margin: 0;
-      }
-      .index-filters .filter-remove:hover { color: var(--pico-color); }
-      .index-filters .add-filter-row { margin-block-end: 0.5rem; max-width: 24rem; }
-      /* Posts feed — meta-line above, line-clamped title-link below.
+      /* Posts feed — inline meta list + title line-clamp. Two
+         patterns, both scoped under `#posts-list > div`:
 
-         Each post `<li>` is a meta `<ul>` followed by a title `<a>`.
-         The meta line carries every "fact about the post" chunk —
-         date, Seeking/Providing, location, format, ages, languages —
-         each as its own `<li><small>…</small></li>`. The outer
-         `#posts-list` `<ul>` keeps Pico's default bullet (one bullet
-         per post); the inner `<ul>` is the inline-list pattern:
-         `<li>` children flow inline and `::before` on adjacent
-         siblings inserts a `·` separator in CSS rather than markup.
-         `margin: 0` keeps the meta line tight against the title.
+         1. Each post's meta `<ul>` is an inline-list — `<li>`
+            children flow inline, and `::before` on adjacent siblings
+            inserts a `·` separator that lives in CSS rather than
+            markup. Pico's default `<ul>` would render vertically
+            with bullets; this flips it to a single inline row.
+         2. Each post's title `<p>` clamps to 3 lines visually with
+            an ellipsis. Long descriptions stay in the DOM so `?q=`
+            ILIKE, search engines, and screen readers all see them.
 
-         The title `<a>` is `display: -webkit-box` with
-         `-webkit-line-clamp: 2` so long descriptions visually clamp
-         to two lines with an ellipsis. The full description stays in
-         the DOM (so `?q=` ILIKE, search engines, and screen readers
-         all see it) — there's no backend `truncate()`. Selectors are
-         scoped tightly by `#posts-list > li >` so the rules can't
-         leak to lists or links elsewhere on the page. */
-      ul#posts-list { list-style: none; padding-inline-start: 0; }
-      #posts-list > li { list-style: none; margin-block: 1.75rem; }
-      #posts-list > li > ul { padding: 0; margin: 0; list-style: none; }
-      #posts-list > li > ul > li { display: inline; }
-      #posts-list > li > ul > li + li::before { content: " · "; color: var(--pico-muted-color); }
-      #posts-list > li > p {
+         Per-post framing (padding, background, vertical margin
+         between cards) is whatever Pico's `<article>` defaults give
+         — no bespoke CSS for the frame itself. */
+      #posts-list > div { margin-block: 1.25rem; }
+      #posts-list > div > ul { padding: 0; margin: 0; list-style: none; }
+      #posts-list > div > ul > li { display: inline; }
+      #posts-list > div > ul > li + li::before { content: " · "; color: var(--pico-muted-color); }
+      #posts-list > div > p {
         display: -webkit-box;
         -webkit-box-orient: vertical;
         -webkit-line-clamp: 3;
