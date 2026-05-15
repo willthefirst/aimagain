@@ -2,12 +2,11 @@
 
 Posts are polymorphic — `client_referral` (Seeking) and
 `provider_availability` (Providing). Each post renders as a plain
-`<li>` inside `<ul id="posts-list">`. The outer `<ul>` drops the
-default bullet + indent (`list-style: none; padding-inline-start: 0`),
-so the rows read as flat text rather than a bulleted list; each
-`<li>` gets a `margin-block` for breathing room. No card frame, no
-row borders. All CSS lives in `base.html` scoped under
-`#posts-list > li`.
+`<div>` inside `<section id="posts-list">` — no per-post framing,
+no card styling, just the meta line and title flowing as content.
+Bespoke CSS is reduced to two patterns both scoped under
+`#posts-list > div`: the inline-list rules for the meta `<ul>`, and
+the line-clamp rule for the title `<p>`.
 
 The row is two lines: a meta `<ul>` above, a title `<p>` below.
 Meta carries every fact about the post — date, kind chunk (Seeking
@@ -96,7 +95,7 @@ the detail page for posture and carrier specifics.
   {%- set d = post.provider_availability_detail -%}
   {%- set p = d.provider -%}
 {%- endif -%}
-<li data-row-id="{{ post.id }}" data-kind="{{ post.kind }}">
+<div data-row-id="{{ post.id }}" data-kind="{{ post.kind }}">
   <ul>{{ _meta_chunks(post, active_kind=active_kind) }}</ul>
   <p>
     <a href="/posts/{{ post.id }}">
@@ -112,5 +111,5 @@ the detail page for posture and carrier specifics.
       {%- endif -%}
     </a>
   </p>
-</li>
+</div>
 {%- endmacro %}
