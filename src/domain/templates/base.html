@@ -84,12 +84,12 @@
          to two lines with an ellipsis. The full description stays in
          the DOM (so `?q=` ILIKE, search engines, and screen readers
          all see it) — there's no backend `truncate()`. Selectors are
-         scoped tightly by `#posts-list > li >` so the rules can't
+         scoped tightly by `#posts-list > article >` so the rules can't
          leak to lists or links elsewhere on the page. */
-      #posts-list > li > ul { padding: 0; margin: 0; list-style: none; }
-      #posts-list > li > ul > li { display: inline; }
-      #posts-list > li > ul > li + li::before { content: " · "; color: var(--pico-muted-color); }
-      #posts-list > li > p {
+      #posts-list > article > ul { padding: 0; margin: 0; list-style: none; }
+      #posts-list > article > ul > li { display: inline; }
+      #posts-list > article > ul > li + li::before { content: " · "; color: var(--pico-muted-color); }
+      #posts-list > article > p {
         display: -webkit-box;
         -webkit-box-orient: vertical;
         -webkit-line-clamp: 2;
