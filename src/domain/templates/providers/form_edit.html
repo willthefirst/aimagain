@@ -1,17 +1,14 @@
-{% extends "base.html" %}
+{% extends "_shared/_form_page.html" %}
 {%- from "_shared/form_fields.html" import text_field, select_field, radio_bool_field, multi_select_field -%}
 {%- from "_shared/forms.html" import inline_add_form -%}
 {%- from "_shared/sections.html" import list_or_empty -%}
 {%- from "_shared/actions.html" import confirm_delete_button -%}
-{%- from "_shared/_breadcrumb.html" import breadcrumb -%}
 
-{% block breadcrumb %}
-{{ breadcrumb([
-  ("Providers", "/providers"),
-  (provider.practice_name, "/providers/" ~ provider.id),
-  ("Edit", none),
-]) }}
-{% endblock %}
+{% block resource_label %}Providers{% endblock %}
+{% block resource_url %}/providers{% endblock %}
+{% block parent_label %}{{ provider.practice_name }}{% endblock %}
+{% block parent_url %}/providers/{{ provider.id }}{% endblock %}
+{% block current_label %}Edit{% endblock %}
 
 {% block content %}
 <section>

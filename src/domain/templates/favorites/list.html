@@ -1,9 +1,8 @@
-{% extends "base.html" %}
+{% extends "_shared/_list_page.html" %}
 {%- from "_shared/index_table.html" import index_table -%}
 {%- from "_shared/_provider_row.html" import provider_headers, provider_row -%}
-{%- from "_shared/list_page.html" import list_breadcrumb -%}
 
-{% block breadcrumb %}{{ list_breadcrumb("Favorites") }}{% endblock %}
+{% block resource_label %}Favorites{% endblock %}
 
 {% block content %}
 {% call index_table(

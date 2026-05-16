@@ -1,10 +1,9 @@
-{% extends "base.html" %}
+{% extends "_shared/_detail_page.html" %}
 {%- from "_shared/_toolbar.html" import toolbar -%}
-{%- from "_shared/_breadcrumb.html" import breadcrumb -%}
 
-{% block breadcrumb %}
-{{ breadcrumb([("Providers", "/providers"), (provider.practice_name, none)]) }}
-{% endblock %}
+{% block resource_label %}Providers{% endblock %}
+{% block resource_url %}/providers{% endblock %}
+{% block current_label %}{{ provider.practice_name }}{% endblock %}
 
 {% block toolbar %}
 {# Primary resource actions (Favorite toggle, Edit) live in the

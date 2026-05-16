@@ -23,7 +23,8 @@ Files prefixed with `_` are shared partials, `{% include %}`d from full pages �
 - `index_table.html` — `index_table(items, headers, row, empty, id=None, row_kwargs={})`: the standard index-page table chrome (wrapping `<div class="index-table">`, `<table role="grid">`, empty-state `<p class="index-empty">`). The wrapper owns mobile-overflow: a site-wide `overflow-x: auto` in `base.html` scrolls a wide table inside its container instead of pushing the viewport wide, so list pages on a phone show a scroll-affordance rather than breaking layout. Headers and rows come from a cluster-local `<resource>/_columns.html` that exports `<resource>_headers()` and `<resource>_row(item, **row_kwargs)`. Every `/<collection>` list page renders through it — see `providers/list.html` for the canonical use. When the cluster's column macros read resource-specific Jinja context (e.g. `LICENSE_TYPES` flowing in via `EntitySpec.static_context`), import them `with context`. Pages with rich empty states (CTAs, per-viewer branches) invoke the macro via `{% call index_table(...) %}<p class="index-empty">…</p>{% endcall %}` and provide their own empty body.
 - `index_filters.html` — `index_filters(filters, action, values)`: filter form for an index page. Reads the `filters` tuple `handle_list` echoes into context (`Filter` instances declared on `EntitySpec.filters`; see [`../../framework/dispatch/filters.py`](../../framework/dispatch/filters.py)) and renders one control per filter (`<input type="search">` for `TextFilter`, `<select>` / `<select multiple>` for `ChoiceFilter`) inside a `<fieldset><legend>Filter</legend>` with Apply + Clear buttons. Plain `<form method="get">` — no JS, no progressive add/remove chrome. Every declared filter is always visible; users fill the ones they want and ignore the rest. Live today on `/posts`; the other list pages still use the legacy single-`QueryParam` shape and migrate when their filter set grows.
 - `_provider_row.html` — `provider_headers()`, `provider_row(provider)`: the provider row shape, shared across `/providers`, `/users/me/favorites`, `/users/{id}/providers`, and the embedded `<section>Providers</section>` on `/users/{id}`. Lives in `_shared/` (not `providers/`) because cross-cluster template imports aren't allowed; provider-specific filter form stays in `providers/_columns.html` since only the /providers index uses it.
-- `list_page.html` — `list_breadcrumb(label)` and `list_toolbar(filters, action, values)`: chrome helpers for the canonical list page. `list_breadcrumb` renders the single-segment "current resource" crumb; `list_toolbar` wraps the filter widget in the `.toolbar-left` zone and accepts a `{% call %}` body for the `.toolbar-right` action cluster. Both are opt-in fillers for the `breadcrumb` and `toolbar` blocks in `base.html`; subresource lists with multi-segment breadcrumbs (e.g. `Users › <username> › Providers`) keep using the underlying `breadcrumb()` primitive from `_breadcrumb.html`. See `posts/list.html` and `providers/list.html` for canonical use.
+- `_list_page.html`, `_detail_page.html`, `_form_page.html` — page-kind base templates that pre-fill the breadcrumb block. See the **Page-kind base templates** section below.
+- `list_page.html` — `list_toolbar(filters, action, values)`: the toolbar shell for a list page. Wraps the filter widget in the `.toolbar-left` zone and accepts a `{% call %}` body for the `.toolbar-right` action cluster (typically the Create-resource button). Filling the `toolbar` block is still per-page since filter values and action labels are page-specific; this macro is just a one-line shortcut for the common shape. See `posts/list.html` and `providers/list.html` for canonical use.
 
 ## Page chrome contract
 
@@ -43,19 +44,48 @@ Every page extending `base.html` lands the same three-strip chrome above its con
 
 **Primary nav** lives in `base.html` and renders on every screen (authed *and* anonymous). Its right-side slot (`#primary-nav`) swaps the profile icon for a Login link depending on `is_authenticated`. Pages don't extend it.
 
-**Breadcrumb zone bar** (`{% block breadcrumb %}`, macro in `_shared/_breadcrumb.html`) renders Pico's native breadcrumb above the toolbar. Every authenticated page extends the block — chrome consistency is the goal. The shape follows the resource hierarchy `list > detail > edit/new`, each level appending one segment:
+**Breadcrumb zone bar** (`{% block breadcrumb %}`, macro in `_shared/_breadcrumb.html`) renders Pico's native breadcrumb above the toolbar. Pages don't fill this block themselves — they `{% extends %}` a **page-kind base template** that fills it from declarative metadata blocks (see below). The shape follows the resource hierarchy `list > detail > edit/new`, each level appending one segment:
 
-| Page type        | URL example                    | Breadcrumb                            |
-| ---------------- | ------------------------------ | ------------------------------------- |
-| Resource list    | `/posts`                       | `Posts`                               |
-| Resource detail  | `/posts/{id}`                  | `Posts › Post`                        |
-| Resource new     | `/posts/form`                  | `Posts › New`                         |
-| Resource edit    | `/posts/{id}/form`             | `Posts › Post › Edit`                 |
-| Subresource list | `/users/{id}/providers`        | `Users › <username> › Providers`      |
+| Page type        | URL example                    | Breadcrumb                            | Page-kind base                  |
+| ---------------- | ------------------------------ | ------------------------------------- | ------------------------------- |
+| Resource list    | `/posts`                       | `Posts`                               | `_shared/_list_page.html`       |
+| Resource detail  | `/posts/{id}`                  | `Posts › Post`                        | `_shared/_detail_page.html`     |
+| Resource new     | `/posts/form`                  | `Posts › New`                         | `_shared/_form_page.html`       |
+| Resource edit    | `/posts/{id}/form`             | `Posts › Post › Edit`                 | `_shared/_form_page.html`       |
+| Subresource list | `/users/{id}/providers`        | `Users › <username> › Providers`      | `base.html` + `breadcrumb()`    |
 
-Every prior segment is a link (`<a href="…">`); the trailing segment is the current page (no `href`, gets `aria-current="page"`). Single-segment list breadcrumbs are still wrapped in the nav so the chrome strip is present and the strip height stays consistent across pages.
+Every prior segment is a link (`<a href="…">`); the trailing segment is the current page (no `href`, gets `aria-current="page"`). Public auth-flow pages (`/auth/login`, `/auth/register`, …) extend `base.html` directly — they aren't in the resource hierarchy.
 
-Public auth-flow pages (`/auth/login`, `/auth/register`, …) opt out — they aren't in the resource hierarchy.
+## Page-kind base templates
+
+Instead of rewiring the breadcrumb block in every page, page templates `{% extends %}` one of three sub-base templates in `_shared/` and declare their position in the hierarchy via small metadata blocks. The base template uses those blocks to fill `{% block breadcrumb %}` automatically.
+
+```jinja
+{# posts/list.html #}
+{% extends "_shared/_list_page.html" %}
+{% block resource_label %}Posts{% endblock %}
+{% block content %}…{% endblock %}
+
+{# posts/detail.html #}
+{% extends "_shared/_detail_page.html" %}
+{% block resource_label %}Posts{% endblock %}
+{% block resource_url %}/posts{% endblock %}
+{% block current_label %}Post{% endblock %}
+{% block content %}…{% endblock %}
+
+{# posts/edit_client_referral.html #}
+{% extends "_shared/_form_page.html" %}
+{% block resource_label %}Posts{% endblock %}
+{% block resource_url %}/posts{% endblock %}
+{% block parent_label %}Post{% endblock %}
+{% block parent_url %}/posts/{{ post.id }}{% endblock %}
+{% block current_label %}Edit{% endblock %}
+{% block content %}…{% endblock %}
+```
+
+`_list_page.html` reads `resource_label`. `_detail_page.html` reads `resource_label`, `resource_url`, `current_label`. `_form_page.html` reads those three plus optional `parent_label` + `parent_url` — when both are set, the breadcrumb nests a detail crumb between the resource and the current page (the canonical edit-page shape). When parent blocks are empty, the form base renders `Resource › Current` (the canonical new-page shape).
+
+Subresource list pages (e.g. `/users/{id}/providers`) don't fit any of the three shapes and extend `base.html` directly, filling `{% block breadcrumb %}` with the `breadcrumb()` primitive from `_shared/_breadcrumb.html`.
 
 **Toolbar / action bar** is the zone bar for page-scoped controls. See `_shared/_toolbar.html` for the two-zone layout (`.toolbar-left` fills the row for filters; `.toolbar-right` parks page actions on the right; single-action toolbars right-align without wrappers). The toolbar is the single home for the page's **primary resource actions**: Edit, Delete, Deactivate/Reactivate, Favorite/Unfavorite. List pages compose the toolbar with `index_filters(...)` in the left zone and a Create-resource action in the right zone; detail pages compose it with the resource's action partial (`_owner_actions.html`, `_admin_actions.html`) or open-coded buttons. Pages without page-scoped controls leave the block empty.
 

@@ -1,0 +1,24 @@
+{# Base template for a resource **list page** (`/posts`, `/providers`,
+   `/users`, `/users/me/favorites`). Children `{% extends %}` this
+   file instead of `base.html` directly; the breadcrumb is filled in
+   automatically from the `resource_label` block.
+
+   Required child blocks:
+     resource_label — the resource label as the current crumb
+                      (`Posts`, `Providers`, …).
+
+   Optional child blocks (forwarded to `base.html`):
+     toolbar, content, head, container_class.
+
+   Subresource list pages (e.g. `/users/{id}/providers` with crumb
+   `Users › <username> › Providers`) don't fit this single-segment
+   shape — extend `base.html` directly and use the `breadcrumb()`
+   primitive in `_breadcrumb.html` instead.
+#}
+
+{% extends "base.html" %}
+{%- from "_shared/_breadcrumb.html" import breadcrumb -%}
+
+{% block resource_label %}Resource{% endblock %}
+
+{% block breadcrumb %}{{ breadcrumb([(self.resource_label(), none)]) }}{% endblock %}

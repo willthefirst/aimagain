@@ -1,0 +1,30 @@
+{# Base template for a resource **detail page** (`/posts/{id}`,
+   `/providers/{id}`, `/users/{id}`). Children `{% extends %}` this
+   file instead of `base.html` directly; the breadcrumb is filled in
+   automatically from the three child blocks below.
+
+   Required child blocks:
+     resource_label — the resource label (`Posts`, `Providers`, …)
+                      used for the parent crumb's text.
+     resource_url   — the resource list URL (`/posts`) used as the
+                      parent crumb's `href`.
+     current_label  — the trailing crumb's text (`Post`, the user's
+                      username, the provider's `practice_name`).
+
+   Optional child blocks (forwarded to `base.html`):
+     toolbar, content, head, container_class.
+#}
+
+{% extends "base.html" %}
+{%- from "_shared/_breadcrumb.html" import breadcrumb -%}
+
+{% block resource_label %}Resource{% endblock %}
+{% block resource_url %}/{% endblock %}
+{% block current_label %}Detail{% endblock %}
+
+{% block breadcrumb %}
+{{ breadcrumb([
+  (self.resource_label(), self.resource_url() | trim),
+  (self.current_label(), none),
+]) }}
+{% endblock %}
