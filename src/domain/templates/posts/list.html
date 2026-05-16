@@ -22,9 +22,8 @@
 {% endblock %}
 
 {% block content %}
-{# Create-post entry lives in the primary nav as `+ Post` — see
-   `base.html`. The picker page (`/posts/form` with no `?kind=`)
-   handles the kind selection. #}
+{# Kind picker lives at `/posts/form` (no `?kind=`) — no UI entry
+   point currently links to it; reachable by typing the URL. #}
 {%- set any_filter_active =
   selected_kind or selected_q or selected_posted_by
   or selected_state or selected_city
