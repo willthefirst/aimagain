@@ -1,16 +1,14 @@
-{% extends "_shared/_detail_page.html" %}
+{% extends "views/detail.html" %}
 {%- from "_shared/index_table.html" import index_table -%}
 {%- from "_shared/_provider_row.html" import provider_headers, provider_row -%}
-{%- from "_shared/_toolbar.html" import toolbar -%}
+
+{% set resource_url = "/users" %}
 
 {% block resource_label %}Users{% endblock %}
-{% block resource_url %}/users{% endblock %}
 {% block current_label %}{{ target_user.username }}{% endblock %}
 
-{% block toolbar %}
-{% call toolbar() %}
-  {% include "users/_admin_actions.html" %}
-{% endcall %}
+{% block actions %}
+{% include "users/_admin_actions.html" %}
 {% endblock %}
 
 {% block content %}

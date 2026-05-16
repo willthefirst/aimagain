@@ -1,39 +1,37 @@
-{% extends "_shared/_detail_page.html" %}
-{%- from "_shared/_toolbar.html" import toolbar -%}
+{% extends "views/detail.html" %}
+
+{% set resource_url = "/providers" %}
 
 {% block resource_label %}Providers{% endblock %}
-{% block resource_url %}/providers{% endblock %}
 {% block current_label %}{{ provider.practice_name }}{% endblock %}
 
-{% block toolbar %}
+{% block actions %}
 {# Primary resource actions (Favorite toggle, Edit) live in the
    toolbar — see the "every page's toolbar is the home for resource
-   actions" rule in [`../README.md`](../README.md). `can_edit` and
-   `is_favorited` are computed by handle_get_provider_detail; templates
-   do not re-derive authorization predicates inline. #}
-{% call toolbar() %}
-  {% if is_authenticated %}
-  <span class="favorite-toggle">
-    {% if is_favorited %}
-    <button type="button"
-            class="secondary outline"
-            hx-delete="/users/me/favorites/{{ provider.id }}"
-            hx-confirm="Remove this provider from your favorites?">
-      Unfavorite
-    </button>
-    {% else %}
-    <button type="button"
-            class="outline"
-            hx-post="/users/me/favorites/{{ provider.id }}">
-      Favorite
-    </button>
-    {% endif %}
-  </span>
+   actions" rule in [`../../../framework/templates/README.md`](../../../framework/templates/README.md).
+   `can_edit` and `is_favorited` are computed by handle_get_provider_detail;
+   templates do not re-derive authorization predicates inline. #}
+{% if is_authenticated %}
+<span class="favorite-toggle">
+  {% if is_favorited %}
+  <button type="button"
+          class="secondary outline"
+          hx-delete="/users/me/favorites/{{ provider.id }}"
+          hx-confirm="Remove this provider from your favorites?">
+    Unfavorite
+  </button>
+  {% else %}
+  <button type="button"
+          class="outline"
+          hx-post="/users/me/favorites/{{ provider.id }}">
+    Favorite
+  </button>
   {% endif %}
-  {% if can_edit %}
-  <a href="/providers/{{ provider.id }}/form" role="button" class="outline">Edit provider</a>
-  {% endif %}
-{% endcall %}
+</span>
+{% endif %}
+{% if can_edit %}
+<a href="/providers/{{ provider.id }}/form" role="button" class="outline">Edit provider</a>
+{% endif %}
 {% endblock %}
 
 {% block content %}

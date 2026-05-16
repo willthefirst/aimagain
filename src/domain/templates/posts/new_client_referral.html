@@ -1,9 +1,9 @@
-{% extends "_shared/_form_page.html" %}
+{% extends "views/form_new.html" %}
 {% from "posts/_client_referral_form.html" import client_referral_form %}
 
+{% set resource_url = "/posts" %}
+
 {% block resource_label %}Posts{% endblock %}
-{% block resource_url %}/posts{% endblock %}
-{% block current_label %}New{% endblock %}
 
 {% block content %}
 <p>Per <code>notes/forms_spec.md</code>. No PII.</p>

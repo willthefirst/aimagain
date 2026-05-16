@@ -1,11 +1,11 @@
-{% extends "_shared/_form_page.html" %}
+{% extends "views/form_edit.html" %}
 {% from "posts/_provider_availability_form.html" import provider_availability_form %}
 
+{% set resource_url = "/posts" %}
+{% set resource_detail_url = "/posts/" ~ post.id %}
+
 {% block resource_label %}Posts{% endblock %}
-{% block resource_url %}/posts{% endblock %}
-{% block parent_label %}Post{% endblock %}
-{% block parent_url %}/posts/{{ post.id }}{% endblock %}
-{% block current_label %}Edit{% endblock %}
+{% block current_label %}Post{% endblock %}
 
 {% block content %}
 {{ provider_availability_form("patch", "/posts/" ~ post.id, "Save changes", post=post, schema=provider_availability_create_schema, current_user=current_user) }}

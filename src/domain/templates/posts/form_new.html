@@ -1,8 +1,8 @@
-{% extends "_shared/_form_page.html" %}
+{% extends "views/form_new.html" %}
+
+{% set resource_url = "/posts" %}
 
 {% block resource_label %}Posts{% endblock %}
-{% block resource_url %}/posts{% endblock %}
-{% block current_label %}New{% endblock %}
 
 {# Kind-picker for `GET /posts/form` (no `?kind=`). Each option is a
    stand-alone `<a role="button">` describing the post the user is

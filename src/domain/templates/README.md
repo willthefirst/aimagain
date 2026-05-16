@@ -1,119 +1,27 @@
-# Templates
+# Domain templates
 
-Jinja2, server-rendered, htmx for progressive enhancement. One cluster directory per resource.
+Per-entity Jinja templates. One cluster directory per resource (`providers/`, `users/`, `posts/`, `favorites/`, `auth/`); cluster-local partials are prefixed `_`.
 
-- `base.html` — every page extends this. HTMX setup + site-wide nav.
-- `_shared/` — cross-resource macros (see below).
-- `<resource>/` — that resource's templates. Cluster-local partials are prefixed `_`.
+Chrome, shared macros, and the generic view-type templates live in [`../../framework/templates/`](../../framework/templates/) — see its README for the full contract, including the page-chrome strips, the layering rule, and the four view-type templates (`views/list.html`, `views/detail.html`, `views/form_new.html`, `views/form_edit.html`) that this directory's pages extend.
 
-## Layering rule
+## Per-cluster grammar
 
-A template under `<resource>/` may only `{% extends %}` / `{% include %}` / `{% from %}` / `{% import %}` from: the project root (`base.html`), its own directory, or `_shared/`. Anything else means the partial is *de facto* shared and belongs in `_shared/`. Enforced by [`../../../scripts/dev/template_imports_check.py`](../../../scripts/dev/template_imports_check.py) (runs in `dev lint` and pre-commit).
+A resource cluster `<entity>/` typically contains:
 
-## Partial convention
+- `list.html` — extends `views/list.html`. Declares `resource_label`, optional `filters` / `filter_action` / `filter_values`, and a `content` block (the table or list body).
+- `detail.html` — extends `views/detail.html`. Declares `resource_label`, `current_label`, `resource_url`, optional `actions`, and `content`.
+- `form_new.html` — extends `views/form_new.html`. Declares `resource_label`, `resource_url`, and the form body in `content`.
+- `form_edit.html` — extends `views/form_edit.html`. Declares `resource_label`, `current_label`, `resource_url`, `resource_detail_url`, and the form body in `content`.
+- `_columns.html` (cluster-local partial) — `<entity>_headers()` / `<entity>_row(item, **row_kwargs)` macros consumed by `_shared/index_table.html` from the list page. Lives in the cluster (rather than `_shared/`) when only the entity's own list uses it.
+- `_<role>_actions.html` (cluster-local partial) — owner/admin action button clusters for the entity, `{% include %}`d from the detail page's `actions` block.
 
-Files prefixed with `_` are shared partials, `{% include %}`d from full pages — never rendered directly by routes. A partial documents its required context in a `{# ... #}` comment at the top and guards visibility on a single named flag (`{% if can_edit %}`). The handler computes the flag using [`../../framework/authz.py`](../../framework/authz.py) predicates; partials never introspect `current_user` to decide visibility. Backend authorization is enforced separately in the logic layer — the template guard is presentation only.
+Subresource lists (e.g. `/users/{id}/providers`) override `{% block breadcrumb %}` to land a multi-segment chain (`Users › <username> › Providers`) while still inheriting the list view's toolbar + content shape from `views/list.html`. See `users/providers_list.html`.
 
-## Shared macros (`_shared/`)
-
-- `form_fields.html` — `text_field`, `textarea_field`, `select_field`, `radio_bool_field`, `multi_select_field`, `time_grid_field`, and the schema-driven `field_for`. `<select>` macros iterate over the controlled-vocabulary tuples from [`../models/enums.py`](../models/enums.py) and resolve labels from `*_LABELS` — both registered as Jinja globals in [`../../framework/rendering/templating.py`](../../framework/rendering/templating.py). Adding a value to a tuple flows automatically to every form using these macros.
-- `forms.html` — `inline_add_form(...)`: single-fieldset form skeleton for sub-resource add forms.
-- `sections.html` — `list_or_empty(...)`: `<ul>` or empty-state. Caller passes the `<li>` body via `{% call(item) %}...{% endcall %}`.
-- `actions.html` — `confirm_delete_button(...)`: HTMX `hx-delete` button with confirm dialog.
-- `index_table.html` — `index_table(items, headers, row, empty, id=None, row_kwargs={})`: the standard index-page table chrome (wrapping `<div class="index-table">`, `<table role="grid">`, empty-state `<p class="index-empty">`). The wrapper owns mobile-overflow: a site-wide `overflow-x: auto` in `base.html` scrolls a wide table inside its container instead of pushing the viewport wide, so list pages on a phone show a scroll-affordance rather than breaking layout. Headers and rows come from a cluster-local `<resource>/_columns.html` that exports `<resource>_headers()` and `<resource>_row(item, **row_kwargs)`. Every `/<collection>` list page renders through it — see `providers/list.html` for the canonical use. When the cluster's column macros read resource-specific Jinja context (e.g. `LICENSE_TYPES` flowing in via `EntitySpec.static_context`), import them `with context`. Pages with rich empty states (CTAs, per-viewer branches) invoke the macro via `{% call index_table(...) %}<p class="index-empty">…</p>{% endcall %}` and provide their own empty body.
-- `index_filters.html` — `index_filters(filters, action, values)`: filter form for an index page. Reads the `filters` tuple `handle_list` echoes into context (`Filter` instances declared on `EntitySpec.filters`; see [`../../framework/dispatch/filters.py`](../../framework/dispatch/filters.py)) and renders one control per filter (`<input type="search">` for `TextFilter`, `<select>` / `<select multiple>` for `ChoiceFilter`) inside a `<fieldset><legend>Filter</legend>` with Apply + Clear buttons. Plain `<form method="get">` — no JS, no progressive add/remove chrome. Every declared filter is always visible; users fill the ones they want and ignore the rest. Live today on `/posts`; the other list pages still use the legacy single-`QueryParam` shape and migrate when their filter set grows.
-- `_provider_row.html` — `provider_headers()`, `provider_row(provider)`: the provider row shape, shared across `/providers`, `/users/me/favorites`, `/users/{id}/providers`, and the embedded `<section>Providers</section>` on `/users/{id}`. Lives in `_shared/` (not `providers/`) because cross-cluster template imports aren't allowed; provider-specific filter form stays in `providers/_columns.html` since only the /providers index uses it.
-- `_list_page.html`, `_detail_page.html`, `_form_page.html` — page-kind base templates that pre-fill the breadcrumb block. See the **Page-kind base templates** section below.
-- `list_page.html` — `list_toolbar(filters, action, values)`: the toolbar shell for a list page. Wraps the filter widget in the `.toolbar-left` zone and accepts a `{% call %}` body for the `.toolbar-right` action cluster (typically the Create-resource button). Filling the `toolbar` block is still per-page since filter values and action labels are page-specific; this macro is just a one-line shortcut for the common shape. See `posts/list.html` and `providers/list.html` for canonical use.
-
-## Page chrome contract
-
-Every page extending `base.html` lands the same three-strip chrome above its content. From top to bottom:
-
-```
-┌───────────────────────────────────────────────────────────┐
-│ <header> primary nav        brand + auth-aware right slot │  ← `base.html`
-├───────────────────────────────────────────────────────────┤
-│ breadcrumb zone bar          Resource › … › Current        │  ← `{% block breadcrumb %}` (detail/form pages only)
-├───────────────────────────────────────────────────────────┤
-│ toolbar / action bar         [filters left]    [actions ▶] │  ← `{% block toolbar %}`
-├───────────────────────────────────────────────────────────┤
-│ page content                                              │  ← `{% block content %}`
-└───────────────────────────────────────────────────────────┘
-```
-
-**Primary nav** lives in `base.html` and renders on every screen (authed *and* anonymous). Its right-side slot (`#primary-nav`) swaps the profile icon for a Login link depending on `is_authenticated`. Pages don't extend it.
-
-**Breadcrumb zone bar** (`{% block breadcrumb %}`, macro in `_shared/_breadcrumb.html`) renders Pico's native breadcrumb above the toolbar. Pages don't fill this block themselves — they `{% extends %}` a **page-kind base template** that fills it from declarative metadata blocks (see below). The shape follows the resource hierarchy `list > detail > edit/new`, each level appending one segment:
-
-| Page type        | URL example                    | Breadcrumb                            | Page-kind base                  |
-| ---------------- | ------------------------------ | ------------------------------------- | ------------------------------- |
-| Resource list    | `/posts`                       | `Posts`                               | `_shared/_list_page.html`       |
-| Resource detail  | `/posts/{id}`                  | `Posts › Post`                        | `_shared/_detail_page.html`     |
-| Resource new     | `/posts/form`                  | `Posts › New`                         | `_shared/_form_page.html`       |
-| Resource edit    | `/posts/{id}/form`             | `Posts › Post › Edit`                 | `_shared/_form_page.html`       |
-| Subresource list | `/users/{id}/providers`        | `Users › <username> › Providers`      | `base.html` + `breadcrumb()`    |
-
-Every prior segment is a link (`<a href="…">`); the trailing segment is the current page (no `href`, gets `aria-current="page"`). Public auth-flow pages (`/auth/login`, `/auth/register`, …) extend `base.html` directly — they aren't in the resource hierarchy.
-
-## Page-kind base templates
-
-Instead of rewiring the breadcrumb block in every page, page templates `{% extends %}` one of three sub-base templates in `_shared/` and declare their position in the hierarchy via small metadata blocks. The base template uses those blocks to fill `{% block breadcrumb %}` automatically.
-
-```jinja
-{# posts/list.html #}
-{% extends "_shared/_list_page.html" %}
-{% block resource_label %}Posts{% endblock %}
-{% block content %}…{% endblock %}
-
-{# posts/detail.html #}
-{% extends "_shared/_detail_page.html" %}
-{% block resource_label %}Posts{% endblock %}
-{% block resource_url %}/posts{% endblock %}
-{% block current_label %}Post{% endblock %}
-{% block content %}…{% endblock %}
-
-{# posts/edit_client_referral.html #}
-{% extends "_shared/_form_page.html" %}
-{% block resource_label %}Posts{% endblock %}
-{% block resource_url %}/posts{% endblock %}
-{% block parent_label %}Post{% endblock %}
-{% block parent_url %}/posts/{{ post.id }}{% endblock %}
-{% block current_label %}Edit{% endblock %}
-{% block content %}…{% endblock %}
-```
-
-`_list_page.html` reads `resource_label`. `_detail_page.html` reads `resource_label`, `resource_url`, `current_label`. `_form_page.html` reads those three plus optional `parent_label` + `parent_url` — when both are set, the breadcrumb nests a detail crumb between the resource and the current page (the canonical edit-page shape). When parent blocks are empty, the form base renders `Resource › Current` (the canonical new-page shape).
-
-Subresource list pages (e.g. `/users/{id}/providers`) don't fit any of the three shapes and extend `base.html` directly, filling `{% block breadcrumb %}` with the `breadcrumb()` primitive from `_shared/_breadcrumb.html`.
-
-**Toolbar / action bar** is the zone bar for page-scoped controls. See `_shared/_toolbar.html` for the two-zone layout (`.toolbar-left` fills the row for filters; `.toolbar-right` parks page actions on the right; single-action toolbars right-align without wrappers). The toolbar is the single home for the page's **primary resource actions**: Edit, Delete, Deactivate/Reactivate, Favorite/Unfavorite. List pages compose the toolbar with `index_filters(...)` in the left zone and a Create-resource action in the right zone; detail pages compose it with the resource's action partial (`_owner_actions.html`, `_admin_actions.html`) or open-coded buttons. Pages without page-scoped controls leave the block empty.
-
-Inline / subresource actions inside the page body (per-row delete buttons on `provider/form_edit.html`'s licensure list, inline-add-form submits) are **not** primary resource actions and stay where they are — they act on a single subentity, not on the page's resource.
-
-Edit forms keep a bottom `<a class="secondary outline">Cancel</a>` pointing at the resource's detail page — a deliberate "abandon this edit" affordance.
-
-`index_table` also supports `header_kwargs={}` for headers that vary by page state. Not every list uses the table shape — `/posts` renders a `<ul id="posts-list">` (Pico-default styling, no custom CSS) via `posts/_item.html::post_item(post, active_kind=None)` instead, since the polymorphic kinds need a description-led row (kind chip + lead text + per-chunk metadata) that the table's fixed columns can't express.
-
-List-page filter controls render through `_shared/index_filters.html` (one `_filter_control` macro per declared `Filter` instance on the spec). `select_field` (for create/edit) is required by default with an optional disabled placeholder.
+Pages that don't fit the resource grammar — the `/auth/*` flow's centered single-card layout, the `/posts/*` polymorphic create/edit forms — extend `base.html` directly and compose the `_shared/` macros by hand. See [`posts/README.md`](posts/README.md) for the two-layer `_<variant>_form.html` + `new_<variant>.html` pattern used for polymorphic intake.
 
 ## Schema-driven `field_for`
 
-`field_for(schema, name, label, current=None, required=None)` in `_shared/form_fields.html` introspects a Pydantic schema via the `field_spec` Jinja global (which points at [`../../framework/rendering/form_fields.py`](../../framework/rendering/form_fields.py)) to derive:
-
-- `required` — from whether the annotation is `T | None`.
-- `<select>` + choices — from `Literal[*TUPLE]`. Labels come from the choice-tuple registry populated in [`../../framework/rendering/templating.py`](../../framework/rendering/templating.py).
-- `pattern` / `maxlength` — from any `HtmlPattern` marker attached to an `Annotated[...]` alias in [`../../framework/schema_validators.py`](../../framework/schema_validators.py).
-
-`field_for` does not yet handle multi-select, checkbox grids, or radio-bool — those have form-level grouping the existing macros own and a schema-side shape (e.g. `list[Literal]`) that isn't yet a stable signal for which control to render. Hand-rolled `text_field` / `select_field` calls remain appropriate when the form intentionally diverges from the schema.
-
-## Per-kind form partials
-
-Resources with polymorphic intake forms follow a two-layer pattern within their cluster: `_<variant>_form.html` defines a form-body `{% macro %}` taking `(hx_method, action, submit_label, prefill=None)`; `new_<variant>.html` and `edit_<variant>.html` are ~5-line wrappers that call it. See the cluster's own README when this pattern is in use (e.g. [`posts/README.md`](posts/README.md)).
-
-## Template context
-
-Handlers pass only resource-specific data. Chrome scalars (`is_authenticated`, `is_admin`, `current_username`, `current_user_id`) and dev globals are merged in by `APIResponse.html_response` — handlers never compute or pass them. See [`../../framework/http/responses.py`](../../framework/http/responses.py).
+Form templates use `field_for(schema, name, label)` from [`../../framework/templates/_shared/form_fields.html`](../../framework/templates/_shared/form_fields.html) to derive each `<input>`'s attributes from the Pydantic schema. See the framework README for details — adding a value to a controlled-vocabulary tuple in [`../models/enums.py`](../models/enums.py) flows automatically to every form using these macros.
 
 ## Tests
 

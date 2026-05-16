@@ -2,18 +2,19 @@
 
 The `src/` tree is organized into two top-level concepts:
 
-- **`framework/`** — the domain-agnostic library. Dispatch helpers (`mount_entity`, the generic `handle_*` family), the audit framework, repository primitives, auth predicates, response/forms/projections helpers, Jinja templating setup, the SQLAlchemy `Base` / `BaseModel` / `AuditLog` infra, the polymorphic discriminator registry. Nothing in `framework/` knows what a "user" or "post" is — it reads specs as parameters.
+- **`framework/`** — the domain-agnostic library. Dispatch helpers (`mount_entity`, the generic `handle_*` family), the audit framework, repository primitives, auth predicates, response/forms/projections helpers, Jinja templating setup, the page-chrome and generic view-type templates (`base.html`, `_shared/`, `views/`), the SQLAlchemy `Base` / `BaseModel` / `AuditLog` infra, the polymorphic discriminator registry. Nothing in `framework/` knows what a "user" or "post" is — it reads specs as parameters.
 - **`domain/`** — everything entity-specific, layered by purpose. Each layer is clustered per entity.
 
 ```
 src/
 ├── framework/           ← AGNOSTIC: read by all entities; depends on none
+│   └── templates/                    ← base.html, _shared/ macros, views/ chrome
 └── domain/              ← DOMAIN: every entity-specific file
     ├── specs/<entity>.py             ← EntitySpec declarations
     ├── models/<entity>/              ← SQLAlchemy classes (clustered)
     ├── logic/<entity>/               ← handlers + repository + schema
     ├── routes/<entity>.py            ← thin route file: mount_entity(spec)
-    └── templates/<entity>/           ← Jinja templates
+    └── templates/<entity>/           ← Jinja templates (extend framework/templates/views/*)
 ```
 
 Plus three loose files at `src/`:
@@ -50,7 +51,7 @@ The work is concentrated. For each step, also add or extend the colocated `test_
 3. **Logic cluster** — create `domain/logic/<entity>/` with `schema.py` (Pydantic types), `repository.py` (only methods with custom SQL — the framework calls `BaseRepository`'s public aliases for the standard shapes; see [`framework/README.md`](framework/README.md)), and `handlers.py` for bespoke business logic the framework can't subsume (custom auth, multi-step writes, edge mutations).
 4. **Spec** — declare `<ENTITY>_ENTITY: EntitySpec` in [`domain/specs/<entity>.py`](domain/specs/) carrying identity, audit binding, route opt-ins, write_authz, body adapters, templates, filters, discriminator (for polymorphism), parent (for owned subentities), private-field visibility, state axes, related-list subresources, M:N relations. Add a colocated `test_<entity>.py` asserting the spec declares the right values.
 5. **Route** — create `domain/routes/<entity>.py` and call `mount_entity(router, <ENTITY>_ENTITY, handlers={...}, owned_subentities=(...))` once. The dispatcher stitches factory-built handlers onto the route module (auto-detected from the caller frame) as `_handle_<verb>_<entity>` so contract-test patches resolve through it. See [`domain/routes/README.md`](domain/routes/README.md).
-6. **Template (if rendering HTML)** — add the Jinja2 template in [`domain/templates/<entity>/`](domain/templates/README.md).
+6. **Template (if rendering HTML)** — add the Jinja2 template in [`domain/templates/<entity>/`](domain/templates/README.md) extending the relevant view-type template from [`framework/templates/views/`](framework/templates/README.md).
 
 For polymorphic entities (`Post` / `kind`), see [`domain/models/posts/post_kinds.py`](domain/models/posts/post_kinds.py). The spec sets `discriminator=<registry>` and the framework's `handle_create` / `handle_update` dispatch through it automatically.
 
@@ -85,5 +86,6 @@ The structure encodes the dependency direction:
 | Per-entity custom queries                                       | [`domain/logic/<entity>/repository.py`](domain/logic/)               |
 | Per-entity Pydantic shapes                                      | [`domain/logic/<entity>/schema.py`](domain/logic/)                   |
 | Route files (one per entity, thin)                              | [`domain/routes/<entity>.py`](domain/routes/)                        |
-| Jinja templates                                                 | [`domain/templates/<entity>/`](domain/templates/)                    |
+| Jinja templates (per-entity pages)                              | [`domain/templates/<entity>/`](domain/templates/)                    |
+| Jinja chrome + generic view-type templates                      | [`framework/templates/`](framework/templates/)                       |
 | SQLAlchemy classes                                              | [`domain/models/<entity>/`](domain/models/)                          |

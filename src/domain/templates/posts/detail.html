@@ -1,14 +1,12 @@
-{% extends "_shared/_detail_page.html" %}
-{%- from "_shared/_toolbar.html" import toolbar -%}
+{% extends "views/detail.html" %}
+
+{% set resource_url = "/posts" %}
 
 {% block resource_label %}Posts{% endblock %}
-{% block resource_url %}/posts{% endblock %}
 {% block current_label %}Post{% endblock %}
 
-{% block toolbar %}
-{% call toolbar() %}
-  {% include "posts/_owner_actions.html" %}
-{% endcall %}
+{% block actions %}
+{% include "posts/_owner_actions.html" %}
 {% endblock %}
 
 {# Detail-page contract:

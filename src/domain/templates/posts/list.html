@@ -1,27 +1,23 @@
-{% extends "_shared/_list_page.html" %}
-{%- from "_shared/list_page.html" import list_toolbar -%}
+{% extends "views/list.html" %}
 {%- from "posts/_item.html" import post_item with context -%}
+
+{% set filter_action = "/posts" %}
+{% set filter_values = {
+  "kind": selected_kind,
+  "q": selected_q,
+  "posted_by": selected_posted_by,
+  "state": selected_state,
+  "city": selected_city,
+  "age_group": selected_age_group,
+  "language": selected_language,
+} %}
 
 {% block resource_label %}Posts{% endblock %}
 
-{% block toolbar %}
-{% call list_toolbar(
-  filters=filters,
-  action="/posts",
-  values={
-    "kind": selected_kind,
-    "q": selected_q,
-    "posted_by": selected_posted_by,
-    "state": selected_state,
-    "city": selected_city,
-    "age_group": selected_age_group,
-    "language": selected_language,
-  },
-) %}
-  {# `/posts/form` (no `?kind=`) renders the kind picker; the user
-     picks the kind there, then lands on the kind-specific create form. #}
-  <a href="/posts/form" role="button">Create post</a>
-{% endcall %}
+{% block actions %}
+{# `/posts/form` (no `?kind=`) renders the kind picker; the user
+   picks the kind there, then lands on the kind-specific create form. #}
+<a href="/posts/form" role="button">Create post</a>
 {% endblock %}
 
 {% block content %}

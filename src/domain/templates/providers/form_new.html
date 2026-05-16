@@ -1,9 +1,9 @@
-{% extends "_shared/_form_page.html" %}
+{% extends "views/form_new.html" %}
 {%- from "_shared/form_fields.html" import field_for, radio_bool_field, text_field -%}
 
+{% set resource_url = "/providers" %}
+
 {% block resource_label %}Providers{% endblock %}
-{% block resource_url %}/providers{% endblock %}
-{% block current_label %}New{% endblock %}
 
 {% block content %}
 <p>Practice details only. Add licensures, education, and certifications after creating the provider.</p>

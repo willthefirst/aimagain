@@ -1,0 +1,41 @@
+{# Generic edit-form view chrome.
+
+An edit-form view (`/posts/{id}/form`, `/providers/{id}/form`) renders
+a three-segment breadcrumb (collection → current item → "Edit") and no
+toolbar — the form's Save and Cancel buttons own the actions.
+
+Child contract:
+
+  Required blocks:
+    resource_label — short string label for the collection segment of
+                     the breadcrumb (e.g. "Providers").
+    current_label  — short string label for the resource being edited
+                     (e.g. `{{ provider.practice_name }}`).
+    content        — the `<form>` body. By convention forms keep a
+                     `<a class="secondary outline">Cancel</a>` linking
+                     to `resource_detail_url` so abandoning an edit is
+                     a one-click affordance (see project chrome rule in
+                     `src/framework/templates/README.md`).
+
+  Required context:
+    resource_url        — URL the collection segment links to.
+    resource_detail_url — URL the current-item segment links to (e.g.
+                          `"/providers/" ~ provider.id`).
+
+  Optional blocks:
+    breadcrumb          — full breadcrumb override for nested-edit pages.
+#}
+{% extends "base.html" %}
+{%- from "_shared/_breadcrumb.html" import breadcrumb -%}
+
+{% block breadcrumb %}
+{%- set collection_label %}{% block resource_label %}{% endblock %}{% endset -%}
+{%- set current %}{% block current_label %}{% endblock %}{% endset -%}
+{{ breadcrumb([
+  (collection_label, resource_url),
+  (current, resource_detail_url),
+  ("Edit", none),
+]) }}
+{% endblock %}
+
+{% block content %}{% endblock %}

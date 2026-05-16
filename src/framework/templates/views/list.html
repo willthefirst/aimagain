@@ -1,0 +1,70 @@
+{# Generic list-view chrome.
+
+A list view (`/posts`, `/providers`, `/users`, `/users/me/favorites`,
+`/users/{id}/providers`) renders the same three-strip chrome: primary
+nav (from `base.html`), single-segment breadcrumb naming the resource,
+and an optional toolbar holding the filter widget on the left and page
+actions on the right. This template wires that chrome by convention so
+the child only declares what's unique.
+
+Child contract:
+
+  Required blocks:
+    resource_label — short string label for the breadcrumb segment
+                     (e.g. "Providers"). Plain text, no markup.
+    content        — the table or list body (typically an
+                     `index_table(...)` call or a hand-rolled `<ul>`).
+
+  Optional blocks:
+    actions        — toolbar right-zone content: a Create button, an
+                     Export link, etc. Empty by default; the toolbar
+                     shell is suppressed when both this block and
+                     `filters` are empty.
+    breadcrumb     — full breadcrumb override for subresource lists
+                     with multi-segment chains (e.g. `users/providers_list.html`
+                     renders `Users › <username> › Providers`).
+
+  Optional context (set via `{% set %}` after `{% extends %}` in the
+  child, or passed by the handler):
+    filters        — filters tuple from `EntitySpec.filters`. When
+                     truthy, the toolbar renders the filter widget in
+                     the left zone.
+    filter_action  — URL the filter form GETs to (e.g. "/providers").
+    filter_values  — `{filter.name: current_value}` dict mapping each
+                     declared filter to the page's selected value.
+
+Pages that share this chrome but need richer body shapes (e.g. the
+posts feed's `<ul>` instead of a table) just override `{% block content %}`
+with whatever markup they need — the chrome above is independent of
+what the body looks like.
+#}
+{% extends "base.html" %}
+{%- from "_shared/_breadcrumb.html" import breadcrumb -%}
+{%- from "_shared/list_page.html" import list_toolbar -%}
+
+{% block breadcrumb %}
+{%- set label %}{% block resource_label %}{% endblock %}{% endset -%}
+{{ breadcrumb([(label, none)]) }}
+{% endblock %}
+
+{% block toolbar %}
+{%- set actions_body %}{% block actions %}{% endblock %}{% endset -%}
+{%- set has_filters = filters is defined and filters -%}
+{%- if has_filters and actions_body | trim %}
+{% call list_toolbar(
+  filters=filters,
+  action=filter_action|default(none),
+  values=filter_values|default({}),
+) %}{{ actions_body }}{% endcall %}
+{%- elif has_filters %}
+{{ list_toolbar(
+  filters=filters,
+  action=filter_action|default(none),
+  values=filter_values|default({}),
+) }}
+{%- elif actions_body | trim %}
+{% call list_toolbar() %}{{ actions_body }}{% endcall %}
+{%- endif %}
+{% endblock %}
+
+{% block content %}{% endblock %}
