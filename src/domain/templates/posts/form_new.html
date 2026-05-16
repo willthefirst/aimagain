@@ -1,9 +1,8 @@
-{% extends "base.html" %}
-{%- from "_shared/_breadcrumb.html" import breadcrumb -%}
+{% extends "_shared/_form_page.html" %}
 
-{% block breadcrumb %}
-{{ breadcrumb([("Posts", "/posts"), ("New", none)]) }}
-{% endblock %}
+{% block resource_label %}Posts{% endblock %}
+{% block resource_url %}/posts{% endblock %}
+{% block current_label %}New{% endblock %}
 
 {# Kind-picker for `GET /posts/form` (no `?kind=`). Each option is a
    stand-alone `<a role="button">` describing the post the user is

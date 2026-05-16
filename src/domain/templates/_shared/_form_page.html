@@ -1,0 +1,43 @@
+{# Base template for a resource **form page** — both **new** and
+   **edit** flavors. Children `{% extends %}` this file instead of
+   `base.html` directly; the breadcrumb is filled in automatically.
+
+   New pages (`/posts/form`, `/providers/form`) leave `parent_label`
+   empty and render `Resource › New`. Edit pages
+   (`/posts/{id}/form`, `/providers/{id}/form`) set `parent_label` +
+   `parent_url` to nest a detail crumb between resource and current
+   — `Resource › Detail › Edit`.
+
+   Required child blocks:
+     resource_label — `Posts`, `Providers`, …
+     resource_url   — `/posts`, `/providers`, …
+     current_label  — `New`, `Edit`.
+
+   Optional child blocks (set on edit pages):
+     parent_label   — the detail crumb's text (`Post`, username,
+                      `practice_name`). Empty/whitespace → omit.
+     parent_url     — the detail crumb's `href`
+                      (`/posts/{{ post.id }}`, …).
+
+   Optional child blocks (forwarded to `base.html`):
+     toolbar, content, head, container_class.
+#}
+
+{% extends "base.html" %}
+{%- from "_shared/_breadcrumb.html" import breadcrumb -%}
+
+{% block resource_label %}Resource{% endblock %}
+{% block resource_url %}/{% endblock %}
+{% block parent_label %}{% endblock %}
+{% block parent_url %}{% endblock %}
+{% block current_label %}Form{% endblock %}
+
+{% block breadcrumb %}
+{%- set ns = namespace(items=[(self.resource_label(), self.resource_url() | trim)]) -%}
+{%- set _parent = self.parent_label() | trim -%}
+{%- if _parent -%}
+{%- set ns.items = ns.items + [(_parent, self.parent_url() | trim)] -%}
+{%- endif -%}
+{%- set ns.items = ns.items + [(self.current_label(), none)] -%}
+{{ breadcrumb(ns.items) }}
+{% endblock %}
