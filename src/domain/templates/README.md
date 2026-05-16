@@ -26,7 +26,34 @@ Files prefixed with `_` are shared partials, `{% include %}`d from full pages �
 
 ## Page chrome contract
 
-Pages that need page-scoped controls render a toolbar via `{% block toolbar %}` from `_shared/_toolbar.html`. The toolbar is the single home for the page's **primary resource actions** (right-aligned, passed via the `{% call %}` body): Edit, Delete, Deactivate/Reactivate, Favorite/Unfavorite, list-page filter `<details>`. List pages compose the toolbar with `index_filters(...)` in the call body; detail pages compose it with the resource's action partial (`_owner_actions.html`, `_admin_actions.html`) or open-coded buttons. Pages without page-scoped controls leave `{% block toolbar %}` empty (or omit it).
+Every page extending `base.html` lands the same three-strip chrome above its content. From top to bottom:
+
+```
+┌───────────────────────────────────────────────────────────┐
+│ <header> primary nav        brand + auth-aware right slot │  ← `base.html`
+├───────────────────────────────────────────────────────────┤
+│ breadcrumb zone bar          Resource › … › Current        │  ← `{% block breadcrumb %}` (detail/form pages only)
+├───────────────────────────────────────────────────────────┤
+│ toolbar / action bar         [filters left]    [actions ▶] │  ← `{% block toolbar %}`
+├───────────────────────────────────────────────────────────┤
+│ page content                                              │  ← `{% block content %}`
+└───────────────────────────────────────────────────────────┘
+```
+
+**Primary nav** lives in `base.html` and renders on every screen (authed *and* anonymous). Its right-side slot (`#primary-nav`) swaps the profile icon for a Login link depending on `is_authenticated`. Pages don't extend it.
+
+**Breadcrumb zone bar** (`{% block breadcrumb %}`, macro in `_shared/_breadcrumb.html`) renders Pico's native breadcrumb above the toolbar. Pages opt in by extending the block; otherwise it's invisible. The shape follows the resource hierarchy `list > detail > edit/new`:
+
+| Page type        | URL example              | Breadcrumb                    |
+| ---------------- | ------------------------ | ----------------------------- |
+| Resource list    | `/posts`                 | *(none — root of hierarchy)*  |
+| Resource detail  | `/posts/{id}`            | `Posts › Post`                |
+| Resource new     | `/posts/form`            | `Posts › New`                 |
+| Resource edit    | `/posts/{id}/form`       | `Posts › Post › Edit`         |
+
+The leading segment is the resource label linked to its list page; the trailing segment is the current page (no `href`, gets `aria-current="page"`). Subresource list pages (`/users/{id}/providers`) are still list pages and stay breadcrumb-less.
+
+**Toolbar / action bar** is the zone bar for page-scoped controls. See `_shared/_toolbar.html` for the two-zone layout (`.toolbar-left` fills the row for filters; `.toolbar-right` parks page actions on the right; single-action toolbars right-align without wrappers). The toolbar is the single home for the page's **primary resource actions**: Edit, Delete, Deactivate/Reactivate, Favorite/Unfavorite. List pages compose the toolbar with `index_filters(...)` in the left zone and a Create-resource action in the right zone; detail pages compose it with the resource's action partial (`_owner_actions.html`, `_admin_actions.html`) or open-coded buttons. Pages without page-scoped controls leave the block empty.
 
 Inline / subresource actions inside the page body (per-row delete buttons on `provider/form_edit.html`'s licensure list, inline-add-form submits) are **not** primary resource actions and stay where they are — they act on a single subentity, not on the page's resource.
 
