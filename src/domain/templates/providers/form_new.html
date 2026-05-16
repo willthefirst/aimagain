@@ -2,7 +2,6 @@
 {%- from "_shared/form_fields.html" import field_for, radio_bool_field, text_field -%}
 
 {% block content %}
-<h1>Create provider</h1>
 <p>Practice details only. Add licensures, education, and certifications after creating the provider.</p>
 
 <form hx-post="/providers">
@@ -43,6 +42,4 @@
 
   <button type="submit">Create provider</button>
 </form>
-
-<p><a href="/providers" role="button" class="secondary outline">Back to providers</a></p>
 {% endblock %}

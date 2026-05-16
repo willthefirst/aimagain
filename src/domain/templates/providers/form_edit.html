@@ -5,8 +5,6 @@
 {%- from "_shared/actions.html" import confirm_delete_button -%}
 
 {% block content %}
-<h1>Edit provider</h1>
-
 <section>
   <h2>Practice</h2>
   <form hx-patch="/providers/{{ provider.id }}">
@@ -102,5 +100,5 @@
   {% endcall %}
 </section>
 
-<p><a href="/providers" role="button" class="secondary outline">Back to providers</a></p>
+<p><a href="/providers/{{ provider.id }}" role="button" class="secondary outline">Cancel</a></p>
 {% endblock %}

@@ -7,8 +7,10 @@ across three clusters render the same row (`/providers`,
 imports aren't allowed (see ../README.md "Layering rule"), so the
 shared shape goes here.
 
-`provider_filters` stays in `providers/_columns.html` — those filter
-fields are provider-specific and only the /providers index uses them.
+Filters for the `/providers` index are declared on
+`PROVIDER_ENTITY.filters` and render through the shared
+`_shared/index_filters.html` macro — there's no provider-specific
+filter partial to maintain.
 
 The Insurance cell composes the same posture summary used on the
 provider detail card (#449): "In-net" / "Out-net" / "Self-pay", with

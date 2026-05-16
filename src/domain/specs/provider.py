@@ -32,6 +32,7 @@ from src.domain.models.enums import (
     EDUCATION_TYPES_LABELS,
     LICENSE_TYPES,
     LICENSE_TYPES_LABELS,
+    US_STATES,
 )
 from src.framework.dispatch.entity_spec import (
     AUTHENTICATED,
@@ -40,7 +41,7 @@ from src.framework.dispatch.entity_spec import (
     Redirects,
     RouteSet,
 )
-from src.framework.dispatch.resource_routes import QueryParam
+from src.framework.dispatch.filters import ChoiceFilter
 from src.framework.persistence.dependencies import get_provider_repository
 
 # After create or update, redirect to the edit form so the user can
@@ -71,9 +72,21 @@ PROVIDER_ENTITY: Final[EntitySpec] = EntitySpec(
         form_new=True,
         form_edit=True,
     ),
+    # Filters render through the shared `_shared/index_filters.html`
+    # macro. Switching from legacy `QueryParam(...)` to `Filter`
+    # subclasses (`ChoiceFilter` here) opts into the toolbar layout
+    # and the collapsible UX that `/posts` uses.
     filters=(
-        QueryParam("license_type", str | None, None),
-        QueryParam("issuing_state", str | None, None),
+        ChoiceFilter(
+            name="license_type",
+            label="License type",
+            choices=tuple((v, LICENSE_TYPES_LABELS[v]) for v in LICENSE_TYPES),
+        ),
+        ChoiceFilter(
+            name="issuing_state",
+            label="Licensed in state",
+            choices=tuple((s, s) for s in US_STATES),
+        ),
     ),
     create_redirect=_provider_form_redirect,
     update_redirect=_provider_form_redirect,

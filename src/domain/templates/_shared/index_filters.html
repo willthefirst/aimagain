@@ -1,17 +1,20 @@
-{# Filter form for an index page.
+{# Filter widget for an index page.
 
-Given a tuple of `Filter` instances (declared on
-`EntitySpec.filters`, echoed into the list template context by
-`handle_list`) plus the route's URL, renders a plain
-`<form method="get">` whose body is wrapped in a `<details>` that
-collapses by default. User clicks "Filter" to expand, sets controls,
-clicks Apply to submit, Clear links back to the bare collection URL.
-No HTMX, no JS — the form is a normal GET submission, the
-collapsible is native HTML5.
+Renders a left-aligned row of filter chips above the list — one chip
+per **active** filter, plus a native `<select>` listing the inactive
+ones as an "Add filter…" picker. Choosing an option fires the
+`change` event which opens that filter's edit `<dialog>`; Apply
+submits the whole form (plain GET); Cancel closes; Clear empties
+this filter's value and submits.
 
-If any filter has a URL-active value, the `<details>` renders with
-the `open` attribute so the user lands seeing what's currently
-applied; otherwise it lands collapsed.
+    {{ index_filters(filters, action="/posts", values={…}) }}
+
+Active chips read filled (Pico-default `<button>`); the picker
+`<select>` and "Clear all" read muted so the active set pops.
+
+All filter inputs share one wrapping `<form method="get">`, so
+applying one dialog submits every filter's current value — filters
+whose dialogs were never opened keep whatever value the URL preselected.
 
 Args:
   filters: tuple of `Filter` instances from the list context.
@@ -26,17 +29,114 @@ Args:
 {% macro index_filters(filters, action, values) -%}
 {%- if filters %}
 {%- set any_active = values.values() | select | list -%}
+{%- set ns = namespace(inactive=[]) -%}
+{%- for f in filters -%}
+{%- if not values.get(f.name) -%}{%- set ns.inactive = ns.inactive + [f] -%}{%- endif -%}
+{%- endfor -%}
 <form class="index-filters" method="get" action="{{ action }}">
-  <details{% if any_active %} open{% endif %}>
-    <summary>Filter</summary>
+  <div class="filter-chips">
     {%- for f in filters %}
-    {{ _filter_control(f, values.get(f.name)) }}
+    {%- set v = values.get(f.name) %}
+    {%- if v %}
+    <button type="button" data-filter-open="filter-{{ f.name }}">
+      {{ _chip_label(f, v) }}
+    </button>
+    {%- endif %}
     {%- endfor %}
-    <button type="submit">Apply</button>
-    <a href="{{ action }}" role="button" class="secondary outline">Clear</a>
-  </details>
+  </div>
+  <div class="filter-actions">
+    {%- if any_active %}
+    <button type="button" class="contrast outline" data-filter-clear-all="{{ action }}">Clear all</button>
+    {%- endif %}
+    {%- if ns.inactive %}
+    <select class="filter-picker" data-filter-picker aria-label="Add filter">
+      <option value="" selected>Add filter…</option>
+      {%- for f in ns.inactive %}
+      <option value="filter-{{ f.name }}">{{ f.display_label }}</option>
+      {%- endfor %}
+    </select>
+    {%- endif %}
+  </div>
+
+  {%- for f in filters %}
+  <dialog id="filter-{{ f.name }}">
+    <article>
+      <header><strong>{{ f.display_label }}</strong></header>
+      {{ _filter_control(f, values.get(f.name)) }}
+      <footer>
+        <div role="group">
+          <button type="button" class="secondary" data-filter-cancel>Cancel</button>
+          <button type="button" class="secondary outline" data-filter-clear="{{ f.name }}">Clear</button>
+          <button type="submit">Apply</button>
+        </div>
+      </footer>
+    </article>
+  </dialog>
+  {%- endfor %}
 </form>
-<hr />
+<script>
+(function() {
+  function open(id) {
+    var dlg = document.getElementById(id);
+    if (dlg && typeof dlg.showModal === 'function') dlg.showModal();
+  }
+  document.querySelectorAll('[data-filter-open]').forEach(function(btn) {
+    btn.addEventListener('click', function() { open(btn.dataset.filterOpen); });
+  });
+  document.querySelectorAll('[data-filter-clear-all]').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      window.location.href = btn.dataset.filterClearAll;
+    });
+  });
+  document.querySelectorAll('[data-filter-picker]').forEach(function(sel) {
+    sel.addEventListener('change', function() {
+      var id = sel.value;
+      sel.value = '';
+      if (id) open(id);
+    });
+  });
+  document.querySelectorAll('[data-filter-cancel]').forEach(function(btn) {
+    btn.addEventListener('click', function() { btn.closest('dialog').close(); });
+  });
+  document.querySelectorAll('[data-filter-clear]').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      var name = btn.dataset.filterClear;
+      var dlg = btn.closest('dialog');
+      var form = dlg.closest('form');
+      dlg.querySelectorAll('[name="' + name + '"]').forEach(function(el) {
+        if (el.tagName === 'SELECT') {
+          Array.from(el.options).forEach(function(o) { o.selected = false; });
+        } else {
+          el.value = '';
+        }
+      });
+      form.submit();
+    });
+  });
+})();
+</script>
+{%- endif -%}
+{%- endmacro %}
+
+{% macro _chip_label(f, value) -%}
+{%- if not value -%}
+{{ f.display_label }}
+{%- elif f.kind == "text" -%}
+{{ f.display_label }}: {{ value }}
+{%- elif f.kind == "choice" -%}
+{%- if f.multi -%}
+{%- set ns = namespace(labels=[]) -%}
+{%- for v, l in f.choices -%}
+{%- if v in value -%}{%- set ns.labels = ns.labels + [l] -%}{%- endif -%}
+{%- endfor -%}
+{{ f.display_label }}: {{ ns.labels[0] if ns.labels else value[0] }}{% if ns.labels | length > 1 %} +{{ ns.labels | length - 1 }}{% endif %}
+{%- else -%}
+{%- set ns = namespace(label="") -%}
+{%- for v, l in f.choices -%}
+{%- if v == value -%}{%- set ns.label = l -%}{%- endif -%}
+{%- endfor -%}
+{{ f.display_label }}: {{ ns.label or value }}
+{%- endif -%}
 {%- endif -%}
 {%- endmacro %}
 

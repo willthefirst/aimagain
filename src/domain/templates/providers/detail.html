@@ -1,19 +1,39 @@
 {% extends "base.html" %}
-{%- from "_shared/_breadcrumb.html" import breadcrumb -%}
+{%- from "_shared/_toolbar.html" import toolbar -%}
 
-{% block breadcrumb %}
-{{ breadcrumb([("Providers", "/providers"), (provider.practice_name, None)]) }}
+{% block toolbar %}
+{# Primary resource actions (Favorite toggle, Edit) live in the
+   toolbar — see the "every page's toolbar is the home for resource
+   actions" rule in [`../README.md`](../README.md). `can_edit` and
+   `is_favorited` are computed by handle_get_provider_detail; templates
+   do not re-derive authorization predicates inline. #}
+{% call toolbar() %}
+  {% if is_authenticated %}
+  <span class="favorite-toggle">
+    {% if is_favorited %}
+    <button type="button"
+            class="secondary outline"
+            hx-delete="/users/me/favorites/{{ provider.id }}"
+            hx-confirm="Remove this provider from your favorites?">
+      Unfavorite
+    </button>
+    {% else %}
+    <button type="button"
+            class="outline"
+            hx-post="/users/me/favorites/{{ provider.id }}">
+      Favorite
+    </button>
+    {% endif %}
+  </span>
+  {% endif %}
+  {% if can_edit %}
+  <a href="/providers/{{ provider.id }}/form" role="button" class="outline">Edit provider</a>
+  {% endif %}
+{% endcall %}
 {% endblock %}
 
 {% block content %}
 <article>
-  <header>
-    <h1>{{ provider.practice_name }}</h1>
-  </header>
-
-  {# `can_edit` is computed by handle_get_provider_detail; templates do
-     not re-derive authorization predicates inline. #}
-
   <section>
     <h2>Practice</h2>
     <dl>
@@ -91,33 +111,5 @@
     {% endif %}
   </details>
 
-  <footer>
-    {# Favorite toggle. `is_favorited` is a per-viewer flag computed by
-       handle_get_provider_detail; templates do not re-derive it. The button
-       is hidden for anonymous viewers — there's no actor to attach the
-       edge to. #}
-    {% if is_authenticated %}
-    <span class="favorite-toggle">
-      {% if is_favorited %}
-      <button type="button"
-              class="secondary"
-              hx-delete="/users/me/favorites/{{ provider.id }}"
-              hx-confirm="Remove this provider from your favorites?">
-        Unfavorite
-      </button>
-      {% else %}
-      <button type="button"
-              hx-post="/users/me/favorites/{{ provider.id }}">
-        Favorite
-      </button>
-      {% endif %}
-    </span>
-    {% endif %}
-
-    {% if can_edit %}
-    <a href="/providers/{{ provider.id }}/form" role="button" class="outline">Edit provider</a>
-    {% endif %}
-    <a href="/providers" role="button" class="secondary outline">Back to providers</a>
-  </footer>
 </article>
 {% endblock %}

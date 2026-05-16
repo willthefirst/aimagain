@@ -1227,10 +1227,14 @@ def mount_entity(
             # Polymorphic entities' create-form `?kind=` query param
             # derives its Literal universe from the discriminator
             # registry — single source of truth for the kind names.
-            from typing import Literal
+            # Default is `None`, which lets the handler render the
+            # picker template (`spec.form_template`) when no kind is
+            # specified, rather than silently defaulting to the first
+            # registered kind.
+            from typing import Literal, Optional
 
             names = entity.discriminator.names
-            query_params = (QueryParam("kind", Literal[*names], names[0]),)
+            query_params = (QueryParam("kind", Optional[Literal[*names]], None),)
         mount_form(
             router,
             spec,

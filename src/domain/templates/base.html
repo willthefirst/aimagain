@@ -33,13 +33,6 @@
         --pico-font-size-h3: 1.125rem;
         --pico-font-size-h4: 1rem;
       }
-      /* Breadcrumb trail above page content. Pico has no breadcrumb
-         primitive, so the trail is a tight inline list with " / "
-         separators rendered via CSS so the markup stays semantic. */
-      nav.breadcrumb { margin-block: 0.5rem; font-size: 0.875rem; }
-      nav.breadcrumb ol { list-style: none; padding: 0; margin: 0; display: flex; flex-wrap: wrap; gap: 0.25rem; }
-      nav.breadcrumb li + li::before { content: "/"; padding-inline: 0.25rem; color: var(--pico-muted-color); }
-      nav.breadcrumb [aria-current="page"] { color: var(--pico-muted-color); }
       /* Posts feed — inline meta list + title line-clamp. Two
          patterns, both scoped under `#posts-list > div`:
 
@@ -55,6 +48,7 @@
          Per-post framing (padding, background, vertical margin
          between cards) is whatever Pico's `<article>` defaults give
          — no bespoke CSS for the frame itself. */
+      #posts-list { list-style: none; padding: 0; margin: 0; }
       #posts-list > div { margin-block: 1.25rem; }
       #posts-list > div > ul { padding: 0; margin: 0; list-style: none; }
       #posts-list > div > ul > li { display: inline; }
@@ -65,12 +59,27 @@
          at a glance without a background or extra markup. */
       [data-kind-chip="client_referral"] { color: darkorange; font-weight: 600; }
       [data-kind-chip="provider_availability"] { color: darkcyan; font-weight: 600; }
-      /* Filter-form collapsible summary: shrink to fit its text so the
-         disclosure caret sits next to "Filter" rather than at the far
-         right of a full-width row. Click target stays roomy enough; the
-         tight footprint also signals "this is a toggle, not a section
-         heading." */
-      .index-filters summary { width: fit-content; }
+      /* Filter row inside `.toolbar`: the form is itself a flex row
+         with two siblings.
+         `.filter-chips` (left) grows to fill (`flex: 1`) and wraps its
+         own children when they overflow — chips reflow internally
+         without pushing `.filter-actions` to a new line.
+         `.filter-actions` (right) holds "Clear all" + the "Add filter…"
+         `<select>` at natural width, anchored right.
+         `width: auto` overrides Pico's default full-width form
+         controls inside flex; everything else uses Pico-default
+         `<button>`, `<select>`, `<dialog>`, `<article>`. */
+      .index-filters { display: flex; flex-wrap: wrap; gap: 1rem; align-items: center; width: 100%; margin: 0; }
+      .filter-chips, .filter-actions { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; }
+      .filter-chips { flex: 1; min-width: 0; }
+      .filter-chips button, .filter-actions button, .filter-actions select { width: auto; margin: 0; }
+      .filter-picker { min-width: 10rem; }
+      /* Page-scoped toolbar: right-aligned controls (edit, favorite,
+         etc.) above a horizontal rule. Flex with `flex-end` parks
+         single-action content on the right; `flex-wrap` lets it
+         wrap on narrow viewports. Composite content like
+         `.filter-chips` overrides via `flex: 1` (below). */
+      .toolbar { display: flex; justify-content: flex-end; align-items: center; flex-wrap: wrap; gap: 1rem; }
       #posts-list > div > p {
         display: -webkit-box;
         -webkit-box-orient: vertical;
@@ -107,6 +116,10 @@
           <li><strong><a href="/" class="contrast">Bedlam Connect</a></strong></li>
         </ul>
         <ul id="primary-nav">
+          {# Permanent create-post entry point — every authenticated
+             page has a one-click route to the kind picker at
+             `/posts/form`, where users pick Seeking or Providing. #}
+          <li><a href="/posts/form" role="button">+ Post</a></li>{# title-case-ignore: "+ Post" is a verb-form CTA — title-case linter wants "+ post" (sentence-case verb), but the visible capitalization signals action #}
           <li>
             <a href="/users/me" aria-label="Profile"{% if _on_profile %} aria-current="page" class="contrast"{% endif %}>
               {# Lucide `user` icon, inlined. `currentColor` makes it
@@ -120,7 +133,11 @@
     </header>
     {% endif %}
     <main class="container {% block container_class %}{% endblock %}">
-      {% block breadcrumb %}{% endblock %}
+      {# Toolbar primitive — `{% block toolbar %}` accepts a `{% call %}`
+         of the shared `toolbar()` macro from `_shared/_toolbar.html`.
+         Renders page-scoped controls right-aligned with a horizontal
+         rule below. Pages without a toolbar leave the block empty. #}
+      {% block toolbar %}{% endblock %}
       {% block content %}{% endblock %}
     </main>
   </body>

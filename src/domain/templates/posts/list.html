@@ -1,43 +1,41 @@
 {% extends "base.html" %}
+{%- from "_shared/_toolbar.html" import toolbar -%}
 {%- from "_shared/index_filters.html" import index_filters -%}
 {%- from "posts/_item.html" import post_item with context -%}
 
+{% block toolbar %}
+{% call toolbar() %}
+  {{ index_filters(
+    filters,
+    action="/posts",
+    values={
+      "kind": selected_kind,
+      "q": selected_q,
+      "posted_by": selected_posted_by,
+      "state": selected_state,
+      "city": selected_city,
+      "age_group": selected_age_group,
+      "language": selected_language,
+    },
+  ) }}
+{% endcall %}
+{% endblock %}
+
 {% block content %}
-<h1>Posts</h1>
-
-<nav aria-label="Create post">
-  <ul>
-  {%- for spec in post_kinds %}
-    <li><a href="/posts/form?kind={{ spec.name }}" role="button" class="outline">New {{ spec.list_label }}</a></li>
-  {%- endfor %}
-  </ul>
-</nav>
-
-{{ index_filters(
-  filters,
-  action="/posts",
-  values={
-    "kind": selected_kind,
-    "q": selected_q,
-    "posted_by": selected_posted_by,
-    "state": selected_state,
-    "city": selected_city,
-    "age_group": selected_age_group,
-    "language": selected_language,
-  },
-) }}
-
+{# Create-post entry lives in the primary nav as `+ Post` — see
+   `base.html`. The picker page (`/posts/form` with no `?kind=`)
+   handles the kind selection. #}
 {%- set any_filter_active =
   selected_kind or selected_q or selected_posted_by
   or selected_state or selected_city
   or selected_age_group or selected_language -%}
 
 {% if posts %}
-<section id="posts-list">
+<ul id="posts-list">
   {%- for post in posts %}
   {{ post_item(post, active_kind=selected_kind) }}
   {%- endfor %}
-</section>
+</ul>
 {% else %}
 <p class="index-empty">
   {% if any_filter_active %}No posts match these filters.{% else %}No posts found.{% endif %}

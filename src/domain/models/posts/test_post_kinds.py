@@ -55,9 +55,9 @@ def test_kind_by_detail_model_inverse_matches_registry():
 
 def test_form_route_literal_matches_registry():
     """The `?kind=` Query parameter on `GET /posts/form` is typed as
-    `Literal[*POST_KIND_NAMES]`. The QueryParam published on the mount's
-    route signature must reflect that — guards against `POST_KIND_NAMES`
-    drifting from the route's accepted-kinds list."""
+    `Optional[Literal[*POST_KIND_NAMES]]` — the kind picker (`?kind=`
+    absent / None) round-trips through the same route. Guards against
+    `POST_KIND_NAMES` drifting from the route's accepted-kinds list."""
     import inspect
 
     routes = [
@@ -65,8 +65,13 @@ def test_form_route_literal_matches_registry():
     ]
     assert len(routes) == 1, "expected exactly one /posts/form route"
     params = inspect.signature(routes[0].endpoint).parameters
-    literal_args = get_args(params["kind"].annotation)
-    assert set(literal_args) == set(POST_KIND_NAMES)
+    # Optional[Literal[...]] → Union[Literal[...], None] → args are
+    # (Literal[...], NoneType). Find the Literal arm and unwrap it.
+    union_args = get_args(params["kind"].annotation)
+    assert type(None) in union_args, "kind param should accept None (the picker)"
+    literal_arm = next(a for a in union_args if a is not type(None))
+    literal_values = get_args(literal_arm)
+    assert set(literal_values) == set(POST_KIND_NAMES)
 
 
 def test_each_spec_detail_relationship_matches_kind_name():

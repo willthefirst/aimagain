@@ -694,6 +694,7 @@ class EntitySpec:
             read_to_dict=self.read_to_dict,
             list_template=self.templates.list,
             detail_template=self.templates.detail,
+            form_template=self.templates.form_new,
             create_redirect=self.create_redirect,
             update_redirect=self.update_redirect,
             delete_redirect=self.delete_redirect,
