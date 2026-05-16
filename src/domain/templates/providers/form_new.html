@@ -1,5 +1,10 @@
 {% extends "base.html" %}
 {%- from "_shared/form_fields.html" import field_for, radio_bool_field, text_field -%}
+{%- from "_shared/_breadcrumb.html" import breadcrumb -%}
+
+{% block breadcrumb %}
+{{ breadcrumb([("Providers", "/providers"), ("New", none)]) }}
+{% endblock %}
 
 {% block content %}
 <p>Practice details only. Add licensures, education, and certifications after creating the provider.</p>

@@ -85,6 +85,24 @@
       .toolbar { display: flex; justify-content: flex-end; align-items: center; flex-wrap: wrap; gap: 1rem; }
       .toolbar-left { flex: 1; min-width: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; }
       .toolbar-right { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; }
+      /* Breadcrumb zone bar. Pico already styles the markup
+         (`nav[aria-label="breadcrumb"] ul` becomes an inline list
+         with a separator via `li + li::before`); the only thing this
+         project adds is the strip's frame — subtle background +
+         bottom border to set it apart from page content — and the
+         divider character via the Pico-exposed
+         `--pico-nav-breadcrumb-divider`. Hidden on narrow viewports;
+         the location context isn't worth the row on mobile. */
+      nav[aria-label="breadcrumb"] {
+        --pico-nav-breadcrumb-divider: '›';
+        background: var(--pico-card-background-color);
+        border-bottom: var(--pico-border-width) solid var(--pico-muted-border-color);
+        padding: calc(var(--pico-spacing) * 0.5) var(--pico-spacing);
+        margin: 0 0 var(--pico-spacing) 0;
+      }
+      @media (max-width: 768px) {
+        nav[aria-label="breadcrumb"] { display: none; }
+      }
       #posts-list > div > p {
         display: -webkit-box;
         -webkit-box-orient: vertical;
@@ -134,6 +152,11 @@
     </header>
     {% endif %}
     <main class="container {% block container_class %}{% endblock %}">
+      {# Breadcrumb zone bar — `{% block breadcrumb %}` accepts the
+         `breadcrumb(items)` macro from `_shared/_breadcrumb.html`.
+         Pages set their own location context; list pages and the
+         top-level home leave the block empty. #}
+      {% block breadcrumb %}{% endblock %}
       {# Toolbar primitive — `{% block toolbar %}` accepts a `{% call %}`
          of the shared `toolbar()` macro from `_shared/_toolbar.html`.
          Renders page-scoped controls right-aligned with a horizontal

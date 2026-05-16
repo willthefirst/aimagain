@@ -1,5 +1,14 @@
 {% extends "base.html" %}
 {% from "posts/_provider_availability_form.html" import provider_availability_form %}
+{%- from "_shared/_breadcrumb.html" import breadcrumb -%}
+
+{% block breadcrumb %}
+{{ breadcrumb([
+  ("Posts", "/posts"),
+  ("Post", "/posts/" ~ post.id),
+  ("Edit", none),
+]) }}
+{% endblock %}
 
 {% block content %}
 {{ provider_availability_form("patch", "/posts/" ~ post.id, "Save changes", post=post, schema=provider_availability_create_schema, current_user=current_user) }}

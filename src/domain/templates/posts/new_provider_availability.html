@@ -1,5 +1,10 @@
 {% extends "base.html" %}
 {% from "posts/_provider_availability_form.html" import provider_availability_form %}
+{%- from "_shared/_breadcrumb.html" import breadcrumb -%}
+
+{% block breadcrumb %}
+{{ breadcrumb([("Posts", "/posts"), ("New", none)]) }}
+{% endblock %}
 
 {% block content %}
 {% if not current_user.providers %}

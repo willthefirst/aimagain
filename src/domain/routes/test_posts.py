@@ -352,6 +352,38 @@ async def test_list_renders_readable_date_format(
     assert rendered in {"May 15", "May 15, 2025"}
 
 
+async def test_detail_renders_breadcrumb(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user: User,
+):
+    """Post detail renders the Pico breadcrumb (`Posts › Post`) above
+    the page toolbar. The trailing `<li>` is marked `aria-current="page"`
+    so screen readers identify it as the current page; visual styling
+    comes from Pico's `nav[aria-label="breadcrumb"]` defaults."""
+    post = _client_referral_post(description="crumb-x", owner_id=logged_in_user.id)
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            session.add(post)
+        await session.refresh(post)
+        post_id = post.id
+
+    response = await authenticated_client.get(f"/posts/{post_id}")
+    assert response.status_code == 200
+    tree = HTMLParser(response.text)
+    crumb = tree.css_first('nav[aria-label="breadcrumb"]')
+    assert crumb is not None
+    items = crumb.css("ul > li")
+    assert [li.text(strip=True) for li in items] == ["Posts", "Post"]
+    parent_link = items[0].css_first("a")
+    assert parent_link is not None
+    assert parent_link.attributes.get("href") == "/posts"
+    assert "aria-current" in items[-1].attributes
+    assert items[-1].attributes.get("aria-current") == "page"
+    # Current page has no link inside — it's the leaf.
+    assert items[-1].css_first("a") is None
+
+
 async def test_detail_renders_kind_chip_in_header(
     authenticated_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],
