@@ -15,6 +15,11 @@
        `main.container.narrow` constrains form-heavy pages to a readable
        width; list/detail pages keep the default full-width container. #}
     <style>
+      /* Reserve scrollbar gutter so pages whose content fits in the
+         viewport render at the same width as pages that overflow —
+         otherwise the layout shifts horizontally when a scrollbar
+         appears (notably on macOS with "Always show scrollbars"). */
+      html { scrollbar-gutter: stable; }
       :root {
         --pico-spacing: 0.75rem;
         --pico-form-element-spacing-vertical: 0.5rem;
