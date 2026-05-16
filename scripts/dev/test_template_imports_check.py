@@ -36,6 +36,54 @@ def test_shared_import_is_allowed(tmp_path: Path) -> None:
     assert violations == []
 
 
+def test_views_extends_is_allowed(tmp_path: Path) -> None:
+    """`views/` is framework-level chrome; any entity may extend it."""
+    root = tmp_path / "templates"
+    a = _write(root / "providers" / "list.html", '{% extends "views/list.html" %}')
+    _write(root / "views" / "list.html", "")
+
+    violations = find_violations([a], root)
+
+    assert violations == []
+
+
+def test_two_template_roots_resolve_owning_resource(tmp_path: Path) -> None:
+    """A file's owning resource is determined relative to whichever root
+    contains it. Framework chrome under one root and entity templates under
+    another should not flag each other."""
+    framework_root = tmp_path / "framework"
+    domain_root = tmp_path / "domain"
+    framework_view = _write(
+        framework_root / "views" / "list.html", '{% extends "base.html" %}'
+    )
+    _write(framework_root / "base.html", "")
+    domain_page = _write(
+        domain_root / "providers" / "list.html",
+        '{% extends "views/list.html" %}\n'
+        '{% from "_shared/index_table.html" import index_table %}',
+    )
+
+    violations = find_violations(
+        [framework_view, domain_page], [framework_root, domain_root]
+    )
+
+    assert violations == []
+
+
+def test_views_files_can_reference_anywhere(tmp_path: Path) -> None:
+    """`views/` itself is framework-level — files inside aren't policed."""
+    root = tmp_path / "templates"
+    a = _write(
+        root / "views" / "list.html",
+        '{% extends "base.html" %}\n'
+        '{% from "_shared/list_page.html" import list_breadcrumb %}',
+    )
+
+    violations = find_violations([a], root)
+
+    assert violations == []
+
+
 def test_root_extends_is_allowed(tmp_path: Path) -> None:
     root = tmp_path / "templates"
     a = _write(root / "providers" / "edit.html", '{% extends "base.html" %}')

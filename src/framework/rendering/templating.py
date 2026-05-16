@@ -38,7 +38,12 @@ def format_post_date(value: datetime | date | None) -> str:
 
 
 _env = Environment(
-    loader=FileSystemLoader("src/domain/templates"),
+    # Two search roots: framework owns `base.html`, `_shared/` macros, and
+    # the generic `views/` chrome; domain owns per-entity templates. The
+    # FileSystemLoader resolves names by walking the list, so domain
+    # templates can `{% extends "views/list.html" %}` (resolved from
+    # framework) and reference `{% from "_shared/..." %}` the same way.
+    loader=FileSystemLoader(["src/framework/templates", "src/domain/templates"]),
     autoescape=select_autoescape(["html", "xml"]),
     auto_reload=auto_reload,
 )
@@ -50,7 +55,7 @@ _env = Environment(
 # value to a tuple in `enums.py` then shows up everywhere — schema,
 # DB, and form dropdown — without per-template edits. The label dicts
 # are looked up in the form-render macro
-# (`src/domain/templates/_shared/form_fields.html`); the
+# (`src/framework/templates/_shared/form_fields.html`); the
 # `test_labels_cover_their_tuples` guardrail asserts every value in a
 # tuple has a label.
 _env.globals.update(

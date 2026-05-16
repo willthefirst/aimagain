@@ -19,8 +19,8 @@ or a ``Filter`` instance — the mount layer normalizes both to
 bespoke ``list_<collection>`` method.
 
 See ``../README.md`` for the framework layer's overall contract and
-``src/domain/templates/_shared/README.md`` for the macro that reads
-these objects.
+``src/framework/templates/README.md`` for the macro that reads these
+objects (``_shared/index_filters.html``).
 
 The rendering macro applies a default-minimal "add a filter" UX on
 top of any declared filter: a control is visible only when the URL

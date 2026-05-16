@@ -52,7 +52,7 @@ repos:
         name: Check template import boundaries
         entry: python scripts/dev/template_imports_check.py
         language: python
-        files: ^src/templates/.*\.html$
+        files: ^src/(framework|domain)/templates/.*\.html$
         pass_filenames: true
 
       - id: python-cluster-imports-check
