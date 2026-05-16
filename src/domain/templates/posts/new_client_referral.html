@@ -1,5 +1,10 @@
 {% extends "base.html" %}
 {% from "posts/_client_referral_form.html" import client_referral_form %}
+{%- from "_shared/_breadcrumb.html" import breadcrumb -%}
+
+{% block breadcrumb %}
+{{ breadcrumb([("Posts", "/posts"), ("New", none)]) }}
+{% endblock %}
 
 {% block content %}
 <p>Per <code>notes/forms_spec.md</code>. No PII.</p>

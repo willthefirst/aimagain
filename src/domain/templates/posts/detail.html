@@ -1,5 +1,10 @@
 {% extends "base.html" %}
 {%- from "_shared/_toolbar.html" import toolbar -%}
+{%- from "_shared/_breadcrumb.html" import breadcrumb -%}
+
+{% block breadcrumb %}
+{{ breadcrumb([("Posts", "/posts"), ("Post", none)]) }}
+{% endblock %}
 
 {% block toolbar %}
 {% call toolbar() %}

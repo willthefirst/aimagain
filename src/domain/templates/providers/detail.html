@@ -1,5 +1,10 @@
 {% extends "base.html" %}
 {%- from "_shared/_toolbar.html" import toolbar -%}
+{%- from "_shared/_breadcrumb.html" import breadcrumb -%}
+
+{% block breadcrumb %}
+{{ breadcrumb([("Providers", "/providers"), (provider.practice_name, none)]) }}
+{% endblock %}
 
 {% block toolbar %}
 {# Primary resource actions (Favorite toggle, Edit) live in the

@@ -1,0 +1,40 @@
+{# Breadcrumb zone bar primitive.
+   title-case-ignore: the literal ARIA value `breadcrumb` is Pico's hook.
+
+Renders the page's location chain as Pico's native breadcrumb nav
+above the page toolbar — see the `breadcrumb` block slot wired in
+[`../base.html`](../base.html). Pico styles the markup automatically
+(horizontal inline list, `›` separator via CSS on `li + li::before`)
+so no classes are added to the nav or list; the divider character
+is set globally in `base.html` via `--pico-nav-breadcrumb-divider`.
+
+Each item is a `(label, href)` tuple. The last item's `href` is
+typically `None` — it renders as plain text (the current page) and
+carries `aria-current="page"` for screen readers.
+
+    {{ breadcrumb([
+        ("Posts", "/posts"),
+        ("Post", "/posts/" ~ post.id),
+        ("Edit", None),
+    ]) }}
+
+Pico's docs at https://picocss.com/docs/nav#breadcrumb require an
+inner `<ul>` specifically — the built-in style hooks off the nav's
+descendant `ul`. Picking `<ol>` (semantically tempting, since
+breadcrumbs are ordered) loses Pico's auto-styling.
+#}
+
+{# title-case-ignore: literal aria-label value `breadcrumb` is the Pico hook #}
+{% macro breadcrumb(items) -%}
+{%- if items %}
+<nav aria-label="breadcrumb">
+  <ul>
+    {%- for label, href in items %}
+    <li{% if loop.last %} aria-current="page"{% endif %}>
+      {%- if href %}<a href="{{ href }}">{{ label }}</a>{% else %}{{ label }}{% endif -%}
+    </li>
+    {%- endfor %}
+  </ul>
+</nav>
+{%- endif %}
+{%- endmacro %}

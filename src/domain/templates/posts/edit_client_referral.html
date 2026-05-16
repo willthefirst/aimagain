@@ -1,5 +1,14 @@
 {% extends "base.html" %}
 {% from "posts/_client_referral_form.html" import client_referral_form %}
+{%- from "_shared/_breadcrumb.html" import breadcrumb -%}
+
+{% block breadcrumb %}
+{{ breadcrumb([
+  ("Posts", "/posts"),
+  ("Post", "/posts/" ~ post.id),
+  ("Edit", none),
+]) }}
+{% endblock %}
 
 {% block content %}
 {{ client_referral_form("patch", "/posts/" ~ post.id, "Save changes", post=post, schema=client_referral_create_schema) }}
