@@ -1,27 +1,19 @@
 {% extends "base.html" %}
 {%- from "_shared/index_table.html" import index_table -%}
 {%- from "_shared/_provider_row.html" import provider_headers, provider_row -%}
-{%- from "_shared/_toolbar.html" import toolbar -%}
-{%- from "_shared/index_filters.html" import index_filters -%}
-{%- from "_shared/_breadcrumb.html" import breadcrumb -%}
+{%- from "_shared/list_page.html" import list_breadcrumb, list_toolbar -%}
 
-{% block breadcrumb %}
-{{ breadcrumb([("Providers", none)]) }}
-{% endblock %}
+{% block breadcrumb %}{{ list_breadcrumb("Providers") }}{% endblock %}
 
 {% block toolbar %}
-{% call toolbar() %}
-  <div class="toolbar-left">
-    {{ index_filters(
-      filters,
-      action="/providers",
-      values={
-        "license_type": selected_license_type,
-        "issuing_state": selected_issuing_state,
-      },
-    ) }}
-  </div>
-{% endcall %}
+{{ list_toolbar(
+  filters=filters,
+  action="/providers",
+  values={
+    "license_type": selected_license_type,
+    "issuing_state": selected_issuing_state,
+  },
+) }}
 {% endblock %}
 
 {% block content %}

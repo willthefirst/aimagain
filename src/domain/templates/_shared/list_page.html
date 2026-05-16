@@ -1,0 +1,77 @@
+{# Chrome helpers for the canonical list page.
+
+A list page (`/posts`, `/providers`, `/users`, `/users/me/favorites`)
+lands the same chrome above its content: a single-segment breadcrumb
+naming the resource, and an optional toolbar holding the filter
+widget on the left and page actions on the right. The macros in this
+file collapse that boilerplate so the list templates focus on the
+list shape (table vs `<ul>`, empty state, row partial).
+
+Pages still `{% extends "base.html" %}` directly — these macros just
+fill the `breadcrumb` and `toolbar` blocks with one-line calls:
+
+    {% block breadcrumb %}{{ list_breadcrumb("Posts") }}{% endblock %}
+
+    {% block toolbar %}
+    {% call list_toolbar(filters=filters, action="/posts", values={...}) %}
+      <a href="/posts/form" role="button">Create post</a>
+    {% endcall %}
+    {% endblock %}
+
+When a page has neither a filter widget nor a right-zone action it
+omits the toolbar block entirely — `list_toolbar` is opt-in.
+Subresource lists with multi-segment breadcrumbs
+(`Users › <username> › Providers`) fall back to the underlying
+`breadcrumb()` primitive in [`_breadcrumb.html`](_breadcrumb.html);
+this file is the simple-case fast path, not a one-size-fits-all
+wrapper.
+#}
+
+{%- from "_shared/_breadcrumb.html" import breadcrumb -%}
+{%- from "_shared/index_filters.html" import index_filters -%}
+
+{# Single-segment list breadcrumb — the resource label as the
+   current page (`aria-current="page"`, no link). #}
+{% macro list_breadcrumb(label) -%}
+{{ breadcrumb([(label, none)]) }}
+{%- endmacro %}
+
+{# List-page toolbar shell. Renders the filter widget in the left
+   zone when `filters` is provided; renders the `{% call %}` body in
+   the right zone when invoked with one. When neither is present the
+   macro emits nothing — pages without page-scoped controls can wrap
+   the call in `{% if filters %}` or just omit the toolbar block.
+
+   Args:
+     filters: optional `Filter` tuple from `EntitySpec.filters`
+              (the same shape `index_filters` reads).
+     action:  the list URL the filter form GETs to.
+     values:  dict of `{filter.name: current_value}`; passed straight
+              through to `index_filters`.
+   The macro caller body becomes the right-zone action cluster — a
+   `Create <resource>` link, an Export button, etc. #}
+{# The toolbar markup is inlined here (rather than delegating to the
+   `toolbar()` macro in `_toolbar.html`) because Jinja's `caller` is
+   shadowed inside a nested `{% call %}`: if this macro tried to
+   `{% call toolbar() %}{% if caller %}…{% endif %}{% endcall %}`,
+   the inner `caller` would refer to `toolbar`'s caller (the body
+   right here), not to `list_toolbar`'s caller. Keep the structural
+   wrapper (`<div class="toolbar">…</div><hr />`) in sync with the
+   `_toolbar.html` primitive. #}
+{% macro list_toolbar(filters=none, action=none, values=none) -%}
+{%- if filters or caller %}
+<div class="toolbar">
+  {%- if filters %}
+  <div class="toolbar-left">
+    {{ index_filters(filters, action=action, values=values or {}) }}
+  </div>
+  {%- endif %}
+  {%- if caller %}
+  <div class="toolbar-right">
+    {{ caller() }}
+  </div>
+  {%- endif %}
+</div>
+<hr />
+{%- endif %}
+{%- endmacro %}
