@@ -23,15 +23,17 @@ async def test_base_template_renders_primary_nav_when_authenticated(
     authenticated_client: AsyncClient,
     logged_in_user: User,
 ):
-    """Authenticated pages include nav links to the main sections plus the
-    `/users/me` shortcut to the viewer's own user page."""
+    """Authenticated pages render the primary nav with a single
+    `/users/me` profile shortcut. Section links (Posts / Users /
+    Providers / Favorites) are reachable from within their pages
+    rather than from the top-level chrome."""
     response = await authenticated_client.get("/users")
 
     assert response.status_code == 200
     tree = HTMLParser(response.text)
     nav_items = tree.css("#primary-nav > li > a")
     hrefs = {a.attributes.get("href") for a in nav_items}
-    assert {"/posts", "/users", "/providers", "/users/me"} <= hrefs
+    assert hrefs == {"/users/me"}
 
 
 async def test_base_template_hides_nav_for_anonymous_visitors(
@@ -341,21 +343,17 @@ async def test_detail_lists_owned_providers(
 # --- Chrome: nav active state + breadcrumb ------------------------------
 
 
-async def test_primary_nav_marks_favorites_active_and_not_users(
+async def test_primary_nav_marks_profile_active_on_users_me_subpaths(
     authenticated_client: AsyncClient,
 ):
-    """On `/users/me/favorites`, more-specific section wins: Favorites
-    is active and Users / Me are not — even though all three share the
-    `/users` URL prefix."""
+    """The profile icon links to `/users/me` and shows `aria-current`
+    on any `/users/me/*` path — `/users/me/favorites` is the canonical
+    case but the rule covers every nested profile sub-route."""
     response = await authenticated_client.get("/users/me/favorites")
     assert response.status_code == 200
     tree = HTMLParser(response.text)
-    favorites_link = tree.css_first('#primary-nav a[href="/users/me/favorites"]')
-    me_link = tree.css_first('#primary-nav a[href="/users/me"]')
-    users_link = tree.css_first('#primary-nav a[href="/users"]')
-    assert favorites_link.attributes.get("aria-current") == "page"
-    assert me_link.attributes.get("aria-current") is None
-    assert users_link.attributes.get("aria-current") is None
+    profile_link = tree.css_first('#primary-nav a[href="/users/me"]')
+    assert profile_link.attributes.get("aria-current") == "page"
 
 
 async def test_users_me_detail_breadcrumb_says_me(
