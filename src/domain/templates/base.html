@@ -59,27 +59,32 @@
          at a glance without a background or extra markup. */
       [data-kind-chip="client_referral"] { color: darkorange; font-weight: 600; }
       [data-kind-chip="provider_availability"] { color: darkcyan; font-weight: 600; }
-      /* Filter row inside `.toolbar`: the form is itself a flex row
-         with two siblings.
-         `.filter-chips` (left) grows to fill (`flex: 1`) and wraps its
-         own children when they overflow — chips reflow internally
-         without pushing `.filter-actions` to a new line.
-         `.filter-actions` (right) holds "Clear all" + the "Add filter…"
-         `<select>` at natural width, anchored right.
+      /* Filter row: an inline group of chips + actions (`Clear all`,
+         `Add filter…`) that sits as a single left-aligned cluster
+         inside `.toolbar-left`. The form itself is a wrap-aware flex
+         row; chips and actions flow inline and reflow when narrow.
          `width: auto` overrides Pico's default full-width form
          controls inside flex; everything else uses Pico-default
          `<button>`, `<select>`, `<dialog>`, `<article>`. */
-      .index-filters { display: flex; flex-wrap: wrap; gap: 1rem; align-items: center; width: 100%; margin: 0; }
+      .index-filters { display: flex; flex-wrap: wrap; gap: 1rem; align-items: center; margin: 0; }
       .filter-chips, .filter-actions { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; }
-      .filter-chips { flex: 1; min-width: 0; }
       .filter-chips button, .filter-actions button, .filter-actions select { width: auto; margin: 0; }
       .filter-picker { min-width: 10rem; }
-      /* Page-scoped toolbar: right-aligned controls (edit, favorite,
-         etc.) above a horizontal rule. Flex with `flex-end` parks
-         single-action content on the right; `flex-wrap` lets it
-         wrap on narrow viewports. Composite content like
-         `.filter-chips` overrides via `flex: 1` (below). */
+      /* Page-scoped zone bar. Every page that wants page-scoped
+         controls renders one `.toolbar` above its content, with two
+         optional zones:
+           `.toolbar-left`  — filling cluster: filters, navigation
+                              chips, anything that grows to consume
+                              the row.
+           `.toolbar-right` — page actions: Create, Edit, Favorite.
+                              Right-aligned naturally via the row's
+                              `justify-content: flex-end`.
+         A single-action toolbar can skip the wrappers entirely — its
+         lone child still parks at the right edge. `flex-wrap` lets
+         long rows wrap onto multiple lines on narrow viewports. */
       .toolbar { display: flex; justify-content: flex-end; align-items: center; flex-wrap: wrap; gap: 1rem; }
+      .toolbar-left { flex: 1; min-width: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; }
+      .toolbar-right { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; }
       #posts-list > div > p {
         display: -webkit-box;
         -webkit-box-orient: vertical;

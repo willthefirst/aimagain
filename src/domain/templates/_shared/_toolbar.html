@@ -1,24 +1,40 @@
-{# Top-of-page toolbar primitive.
+{# Top-of-page zone bar primitive.
 
 Every page that needs page-scoped controls renders one toolbar
-above its content, followed by an `<hr />` separator:
+above its content, followed by an `<hr />` separator. The bar is
+a two-zone shelf: a left cluster that fills the row and a right
+cluster of page actions:
 
-  [active filter chips left]                  [actions / picker right]
+  [filters / left cluster]                        [page actions]
   ──────────────────────────────────────────────────────────────────
   (page content below)
 
-The caller body fills the toolbar. Single-action toolbars right-align
-naturally (`.toolbar` is `display: flex; justify-content: flex-end`).
-Composite content like `index_filters` overrides that by stretching
-to full width and managing its own internal left/right layout.
+The caller body fills the bar. Wrap content in `.toolbar-left` to
+fill the available space (filters, navigation chips); wrap actions
+in `.toolbar-right` for an explicit right-anchored cluster. Single-
+action toolbars can skip the wrappers — a lone child still parks at
+the right edge via the toolbar's `justify-content: flex-end`.
 
-    {% call toolbar() %}
-      {{ index_filters(filters, action="/posts", values={…}) }}
-    {% endcall %}
+    Two-zone bar (e.g. /posts):
 
-    {% call toolbar() %}
-      <a href="…/form" role="button">Edit</a>
-    {% endcall %}
+        {% call toolbar() %}
+          <div class="toolbar-left">{{ index_filters(...) }}</div>
+          <div class="toolbar-right">
+            <a href="/posts/form" role="button">Create post</a>
+          </div>
+        {% endcall %}
+
+    Filters-only (e.g. /providers):
+
+        {% call toolbar() %}
+          <div class="toolbar-left">{{ index_filters(...) }}</div>
+        {% endcall %}
+
+    Single right-side action:
+
+        {% call toolbar() %}
+          <a href=".../form" role="button">Edit</a>
+        {% endcall %}
 
 Pages that have no toolbar content leave `{% block toolbar %}` empty
 (or omit it).

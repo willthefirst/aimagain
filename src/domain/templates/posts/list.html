@@ -5,25 +5,31 @@
 
 {% block toolbar %}
 {% call toolbar() %}
-  {{ index_filters(
-    filters,
-    action="/posts",
-    values={
-      "kind": selected_kind,
-      "q": selected_q,
-      "posted_by": selected_posted_by,
-      "state": selected_state,
-      "city": selected_city,
-      "age_group": selected_age_group,
-      "language": selected_language,
-    },
-  ) }}
+  <div class="toolbar-left">
+    {{ index_filters(
+      filters,
+      action="/posts",
+      values={
+        "kind": selected_kind,
+        "q": selected_q,
+        "posted_by": selected_posted_by,
+        "state": selected_state,
+        "city": selected_city,
+        "age_group": selected_age_group,
+        "language": selected_language,
+      },
+    ) }}
+  </div>
+  <div class="toolbar-right">
+    {# Routes to `/posts/form` (no `?kind=`), which renders the kind
+       picker — the user picks the kind, then lands on the kind-specific
+       create form. #}
+    <a href="/posts/form" role="button">Create post</a>
+  </div>
 {% endcall %}
 {% endblock %}
 
 {% block content %}
-{# Kind picker lives at `/posts/form` (no `?kind=`) — no UI entry
-   point currently links to it; reachable by typing the URL. #}
 {%- set any_filter_active =
   selected_kind or selected_q or selected_posted_by
   or selected_state or selected_city
