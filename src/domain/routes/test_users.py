@@ -201,6 +201,32 @@ async def test_get_user_detail_renders(
     assert target_username in tree.body.text()
 
 
+async def test_get_user_detail_renders_breadcrumb(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user: User,
+):
+    """User detail follows the standard `list → detail` breadcrumb
+    shape: `Users › <username>`. The first item links to the user
+    list; the trailing username is the current page (`aria-current`)."""
+    target_username = f"target-{uuid.uuid4()}"
+    target = create_test_user(username=target_username)
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            session.add(target)
+
+    response = await authenticated_client.get(f"/users/{target.id}")
+    assert response.status_code == 200
+    tree = HTMLParser(response.text)
+    items = tree.css('nav[aria-label="breadcrumb"] ul > li')
+    assert [li.text(strip=True) for li in items] == ["Users", target_username]
+    parent = items[0].css_first("a")
+    assert parent is not None
+    assert parent.attributes.get("href") == "/users"
+    assert items[-1].attributes.get("aria-current") == "page"
+    assert items[-1].css_first("a") is None
+
+
 async def test_detail_hides_private_fields_from_strangers(
     authenticated_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],

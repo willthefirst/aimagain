@@ -562,6 +562,23 @@ async def test_admin_can_patch_anyone_post(
     assert response.json()["description"] == "moderated"
 
 
+# --- Chrome abstraction --------------------------------------------------
+
+
+async def test_list_page_does_not_render_breadcrumb(
+    authenticated_client: AsyncClient,
+    logged_in_user: User,
+):
+    """The page chrome abstraction is `list > detail > edit/new`: lists
+    are the root of the resource hierarchy and don't carry a breadcrumb;
+    detail and form pages do. Pin the absence on `/posts` so the rule
+    doesn't drift template-by-template."""
+    response = await authenticated_client.get("/posts")
+    assert response.status_code == 200
+    tree = HTMLParser(response.text)
+    assert tree.css_first('nav[aria-label="breadcrumb"]') is None
+
+
 # --- Zone bar ------------------------------------------------------------
 
 
