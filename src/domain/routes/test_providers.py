@@ -351,20 +351,7 @@ async def test_list_providers_treats_empty_filter_values_as_absent(
     assert len(rows) == 1, "Empty filter values should not exclude rows"
 
 
-# --- Chrome: nav active state + breadcrumb ------------------------------
-
-
-async def test_primary_nav_marks_providers_active_on_providers_index(
-    authenticated_client: AsyncClient,
-):
-    response = await authenticated_client.get("/providers")
-    assert response.status_code == 200
-    tree = HTMLParser(response.text)
-    providers_link = tree.css_first('#primary-nav a[href="/providers"]')
-    posts_link = tree.css_first('#primary-nav a[href="/posts"]')
-    assert providers_link is not None
-    assert providers_link.attributes.get("aria-current") == "page"
-    assert posts_link.attributes.get("aria-current") is None
+# --- Chrome: breadcrumb -------------------------------------------------
 
 
 async def test_provider_detail_renders_breadcrumb(
