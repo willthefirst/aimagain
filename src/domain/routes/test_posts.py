@@ -565,18 +565,23 @@ async def test_admin_can_patch_anyone_post(
 # --- Chrome abstraction --------------------------------------------------
 
 
-async def test_list_page_does_not_render_breadcrumb(
+async def test_list_page_renders_single_segment_breadcrumb(
     authenticated_client: AsyncClient,
     logged_in_user: User,
 ):
-    """The page chrome abstraction is `list > detail > edit/new`: lists
-    are the root of the resource hierarchy and don't carry a breadcrumb;
-    detail and form pages do. Pin the absence on `/posts` so the rule
-    doesn't drift template-by-template."""
+    """Every page in the chrome contract carries a breadcrumb. List
+    pages are the root of the resource hierarchy and render as a
+    single segment (the resource label, no parent link, marked
+    `aria-current="page"`). Detail and form pages extend that with
+    `Resource › … › Current`. Pin the shape on `/posts` so the
+    abstraction doesn't drift template-by-template."""
     response = await authenticated_client.get("/posts")
     assert response.status_code == 200
     tree = HTMLParser(response.text)
-    assert tree.css_first('nav[aria-label="breadcrumb"]') is None
+    items = tree.css('nav[aria-label="breadcrumb"] ul > li')
+    assert [li.text(strip=True) for li in items] == ["Posts"]
+    assert items[0].attributes.get("aria-current") == "page"
+    assert items[0].css_first("a") is None
 
 
 # --- Zone bar ------------------------------------------------------------

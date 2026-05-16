@@ -3,6 +3,11 @@
 {%- from "_shared/_provider_row.html" import provider_headers, provider_row -%}
 {%- from "_shared/_toolbar.html" import toolbar -%}
 {%- from "_shared/index_filters.html" import index_filters -%}
+{%- from "_shared/_breadcrumb.html" import breadcrumb -%}
+
+{% block breadcrumb %}
+{{ breadcrumb([("Providers", none)]) }}
+{% endblock %}
 
 {% block toolbar %}
 {% call toolbar() %}

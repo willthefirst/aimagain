@@ -42,16 +42,19 @@ Every page extending `base.html` lands the same three-strip chrome above its con
 
 **Primary nav** lives in `base.html` and renders on every screen (authed *and* anonymous). Its right-side slot (`#primary-nav`) swaps the profile icon for a Login link depending on `is_authenticated`. Pages don't extend it.
 
-**Breadcrumb zone bar** (`{% block breadcrumb %}`, macro in `_shared/_breadcrumb.html`) renders Pico's native breadcrumb above the toolbar. Pages opt in by extending the block; otherwise it's invisible. The shape follows the resource hierarchy `list > detail > edit/new`:
+**Breadcrumb zone bar** (`{% block breadcrumb %}`, macro in `_shared/_breadcrumb.html`) renders Pico's native breadcrumb above the toolbar. Every authenticated page extends the block — chrome consistency is the goal. The shape follows the resource hierarchy `list > detail > edit/new`, each level appending one segment:
 
-| Page type        | URL example              | Breadcrumb                    |
-| ---------------- | ------------------------ | ----------------------------- |
-| Resource list    | `/posts`                 | *(none — root of hierarchy)*  |
-| Resource detail  | `/posts/{id}`            | `Posts › Post`                |
-| Resource new     | `/posts/form`            | `Posts › New`                 |
-| Resource edit    | `/posts/{id}/form`       | `Posts › Post › Edit`         |
+| Page type        | URL example                    | Breadcrumb                            |
+| ---------------- | ------------------------------ | ------------------------------------- |
+| Resource list    | `/posts`                       | `Posts`                               |
+| Resource detail  | `/posts/{id}`                  | `Posts › Post`                        |
+| Resource new     | `/posts/form`                  | `Posts › New`                         |
+| Resource edit    | `/posts/{id}/form`             | `Posts › Post › Edit`                 |
+| Subresource list | `/users/{id}/providers`        | `Users › <username> › Providers`      |
 
-The leading segment is the resource label linked to its list page; the trailing segment is the current page (no `href`, gets `aria-current="page"`). Subresource list pages (`/users/{id}/providers`) are still list pages and stay breadcrumb-less.
+Every prior segment is a link (`<a href="…">`); the trailing segment is the current page (no `href`, gets `aria-current="page"`). Single-segment list breadcrumbs are still wrapped in the nav so the chrome strip is present and the strip height stays consistent across pages.
+
+Public auth-flow pages (`/auth/login`, `/auth/register`, …) opt out — they aren't in the resource hierarchy.
 
 **Toolbar / action bar** is the zone bar for page-scoped controls. See `_shared/_toolbar.html` for the two-zone layout (`.toolbar-left` fills the row for filters; `.toolbar-right` parks page actions on the right; single-action toolbars right-align without wrappers). The toolbar is the single home for the page's **primary resource actions**: Edit, Delete, Deactivate/Reactivate, Favorite/Unfavorite. List pages compose the toolbar with `index_filters(...)` in the left zone and a Create-resource action in the right zone; detail pages compose it with the resource's action partial (`_owner_actions.html`, `_admin_actions.html`) or open-coded buttons. Pages without page-scoped controls leave the block empty.
 
