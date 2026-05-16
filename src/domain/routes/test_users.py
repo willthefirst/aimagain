@@ -36,19 +36,32 @@ async def test_base_template_renders_primary_nav_when_authenticated(
     assert hrefs == {"/users/me"}
 
 
-async def test_base_template_hides_nav_for_anonymous_visitors(
+async def test_base_template_renders_primary_nav_for_anonymous_visitors(
     test_client: AsyncClient,
 ):
-    """Public pages (auth flow) must not link to auth-gated sections —
-    those links would 401 and clutter the page for users who can't use
-    them yet. The chrome `{% if is_authenticated %}` gate is what
-    enforces this; the four scalars from `base_context(None)` are what
-    let `base.html` make the call without per-handler boilerplate."""
+    """The primary nav renders on every screen — public auth-flow pages
+    included — so the chrome stays consistent across the auth gate.
+    Anonymous visitors get the brand link plus a Login shortcut on the
+    right (no `/users/me` link, which would 401). The `{% if
+    is_authenticated %}` branch lives inside `#primary-nav` so the
+    nav scaffold is always present and only its right-side item swaps."""
     response = await test_client.get("/auth/login")
 
     assert response.status_code == 200
     tree = HTMLParser(response.text)
-    assert tree.css_first("#primary-nav") is None
+    nav = tree.css_first('nav[aria-label="Primary"]')
+    assert nav is not None
+    # Brand link is present on the left.
+    brand = nav.css_first('a[href="/"]')
+    assert brand is not None
+    # Right-side slot has the Login link; no profile link.
+    nav_items = tree.css("#primary-nav > li > a")
+    hrefs = {a.attributes.get("href") for a in nav_items}
+    assert hrefs == {"/auth/login"}
+    # The current Login link is marked aria-current="page".
+    login_link = tree.css_first('#primary-nav a[href="/auth/login"]')
+    assert login_link is not None
+    assert login_link.attributes.get("aria-current") == "page"
 
 
 # --- Listing -------------------------------------------------------------

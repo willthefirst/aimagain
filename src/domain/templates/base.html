@@ -130,8 +130,16 @@
     {% endif %}
   </head>
   <body>
-    {% if is_authenticated %}
-    {%- set _on_profile = request.url.path == '/users/me' or request.url.path.startswith('/users/me/') -%}
+    {# Primary nav renders on every screen so the chrome stays
+       consistent between authenticated app pages and the public auth
+       flow. The right-side slot (`#primary-nav`) adapts: authed users
+       see the profile icon (with `aria-current="page"` while on
+       `/users/me`); anonymous visitors see a Login link. The brand
+       link goes to `/`, which redirects authed users to `/posts` and
+       unauthed users to the login page — safe on either side of the
+       auth gate. #}
+    {%- set _on_profile = is_authenticated and (request.url.path == '/users/me' or request.url.path.startswith('/users/me/')) -%}
+    {%- set _on_login = request.url.path == '/auth/login' -%}
     <header class="container">
       <nav aria-label="Primary">
         <ul>
@@ -139,6 +147,7 @@
           <li><strong><a href="/" class="contrast">Bedlam Connect</a></strong></li>
         </ul>
         <ul id="primary-nav">
+          {% if is_authenticated %}
           <li>
             <a href="/users/me" aria-label="Profile"{% if _on_profile %} aria-current="page" class="contrast"{% endif %}>
               {# Lucide `user` icon, inlined. `currentColor` makes it
@@ -147,10 +156,14 @@
               <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
             </a>
           </li>
+          {% else %}
+          <li>
+            <a href="/auth/login"{% if _on_login %} aria-current="page" class="contrast"{% endif %}>Login</a>
+          </li>
+          {% endif %}
         </ul>
       </nav>
     </header>
-    {% endif %}
     <main class="container {% block container_class %}{% endblock %}">
       {# Breadcrumb zone bar — `{% block breadcrumb %}` accepts the
          `breadcrumb(items)` macro from `_shared/_breadcrumb.html`.
