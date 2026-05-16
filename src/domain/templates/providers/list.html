@@ -1,18 +1,23 @@
 {% extends "base.html" %}
 {%- from "_shared/index_table.html" import index_table -%}
 {%- from "_shared/_provider_row.html" import provider_headers, provider_row -%}
-{# `with context` so `provider_filters` can read the provider-specific
-   enum tuples (`LICENSE_TYPES`) that flow into the page from
-   `PROVIDER_ENTITY.static_context` (and `US_STATES` from the Jinja
-   globals); without it, macros run in an isolated scope and the
-   filter selects render empty. #}
-{%- from "providers/_columns.html" import provider_filters with context -%}
+{%- from "_shared/_toolbar.html" import toolbar -%}
+{%- from "_shared/index_filters.html" import index_filters -%}
+
+{% block toolbar %}
+{% call toolbar() %}
+  {{ index_filters(
+    filters,
+    action="/providers",
+    values={
+      "license_type": selected_license_type,
+      "issuing_state": selected_issuing_state,
+    },
+  ) }}
+{% endcall %}
+{% endblock %}
 
 {% block content %}
-<h1>Providers</h1>
-
-{{ provider_filters(selected_license_type, selected_issuing_state) }}
-
 {{ index_table(
   items=providers,
   headers=provider_headers,

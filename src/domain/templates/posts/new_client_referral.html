@@ -2,9 +2,6 @@
 {% from "posts/_client_referral_form.html" import client_referral_form %}
 
 {% block content %}
-<h1>New client referral</h1>
 <p>Per <code>notes/forms_spec.md</code>. No PII.</p>
 {{ client_referral_form("post", "/posts", "Create client referral", schema=client_referral_create_schema) }}
-
-<p><a href="/posts" role="button" class="secondary outline">Back to posts</a></p>
 {% endblock %}

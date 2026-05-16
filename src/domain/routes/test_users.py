@@ -23,17 +23,18 @@ async def test_base_template_renders_primary_nav_when_authenticated(
     authenticated_client: AsyncClient,
     logged_in_user: User,
 ):
-    """Authenticated pages render the primary nav with a single
-    `/users/me` profile shortcut. Section links (Posts / Users /
-    Providers / Favorites) are reachable from within their pages
-    rather than from the top-level chrome."""
+    """Authenticated pages render the primary nav with two entries:
+    the permanent `+ Post` CTA (routes to the kind picker at
+    `/posts/form`) and the `/users/me` profile icon. Section links
+    (Posts / Users / Providers / Favorites) are reachable from
+    within their pages rather than from the top-level chrome."""
     response = await authenticated_client.get("/users")
 
     assert response.status_code == 200
     tree = HTMLParser(response.text)
     nav_items = tree.css("#primary-nav > li > a")
     hrefs = {a.attributes.get("href") for a in nav_items}
-    assert hrefs == {"/users/me"}
+    assert hrefs == {"/posts/form", "/users/me"}
 
 
 async def test_base_template_hides_nav_for_anonymous_visitors(
@@ -276,6 +277,27 @@ async def test_detail_shows_admin_actions_for_admin(
     assert tree.css_first("span.admin-actions") is not None
 
 
+async def test_detail_admin_actions_render_inside_toolbar(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user: User,
+):
+    """Admin actions render inside the page toolbar (not the `<article>`
+    body). This pins the "primary resource actions live in the toolbar"
+    rule documented in `src/domain/templates/README.md`."""
+    await promote_to_admin(db_test_session_manager, logged_in_user.email)
+    target = create_test_user(username=f"target-{uuid.uuid4()}")
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            session.add(target)
+
+    response = await authenticated_client.get(f"/users/{target.id}")
+    tree = HTMLParser(response.text)
+    assert tree.css_first(".toolbar span.admin-actions") is not None
+    # Sanity: not duplicated inside <article>.
+    assert tree.css_first("article span.admin-actions") is None
+
+
 async def test_detail_hides_admin_actions_for_non_admin(
     authenticated_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],
@@ -340,7 +362,7 @@ async def test_detail_lists_owned_providers(
     assert hrefs == {f"/providers/{first.id}", f"/providers/{second.id}"}
 
 
-# --- Chrome: nav active state + breadcrumb ------------------------------
+# --- Chrome: nav active state -------------------------------------------
 
 
 async def test_primary_nav_marks_profile_active_on_users_me_subpaths(
@@ -354,21 +376,6 @@ async def test_primary_nav_marks_profile_active_on_users_me_subpaths(
     tree = HTMLParser(response.text)
     profile_link = tree.css_first('#primary-nav a[href="/users/me"]')
     assert profile_link.attributes.get("aria-current") == "page"
-
-
-async def test_users_me_detail_breadcrumb_says_me(
-    authenticated_client: AsyncClient,
-    logged_in_user: User,
-):
-    """The /users/me alias renders the user-detail page; its breadcrumb
-    says "Me" rather than "Users > {username}" since the viewer is
-    looking at themselves."""
-    response = await authenticated_client.get("/users/me")
-    assert response.status_code == 200
-    tree = HTMLParser(response.text)
-    crumbs = tree.css("nav.breadcrumb li")
-    assert len(crumbs) == 1
-    assert crumbs[0].text(strip=True) == "Me"
 
 
 # --- Activation endpoint -------------------------------------------------
@@ -670,9 +677,6 @@ async def test_get_user_providers_admin_can_view_other(
     response = await authenticated_client.get(f"/users/{target.id}/providers")
     assert response.status_code == 200
     tree = HTMLParser(response.text)
-    heading = tree.css_first("#user-providers-heading")
-    assert heading is not None
-    assert target.username in heading.text()
     assert len(tree.css("#user-providers tbody tr")) == 1
 
 

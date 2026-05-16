@@ -1,39 +1,29 @@
 {% extends "base.html" %}
-{%- from "_shared/_breadcrumb.html" import breadcrumb -%}
+{%- from "_shared/_toolbar.html" import toolbar -%}
 
-{% block breadcrumb %}
-{%- if post.kind == "client_referral" -%}
-  {{ breadcrumb([("Posts", "/posts"), ("Client referral", None)]) }}
-{%- elif post.kind == "provider_availability" -%}
-  {{ breadcrumb([("Posts", "/posts"), (post.provider_availability_detail.provider.practice_name, None)]) }}
-{%- endif -%}
+{% block toolbar %}
+{% call toolbar() %}
+  {% include "posts/_owner_actions.html" %}
+{% endcall %}
 {% endblock %}
 
-{# The detail page is the *unfold* of a card on /posts. Sections are
-   ordered by what a reader needs to decide whether to act on the post:
-   1. Header — kind chip, title, posted-by/posted-at (same identifiers
-      the card showed).
-   2. Description — full prose; promoted above the metadata grid
-      because it's what the card preview was teasing.
-   3. Match facts (`<dl>`) — the card's chip line, expanded: full age-
-      group list, languages, services, modality, full carrier list,
-      insurance posture, sliding scale, schedule.
-   4. Footer — for `provider_availability` the call-to-action (website
-      + referral instructions) and `_owner_actions.html`. For
-      `client_referral` just `_owner_actions.html` + back link. #}
+{# Detail-page contract:
+   1. Kind chip + posted-by/posted-at — the post's "meta" line.
+   2. Description prose — what the post is about.
+   3. Match-facts `<dl>` — chip-line tokens expanded into full lists.
+   4. "How to refer" section for `provider_availability` (website +
+      referral instructions).
+
+   Edit/Delete actions live in the toolbar above — no `<header>`
+   block here, no `_owner_actions.html` in the footer. #}
 {% block content %}
 <article>
 {% if post.kind == "client_referral" %}
 {% set d = post.client_referral_detail %}
-  <header>
-    <hgroup>
-      <h1>Seeking in {{ d.location_city }}, {{ d.location_state }}</h1>
-      <p>
-        <span data-kind-chip="client_referral">Seeking</span>
-        <small>by <a href="/users/{{ post.owner_id }}">{{ post.owner.username }}</a> · {{ post.created_at | format_post_date }}</small>
-      </p>
-    </hgroup>
-  </header>
+  <p>
+    <span data-kind-chip="client_referral">Seeking</span>
+    <small>by <a href="/users/{{ post.owner_id }}">{{ post.owner.username }}</a> · {{ post.created_at | format_post_date }}</small>
+  </p>
 
   <p>{{ d.description }}</p>
 
@@ -67,15 +57,10 @@
 {% elif post.kind == "provider_availability" %}
 {% set d = post.provider_availability_detail %}
 {% set p = d.provider %}
-  <header>
-    <hgroup>
-      <h1>{{ p.practice_name }}</h1>
-      <p>
-        <span data-kind-chip="provider_availability">Providing</span>
-        <small>by <a href="/users/{{ post.owner_id }}">{{ post.owner.username }}</a> · {{ post.created_at | format_post_date }}</small>
-      </p>
-    </hgroup>
-  </header>
+  <p>
+    <span data-kind-chip="provider_availability">Providing</span>
+    <small>by <a href="/users/{{ post.owner_id }}">{{ post.owner.username }}</a> · {{ post.created_at | format_post_date }}</small>
+  </p>
 
   {% if d.description %}
   <p>{{ d.description }}</p>
@@ -142,10 +127,5 @@
   </section>
   {% endif %}
 {% endif %}
-
-  <footer>
-    {% include "posts/_owner_actions.html" %}
-    <a href="/posts" role="button" class="secondary outline">Back to posts</a>
-  </footer>
 </article>
 {% endblock %}

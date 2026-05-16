@@ -151,21 +151,27 @@ async def test_get_register_page(test_client: AsyncClient):
     response = await test_client.get("/auth/register")
     assert response.status_code == 200
     assert "text/html" in response.headers["content-type"]
-    assert "<h1>Register</h1>" in response.text
+    # Page-title text is no longer wrapped in an `<h1>` (per app-wide
+    # H1 removal); the form's submit button still says "Register".
+    assert "Register" in response.text
 
 
 async def test_get_login_page(test_client: AsyncClient):
     response = await test_client.get("/auth/login")
     assert response.status_code == 200
     assert "text/html" in response.headers["content-type"]
-    assert "<h1>Login</h1>" in response.text
+    assert "Login" in response.text
 
 
 async def test_get_forgot_password_page(test_client: AsyncClient):
     response = await test_client.get("/auth/forgot-password")
     assert response.status_code == 200
     assert "text/html" in response.headers["content-type"]
-    assert "<h1>Forgot password</h1>" in response.text
+    # H1 was removed app-wide; the page no longer carries the literal
+    # "Forgot password" text. The submit button and body copy still
+    # identify the page.
+    assert "/auth/forgot-password" in response.text
+    assert "Send reset link" in response.text
 
 
 async def test_get_reset_password_page(test_client: AsyncClient):
@@ -173,7 +179,7 @@ async def test_get_reset_password_page(test_client: AsyncClient):
     response = await test_client.get(f"/auth/reset-password/{reset_token}")
     assert response.status_code == 200
     assert "text/html" in response.headers["content-type"]
-    assert "<h1>Reset password</h1>" in response.text
+    assert "Reset password" in response.text
     assert (
         f'value="{reset_token}"' in response.text
         or f'data-token="{reset_token}"' in response.text
@@ -212,7 +218,7 @@ async def test_unauthorized_redirect_follows_to_login_page(test_client: AsyncCli
     )
     assert response.status_code == 200
     assert "text/html" in response.headers["content-type"]
-    assert "<h1>Login</h1>" in response.text
+    assert "Login" in response.text
 
 
 async def test_register_writes_audit_row(

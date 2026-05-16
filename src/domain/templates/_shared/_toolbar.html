@@ -1,0 +1,32 @@
+{# Top-of-page toolbar primitive.
+
+Every page that needs page-scoped controls renders one toolbar
+above its content, followed by an `<hr />` separator:
+
+  [active filter chips left]                  [actions / picker right]
+  ──────────────────────────────────────────────────────────────────
+  (page content below)
+
+The caller body fills the toolbar. Single-action toolbars right-align
+naturally (`.toolbar` is `display: flex; justify-content: flex-end`).
+Composite content like `index_filters` overrides that by stretching
+to full width and managing its own internal left/right layout.
+
+    {% call toolbar() %}
+      {{ index_filters(filters, action="/posts", values={…}) }}
+    {% endcall %}
+
+    {% call toolbar() %}
+      <a href="…/form" role="button">Edit</a>
+    {% endcall %}
+
+Pages that have no toolbar content leave `{% block toolbar %}` empty
+(or omit it).
+#}
+
+{% macro toolbar() -%}
+{%- if caller %}
+<div class="toolbar">{{ caller() }}</div>
+<hr />
+{%- endif %}
+{%- endmacro %}

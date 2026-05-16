@@ -1666,7 +1666,12 @@ async def test_new_form_polymorphic_uses_kind_create_template():
 
 
 @pytest.mark.asyncio
-async def test_new_form_polymorphic_defaults_kind_to_first_registered():
+async def test_new_form_polymorphic_no_kind_leaves_template_unset():
+    """Polymorphic + `kind=None`: handler does NOT set `template_name`,
+    so the route falls through to `spec.form_template` (the kind
+    picker, conventionally `<collection>/form_new.html`). A previous
+    revision defaulted to the first registered kind's template silently;
+    that hid the kind-choice UX behind a default."""
     registry = DiscriminatorRegistry(
         column="kind",
         specs={
@@ -1687,7 +1692,7 @@ async def test_new_form_polymorphic_defaults_kind_to_first_registered():
         spec, request=SimpleNamespace(), requesting_user=_user(), kind=None
     )
 
-    assert context["template_name"] == "paintings/new_red.html"
+    assert "template_name" not in context
 
 
 # --- make_new_form_handler factory ----------------------------------------

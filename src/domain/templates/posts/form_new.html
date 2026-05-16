@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+
+{# Kind-picker for `GET /posts/form` (no `?kind=`). Each option is a
+   stand-alone `<a role="button">` describing the post the user is
+   about to create — the button label is the entire prompt, no
+   surrounding heading or explainer copy. Wrapping each button in a
+   `<p>` stacks them vertically and gives them Pico-default block
+   spacing for free. Each link round-trips back to this route with
+   `?kind=…`, which the handler routes to the kind-specific create
+   form. Two kinds today; add another `<p><a>…</a></p>` per kind. #}
+{% block content %}
+<p><a href="/posts/form?kind=client_referral" role="button">Refer a client to a provider</a></p>
+<p><a href="/posts/form?kind=provider_availability" role="button">Announce availability for new clients</a></p>
+{% endblock %}

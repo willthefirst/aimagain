@@ -162,7 +162,6 @@ async def test_get_provider_renders_detail_page(
     assert response.status_code == 200
     assert response.headers["content-type"].startswith("text/html")
     tree = HTMLParser(response.text)
-    assert "Mine" in tree.css_first("h1").text()
     # Licensure section renders the seeded row.
     assert "L-99999" in response.text
     # Owner sees an Edit link, no edit forms (read-only).
@@ -351,27 +350,67 @@ async def test_list_providers_treats_empty_filter_values_as_absent(
     assert len(rows) == 1, "Empty filter values should not exclude rows"
 
 
-# --- Chrome: breadcrumb -------------------------------------------------
+# --- Chrome: toolbar + form affordances --------------------------------
 
 
-async def test_provider_detail_renders_breadcrumb(
+async def test_provider_detail_favorite_toggle_lives_in_toolbar(
     authenticated_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user: User,
 ):
-    provider_id = await _seed_provider_for(
-        db_test_session_manager,
-        user_id=logged_in_user.id,
-        practice_name="Crumb Therapy",
-    )
+    """The favorite/unfavorite button is a primary resource action and
+    renders inside the toolbar, not in `<footer>` or `<article>`. Pins
+    the chrome rule in `src/domain/templates/README.md`."""
+    other = create_test_user(username=f"other-{uuid.uuid4()}")
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            session.add(other)
+    provider_id = await _seed_provider_for(db_test_session_manager, user_id=other.id)
+
     response = await authenticated_client.get(f"/providers/{provider_id}")
     assert response.status_code == 200
     tree = HTMLParser(response.text)
-    crumbs = tree.css("nav.breadcrumb li")
-    assert len(crumbs) == 2
-    assert crumbs[0].css_first("a").attributes.get("href") == "/providers"
-    assert crumbs[0].text(strip=True) == "Providers"
-    assert crumbs[1].text(strip=True) == "Crumb Therapy"
+    assert tree.css_first(".toolbar span.favorite-toggle") is not None
+    # The favorite toggle is not duplicated inside <article>.
+    assert tree.css_first("article span.favorite-toggle") is None
+    # And the Favorite button posts to the canonical edge endpoint.
+    btn = tree.css_first(".toolbar span.favorite-toggle button")
+    assert btn is not None
+    assert btn.attributes.get("hx-post") == f"/users/me/favorites/{provider_id}"
+
+
+async def test_provider_form_new_omits_bottom_back_link(
+    authenticated_client: AsyncClient,
+    logged_in_user: User,
+):
+    """`GET /providers/form` renders the create form with no redundant
+    bottom "Back to providers" link — primary nav is the way back."""
+    response = await authenticated_client.get("/providers/form")
+    assert response.status_code == 200
+    tree = HTMLParser(response.text)
+    bottom_back = tree.css_first('a[href="/providers"][role="button"]')
+    assert bottom_back is None
+
+
+async def test_provider_form_edit_renders_cancel(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user: User,
+):
+    """`GET /providers/{id}/form` keeps a bottom "Cancel" link pointing
+    at the detail page (a deliberate "abandon this edit" affordance —
+    see `src/domain/templates/README.md`)."""
+    provider_id = await _seed_provider_for(
+        db_test_session_manager,
+        user_id=logged_in_user.id,
+        practice_name="Edit Me",
+    )
+    response = await authenticated_client.get(f"/providers/{provider_id}/form")
+    assert response.status_code == 200
+    tree = HTMLParser(response.text)
+    cancel = tree.css_first(f'a[href="/providers/{provider_id}"][role="button"]')
+    assert cancel is not None
+    assert cancel.text(strip=True) == "Cancel"
 
 
 # --- Provider update ------------------------------------------------------

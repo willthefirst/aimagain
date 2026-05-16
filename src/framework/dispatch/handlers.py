@@ -464,7 +464,17 @@ async def handle_get_new_form(
     requesting_user: User,
     kind: str | None = None,
 ) -> dict[str, Any]:
-    """Generic create-form handler driven by `spec`."""
+    """Generic create-form handler driven by `spec`.
+
+    For polymorphic entities (those with a `discriminator`):
+      * `kind=None` (no `?kind=` on the URL) → don't set `template_name`,
+        so the route falls back to `spec.form_template` and renders the
+        picker template (conventionally `<collection>/form_new.html`).
+        The picker lists the available kinds; users pick one and round-
+        trip back to this handler with `?kind=…`.
+      * `kind=<value>` → set `template_name` to the kind's
+        `create_template` so the route renders the kind-specific form.
+    """
     context: dict[str, Any] = {
         "request": request,
         "current_user": requesting_user,
@@ -472,8 +482,10 @@ async def handle_get_new_form(
     if spec.static_context:
         context.update(spec.static_context)
     if spec.discriminator is not None:
-        chosen = kind or spec.discriminator.names[0]
-        context["template_name"] = spec.discriminator[chosen].create_template
+        if kind is not None:
+            context["template_name"] = spec.discriminator[kind].create_template
+        # When `kind is None`, leave `template_name` unset so the route
+        # falls through to `spec.form_template` (the picker).
     elif spec.create_adapter_class is not None:
         # Non-polymorphic create forms render fields via
         # `field_for(schema, ...)` (reads `schema.model_fields`); the

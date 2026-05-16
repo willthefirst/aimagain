@@ -2,13 +2,10 @@
 {% from "posts/_provider_availability_form.html" import provider_availability_form %}
 
 {% block content %}
-<h1>New provider availability</h1>
 {% if not current_user.providers %}
 <p>You need a provider profile before posting availability. <a href="/providers/form">Create your provider profile</a>, then return here.</p>
 {% else %}
 <p>Per <code>notes/forms_spec.md</code>. No PII.</p>
 {{ provider_availability_form("post", "/posts", "Create provider availability", schema=provider_availability_create_schema, current_user=current_user) }}
 {% endif %}
-
-<p><a href="/posts" role="button" class="secondary outline">Back to posts</a></p>
 {% endblock %}

@@ -2,7 +2,6 @@
 {% from "posts/_provider_availability_form.html" import provider_availability_form %}
 
 {% block content %}
-<h1>Edit provider availability</h1>
 {{ provider_availability_form("patch", "/posts/" ~ post.id, "Save changes", post=post, schema=provider_availability_create_schema, current_user=current_user) }}
 
 <p><a href="/posts/{{ post.id }}" role="button" class="secondary outline">Cancel</a></p>

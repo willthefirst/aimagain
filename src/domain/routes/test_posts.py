@@ -352,15 +352,15 @@ async def test_list_renders_readable_date_format(
     assert rendered in {"May 15", "May 15, 2025"}
 
 
-async def test_detail_renders_kind_chip_and_synthesized_header(
+async def test_detail_renders_kind_chip_in_header(
     authenticated_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user: User,
 ):
-    """The detail page header echoes the listing row: kind chip + the
-    same synthesized title for a seeking post. The chip is a
-    `<mark data-kind-chip>` so the summary→detail relationship is
-    testable as a single shape, not two paraphrased copies."""
+    """The detail page header carries the kind chip + posted-by/posted-
+    at metadata. App-wide H1 removal dropped the synthesized title
+    that used to mirror the listing row; the chip now carries the
+    "where am I" information."""
     post = _client_referral_post(
         description="header-echo",
         owner_id=logged_in_user.id,
@@ -376,11 +376,9 @@ async def test_detail_renders_kind_chip_and_synthesized_header(
     response = await authenticated_client.get(f"/posts/{post_id}")
     assert response.status_code == 200
     tree = HTMLParser(response.text)
-    h1 = tree.css_first("article > header h1")
-    assert h1 is not None
-    assert h1.text(strip=True) == "Seeking in Boise, ID"
-    chip = tree.css_first("article > header [data-kind-chip]")
+    chip = tree.css_first("article [data-kind-chip]")
     assert chip is not None
+    assert chip.attributes.get("data-kind-chip") == "client_referral"
     assert chip.text(strip=True) == "Seeking"
 
 
@@ -405,7 +403,7 @@ async def test_detail_provider_availability_uses_providing_label(
     response = await authenticated_client.get(f"/posts/{post_id}")
     assert response.status_code == 200
     tree = HTMLParser(response.text)
-    chip = tree.css_first("article > header [data-kind-chip]")
+    chip = tree.css_first("article [data-kind-chip]")
     assert chip is not None
     assert chip.text(strip=True) == "Providing"
 
@@ -535,17 +533,22 @@ async def test_admin_can_patch_anyone_post(
 # --- Create form page (GET /posts/form) ----------------------------------
 
 
-async def test_list_page_links_to_create_forms(
+async def test_nav_has_permanent_create_post_link(
     authenticated_client: AsyncClient,
     logged_in_user: User,
 ):
+    """The primary nav carries a `+ Post` entry on every authenticated
+    page. Clicking it lands on the kind picker (`/posts/form` with no
+    `?kind=`). The link is in `#primary-nav` so it's visible across
+    the app, not just on `/posts`."""
     response = await authenticated_client.get("/posts")
     assert response.status_code == 200
     tree = HTMLParser(response.text)
-    cr_link = tree.css_first('a[href="/posts/form?kind=client_referral"]')
-    assert cr_link is not None
-    pa_link = tree.css_first('a[href="/posts/form?kind=provider_availability"]')
-    assert pa_link is not None
+    # The `+ Post` CTA moved to the right-side `<ul>` in the slimmed
+    # primary nav — look it up under `nav[aria-label="Primary"]`.
+    nav_link = tree.css_first('nav[aria-label="Primary"] a[href="/posts/form"]')
+    assert nav_link is not None
+    assert "Post" in nav_link.text(strip=True)
 
 
 # --- Filter form ---------------------------------------------------------
@@ -924,32 +927,28 @@ async def test_list_renders_one_control_per_declared_filter(
     assert expected <= labels
 
 
-# --- Chrome: breadcrumb on post detail ----------------------------------
+# --- Chrome: edit form cancel link --------------------------------------
 
 
-async def test_post_detail_renders_breadcrumb(
+async def test_edit_client_referral_form_renders_cancel(
     authenticated_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user: User,
 ):
-    """A client_referral detail page renders a `Posts > Client referral`
-    breadcrumb. The terminal entry is a `<span aria-current="page">`,
-    not a link."""
-    post = _client_referral_post(description="bread", owner_id=logged_in_user.id)
+    """Edit form keeps a bottom Cancel link to the post detail page."""
+    post = _client_referral_post(description="x", owner_id=logged_in_user.id)
     async with db_test_session_manager() as session:
         async with session.begin():
             session.add(post)
         await session.refresh(post)
         post_id = post.id
 
-    response = await authenticated_client.get(f"/posts/{post_id}")
+    response = await authenticated_client.get(f"/posts/{post_id}/form")
     assert response.status_code == 200
     tree = HTMLParser(response.text)
-    crumbs = tree.css("nav.breadcrumb li")
-    assert len(crumbs) == 2
-    assert crumbs[0].css_first("a").attributes.get("href") == "/posts"
-    assert crumbs[1].css_first("span[aria-current=page]") is not None
-    assert crumbs[1].text(strip=True) == "Client referral"
+    cancel = tree.css_first(f'a[href="/posts/{post_id}"][role="button"]')
+    assert cancel is not None
+    assert cancel.text(strip=True) == "Cancel"
 
 
 # --- Edit form page (GET /posts/{id}/form) -------------------------------
@@ -1297,35 +1296,41 @@ async def test_client_referral_form_renders_age_groups_multi_select(
     }
 
 
-async def test_get_post_form_default_kind_is_client_referral(
+async def test_get_post_form_no_kind_renders_picker(
     authenticated_client: AsyncClient,
     logged_in_user: User,
 ):
     """`GET /posts/form` without a `kind` query parameter renders the
-    first registered kind's form (currently client_referral)."""
+    kind picker (`posts/form_new.html`) — not a kind-specific create
+    form. The picker has one link per kind round-tripping back with
+    `?kind=…`."""
     response = await authenticated_client.get("/posts/form")
     assert response.status_code == 200
     tree = HTMLParser(response.text)
-    kind_input = tree.css_first('input[name="kind"]')
-    assert kind_input is not None
-    assert kind_input.attributes.get("value") == "client_referral"
+    # No `<input name="kind">` — that lives on the kind-specific forms,
+    # not the picker.
+    assert tree.css_first('input[name="kind"]') is None
+    # Each registered kind has a link on the picker.
+    assert tree.css_first('a[href="/posts/form?kind=client_referral"]') is not None
+    assert (
+        tree.css_first('a[href="/posts/form?kind=provider_availability"]') is not None
+    )
 
 
 async def test_get_post_form_treats_empty_kind_as_absent(
     authenticated_client: AsyncClient,
     logged_in_user: User,
 ):
-    """`GET /posts/form?kind=` should fall back to the default kind
-    rather than 422 against the `Literal[...]` annotation. The
-    middleware strips the empty pair at request entry so FastAPI sees
-    the param as absent and the route's default (`POST_KIND_NAMES[0]`)
-    fires."""
+    """`GET /posts/form?kind=` should behave the same as no `kind=` at
+    all — render the picker rather than 422 against the `Literal[...]`
+    annotation. The middleware strips the empty pair at request entry
+    so FastAPI sees the param as absent and the route's default
+    (`None` → picker) fires."""
     response = await authenticated_client.get("/posts/form?kind=")
     assert response.status_code == 200
     tree = HTMLParser(response.text)
-    kind_input = tree.css_first('input[name="kind"]')
-    assert kind_input is not None
-    assert kind_input.attributes.get("value") == "client_referral"
+    assert tree.css_first('input[name="kind"]') is None
+    assert tree.css_first('a[href="/posts/form?kind=client_referral"]') is not None
 
 
 async def test_list_renders_client_referral_row(
@@ -1347,7 +1352,9 @@ async def test_list_renders_client_referral_row(
     assert response.status_code == 200
     page = response.text
     assert description in page
-    assert "client referral" in page.lower()
+    # The kind chunk renders `Seeking` (not the longer `client referral`
+    # label) — the chip text is what the user actually sees.
+    assert "Seeking" in page
 
 
 async def test_get_client_referral_detail_renders(
@@ -1802,7 +1809,9 @@ async def test_list_renders_provider_availability_row(
     assert response.status_code == 200
     page = response.text
     assert practice_name in page
-    assert "provider availability" in page.lower()
+    # The kind chunk renders `Providing` (not the longer `provider
+    # availability` label) — the chip text is what the user sees.
+    assert "Providing" in page
 
 
 async def test_get_provider_availability_detail_renders(
