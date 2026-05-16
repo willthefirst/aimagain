@@ -360,7 +360,7 @@ async def test_provider_detail_favorite_toggle_lives_in_toolbar(
 ):
     """The favorite/unfavorite button is a primary resource action and
     renders inside the toolbar, not in `<footer>` or `<article>`. Pins
-    the chrome rule in `src/domain/templates/README.md`."""
+    the chrome rule in `src/framework/templates/README.md`."""
     other = create_test_user(username=f"other-{uuid.uuid4()}")
     async with db_test_session_manager() as session:
         async with session.begin():
@@ -399,7 +399,7 @@ async def test_provider_form_edit_renders_cancel(
 ):
     """`GET /providers/{id}/form` keeps a bottom "Cancel" link pointing
     at the detail page (a deliberate "abandon this edit" affordance —
-    see `src/domain/templates/README.md`)."""
+    see `src/framework/templates/README.md`)."""
     provider_id = await _seed_provider_for(
         db_test_session_manager,
         user_id=logged_in_user.id,

@@ -150,7 +150,7 @@ TREATMENT_SETTINGS: Final[tuple[str, ...]] = (
 # Where the storage value isn't directly usable as the dropdown label
 # (e.g. `children_0_5`, `in_network`), the labels live next to the tuple
 # they cover. The form-render macro in
-# `src/domain/templates/_shared/form_fields.html` looks up labels via these
+# `src/framework/templates/_shared/form_fields.html` looks up labels via these
 # dicts; missing keys fail at render time. A guardrail test in
 # `src/schemas/test_post.py` asserts every value in a tuple has a label.
 #

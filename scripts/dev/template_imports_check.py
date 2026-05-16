@@ -1,8 +1,19 @@
 #!/usr/bin/env python3
-"""Forbid cross-resource Jinja imports in src/domain/templates/.
+"""Forbid cross-resource Jinja imports across the template tree.
 
-A template under ``<a>/`` may only reference root, ``<a>/``, or ``_shared/``;
-anything else belongs in ``_shared/`` (#206).
+Templates live in two roots:
+
+- ``src/framework/templates/`` — ``base.html``, ``_shared/`` macros, and
+  ``views/`` chrome. Framework-level files: importable from any domain
+  entity; no cross-cluster constraint applies inside this root.
+- ``src/domain/templates/<entity>/`` — per-entity pages. A template under
+  ``<a>/`` may only reference: a root-level file (``base.html``), its own
+  ``<a>/``, ``_shared/`` (the cross-resource macro library), or ``views/``
+  (the generic list/detail/form chrome). Anything else belongs in
+  ``_shared/`` (#206).
+
+The check accepts ``files or directories``; with no args it scans both
+roots.
 """
 
 from __future__ import annotations
@@ -23,7 +34,10 @@ _DIRECTIVE_RE = re.compile(
     re.DOTALL,
 )
 
-SHARED_DIR = "_shared"
+# Directories under a templates root that any template may reference.
+# `_shared/` is the cross-resource macro library; `views/` is the generic
+# list/detail/form-new/form-edit chrome. Both are framework-level.
+SHARED_DIRS = frozenset({"_shared", "views"})
 
 
 @dataclass(frozen=True)
@@ -39,20 +53,25 @@ class Violation:
             f'{self.file}: {{% {self.directive} "{self.referenced}" %}} '
             f"crosses resource boundary "
             f"({self.importing_dir}/ → {self.referenced_dir}/). "
-            f"Relocate to src/domain/templates/{SHARED_DIR}/."
+            f"Relocate to src/framework/templates/_shared/."
         )
 
 
-def _resource_dir_of(template_path: Path, templates_root: Path) -> str | None:
-    """Return the immediate sub-directory under templates_root, or None for root files."""
-    try:
-        rel = template_path.relative_to(templates_root)
-    except ValueError:
-        return None
-    parts = rel.parts
-    if len(parts) <= 1:
-        return None  # File sits at templates_root (e.g. base.html).
-    return parts[0]
+def _resource_dir_of(
+    template_path: Path, templates_roots: Iterable[Path]
+) -> str | None:
+    """Return the immediate sub-directory under the matching root, or None for root files."""
+    abs_path = template_path.resolve()
+    for root in templates_roots:
+        try:
+            rel = abs_path.relative_to(root.resolve())
+        except ValueError:
+            continue
+        parts = rel.parts
+        if len(parts) <= 1:
+            return None  # File sits at a templates root (e.g. base.html).
+        return parts[0]
+    return None
 
 
 def _referenced_dir(referenced: str) -> str | None:
@@ -64,14 +83,23 @@ def _referenced_dir(referenced: str) -> str | None:
 
 def find_violations(
     template_files: Iterable[Path],
-    templates_root: Path,
+    templates_root: Path | Iterable[Path],
 ) -> list[Violation]:
+    if isinstance(templates_root, Path):
+        roots: list[Path] = [templates_root]
+    else:
+        roots = list(templates_root)
     violations: list[Violation] = []
     for file in template_files:
-        importing_dir = _resource_dir_of(file, templates_root)
+        importing_dir = _resource_dir_of(file, roots)
         if importing_dir is None:
             # Root-level templates (base.html) have no owning resource —
             # nothing to lint. They're shared by definition.
+            continue
+        if importing_dir in SHARED_DIRS:
+            # Files under `_shared/` or `views/` are framework-level
+            # chrome; they can reference anywhere under any root without
+            # crossing a resource boundary (there's no resource to leave).
             continue
         text = file.read_text(encoding="utf-8")
         for match in _DIRECTIVE_RE.finditer(text):
@@ -81,8 +109,8 @@ def find_violations(
                 continue  # Root reference (e.g. "base.html").
             if referenced_dir == importing_dir:
                 continue  # Same resource — fine.
-            if referenced_dir == SHARED_DIR:
-                continue  # Shared — fine.
+            if referenced_dir in SHARED_DIRS:
+                continue  # Framework-level chrome — fine.
             violations.append(
                 Violation(
                     file=file,
@@ -104,14 +132,22 @@ def _project_root() -> Path:
     raise RuntimeError("Could not locate project root (no pyproject.toml found).")
 
 
-def _default_templates_root() -> Path:
-    return _project_root() / "src" / "domain" / "templates"
+def _default_templates_roots() -> list[Path]:
+    root = _project_root()
+    return [
+        root / "src" / "framework" / "templates",
+        root / "src" / "domain" / "templates",
+    ]
 
 
-def _collect_files(paths: list[str], templates_root: Path) -> list[Path]:
+def _collect_files(paths: list[str], templates_roots: list[Path]) -> list[Path]:
     if not paths:
-        return sorted(templates_root.rglob("*.html"))
-    files: list[Path] = []
+        files: list[Path] = []
+        for root in templates_roots:
+            if root.exists():
+                files.extend(sorted(root.rglob("*.html")))
+        return files
+    files = []
     for raw in paths:
         p = Path(raw).resolve()
         if p.is_dir():
@@ -126,21 +162,24 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "paths",
         nargs="*",
-        help="Files or directories to check. Defaults to src/domain/templates/.",
+        help=(
+            "Files or directories to check. Defaults to "
+            "src/framework/templates/ and src/domain/templates/."
+        ),
     )
     args = parser.parse_args(argv)
 
-    templates_root = _default_templates_root()
-    files = _collect_files(args.paths, templates_root)
-    violations = find_violations(files, templates_root)
+    templates_roots = _default_templates_roots()
+    files = _collect_files(args.paths, templates_roots)
+    violations = find_violations(files, templates_roots)
 
     if violations:
         print("❌ Cross-resource template imports found:", file=sys.stderr)
         for v in violations:
             print(f"  {v.message()}", file=sys.stderr)
         print(
-            "\nA shared partial belongs in src/domain/templates/_shared/. "
-            "See issue #206 / src/domain/templates/README.md.",
+            "\nA shared partial belongs in src/framework/templates/_shared/. "
+            "See issue #206 / src/framework/templates/README.md.",
             file=sys.stderr,
         )
         return 1

@@ -322,7 +322,7 @@ async def test_detail_admin_actions_render_inside_toolbar(
 ):
     """Admin actions render inside the page toolbar (not the `<article>`
     body). This pins the "primary resource actions live in the toolbar"
-    rule documented in `src/domain/templates/README.md`."""
+    rule documented in `src/framework/templates/README.md`."""
     await promote_to_admin(db_test_session_manager, logged_in_user.email)
     target = create_test_user(username=f"target-{uuid.uuid4()}")
     async with db_test_session_manager() as session:
