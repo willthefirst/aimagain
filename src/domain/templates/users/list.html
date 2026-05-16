@@ -1,11 +1,9 @@
 {% extends "base.html" %}
 {%- from "_shared/index_table.html" import index_table -%}
 {%- from "users/_columns.html" import user_headers, user_row -%}
-{%- from "_shared/_breadcrumb.html" import breadcrumb -%}
+{%- from "_shared/list_page.html" import list_breadcrumb -%}
 
-{% block breadcrumb %}
-{{ breadcrumb([("Users", none)]) }}
-{% endblock %}
+{% block breadcrumb %}{{ list_breadcrumb("Users") }}{% endblock %}
 
 {% block content %}
 {{ index_table(
