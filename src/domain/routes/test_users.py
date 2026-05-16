@@ -23,18 +23,17 @@ async def test_base_template_renders_primary_nav_when_authenticated(
     authenticated_client: AsyncClient,
     logged_in_user: User,
 ):
-    """Authenticated pages render the primary nav with two entries:
-    the permanent `+ Post` CTA (routes to the kind picker at
-    `/posts/form`) and the `/users/me` profile icon. Section links
-    (Posts / Users / Providers / Favorites) are reachable from
-    within their pages rather than from the top-level chrome."""
+    """Authenticated pages render the primary nav with a single
+    `/users/me` profile shortcut. Section links (Posts / Users /
+    Providers / Favorites) and the create-post CTA are reachable
+    from within their pages rather than from the top-level chrome."""
     response = await authenticated_client.get("/users")
 
     assert response.status_code == 200
     tree = HTMLParser(response.text)
     nav_items = tree.css("#primary-nav > li > a")
     hrefs = {a.attributes.get("href") for a in nav_items}
-    assert hrefs == {"/posts/form", "/users/me"}
+    assert hrefs == {"/users/me"}
 
 
 async def test_base_template_hides_nav_for_anonymous_visitors(

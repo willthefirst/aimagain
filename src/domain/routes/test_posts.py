@@ -530,27 +530,6 @@ async def test_admin_can_patch_anyone_post(
     assert response.json()["description"] == "moderated"
 
 
-# --- Create form page (GET /posts/form) ----------------------------------
-
-
-async def test_nav_has_permanent_create_post_link(
-    authenticated_client: AsyncClient,
-    logged_in_user: User,
-):
-    """The primary nav carries a `+ Post` entry on every authenticated
-    page. Clicking it lands on the kind picker (`/posts/form` with no
-    `?kind=`). The link is in `#primary-nav` so it's visible across
-    the app, not just on `/posts`."""
-    response = await authenticated_client.get("/posts")
-    assert response.status_code == 200
-    tree = HTMLParser(response.text)
-    # The `+ Post` CTA moved to the right-side `<ul>` in the slimmed
-    # primary nav — look it up under `nav[aria-label="Primary"]`.
-    nav_link = tree.css_first('nav[aria-label="Primary"] a[href="/posts/form"]')
-    assert nav_link is not None
-    assert "Post" in nav_link.text(strip=True)
-
-
 # --- Filter form ---------------------------------------------------------
 
 

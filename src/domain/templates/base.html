@@ -116,10 +116,6 @@
           <li><strong><a href="/" class="contrast">Bedlam Connect</a></strong></li>
         </ul>
         <ul id="primary-nav">
-          {# Permanent create-post entry point — every authenticated
-             page has a one-click route to the kind picker at
-             `/posts/form`, where users pick Seeking or Providing. #}
-          <li><a href="/posts/form" role="button">+ Post</a></li>{# title-case-ignore: "+ Post" is a verb-form CTA — title-case linter wants "+ post" (sentence-case verb), but the visible capitalization signals action #}
           <li>
             <a href="/users/me" aria-label="Profile"{% if _on_profile %} aria-current="page" class="contrast"{% endif %}>
               {# Lucide `user` icon, inlined. `currentColor` makes it
