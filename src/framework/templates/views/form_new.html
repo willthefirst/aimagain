@@ -1,0 +1,31 @@
+{# Generic create-form view chrome.
+
+A create-form view (`/posts/form`, `/providers/form`) renders a two-segment
+breadcrumb (collection → "New") and no toolbar — the submit button at
+the bottom of the form is the primary action. The child fills the form.
+
+Child contract:
+
+  Required blocks:
+    resource_label — short string label for the collection segment of
+                     the breadcrumb (e.g. "Providers").
+    content        — the `<form>` body.
+
+  Required context:
+    resource_url   — URL the collection segment links to (e.g. "/providers").
+
+  Optional blocks:
+    breadcrumb     — full breadcrumb override for nested-create pages.
+
+Edit-form chrome is in `form_edit.html` (three segments, with a link
+back to the resource's detail page on the middle one).
+#}
+{% extends "base.html" %}
+{%- from "_shared/_breadcrumb.html" import breadcrumb -%}
+
+{% block breadcrumb %}
+{%- set collection_label %}{% block resource_label %}{% endblock %}{% endset -%}
+{{ breadcrumb([(collection_label, resource_url), ("New", none)]) }}
+{% endblock %}
+
+{% block content %}{% endblock %}
