@@ -1,7 +1,12 @@
 {% extends "base.html" %}
 {%- from "_shared/_toolbar.html" import toolbar -%}
 {%- from "_shared/index_filters.html" import index_filters -%}
+{%- from "_shared/_breadcrumb.html" import breadcrumb -%}
 {%- from "posts/_item.html" import post_item with context -%}
+
+{% block breadcrumb %}
+{{ breadcrumb([("Posts", none)]) }}
+{% endblock %}
 
 {% block toolbar %}
 {% call toolbar() %}
