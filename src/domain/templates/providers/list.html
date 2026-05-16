@@ -6,14 +6,16 @@
 
 {% block toolbar %}
 {% call toolbar() %}
-  {{ index_filters(
-    filters,
-    action="/providers",
-    values={
-      "license_type": selected_license_type,
-      "issuing_state": selected_issuing_state,
-    },
-  ) }}
+  <div class="toolbar-left">
+    {{ index_filters(
+      filters,
+      action="/providers",
+      values={
+        "license_type": selected_license_type,
+        "issuing_state": selected_issuing_state,
+      },
+    ) }}
+  </div>
 {% endcall %}
 {% endblock %}
 

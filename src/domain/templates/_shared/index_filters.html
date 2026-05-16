@@ -34,6 +34,7 @@ Args:
 {%- if not values.get(f.name) -%}{%- set ns.inactive = ns.inactive + [f] -%}{%- endif -%}
 {%- endfor -%}
 <form class="index-filters" method="get" action="{{ action }}">
+  {%- if any_active %}
   <div class="filter-chips">
     {%- for f in filters %}
     {%- set v = values.get(f.name) %}
@@ -44,6 +45,7 @@ Args:
     {%- endif %}
     {%- endfor %}
   </div>
+  {%- endif %}
   <div class="filter-actions">
     {%- if any_active %}
     <button type="button" class="contrast outline" data-filter-clear-all="{{ action }}">Clear all</button>

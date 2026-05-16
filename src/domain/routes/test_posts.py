@@ -530,6 +530,26 @@ async def test_admin_can_patch_anyone_post(
     assert response.json()["description"] == "moderated"
 
 
+# --- Zone bar ------------------------------------------------------------
+
+
+async def test_list_page_renders_create_post_button_in_toolbar_right(
+    authenticated_client: AsyncClient,
+    logged_in_user: User,
+):
+    """The /posts zone bar parks a `Create post` link on the right; it
+    routes to `/posts/form` (no `?kind=`), which renders the kind picker.
+    Before the zone bar existed, the kind picker was reachable only by
+    typing the URL — pin the UI entry point so it doesn't regress."""
+    response = await authenticated_client.get("/posts")
+    assert response.status_code == 200
+    tree = HTMLParser(response.text)
+    link = tree.css_first('.toolbar .toolbar-right a[href="/posts/form"]')
+    assert link is not None
+    assert link.attributes.get("role") == "button"
+    assert link.text().strip() == "Create post"
+
+
 # --- Filter form ---------------------------------------------------------
 
 
