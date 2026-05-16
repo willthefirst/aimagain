@@ -99,18 +99,7 @@
   </head>
   <body>
     {% if is_authenticated %}
-    {# Section-precedence rule for the active-nav indicator: more-specific
-       paths win. `/users/me/favorites` resolves to "favorites"; `/users/me`
-       (and `/users/me/providers`) to "me"; `/users/<id>` to "users". The
-       ladder is encoded here once so each `<li>` reads as a flat check. #}
-    {%- set _p = request.url.path -%}
-    {%- if _p.startswith('/users/me/favorites') -%}{%- set _section = 'favorites' -%}
-    {%- elif _p == '/users/me' or _p.startswith('/users/me/') -%}{%- set _section = 'me' -%}
-    {%- elif _p.startswith('/posts') -%}{%- set _section = 'posts' -%}
-    {%- elif _p.startswith('/providers') -%}{%- set _section = 'providers' -%}
-    {%- elif _p.startswith('/users') -%}{%- set _section = 'users' -%}
-    {%- else -%}{%- set _section = None -%}
-    {%- endif -%}
+    {%- set _on_profile = request.url.path == '/users/me' or request.url.path.startswith('/users/me/') -%}
     <header class="container">
       <nav aria-label="Primary">
         <ul>
@@ -118,11 +107,14 @@
           <li><strong><a href="/" class="contrast">Bedlam Connect</a></strong></li>
         </ul>
         <ul id="primary-nav">
-          <li><a href="/posts"{% if _section == 'posts' %} aria-current="page" class="contrast"{% endif %}>Posts</a></li>
-          <li><a href="/users"{% if _section == 'users' %} aria-current="page" class="contrast"{% endif %}>Users</a></li>
-          <li><a href="/providers"{% if _section == 'providers' %} aria-current="page" class="contrast"{% endif %}>Providers</a></li>
-          <li><a href="/users/me/favorites"{% if _section == 'favorites' %} aria-current="page" class="contrast"{% endif %}>Favorites</a></li>
-          <li><a href="/users/me"{% if _section == 'me' %} aria-current="page" class="contrast"{% endif %}>Me</a></li>
+          <li>
+            <a href="/users/me" aria-label="Profile"{% if _on_profile %} aria-current="page" class="contrast"{% endif %}>
+              {# Lucide `user` icon, inlined. `currentColor` makes it
+                 inherit the link color (including Pico's `.contrast`
+                 active state). #}
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+            </a>
+          </li>
         </ul>
       </nav>
     </header>
