@@ -7,17 +7,19 @@ inside `<ul id="posts-list">` — `<li>` is the only valid child of
 No per-post framing, no card styling, just the meta line and title
 flowing as content. Bespoke CSS is reduced to two patterns both
 scoped under `#posts-list > li`: the inline-list rules for the meta
-`<ul>`, and the line-clamp rule for the title `<p>`.
+`<dl>`, and the line-clamp rule for the title `<p>`.
 
-The row is two lines: a meta `<ul>` above, a title `<p>` below.
+The row is two lines: a meta `<dl>` above, a title `<p>` below.
 Meta carries every fact about the post — date, kind chunk (Seeking
 or Providing — colored via the `[data-kind-chip]` attribute selector
-on the `<li>` wrapper), location, in-person / virtual format, age
-groups, and languages when non-default — each chunk inside its own
-`<li><small>…</small></li>`. The inline-list
-CSS in `base.html` flips the children to `display: inline` and
-inserts a `·` between adjacent siblings via `::before`, so the
-separator lives in CSS rather than markup. The title `<p>` is
+on the `<div>` wrapper), location, in-person / virtual format, age
+groups, and languages when non-default — each fact is a `<dt>` label
+(visually hidden, announced by screen readers) plus a `<dd><small>`
+value, wrapped in a `<div>` (HTML5 permits `<div>` grouping inside
+`<dl>`). The inline-list CSS in `base.html` flips the `<div>`
+wrappers to `display: inline` and inserts a `·` between adjacent
+siblings via `::before`, so the separator lives in CSS rather than
+markup. The title `<p>` is
 `display: -webkit-box` with `-webkit-line-clamp: 2`, so long
 descriptions clamp visually to two lines with an ellipsis but stay
 in the DOM (search engines, `?q=` ILIKE, and screen readers all see
@@ -40,7 +42,7 @@ post is about:
 `active_kind` (passed via `row_kwargs`) hides the kind chunk when the
 page is filtered to a single kind — the chunk would be constant for
 every row; tests assert presence/absence via the `[data-kind-chip]`
-attribute on the meta `<li>`. The leading date renders via the
+attribute on the meta `<div>` wrapper. The leading date renders via the
 `format_post_date` filter — see
 [`src/framework/rendering/templating.py`](../../../framework/rendering/templating.py).
 Insurance posture (in-network, sliding scale, etc.) is *not* in the
@@ -49,10 +51,12 @@ the detail page for posture and carrier specifics.
 #}
 
 {% macro _meta_chunks(post, active_kind=None) -%}
-{# Yields one `<li><small>...</small></li>` per metadata chunk. The
-   wrapper `<ul>` in `post_item` styles them inline (see the
-   `#posts-list ul` rules in `base.html`); a `·` separator is inserted
-   via CSS `::before` rather than the markup. #}
+{# Yields one `<div><dt>Label</dt><dd><small>Value</small></dd></div>`
+   per metadata chunk. The wrapper `<dl>` in `post_item` styles them
+   inline (see the `#posts-list dl` rules in `base.html`); a `·`
+   separator is inserted via CSS `::before` rather than the markup.
+   `<dt>` labels are visually hidden but announced by screen readers,
+   so each chunk reads as the key/value pair it actually is. #}
 {%- if post.kind == "client_referral" -%}
   {%- set d = post.client_referral_detail -%}
   {%- set kind_label = "Seeking" -%}
@@ -69,25 +73,25 @@ the detail page for posture and carrier specifics.
   {%- set in_person = p.in_person_sessions -%}
   {%- set virtual = p.virtual_sessions -%}
 {%- endif -%}
-<li><small>{{ post.created_at | format_post_date }}</small></li>
+<div><dt>Date</dt><dd><small>{{ post.created_at | format_post_date }}</small></dd></div>
 {%- if active_kind is none %}
-<li data-kind-chip="{{ post.kind }}"><small>{{ kind_label }}</small></li>
+<div data-kind-chip="{{ post.kind }}"><dt>Kind</dt><dd><small>{{ kind_label }}</small></dd></div>
 {%- endif -%}
-{%- if city and state %}<li><small>{{ city }}, {{ state }}</small></li>{% endif %}
+{%- if city and state %}<div><dt>Location</dt><dd><small>{{ city }}, {{ state }}</small></dd></div>{% endif %}
 {%- set fmt = [] -%}
 {%- if in_person == "yes" -%}{%- set _ = fmt.append("In-person") -%}{%- endif -%}
 {%- if virtual == "yes" -%}{%- set _ = fmt.append("Virtual") -%}{%- endif -%}
-{%- if fmt %}<li><small>{{ fmt | join(" + ") }}</small></li>{% endif %}
+{%- if fmt %}<div><dt>Format</dt><dd><small>{{ fmt | join(" + ") }}</small></dd></div>{% endif %}
 {%- if d.age_groups %}
   {%- set ages = [] -%}
   {%- for g in d.age_groups[:2] -%}{%- set _ = ages.append(CLIENT_AGE_GROUP_LABELS[g]) -%}{%- endfor -%}
   {%- if d.age_groups | length > 2 -%}{%- set _ = ages.append("+" ~ (d.age_groups | length - 2)) -%}{%- endif -%}
-<li><small>{{ ages | join(", ") }}</small></li>{% endif %}
+<div><dt>Age groups</dt><dd><small>{{ ages | join(", ") }}</small></dd></div>{% endif %}
 {%- if d.languages and not (d.languages | length == 1 and d.languages[0] == "en") %}
   {%- set langs = [] -%}
   {%- for l in d.languages[:2] -%}{%- set _ = langs.append(LANGUAGE_LABELS[l]) -%}{%- endfor -%}
   {%- if d.languages | length > 2 -%}{%- set _ = langs.append("+" ~ (d.languages | length - 2)) -%}{%- endif -%}
-<li><small>{{ langs | join(", ") }}</small></li>{% endif %}
+<div><dt>Languages</dt><dd><small>{{ langs | join(", ") }}</small></dd></div>{% endif %}
 {%- endmacro %}
 
 {% macro post_item(post, active_kind=None) -%}
@@ -98,7 +102,7 @@ the detail page for posture and carrier specifics.
   {%- set p = d.provider -%}
 {%- endif -%}
 <li data-row-id="{{ post.id }}" data-kind="{{ post.kind }}">
-  <ul>{{ _meta_chunks(post, active_kind=active_kind) }}</ul>
+  <dl>{{ _meta_chunks(post, active_kind=active_kind) }}</dl>
   <p>
     <a href="/posts/{{ post.id }}">
       {%- if post.kind == "client_referral" -%}
