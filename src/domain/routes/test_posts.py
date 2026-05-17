@@ -1021,25 +1021,39 @@ async def test_toolbar_inline_active_filter_summary_collapses_beyond_two(
     assert "Seeking" in text
     assert "needle" in text
     assert "+1 more filter" in text
-    # Clear all link is present alongside.
-    clear = tree.css_first("a.toolbar-clear-all")
-    assert clear is not None
-    assert clear.attributes.get("href") == "/posts"
+    # No Clear-all link in the toolbar — clearing happens on the
+    # search page's form.
+    assert tree.css_first("a.toolbar-clear-all") is None
 
 
-async def test_toolbar_empty_search_link_reads_as_search_collection(
+async def test_toolbar_empty_filter_link_reads_as_filters(
     authenticated_client: AsyncClient,
     logged_in_user: User,
 ):
     """With no active filters, the toolbar's filter link reads
-    ``Search posts`` and no Clear-all link is rendered."""
+    ``filters`` and no Clear-all link is rendered."""
     response = await authenticated_client.get("/posts")
     assert response.status_code == 200
     tree = HTMLParser(response.text)
     link = tree.css_first("a.toolbar-filter-link")
     assert link is not None
-    assert link.text().strip() == "Search posts"
+    assert link.text().strip() == "filters"
     assert tree.css_first("a.toolbar-clear-all") is None
+
+
+async def test_toolbar_separator_between_filter_link_and_actions(
+    authenticated_client: AsyncClient,
+    logged_in_user: User,
+):
+    """When both the filter link and an action menu are present,
+    a `|` separator sits between them (filter on the left of the
+    separator, action menu on the right)."""
+    response = await authenticated_client.get("/posts")
+    assert response.status_code == 200
+    tree = HTMLParser(response.text)
+    sep = tree.css_first(".toolbar .toolbar-separator")
+    assert sep is not None
+    assert sep.text().strip() == "|"
 
 
 # --- Chrome: edit form cancel link --------------------------------------

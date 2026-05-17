@@ -371,6 +371,19 @@ async def test_list_providers_treats_empty_filter_values_as_absent(
 # --- Chrome: toolbar + form affordances --------------------------------
 
 
+async def test_providers_list_toolbar_has_filter_link_but_no_separator(
+    authenticated_client: AsyncClient,
+):
+    """`/providers` has no list-level action (no Create button), so the
+    toolbar renders only the filter link — no `|` separator next to it."""
+    response = await authenticated_client.get("/providers")
+    assert response.status_code == 200
+    tree = HTMLParser(response.text)
+    assert tree.css_first("a.toolbar-filter-link") is not None
+    assert tree.css_first(".toolbar .toolbar-separator") is None
+    assert tree.css_first("menu.toolbar-right") is None
+
+
 async def test_provider_detail_favorite_toggle_lives_in_toolbar(
     authenticated_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],

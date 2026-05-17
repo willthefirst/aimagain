@@ -680,11 +680,10 @@ async def handle_list(
     # `filters` stays for any legacy template still reading it.
     context["filters"] = declared
     # Active filter descriptors — each is `{name, value, label}`. The
-    # toolbar's search link inlines a short summary of these
+    # toolbar's filter link inlines a short summary of these
     # (``Type: Seeking, Description: needle, +2 more filters``); when
-    # the list is empty, the link reads ``Search <collection>``
-    # instead. Multi-value filters fan out (one descriptor per
-    # selected value).
+    # the list is empty, the link reads ``filters`` instead.
+    # Multi-value filters fan out (one descriptor per selected value).
     context["active_filters"] = _active_filter_descriptors(declared, filter_values)
     context["active_filter_count"] = len(context["active_filters"])
     # Search-link URL forwards the current query string so the search
@@ -707,13 +706,6 @@ async def handle_list(
         context["search_url"] = f"{base}?{qs}" if qs else base
     else:
         context["search_url"] = None
-    # Clear-all URL — the bare list URL, with every active filter
-    # dropped.
-    context["clear_all_url"] = f"/{spec.url_collection}"
-    # Human-readable noun the toolbar prepends with "Search" when no
-    # filters are active (``Search posts``). Title case so the link
-    # reads as a sentence-cased prompt.
-    context["collection_label"] = spec.url_collection
 
     # Spec-declared constants — same merge precedence as handle_detail.
     if spec.static_context:
