@@ -40,8 +40,8 @@
     <dt>Desired times</dt>
     <dd>{% for slot in d.desired_times %}{{ DESIRED_TIME_SLOT_LABELS[slot] }}{% if not loop.last %}, {% endif %}{% endfor %}</dd>
     {% endif %}
-    <dt>Age groups</dt>
-    <dd>{% for g in d.age_groups %}{{ CLIENT_AGE_GROUP_LABELS[g] }}{% if not loop.last %}, {% endif %}{% endfor %}</dd>
+    <dt>Age</dt>
+    <dd>{% for g in d.age_groups %}{{ CLIENT_AGE_GROUP_LABELS_SINGULAR[g] }}{% if not loop.last %}, {% endif %}{% endfor %}</dd>
     <dt>Languages</dt>
     <dd>{% for l in d.languages %}{{ LANGUAGE_LABELS[l] }}{% if not loop.last %}, {% endif %}{% endfor %}</dd>
     <dt>Gender</dt>
