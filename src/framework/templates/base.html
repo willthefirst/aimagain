@@ -73,42 +73,28 @@
          at a glance without a background or extra markup. */
       [data-kind-chip="client_referral"] { color: darkorange; font-weight: 600; }
       [data-kind-chip="provider_availability"] { color: darkcyan; font-weight: 600; }
-      /* Filter form: every declared filter on `EntitySpec.filters`
-         renders as a `<label>` (with nested input/select) inside one
-         `<form>`; the trailing `<menu>` holds Apply + Clear all. Lay
-         it out as a wrap-aware flex row so the controls flow inline
-         when wide and reflow onto multiple rows when narrow. Pico's
-         default form controls fill 100% width — `width: auto` lets
-         each control size to its own content (with a small
-         `min-width` so a `<select>` doesn't collapse to its arrow).
-         `align-items: end` lines the controls up along their bottom
-         edge under each label heading. */
-      .index-filters { display: flex; flex-wrap: wrap; gap: 0.75rem 1rem; align-items: end; margin: 0; }
-      .index-filters > label { margin: 0; }
-      .index-filters input, .index-filters select { width: auto; min-width: 8rem; margin: 0; }
-      .index-filters > menu { display: flex; flex-wrap: wrap; gap: 0.5rem; margin: 0; padding: 0; list-style: none; }
-      .index-filters > menu button, .index-filters > menu [role="button"] { width: auto; margin: 0; }
-      /* Page-scoped zone bar. Every page that wants page-scoped
-         controls renders one `.toolbar` above its content, with two
-         optional zones:
-           `.toolbar-left`  — filling cluster: filters, navigation
-                              chips, anything that grows to consume
-                              the row.
-           `.toolbar-right` — page actions: Create, Edit, Favorite.
-                              Right-aligned naturally via the row's
-                              `justify-content: flex-end`.
-         A single-action toolbar can skip the wrappers entirely — its
-         lone child still parks at the right edge. `flex-wrap` lets
-         long rows wrap onto multiple lines on narrow viewports. */
-      .toolbar { display: flex; justify-content: flex-end; align-items: center; flex-wrap: wrap; gap: 1rem; }
+      /* Page-scoped zone bar. List pages render a single `.toolbar`
+         strip with two zones:
+           `.toolbar-filter-link` — `<a>` (left) opening the dedicated
+             `/<collection>/search` page; only present when the spec
+             opts into `routes.search`. Doubles as the active-filter
+             summary when filters are applied.
+           `.toolbar-clear-all` — `<a>` (left, next to the filter
+             link) that drops every active filter. Only rendered when
+             at least one filter is active.
+           `.toolbar-right` — page action `<menu>` (Create, Export...),
+             pushed to the right edge by `margin-left: auto`.
+         Detail pages emit `<menu class="toolbar">` directly with no
+         filter-link zone; the rules below cover both shapes. */
+      .toolbar { display: flex; align-items: center; flex-wrap: wrap; gap: 0.75rem; }
       /* Pico's default `<button>` is `display: block; width: 100%`
-         (form-shaped); the action bar overrides to natural-width
-         inline buttons. Each action is a `<li>` child of a `<menu>`
-         (commands list); the button lives inside the `<li>`, so this
-         selector reaches every action via descendant match. */
+         (form-shaped); the toolbar overrides to natural-width inline
+         buttons. Reaches every nested `<button>` / `[role="button"]`
+         regardless of whether it lives in a form, menu, or `<li>`. */
       .toolbar button, .toolbar [role="button"] { width: auto; margin: 0; }
-      .toolbar-left { flex: 1; min-width: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; }
-      .toolbar-right { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; }
+      .toolbar-filter-link { min-width: 0; }
+      .toolbar-clear-all { white-space: nowrap; color: var(--pico-muted-color); }
+      .toolbar-right { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; margin-left: auto; }
       /* `<menu>` is HTML's native "list of commands" element — used
          by the page toolbar (`menu.toolbar`, `menu.toolbar-right`)
          and any in-row action cluster (e.g. the users-table Actions

@@ -8,9 +8,9 @@ imports aren't allowed (see ../README.md "Layering rule"), so the
 shared shape goes here.
 
 Filters for the `/providers` index are declared on
-`PROVIDER_ENTITY.filters` and render through the shared
-`_shared/index_filters.html` macro — there's no provider-specific
-filter partial to maintain.
+`PROVIDER_ENTITY.filters` and render on the dedicated
+`/providers/search` page (via `views/search.html`) — there's no
+provider-specific filter partial to maintain.
 
 The Insurance cell composes the same posture summary used on the
 provider detail card (#449): "In-net" / "Out-net" / "Self-pay", with

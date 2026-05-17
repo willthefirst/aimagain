@@ -264,19 +264,27 @@ async def test_list_providers_renders_empty_state(
     authenticated_client: AsyncClient,
 ):
     """With no persisted providers, the page renders a friendly empty
-    message instead of an empty `<table>`. With no filter set, the filter
-    form's `<option value="">Any</option>` is the preselected entry on
-    each `<select>` (the `filter_select_field` macro contract)."""
+    message instead of an empty `<table>`. The list page's toolbar
+    links to `/providers/search`; the secondary-filter `<select>`s
+    live there, not on the list page."""
     response = await authenticated_client.get("/providers")
     assert response.status_code == 200
     assert "No providers found" in response.text
     tree = HTMLParser(response.text)
     assert tree.css_first("#providers-table") is None
+    # Filter link goes to the dedicated search page.
+    link = tree.css_first("a.toolbar-filter-link")
+    assert link is not None
+    assert (link.attributes.get("href") or "").startswith("/providers/search")
+    # The actual filter selects live on the search page.
+    search_response = await authenticated_client.get("/providers/search")
+    assert search_response.status_code == 200
+    search_tree = HTMLParser(search_response.text)
     for select_name in ("license_type", "issuing_state"):
-        selected = tree.css_first(f'select[name="{select_name}"] option[selected]')
+        selected = search_tree.css_first(
+            f'select[name="{select_name}"] option[selected]'
+        )
         assert selected is not None
-        # The "Any" option carries `value=""`, which selectolax surfaces
-        # as a None attribute value rather than the empty string.
         assert selected.attributes.get("value", "missing") is None
         assert selected.text().strip() == "Any"
 
@@ -317,8 +325,17 @@ async def test_list_providers_filters_by_license_type(
     assert len(rows) == 1
     assert tree.css_first(f'a[href="/providers/{provider_a}"]') is not None
     assert tree.css_first(f'a[href="/providers/{provider_b}"]') is None
-    # Filter form preserves the active selection.
-    selected = tree.css_first('select[name="license_type"] option[selected]')
+    # The toolbar's filter link summarizes the active filter inline.
+    link = tree.css_first("a.toolbar-filter-link")
+    assert link is not None
+    link_text = link.text()
+    assert "psyd" in link_text.lower() or "PsyD" in link_text
+    # The search page re-renders the form with the active value preselected.
+    search = await authenticated_client.get("/providers/search?license_type=psyd")
+    assert search.status_code == 200
+    selected = HTMLParser(search.text).css_first(
+        'select[name="license_type"] option[selected]'
+    )
     assert selected is not None
     assert selected.attributes.get("value") == "psyd"
 

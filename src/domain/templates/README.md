@@ -8,7 +8,8 @@ Chrome, shared macros, and the generic view-type templates live in [`../../frame
 
 A resource cluster `<entity>/` typically contains:
 
-- `list.html` — extends `views/list.html`. Declares `resource_label`, optional `filters` / `filter_action` / `filter_values`, and a `content` block (the table or list body).
+- `list.html` — extends `views/list.html`. Declares `resource_label`, an optional `actions` block (right-zone toolbar items, each an `<li>`), and a `content` block (the table or list body). The toolbar's filter link + Clear-all are rendered automatically by `views/list.html` from spec-driven context (`active_filters`, `search_url`, `clear_all_url`, `collection_label`) that `handle_list` injects — no per-template wiring needed.
+- `search.html` — extends `views/search.html`. One-line stub setting the `resource_label` breadcrumb for entities that opt into `routes.search=True`. Renders one form control per declared secondary `Filter` on the spec.
 - `detail.html` — extends `views/detail.html`. Declares `resource_label`, `current_label`, `resource_url`, optional `actions`, and `content`.
 - `form_new.html` — extends `views/form_new.html`. Declares `resource_label`, `resource_url`, and the form body in `content`.
 - `form_edit.html` — extends `views/form_edit.html`. Declares `resource_label`, `current_label`, `resource_url`, `resource_detail_url`, and the form body in `content`.

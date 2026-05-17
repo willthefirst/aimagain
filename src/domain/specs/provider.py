@@ -71,11 +71,11 @@ PROVIDER_ENTITY: Final[EntitySpec] = EntitySpec(
         delete=True,
         form_new=True,
         form_edit=True,
+        search=True,
     ),
-    # Filters render through the shared `_shared/index_filters.html`
-    # macro. Switching from legacy `QueryParam(...)` to `Filter`
-    # subclasses (`ChoiceFilter` here) opts into the toolbar layout
-    # and the collapsible UX that `/posts` uses.
+    # Filters render on the dedicated `/providers/search` page; the
+    # list-page toolbar carries only the "Filter · N" link and the
+    # Create button.
     filters=(
         ChoiceFilter(
             name="license_type",

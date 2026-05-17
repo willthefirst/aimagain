@@ -45,6 +45,11 @@ class RouteSet:
     update: bool = False
     form_new: bool = False
     form_edit: bool = False
+    # `GET /<collection>/search` — the dedicated filter page. The
+    # list page's toolbar links here ("Filter · N"); the form on this
+    # page submits back to the list URL via GET. Read by
+    # `mount_entity` → `mount_search`.
+    search: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -97,6 +102,7 @@ class Templates:
     detail: str | None = None
     form_new: str | None = None
     form_edit: str | None = None
+    search: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -302,11 +308,12 @@ class EntitySpec:
 
     # List-page filters --------------------------------------------------
     # Each entry is either a raw ``QueryParam`` (URL-only declaration)
-    # or a ``Filter`` (URL + UI metadata for the
-    # ``_shared/index_filters.html`` macro). The mount layer normalizes
-    # both to ``QueryParam`` before handing them to FastAPI; the list
-    # handler echoes them into the template context so the macro can
-    # render the right control. See ``filters.py``.
+    # or a ``Filter`` (URL + UI metadata for the dedicated
+    # ``/<collection>/search`` page). The mount layer normalizes both
+    # to ``QueryParam`` before handing them to FastAPI; the list
+    # handler echoes them into the template context so the
+    # active-filter strip and the search-page form can render. See
+    # ``filters.py``.
     filters: tuple[QueryParam | Filter, ...] = ()
 
     # State axes + subresources -----------------------------------------
@@ -422,6 +429,16 @@ class EntitySpec:
                 f"EntitySpec({self.name!r}) sets delete_forbid_self=True but "
                 "routes.delete is False — the flag would never apply."
             )
+        # `routes.search=True` without any declared `Filter` is dead —
+        # the search page would render an empty form. Catch the misconfig
+        # at import time.
+        if self.routes.search:
+            declared = [f for f in self.filters if isinstance(f, Filter)]
+            if not declared:
+                raise ValueError(
+                    f"EntitySpec({self.name!r}) sets routes.search=True but "
+                    "has no declared Filter — the /search page would be empty."
+                )
         # State-axis names must be unique; route mounting iterates by
         # name, so duplicates would shadow each other silently.
         axis_names = [axis.name for axis in self.state_axes]
@@ -641,6 +658,7 @@ class EntitySpec:
             "detail": self.templates.detail,
             "form_new": self.templates.form_new,
             "form_edit": self.templates.form_edit,
+            "search": self.templates.search,
         }
         for verb in resolved:
             if resolved[verb] is None and getattr(self.routes, verb, False):
@@ -658,7 +676,15 @@ class EntitySpec:
             or r.delete
             or r.form_new
             or r.form_edit
+            or r.search
         )
+
+    @property
+    def declared_filters(self) -> tuple["Filter", ...]:
+        """`Filter` instances declared on this spec (excluding raw
+        `QueryParam`); what the `/search` page renders and what the
+        active-filter strip iterates."""
+        return tuple(f for f in self.filters if isinstance(f, Filter))
 
     @property
     def children(self) -> tuple["EntitySpec", ...]:

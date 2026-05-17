@@ -63,6 +63,7 @@ POST_ENTITY: Final[EntitySpec] = EntitySpec(
         delete=True,
         form_new=True,
         form_edit=True,
+        search=True,
     ),
     # Filter form above `/posts` — one control per table column the
     # user might want to narrow on. Order roughly matches the column
@@ -84,7 +85,7 @@ POST_ENTITY: Final[EntitySpec] = EntitySpec(
             label="Type",
             choices=(
                 ("client_referral", "Seeking"),
-                ("provider_availability", "Offering"),
+                ("provider_availability", "Providing"),
             ),
             value_type=Literal[*POST_KINDS.names],  # type: ignore[valid-type]
         ),

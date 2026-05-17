@@ -1,11 +1,11 @@
 {# Generic list-view chrome.
 
 A list view (`/posts`, `/providers`, `/users`, `/users/me/favorites`,
-`/users/{id}/providers`) renders the same three-strip chrome: primary
-nav (from `base.html`), single-segment breadcrumb naming the resource,
-and an optional toolbar holding the filter widget on the left and page
-actions on the right. This template wires that chrome by convention so
-the child only declares what's unique.
+`/users/{id}/providers`) renders the same chrome: primary nav (from
+`base.html`), single-segment breadcrumb naming the resource, then a
+single toolbar strip (search link + Clear all on the left, action
+menu on the right). The search link summarizes any active filters
+inline — there is no separate active-filter strip.
 
 Child contract:
 
@@ -16,37 +16,17 @@ Child contract:
                      `index_table(...)` call or a hand-rolled `<ul>`).
 
   Optional blocks:
-    actions        — toolbar right-zone content: a Create button, an
-                     Export link, etc. Each action is a `<li>` because
-                     the right zone is a `<menu>` (list of commands).
-                     Empty by default; the toolbar shell is suppressed
-                     when both this block and `filters` are empty.
+    actions        — toolbar right-zone content (Create button,
+                     Export link). Each action is a `<li>` because
+                     the right zone is a `<menu>` (commands list).
+                     Empty by default.
     breadcrumb     — full breadcrumb override for subresource lists
-                     with multi-segment chains (e.g. `users/providers_list.html`
-                     renders `Users › <username> › Providers`).
+                     with multi-segment chains.
 
-  Optional context (set via `{% set %}` after `{% extends %}` in the
-  child, or passed by the handler):
-    filters        — filters tuple from `EntitySpec.filters`. When
-                     truthy, the toolbar renders the filter widget in
-                     the left zone.
-    filter_action  — URL the filter form GETs to (e.g. "/providers").
-    filter_values  — `{filter.name: current_value}` dict mapping each
-                     declared filter to the page's selected value.
-    page_meta      — `Page` from `src/framework/dispatch/pagination.py`.
-                     When set, the pagination footer renders Prev/Next
-                     beneath the content (empty on single-page results).
-                     `handle_list` and the bespoke list handlers
-                     (favorites, user-providers) all supply it.
-    paginator_base_query — current request's query string with `page`
-                     stripped, so pagination links preserve filter
-                     state. The framework handler builds it; children
-                     don't touch it.
-
-Pages that share this chrome but need richer body shapes (e.g. the
-posts feed's `<ul>` instead of a table) just override `{% block content %}`
-with whatever markup they need — the chrome above is independent of
-what the body looks like.
+  Context the framework's `handle_list` injects (children don't set
+  these by hand):
+    active_filters, search_url, clear_all_url, collection_label,
+    page_meta, paginator_base_query.
 #}
 {% extends "base.html" %}
 {%- from "_shared/_breadcrumb.html" import breadcrumb -%}
@@ -60,21 +40,15 @@ what the body looks like.
 
 {% block toolbar %}
 {%- set actions_body %}{% block actions %}{% endblock %}{% endset -%}
-{%- set has_filters = filters is defined and filters -%}
-{%- if has_filters and actions_body | trim %}
+{%- set has_search = search_url is defined and search_url -%}
+{%- set has_actions = actions_body | trim -%}
+{%- if has_search or has_actions %}
 {% call list_toolbar(
-  filters=filters,
-  action=filter_action|default(none),
-  values=filter_values|default({}),
+  active_filters=active_filters|default([]),
+  search_url=search_url if has_search else none,
+  clear_all_url=clear_all_url|default(none),
+  collection_label=collection_label|default("")
 ) %}{{ actions_body }}{% endcall %}
-{%- elif has_filters %}
-{{ list_toolbar(
-  filters=filters,
-  action=filter_action|default(none),
-  values=filter_values|default({}),
-) }}
-{%- elif actions_body | trim %}
-{% call list_toolbar() %}{{ actions_body }}{% endcall %}
 {%- endif %}
 {% endblock %}
 
