@@ -12,7 +12,6 @@
    `can_edit` and `is_favorited` are computed by handle_get_provider_detail;
    templates do not re-derive authorization predicates inline. #}
 {% if is_authenticated %}
-<span class="favorite-toggle">
   {% if is_favorited %}
   <button type="button"
           class="secondary outline"
@@ -27,7 +26,6 @@
     Favorite
   </button>
   {% endif %}
-</span>
 {% endif %}
 {% if can_edit %}
 <a href="/providers/{{ provider.id }}/form" role="button" class="outline">Edit provider</a>

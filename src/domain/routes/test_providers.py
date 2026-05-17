@@ -370,13 +370,10 @@ async def test_provider_detail_favorite_toggle_lives_in_toolbar(
     response = await authenticated_client.get(f"/providers/{provider_id}")
     assert response.status_code == 200
     tree = HTMLParser(response.text)
-    assert tree.css_first(".toolbar span.favorite-toggle") is not None
-    # The favorite toggle is not duplicated inside <article>.
-    assert tree.css_first("article span.favorite-toggle") is None
-    # And the Favorite button posts to the canonical edge endpoint.
-    btn = tree.css_first(".toolbar span.favorite-toggle button")
-    assert btn is not None
-    assert btn.attributes.get("hx-post") == f"/users/me/favorites/{provider_id}"
+    favorite_selector = f'button[hx-post="/users/me/favorites/{provider_id}"]'
+    assert tree.css_first(f".toolbar {favorite_selector}") is not None
+    # The favorite button is not duplicated inside <article>.
+    assert tree.css_first(f"article {favorite_selector}") is None
 
 
 async def test_provider_form_new_omits_bottom_back_link(
