@@ -72,10 +72,26 @@
         background: none;
         border: none;
       }
-      #posts-list > article > header.post-header > strong { flex: 1 1 auto; }
+      #posts-list > article > header.post-header > strong { flex: 0 0 auto; }
       #posts-list > article > header.post-header > strong > a { color: inherit; text-decoration: none; }
       #posts-list > article > header.post-header > strong > a:hover { text-decoration: underline; }
-      #posts-list > article > header.post-header > small { color: var(--pico-muted-color); }
+      /* Date sits at the right edge regardless of headline + modality
+         width; the chips between strong and small stay attached to
+         the headline on the left. */
+      #posts-list > article > header.post-header > small {
+        margin-left: auto;
+        color: var(--pico-muted-color);
+      }
+      /* In-person / virtual chips: icon + short label, muted color
+         so the headline stays the visual lead. Flex items in the
+         header gap pick up the parent's 0.5rem separation. */
+      #posts-list > article > header.post-header > .post-modality {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.25rem;
+        color: var(--pico-muted-color);
+        font-size: 0.875rem;
+      }
       /* Three-column grid for the body. Columns auto-fit narrow
          viewports by collapsing to one column under 640px. */
       #posts-list > article > .post-grid {

@@ -10,7 +10,7 @@ id="posts-list">` of `<article>` children.
 Layout per card:
 
   ┌──────────────────────────────────────────────────────────────┐
-  │ Kind, ST (format-summary)                          May 17    │
+  │ Kind, ST  📹 Virtual  📍 In-person                   May 17   │
   │                                                              │
   │ Seeking         │  Age: …             │  Contact             │
   │   • icon name   │  Languages: …       │  username            │
@@ -18,10 +18,13 @@ Layout per card:
   │                 │  Modality: …        │                      │
   └──────────────────────────────────────────────────────────────┘
 
-The header line condenses kind + state + format into one structured
-phrase ("Client Referral, WA (virtual or in person)") — the format
-parenthetical varies based on the post's in-person/virtual posture.
-The body is a three-column grid: services, demographics, attribution.
+The header line carries the headline link ("Client Referral, WA" /
+"{practice_name}, ST"), one or two modality chips (icon + short
+label) describing the post's in-person/virtual posture, and a
+right-aligned date. Each modality is a separate chip so each glyph
+anchors a single fact; the muted color keeps the headline as the
+visual lead. The body is a three-column grid: services,
+demographics, attribution.
 
 The left-column heading is kind-aware — "Seeking" for `client_referral`,
 "Providing" for `provider_availability`. The generic "Services" label was
@@ -62,19 +65,16 @@ but ignored — the cards' `data-kind` left-edge color is constant
 per-kind, so a single-kind filter doesn't need to suppress anything.
 #}
 
-{% macro _format_parenthetical(in_person, virtual) -%}
-{#- Compact "(virtual or in person)" / "(in person)" / "(virtual)"
-    summary for the header. "please_contact" on either arm degrades
-    to the generic "(contact for format)" label — the header isn't
-    the place to communicate posture nuance. -#}
+{% macro _modality_chips(in_person, virtual) -%}
+{#- Header-line in-person/virtual posture as one or two icon+label
+    chips. `please_contact` on either arm collapses to a single
+    "Contact for format" chip (no icon — the posture is unknown,
+    so neither glyph applies). Empty when neither arm is `yes`. -#}
 {%- if in_person == "please_contact" or virtual == "please_contact" -%}
-contact for format
-{%- elif in_person == "yes" and virtual == "yes" -%}
-virtual or in person
-{%- elif in_person == "yes" -%}
-in person
-{%- elif virtual == "yes" -%}
-virtual
+<span class="post-modality">Contact for format</span>
+{%- else -%}
+{%- if virtual == "yes" %}<span class="post-modality"><i class="icon-video" aria-hidden="true"></i> Virtual</span>{% endif -%}
+{%- if in_person == "yes" %}<span class="post-modality"><i class="icon-map-pin" aria-hidden="true"></i> In-person</span>{% endif -%}
 {%- endif -%}
 {%- endmacro %}
 
@@ -106,11 +106,11 @@ virtual
   {%- set services = d.services or [] -%}
   {%- set settings_list = d.settings or [] -%}
 {%- endif -%}
-{%- set fmt = _format_parenthetical(in_person, virtual) | trim -%}
 {%- set posture = insurance_posture(post) -%}
 <article data-row-id="{{ post.id }}" data-kind="{{ post.kind }}">
   <header class="post-header">
-    <strong><a href="/posts/{{ post.id }}">{{ headline_text }}{% if state %}, {{ state }}{% endif %}</a>{% if fmt %} ({{ fmt }}){% endif %}</strong>
+    <strong><a href="/posts/{{ post.id }}">{{ headline_text }}{% if state %}, {{ state }}{% endif %}</a></strong>
+    {{ _modality_chips(in_person, virtual) }}
     <small>{{ post.created_at | format_post_date }}</small>
   </header>
   <div class="post-grid">
