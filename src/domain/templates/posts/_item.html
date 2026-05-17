@@ -10,21 +10,33 @@ id="posts-list">` of `<article>` children.
 Layout per card:
 
   ┌──────────────────────────────────────────────────────────────┐
-  │ Kind, ST  📹 Virtual  📍 In-person                   May 17   │
+  │ <header>  Adult male (25–64)  📹 Virtual  📍 In-person   May 17 │
   │                                                              │
-  │ Seeking         │  Age: …             │  Contact             │
-  │   • icon name   │  Languages: …       │  username            │
-  │   • icon name   │  Insurance: …       │  (PA: practice name) │
-  │                 │  Modality: …        │                      │
+  │ Seeking                      │  📍 City, ST                  │
+  │   • icon name                │  Languages: …                 │
+  │   • icon name                │  Insurance: …                 │
+  │                              │  Modality: …                  │
+  │                                                              │
+  │ <footer>                          username · email-link      │
   └──────────────────────────────────────────────────────────────┘
 
-The header line carries the headline link ("Client Referral, WA" /
-"{practice_name}, ST"), one or two modality chips (icon + short
-label) describing the post's in-person/virtual posture, and a
-right-aligned date. Each modality is a separate chip so each glyph
-anchors a single fact; the muted color keeps the headline as the
-visual lead. The body is a three-column grid: services,
-demographics, attribution.
+The card is `<article>` with `<header>`, two-column body, and
+`<footer>` — Pico's classless styling tints header and footer as
+the top/bottom bands of the card automatically, so we don't restyle
+them. The header line carries the headline link, one or two
+modality chips (icon + short label) describing the post's
+in-person/virtual posture, and a right-aligned date. The headline
+shape varies by kind: CR is the age + gender combo from
+`client_referral_headline` ("Adult male (25–64)"); PA is
+"{practice_name}, ST". CR's state is demoted to a location chunk in
+the demographics column (icon-only `<dt>` + "City, ST"); PA still
+carries state in the header. Each modality is a separate chip so
+each glyph anchors a single fact; the muted color keeps the
+headline as the visual lead. The body is a two-column grid:
+services (left), demographics (right). The footer carries the
+contact band — name (username for CR, practice for PA) + mailto
+link — right-aligned by `.post-footer` so it reads as the action
+landing at the natural eye-end of the card.
 
 The left-column heading is kind-aware — "Seeking" for `client_referral`,
 "Providing" for `provider_availability`. The generic "Services" label was
@@ -43,22 +55,20 @@ Lucide font CSS in `base.html` renders the glyphs. Icons next to a
 labeled item are unambiguous — the reader sees "pill | Medication
 management" together — unlike the earlier icon-only experiment.
 
-Right column ("Contact") names *who* you're reaching and gives a
-clickable `mailto:` link as the action:
+Footer ("Contact") names *who* you're reaching and gives a
+clickable `mailto:` link as the action, both inline on one
+right-aligned line:
   * `client_referral` → `{username}` (the referring provider — the
-    User account is the only identity we have for them; rendered as
-    plain text, matching the bare-name style PA uses for the practice) +
+    User account is the only identity we have for them) +
     `<a href="mailto:…" target="_blank" rel="noopener noreferrer">`.
   * `provider_availability` → `{practice_name}` (the practice IS the
     provider; the practice_name is also in the header but repeating
     it here keeps the email anchored to a name at scan distance) +
     `<a href="mailto:…" target="_blank" rel="noopener noreferrer">`.
 
-The email link replaces the earlier "@username only" treatment — a
-post is useful when a reader can act on it, and email is the action.
 `target="_blank"` is harmless on `mailto:` URLs (most clients open
-the mail handler regardless) and matches the pattern used for the PA
-`website` link on the detail page.
+the mail handler regardless) and matches the pattern used for the
+PA `website` link on the detail page.
 
 `active_kind` accepted for backward compatibility with `list.html`
 but ignored — the cards' `data-kind` left-edge color is constant
@@ -87,9 +97,13 @@ per-kind, so a single-kind filter doesn't need to suppress anything.
 {% macro post_item(post, active_kind=None) -%}
 {%- if post.kind == "client_referral" -%}
   {%- set d = post.client_referral_detail -%}
-  {#- CR posts have no client name; the kind label IS the identity. -#}
-  {%- set headline_text = "Client Referral" -%}
-  {%- set state = d.location_state -%}
+  {#- CR posts have no client name; the age + gender combo (e.g.
+      "Adult male (25–64)") is the identity. `client_referral_headline`
+      composes it from `age_groups[0]` + `gender`. State is intentionally
+      omitted from the header — it lives in the demographics column as
+      a labeled location chunk (`📍 City, ST`). -#}
+  {%- set headline_text = client_referral_headline(d) -%}
+  {%- set state = None -%}
   {%- set in_person = d.location_in_person -%}
   {%- set virtual = d.location_virtual -%}
   {%- set services = d.services or [] -%}
@@ -138,27 +152,30 @@ per-kind, so a single-kind filter doesn't need to suppress anything.
 
     <section class="post-facts">
       <dl>
-        {%- if d.age_groups %}
-        {#- "Age" for a CR (one client) vs "Ages" for a PA (the
-            range of clients the practice will accept) — same
-            `age_groups` field, different cardinality. -#}
-        {#- Label dict is kind-aware: CR refers to one client (singular,
-            "Child (6–10)"); PA refers to a cohort the practice accepts
-            (plural, "Children (6–10)"). Same underlying enum value. -#}
-        {%- set _age_labels = CLIENT_AGE_GROUP_LABELS_SINGULAR if post.kind == "client_referral" else CLIENT_AGE_GROUP_LABELS -%}
-        <div><dt>{% if post.kind == "client_referral" %}Age{% else %}Ages{% endif %}</dt><dd>
+        {%- if post.kind == "client_referral" %}
+        {#- CR: location chunk replaces the state-in-header treatment.
+            City + state inline (city always present per LocationMixin
+            NOT NULL; falls back to state alone if absent). The `<dt>`
+            is icon-only — `aria-label` carries the meaning for screen
+            readers; CSS suppresses the trailing colon for this row.
+            Age + gender are intentionally not surfaced here — the
+            headline already carries both. -#}
+        <div class="post-location"><dt aria-label="Location"><i class="icon-map-pinned" aria-hidden="true"></i></dt><dd>
+          {%- if d.location_city -%}{{ d.location_city }}, {% endif -%}{{ d.location_state }}
+        </dd></div>
+        {%- elif d.age_groups %}
+        {#- PA: "Ages" — the cohort of clients the practice accepts.
+            Plural `CLIENT_AGE_GROUP_LABELS`. -#}
+        <div><dt>Ages</dt><dd>
           {%- set ages = [] -%}
-          {%- for g in d.age_groups -%}{%- set _ = ages.append(_age_labels[g]) -%}{%- endfor -%}
+          {%- for g in d.age_groups -%}{%- set _ = ages.append(CLIENT_AGE_GROUP_LABELS[g]) -%}{%- endfor -%}
           {{ ages | join(", ") }}
         </dd></div>
         {%- endif %}
-        {#- Gender chunk: CR has a single `gender`; PA has a list
-            `genders` (may be empty, which means "no restriction
-            stated" — omit the chunk entirely). Both branches read
-            through the GENDER_LABELS dict. -#}
-        {%- if post.kind == "client_referral" and d.gender %}
-        <div><dt>Gender</dt><dd>{{ GENDER_LABELS[d.gender] }}</dd></div>
-        {%- elif post.kind == "provider_availability" and d.genders %}
+        {#- PA gender chunk: `genders` is a list (may be empty, which
+            means "no restriction stated" — omit the chunk entirely).
+            CR's gender lives in the headline, so no CR branch here. -#}
+        {%- if post.kind == "provider_availability" and d.genders %}
         <div><dt>Genders</dt><dd>
           {%- set gs = [] -%}
           {%- for g in d.genders -%}{%- set _ = gs.append(GENDER_LABELS[g]) -%}{%- endfor -%}
@@ -180,22 +197,20 @@ per-kind, so a single-kind filter doesn't need to suppress anything.
         {%- endif %}
       </dl>
     </section>
-
-    <section class="post-attribution">
-      {#- "Contact" frames the third column as the action — the
-          reader is here to reach somebody. Name first (practice for
-          PA, username for CR — the User account is the only identity
-          we have for the referring provider), then a `mailto:` link
-          as the clickable action. Both kinds render the name as plain
-          text without prefixing, matching the provider detail page. -#}
-      <h4>Contact</h4>
-      {%- if post.kind == "client_referral" %}
-      <p>{{ post.owner.username }}</p>
-      {%- else %}
-      <p>{{ p.practice_name }}</p>
-      {%- endif %}
-      <p><a href="mailto:{{ post.owner.email }}" target="_blank" rel="noopener noreferrer">{{ post.owner.email }}</a></p>
-    </section>
   </div>
+
+  {#- Contact lives in the article's `<footer>` (Pico styles it as the
+      bottom band of the card automatically) and is right-aligned by
+      the `.post-footer` rule. Name + mailto sit inline on one line:
+      the username (CR) or practice name (PA) anchors who you're
+      reaching, the mailto is the action. -#}
+  <footer class="post-footer">
+    {%- if post.kind == "client_referral" %}
+    <span>{{ post.owner.username }}</span>
+    {%- else %}
+    <span>{{ p.practice_name }}</span>
+    {%- endif %}
+    <a href="mailto:{{ post.owner.email }}" target="_blank" rel="noopener noreferrer">{{ post.owner.email }}</a>
+  </footer>
 </article>
 {%- endmacro %}

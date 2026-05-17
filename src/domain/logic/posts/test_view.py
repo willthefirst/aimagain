@@ -4,7 +4,10 @@ from types import SimpleNamespace
 
 import pytest
 
-from src.domain.logic.posts.view import insurance_posture_for_post
+from src.domain.logic.posts.view import (
+    client_referral_headline,
+    insurance_posture_for_post,
+)
 
 
 def _cr_post(insurance: str):
@@ -73,3 +76,44 @@ def test_posture_returns_none_for_unknown_kind():
 def test_posture_returns_none_when_detail_missing():
     post = SimpleNamespace(kind="client_referral", client_referral_detail=None)
     assert insurance_posture_for_post(post) is None
+
+
+# --- client_referral_headline -------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "age,gender,expected",
+    [
+        ("adults_25_64", "male", "Adult male (25–64)"),
+        ("adolescents_14_18", "female", "Adolescent female (14–18)"),
+        ("young_adults_19_24", "non_binary", "Young adult non-binary (19–24)"),
+        ("adults_25_64", "trans_female", "Adult trans woman (25–64)"),
+        ("adults_25_64", "trans_male", "Adult trans man (25–64)"),
+        # Gender values that don't slot in as an adjective drop the
+        # gender word entirely; the headline becomes "<noun> (<range>)".
+        ("adults_25_64", "prefer_not_to_say", "Adult (25–64)"),
+        ("adults_25_64", "gender_diverse", "Adult (25–64)"),
+        ("older_adults_65_plus", "prefer_not_to_say", "Older adult (65+)"),
+    ],
+)
+def test_client_referral_headline_composes_age_and_gender(age, gender, expected):
+    detail = SimpleNamespace(age_groups=[age], gender=gender)
+    assert client_referral_headline(detail) == expected
+
+
+def test_client_referral_headline_uses_first_age_group_only():
+    """CR posts describe one client; the schema allows multi age_groups
+    for forward-compat but the headline picks the first value so the
+    title stays a single "<noun> (<range>)" phrase."""
+    detail = SimpleNamespace(
+        age_groups=["adolescents_14_18", "adults_25_64"],
+        gender="female",
+    )
+    assert client_referral_headline(detail) == "Adolescent female (14–18)"
+
+
+def test_client_referral_headline_falls_back_when_age_groups_empty():
+    """Defensive — schema requires min-1, but the helper degrades
+    gracefully if a future code path hands us an empty list."""
+    detail = SimpleNamespace(age_groups=[], gender="male")
+    assert client_referral_headline(detail) == "Client Referral"

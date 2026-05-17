@@ -1,6 +1,24 @@
 """Controlled-vocabulary tuples (Text+CHECK columns); paired *_LABELS dicts."""
 
-from typing import Final
+from typing import Final, NamedTuple
+
+
+class AgeGroup(NamedTuple):
+    """Display facts for a `CLIENT_AGE_GROUPS` token.
+
+    One row per age token, three columns: the singular noun (for CR
+    reads — one client), the plural noun (for PA reads — a cohort,
+    plus the filter dropdown / form checkbox vocabulary), and the
+    numeric range. The CR card's headline composer in
+    `domain/logic/posts/view.py` reads `singular` + `range` directly;
+    label dicts further down derive `"<noun> (<range>)"` for the read
+    paths that want a single ready-to-render string.
+    """
+
+    singular: str
+    plural: str
+    range: str
+
 
 US_STATES: Final[tuple[str, ...]] = (
     "AL",
@@ -182,29 +200,28 @@ LOCATION_AVAILABILITY_LABELS: Final[dict[str, str]] = {
     "no": "No",
     "please_contact": "Please contact",
 }
-# Plural form. Used wherever the referent is a *cohort* the provider
-# accepts (provider_availability listings + detail, the filter dropdown,
-# the form checkbox vocabulary). The age range is in parens to keep the
-# category word and the numeric span visually separable at scan
-# distance. The singular form lives in `CLIENT_AGE_GROUP_LABELS_SINGULAR`
-# and is used for `client_referral` reads (one client, one age).
+# One AgeGroup row per `CLIENT_AGE_GROUPS` token, carrying every
+# display fact (singular noun, plural noun, numeric range). All other
+# dicts derive from this — adding a value means editing one row, not
+# six. The `*_LABELS` / `*_LABELS_SINGULAR` derivations are kept so
+# call sites that want a single ready-to-render string don't have to
+# format. Direct attribute access on the `AgeGroup` (e.g.
+# `CLIENT_AGE_GROUPS_BY_KEY[k].singular`) is the right shape for the
+# CR headline builder, which composes "<noun> <gender> (<range>)".
+CLIENT_AGE_GROUPS_BY_KEY: Final[dict[str, AgeGroup]] = {
+    "children_0_5": AgeGroup("Child", "Children", "0–5"),
+    "children_6_10": AgeGroup("Child", "Children", "6–10"),
+    "preteens_11_13": AgeGroup("Preteen", "Preteens", "11–13"),
+    "adolescents_14_18": AgeGroup("Adolescent", "Adolescents", "14–18"),
+    "young_adults_19_24": AgeGroup("Young adult", "Young adults", "19–24"),
+    "adults_25_64": AgeGroup("Adult", "Adults", "25–64"),
+    "older_adults_65_plus": AgeGroup("Older adult", "Older adults", "65+"),
+}
 CLIENT_AGE_GROUP_LABELS: Final[dict[str, str]] = {
-    "children_0_5": "Children (0–5)",
-    "children_6_10": "Children (6–10)",
-    "preteens_11_13": "Preteens (11–13)",
-    "adolescents_14_18": "Adolescents (14–18)",
-    "young_adults_19_24": "Young adults (19–24)",
-    "adults_25_64": "Adults (25–64)",
-    "older_adults_65_plus": "Older adults (65+)",
+    k: f"{g.plural} ({g.range})" for k, g in CLIENT_AGE_GROUPS_BY_KEY.items()
 }
 CLIENT_AGE_GROUP_LABELS_SINGULAR: Final[dict[str, str]] = {
-    "children_0_5": "Child (0–5)",
-    "children_6_10": "Child (6–10)",
-    "preteens_11_13": "Preteen (11–13)",
-    "adolescents_14_18": "Adolescent (14–18)",
-    "young_adults_19_24": "Young adult (19–24)",
-    "adults_25_64": "Adult (25–64)",
-    "older_adults_65_plus": "Older adult (65+)",
+    k: f"{g.singular} ({g.range})" for k, g in CLIENT_AGE_GROUPS_BY_KEY.items()
 }
 LANGUAGE_LABELS: Final[dict[str, str]] = {"en": "English", "es": "Spanish"}
 INSURANCE_LABELS: Final[dict[str, str]] = {

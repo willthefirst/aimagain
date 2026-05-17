@@ -76,8 +76,10 @@ async def test_list_client_referral_item_shape(
     logged_in_user: User,
 ):
     """A `client_referral` renders as a card `<article>` in
-    `#posts-list`. The header reads "Client Referral, {state}
-    ({format-summary})" and links to the detail page. The body is a
+    `#posts-list`. The header reads "<Age noun> <gender> (<range>)"
+    (e.g. "Adolescent male (14–18)") and links to the detail page;
+    state is demoted to the demographics column as a `📍 City, ST`
+    location chunk. The body is a
     three-column grid: services with icons (left), labeled facts
     `<dl>` (middle), and referring-provider attribution (right). The
     description never appears in the row — it lives on the detail
@@ -93,6 +95,7 @@ async def test_list_client_referral_item_shape(
         location_in_person="yes",
         location_virtual="yes",
         age_groups=["adolescents_14_18", "adults_25_64"],
+        gender="male",
         languages=["en", "es"],
         insurance="in_network",
         services=["psychotherapy", "medication_management"],
@@ -109,13 +112,14 @@ async def test_list_client_referral_item_shape(
     assert item is not None
     assert item.attributes.get("data-kind") == "client_referral"
 
-    # Header line: link text carries kind + state; the in-person /
-    # virtual posture renders as one or two `<span.post-modality>`
-    # chips (icon + short label) next to the link.
+    # Header line: link text is the age + gender combo (no state —
+    # state moved to the demographics column for CR). Modality chips
+    # (icon + short label) sit next to the headline.
     header_link = item.css_first("header.post-header a")
     assert header_link is not None
     assert header_link.attributes.get("href") == f"/posts/{post.id}"
-    assert header_link.text(strip=True) == "Client Referral, WA"
+    # `age_groups[0]` = adolescents_14_18 + gender=male.
+    assert header_link.text(strip=True) == "Adolescent male (14–18)"
     modality_chips = [
         chip.text(strip=True)
         for chip in item.css("header.post-header > .post-modality")
@@ -136,45 +140,54 @@ async def test_list_client_referral_item_shape(
     # Each service item carries a Lucide `<i>` icon (decorative).
     assert all(li.css_first("i[class^=icon-]") is not None for li in service_items)
 
-    # Demographics column carries labeled facts.
+    # Demographics column: location chunk (City, ST) + languages +
+    # insurance posture. CR's age + gender live in the headline, not
+    # here.
     facts_text = item.css_first("section.post-facts").text()
-    # CR uses singular age labels with the range in parens (one client,
-    # one age); PA uses the plural form (a cohort the practice accepts).
-    assert "Adolescent (14–18), Adult (25–64)" in facts_text  # en-dash
+    location = item.css_first("section.post-facts dl > div.post-location")
+    assert location is not None
+    assert location.css_first("dt > i[class^=icon-]") is not None
+    assert location.css_first("dd").text(strip=True) == "Seattle, WA"
     assert "In-network" in facts_text
     assert "English, Spanish" in facts_text
+    # Age + gender labels do not appear in the demographics column for CR.
+    assert "Adolescent" not in facts_text
+    assert "Adult" not in facts_text
 
-    # Contact column: "Contact" header + bare username (CR has no
-    # practice name; the User account is the only identity for the
-    # referring provider — rendered plain, matching how PA shows its
-    # practice name) + a `mailto:` link to the owner's email.
-    attribution = item.css_first("section.post-attribution")
-    attribution_text = attribution.text()
-    assert "Contact" in attribution_text
-    assert author.username in attribution_text
-    assert f"@{author.username}" not in attribution_text
-    mailto = attribution.css_first("a")
+    # Contact band lives in `<footer class="post-footer">` — bare
+    # username (CR has no practice name; the User account is the only
+    # identity for the referring provider, rendered plain, matching
+    # how PA renders the practice name) + a `mailto:` link to the
+    # owner's email.
+    footer = item.css_first("footer.post-footer")
+    footer_text = footer.text()
+    assert author.username in footer_text
+    assert f"@{author.username}" not in footer_text
+    mailto = footer.css_first("a")
     assert mailto is not None
     assert mailto.attributes.get("href") == f"mailto:{author.email}"
     assert mailto.attributes.get("target") == "_blank"
 
 
-async def test_list_client_referral_header_is_kind_label_plus_state(
+async def test_list_client_referral_header_is_age_gender_combo(
     authenticated_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user: User,
 ):
-    """The `client_referral` card header reads `Client Referral,
-    {state}` (the kind label, plus state). CR posts have no client
-    name to use as identity, so the kind label fills that slot. The
-    description never serves as the header (it stays on the detail
-    page)."""
+    """The `client_referral` card header reads `<Age noun> [<gender>]
+    (<range>)` — the age + gender combo is the identity for a CR (CR
+    posts have no client name). Gender values that don't slot in
+    (`prefer_not_to_say`, `gender_diverse`) drop the gender word, and
+    the headline becomes `<Age noun> (<range>)`. State lives in the
+    demographics column (a location chunk), not in the header."""
     author = create_test_user(username=f"author-{uuid.uuid4()}")
     post = _client_referral_post(
         description="",
         owner_id=author.id,
         location_city="Boise",
         location_state="ID",
+        age_groups=["young_adults_19_24"],
+        gender="female",
     )
     async with db_test_session_manager() as session:
         async with session.begin():
@@ -184,9 +197,16 @@ async def test_list_client_referral_header_is_kind_label_plus_state(
     response = await authenticated_client.get("/posts")
     assert response.status_code == 200
     tree = HTMLParser(response.text)
-    lead = tree.css_first("#posts-list > article header.post-header a")
+    item = tree.css_first("#posts-list > article")
+    lead = item.css_first("header.post-header a")
     assert lead is not None
-    assert lead.text(strip=True) == "Client Referral, ID"
+    assert lead.text(strip=True) == "Young adult female (19–24)"
+    # State is *not* in the header anymore.
+    assert "ID" not in item.css_first("header.post-header").text()
+    # ...but it does appear in the demographics column's location chunk.
+    location = item.css_first("section.post-facts dl > div.post-location")
+    assert location is not None
+    assert location.css_first("dd").text(strip=True) == "Boise, ID"
 
 
 async def test_list_provider_availability_item_shape(
@@ -251,15 +271,14 @@ async def test_list_provider_availability_item_shape(
     facts_text = item.css_first("section.post-facts").text()
     assert "In-network" in facts_text
 
-    # Contact column names the practice (PA's identity is the
-    # practice, not the user) and offers a `mailto:` link to the
-    # post owner's email.
-    attribution = item.css_first("section.post-attribution")
-    attribution_text = attribution.text()
-    assert "Contact" in attribution_text
-    assert practice_name in attribution_text
-    assert author.username not in attribution_text
-    mailto = attribution.css_first("a")
+    # Contact band names the practice (PA's identity is the practice,
+    # not the user) and offers a `mailto:` link to the post owner's
+    # email. Lives in `<footer class="post-footer">`.
+    footer = item.css_first("footer.post-footer")
+    footer_text = footer.text()
+    assert practice_name in footer_text
+    assert author.username not in footer_text
+    mailto = footer.css_first("a")
     assert mailto is not None
     assert mailto.attributes.get("href") == f"mailto:{author.email}"
 
@@ -344,15 +363,16 @@ async def test_list_services_priority_sorted_psychotherapy_and_medmgmt_first(
     assert labels[2:] == ["Evaluation", "Case management"]
 
 
-async def test_list_age_label_is_kind_aware(
+async def test_list_demographics_diverge_by_kind(
     authenticated_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user: User,
 ):
-    """The demographics `<dt>` for the age field differs by kind: CR
-    says "Age" (the post describes one client) and PA says "Ages"
-    (the post describes who the practice accepts). Same underlying
-    `age_groups` field, different cardinality."""
+    """CR and PA cards carry different demographics shapes: CR's center
+    column leads with a location chunk (icon `<dt>` + `City, ST`) and
+    omits age + gender entirely (both live in the headline). PA's
+    center column carries the "Ages" cohort chunk (and a "Genders"
+    chunk when set), no location row."""
     author = create_test_user(username=f"author-{uuid.uuid4()}")
     cr_post = _client_referral_post(
         description="cr",
@@ -378,16 +398,17 @@ async def test_list_age_label_is_kind_aware(
     cards = {
         a.attributes.get("data-row-id"): a for a in tree.css("#posts-list > article")
     }
-    cr_labels = [
-        dt.text(strip=True)
-        for dt in cards[str(cr_post.id)].css("section.post-facts dl dt")
-    ]
-    pa_labels = [
-        dt.text(strip=True)
-        for dt in cards[str(pa_post.id)].css("section.post-facts dl dt")
-    ]
-    assert "Age" in cr_labels and "Ages" not in cr_labels
+    cr_card = cards[str(cr_post.id)]
+    pa_card = cards[str(pa_post.id)]
+    cr_labels = [dt.text(strip=True) for dt in cr_card.css("section.post-facts dl dt")]
+    pa_labels = [dt.text(strip=True) for dt in pa_card.css("section.post-facts dl dt")]
+    # CR omits Age + Gender (they're in the headline) and adds a
+    # location chunk whose `<dt>` is icon-only (empty text).
+    assert "Age" not in cr_labels and "Gender" not in cr_labels
+    assert cr_card.css_first("section.post-facts dl > div.post-location") is not None
+    # PA carries the cohort chunk; no location row.
     assert "Ages" in pa_labels and "Age" not in pa_labels
+    assert pa_card.css_first("section.post-facts dl > div.post-location") is None
 
 
 async def test_list_contact_column_shows_practice_name_and_mailto_for_pa(
@@ -414,14 +435,13 @@ async def test_list_contact_column_shows_practice_name_and_mailto_for_pa(
     response = await authenticated_client.get("/posts")
     assert response.status_code == 200
     tree = HTMLParser(response.text)
-    attribution = tree.css_first("#posts-list > article section.post-attribution")
-    assert attribution is not None
-    text = attribution.text()
-    assert "Contact" in text
+    footer = tree.css_first("#posts-list > article footer.post-footer")
+    assert footer is not None
+    text = footer.text()
     assert practice_name in text
-    # PA contact column names the practice, not the post owner's username.
+    # PA contact band names the practice, not the post owner's username.
     assert author.username not in text
-    mailto = attribution.css_first("a")
+    mailto = footer.css_first("a")
     assert mailto is not None
     assert mailto.attributes.get("href") == f"mailto:{author.email}"
     assert mailto.attributes.get("target") == "_blank"
@@ -468,11 +488,11 @@ async def test_list_meta_is_a_dl_of_labeled_key_value_chunks(
 ):
     """Each metadata fact is a `<dt>`/`<dd>` pair (wrapped in a
     `<div>`, the HTML5 grouping construct inside `<dl>`) in the
-    demographics column (`section.post-facts`). The `<dt>` is a
-    visible label (e.g. "Ages", "Insurance") — labels make the card
-    self-explanatory at scan distance. State + format live in the
-    card header parenthetical rather than the demographics list, so
-    the column stays focused on per-client facts.
+    demographics column (`section.post-facts`). For CR the first
+    chunk is a location row: an icon-only `<dt>` (`aria-label`
+    carries the meaning) + `City, ST` value. Other chunks have a
+    visible text `<dt>` label (e.g. "Insurance"). Modality lives in
+    the header, not here.
 
     The author's username appears in the `Contact` column (the
     third grid column) — a deliberate change from the earlier
@@ -503,23 +523,28 @@ async def test_list_meta_is_a_dl_of_labeled_key_value_chunks(
     item = tree.css_first("#posts-list > article")
     assert item is not None
 
-    # Demographics `<dl>` chunks. English-only languages are dropped
-    # (default); no modality on this post; insurance posture renders.
-    # Gender is always present on CR (the helper defaults to
-    # "prefer_not_to_say" — the privacy-respecting opt-out).
+    # Demographics `<dl>` chunks for CR. English-only languages are
+    # dropped (default); insurance posture renders; age + gender are
+    # absent (they're in the headline).
     meta_chunks = item.css("section.post-facts dl > div")
-    # Age + Gender + Insurance = 3 chunks.
-    assert len(meta_chunks) == 3
+    # Location + Insurance = 2 chunks.
+    assert len(meta_chunks) == 2
     labels = [chunk.css_first("dt").text(strip=True) for chunk in meta_chunks]
-    # `dt::after { content: ": " }` adds the colon in CSS; the DOM
-    # text of the `<dt>` is just the label.
-    assert labels == ["Age", "Gender", "Insurance"]
+    # First `<dt>` is icon-only (no visible text); second is "Insurance".
+    assert labels == ["", "Insurance"]
+    assert meta_chunks[0].attributes.get("class") == "post-location"
+    assert meta_chunks[0].css_first("dt").attributes.get("aria-label") == "Location"
+    assert meta_chunks[0].css_first("dt > i[class^=icon-]") is not None
     values = [chunk.css_first("dd").text(strip=True) for chunk in meta_chunks]
-    assert values == ["Adolescent (14–18)", "Prefer not to say", "In-network"]
+    assert values == ["Seattle, WA", "In-network"]
 
-    # Header carries state + an "In-person" modality chip (virtual=no).
+    # Header carries the age headline + an "In-person" modality chip
+    # (virtual=no). The fixture's gender default is `prefer_not_to_say`,
+    # so the gender word drops out. State lives in the location chunk
+    # of the demographics column, not in the header.
     header_text = item.css_first("header.post-header").text()
-    assert "Client Referral, WA" in header_text
+    assert "Adolescent (14–18)" in header_text
+    assert "WA" not in header_text
     modality_chips = [
         chip.text(strip=True)
         for chip in item.css("header.post-header > .post-modality")
@@ -527,16 +552,16 @@ async def test_list_meta_is_a_dl_of_labeled_key_value_chunks(
     assert modality_chips == ["In-person"]
 
     # Two `<a>`s per card: the header link to the detail page and
-    # the `mailto:` link in the contact column. The contact column
+    # the `mailto:` link in the footer's contact band. The footer
     # also names the contact (username for CR — plain, matching how
     # PA renders the practice name) as plain text.
     header_link = item.css_first("header.post-header a")
     assert header_link is not None
     assert header_link.attributes.get("href") == f"/posts/{post.id}"
-    attribution = item.css_first("section.post-attribution")
-    assert author.username in attribution.text()
-    assert f"@{author.username}" not in attribution.text()
-    mailto = attribution.css_first("a")
+    footer = item.css_first("footer.post-footer")
+    assert author.username in footer.text()
+    assert f"@{author.username}" not in footer.text()
+    mailto = footer.css_first("a")
     assert mailto is not None
     assert mailto.attributes.get("href") == f"mailto:{author.email}"
     assert mailto.attributes.get("target") == "_blank"
@@ -1684,9 +1709,10 @@ async def test_list_renders_client_referral_row(
     logged_in_user: User,
 ):
     """`GET /posts` renders a client_referral card whose header link
-    starts with `Client Referral` (the kind label). The kind is also
-    conveyed by the `data-kind` left-edge color, but tests assert
-    against the visible text."""
+    is the age + gender combo (e.g. `Adult (25–64)` with the default
+    `prefer_not_to_say` gender). State lives in the location chunk of
+    the demographics column. The kind is also conveyed by the
+    `data-kind` left-edge color."""
     author = create_test_user(username=f"author-{uuid.uuid4()}")
     post = _client_referral_post(
         description=f"crsummary-{uuid.uuid4()}",
@@ -1704,7 +1730,9 @@ async def test_list_renders_client_referral_row(
     item = tree.css_first("#posts-list > article")
     assert item is not None
     assert item.attributes.get("data-kind") == "client_referral"
-    assert "Client Referral" in item.css_first("header.post-header a").text()
+    # Default fixture: age_groups=["adults_25_64"], gender="prefer_not_to_say".
+    # State (IL) lives in the demographics location chunk, not the header.
+    assert item.css_first("header.post-header a").text().strip() == "Adult (25–64)"
 
 
 async def test_get_client_referral_detail_renders(
