@@ -10,25 +10,26 @@
    toolbar — see the "every page's toolbar is the home for resource
    actions" rule in [`../../../framework/templates/README.md`](../../../framework/templates/README.md).
    `can_edit` and `is_favorited` are computed by handle_get_provider_detail;
-   templates do not re-derive authorization predicates inline. #}
+   templates do not re-derive authorization predicates inline. Each
+   action is a `<li>` because the toolbar is a `<menu>` of commands. #}
 {% if is_authenticated %}
   {% if is_favorited %}
-  <button type="button"
+  <li><button type="button"
           class="secondary outline"
           hx-delete="/users/me/favorites/{{ provider.id }}"
           hx-confirm="Remove this provider from your favorites?">
     Unfavorite
-  </button>
+  </button></li>
   {% else %}
-  <button type="button"
+  <li><button type="button"
           class="outline"
           hx-post="/users/me/favorites/{{ provider.id }}">
     Favorite
-  </button>
+  </button></li>
   {% endif %}
 {% endif %}
 {% if can_edit %}
-<a href="/providers/{{ provider.id }}/form" role="button" class="outline">Edit provider</a>
+<li><a href="/providers/{{ provider.id }}/form" role="button" class="outline">Edit provider</a></li>
 {% endif %}
 {% endblock %}
 

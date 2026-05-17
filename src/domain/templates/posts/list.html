@@ -16,8 +16,10 @@
 
 {% block actions %}
 {# `/posts/form` (no `?kind=`) renders the kind picker; the user
-   picks the kind there, then lands on the kind-specific create form. #}
-<a href="/posts/form" role="button">Create post</a>
+   picks the kind there, then lands on the kind-specific create form.
+   The action is a `<li>` because the toolbar's right zone is a
+   `<menu>` of commands. #}
+<li><a href="/posts/form" role="button">Create post</a></li>
 {% endblock %}
 
 {% block content %}

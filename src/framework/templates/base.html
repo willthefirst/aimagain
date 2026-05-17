@@ -86,12 +86,29 @@
       /* Pico's default `<button>` is `display: block; width: 100%`
          (form-shaped); the action bar overrides to natural-width
          inline buttons — same pattern as `.filter-chips` /
-         `.filter-actions` above. Each action is a bare button-shaped
-         element (`<button>`, `<a role="button">`) — no wrapping spans
-         — so this selector reaches every action child directly. */
+         `.filter-actions` above. Each action is a `<li>` child of a
+         `<menu>` (commands list); the button lives inside the `<li>`,
+         so this selector reaches every action via descendant match. */
       .toolbar button, .toolbar [role="button"] { width: auto; margin: 0; }
       .toolbar-left { flex: 1; min-width: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; }
       .toolbar-right { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; }
+      /* `<menu>` is HTML's native "list of commands" element — used
+         by the page toolbar (`menu.toolbar`, `menu.toolbar-right`)
+         and any in-row action cluster (e.g. the users-table Actions
+         cell). Strip its default `<ul>`-style bullets + padding so
+         the container is invisible chrome; the parent's flex layout
+         (when present) handles spacing, and `<li>` children carry no
+         visual weight. The `.toolbar button` rule above reaches each
+         action via descendant selector. */
+      menu { list-style: none; padding: 0; margin: 0; }
+      /* Filter dialog footer menu (Cancel / Clear / Apply): inline
+         the three commands as a right-anchored row. The previous
+         `<div role="group">` got this for free from Pico's grouped-
+         button styling; the `<menu>` replacement needs the layout
+         spelled out — it earns the gain in semantics (a list of
+         commands, no aria-role needed) for one flex rule. */
+      dialog footer menu { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 0.5rem; }
+      dialog footer menu button { width: auto; margin: 0; }
       /* Breadcrumb zone bar. Pico already styles the markup
          (`nav[aria-label="breadcrumb"] ul` becomes an inline list
          with a separator via `li + li::before`); the only thing this
