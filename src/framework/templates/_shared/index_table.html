@@ -30,33 +30,24 @@ Args:
                 nothing.
 
 Why a macro at all (vs. each list.html owning the table chrome): the
-empty-state branch and the wrapping `<div class="index-table">` are the
-load-bearing repeated structure — collapsing them here keeps every list
-honest about the empty-state contract (`<p class="index-empty">…`) so a
-single CSS rule styles every empty list the same way. Pages with rich
-empty states (CTA links, per-viewer branches) invoke the macro via
-`{% call %}` and provide their own `<p class="index-empty" id="…">`
-body.
-
-The wrapping `<div class="index-table">` also owns the mobile-overflow
-behavior: the global `overflow-x: auto` rule in `base.html` scrolls
-wide tables horizontally inside the wrapper instead of pushing the
-viewport wide. Templates don't need per-page CSS — wrapping a row's
-cells in `<td data-label="…">` is enough.
+empty-state branch is the load-bearing repeated structure — collapsing
+it here keeps every list honest about the empty-state contract (a
+single `<p>` when `items` is empty). Pages with rich empty states (CTA
+links, per-viewer branches) invoke the macro via `{% call %}` and
+provide their own empty body, typically with an `id="…"` so tests can
+scope to it.
 #}
 {% macro index_table(items, headers, row, empty=None, id=None, row_kwargs={}, header_kwargs={}) -%}
 {% if items %}
-<div class="index-table">
-  <table{% if id %} id="{{ id }}"{% endif %} role="grid">
-    <thead><tr>{{ headers(**header_kwargs) }}</tr></thead>
-    <tbody>
-      {%- for item in items %}
+<table{% if id %} id="{{ id }}"{% endif %} role="grid">
+  <thead><tr>{{ headers(**header_kwargs) }}</tr></thead>
+  <tbody>
+    {%- for item in items %}
 {{ row(item, **row_kwargs) }}
-      {%- endfor %}
-    </tbody>
-  </table>
-</div>
+    {%- endfor %}
+  </tbody>
+</table>
 {%- else -%}
-{% if caller %}{{ caller() }}{% else %}<p class="index-empty">{{ empty }}</p>{% endif %}
+{% if caller %}{{ caller() }}{% else %}<p>{{ empty }}</p>{% endif %}
 {%- endif %}
 {%- endmacro %}

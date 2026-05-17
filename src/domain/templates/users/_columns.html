@@ -1,8 +1,8 @@
 {# Column macros for the users index table.
 
-`user_row` renders both the row and the deactivated state styling
-(`class="deactivated"` on the `<tr>`) — the same hook the previous
-`<li class="deactivated">` carried, so existing CSS continues to apply.
+`user_row` renders the row; the Status cell ("Active" / "Deactivated"
+in an `<em>`) carries the visual cue for deactivated users — no row-
+level class needed.
 
 The Actions cell wraps `_admin_actions.html` in a `<menu>` because
 the partial emits `<li>` children (it lives in a toolbar `<menu>` on
@@ -24,7 +24,7 @@ renders nothing when the viewer is not an admin (its existing guard).
 {%- endmacro %}
 
 {% macro user_row(user, can_admin_actions=False) -%}
-<tr data-row-id="{{ user.id }}"{% if not user.is_active %} class="deactivated"{% endif %}>
+<tr data-row-id="{{ user.id }}">
   <td data-label="Username" class="primary">
     <a href="/users/{{ user.id }}">{{ user.username }}</a>
   </td>

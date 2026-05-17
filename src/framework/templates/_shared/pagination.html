@@ -25,7 +25,7 @@ The handler is responsible for building `paginator_base_query`; see
 {% macro pagination(page_meta, paginator_base_query="") -%}
 {%- if page_meta.has_prev or page_meta.has_next -%}
 {%- set sep = "&" if paginator_base_query else "" -%}
-<nav aria-label="Pagination" class="pagination">
+<nav aria-label="Pagination">
   <ul>
     {%- if page_meta.has_prev %}
     <li>
@@ -33,7 +33,7 @@ The handler is responsible for building `paginator_base_query`; see
          rel="prev">&laquo; Prev</a>
     </li>
     {%- else %}
-    <li><span class="pagination-disabled" aria-disabled="true">&laquo; Prev</span></li>
+    <li><span aria-disabled="true">&laquo; Prev</span></li>
     {%- endif %}
     <li><span aria-current="page">Page {{ page_meta.page }}</span></li>
     {%- if page_meta.has_next %}
@@ -42,7 +42,7 @@ The handler is responsible for building `paginator_base_query`; see
          rel="next">Next &raquo;</a>
     </li>
     {%- else %}
-    <li><span class="pagination-disabled" aria-disabled="true">Next &raquo;</span></li>
+    <li><span aria-disabled="true">Next &raquo;</span></li>
     {%- endif %}
   </ul>
 </nav>
