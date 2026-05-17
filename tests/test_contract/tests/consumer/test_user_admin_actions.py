@@ -81,8 +81,8 @@ async def test_consumer_deactivate_button_click(origin_with_routes: str, page: P
 
     with pact:
         await page.goto(detail_page_url)
-        await page.wait_for_selector("span.admin-actions button")
-        await page.locator("span.admin-actions button", has_text="Deactivate").click()
+        await page.wait_for_selector("button[hx-put*='/activation']")
+        await page.locator("button[hx-put*='/activation']", has_text="Deactivate").click()
         await page.wait_for_timeout(NETWORK_TIMEOUT_MS)
 
     # Pact verification happens automatically on context exit.

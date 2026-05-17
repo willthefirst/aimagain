@@ -63,8 +63,8 @@ async def test_consumer_delete_button_click(origin_with_routes: str, page: Page)
 
     with pact:
         await page.goto(detail_page_url)
-        await page.wait_for_selector("span.owner-actions button")
-        await page.locator("span.owner-actions button", has_text="Delete").click()
+        await page.wait_for_selector("button[hx-delete^='/posts/']")
+        await page.locator("button[hx-delete^='/posts/']", has_text="Delete").click()
         await page.wait_for_timeout(NETWORK_TIMEOUT_MS)
 
     # Pact verification happens automatically on context exit.
