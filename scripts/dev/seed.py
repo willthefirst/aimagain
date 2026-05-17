@@ -558,7 +558,7 @@ FIXTURE_CLIENT_REFERRAL: list[FixtureClientReferral] = [
             ),
             "services": ["psychotherapy"],
             "treatment_modality": "TF-CBT or EMDR preferred",
-            "insurance": "in_network",
+            "network_preference": "in_network_required",
             "gender": "female",
         },
     },
@@ -582,7 +582,7 @@ FIXTURE_CLIENT_REFERRAL: list[FixtureClientReferral] = [
             ),
             "services": ["psychotherapy", "evaluation"],
             "treatment_modality": "PCIT or behavior-based",
-            "insurance": "in_network",
+            "network_preference": "in_network_required",
             # 7yo with selective mutism — gender not specified in the
             # referring clinician's description.
             "gender": "prefer_not_to_say",
@@ -612,7 +612,7 @@ FIXTURE_CLIENT_REFERRAL: list[FixtureClientReferral] = [
             ),
             "services": ["psychotherapy"],
             "treatment_modality": "DBT or DBT-informed",
-            "insurance": "out_of_network",
+            "network_preference": "in_network_preferred",
             "gender": "male",
         },
     },
@@ -636,7 +636,7 @@ FIXTURE_CLIENT_REFERRAL: list[FixtureClientReferral] = [
             ),
             "services": ["psychotherapy"],
             "treatment_modality": None,
-            "insurance": "self_pay_only",
+            "network_preference": "no_preference",
             # 20yo (she/they) doing gender-identity work — the queer-
             # affirming, Spanish-fluent ask drives the gender_diverse
             # signal so trans-affirming providers surface as matches.
@@ -663,7 +663,7 @@ FIXTURE_CLIENT_REFERRAL: list[FixtureClientReferral] = [
             ),
             "services": ["evaluation"],
             "treatment_modality": None,
-            "insurance": "in_network",
+            "network_preference": "in_network_required",
             # 11yo — gender not stated by the referring clinician.
             "gender": "prefer_not_to_say",
         },
@@ -692,7 +692,7 @@ FIXTURE_CLIENT_REFERRAL: list[FixtureClientReferral] = [
             ),
             "services": ["couples_therapy"],
             "treatment_modality": "EFT or Gottman",
-            "insurance": "out_of_network",
+            "network_preference": "in_network_preferred",
             # Couple — the gender field models a single client; for
             # couples-therapy referrals the referrer typically leaves
             # it unspecified.
@@ -719,7 +719,7 @@ FIXTURE_CLIENT_REFERRAL: list[FixtureClientReferral] = [
             ),
             "services": ["medication_management", "psychotherapy"],
             "treatment_modality": "DBT",
-            "insurance": "in_network",
+            "network_preference": "in_network_required",
             # 17yo stepping down from residential — gender unstated by
             # the referring clinician on the wire.
             "gender": "prefer_not_to_say",
@@ -745,7 +745,7 @@ FIXTURE_CLIENT_REFERRAL: list[FixtureClientReferral] = [
             ),
             "services": ["psychotherapy"],
             "treatment_modality": None,
-            "insurance": "in_network",
+            "network_preference": "in_network_required",
             "gender": "female",
         },
     },
@@ -768,7 +768,7 @@ FIXTURE_CLIENT_REFERRAL: list[FixtureClientReferral] = [
             ),
             "services": ["family_therapy", "case_management"],
             "treatment_modality": "ESDM or PCIT",
-            "insurance": "in_network",
+            "network_preference": "in_network_required",
             # 5yo with autism — gender not stated by referring family.
             "gender": "prefer_not_to_say",
         },
@@ -793,7 +793,7 @@ FIXTURE_CLIENT_REFERRAL: list[FixtureClientReferral] = [
             ),
             "services": ["medication_management"],
             "treatment_modality": None,
-            "insurance": "in_network",
+            "network_preference": "in_network_required",
             "gender": "prefer_not_to_say",
         },
     },
@@ -823,7 +823,7 @@ FIXTURE_CLIENT_REFERRAL: list[FixtureClientReferral] = [
             ),
             "services": ["case_management"],
             "treatment_modality": None,
-            "insurance": "please_contact",
+            "network_preference": "no_preference",
             # Multi-client referral (the group practice has openings,
             # not a single named client) — gender doesn't apply.
             "gender": "prefer_not_to_say",
@@ -849,7 +849,7 @@ FIXTURE_CLIENT_REFERRAL: list[FixtureClientReferral] = [
             ),
             "services": ["psychotherapy"],
             "treatment_modality": "CBT or ACT",
-            "insurance": "self_pay_only",
+            "network_preference": "no_preference",
             "gender": "male",
         },
     },

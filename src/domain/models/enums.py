@@ -92,17 +92,25 @@ CLIENT_AGE_GROUPS: Final[tuple[str, ...]] = (
 # display names. The tuple starts minimal — covers every seed example
 # today — and grows as real posts demand more entries.
 LANGUAGES: Final[tuple[str, ...]] = ("en", "es")
-INSURANCE_OPTIONS: Final[tuple[str, ...]] = (
-    "in_network",
-    "out_of_network",
-    "self_pay_only",
-    "please_contact",
+
+# Referrer's posture toward in-network matching for a `client_referral`.
+# Paired with `insurance_carrier` (nullable, from `INSURANCE_CARRIERS`) on
+# the same detail row: `network_preference` describes *strictness*,
+# `insurance_carrier` describes *which carrier* (null = self-pay /
+# unknown / no carrier). When `network_preference == 'no_preference'`
+# the carrier value is irrelevant — the form hides the control.
+NETWORK_PREFERENCES: Final[tuple[str, ...]] = (
+    "in_network_required",
+    "in_network_preferred",
+    "no_preference",
 )
 
-# Carrier vocabulary for `Provider.in_network_carriers` (#449). Decoupled
-# from `INSURANCE_OPTIONS` (which captures the in/out-of-network posture)
-# so the two concepts can vary independently. Required-min-1 when
-# `accepts_in_network=True`; must be empty otherwise.
+# Carrier vocabulary for `Provider.in_network_carriers` and
+# `ClientReferralDetail.insurance_carrier`. Single-sourced so the
+# referral side (one carrier per patient) and the provider side (the
+# list of carriers the practice accepts) share tokens. Required-min-1
+# on the provider side when `accepts_in_network=True`; nullable on the
+# referral side (null = self-pay / unknown / no carrier).
 INSURANCE_CARRIERS: Final[tuple[str, ...]] = (
     "aetna",
     "anthem_bcbs",
@@ -224,11 +232,10 @@ CLIENT_AGE_GROUP_LABELS_SINGULAR: Final[dict[str, str]] = {
     k: f"{g.singular} ({g.range})" for k, g in CLIENT_AGE_GROUPS_BY_KEY.items()
 }
 LANGUAGE_LABELS: Final[dict[str, str]] = {"en": "English", "es": "Spanish"}
-INSURANCE_LABELS: Final[dict[str, str]] = {
-    "in_network": "In-network",
-    "out_of_network": "Out-of-network",
-    "self_pay_only": "Self-pay only",
-    "please_contact": "Please contact",
+NETWORK_PREFERENCE_LABELS: Final[dict[str, str]] = {
+    "in_network_required": "In-network required",
+    "in_network_preferred": "In-network preferred",
+    "no_preference": "No preference / self-pay",
 }
 INSURANCE_CARRIER_LABELS: Final[dict[str, str]] = {
     "aetna": "Aetna",
@@ -312,18 +319,19 @@ GENDER_LABELS: Final[dict[str, str]] = {
 # --- Unified insurance posture -----------------------------------------
 #
 # The two post kinds model "insurance situation" with asymmetric vocab:
-#   * `client_referral.insurance` — enum (`in_network` / `out_of_network`
-#     / `self_pay_only` / `please_contact`)
+#   * `client_referral` — `network_preference` enum
+#     (`in_network_required` / `in_network_preferred` / `no_preference`)
+#     paired with a nullable `insurance_carrier`.
 #   * `provider_availability` → linked `Provider` carries boolean flags
 #     (`accepts_in_network`, `accepts_out_of_network`, `sliding_scale`)
 #     plus the carriers tuple.
 #
 # For the listing row we need *one* axis the eye can read at a glance,
 # so both shapes collapse to this 4-state posture. The mapping helper
-# `insurance_posture_for_post(post)` lives next to the row macro
-# (see `src/framework/rendering/post_view.py`). Adding a fifth state
-# means: extend this tuple, extend the labels + icons dicts, update the
-# helper, and the row macro picks it up.
+# `insurance_posture_for_post(post)` lives in
+# `src/domain/logic/posts/view.py`. Adding a fifth state means: extend
+# this tuple, extend the labels + icons dicts, update the helper, and
+# the row macro picks it up.
 INSURANCE_POSTURES: Final[tuple[str, ...]] = (
     "in_network",
     "out_of_network",

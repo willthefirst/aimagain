@@ -46,8 +46,8 @@ from src.domain.models.enums import (
     DESIRED_TIME_SLOTS,
     GENDER_LABELS,
     GENDERS,
-    INSURANCE_LABELS,
-    INSURANCE_OPTIONS,
+    INSURANCE_CARRIER_LABELS,
+    INSURANCE_CARRIERS,
     INSURANCE_POSTURE_ICONS,
     INSURANCE_POSTURE_LABELS,
     INSURANCE_POSTURES,
@@ -55,6 +55,8 @@ from src.domain.models.enums import (
     LANGUAGES,
     LOCATION_AVAILABILITY_LABELS,
     LOCATION_AVAILABILITY_OPTIONS,
+    NETWORK_PREFERENCE_LABELS,
+    NETWORK_PREFERENCES,
     TREATMENT_SETTINGS,
     TREATMENT_SETTINGS_ICONS,
 )
@@ -74,7 +76,8 @@ def test_post_create_dispatches_client_referral():
     # flat — see ``test_post_create_client_referral_dump_keeps_flat_location``.
     assert p.location.city == "Springfield"
     assert p.location.state == "IL"
-    assert p.insurance == "in_network"
+    assert p.network_preference == "in_network_required"
+    assert p.insurance_carrier is None
 
 
 def test_post_create_requires_kind():
@@ -121,7 +124,7 @@ def test_post_create_client_referral_rejects_empty_description():
         "location_virtual",
         "age_groups",
         "description",
-        "insurance",
+        "network_preference",
     ],
 )
 def test_post_create_client_referral_requires_all_required_fields(missing_field):
@@ -207,11 +210,42 @@ def test_post_create_client_referral_rejects_unknown_age_group():
         )
 
 
-def test_post_create_client_referral_rejects_unknown_insurance():
+def test_post_create_client_referral_rejects_unknown_network_preference():
     with pytest.raises(ValidationError):
         post_create_adapter.validate_python(
-            client_referral_payload(insurance="cash_only")
+            client_referral_payload(network_preference="bring_cash")
         )
+
+
+def test_post_create_client_referral_rejects_unknown_insurance_carrier():
+    with pytest.raises(ValidationError):
+        post_create_adapter.validate_python(
+            client_referral_payload(insurance_carrier="my_local_co_op")
+        )
+
+
+def test_post_create_client_referral_allows_null_insurance_carrier():
+    """Carrier is nullable — self-pay / unknown / no carrier all map to
+    NULL on the wire. The form hides the field when network_preference
+    = no_preference; the schema accepts a null carrier with any
+    network_preference value."""
+    for pref in NETWORK_PREFERENCES:
+        p = post_create_adapter.validate_python(
+            client_referral_payload(network_preference=pref, insurance_carrier=None)
+        )
+        assert p.network_preference == pref
+        assert p.insurance_carrier is None
+
+
+def test_post_create_client_referral_accepts_carrier_with_required():
+    p = post_create_adapter.validate_python(
+        client_referral_payload(
+            network_preference="in_network_required",
+            insurance_carrier="cigna",
+        )
+    )
+    assert p.network_preference == "in_network_required"
+    assert p.insurance_carrier == "cigna"
 
 
 def test_post_create_rejects_owner_id():
@@ -337,7 +371,8 @@ def test_audit_snapshot_for_client_referral_post():
     assert snap["owner_id"] == str(owner_id)
     assert snap["description"] == detail_attrs["description"]
     assert snap["location_city"] == detail_attrs["location_city"]
-    assert snap["insurance"] == detail_attrs["insurance"]
+    assert snap["network_preference"] == detail_attrs["network_preference"]
+    assert snap["insurance_carrier"] == detail_attrs["insurance_carrier"]
 
 
 def test_audit_snapshot_unknown_kind_raises():
@@ -419,29 +454,33 @@ def test_post_create_client_referral_accepts_new_services_tokens(token):
     assert p.services == [token]
 
 
-@pytest.mark.parametrize(
-    "token",
-    [
-        "in_network",
-        "out_of_network",
-        "self_pay_only",
-        "please_contact",
-    ],
-)
-def test_post_create_client_referral_accepts_all_insurance_tokens(token):
-    """All four post-#449 `INSURANCE_OPTIONS` tokens validate on CR
-    (`in_and_out_of_network` was dropped because the composite is redundant
-    with the new orthogonal Provider booleans)."""
-    p = post_create_adapter.validate_python(client_referral_payload(insurance=token))
-    assert p.insurance == token
+@pytest.mark.parametrize("token", NETWORK_PREFERENCES)
+def test_post_create_client_referral_accepts_all_network_preference_tokens(token):
+    """Every `NETWORK_PREFERENCES` token validates as a CR
+    `network_preference` value."""
+    p = post_create_adapter.validate_python(
+        client_referral_payload(network_preference=token)
+    )
+    assert p.network_preference == token
 
 
-def test_post_create_client_referral_rejects_retired_in_and_out_token():
-    """`in_and_out_of_network` was dropped from `INSURANCE_OPTIONS` in
-    #449; CR rows holding it were backfilled to `out_of_network`."""
+@pytest.mark.parametrize("token", INSURANCE_CARRIERS)
+def test_post_create_client_referral_accepts_all_insurance_carriers(token):
+    """Every `INSURANCE_CARRIERS` token validates as a CR
+    `insurance_carrier` value (shared vocab with Provider)."""
+    p = post_create_adapter.validate_python(
+        client_referral_payload(insurance_carrier=token)
+    )
+    assert p.insurance_carrier == token
+
+
+def test_post_create_client_referral_rejects_retired_in_network_token():
+    """The old `insurance` enum is gone. A payload sending the legacy
+    field gets ignored as an unknown field (extra='forbid' on
+    WirePayload), so this 422s."""
     with pytest.raises(ValidationError):
         post_create_adapter.validate_python(
-            client_referral_payload(insurance="in_and_out_of_network")
+            client_referral_payload(insurance="in_network")
         )
 
 
@@ -684,13 +723,16 @@ def _literal_args(model_cls, field_name: str) -> tuple[str, ...]:
         # test in ``src/domain/logic/value_objects/test_location.py``.
         (ClientReferralRead, "location_in_person", LOCATION_AVAILABILITY_OPTIONS),
         (ClientReferralRead, "location_virtual", LOCATION_AVAILABILITY_OPTIONS),
-        (ClientReferralRead, "insurance", INSURANCE_OPTIONS),
+        (ClientReferralRead, "network_preference", NETWORK_PREFERENCES),
+        (ClientReferralRead, "insurance_carrier", INSURANCE_CARRIERS),
         (ClientReferralRead, "gender", GENDERS),
         # Create variants
-        (ClientReferralCreate, "insurance", INSURANCE_OPTIONS),
+        (ClientReferralCreate, "network_preference", NETWORK_PREFERENCES),
+        (ClientReferralCreate, "insurance_carrier", INSURANCE_CARRIERS),
         (ClientReferralCreate, "gender", GENDERS),
         # Update variants (Optional[Literal[*TUPLE]])
-        (ClientReferralUpdate, "insurance", INSURANCE_OPTIONS),
+        (ClientReferralUpdate, "network_preference", NETWORK_PREFERENCES),
+        (ClientReferralUpdate, "insurance_carrier", INSURANCE_CARRIERS),
         (ClientReferralUpdate, "gender", GENDERS),
     ],
 )
@@ -915,7 +957,8 @@ def test_post_update_services_rejects_unknown_token(kind):
         (CLIENT_AGE_GROUPS, CLIENT_AGE_GROUP_LABELS_SINGULAR),
         (CLIENT_AGE_GROUPS, CLIENT_AGE_GROUPS_BY_KEY),
         (LANGUAGES, LANGUAGE_LABELS),
-        (INSURANCE_OPTIONS, INSURANCE_LABELS),
+        (NETWORK_PREFERENCES, NETWORK_PREFERENCE_LABELS),
+        (INSURANCE_CARRIERS, INSURANCE_CARRIER_LABELS),
         (DESIRED_TIME_SLOTS, DESIRED_TIME_SLOT_LABELS),
         (CLIENT_REFERRAL_SERVICES, CLIENT_REFERRAL_SERVICE_LABELS),
         (GENDERS, GENDER_LABELS),

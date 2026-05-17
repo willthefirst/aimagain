@@ -10,10 +10,13 @@ from src.domain.logic.posts.view import (
 )
 
 
-def _cr_post(insurance: str):
+def _cr_post(network_preference: str, insurance_carrier: str | None = None):
     return SimpleNamespace(
         kind="client_referral",
-        client_referral_detail=SimpleNamespace(insurance=insurance),
+        client_referral_detail=SimpleNamespace(
+            network_preference=network_preference,
+            insurance_carrier=insurance_carrier,
+        ),
     )
 
 
@@ -33,14 +36,18 @@ def _pa_post(**provider_attrs):
 @pytest.mark.parametrize(
     "storage,expected",
     [
-        ("in_network", "in_network"),
-        ("out_of_network", "out_of_network"),
-        ("self_pay_only", "self_pay"),
-        ("please_contact", "please_contact"),
+        ("in_network_required", "in_network"),
+        ("in_network_preferred", "out_of_network"),
+        ("no_preference", "self_pay"),
     ],
 )
-def test_cr_posture_maps_each_enum(storage, expected):
+def test_cr_posture_maps_each_network_preference(storage, expected):
+    """`network_preference` collapses to one of the unified
+    `INSURANCE_POSTURES` values for the listing-row badge. The carrier
+    is irrelevant to the posture — same posture whether it's set or
+    null."""
     assert insurance_posture_for_post(_cr_post(storage)) == expected
+    assert insurance_posture_for_post(_cr_post(storage, "cigna")) == expected
 
 
 def test_pa_posture_prefers_in_network_when_set():

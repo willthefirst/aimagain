@@ -48,8 +48,40 @@ which FastAPI/Pydantic parses as a list.
     {{ text_field("treatment_modality", "Psychotherapy modality (optional, e.g. DBT, EMDR)", current=d.treatment_modality if d else None, required=false) }}
   </fieldset>
 
-  {{ select_field("insurance", "Payment situation", INSURANCE_OPTIONS, labels=INSURANCE_LABELS, current=d.insurance if d else None, placeholder=true) }}
+  {# Insurance: two controls. `network_preference` is the referrer's
+     posture (always set); `insurance_carrier` is the patient's carrier
+     (optional — null when network_preference='no_preference'). The
+     carrier <div> is hidden whenever no_preference is selected; a tiny
+     inline script (below) toggles on change. Server-side, the
+     ClientReferralCreate schema accepts a null carrier with any
+     network_preference, so the hidden control just leaves the field
+     unset rather than enforcing the invariant on the wire. #}
+  <fieldset>
+    <legend>Insurance</legend>
+    {{ select_field("network_preference", "Network preference", NETWORK_PREFERENCES, labels=NETWORK_PREFERENCE_LABELS, current=d.network_preference if d else None, placeholder=true) }}
+    <div data-cr-carrier{% if d and d.network_preference == "no_preference" %} hidden{% endif %}>
+      {{ select_field("insurance_carrier", "Insurance carrier", INSURANCE_CARRIERS, labels=INSURANCE_CARRIER_LABELS, current=d.insurance_carrier if d else None, placeholder=true, required=false) }}
+    </div>
+  </fieldset>
 
   <button type="submit">{{ submit_label }}</button>
 </form>
+<script>
+  // Hide the insurance_carrier control when the referrer has no
+  // preference — the field is meaningless in that branch.
+  (function () {
+    var sel = document.querySelector('select[name="network_preference"]');
+    var wrap = document.querySelector('[data-cr-carrier]');
+    if (!sel || !wrap) return;
+    function sync() {
+      if (sel.value === 'no_preference') {
+        wrap.setAttribute('hidden', '');
+      } else {
+        wrap.removeAttribute('hidden');
+      }
+    }
+    sel.addEventListener('change', sync);
+    sync();
+  })();
+</script>
 {%- endmacro -%}

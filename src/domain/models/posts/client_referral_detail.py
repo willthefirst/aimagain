@@ -8,8 +8,9 @@ from src.framework.persistence.mixins import LocationMixin
 
 from ..enums import (
     GENDERS,
-    INSURANCE_OPTIONS,
+    INSURANCE_CARRIERS,
     LOCATION_AVAILABILITY_OPTIONS,
+    NETWORK_PREFERENCES,
     US_STATES,
     named_check_in,
 )
@@ -31,7 +32,8 @@ class ClientReferralDetail(LocationMixin, Base):
         _ck("location_state", US_STATES),
         _ck("location_in_person", LOCATION_AVAILABILITY_OPTIONS),
         _ck("location_virtual", LOCATION_AVAILABILITY_OPTIONS),
-        _ck("insurance", INSURANCE_OPTIONS),
+        _ck("insurance_carrier", INSURANCE_CARRIERS),
+        _ck("network_preference", NETWORK_PREFERENCES),
         _ck("gender", GENDERS),
     )
 
@@ -65,5 +67,12 @@ class ClientReferralDetail(LocationMixin, Base):
     services = Column(JSON, nullable=False, server_default=text("'[]'"), default=list)
     treatment_modality = Column(Text, nullable=True)
 
-    # Section 5 — insurance
-    insurance = Column(Text, nullable=False)
+    # Section 5 — insurance. Split into two concerns: `network_preference`
+    # is the referrer's posture (mandatory / preferred / indifferent) and
+    # is always set; `insurance_carrier` is the patient's actual carrier
+    # and is nullable (null = self-pay / unknown / no carrier, which is
+    # the natural shape when network_preference='no_preference').
+    network_preference = Column(
+        Text, nullable=False, server_default=text("'no_preference'")
+    )
+    insurance_carrier = Column(Text, nullable=True)

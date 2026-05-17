@@ -54,8 +54,12 @@
     <dt>Psychotherapy modality</dt>
     <dd>{{ d.treatment_modality }}</dd>
     {% endif %}
-    <dt>Insurance</dt>
-    <dd>{{ INSURANCE_LABELS[d.insurance] }}</dd>
+    <dt>Network preference</dt>
+    <dd>{{ NETWORK_PREFERENCE_LABELS[d.network_preference] }}</dd>
+    {% if d.insurance_carrier and d.network_preference != "no_preference" %}
+    <dt>Insurance carrier</dt>
+    <dd>{{ INSURANCE_CARRIER_LABELS[d.insurance_carrier] }}</dd>
+    {% endif %}
   </dl>
 
 {% elif post.kind == "provider_availability" %}

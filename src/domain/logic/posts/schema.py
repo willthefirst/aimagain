@@ -57,9 +57,10 @@ from src.domain.models.enums import (
     CLIENT_REFERRAL_SERVICES,
     DESIRED_TIME_SLOTS,
     GENDERS,
-    INSURANCE_OPTIONS,
+    INSURANCE_CARRIERS,
     LANGUAGES,
     LOCATION_AVAILABILITY_OPTIONS,
+    NETWORK_PREFERENCES,
     TREATMENT_SETTINGS,
 )
 from src.framework.rendering.form_fields import HtmlTextarea, HtmlUrl
@@ -95,6 +96,24 @@ def _scalar_to_list(v):
     if isinstance(v, str):
         return [v]
     return v
+
+
+def _empty_to_none(v):
+    """Coerce an empty/whitespace-only string to `None` for optional enum
+    fields. HTML `<select>` with a placeholder option always submits a
+    string — `""` when the user hasn't picked anything. Without this,
+    Pydantic's `Literal[*TUPLE] | None` would try the `Literal` arm
+    against `""`, fail, and 422 every form submission that omits the
+    field. Required enum fields don't need this — `""` legitimately
+    422s a required field — so it's wired up per-field, not globally."""
+    if isinstance(v, str) and v.strip() == "":
+        return None
+    return v
+
+
+OptionalInsuranceCarrier = Annotated[
+    Literal[*INSURANCE_CARRIERS] | None, BeforeValidator(_empty_to_none)
+]
 
 
 # Annotated aliases for the multi-checkbox fields. The `BeforeValidator`
@@ -200,7 +219,9 @@ class ClientReferralRead(_PostReadBase):
     description: str
     services: ServicesField = []
     treatment_modality: str | None = None
-    insurance: Literal[*INSURANCE_OPTIONS]
+    # See :class:`ClientReferralCreate` for the carrier/preference split.
+    network_preference: Literal[*NETWORK_PREFERENCES]
+    insurance_carrier: OptionalInsuranceCarrier = None
 
     # Flat-on-dump: keep ``location_city`` / ``location_state`` /
     # ``location_zip`` at the top level of JSON responses (#451). The
@@ -275,7 +296,16 @@ class ClientReferralCreate(WirePayload):
     description: StrippedText
     services: ServicesField = []
     treatment_modality: StrippedOptionalText = None
-    insurance: Literal[*INSURANCE_OPTIONS]
+    # `network_preference` is the referrer's posture toward in-network
+    # match (required). `insurance_carrier` is the patient's actual
+    # carrier (nullable — null means self-pay / unknown / no carrier,
+    # which is the natural shape when network_preference='no_preference').
+    # No cross-field validator yet: the form hides the carrier control
+    # when 'no_preference' is selected, so the data-shape stays clean in
+    # practice; tightening this to a server-side invariant is a separate
+    # decision.
+    network_preference: Literal[*NETWORK_PREFERENCES]
+    insurance_carrier: OptionalInsuranceCarrier = None
 
     @model_validator(mode="before")
     @classmethod
@@ -369,7 +399,11 @@ class ClientReferralUpdate(PartialUpdate):
     description: StrippedText | None = None
     services: ServicesField | None = None
     treatment_modality: StrippedOptionalText = None
-    insurance: Literal[*INSURANCE_OPTIONS] | None = None
+    # `None` = leave unchanged; any enum value sets it. Clearing the
+    # carrier back to NULL via PATCH is not supported today (matches the
+    # repo's "None means leave unchanged" semantic for optional fields).
+    network_preference: Literal[*NETWORK_PREFERENCES] | None = None
+    insurance_carrier: OptionalInsuranceCarrier = None
 
     @model_validator(mode="before")
     @classmethod
@@ -443,7 +477,8 @@ class ClientReferralAuditSnapshot(_PostAuditSnapshotBase):
     description: str
     services: ServicesField = []
     treatment_modality: str | None = None
-    insurance: Literal[*INSURANCE_OPTIONS]
+    network_preference: Literal[*NETWORK_PREFERENCES]
+    insurance_carrier: OptionalInsuranceCarrier = None
 
     # Flat-on-dump (#451) — see :class:`ClientReferralRead`.
     @model_serializer(mode="wrap")

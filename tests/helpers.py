@@ -60,7 +60,8 @@ _CLIENT_REFERRAL_DEFAULTS: dict[str, Any] = {
     "description": "needs placement",
     "services": [],
     "treatment_modality": None,
-    "insurance": "in_network",
+    "network_preference": "in_network_required",
+    "insurance_carrier": None,
 }
 
 _PROVIDER_AVAILABILITY_DEFAULTS: dict[str, Any] = {

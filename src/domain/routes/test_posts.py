@@ -97,7 +97,8 @@ async def test_list_client_referral_item_shape(
         age_groups=["adolescents_14_18", "adults_25_64"],
         gender="male",
         languages=["en", "es"],
-        insurance="in_network",
+        network_preference="in_network_required",
+        insurance_carrier="cigna",
         services=["psychotherapy", "medication_management"],
     )
     async with db_test_session_manager() as session:
@@ -511,7 +512,7 @@ async def test_list_meta_is_a_dl_of_labeled_key_value_chunks(
         location_virtual="no",
         age_groups=["adolescents_14_18"],
         languages=["en"],
-        insurance="in_network",
+        network_preference="in_network_required",
     )
     async with db_test_session_manager() as session:
         async with session.begin():
@@ -1593,7 +1594,12 @@ async def test_create_client_referral_strips_whitespace(
         client_referral_payload(description="   "),
         client_referral_payload(location_zip="abc"),  # non-numeric ZIP
         client_referral_payload(location_state="ZZ"),  # not a US state
-        client_referral_payload(insurance="cash_only"),  # not in INSURANCE_OPTIONS
+        client_referral_payload(
+            network_preference="bring_cash"
+        ),  # not in NETWORK_PREFERENCES
+        client_referral_payload(
+            insurance_carrier="my_local_co_op"
+        ),  # not in INSURANCE_CARRIERS
         client_referral_payload(title="bleed"),  # cross-kind field bleed
         client_referral_payload(evil=True),  # unknown field
         {"kind": "unknown_kind", "description": "ok"},
