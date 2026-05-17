@@ -45,11 +45,11 @@
       <dt>ZIP</dt><dd>{{ provider.location_zip }}</dd>
       <dt>In-person sessions</dt><dd>{{ LOCATION_AVAILABILITY_LABELS[provider.in_person_sessions] }}</dd>
       <dt>Virtual sessions</dt><dd>{{ LOCATION_AVAILABILITY_LABELS[provider.virtual_sessions] }}</dd>
-      {% if provider.accepts_in_network or provider.accepts_out_of_network %}
+      {% if provider.in_network_carriers or provider.accepts_out_of_network %}
       <dt>Insurance accepted</dt>
       <dd>
-        {% if provider.accepts_in_network %}In-network ({% for c in provider.in_network_carriers %}{{ INSURANCE_CARRIER_LABELS[c] }}{% if not loop.last %}, {% endif %}{% endfor %}){% endif %}
-        {% if provider.accepts_in_network and provider.accepts_out_of_network %} · {% endif %}
+        {% if provider.in_network_carriers %}In-network ({% for c in provider.in_network_carriers %}{{ INSURANCE_CARRIER_LABELS[c] }}{% if not loop.last %}, {% endif %}{% endfor %}){% endif %}
+        {% if provider.in_network_carriers and provider.accepts_out_of_network %} · {% endif %}
         {% if provider.accepts_out_of_network %}Out-of-network{% endif %}
       </dd>
       {% else %}

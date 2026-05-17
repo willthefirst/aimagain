@@ -43,18 +43,14 @@ class Provider(LocationMixin, BaseModel):
     in_person_sessions = Column(Text, nullable=False)
     virtual_sessions = Column(Text, nullable=False)
 
-    # Insurance posture (#449). `accepts_in_network` and
-    # `accepts_out_of_network` are orthogonal Booleans — a practice may
-    # accept either, both, or neither (self-pay only). `in_network_carriers`
-    # is required-min-1 when `accepts_in_network=True`; must be empty
-    # otherwise. The cross-field rule is enforced in the wire schema
-    # (`ProviderCreate` / `ProviderUpdate`) — the model just records the
-    # state.
-    accepts_in_network = Column(
-        Boolean, nullable=False, server_default=text("0"), default=False
-    )
+    # Insurance posture. `in_network_carriers` is the set of carriers the
+    # practice accepts in-network — an empty list means "no in-network".
+    # `accepts_out_of_network` is independent: a practice may accept
+    # in-network, out-of-network, both, or neither (self-pay only).
+    # Default is `True` — most practices accept OON, and forcing the
+    # opt-out matches the real-world prior.
     accepts_out_of_network = Column(
-        Boolean, nullable=False, server_default=text("0"), default=False
+        Boolean, nullable=False, server_default=text("1"), default=True
     )
     in_network_carriers = Column(
         JSON, nullable=False, server_default=text("'[]'"), default=list

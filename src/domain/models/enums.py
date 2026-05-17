@@ -108,9 +108,9 @@ NETWORK_PREFERENCES: Final[tuple[str, ...]] = (
 # Carrier vocabulary for `Provider.in_network_carriers` and
 # `ClientReferralDetail.insurance_carrier`. Single-sourced so the
 # referral side (one carrier per patient) and the provider side (the
-# list of carriers the practice accepts) share tokens. Required-min-1
-# on the provider side when `accepts_in_network=True`; nullable on the
-# referral side (null = self-pay / unknown / no carrier).
+# list of carriers the practice accepts) share tokens. On the provider
+# side an empty list means "no in-network"; nullable on the referral
+# side (null = self-pay / unknown / no carrier).
 INSURANCE_CARRIERS: Final[tuple[str, ...]] = (
     "aetna",
     "anthem_bcbs",
@@ -322,9 +322,9 @@ GENDER_LABELS: Final[dict[str, str]] = {
 #   * `client_referral` — `network_preference` enum
 #     (`in_network_required` / `in_network_preferred` / `no_preference`)
 #     paired with a nullable `insurance_carrier`.
-#   * `provider_availability` → linked `Provider` carries boolean flags
-#     (`accepts_in_network`, `accepts_out_of_network`, `sliding_scale`)
-#     plus the carriers tuple.
+#   * `provider_availability` → linked `Provider` carries the
+#     `in_network_carriers` list (empty = no in-network) plus the
+#     `accepts_out_of_network` / `sliding_scale` booleans.
 #
 # For the listing row we need *one* axis the eye can read at a glance,
 # so both shapes collapse to this 4-state posture. The mapping helper

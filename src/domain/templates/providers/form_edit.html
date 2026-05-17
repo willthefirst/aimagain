@@ -26,14 +26,12 @@
       {{ select_field("in_person_sessions", "In-person sessions", LOCATION_AVAILABILITY_OPTIONS, labels=LOCATION_AVAILABILITY_LABELS, current=provider.in_person_sessions) }}
       {{ select_field("virtual_sessions", "Virtual sessions", LOCATION_AVAILABILITY_OPTIONS, labels=LOCATION_AVAILABILITY_LABELS, current=provider.virtual_sessions) }}
     </fieldset>
-    {# Insurance & payment (#449). See `form_new.html` for the
-       cross-field rule on `in_network_carriers`. #}
+    {# Insurance & payment. Empty carrier list = no in-network. #}
     <fieldset>
       <legend>Insurance &amp; payment</legend>
-      {{ radio_bool_field("accepts_in_network", "Accepts in-network?", current=provider.accepts_in_network, required=false) }}
+      {{ multi_select_field("in_network_carriers", "In-network carriers (leave empty for none)", INSURANCE_CARRIERS, labels=INSURANCE_CARRIER_LABELS, current=provider.in_network_carriers) }}
       {{ radio_bool_field("accepts_out_of_network", "Accepts out-of-network?", current=provider.accepts_out_of_network, required=false) }}
       {{ radio_bool_field("sliding_scale", "Sliding scale?", current=provider.sliding_scale, required=false) }}
-      {{ multi_select_field("in_network_carriers", "In-network carriers (required if accepts in-network)", INSURANCE_CARRIERS, labels=INSURANCE_CARRIER_LABELS, current=provider.in_network_carriers) }}
       {{ text_field("cost", "Cost (optional, free text)", current=provider.cost, required=false) }}
     </fieldset>
     <button type="submit">Save practice details</button>

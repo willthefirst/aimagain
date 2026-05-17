@@ -21,7 +21,7 @@ def _cr_post(network_preference: str, insurance_carrier: str | None = None):
 
 
 def _pa_post(**provider_attrs):
-    provider_attrs.setdefault("accepts_in_network", False)
+    provider_attrs.setdefault("in_network_carriers", [])
     provider_attrs.setdefault("accepts_out_of_network", False)
     provider_attrs.setdefault("sliding_scale", False)
     provider_attrs.setdefault("cost", None)
@@ -54,7 +54,7 @@ def test_pa_posture_prefers_in_network_when_set():
     """In-network is the highest-signal posture; show it even when the
     provider also accepts out-of-network or offers sliding scale."""
     post = _pa_post(
-        accepts_in_network=True,
+        in_network_carriers=["aetna"],
         accepts_out_of_network=True,
         sliding_scale=True,
     )

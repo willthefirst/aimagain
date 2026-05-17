@@ -174,62 +174,45 @@ def test_provider_create_rejects_non_5_digit_zip():
         ProviderCreate(**_provider_create_kwargs(location_zip="123"))
 
 
-def test_provider_create_defaults_insurance_fields_to_self_pay():
-    """Insurance posture (#449) defaults to self-pay-only: both Booleans
-    `False`, empty carrier list, no sliding scale, no cost — keeps the
-    cross-field invariant satisfied without forcing every caller to
-    specify the fields."""
+def test_provider_create_defaults_to_oon_only():
+    """Insurance posture defaults to OON-only: empty carrier list +
+    `accepts_out_of_network=True`. The OON default reflects that most
+    practices accept out-of-network; opting out is the explicit choice."""
     p = ProviderCreate(**_provider_create_kwargs())
-    assert p.accepts_in_network is False
-    assert p.accepts_out_of_network is False
+    assert p.accepts_out_of_network is True
     assert p.in_network_carriers == []
     assert p.sliding_scale is False
     assert p.cost is None
 
 
-def test_provider_create_accepts_in_network_with_carriers():
-    """`accepts_in_network=True` requires `in_network_carriers` non-empty;
-    the happy path passes through."""
+def test_provider_create_with_in_network_carriers():
+    """A non-empty carrier list expresses in-network acceptance — no
+    separate boolean needed."""
     p = ProviderCreate(
         **_provider_create_kwargs(
-            accepts_in_network=True,
             in_network_carriers=["aetna", "cigna"],
         )
     )
-    assert p.accepts_in_network is True
     assert p.in_network_carriers == ["aetna", "cigna"]
 
 
-def test_provider_create_rejects_in_network_without_carriers():
-    """Cross-field rule: `accepts_in_network=True` + empty carrier list
-    must 422."""
-    with pytest.raises(ValidationError):
-        ProviderCreate(
-            **_provider_create_kwargs(
-                accepts_in_network=True,
-                in_network_carriers=[],
-            )
+def test_provider_create_accepts_out_of_network_with_no_carriers():
+    """OON-only is a valid posture: empty carrier list +
+    `accepts_out_of_network=True`."""
+    p = ProviderCreate(
+        **_provider_create_kwargs(
+            accepts_out_of_network=True,
+            in_network_carriers=[],
         )
-
-
-def test_provider_create_rejects_carriers_without_in_network():
-    """Cross-field rule: a non-empty carrier list with
-    `accepts_in_network=False` must 422 — leaking carriers when not
-    accepting in-network is incoherent."""
-    with pytest.raises(ValidationError):
-        ProviderCreate(
-            **_provider_create_kwargs(
-                accepts_in_network=False,
-                in_network_carriers=["aetna"],
-            )
-        )
+    )
+    assert p.accepts_out_of_network is True
+    assert p.in_network_carriers == []
 
 
 def test_provider_create_rejects_unknown_carrier():
     with pytest.raises(ValidationError):
         ProviderCreate(
             **_provider_create_kwargs(
-                accepts_in_network=True,
                 in_network_carriers=["not_a_real_carrier"],
             )
         )
@@ -241,41 +224,23 @@ def test_provider_create_coerces_scalar_carrier_to_singleton_list():
     the `Literal[*INSURANCE_CARRIERS]` member check fires."""
     p = ProviderCreate(
         **_provider_create_kwargs(
-            accepts_in_network=True,
             in_network_carriers="aetna",
         )
     )
     assert p.in_network_carriers == ["aetna"]
 
 
-def test_provider_update_rejects_in_network_without_carriers_when_both_set():
-    """Cross-field rule fires on Update only when *both* fields are in
-    the patch — patches that touch only one of the two pass through and
-    let the route handler reconcile with the persisted row."""
-    with pytest.raises(ValidationError):
-        ProviderUpdate(accepts_in_network=True, in_network_carriers=[])
-
-
-def test_provider_update_rejects_carriers_without_in_network_when_both_set():
-    with pytest.raises(ValidationError):
-        ProviderUpdate(accepts_in_network=False, in_network_carriers=["aetna"])
-
-
-def test_provider_update_accepts_in_network_only_without_validating_carriers():
-    """Patching only `accepts_in_network` (without the carrier list) is
-    allowed; the route handler is responsible for merging with the
-    persisted row."""
-    p = ProviderUpdate(accepts_in_network=True)
-    assert p.accepts_in_network is True
-    assert p.in_network_carriers is None
-
-
-def test_provider_update_accepts_carriers_only_without_validating_in_network():
-    """Symmetric: patching only the carrier list (without the Boolean)
-    is allowed."""
+def test_provider_update_accepts_carrier_list_patch():
+    """Patching only the carrier list is fine — no cross-field rule."""
     p = ProviderUpdate(in_network_carriers=["aetna"])
     assert p.in_network_carriers == ["aetna"]
-    assert p.accepts_in_network is None
+
+
+def test_provider_update_accepts_empty_carrier_list_patch():
+    """Clearing the carrier list (setting to empty) is the patch shape
+    for dropping in-network acceptance."""
+    p = ProviderUpdate(in_network_carriers=[])
+    assert p.in_network_carriers == []
 
 
 def test_provider_create_accepts_cost_and_sliding_scale():
@@ -301,7 +266,6 @@ def test_provider_create_accepts_all_insurance_carriers():
     """Every token in `INSURANCE_CARRIERS` validates on the wire."""
     p = ProviderCreate(
         **_provider_create_kwargs(
-            accepts_in_network=True,
             in_network_carriers=list(INSURANCE_CARRIERS),
         )
     )
@@ -357,7 +321,6 @@ def test_provider_read_validates_from_nested_dict():
         "location_zip": "83702",
         "in_person_sessions": "yes",
         "virtual_sessions": "no",
-        "accepts_in_network": False,
         "accepts_out_of_network": False,
         "in_network_carriers": [],
         "sliding_scale": False,

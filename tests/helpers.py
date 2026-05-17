@@ -143,11 +143,10 @@ _PROVIDER_DEFAULTS: dict[str, Any] = {
     "location_zip": "62701",
     "in_person_sessions": "yes",
     "virtual_sessions": "no",
-    # Insurance posture (#449). Self-pay-only / no-carriers default keeps
-    # the cross-field invariant satisfied without forcing every test to
-    # think about it.
-    "accepts_in_network": False,
-    "accepts_out_of_network": False,
+    # Insurance posture: empty carrier list (no in-network) + OON on by
+    # default (matches the model's `server_default`). Tests that need a
+    # pure self-pay shape pass `accepts_out_of_network=False` explicitly.
+    "accepts_out_of_network": True,
     "in_network_carriers": [],
     "sliding_scale": False,
     "cost": None,

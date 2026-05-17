@@ -191,9 +191,8 @@ class MockDataFactory:
             location_zip="11201",
             in_person_sessions="yes",
             virtual_sessions="please_contact",
-            # Insurance posture moved to Provider (#449); `ProviderRead`
-            # requires all five fields, so the stub exposes them too.
-            accepts_in_network=False,
+            # Insurance posture on Provider: empty carrier list (no
+            # in-network) + OON off keeps this stub deterministic.
             accepts_out_of_network=False,
             in_network_carriers=[],
             sliding_scale=False,

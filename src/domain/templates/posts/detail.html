@@ -107,12 +107,12 @@
     <dt>Genders served</dt>
     <dd>{% for g in d.genders %}{{ GENDER_LABELS[g] }}{% if not loop.last %}, {% endif %}{% endfor %}</dd>
     {% endif %}
-    {# Insurance posture lives on the linked Provider (#449). #}
-    {% if p.accepts_in_network or p.accepts_out_of_network %}
+    {# Insurance posture lives on the linked Provider. #}
+    {% if p.in_network_carriers or p.accepts_out_of_network %}
     <dt>Insurance accepted</dt>
     <dd>
-      {% if p.accepts_in_network %}In-network ({% for c in p.in_network_carriers %}{{ INSURANCE_CARRIER_LABELS[c] }}{% if not loop.last %}, {% endif %}{% endfor %}){% endif %}
-      {% if p.accepts_in_network and p.accepts_out_of_network %} · {% endif %}
+      {% if p.in_network_carriers %}In-network ({% for c in p.in_network_carriers %}{{ INSURANCE_CARRIER_LABELS[c] }}{% if not loop.last %}, {% endif %}{% endfor %}){% endif %}
+      {% if p.in_network_carriers and p.accepts_out_of_network %} · {% endif %}
       {% if p.accepts_out_of_network %}Out-of-network{% endif %}
     </dd>
     {% else %}
