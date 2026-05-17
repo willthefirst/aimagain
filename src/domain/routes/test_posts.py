@@ -218,7 +218,7 @@ async def test_list_provider_availability_item_shape(
     kind label would be redundant noise). Kind is signaled by the
     `data-kind` left-edge color, not a text chip. Insurance posture
     is rendered in the demographics column, derived from the linked
-    provider's `accepts_in_network` flag."""
+    provider's `in_network_carriers` (non-empty wins the badge)."""
     author = create_test_user(username=f"author-{uuid.uuid4()}")
     practice_name = f"Practice-{uuid.uuid4()}"
     post = _provider_availability_post(
@@ -231,7 +231,7 @@ async def test_list_provider_availability_item_shape(
             location_state="OR",
             in_person_sessions="yes",
             virtual_sessions="no",
-            accepts_in_network=True,
+            in_network_carriers=["aetna"],
             accepts_out_of_network=False,
             sliding_scale=True,
         ),
@@ -264,7 +264,7 @@ async def test_list_provider_availability_item_shape(
     ]
     assert modality_chips == ["In-person"]
 
-    # Demographics column shows the posture; accepts_in_network=True
+    # Demographics column shows the posture; non-empty in_network_carriers
     # wins the priority even though sliding_scale is also set.
     facts_text = item.css_first("section.post-facts").text()
     assert "In-network" in facts_text
@@ -1997,15 +1997,13 @@ async def test_create_provider_availability_happy_path(
             persisted.provider_availability_detail.provider.practice_name
             == practice_name
         )
-        # Insurance posture / sliding-scale / cost live on Provider (#449),
-        # not PA. The linked Provider's defaults match the `make_provider`
-        # factory: self-pay-only, no carriers, no sliding scale.
-        assert (
-            persisted.provider_availability_detail.provider.accepts_in_network is False
-        )
+        # Insurance posture / sliding-scale / cost live on Provider, not
+        # PA. The `make_provider` factory defaults are: empty carrier list
+        # (no in-network) + `accepts_out_of_network=True`, no sliding scale.
+        assert persisted.provider_availability_detail.provider.in_network_carriers == []
         assert (
             persisted.provider_availability_detail.provider.accepts_out_of_network
-            is False
+            is True
         )
         assert persisted.provider_availability_detail.provider.sliding_scale is False
         assert persisted.client_referral_detail is None

@@ -23,18 +23,14 @@
     {{ field_for(schema, "virtual_sessions", "Virtual sessions") }}
   </fieldset>
 
-  {# Insurance & payment (#449). `accepts_in_network` /
-     `accepts_out_of_network` are orthogonal bool radios; carriers are a
-     multi-select rendered via `field_for` (the `list[Literal[*T]]`
-     annotation drives multi-select rendering). The cross-field rule
-     "carriers required-min-1 iff accepts_in_network=True" is enforced
-     server-side by `ProviderCreate`. #}
+  {# Insurance & payment. `in_network_carriers` is a multi-select — an
+     empty selection means "no in-network". `accepts_out_of_network` is
+     independent. No cross-field invariant. #}
   <fieldset>
     <legend>Insurance &amp; payment</legend>
-    {{ radio_bool_field("accepts_in_network", "Accepts in-network?", required=false) }}
+    {{ field_for(schema, "in_network_carriers", "In-network carriers (leave empty for none)") }}
     {{ radio_bool_field("accepts_out_of_network", "Accepts out-of-network?", required=false) }}
     {{ radio_bool_field("sliding_scale", "Sliding scale?", required=false) }}
-    {{ field_for(schema, "in_network_carriers", "In-network carriers (required if accepts in-network)") }}
     {{ text_field("cost", "Cost (optional, free text)", required=false) }}
   </fieldset>
 

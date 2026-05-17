@@ -180,7 +180,6 @@ class ProviderRead(ReadProjection):
     location: Location
     in_person_sessions: str
     virtual_sessions: str
-    accepts_in_network: bool
     accepts_out_of_network: bool
     in_network_carriers: list[str] = []
     sliding_scale: bool
@@ -197,23 +196,6 @@ class ProviderRead(ReadProjection):
     @model_serializer(mode="wrap")
     def _flatten_location(self, handler):
         return flatten_location_on_dump(self, handler(self))
-
-
-def _check_in_network_carriers_invariant(
-    accepts_in_network: bool | None, in_network_carriers: list[str] | None
-) -> None:
-    """Cross-field rule (#449): if `accepts_in_network=True`, the carrier
-    list is required-min-1; if `False`, the list must be empty. Both
-    arguments are non-`None` when this fires."""
-    if accepts_in_network and not in_network_carriers:
-        raise ValueError(
-            "in_network_carriers must contain at least one carrier when "
-            "accepts_in_network is True"
-        )
-    if not accepts_in_network and in_network_carriers:
-        raise ValueError(
-            "in_network_carriers must be empty when accepts_in_network is False"
-        )
 
 
 class ProviderCreate(WirePayload):
@@ -241,12 +223,11 @@ class ProviderCreate(WirePayload):
     location: Location
     in_person_sessions: Literal[*LOCATION_AVAILABILITY_OPTIONS]
     virtual_sessions: Literal[*LOCATION_AVAILABILITY_OPTIONS]
-    # Insurance posture (#449). `accepts_in_network` /
-    # `accepts_out_of_network` are orthogonal Booleans; the carrier list
-    # only applies when `accepts_in_network=True`. The cross-field rule
-    # is enforced by `_check_in_network_carriers` below.
-    accepts_in_network: bool = False
-    accepts_out_of_network: bool = False
+    # Insurance posture. `in_network_carriers` is the set the practice
+    # accepts in-network (empty = no in-network); `accepts_out_of_network`
+    # is independent and defaults `True` (most practices accept OON;
+    # opt-out is the explicit choice). No cross-field invariant.
+    accepts_out_of_network: bool = True
     in_network_carriers: InNetworkCarriersField = []
     sliding_scale: bool = False
     cost: StrippedOptionalText = None
@@ -258,13 +239,6 @@ class ProviderCreate(WirePayload):
     @classmethod
     def _gather_flat_location(cls, data: Any) -> Any:
         return gather_flat_location(data)
-
-    @model_validator(mode="after")
-    def _check_in_network_carriers(self):
-        _check_in_network_carriers_invariant(
-            self.accepts_in_network, self.in_network_carriers
-        )
-        return self
 
     @model_serializer(mode="wrap")
     def _flatten_location(self, handler):
@@ -288,7 +262,6 @@ class ProviderUpdate(PartialUpdate):
     location: LocationPartial | None = None
     in_person_sessions: Literal[*LOCATION_AVAILABILITY_OPTIONS] | None = None
     virtual_sessions: Literal[*LOCATION_AVAILABILITY_OPTIONS] | None = None
-    accepts_in_network: bool | None = None
     accepts_out_of_network: bool | None = None
     in_network_carriers: InNetworkCarriersField | None = None
     sliding_scale: bool | None = None
@@ -298,21 +271,6 @@ class ProviderUpdate(PartialUpdate):
     @classmethod
     def _gather_flat_location(cls, data: Any) -> Any:
         return gather_flat_location(data)
-
-    @model_validator(mode="after")
-    def _check_in_network_carriers(self):
-        # Only enforce the cross-field rule when *both* fields are in the
-        # patch — otherwise the route handler would have to merge with the
-        # persisted row to know whether the invariant holds, which isn't
-        # easily reachable from the schema layer. Patches that only touch
-        # one of the two pass through; the other field's persisted value
-        # may make the invariant hold or not, but that's the caller's
-        # responsibility to keep coherent.
-        if self.accepts_in_network is not None and self.in_network_carriers is not None:
-            _check_in_network_carriers_invariant(
-                self.accepts_in_network, self.in_network_carriers
-            )
-        return self
 
     @model_serializer(mode="wrap")
     def _flatten_location(self, handler):

@@ -192,7 +192,6 @@ async def test_insurance_fields_round_trip(
                 location_zip="62701",
                 in_person_sessions="yes",
                 virtual_sessions="no",
-                accepts_in_network=True,
                 accepts_out_of_network=True,
                 in_network_carriers=["aetna", "cigna"],
                 sliding_scale=True,
@@ -208,18 +207,18 @@ async def test_insurance_fields_round_trip(
             .scalars()
             .first()
         )
-        assert row.accepts_in_network is True
         assert row.accepts_out_of_network is True
         assert row.in_network_carriers == ["aetna", "cigna"]
         assert row.sliding_scale is True
         assert row.cost == "$200 - $400 per session"
 
 
-async def test_insurance_fields_default_to_self_pay(
+async def test_insurance_fields_default_to_oon_only(
     db_test_session_manager: async_sessionmaker[AsyncSession],
 ):
-    """Omitting the new columns falls back to the server defaults
-    (self-pay-only posture, empty carrier list, no sliding scale)."""
+    """Omitting the new columns falls back to the server defaults:
+    empty carrier list (no in-network) + `accepts_out_of_network=True`
+    (most practices accept OON), no sliding scale."""
     user = await _seed_user(db_test_session_manager)
 
     async with db_test_session_manager() as session:
@@ -244,8 +243,7 @@ async def test_insurance_fields_default_to_self_pay(
             .scalars()
             .first()
         )
-        assert row.accepts_in_network is False
-        assert row.accepts_out_of_network is False
+        assert row.accepts_out_of_network is True
         assert row.in_network_carriers == []
         assert row.sliding_scale is False
         assert row.cost is None

@@ -75,11 +75,11 @@ POST_ENTITY: Final[EntitySpec] = EntitySpec(
     # Two columns are deliberately *not* filterable yet:
     #   * `created_at` — needs a `DateRangeFilter` type (not yet built).
     #   * insurance posture — CR stores `network_preference` directly
-    #     in the unified vocab; PA still derives posture at view time
-    #     from `Provider.accepts_in_network`/`accepts_out_of_network`/
-    #     `sliding_scale` booleans. Adding the filter needs either a
-    #     per-kind mapping in the repo or normalizing PA's storage —
-    #     deferred.
+    #     in the unified vocab; PA derives posture at view time from
+    #     `Provider.in_network_carriers` (truthy) +
+    #     `accepts_out_of_network` / `sliding_scale`. Adding the filter
+    #     needs either a per-kind mapping in the repo or normalizing
+    #     PA's storage — deferred.
     filters=(
         ChoiceFilter(
             name="kind",

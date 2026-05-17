@@ -9,8 +9,9 @@ kinds model the underlying data asymmetrically:
     paired with a nullable `insurance_carrier`. The posture is derived
     from `network_preference` alone — the carrier doesn't change the
     badge.
-  * `provider_availability` → linked `Provider` — boolean flags
-    (`accepts_in_network`, `accepts_out_of_network`, `sliding_scale`).
+  * `provider_availability` → linked `Provider` — the
+    `in_network_carriers` list (empty = no in-network) plus the
+    `accepts_out_of_network` / `sliding_scale` booleans.
 
 `insurance_posture_for_post(post)` collapses both shapes to a value
 from `INSURANCE_POSTURES` (see `src/domain/models/enums.py`). The
@@ -70,7 +71,7 @@ def insurance_posture_for_post(post) -> str | None:
         if detail is None or detail.provider is None:
             return None
         provider = detail.provider
-        if provider.accepts_in_network:
+        if provider.in_network_carriers:
             return "in_network"
         if provider.accepts_out_of_network:
             return "out_of_network"

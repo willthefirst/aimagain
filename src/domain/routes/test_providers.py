@@ -627,10 +627,10 @@ async def test_get_provider_form_renders(
     assert virtual is not None
     assert len(in_person.css("option")) == 4
     assert len(virtual.css("option")) == 4
-    # Insurance & payment fieldset (#449). Bool fields render as radios;
-    # carriers render as the unified `<select multiple>` widget with one
-    # option per `INSURANCE_CARRIERS` token.
-    assert tree.css_first('input[type="radio"][name="accepts_in_network"]') is not None
+    # Insurance & payment fieldset. The carrier multi-select speaks for
+    # the in-network signal (empty = no in-network); only OON and
+    # sliding-scale render as bool radios.
+    assert tree.css_first('input[type="radio"][name="accepts_in_network"]') is None
     assert (
         tree.css_first('input[type="radio"][name="accepts_out_of_network"]') is not None
     )

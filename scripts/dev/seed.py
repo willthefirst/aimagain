@@ -100,7 +100,6 @@ FIXTURE_PROVIDER_AVAILABILITY: list[FixtureProviderAvailability] = [
             "location_zip": "00000",
             "in_person_sessions": "no",
             "virtual_sessions": "yes",
-            "accepts_in_network": False,
             "accepts_out_of_network": False,
             "in_network_carriers": [],
             "sliding_scale": False,
@@ -143,7 +142,6 @@ FIXTURE_PROVIDER_AVAILABILITY: list[FixtureProviderAvailability] = [
             "location_zip": "95050",
             "in_person_sessions": "yes",
             "virtual_sessions": "no",
-            "accepts_in_network": False,
             "accepts_out_of_network": False,
             "in_network_carriers": [],
             "sliding_scale": True,
@@ -182,10 +180,8 @@ FIXTURE_PROVIDER_AVAILABILITY: list[FixtureProviderAvailability] = [
             "in_person_sessions": "yes",
             "virtual_sessions": "no",
             # Source says "no MediCal, please contact for carriers" — the
-            # carrier list itself is in `referral_instructions`. Use
-            # `other` as a placeholder so the in-network invariant
-            # (min-1 carrier when accepting in-network) holds.
-            "accepts_in_network": True,
+            # carrier list itself is in `referral_instructions`. `other`
+            # stands in as the in-network signal.
             "accepts_out_of_network": True,
             "in_network_carriers": ["other"],
             "sliding_scale": True,
@@ -228,7 +224,6 @@ FIXTURE_PROVIDER_AVAILABILITY: list[FixtureProviderAvailability] = [
             "location_zip": "98101",
             "in_person_sessions": "yes",
             "virtual_sessions": "yes",
-            "accepts_in_network": True,
             "accepts_out_of_network": True,
             "in_network_carriers": ["aetna", "anthem_bcbs", "cigna"],
             "sliding_scale": False,
@@ -264,7 +259,6 @@ FIXTURE_PROVIDER_AVAILABILITY: list[FixtureProviderAvailability] = [
             "location_zip": "11215",
             "in_person_sessions": "yes",
             "virtual_sessions": "yes",
-            "accepts_in_network": True,
             "accepts_out_of_network": False,
             "in_network_carriers": [
                 "aetna",
@@ -305,7 +299,6 @@ FIXTURE_PROVIDER_AVAILABILITY: list[FixtureProviderAvailability] = [
             "location_zip": "78704",
             "in_person_sessions": "no",
             "virtual_sessions": "yes",
-            "accepts_in_network": False,
             "accepts_out_of_network": True,
             "in_network_carriers": [],
             "sliding_scale": True,
@@ -351,7 +344,6 @@ FIXTURE_PROVIDER_AVAILABILITY: list[FixtureProviderAvailability] = [
             "location_zip": "02114",
             "in_person_sessions": "yes",
             "virtual_sessions": "yes",
-            "accepts_in_network": True,
             "accepts_out_of_network": True,
             "in_network_carriers": [
                 "aetna",
@@ -403,7 +395,6 @@ FIXTURE_PROVIDER_AVAILABILITY: list[FixtureProviderAvailability] = [
             # `please_contact` would be the right CHECK value if we had
             # one on Provider; the model uses booleans, so we encode
             # the same intent as "self-pay only" + cost text.
-            "accepts_in_network": False,
             "accepts_out_of_network": True,
             "in_network_carriers": [],
             "sliding_scale": False,
@@ -446,7 +437,6 @@ FIXTURE_PROVIDER_AVAILABILITY: list[FixtureProviderAvailability] = [
             "location_zip": "98402",
             "in_person_sessions": "yes",
             "virtual_sessions": "no",
-            "accepts_in_network": True,
             "accepts_out_of_network": True,
             "in_network_carriers": [
                 "aetna",
@@ -493,7 +483,6 @@ FIXTURE_PROVIDER_AVAILABILITY: list[FixtureProviderAvailability] = [
             "location_zip": "55401",
             "in_person_sessions": "yes",
             "virtual_sessions": "yes",
-            "accepts_in_network": True,
             "accepts_out_of_network": False,
             "in_network_carriers": ["anthem_bcbs", "medicaid", "united_healthcare"],
             "sliding_scale": True,

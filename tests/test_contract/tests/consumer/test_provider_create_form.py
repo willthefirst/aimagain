@@ -56,9 +56,9 @@ async def test_consumer_provider_create_form_submits(
         "Content-Type": Like("application/x-www-form-urlencoded")
     }
     # `cost` is an empty text input — the browser includes empty-valued
-    # text inputs in the form body. The bool radios for `accepts_in_network`
-    # / `accepts_out_of_network` / `sliding_scale` are not pre-checked on
-    # the create form, so they're absent. The carrier checkbox group is
+    # text inputs in the form body. The bool radios for
+    # `accepts_out_of_network` / `sliding_scale` are not pre-checked on
+    # the create form, so they're absent. The carrier multi-select is
     # similarly empty.
     expected_request_body = (
         "practice_name=Acme+Counseling"

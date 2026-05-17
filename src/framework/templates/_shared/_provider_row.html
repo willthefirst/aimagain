@@ -40,9 +40,9 @@ so the table stays narrow.
     {%- endif -%}
   </td>
   <td data-label="Insurance">
-    {%- if provider.accepts_in_network and provider.accepts_out_of_network -%}
+    {%- if provider.in_network_carriers and provider.accepts_out_of_network -%}
       In-net &amp; out-net
-    {%- elif provider.accepts_in_network -%}
+    {%- elif provider.in_network_carriers -%}
       In-net
     {%- elif provider.accepts_out_of_network -%}
       Out-net
