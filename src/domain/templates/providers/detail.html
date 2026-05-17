@@ -67,7 +67,7 @@
   <section>
     <h2>Licensures</h2>
     {% if provider.licensures %}
-    <ul class="licensures-list">
+    <ul>
       {%- for lic in provider.licensures %}
       <li>
         <strong>{{ LICENSE_TYPES_LABELS[lic.license_type] }}</strong>
@@ -83,7 +83,7 @@
   <details>
     <summary><strong>Education</strong></summary>
     {% if provider.educations %}
-    <ul class="educations-list">
+    <ul>
       {%- for edu in provider.educations %}
       <li>
         <strong>{{ EDUCATION_TYPES_LABELS[edu.education_type] }}</strong>
@@ -99,7 +99,7 @@
   <details>
     <summary><strong>Certifications</strong></summary>
     {% if provider.certifications %}
-    <ul class="certifications-list">
+    <ul>
       {%- for cert in provider.certifications %}
       <li>
         <strong>{{ CERTIFICATION_TYPES_LABELS[cert.certification_type] }}</strong>

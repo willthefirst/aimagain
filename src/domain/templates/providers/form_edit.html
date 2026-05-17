@@ -42,7 +42,7 @@
 
 <section>
   <h2>Licensures</h2>
-  {% call(lic) list_or_empty(provider.licensures, "licensures-list", "No licensures yet.") %}
+  {% call(lic) list_or_empty(provider.licensures, "No licensures yet.") %}
   <li>
     <strong>{{ LICENSE_TYPES_LABELS[lic.license_type] }}</strong>
     &mdash; {{ lic.license_number }} ({{ lic.issuing_state }}){% if lic.expiration_date %}, expires {{ lic.expiration_date }}{% endif %}
@@ -60,7 +60,7 @@
 
 <section>
   <h2>Education</h2>
-  {% call(edu) list_or_empty(provider.educations, "educations-list", "No education entries yet.") %}
+  {% call(edu) list_or_empty(provider.educations, "No education entries yet.") %}
   <li>
     <strong>{{ EDUCATION_TYPES_LABELS[edu.education_type] }}</strong>
     &mdash; {{ edu.institution }}{% if edu.month_completed %}, {{ edu.month_completed }}{% endif %}
@@ -77,7 +77,7 @@
 
 <section>
   <h2>Certifications</h2>
-  {% call(cert) list_or_empty(provider.certifications, "certifications-list", "No certifications yet.") %}
+  {% call(cert) list_or_empty(provider.certifications, "No certifications yet.") %}
   <li>
     <strong>{{ CERTIFICATION_TYPES_LABELS[cert.certification_type] }}</strong>
     &mdash; {{ cert.certifying_body }}{% if cert.expiration_date %}, expires {{ cert.expiration_date }}{% endif %}
