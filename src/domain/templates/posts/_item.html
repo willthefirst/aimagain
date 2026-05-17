@@ -77,15 +77,15 @@ per-kind, so a single-kind filter doesn't need to suppress anything.
 {%- if in_person == "please_contact" or virtual == "please_contact" -%}
 <span class="post-modality">Contact for format</span>
 {%- else -%}
-{%- if virtual == "yes" %}<span class="post-modality"><i class="icon-video" aria-hidden="true"></i> Virtual</span>{% endif -%}
-{%- if in_person == "yes" %}<span class="post-modality"><i class="icon-map-pin" aria-hidden="true"></i> In-person</span>{% endif -%}
+{%- if virtual == "yes" %}<span class="post-modality"><i class="icon-video" aria-hidden="true"></i>Virtual</span>{% endif -%}
+{%- if in_person == "yes" %}<span class="post-modality"><i class="icon-map-pin" aria-hidden="true"></i>In-person</span>{% endif -%}
 {%- endif -%}
 {%- endmacro %}
 
 {% macro _service_item(value, label_dict, icon_dict) -%}
 {#- One `<li>` for a service or setting: icon + label. The icon is
     decorative; the label carries the meaning for screen readers. -#}
-<li><i class="icon-{{ icon_dict[value] }}" aria-hidden="true"></i> {{ label_dict[value] }}</li>
+<li><i class="icon-{{ icon_dict[value] }}" aria-hidden="true"></i>{{ label_dict[value] }}</li>
 {%- endmacro %}
 
 {% macro post_item(post, active_kind=None) -%}
