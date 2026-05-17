@@ -12,19 +12,15 @@
   <fieldset>
     <legend>Practice</legend>
     {{ field_for(schema, "practice_name", "Practice name") }}
-    <div class="grid">
-      {{ field_for(schema, "location_city", "City") }}
-      {{ field_for(schema, "location_state", "State") }}
-      {{ field_for(schema, "location_zip", "ZIP") }}
-    </div>
+    {{ field_for(schema, "location_city", "City") }}
+    {{ field_for(schema, "location_state", "State") }}
+    {{ field_for(schema, "location_zip", "ZIP") }}
   </fieldset>
 
   <fieldset>
     <legend>Session availability</legend>
-    <div class="grid">
-      {{ field_for(schema, "in_person_sessions", "In-person sessions") }}
-      {{ field_for(schema, "virtual_sessions", "Virtual sessions") }}
-    </div>
+    {{ field_for(schema, "in_person_sessions", "In-person sessions") }}
+    {{ field_for(schema, "virtual_sessions", "Virtual sessions") }}
   </fieldset>
 
   {# Insurance & payment (#449). `accepts_in_network` /
@@ -35,11 +31,9 @@
      server-side by `ProviderCreate`. #}
   <fieldset>
     <legend>Insurance &amp; payment</legend>
-    <div class="grid">
-      {{ radio_bool_field("accepts_in_network", "Accepts in-network?", required=false) }}
-      {{ radio_bool_field("accepts_out_of_network", "Accepts out-of-network?", required=false) }}
-      {{ radio_bool_field("sliding_scale", "Sliding scale?", required=false) }}
-    </div>
+    {{ radio_bool_field("accepts_in_network", "Accepts in-network?", required=false) }}
+    {{ radio_bool_field("accepts_out_of_network", "Accepts out-of-network?", required=false) }}
+    {{ radio_bool_field("sliding_scale", "Sliding scale?", required=false) }}
     {{ field_for(schema, "in_network_carriers", "In-network carriers (required if accepts in-network)") }}
     {{ text_field("cost", "Cost (optional, free text)", required=false) }}
   </fieldset>
