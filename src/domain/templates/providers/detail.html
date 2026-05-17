@@ -11,7 +11,8 @@
    actions" rule in [`../../../framework/templates/README.md`](../../../framework/templates/README.md).
    `can_edit` and `is_favorited` are computed by handle_get_provider_detail;
    templates do not re-derive authorization predicates inline. Each
-   action is a `<li>` because the toolbar is a `<menu>` of commands. #}
+   action is a `<li>` because the toolbar's right zone is a
+   `<menu class="toolbar-right">` of commands. #}
 {% if is_authenticated %}
   {% if is_favorited %}
   <li><button type="button"

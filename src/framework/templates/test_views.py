@@ -17,6 +17,7 @@ from __future__ import annotations
 import textwrap
 
 from jinja2 import DictLoader, Environment, FileSystemLoader, select_autoescape
+from selectolax.parser import HTMLParser
 
 
 def _make_env() -> Environment:
@@ -40,7 +41,7 @@ def _make_env() -> Environment:
         loader=ChoiceLoader([stub_loader, framework_loader]),
         autoescape=select_autoescape(["html", "xml"]),
     )
-    # The shared `list_page.html` / `_breadcrumb.html` macros render
+    # The shared `_toolbar.html` / `_breadcrumb.html` macros render
     # `breadcrumb(items)` which is pure HTML and needs no globals; no
     # context wiring required for these tests.
     return env
@@ -101,7 +102,11 @@ def test_list_view_omits_toolbar_when_no_filters_no_actions() -> None:
         is_development=False,
     )
 
-    assert '<div class="toolbar">' not in html
+    # Parse rather than substring-match: `base.html`'s CSS comment
+    # references `<div class="toolbar">` verbatim to document the
+    # shape, so a naive `in html` check would false-positive.
+    tree = HTMLParser(html)
+    assert tree.css_first("div.toolbar") is None
 
 
 def test_list_view_renders_actions_block_in_toolbar_right() -> None:
@@ -132,8 +137,11 @@ def test_list_view_renders_actions_block_in_toolbar_right() -> None:
 
 def test_detail_view_renders_two_segment_breadcrumb_and_actions() -> None:
     """``views/detail.html`` builds `[(resource_label, resource_url),
-    (current_label, None)]` and renders the actions toolbar (a `<menu>`
-    of `<li>` commands)."""
+    (current_label, None)]` and renders actions inside the shared
+    two-zone toolbar — empty left zone (no search link), and a
+    `<menu class="toolbar-right">` carrying the `<li>` commands. Pins
+    the "detail actions land at the same right edge as list-page
+    actions" rule (no per-view-type toolbar shape)."""
     env = _make_env()
     _add_child(
         env,
@@ -156,7 +164,10 @@ def test_detail_view_renders_two_segment_breadcrumb_and_actions() -> None:
 
     assert 'href="/providers"' in html and ">Providers</a>" in html
     assert "Sunrise Therapy" in html
-    assert '<menu class="toolbar">' in html
+    assert '<div class="toolbar">' in html
+    assert '<menu class="toolbar-right">' in html
+    # No search link on detail pages — left zone stays empty.
+    assert 'class="toolbar-filter-link"' not in html
     assert '<li><a id="edit" href="/providers/1/form">Edit</a></li>' in html
 
 

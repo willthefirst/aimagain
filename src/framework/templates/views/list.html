@@ -30,7 +30,7 @@ Child contract:
 #}
 {% extends "base.html" %}
 {%- from "_shared/_breadcrumb.html" import breadcrumb -%}
-{%- from "_shared/list_page.html" import list_toolbar -%}
+{%- from "_shared/_toolbar.html" import page_toolbar -%}
 {%- from "_shared/pagination.html" import pagination -%}
 
 {% block breadcrumb %}
@@ -43,7 +43,7 @@ Child contract:
 {%- set has_search = search_url is defined and search_url -%}
 {%- set has_actions = actions_body | trim -%}
 {%- if has_search or has_actions %}
-{% call list_toolbar(
+{% call page_toolbar(
   active_filters=active_filters|default([]),
   search_url=search_url if has_search else none,
   clear_all_url=clear_all_url|default(none),
