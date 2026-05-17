@@ -105,11 +105,14 @@ async def test_list_client_referral_item_shape(
     assert item is not None
     assert item.attributes.get("data-kind") == "client_referral"
 
-    # Kind chip: rendered when no `?kind=` filter is active.
+    # Kind chip: rendered when no `?kind=` filter is active. The chip
+    # attribute lives on the `<dl>` group wrapper `<div>`; the visible
+    # text is the `<dd>` (the `<dt>` label is visually hidden but in
+    # the DOM, so we read the `<dd>` directly for the visible value).
     chip = item.css_first("[data-kind-chip]")
     assert chip is not None
     assert chip.attributes.get("data-kind-chip") == "client_referral"
-    assert chip.text(strip=True) == "Seeking"
+    assert chip.css_first("dd").text(strip=True) == "Seeking"
 
     # Description is the link target — the lead text is the seeker's
     # own words, not a synthesized headline.
@@ -198,7 +201,7 @@ async def test_list_provider_availability_item_shape(
 
     chip = item.css_first("[data-kind-chip]")
     assert chip is not None
-    assert chip.text(strip=True) == "Providing"
+    assert chip.css_first("dd").text(strip=True) == "Providing"
 
     # Practice name is in <strong> inside the lead link.
     lead = item.css_first("a")
@@ -247,17 +250,20 @@ async def test_list_lead_contains_full_description_no_backend_truncation(
     assert lead.text(strip=True) == description
 
 
-async def test_list_meta_is_an_inline_list_of_li_chunks(
+async def test_list_meta_is_an_inline_dl_of_key_value_chunks(
     authenticated_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user: User,
 ):
-    """Each metadata fact is its own `<li>` inside a nested `<ul>`
-    after the title link — the inline-list pattern. The `·` visual
-    separator lives in CSS (`#posts-list > li > ul > li + li::before`)
-    rather than the markup, so the DOM text has no `·` glyphs. A
-    regression that collapsed the chunks back into a single
-    `·`-joined string (or onto the title line) would fail here.
+    """Each metadata fact is a `<dt>`/`<dd>` pair (wrapped in a
+    `<div>`, the HTML5 grouping construct inside `<dl>`) after the
+    title link. The `<dt>` label is visually hidden but read by
+    screen readers; the visible value is the `<dd><small>`. The `·`
+    visual separator lives in CSS (`#posts-list > li > dl > div +
+    div::before`) rather than the markup, so the DOM text has no `·`
+    glyphs. A regression that collapsed the chunks back into a
+    single `·`-joined string (or onto the title line) would fail
+    here.
 
     Also: no owner-username link in the listing row. The author lives
     on the detail page; the listing reads as Craigslist, not as a feed
@@ -285,22 +291,27 @@ async def test_list_meta_is_an_inline_list_of_li_chunks(
     item = tree.css_first("#posts-list > li")
     assert item is not None
 
-    # Metadata is a nested `<ul>` of `<li>` chunks above the title —
-    # the inline-list pattern. Date and the kind chip both live in
-    # this list so the whole line reads uniformly. The outer
-    # `#posts-list` `<ul>` keeps Pico-default bullets; the inner one
-    # is styled inline by CSS in base.html.
-    meta_chunks = item.css("ul > li")
+    # Metadata is a nested `<dl>` of `<div><dt><dd>` chunks above the
+    # title — the inline-list pattern. Date and the kind chip both
+    # live in this list so the whole line reads uniformly. The outer
+    # `#posts-list` `<ul>` strips bullets; the inner `<dl>` is styled
+    # inline (and its `<dt>` labels visually hidden) by CSS in
+    # base.html.
+    meta_chunks = item.css("dl > div")
     # date + Seeking + location + format + ages = 5 chunks.
     # (English-only languages are dropped by the macro since `en` is
     # the default; insurance is no longer in the listing meta —
     # readers go to the detail page for that.)
     assert len(meta_chunks) == 5
-    rendered = [li.text(strip=True) for li in meta_chunks]
-    # The first chunk is the formatted date — content depends on
-    # `now()`, so just check it's non-empty rather than pin a value.
-    assert rendered[0]
-    assert rendered[1:] == [
+    # Each chunk has both a `<dt>` label and a `<dd>` value — the
+    # screen-reader announcement is "Date: May 15", not bare "May 15".
+    labels = [chunk.css_first("dt").text(strip=True) for chunk in meta_chunks]
+    values = [chunk.css_first("dd").text(strip=True) for chunk in meta_chunks]
+    assert labels == ["Date", "Kind", "Location", "Format", "Age groups"]
+    # The first chunk's value is the formatted date — content depends
+    # on `now()`, so just check it's non-empty rather than pin a value.
+    assert values[0]
+    assert values[1:] == [
         "Seeking",
         "Seattle, WA",
         "In-person",
@@ -325,7 +336,7 @@ async def test_list_renders_readable_date_format(
     """The leading date renders Craigslist-style (`May 15`) via the
     `format_post_date` Jinja filter — *not* the raw ISO `YYYY-MM-DD`
     that `post.created_at.date()` produced before. The date is the
-    first chunk in the meta `<ul>`."""
+    first chunk in the meta `<dl>`."""
     from datetime import datetime, timezone
 
     author = create_test_user(username=f"author-{uuid.uuid4()}")
@@ -342,8 +353,9 @@ async def test_list_renders_readable_date_format(
     tree = HTMLParser(response.text)
     item = tree.css_first("#posts-list > li")
     assert item is not None
-    # First chunk of the meta `<ul>` is the leading date.
-    date_cell = item.css_first("ul > li")
+    # First chunk of the meta `<dl>` is the leading date — its `<dd>`
+    # value carries the formatted text.
+    date_cell = item.css_first("dl > div dd")
     assert date_cell is not None
     rendered = date_cell.text(strip=True)
     # `May 15` for current-year posts; `May 15, 2025` once we cross a
