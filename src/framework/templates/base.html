@@ -89,8 +89,12 @@
          two buttons) become layout-invisible so their inner buttons
          participate directly in the toolbar's row — same alignment +
          gap as bare button-shaped children. The span stays in the DOM
-         for selectors and `data-*` attributes. */
+         for selectors and `data-*` attributes. Pico's default
+         `<button>` is `display: block; width: 100%` (form-shaped); the
+         action bar overrides to natural-width inline buttons — same
+         pattern as `.filter-chips` / `.filter-actions` above. */
       .toolbar > span { display: contents; }
+      .toolbar button, .toolbar [role="button"] { width: auto; margin: 0; }
       .toolbar-left { flex: 1; min-width: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; }
       .toolbar-right { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; }
       /* Breadcrumb zone bar. Pico already styles the markup
