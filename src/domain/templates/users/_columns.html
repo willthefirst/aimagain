@@ -4,8 +4,13 @@
 (`class="deactivated"` on the `<tr>`) — the same hook the previous
 `<li class="deactivated">` carried, so existing CSS continues to apply.
 
-The Actions cell `{% include %}`s the shared `_admin_actions.html`
-partial. Macros isolate `{% include %}` from the page-level rendering
+The Actions cell wraps `_admin_actions.html` in a `<menu>` because
+the partial emits `<li>` children (it lives in a toolbar `<menu>` on
+the user detail page; the same `<li>` shape needs a `<menu>` parent
+here to stay valid HTML). The cell `<menu>` is a list of commands —
+same semantics as the toolbar, different layout context.
+
+Macros isolate `{% include %}` from the page-level rendering
 context, so `can_admin_actions` is threaded through as a `row_kwargs`
 arg by `users/list.html` and re-bound via `{% with %}` here. The
 partial then sees both `target_user` and `can_admin_actions` and
@@ -31,9 +36,11 @@ renders nothing when the viewer is not an admin (its existing guard).
     {%- endif -%}
   </td>
   <td data-label="Actions">
+    <menu>
     {%- with target_user = user, can_admin_actions = can_admin_actions -%}
       {%- include "users/_admin_actions.html" -%}
     {%- endwith -%}
+    </menu>
   </td>
 </tr>
 {%- endmacro %}

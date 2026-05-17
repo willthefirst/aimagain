@@ -21,8 +21,9 @@ Child contract:
 
   Optional blocks:
     actions        — toolbar content: Edit, Delete, Favorite, admin
-                     actions, etc. The toolbar shell is suppressed when
-                     this block is empty.
+                     actions, etc. Each action is a `<li>` because the
+                     toolbar is a `<menu>` (list of commands). The
+                     toolbar shell is suppressed when this block is empty.
     breadcrumb     — full breadcrumb override for nested-detail pages
                      that don't fit the two-segment shape.
 #}

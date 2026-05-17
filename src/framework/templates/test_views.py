@@ -106,7 +106,7 @@ def test_list_view_omits_toolbar_when_no_filters_no_actions() -> None:
 
 def test_list_view_renders_actions_block_in_toolbar_right() -> None:
     """A child that fills `{% block actions %}` gets its content in the
-    toolbar's right zone."""
+    toolbar's right zone, which is a `<menu>` of `<li>` commands."""
     env = _make_env()
     _add_child(
         env,
@@ -114,7 +114,7 @@ def test_list_view_renders_actions_block_in_toolbar_right() -> None:
         """
         {% extends "views/list.html" %}
         {% block resource_label %}Posts{% endblock %}
-        {% block actions %}<a id="create" href="/posts/form">Create</a>{% endblock %}
+        {% block actions %}<li><a id="create" href="/posts/form">Create</a></li>{% endblock %}
         {% block content %}body{% endblock %}
         """,
     )
@@ -126,12 +126,14 @@ def test_list_view_renders_actions_block_in_toolbar_right() -> None:
     )
 
     assert '<div class="toolbar">' in html
-    assert '<a id="create" href="/posts/form">Create</a>' in html
+    assert '<menu class="toolbar-right">' in html
+    assert '<li><a id="create" href="/posts/form">Create</a></li>' in html
 
 
 def test_detail_view_renders_two_segment_breadcrumb_and_actions() -> None:
     """``views/detail.html`` builds `[(resource_label, resource_url),
-    (current_label, None)]` and renders the actions toolbar."""
+    (current_label, None)]` and renders the actions toolbar (a `<menu>`
+    of `<li>` commands)."""
     env = _make_env()
     _add_child(
         env,
@@ -141,7 +143,7 @@ def test_detail_view_renders_two_segment_breadcrumb_and_actions() -> None:
         {% set resource_url = "/providers" %}
         {% block resource_label %}Providers{% endblock %}
         {% block current_label %}Sunrise Therapy{% endblock %}
-        {% block actions %}<a id="edit" href="/providers/1/form">Edit</a>{% endblock %}
+        {% block actions %}<li><a id="edit" href="/providers/1/form">Edit</a></li>{% endblock %}
         {% block content %}body{% endblock %}
         """,
     )
@@ -154,7 +156,8 @@ def test_detail_view_renders_two_segment_breadcrumb_and_actions() -> None:
 
     assert 'href="/providers"' in html and ">Providers</a>" in html
     assert "Sunrise Therapy" in html
-    assert '<a id="edit" href="/providers/1/form">Edit</a>' in html
+    assert '<menu class="toolbar">' in html
+    assert '<li><a id="edit" href="/providers/1/form">Edit</a></li>' in html
 
 
 def test_form_new_view_appends_new_segment() -> None:
