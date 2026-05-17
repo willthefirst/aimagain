@@ -12,8 +12,8 @@
     {# Density overrides. Pico's defaults are generous (~1rem spacing, 1.5
        line-height, large H1). These tokens tighten the scale globally so
        templates stay vanilla Pico semantics without per-page overrides.
-       `main.container.narrow` constrains form-heavy pages to a readable
-       width; list/detail pages keep the default full-width container. #}
+       The fluid-classless build styles `<main>` / `<header>` element-wise
+       at viewport width, so no `.container` wrapper class is needed. #}
     <style>
       /* Reserve scrollbar gutter so pages whose content fits in the
          viewport render at the same width as pages that overflow —
@@ -161,7 +161,7 @@
        auth gate. #}
     {%- set _on_profile = is_authenticated and (request.url.path == '/users/me' or request.url.path.startswith('/users/me/')) -%}
     {%- set _on_login = request.url.path == '/auth/login' -%}
-    <header class="container">
+    <header>
       <nav aria-label="Primary">
         <ul>
           {# title-case-ignore: "Bedlam Connect" is a brand name #}
@@ -185,7 +185,7 @@
         </ul>
       </nav>
     </header>
-    <main class="container {% block container_class %}{% endblock %}">
+    <main>
       {# Breadcrumb zone bar — `{% block breadcrumb %}` accepts the
          `breadcrumb(items)` macro from `_shared/_breadcrumb.html`.
          Pages set their own location context; list pages and the
