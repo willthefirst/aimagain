@@ -66,11 +66,11 @@ Args:
       <header><strong>{{ f.display_label }}</strong></header>
       {{ _filter_control(f, values.get(f.name)) }}
       <footer>
-        <div role="group">
-          <button type="button" class="secondary" data-filter-cancel>Cancel</button>
-          <button type="button" class="secondary outline" data-filter-clear="{{ f.name }}">Clear</button>
-          <button type="submit">Apply</button>
-        </div>
+        <menu>
+          <li><button type="button" class="secondary" data-filter-cancel>Cancel</button></li>
+          <li><button type="button" class="secondary outline" data-filter-clear="{{ f.name }}">Clear</button></li>
+          <li><button type="submit">Apply</button></li>
+        </menu>
       </footer>
     </article>
   </dialog>

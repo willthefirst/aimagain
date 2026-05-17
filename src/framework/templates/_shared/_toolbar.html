@@ -1,48 +1,35 @@
 {# Top-of-page zone bar primitive.
 
 Every page that needs page-scoped controls renders one toolbar
-above its content, followed by an `<hr />` separator. The bar is
-a two-zone shelf: a left cluster that fills the row and a right
-cluster of page actions:
+above its content, followed by an `<hr />` separator. Detail-page
+toolbars are a `<menu>` — a native list of commands — so the page's
+primary resource actions (Edit, Delete, Favorite, ...) are marked up
+as the toolbar a screen reader / browser already expects:
 
-  [filters / left cluster]                        [page actions]
-  ──────────────────────────────────────────────────────────────────
+  [page action] [page action] [page action]
+  ──────────────────────────────────────────
   (page content below)
 
-The caller body fills the bar. Wrap content in `.toolbar-left` to
-fill the available space (filters, navigation chips); wrap actions
-in `.toolbar-right` for an explicit right-anchored cluster. Single-
-action toolbars can skip the wrappers — a lone child still parks at
-the right edge via the toolbar's `justify-content: flex-end`.
+The caller body fills the bar. Each action is wrapped in a `<li>`
+because `<menu>` only permits list items.
 
-Action-bar contract: each direct child of `.toolbar` is a button-
-shaped element (`<button>`, `<a role="button">`, ...). A page that
-needs a DOM/test hook around an action may wrap it in a `<span>` —
-`base.html` styles `.toolbar > span` as `display: contents`, so the
-wrapper stays in the DOM (test selectors, `data-*` attributes work)
-while the inner buttons become the actual flex children. Either
-shape — wrapped or bare — aligns identically.
-
-    Two-zone bar (e.g. /posts):
+    Single action:
 
         {% call toolbar() %}
-          <div class="toolbar-left">{{ index_filters(...) }}</div>
-          <div class="toolbar-right">
-            <a href="/posts/form" role="button">Create post</a>
-          </div>
+          <li><a href=".../form" role="button">Edit</a></li>
         {% endcall %}
 
-    Filters-only (e.g. /providers):
+    Multiple actions:
 
         {% call toolbar() %}
-          <div class="toolbar-left">{{ index_filters(...) }}</div>
+          <li><a href=".../form" role="button">Edit</a></li>
+          <li>{{ confirm_delete_button(...) }}</li>
         {% endcall %}
 
-    Single right-side action:
-
-        {% call toolbar() %}
-          <a href=".../form" role="button">Edit</a>
-        {% endcall %}
+List pages with a filter row use `list_toolbar(...)` from
+`list_page.html` instead — that one keeps a `<div>` outer wrapper
+(filters + action menu side-by-side) and emits the action `<menu>`
+in the right zone.
 
 Pages that have no toolbar content leave `{% block toolbar %}` empty
 (or omit it).
@@ -50,7 +37,7 @@ Pages that have no toolbar content leave `{% block toolbar %}` empty
 
 {% macro toolbar() -%}
 {%- if caller %}
-<div class="toolbar">{{ caller() }}</div>
+<menu class="toolbar">{{ caller() }}</menu>
 <hr />
 {%- endif %}
 {%- endmacro %}

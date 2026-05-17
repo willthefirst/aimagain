@@ -7,12 +7,15 @@
                           (`viewer.id != target.id`). The partial does
                           not introspect `current_user`.
 
-   Renders nothing unless `can_admin_actions` is truthy. The buttons
-   themselves carry the user's identity in their `hx-*` URLs
-   (`/users/{id}/activation`, `/users/{id}`); tests find them by
-   attribute rather than a wrapper class. To add a new admin action,
-   append a button below; every view that includes this partial picks
-   it up automatically.
+   Renders nothing unless `can_admin_actions` is truthy. Each action
+   is a `<li>` because this partial renders inside a `<menu>` —
+   either the page toolbar on `/users/{id}` or the Actions cell on
+   the `/users` index table (`users/_columns.html` wraps the include
+   in a `<menu>`). The buttons themselves carry the user's identity
+   in their `hx-*` URLs (`/users/{id}/activation`, `/users/{id}`);
+   tests find them by attribute rather than a wrapper class. To add
+   a new admin action, append a `<li><button>…</button></li>` below;
+   every view that includes this partial picks it up automatically.
 
    Backend self-guards live in src/logic/users/user_processing.py — this
    `{% if %}` is presentation only.
@@ -20,7 +23,7 @@
 {%- from "_shared/actions.html" import confirm_delete_button -%}
 {% if can_admin_actions %}
 {% if target_user.is_active %}
-<button
+<li><button
   type="button"
   class="secondary outline"
   hx-put="/users/{{ target_user.id }}/activation"
@@ -28,9 +31,9 @@
   hx-vals='{"state": "deactivated"}'
   hx-confirm="Deactivate {{ target_user.username }}? They will be unable to log in until reactivated.">
   Deactivate
-</button>
+</button></li>
 {% else %}
-<button
+<li><button
   type="button"
   class="secondary outline"
   hx-put="/users/{{ target_user.id }}/activation"
@@ -38,7 +41,7 @@
   hx-vals='{"state": "active"}'
   hx-confirm="Reactivate {{ target_user.username }}?">
   Reactivate
-</button>
+</button></li>
 {% endif %}
-{{ confirm_delete_button("/users/" ~ target_user.id, "Permanently delete " ~ target_user.username ~ "? This cannot be undone.") }}
+<li>{{ confirm_delete_button("/users/" ~ target_user.id, "Permanently delete " ~ target_user.username ~ "? This cannot be undone.") }}</li>
 {% endif %}
