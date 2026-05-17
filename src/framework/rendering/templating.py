@@ -150,9 +150,13 @@ _env.filters["format_post_date"] = format_post_date
 # import goes through `domain.logic` (the framework would normally not
 # import domain, but this template-context binding is the same site
 # that already exposes domain enums + per-kind create schemas above).
-from src.domain.logic.posts.view import insurance_posture_for_post  # noqa: E402
+from src.domain.logic.posts.view import (  # noqa: E402
+    client_referral_headline,
+    insurance_posture_for_post,
+)
 
 _env.globals["insurance_posture"] = insurance_posture_for_post
+_env.globals["client_referral_headline"] = client_referral_headline
 
 templates = Jinja2Templates(env=_env)
 
