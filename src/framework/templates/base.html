@@ -73,17 +73,21 @@
          at a glance without a background or extra markup. */
       [data-kind-chip="client_referral"] { color: darkorange; font-weight: 600; }
       [data-kind-chip="provider_availability"] { color: darkcyan; font-weight: 600; }
-      /* Filter row: an inline group of chips + actions (`Clear all`,
-         `Add filter…`) that sits as a single left-aligned cluster
-         inside `.toolbar-left`. The form itself is a wrap-aware flex
-         row; chips and actions flow inline and reflow when narrow.
-         `width: auto` overrides Pico's default full-width form
-         controls inside flex; everything else uses Pico-default
-         `<button>`, `<select>`, `<dialog>`, `<article>`. */
-      .index-filters { display: flex; flex-wrap: wrap; gap: 1rem; align-items: center; margin: 0; }
-      .filter-chips, .filter-actions { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; }
-      .filter-chips button, .filter-actions button, .filter-actions select { width: auto; margin: 0; }
-      .filter-picker { min-width: 10rem; }
+      /* Filter form: every declared filter on `EntitySpec.filters`
+         renders as a `<label>` (with nested input/select) inside one
+         `<form>`; the trailing `<menu>` holds Apply + Clear all. Lay
+         it out as a wrap-aware flex row so the controls flow inline
+         when wide and reflow onto multiple rows when narrow. Pico's
+         default form controls fill 100% width — `width: auto` lets
+         each control size to its own content (with a small
+         `min-width` so a `<select>` doesn't collapse to its arrow).
+         `align-items: end` lines the controls up along their bottom
+         edge under each label heading. */
+      .index-filters { display: flex; flex-wrap: wrap; gap: 0.75rem 1rem; align-items: end; margin: 0; }
+      .index-filters > label { margin: 0; }
+      .index-filters input, .index-filters select { width: auto; min-width: 8rem; margin: 0; }
+      .index-filters > menu { display: flex; flex-wrap: wrap; gap: 0.5rem; margin: 0; padding: 0; list-style: none; }
+      .index-filters > menu button, .index-filters > menu [role="button"] { width: auto; margin: 0; }
       /* Page-scoped zone bar. Every page that wants page-scoped
          controls renders one `.toolbar` above its content, with two
          optional zones:
@@ -99,10 +103,9 @@
       .toolbar { display: flex; justify-content: flex-end; align-items: center; flex-wrap: wrap; gap: 1rem; }
       /* Pico's default `<button>` is `display: block; width: 100%`
          (form-shaped); the action bar overrides to natural-width
-         inline buttons — same pattern as `.filter-chips` /
-         `.filter-actions` above. Each action is a `<li>` child of a
-         `<menu>` (commands list); the button lives inside the `<li>`,
-         so this selector reaches every action via descendant match. */
+         inline buttons. Each action is a `<li>` child of a `<menu>`
+         (commands list); the button lives inside the `<li>`, so this
+         selector reaches every action via descendant match. */
       .toolbar button, .toolbar [role="button"] { width: auto; margin: 0; }
       .toolbar-left { flex: 1; min-width: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; }
       .toolbar-right { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; }
@@ -115,14 +118,6 @@
          visual weight. The `.toolbar button` rule above reaches each
          action via descendant selector. */
       menu { list-style: none; padding: 0; margin: 0; }
-      /* Filter dialog footer menu (Cancel / Clear / Apply): inline
-         the three commands as a right-anchored row. The previous
-         `<div role="group">` got this for free from Pico's grouped-
-         button styling; the `<menu>` replacement needs the layout
-         spelled out — it earns the gain in semantics (a list of
-         commands, no aria-role needed) for one flex rule. */
-      dialog footer menu { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 0.5rem; }
-      dialog footer menu button { width: auto; margin: 0; }
       /* Breadcrumb zone bar. Pico already styles the markup
          (`nav[aria-label="breadcrumb"] ul` becomes an inline list
          with a separator via `li + li::before`); the only thing this
