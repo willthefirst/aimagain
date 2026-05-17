@@ -230,6 +230,10 @@ class _RequestStub:
         path = "/"
 
     url = _Url()
+    # `base.html` reads `request.query_params.get('kind')` to highlight
+    # the section-shortcut links; an empty mapping mirrors the no-query
+    # case for view-template unit tests.
+    query_params: dict[str, str] = {}
 
 
 def _request_stub() -> _RequestStub:
