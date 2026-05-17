@@ -1,36 +1,33 @@
 {# Top-of-page zone bar primitive.
 
 Every page that needs page-scoped controls renders one toolbar
-strip above its content, followed by an `<hr />` separator. The bar
-has two zones:
+strip above its content, followed by an `<hr />` separator. All
+content right-aligns. The bar carries up to three items:
 
-  Left  — search link (and, when filters are active, a sibling
-          "Clear all" link). Only rendered when `search_url` is
-          set — list pages opt in via `routes.search`; detail
-          pages leave it unset so the left zone is empty.
-  Right — page actions `<menu class="toolbar-right">`: the caller
-          body (Create, Edit, Delete, Favorite...). Each action is
-          a `<li>` because `<menu>` is HTML's native "list of
-          commands" element. Pushed to the right edge via
-          `margin-left: auto` in `base.html`, so detail-page
-          actions and list-page actions land in the same place
-          even when the left zone is empty.
-
-The search link does double duty:
-  * No active filters → reads `Search <collection>` and opens the
-    dedicated `/<collection>/search` page.
-  * Some filters active → reads a short summary
-    (`Type: Seeking, Description: needle, +2 more filters`) and
-    opens the same page with the active query string forwarded.
-
-There is no separate active-filter strip — the inline summary in
-the search link replaces it. To drop everything, the user clicks
-the "Clear all" link sibling.
+  Filter link (`a.toolbar-filter-link`) — opens the dedicated
+    `/<collection>/search` page. Always reads `filters` when none
+    are active; switches to a short inline summary
+    (`Type: Seeking, Description: needle, +1 more filter`) when
+    any are. Only rendered when `search_url` is set — list pages
+    opt in via `routes.search`; detail pages leave it unset.
+    Clearing happens on the search page's form (its "Clear"
+    button), not here.
+  Separator (`span.toolbar-separator`) — a `|` glyph rendered
+    only when *both* the filter link and the caller body are
+    present, since filtering a collection is a different concern
+    from acting on it (Create, Edit, ...). Pages with only one
+    side render no separator.
+  Action menu (`menu.toolbar-right`) — caller-provided `<li>`
+    commands (Create, Edit, Delete, Favorite, ...). `<menu>` is
+    HTML's native "list of commands" element. Detail-page and
+    list-page actions land in the same place because the whole
+    cluster is right-aligned via `margin-left: auto` in
+    `base.html`.
 
 Cap on how many filter chips appear inline before collapsing to
 `+N more filters`. Keeps the link readable on narrow viewports.
 
-    Detail page (right-zone only):
+    Detail page (actions only):
 
         {% call page_toolbar() %}
           <li><a href=".../form" role="button">Edit</a></li>
@@ -42,14 +39,12 @@ Cap on how many filter chips appear inline before collapsing to
         {% call page_toolbar(
           active_filters=active_filters,
           search_url=search_url,
-          clear_all_url=clear_all_url,
-          collection_label=collection_label,
         ) %}
           <li><a href="/posts/form" role="button">Create</a></li>
         {% endcall %}
 
 Pages with no toolbar content leave `{% block toolbar %}` empty
-(or omit it). The shell is suppressed when neither a search link
+(or omit it). The shell is suppressed when neither a filter link
 nor a caller body is present, so empty pages don't emit a stray
 `<hr />`.
 #}
@@ -61,29 +56,30 @@ nor a caller body is present, so empty pages don't emit a stray
 
 Args:
   active_filters: list of `{name, value, label}` descriptors (one
-    per active value; multi-valued filters fan out). Empty for
-    detail pages.
+    per active value; multi-valued filters fan out). Empty when
+    no filter is applied.
   search_url: link target for the search page (with active filters
-    forwarded as query params), or `None` to omit the left zone
+    forwarded as query params), or `None` to omit the filter link
     entirely (detail pages, or list pages that didn't opt into
     `routes.search`).
-  clear_all_url: the list URL with every filter dropped. Only
-    rendered when at least one filter is active.
-  collection_label: human noun for the empty-state search link
-    (`"posts"` → `Search posts`).
 #}
 {% macro page_toolbar(
   active_filters=(),
-  search_url=none,
-  clear_all_url=none,
-  collection_label=""
+  search_url=none
 ) -%}
+{# `caller` is truthy whenever the macro was invoked via `{% call %}`,
+   even if the caller body trims to empty (e.g. the list view always
+   wraps with `{% call %}` and passes `{{ actions_body }}` which may
+   be blank). Render once and check the trimmed string so empty
+   bodies don't emit a stray `<menu>` or a separator. #}
+{%- set actions_html = caller() if caller else "" -%}
+{%- set has_actions = actions_html | trim -%}
 <div class="toolbar">
 
   {%- if search_url %}
   <a href="{{ search_url }}" class="toolbar-filter-link">
     {%- if not active_filters -%}
-    Search {{ collection_label }}
+    filters
     {%- else -%}
       {%- set shown = active_filters[:_ACTIVE_FILTER_INLINE_LIMIT] -%}
       {%- set hidden = active_filters | length - shown | length -%}
@@ -91,14 +87,15 @@ Args:
       {%- if hidden > 0 %}, +{{ hidden }} more filter{% if hidden != 1 %}s{% endif %}{%- endif -%}
     {%- endif -%}
   </a>
-  {%- if active_filters and clear_all_url %}
-  <a href="{{ clear_all_url }}" class="toolbar-clear-all">Clear all</a>
-  {%- endif %}
   {%- endif %}
 
-  {%- if caller %}
+  {%- if search_url and has_actions %}
+  <span class="toolbar-separator" aria-hidden="true">|</span>
+  {%- endif %}
+
+  {%- if has_actions %}
   <menu class="toolbar-right">
-    {{ caller() }}
+    {{ actions_html }}
   </menu>
   {%- endif %}
 
