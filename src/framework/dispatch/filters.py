@@ -103,7 +103,10 @@ class ChoiceFilter(Filter):
     ``choices`` is a tuple of ``(value, label)`` pairs. ``multi=True``
     renders ``<select multiple size=N>`` and parses repeated query
     params (``?<name>=a&<name>=b``) into a list; ``multi=False``
-    renders a single ``<select>`` with an "Any" placeholder.
+    renders a single ``<select>`` with an "Any" placeholder. Pass
+    ``radio=True`` (single-select only) to render a Pico-style toggle
+    radio-button group instead — an "Any" reset option is prepended
+    automatically. ``radio`` is ignored when ``multi=True``.
 
     The ``annotation`` defaults to permissive (``str | None`` /
     ``list[str]``) so adding a value to the choice set doesn't
@@ -114,6 +117,7 @@ class ChoiceFilter(Filter):
 
     choices: tuple[tuple[str, str], ...] = ()
     multi: bool = False
+    radio: bool = False
     value_type: Any = None  # tighten annotation; defaults to `str`
     size: int = 6
 

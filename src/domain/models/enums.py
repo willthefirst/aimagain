@@ -99,10 +99,10 @@ INSURANCE_CARRIERS: Final[tuple[str, ...]] = (
     "other",
 )
 
-# Day × time-of-day grid for "when are you available". 21 tokens of the
-# form `<day>_<slot>`. Day order is Mon→Sun (week-of-work convention from
-# the form spec); slot order is morning→afternoon→evening so the
-# rendered checkbox grid reads left-to-right top-to-bottom. The two
+# Day × time-of-day grid for "when are you available". 14 tokens of the
+# form `<day>_<part>`. Day order is Mon→Sun (week-of-work convention from
+# the form spec); part order is am→pm so the rendered grid reads
+# left-to-right (am, pm columns) top-to-bottom (Mon→Sun rows). The two
 # axis tuples are exposed alongside the combined token list because the
 # form-render macro iterates the grid by (day row × part column).
 DESIRED_TIME_DAYS: Final[tuple[str, ...]] = (
@@ -114,7 +114,7 @@ DESIRED_TIME_DAYS: Final[tuple[str, ...]] = (
     "saturday",
     "sunday",
 )
-DESIRED_TIME_PARTS: Final[tuple[str, ...]] = ("morning", "afternoon", "evening")
+DESIRED_TIME_PARTS: Final[tuple[str, ...]] = ("am", "pm")
 DESIRED_TIME_SLOTS: Final[tuple[str, ...]] = tuple(
     f"{day}_{part}" for day in DESIRED_TIME_DAYS for part in DESIRED_TIME_PARTS
 )
@@ -194,6 +194,11 @@ INSURANCE_CARRIER_LABELS: Final[dict[str, str]] = {
 # Per-axis labels for the desired-times grid. The form-render macro
 # uses these for the row (day) and column (slot) headers; per-cell
 # labels aren't needed because the checkbox value carries the meaning.
+# Two label maps for days. `DESIRED_TIME_DAY_LABELS` is the long
+# form used in read-views (detail pages, audit dumps via
+# `DESIRED_TIME_SLOT_LABELS`). `DESIRED_TIME_DAY_SHORT_LABELS` is the
+# row-header form used in the compact `time_grid_field` checkbox grid
+# (M/T/W/Th/F/Sat/Sun).
 DESIRED_TIME_DAY_LABELS: Final[dict[str, str]] = {
     "monday": "Monday",
     "tuesday": "Tuesday",
@@ -203,16 +208,24 @@ DESIRED_TIME_DAY_LABELS: Final[dict[str, str]] = {
     "saturday": "Saturday",
     "sunday": "Sunday",
 }
+DESIRED_TIME_DAY_SHORT_LABELS: Final[dict[str, str]] = {
+    "monday": "M",
+    "tuesday": "T",
+    "wednesday": "W",
+    "thursday": "Th",
+    "friday": "F",
+    "saturday": "Sat",
+    "sunday": "Sun",
+}
 DESIRED_TIME_PART_LABELS: Final[dict[str, str]] = {
-    "morning": "Morning",
-    "afternoon": "Afternoon",
-    "evening": "Evening",
+    "am": "AM",
+    "pm": "PM",
 }
 # Combined per-token label, e.g. "Monday morning". Used wherever a
 # single value is rendered standalone (read views, audit dumps shown
 # in admin tooling).
 DESIRED_TIME_SLOT_LABELS: Final[dict[str, str]] = {
-    f"{day}_{part}": f"{DESIRED_TIME_DAY_LABELS[day]} {DESIRED_TIME_PART_LABELS[part].lower()}"
+    f"{day}_{part}": f"{DESIRED_TIME_DAY_LABELS[day]} {DESIRED_TIME_PART_LABELS[part]}"
     for day in DESIRED_TIME_DAYS
     for part in DESIRED_TIME_PARTS
 }

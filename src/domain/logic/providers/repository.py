@@ -41,26 +41,28 @@ class ProviderRepository(BaseRepository):
     async def list_providers(
         self,
         *,
-        license_type: str | None = None,
-        issuing_state: str | None = None,
+        license_type: list[str] | None = None,
+        issuing_state: list[str] | None = None,
         offset: int = 0,
         limit: int | None = None,
     ) -> Sequence[Provider]:
-        """Lists providers, newest first. When a filter is set, joins
-        through `provider_licensures` and `.distinct()`s the parents so
-        a provider with multiple matching licensures appears once.
-        `offset`/`limit` come from the framework's pagination layer
-        (see `src/framework/dispatch/pagination.py`)."""
+        """Lists providers, newest first. Both filters are multi-select
+        lists; each non-empty list ANDs into the join (any-of within
+        the list, all-of across filters). When either filter is set,
+        joins through `provider_licensures` and `.distinct()`s the
+        parents so a provider with multiple matching licensures
+        appears once. `offset`/`limit` come from the framework's
+        pagination layer (see `src/framework/dispatch/pagination.py`)."""
         stmt = select(Provider)
-        if license_type is not None or issuing_state is not None:
+        if license_type or issuing_state:
             stmt = stmt.join(
                 ProviderLicensure,
                 ProviderLicensure.provider_id == Provider.id,
             )
-            if license_type is not None:
-                stmt = stmt.filter(ProviderLicensure.license_type == license_type)
-            if issuing_state is not None:
-                stmt = stmt.filter(ProviderLicensure.issuing_state == issuing_state)
+            if license_type:
+                stmt = stmt.filter(ProviderLicensure.license_type.in_(license_type))
+            if issuing_state:
+                stmt = stmt.filter(ProviderLicensure.issuing_state.in_(issuing_state))
             stmt = stmt.distinct()
         stmt = stmt.order_by(Provider.created_at.desc())
         return await self._list(stmt, offset=offset, limit=limit)

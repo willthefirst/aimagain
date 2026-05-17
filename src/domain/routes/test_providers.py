@@ -265,8 +265,8 @@ async def test_list_providers_renders_empty_state(
 ):
     """With no persisted providers, the page renders a friendly empty
     message instead of an empty `<table>`. The list page's toolbar
-    links to `/providers/search`; the secondary-filter `<select>`s
-    live there, not on the list page."""
+    links to `/providers/search`; the multi-select widgets live there,
+    not on the list page."""
     response = await authenticated_client.get("/providers")
     assert response.status_code == 200
     assert "No providers found" in response.text
@@ -276,17 +276,18 @@ async def test_list_providers_renders_empty_state(
     link = tree.css_first("a.toolbar-filter-link")
     assert link is not None
     assert (link.attributes.get("href") or "").startswith("/providers/search")
-    # The actual filter selects live on the search page.
+    # The filter widgets live on the search page — both filters are
+    # now multi-select (`<select multiple>`) with no preselected option
+    # when no filter is active.
     search_response = await authenticated_client.get("/providers/search")
     assert search_response.status_code == 200
     search_tree = HTMLParser(search_response.text)
     for select_name in ("license_type", "issuing_state"):
-        selected = search_tree.css_first(
-            f'select[name="{select_name}"] option[selected]'
-        )
-        assert selected is not None
-        assert selected.attributes.get("value", "missing") is None
-        assert selected.text().strip() == "Any"
+        select = search_tree.css_first(f'select[name="{select_name}"][multiple]')
+        assert select is not None
+        assert not select.css(
+            "option[selected]"
+        ), f"{select_name} should have no preselected option when filter is inactive"
 
 
 async def test_list_providers_filters_by_license_type(
@@ -615,16 +616,17 @@ async def test_get_provider_form_renders(
     assert len(in_person.css("option")) == 4
     assert len(virtual.css("option")) == 4
     # Insurance & payment fieldset (#449). Bool fields render as radios;
-    # carrier multi-select renders one checkbox per `INSURANCE_CARRIERS`
-    # token.
+    # carriers render as the unified `<select multiple>` widget with one
+    # option per `INSURANCE_CARRIERS` token.
     assert tree.css_first('input[type="radio"][name="accepts_in_network"]') is not None
     assert (
         tree.css_first('input[type="radio"][name="accepts_out_of_network"]') is not None
     )
     assert tree.css_first('input[type="radio"][name="sliding_scale"]') is not None
     assert tree.css_first('input[name="cost"]') is not None
-    carrier_boxes = tree.css('input[type="checkbox"][name="in_network_carriers"]')
-    assert len(carrier_boxes) == 11
+    carrier_select = tree.css_first('select[name="in_network_carriers"][multiple]')
+    assert carrier_select is not None
+    assert len(carrier_select.css("option")) == 11
 
 
 # --- Edit form page (GET /providers/{id}/form) -------------------

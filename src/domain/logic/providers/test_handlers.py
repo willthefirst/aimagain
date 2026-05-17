@@ -195,10 +195,10 @@ async def test_list_providers_filters_by_license_type(
             request=_fake_request(),
             repo=repo,
             requesting_user=None,
-            filter_values={"license_type": "lcsw", "issuing_state": None},
+            filter_values={"license_type": ["lcsw"], "issuing_state": None},
         )
         assert [p.id for p in context["providers"]] == [provider_a]
-        assert context["selected_license_type"] == "lcsw"
+        assert context["selected_license_type"] == ["lcsw"]
 
 
 async def test_get_provider_detail_returns_context(

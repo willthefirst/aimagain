@@ -711,9 +711,9 @@ def test_post_create_desired_times_defaults_to_empty_list(payload_factory, kind)
 )
 def test_post_create_desired_times_accepts_subset(payload_factory):
     p = post_create_adapter.validate_python(
-        payload_factory(desired_times=["monday_morning", "friday_evening"])
+        payload_factory(desired_times=["monday_am", "friday_pm"])
     )
-    assert p.desired_times == ["monday_morning", "friday_evening"]
+    assert p.desired_times == ["monday_am", "friday_pm"]
 
 
 @pytest.mark.parametrize(
@@ -726,18 +726,16 @@ def test_post_create_desired_times_coerces_scalar_to_singleton_list(payload_fact
     2+ times). The schema's `_scalar_to_list` BeforeValidator wraps that
     scalar back into a list before the `Literal[*TUPLE]` member check
     fires; otherwise users who pick exactly one slot would 422."""
-    p = post_create_adapter.validate_python(
-        payload_factory(desired_times="monday_morning")
-    )
-    assert p.desired_times == ["monday_morning"]
+    p = post_create_adapter.validate_python(payload_factory(desired_times="monday_am"))
+    assert p.desired_times == ["monday_am"]
 
 
 @pytest.mark.parametrize("kind", ["client_referral", "provider_availability"])
 def test_post_update_desired_times_coerces_scalar_to_singleton_list(kind):
     p = post_update_adapter.validate_python(
-        {"kind": kind, "desired_times": "monday_morning"}
+        {"kind": kind, "desired_times": "monday_am"}
     )
-    assert p.desired_times == ["monday_morning"]
+    assert p.desired_times == ["monday_am"]
 
 
 @pytest.mark.parametrize(
@@ -760,9 +758,9 @@ def test_post_update_desired_times_replaces_with_explicit_list(kind):
     selection. None is "leave unchanged" — that's the standard
     `update_post` semantic, not specific to this field."""
     p = post_update_adapter.validate_python(
-        {"kind": kind, "desired_times": ["monday_morning"]}
+        {"kind": kind, "desired_times": ["monday_am"]}
     )
-    assert p.desired_times == ["monday_morning"]
+    assert p.desired_times == ["monday_am"]
     p = post_update_adapter.validate_python({"kind": kind, "desired_times": []})
     assert p.desired_times == []
 

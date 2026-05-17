@@ -82,6 +82,16 @@ def test_choice_filter_value_type_tightens_annotation():
     assert type(None) in args
 
 
+def test_choice_filter_radio_flag_defaults_to_false():
+    """`radio=True` is the radio-toggle render opt-in for single-select
+    `ChoiceFilter`s; the default `False` keeps the historical `<select>`
+    rendering for every other single-select filter."""
+    f = ChoiceFilter(name="kind", choices=(("a", "A"),))
+    assert f.radio is False
+    f = ChoiceFilter(name="kind", choices=(("a", "A"),), radio=True)
+    assert f.radio is True
+
+
 def test_choice_filter_to_query_param_preserves_default_and_annotation():
     f = ChoiceFilter(
         name="kind",

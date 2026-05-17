@@ -968,8 +968,8 @@ async def test_search_page_renders_one_control_per_filter(
     logged_in_user: User,
 ):
     """`/posts/search` renders one control per declared `Filter` on
-    POST_ENTITY — including `kind` (rendered as a `<select>` here,
-    since the primary-filter notion was removed)."""
+    POST_ENTITY — `kind` is the single-select `ChoiceFilter(radio=True)`
+    rendered as a toggle radio-button group with an "Any" reset."""
     response = await authenticated_client.get("/posts/search")
     assert response.status_code == 200
     tree = HTMLParser(response.text)
@@ -988,12 +988,12 @@ async def test_search_page_renders_one_control_per_filter(
     }
     for label in expected:
         assert label in text, f"missing search-form control for {label!r}"
-    # `kind` is just another `ChoiceFilter` now — `<select>` with Any +
-    # the two values.
-    kind_select = form.css_first('select[name="kind"]')
-    assert kind_select is not None
-    values = {o.attributes.get("value") for o in kind_select.css("option")}
-    assert {"client_referral", "provider_availability"} <= values
+    # `kind` is a radio toggle (ChoiceFilter(radio=True)) — one radio per
+    # value plus an "Any" reset (`value=""`, surfaced by selectolax as
+    # `None` on the attribute dict).
+    radios = form.css('input[type="radio"][name="kind"]')
+    values = {r.attributes.get("value") for r in radios}
+    assert values == {None, "client_referral", "provider_availability"}
 
 
 async def test_toolbar_inline_active_filter_summary_collapses_beyond_two(
@@ -1374,13 +1374,15 @@ async def test_client_referral_form_renders_languages_multi_select(
     authenticated_client: AsyncClient,
     logged_in_user: User,
 ):
-    """`languages` on CR renders via `field_for`'s multi_select arm (#428),
-    same shape as PA."""
+    """`languages` on CR renders via `field_for`'s multi_select arm (#428)
+    — the unified `<select multiple>` widget shared by every multi-select
+    field on the site."""
     response = await authenticated_client.get("/posts/form?kind=client_referral")
     assert response.status_code == 200
     tree = HTMLParser(response.text)
-    boxes = tree.css('input[type="checkbox"][name="languages"]')
-    values = {b.attributes.get("value") for b in boxes}
+    select = tree.css_first('select[name="languages"][multiple]')
+    assert select is not None
+    values = {o.attributes.get("value") for o in select.css("option")}
     assert values == {"en", "es"}
 
 
@@ -1389,12 +1391,14 @@ async def test_client_referral_form_renders_age_groups_multi_select(
     logged_in_user: User,
 ):
     """`age_groups` on CR renders via the multi-select arm (#432),
-    mirroring PA's `age_groups` (#430)."""
+    mirroring PA's `age_groups` (#430) — the unified `<select multiple>`
+    widget."""
     response = await authenticated_client.get("/posts/form?kind=client_referral")
     assert response.status_code == 200
     tree = HTMLParser(response.text)
-    boxes = tree.css('input[type="checkbox"][name="age_groups"]')
-    values = {b.attributes.get("value") for b in boxes}
+    select = tree.css_first('select[name="age_groups"][multiple]')
+    assert select is not None
+    values = {o.attributes.get("value") for o in select.css("option")}
     assert values == {
         "children_0_5",
         "children_6_10",
@@ -1853,9 +1857,9 @@ async def test_provider_availability_form_renders_languages_multi_select(
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user: User,
 ):
-    """`languages` renders as a multi-select checkbox group via `field_for`'s
-    new `list[Literal[*T]]` arm (#425). Confirms the schema-driven multi-
-    select dispatch is wired end-to-end."""
+    """`languages` renders as a `<select multiple>` via `field_for`'s
+    `list[Literal[*T]]` arm (#425). Confirms the schema-driven multi-
+    select dispatch is wired end-to-end through the unified widget."""
     provider = make_provider(owner_id=logged_in_user.id)
     async with db_test_session_manager() as session:
         async with session.begin():
@@ -1864,8 +1868,9 @@ async def test_provider_availability_form_renders_languages_multi_select(
     response = await authenticated_client.get("/posts/form?kind=provider_availability")
     assert response.status_code == 200
     tree = HTMLParser(response.text)
-    boxes = tree.css('input[type="checkbox"][name="languages"]')
-    values = {b.attributes.get("value") for b in boxes}
+    select = tree.css_first('select[name="languages"][multiple]')
+    assert select is not None
+    values = {o.attributes.get("value") for o in select.css("option")}
     assert values == {"en", "es"}
     assert "English" in response.text
     assert "Spanish" in response.text
@@ -1876,7 +1881,7 @@ async def test_provider_availability_form_renders_age_groups_multi_select(
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user: User,
 ):
-    """`age_groups` renders as a 7-option multi-select checkbox group via
+    """`age_groups` renders as a 7-option `<select multiple>` via
     `field_for`'s `list[Literal[*T]]` arm (#430). First 7-option consumer
     of the multi-select rails."""
     provider = make_provider(owner_id=logged_in_user.id)
@@ -1887,8 +1892,9 @@ async def test_provider_availability_form_renders_age_groups_multi_select(
     response = await authenticated_client.get("/posts/form?kind=provider_availability")
     assert response.status_code == 200
     tree = HTMLParser(response.text)
-    boxes = tree.css('input[type="checkbox"][name="age_groups"]')
-    values = {b.attributes.get("value") for b in boxes}
+    select = tree.css_first('select[name="age_groups"][multiple]')
+    assert select is not None
+    values = {o.attributes.get("value") for o in select.css("option")}
     assert values == {
         "children_0_5",
         "children_6_10",
