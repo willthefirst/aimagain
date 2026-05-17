@@ -342,10 +342,9 @@ async def test_list_age_label_is_kind_aware(
     logged_in_user: User,
 ):
     """The demographics `<dt>` for the age field differs by kind: CR
-    says "Age" (the post describes one client) and PA says "Treats"
+    says "Age" (the post describes one client) and PA says "Ages"
     (the post describes who the practice accepts). Same underlying
-    `age_groups` field, different semantics — the verb-framed "Treats"
-    pairs with "Providing" in the left column."""
+    `age_groups` field, different cardinality."""
     author = create_test_user(username=f"author-{uuid.uuid4()}")
     cr_post = _client_referral_post(
         description="cr",
@@ -379,8 +378,8 @@ async def test_list_age_label_is_kind_aware(
         dt.text(strip=True)
         for dt in cards[str(pa_post.id)].css("section.post-facts dl dt")
     ]
-    assert "Age" in cr_labels and "Treats" not in cr_labels
-    assert "Treats" in pa_labels and "Age" not in pa_labels
+    assert "Age" in cr_labels and "Ages" not in cr_labels
+    assert "Ages" in pa_labels and "Age" not in pa_labels
 
 
 async def test_list_contact_column_shows_practice_name_and_mailto_for_pa(
