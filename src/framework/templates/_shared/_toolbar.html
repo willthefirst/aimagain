@@ -15,6 +15,14 @@ in `.toolbar-right` for an explicit right-anchored cluster. Single-
 action toolbars can skip the wrappers — a lone child still parks at
 the right edge via the toolbar's `justify-content: flex-end`.
 
+Action-bar contract: each direct child of `.toolbar` is a button-
+shaped element (`<button>`, `<a role="button">`, ...). A page that
+needs a DOM/test hook around an action may wrap it in a `<span>` —
+`base.html` styles `.toolbar > span` as `display: contents`, so the
+wrapper stays in the DOM (test selectors, `data-*` attributes work)
+while the inner buttons become the actual flex children. Either
+shape — wrapped or bare — aligns identically.
+
     Two-zone bar (e.g. /posts):
 
         {% call toolbar() %}
