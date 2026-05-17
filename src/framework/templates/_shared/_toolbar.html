@@ -1,43 +1,107 @@
 {# Top-of-page zone bar primitive.
 
 Every page that needs page-scoped controls renders one toolbar
-above its content, followed by an `<hr />` separator. Detail-page
-toolbars are a `<menu>` — a native list of commands — so the page's
-primary resource actions (Edit, Delete, Favorite, ...) are marked up
-as the toolbar a screen reader / browser already expects:
+strip above its content, followed by an `<hr />` separator. The bar
+has two zones:
 
-  [page action] [page action] [page action]
-  ──────────────────────────────────────────
-  (page content below)
+  Left  — search link (and, when filters are active, a sibling
+          "Clear all" link). Only rendered when `search_url` is
+          set — list pages opt in via `routes.search`; detail
+          pages leave it unset so the left zone is empty.
+  Right — page actions `<menu class="toolbar-right">`: the caller
+          body (Create, Edit, Delete, Favorite...). Each action is
+          a `<li>` because `<menu>` is HTML's native "list of
+          commands" element. Pushed to the right edge via
+          `margin-left: auto` in `base.html`, so detail-page
+          actions and list-page actions land in the same place
+          even when the left zone is empty.
 
-The caller body fills the bar. Each action is wrapped in a `<li>`
-because `<menu>` only permits list items.
+The search link does double duty:
+  * No active filters → reads `Search <collection>` and opens the
+    dedicated `/<collection>/search` page.
+  * Some filters active → reads a short summary
+    (`Type: Seeking, Description: needle, +2 more filters`) and
+    opens the same page with the active query string forwarded.
 
-    Single action:
+There is no separate active-filter strip — the inline summary in
+the search link replaces it. To drop everything, the user clicks
+the "Clear all" link sibling.
 
-        {% call toolbar() %}
-          <li><a href=".../form" role="button">Edit</a></li>
-        {% endcall %}
+Cap on how many filter chips appear inline before collapsing to
+`+N more filters`. Keeps the link readable on narrow viewports.
 
-    Multiple actions:
+    Detail page (right-zone only):
 
-        {% call toolbar() %}
+        {% call page_toolbar() %}
           <li><a href=".../form" role="button">Edit</a></li>
           <li>{{ confirm_delete_button(...) }}</li>
         {% endcall %}
 
-List pages with a filter row use `list_toolbar(...)` from
-`list_page.html` instead — that one keeps a `<div>` outer wrapper
-(filters + action menu side-by-side) and emits the action `<menu>`
-in the right zone.
+    List page (filter link + actions):
 
-Pages that have no toolbar content leave `{% block toolbar %}` empty
-(or omit it).
+        {% call page_toolbar(
+          active_filters=active_filters,
+          search_url=search_url,
+          clear_all_url=clear_all_url,
+          collection_label=collection_label,
+        ) %}
+          <li><a href="/posts/form" role="button">Create</a></li>
+        {% endcall %}
+
+Pages with no toolbar content leave `{% block toolbar %}` empty
+(or omit it). The shell is suppressed when neither a search link
+nor a caller body is present, so empty pages don't emit a stray
+`<hr />`.
 #}
 
-{% macro toolbar() -%}
-{%- if caller %}
-<menu class="toolbar">{{ caller() }}</menu>
+{% set _ACTIVE_FILTER_INLINE_LIMIT = 2 %}
+
+
+{# Render the toolbar.
+
+Args:
+  active_filters: list of `{name, value, label}` descriptors (one
+    per active value; multi-valued filters fan out). Empty for
+    detail pages.
+  search_url: link target for the search page (with active filters
+    forwarded as query params), or `None` to omit the left zone
+    entirely (detail pages, or list pages that didn't opt into
+    `routes.search`).
+  clear_all_url: the list URL with every filter dropped. Only
+    rendered when at least one filter is active.
+  collection_label: human noun for the empty-state search link
+    (`"posts"` → `Search posts`).
+#}
+{% macro page_toolbar(
+  active_filters=(),
+  search_url=none,
+  clear_all_url=none,
+  collection_label=""
+) -%}
+<div class="toolbar">
+
+  {%- if search_url %}
+  <a href="{{ search_url }}" class="toolbar-filter-link">
+    {%- if not active_filters -%}
+    Search {{ collection_label }}
+    {%- else -%}
+      {%- set shown = active_filters[:_ACTIVE_FILTER_INLINE_LIMIT] -%}
+      {%- set hidden = active_filters | length - shown | length -%}
+      {%- for tag in shown -%}{{ tag.label }}{%- if not loop.last %}, {% endif -%}{%- endfor -%}
+      {%- if hidden > 0 %}, +{{ hidden }} more filter{% if hidden != 1 %}s{% endif %}{%- endif -%}
+    {%- endif -%}
+  </a>
+  {%- if active_filters and clear_all_url %}
+  <a href="{{ clear_all_url }}" class="toolbar-clear-all">Clear all</a>
+  {%- endif %}
+  {%- endif %}
+
+  {%- if caller %}
+  <menu class="toolbar-right">
+    {{ caller() }}
+  </menu>
+  {%- endif %}
+
+</div>
 <hr />
-{%- endif %}
 {%- endmacro %}

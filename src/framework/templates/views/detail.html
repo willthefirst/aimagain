@@ -20,15 +20,16 @@ Child contract:
                      text with `aria-current="page"`.
 
   Optional blocks:
-    actions        — toolbar content: Edit, Delete, Favorite, admin
-                     actions, etc. Each action is a `<li>` because the
-                     toolbar is a `<menu>` (list of commands). The
+    actions        — toolbar right-zone content: Edit, Delete, Favorite,
+                     admin actions, etc. Each action is a `<li>` because
+                     the right zone is a `<menu class="toolbar-right">`
+                     (list of commands, pushed to the right edge). The
                      toolbar shell is suppressed when this block is empty.
     breadcrumb     — full breadcrumb override for nested-detail pages
                      that don't fit the two-segment shape.
 #}
 {% extends "base.html" %}
-{%- from "_shared/_toolbar.html" import toolbar -%}
+{%- from "_shared/_toolbar.html" import page_toolbar -%}
 {%- from "_shared/_breadcrumb.html" import breadcrumb -%}
 
 {% block breadcrumb %}
@@ -40,7 +41,11 @@ Child contract:
 {% block toolbar %}
 {%- set actions_body %}{% block actions %}{% endblock %}{% endset -%}
 {%- if actions_body | trim %}
-{% call toolbar() %}{{ actions_body }}{% endcall %}
+{# Detail-page toolbar reuses the shared two-zone primitive with
+   no search/filter args, so the left zone is empty and the action
+   `<menu class="toolbar-right">` lands at the same right edge as
+   list-page actions (Create, Export...). #}
+{% call page_toolbar() %}{{ actions_body }}{% endcall %}
 {%- endif %}
 {% endblock %}
 
