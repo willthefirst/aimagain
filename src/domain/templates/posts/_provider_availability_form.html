@@ -56,6 +56,7 @@ with at least one provider available.
     {{ text_field("treatment_modality", "Treatment modality (optional, e.g. DBT, EMDR)", current=d.treatment_modality if d else None, required=false) }}
     {{ field_for(schema, "age_groups", "Age groups (select all that apply)", current=d.age_groups if d else None) }}
     {{ field_for(schema, "languages", "Languages spoken", current=d.languages if d else None) }}
+    {{ multi_select_field("genders", "Genders served (optional)", GENDERS, labels=GENDER_LABELS, current=d.genders if d else None) }}
   </fieldset>
 
   <button type="submit">{{ submit_label }}</button>

@@ -56,6 +56,7 @@ from src.domain.models.enums import (
     CLIENT_AGE_GROUPS,
     CLIENT_REFERRAL_SERVICES,
     DESIRED_TIME_SLOTS,
+    GENDERS,
     INSURANCE_OPTIONS,
     LANGUAGES,
     LOCATION_AVAILABILITY_OPTIONS,
@@ -129,6 +130,10 @@ AgeGroupsField = Annotated[
 # practice serves at least one age bucket. Replaces the single-valued
 # `age_group` (#430).
 RequiredAgeGroupsField = Annotated[AgeGroupsField, Field(min_length=1)]
+# `provider_availability.genders` is a multi-checkbox on the wire, same
+# normalization shape as services/settings/age_groups. Empty list is
+# allowed — "no restriction stated" / serves any gender.
+GendersField = Annotated[list[Literal[*GENDERS]], BeforeValidator(_scalar_to_list)]
 
 
 # --- Shared flatten helper ----------------------------------------------
@@ -191,6 +196,7 @@ class ClientReferralRead(_PostReadBase):
     desired_times: DesiredTimesField = []
     age_groups: AgeGroupsField = []
     languages: LanguagesField = []
+    gender: Literal[*GENDERS]
     description: str
     services: ServicesField = []
     treatment_modality: str | None = None
@@ -222,6 +228,7 @@ class ProviderAvailabilityRead(_PostReadBase):
     treatment_modality: str | None = None
     age_groups: AgeGroupsField = []
     languages: LanguagesField = []
+    genders: GendersField = []
 
 
 PostRead = Annotated[
@@ -260,6 +267,11 @@ class ClientReferralCreate(WirePayload):
     # `language_preferred` flag (#428). Defaults to `["en"]` so the
     # form's "submit with defaults" case still validates.
     languages: RequiredLanguagesField = ["en"]
+    # Gender identity of the referred client. Defaults to
+    # `prefer_not_to_say` so existing form submissions that don't
+    # include the field still validate; the form's <select> defaults
+    # to the same value.
+    gender: Literal[*GENDERS] = "prefer_not_to_say"
     description: StrippedText
     services: ServicesField = []
     treatment_modality: StrippedOptionalText = None
@@ -305,6 +317,9 @@ class ProviderAvailabilityCreate(WirePayload):
     # `non_english_services` flag (#425). Defaults to `["en"]` so the
     # form's "submit with defaults" case still validates.
     languages: RequiredLanguagesField = ["en"]
+    # Genders this practice serves. Optional; empty = "no restriction
+    # stated" / serves any. Multi-checkbox on the wire.
+    genders: GendersField = []
 
 
 PostCreate = Annotated[
@@ -349,6 +364,8 @@ class ClientReferralUpdate(PartialUpdate):
     # `None` = leave unchanged. `min_length=1` rejects an explicit `[]`,
     # mirroring PA's `languages` semantics.
     languages: RequiredLanguagesField | None = None
+    # `None` = leave unchanged; any enum value sets it.
+    gender: Literal[*GENDERS] | None = None
     description: StrippedText | None = None
     services: ServicesField | None = None
     treatment_modality: StrippedOptionalText = None
@@ -387,6 +404,9 @@ class ProviderAvailabilityUpdate(PartialUpdate):
     # mirroring `services`. Clearing the list is intentionally not
     # supported.
     languages: RequiredLanguagesField | None = None
+    # `None` = leave unchanged; `[]` is allowed (clear the list to
+    # "no restriction stated").
+    genders: GendersField | None = None
 
 
 PostUpdate = Annotated[
@@ -419,6 +439,7 @@ class ClientReferralAuditSnapshot(_PostAuditSnapshotBase):
     desired_times: DesiredTimesField = []
     age_groups: AgeGroupsField = []
     languages: LanguagesField = []
+    gender: Literal[*GENDERS]
     description: str
     services: ServicesField = []
     treatment_modality: str | None = None
@@ -445,6 +466,7 @@ class ProviderAvailabilityAuditSnapshot(_PostAuditSnapshotBase):
     treatment_modality: str | None = None
     age_groups: AgeGroupsField = []
     languages: LanguagesField = []
+    genders: GendersField = []
 
 
 PostAuditSnapshot = Annotated[

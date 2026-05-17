@@ -81,6 +81,8 @@ _env.globals.update(
     CLIENT_REFERRAL_SERVICE_LABELS=enums.CLIENT_REFERRAL_SERVICE_LABELS,
     TREATMENT_SETTINGS=enums.TREATMENT_SETTINGS,
     TREATMENT_SETTINGS_LABELS=enums.TREATMENT_SETTINGS_LABELS,
+    GENDERS=enums.GENDERS,
+    GENDER_LABELS=enums.GENDER_LABELS,
     # Lucide icon names per enum value — consumed by the listing-row
     # macro in `src/domain/templates/posts/_item.html`. Renaming a label
     # leaves these untouched; adding/renaming an *enum value* must touch
@@ -136,6 +138,7 @@ register_choice_labels(
     enums.CLIENT_REFERRAL_SERVICES, enums.CLIENT_REFERRAL_SERVICE_LABELS
 )
 register_choice_labels(enums.TREATMENT_SETTINGS, enums.TREATMENT_SETTINGS_LABELS)
+register_choice_labels(enums.GENDERS, enums.GENDER_LABELS)
 register_choice_labels(enums.LICENSE_TYPES, enums.LICENSE_TYPES_LABELS)
 register_choice_labels(enums.EDUCATION_TYPES, enums.EDUCATION_TYPES_LABELS)
 register_choice_labels(enums.CERTIFICATION_TYPES, enums.CERTIFICATION_TYPES_LABELS)

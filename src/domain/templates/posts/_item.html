@@ -148,6 +148,19 @@ virtual
           {{ ages | join(", ") }}
         </dd></div>
         {%- endif %}
+        {#- Gender chunk: CR has a single `gender`; PA has a list
+            `genders` (may be empty, which means "no restriction
+            stated" — omit the chunk entirely). Both branches read
+            through the GENDER_LABELS dict. -#}
+        {%- if post.kind == "client_referral" and d.gender %}
+        <div><dt>Gender</dt><dd>{{ GENDER_LABELS[d.gender] }}</dd></div>
+        {%- elif post.kind == "provider_availability" and d.genders %}
+        <div><dt>Genders</dt><dd>
+          {%- set gs = [] -%}
+          {%- for g in d.genders -%}{%- set _ = gs.append(GENDER_LABELS[g]) -%}{%- endfor -%}
+          {{ gs | join(", ") }}
+        </dd></div>
+        {%- endif %}
         {%- if d.languages and not (d.languages | length == 1 and d.languages[0] == "en") %}
         <div><dt>Languages</dt><dd>
           {%- set langs = [] -%}

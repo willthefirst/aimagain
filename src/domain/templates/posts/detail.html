@@ -44,6 +44,8 @@
     <dd>{% for g in d.age_groups %}{{ CLIENT_AGE_GROUP_LABELS[g] }}{% if not loop.last %}, {% endif %}{% endfor %}</dd>
     <dt>Languages</dt>
     <dd>{% for l in d.languages %}{{ LANGUAGE_LABELS[l] }}{% if not loop.last %}, {% endif %}{% endfor %}</dd>
+    <dt>Gender</dt>
+    <dd>{{ GENDER_LABELS[d.gender] }}</dd>
     {% if d.services %}
     <dt>Services</dt>
     <dd>{% for s in d.services %}{{ CLIENT_REFERRAL_SERVICE_LABELS[s] }}{% if not loop.last %}, {% endif %}{% endfor %}</dd>
@@ -97,6 +99,10 @@
     <dd>{% for g in d.age_groups %}{{ CLIENT_AGE_GROUP_LABELS[g] }}{% if not loop.last %}, {% endif %}{% endfor %}</dd>
     <dt>Languages</dt>
     <dd>{% for l in d.languages %}{{ LANGUAGE_LABELS[l] }}{% if not loop.last %}, {% endif %}{% endfor %}</dd>
+    {% if d.genders %}
+    <dt>Genders served</dt>
+    <dd>{% for g in d.genders %}{{ GENDER_LABELS[g] }}{% if not loop.last %}, {% endif %}{% endfor %}</dd>
+    {% endif %}
     {# Insurance posture lives on the linked Provider (#449). #}
     {% if p.accepts_in_network or p.accepts_out_of_network %}
     <dt>Insurance accepted</dt>
