@@ -248,6 +248,84 @@ TREATMENT_SETTINGS_LABELS: Final[dict[str, str]] = {
     "day_program": "Day program",
 }
 
+# --- Unified insurance posture -----------------------------------------
+#
+# The two post kinds model "insurance situation" with asymmetric vocab:
+#   * `client_referral.insurance` — enum (`in_network` / `out_of_network`
+#     / `self_pay_only` / `please_contact`)
+#   * `provider_availability` → linked `Provider` carries boolean flags
+#     (`accepts_in_network`, `accepts_out_of_network`, `sliding_scale`)
+#     plus the carriers tuple.
+#
+# For the listing row we need *one* axis the eye can read at a glance,
+# so both shapes collapse to this 4-state posture. The mapping helper
+# `insurance_posture_for_post(post)` lives next to the row macro
+# (see `src/framework/rendering/post_view.py`). Adding a fifth state
+# means: extend this tuple, extend the labels + icons dicts, update the
+# helper, and the row macro picks it up.
+INSURANCE_POSTURES: Final[tuple[str, ...]] = (
+    "in_network",
+    "out_of_network",
+    "self_pay",
+    "please_contact",
+)
+INSURANCE_POSTURE_LABELS: Final[dict[str, str]] = {
+    "in_network": "In-network",
+    "out_of_network": "Out-of-network",
+    "self_pay": "Self-pay",
+    "please_contact": "Contact for insurance",
+}
+
+
+# --- Lucide icon names ------------------------------------------------
+#
+# Icon names are keyed by the same enum storage value as the matching
+# `*_LABELS` dict — renaming a *label* leaves these untouched; adding
+# or renaming an *enum value* touches the tuple, the labels dict, and
+# the icons dict in lockstep (the `test_icons_cover_their_tuples`
+# guardrail in `src/domain/logic/posts/test_schema.py` fails the build
+# if you forget one). Values are Lucide icon names (`lucide-static`
+# font CSS exposes them as `<i class="icon-<name>">`); the row macro
+# in `src/domain/templates/posts/_item.html` emits the `<i>` tag.
+#
+# Multiple enum values may share an icon when the visual signal at
+# scan distance is the same — e.g. children_0_5 and children_6_10 both
+# read as "kid" in the row. The detail page still distinguishes via
+# `CLIENT_AGE_GROUP_LABELS`.
+CLIENT_AGE_GROUP_ICONS: Final[dict[str, str]] = {
+    "children_0_5": "baby",
+    "children_6_10": "baby",
+    "preteens_11_13": "graduation-cap",
+    "adolescents_14_18": "graduation-cap",
+    "young_adults_19_24": "user",
+    "adults_25_64": "user",
+    "older_adults_65_plus": "user-round",
+}
+CLIENT_REFERRAL_SERVICE_ICONS: Final[dict[str, str]] = {
+    "evaluation": "clipboard-list",
+    "medication_management": "pill",
+    "psychotherapy": "message-circle",
+    "case_management": "briefcase",
+    "allied_health": "heart-pulse",
+    "group_therapy": "users",
+    "family_therapy": "users-round",
+    "couples_therapy": "heart-handshake",
+}
+TREATMENT_SETTINGS_ICONS: Final[dict[str, str]] = {
+    "outpatient": "house",
+    "iop": "calendar-clock",
+    "php": "calendar-days",
+    "crisis_care": "siren",
+    "residential": "hospital",
+    "day_program": "sun",
+}
+INSURANCE_POSTURE_ICONS: Final[dict[str, str]] = {
+    "in_network": "shield-check",
+    "out_of_network": "shield",
+    "self_pay": "dollar-sign",
+    "please_contact": "circle-help",
+}
+
 LICENSE_TYPES: Final[tuple[str, ...]] = (
     "lcsw",
     "lpc",

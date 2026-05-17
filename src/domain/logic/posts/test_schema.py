@@ -34,18 +34,25 @@ from src.domain.logic.posts.schema import (
     post_update_adapter,
 )
 from src.domain.models.enums import (
+    CLIENT_AGE_GROUP_ICONS,
     CLIENT_AGE_GROUP_LABELS,
     CLIENT_AGE_GROUPS,
+    CLIENT_REFERRAL_SERVICE_ICONS,
     CLIENT_REFERRAL_SERVICE_LABELS,
     CLIENT_REFERRAL_SERVICES,
     DESIRED_TIME_SLOT_LABELS,
     DESIRED_TIME_SLOTS,
     INSURANCE_LABELS,
     INSURANCE_OPTIONS,
+    INSURANCE_POSTURE_ICONS,
+    INSURANCE_POSTURE_LABELS,
+    INSURANCE_POSTURES,
     LANGUAGE_LABELS,
     LANGUAGES,
     LOCATION_AVAILABILITY_LABELS,
     LOCATION_AVAILABILITY_OPTIONS,
+    TREATMENT_SETTINGS,
+    TREATMENT_SETTINGS_ICONS,
 )
 from tests.helpers import client_referral_payload, provider_availability_payload
 
@@ -911,3 +918,26 @@ def test_labels_cover_their_tuples(values, labels):
     a `KeyError` at request time. Catching it here keeps the failure
     mode loud and offline."""
     assert set(labels) == set(values)
+
+
+# --- Listing-row icons cover their value tuples -------------------------
+
+
+@pytest.mark.parametrize(
+    "values,icons",
+    [
+        (CLIENT_AGE_GROUPS, CLIENT_AGE_GROUP_ICONS),
+        (CLIENT_REFERRAL_SERVICES, CLIENT_REFERRAL_SERVICE_ICONS),
+        (TREATMENT_SETTINGS, TREATMENT_SETTINGS_ICONS),
+        (INSURANCE_POSTURES, INSURANCE_POSTURE_ICONS),
+        (INSURANCE_POSTURES, INSURANCE_POSTURE_LABELS),
+    ],
+)
+def test_icons_cover_their_tuples(values, icons):
+    """Each `*_ICONS` dict in `src/domain/models/enums.py` must have an
+    icon name for every value in its corresponding tuple. The row macro
+    (`src/domain/templates/posts/_item.html`) looks icons up by value;
+    a missing key would render as `<i class="icon-">` (no glyph) at
+    request time. Catching it here keeps the failure mode loud and
+    offline — same pattern as `test_labels_cover_their_tuples` above."""
+    assert set(icons) == set(values)

@@ -1,0 +1,75 @@
+"""Tests for the post view helpers (`view.py`)."""
+
+from types import SimpleNamespace
+
+import pytest
+
+from src.domain.logic.posts.view import insurance_posture_for_post
+
+
+def _cr_post(insurance: str):
+    return SimpleNamespace(
+        kind="client_referral",
+        client_referral_detail=SimpleNamespace(insurance=insurance),
+    )
+
+
+def _pa_post(**provider_attrs):
+    provider_attrs.setdefault("accepts_in_network", False)
+    provider_attrs.setdefault("accepts_out_of_network", False)
+    provider_attrs.setdefault("sliding_scale", False)
+    provider_attrs.setdefault("cost", None)
+    return SimpleNamespace(
+        kind="provider_availability",
+        provider_availability_detail=SimpleNamespace(
+            provider=SimpleNamespace(**provider_attrs),
+        ),
+    )
+
+
+@pytest.mark.parametrize(
+    "storage,expected",
+    [
+        ("in_network", "in_network"),
+        ("out_of_network", "out_of_network"),
+        ("self_pay_only", "self_pay"),
+        ("please_contact", "please_contact"),
+    ],
+)
+def test_cr_posture_maps_each_enum(storage, expected):
+    assert insurance_posture_for_post(_cr_post(storage)) == expected
+
+
+def test_pa_posture_prefers_in_network_when_set():
+    """In-network is the highest-signal posture; show it even when the
+    provider also accepts out-of-network or offers sliding scale."""
+    post = _pa_post(
+        accepts_in_network=True,
+        accepts_out_of_network=True,
+        sliding_scale=True,
+    )
+    assert insurance_posture_for_post(post) == "in_network"
+
+
+def test_pa_posture_falls_back_to_oon_then_self_pay_then_contact():
+    assert (
+        insurance_posture_for_post(_pa_post(accepts_out_of_network=True))
+        == "out_of_network"
+    )
+    assert insurance_posture_for_post(_pa_post(sliding_scale=True)) == "self_pay"
+    assert insurance_posture_for_post(_pa_post(cost="$150/session")) == "self_pay"
+    # No flags set at all → the post offers no insurance signal; the row
+    # macro renders the help glyph so the reader knows to ask.
+    assert insurance_posture_for_post(_pa_post()) == "please_contact"
+
+
+def test_posture_returns_none_for_unknown_kind():
+    """An unregistered kind has no detail row; the helper returns None
+    and the row macro omits the insurance chunk."""
+    post = SimpleNamespace(kind="mystery")
+    assert insurance_posture_for_post(post) is None
+
+
+def test_posture_returns_none_when_detail_missing():
+    post = SimpleNamespace(kind="client_referral", client_referral_detail=None)
+    assert insurance_posture_for_post(post) is None

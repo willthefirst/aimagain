@@ -8,7 +8,7 @@ A model in cluster A does not import from cluster B. Shared primitives hoist to 
 
 ## Parent-level shared
 
-- `enums.py` — controlled-vocabulary tuples + `*_LABELS` dicts + `check_in_tuple_sql`. Single source of truth that Pydantic `Literal[*TUPLE]`, Jinja form macros, and DB `CHECK` constraints all derive from. A *leaf* (no internal imports) so any cluster can import without cycling.
+- `enums.py` — controlled-vocabulary tuples + `*_LABELS` dicts + `*_ICONS` dicts (Lucide icon names, consumed by listing-row macros) + `check_in_tuple_sql`. Single source of truth that Pydantic `Literal[*TUPLE]`, Jinja form macros, and DB `CHECK` constraints all derive from. A *leaf* (no internal imports) so any cluster can import without cycling. Both `*_LABELS` and `*_ICONS` are keyed by the storage value, so renaming a *label* doesn't propagate; renaming an *enum value* touches the tuple, the labels dict, and the icons dict in lockstep (guardrail tests in the relevant `test_schema.py` fail if any goes missing).
 - `__init__.py` — re-exports model classes and the framework primitives (`Base`, `BaseModel`, `metadata`, `AuditLog`) from [`../../framework/`](../../framework/) so external code can always say `from src.domain.models import ...`.
 
 ## Polymorphic entities (the post-shape)
