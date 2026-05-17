@@ -109,15 +109,18 @@ async def test_list_client_referral_item_shape(
     assert item is not None
     assert item.attributes.get("data-kind") == "client_referral"
 
-    # Header line: "Client Referral, WA (virtual or in person)" — the
-    # link text within the header carries the kind + state; the
-    # parenthetical lives in the same `<strong>` next to the link.
+    # Header line: link text carries kind + state; the in-person /
+    # virtual posture renders as one or two `<span.post-modality>`
+    # chips (icon + short label) next to the link.
     header_link = item.css_first("header.post-header a")
     assert header_link is not None
     assert header_link.attributes.get("href") == f"/posts/{post.id}"
     assert header_link.text(strip=True) == "Client Referral, WA"
-    header_text = item.css_first("header.post-header").text()
-    assert "(virtual or in person)" in header_text
+    modality_chips = [
+        chip.text(strip=True)
+        for chip in item.css("header.post-header > .post-modality")
+    ]
+    assert modality_chips == ["Virtual", "In-person"]
 
     # No text kind-chip anywhere in the listing row.
     assert item.css_first("[data-kind-chip]") is None
@@ -231,12 +234,17 @@ async def test_list_provider_availability_item_shape(
     # No text kind-chip in the listing row.
     assert item.css_first("[data-kind-chip]") is None
 
-    # Header link text: practice name + state. The `(in person)`
-    # parenthetical sits next to the link inside the same `<strong>`.
+    # Header link text: practice name + state. The in-person posture
+    # renders as a `<span.post-modality>` chip (icon + label) next to
+    # the link; virtual=no, so no virtual chip.
     lead = item.css_first("header.post-header a")
     assert lead is not None
     assert lead.text(strip=True) == f"{practice_name}, OR"
-    assert "(in person)" in item.css_first("header.post-header").text()
+    modality_chips = [
+        chip.text(strip=True)
+        for chip in item.css("header.post-header > .post-modality")
+    ]
+    assert modality_chips == ["In-person"]
 
     # Demographics column shows the posture; accepts_in_network=True
     # wins the priority even though sliding_scale is also set.
@@ -509,10 +517,14 @@ async def test_list_meta_is_a_dl_of_labeled_key_value_chunks(
     values = [chunk.css_first("dd").text(strip=True) for chunk in meta_chunks]
     assert values == ["Adolescent (14–18)", "Prefer not to say", "In-network"]
 
-    # Header carries state + format parenthetical.
+    # Header carries state + an "In-person" modality chip (virtual=no).
     header_text = item.css_first("header.post-header").text()
     assert "Client Referral, WA" in header_text
-    assert "(in person)" in header_text
+    modality_chips = [
+        chip.text(strip=True)
+        for chip in item.css("header.post-header > .post-modality")
+    ]
+    assert modality_chips == ["In-person"]
 
     # Two `<a>`s per card: the header link to the detail page and
     # the `mailto:` link in the contact column. The contact column
