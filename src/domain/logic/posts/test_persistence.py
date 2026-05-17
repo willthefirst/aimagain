@@ -148,6 +148,68 @@ async def test_create_post_persists_parent_and_client_referral_detail(
         assert detail_row.description == "needs placement"
 
 
+async def test_client_referral_persists_network_preference_and_carrier(
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+):
+    """Both insurance fields round-trip through the detail row.
+    `network_preference` is required (CHECK against NETWORK_PREFERENCES);
+    `insurance_carrier` is nullable — null is the expected shape when the
+    referrer says 'no preference' / patient is self-pay."""
+    owner = await _seed_owner(db_test_session_manager)
+
+    async with db_test_session_manager() as session:
+        repo = BaseRepository(session)
+        with_carrier = await _create_post(
+            repo,
+            Post(kind="client_referral", owner_id=owner.id),
+            make_client_referral_detail(
+                description="cigna patient",
+                network_preference="in_network_preferred",
+                insurance_carrier="cigna",
+            ),
+        )
+        no_carrier = await _create_post(
+            repo,
+            Post(kind="client_referral", owner_id=owner.id),
+            make_client_referral_detail(
+                description="self-pay patient",
+                network_preference="no_preference",
+                insurance_carrier=None,
+            ),
+        )
+        await session.commit()
+        with_id = with_carrier.id
+        no_id = no_carrier.id
+
+    async with db_test_session_manager() as session:
+        with_row = (
+            (
+                await session.execute(
+                    select(ClientReferralDetail).filter(
+                        ClientReferralDetail.post_id == with_id
+                    )
+                )
+            )
+            .scalars()
+            .first()
+        )
+        no_row = (
+            (
+                await session.execute(
+                    select(ClientReferralDetail).filter(
+                        ClientReferralDetail.post_id == no_id
+                    )
+                )
+            )
+            .scalars()
+            .first()
+        )
+        assert with_row.network_preference == "in_network_preferred"
+        assert with_row.insurance_carrier == "cigna"
+        assert no_row.network_preference == "no_preference"
+        assert no_row.insurance_carrier is None
+
+
 async def test_update_post_writes_to_client_referral_detail(
     db_test_session_manager: async_sessionmaker[AsyncSession],
 ):

@@ -4,8 +4,11 @@ The listing row in `src/domain/templates/posts/_item.html` needs a single
 4-state "insurance posture" axis to render as one icon badge. The two
 kinds model the underlying data asymmetrically:
 
-  * `client_referral.insurance` — single enum
-    (`in_network` / `out_of_network` / `self_pay_only` / `please_contact`).
+  * `client_referral` — `network_preference` enum
+    (`in_network_required` / `in_network_preferred` / `no_preference`)
+    paired with a nullable `insurance_carrier`. The posture is derived
+    from `network_preference` alone — the carrier doesn't change the
+    badge.
   * `provider_availability` → linked `Provider` — boolean flags
     (`accepts_in_network`, `accepts_out_of_network`, `sliding_scale`).
 
@@ -52,9 +55,16 @@ def insurance_posture_for_post(post) -> str | None:
         detail = getattr(post, "client_referral_detail", None)
         if detail is None:
             return None
-        # `self_pay_only` storage value normalizes to the posture key
-        # `self_pay`; everything else round-trips.
-        return "self_pay" if detail.insurance == "self_pay_only" else detail.insurance
+        # Map the referrer's posture to the unified posture vocabulary.
+        # The mapping mirrors the alembic migration that backfilled the
+        # old `insurance` column (in_network → required, out_of_network
+        # → preferred, self_pay_only → no_preference); the read path
+        # inverts that to recover the original posture display.
+        return {
+            "in_network_required": "in_network",
+            "in_network_preferred": "out_of_network",
+            "no_preference": "self_pay",
+        }.get(detail.network_preference)
     if kind == "provider_availability":
         detail = getattr(post, "provider_availability_detail", None)
         if detail is None or detail.provider is None:
