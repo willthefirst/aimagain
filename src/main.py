@@ -11,7 +11,14 @@ from src.domain.logic.users.schema import UserRead
 from src.domain.routes import auth_routes
 from src.framework.http.middleware import StripEmptyQueryParamsMiddleware
 
-from .domain.routes import auth_pages, favorites, posts, providers, users
+from .domain.routes import (
+    auth_pages,
+    favorites,
+    organizations,
+    posts,
+    providers,
+    users,
+)
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -100,6 +107,7 @@ app.include_router(auth_pages.auth_pages_api_router)
 app.include_router(users.users_api_router, tags=["users"])
 app.include_router(posts.posts_api_router, tags=["posts"])
 app.include_router(providers.providers_api_router, tags=["providers"])
+app.include_router(organizations.organizations_api_router, tags=["organizations"])
 # `/users/me/favorites/*` is mounted on its own router (favorites_api_router)
 # rather than on users_api_router, because favorites is its own resource
 # cluster — the path just happens to live under /users/me for self-scoping.

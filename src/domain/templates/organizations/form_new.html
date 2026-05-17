@@ -1,0 +1,19 @@
+{% extends "views/form_new.html" %}
+{%- from "_shared/form_fields.html" import select_field, text_field -%}
+
+{% set resource_url = "/organizations" %}
+
+{% block resource_label %}Organizations{% endblock %}
+
+{% block content %}
+<form hx-post="/organizations">
+  <fieldset>
+    <legend>Organization</legend>
+    {{ text_field("name", "Name", maxlength=200) }}
+    {{ select_field("type", "Type", ORGANIZATION_TYPES, labels=ORGANIZATION_TYPES_LABELS, placeholder=true) }}
+    {{ text_field("parent_org_id", "Parent organization ID (optional)", required=false) }}
+  </fieldset>
+
+  <button type="submit">Create organization</button>
+</form>
+{% endblock %}

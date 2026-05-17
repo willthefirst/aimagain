@@ -3,6 +3,7 @@
 import pytest
 from pydantic import BaseModel, TypeAdapter
 
+from src.domain.specs.organization import ORGANIZATION_ENTITY
 from src.domain.specs.post import POST_ENTITY
 from src.domain.specs.provider import PROVIDER_ENTITY
 from src.domain.specs.provider_certification import CERTIFICATION_ENTITY
@@ -25,6 +26,7 @@ ALL_ENTITY_SPECS: tuple[EntitySpec, ...] = (
     CERTIFICATION_ENTITY,
     POST_ENTITY,
     FAVORITE_ENTITY,
+    ORGANIZATION_ENTITY,
 )
 
 

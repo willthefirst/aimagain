@@ -395,6 +395,24 @@ INSURANCE_POSTURE_ICONS: Final[dict[str, str]] = {
     "please_contact": "circle-help",
 }
 
+# Organization kind. CHECK'd at the table level — empty-tuple growth
+# isn't a concern (the five tokens cover the directory's organization
+# universe today; expanding it means editing one tuple).
+ORGANIZATION_TYPES: Final[tuple[str, ...]] = (
+    "solo_practice",
+    "group_practice",
+    "clinic",
+    "health_system",
+    "other",
+)
+ORGANIZATION_TYPES_LABELS: Final[dict[str, str]] = {
+    "solo_practice": "Solo practice",
+    "group_practice": "Group practice",
+    "clinic": "Clinic",
+    "health_system": "Health system",
+    "other": "Other",
+}
+
 LICENSE_TYPES: Final[tuple[str, ...]] = (
     "lcsw",
     "lpc",
