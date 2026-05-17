@@ -493,15 +493,17 @@ async def test_list_meta_is_a_dl_of_labeled_key_value_chunks(
 
     # Demographics `<dl>` chunks. English-only languages are dropped
     # (default); no modality on this post; insurance posture renders.
+    # Gender is always present on CR (the helper defaults to
+    # "prefer_not_to_say" — the privacy-respecting opt-out).
     meta_chunks = item.css("section.post-facts dl > div")
-    # Ages + Insurance = 2 chunks.
-    assert len(meta_chunks) == 2
+    # Age + Gender + Insurance = 3 chunks.
+    assert len(meta_chunks) == 3
     labels = [chunk.css_first("dt").text(strip=True) for chunk in meta_chunks]
     # `dt::after { content: ": " }` adds the colon in CSS; the DOM
     # text of the `<dt>` is just the label.
-    assert labels == ["Age", "Insurance"]
+    assert labels == ["Age", "Gender", "Insurance"]
     values = [chunk.css_first("dd").text(strip=True) for chunk in meta_chunks]
-    assert values == ["Adolescents 14–18", "In-network"]
+    assert values == ["Adolescents 14–18", "Prefer not to say", "In-network"]
 
     # Header carries state + format parenthetical.
     header_text = item.css_first("header.post-header").text()

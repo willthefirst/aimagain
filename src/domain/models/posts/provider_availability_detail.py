@@ -51,6 +51,11 @@ class ProviderAvailabilityDetail(Base):
     languages = Column(
         JSON, nullable=False, server_default=text("'[\"en\"]'"), default=lambda: ["en"]
     )
+    # Genders this practice serves. JSON-array of `GENDERS` tokens
+    # (vocabulary enforced on the wire by Pydantic, not via SQL CHECK —
+    # same shape as `services` / `settings` / `age_groups`). Empty list
+    # is allowed both at rest and on the wire — "no restriction stated."
+    genders = Column(JSON, nullable=False, server_default=text("'[]'"), default=list)
 
     # Section 6 — about (free-text core fields)
     description = Column(Text, nullable=True)

@@ -134,6 +134,26 @@ CLIENT_REFERRAL_SERVICES: Final[tuple[str, ...]] = (
     "couples_therapy",
 )
 
+# Gender identity vocabulary. Single-axis enum that folds trans/cis into
+# the value (`female` / `trans_female`) rather than splitting into two
+# fields — for the listing row the reader wants one labeled chunk
+# ("Gender: Trans woman"), not a parenthesized modifier. `gender_diverse`
+# is the umbrella token for genderqueer / agender / two-spirit / etc.;
+# `prefer_not_to_say` is the privacy-respecting opt-out.
+#
+# Used as a scalar on `client_referral` (`gender`: the client's identity)
+# and as a multi-value list on `provider_availability` (`genders`: the
+# practice serves these).
+GENDERS: Final[tuple[str, ...]] = (
+    "female",
+    "male",
+    "non_binary",
+    "trans_female",
+    "trans_male",
+    "gender_diverse",
+    "prefer_not_to_say",
+)
+
 # Treatment settings categories. `provider_availability` only; required-min-1.
 TREATMENT_SETTINGS: Final[tuple[str, ...]] = (
     "outpatient",
@@ -246,6 +266,15 @@ TREATMENT_SETTINGS_LABELS: Final[dict[str, str]] = {
     "php": "PHP",
     "residential": "Residential",
     "day_program": "Day program",
+}
+GENDER_LABELS: Final[dict[str, str]] = {
+    "female": "Female / woman",
+    "male": "Male / man",
+    "non_binary": "Non-binary",
+    "trans_female": "Trans woman",
+    "trans_male": "Trans man",
+    "gender_diverse": "Gender-diverse",
+    "prefer_not_to_say": "Prefer not to say",
 }
 
 # --- Unified insurance posture -----------------------------------------

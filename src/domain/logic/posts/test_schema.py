@@ -42,6 +42,8 @@ from src.domain.models.enums import (
     CLIENT_REFERRAL_SERVICES,
     DESIRED_TIME_SLOT_LABELS,
     DESIRED_TIME_SLOTS,
+    GENDER_LABELS,
+    GENDERS,
     INSURANCE_LABELS,
     INSURANCE_OPTIONS,
     INSURANCE_POSTURE_ICONS,
@@ -681,10 +683,13 @@ def _literal_args(model_cls, field_name: str) -> tuple[str, ...]:
         (ClientReferralRead, "location_in_person", LOCATION_AVAILABILITY_OPTIONS),
         (ClientReferralRead, "location_virtual", LOCATION_AVAILABILITY_OPTIONS),
         (ClientReferralRead, "insurance", INSURANCE_OPTIONS),
+        (ClientReferralRead, "gender", GENDERS),
         # Create variants
         (ClientReferralCreate, "insurance", INSURANCE_OPTIONS),
+        (ClientReferralCreate, "gender", GENDERS),
         # Update variants (Optional[Literal[*TUPLE]])
         (ClientReferralUpdate, "insurance", INSURANCE_OPTIONS),
+        (ClientReferralUpdate, "gender", GENDERS),
     ],
 )
 def test_schema_literals_match_model_tuples(model_cls, field, expected):
@@ -909,6 +914,7 @@ def test_post_update_services_rejects_unknown_token(kind):
         (INSURANCE_OPTIONS, INSURANCE_LABELS),
         (DESIRED_TIME_SLOTS, DESIRED_TIME_SLOT_LABELS),
         (CLIENT_REFERRAL_SERVICES, CLIENT_REFERRAL_SERVICE_LABELS),
+        (GENDERS, GENDER_LABELS),
     ],
 )
 def test_labels_cover_their_tuples(values, labels):

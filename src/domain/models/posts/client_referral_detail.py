@@ -7,6 +7,7 @@ from src.framework.persistence.base_model import Base
 from src.framework.persistence.mixins import LocationMixin
 
 from ..enums import (
+    GENDERS,
     INSURANCE_OPTIONS,
     LOCATION_AVAILABILITY_OPTIONS,
     US_STATES,
@@ -31,6 +32,7 @@ class ClientReferralDetail(LocationMixin, Base):
         _ck("location_in_person", LOCATION_AVAILABILITY_OPTIONS),
         _ck("location_virtual", LOCATION_AVAILABILITY_OPTIONS),
         _ck("insurance", INSURANCE_OPTIONS),
+        _ck("gender", GENDERS),
     )
 
     post_id = Column(
@@ -51,6 +53,10 @@ class ClientReferralDetail(LocationMixin, Base):
     languages = Column(
         JSON, nullable=False, server_default=text("'[\"en\"]'"), default=lambda: ["en"]
     )
+    # Gender identity of the referred client. NOT NULL with a
+    # server-side default so the migration backfill picks up existing
+    # rows. CHECK constraint above pins the vocabulary to `GENDERS`.
+    gender = Column(Text, nullable=False, server_default=text("'prefer_not_to_say'"))
 
     # Section 3 — description
     description = Column(Text, nullable=False)

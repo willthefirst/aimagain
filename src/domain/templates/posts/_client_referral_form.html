@@ -37,6 +37,7 @@ which FastAPI/Pydantic parses as a list.
     <legend>Demographics</legend>
     {{ field_for(schema, "age_groups", "Age groups (select all that apply)", current=d.age_groups if d else None) }}
     {{ field_for(schema, "languages", "Languages spoken", current=d.languages if d else None) }}
+    {{ select_field("gender", "Gender identity", GENDERS, labels=GENDER_LABELS, current=d.gender if d else None) }}
   </fieldset>
 
   {{ textarea_field("description", "Description (no PII)", current=d.description if d else None) }}

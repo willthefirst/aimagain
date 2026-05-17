@@ -126,6 +126,7 @@ FIXTURE_PROVIDER_AVAILABILITY: list[FixtureProviderAvailability] = [
                 "adults_25_64",
             ],
             "languages": ["en"],
+            "genders": [],
         },
     },
     {
@@ -167,6 +168,7 @@ FIXTURE_PROVIDER_AVAILABILITY: list[FixtureProviderAvailability] = [
             "treatment_modality": "Social skills, emotion regulation",
             "age_groups": ["children_6_10", "preteens_11_13"],
             "languages": ["en", "es"],
+            "genders": [],
         },
     },
     {
@@ -213,6 +215,7 @@ FIXTURE_PROVIDER_AVAILABILITY: list[FixtureProviderAvailability] = [
             "treatment_modality": "Comprehensive DBT",
             "age_groups": ["adolescents_14_18"],
             "languages": ["en", "es"],
+            "genders": [],
         },
     },
     {
@@ -248,6 +251,7 @@ FIXTURE_PROVIDER_AVAILABILITY: list[FixtureProviderAvailability] = [
             "treatment_modality": "Integrative, attachment-focused",
             "age_groups": ["adults_25_64", "older_adults_65_plus"],
             "languages": ["en"],
+            "genders": [],
         },
     },
     {
@@ -288,6 +292,7 @@ FIXTURE_PROVIDER_AVAILABILITY: list[FixtureProviderAvailability] = [
             "treatment_modality": "Psychopharmacology, supportive therapy",
             "age_groups": ["young_adults_19_24", "adults_25_64"],
             "languages": ["en"],
+            "genders": [],
         },
     },
     {
@@ -324,6 +329,16 @@ FIXTURE_PROVIDER_AVAILABILITY: list[FixtureProviderAvailability] = [
             "treatment_modality": "Parent–Child Interaction Therapy (PCIT)",
             "age_groups": ["children_0_5", "children_6_10", "preteens_11_13"],
             "languages": ["en", "es"],
+            # Bilingual practice; explicitly inclusive of trans + non-
+            # binary clients so families looking for affirming care see it.
+            "genders": [
+                "female",
+                "male",
+                "non_binary",
+                "trans_female",
+                "trans_male",
+                "gender_diverse",
+            ],
         },
     },
     {
@@ -371,6 +386,7 @@ FIXTURE_PROVIDER_AVAILABILITY: list[FixtureProviderAvailability] = [
                 "adults_25_64",
             ],
             "languages": ["en"],
+            "genders": [],
         },
     },
     {
@@ -417,6 +433,7 @@ FIXTURE_PROVIDER_AVAILABILITY: list[FixtureProviderAvailability] = [
             "treatment_modality": "Enhanced CBT-E for eating disorders",
             "age_groups": ["adolescents_14_18"],
             "languages": ["en"],
+            "genders": [],
         },
     },
     {
@@ -463,6 +480,7 @@ FIXTURE_PROVIDER_AVAILABILITY: list[FixtureProviderAvailability] = [
             "treatment_modality": "DBT-informed PHP",
             "age_groups": ["adults_25_64"],
             "languages": ["en"],
+            "genders": [],
         },
     },
     {
@@ -500,6 +518,16 @@ FIXTURE_PROVIDER_AVAILABILITY: list[FixtureProviderAvailability] = [
             "treatment_modality": "AEDP, IFS",
             "age_groups": ["adults_25_64"],
             "languages": ["en"],
+            # Solo LMFT doing identity work — queer-affirming explicit so
+            # LGBTQ+ adults and couples see the signal at scan distance.
+            "genders": [
+                "female",
+                "male",
+                "non_binary",
+                "trans_female",
+                "trans_male",
+                "gender_diverse",
+            ],
         },
     },
 ]
@@ -531,6 +559,7 @@ FIXTURE_CLIENT_REFERRAL: list[FixtureClientReferral] = [
             "services": ["psychotherapy"],
             "treatment_modality": "TF-CBT or EMDR preferred",
             "insurance": "in_network",
+            "gender": "female",
         },
     },
     {
@@ -554,6 +583,9 @@ FIXTURE_CLIENT_REFERRAL: list[FixtureClientReferral] = [
             "services": ["psychotherapy", "evaluation"],
             "treatment_modality": "PCIT or behavior-based",
             "insurance": "in_network",
+            # 7yo with selective mutism — gender not specified in the
+            # referring clinician's description.
+            "gender": "prefer_not_to_say",
         },
     },
     {
@@ -581,6 +613,7 @@ FIXTURE_CLIENT_REFERRAL: list[FixtureClientReferral] = [
             "services": ["psychotherapy"],
             "treatment_modality": "DBT or DBT-informed",
             "insurance": "out_of_network",
+            "gender": "male",
         },
     },
     {
@@ -604,6 +637,10 @@ FIXTURE_CLIENT_REFERRAL: list[FixtureClientReferral] = [
             "services": ["psychotherapy"],
             "treatment_modality": None,
             "insurance": "self_pay_only",
+            # 20yo (she/they) doing gender-identity work — the queer-
+            # affirming, Spanish-fluent ask drives the gender_diverse
+            # signal so trans-affirming providers surface as matches.
+            "gender": "gender_diverse",
         },
     },
     {
@@ -627,6 +664,8 @@ FIXTURE_CLIENT_REFERRAL: list[FixtureClientReferral] = [
             "services": ["evaluation"],
             "treatment_modality": None,
             "insurance": "in_network",
+            # 11yo — gender not stated by the referring clinician.
+            "gender": "prefer_not_to_say",
         },
     },
     {
@@ -654,6 +693,10 @@ FIXTURE_CLIENT_REFERRAL: list[FixtureClientReferral] = [
             "services": ["couples_therapy"],
             "treatment_modality": "EFT or Gottman",
             "insurance": "out_of_network",
+            # Couple — the gender field models a single client; for
+            # couples-therapy referrals the referrer typically leaves
+            # it unspecified.
+            "gender": "prefer_not_to_say",
         },
     },
     {
@@ -677,6 +720,9 @@ FIXTURE_CLIENT_REFERRAL: list[FixtureClientReferral] = [
             "services": ["medication_management", "psychotherapy"],
             "treatment_modality": "DBT",
             "insurance": "in_network",
+            # 17yo stepping down from residential — gender unstated by
+            # the referring clinician on the wire.
+            "gender": "prefer_not_to_say",
         },
     },
     {
@@ -700,6 +746,7 @@ FIXTURE_CLIENT_REFERRAL: list[FixtureClientReferral] = [
             "services": ["psychotherapy"],
             "treatment_modality": None,
             "insurance": "in_network",
+            "gender": "female",
         },
     },
     {
@@ -722,6 +769,8 @@ FIXTURE_CLIENT_REFERRAL: list[FixtureClientReferral] = [
             "services": ["family_therapy", "case_management"],
             "treatment_modality": "ESDM or PCIT",
             "insurance": "in_network",
+            # 5yo with autism — gender not stated by referring family.
+            "gender": "prefer_not_to_say",
         },
     },
     {
@@ -745,6 +794,7 @@ FIXTURE_CLIENT_REFERRAL: list[FixtureClientReferral] = [
             "services": ["medication_management"],
             "treatment_modality": None,
             "insurance": "in_network",
+            "gender": "prefer_not_to_say",
         },
     },
     {
@@ -774,6 +824,9 @@ FIXTURE_CLIENT_REFERRAL: list[FixtureClientReferral] = [
             "services": ["case_management"],
             "treatment_modality": None,
             "insurance": "please_contact",
+            # Multi-client referral (the group practice has openings,
+            # not a single named client) — gender doesn't apply.
+            "gender": "prefer_not_to_say",
         },
     },
     {
@@ -797,6 +850,7 @@ FIXTURE_CLIENT_REFERRAL: list[FixtureClientReferral] = [
             "services": ["psychotherapy"],
             "treatment_modality": "CBT or ACT",
             "insurance": "self_pay_only",
+            "gender": "male",
         },
     },
 ]

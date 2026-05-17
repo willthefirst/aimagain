@@ -56,6 +56,7 @@ _CLIENT_REFERRAL_DEFAULTS: dict[str, Any] = {
     "desired_times": [],
     "age_groups": ["adults_25_64"],
     "languages": ["en"],
+    "gender": "prefer_not_to_say",
     "description": "needs placement",
     "services": [],
     "treatment_modality": None,
@@ -77,6 +78,9 @@ _PROVIDER_AVAILABILITY_DEFAULTS: dict[str, Any] = {
     "treatment_modality": None,
     "age_groups": ["adults_25_64"],
     "languages": ["en"],
+    # Empty allowed = "no restriction stated". Tests that exercise
+    # gender semantics override; everything else gets a clean default.
+    "genders": [],
 }
 
 
