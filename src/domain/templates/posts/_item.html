@@ -1,121 +1,144 @@
-{# Dense list-item macro for the posts index.
+{# Card-shaped list-item macro for the posts index.
 
-Posts are polymorphic — `client_referral` (Seeking) and
-`provider_availability` (Providing). Each post renders as an `<li>`
-inside `<ul id="posts-list">` — `<li>` is the only valid child of
-`<ul>`, so the row carries `data-row-id` / `data-kind` directly.
-No per-post framing, no card styling, just the meta line and title
-flowing as content. Bespoke CSS is reduced to two patterns both
-scoped under `#posts-list > li`: the inline-list rules for the meta
-`<dl>`, and the line-clamp rule for the title `<p>`.
+Each post renders as a Pico `<article>` (default Pico styles give the
+card chrome — background, border, padding, rounded corners). The
+`<article>` is the natural HTML element for a self-contained piece of
+syndicated content; `<ul><li>` wrapping isn't needed once cards have
+their own framing. The list container in `list.html` is a `<section
+id="posts-list">` of `<article>` children.
 
-The row is two lines: a meta `<dl>` above, a title `<p>` below.
-Meta carries every fact about the post — date, kind chunk (Seeking
-or Providing — colored via the `[data-kind-chip]` attribute selector
-on the `<div>` wrapper), location, in-person / virtual format, age
-groups, and languages when non-default — each fact is a `<dt>` label
-(visually hidden, announced by screen readers) plus a `<dd><small>`
-value, wrapped in a `<div>` (HTML5 permits `<div>` grouping inside
-`<dl>`). The inline-list CSS in `base.html` flips the `<div>`
-wrappers to `display: inline` and inserts a `·` between adjacent
-siblings via `::before`, so the separator lives in CSS rather than
-markup. The title `<p>` is
-`display: -webkit-box` with `-webkit-line-clamp: 2`, so long
-descriptions clamp visually to two lines with an ellipsis but stay
-in the DOM (search engines, `?q=` ILIKE, and screen readers all see
-the full text). The `<p>` wrapper also inherits Pico's
-`typography-spacing-vertical`, which gives a small gap between the
-meta line and the title — the visual separation we want now that
-meta is above (the inverse of the earlier title-line `<p>`, which
-added unwanted space below the title).
+Layout per card:
 
-**Lead text per kind.** This is the part most evocative of what the
-post is about:
-  * `client_referral` → the description (the seeker's own words).
-    Falls back to a synthesized headline (`Seeking in <city>,
-    <state>`) only when description is empty.
-  * `provider_availability` → the linked provider's practice name
-    inside `<strong>`, plus an em-dash + description when one
-    exists. The practice name is the most-useful identifier; the
-    description elaborates.
+  ┌──────────────────────────────────────────────────────────────┐
+  │ Kind, ST (format-summary)                          May 17    │
+  │                                                              │
+  │ Services        │  Age: …             │  Referring Provider  │
+  │   • icon name   │  Languages: …       │  @username           │
+  │   • icon name   │  Insurance: …       │  (PA: practice name) │
+  │                 │  Modality: …        │                      │
+  └──────────────────────────────────────────────────────────────┘
 
-`active_kind` (passed via `row_kwargs`) hides the kind chunk when the
-page is filtered to a single kind — the chunk would be constant for
-every row; tests assert presence/absence via the `[data-kind-chip]`
-attribute on the meta `<div>` wrapper. The leading date renders via the
-`format_post_date` filter — see
-[`src/framework/rendering/templating.py`](../../../framework/rendering/templating.py).
-Insurance posture (in-network, sliding scale, etc.) is *not* in the
-listing meta — too noisy for a Craigslist-style feed; readers go to
-the detail page for posture and carrier specifics.
+The header line condenses kind + state + format into one structured
+phrase ("Client Referral, WA (virtual or in person)") — the format
+parenthetical varies based on the post's in-person/virtual posture.
+The body is a three-column grid: services, demographics, attribution.
+
+Per-service icons render inline next to each service name in the
+left column. The icons come from `CLIENT_REFERRAL_SERVICE_ICONS` and
+`TREATMENT_SETTINGS_ICONS` in `src/domain/models/enums.py`; the
+Lucide font CSS in `base.html` renders the glyphs. Icons next to a
+labeled item are unambiguous — the reader sees "pill | Medication
+management" together — unlike the earlier icon-only experiment.
+
+Right column varies by kind:
+  * `client_referral` → "Referring Provider" header + @username.
+  * `provider_availability` → "Practice" header + `<strong>{practice
+    _name}</strong>` + a smaller "Posted by @username" line.
+
+`active_kind` accepted for backward compatibility with `list.html`
+but ignored — the cards' `data-kind` left-edge color is constant
+per-kind, so a single-kind filter doesn't need to suppress anything.
 #}
 
-{% macro _meta_chunks(post, active_kind=None) -%}
-{# Yields one `<div><dt>Label</dt><dd><small>Value</small></dd></div>`
-   per metadata chunk. The wrapper `<dl>` in `post_item` styles them
-   inline (see the `#posts-list dl` rules in `base.html`); a `·`
-   separator is inserted via CSS `::before` rather than the markup.
-   `<dt>` labels are visually hidden but announced by screen readers,
-   so each chunk reads as the key/value pair it actually is. #}
-{%- if post.kind == "client_referral" -%}
-  {%- set d = post.client_referral_detail -%}
-  {%- set kind_label = "Seeking" -%}
-  {%- set city = d.location_city -%}
-  {%- set state = d.location_state -%}
-  {%- set in_person = d.location_in_person -%}
-  {%- set virtual = d.location_virtual -%}
-{%- else -%}
-  {%- set d = post.provider_availability_detail -%}
-  {%- set kind_label = "Providing" -%}
-  {%- set p = d.provider -%}
-  {%- set city = p.location_city -%}
-  {%- set state = p.location_state -%}
-  {%- set in_person = p.in_person_sessions -%}
-  {%- set virtual = p.virtual_sessions -%}
+{% macro _format_parenthetical(in_person, virtual) -%}
+{#- Compact "(virtual or in person)" / "(in person)" / "(virtual)"
+    summary for the header. "please_contact" on either arm degrades
+    to the generic "(contact for format)" label — the header isn't
+    the place to communicate posture nuance. -#}
+{%- if in_person == "please_contact" or virtual == "please_contact" -%}
+contact for format
+{%- elif in_person == "yes" and virtual == "yes" -%}
+virtual or in person
+{%- elif in_person == "yes" -%}
+in person
+{%- elif virtual == "yes" -%}
+virtual
 {%- endif -%}
-<div><dt>Date</dt><dd><small>{{ post.created_at | format_post_date }}</small></dd></div>
-{%- if active_kind is none %}
-<div data-kind-chip="{{ post.kind }}"><dt>Kind</dt><dd><small>{{ kind_label }}</small></dd></div>
-{%- endif -%}
-{%- if city and state %}<div><dt>Location</dt><dd><small>{{ city }}, {{ state }}</small></dd></div>{% endif %}
-{%- set fmt = [] -%}
-{%- if in_person == "yes" -%}{%- set _ = fmt.append("In-person") -%}{%- endif -%}
-{%- if virtual == "yes" -%}{%- set _ = fmt.append("Virtual") -%}{%- endif -%}
-{%- if fmt %}<div><dt>Format</dt><dd><small>{{ fmt | join(" + ") }}</small></dd></div>{% endif %}
-{%- if d.age_groups %}
-  {%- set ages = [] -%}
-  {%- for g in d.age_groups[:2] -%}{%- set _ = ages.append(CLIENT_AGE_GROUP_LABELS[g]) -%}{%- endfor -%}
-  {%- if d.age_groups | length > 2 -%}{%- set _ = ages.append("+" ~ (d.age_groups | length - 2)) -%}{%- endif -%}
-<div><dt>Age groups</dt><dd><small>{{ ages | join(", ") }}</small></dd></div>{% endif %}
-{%- if d.languages and not (d.languages | length == 1 and d.languages[0] == "en") %}
-  {%- set langs = [] -%}
-  {%- for l in d.languages[:2] -%}{%- set _ = langs.append(LANGUAGE_LABELS[l]) -%}{%- endfor -%}
-  {%- if d.languages | length > 2 -%}{%- set _ = langs.append("+" ~ (d.languages | length - 2)) -%}{%- endif -%}
-<div><dt>Languages</dt><dd><small>{{ langs | join(", ") }}</small></dd></div>{% endif %}
+{%- endmacro %}
+
+{% macro _service_item(value, label_dict, icon_dict) -%}
+{#- One `<li>` for a service or setting: icon + label. The icon is
+    decorative; the label carries the meaning for screen readers. -#}
+<li><i class="icon-{{ icon_dict[value] }}" aria-hidden="true"></i> {{ label_dict[value] }}</li>
 {%- endmacro %}
 
 {% macro post_item(post, active_kind=None) -%}
 {%- if post.kind == "client_referral" -%}
   {%- set d = post.client_referral_detail -%}
+  {#- CR posts have no client name; the kind label IS the identity. -#}
+  {%- set headline_text = "Client Referral" -%}
+  {%- set state = d.location_state -%}
+  {%- set in_person = d.location_in_person -%}
+  {%- set virtual = d.location_virtual -%}
+  {%- set services = d.services or [] -%}
+  {%- set settings_list = [] -%}
 {%- else -%}
   {%- set d = post.provider_availability_detail -%}
   {%- set p = d.provider -%}
+  {#- PA posts identify as their practice. The practice name is the
+      identity; "Provider Availability" as a label adds nothing. -#}
+  {%- set headline_text = p.practice_name -%}
+  {%- set state = p.location_state if p else None -%}
+  {%- set in_person = p.in_person_sessions if p else None -%}
+  {%- set virtual = p.virtual_sessions if p else None -%}
+  {%- set services = d.services or [] -%}
+  {%- set settings_list = d.settings or [] -%}
 {%- endif -%}
-<li data-row-id="{{ post.id }}" data-kind="{{ post.kind }}">
-  <dl>{{ _meta_chunks(post, active_kind=active_kind) }}</dl>
-  <p>
-    <a href="/posts/{{ post.id }}">
-      {%- if post.kind == "client_referral" -%}
-        {%- if d.description -%}
-          {{ d.description }}
-        {%- else -%}
-          Seeking in {{ d.location_city }}, {{ d.location_state }}
-        {%- endif -%}
-      {%- else -%}
-        <strong>{{ p.practice_name }}</strong>
-        {%- if d.description %} — {{ d.description }}{% endif -%}
-      {%- endif -%}
-    </a>
-  </p>
-</li>
+{%- set fmt = _format_parenthetical(in_person, virtual) | trim -%}
+{%- set posture = insurance_posture(post) -%}
+<article data-row-id="{{ post.id }}" data-kind="{{ post.kind }}">
+  <header class="post-header">
+    <strong><a href="/posts/{{ post.id }}">{{ headline_text }}{% if state %}, {{ state }}{% endif %}</a>{% if fmt %} ({{ fmt }}){% endif %}</strong>
+    <small>{{ post.created_at | format_post_date }}</small>
+  </header>
+  <div class="post-grid">
+    <section class="post-services">
+      {%- if services or settings_list %}
+      <h4>Services</h4>
+      <ul>
+        {%- for s in services %}
+        {{ _service_item(s, CLIENT_REFERRAL_SERVICE_LABELS, CLIENT_REFERRAL_SERVICE_ICONS) }}
+        {%- endfor %}
+        {%- for s in settings_list %}
+        {{ _service_item(s, TREATMENT_SETTINGS_LABELS, TREATMENT_SETTINGS_ICONS) }}
+        {%- endfor %}
+      </ul>
+      {%- endif %}
+    </section>
+
+    <section class="post-facts">
+      <dl>
+        {%- if d.age_groups %}
+        <div><dt>Age</dt><dd>
+          {%- set ages = [] -%}
+          {%- for g in d.age_groups -%}{%- set _ = ages.append(CLIENT_AGE_GROUP_LABELS[g]) -%}{%- endfor -%}
+          {{ ages | join(", ") }}
+        </dd></div>
+        {%- endif %}
+        {%- if d.languages and not (d.languages | length == 1 and d.languages[0] == "en") %}
+        <div><dt>Languages</dt><dd>
+          {%- set langs = [] -%}
+          {%- for l in d.languages -%}{%- set _ = langs.append(LANGUAGE_LABELS[l]) -%}{%- endfor -%}
+          {{ langs | join(", ") }}
+        </dd></div>
+        {%- endif %}
+        {%- if posture %}
+        <div><dt>Insurance</dt><dd>{{ INSURANCE_POSTURE_LABELS[posture] }}</dd></div>
+        {%- endif %}
+        {%- if d.treatment_modality %}
+        <div><dt>Modality</dt><dd>{{ d.treatment_modality }}</dd></div>
+        {%- endif %}
+      </dl>
+    </section>
+
+    <section class="post-attribution">
+      {#- "Contact" frames the third column as the action — the
+          reader is here to reach somebody. The post's owner is the
+          contact for either kind: for CR they're the referring
+          provider; for PA they're whoever speaks for the practice. -#}
+      <h4>Contact</h4>
+      <p>@{{ post.owner.username }}</p>
+    </section>
+  </div>
+</article>
 {%- endmacro %}

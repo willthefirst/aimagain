@@ -75,11 +75,14 @@ async def test_list_client_referral_item_shape(
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user: User,
 ):
-    """A `client_referral` renders as a single dense `<li>` in
-    `#posts-list`: a `Seeking` kind chip (`<mark data-kind-chip>`), the
-    description as the link target (the seeker's own words are the
-    lead), and a `·`-joined meta tail covering location / format / ages
-    / languages / insurance."""
+    """A `client_referral` renders as a card `<article>` in
+    `#posts-list`. The header reads "Client Referral, {state}
+    ({format-summary})" and links to the detail page. The body is a
+    three-column grid: services with icons (left), labeled facts
+    `<dl>` (middle), and referring-provider attribution (right). The
+    description never appears in the row — it lives on the detail
+    page. The kind is signaled by the `data-kind` attribute (which
+    the CSS turns into a 4px left-edge color)."""
     author = create_test_user(username=f"author-{uuid.uuid4()}")
     description = f"item-{uuid.uuid4()}"
     post = _client_referral_post(
@@ -92,6 +95,7 @@ async def test_list_client_referral_item_shape(
         age_groups=["adolescents_14_18", "adults_25_64"],
         languages=["en", "es"],
         insurance="in_network",
+        services=["psychotherapy", "medication_management"],
     )
     async with db_test_session_manager() as session:
         async with session.begin():
@@ -101,46 +105,57 @@ async def test_list_client_referral_item_shape(
     response = await authenticated_client.get("/posts")
     assert response.status_code == 200
     tree = HTMLParser(response.text)
-    item = tree.css_first("#posts-list > li")
+    item = tree.css_first("#posts-list > article")
     assert item is not None
     assert item.attributes.get("data-kind") == "client_referral"
 
-    # Kind chip: rendered when no `?kind=` filter is active. The chip
-    # attribute lives on the `<dl>` group wrapper `<div>`; the visible
-    # text is the `<dd>` (the `<dt>` label is visually hidden but in
-    # the DOM, so we read the `<dd>` directly for the visible value).
-    chip = item.css_first("[data-kind-chip]")
-    assert chip is not None
-    assert chip.attributes.get("data-kind-chip") == "client_referral"
-    assert chip.css_first("dd").text(strip=True) == "Seeking"
+    # Header line: "Client Referral, WA (virtual or in person)" — the
+    # link text within the header carries the kind + state; the
+    # parenthetical lives in the same `<strong>` next to the link.
+    header_link = item.css_first("header.post-header a")
+    assert header_link is not None
+    assert header_link.attributes.get("href") == f"/posts/{post.id}"
+    assert header_link.text(strip=True) == "Client Referral, WA"
+    header_text = item.css_first("header.post-header").text()
+    assert "(virtual or in person)" in header_text
 
-    # Description is the link target — the lead text is the seeker's
-    # own words, not a synthesized headline.
-    lead = item.css_first("a")
-    assert lead is not None
-    assert lead.attributes.get("href") == f"/posts/{post.id}"
-    assert lead.text(strip=True) == description
+    # No text kind-chip anywhere in the listing row.
+    assert item.css_first("[data-kind-chip]") is None
 
-    # Meta tail carries the location, format, ages, languages.
-    # Insurance posture deliberately dropped from listing meta — it's
-    # noisy in a Craigslist-style feed; readers go to the detail page
-    # for in-network carriers + sliding-scale specifics.
-    item_text = item.text()
-    assert "Seattle, WA" in item_text
-    assert "In-person + Virtual" in item_text
-    assert "Adolescents 14–18" in item_text  # en-dash
-    assert "English" in item_text and "Spanish" in item_text
+    # Description is not in the row text — it stays on the detail page.
+    assert description not in item.text()
+
+    # Services column lists each service with an inline icon and label.
+    service_items = item.css("section.post-services > ul > li")
+    service_labels = [li.text(strip=True) for li in service_items]
+    assert "Psychotherapy" in service_labels
+    assert "Medication management" in service_labels
+    # Each service item carries a Lucide `<i>` icon (decorative).
+    assert all(li.css_first("i[class^=icon-]") is not None for li in service_items)
+
+    # Demographics column carries labeled facts.
+    facts_text = item.css_first("section.post-facts").text()
+    assert "Adolescents 14–18, Adults 25–64" in facts_text  # en-dash
+    assert "In-network" in facts_text
+    assert "English, Spanish" in facts_text
+
+    # Attribution column: "Contact" header + @username (the post's
+    # owner is the contact for either kind).
+    attribution_text = item.css_first("section.post-attribution").text()
+    assert "Contact" in attribution_text
+    assert f"@{author.username}" in attribution_text
 
 
-async def test_list_client_referral_falls_back_to_synthesized_title(
+async def test_list_client_referral_header_is_kind_label_plus_state(
     authenticated_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user: User,
 ):
-    """A `client_referral` with an empty description (defensive — the
-    wire schema requires one today, but persisted blanks could exist)
-    falls back to the synthesized `Seeking in <city>, <state>` headline
-    so the row is never link-text-empty."""
+    """The `client_referral` card header reads `Client Referral,
+    {state}` (the kind label, plus state). CR posts have no client
+    name to use as identity, so the kind label fills that slot. The
+    description never serves as the header (it stays on the detail
+    page)."""
     author = create_test_user(username=f"author-{uuid.uuid4()}")
     post = _client_referral_post(
         description="",
@@ -156,9 +171,9 @@ async def test_list_client_referral_falls_back_to_synthesized_title(
     response = await authenticated_client.get("/posts")
     assert response.status_code == 200
     tree = HTMLParser(response.text)
-    lead = tree.css_first("#posts-list > li a")
+    lead = tree.css_first("#posts-list > article header.post-header a")
     assert lead is not None
-    assert lead.text(strip=True) == "Seeking in Boise, ID"
+    assert lead.text(strip=True) == "Client Referral, ID"
 
 
 async def test_list_provider_availability_item_shape(
@@ -166,9 +181,13 @@ async def test_list_provider_availability_item_shape(
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user: User,
 ):
-    """A `provider_availability` `<li>` uses the linked Provider's
-    `practice_name` as the lead (in `<strong>`) and renders a
-    `Providing` chip — the standardized counterpart to `Seeking`."""
+    """A `provider_availability` card header is `{practice_name},
+    {state} ({format})` — PA posts identify by their practice, so the
+    practice name fills the title slot (the `Provider Availability`
+    kind label would be redundant noise). Kind is signaled by the
+    `data-kind` left-edge color, not a text chip. Insurance posture
+    is rendered in the demographics column, derived from the linked
+    provider's `accepts_in_network` flag."""
     author = create_test_user(username=f"author-{uuid.uuid4()}")
     practice_name = f"Practice-{uuid.uuid4()}"
     post = _provider_availability_post(
@@ -195,46 +214,46 @@ async def test_list_provider_availability_item_shape(
     response = await authenticated_client.get("/posts")
     assert response.status_code == 200
     tree = HTMLParser(response.text)
-    item = tree.css_first("#posts-list > li")
+    item = tree.css_first("#posts-list > article")
     assert item is not None
     assert item.attributes.get("data-kind") == "provider_availability"
 
-    chip = item.css_first("[data-kind-chip]")
-    assert chip is not None
-    assert chip.css_first("dd").text(strip=True) == "Providing"
+    # No text kind-chip in the listing row.
+    assert item.css_first("[data-kind-chip]") is None
 
-    # Practice name is in <strong> inside the lead link.
-    lead = item.css_first("a")
+    # Header link text: practice name + state. The `(in person)`
+    # parenthetical sits next to the link inside the same `<strong>`.
+    lead = item.css_first("header.post-header a")
     assert lead is not None
-    assert lead.css_first("strong").text(strip=True) == practice_name
+    assert lead.text(strip=True) == f"{practice_name}, OR"
+    assert "(in person)" in item.css_first("header.post-header").text()
 
-    item_text = item.text()
-    assert "Portland, OR" in item_text
-    assert "In-person" in item_text
+    # Demographics column shows the posture; accepts_in_network=True
+    # wins the priority even though sliding_scale is also set.
+    facts_text = item.css_first("section.post-facts").text()
+    assert "In-network" in facts_text
+
+    # Attribution column carries Contact + @username.
+    attribution_text = item.css_first("section.post-attribution").text()
+    assert "Contact" in attribution_text
+    assert f"@{author.username}" in attribution_text
 
 
-async def test_list_lead_contains_full_description_no_backend_truncation(
+async def test_list_does_not_render_description_prose(
     authenticated_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user: User,
 ):
-    """The lead `<a>` contains the post's full description text — no
-    server-side `truncate()`. Visual clamping is CSS's job
-    (`-webkit-line-clamp: 2` on the title `<p>`), so long descriptions
-    stay in the DOM where `?q=` ILIKE filtering, search engines, and
-    screen readers can see them. A regression that re-introduced a
-    backend `truncate(N)` would silently lose text past N chars in
-    the DOM and break this test."""
+    """The description never appears in the listing row — it lives on
+    the detail page where the reader has committed to reading. The
+    card header is the kind label + state (CR) or the practice name +
+    state (PA); the body columns are services / labeled facts /
+    contact. A regression that re-introduced the description into the
+    row would surface this string in the DOM."""
     author = create_test_user(username=f"author-{uuid.uuid4()}")
-    # Description longer than any plausible visual-clamp budget — if
-    # the backend truncates, this string won't appear intact in the DOM.
     description = (
         "Looking for a long-term outpatient therapist for a 17-year-old "
-        "(she/her) with complex PTSD, emerging self-injury, and a recent "
-        "psychiatric hospitalization. Mom is engaged and willing to do "
-        "family work. We need someone trauma-trained who can hold a frame "
-        "and ideally has DBT skills training to draw on. Aetna in-network "
-        "preferred but we can flex on insurance for the right fit."
+        "(she/her) with complex PTSD. Aetna in-network preferred."
     )
     post = _client_referral_post(description=description, owner_id=author.id)
     async with db_test_session_manager() as session:
@@ -245,29 +264,31 @@ async def test_list_lead_contains_full_description_no_backend_truncation(
     response = await authenticated_client.get("/posts")
     assert response.status_code == 200
     tree = HTMLParser(response.text)
-    lead = tree.css_first("#posts-list > li a")
-    assert lead is not None
-    assert lead.text(strip=True) == description
+    item = tree.css_first("#posts-list > article")
+    assert item is not None
+    # No fragment of the description appears anywhere in the row.
+    assert "complex PTSD" not in item.text()
+    assert "Aetna" not in item.text()
 
 
-async def test_list_meta_is_an_inline_dl_of_key_value_chunks(
+async def test_list_meta_is_a_dl_of_labeled_key_value_chunks(
     authenticated_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user: User,
 ):
     """Each metadata fact is a `<dt>`/`<dd>` pair (wrapped in a
-    `<div>`, the HTML5 grouping construct inside `<dl>`) after the
-    title link. The `<dt>` label is visually hidden but read by
-    screen readers; the visible value is the `<dd><small>`. The `·`
-    visual separator lives in CSS (`#posts-list > li > dl > div +
-    div::before`) rather than the markup, so the DOM text has no `·`
-    glyphs. A regression that collapsed the chunks back into a
-    single `·`-joined string (or onto the title line) would fail
-    here.
+    `<div>`, the HTML5 grouping construct inside `<dl>`) in the
+    demographics column (`section.post-facts`). The `<dt>` is a
+    visible label (e.g. "Ages", "Insurance") — labels make the card
+    self-explanatory at scan distance. State + format live in the
+    card header parenthetical rather than the demographics list, so
+    the column stays focused on per-client facts.
 
-    Also: no owner-username link in the listing row. The author lives
-    on the detail page; the listing reads as Craigslist, not as a feed
-    of posts-by-people."""
+    The author's username appears in the `Contact` column (the
+    third grid column) — a deliberate change from the earlier
+    Craigslist-style row where the author was hidden. The header
+    link is the only `<a>` in the card; the contact text is a plain
+    `<p>` with `@username`."""
     author = create_test_user(username=f"author-{uuid.uuid4()}")
     post = _client_referral_post(
         description="meta-shape",
@@ -288,44 +309,33 @@ async def test_list_meta_is_an_inline_dl_of_key_value_chunks(
     response = await authenticated_client.get("/posts")
     assert response.status_code == 200
     tree = HTMLParser(response.text)
-    item = tree.css_first("#posts-list > li")
+    item = tree.css_first("#posts-list > article")
     assert item is not None
 
-    # Metadata is a nested `<dl>` of `<div><dt><dd>` chunks above the
-    # title — the inline-list pattern. Date and the kind chip both
-    # live in this list so the whole line reads uniformly. The outer
-    # `#posts-list` `<ul>` strips bullets; the inner `<dl>` is styled
-    # inline (and its `<dt>` labels visually hidden) by CSS in
-    # base.html.
-    meta_chunks = item.css("dl > div")
-    # date + Seeking + location + format + ages = 5 chunks.
-    # (English-only languages are dropped by the macro since `en` is
-    # the default; insurance is no longer in the listing meta —
-    # readers go to the detail page for that.)
-    assert len(meta_chunks) == 5
-    # Each chunk has both a `<dt>` label and a `<dd>` value — the
-    # screen-reader announcement is "Date: May 15", not bare "May 15".
+    # Demographics `<dl>` chunks. English-only languages are dropped
+    # (default); no modality on this post; insurance posture renders.
+    meta_chunks = item.css("section.post-facts dl > div")
+    # Ages + Insurance = 2 chunks.
+    assert len(meta_chunks) == 2
     labels = [chunk.css_first("dt").text(strip=True) for chunk in meta_chunks]
+    # `dt::after { content: ": " }` adds the colon in CSS; the DOM
+    # text of the `<dt>` is just the label.
+    assert labels == ["Age", "Insurance"]
     values = [chunk.css_first("dd").text(strip=True) for chunk in meta_chunks]
-    assert labels == ["Date", "Kind", "Location", "Format", "Age groups"]
-    # The first chunk's value is the formatted date — content depends
-    # on `now()`, so just check it's non-empty rather than pin a value.
-    assert values[0]
-    assert values[1:] == [
-        "Seeking",
-        "Seattle, WA",
-        "In-person",
-        "Adolescents 14–18",
-    ]
-    # No `·` separator anywhere in the parsed DOM text — the glyph
-    # lives in CSS `::before content`, not the HTML.
-    assert "·" not in item.text()
+    assert values == ["Adolescents 14–18", "In-network"]
 
-    # No owner-username link in the listing row — only the lead link.
+    # Header carries state + format parenthetical.
+    header_text = item.css_first("header.post-header").text()
+    assert "Client Referral, WA" in header_text
+    assert "(in person)" in header_text
+
+    # Single `<a>`: the header link to the detail page. The contact
+    # column shows the @username as plain text, not as a link.
     links = item.css("a")
     assert len(links) == 1
     assert links[0].attributes.get("href") == f"/posts/{post.id}"
-    assert author.username not in item.text()
+    attribution_text = item.css_first("section.post-attribution").text()
+    assert f"@{author.username}" in attribution_text
 
 
 async def test_list_renders_readable_date_format(
@@ -333,10 +343,10 @@ async def test_list_renders_readable_date_format(
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user: User,
 ):
-    """The leading date renders Craigslist-style (`May 15`) via the
+    """The date renders Craigslist-style (`May 15`) via the
     `format_post_date` Jinja filter — *not* the raw ISO `YYYY-MM-DD`
-    that `post.created_at.date()` produced before. The date is the
-    first chunk in the meta `<dl>`."""
+    that `post.created_at.date()` produced before. The date sits in
+    the card header's right-aligned `<small>`."""
     from datetime import datetime, timezone
 
     author = create_test_user(username=f"author-{uuid.uuid4()}")
@@ -351,11 +361,9 @@ async def test_list_renders_readable_date_format(
     response = await authenticated_client.get("/posts")
     assert response.status_code == 200
     tree = HTMLParser(response.text)
-    item = tree.css_first("#posts-list > li")
+    item = tree.css_first("#posts-list > article")
     assert item is not None
-    # First chunk of the meta `<dl>` is the leading date — its `<dd>`
-    # value carries the formatted text.
-    date_cell = item.css_first("dl > div dd")
+    date_cell = item.css_first("header.post-header small")
     assert date_cell is not None
     rendered = date_cell.text(strip=True)
     # `May 15` for current-year posts; `May 15, 2025` once we cross a
@@ -484,10 +492,11 @@ async def test_list_posts_one_post(
 
     assert response.status_code == 200
     tree = HTMLParser(response.text)
-    items = tree.css("#posts-list > li")
+    items = tree.css("#posts-list > article")
     assert len(items) == 1
-    item_text = items[0].text()
-    assert description in item_text
+    # The description doesn't appear in the listing row (lives on the
+    # detail page); the card header link is what we look for.
+    assert items[0].css_first("header.post-header a") is not None
     assert "No posts found" not in tree.body.text()
 
 
@@ -496,7 +505,9 @@ async def test_list_posts_orders_newest_first(
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user: User,
 ):
-    """GET /posts orders results by created_at DESC."""
+    """GET /posts orders results by created_at DESC. Descriptions don't
+    appear in the listing row, so the ordering check uses the row's
+    `data-row-id` attribute (set to the post UUID by the macro)."""
     from datetime import datetime, timedelta, timezone
 
     author = create_test_user(username=f"author-{uuid.uuid4()}")
@@ -519,10 +530,10 @@ async def test_list_posts_orders_newest_first(
     assert response.status_code == 200
 
     tree = HTMLParser(response.text)
-    items = tree.css("#posts-list > li")
+    items = tree.css("#posts-list > article")
     assert len(items) == 2
-    assert newer.client_referral_detail.description in items[0].text()
-    assert older.client_referral_detail.description in items[1].text()
+    assert items[0].attributes.get("data-row-id") == str(newer.id)
+    assert items[1].attributes.get("data-row-id") == str(older.id)
 
 
 # --- Update (PATCH) ------------------------------------------------------
@@ -674,7 +685,7 @@ async def test_list_filters_by_kind_seeking(
     response = await authenticated_client.get("/posts?kind=client_referral")
     assert response.status_code == 200
     tree = HTMLParser(response.text)
-    rows = tree.css("#posts-list > li")
+    rows = tree.css("#posts-list > article")
     assert len(rows) == 1
     assert rows[0].attributes.get("data-kind") == "client_referral"
     # The toolbar's filter link summarizes the active filter inline.
@@ -683,7 +694,7 @@ async def test_list_filters_by_kind_seeking(
     assert "Seeking" in link.text()
     # The kind chip is hidden on the cards when a single kind is selected —
     # it would be constant for every card on this page.
-    assert tree.css("#posts-list > li [data-kind-chip]") == []
+    assert tree.css("#posts-list > article [data-kind-chip]") == []
 
 
 async def test_list_rejects_unknown_kind(
@@ -727,7 +738,7 @@ async def test_list_filters_by_free_text_q_across_both_detail_tables(
     response = await authenticated_client.get("/posts?q=needle")
     assert response.status_code == 200
     tree = HTMLParser(response.text)
-    rows = tree.css("#posts-list > li")
+    rows = tree.css("#posts-list > article")
     # Both `needle-*` posts match across the polymorphic OR. The
     # `haystack-*` seeker is filtered out.
     assert len(rows) == 2
@@ -765,7 +776,7 @@ async def test_list_combines_kind_and_q_with_and(
     response = await authenticated_client.get("/posts?kind=client_referral&q=needle")
     assert response.status_code == 200
     tree = HTMLParser(response.text)
-    rows = tree.css("#posts-list > li")
+    rows = tree.css("#posts-list > article")
     assert len(rows) == 1
     assert rows[0].attributes.get("data-kind") == "client_referral"
 
@@ -793,7 +804,7 @@ async def test_list_filters_by_posted_by_username(
     response = await authenticated_client.get("/posts?posted_by=alice")
     assert response.status_code == 200
     tree = HTMLParser(response.text)
-    rows = tree.css("#posts-list > li")
+    rows = tree.css("#posts-list > article")
     assert len(rows) == 1
     assert rows[0].attributes.get("data-row-id") == str(alice_post.id)
     # The toolbar's filter link summarizes the active value inline.
@@ -848,7 +859,7 @@ async def test_list_filters_by_state_across_polymorphic_paths(
     response = await authenticated_client.get("/posts?state=NY&state=NJ")
     assert response.status_code == 200
     tree = HTMLParser(response.text)
-    rows = tree.css("#posts-list > li")
+    rows = tree.css("#posts-list > article")
     row_ids = {r.attributes.get("data-row-id") for r in rows}
     assert row_ids == {str(seeking_ny.id), str(offering_nj.id)}
     # The toolbar's filter link shows both values inline (within the
@@ -892,7 +903,9 @@ async def test_list_filters_by_city_substring_across_polymorphic_paths(
     response = await authenticated_client.get("/posts?city=spring")
     assert response.status_code == 200
     tree = HTMLParser(response.text)
-    row_ids = {r.attributes.get("data-row-id") for r in tree.css("#posts-list > li")}
+    row_ids = {
+        r.attributes.get("data-row-id") for r in tree.css("#posts-list > article")
+    }
     assert row_ids == {str(seeking_match.id), str(offering_match.id)}
 
 
@@ -930,7 +943,9 @@ async def test_list_filters_by_age_group_json_contains(
     response = await authenticated_client.get("/posts?age_group=adults_25_64")
     assert response.status_code == 200
     tree = HTMLParser(response.text)
-    row_ids = {r.attributes.get("data-row-id") for r in tree.css("#posts-list > li")}
+    row_ids = {
+        r.attributes.get("data-row-id") for r in tree.css("#posts-list > article")
+    }
     assert row_ids == {str(seeking_match.id), str(offering_match.id)}
 
 
@@ -958,7 +973,7 @@ async def test_list_filters_by_language_json_contains(
     response = await authenticated_client.get("/posts?language=es")
     assert response.status_code == 200
     tree = HTMLParser(response.text)
-    rows = tree.css("#posts-list > li")
+    rows = tree.css("#posts-list > article")
     assert len(rows) == 1
     assert rows[0].attributes.get("data-row-id") == str(spanish_seeker.id)
 
@@ -1463,10 +1478,15 @@ async def test_list_renders_client_referral_row(
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user: User,
 ):
-    """`GET /posts` lists a client_referral with a kind label."""
+    """`GET /posts` renders a client_referral card whose header link
+    starts with `Client Referral` (the kind label). The kind is also
+    conveyed by the `data-kind` left-edge color, but tests assert
+    against the visible text."""
     author = create_test_user(username=f"author-{uuid.uuid4()}")
-    description = f"crsummary-{uuid.uuid4()}"
-    post = _client_referral_post(description=description, owner_id=author.id)
+    post = _client_referral_post(
+        description=f"crsummary-{uuid.uuid4()}",
+        owner_id=author.id,
+    )
 
     async with db_test_session_manager() as session:
         async with session.begin():
@@ -1475,11 +1495,11 @@ async def test_list_renders_client_referral_row(
 
     response = await authenticated_client.get("/posts")
     assert response.status_code == 200
-    page = response.text
-    assert description in page
-    # The kind chunk renders `Seeking` (not the longer `client referral`
-    # label) — the chip text is what the user actually sees.
-    assert "Seeking" in page
+    tree = HTMLParser(response.text)
+    item = tree.css_first("#posts-list > article")
+    assert item is not None
+    assert item.attributes.get("data-kind") == "client_referral"
+    assert "Client Referral" in item.css_first("header.post-header a").text()
 
 
 async def test_get_client_referral_detail_renders(
@@ -1922,7 +1942,10 @@ async def test_list_renders_provider_availability_row(
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user: User,
 ):
-    """`GET /posts` lists a provider_availability with a kind label."""
+    """`GET /posts` renders a provider_availability card whose header
+    link IS the practice name (PA posts identify by their practice;
+    the `Provider Availability` kind label is dropped from the title
+    as redundant)."""
     author = create_test_user(username=f"author-{uuid.uuid4()}")
     practice_name = f"Practice-{uuid.uuid4()}"
     post = _provider_availability_post(practice_name=practice_name, owner_id=author.id)
@@ -1934,11 +1957,11 @@ async def test_list_renders_provider_availability_row(
 
     response = await authenticated_client.get("/posts")
     assert response.status_code == 200
-    page = response.text
-    assert practice_name in page
-    # The kind chunk renders `Providing` (not the longer `provider
-    # availability` label) — the chip text is what the user sees.
-    assert "Providing" in page
+    tree = HTMLParser(response.text)
+    item = tree.css_first("#posts-list > article")
+    assert item is not None
+    assert item.attributes.get("data-kind") == "provider_availability"
+    assert practice_name in item.css_first("header.post-header a").text()
 
 
 async def test_get_provider_availability_detail_renders(

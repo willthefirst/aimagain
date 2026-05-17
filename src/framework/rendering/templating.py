@@ -81,6 +81,17 @@ _env.globals.update(
     CLIENT_REFERRAL_SERVICE_LABELS=enums.CLIENT_REFERRAL_SERVICE_LABELS,
     TREATMENT_SETTINGS=enums.TREATMENT_SETTINGS,
     TREATMENT_SETTINGS_LABELS=enums.TREATMENT_SETTINGS_LABELS,
+    # Lucide icon names per enum value — consumed by the listing-row
+    # macro in `src/domain/templates/posts/_item.html`. Renaming a label
+    # leaves these untouched; adding/renaming an *enum value* must touch
+    # the icons dict too (`test_icons_cover_their_tuples` guard fires
+    # otherwise).
+    CLIENT_AGE_GROUP_ICONS=enums.CLIENT_AGE_GROUP_ICONS,
+    CLIENT_REFERRAL_SERVICE_ICONS=enums.CLIENT_REFERRAL_SERVICE_ICONS,
+    TREATMENT_SETTINGS_ICONS=enums.TREATMENT_SETTINGS_ICONS,
+    INSURANCE_POSTURES=enums.INSURANCE_POSTURES,
+    INSURANCE_POSTURE_LABELS=enums.INSURANCE_POSTURE_LABELS,
+    INSURANCE_POSTURE_ICONS=enums.INSURANCE_POSTURE_ICONS,
     # `LICENSE_TYPES`, `EDUCATION_TYPES`, `CERTIFICATION_TYPES` and
     # their `_LABELS` are provider-only — they flow into the context
     # via `PROVIDER_ENTITY.static_context` (merged by `handle_detail` /
@@ -130,6 +141,14 @@ register_choice_labels(enums.EDUCATION_TYPES, enums.EDUCATION_TYPES_LABELS)
 register_choice_labels(enums.CERTIFICATION_TYPES, enums.CERTIFICATION_TYPES_LABELS)
 
 _env.filters["format_post_date"] = format_post_date
+
+# Post-specific view helper. Lives in `domain/logic/posts/view.py`; the
+# import goes through `domain.logic` (the framework would normally not
+# import domain, but this template-context binding is the same site
+# that already exposes domain enums + per-kind create schemas above).
+from src.domain.logic.posts.view import insurance_posture_for_post  # noqa: E402
+
+_env.globals["insurance_posture"] = insurance_posture_for_post
 
 templates = Jinja2Templates(env=_env)
 
