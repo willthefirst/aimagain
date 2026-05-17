@@ -83,17 +83,12 @@
          lone child still parks at the right edge. `flex-wrap` lets
          long rows wrap onto multiple lines on narrow viewports. */
       .toolbar { display: flex; justify-content: flex-end; align-items: center; flex-wrap: wrap; gap: 1rem; }
-      /* Action-bar children align as individual flex items. `<span>`
-         wrappers used as DOM-grouping hooks (e.g. `.admin-actions`,
-         `.owner-actions` — both carry `data-*` attributes and bundle
-         two buttons) become layout-invisible so their inner buttons
-         participate directly in the toolbar's row — same alignment +
-         gap as bare button-shaped children. The span stays in the DOM
-         for selectors and `data-*` attributes. Pico's default
-         `<button>` is `display: block; width: 100%` (form-shaped); the
-         action bar overrides to natural-width inline buttons — same
-         pattern as `.filter-chips` / `.filter-actions` above. */
-      .toolbar > span { display: contents; }
+      /* Pico's default `<button>` is `display: block; width: 100%`
+         (form-shaped); the action bar overrides to natural-width
+         inline buttons — same pattern as `.filter-chips` /
+         `.filter-actions` above. Each action is a bare button-shaped
+         element (`<button>`, `<a role="button">`) — no wrapping spans
+         — so this selector reaches every action child directly. */
       .toolbar button, .toolbar [role="button"] { width: auto; margin: 0; }
       .toolbar-left { flex: 1; min-width: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; }
       .toolbar-right { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; }
