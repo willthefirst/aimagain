@@ -135,7 +135,7 @@ async def test_list_hides_admin_actions_for_non_admin(
     response = await authenticated_client.get("/users")
     tree = HTMLParser(response.text)
     assert (
-        tree.css_first("span.admin-actions") is None
+        tree.css_first("button[hx-put*='/activation']") is None
     ), "Non-admin should not see admin action buttons"
 
 
@@ -153,12 +153,10 @@ async def test_list_shows_admin_actions_for_admin(
 
     response = await authenticated_client.get("/users")
     tree = HTMLParser(response.text)
-    actions = tree.css("span.admin-actions")
-    assert len(actions) == 1, "Expected one admin-actions span (one non-self row)"
-    buttons = actions[0].css("button")
-    button_labels = {b.text().strip() for b in buttons}
-    assert "Deactivate" in button_labels
-    assert "Delete" in button_labels
+    activation_buttons = tree.css(f"button[hx-put='/users/{other.id}/activation']")
+    assert len(activation_buttons) == 1, "Expected one activation button (one non-self row)"
+    assert activation_buttons[0].text().strip() == "Deactivate"
+    assert tree.css_first(f"button[hx-delete='/users/{other.id}']") is not None
 
 
 async def test_list_shows_reactivate_for_deactivated_user(
@@ -175,9 +173,9 @@ async def test_list_shows_reactivate_for_deactivated_user(
 
     response = await authenticated_client.get("/users")
     tree = HTMLParser(response.text)
-    button_labels = {b.text().strip() for b in tree.css("span.admin-actions button")}
-    assert "Reactivate" in button_labels
-    assert "Deactivate" not in button_labels
+    activation_button = tree.css_first(f"button[hx-put='/users/{other.id}/activation']")
+    assert activation_button is not None
+    assert activation_button.text().strip() == "Reactivate"
 
 
 # --- Detail page ---------------------------------------------------------
@@ -312,7 +310,7 @@ async def test_detail_shows_admin_actions_for_admin(
 
     response = await authenticated_client.get(f"/users/{target.id}")
     tree = HTMLParser(response.text)
-    assert tree.css_first("span.admin-actions") is not None
+    assert tree.css_first(f"button[hx-put='/users/{target.id}/activation']") is not None
 
 
 async def test_detail_admin_actions_render_inside_toolbar(
@@ -331,9 +329,10 @@ async def test_detail_admin_actions_render_inside_toolbar(
 
     response = await authenticated_client.get(f"/users/{target.id}")
     tree = HTMLParser(response.text)
-    assert tree.css_first(".toolbar span.admin-actions") is not None
+    activation_selector = f"button[hx-put='/users/{target.id}/activation']"
+    assert tree.css_first(f".toolbar {activation_selector}") is not None
     # Sanity: not duplicated inside <article>.
-    assert tree.css_first("article span.admin-actions") is None
+    assert tree.css_first(f"article {activation_selector}") is None
 
 
 async def test_detail_hides_admin_actions_for_non_admin(
@@ -349,7 +348,7 @@ async def test_detail_hides_admin_actions_for_non_admin(
 
     response = await authenticated_client.get(f"/users/{target.id}")
     tree = HTMLParser(response.text)
-    assert tree.css_first("span.admin-actions") is None
+    assert tree.css_first(f"button[hx-put='/users/{target.id}/activation']") is None
 
 
 async def test_detail_shows_providers_empty_state(

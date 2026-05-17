@@ -7,14 +7,14 @@
                 `src/logic/_authz.py`. The partial does not introspect
                 `current_user`; the rule lives in the predicate module.
 
-   Renders nothing unless `can_edit` is truthy. Backend authz lives in
-   src/logic/posts/post_processing.py — this `{% if %}` is presentation
-   only.
+   Renders nothing unless `can_edit` is truthy. The buttons themselves
+   carry the post's identity in their `href` / `hx-delete` URLs; tests
+   find them by attribute rather than a wrapper class. Backend authz
+   lives in src/logic/posts/post_processing.py — this `{% if %}` is
+   presentation only.
 #}
 {%- from "_shared/actions.html" import confirm_delete_button -%}
 {% if can_edit %}
-<span class="owner-actions" data-post-id="{{ post.id }}">
-  <a href="/posts/{{ post.id }}/form" role="button" class="outline">Edit</a>
-  {{ confirm_delete_button("/posts/" ~ post.id, "Permanently delete this post? This cannot be undone.") }}
-</span>
+<a href="/posts/{{ post.id }}/form" role="button" class="outline">Edit</a>
+{{ confirm_delete_button("/posts/" ~ post.id, "Permanently delete this post? This cannot be undone.") }}
 {% endif %}

@@ -1056,11 +1056,9 @@ async def test_detail_page_shows_edit_link_for_owner(
     response = await authenticated_client.get(f"/posts/{post.id}")
     assert response.status_code == 200
     tree = HTMLParser(response.text)
-    actions = tree.css_first("span.owner-actions")
-    assert actions is not None
-    edit_link = actions.css_first("a")
+    edit_link = tree.css_first(f"a[href='/posts/{post.id}/form']")
     assert edit_link is not None
-    assert edit_link.attributes.get("href") == f"/posts/{post.id}/form"
+    assert edit_link.attributes.get("role") == "button"
 
 
 async def test_detail_page_shows_edit_link_for_admin(
@@ -1079,7 +1077,7 @@ async def test_detail_page_shows_edit_link_for_admin(
     response = await authenticated_client.get(f"/posts/{post.id}")
     assert response.status_code == 200
     tree = HTMLParser(response.text)
-    assert tree.css_first("span.owner-actions") is not None
+    assert tree.css_first(f"a[href='/posts/{post.id}/form']") is not None
 
 
 async def test_detail_page_hides_edit_link_for_stranger(
@@ -1097,7 +1095,8 @@ async def test_detail_page_hides_edit_link_for_stranger(
     response = await authenticated_client.get(f"/posts/{post.id}")
     assert response.status_code == 200
     tree = HTMLParser(response.text)
-    assert tree.css_first("span.owner-actions") is None
+    assert tree.css_first(f"a[href='/posts/{post.id}/form']") is None
+    assert tree.css_first(f"button[hx-delete='/posts/{post.id}']") is None
 
 
 async def test_detail_page_delete_button_for_owner(
@@ -1115,12 +1114,9 @@ async def test_detail_page_delete_button_for_owner(
     response = await authenticated_client.get(f"/posts/{post.id}")
     assert response.status_code == 200
     tree = HTMLParser(response.text)
-    actions = tree.css_first("span.owner-actions")
-    assert actions is not None
-    button = actions.css_first("button")
+    button = tree.css_first(f"button[hx-delete='/posts/{post.id}']")
     assert button is not None
     assert button.text().strip() == "Delete"
-    assert button.attributes.get("hx-delete") == f"/posts/{post.id}"
     assert button.attributes.get("hx-confirm")
 
 
@@ -1141,9 +1137,8 @@ async def test_detail_page_delete_button_for_admin(
     response = await authenticated_client.get(f"/posts/{post.id}")
     assert response.status_code == 200
     tree = HTMLParser(response.text)
-    button = tree.css_first("span.owner-actions button")
+    button = tree.css_first(f"button[hx-delete='/posts/{post.id}']")
     assert button is not None
-    assert button.attributes.get("hx-delete") == f"/posts/{post.id}"
 
 
 # --- Audit log -----------------------------------------------------------
