@@ -28,6 +28,13 @@ from src.domain.models import (
     Provider,
     User,
 )
+from src.framework.dispatch.pagination import (
+    DEFAULT_PAGE_SIZE,
+    base_query,
+    offset_for,
+    paginate,
+    parse_page,
+)
 from src.framework.http.exceptions import ForbiddenError, NotFoundError
 
 logger = logging.getLogger(__name__)
@@ -72,6 +79,11 @@ async def handle_list_user_providers(
     list page. A user may view their own list; admins may view anyone's.
     404 if the target user does not exist; 403 if a non-admin requests
     another user's list.
+
+    Pagination: parses `?page=N` and asks the repo for `per_page + 1`
+    rows to compute `has_next`. Uses the framework's
+    `DEFAULT_PAGE_SIZE` — this is a bespoke handler so there's no
+    `EntitySpec.page_size` to consult.
     """
     if user_id != requesting_user.id and not requesting_user.is_superuser:
         raise ForbiddenError(
@@ -80,11 +92,22 @@ async def handle_list_user_providers(
     target_user = await user_repo.get_by_model_id(User, user_id)
     if target_user is None:
         raise NotFoundError(detail=f"User {user_id} not found")
-    providers = await repo.list_for_user(user_id)
+    page_number = parse_page(request)
+    per_page = DEFAULT_PAGE_SIZE
+    providers_plus_one = await repo.list_for_user(
+        user_id,
+        offset=offset_for(page_number, per_page),
+        limit=per_page + 1,
+    )
+    providers, page_meta = paginate(
+        providers_plus_one, page=page_number, per_page=per_page
+    )
     return {
         "request": request,
         "target_user": target_user,
         "providers": providers,
         "is_self": user_id == requesting_user.id,
         "current_user": requesting_user,
+        "page_meta": page_meta,
+        "paginator_base_query": base_query(request),
     }

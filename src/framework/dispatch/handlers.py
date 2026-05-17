@@ -14,6 +14,13 @@ from src.framework.audit.repository import AuditRepository
 from src.framework.authz import is_admin
 from src.framework.dispatch.entity_spec import EntitySpec
 from src.framework.dispatch.filters import Filter
+from src.framework.dispatch.pagination import (
+    DEFAULT_PAGE_SIZE,
+    base_query,
+    offset_for,
+    paginate,
+    parse_page,
+)
 from src.framework.http.exceptions import BadRequestError, ForbiddenError, NotFoundError
 from src.framework.persistence.base_repository import BaseRepository
 from src.framework.rendering.projections import project_view
@@ -593,13 +600,23 @@ async def handle_list(
 ) -> dict[str, Any]:
     """Generic list handler driven by `spec`; prefers
     ``repo.list_<collection>`` and falls through to ``repo.list_default``
-    when the bespoke method doesn't exist."""
+    when the bespoke method doesn't exist.
+
+    Pagination: parses `?page=N` from the request, asks the logic layer
+    for `per_page + 1` rows, and slices the probe off to compute
+    `has_next` without a separate count query. Per-page size is
+    `spec.page_size` if set, otherwise `DEFAULT_PAGE_SIZE`.
+    """
+    page_number = parse_page(request)
+    per_page = spec.page_size or DEFAULT_PAGE_SIZE
     list_kwargs: dict[str, Any] = dict(filter_values)
     if spec.list_exclude_self and requesting_user is not None:
         list_kwargs["exclude_self"] = requesting_user
+    list_kwargs["offset"] = offset_for(page_number, per_page)
+    list_kwargs["limit"] = per_page + 1
     list_method = getattr(repo, f"list_{spec.url_collection}", None)
     if list_method is not None:
-        items = await list_method(**list_kwargs)
+        items_plus_one = await list_method(**list_kwargs)
     else:
         if spec.list_order_by is None:
             raise ValueError(
@@ -608,15 +625,19 @@ async def handle_list(
                 "repo — either declare list_order_by on the spec or add a "
                 f"list_{spec.url_collection!s}() method to the repo."
             )
-        items = await repo.list_default(
+        items_plus_one = await repo.list_default(
             spec.model, order_by=spec.list_order_by, **list_kwargs
         )
+
+    items, page_meta = paginate(items_plus_one, page=page_number, per_page=per_page)
 
     context: dict[str, Any] = {
         "request": request,
         spec.url_collection: items,
         "current_user": requesting_user,
         "can_admin_actions": is_admin(requesting_user),
+        "page_meta": page_meta,
+        "paginator_base_query": base_query(request),
     }
     # Filter echo — the list page's filter form preselects the active
     # value by reading ``selected_<name>`` from the context.

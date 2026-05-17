@@ -183,6 +183,12 @@
          rule below. Pages without a toolbar leave the block empty. #}
       {% block toolbar %}{% endblock %}
       {% block content %}{% endblock %}
+      {# Post-content slot. `views/list.html` populates this with the
+         pagination footer; non-list views leave it empty. Reserved
+         for chrome that belongs *after* the main body but inside the
+         `<main>` container — keep it small (a footer nav, not new
+         content). #}
+      {% block after_content %}{% endblock %}
     </main>
   </body>
 </html>

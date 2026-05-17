@@ -282,6 +282,15 @@ class EntitySpec:
     # owns ordering inline.
     list_order_by: Any = None
 
+    # List pagination size ---------------------------------------------
+    # Per-page row count `handle_list` passes to the logic layer
+    # (handler asks for `page_size + 1` rows and slices the probe off
+    # to compute `has_next`). When `None`, falls back to
+    # `src.framework.dispatch.pagination.DEFAULT_PAGE_SIZE`. Override
+    # per entity when the row shape calls for it (e.g. posts' rich
+    # `<li>` feed wants a smaller page than the providers table).
+    page_size: int | None = None
+
     # Delete-route self guard ------------------------------------------
     # When True, `handle_delete` rejects the request with 403 if the
     # URL's target id equals the requesting user's id — preventing an

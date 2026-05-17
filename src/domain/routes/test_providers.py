@@ -680,3 +680,81 @@ async def test_non_owner_cannot_open_edit_form(
     )
     response = await authenticated_client.get(f"/providers/{provider_id}/form")
     assert response.status_code == 403
+
+
+# --- Pagination ---------------------------------------------------------
+
+
+async def test_list_renders_no_pagination_footer_for_single_page(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user: User,
+):
+    """A result that fits on a single page renders no Prev/Next chrome.
+    Pins the `pagination` macro's single-page suppression rule."""
+    await _seed_provider_for(db_test_session_manager, user_id=logged_in_user.id)
+    response = await authenticated_client.get("/providers")
+    assert response.status_code == 200
+    tree = HTMLParser(response.text)
+    assert tree.css_first('nav[aria-label="Pagination"]') is None
+
+
+async def test_list_paginates_when_over_per_page(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user: User,
+    monkeypatch,
+):
+    """Page 1 shows up to `DEFAULT_PAGE_SIZE` rows and a Next link;
+    page 2 shows the rest and a Prev link. Monkeypatches the page
+    size down to keep the seed cheap — the framework's `handle_list`
+    reads the constant from `handlers.DEFAULT_PAGE_SIZE`, so that's
+    where the patch lives."""
+    monkeypatch.setattr("src.framework.dispatch.handlers.DEFAULT_PAGE_SIZE", 2)
+    for _ in range(3):
+        await _seed_provider_for(db_test_session_manager, user_id=logged_in_user.id)
+
+    response = await authenticated_client.get("/providers")
+    assert response.status_code == 200
+    tree = HTMLParser(response.text)
+    rows = tree.css("#providers-table tbody tr")
+    assert len(rows) == 2
+    pagination = tree.css_first('nav[aria-label="Pagination"]')
+    assert pagination is not None
+    assert pagination.css_first('a[rel="next"]') is not None
+    assert pagination.css_first('a[rel="prev"]') is None
+
+    response2 = await authenticated_client.get("/providers?page=2")
+    assert response2.status_code == 200
+    tree2 = HTMLParser(response2.text)
+    rows2 = tree2.css("#providers-table tbody tr")
+    assert len(rows2) == 1
+    pagination2 = tree2.css_first('nav[aria-label="Pagination"]')
+    assert pagination2 is not None
+    assert pagination2.css_first('a[rel="prev"]') is not None
+    assert pagination2.css_first('a[rel="next"]') is None
+
+
+async def test_list_pagination_preserves_query_params(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user: User,
+    monkeypatch,
+):
+    """A page-link from `/providers?foo=bar&page=1` round-trips
+    `foo=bar` — the Next link must preserve query state so the user
+    doesn't lose their filter when navigating. `base_query()` is
+    filter-agnostic: anything in the URL except `page=` carries over,
+    so any extra param works as the test signal."""
+    monkeypatch.setattr("src.framework.dispatch.handlers.DEFAULT_PAGE_SIZE", 1)
+    for _ in range(2):
+        await _seed_provider_for(db_test_session_manager, user_id=logged_in_user.id)
+
+    response = await authenticated_client.get("/providers?ignored_param=foo")
+    assert response.status_code == 200
+    tree = HTMLParser(response.text)
+    next_link = tree.css_first('nav[aria-label="Pagination"] a[rel="next"]')
+    assert next_link is not None
+    href = next_link.attributes.get("href", "")
+    assert "ignored_param=foo" in href
+    assert "page=2" in href

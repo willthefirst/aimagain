@@ -20,12 +20,22 @@ class ProviderRepository(BaseRepository):
         result = await self.session.execute(stmt)
         return result.scalars().first()
 
-    async def list_for_user(self, user_id: UUID) -> Sequence[Provider]:
-        """Lists every provider owned by the given user, newest first."""
+    async def list_for_user(
+        self,
+        user_id: UUID,
+        *,
+        offset: int = 0,
+        limit: int | None = None,
+    ) -> Sequence[Provider]:
+        """Lists every provider owned by the given user, newest first.
+        `offset`/`limit` come from the pagination layer (the bespoke
+        `handle_list_user_providers` handler computes them)."""
         return await self._list(
             select(Provider)
             .filter(Provider.owner_id == user_id)
-            .order_by(Provider.created_at.desc())
+            .order_by(Provider.created_at.desc()),
+            offset=offset,
+            limit=limit,
         )
 
     async def list_providers(
@@ -33,10 +43,14 @@ class ProviderRepository(BaseRepository):
         *,
         license_type: str | None = None,
         issuing_state: str | None = None,
+        offset: int = 0,
+        limit: int | None = None,
     ) -> Sequence[Provider]:
         """Lists providers, newest first. When a filter is set, joins
         through `provider_licensures` and `.distinct()`s the parents so
-        a provider with multiple matching licensures appears once."""
+        a provider with multiple matching licensures appears once.
+        `offset`/`limit` come from the framework's pagination layer
+        (see `src/framework/dispatch/pagination.py`)."""
         stmt = select(Provider)
         if license_type is not None or issuing_state is not None:
             stmt = stmt.join(
@@ -49,7 +63,7 @@ class ProviderRepository(BaseRepository):
                 stmt = stmt.filter(ProviderLicensure.issuing_state == issuing_state)
             stmt = stmt.distinct()
         stmt = stmt.order_by(Provider.created_at.desc())
-        return await self._list(stmt)
+        return await self._list(stmt, offset=offset, limit=limit)
 
     # --- Provider mutations ----------------------------------------
     # The framework's `handle_create` calls `repo.create(Provider(...))`
