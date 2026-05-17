@@ -36,8 +36,19 @@ from tests.helpers import create_test_user, make_provider
 pytestmark = pytest.mark.asyncio
 
 
-def _fake_request() -> Request:
-    return Request({"type": "http", "headers": [], "method": "GET", "path": "/"})
+def _fake_request(query_string: bytes = b"") -> Request:
+    """Minimal Starlette Request used as a placeholder. `query_string`
+    is consumed by `parse_page` / `base_query` when the handler
+    paginates; callers that don't care leave the default empty."""
+    return Request(
+        {
+            "type": "http",
+            "headers": [],
+            "method": "GET",
+            "path": "/",
+            "query_string": query_string,
+        }
+    )
 
 
 async def _seed_user(

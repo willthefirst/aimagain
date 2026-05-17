@@ -32,17 +32,25 @@ class UserFavoriteRepository(BaseRepository):
     async def delete_favorite(self, favorite: UserFavorite) -> None:
         await self._delete(favorite)
 
-    async def list_favorited_providers(self, user_id: UUID) -> Sequence[Provider]:
+    async def list_favorited_providers(
+        self,
+        user_id: UUID,
+        *,
+        offset: int = 0,
+        limit: int | None = None,
+    ) -> Sequence[Provider]:
         """Return the providers a user has favorited, newest-favoriting
         first. Joined query (not two round-trips) so the listing page
-        renders in one shot."""
+        renders in one shot. `offset`/`limit` come from the pagination
+        layer (the bespoke `handle_list_my_favorites` handler computes
+        them)."""
         stmt = (
             select(Provider)
             .join(UserFavorite, UserFavorite.provider_id == Provider.id)
             .filter(UserFavorite.user_id == user_id)
             .order_by(UserFavorite.created_at.desc())
         )
-        return await self._list(stmt)
+        return await self._list(stmt, offset=offset, limit=limit)
 
     async def is_favorited(self, *, user_id: UUID, provider_id: UUID) -> bool:
         """True if this user has this provider favorited. Wrapper around

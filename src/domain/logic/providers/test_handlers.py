@@ -47,11 +47,20 @@ from tests.helpers import (
 pytestmark = pytest.mark.asyncio
 
 
-def _fake_request() -> Request:
+def _fake_request(query_string: bytes = b"") -> Request:
     """Minimal Starlette Request used as a placeholder for handlers that
-    forward the request into a template context but don't otherwise read
-    from it."""
-    return Request({"type": "http", "headers": [], "method": "GET", "path": "/"})
+    forward the request into a template context. `query_string` is
+    consumed by `parse_page` / `base_query` when the handler paginates;
+    callers that don't care leave the default empty."""
+    return Request(
+        {
+            "type": "http",
+            "headers": [],
+            "method": "GET",
+            "path": "/",
+            "query_string": query_string,
+        }
+    )
 
 
 # --- Seeding helpers -----------------------------------------------------

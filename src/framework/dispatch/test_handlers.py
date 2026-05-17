@@ -16,9 +16,25 @@ import inspect
 from dataclasses import dataclass
 from types import SimpleNamespace
 from typing import Any
+from urllib.parse import parse_qsl
 from uuid import UUID, uuid4
 
 import pytest
+
+
+def _request_stub(query: str = "") -> SimpleNamespace:
+    """Minimal SimpleNamespace mimicking the bits of `starlette.Request`
+    these handler tests read: `query_params.get(name)` (consumed by
+    `parse_page` for pagination) and `url.query` (consumed by
+    `base_query` to build pagination links). Tests that don't care
+    about pagination pass no query and get the defaults (`page=1`,
+    no filter state in the paginator base)."""
+    params = dict(parse_qsl(query))
+    return SimpleNamespace(
+        query_params=SimpleNamespace(get=params.get),
+        url=SimpleNamespace(query=query),
+    )
+
 
 from src.framework.audit.core import AuditAction, AuditedResource
 from src.framework.dispatch.entity_spec import EntitySpec, RouteSet
@@ -1435,7 +1451,7 @@ async def test_edit_form_invokes_write_authz_against_target():
 
     await handle_get_edit_form(
         spec,
-        request=SimpleNamespace(),
+        request=_request_stub(),
         target_id=target_id,
         repo=repo,
         requesting_user=user,
@@ -1454,7 +1470,7 @@ async def test_edit_form_target_not_found_raises_not_found():
     with pytest.raises(NotFoundError):
         await handle_get_edit_form(
             spec,
-            request=SimpleNamespace(),
+            request=_request_stub(),
             target_id=uuid4(),
             repo=repo,
             requesting_user=_user(),
@@ -1473,7 +1489,7 @@ async def test_edit_form_write_authz_raises_propagates():
     with pytest.raises(ForbiddenError):
         await handle_get_edit_form(
             spec,
-            request=SimpleNamespace(),
+            request=_request_stub(),
             target_id=target_id,
             repo=repo,
             requesting_user=_user(),
@@ -1506,7 +1522,7 @@ async def test_edit_form_polymorphic_returns_kind_template():
 
     context = await handle_get_edit_form(
         spec,
-        request=SimpleNamespace(),
+        request=_request_stub(),
         target_id=target_id,
         repo=repo,
         requesting_user=_user(),
@@ -1627,7 +1643,7 @@ async def test_new_form_merges_static_context():
     )
 
     context = await handle_get_new_form(
-        spec, request=SimpleNamespace(), requesting_user=_user()
+        spec, request=_request_stub(), requesting_user=_user()
     )
 
     assert context["LABELS"] == {"a": "A"}
@@ -1656,7 +1672,7 @@ async def test_new_form_polymorphic_uses_kind_create_template():
 
     context = await handle_get_new_form(
         spec,
-        request=SimpleNamespace(),
+        request=_request_stub(),
         requesting_user=_user(),
         kind="blue",
     )
@@ -1689,7 +1705,7 @@ async def test_new_form_polymorphic_no_kind_leaves_template_unset():
     )
 
     context = await handle_get_new_form(
-        spec, request=SimpleNamespace(), requesting_user=_user(), kind=None
+        spec, request=_request_stub(), requesting_user=_user(), kind=None
     )
 
     assert "template_name" not in context
@@ -1794,7 +1810,7 @@ async def test_detail_top_level_happy_path():
 
     context = await handle_detail(
         spec,
-        request=SimpleNamespace(),
+        request=_request_stub(),
         target_id=target_id,
         repo=repo,
         requesting_user=user,
@@ -1829,7 +1845,7 @@ async def test_detail_populates_can_edit_from_can_write():
 
     owner_ctx = await handle_detail(
         spec,
-        request=SimpleNamespace(),
+        request=_request_stub(),
         target_id=target_id,
         repo=repo,
         requesting_user=owner,
@@ -1838,7 +1854,7 @@ async def test_detail_populates_can_edit_from_can_write():
 
     stranger_ctx = await handle_detail(
         spec,
-        request=SimpleNamespace(),
+        request=_request_stub(),
         target_id=target_id,
         repo=repo,
         requesting_user=stranger,
@@ -1866,7 +1882,7 @@ async def test_detail_extras_merges_into_context():
 
     context = await handle_detail(
         spec,
-        request=SimpleNamespace(),
+        request=_request_stub(),
         target_id=target_id,
         repo=repo,
         requesting_user=_user(),
@@ -1896,7 +1912,7 @@ async def test_detail_extras_receives_extra_kwargs():
     side_repo = object()
     await handle_detail(
         spec,
-        request=SimpleNamespace(),
+        request=_request_stub(),
         target_id=target_id,
         repo=repo,
         requesting_user=_user(),
@@ -1915,7 +1931,7 @@ async def test_detail_target_not_found_raises_not_found():
     with pytest.raises(NotFoundError):
         await handle_detail(
             spec,
-            request=SimpleNamespace(),
+            request=_request_stub(),
             target_id=uuid4(),
             repo=repo,
             requesting_user=_user(),
@@ -1934,7 +1950,7 @@ async def test_detail_anonymous_viewer_supported():
 
     context = await handle_detail(
         spec,
-        request=SimpleNamespace(),
+        request=_request_stub(),
         target_id=target_id,
         repo=repo,
         requesting_user=None,
@@ -2003,7 +2019,7 @@ async def test_make_detail_handler_delegates_to_handle_detail():
         spec, extras=extras, extra_repos=(("side_repo", _SideRepo),)
     )
     context = await handler(
-        request=SimpleNamespace(),
+        request=_request_stub(),
         widget_id=target_id,
         repo=repo,
         requesting_user=_user(),
@@ -2033,7 +2049,7 @@ async def test_handle_list_returns_items_under_url_collection():
 
     context = await handle_list(
         spec,
-        request=SimpleNamespace(),
+        request=_request_stub(),
         repo=_ListRepo(),
         requesting_user=None,
         filter_values={},
@@ -2055,7 +2071,7 @@ async def test_handle_list_echoes_filter_values_as_selected():
 
     context = await handle_list(
         spec,
-        request=SimpleNamespace(),
+        request=_request_stub(),
         repo=_ListRepo(),
         requesting_user=None,
         filter_values={"kind": "alpha", "state": None},
@@ -2078,12 +2094,14 @@ async def test_handle_list_threads_filter_values_into_repo_call():
 
     await handle_list(
         spec,
-        request=SimpleNamespace(),
+        request=_request_stub(),
         repo=_ListRepo(),
         requesting_user=None,
         filter_values={"kind": "beta"},
     )
-    assert captured == {"kind": "beta"}
+    # `offset` + `limit` come from the pagination layer (`page=1`,
+    # `per_page=DEFAULT_PAGE_SIZE=25`, asked-for-rows=`per_page + 1`).
+    assert captured == {"kind": "beta", "offset": 0, "limit": 26}
 
 
 async def test_handle_list_extras_merges_into_context():
@@ -2102,7 +2120,7 @@ async def test_handle_list_extras_merges_into_context():
 
     context = await handle_list(
         spec,
-        request=SimpleNamespace(),
+        request=_request_stub(),
         repo=_ListRepo(),
         requesting_user=None,
         filter_values={},
@@ -2178,21 +2196,21 @@ async def test_detail_injects_is_self_for_owned_resource():
 
     owner_ctx = await handle_detail(
         spec,
-        request=SimpleNamespace(),
+        request=_request_stub(),
         target_id=target_id,
         repo=repo,
         requesting_user=owner,
     )
     stranger_ctx = await handle_detail(
         spec,
-        request=SimpleNamespace(),
+        request=_request_stub(),
         target_id=target_id,
         repo=repo,
         requesting_user=stranger,
     )
     anon_ctx = await handle_detail(
         spec,
-        request=SimpleNamespace(),
+        request=_request_stub(),
         target_id=target_id,
         repo=repo,
         requesting_user=None,
@@ -2225,14 +2243,14 @@ async def test_detail_injects_is_self_for_user_like_resource():
 
     self_ctx = await handle_detail(
         spec,
-        request=SimpleNamespace(),
+        request=_request_stub(),
         target_id=target_id,
         repo=repo,
         requesting_user=self_viewer,
     )
     other_ctx = await handle_detail(
         spec,
-        request=SimpleNamespace(),
+        request=_request_stub(),
         target_id=target_id,
         repo=repo,
         requesting_user=other_viewer,
@@ -2265,21 +2283,21 @@ async def test_detail_injects_can_admin_actions_excludes_self():
 
     admin_ctx = await handle_detail(
         spec,
-        request=SimpleNamespace(),
+        request=_request_stub(),
         target_id=target_id,
         repo=repo,
         requesting_user=admin,
     )
     self_admin_ctx = await handle_detail(
         spec,
-        request=SimpleNamespace(),
+        request=_request_stub(),
         target_id=target_id,
         repo=repo,
         requesting_user=self_admin,
     )
     plain_ctx = await handle_detail(
         spec,
-        request=SimpleNamespace(),
+        request=_request_stub(),
         target_id=target_id,
         repo=repo,
         requesting_user=plain,
@@ -2314,21 +2332,21 @@ async def test_detail_injects_can_view_private_when_predicate_set():
 
     self_ctx = await handle_detail(
         spec_with,
-        request=SimpleNamespace(),
+        request=_request_stub(),
         target_id=target_id,
         repo=repo,
         requesting_user=self_viewer,
     )
     stranger_ctx = await handle_detail(
         spec_with,
-        request=SimpleNamespace(),
+        request=_request_stub(),
         target_id=target_id,
         repo=repo,
         requesting_user=stranger,
     )
     without_ctx = await handle_detail(
         spec_without,
-        request=SimpleNamespace(),
+        request=_request_stub(),
         target_id=target_id,
         repo=repo,
         requesting_user=stranger,
@@ -2364,14 +2382,14 @@ async def test_detail_injects_target_projection_when_public_fields_set():
 
     self_ctx = await handle_detail(
         spec,
-        request=SimpleNamespace(),
+        request=_request_stub(),
         target_id=target_id,
         repo=repo,
         requesting_user=self_viewer,
     )
     stranger_ctx = await handle_detail(
         spec,
-        request=SimpleNamespace(),
+        request=_request_stub(),
         target_id=target_id,
         repo=repo,
         requesting_user=stranger,
@@ -2391,7 +2409,7 @@ async def test_detail_no_projection_when_public_fields_unset():
 
     context = await handle_detail(
         spec,
-        request=SimpleNamespace(),
+        request=_request_stub(),
         target_id=target_id,
         repo=repo,
         requesting_user=SimpleNamespace(id=uuid4(), is_superuser=False),
@@ -2417,21 +2435,21 @@ async def test_handle_list_injects_can_admin_actions():
 
     admin_ctx = await handle_list(
         spec,
-        request=SimpleNamespace(),
+        request=_request_stub(),
         repo=_ListRepo(),
         requesting_user=SimpleNamespace(id=uuid4(), is_superuser=True),
         filter_values={},
     )
     plain_ctx = await handle_list(
         spec,
-        request=SimpleNamespace(),
+        request=_request_stub(),
         repo=_ListRepo(),
         requesting_user=SimpleNamespace(id=uuid4(), is_superuser=False),
         filter_values={},
     )
     anon_ctx = await handle_list(
         spec,
-        request=SimpleNamespace(),
+        request=_request_stub(),
         repo=_ListRepo(),
         requesting_user=None,
         filter_values={},
@@ -2467,21 +2485,22 @@ async def test_handle_list_passes_exclude_self_when_spec_opts_in():
     viewer = SimpleNamespace(id=uuid4(), is_superuser=False)
     await handle_list(
         spec,
-        request=SimpleNamespace(),
+        request=_request_stub(),
         repo=_ListRepo(),
         requesting_user=viewer,
         filter_values={},
     )
     await handle_list(
         spec,
-        request=SimpleNamespace(),
+        request=_request_stub(),
         repo=_ListRepo(),
         requesting_user=None,
         filter_values={},
     )
 
-    assert captured[0] == {"exclude_self": viewer}
-    assert captured[1] == {}
+    # `offset` + `limit` come from the pagination layer (page 1 of 25).
+    assert captured[0] == {"exclude_self": viewer, "offset": 0, "limit": 26}
+    assert captured[1] == {"offset": 0, "limit": 26}
 
 
 @pytest.mark.asyncio
@@ -2500,13 +2519,14 @@ async def test_handle_list_omits_exclude_self_when_spec_opts_out():
 
     await handle_list(
         spec,
-        request=SimpleNamespace(),
+        request=_request_stub(),
         repo=_ListRepo(),
         requesting_user=SimpleNamespace(id=uuid4(), is_superuser=False),
         filter_values={"kind": "alpha"},
     )
 
-    assert captured[0] == {"kind": "alpha"}
+    # `offset` + `limit` come from the pagination layer (page 1 of 25).
+    assert captured[0] == {"kind": "alpha", "offset": 0, "limit": 26}
     assert "exclude_self" not in captured[0]
 
 
@@ -2538,7 +2558,7 @@ async def test_handle_list_falls_back_to_list_default_when_no_bespoke_method():
 
     await handle_list(
         spec,
-        request=SimpleNamespace(),
+        request=_request_stub(),
         repo=_DefaultOnlyRepo(),
         requesting_user=None,
         filter_values={},
@@ -2546,7 +2566,8 @@ async def test_handle_list_falls_back_to_list_default_when_no_bespoke_method():
 
     assert captured["model"] is _FixtureRow
     assert captured["order_by"] == "ORDER_BY_SENTINEL"
-    assert captured["kwargs"] == {}
+    # `offset` + `limit` come from the pagination layer (page 1 of 25).
+    assert captured["kwargs"] == {"offset": 0, "limit": 26}
 
 
 @pytest.mark.asyncio
@@ -2572,7 +2593,7 @@ async def test_handle_list_fallback_raises_when_no_order_by():
     with pytest.raises(ValueError, match="list_order_by"):
         await handle_list(
             spec,
-            request=SimpleNamespace(),
+            request=_request_stub(),
             repo=_DefaultOnlyRepo(),
             requesting_user=None,
             filter_values={},
@@ -2632,7 +2653,7 @@ async def test_handle_detail_merges_static_context():
 
     context = await handle_detail(
         spec,
-        request=SimpleNamespace(),
+        request=_request_stub(),
         target_id=target_id,
         repo=repo,
         requesting_user=_user(),
@@ -2662,7 +2683,7 @@ async def test_handle_list_merges_static_context():
 
     context = await handle_list(
         spec,
-        request=SimpleNamespace(),
+        request=_request_stub(),
         repo=_ListRepo(),
         requesting_user=None,
         filter_values={},
@@ -2692,7 +2713,7 @@ async def test_extras_can_override_static_context():
 
     context = await handle_detail(
         spec,
-        request=SimpleNamespace(),
+        request=_request_stub(),
         target_id=target_id,
         repo=repo,
         requesting_user=_user(),

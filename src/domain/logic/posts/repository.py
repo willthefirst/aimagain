@@ -59,6 +59,8 @@ class PostRepository(BaseRepository):
         city: str | None = None,
         age_group: list[str] | None = None,
         language: list[str] | None = None,
+        offset: int = 0,
+        limit: int | None = None,
     ) -> Sequence[Post]:
         stmt = select(Post)
 
@@ -117,7 +119,7 @@ class PostRepository(BaseRepository):
             stmt = stmt.filter(_json_array_contains_any(language, "languages"))
 
         stmt = stmt.order_by(Post.created_at.desc())
-        return await self._list(stmt)
+        return await self._list(stmt, offset=offset, limit=limit)
 
 
 def _json_array_contains_any(values: list[str], column_name: str):

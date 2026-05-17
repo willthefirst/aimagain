@@ -32,6 +32,15 @@ Child contract:
     filter_action  — URL the filter form GETs to (e.g. "/providers").
     filter_values  — `{filter.name: current_value}` dict mapping each
                      declared filter to the page's selected value.
+    page_meta      — `Page` from `src/framework/dispatch/pagination.py`.
+                     When set, the pagination footer renders Prev/Next
+                     beneath the content (empty on single-page results).
+                     `handle_list` and the bespoke list handlers
+                     (favorites, user-providers) all supply it.
+    paginator_base_query — current request's query string with `page`
+                     stripped, so pagination links preserve filter
+                     state. The framework handler builds it; children
+                     don't touch it.
 
 Pages that share this chrome but need richer body shapes (e.g. the
 posts feed's `<ul>` instead of a table) just override `{% block content %}`
@@ -41,6 +50,7 @@ what the body looks like.
 {% extends "base.html" %}
 {%- from "_shared/_breadcrumb.html" import breadcrumb -%}
 {%- from "_shared/list_page.html" import list_toolbar -%}
+{%- from "_shared/pagination.html" import pagination -%}
 
 {% block breadcrumb %}
 {%- set label %}{% block resource_label %}{% endblock %}{% endset -%}
@@ -68,3 +78,9 @@ what the body looks like.
 {% endblock %}
 
 {% block content %}{% endblock %}
+
+{% block after_content %}
+{%- if page_meta is defined %}
+{{ pagination(page_meta, paginator_base_query|default("")) }}
+{%- endif %}
+{% endblock %}

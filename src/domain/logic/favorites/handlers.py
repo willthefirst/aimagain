@@ -24,6 +24,13 @@ from src.domain.models import Provider, User, UserFavorite
 from src.domain.specs.user_favorite import FAVORITE_ENTITY
 from src.framework.audit.core import record_audit
 from src.framework.audit.repository import AuditRepository
+from src.framework.dispatch.pagination import (
+    DEFAULT_PAGE_SIZE,
+    base_query,
+    offset_for,
+    paginate,
+    parse_page,
+)
 from src.framework.http.exceptions import NotFoundError
 
 logger = logging.getLogger(__name__)
@@ -120,10 +127,26 @@ async def handle_list_my_favorites(
 ) -> dict[str, Any]:
     """Page context for the self-only favorites listing. Returns the
     providers the requesting user has favorited, newest-favoriting first.
+
+    Pagination: parses `?page=N` and asks the repo for `per_page + 1`
+    rows to compute `has_next`. Uses the framework's
+    `DEFAULT_PAGE_SIZE` — this is a bespoke handler so there's no
+    `EntitySpec.page_size` to consult.
     """
-    providers = await repo.list_favorited_providers(requesting_user.id)
+    page_number = parse_page(request)
+    per_page = DEFAULT_PAGE_SIZE
+    providers_plus_one = await repo.list_favorited_providers(
+        requesting_user.id,
+        offset=offset_for(page_number, per_page),
+        limit=per_page + 1,
+    )
+    providers, page_meta = paginate(
+        providers_plus_one, page=page_number, per_page=per_page
+    )
     return {
         "request": request,
         "providers": providers,
         "current_user": requesting_user,
+        "page_meta": page_meta,
+        "paginator_base_query": base_query(request),
     }
