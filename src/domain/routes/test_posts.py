@@ -1031,29 +1031,26 @@ async def test_toolbar_empty_filter_link_reads_as_filters(
     logged_in_user: User,
 ):
     """With no active filters, the toolbar's filter link reads
-    ``filters`` and no Clear-all link is rendered."""
+    ``Filters`` and no Clear-all link is rendered."""
     response = await authenticated_client.get("/posts")
     assert response.status_code == 200
     tree = HTMLParser(response.text)
     link = tree.css_first("a.toolbar-filter-link")
     assert link is not None
-    assert link.text().strip() == "filters"
+    assert link.text().strip() == "Filters"
     assert tree.css_first("a.toolbar-clear-all") is None
 
 
-async def test_toolbar_separator_between_filter_link_and_actions(
+async def test_toolbar_has_no_separator_between_filter_link_and_actions(
     authenticated_client: AsyncClient,
     logged_in_user: User,
 ):
-    """When both the filter link and an action menu are present,
-    a `|` separator sits between them (filter on the left of the
-    separator, action menu on the right)."""
+    """No glyph separator between the filter link and the action
+    menu — gap alone delineates them."""
     response = await authenticated_client.get("/posts")
     assert response.status_code == 200
     tree = HTMLParser(response.text)
-    sep = tree.css_first(".toolbar .toolbar-separator")
-    assert sep is not None
-    assert sep.text().strip() == "|"
+    assert tree.css_first(".toolbar .toolbar-separator") is None
 
 
 # --- Chrome: edit form cancel link --------------------------------------

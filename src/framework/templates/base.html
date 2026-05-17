@@ -81,13 +81,11 @@
              opts into `routes.search`. Doubles as the active-filter
              summary when filters are applied. Detail pages omit it.
              Clearing happens on the search page's form, not here.
-           `.toolbar-separator` — `|` glyph between the filter link
-             and the action menu when both are present.
            `.toolbar-right` — page action `<menu>` (Create, Edit,
              Favorite, Export...).
          The first right-aligned item carries `margin-left: auto`,
-         so the whole cluster lands at the right edge whether one,
-         two, or all three pieces are present. */
+         so the whole cluster lands at the right edge whether one
+         or both pieces are present. */
       .toolbar { display: flex; align-items: center; flex-wrap: wrap; gap: 0.75rem; }
       /* Pico's default `<button>` is `display: block; width: 100%`
          (form-shaped); the toolbar overrides to natural-width inline
@@ -95,7 +93,6 @@
          regardless of whether it lives in a form, menu, or `<li>`. */
       .toolbar button, .toolbar [role="button"] { width: auto; margin: 0; }
       .toolbar-filter-link { min-width: 0; margin-left: auto; }
-      .toolbar-separator { color: var(--pico-muted-color); }
       .toolbar-right { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; margin-left: auto; }
       /* When the filter link is present it already eats the slack,
          so the action menu joins it directly instead of being pushed
