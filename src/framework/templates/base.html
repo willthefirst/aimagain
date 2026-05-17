@@ -8,7 +8,7 @@
     <title>Bedlam Connect</title>
     <link
       rel="stylesheet"
-      href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css" />
+      href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.fluid.classless.min.css" />
     {# Density overrides. Pico's defaults are generous (~1rem spacing, 1.5
        line-height, large H1). These tokens tighten the scale globally so
        templates stay vanilla Pico semantics without per-page overrides.
@@ -34,13 +34,17 @@
         --pico-font-size-h4: 1rem;
       }
       /* Posts feed — inline meta list + title line-clamp. Two
-         patterns, both scoped under `#posts-list > div`:
+         patterns, both scoped under `#posts-list > li` (each post
+         row is an `<li>`, the only valid child of the outer `<ul>`):
 
-         1. Each post's meta `<ul>` is an inline-list — `<li>`
-            children flow inline, and `::before` on adjacent siblings
-            inserts a `·` separator that lives in CSS rather than
-            markup. Pico's default `<ul>` would render vertically
-            with bullets; this flips it to a single inline row.
+         1. Each post's meta `<dl>` is an inline-list — `<div>`
+            groups (each wrapping a `<dt>` label + `<dd>` value)
+            flow inline, and `::before` on adjacent siblings inserts
+            a `·` separator that lives in CSS rather than markup.
+            `<dt>` labels are visually hidden (announced by screen
+            readers, invisible on screen) so the visual row stays a
+            single inline strip while the semantics describe each
+            fact as the key/value pair it actually is.
          2. Each post's title `<p>` clamps to 3 lines visually with
             an ellipsis. Long descriptions stay in the DOM so `?q=`
             ILIKE, search engines, and screen readers all see them.
@@ -49,10 +53,20 @@
          between cards) is whatever Pico's `<article>` defaults give
          — no bespoke CSS for the frame itself. */
       #posts-list { list-style: none; padding: 0; margin: 0; }
-      #posts-list > div { margin-block: 1.25rem; }
-      #posts-list > div > ul { padding: 0; margin: 0; list-style: none; }
-      #posts-list > div > ul > li { display: inline; }
-      #posts-list > div > ul > li + li::before { content: " · "; color: var(--pico-muted-color); }
+      #posts-list > li { margin-block: 1.25rem; }
+      #posts-list > li > dl { padding: 0; margin: 0; }
+      #posts-list > li > dl > div { display: inline; }
+      #posts-list > li > dl > div + div::before { content: " · "; color: var(--pico-muted-color); }
+      #posts-list > li > dl dd { display: inline; margin: 0; }
+      #posts-list > li > dl dt {
+        position: absolute;
+        width: 1px; height: 1px;
+        padding: 0; margin: -1px;
+        overflow: hidden;
+        clip: rect(0, 0, 0, 0);
+        white-space: nowrap;
+        border: 0;
+      }
       /* Kind-chip color differentiation. `[data-kind-chip]` sits on the
          <li> wrapper in the meta line (and on a <span> in the detail
          header). Color the contained text so Seeking vs Providing reads
@@ -127,7 +141,7 @@
       @media (max-width: 768px) {
         nav[aria-label="breadcrumb"] { display: none; }
       }
-      #posts-list > div > p {
+      #posts-list > li > p {
         display: -webkit-box;
         -webkit-box-orient: vertical;
         -webkit-line-clamp: 3;

@@ -101,15 +101,18 @@ async def test_list_client_referral_item_shape(
     response = await authenticated_client.get("/posts")
     assert response.status_code == 200
     tree = HTMLParser(response.text)
-    item = tree.css_first("#posts-list > div")
+    item = tree.css_first("#posts-list > li")
     assert item is not None
     assert item.attributes.get("data-kind") == "client_referral"
 
-    # Kind chip: rendered when no `?kind=` filter is active.
+    # Kind chip: rendered when no `?kind=` filter is active. The chip
+    # attribute lives on the `<dl>` group wrapper `<div>`; the visible
+    # text is the `<dd>` (the `<dt>` label is visually hidden but in
+    # the DOM, so we read the `<dd>` directly for the visible value).
     chip = item.css_first("[data-kind-chip]")
     assert chip is not None
     assert chip.attributes.get("data-kind-chip") == "client_referral"
-    assert chip.text(strip=True) == "Seeking"
+    assert chip.css_first("dd").text(strip=True) == "Seeking"
 
     # Description is the link target — the lead text is the seeker's
     # own words, not a synthesized headline.
@@ -153,7 +156,7 @@ async def test_list_client_referral_falls_back_to_synthesized_title(
     response = await authenticated_client.get("/posts")
     assert response.status_code == 200
     tree = HTMLParser(response.text)
-    lead = tree.css_first("#posts-list > div a")
+    lead = tree.css_first("#posts-list > li a")
     assert lead is not None
     assert lead.text(strip=True) == "Seeking in Boise, ID"
 
@@ -192,13 +195,13 @@ async def test_list_provider_availability_item_shape(
     response = await authenticated_client.get("/posts")
     assert response.status_code == 200
     tree = HTMLParser(response.text)
-    item = tree.css_first("#posts-list > div")
+    item = tree.css_first("#posts-list > li")
     assert item is not None
     assert item.attributes.get("data-kind") == "provider_availability"
 
     chip = item.css_first("[data-kind-chip]")
     assert chip is not None
-    assert chip.text(strip=True) == "Providing"
+    assert chip.css_first("dd").text(strip=True) == "Providing"
 
     # Practice name is in <strong> inside the lead link.
     lead = item.css_first("a")
@@ -242,22 +245,25 @@ async def test_list_lead_contains_full_description_no_backend_truncation(
     response = await authenticated_client.get("/posts")
     assert response.status_code == 200
     tree = HTMLParser(response.text)
-    lead = tree.css_first("#posts-list > div a")
+    lead = tree.css_first("#posts-list > li a")
     assert lead is not None
     assert lead.text(strip=True) == description
 
 
-async def test_list_meta_is_an_inline_list_of_li_chunks(
+async def test_list_meta_is_an_inline_dl_of_key_value_chunks(
     authenticated_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user: User,
 ):
-    """Each metadata fact is its own `<li>` inside a nested `<ul>`
-    after the title link — the inline-list pattern. The `·` visual
-    separator lives in CSS (`#posts-list > div > ul > li + li::before`)
-    rather than the markup, so the DOM text has no `·` glyphs. A
-    regression that collapsed the chunks back into a single
-    `·`-joined string (or onto the title line) would fail here.
+    """Each metadata fact is a `<dt>`/`<dd>` pair (wrapped in a
+    `<div>`, the HTML5 grouping construct inside `<dl>`) after the
+    title link. The `<dt>` label is visually hidden but read by
+    screen readers; the visible value is the `<dd><small>`. The `·`
+    visual separator lives in CSS (`#posts-list > li > dl > div +
+    div::before`) rather than the markup, so the DOM text has no `·`
+    glyphs. A regression that collapsed the chunks back into a
+    single `·`-joined string (or onto the title line) would fail
+    here.
 
     Also: no owner-username link in the listing row. The author lives
     on the detail page; the listing reads as Craigslist, not as a feed
@@ -282,25 +288,30 @@ async def test_list_meta_is_an_inline_list_of_li_chunks(
     response = await authenticated_client.get("/posts")
     assert response.status_code == 200
     tree = HTMLParser(response.text)
-    item = tree.css_first("#posts-list > div")
+    item = tree.css_first("#posts-list > li")
     assert item is not None
 
-    # Metadata is a nested `<ul>` of `<li>` chunks above the title —
-    # the inline-list pattern. Date and the kind chip both live in
-    # this list so the whole line reads uniformly. The outer
-    # `#posts-list` `<ul>` keeps Pico-default bullets; the inner one
-    # is styled inline by CSS in base.html.
-    meta_chunks = item.css("ul > li")
+    # Metadata is a nested `<dl>` of `<div><dt><dd>` chunks above the
+    # title — the inline-list pattern. Date and the kind chip both
+    # live in this list so the whole line reads uniformly. The outer
+    # `#posts-list` `<ul>` strips bullets; the inner `<dl>` is styled
+    # inline (and its `<dt>` labels visually hidden) by CSS in
+    # base.html.
+    meta_chunks = item.css("dl > div")
     # date + Seeking + location + format + ages = 5 chunks.
     # (English-only languages are dropped by the macro since `en` is
     # the default; insurance is no longer in the listing meta —
     # readers go to the detail page for that.)
     assert len(meta_chunks) == 5
-    rendered = [li.text(strip=True) for li in meta_chunks]
-    # The first chunk is the formatted date — content depends on
-    # `now()`, so just check it's non-empty rather than pin a value.
-    assert rendered[0]
-    assert rendered[1:] == [
+    # Each chunk has both a `<dt>` label and a `<dd>` value — the
+    # screen-reader announcement is "Date: May 15", not bare "May 15".
+    labels = [chunk.css_first("dt").text(strip=True) for chunk in meta_chunks]
+    values = [chunk.css_first("dd").text(strip=True) for chunk in meta_chunks]
+    assert labels == ["Date", "Kind", "Location", "Format", "Age groups"]
+    # The first chunk's value is the formatted date — content depends
+    # on `now()`, so just check it's non-empty rather than pin a value.
+    assert values[0]
+    assert values[1:] == [
         "Seeking",
         "Seattle, WA",
         "In-person",
@@ -325,7 +336,7 @@ async def test_list_renders_readable_date_format(
     """The leading date renders Craigslist-style (`May 15`) via the
     `format_post_date` Jinja filter — *not* the raw ISO `YYYY-MM-DD`
     that `post.created_at.date()` produced before. The date is the
-    first chunk in the meta `<ul>`."""
+    first chunk in the meta `<dl>`."""
     from datetime import datetime, timezone
 
     author = create_test_user(username=f"author-{uuid.uuid4()}")
@@ -340,10 +351,11 @@ async def test_list_renders_readable_date_format(
     response = await authenticated_client.get("/posts")
     assert response.status_code == 200
     tree = HTMLParser(response.text)
-    item = tree.css_first("#posts-list > div")
+    item = tree.css_first("#posts-list > li")
     assert item is not None
-    # First chunk of the meta `<ul>` is the leading date.
-    date_cell = item.css_first("ul > li")
+    # First chunk of the meta `<dl>` is the leading date — its `<dd>`
+    # value carries the formatted text.
+    date_cell = item.css_first("dl > div dd")
     assert date_cell is not None
     rendered = date_cell.text(strip=True)
     # `May 15` for current-year posts; `May 15, 2025` once we cross a
@@ -472,7 +484,7 @@ async def test_list_posts_one_post(
 
     assert response.status_code == 200
     tree = HTMLParser(response.text)
-    items = tree.css("#posts-list > div")
+    items = tree.css("#posts-list > li")
     assert len(items) == 1
     item_text = items[0].text()
     assert description in item_text
@@ -507,7 +519,7 @@ async def test_list_posts_orders_newest_first(
     assert response.status_code == 200
 
     tree = HTMLParser(response.text)
-    items = tree.css("#posts-list > div")
+    items = tree.css("#posts-list > li")
     assert len(items) == 2
     assert newer.client_referral_detail.description in items[0].text()
     assert older.client_referral_detail.description in items[1].text()
@@ -666,7 +678,7 @@ async def test_list_filters_by_kind_seeking(
     response = await authenticated_client.get("/posts?kind=client_referral")
     assert response.status_code == 200
     tree = HTMLParser(response.text)
-    rows = tree.css("#posts-list > div")
+    rows = tree.css("#posts-list > li")
     assert len(rows) == 1
     assert rows[0].attributes.get("data-kind") == "client_referral"
     # The kind <select> preselects the seeking option.
@@ -675,7 +687,7 @@ async def test_list_filters_by_kind_seeking(
     assert selected_option.attributes.get("value") == "client_referral"
     # The kind chip is hidden on the cards when a single kind is selected —
     # it would be constant for every card on this page.
-    assert tree.css("#posts-list > div [data-kind-chip]") == []
+    assert tree.css("#posts-list > li [data-kind-chip]") == []
 
 
 async def test_list_rejects_unknown_kind(
@@ -719,7 +731,7 @@ async def test_list_filters_by_free_text_q_across_both_detail_tables(
     response = await authenticated_client.get("/posts?q=needle")
     assert response.status_code == 200
     tree = HTMLParser(response.text)
-    rows = tree.css("#posts-list > div")
+    rows = tree.css("#posts-list > li")
     # Both `needle-*` posts match across the polymorphic OR. The
     # `haystack-*` seeker is filtered out.
     assert len(rows) == 2
@@ -756,7 +768,7 @@ async def test_list_combines_kind_and_q_with_and(
     response = await authenticated_client.get("/posts?kind=client_referral&q=needle")
     assert response.status_code == 200
     tree = HTMLParser(response.text)
-    rows = tree.css("#posts-list > div")
+    rows = tree.css("#posts-list > li")
     assert len(rows) == 1
     assert rows[0].attributes.get("data-kind") == "client_referral"
 
@@ -784,7 +796,7 @@ async def test_list_filters_by_posted_by_username(
     response = await authenticated_client.get("/posts?posted_by=alice")
     assert response.status_code == 200
     tree = HTMLParser(response.text)
-    rows = tree.css("#posts-list > div")
+    rows = tree.css("#posts-list > li")
     assert len(rows) == 1
     assert rows[0].attributes.get("data-row-id") == str(alice_post.id)
     # The text input echoes the URL value.
@@ -838,7 +850,7 @@ async def test_list_filters_by_state_across_polymorphic_paths(
     response = await authenticated_client.get("/posts?state=NY&state=NJ")
     assert response.status_code == 200
     tree = HTMLParser(response.text)
-    rows = tree.css("#posts-list > div")
+    rows = tree.css("#posts-list > li")
     row_ids = {r.attributes.get("data-row-id") for r in rows}
     assert row_ids == {str(seeking_ny.id), str(offering_nj.id)}
     # Both NY and NJ options are preselected in the multi-<select>.
@@ -882,7 +894,7 @@ async def test_list_filters_by_city_substring_across_polymorphic_paths(
     response = await authenticated_client.get("/posts?city=spring")
     assert response.status_code == 200
     tree = HTMLParser(response.text)
-    row_ids = {r.attributes.get("data-row-id") for r in tree.css("#posts-list > div")}
+    row_ids = {r.attributes.get("data-row-id") for r in tree.css("#posts-list > li")}
     assert row_ids == {str(seeking_match.id), str(offering_match.id)}
 
 
@@ -920,7 +932,7 @@ async def test_list_filters_by_age_group_json_contains(
     response = await authenticated_client.get("/posts?age_group=adults_25_64")
     assert response.status_code == 200
     tree = HTMLParser(response.text)
-    row_ids = {r.attributes.get("data-row-id") for r in tree.css("#posts-list > div")}
+    row_ids = {r.attributes.get("data-row-id") for r in tree.css("#posts-list > li")}
     assert row_ids == {str(seeking_match.id), str(offering_match.id)}
 
 
@@ -948,7 +960,7 @@ async def test_list_filters_by_language_json_contains(
     response = await authenticated_client.get("/posts?language=es")
     assert response.status_code == 200
     tree = HTMLParser(response.text)
-    rows = tree.css("#posts-list > div")
+    rows = tree.css("#posts-list > li")
     assert len(rows) == 1
     assert rows[0].attributes.get("data-row-id") == str(spanish_seeker.id)
 
