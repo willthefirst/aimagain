@@ -1,12 +1,13 @@
 {# Dense list-item macro for the posts index.
 
 Posts are polymorphic — `client_referral` (Seeking) and
-`provider_availability` (Providing). Each post renders as a plain
-`<div>` inside `<section id="posts-list">` — no per-post framing,
-no card styling, just the meta line and title flowing as content.
-Bespoke CSS is reduced to two patterns both scoped under
-`#posts-list > div`: the inline-list rules for the meta `<ul>`, and
-the line-clamp rule for the title `<p>`.
+`provider_availability` (Providing). Each post renders as an `<li>`
+inside `<ul id="posts-list">` — `<li>` is the only valid child of
+`<ul>`, so the row carries `data-row-id` / `data-kind` directly.
+No per-post framing, no card styling, just the meta line and title
+flowing as content. Bespoke CSS is reduced to two patterns both
+scoped under `#posts-list > li`: the inline-list rules for the meta
+`<ul>`, and the line-clamp rule for the title `<p>`.
 
 The row is two lines: a meta `<ul>` above, a title `<p>` below.
 Meta carries every fact about the post — date, kind chunk (Seeking
@@ -96,7 +97,7 @@ the detail page for posture and carrier specifics.
   {%- set d = post.provider_availability_detail -%}
   {%- set p = d.provider -%}
 {%- endif -%}
-<div data-row-id="{{ post.id }}" data-kind="{{ post.kind }}">
+<li data-row-id="{{ post.id }}" data-kind="{{ post.kind }}">
   <ul>{{ _meta_chunks(post, active_kind=active_kind) }}</ul>
   <p>
     <a href="/posts/{{ post.id }}">
@@ -112,5 +113,5 @@ the detail page for posture and carrier specifics.
       {%- endif -%}
     </a>
   </p>
-</div>
+</li>
 {%- endmacro %}
