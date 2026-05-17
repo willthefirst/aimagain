@@ -160,11 +160,27 @@
        auth gate. #}
     {%- set _on_profile = is_authenticated and (request.url.path == '/users/me' or request.url.path.startswith('/users/me/')) -%}
     {%- set _on_login = request.url.path == '/auth/login' -%}
+    {# Section shortcuts. Posts is one route partitioned by `?kind=`, so
+       Referrals/Openings disambiguate via the query param; Directory is
+       its own route under `/providers`. Active-state matching keeps
+       sub-paths highlighted (e.g. `/providers/42/edit` keeps Directory
+       lit) while only the bare `/posts` list with the matching `?kind=`
+       lights Referrals/Openings — detail pages drop the query param. #}
+    {%- set _post_kind = request.query_params.get('kind') if is_authenticated else none -%}
+    {%- set _on_posts_list = is_authenticated and request.url.path == '/posts' -%}
+    {%- set _on_referrals = _on_posts_list and _post_kind == 'client_referral' -%}
+    {%- set _on_openings = _on_posts_list and _post_kind == 'provider_availability' -%}
+    {%- set _on_directory = is_authenticated and (request.url.path == '/providers' or request.url.path.startswith('/providers/')) -%}
     <header>
       <nav aria-label="Primary">
         <ul>
           {# title-case-ignore: "Bedlam Connect" is a brand name #}
           <li><strong><a href="/" class="contrast">Bedlam Connect</a></strong></li>
+          {% if is_authenticated %}
+          <li><a href="/posts?kind=client_referral"{% if _on_referrals %} aria-current="page" class="contrast"{% endif %}>Referrals</a></li>
+          <li><a href="/posts?kind=provider_availability"{% if _on_openings %} aria-current="page" class="contrast"{% endif %}>Openings</a></li>
+          <li><a href="/providers"{% if _on_directory %} aria-current="page" class="contrast"{% endif %}>Directory</a></li>
+          {% endif %}
         </ul>
         <ul id="primary-nav">
           {% if is_authenticated %}

@@ -63,7 +63,7 @@ Every page extending `base.html` lands the same three-strip chrome above its con
 └───────────────────────────────────────────────────────────┘
 ```
 
-**Primary nav** lives in `base.html` and renders on every screen (authed *and* anonymous). Its right-side slot (`#primary-nav`) swaps the profile icon for a Login link depending on `is_authenticated`. Pages don't extend it.
+**Primary nav** lives in `base.html` and renders on every screen (authed *and* anonymous). The left-side slot carries the brand link plus (when authed) section shortcuts: Referrals (`/posts?kind=client_referral`), Openings (`/posts?kind=provider_availability`), Directory (`/providers`). The right-side slot (`#primary-nav`) swaps the profile icon for a Login link depending on `is_authenticated`. Active state is matched against `request.url.path` plus `request.query_params['kind']` for the kind-partitioned Posts links. Pages don't extend it.
 
 **Breadcrumb zone bar** (`{% block breadcrumb %}`, macro in `_shared/_breadcrumb.html`) renders Pico's native breadcrumb above the toolbar. Every authenticated page extends the block — chrome consistency is the goal. The shape follows the resource hierarchy `list > detail > edit/new`, each level appending one segment:
 

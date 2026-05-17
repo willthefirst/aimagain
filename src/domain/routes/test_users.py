@@ -23,17 +23,61 @@ async def test_base_template_renders_primary_nav_when_authenticated(
     authenticated_client: AsyncClient,
     logged_in_user: User,
 ):
-    """Authenticated pages render the primary nav with a single
-    `/users/me` profile shortcut. Section links (Posts / Users /
-    Providers / Favorites) and the create-post CTA are reachable
+    """Authenticated pages render the primary nav with section
+    shortcuts (Referrals / Openings / Directory) on the left and a
+    single `/users/me` profile shortcut on the right. Other section
+    links (Users / Favorites) and the create-post CTA are reachable
     from within their pages rather than from the top-level chrome."""
     response = await authenticated_client.get("/users")
 
     assert response.status_code == 200
     tree = HTMLParser(response.text)
-    nav_items = tree.css("#primary-nav > li > a")
-    hrefs = {a.attributes.get("href") for a in nav_items}
-    assert hrefs == {"/users/me"}
+    profile_items = tree.css("#primary-nav > li > a")
+    profile_hrefs = {a.attributes.get("href") for a in profile_items}
+    assert profile_hrefs == {"/users/me"}
+    section_items = tree.css('nav[aria-label="Primary"] > ul:first-of-type > li > a')
+    section_hrefs = [a.attributes.get("href") for a in section_items]
+    # Brand link is `<li><strong><a>` so the `> li > a` direct-child
+    # selector picks up only the section shortcuts (Referrals /
+    # Openings / Directory) in render order.
+    assert section_hrefs == [
+        "/posts?kind=client_referral",
+        "/posts?kind=provider_availability",
+        "/providers",
+    ]
+
+
+async def test_primary_nav_highlights_active_section(
+    authenticated_client: AsyncClient,
+    logged_in_user: User,
+):
+    """The Posts list is one route partitioned by `?kind=`, so the
+    Referrals and Openings shortcuts only light up when both the path
+    and the `kind` query param match. Directory matches any path under
+    `/providers`."""
+    referrals = await authenticated_client.get("/posts?kind=client_referral")
+    tree = HTMLParser(referrals.text)
+    assert (
+        tree.css_first(
+            'nav[aria-label="Primary"] a[href="/posts?kind=client_referral"]'
+        ).attributes.get("aria-current")
+        == "page"
+    )
+    assert (
+        tree.css_first(
+            'nav[aria-label="Primary"] a[href="/posts?kind=provider_availability"]'
+        ).attributes.get("aria-current")
+        is None
+    )
+
+    directory = await authenticated_client.get("/providers")
+    tree = HTMLParser(directory.text)
+    assert (
+        tree.css_first('nav[aria-label="Primary"] a[href="/providers"]').attributes.get(
+            "aria-current"
+        )
+        == "page"
+    )
 
 
 async def test_base_template_renders_primary_nav_for_anonymous_visitors(
