@@ -34,7 +34,8 @@
         --pico-font-size-h4: 1rem;
       }
       /* Posts feed — inline meta list + title line-clamp. Two
-         patterns, both scoped under `#posts-list > div`:
+         patterns, both scoped under `#posts-list > li` (each post
+         row is an `<li>`, the only valid child of the outer `<ul>`):
 
          1. Each post's meta `<ul>` is an inline-list — `<li>`
             children flow inline, and `::before` on adjacent siblings
@@ -49,10 +50,10 @@
          between cards) is whatever Pico's `<article>` defaults give
          — no bespoke CSS for the frame itself. */
       #posts-list { list-style: none; padding: 0; margin: 0; }
-      #posts-list > div { margin-block: 1.25rem; }
-      #posts-list > div > ul { padding: 0; margin: 0; list-style: none; }
-      #posts-list > div > ul > li { display: inline; }
-      #posts-list > div > ul > li + li::before { content: " · "; color: var(--pico-muted-color); }
+      #posts-list > li { margin-block: 1.25rem; }
+      #posts-list > li > ul { padding: 0; margin: 0; list-style: none; }
+      #posts-list > li > ul > li { display: inline; }
+      #posts-list > li > ul > li + li::before { content: " · "; color: var(--pico-muted-color); }
       /* Kind-chip color differentiation. `[data-kind-chip]` sits on the
          <li> wrapper in the meta line (and on a <span> in the detail
          header). Color the contained text so Seeking vs Providing reads
@@ -110,7 +111,7 @@
       @media (max-width: 768px) {
         nav[aria-label="breadcrumb"] { display: none; }
       }
-      #posts-list > div > p {
+      #posts-list > li > p {
         display: -webkit-box;
         -webkit-box-orient: vertical;
         -webkit-line-clamp: 3;
