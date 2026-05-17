@@ -182,14 +182,29 @@ LOCATION_AVAILABILITY_LABELS: Final[dict[str, str]] = {
     "no": "No",
     "please_contact": "Please contact",
 }
+# Plural form. Used wherever the referent is a *cohort* the provider
+# accepts (provider_availability listings + detail, the filter dropdown,
+# the form checkbox vocabulary). The age range is in parens to keep the
+# category word and the numeric span visually separable at scan
+# distance. The singular form lives in `CLIENT_AGE_GROUP_LABELS_SINGULAR`
+# and is used for `client_referral` reads (one client, one age).
 CLIENT_AGE_GROUP_LABELS: Final[dict[str, str]] = {
-    "children_0_5": "Children 0–5",
-    "children_6_10": "Children 6–10",
-    "preteens_11_13": "Preteens 11–13",
-    "adolescents_14_18": "Adolescents 14–18",
-    "young_adults_19_24": "Young adults 19–24",
-    "adults_25_64": "Adults 25–64",
-    "older_adults_65_plus": "Older adults 65+",
+    "children_0_5": "Children (0–5)",
+    "children_6_10": "Children (6–10)",
+    "preteens_11_13": "Preteens (11–13)",
+    "adolescents_14_18": "Adolescents (14–18)",
+    "young_adults_19_24": "Young adults (19–24)",
+    "adults_25_64": "Adults (25–64)",
+    "older_adults_65_plus": "Older adults (65+)",
+}
+CLIENT_AGE_GROUP_LABELS_SINGULAR: Final[dict[str, str]] = {
+    "children_0_5": "Child (0–5)",
+    "children_6_10": "Child (6–10)",
+    "preteens_11_13": "Preteen (11–13)",
+    "adolescents_14_18": "Adolescent (14–18)",
+    "young_adults_19_24": "Young adult (19–24)",
+    "adults_25_64": "Adult (25–64)",
+    "older_adults_65_plus": "Older adult (65+)",
 }
 LANGUAGE_LABELS: Final[dict[str, str]] = {"en": "English", "es": "Spanish"}
 INSURANCE_LABELS: Final[dict[str, str]] = {
@@ -268,8 +283,8 @@ TREATMENT_SETTINGS_LABELS: Final[dict[str, str]] = {
     "day_program": "Day program",
 }
 GENDER_LABELS: Final[dict[str, str]] = {
-    "female": "Female / woman",
-    "male": "Male / man",
+    "female": "Female",
+    "male": "Male",
     "non_binary": "Non-binary",
     "trans_female": "Trans woman",
     "trans_male": "Trans man",

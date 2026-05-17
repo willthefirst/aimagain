@@ -135,17 +135,21 @@ async def test_list_client_referral_item_shape(
 
     # Demographics column carries labeled facts.
     facts_text = item.css_first("section.post-facts").text()
-    assert "Adolescents 14–18, Adults 25–64" in facts_text  # en-dash
+    # CR uses singular age labels with the range in parens (one client,
+    # one age); PA uses the plural form (a cohort the practice accepts).
+    assert "Adolescent (14–18), Adult (25–64)" in facts_text  # en-dash
     assert "In-network" in facts_text
     assert "English, Spanish" in facts_text
 
-    # Contact column: "Contact" header + @username (CR has no
+    # Contact column: "Contact" header + bare username (CR has no
     # practice name; the User account is the only identity for the
-    # referring provider) + a `mailto:` link to the owner's email.
+    # referring provider — rendered plain, matching how PA shows its
+    # practice name) + a `mailto:` link to the owner's email.
     attribution = item.css_first("section.post-attribution")
     attribution_text = attribution.text()
     assert "Contact" in attribution_text
-    assert f"@{author.username}" in attribution_text
+    assert author.username in attribution_text
+    assert f"@{author.username}" not in attribution_text
     mailto = attribution.css_first("a")
     assert mailto is not None
     assert mailto.attributes.get("href") == f"mailto:{author.email}"
@@ -239,14 +243,14 @@ async def test_list_provider_availability_item_shape(
     facts_text = item.css_first("section.post-facts").text()
     assert "In-network" in facts_text
 
-    # Contact column names the practice (not @username for PA — the
-    # practice IS the provider) and offers a `mailto:` link to the
+    # Contact column names the practice (PA's identity is the
+    # practice, not the user) and offers a `mailto:` link to the
     # post owner's email.
     attribution = item.css_first("section.post-attribution")
     attribution_text = attribution.text()
     assert "Contact" in attribution_text
     assert practice_name in attribution_text
-    assert f"@{author.username}" not in attribution_text
+    assert author.username not in attribution_text
     mailto = attribution.css_first("a")
     assert mailto is not None
     assert mailto.attributes.get("href") == f"mailto:{author.email}"
@@ -385,9 +389,9 @@ async def test_list_contact_column_shows_practice_name_and_mailto_for_pa(
     logged_in_user: User,
 ):
     """For a `provider_availability` card the contact column names the
-    *practice* (not @username) and offers a `mailto:` link to the post
-    owner's email — the practice IS the provider, so the practice name
-    is the natural anchor for "who am I emailing"."""
+    *practice* (not the post owner's username) and offers a `mailto:`
+    link to the post owner's email — the practice IS the provider, so
+    the practice name is the natural anchor for "who am I emailing"."""
     author = create_test_user(username=f"author-{uuid.uuid4()}")
     practice_name = f"Practice-{uuid.uuid4()}"
     post = _provider_availability_post(
@@ -408,8 +412,8 @@ async def test_list_contact_column_shows_practice_name_and_mailto_for_pa(
     text = attribution.text()
     assert "Contact" in text
     assert practice_name in text
-    # PA contact column names the practice, not the @username.
-    assert f"@{author.username}" not in text
+    # PA contact column names the practice, not the post owner's username.
+    assert author.username not in text
     mailto = attribution.css_first("a")
     assert mailto is not None
     assert mailto.attributes.get("href") == f"mailto:{author.email}"
@@ -467,7 +471,8 @@ async def test_list_meta_is_a_dl_of_labeled_key_value_chunks(
     third grid column) — a deliberate change from the earlier
     Craigslist-style row where the author was hidden. The header
     link is the only `<a>` in the card; the contact text is a plain
-    `<p>` with `@username`."""
+    `<p>` with the bare username (no `@` prefix), matching how PA
+    renders the practice name."""
     author = create_test_user(username=f"author-{uuid.uuid4()}")
     post = _client_referral_post(
         description="meta-shape",
@@ -503,7 +508,7 @@ async def test_list_meta_is_a_dl_of_labeled_key_value_chunks(
     # text of the `<dt>` is just the label.
     assert labels == ["Age", "Gender", "Insurance"]
     values = [chunk.css_first("dd").text(strip=True) for chunk in meta_chunks]
-    assert values == ["Adolescents 14–18", "Prefer not to say", "In-network"]
+    assert values == ["Adolescent (14–18)", "Prefer not to say", "In-network"]
 
     # Header carries state + format parenthetical.
     header_text = item.css_first("header.post-header").text()
@@ -512,12 +517,14 @@ async def test_list_meta_is_a_dl_of_labeled_key_value_chunks(
 
     # Two `<a>`s per card: the header link to the detail page and
     # the `mailto:` link in the contact column. The contact column
-    # also names the contact (@username for CR) as plain text.
+    # also names the contact (username for CR — plain, matching how
+    # PA renders the practice name) as plain text.
     header_link = item.css_first("header.post-header a")
     assert header_link is not None
     assert header_link.attributes.get("href") == f"/posts/{post.id}"
     attribution = item.css_first("section.post-attribution")
-    assert f"@{author.username}" in attribution.text()
+    assert author.username in attribution.text()
+    assert f"@{author.username}" not in attribution.text()
     mailto = attribution.css_first("a")
     assert mailto is not None
     assert mailto.attributes.get("href") == f"mailto:{author.email}"

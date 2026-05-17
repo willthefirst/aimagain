@@ -12,8 +12,8 @@ Layout per card:
   ┌──────────────────────────────────────────────────────────────┐
   │ Kind, ST (format-summary)                          May 17    │
   │                                                              │
-  │ Seeking         │  Age: …             │  Referring Provider  │
-  │   • icon name   │  Languages: …       │  @username           │
+  │ Seeking         │  Age: …             │  Contact             │
+  │   • icon name   │  Languages: …       │  username            │
   │   • icon name   │  Insurance: …       │  (PA: practice name) │
   │                 │  Modality: …        │                      │
   └──────────────────────────────────────────────────────────────┘
@@ -42,8 +42,9 @@ management" together — unlike the earlier icon-only experiment.
 
 Right column ("Contact") names *who* you're reaching and gives a
 clickable `mailto:` link as the action:
-  * `client_referral` → `@{username}` (the referring provider — the
-    User account is the only identity we have for them) +
+  * `client_referral` → `{username}` (the referring provider — the
+    User account is the only identity we have for them; rendered as
+    plain text, matching the bare-name style PA uses for the practice) +
     `<a href="mailto:…" target="_blank" rel="noopener noreferrer">`.
   * `provider_availability` → `{practice_name}` (the practice IS the
     provider; the practice_name is also in the header but repeating
@@ -142,9 +143,13 @@ virtual
             range of clients the practice will accept) — same
             `age_groups` field, different semantics. The verb-framed
             "Treats" pairs with "Providing" in the left column. -#}
+        {#- Label dict is kind-aware: CR refers to one client (singular,
+            "Child (6–10)"); PA refers to a cohort the practice accepts
+            (plural, "Children (6–10)"). Same underlying enum value. -#}
+        {%- set _age_labels = CLIENT_AGE_GROUP_LABELS_SINGULAR if post.kind == "client_referral" else CLIENT_AGE_GROUP_LABELS -%}
         <div><dt>{% if post.kind == "client_referral" %}Age{% else %}Treats{% endif %}</dt><dd>
           {%- set ages = [] -%}
-          {%- for g in d.age_groups -%}{%- set _ = ages.append(CLIENT_AGE_GROUP_LABELS[g]) -%}{%- endfor -%}
+          {%- for g in d.age_groups -%}{%- set _ = ages.append(_age_labels[g]) -%}{%- endfor -%}
           {{ ages | join(", ") }}
         </dd></div>
         {%- endif %}
@@ -180,12 +185,13 @@ virtual
     <section class="post-attribution">
       {#- "Contact" frames the third column as the action — the
           reader is here to reach somebody. Name first (practice for
-          PA, @username for CR — that's the only identity we have for
-          the referring provider), then a `mailto:` link as the
-          clickable action. -#}
+          PA, username for CR — the User account is the only identity
+          we have for the referring provider), then a `mailto:` link
+          as the clickable action. Both kinds render the name as plain
+          text without prefixing, matching the provider detail page. -#}
       <h4>Contact</h4>
       {%- if post.kind == "client_referral" %}
-      <p>@{{ post.owner.username }}</p>
+      <p>{{ post.owner.username }}</p>
       {%- else %}
       <p>{{ p.practice_name }}</p>
       {%- endif %}
