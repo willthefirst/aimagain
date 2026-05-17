@@ -2,21 +2,16 @@
 
 Every page that needs page-scoped controls renders one toolbar
 strip above its content, followed by an `<hr />` separator. All
-content right-aligns. The bar carries up to three items:
+content right-aligns. The bar carries up to two items:
 
   Filter link (`a.toolbar-filter-link`) — opens the dedicated
-    `/<collection>/search` page. Always reads `filters` when none
+    `/<collection>/search` page. Always reads `Filters` when none
     are active; switches to a short inline summary
     (`Type: Seeking, Description: needle, +1 more filter`) when
     any are. Only rendered when `search_url` is set — list pages
     opt in via `routes.search`; detail pages leave it unset.
     Clearing happens on the search page's form (its "Clear"
     button), not here.
-  Separator (`span.toolbar-separator`) — a `|` glyph rendered
-    only when *both* the filter link and the caller body are
-    present, since filtering a collection is a different concern
-    from acting on it (Create, Edit, ...). Pages with only one
-    side render no separator.
   Action menu (`menu.toolbar-right`) — caller-provided `<li>`
     commands (Create, Edit, Delete, Favorite, ...). `<menu>` is
     HTML's native "list of commands" element. Detail-page and
@@ -79,7 +74,7 @@ Args:
   {%- if search_url %}
   <a href="{{ search_url }}" class="toolbar-filter-link">
     {%- if not active_filters -%}
-    filters
+    Filters
     {%- else -%}
       {%- set shown = active_filters[:_ACTIVE_FILTER_INLINE_LIMIT] -%}
       {%- set hidden = active_filters | length - shown | length -%}
@@ -87,10 +82,6 @@ Args:
       {%- if hidden > 0 %}, +{{ hidden }} more filter{% if hidden != 1 %}s{% endif %}{%- endif -%}
     {%- endif -%}
   </a>
-  {%- endif %}
-
-  {%- if search_url and has_actions %}
-  <span class="toolbar-separator" aria-hidden="true">|</span>
   {%- endif %}
 
   {%- if has_actions %}
