@@ -12,7 +12,7 @@ Layout per card:
   ┌──────────────────────────────────────────────────────────────┐
   │ Kind, ST (format-summary)                          May 17    │
   │                                                              │
-  │ Services        │  Age: …             │  Referring Provider  │
+  │ Seeking         │  Age: …             │  Referring Provider  │
   │   • icon name   │  Languages: …       │  @username           │
   │   • icon name   │  Insurance: …       │  (PA: practice name) │
   │                 │  Modality: …        │                      │
@@ -23,6 +23,16 @@ phrase ("Client Referral, WA (virtual or in person)") — the format
 parenthetical varies based on the post's in-person/virtual posture.
 The body is a three-column grid: services, demographics, attribution.
 
+The left-column heading is kind-aware — "Seeking" for `client_referral`,
+"Providing" for `provider_availability`. The generic "Services" label was
+ambiguous (both kinds carried it with opposite meaning); the verb forms
+reuse the chip vocabulary documented for the colored left edge (orange =
+Seeking, cyan = Providing). Service order is priority-sorted, not enum
+order: `psychotherapy` and `medication_management` lead the list (the
+two services a reader is overwhelmingly likeliest to be scanning for);
+the rest follow in `CLIENT_REFERRAL_SERVICES` declaration order. PA
+`settings` render under the same heading after services, unsorted.
+
 Per-service icons render inline next to each service name in the
 left column. The icons come from `CLIENT_REFERRAL_SERVICE_ICONS` and
 `TREATMENT_SETTINGS_ICONS` in `src/domain/models/enums.py`; the
@@ -30,10 +40,21 @@ Lucide font CSS in `base.html` renders the glyphs. Icons next to a
 labeled item are unambiguous — the reader sees "pill | Medication
 management" together — unlike the earlier icon-only experiment.
 
-Right column varies by kind:
-  * `client_referral` → "Referring Provider" header + @username.
-  * `provider_availability` → "Practice" header + `<strong>{practice
-    _name}</strong>` + a smaller "Posted by @username" line.
+Right column ("Contact") names *who* you're reaching and gives a
+clickable `mailto:` link as the action:
+  * `client_referral` → `@{username}` (the referring provider — the
+    User account is the only identity we have for them) +
+    `<a href="mailto:…" target="_blank" rel="noopener noreferrer">`.
+  * `provider_availability` → `{practice_name}` (the practice IS the
+    provider; the practice_name is also in the header but repeating
+    it here keeps the email anchored to a name at scan distance) +
+    `<a href="mailto:…" target="_blank" rel="noopener noreferrer">`.
+
+The email link replaces the earlier "@username only" treatment — a
+post is useful when a reader can act on it, and email is the action.
+`target="_blank"` is harmless on `mailto:` URLs (most clients open
+the mail handler regardless) and matches the pattern used for the PA
+`website` link on the detail page.
 
 `active_kind` accepted for backward compatibility with `list.html`
 but ignored — the cards' `data-kind` left-edge color is constant
@@ -94,9 +115,17 @@ virtual
   <div class="post-grid">
     <section class="post-services">
       {%- if services or settings_list %}
-      <h4>Services</h4>
+      {#- "Seeking" / "Providing" mirrors the kind-chip vocabulary
+          (see this file's top doc-comment). Priority services
+          ("psychotherapy", "medication_management") render first so a
+          scanner finds the two most-asked-for items at the top. -#}
+      <h4>{% if post.kind == "client_referral" %}Seeking{% else %}Providing{% endif %}</h4>
+      {%- set _priority = ["psychotherapy", "medication_management"] %}
       <ul>
-        {%- for s in services %}
+        {%- for s in _priority if s in services %}
+        {{ _service_item(s, CLIENT_REFERRAL_SERVICE_LABELS, CLIENT_REFERRAL_SERVICE_ICONS) }}
+        {%- endfor %}
+        {%- for s in services if s not in _priority %}
         {{ _service_item(s, CLIENT_REFERRAL_SERVICE_LABELS, CLIENT_REFERRAL_SERVICE_ICONS) }}
         {%- endfor %}
         {%- for s in settings_list %}
@@ -109,7 +138,11 @@ virtual
     <section class="post-facts">
       <dl>
         {%- if d.age_groups %}
-        <div><dt>Age</dt><dd>
+        {#- "Age" for a CR (one client) vs "Treats" for a PA (the
+            range of clients the practice will accept) — same
+            `age_groups` field, different semantics. The verb-framed
+            "Treats" pairs with "Providing" in the left column. -#}
+        <div><dt>{% if post.kind == "client_referral" %}Age{% else %}Treats{% endif %}</dt><dd>
           {%- set ages = [] -%}
           {%- for g in d.age_groups -%}{%- set _ = ages.append(CLIENT_AGE_GROUP_LABELS[g]) -%}{%- endfor -%}
           {{ ages | join(", ") }}
@@ -133,11 +166,17 @@ virtual
 
     <section class="post-attribution">
       {#- "Contact" frames the third column as the action — the
-          reader is here to reach somebody. The post's owner is the
-          contact for either kind: for CR they're the referring
-          provider; for PA they're whoever speaks for the practice. -#}
+          reader is here to reach somebody. Name first (practice for
+          PA, @username for CR — that's the only identity we have for
+          the referring provider), then a `mailto:` link as the
+          clickable action. -#}
       <h4>Contact</h4>
+      {%- if post.kind == "client_referral" %}
       <p>@{{ post.owner.username }}</p>
+      {%- else %}
+      <p>{{ p.practice_name }}</p>
+      {%- endif %}
+      <p><a href="mailto:{{ post.owner.email }}" target="_blank" rel="noopener noreferrer">{{ post.owner.email }}</a></p>
     </section>
   </div>
 </article>

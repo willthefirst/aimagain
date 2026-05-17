@@ -139,11 +139,17 @@ async def test_list_client_referral_item_shape(
     assert "In-network" in facts_text
     assert "English, Spanish" in facts_text
 
-    # Attribution column: "Contact" header + @username (the post's
-    # owner is the contact for either kind).
-    attribution_text = item.css_first("section.post-attribution").text()
+    # Contact column: "Contact" header + @username (CR has no
+    # practice name; the User account is the only identity for the
+    # referring provider) + a `mailto:` link to the owner's email.
+    attribution = item.css_first("section.post-attribution")
+    attribution_text = attribution.text()
     assert "Contact" in attribution_text
     assert f"@{author.username}" in attribution_text
+    mailto = attribution.css_first("a")
+    assert mailto is not None
+    assert mailto.attributes.get("href") == f"mailto:{author.email}"
+    assert mailto.attributes.get("target") == "_blank"
 
 
 async def test_list_client_referral_header_is_kind_label_plus_state(
@@ -233,10 +239,183 @@ async def test_list_provider_availability_item_shape(
     facts_text = item.css_first("section.post-facts").text()
     assert "In-network" in facts_text
 
-    # Attribution column carries Contact + @username.
-    attribution_text = item.css_first("section.post-attribution").text()
+    # Contact column names the practice (not @username for PA — the
+    # practice IS the provider) and offers a `mailto:` link to the
+    # post owner's email.
+    attribution = item.css_first("section.post-attribution")
+    attribution_text = attribution.text()
     assert "Contact" in attribution_text
-    assert f"@{author.username}" in attribution_text
+    assert practice_name in attribution_text
+    assert f"@{author.username}" not in attribution_text
+    mailto = attribution.css_first("a")
+    assert mailto is not None
+    assert mailto.attributes.get("href") == f"mailto:{author.email}"
+
+
+async def test_list_services_column_heading_is_kind_aware(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user: User,
+):
+    """The left-column heading reads "Seeking" for `client_referral`
+    and "Providing" for `provider_availability`. The generic "Services"
+    label carried opposite meanings on the two kinds (what the post is
+    asking for vs. what the post is offering); the verb forms reuse
+    the chip vocabulary that already names the left-edge colors."""
+    author = create_test_user(username=f"author-{uuid.uuid4()}")
+    cr_post = _client_referral_post(
+        description="cr",
+        owner_id=author.id,
+        services=["psychotherapy"],
+    )
+    pa_practice = f"Practice-{uuid.uuid4()}"
+    pa_post = _provider_availability_post(
+        practice_name=pa_practice,
+        owner_id=author.id,
+        services=["psychotherapy"],
+        settings=["outpatient"],
+    )
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            session.add(author)
+            session.add(pa_post.provider_availability_detail.provider)
+            session.add(cr_post)
+            session.add(pa_post)
+
+    response = await authenticated_client.get("/posts")
+    assert response.status_code == 200
+    tree = HTMLParser(response.text)
+    cards = {
+        a.attributes.get("data-row-id"): a for a in tree.css("#posts-list > article")
+    }
+    cr_heading = cards[str(cr_post.id)].css_first("section.post-services h4")
+    pa_heading = cards[str(pa_post.id)].css_first("section.post-services h4")
+    assert cr_heading is not None and cr_heading.text(strip=True) == "Seeking"
+    assert pa_heading is not None and pa_heading.text(strip=True) == "Providing"
+
+
+async def test_list_services_priority_sorted_psychotherapy_and_medmgmt_first(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user: User,
+):
+    """`psychotherapy` and `medication_management` lead the services
+    list regardless of storage order — they're the two services a
+    reader is overwhelmingly likeliest to be scanning for, so they get
+    top billing. The remaining services follow in
+    `CLIENT_REFERRAL_SERVICES` declaration order."""
+    author = create_test_user(username=f"author-{uuid.uuid4()}")
+    # Storage order puts the priority items last; the template must
+    # re-order so they appear first regardless of input order.
+    post = _client_referral_post(
+        description="cr",
+        owner_id=author.id,
+        services=[
+            "evaluation",
+            "case_management",
+            "medication_management",
+            "psychotherapy",
+        ],
+    )
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            session.add(author)
+            session.add(post)
+
+    response = await authenticated_client.get("/posts")
+    assert response.status_code == 200
+    tree = HTMLParser(response.text)
+    items = tree.css("#posts-list > article section.post-services > ul > li")
+    labels = [li.text(strip=True) for li in items]
+    assert labels[:2] == ["Psychotherapy", "Medication management"]
+    # The non-priority items keep enum declaration order.
+    assert labels[2:] == ["Evaluation", "Case management"]
+
+
+async def test_list_age_label_is_kind_aware(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user: User,
+):
+    """The demographics `<dt>` for the age field differs by kind: CR
+    says "Age" (the post describes one client) and PA says "Treats"
+    (the post describes who the practice accepts). Same underlying
+    `age_groups` field, different semantics — the verb-framed "Treats"
+    pairs with "Providing" in the left column."""
+    author = create_test_user(username=f"author-{uuid.uuid4()}")
+    cr_post = _client_referral_post(
+        description="cr",
+        owner_id=author.id,
+        age_groups=["adolescents_14_18"],
+    )
+    pa_practice = f"Practice-{uuid.uuid4()}"
+    pa_post = _provider_availability_post(
+        practice_name=pa_practice,
+        owner_id=author.id,
+        age_groups=["adolescents_14_18", "adults_25_64"],
+    )
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            session.add(author)
+            session.add(pa_post.provider_availability_detail.provider)
+            session.add(cr_post)
+            session.add(pa_post)
+
+    response = await authenticated_client.get("/posts")
+    assert response.status_code == 200
+    tree = HTMLParser(response.text)
+    cards = {
+        a.attributes.get("data-row-id"): a for a in tree.css("#posts-list > article")
+    }
+    cr_labels = [
+        dt.text(strip=True)
+        for dt in cards[str(cr_post.id)].css("section.post-facts dl dt")
+    ]
+    pa_labels = [
+        dt.text(strip=True)
+        for dt in cards[str(pa_post.id)].css("section.post-facts dl dt")
+    ]
+    assert "Age" in cr_labels and "Treats" not in cr_labels
+    assert "Treats" in pa_labels and "Age" not in pa_labels
+
+
+async def test_list_contact_column_shows_practice_name_and_mailto_for_pa(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user: User,
+):
+    """For a `provider_availability` card the contact column names the
+    *practice* (not @username) and offers a `mailto:` link to the post
+    owner's email — the practice IS the provider, so the practice name
+    is the natural anchor for "who am I emailing"."""
+    author = create_test_user(username=f"author-{uuid.uuid4()}")
+    practice_name = f"Practice-{uuid.uuid4()}"
+    post = _provider_availability_post(
+        practice_name=practice_name,
+        owner_id=author.id,
+    )
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            session.add(author)
+            session.add(post.provider_availability_detail.provider)
+            session.add(post)
+
+    response = await authenticated_client.get("/posts")
+    assert response.status_code == 200
+    tree = HTMLParser(response.text)
+    attribution = tree.css_first("#posts-list > article section.post-attribution")
+    assert attribution is not None
+    text = attribution.text()
+    assert "Contact" in text
+    assert practice_name in text
+    # PA contact column names the practice, not the @username.
+    assert f"@{author.username}" not in text
+    mailto = attribution.css_first("a")
+    assert mailto is not None
+    assert mailto.attributes.get("href") == f"mailto:{author.email}"
+    assert mailto.attributes.get("target") == "_blank"
+    assert "noopener" in (mailto.attributes.get("rel") or "")
+    assert mailto.text(strip=True) == author.email
 
 
 async def test_list_does_not_render_description_prose(
@@ -329,13 +508,19 @@ async def test_list_meta_is_a_dl_of_labeled_key_value_chunks(
     assert "Client Referral, WA" in header_text
     assert "(in person)" in header_text
 
-    # Single `<a>`: the header link to the detail page. The contact
-    # column shows the @username as plain text, not as a link.
-    links = item.css("a")
-    assert len(links) == 1
-    assert links[0].attributes.get("href") == f"/posts/{post.id}"
-    attribution_text = item.css_first("section.post-attribution").text()
-    assert f"@{author.username}" in attribution_text
+    # Two `<a>`s per card: the header link to the detail page and
+    # the `mailto:` link in the contact column. The contact column
+    # also names the contact (@username for CR) as plain text.
+    header_link = item.css_first("header.post-header a")
+    assert header_link is not None
+    assert header_link.attributes.get("href") == f"/posts/{post.id}"
+    attribution = item.css_first("section.post-attribution")
+    assert f"@{author.username}" in attribution.text()
+    mailto = attribution.css_first("a")
+    assert mailto is not None
+    assert mailto.attributes.get("href") == f"mailto:{author.email}"
+    assert mailto.attributes.get("target") == "_blank"
+    assert "noopener" in (mailto.attributes.get("rel") or "")
 
 
 async def test_list_renders_readable_date_format(
