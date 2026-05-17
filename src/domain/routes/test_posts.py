@@ -154,19 +154,16 @@ async def test_list_client_referral_item_shape(
     assert "Adolescent" not in facts_text
     assert "Adult" not in facts_text
 
-    # Contact band lives in `<footer class="post-footer">` — bare
-    # username (CR has no practice name; the User account is the only
-    # identity for the referring provider, rendered plain, matching
-    # how PA renders the practice name) + a `mailto:` link to the
-    # owner's email.
+    # Contact band lives in `<footer class="post-footer">` — just the
+    # Email CTA. The username + practice name no longer render in the
+    # footer; the headline already identifies who you're contacting.
     footer = item.css_first("footer.post-footer")
-    footer_text = footer.text()
-    assert author.username in footer_text
-    assert f"@{author.username}" not in footer_text
+    assert author.username not in footer.text()
     mailto = footer.css_first("a")
     assert mailto is not None
     assert mailto.attributes.get("href") == f"mailto:{author.email}"
     assert mailto.attributes.get("target") == "_blank"
+    assert mailto.text(strip=True) == "Email"
 
 
 async def test_list_client_referral_header_is_age_gender_combo(
@@ -271,12 +268,11 @@ async def test_list_provider_availability_item_shape(
     facts_text = item.css_first("section.post-facts").text()
     assert "In-network" in facts_text
 
-    # Contact band names the practice (PA's identity is the practice,
-    # not the user) and offers a `mailto:` link to the post owner's
-    # email. Lives in `<footer class="post-footer">`.
+    # Contact band lives in `<footer class="post-footer">` — just the
+    # Email CTA. Practice name is in the headline, not duplicated here.
     footer = item.css_first("footer.post-footer")
     footer_text = footer.text()
-    assert practice_name in footer_text
+    assert practice_name not in footer_text
     assert author.username not in footer_text
     mailto = footer.css_first("a")
     assert mailto is not None
@@ -411,15 +407,16 @@ async def test_list_demographics_diverge_by_kind(
     assert pa_card.css_first("section.post-facts dl > div.post-location") is None
 
 
-async def test_list_contact_column_shows_practice_name_and_mailto_for_pa(
+async def test_list_pa_footer_carries_email_cta_only(
     authenticated_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user: User,
 ):
-    """For a `provider_availability` card the contact column names the
-    *practice* (not the post owner's username) and offers a `mailto:`
-    link to the post owner's email — the practice IS the provider, so
-    the practice name is the natural anchor for "who am I emailing"."""
+    """For a `provider_availability` card the footer band carries just
+    the Email CTA — practice name is already in the headline, so the
+    footer doesn't re-name the contact. The CTA is a Pico-styled
+    `role="button"` anchor with the visible label "Email"; the raw
+    address is in the `href` only."""
     author = create_test_user(username=f"author-{uuid.uuid4()}")
     practice_name = f"Practice-{uuid.uuid4()}"
     post = _provider_availability_post(
@@ -438,15 +435,19 @@ async def test_list_contact_column_shows_practice_name_and_mailto_for_pa(
     footer = tree.css_first("#posts-list > article footer.post-footer")
     assert footer is not None
     text = footer.text()
-    assert practice_name in text
-    # PA contact band names the practice, not the post owner's username.
+    # Neither name renders in the footer — only the Email CTA.
+    assert practice_name not in text
     assert author.username not in text
     mailto = footer.css_first("a")
     assert mailto is not None
     assert mailto.attributes.get("href") == f"mailto:{author.email}"
     assert mailto.attributes.get("target") == "_blank"
     assert "noopener" in (mailto.attributes.get("rel") or "")
-    assert mailto.text(strip=True) == author.email
+    # CTA label is the verb "Email", not the raw address — the
+    # address is in the href, not the text content.
+    assert mailto.attributes.get("role") == "button"
+    assert mailto.text(strip=True) == "Email"
+    assert author.email not in mailto.text()
 
 
 async def test_list_does_not_render_description_prose(
@@ -552,15 +553,14 @@ async def test_list_meta_is_a_dl_of_labeled_key_value_chunks(
     assert modality_chips == ["In-person"]
 
     # Two `<a>`s per card: the header link to the detail page and
-    # the `mailto:` link in the footer's contact band. The footer
-    # also names the contact (username for CR — plain, matching how
-    # PA renders the practice name) as plain text.
+    # the Email CTA in the footer. The footer carries only the CTA;
+    # the name (username for CR, practice for PA) lives in the
+    # headline, not duplicated here.
     header_link = item.css_first("header.post-header a")
     assert header_link is not None
     assert header_link.attributes.get("href") == f"/posts/{post.id}"
     footer = item.css_first("footer.post-footer")
-    assert author.username in footer.text()
-    assert f"@{author.username}" not in footer.text()
+    assert author.username not in footer.text()
     mailto = footer.css_first("a")
     assert mailto is not None
     assert mailto.attributes.get("href") == f"mailto:{author.email}"

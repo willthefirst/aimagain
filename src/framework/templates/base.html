@@ -8,7 +8,7 @@
     <title>Bedlam Connect</title>
     <link
       rel="stylesheet"
-      href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.classless.min.css" />
+      href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css" />
     {# Lucide icon font. Pinned to a recent release rather than `@latest`
        so the icon glyphs don't shift under us between deploys; bump the
        version deliberately. The CSS defines `<i class="icon-<name>">`
@@ -22,8 +22,9 @@
     {# Density overrides. Pico's defaults are generous (~1rem spacing, 1.5
        line-height, large H1). These tokens tighten the scale globally so
        templates stay vanilla Pico semantics without per-page overrides.
-       The fluid-classless build styles `<main>` / `<header>` element-wise
-       at viewport width, so no `.container` wrapper class is needed. #}
+       The classful Pico build requires `class="container"` on the
+       layout wrappers (`<header>` for the top nav, `<main>` for the
+       page body) to get Pico's max-width centering. #}
     <style>
       /* Reserve scrollbar gutter so pages whose content fits in the
          viewport render at the same width as pages that overflow —
@@ -96,14 +97,19 @@
         gap: 1.5rem;
         align-items: start;
       }
-      /* Footer band: Pico provides the tinted band; we right-align
-         the inline content (name · mailto). `gap` separates the two
-         spans without an explicit dot character. */
+      /* Footer band: Pico provides the tinted background and styles
+         the Email CTA itself (role="button" class="secondary outline").
+         We right-align the CTA inside the band and scale its
+         `font-size` down so it matches the `<small>` date in the
+         header (Pico's button padding is em-based, so font-size
+         shrinks the whole button proportionally — no padding override
+         needed). */
       #posts-list > article > footer.post-footer {
         display: flex;
         justify-content: flex-end;
-        align-items: baseline;
-        gap: 0.5rem;
+      }
+      #posts-list > article > footer.post-footer > [role="button"] {
+        font-size: 0.875rem;
       }
       @media (max-width: 640px) {
         #posts-list > article > .post-grid { grid-template-columns: 1fr; gap: 1rem; }
@@ -149,12 +155,15 @@
          only the listing row swaps the chip for the left edge. */
       [data-kind-chip="client_referral"] { color: darkorange; font-weight: 600; }
       [data-kind-chip="provider_availability"] { color: darkcyan; font-weight: 600; }
-      /* Lucide icon sizing tuned for the inline service icons. */
+      /* Lucide icon sizing tuned for the inline service icons.
+         `color: inherit` lets each icon pick up the surrounding text
+         color — so an icon inside a `<small>` or a `.secondary`
+         button matches the text next to it. */
       [class^="icon-"], [class*=" icon-"] {
         font-size: 1.1em;
         vertical-align: -0.15em;
         line-height: 1;
-        color: var(--pico-muted-color);
+        color: inherit;
       }
       /* Page-scoped zone bar. Every page that needs page-scoped
          controls renders a single `<div class="toolbar">` strip
@@ -249,7 +258,7 @@
     {%- set _on_referrals = _on_posts_list and _post_kind == 'client_referral' -%}
     {%- set _on_openings = _on_posts_list and _post_kind == 'provider_availability' -%}
     {%- set _on_directory = is_authenticated and (request.url.path == '/providers' or request.url.path.startswith('/providers/')) -%}
-    <header>
+    <header class="container">
       <nav aria-label="Primary">
         <ul>
           {# title-case-ignore: "Bedlam Connect" is a brand name #}
@@ -278,7 +287,7 @@
         </ul>
       </nav>
     </header>
-    <main>
+    <main class="container">
       {# Breadcrumb zone bar — `{% block breadcrumb %}` accepts the
          `breadcrumb(items)` macro from `_shared/_breadcrumb.html`.
          Pages set their own location context; list pages and the

@@ -17,26 +17,28 @@ Layout per card:
   │   • icon name                │  Insurance: …                 │
   │                              │  Modality: …                  │
   │                                                              │
-  │ <footer>                          username · email-link      │
+  │ <footer>                                     [✉ Email]        │
   └──────────────────────────────────────────────────────────────┘
 
 The card is `<article>` with `<header>`, two-column body, and
-`<footer>` — Pico's classless styling tints header and footer as
-the top/bottom bands of the card automatically, so we don't restyle
-them. The header line carries the headline link, one or two
-modality chips (icon + short label) describing the post's
-in-person/virtual posture, and a right-aligned date. The headline
-shape varies by kind: CR is the age + gender combo from
-`client_referral_headline` ("Adult male (25–64)"); PA is
-"{practice_name}, ST". CR's state is demoted to a location chunk in
-the demographics column (icon-only `<dt>` + "City, ST"); PA still
-carries state in the header. Each modality is a separate chip so
-each glyph anchors a single fact; the muted color keeps the
-headline as the visual lead. The body is a two-column grid:
-services (left), demographics (right). The footer carries the
-contact band — name (username for CR, practice for PA) + mailto
-link — right-aligned by `.post-footer` so it reads as the action
+`<footer>` — Pico's automatic styling tints header and footer as
+the top/bottom bands of the card, so we don't restyle them. The
+header line carries the headline link, one or two modality chips
+(icon + short label) describing the post's in-person/virtual
+posture, and a right-aligned date. The headline shape varies by
+kind: CR is the age + gender combo from `client_referral_headline`
+("Adult male (25–64)"); PA is "{practice_name}, ST". CR's state is
+demoted to a location chunk in the demographics column (icon-only
+`<dt>` + "City, ST"); PA still carries state in the header. Each
+modality is a separate chip so each glyph anchors a single fact;
+the muted color keeps the headline as the visual lead. The body is
+a two-column grid: services (left), demographics (right). The
+footer carries one element — the "Email" CTA (Pico `secondary
+outline` button) — right-aligned so it reads as the action
 landing at the natural eye-end of the card.
+The reader already knows who they're contacting from the headline
+(PA: practice name; CR: the post itself implies the author), so
+the raw address stays inside the `href`.
 
 The left-column heading is kind-aware — "Seeking" for `client_referral`,
 "Providing" for `provider_availability`. The generic "Services" label was
@@ -55,20 +57,12 @@ Lucide font CSS in `base.html` renders the glyphs. Icons next to a
 labeled item are unambiguous — the reader sees "pill | Medication
 management" together — unlike the earlier icon-only experiment.
 
-Footer ("Contact") names *who* you're reaching and gives a
-clickable `mailto:` link as the action, both inline on one
-right-aligned line:
-  * `client_referral` → `{username}` (the referring provider — the
-    User account is the only identity we have for them) +
-    `<a href="mailto:…" target="_blank" rel="noopener noreferrer">`.
-  * `provider_availability` → `{practice_name}` (the practice IS the
-    provider; the practice_name is also in the header but repeating
-    it here keeps the email anchored to a name at scan distance) +
-    `<a href="mailto:…" target="_blank" rel="noopener noreferrer">`.
-
-`target="_blank"` is harmless on `mailto:` URLs (most clients open
-the mail handler regardless) and matches the pattern used for the
-PA `website` link on the detail page.
+Footer carries just the Email CTA — Pico-styled `role="button"
+class="secondary outline"` with the label "Email". The raw address
+lives only in the `href`. `target="_blank" rel="noopener noreferrer"`
+is harmless on `mailto:` URLs (most clients open the mail handler
+regardless) and matches the pattern used for the PA `website` link
+on the detail page.
 
 `active_kind` accepted for backward compatibility with `list.html`
 but ignored — the cards' `data-kind` left-edge color is constant
@@ -199,18 +193,13 @@ per-kind, so a single-kind filter doesn't need to suppress anything.
     </section>
   </div>
 
-  {#- Contact lives in the article's `<footer>` (Pico styles it as the
-      bottom band of the card automatically) and is right-aligned by
-      the `.post-footer` rule. Name + mailto sit inline on one line:
-      the username (CR) or practice name (PA) anchors who you're
-      reaching, the mailto is the action. -#}
+  {#- Footer contains only the Email CTA, right-aligned by the
+      `.post-footer` rule. The headline already identifies the
+      contact (PA: practice name; CR: implicit in the post), so the
+      footer is just the action. Pico-styled `role="button"
+      class="secondary outline"`. -#}
   <footer class="post-footer">
-    {%- if post.kind == "client_referral" %}
-    <span>{{ post.owner.username }}</span>
-    {%- else %}
-    <span>{{ p.practice_name }}</span>
-    {%- endif %}
-    <a href="mailto:{{ post.owner.email }}" target="_blank" rel="noopener noreferrer">{{ post.owner.email }}</a>
+    <a href="mailto:{{ post.owner.email }}" target="_blank" rel="noopener noreferrer" role="button" class="secondary outline">Email</a>
   </footer>
 </article>
 {%- endmacro %}
