@@ -73,19 +73,20 @@
          at a glance without a background or extra markup. */
       [data-kind-chip="client_referral"] { color: darkorange; font-weight: 600; }
       [data-kind-chip="provider_availability"] { color: darkcyan; font-weight: 600; }
-      /* Page-scoped zone bar. List pages render a single `.toolbar`
-         strip with two zones:
+      /* Page-scoped zone bar. Every page that needs page-scoped
+         controls renders a single `<div class="toolbar">` strip with
+         two zones:
            `.toolbar-filter-link` — `<a>` (left) opening the dedicated
              `/<collection>/search` page; only present when the spec
              opts into `routes.search`. Doubles as the active-filter
-             summary when filters are applied.
+             summary when filters are applied. Detail pages omit it.
            `.toolbar-clear-all` — `<a>` (left, next to the filter
              link) that drops every active filter. Only rendered when
              at least one filter is active.
-           `.toolbar-right` — page action `<menu>` (Create, Export...),
-             pushed to the right edge by `margin-left: auto`.
-         Detail pages emit `<menu class="toolbar">` directly with no
-         filter-link zone; the rules below cover both shapes. */
+           `.toolbar-right` — page action `<menu>` (Create, Edit,
+             Favorite, Export...), pushed to the right edge by
+             `margin-left: auto`. Works the same whether the left zone
+             is occupied (list pages) or empty (detail pages). */
       .toolbar { display: flex; align-items: center; flex-wrap: wrap; gap: 0.75rem; }
       /* Pico's default `<button>` is `display: block; width: 100%`
          (form-shaped); the toolbar overrides to natural-width inline
@@ -190,9 +191,11 @@
          top-level home leave the block empty. #}
       {% block breadcrumb %}{% endblock %}
       {# Toolbar primitive — `{% block toolbar %}` accepts a `{% call %}`
-         of the shared `toolbar()` macro from `_shared/_toolbar.html`.
-         Renders page-scoped controls right-aligned with a horizontal
-         rule below. Pages without a toolbar leave the block empty. #}
+         of the shared `page_toolbar(...)` macro from
+         `_shared/_toolbar.html`. Renders page-scoped controls
+         right-aligned (with an optional left-zone search link on list
+         pages) and a horizontal rule below. Pages without a toolbar
+         leave the block empty. #}
       {% block toolbar %}{% endblock %}
       {% block content %}{% endblock %}
       {# Post-content slot. `views/list.html` populates this with the
