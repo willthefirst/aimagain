@@ -677,6 +677,45 @@ def test_templates_explicit_value_for_non_opted_in_verb_preserved():
     assert spec.templates.detail is None
 
 
+def test_routes_search_without_filters_raises():
+    """`routes.search=True` only makes sense when there are declared
+    `Filter`s to render on the search page; an empty filter set would
+    leave the page empty."""
+    with pytest.raises(ValueError, match="routes.search=True"):
+        _make_spec(
+            routes=RouteSet(list=True, search=True),
+            list_order_by=object(),
+        )
+
+
+def test_declared_filters_property_returns_only_filter_instances():
+    """`declared_filters` is what the search page renders and what
+    the active-filter strip iterates."""
+    from src.framework.dispatch.filters import ChoiceFilter, TextFilter
+
+    a = ChoiceFilter(name="kind", choices=(("x", "X"),))
+    b = TextFilter(name="q")
+    spec = _make_spec(filters=(a, b))
+    assert spec.declared_filters == (a, b)
+
+
+def test_search_template_default_by_convention():
+    """`routes.search=True` makes `templates.search` default to
+    `<url_collection>/search.html`, the same convention every other
+    opted-in verb uses."""
+    from src.framework.dispatch.filters import ChoiceFilter, TextFilter
+
+    spec = _make_spec(
+        routes=RouteSet(list=True, search=True),
+        list_order_by=object(),
+        filters=(
+            ChoiceFilter(name="kind", choices=(("x", "X"),)),
+            TextFilter(name="q"),
+        ),
+    )
+    assert spec.templates.search == "widgets/search.html"
+
+
 def test_to_resource_spec_walks_parent_chain():
     """`to_resource_spec()` on a child propagates the parent chain so
     the mount layer can build nested paths."""

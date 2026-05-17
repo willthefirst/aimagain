@@ -1,17 +1,6 @@
 {% extends "views/list.html" %}
 {%- from "posts/_item.html" import post_item with context -%}
 
-{% set filter_action = "/posts" %}
-{% set filter_values = {
-  "kind": selected_kind,
-  "q": selected_q,
-  "posted_by": selected_posted_by,
-  "state": selected_state,
-  "city": selected_city,
-  "age_group": selected_age_group,
-  "language": selected_language,
-} %}
-
 {% block resource_label %}Posts{% endblock %}
 
 {% block actions %}
@@ -23,11 +12,6 @@
 {% endblock %}
 
 {% block content %}
-{%- set any_filter_active =
-  selected_kind or selected_q or selected_posted_by
-  or selected_state or selected_city
-  or selected_age_group or selected_language -%}
-
 {% if posts %}
 <ul id="posts-list">
   {%- for post in posts %}
@@ -36,7 +20,7 @@
 </ul>
 {% else %}
 <p>
-  {% if any_filter_active %}No posts match these filters.{% else %}No posts found.{% endif %}
+  {% if active_filter_count or current_primary %}No posts match these filters.{% else %}No posts found.{% endif %}
 </p>
 {% endif %}
 {% endblock %}

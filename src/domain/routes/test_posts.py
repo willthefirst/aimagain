@@ -619,39 +619,35 @@ async def test_list_page_renders_create_post_button_in_toolbar_right(
 # --- Filter form ---------------------------------------------------------
 
 
-async def test_list_page_renders_filter_form(
+async def test_list_page_toolbar_has_only_filter_link_and_actions(
     authenticated_client: AsyncClient,
     logged_in_user: User,
 ):
-    """The shared `index_filters.html` macro renders `<select name="kind">`
-    + `<input type="search" name="q">` above the table. With no `?kind=`,
-    the kind `<select>`'s "Any" placeholder option is selected."""
+    """The toolbar carries exactly two zones: the filter link on the
+    left, the page-action `<menu>` on the right. No segmented control
+    and no sort form."""
     response = await authenticated_client.get("/posts")
     assert response.status_code == 200
     tree = HTMLParser(response.text)
+    # Neither segmented nor sort form is rendered.
+    assert tree.css_first("form.toolbar-segmented") is None
+    assert tree.css_first("form.toolbar-sort") is None
+    # Filter link and action menu both present.
+    assert tree.css_first("a.toolbar-filter-link") is not None
+    assert tree.css_first("menu.toolbar-right") is not None
 
-    form = tree.css_first("form.index-filters")
-    assert form is not None
-    assert form.attributes.get("action") == "/posts"
 
-    kind_select = tree.css_first('form.index-filters select[name="kind"]')
-    assert kind_select is not None
-    options = kind_select.css("option")
-    # Empty-string attribute values come back as `None` from selectolax;
-    # treat them as the "Any" placeholder slot.
-    values = [o.attributes.get("value") for o in options]
-    assert None in values  # "Any" placeholder (value="")
-    assert "client_referral" in values
-    assert "provider_availability" in values
-    # The "Any" placeholder is selected when no kind is in the URL.
-    # `<option selected>` is a valueless attribute — selectolax stores
-    # it as a `selected: None` key, so test for key presence.
-    any_option = next(o for o in options if o.attributes.get("value") is None)
-    assert "selected" in any_option.attributes
-    assert any_option.text().strip() == "Any"
-
-    q_input = tree.css_first('form.index-filters input[type="search"][name="q"]')
-    assert q_input is not None
+async def test_list_page_links_to_search(
+    authenticated_client: AsyncClient,
+    logged_in_user: User,
+):
+    """The toolbar's filter link points at `/posts/search`."""
+    response = await authenticated_client.get("/posts")
+    assert response.status_code == 200
+    tree = HTMLParser(response.text)
+    link = tree.css_first("a.toolbar-filter-link")
+    assert link is not None
+    assert (link.attributes.get("href") or "").startswith("/posts/search")
 
 
 async def test_list_filters_by_kind_seeking(
@@ -681,10 +677,10 @@ async def test_list_filters_by_kind_seeking(
     rows = tree.css("#posts-list > li")
     assert len(rows) == 1
     assert rows[0].attributes.get("data-kind") == "client_referral"
-    # The kind <select> preselects the seeking option.
-    options = tree.css('form.index-filters select[name="kind"] option')
-    selected_option = next(o for o in options if "selected" in o.attributes)
-    assert selected_option.attributes.get("value") == "client_referral"
+    # The toolbar's filter link summarizes the active filter inline.
+    link = tree.css_first("a.toolbar-filter-link")
+    assert link is not None
+    assert "Seeking" in link.text()
     # The kind chip is hidden on the cards when a single kind is selected —
     # it would be constant for every card on this page.
     assert tree.css("#posts-list > li [data-kind-chip]") == []
@@ -737,9 +733,10 @@ async def test_list_filters_by_free_text_q_across_both_detail_tables(
     assert len(rows) == 2
     kinds = sorted(r.attributes.get("data-kind") for r in rows)
     assert kinds == ["client_referral", "provider_availability"]
-    # `q` value is echoed back into the input so the form reflects the URL.
-    q_input = tree.css_first('form.index-filters input[name="q"]')
-    assert q_input.attributes.get("value") == "needle"
+    # The toolbar's filter link summarizes the active value inline.
+    link = tree.css_first("a.toolbar-filter-link")
+    assert link is not None
+    assert "needle" in link.text()
 
 
 async def test_list_combines_kind_and_q_with_and(
@@ -799,9 +796,10 @@ async def test_list_filters_by_posted_by_username(
     rows = tree.css("#posts-list > li")
     assert len(rows) == 1
     assert rows[0].attributes.get("data-row-id") == str(alice_post.id)
-    # The text input echoes the URL value.
-    posted_by_input = tree.css_first('form.index-filters input[name="posted_by"]')
-    assert posted_by_input.attributes.get("value") == "alice"
+    # The toolbar's filter link summarizes the active value inline.
+    link = tree.css_first("a.toolbar-filter-link")
+    assert link is not None
+    assert "alice" in link.text()
 
 
 async def test_list_filters_by_state_across_polymorphic_paths(
@@ -853,12 +851,12 @@ async def test_list_filters_by_state_across_polymorphic_paths(
     rows = tree.css("#posts-list > li")
     row_ids = {r.attributes.get("data-row-id") for r in rows}
     assert row_ids == {str(seeking_ny.id), str(offering_nj.id)}
-    # Both NY and NJ options are preselected in the multi-<select>.
-    options = tree.css('form.index-filters select[name="state"] option')
-    selected = {
-        o.attributes.get("value") for o in options if "selected" in o.attributes
-    }
-    assert selected == {"NY", "NJ"}
+    # The toolbar's filter link shows both values inline (within the
+    # cutoff of two inline chips).
+    link = tree.css_first("a.toolbar-filter-link")
+    assert link is not None
+    assert "NY" in link.text()
+    assert "NJ" in link.text()
 
 
 async def test_list_filters_by_city_substring_across_polymorphic_paths(
@@ -965,21 +963,20 @@ async def test_list_filters_by_language_json_contains(
     assert rows[0].attributes.get("data-row-id") == str(spanish_seeker.id)
 
 
-async def test_list_renders_one_control_per_declared_filter(
+async def test_search_page_renders_one_control_per_filter(
     authenticated_client: AsyncClient,
     logged_in_user: User,
 ):
-    """The filter form has a `<label>` per declared filter on
-    POST_ENTITY. This is the exportable-pattern guarantee — adding a
-    Filter to the spec lights up a control on the page without any
-    template edit."""
-    response = await authenticated_client.get("/posts")
+    """`/posts/search` renders one control per declared `Filter` on
+    POST_ENTITY — including `kind` (rendered as a `<select>` here,
+    since the primary-filter notion was removed)."""
+    response = await authenticated_client.get("/posts/search")
     assert response.status_code == 200
     tree = HTMLParser(response.text)
-    form = tree.css_first("form.index-filters")
+    form = tree.css_first("form.search-form")
     assert form is not None
-    # Every Filter declared on POST_ENTITY appears once.
-    labels = {l.text().strip().split("\n")[0].strip() for l in form.css("label")}
+    assert form.attributes.get("action") == "/posts"
+    text = " ".join(n.text().strip() for n in form.css("label, legend"))
     expected = {
         "Type",
         "Description",
@@ -989,7 +986,60 @@ async def test_list_renders_one_control_per_declared_filter(
         "Age groups",
         "Languages",
     }
-    assert expected <= labels
+    for label in expected:
+        assert label in text, f"missing search-form control for {label!r}"
+    # `kind` is just another `ChoiceFilter` now — `<select>` with Any +
+    # the two values.
+    kind_select = form.css_first('select[name="kind"]')
+    assert kind_select is not None
+    values = {o.attributes.get("value") for o in kind_select.css("option")}
+    assert {"client_referral", "provider_availability"} <= values
+
+
+async def test_toolbar_inline_active_filter_summary_collapses_beyond_two(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user: User,
+):
+    """With three active filters, the toolbar's filter link shows the
+    first two inline and collapses the rest to ``+1 more filter``."""
+    author = create_test_user(username=f"author-{uuid.uuid4()}")
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            session.add(author)
+
+    response = await authenticated_client.get(
+        "/posts?kind=client_referral&q=needle&posted_by=alice"
+    )
+    assert response.status_code == 200
+    tree = HTMLParser(response.text)
+    link = tree.css_first("a.toolbar-filter-link")
+    assert link is not None
+    text = link.text()
+    # First filter declared on POST_ENTITY is `kind`, then `q`; the
+    # third (`posted_by`) collapses into the "+N more filters" tail.
+    assert "Seeking" in text
+    assert "needle" in text
+    assert "+1 more filter" in text
+    # Clear all link is present alongside.
+    clear = tree.css_first("a.toolbar-clear-all")
+    assert clear is not None
+    assert clear.attributes.get("href") == "/posts"
+
+
+async def test_toolbar_empty_search_link_reads_as_search_collection(
+    authenticated_client: AsyncClient,
+    logged_in_user: User,
+):
+    """With no active filters, the toolbar's filter link reads
+    ``Search posts`` and no Clear-all link is rendered."""
+    response = await authenticated_client.get("/posts")
+    assert response.status_code == 200
+    tree = HTMLParser(response.text)
+    link = tree.css_first("a.toolbar-filter-link")
+    assert link is not None
+    assert link.text().strip() == "Search posts"
+    assert tree.css_first("a.toolbar-clear-all") is None
 
 
 # --- Chrome: edit form cancel link --------------------------------------

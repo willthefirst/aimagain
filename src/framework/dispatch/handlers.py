@@ -588,6 +588,39 @@ def make_detail_handler(
     )
 
 
+def _active_filter_descriptors(
+    declared_filters: tuple[Filter, ...],
+    filter_values: dict[str, Any],
+) -> list[dict[str, Any]]:
+    """Build per-active-value tags for the active-filter strip.
+
+    Each tag is one ``(name, value, label)`` entry — multi-valued
+    filters fan out to one tag per selected value. The label is the
+    filter's display label paired with the choice's human label when
+    available (``"Languages: Spanish"``); free-text filters use the
+    raw value.
+    """
+    out: list[dict[str, Any]] = []
+    for f in declared_filters:
+        v = filter_values.get(f.name)
+        if v is None or v == "" or v == []:
+            continue
+        choice_labels = (
+            dict(f.choices) if getattr(f, "choices", None) else {}  # type: ignore[attr-defined]
+        )
+        values = v if isinstance(v, list) else [v]
+        for one in values:
+            human = choice_labels.get(one, str(one))
+            out.append(
+                {
+                    "name": f.name,
+                    "value": one,
+                    "label": f"{f.display_label}: {human}",
+                }
+            )
+    return out
+
+
 async def handle_list(
     spec: EntitySpec,
     *,
@@ -643,11 +676,44 @@ async def handle_list(
     # value by reading ``selected_<name>`` from the context.
     for fname, fvalue in filter_values.items():
         context[f"selected_{fname}"] = fvalue
-    # Filter declarations — the ``_shared/index_filters.html`` macro
-    # iterates these to render one control per declared filter (only
-    # ``Filter`` instances are surfaced; raw ``QueryParam`` is URL-only
-    # with no UI metadata).
-    context["filters"] = tuple(f for f in spec.filters if isinstance(f, Filter))
+    declared = spec.declared_filters
+    # `filters` stays for any legacy template still reading it.
+    context["filters"] = declared
+    # Active filter descriptors — each is `{name, value, label}`. The
+    # toolbar's search link inlines a short summary of these
+    # (``Type: Seeking, Description: needle, +2 more filters``); when
+    # the list is empty, the link reads ``Search <collection>``
+    # instead. Multi-value filters fan out (one descriptor per
+    # selected value).
+    context["active_filters"] = _active_filter_descriptors(declared, filter_values)
+    context["active_filter_count"] = len(context["active_filters"])
+    # Search-link URL forwards the current query string so the search
+    # page renders its form pre-populated. Only set when the spec opts
+    # into `routes.search`.
+    if spec.routes.search:
+        from urllib.parse import urlencode
+
+        active_pairs: list[tuple[str, str]] = []
+        for fname, fvalue in filter_values.items():
+            if fvalue is None or fvalue == "" or fvalue == []:
+                continue
+            if isinstance(fvalue, list):
+                for one in fvalue:
+                    active_pairs.append((fname, str(one)))
+            else:
+                active_pairs.append((fname, str(fvalue)))
+        qs = urlencode(active_pairs)
+        base = f"/{spec.url_collection}/search"
+        context["search_url"] = f"{base}?{qs}" if qs else base
+    else:
+        context["search_url"] = None
+    # Clear-all URL — the bare list URL, with every active filter
+    # dropped.
+    context["clear_all_url"] = f"/{spec.url_collection}"
+    # Human-readable noun the toolbar prepends with "Search" when no
+    # filters are active (``Search posts``). Title case so the link
+    # reads as a sentence-cased prompt.
+    context["collection_label"] = spec.url_collection
 
     # Spec-declared constants — same merge precedence as handle_detail.
     if spec.static_context:

@@ -1,0 +1,77 @@
+{# Generic /<collection>/search view chrome.
+
+The dedicated filter page for a resource. Renders one
+`<form method="get" action="{{ list_action }}">` whose controls map
+1:1 to the entity's declared `Filter`s. Submitting GETs back to the
+list URL with the filled-in values — the search page never owns the
+applied state, it just *constructs* a URL the list page reads.
+
+Control selection (read by `_search_field`):
+  * `TextFilter`         → `<input type="search">`
+  * `ChoiceFilter`       → `<select>` with "Any" placeholder
+  * `ChoiceFilter multi` → grid of `<label><input type="checkbox">`
+
+Children supply only `resource_label`; the form body is built from
+the spec.
+#}
+{% extends "base.html" %}
+{%- from "_shared/_breadcrumb.html" import breadcrumb -%}
+
+{% block breadcrumb %}
+{%- set label %}{% block resource_label %}{% endblock %}{% endset -%}
+{{ breadcrumb([(label, list_action), ("Search", none)]) }}
+{% endblock %}
+
+{% block content %}
+<h1>{{ self.resource_label() }} search</h1>
+
+<form method="get" action="{{ list_action }}" class="search-form">
+
+  {%- for f in declared_filters %}
+  {{ _search_field(f, filter_values.get(f.name)) }}
+  {%- endfor %}
+
+  <menu>
+    <li><button type="submit">Apply</button></li>
+    <li><a href="{{ list_action }}" role="button" class="secondary">Clear</a></li>
+  </menu>
+
+</form>
+{% endblock %}
+
+
+{% macro _search_field(f, value) -%}
+{%- if f.kind == "text" -%}
+<label>
+  {{ f.display_label }}
+  <input
+    type="search"
+    name="{{ f.name }}"
+    value="{{ value or '' }}"
+    {%- if f.placeholder %} placeholder="{{ f.placeholder }}"{% endif %} />
+</label>
+{%- elif f.kind == "choice" -%}
+{%- if f.multi -%}
+{%- set selected = value or [] -%}
+<fieldset>
+  <legend>{{ f.display_label }}</legend>
+  {%- for v, l in f.choices %}
+  <label>
+    <input type="checkbox" name="{{ f.name }}" value="{{ v }}"{% if v in selected %} checked{% endif %} />
+    {{ l }}
+  </label>
+  {%- endfor %}
+</fieldset>
+{%- else -%}
+<label>
+  {{ f.display_label }}
+  <select name="{{ f.name }}">
+    <option value=""{% if not value %} selected{% endif %}>Any</option>
+    {%- for v, l in f.choices %}
+    <option value="{{ v }}"{% if value == v %} selected{% endif %}>{{ l }}</option>
+    {%- endfor %}
+  </select>
+</label>
+{%- endif -%}
+{%- endif -%}
+{%- endmacro %}

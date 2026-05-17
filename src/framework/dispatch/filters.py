@@ -2,9 +2,9 @@
 
 A ``Filter`` is a richer ``QueryParam`` — same URL contract (it
 becomes a FastAPI ``Query(...)`` on the list route via
-``to_query_param()``) plus rendering metadata the
-``_shared/index_filters.html`` macro reads to pick the right HTML
-control (search input, single ``<select>``, multi ``<select>``).
+``to_query_param()``) plus rendering metadata the templates read to
+pick the right HTML control (search input, single ``<select>``,
+multi ``<select>``, checkboxes).
 
 The split is deliberate: the URL shape and the UI shape change for
 different reasons. A column may stay queryable from a URL while the
@@ -18,16 +18,13 @@ or a ``Filter`` instance — the mount layer normalizes both to
 ``handle_list`` factory threads the same names through to the repo's
 bespoke ``list_<collection>`` method.
 
-See ``../README.md`` for the framework layer's overall contract and
-``src/framework/templates/README.md`` for the macro that reads these
-objects (``_shared/index_filters.html``).
-
-The rendering macro renders every declared filter inline in a single
-plain `<form method="get">` — no JS, no dialog, no progressive
-add/remove chrome. Users fill the controls they want and submit.
-Declaring a filter on a spec therefore adds a visible control on
-the page; pick the filter set deliberately rather than adding
-zero-cost rows.
+Every declared ``Filter`` renders as a form control on the
+dedicated ``/<collection>/search`` page (see
+``framework/templates/views/search.html``). The list-page toolbar
+has only the "Filter · N" link (on the left) and the page-action
+menu (on the right); the active-filter strip below it lists each
+active value as a removable tag (each tag a small ``<form>`` that
+resubmits the URL minus that one filter).
 """
 
 from dataclasses import dataclass

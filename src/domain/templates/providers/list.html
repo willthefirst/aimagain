@@ -2,12 +2,6 @@
 {%- from "_shared/index_table.html" import index_table -%}
 {%- from "_shared/_provider_row.html" import provider_headers, provider_row -%}
 
-{% set filter_action = "/providers" %}
-{% set filter_values = {
-  "license_type": selected_license_type,
-  "issuing_state": selected_issuing_state,
-} %}
-
 {% block resource_label %}Providers{% endblock %}
 
 {% block content %}
