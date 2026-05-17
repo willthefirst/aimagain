@@ -1,5 +1,6 @@
 """Drift guard: every `AuditAction` member is justified by a spec."""
 
+from src.domain.specs.organization import ORGANIZATION_ENTITY
 from src.domain.specs.post import POST_ENTITY
 from src.domain.specs.provider import PROVIDER_ENTITY
 from src.domain.specs.provider_certification import CERTIFICATION_ENTITY
@@ -18,6 +19,7 @@ _CRUD_SPECS = (
     LICENSURE_ENTITY,
     EDUCATION_ENTITY,
     CERTIFICATION_ENTITY,
+    ORGANIZATION_ENTITY,
 )
 
 # Edge-shaped specs whose `edge_audit.actions` declares each member directly.

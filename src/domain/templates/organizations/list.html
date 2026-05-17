@@ -1,0 +1,32 @@
+{% extends "views/list.html" %}
+
+{% block resource_label %}Organizations{% endblock %}
+
+{% block actions %}
+<li><a href="/organizations/form" role="button">Create organization</a></li>
+{% endblock %}
+
+{% block content %}
+{% if organizations %}
+<table id="organizations-table">
+  <thead>
+    <tr>
+      <th>Name</th>
+      <th>Type</th>
+      <th>Parent</th>
+    </tr>
+  </thead>
+  <tbody>
+    {%- for org in organizations %}
+    <tr>
+      <td><a href="/organizations/{{ org.id }}">{{ org.name }}</a></td>
+      <td>{{ ORGANIZATION_TYPES_LABELS[org.type] }}</td>
+      <td>{% if org.parent_org_id %}<a href="/organizations/{{ org.parent_org_id }}">Parent</a>{% else %}—{% endif %}</td>
+    </tr>
+    {%- endfor %}
+  </tbody>
+</table>
+{% else %}
+<p>No organizations found.</p>
+{% endif %}
+{% endblock %}
