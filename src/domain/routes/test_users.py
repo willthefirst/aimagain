@@ -154,7 +154,9 @@ async def test_list_shows_admin_actions_for_admin(
     response = await authenticated_client.get("/users")
     tree = HTMLParser(response.text)
     activation_buttons = tree.css(f"button[hx-put='/users/{other.id}/activation']")
-    assert len(activation_buttons) == 1, "Expected one activation button (one non-self row)"
+    assert (
+        len(activation_buttons) == 1
+    ), "Expected one activation button (one non-self row)"
     assert activation_buttons[0].text().strip() == "Deactivate"
     assert tree.css_first(f"button[hx-delete='/users/{other.id}']") is not None
 
