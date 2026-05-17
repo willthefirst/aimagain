@@ -83,6 +83,13 @@
          lone child still parks at the right edge. `flex-wrap` lets
          long rows wrap onto multiple lines on narrow viewports. */
       .toolbar { display: flex; justify-content: flex-end; align-items: center; flex-wrap: wrap; gap: 1rem; }
+      /* Action-bar children align as individual flex items. `<span>`
+         wrappers used purely as test/data hooks (e.g. `.favorite-toggle`,
+         `.admin-actions`, `.owner-actions`) become layout-invisible so
+         their inner buttons participate directly in the toolbar's row —
+         same alignment + gap as bare button-shaped children. The span
+         stays in the DOM for selectors and `data-*` attributes. */
+      .toolbar > span { display: contents; }
       .toolbar-left { flex: 1; min-width: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; }
       .toolbar-right { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; }
       /* Breadcrumb zone bar. Pico already styles the markup
