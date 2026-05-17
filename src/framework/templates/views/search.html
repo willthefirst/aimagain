@@ -7,15 +7,19 @@ list URL with the filled-in values — the search page never owns the
 applied state, it just *constructs* a URL the list page reads.
 
 Control selection (read by `_search_field`):
-  * `TextFilter`         → `<input type="search">`
-  * `ChoiceFilter`       → `<select>` with "Any" placeholder
-  * `ChoiceFilter multi` → grid of `<label><input type="checkbox">`
+  * `TextFilter`           → `<input type="search">`
+  * `ChoiceFilter`         → `<select>` with "Any" placeholder
+  * `ChoiceFilter radio`   → toggle radio-button group (`role="group"`)
+  * `ChoiceFilter multi`   → `<select multiple>` (the single multiselect
+                              widget shared with form fields, see
+                              `_shared/form_fields.html::multi_select_field`)
 
 Children supply only `resource_label`; the form body is built from
 the spec.
 #}
 {% extends "base.html" %}
 {%- from "_shared/_breadcrumb.html" import breadcrumb -%}
+{%- from "_shared/form_fields.html" import multi_select_field -%}
 
 {% block breadcrumb %}
 {%- set label %}{% block resource_label %}{% endblock %}{% endset -%}
@@ -52,15 +56,22 @@ the spec.
 </label>
 {%- elif f.kind == "choice" -%}
 {%- if f.multi -%}
-{%- set selected = value or [] -%}
-<fieldset>
+{{ multi_select_field(f.name, f.display_label, f.choices|map(attribute=0)|list, labels=dict(f.choices), current=value) }}
+{%- elif f.radio -%}
+<fieldset class="toggle-radio">
   <legend>{{ f.display_label }}</legend>
-  {%- for v, l in f.choices %}
-  <label>
-    <input type="checkbox" name="{{ f.name }}" value="{{ v }}"{% if v in selected %} checked{% endif %} />
-    {{ l }}
-  </label>
-  {%- endfor %}
+  <div role="group">
+    <label>
+      <input type="radio" name="{{ f.name }}" value=""{% if not value %} checked{% endif %} />
+      Any
+    </label>
+    {%- for v, l in f.choices %}
+    <label>
+      <input type="radio" name="{{ f.name }}" value="{{ v }}"{% if value == v %} checked{% endif %} />
+      {{ l }}
+    </label>
+    {%- endfor %}
+  </div>
 </fieldset>
 {%- else -%}
 <label>

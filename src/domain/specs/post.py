@@ -87,6 +87,7 @@ POST_ENTITY: Final[EntitySpec] = EntitySpec(
                 ("client_referral", "Seeking"),
                 ("provider_availability", "Providing"),
             ),
+            radio=True,
             value_type=Literal[*POST_KINDS.names],  # type: ignore[valid-type]
         ),
         TextFilter(

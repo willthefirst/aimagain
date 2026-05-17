@@ -14,7 +14,7 @@ difference is the prefill, not the structure.
 
 The `desired_times` checkbox grid sends form-encoded data with multiple
 values for the same field name. The form naturally encodes multiple
-checkboxes as `desired_times=monday_morning&desired_times=friday_evening`,
+checkboxes as `desired_times=monday_am&desired_times=friday_pm`,
 which FastAPI/Pydantic parses as a list.
 #}
 {%- from "_shared/form_fields.html" import text_field, textarea_field, select_field, time_grid_field, multi_select_field, field_for -%}

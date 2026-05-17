@@ -81,11 +81,13 @@ PROVIDER_ENTITY: Final[EntitySpec] = EntitySpec(
             name="license_type",
             label="License type",
             choices=tuple((v, LICENSE_TYPES_LABELS[v]) for v in LICENSE_TYPES),
+            multi=True,
         ),
         ChoiceFilter(
             name="issuing_state",
             label="Licensed in state",
             choices=tuple((s, s) for s in US_STATES),
+            multi=True,
         ),
     ),
     create_redirect=_provider_form_redirect,

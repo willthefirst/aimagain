@@ -64,23 +64,26 @@ canonical use.
 </fieldset>
 {%- endmacro %}
 
-{# Flat checkbox list driven by a controlled-vocabulary tuple. All
-checkboxes share the same `name` so 2+ selections serialize as a JSON
-array; htmx's `json-enc` collapses 0/1 selections to absent/scalar, and
-the schema's `_scalar_to_list` `BeforeValidator` re-wraps the scalar
+{# Single `<select multiple>` widget driven by a controlled-vocabulary
+tuple. One option per value; selected ones get the `selected` attribute.
+Multiple selections serialize as repeated `name=v` pairs under
+application/x-www-form-urlencoded; under htmx's `json-enc` the
+extension emits an array for 2+ selections, scalar for 1, absent for 0
+— the schema's `_scalar_to_list` `BeforeValidator` re-wraps the scalar
 back into a list (see `time_grid_field` for the same trick on the day-
-time grid). Used today for the `services` multi-select on both forms;
-the upcoming `settings` field on `provider_availability` reuses it. #}
+time grid). Used today for `services`/`settings` on the post forms and
+`in_network_carriers` on the provider form, and reused by the search
+form's multi `ChoiceFilter` branch. #}
 {% macro multi_select_field(name, label, options, labels=None, current=None) -%}
 {%- set selected = current or [] -%}
-<fieldset>
-  <legend>{{ label }}</legend>
-  {%- for v in options %}
-  <label>
-    <input type="checkbox" name="{{ name }}" value="{{ v }}"{% if v in selected %} checked{% endif %} />{{ labels[v] if labels else v }}
-  </label>
-  {%- endfor %}
-</fieldset>
+<label for="{{ name }}">
+  {{ label }}
+  <select id="{{ name }}" name="{{ name }}" multiple size="{{ [options|length, 8]|min }}">
+    {%- for v in options %}
+    <option value="{{ v }}"{% if v in selected %} selected{% endif %}>{{ labels[v] if labels else v }}</option>
+    {%- endfor %}
+  </select>
+</label>
 {%- endmacro %}
 
 {# Day × time-of-day checkbox grid. Renders one checkbox per
@@ -119,19 +122,19 @@ posts an empty array. #}
     <thead>
       <tr>
         <th></th>
-        {%- for day in DESIRED_TIME_DAYS %}
-        <th scope="col">{{ DESIRED_TIME_DAY_LABELS[day] }}</th>
+        {%- for part in DESIRED_TIME_PARTS %}
+        <th scope="col">{{ DESIRED_TIME_PART_LABELS[part] }}</th>
         {%- endfor %}
       </tr>
     </thead>
     <tbody>
-      {%- for part in DESIRED_TIME_PARTS %}
+      {%- for day in DESIRED_TIME_DAYS %}
       <tr>
-        <th scope="row">{{ DESIRED_TIME_PART_LABELS[part] }}</th>
-        {%- for day in DESIRED_TIME_DAYS %}
+        <th scope="row">{{ DESIRED_TIME_DAY_SHORT_LABELS[day] }}</th>
+        {%- for part in DESIRED_TIME_PARTS %}
         {%- set token = day ~ "_" ~ part -%}
         <td>
-          <input type="checkbox" name="{{ name }}" value="{{ token }}"{% if token in selected %} checked{% endif %} aria-label="{{ DESIRED_TIME_DAY_LABELS[day] }} {{ DESIRED_TIME_PART_LABELS[part]|lower }}" />
+          <input type="checkbox" name="{{ name }}" value="{{ token }}"{% if token in selected %} checked{% endif %} aria-label="{{ DESIRED_TIME_DAY_LABELS[day] }} {{ DESIRED_TIME_PART_LABELS[part] }}" />
         </td>
         {%- endfor %}
       </tr>

@@ -375,7 +375,7 @@ async def test_list_providers_filtered_by_license_type(
 
     async with db_test_session_manager() as session:
         repo = ProviderRepository(session)
-        providers = await repo.list_providers(license_type="lcsw")
+        providers = await repo.list_providers(license_type=["lcsw"])
         assert [p.id for p in providers] == [keep_id]
 
 
@@ -405,7 +405,7 @@ async def test_list_providers_filtered_by_issuing_state(
 
     async with db_test_session_manager() as session:
         repo = ProviderRepository(session)
-        providers = await repo.list_providers(issuing_state="CA")
+        providers = await repo.list_providers(issuing_state=["CA"])
         assert [p.id for p in providers] == [keep_id]
 
 
@@ -446,7 +446,9 @@ async def test_list_providers_combined_filter_is_anded(
 
     async with db_test_session_manager() as session:
         repo = ProviderRepository(session)
-        providers = await repo.list_providers(license_type="lcsw", issuing_state="CA")
+        providers = await repo.list_providers(
+            license_type=["lcsw"], issuing_state=["CA"]
+        )
         assert [p.id for p in providers] == [keep_id]
 
 
@@ -480,7 +482,7 @@ async def test_list_providers_distinct_when_multiple_licensures_match(
 
     async with db_test_session_manager() as session:
         repo = ProviderRepository(session)
-        providers = await repo.list_providers(license_type="lcsw")
+        providers = await repo.list_providers(license_type=["lcsw"])
         assert len(providers) == 1
 
 

@@ -102,7 +102,7 @@ Files prefixed with `_` (e.g. `_breadcrumb.html`, `_toolbar.html`, `_provider_ro
 
 `index_table` also supports `header_kwargs={}` for headers that vary by page state. Not every list uses the table shape — `/posts` renders a `<ul id="posts-list">` (Pico-default styling, no custom CSS) via `posts/_item.html::post_item(post, active_kind=None)` instead, since the polymorphic kinds need a description-led row (kind chip + lead text + per-chunk metadata) that the table's fixed columns can't express.
 
-The search-page form (`views/search.html`) reads the `Filter` instances declared on the spec; the macro picks the right control by `f.kind` and `f.multi` (search input for `TextFilter`, `<select>` for single-choice, `<input type="checkbox">` grid for multi-choice). `select_field` (for create/edit) is required by default with an optional disabled placeholder.
+The search-page form (`views/search.html`) reads the `Filter` instances declared on the spec; the macro picks the right control by `f.kind`, `f.multi`, and `f.radio` (search input for `TextFilter`; `<select>` with "Any" for single-choice; a Pico toggle radio-button group for `ChoiceFilter(radio=True)`; the shared `<select multiple>` widget — same macro as the create/edit forms' `multi_select_field` — for multi-choice). `select_field` (for create/edit) is required by default with an optional disabled placeholder.
 
 ## Schema-driven `field_for`
 
