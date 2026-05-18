@@ -11,12 +11,18 @@ flags any missing piece.
 from src.domain.specs import ALL_ENTITY_SPECS
 from src.framework.audit.core import AuditAction
 
-# Bespoke members not modeled by any spec. `REGISTER` is fired by the
-# fastapi-users self-signup flow in `src/logic/auth/auth_processing.py`
-# — there is no `RegistrationEntity` spec, the verb just sits on top of
-# `User`. Keep tight: add an entry only when adding a corresponding
+# Bespoke members not modeled by any spec.
+#
+# - `REGISTER` is fired by the fastapi-users self-signup flow in
+#   `src/logic/auth/auth_processing.py` — there is no `RegistrationEntity`
+#   spec, the verb just sits on top of `User`.
+# - `JOB_RUN_STARTED` is fired by APScheduler-driven background jobs in
+#   `src/jobs/` (system actor; `resource_type="job"`; per-run `resource_id`).
+#   There is no spec home: a "job ran" event has no `AuditedResource` shape.
+#
+# Keep tight: add an entry only when adding a corresponding
 # `record_audit(action=...)` callsite.
-_BESPOKE: frozenset[str] = frozenset({"REGISTER"})
+_BESPOKE: frozenset[str] = frozenset({"REGISTER", "JOB_RUN_STARTED"})
 
 
 def _expected_members() -> set[str]:

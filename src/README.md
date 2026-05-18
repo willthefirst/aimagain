@@ -22,6 +22,9 @@ Plus three loose files at `src/`:
 - **`db.py`** — database engine / session factory.
 - **`auth_config.py`** — fastapi-users setup.
 
+And one documented bucket-grammar deviation:
+- **[`jobs/`](jobs/README.md)** — APScheduler-driven in-process jobs. App-level glue that's neither domain-specific nor reusable framework; each job opens its own `async_session_maker` session and writes a `record_audit(...)` row.
+
 ## How the buckets relate
 
 ```

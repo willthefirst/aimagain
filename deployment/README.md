@@ -43,3 +43,12 @@ chmod +x deploy.sh cleanup-docker.sh
 ```
 
 `./deploy.sh` is idempotent — re-running it after a failure rolls back to the working color.
+
+## Scheduled work: APScheduler vs host cron
+
+Two scheduling rails coexist:
+
+- **In-process (APScheduler)** — jobs that need the application's plumbing (`async_session_maker`, audit repository, domain handlers). Started from `src/main.py`'s `lifespan` and configured under [`src/jobs/`](../src/jobs/README.md).
+- **Host cron** — jobs that operate outside the app process (e.g. `droplet-files/cleanup-docker.sh` prunes container layers). These keep their place at the host level and never go through APScheduler.
+
+Pick the rail by where the work happens, not by cadence.

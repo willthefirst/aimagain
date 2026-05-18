@@ -12,6 +12,7 @@ from src.domain.logic.users.schema import UserRead
 from src.domain.routes import auth_pages, auth_routes
 from src.framework.dispatch.registry import entity_registry
 from src.framework.http.middleware import StripEmptyQueryParamsMiddleware
+from src.jobs.scheduler import make_scheduler, register_jobs
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -41,7 +42,23 @@ async def lifespan(app: FastAPI):
         logger.error("Application startup aborted due to database issues")
         raise
 
-    yield
+    # APScheduler runs inside the app process so jobs share the real
+    # async_session_maker and audit repository (see src/jobs/README.md).
+    # DISABLE_SCHEDULER=1 keeps the scheduler idle under pytest while
+    # still letting tests inspect register_jobs(make_scheduler()).
+    scheduler = make_scheduler()
+    register_jobs(scheduler)
+    scheduler_running = False
+    if os.getenv("DISABLE_SCHEDULER") != "1":
+        scheduler.start()
+        scheduler_running = True
+        logger.info("APScheduler started")
+
+    try:
+        yield
+    finally:
+        if scheduler_running:
+            scheduler.shutdown(wait=False)
 
 
 app = FastAPI(title="Bedlam Connect", lifespan=lifespan)

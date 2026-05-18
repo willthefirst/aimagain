@@ -26,7 +26,8 @@ app = [
     "fastapi-users[sqlalchemy]",
     "aiosqlite",
     "pydantic-settings",
-    "asyncstdlib"
+    "asyncstdlib",
+    "apscheduler>=3.10,<4"
 ]
 
 dev = [
