@@ -21,7 +21,6 @@ from typing import Annotated, Literal
 from src.domain.models.enums import ORGANIZATION_TYPES
 from src.framework.rendering.form_fields import HtmlPattern
 from src.framework.schema_validators import (
-    OptionalUuid,
     PartialUpdate,
     ReadProjection,
     StrippedText,
@@ -46,10 +45,9 @@ class OrganizationCreate(WirePayload):
 
     name: Annotated[StrippedText, HtmlPattern(maxlength=200)]
     type: Literal[*ORGANIZATION_TYPES]
-    # `OptionalUuid` coerces a blank HTML input (`""`) to `None` before
-    # UUID parsing — plain `uuid.UUID | None` 422s on the empty string
-    # the form posts when the field is left blank.
-    parent_org_id: OptionalUuid = None
+    # Blank HTML form input (`""`) is coerced to `None` at the
+    # `WirePayload` layer — see `_coerce_blank_strings_on_nullable_scalars`.
+    parent_org_id: uuid.UUID | None = None
 
 
 class OrganizationUpdate(PartialUpdate):
@@ -59,4 +57,4 @@ class OrganizationUpdate(PartialUpdate):
 
     name: StrippedText | None = None
     type: Literal[*ORGANIZATION_TYPES] | None = None
-    parent_org_id: OptionalUuid = None
+    parent_org_id: uuid.UUID | None = None

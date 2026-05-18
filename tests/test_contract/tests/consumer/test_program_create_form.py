@@ -8,15 +8,13 @@ schema expects. The form's `org_id` dropdown is populated by
 `program_form_extras` in production (scoped to the user's owned Orgs);
 the stub seeds one Org so the pact body is deterministic.
 
-`description` (optional text) is left blank — the browser still
-submits ``description=`` and the schema's ``StrippedOptionalText``
-coerces it to ``None``.
-
-`start_date` / `end_date` are filled with concrete dates rather than
-left blank: a blank text input posts ``start_date=`` (empty string),
-which `date | None` rejects with a 422 — the same class of bug as the
-fixed-in-#550 `parent_org_id` 422, here lurking on the date fields.
-Tracked separately (see issue #551, which broadens to nullable dates).
+`description`, `start_date`, and `end_date` are all left **blank** —
+the browser submits ``description=&start_date=&end_date=`` and the
+``WirePayload._coerce_blank_strings_on_nullable_scalars`` model
+validator collapses each to ``None`` before per-field validation runs.
+Pinning the blank wire shape is the whole point — this is the shape
+the prod form actually produces, and #551 (the systemic fix) made it
+accepted.
 """
 
 import pytest
@@ -49,7 +47,8 @@ async def test_consumer_program_create_form_submits(
     origin_with_routes: str, page: Page
 ):
     """Fill the create form on the stubbed page; assert the intercepted
-    request matches the contracted shape."""
+    request matches the contracted shape — including blank optional
+    text/date inputs (the #551 regression)."""
     pact = setup_pact(
         CONSUMER_NAME_PROGRAM_CREATE_FORM,
         PROVIDER_NAME_PROGRAMS,
@@ -62,17 +61,16 @@ async def test_consumer_program_create_form_submits(
     expected_request_headers = {
         "Content-Type": Like("application/x-www-form-urlencoded")
     }
-    # DOM-order field serialization. The radio `accepting_referrals`
-    # is pre-checked at "true" by the template (`current=true`), so it
-    # submits without user interaction. Dates are real values, not
-    # blanks — see module docstring.
+    # DOM-order field serialization. Blank optional inputs serialize
+    # as `<name>=`; the radio `accepting_referrals` is pre-checked at
+    # "true" by the template (`current=true`).
     expected_request_body = (
         f"org_id={STUB_PROGRAM_FORM_ORG_ID}"
         "&name=Intensive+Outpatient"
         "&description="
         "&state_preference=NY"
-        "&start_date=2026-06-01"
-        "&end_date=2026-12-31"
+        "&start_date="
+        "&end_date="
         "&accepting_referrals=true"
     )
 
@@ -107,8 +105,8 @@ async def test_consumer_program_create_form_submits(
         )
         await page.locator('input[name="name"]').fill("Intensive Outpatient")
         await page.locator('select[name="state_preference"]').select_option("NY")
-        await page.locator('input[name="start_date"]').fill("2026-06-01")
-        await page.locator('input[name="end_date"]').fill("2026-12-31")
+        # description / start_date / end_date intentionally left blank
+        # — pins the #551 regression class.
         await page.locator("button[type='submit']").click()
         await page.wait_for_timeout(NETWORK_TIMEOUT_MS)
 
