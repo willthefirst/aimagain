@@ -20,7 +20,7 @@ Program is stale by construction).
 Schema-only per the repo convention in ``alembic/README.md``.
 
 Revision ID: 73eb6dcb6908
-Revises: 2cc8e54d7a19
+Revises: f89c9e2a7748
 Create Date: 2026-05-17 22:15:01.411551
 
 """
@@ -33,7 +33,7 @@ from alembic import op
 
 # revision identifiers, used by Alembic.
 revision: str = "73eb6dcb6908"
-down_revision: Union[str, None] = "2cc8e54d7a19"
+down_revision: Union[str, None] = "f89c9e2a7748"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
