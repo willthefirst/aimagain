@@ -129,14 +129,10 @@ POST_ENTITY: Final[EntitySpec] = EntitySpec(
         ),
     ),
     update_redirect=Redirects.to_detail("posts", "post_id"),
-    # Wire-side authz on per-kind FK fields (#541). Dispatches on
-    # ``payload.kind``: PA's ``provider_id`` and Program-availability's
-    # ``program_id`` must point at rows the requesting user owns
-    # (superusers bypass). Pre-#541 there was *no* check on PA's
-    # ``provider_id`` despite the schema docstring claiming one;
-    # generalizing for the new kind closed that gap. See
-    # ``src/domain/logic/posts/handlers.py`` for the dispatcher and the
-    # tech-debt note on a per-kind registry shape.
+    # Wire-side authz on per-kind FK fields. Dispatches on ``payload.kind``:
+    # PA's ``provider_id`` and Program-availability's ``program_id`` must
+    # point at rows the requesting user owns (superusers bypass). See
+    # ``src/domain/logic/posts/handlers.py`` for the dispatcher.
     payload_authz_path=(
         "src.domain.logic.posts.handlers._assert_post_payload_target_ownership"
     ),

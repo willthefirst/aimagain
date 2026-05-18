@@ -13,7 +13,7 @@ Read by:
   - `src/domain/specs/user.py` — the related-list subresource
     `RelatedListSubresource(child_spec=PROVIDER_ENTITY.to_resource_spec(), ...)`
     on the user spec; closes the `api/common -> api/routes`
-    inversion documented in A1 (#317).
+    inversion.
 """
 
 from typing import Final
@@ -97,16 +97,12 @@ PROVIDER_ENTITY: Final[EntitySpec] = EntitySpec(
     detail_extras_path="src.domain.logic.providers.handlers.provider_detail_extras",
     detail_extras_repos=(("user_favorite_repo", UserFavoriteRepository),),
     # The create/edit form's Org-picker dropdown is scoped per-viewer to
-    # the user's owned Organizations (#524). The framework invokes the
-    # extras callable on both the create path (target=None) and the
-    # edit path (target=<row>) — see `EntitySpec.form_extras_path`.
+    # the user's owned Organizations. The framework invokes the extras
+    # callable on both the create path (target=None) and the edit path
+    # (target=<row>) — see `EntitySpec.form_extras_path`.
     form_extras_path="src.domain.logic.providers.handlers.provider_form_extras",
     form_extras_repos=(("organization_repo", OrganizationRepository),),
-    # Write-time check: a user may only attach a Provider to an Org they
-    # own (#524). Replaces the bespoke `handle_create_provider` /
-    # `handle_update_provider` PR #531 introduced as a workaround —
-    # the framework's `payload_authz` hook (#532) lets the rule live
-    # on the spec instead of duplicating the create/update wiring.
+    # Write-time check: a user may only attach a Provider to an Org they own.
     payload_authz_path=(
         "src.domain.logic.providers.handlers._assert_provider_payload_org_ownership"
     ),

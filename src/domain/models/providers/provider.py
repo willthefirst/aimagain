@@ -13,11 +13,10 @@ _TABLE = "providers"
 _ck = partial(named_check_in, _TABLE)
 
 # `npi` is either NULL or exactly 10 ASCII digits — the NPPES registry
-# (issue A3) lookups expect that shape. SQLite-flavored `GLOB`; the
-# project is single-dialect (sqlite+aiosqlite for both dev and prod —
-# see `.env.test`, deployment Dockerfile). The Pydantic validator
-# `_validate_npi` in `src/domain/logic/providers/schema.py` is the
-# primary wire-side enforcement; this CHECK is defense-in-depth.
+# lookups expect that shape. SQLite-flavored `GLOB`; the project is
+# single-dialect (sqlite+aiosqlite for both dev and prod). The Pydantic
+# validator `_validate_npi` in `src/domain/logic/providers/schema.py` is
+# the primary wire-side enforcement; this CHECK is defense-in-depth.
 _NPI_FORMAT_CHECK = CheckConstraint(
     "npi IS NULL OR (length(npi) = 10 "
     "AND npi GLOB '[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]')",
@@ -52,10 +51,8 @@ class Provider(LocationMixin, BaseModel):
         nullable=False,
     )
     user = relationship("User")
-    # `org_id` is the source of truth for which Organization this
-    # Provider belongs to — `provider.org.name` is the practice's
-    # display name (the former `practice_name` column was dropped in
-    # PR 3 of the Org/Program roadmap, #524).
+    # `provider.org.name` is the practice's display name — there is no
+    # separate `practice_name` column.
     org_id = Column(
         Uuid(as_uuid=True),
         ForeignKey("organizations.id", ondelete="RESTRICT"),

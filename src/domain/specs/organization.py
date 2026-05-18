@@ -1,13 +1,5 @@
-"""`ORGANIZATION_ENTITY`: PR 1 of the Org/Program roadmap (#516).
-
-Standalone directory entity for clinics, group practices, health
-systems, and solo-practice shells. No Provider-side relationships yet —
-that lands in PR 2 (Provider.org_id).
-
-Read by:
-  - `src/domain/routes/organizations.py` — single `mount_entity` call.
-  - `src/framework/audit/test_audit_action_drift.py` — pins that the
-    spec's CRUD audit triple is declared on `AuditAction`.
+"""`ORGANIZATION_ENTITY`: standalone directory entity for clinics, group
+practices, health systems, and solo-practice shells.
 """
 
 from typing import Final
