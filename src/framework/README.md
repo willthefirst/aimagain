@@ -28,4 +28,6 @@ Per-mount docstrings in [`dispatch/resource_routes.py`](dispatch/resource_routes
 
 ## Import discipline
 
-Framework code reads specs **via parameters, not via imports** — nothing under this directory imports from `src/domain/` at module load time. The model hub at `src/domain/models/__init__.py` is allowed as a runtime import (the SQLAlchemy classes the repos operate on).
+Framework code reads specs **via parameters, not via imports** — nothing under this directory imports from `src/domain/` at module load time. The one exception is the `AuditLog` SQLAlchemy class at `src/domain/models/__init__.py`, which the audit framework reads directly.
+
+The auth-resolved actor is typed via the structural [`Actor` protocol](actor.py), so generic handlers (`dispatch/handlers.py`), audit (`audit/core.py`), authz predicates (`authz.py`), and chrome context (`http/responses.py`) take `Actor` / `Actor | None` instead of a concrete domain `User`. The domain's `User` model satisfies the protocol by structure; tests can pass a `SimpleNamespace`.

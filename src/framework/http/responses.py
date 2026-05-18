@@ -8,10 +8,10 @@ from fastapi.responses import JSONResponse
 from src.framework.authz import is_admin
 
 if TYPE_CHECKING:
-    from src.domain.models import User
+    from src.framework.actor import Actor
 
 
-def base_context(user: User | None) -> dict:
+def base_context(user: Actor | None) -> dict:
     """Flat scalars the chrome layer (`base.html` + identity widgets) reads
     on every render.
 
@@ -38,7 +38,7 @@ class APIResponse:
         context: dict,
         request: Any,
         *,
-        current_user: User | None = None,
+        current_user: Actor | None = None,
     ) -> Any:
         """
         Helper for HTML responses using templates.

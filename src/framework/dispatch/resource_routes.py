@@ -1029,13 +1029,13 @@ def mount_search(
             )
         )
     if spec.read_user_dep is not None:
-        from src.domain.models import User
+        from src.framework.actor import Actor
 
         sig_params.append(
             inspect.Parameter(
                 "requesting_user",
                 inspect.Parameter.POSITIONAL_OR_KEYWORD,
-                annotation=User,
+                annotation=Actor,
             )
         )
     _search_handler.__signature__ = inspect.Signature(parameters=sig_params)  # type: ignore[attr-defined]

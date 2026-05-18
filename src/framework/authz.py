@@ -9,15 +9,15 @@ from typing import TYPE_CHECKING
 from src.framework.http.exceptions import ForbiddenError
 
 if TYPE_CHECKING:
-    from src.domain.models import User
+    from src.framework.actor import Actor
 
 
-def is_admin(user: User | None) -> bool:
+def is_admin(user: Actor | None) -> bool:
     """True iff `user` is authenticated and is a superuser."""
     return user is not None and user.is_superuser
 
 
-def is_owner(obj, user: User | None, *, owner_attr: str = "owner_id") -> bool:
+def is_owner(obj, user: Actor | None, *, owner_attr: str = "owner_id") -> bool:
     """True iff `user` is authenticated and `obj`'s owner-FK matches.
 
     `owner_attr` names the foreign-key column on `obj` that points at
@@ -30,7 +30,7 @@ def is_owner(obj, user: User | None, *, owner_attr: str = "owner_id") -> bool:
     return getattr(obj, owner_attr) == user.id
 
 
-def is_owner_or_admin(obj, user: User | None, *, owner_attr: str = "owner_id") -> bool:
+def is_owner_or_admin(obj, user: Actor | None, *, owner_attr: str = "owner_id") -> bool:
     """True iff `user` owns `obj` (by FK) or is a superuser.
 
     Predicate form of `assert_owner_or_admin`. The two forms share one
@@ -42,7 +42,7 @@ def is_owner_or_admin(obj, user: User | None, *, owner_attr: str = "owner_id") -
     return is_owner(obj, user, owner_attr=owner_attr) or is_admin(user)
 
 
-def is_self_or_admin(actor: User | None, target) -> bool:
+def is_self_or_admin(actor: Actor | None, target) -> bool:
     """True iff `actor` is authenticated and is either `target` itself or a superuser.
 
     Distinct signature from `is_owner`: the resource *is* the user, not
@@ -54,7 +54,7 @@ def is_self_or_admin(actor: User | None, target) -> bool:
     return actor.id == target.id or actor.is_superuser
 
 
-def forbid_self_action(target, actor: User, *, detail: str) -> None:
+def forbid_self_action(target, actor: Actor, *, detail: str) -> None:
     """Raise `ForbiddenError` if `actor` is operating on themselves.
 
     For admin-only mutations whose target is a `User` row, the route's
@@ -71,7 +71,7 @@ def forbid_self_action(target, actor: User, *, detail: str) -> None:
 
 def assert_owner_or_admin(
     obj,
-    user: User,
+    user: Actor,
     *,
     owner_attr: str = "owner_id",
     action: str = "edit this resource",
