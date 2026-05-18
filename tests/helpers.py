@@ -138,7 +138,6 @@ def make_provider_availability_detail(
 # instead of a `NOT NULL` violation at flush time.
 
 _PROVIDER_DEFAULTS: dict[str, Any] = {
-    "practice_name": "Acme Health",
     "location_city": "Springfield",
     "location_state": "IL",
     "location_zip": "62701",
@@ -185,7 +184,11 @@ def _drop_none(d: dict[str, Any]) -> dict[str, Any]:
 def provider_payload(**overrides: Any) -> dict[str, Any]:
     """Build a wire-valid `POST /providers` form-encoded payload.
     Returns a fresh flat dict each call. Sub-entity arrays are intentionally
-    omitted — credentials are added via the dedicated sub-resource endpoints."""
+    omitted — credentials are added via the dedicated sub-resource endpoints.
+
+    ``org_id`` is required on the wire (#524). Callers that hit a real DB
+    must pass an existing Organization's id; pure schema-validation tests
+    that don't persist can pass any UUID."""
     return _drop_none({**_PROVIDER_DEFAULTS, **overrides})
 
 
@@ -207,16 +210,13 @@ def certification_payload(**overrides: Any) -> dict[str, Any]:
 def make_provider(*, owner_id: UUID, **overrides: Any) -> Provider:
     """Build a `Provider` ORM row with CHECK-valid defaults.
 
-    PR 2 of the Org roadmap (#520) introduced ``Provider.org_id`` as a
-    NOT NULL FK. Callers persisting the returned row must either:
-
-    * pass ``org_id=<existing-org.id>`` in ``overrides`` (Org persisted
-      separately via ``make_organization_row`` + ``session.add``); or
-    * route the create through ``ProviderRepository.create``, which
-      find-or-creates an Org from ``practice_name``.
-
-    Bare ORM constructors without one of the above will trip the
-    ``NOT NULL`` constraint at flush time.
+    ``Provider.org_id`` is NOT NULL (#524 — the former ``practice_name``
+    mirror was dropped). Callers persisting the returned row must pass
+    ``org_id=<existing-org.id>`` in ``overrides`` (Org persisted
+    separately via ``make_organization_row`` + ``session.add``), or use
+    :func:`make_provider_with_org` which builds the Org + Provider in
+    one call. Bare ORM constructors without an ``org_id`` will trip the
+    NOT NULL constraint at flush time.
     """
     return Provider(owner_id=owner_id, **{**_PROVIDER_DEFAULTS, **overrides})
 
@@ -252,23 +252,24 @@ def make_provider_with_org(
     org: Organization | None = None,
     **overrides: Any,
 ) -> Provider:
-    """Build a Provider wired to a matching Organization (PR 2 mirror
-    invariant: ``provider.practice_name == org.name``).
+    """Build a Provider wired to an Organization. ``Organization.name``
+    is the practice's display name; tests that previously asserted on
+    ``provider.practice_name`` now read ``provider.org.name``.
 
     The Org is attached via ``provider.org = org`` rather than just
     ``org_id`` so SQLAlchemy's default save-update cascade picks the
-    Org up when the Provider is added to a session — callers can stay
-    on the single-add ``session.add(provider)`` shape they used before
-    PR 2 introduced ``org_id``.
+    Org up when the Provider is added to a session — callers stay on
+    the single-add ``session.add(provider)`` shape.
 
-    Pass ``org=<instance>`` when multiple Providers share an Org;
-    practice_name is taken from the Org in that case."""
+    ``practice_name`` here names the *Organization* — the kwarg is
+    kept under that name for call-site stability. Pass ``org=<instance>``
+    when multiple Providers share an Org; the kwarg is ignored in that
+    case (the existing Org's name wins)."""
     if org is None:
         org = make_organization_row(owner_id=owner_id, name=practice_name)
     provider = make_provider(
         owner_id=owner_id,
         org_id=org.id,
-        practice_name=org.name,
         **{k: v for k, v in overrides.items() if k != "practice_name"},
     )
     provider.org = org

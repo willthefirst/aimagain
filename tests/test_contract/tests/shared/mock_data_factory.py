@@ -185,7 +185,11 @@ class MockDataFactory:
             owner_id=UUID("00000000-0000-0000-0000-000000000004"),
             created_at=now,
             updated_at=now,
-            practice_name="Acme Counseling",
+            # `org_id` + `org_name` replace the former `practice_name`
+            # (#524). `ProviderRead.model_validate` reads `org_name` off
+            # this stub via `from_attributes`.
+            org_id=UUID("55555555-5555-5555-5555-555555555555"),
+            org_name="Acme Counseling",
             location_city="Brooklyn",
             location_state="NY",
             location_zip="11201",

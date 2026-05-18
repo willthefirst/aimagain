@@ -45,7 +45,7 @@ def test_location_property_returns_dict_view():
     :class:`src.domain.logic.providers.schema.ProviderRead`."""
     p = Provider(
         owner_id="00000000-0000-0000-0000-000000000001",
-        practice_name="X",
+        org_id="00000000-0000-0000-0000-000000000002",
         location_city="Boise",
         location_state="ID",
         location_zip="83702",

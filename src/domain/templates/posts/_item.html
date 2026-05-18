@@ -27,7 +27,7 @@ header line carries the headline link, one or two modality chips
 (icon + short label) describing the post's in-person/virtual
 posture, and a right-aligned date. The headline shape varies by
 kind: CR is the age + gender combo from `client_referral_headline`
-("Adult male (25–64)"); PA is "{practice_name}, ST". CR's state is
+("Adult male (25–64)"); PA is "{org.name}, ST". CR's state is
 demoted to a location chunk in the demographics column (icon-only
 `<dt>` + "City, ST"); PA still carries state in the header. Each
 modality is a separate chip so each glyph anchors a single fact;
@@ -107,7 +107,7 @@ per-kind, so a single-kind filter doesn't need to suppress anything.
   {%- set p = d.provider -%}
   {#- PA posts identify as their practice. The practice name is the
       identity; "Provider Availability" as a label adds nothing. -#}
-  {%- set headline_text = p.practice_name -%}
+  {%- set headline_text = p.org.name -%}
   {%- set state = p.location_state if p else None -%}
   {%- set in_person = p.in_person_sessions if p else None -%}
   {%- set virtual = p.virtual_sessions if p else None -%}

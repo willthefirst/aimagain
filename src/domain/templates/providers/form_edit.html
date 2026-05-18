@@ -8,15 +8,27 @@
 {% set resource_detail_url = "/providers/" ~ provider.id %}
 
 {% block resource_label %}Providers{% endblock %}
-{% block current_label %}{{ provider.practice_name }}{% endblock %}
+{% block current_label %}{{ provider.org.name }}{% endblock %}
 
 {% block content %}
 <section>
   <h2>Practice</h2>
+  {# `org_id` PATCH reassigns the Provider to a different Organization;
+     `org.name` itself changes by editing the Organization (not via this
+     form). To use a new Organization, create one at
+     <a href="/organizations/new">/organizations/new</a> first. See #524. #}
   <form hx-patch="/providers/{{ provider.id }}">
     <fieldset>
       <legend>Practice location</legend>
-      {{ text_field("practice_name", "Practice name", current=provider.practice_name, maxlength=200) }}
+      <label for="org_id">
+        Organization
+        <select id="org_id" name="org_id" required>
+          {%- for o in orgs %}
+          <option value="{{ o.id }}"{% if o.id == provider.org_id %} selected{% endif %}>{{ o.name }}</option>
+          {%- endfor %}
+        </select>
+        <small>Don't see your organization? <a href="/organizations/new">Create one first</a>.</small>
+      </label>
       {{ text_field("location_city", "City", current=provider.location_city, maxlength=120) }}
       {{ select_field("location_state", "State", US_STATES, current=provider.location_state) }}
       {{ text_field("location_zip", "ZIP", current=provider.location_zip, pattern="\\d{5}", maxlength=5) }}

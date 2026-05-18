@@ -330,9 +330,9 @@ async def test_create_post_persists_parent_and_provider_availability_detail(
         assert post_row is not None
         assert post_row.kind == "provider_availability"
         assert detail_row is not None
-        # Practice name lives on the linked Provider now (#448).
+        # Practice name lives on the linked Provider's Organization (#524).
         assert detail_row.provider_id == provider.id
-        assert detail_row.provider.practice_name == "Acme Health"
+        assert detail_row.provider.org.name == "Acme Health"
 
 
 async def test_create_post_round_trips_free_text_fields(

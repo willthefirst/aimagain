@@ -40,16 +40,15 @@ class Provider(LocationMixin, BaseModel):
     )
     user = relationship("User")
     # `org_id` is the source of truth for which Organization this
-    # Provider belongs to. `practice_name` is a denormalized mirror of
-    # `org.name` — see the README for the invariant + lifetime.
-    # TODO(roadmap-pr-3): drop `practice_name` and read `org.name`.
+    # Provider belongs to — `provider.org.name` is the practice's
+    # display name (the former `practice_name` column was dropped in
+    # PR 3 of the Org/Program roadmap, #524).
     org_id = Column(
         Uuid(as_uuid=True),
         ForeignKey("organizations.id", ondelete="RESTRICT"),
         nullable=False,
     )
-    org = relationship("Organization", back_populates="providers")
-    practice_name = Column(Text, nullable=False)
+    org = relationship("Organization", back_populates="providers", lazy="selectin")
     in_person_sessions = Column(Text, nullable=False)
     virtual_sessions = Column(Text, nullable=False)
 
@@ -85,3 +84,13 @@ class Provider(LocationMixin, BaseModel):
         cascade="all, delete-orphan",
         lazy="selectin",
     )
+
+    @property
+    def org_name(self) -> str | None:
+        """Convenience accessor for ``provider.org.name`` — the practice's
+        display name. Used by ``ProviderRead`` (via ``from_attributes``)
+        and templates that want a `None`-safe read when the relationship
+        is unloaded. Returns ``None`` only in the narrow window where
+        ``org`` hasn't been populated yet (pre-flush ORM constructions);
+        every persisted row has a NOT NULL ``org_id``."""
+        return self.org.name if self.org is not None else None

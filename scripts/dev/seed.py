@@ -4,8 +4,10 @@ Seed the database with fixture data for development.
 
 Idempotent:
   - Users are matched by email; existing rows are skipped.
-  - Providers are matched by (owner_id, practice_name); existing rows
-    are reused so PA fixtures can always point at a real Provider.
+  - Organizations are matched by name; existing rows are reused so
+    multiple Providers can share an Org across reseeds.
+  - Providers are matched by (owner_id, org_id); existing rows are
+    reused so PA fixtures can always point at a real Provider.
   - Provider-availability posts are matched by
     (kind='provider_availability', owner_id, provider_id); existing
     rows are skipped.
@@ -899,7 +901,12 @@ async def seed_provider_availability() -> tuple[int, int]:
 
     async with async_session_maker() as session:
         for fixture in FIXTURE_PROVIDER_AVAILABILITY:
-            practice_name = fixture["provider"]["practice_name"]
+            # The fixture declares `practice_name` as a convenience key
+            # for the seeded Organization's name — it is NOT a column on
+            # Provider anymore (#524). Strip it before splatting the
+            # fixture dict into `Provider(**...)`.
+            provider_fields = dict(fixture["provider"])
+            practice_name = provider_fields.pop("practice_name")
             owner_result = await session.execute(
                 select(User).where(User.email == fixture["owner_email"])
             )
@@ -912,40 +919,35 @@ async def seed_provider_availability() -> tuple[int, int]:
                 skipped += 1
                 continue
 
-            # Find-or-create the Provider for this fixture's owner +
-            # practice_name. Reusing across reseeds keeps the FK stable.
+            # Find-or-create the Organization keyed on the fixture's
+            # practice_name — the Org's `name` is the practice's display
+            # name post-#524.
+            org_result = await session.execute(
+                select(Organization).where(Organization.name == practice_name)
+            )
+            org = org_result.scalar_one_or_none()
+            if org is None:
+                org = Organization(
+                    id=uuid.uuid4(),
+                    name=practice_name,
+                    type="solo_practice",
+                    owner_id=owner.id,
+                )
+                org.root_org_id = org.id
+                session.add(org)
+                await session.flush()
+
+            # Find-or-create the Provider for (owner_id, org_id).
+            # Reusing across reseeds keeps the FK stable.
             provider_result = await session.execute(
                 select(Provider).where(
                     Provider.owner_id == owner.id,
-                    Provider.practice_name == practice_name,
+                    Provider.org_id == org.id,
                 )
             )
             provider = provider_result.scalar_one_or_none()
             if provider is None:
-                # PR 2 of the Org roadmap (#520) requires a Provider to
-                # carry an `org_id`. Find-or-create an Organization by
-                # name so seeded Providers cluster under the same Org
-                # the directory will eventually surface — keeps the
-                # mirror invariant (`provider.practice_name == org.name`)
-                # holding without forcing each fixture to declare its Org.
-                org_result = await session.execute(
-                    select(Organization).where(Organization.name == practice_name)
-                )
-                org = org_result.scalar_one_or_none()
-                if org is None:
-                    org = Organization(
-                        id=uuid.uuid4(),
-                        name=practice_name,
-                        type="solo_practice",
-                        owner_id=owner.id,
-                    )
-                    org.root_org_id = org.id
-                    session.add(org)
-                    await session.flush()
-
-                provider = Provider(
-                    owner_id=owner.id, org_id=org.id, **fixture["provider"]
-                )
+                provider = Provider(owner_id=owner.id, org_id=org.id, **provider_fields)
                 session.add(provider)
                 await session.flush()
                 providers_created += 1

@@ -52,7 +52,6 @@ from src.domain.models.enums import (
     LOCATION_AVAILABILITY_OPTIONS,
     US_STATES,
 )
-from src.framework.rendering.form_fields import HtmlPattern
 from src.framework.schema_validators import (
     PartialUpdate,
     ReadProjection,
@@ -169,7 +168,13 @@ class ProviderRead(ReadProjection):
     owner_id: uuid.UUID
     created_at: datetime
     updated_at: datetime
-    practice_name: str
+    # `org_id` is the FK to the Provider's Organization (#524). `org_name`
+    # is the practice's display name, sourced from ``provider.org.name``
+    # via the model-validator below — every reader (templates, audit
+    # snapshots, contract tests) reads `org_name` rather than dereferencing
+    # the relationship inline.
+    org_id: uuid.UUID
+    org_name: str
     # `(city, state, zip)` arrive flat — from ORM attributes via
     # ``from_attributes`` or from a flat dict — and dump flat (JSON
     # responses still expose ``location_city`` / ``location_state`` /
@@ -213,13 +218,12 @@ class ProviderCreate(WirePayload):
     snapshots keep the pre-#451 shape.
     """
 
-    # `HtmlPattern(maxlength=...)` is a form-side hint only — does not
-    # affect server-side validation. It exists so the rendered
-    # `<input maxlength=...>` matches the previous hand-rolled form
-    # without restating the number per template. Adding a true server-
-    # side length cap (`pydantic.StringConstraints` etc.) is a separate
-    # concern.
-    practice_name: Annotated[StrippedText, HtmlPattern(maxlength=200)]
+    # The practice's display name lives on the linked Organization
+    # (`org.name`). Provider create accepts an existing Org's id; users
+    # who need a new Org create it via `POST /organizations` first and
+    # come back to this form. The dropdown is rendered by the form
+    # template from an `orgs` context var the form_new handler injects.
+    org_id: uuid.UUID
     location: Location
     in_person_sessions: Literal[*LOCATION_AVAILABILITY_OPTIONS]
     virtual_sessions: Literal[*LOCATION_AVAILABILITY_OPTIONS]
@@ -258,7 +262,10 @@ class ProviderUpdate(PartialUpdate):
     handler's ``repo.patch(target, **fields)`` call expects.
     """
 
-    practice_name: StrippedText | None = None
+    # Patch the Provider's Organization by pointing `org_id` at a
+    # different row in `organizations`. `org.name` changes by editing
+    # the Organization itself, not via this schema.
+    org_id: uuid.UUID | None = None
     location: LocationPartial | None = None
     in_person_sessions: Literal[*LOCATION_AVAILABILITY_OPTIONS] | None = None
     virtual_sessions: Literal[*LOCATION_AVAILABILITY_OPTIONS] | None = None

@@ -3,7 +3,7 @@
 {% set resource_url = "/providers" %}
 
 {% block resource_label %}Providers{% endblock %}
-{% block current_label %}{{ provider.practice_name }}{% endblock %}
+{% block current_label %}{{ provider.org.name }}{% endblock %}
 
 {% block actions %}
 {# Primary resource actions (Favorite toggle, Edit) live in the
@@ -39,7 +39,7 @@
   <section>
     <h2>Practice</h2>
     <dl>
-      <dt>Practice name</dt><dd>{{ provider.practice_name }}</dd>
+      <dt>Practice name</dt><dd><a href="/organizations/{{ provider.org_id }}">{{ provider.org.name }}</a></dd>
       <dt>City</dt><dd>{{ provider.location_city }}</dd>
       <dt>State</dt><dd>{{ provider.location_state }}</dd>
       <dt>ZIP</dt><dd>{{ provider.location_zip }}</dd>

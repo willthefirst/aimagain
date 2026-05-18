@@ -158,7 +158,7 @@ async def test_list_favorited_providers_newest_first(
     async with db_test_session_manager() as session:
         repo = UserFavoriteRepository(session)
         providers = await repo.list_favorited_providers(user.id)
-        names = [p.practice_name for p in providers]
+        names = [p.org.name for p in providers]
         assert names == ["Second", "First"]
 
 

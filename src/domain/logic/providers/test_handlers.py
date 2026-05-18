@@ -38,6 +38,7 @@ from src.framework.dispatch.handlers import handle_create, handle_detail, handle
 from src.framework.http.exceptions import ForbiddenError, NotFoundError
 from tests.helpers import (
     create_test_user,
+    make_organization_row,
     make_provider_certification,
     make_provider_education,
     make_provider_licensure,
@@ -120,9 +121,25 @@ async def _seed_provider(
     return provider_id, licensure_id, education_id, certification_id
 
 
-def _provider_create_payload(**overrides) -> ProviderCreate:
+async def _seed_org(
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    *,
+    owner_id: uuid.UUID,
+    name: str = "Acme Health",
+) -> uuid.UUID:
+    """Persist a root Organization and return its id. Provider create
+    payloads require ``org_id`` on the wire (#524); tests seed an Org
+    first and reference its id."""
+    org = make_organization_row(owner_id=owner_id, name=name)
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            session.add(org)
+    return org.id
+
+
+def _provider_create_payload(*, org_id: uuid.UUID, **overrides) -> ProviderCreate:
     base = dict(
-        practice_name="Acme Health",
+        org_id=org_id,
         location_city="Springfield",
         location_state="IL",
         location_zip="62701",
@@ -411,7 +428,8 @@ async def test_create_provider_persists_row_and_writes_audit(
     db_test_session_manager: async_sessionmaker[AsyncSession],
 ):
     user = await _seed_user(db_test_session_manager)
-    payload = _provider_create_payload()
+    org_id = await _seed_org(db_test_session_manager, owner_id=user.id)
+    payload = _provider_create_payload(org_id=org_id)
 
     async with db_test_session_manager() as session:
         repo = ProviderRepository(session)
@@ -425,7 +443,8 @@ async def test_create_provider_persists_row_and_writes_audit(
         )
 
     assert created.owner_id == user.id
-    assert created.practice_name == "Acme Health"
+    assert created.org_id == org_id
+    assert created.org.name == "Acme Health"
 
     rows = await _audit_rows_for(
         db_test_session_manager,
@@ -436,14 +455,19 @@ async def test_create_provider_persists_row_and_writes_audit(
     assert rows[0].action == AuditAction.CREATE_PROVIDER
     assert rows[0].actor_id == user.id
     assert rows[0].before is None
-    assert rows[0].after["practice_name"] == "Acme Health"
+    # The audit snapshot mirrors `ProviderRead` — `org_name` is the
+    # practice's display name post-#524.
+    assert rows[0].after["org_name"] == "Acme Health"
+    assert rows[0].after["org_id"] == str(org_id)
 
 
 async def test_create_provider_with_inline_children_captures_them_in_audit(
     db_test_session_manager: async_sessionmaker[AsyncSession],
 ):
     user = await _seed_user(db_test_session_manager)
+    org_id = await _seed_org(db_test_session_manager, owner_id=user.id)
     payload = _provider_create_payload(
+        org_id=org_id,
         licensures=[
             ProviderLicensureCreate(
                 license_type="lcsw", license_number="L-1", issuing_state="IL"
@@ -505,13 +529,16 @@ async def test_create_provider_allows_multiple_per_user(
     successfully without surfacing the previously-enforced 1:1 rejection."""
     user = await _seed_user(db_test_session_manager)
     first_id, *_ = await _seed_provider(db_test_session_manager, user_id=user.id)
+    second_org_id = await _seed_org(
+        db_test_session_manager, owner_id=user.id, name="Second Practice"
+    )
 
     async with db_test_session_manager() as session:
         repo = ProviderRepository(session)
         audit_repo = AuditRepository(session)
         second = await handle_create(
             PROVIDER_ENTITY,
-            payload=_provider_create_payload(practice_name="Second Practice"),
+            payload=_provider_create_payload(org_id=second_org_id),
             repo=repo,
             audit_repo=audit_repo,
             requesting_user=user,
@@ -519,4 +546,4 @@ async def test_create_provider_allows_multiple_per_user(
 
     assert second.id != first_id
     assert second.owner_id == user.id
-    assert second.practice_name == "Second Practice"
+    assert second.org.name == "Second Practice"

@@ -6,7 +6,8 @@ Three invariants matter beyond "the script ran":
     A regression where the parent is committed without the detail
     would 500 every read view that joins the detail in.
   - Re-running is a no-op. The idempotency keys
-    (provider_availability: `kind + owner_id + practice_name`;
+    (provider_availability: `kind + owner_id + provider_id` (with
+    Provider matched by `(owner_id, org_id)` and Org by `name`);
     client_referral: `kind + owner_id + description`) keep `dev seed`
     safe to run repeatedly during development.
   - `created_at` is varied via the per-fixture `days_ago` field so the
@@ -93,9 +94,8 @@ async def test_each_pa_post_has_populated_detail_relationship(db_test_session_ma
         )
         details = list(result.scalars().all())
 
-    # Practice name lives on the linked Provider (#448); dereference via
-    # the FK relationship on the detail row.
-    practice_names = {d.provider.practice_name for d in details}
+    # Practice name lives on the linked Provider's Organization (#524).
+    practice_names = {d.provider.org.name for d in details}
     expected = {
         f["provider"]["practice_name"] for f in seed.FIXTURE_PROVIDER_AVAILABILITY
     }

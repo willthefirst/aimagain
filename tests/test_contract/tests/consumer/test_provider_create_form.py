@@ -59,9 +59,10 @@ async def test_consumer_provider_create_form_submits(
     # text inputs in the form body. The bool radios for
     # `accepts_out_of_network` / `sliding_scale` are not pre-checked on
     # the create form, so they're absent. The carrier multi-select is
-    # similarly empty.
+    # similarly empty. `org_id` carries the Organization picked from the
+    # dropdown (#524); the stub server seeds one Org.
     expected_request_body = (
-        "practice_name=Acme+Counseling"
+        "org_id=66666666-6666-6666-6666-666666666666"
         "&location_city=Brooklyn"
         "&location_state=NY"
         "&location_zip=11201"
@@ -95,8 +96,10 @@ async def test_consumer_provider_create_form_submits(
 
     with pact:
         await page.goto(form_page_url)
-        await page.wait_for_selector('input[name="practice_name"]')
-        await page.locator('input[name="practice_name"]').fill("Acme Counseling")
+        await page.wait_for_selector('select[name="org_id"]')
+        await page.locator('select[name="org_id"]').select_option(
+            "66666666-6666-6666-6666-666666666666"
+        )
         await page.locator('input[name="location_city"]').fill("Brooklyn")
         await page.locator('select[name="location_state"]').select_option("NY")
         await page.locator('input[name="location_zip"]').fill("11201")

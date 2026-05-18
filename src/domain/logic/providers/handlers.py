@@ -22,11 +22,18 @@ from uuid import UUID
 from fastapi import Request
 
 from src.domain.logic.favorites.repository import UserFavoriteRepository
+from src.domain.logic.organizations.repository import OrganizationRepository
 from src.domain.logic.providers.repository import ProviderRepository
 from src.domain.logic.users.repository import UserRepository
 from src.domain.models import (
+    Organization,
     Provider,
     User,
+)
+from src.domain.specs.provider import PROVIDER_ENTITY
+from src.framework.dispatch.handlers import (
+    handle_get_edit_form,
+    handle_get_new_form,
 )
 from src.framework.dispatch.pagination import (
     DEFAULT_PAGE_SIZE,
@@ -41,6 +48,59 @@ logger = logging.getLogger(__name__)
 
 
 # --- Provider handlers ----------------------------------------------------
+
+
+async def _list_all_orgs(org_repo: OrganizationRepository) -> list[Organization]:
+    """Return every Organization in the directory, newest first. Used by
+    the Provider create/edit form's Org-picker dropdown — any user may
+    attach their Provider to any Org (#524), so the list is unfiltered."""
+    return list(
+        await org_repo.list_default(
+            Organization, order_by=Organization.created_at.desc()
+        )
+    )
+
+
+async def handle_get_provider_new_form(
+    *,
+    request: Request,
+    requesting_user: User,
+    organization_repo: OrganizationRepository,
+) -> dict[str, Any]:
+    """Provider create-form handler. Extends the framework's default
+    by loading every Organization into the context for the Org-picker
+    dropdown — Provider create takes ``org_id`` (#524), and the form
+    needs a populated select."""
+    context = await handle_get_new_form(
+        PROVIDER_ENTITY, request=request, requesting_user=requesting_user
+    )
+    context["orgs"] = await _list_all_orgs(organization_repo)
+    return context
+
+
+async def handle_get_provider_edit_form(
+    *,
+    request: Request,
+    provider_id: UUID,
+    repo: ProviderRepository,
+    requesting_user: User,
+    organization_repo: OrganizationRepository,
+) -> dict[str, Any]:
+    """Provider edit-form handler. Mirror of the new-form handler — the
+    Org-picker dropdown lists every Org, with the Provider's current
+    ``org_id`` pre-selected (the template handles the `selected`
+    attribute). ``provider_id`` is the URL's path param
+    (``PROVIDER_ENTITY.id_param``); it's forwarded to the framework's
+    ``handle_get_edit_form`` as ``target_id``."""
+    context = await handle_get_edit_form(
+        PROVIDER_ENTITY,
+        request=request,
+        target_id=provider_id,
+        repo=repo,
+        requesting_user=requesting_user,
+    )
+    context["orgs"] = await _list_all_orgs(organization_repo)
+    return context
 
 
 async def provider_detail_extras(
