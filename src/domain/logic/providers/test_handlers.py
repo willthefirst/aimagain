@@ -14,9 +14,11 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from starlette.requests import Request
 
 from src.domain.logic.favorites.repository import UserFavoriteRepository
+from src.domain.logic.organizations.repository import OrganizationRepository
 from src.domain.logic.providers.handlers import (
     handle_list_user_providers,
     provider_detail_extras,
+    provider_form_extras,
 )
 from src.domain.logic.providers.repository import ProviderRepository
 from src.domain.logic.providers.schema import (
@@ -28,6 +30,7 @@ from src.domain.logic.providers.schema import (
 from src.domain.logic.users.repository import UserRepository
 from src.domain.models import (
     AuditLog,
+    Provider,
     ProviderLicensure,
     User,
 )
@@ -547,3 +550,73 @@ async def test_create_provider_allows_multiple_per_user(
     assert second.id != first_id
     assert second.owner_id == user.id
     assert second.org.name == "Second Practice"
+
+
+# --- provider_form_extras (#533) -----------------------------------------
+
+
+async def test_provider_form_extras_returns_owners_visible_orgs(
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+):
+    """Owner sees only the Orgs they own. Mirrors the previous
+    `handle_get_provider_new_form` behavior, now provided by the
+    framework via `form_extras_path`."""
+    owner = await _seed_user(db_test_session_manager)
+    stranger = await _seed_user(db_test_session_manager)
+    owned_id = await _seed_org(db_test_session_manager, owner_id=owner.id, name="Mine")
+    await _seed_org(db_test_session_manager, owner_id=stranger.id, name="Other")
+
+    async with db_test_session_manager() as session:
+        org_repo = OrganizationRepository(session)
+        # Create path: target is None.
+        result = await provider_form_extras(
+            target=None,
+            requesting_user=owner,
+            organization_repo=org_repo,
+        )
+        assert [o.id for o in result["orgs"]] == [owned_id]
+
+
+async def test_provider_form_extras_superuser_sees_all_orgs(
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+):
+    """Superusers see every Org regardless of ownership — same
+    semantics as the previous bespoke handler."""
+    admin = await _seed_user(db_test_session_manager, is_superuser=True)
+    other = await _seed_user(db_test_session_manager)
+    await _seed_org(db_test_session_manager, owner_id=admin.id, name="Admin Org")
+    await _seed_org(db_test_session_manager, owner_id=other.id, name="Other Org")
+
+    async with db_test_session_manager() as session:
+        org_repo = OrganizationRepository(session)
+        result = await provider_form_extras(
+            target=None,
+            requesting_user=admin,
+            organization_repo=org_repo,
+        )
+        org_names = {o.name for o in result["orgs"]}
+        assert "Admin Org" in org_names
+        assert "Other Org" in org_names
+
+
+async def test_provider_form_extras_edit_path_passes_target(
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+):
+    """On the edit path the framework passes the loaded Provider as
+    `target`. The current implementation doesn't read it, but the
+    callable must accept it without complaint — the contract is the
+    same on both paths."""
+    owner = await _seed_user(db_test_session_manager)
+    await _seed_org(db_test_session_manager, owner_id=owner.id, name="Owned")
+    provider_id, *_ = await _seed_provider(db_test_session_manager, user_id=owner.id)
+
+    async with db_test_session_manager() as session:
+        provider_repo = ProviderRepository(session)
+        provider = await provider_repo.get_by_model_id(Provider, provider_id)
+        org_repo = OrganizationRepository(session)
+        result = await provider_form_extras(
+            target=provider,
+            requesting_user=owner,
+            organization_repo=org_repo,
+        )
+        assert "orgs" in result
