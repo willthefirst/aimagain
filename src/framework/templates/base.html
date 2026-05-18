@@ -294,6 +294,37 @@
          with the cap above — flatten the rhythm so siblings sit at a
          consistent gap inside the capped form. */
       .entity-form-page form > fieldset { margin-block-start: var(--pico-spacing); }
+      /* Credential rows (provider licensures / education / certifications)
+         render as flat rows inside an outer `<section>` (edit) or
+         `<article>` (detail), so a card-on-card pattern would read as
+         visual noise. The row's vocabulary is just a stacked
+         `<strong>` + muted `<small>` on the left, optional Delete on
+         the right, with a hairline divider between entries. */
+      .credential-list {
+        display: flex;
+        flex-direction: column;
+        margin-block: var(--pico-spacing);
+      }
+      .credential-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 1rem;
+        padding-block: 0.5rem;
+      }
+      .credential-row + .credential-row {
+        border-top: 1px solid var(--pico-muted-border-color);
+      }
+      .credential-row-text {
+        display: flex;
+        flex-direction: column;
+        gap: 0.1rem;
+        min-width: 0;
+      }
+      .credential-row-text > small {
+        color: var(--pico-muted-color);
+      }
+      .credential-row > button { margin: 0; flex: 0 0 auto; }
     </style>
     <script
       src="https://unpkg.com/htmx.org@2.0.4"
