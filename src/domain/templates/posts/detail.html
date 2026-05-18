@@ -1,4 +1,9 @@
 {% extends "views/detail.html" %}
+{%- from "posts/_modality_chips.html" import modality_chips -%}
+{%- from "posts/_services_block.html" import services_block -%}
+{%- from "posts/_facts_block.html" import facts_block -%}
+{%- from "posts/_meta_line.html" import meta_line -%}
+{%- from "posts/_how_to_refer.html" import how_to_refer -%}
 
 {% set resource_url = entity_url('post') %}
 
@@ -9,194 +14,54 @@
 {% include "posts/_owner_actions.html" %}
 {% endblock %}
 
-{# Detail-page contract:
-   1. Kind chip + posted-by/posted-at — the post's "meta" line.
-   2. Description prose — what the post is about.
-   3. Match-facts `<dl>` — chip-line tokens expanded into full lists.
-   4. "How to refer" section for `provider_availability` (website +
-      referral instructions).
+{# Detail-page layout: same `.post-card` shape the list cards use
+   (kind-colored left edge, Pico's article framing, header band,
+   two-column body grid, footer band), with detail-only sections
+   appended in reading order between the header and the body grid:
 
-   Edit/Delete actions live in the toolbar above — no `<header>`
-   block here, no `_owner_actions.html` in the footer. #}
+     1. Header band — headline + modality chips + date (same shape
+        as the list card's header, but the headline is plain text,
+        not a link to itself).
+     2. Meta line — kind chip + "by user · date" byline.
+     3. Description prose — the post's lead text (required for CR;
+        optional for PA / program).
+     4. Body grid — services-with-icons (left) + demographics `<dl>`
+        (right) in expanded mode (the facts block surfaces
+        detail-only rows: full address, practice/program link,
+        desired times, schedule notes, network preference, sliding
+        scale, cost).
+     5. How to refer — PA / program only, when website or
+        instructions are set.
+     6. Footer — Email CTA (same as list card).
+
+   Per-kind branching lives in `post_card_view` (one place). Every
+   visual element in the card reads from `view` (the dict view-model). #}
 {% block content %}
-<article>
-{% if post.kind == "client_referral" %}
-{% set d = post.client_referral_detail %}
-  <p>
-    <span data-kind-chip="client_referral">Seeking</span>
-    <small>by <a href="{{ entity_url('user', id=post.owner_id) }}">{{ post.owner.username }}</a> · {{ post.created_at | format_post_date }}</small>
-  </p>
+{%- set view = post_card_view(post) -%}
+<article class="post-card" data-kind="{{ post.kind }}">
+  <header class="post-header">
+    <strong>{{ view.headline }}{% if view.header_state %}, {{ view.header_state }}{% endif %}</strong>
+    {{ modality_chips(view.in_person, view.virtual) }}
+    <small>{{ post.created_at | format_post_date }}</small>
+  </header>
 
-  <p>{{ d.description }}</p>
+  {{ meta_line(view, post.owner, post.owner_id, post.created_at) }}
 
-  <dl>
-    <dt>Location</dt>
-    <dd>{{ d.location_city }}, {{ d.location_state }} {{ d.location_zip }}</dd>
-    <dt>In-person sessions</dt>
-    <dd>{{ LOCATION_AVAILABILITY_LABELS[d.location_in_person] }}</dd>
-    <dt>Virtual sessions</dt>
-    <dd>{{ LOCATION_AVAILABILITY_LABELS[d.location_virtual] }}</dd>
-    {% if d.desired_times %}
-    <dt>Desired times</dt>
-    <dd>{% for slot in d.desired_times %}{{ DESIRED_TIME_SLOT_LABELS[slot] }}{% if not loop.last %}, {% endif %}{% endfor %}</dd>
-    {% endif %}
-    <dt>Age</dt>
-    <dd>{% for g in d.age_groups %}{{ CLIENT_AGE_GROUP_LABELS_SINGULAR[g] }}{% if not loop.last %}, {% endif %}{% endfor %}</dd>
-    <dt>Languages</dt>
-    <dd>{% for l in d.languages %}{{ LANGUAGE_LABELS[l] }}{% if not loop.last %}, {% endif %}{% endfor %}</dd>
-    <dt>Gender</dt>
-    <dd>{{ GENDER_LABELS[d.gender] }}</dd>
-    {% if d.services %}
-    <dt>Services</dt>
-    <dd>{% for s in d.services %}{{ CLIENT_REFERRAL_SERVICE_LABELS[s] }}{% if not loop.last %}, {% endif %}{% endfor %}</dd>
-    {% endif %}
-    {% if d.treatment_modality %}
-    <dt>Psychotherapy modality</dt>
-    <dd>{{ d.treatment_modality }}</dd>
-    {% endif %}
-    <dt>Network preference</dt>
-    <dd>{{ NETWORK_PREFERENCE_LABELS[d.network_preference] }}</dd>
-    {% if d.insurance_carrier and d.network_preference != "no_preference" %}
-    <dt>Insurance carrier</dt>
-    <dd>{{ INSURANCE_CARRIER_LABELS[d.insurance_carrier] }}</dd>
-    {% endif %}
-  </dl>
+  {%- if view.description %}
+  <p class="post-description">{{ view.description }}</p>
+  {%- endif %}
 
-{% elif post.kind == "provider_availability" %}
-{% set d = post.provider_availability_detail %}
-{% set p = d.provider %}
-  <p>
-    <span data-kind-chip="provider_availability">Providing</span>
-    <small>by <a href="{{ entity_url('user', id=post.owner_id) }}">{{ post.owner.username }}</a> · {{ post.created_at | format_post_date }}</small>
-  </p>
+  <div class="post-grid">
+    {{ services_block(view) }}
+    {{ facts_block(view, expanded=True) }}
+  </div>
 
-  {% if d.description %}
-  <p>{{ d.description }}</p>
-  {% endif %}
+  {%- if view.referral %}
+  {{ how_to_refer(view) }}
+  {%- endif %}
 
-  <dl>
-    <dt>Practice</dt>
-    <dd><a href="{{ entity_url('provider', id=p.id) }}">{{ p.org.name }}</a></dd>
-    <dt>Location</dt>
-    <dd>{{ p.location_city }}, {{ p.location_state }} {{ p.location_zip }}</dd>
-    <dt>In-person sessions</dt>
-    <dd>{{ LOCATION_AVAILABILITY_LABELS[p.in_person_sessions] }}</dd>
-    <dt>Virtual sessions</dt>
-    <dd>{{ LOCATION_AVAILABILITY_LABELS[p.virtual_sessions] }}</dd>
-    {% if d.desired_times %}
-    <dt>Desired times</dt>
-    <dd>{% for slot in d.desired_times %}{{ DESIRED_TIME_SLOT_LABELS[slot] }}{% if not loop.last %}, {% endif %}{% endfor %}</dd>
-    {% endif %}
-    {% if d.schedule_text %}
-    <dt>Schedule notes</dt>
-    <dd>{{ d.schedule_text }}</dd>
-    {% endif %}
-    {% if d.services %}
-    <dt>Services</dt>
-    <dd>{% for s in d.services %}{{ CLIENT_REFERRAL_SERVICE_LABELS[s] }}{% if not loop.last %}, {% endif %}{% endfor %}</dd>
-    {% endif %}
-    {% if d.treatment_modality %}
-    <dt>Treatment modality</dt>
-    <dd>{{ d.treatment_modality }}</dd>
-    {% endif %}
-    <dt>Age groups</dt>
-    <dd>{% for g in d.age_groups %}{{ CLIENT_AGE_GROUP_LABELS[g] }}{% if not loop.last %}, {% endif %}{% endfor %}</dd>
-    <dt>Languages</dt>
-    <dd>{% for l in d.languages %}{{ LANGUAGE_LABELS[l] }}{% if not loop.last %}, {% endif %}{% endfor %}</dd>
-    {% if d.genders %}
-    <dt>Genders served</dt>
-    <dd>{% for g in d.genders %}{{ GENDER_LABELS[g] }}{% if not loop.last %}, {% endif %}{% endfor %}</dd>
-    {% endif %}
-    {# Insurance posture lives on the linked Provider. #}
-    {% if p.in_network_carriers or p.accepts_out_of_network %}
-    <dt>Insurance accepted</dt>
-    <dd>
-      {% if p.in_network_carriers %}In-network ({% for c in p.in_network_carriers %}{{ INSURANCE_CARRIER_LABELS[c] }}{% if not loop.last %}, {% endif %}{% endfor %}){% endif %}
-      {% if p.in_network_carriers and p.accepts_out_of_network %} · {% endif %}
-      {% if p.accepts_out_of_network %}Out-of-network{% endif %}
-    </dd>
-    {% else %}
-    <dt>Insurance accepted</dt>
-    <dd>Self-pay only</dd>
-    {% endif %}
-    <dt>Sliding scale</dt>
-    <dd>{{ "Yes" if p.sliding_scale else "No" }}</dd>
-    {% if p.cost %}
-    <dt>Cost</dt>
-    <dd>{{ p.cost }}</dd>
-    {% endif %}
-  </dl>
-
-  {% if d.referral_instructions or d.website %}
-  <section>
-    <h2>How to refer</h2>
-    {% if d.website %}
-    <p><a href="{{ d.website }}" target="_blank" rel="noopener noreferrer">{{ d.website }}</a></p>
-    {% endif %}
-    {% if d.referral_instructions %}
-    <p>{{ d.referral_instructions }}</p>
-    {% endif %}
-  </section>
-  {% endif %}
-
-{% elif post.kind == "program_availability" %}
-{% set d = post.program_availability_detail %}
-{% set prog = d.program %}
-  <p>
-    <span data-kind-chip="provider_availability">Providing</span>
-    <small>by <a href="{{ entity_url('user', id=post.owner_id) }}">{{ post.owner.username }}</a> &middot; {{ post.created_at | format_post_date }}</small>
-  </p>
-
-  {% if d.description %}
-  <p>{{ d.description }}</p>
-  {% endif %}
-
-  <dl>
-    <dt>Program</dt>
-    <dd><a href="{{ entity_url('program', id=prog.id) }}">{{ prog.name }}</a></dd>
-    <dt>Organization</dt>
-    <dd>{{ prog.organization.name }}</dd>
-    {% if prog.state_preference %}
-    <dt>State</dt>
-    <dd>{{ prog.state_preference }}</dd>
-    {% endif %}
-    {% if d.desired_times %}
-    <dt>Desired times</dt>
-    <dd>{% for slot in d.desired_times %}{{ DESIRED_TIME_SLOT_LABELS[slot] }}{% if not loop.last %}, {% endif %}{% endfor %}</dd>
-    {% endif %}
-    {% if d.schedule_text %}
-    <dt>Schedule notes</dt>
-    <dd>{{ d.schedule_text }}</dd>
-    {% endif %}
-    {% if d.services %}
-    <dt>Services</dt>
-    <dd>{% for s in d.services %}{{ CLIENT_REFERRAL_SERVICE_LABELS[s] }}{% if not loop.last %}, {% endif %}{% endfor %}</dd>
-    {% endif %}
-    {% if d.treatment_modality %}
-    <dt>Treatment modality</dt>
-    <dd>{{ d.treatment_modality }}</dd>
-    {% endif %}
-    <dt>Age groups</dt>
-    <dd>{% for g in d.age_groups %}{{ CLIENT_AGE_GROUP_LABELS[g] }}{% if not loop.last %}, {% endif %}{% endfor %}</dd>
-    <dt>Languages</dt>
-    <dd>{% for l in d.languages %}{{ LANGUAGE_LABELS[l] }}{% if not loop.last %}, {% endif %}{% endfor %}</dd>
-    {% if d.genders %}
-    <dt>Genders served</dt>
-    <dd>{% for g in d.genders %}{{ GENDER_LABELS[g] }}{% if not loop.last %}, {% endif %}{% endfor %}</dd>
-    {% endif %}
-  </dl>
-
-  {% if d.referral_instructions or d.website %}
-  <section>
-    <h2>How to refer</h2>
-    {% if d.website %}
-    <p><a href="{{ d.website }}" target="_blank" rel="noopener noreferrer">{{ d.website }}</a></p>
-    {% endif %}
-    {% if d.referral_instructions %}
-    <p>{{ d.referral_instructions }}</p>
-    {% endif %}
-  </section>
-  {% endif %}
-{% endif %}
+  <footer class="post-footer">
+    <a href="mailto:{{ post.owner.email }}" target="_blank" rel="noopener noreferrer" role="button" class="secondary outline">Email</a>
+  </footer>
 </article>
 {% endblock %}

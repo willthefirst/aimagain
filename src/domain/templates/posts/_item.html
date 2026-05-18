@@ -45,7 +45,7 @@ per-kind, so a single-kind filter doesn't need to suppress anything. #}
 
 {% macro post_item(post, active_kind=None) -%}
 {%- set view = post_card_view(post) -%}
-<article data-row-id="{{ post.id }}" data-kind="{{ post.kind }}">
+<article class="post-card" data-row-id="{{ post.id }}" data-kind="{{ post.kind }}">
   <header class="post-header">
     <strong><a href="{{ entity_url('post', id=post.id) }}">{{ view.headline }}{% if view.header_state %}, {{ view.header_state }}{% endif %}</a></strong>
     {{ modality_chips(view.in_person, view.virtual) }}

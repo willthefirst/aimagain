@@ -66,38 +66,39 @@
         --pico-font-size-h3: 1.125rem;
         --pico-font-size-h4: 1rem;
       }
-      /* Posts feed — card-shaped `<article>` per post inside a
-         `<section id="posts-list">`. Each card has Pico's default
-         article framing (background, border, padding, rounded
-         corners). Header and footer use Pico's classless tinted-band
-         styling automatically (no overrides). Card gets a 4px left
-         edge in the kind color (orange = Seeking, cyan = Providing) —
-         peripheral-vision differentiator. The card body is a
-         two-column grid: services with inline icons (left) and a
-         labeled demographics `<dl>` (right). Contact info (name +
-         mailto link) lives in the footer band, right-aligned. */
+      /* Post cards — `<article class="post-card">` is the canonical
+         shape for a single post anywhere on the site: the list page
+         (`#posts-list` of `.post-card` articles) and the detail page
+         (one `.post-card` standing alone). Pico's default article
+         framing (background, border, padding, rounded corners) gives
+         the chrome; the rules below add the kind-colored left edge,
+         the header/footer band layouts, and the two-column body grid.
+         Detail-only sections (description prose, "how to refer")
+         render between the header and the body grid using
+         `.post-description` and `.post-how-to-refer`. */
       #posts-list { padding: 0; margin: 0; display: flex; flex-direction: column; gap: 1rem; }
-      #posts-list > article {
+      .post-card {
         margin: 0;
         border-left: 4px solid var(--pico-muted-border-color);
       }
-      #posts-list > article[data-kind="client_referral"] { border-left-color: darkorange; }
-      #posts-list > article[data-kind="provider_availability"] { border-left-color: darkcyan; }
+      .post-card[data-kind="client_referral"] { border-left-color: darkorange; }
+      .post-card[data-kind="provider_availability"] { border-left-color: darkcyan; }
+      .post-card[data-kind="program_availability"] { border-left-color: darkcyan; }
       /* Header band: Pico provides the background tint + bottom
          border; we only configure the in-row flex layout (headline,
          modality chips, right-aligned date). */
-      #posts-list > article > header.post-header {
+      .post-card > header.post-header {
         display: flex;
         align-items: baseline;
         gap: 0.5rem;
       }
-      #posts-list > article > header.post-header > strong { flex: 0 0 auto; }
-      #posts-list > article > header.post-header > strong > a { color: inherit; text-decoration: none; }
-      #posts-list > article > header.post-header > strong > a:hover { text-decoration: underline; }
+      .post-card > header.post-header > strong { flex: 0 0 auto; }
+      .post-card > header.post-header > strong > a { color: inherit; text-decoration: none; }
+      .post-card > header.post-header > strong > a:hover { text-decoration: underline; }
       /* Date sits at the right edge regardless of headline + modality
          width; the chips between strong and small stay attached to
          the headline on the left. */
-      #posts-list > article > header.post-header > small {
+      .post-card > header.post-header > small {
         margin-left: auto;
         color: var(--pico-muted-color);
       }
@@ -106,15 +107,32 @@
          header gap pick up the parent's 0.5rem separation. Icon →
          label spacing comes from the global icon rule below, not
          a local `gap`. */
-      #posts-list > article > header.post-header > .post-modality {
+      .post-card > header.post-header > .post-modality {
         display: inline-flex;
         align-items: center;
         color: var(--pico-muted-color);
         font-size: 0.875rem;
       }
+      /* Detail-only meta line below the header: kind chip + "by user
+         · date". The `.post-meta` paragraph sits between the header
+         band and any description prose so the page leads with
+         identity + provenance before content. */
+      .post-card > .post-meta {
+        margin: 0;
+        color: var(--pico-muted-color);
+        font-size: 0.875rem;
+        display: flex;
+        align-items: baseline;
+        gap: 0.5rem;
+      }
+      /* Detail-only description prose — sits above the body grid as
+         the post's lead. `<p>` defaults are fine; just trim the
+         margin so the band-to-prose gap is consistent with the
+         grid-to-prose gap. */
+      .post-card > .post-description { margin: 0; }
       /* Two-column grid for the body. Columns auto-fit narrow
          viewports by collapsing to one column under 640px. */
-      #posts-list > article > .post-grid {
+      .post-card > .post-grid {
         display: grid;
         grid-template-columns: 1fr 1fr;
         gap: 1.5rem;
@@ -127,59 +145,67 @@
          header (Pico's button padding is em-based, so font-size
          shrinks the whole button proportionally — no padding override
          needed). */
-      #posts-list > article > footer.post-footer {
+      .post-card > footer.post-footer {
         display: flex;
         justify-content: flex-end;
       }
-      #posts-list > article > footer.post-footer > [role="button"] {
+      .post-card > footer.post-footer > [role="button"] {
         font-size: 0.875rem;
       }
       @media (max-width: 640px) {
-        #posts-list > article > .post-grid { grid-template-columns: 1fr; gap: 1rem; }
+        .post-card > .post-grid { grid-template-columns: 1fr; gap: 1rem; }
       }
       /* Column tweaks: kill default vertical margins on `h4`, `<ul>`,
          `<dl>`, `<p>` so columns line up at the top. */
-      #posts-list > article > .post-grid h4 {
+      .post-card > .post-grid h4 {
         margin: 0 0 0.4rem 0;
         font-size: 1rem;
       }
-      #posts-list > article > .post-grid section.post-services > ul {
+      .post-card > .post-grid section.post-services > ul {
         list-style: none;
         padding: 0;
         margin: 0;
       }
-      #posts-list > article > .post-grid section.post-services > ul > li {
+      .post-card > .post-grid section.post-services > ul > li {
         display: flex;
         align-items: center;
         padding: 0.1rem 0;
       }
       /* Demographics `<dl>`: one `<div>` per fact, "Label: value"
          layout — `<dt>` inline with a colon, `<dd>` inline after. */
-      #posts-list > article > .post-grid section.post-facts > dl {
+      .post-card > .post-grid section.post-facts > dl {
         margin: 0;
         padding: 0;
       }
-      #posts-list > article > .post-grid section.post-facts > dl > div {
+      .post-card > .post-grid section.post-facts > dl > div {
         padding: 0.1rem 0;
       }
-      #posts-list > article > .post-grid section.post-facts dt {
+      .post-card > .post-grid section.post-facts dt {
         display: inline;
         font-weight: 600;
       }
-      #posts-list > article > .post-grid section.post-facts dt::after { content: ": "; }
+      .post-card > .post-grid section.post-facts dt::after { content: ": "; }
       /* CR location chunk: `<dt>` is icon-only (`aria-label` carries
          meaning for screen readers), so suppress the trailing colon
          that the generic rule above adds to every `<dt>`. Icon →
          `<dd>` spacing comes from the icon's own `margin-inline-end`
          (set in the global icon rule below), which extends past
          the inline `<dt>` into the inline flow. */
-      #posts-list > article > .post-grid section.post-facts dl > div.post-location > dt::after { content: ""; }
-      #posts-list > article > .post-grid section.post-facts dl > div.post-location > dt { font-weight: normal; }
-      #posts-list > article > .post-grid section.post-facts dd { display: inline; margin: 0; }
-      /* Detail-page kind chip — retained from the previous design;
-         only the listing row swaps the chip for the left edge. */
+      .post-card > .post-grid section.post-facts dl > div.post-location > dt::after { content: ""; }
+      .post-card > .post-grid section.post-facts dl > div.post-location > dt { font-weight: normal; }
+      .post-card > .post-grid section.post-facts dd { display: inline; margin: 0; }
+      /* Detail-only "how to refer" section — sits below the body
+         grid, before the footer. Margin-top echoes the grid's
+         vertical rhythm; the heading is the standard `<h4>`. */
+      .post-card > .post-how-to-refer { margin: 0; }
+      .post-card > .post-how-to-refer h4 { margin: 0 0 0.4rem 0; font-size: 1rem; }
+      .post-card > .post-how-to-refer p { margin: 0.25rem 0; }
+      /* Detail-page kind chip — matches the kind-colored left edge
+         (orange = Seeking, cyan = Providing) so the visual identity
+         is consistent between list and detail. */
       [data-kind-chip="client_referral"] { color: darkorange; font-weight: 600; }
       [data-kind-chip="provider_availability"] { color: darkcyan; font-weight: 600; }
+      [data-kind-chip="program_availability"] { color: darkcyan; font-weight: 600; }
       /* Lucide icons — single source of truth for sizing AND
          spacing. `color: inherit` lets each icon pick up the
          surrounding text color (so an icon inside a `<small>` or a
