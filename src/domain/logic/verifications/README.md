@@ -36,12 +36,9 @@ The OIG publishes a fresh LEIE CSV on the first business day of each month at ht
 
 A missing CSV does not crash the pipeline — `oig_check` logs once at process startup and returns "no match" for every check. The scoring layer's `verified` outcome therefore still requires the NPPES side to succeed, so a missing LEIE never falsely escalates a row to `verified`; it merely degrades the OIG check to a no-op.
 
-## System-actor audit pattern
+## Audit ritual
 
-The orchestrator writes one `Verification` row plus one matching audit row in a single transaction (`record_audit_for(...)` + an explicit `session.commit()`). The audit row's `actor_id`:
-
-- `None` when the nightly job (#530) drives the run. `AuditLog.actor_id` is `nullable=True` with `ON DELETE SET NULL` (`src/framework/audit/log.py`), so this is legal at the DB layer and lets the audit row outlive any specific user.
-- `requesting_user.id` when the admin retrigger endpoint (`POST /providers/{provider_id}/verifications`) drives the run. The endpoint is `current_admin_user`-gated; non-superusers get `403`.
+The orchestrator writes one `Verification` row plus one matching audit row in a single transaction (`record_audit_for(...)` + an explicit `session.commit()`). `actor_id=None` for nightly runs, `requesting_user.id` for the admin retrigger — see [System actor](../../../framework/audit/README.md#system-actor). The retrigger endpoint is `current_admin_user`-gated; non-superusers get 403.
 
 ### Why `record_audit_for` + explicit commit (not `mutate`)
 

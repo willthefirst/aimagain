@@ -25,7 +25,7 @@ dev test -k login                                     # by keyword
 dev test tests/test_contract                          # explicit opt-in for contract
 ```
 
-`pytest` discovers `test_*.py` under both `tests/` and `src/` (configured via `testpaths` in `pyproject.toml`). Contract tests are excluded from the default run by `addopts = --ignore=tests/test_contract` — they bind ports and need Playwright.
+`pytest` discovers `test_*.py` under both `tests/` and `src/` (configured via `testpaths` in `pyproject.toml`). Contract tests are excluded from the default run — see [`test_contract/README.md`](test_contract/README.md).
 
 ## Database isolation
 

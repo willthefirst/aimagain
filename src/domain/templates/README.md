@@ -20,10 +20,6 @@ Subresource lists (e.g. `/users/{id}/providers`) override `{% block breadcrumb %
 
 Pages that don't fit the resource grammar — the `/auth/*` flow's centered single-card layout, the `/posts/*` polymorphic create/edit forms — extend `base.html` directly and compose the `_shared/` macros by hand. See [`posts/README.md`](posts/README.md) for the two-layer `_<variant>_form.html` + `new_<variant>.html` pattern used for polymorphic intake.
 
-## Schema-driven `field_for`
-
-Form templates use `field_for(schema, name, label)` from [`../../framework/templates/_shared/form_fields.html`](../../framework/templates/_shared/form_fields.html) to derive each `<input>`'s attributes from the Pydantic schema. See the framework README for details — adding a value to a controlled-vocabulary tuple in [`../models/enums.py`](../models/enums.py) flows automatically to every form using these macros.
-
 ## Tests
 
-Exercised indirectly via route tests under [`../routes/`](../routes/). When adding a template, extend the relevant route test (or add one) to cover its rendering. Selectors must scope to a stable handle (`id`, `class`, `data-testid`) rather than relying on a page having only one `<ul>` / `<form>` / `<table>` — see [`../../../tests/README.md`](../../../tests/README.md).
+Exercised indirectly via route tests under [`../routes/`](../routes/). Selector and fixture conventions live in [`../../../tests/README.md`](../../../tests/README.md).
