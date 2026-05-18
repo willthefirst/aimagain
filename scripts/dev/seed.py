@@ -23,6 +23,7 @@ renders a spread of dates rather than a wall of identical timestamps.
 
 import asyncio
 import sys
+import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Any, TypedDict
 
@@ -35,6 +36,7 @@ from src.db import async_session_maker
 from src.domain.logic.users.schema import UserCreate
 from src.domain.models import (
     ClientReferralDetail,
+    Organization,
     Post,
     Provider,
     ProviderAvailabilityDetail,
@@ -920,7 +922,30 @@ async def seed_provider_availability() -> tuple[int, int]:
             )
             provider = provider_result.scalar_one_or_none()
             if provider is None:
-                provider = Provider(owner_id=owner.id, **fixture["provider"])
+                # PR 2 of the Org roadmap (#520) requires a Provider to
+                # carry an `org_id`. Find-or-create an Organization by
+                # name so seeded Providers cluster under the same Org
+                # the directory will eventually surface — keeps the
+                # mirror invariant (`provider.practice_name == org.name`)
+                # holding without forcing each fixture to declare its Org.
+                org_result = await session.execute(
+                    select(Organization).where(Organization.name == practice_name)
+                )
+                org = org_result.scalar_one_or_none()
+                if org is None:
+                    org = Organization(
+                        id=uuid.uuid4(),
+                        name=practice_name,
+                        type="solo_practice",
+                        owner_id=owner.id,
+                    )
+                    org.root_org_id = org.id
+                    session.add(org)
+                    await session.flush()
+
+                provider = Provider(
+                    owner_id=owner.id, org_id=org.id, **fixture["provider"]
+                )
                 session.add(provider)
                 await session.flush()
                 providers_created += 1

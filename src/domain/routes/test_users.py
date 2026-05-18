@@ -10,7 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from src.domain.models import AuditLog, User
 from src.framework.audit.repository import AuditRepository
-from tests.helpers import create_test_user, make_provider, promote_to_admin
+from tests.helpers import create_test_user, make_provider_with_org, promote_to_admin
 
 # Mark all tests in this module as async
 pytestmark = pytest.mark.asyncio
@@ -427,8 +427,8 @@ async def test_detail_lists_owned_providers(
     async with db_test_session_manager() as session:
         async with session.begin():
             session.add(target)
-    first = make_provider(owner_id=target.id, practice_name="First")
-    second = make_provider(owner_id=target.id, practice_name="Second")
+    first = make_provider_with_org(owner_id=target.id, practice_name="First")
+    second = make_provider_with_org(owner_id=target.id, practice_name="Second")
     async with db_test_session_manager() as session:
         async with session.begin():
             session.add_all([first, second])
@@ -700,7 +700,7 @@ async def _seed_user_provider(
     user_id: uuid.UUID,
     practice_name: str,
 ) -> uuid.UUID:
-    provider = make_provider(owner_id=user_id, practice_name=practice_name)
+    provider = make_provider_with_org(owner_id=user_id, practice_name=practice_name)
     async with db_test_session_manager() as session:
         async with session.begin():
             session.add(provider)

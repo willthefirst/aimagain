@@ -26,6 +26,23 @@ Before this extraction the four model files were flat siblings of the rest of `s
 
 Pulling them into `providers/` makes the boundary explicit. The cross-cluster shared modules (the controlled-vocabulary tuples in [`../enums.py`](../enums.py), the `BaseModel` in [`src/framework/persistence/base_model.py`](../../../framework/persistence/base_model.py)) stay at the parent level because the `posts/` cluster also consumes them.
 
+## The `org_id` + `practice_name` mirror
+
+PR 2 of the Org/Program roadmap (#520). `Provider.org_id` is a NOT NULL FK to `organizations.id` — every Provider belongs to exactly one Org. `Provider.practice_name` exists alongside it as a **denormalized mirror** of `provider.org.name`.
+
+**The invariant: `provider.practice_name == provider.org.name`, for every row, at all times.**
+
+The mirror is enforced in [`../../logic/providers/repository.py`](../../logic/providers/repository.py) (`ProviderRepository.create` / `patch`), mirroring the shape `OrganizationRepository` uses for its own `root_org_id` denormalization (PR 1):
+
+- On `create`: if `org_id` is set, `practice_name` is overwritten from the Org's `name`. If `org_id` is unset (today's wire shape — no Org-picker in the create form yet), the repo find-or-creates an Org keyed on `practice_name` and assigns its id.
+- On `patch`: a change to `org_id` rewrites `practice_name` from the new Org; a change to `practice_name` find-or-creates an Org and reassigns `org_id`.
+
+**Why a mirror at all.** Templates, Pydantic schemas, contract tests, and repository queries currently read `provider.practice_name` directly (~100+ call sites). The mirror keeps those callers untouched in PR 2 — the migration vehicle costs one column and one repo override; the alternative was a multi-PR template / schema / contract sweep behind a feature flag.
+
+**Lifetime.** PR 3 of the roadmap drops `practice_name` and switches every reader to `provider.org.name`. The override and this section go with it. The repository override is marked `# TODO(roadmap-pr-3)` so the cleanup is grep-able.
+
+The two columns being required to agree is the only place this codebase deliberately violates the "one source of truth" rule in CLAUDE.md — it's load-bearing only because PR 3 is the next change.
+
 ## Adding a new credential sub-record type
 
 If the `Provider` directory entry needs a fourth credential category (e.g. board certifications distinct from professional certifications, malpractice insurance records, etc.):

@@ -22,8 +22,8 @@ from src.framework.persistence.base_repository import BaseRepository
 from tests.helpers import (
     create_test_user,
     make_client_referral_detail,
-    make_provider,
     make_provider_availability_detail,
+    make_provider_with_org,
 )
 
 pytestmark = pytest.mark.asyncio
@@ -45,7 +45,7 @@ async def _seed_owner_and_provider(db_test_session_manager, **provider_overrides
     in the DB to satisfy the FK.
     """
     owner = create_test_user(username=f"owner-{uuid.uuid4()}")
-    provider = make_provider(owner_id=owner.id, **provider_overrides)
+    provider = make_provider_with_org(owner_id=owner.id, **provider_overrides)
     async with db_test_session_manager() as session:
         async with session.begin():
             session.add(owner)

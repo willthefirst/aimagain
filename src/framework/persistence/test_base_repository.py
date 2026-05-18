@@ -16,7 +16,11 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from src.domain.models import Provider, ProviderLicensure, User
 from src.framework.persistence.base_repository import BaseRepository
-from tests.helpers import create_test_user, make_provider, make_provider_licensure
+from tests.helpers import (
+    create_test_user,
+    make_provider_licensure,
+    make_provider_with_org,
+)
 
 pytestmark = pytest.mark.asyncio
 
@@ -172,7 +176,7 @@ async def test_count_respects_distinct_with_join(
         async with session.begin():
             session.add(owner)
 
-    provider = make_provider(owner_id=owner.id)
+    provider = make_provider_with_org(owner_id=owner.id)
     async with db_test_session_manager() as session:
         async with session.begin():
             session.add(provider)

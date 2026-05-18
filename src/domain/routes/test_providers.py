@@ -16,10 +16,10 @@ from src.domain.models import (
 from src.framework.audit.repository import AuditRepository
 from tests.helpers import (
     create_test_user,
-    make_provider,
     make_provider_certification,
     make_provider_education,
     make_provider_licensure,
+    make_provider_with_org,
     promote_to_admin,
     provider_payload,
 )
@@ -37,7 +37,7 @@ async def _seed_provider_for(
     **overrides,
 ) -> uuid.UUID:
     """Insert a provider owned by `user_id` and return its id."""
-    provider = make_provider(owner_id=user_id, **overrides)
+    provider = make_provider_with_org(owner_id=user_id, **overrides)
     async with db_test_session_manager() as session:
         async with session.begin():
             session.add(provider)

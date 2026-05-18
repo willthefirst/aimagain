@@ -16,6 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from src.domain.logic.providers.repository import ProviderRepository
 from src.domain.models import (
+    Organization,
     Provider,
     ProviderCertification,
     ProviderEducation,
@@ -24,10 +25,10 @@ from src.domain.models import (
 )
 from tests.helpers import (
     create_test_user,
-    make_provider,
     make_provider_certification,
     make_provider_education,
     make_provider_licensure,
+    make_provider_with_org,
 )
 
 pytestmark = pytest.mark.asyncio
@@ -258,7 +259,7 @@ async def test_delete_provider_cascades_licensures(
 
     async with db_test_session_manager() as session:
         async with session.begin():
-            provider = make_provider(owner_id=user.id)
+            provider = make_provider_with_org(owner_id=user.id)
             session.add(provider)
             await session.flush()
             session.add(
@@ -338,8 +339,8 @@ async def test_list_providers_no_filters_returns_all(
 
     async with db_test_session_manager() as session:
         async with session.begin():
-            session.add(make_provider(owner_id=user_a.id))
-            session.add(make_provider(owner_id=user_b.id))
+            session.add(make_provider_with_org(owner_id=user_a.id))
+            session.add(make_provider_with_org(owner_id=user_b.id))
 
     async with db_test_session_manager() as session:
         repo = ProviderRepository(session)
@@ -355,8 +356,8 @@ async def test_list_providers_filtered_by_license_type(
 
     async with db_test_session_manager() as session:
         async with session.begin():
-            provider_a = make_provider(owner_id=user_a.id)
-            provider_b = make_provider(owner_id=user_b.id)
+            provider_a = make_provider_with_org(owner_id=user_a.id)
+            provider_b = make_provider_with_org(owner_id=user_b.id)
             session.add_all([provider_a, provider_b])
             await session.flush()
             session.add(
@@ -385,8 +386,8 @@ async def test_list_providers_filtered_by_issuing_state(
 
     async with db_test_session_manager() as session:
         async with session.begin():
-            provider_a = make_provider(owner_id=user_a.id)
-            provider_b = make_provider(owner_id=user_b.id)
+            provider_a = make_provider_with_org(owner_id=user_a.id)
+            provider_b = make_provider_with_org(owner_id=user_b.id)
             session.add_all([provider_a, provider_b])
             await session.flush()
             session.add(
@@ -417,9 +418,9 @@ async def test_list_providers_combined_filter_is_anded(
 
     async with db_test_session_manager() as session:
         async with session.begin():
-            provider_a = make_provider(owner_id=user_a.id)
-            provider_b = make_provider(owner_id=user_b.id)
-            provider_c = make_provider(owner_id=user_c.id)
+            provider_a = make_provider_with_org(owner_id=user_a.id)
+            provider_b = make_provider_with_org(owner_id=user_b.id)
+            provider_c = make_provider_with_org(owner_id=user_c.id)
             session.add_all([provider_a, provider_b, provider_c])
             await session.flush()
             # A: matches both filters
@@ -458,7 +459,7 @@ async def test_list_providers_distinct_when_multiple_licensures_match(
 
     async with db_test_session_manager() as session:
         async with session.begin():
-            provider = make_provider(owner_id=user.id)
+            provider = make_provider_with_org(owner_id=user.id)
             session.add(provider)
             await session.flush()
             session.add(
@@ -494,7 +495,7 @@ async def test_licensure_crud_round_trip(
 
     async with db_test_session_manager() as session:
         async with session.begin():
-            provider = make_provider(owner_id=user.id)
+            provider = make_provider_with_org(owner_id=user.id)
             session.add(provider)
             await session.flush()
             provider_id = provider.id
@@ -540,7 +541,7 @@ async def test_education_crud_round_trip(
 
     async with db_test_session_manager() as session:
         async with session.begin():
-            provider = make_provider(owner_id=user.id)
+            provider = make_provider_with_org(owner_id=user.id)
             session.add(provider)
             await session.flush()
             provider_id = provider.id
@@ -585,7 +586,7 @@ async def test_certification_crud_round_trip(
 
     async with db_test_session_manager() as session:
         async with session.begin():
-            provider = make_provider(owner_id=user.id)
+            provider = make_provider_with_org(owner_id=user.id)
             session.add(provider)
             await session.flush()
             provider_id = provider.id
@@ -621,3 +622,134 @@ async def test_certification_crud_round_trip(
     async with db_test_session_manager() as session:
         repo = ProviderRepository(session)
         assert await repo.get_by_model_id(ProviderCertification, cert_id) is None
+
+
+# --- Org mirror invariant (PR 2 of the Org/Program roadmap, #520) ---------
+# `Provider.practice_name` is a temporary denormalized mirror of
+# `provider.org.name` while the directory transitions from free-text
+# practice names to Org-backed ones. The repository's `create` / `patch`
+# overrides enforce the mirror. PR 3 drops `practice_name` and these
+# tests with it; the colocation pins the invariant in the meantime.
+
+
+async def test_create_auto_finds_or_creates_org_from_practice_name(
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+):
+    """Two providers created with the same `practice_name` collapse to a
+    single Org — `create`'s find-or-create keys on `Organization.name`."""
+    user_a = await _seed_user(db_test_session_manager)
+    user_b = await _seed_user(db_test_session_manager)
+
+    async with db_test_session_manager() as session:
+        repo = ProviderRepository(session)
+        p1 = await repo.create(
+            Provider(
+                owner_id=user_a.id,
+                practice_name="Shared Practice",
+                location_city="Chicago",
+                location_state="IL",
+                location_zip="60601",
+                in_person_sessions="yes",
+                virtual_sessions="no",
+            )
+        )
+        p2 = await repo.create(
+            Provider(
+                owner_id=user_b.id,
+                practice_name="Shared Practice",
+                location_city="Chicago",
+                location_state="IL",
+                location_zip="60601",
+                in_person_sessions="yes",
+                virtual_sessions="no",
+            )
+        )
+        await session.commit()
+        assert p1.org_id is not None
+        assert p1.org_id == p2.org_id
+        assert p1.practice_name == "Shared Practice"
+        assert p2.practice_name == "Shared Practice"
+
+
+async def test_create_mirrors_practice_name_from_existing_org(
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+):
+    """If the caller passes ``org_id`` explicitly, the override overwrites
+    ``practice_name`` from the Org's name — the Org is the source of truth."""
+    user = await _seed_user(db_test_session_manager)
+
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            org = Organization(
+                id=uuid.uuid4(),
+                name="Canonical Org Name",
+                type="clinic",
+                owner_id=user.id,
+            )
+            org.root_org_id = org.id
+            session.add(org)
+        org_id = org.id
+
+    async with db_test_session_manager() as session:
+        repo = ProviderRepository(session)
+        created = await repo.create(
+            Provider(
+                owner_id=user.id,
+                org_id=org_id,
+                practice_name="Wrong Name Caller Passed",
+                location_city="Chicago",
+                location_state="IL",
+                location_zip="60601",
+                in_person_sessions="yes",
+                virtual_sessions="no",
+            )
+        )
+        await session.commit()
+        assert created.org_id == org_id
+        assert created.practice_name == "Canonical Org Name"
+
+
+async def test_patch_changing_org_id_rewrites_practice_name(
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+):
+    """A PATCH that swaps ``org_id`` pulls ``practice_name`` from the new
+    Org — keeps the mirror invariant after a reassignment."""
+    user = await _seed_user(db_test_session_manager)
+
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            other_org = Organization(
+                id=uuid.uuid4(),
+                name="Other Practice",
+                type="clinic",
+                owner_id=user.id,
+            )
+            other_org.root_org_id = other_org.id
+            session.add(other_org)
+        other_org_id = other_org.id
+
+    async with db_test_session_manager() as session:
+        repo = ProviderRepository(session)
+        provider = await repo.create(
+            Provider(
+                owner_id=user.id,
+                practice_name="Original Practice",
+                location_city="Chicago",
+                location_state="IL",
+                location_zip="60601",
+                in_person_sessions="yes",
+                virtual_sessions="no",
+            )
+        )
+        await session.commit()
+        provider_id = provider.id
+        assert provider.practice_name == "Original Practice"
+
+    async with db_test_session_manager() as session:
+        repo = ProviderRepository(session)
+        provider = await repo.get_by_model_id(Provider, provider_id)
+        assert provider is not None
+        await repo.patch(provider, org_id=other_org_id)
+        await session.commit()
+        assert provider.org_id == other_org_id
+        assert provider.practice_name == "Other Practice"
