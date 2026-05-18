@@ -1,0 +1,19 @@
+{# Two-chip modality posture for the post card's header line.
+
+`in_person` and `virtual` are `LOCATION_AVAILABILITY_OPTIONS` values
+(`yes` / `no` / `please_contact`). A `please_contact` on either arm
+collapses to a single "Contact for format" chip — the posture is
+unknown so neither glyph applies. When both are `no` (or None), no
+chip renders.
+
+Used by `posts/_item.html` (the list card) and `posts/detail.html`
+(the detail page, post PR C). Same visual treatment in both views
+so the modality posture reads the same wherever it appears. #}
+{% macro modality_chips(in_person, virtual) -%}
+{%- if in_person == "please_contact" or virtual == "please_contact" -%}
+<span class="post-modality">Contact for format</span>
+{%- else -%}
+{%- if virtual == "yes" %}<span class="post-modality"><i class="icon-video" aria-hidden="true"></i>Virtual</span>{% endif -%}
+{%- if in_person == "yes" %}<span class="post-modality"><i class="icon-map-pin" aria-hidden="true"></i>In-person</span>{% endif -%}
+{%- endif -%}
+{%- endmacro %}

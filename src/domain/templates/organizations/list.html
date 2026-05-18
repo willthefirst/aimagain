@@ -8,24 +8,26 @@
 
 {% block content %}
 {% if organizations %}
-<table id="organizations-table">
-  <thead>
-    <tr>
-      <th>Name</th>
-      <th>Type</th>
-      <th>Parent</th>
-    </tr>
-  </thead>
-  <tbody>
-    {%- for org in organizations %}
-    <tr>
-      <td><a href="{{ entity_url('organization', id=org.id) }}">{{ org.name }}</a></td>
-      <td>{{ ORGANIZATION_TYPES_LABELS[org.type] }}</td>
-      <td>{% if org.parent_org_id %}<a href="{{ entity_url('organization', id=org.parent_org_id) }}">Parent</a>{% else %}—{% endif %}</td>
-    </tr>
-    {%- endfor %}
-  </tbody>
-</table>
+<div class="overflow-auto">
+  <table id="organizations-table">
+    <thead>
+      <tr>
+        <th>Name</th>
+        <th>Type</th>
+        <th>Parent</th>
+      </tr>
+    </thead>
+    <tbody>
+      {%- for org in organizations %}
+      <tr>
+        <td><a href="{{ entity_url('organization', id=org.id) }}">{{ org.name }}</a></td>
+        <td>{{ ORGANIZATION_TYPES_LABELS[org.type] }}</td>
+        <td>{% if org.parent_org_id %}<a href="{{ entity_url('organization', id=org.parent_org_id) }}">Parent</a>{% else %}—{% endif %}</td>
+      </tr>
+      {%- endfor %}
+    </tbody>
+  </table>
+</div>
 {% else %}
 <p>No organizations found.</p>
 {% endif %}
