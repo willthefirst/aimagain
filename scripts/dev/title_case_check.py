@@ -114,6 +114,7 @@ class TitleCaseChecker:
         # Tech / framework names
         "FastAPI",
         "SQLAlchemy",
+        "APScheduler",
         "Jinja2",
         "pytest",
         "GitHub",
