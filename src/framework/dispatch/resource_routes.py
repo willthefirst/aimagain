@@ -1248,6 +1248,23 @@ def mount_entity(
             "or handlers['form_edit'] — pick one. Extras are for the "
             "factory-built path; an explicit handler owns its own."
         )
+    # `payload_authz_path` is consumed by the factory-built create /
+    # update handlers; supplying an explicit `handlers["create"]` /
+    # `handlers["update"]` would silently bypass the spec hook.
+    if entity.payload_authz_path is not None and "create" in handlers:
+        raise ValueError(
+            f"mount_entity({entity.name!r}): spec declares "
+            "payload_authz_path alongside an explicit handlers['create'] "
+            "— pick one. The hook runs in the factory-built path; an "
+            "explicit handler would silently bypass it."
+        )
+    if entity.payload_authz_path is not None and "update" in handlers:
+        raise ValueError(
+            f"mount_entity({entity.name!r}): spec declares "
+            "payload_authz_path alongside an explicit handlers['update'] "
+            "— pick one. The hook runs in the factory-built path; an "
+            "explicit handler would silently bypass it."
+        )
 
     detail_extras = (
         _resolve_dotted_path(entity, entity.detail_extras_path, "detail_extras_path")
@@ -1262,6 +1279,11 @@ def mount_entity(
     form_extras = (
         _resolve_dotted_path(entity, entity.form_extras_path, "form_extras_path")
         if entity.form_extras_path is not None
+        else None
+    )
+    payload_authz = (
+        _resolve_dotted_path(entity, entity.payload_authz_path, "payload_authz_path")
+        if entity.payload_authz_path is not None
         else None
     )
 
@@ -1308,6 +1330,12 @@ def mount_entity(
                 entity,
                 extras=form_extras,
                 extra_repos=entity.form_extras_repos,
+            )
+        elif verb in ("create", "update"):
+            built = maker(
+                entity,
+                payload_authz=payload_authz,
+                payload_authz_repos=entity.payload_authz_repos,
             )
         else:
             built = maker(entity)

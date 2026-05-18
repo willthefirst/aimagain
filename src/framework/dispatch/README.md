@@ -34,6 +34,35 @@ mount's query_params= tuple).
 
 `EntitySpec` (this directory) and `ResourceSpec` (also this directory) look similar but serve different layers. `EntitySpec` is the **upstream declaration** every consumer reads from. `ResourceSpec` is the **downstream input** to the mount helpers — derived from `EntitySpec` via `to_resource_spec()` at mount time. Future cross-cutting features (richer audit hooks, response synthesis, OpenAPI doc generation) add fields to `EntitySpec`; `ResourceSpec` stays narrow because it only needs what the mount helpers consume.
 
+## Write-time authorization: `write_authz` vs. `payload_authz`
+
+Two distinct spec hooks gate writes, run in this order from
+`handle_create` / `handle_update`:
+
+- **`write_authz`** (on `EntitySpec`) — gates **the target row**. Runs
+  after the parent or target has been loaded. For owned subentities,
+  the predicate sees the parent; for top-level entities, it sees the
+  target. Raises `ForbiddenError` on rejection. Same callable is used
+  by `handle_delete` and `handle_get_edit_form`.
+
+- **`payload_authz_path`** (on `EntitySpec`) — gates **rows the
+  payload references** (e.g. "the user must own the Org the payload's
+  `org_id` points at"). Runs *after* `write_authz`, *before* the model
+  is built / patched. The dotted-string path resolves via `importlib`
+  at mount time; the framework synthesizes typed-repo kwargs from
+  `payload_authz_repos` and forwards them to the callable. Raises
+  `ForbiddenError` / `NotFoundError` on rejection.
+
+The two run in addition to each other, not instead of. Superuser
+bypass is the **callable's responsibility** — the framework does not
+short-circuit on `requesting_user.is_superuser`. Each hook owns its
+own policy (e.g. providers' Org-attach rule lets superusers attach
+to any Org, but a different rule might not).
+
+Declaring `payload_authz_path` alongside an explicit `handlers["create"]`
+or `handlers["update"]` is rejected at mount time — the explicit
+handler would silently bypass the spec hook. Use one or the other.
+
 ## Handler stitching
 
 `mount_entity` walks up the call stack to find the route module that invoked it and `setattr`s factory-built handlers onto it as `_handle_<verb>_<entity>`. This keeps the contract-test patch path stable across the refactor that moved handler bodies out of route files. The stitching is described in the docstring of `_detect_caller_module` in `resource_routes.py`.
