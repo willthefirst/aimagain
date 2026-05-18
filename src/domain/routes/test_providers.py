@@ -388,6 +388,26 @@ async def test_list_providers_shows_licensure_states(
     assert licensed_in_cell.text(strip=True) == "CA, CT"
 
 
+async def test_list_providers_renders_create_toolbar_action(
+    authenticated_client: AsyncClient,
+):
+    """`/providers` (Directory) carries a 'Create provider' toolbar
+    button — matches the orgs/programs/posts list convention so an
+    authenticated user always has a discoverable Create entry point.
+    The route's auth is `AUTHENTICATED` (creation is not gated to
+    owners/admins), so the button shows to every authenticated viewer."""
+    response = await authenticated_client.get("/providers")
+    assert response.status_code == 200
+    tree = HTMLParser(response.text)
+    action = None
+    for anchor in tree.css('menu.toolbar-right > li > a[role="button"]'):
+        if "Create provider" in (anchor.text() or ""):
+            action = anchor
+            break
+    assert action is not None, "Create provider toolbar action is missing on /providers"
+    assert action.attributes.get("href") == "/providers/form"
+
+
 async def test_list_providers_renders_empty_state(
     authenticated_client: AsyncClient,
 ):
@@ -499,16 +519,22 @@ async def test_list_providers_treats_empty_filter_values_as_absent(
 # --- Chrome: toolbar + form affordances --------------------------------
 
 
-async def test_providers_list_toolbar_renders_only_filter_link(
+async def test_providers_list_toolbar_renders_filter_link_and_create_action(
     authenticated_client: AsyncClient,
 ):
-    """`/providers` has no list-level action (no Create button), so the
-    toolbar renders only the filter link — no action menu."""
+    """`/providers` toolbar carries both the filter link (left) and a
+    'Create provider' action (right). The Create button matches the
+    orgs/programs/posts list-page convention; the dedicated
+    `test_list_providers_renders_create_toolbar_action` test above
+    pins the action's `href` shape — this one pins the toolbar
+    composition (filter ✕ actions both present)."""
     response = await authenticated_client.get("/providers")
     assert response.status_code == 200
     tree = HTMLParser(response.text)
     assert tree.css_first("a.toolbar-filter-link") is not None
-    assert tree.css_first("menu.toolbar-right") is None
+    action_menu = tree.css_first("menu.toolbar-right")
+    assert action_menu is not None
+    assert "Create provider" in action_menu.text()
 
 
 async def test_provider_detail_favorite_toggle_lives_in_toolbar(
