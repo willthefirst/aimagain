@@ -13,13 +13,9 @@ class BaseRouter:
         self,
         router: APIRouter,
         default_tags: Optional[List[str]] = None,
-        default_dependencies: Optional[List[Depends]] = None,
     ):
         self.router = router
         self.default_tags = default_tags if default_tags is not None else []
-        self.default_dependencies = (
-            default_dependencies if default_dependencies is not None else []
-        )
 
     def add_api_route(
         self,
@@ -39,10 +35,6 @@ class BaseRouter:
         if tags:
             route_tags.extend(tags)
 
-        route_dependencies = list(self.default_dependencies)
-        if dependencies:
-            route_dependencies.extend(dependencies)
-
         decorated_endpoint = endpoint
         if apply_common_decorators:
             decorated_endpoint = handle_route_errors(decorated_endpoint)
@@ -53,7 +45,7 @@ class BaseRouter:
             decorated_endpoint,
             methods=methods,
             tags=list(set(route_tags)),  # Ensure unique tags
-            dependencies=route_dependencies,
+            dependencies=dependencies or [],
             **kwargs,
         )
 
@@ -103,18 +95,15 @@ class BaseRouter:
         return decorator
 
 
-def make_entity_router(entity: "EntitySpec") -> BaseRouter:
+def _make_entity_router(entity: "EntitySpec") -> BaseRouter:
     """Build a `BaseRouter` for `entity` with prefix + tags derived from the spec.
 
-    The prefix is ``f"/{entity.url_collection}"`` by default; entities
-    whose URL doesn't fit the convention (favorites lives under
-    ``/users/me/favorites``) set ``prefix_override`` on the spec.
-    Default tags are ``[entity.url_collection]``.
-
-    Route files don't call this directly — they call
+    Framework-internal. Route files call
     :func:`src.framework.dispatch.registry.register_entity`, which wraps
-    this helper with the registry append. See that function's docstring
-    for the full lifecycle.
+    this helper and adds the registry bookkeeping. The prefix is
+    ``f"/{entity.url_collection}"`` unless the spec sets
+    ``prefix_override`` (favorites lives at ``/users/me/favorites``);
+    default tags are ``[entity.url_collection]``.
     """
     prefix = (
         entity.prefix_override
@@ -125,26 +114,3 @@ def make_entity_router(entity: "EntitySpec") -> BaseRouter:
         router=APIRouter(prefix=prefix),
         default_tags=[entity.url_collection],
     )
-
-
-# Example of how to use this BaseRouter:
-# from fastapi import FastAPI
-# app = FastAPI()
-#
-# # In your main app or a specific module router setup
-# main_router_instance = APIRouter(prefix="/api/v1")
-# base_router_helper = BaseRouter(router=main_router_instance, default_tags=["API_V1"])
-#
-# # In a specific route file, e.g., items_routes.py
-# # items_api_router = APIRouter() # This APIRouter instance is passed to BaseRouter
-# # items_router = BaseRouter(router=items_api_router, default_tags=["Items"])
-#
-# @base_router_helper.get("/items/{item_id}")
-# async def read_item(item_id: int, q: Optional[str] = None):
-#     return {"item_id": item_id, "q": q}
-#
-# @base_router_helper.post("/items", status_code=201)
-# async def create_item(item_name: str):
-#     return {"name": item_name}
-#
-# app.include_router(main_router_instance)

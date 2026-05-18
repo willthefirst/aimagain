@@ -100,8 +100,11 @@ app.include_router(auth_pages.auth_pages_api_router)
 # then a single iteration over `entity_registry` — no `include_router`
 # line to forget per entity. Owned-subentity specs mount nested under
 # their parent's route file and are not registered here.
-for _spec, _router in entity_registry.entries():
-    app.include_router(_router, tags=[_spec.url_collection])
+# Tags come from each spec's `BaseRouter.default_tags`
+# (`register_entity` sets them to `[spec.url_collection]`); no need to
+# repeat them on `include_router`.
+for _, _router in entity_registry.entries():
+    app.include_router(_router)
 
 
 @app.get("/health")

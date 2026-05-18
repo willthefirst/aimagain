@@ -1,6 +1,7 @@
 # Convenience re-exports for the most-used framework symbols.
 
-from .dispatch.base_router import BaseRouter, make_entity_router
+from .dispatch.base_router import BaseRouter
+from .dispatch.registry import register_entity
 from .http.decorators import handle_route_errors
 from .http.exceptions import (
     APIException,
@@ -19,20 +20,20 @@ from .http.responses import (
 )
 
 __all__ = [
-    "APIResponse",
-    "handle_route_errors",
     "APIException",
-    "NotFoundError",
+    "APIResponse",
     "BadRequestError",
-    "ForbiddenError",
-    "handle_fastapi_users_error",
     "BaseRouter",
-    "make_entity_router",
+    "ForbiddenError",
+    "NotFoundError",
     "created_response",
     "deleted_response",
+    "handle_fastapi_users_error",
+    "handle_route_errors",
     "parse_and_validate_form",
     "parse_form_to_payload",
     "refreshed_response",
+    "register_entity",
     "updated_response",
     "validate_or_422",
 ]

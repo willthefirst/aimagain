@@ -13,7 +13,7 @@ The URL shape, lifecycle, and subresource conventions every resource MUST follow
 
 ```python
 from src.domain.specs.<entity> import <ENTITY>_ENTITY
-from src.framework.dispatch.registry import register_entity
+from src.framework import register_entity
 from src.framework.dispatch.resource_routes import mount_entity
 
 router = register_entity(<ENTITY>_ENTITY)

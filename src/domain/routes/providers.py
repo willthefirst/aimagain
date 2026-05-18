@@ -2,7 +2,7 @@ from src.domain.specs.provider import PROVIDER_ENTITY
 from src.domain.specs.provider_certification import CERTIFICATION_ENTITY
 from src.domain.specs.provider_education import EDUCATION_ENTITY
 from src.domain.specs.provider_licensure import LICENSURE_ENTITY
-from src.framework.dispatch.registry import register_entity
+from src.framework import register_entity
 from src.framework.dispatch.resource_routes import mount_entity
 
 router = register_entity(PROVIDER_ENTITY)
