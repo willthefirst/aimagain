@@ -20,6 +20,7 @@ from .posts.post_kinds import (
     PostKindSpec,
 )
 from .posts.provider_availability_detail import ProviderAvailabilityDetail
+from .programs.program import Program
 from .providers.provider import Provider
 from .providers.provider_certification import ProviderCertification
 from .providers.provider_education import ProviderEducation
@@ -42,6 +43,7 @@ __all__ = [
     "POST_KINDS",
     "Post",
     "PostKindSpec",
+    "Program",
     "ProviderAvailabilityDetail",
     "ProviderCertification",
     "ProviderEducation",

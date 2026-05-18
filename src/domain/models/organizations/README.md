@@ -27,4 +27,4 @@ Today only `Organization` itself writes the table, so the invariant is enforced 
 
 ## Why this cluster, not flat siblings
 
-`organizations/` matches the per-entity cluster grammar in [`../README.md`](../README.md) — every entity with at least one model file gets its own directory. PR 4 of the Org/Program roadmap (Program entity, owned by Organization) will add `program.py` next to `organization.py` in this same cluster, sharing the `ORGANIZATION_TYPES` enum and the parent/root denormalization pattern.
+`organizations/` matches the per-entity cluster grammar in [`../README.md`](../README.md) — every entity with at least one model file gets its own directory. The Program entity (PR 4 of the Org/Program roadmap, #537) is owned by Organization but lives in its own [`../programs/`](../programs/) cluster — same parent-cluster grammar applied recursively, not nested inside `organizations/`.

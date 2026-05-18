@@ -1,0 +1,54 @@
+{% extends "views/form_edit.html" %}
+{%- from "_shared/form_fields.html" import radio_bool_field, select_field, text_field -%}
+{%- from "_shared/actions.html" import confirm_delete_button -%}
+
+{% set resource_url = "/programs" %}
+{% set resource_detail_url = "/programs/" ~ program.id %}
+
+{% block resource_label %}Programs{% endblock %}
+{% block current_label %}{{ program.name }}{% endblock %}
+
+{% block content %}
+<section>
+  <h2>Program</h2>
+  {# `org_id` PATCH reassigns the Program to a different Organization.
+     The dropdown is the user's owned Orgs plus the currently-attached
+     Org (added by `program_form_extras` on the edit path even when
+     the user doesn't own it, so the form doesn't silently drop the
+     FK on submit). #}
+  <form hx-patch="/programs/{{ program.id }}">
+    <fieldset>
+      <legend>Identity</legend>
+      <label for="org_id">
+        Organization
+        <select id="org_id" name="org_id" required>
+          {%- for o in organizations %}
+          <option value="{{ o.id }}"{% if o.id == program.org_id %} selected{% endif %}>{{ o.name }}</option>
+          {%- endfor %}
+        </select>
+        <small>Don't see your organization? <a href="/organizations/new">Create one first</a>.</small>
+      </label>
+      {{ text_field("name", "Name", current=program.name) }}
+      {{ text_field("description", "Description (optional)", current=program.description, required=false) }}
+    </fieldset>
+    <fieldset>
+      <legend>State &amp; dates</legend>
+      {{ select_field("state_preference", "State served (optional)", US_STATES, current=program.state_preference, required=false, placeholder=true) }}
+      {{ text_field("start_date", "Start date (optional, YYYY-MM-DD)", current=program.start_date, required=false, pattern="\\d{4}-\\d{2}-\\d{2}", maxlength=10) }}
+      {{ text_field("end_date", "End date (optional, YYYY-MM-DD)", current=program.end_date, required=false, pattern="\\d{4}-\\d{2}-\\d{2}", maxlength=10) }}
+    </fieldset>
+    <fieldset>
+      <legend>Intake</legend>
+      {{ radio_bool_field("accepting_referrals", "Accepting referrals?", current=program.accepting_referrals, required=false) }}
+    </fieldset>
+    <button type="submit">Save program</button>
+  </form>
+</section>
+
+<section>
+  <h2>Delete</h2>
+  {{ confirm_delete_button("/programs/" ~ program.id, "Delete this program?") }}
+</section>
+
+<p><a href="/programs/{{ program.id }}" role="button" class="secondary outline">Cancel</a></p>
+{% endblock %}

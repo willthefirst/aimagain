@@ -20,6 +20,7 @@ from src.framework.dispatch.entity_spec import EntitySpec
 
 from .organization import ORGANIZATION_ENTITY
 from .post import POST_ENTITY
+from .program import PROGRAM_ENTITY
 from .provider import PROVIDER_ENTITY
 from .provider_certification import CERTIFICATION_ENTITY
 from .provider_education import EDUCATION_ENTITY
@@ -30,6 +31,7 @@ from .user_favorite import FAVORITE_ENTITY
 ALL_ENTITY_SPECS: tuple[EntitySpec, ...] = (
     ORGANIZATION_ENTITY,
     POST_ENTITY,
+    PROGRAM_ENTITY,
     PROVIDER_ENTITY,
     CERTIFICATION_ENTITY,
     EDUCATION_ENTITY,
@@ -46,6 +48,7 @@ __all__ = [
     "LICENSURE_ENTITY",
     "ORGANIZATION_ENTITY",
     "POST_ENTITY",
+    "PROGRAM_ENTITY",
     "PROVIDER_ENTITY",
     "USER_ENTITY",
 ]

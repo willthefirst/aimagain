@@ -60,3 +60,6 @@ class Organization(BaseModel):
     # is read-only from the Org side. PR 3+ adds the create form that
     # picks an Org explicitly.
     providers = relationship("Provider", back_populates="org")
+    # Programs that belong to this Org. PR 4 of the roadmap (#537).
+    # Same ``RESTRICT`` FK posture as ``providers``.
+    programs = relationship("Program", back_populates="organization")
