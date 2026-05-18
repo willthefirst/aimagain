@@ -9,7 +9,7 @@ from src.auth_config import auth_backend, fastapi_users
 from src.db import check_database_health
 from src.domain import routes  # noqa: F401  # populates entity_registry
 from src.domain.logic.users.schema import UserRead
-from src.domain.routes import auth_pages, auth_routes
+from src.domain.routes import auth_pages, auth_routes, verifications
 from src.framework.dispatch.registry import entity_registry
 from src.framework.http.middleware import StripEmptyQueryParamsMiddleware
 from src.jobs.scheduler import make_scheduler, register_jobs
@@ -110,6 +110,7 @@ app.include_router(
     tags=["auth"],
 )
 app.include_router(auth_pages.auth_pages_api_router)
+app.include_router(verifications.verifications_api_router)
 
 # Every entity route file calls `register_entity(SPEC)` at import time
 # (see `src/framework/dispatch/registry.py`). The package import above

@@ -9,10 +9,9 @@ Persistence + pure-function primitives for the provider verification pipeline. T
 - `nppes.py` — `nppes_lookup(npi, *, http)` against the public CMS registry. Errors / timeouts degrade to `NppesResult(found=False, raw=None)` plus a logged warning — never raises.
 - `oig.py` — `oig_check(*, first_name, last_name, npi)` against the OIG/LEIE exclusion list (loaded from a CSV on disk). Module-level cache by absolute path; missing CSV degrades to "no match" with a single startup warning.
 - `scoring.py` — `score_verification(...)` table-driven rules over `(NppesResult, OigResult, provider name)` → `Score(status, flags, name_match_score)`. No I/O.
+- `handlers.py` — `run_provider_verification(...)` orchestrator + `handle_create_provider_verification(...)` admin-only retrigger. Composes the primitives with persistence + audit + an `httpx.AsyncClient`. The bespoke route lives at [`../../routes/verifications.py`](../../routes/verifications.py) and is wired into `src/main.py` next to the other hand-rolled routers.
 
-(`__init__.py` is intentionally empty — these are imported directly via `src.domain.logic.verifications.nppes`/`.oig`/`.scoring`/`.repository`/`.schema`.)
-
-Issue #528 will add `handlers.py` with the orchestrator + the bespoke trigger endpoint.
+(`__init__.py` is intentionally empty — these are imported directly via `src.domain.logic.verifications.nppes`/`.oig`/`.scoring`/`.repository`/`.schema`/`.handlers`.)
 
 ## Why pure functions, not classes
 
@@ -34,6 +33,19 @@ A missing CSV does not crash the pipeline — `oig_check` logs once at process s
 
 ## System-actor audit pattern
 
-(Preview — full documentation lands with the orchestrator in #528.)
+The orchestrator writes one `Verification` row plus one matching audit row in a single transaction (`record_audit_for(...)` + an explicit `session.commit()`). The audit row's `actor_id`:
 
-The orchestrator writes the audit row with `actor_id=None` for nightly-job runs (no requesting user) and with `requesting_user.id` for the superuser retrigger endpoint. `AuditLog.actor_id` is nullable for this reason — see [`../../models/verifications/README.md`](../../models/verifications/README.md#system-triggered-runs-and-actor_id).
+- `None` when the nightly job (#530) drives the run. `AuditLog.actor_id` is `nullable=True` with `ON DELETE SET NULL` (`src/framework/audit/log.py`), so this is legal at the DB layer and lets the audit row outlive any specific user.
+- `requesting_user.id` when the admin retrigger endpoint (`POST /providers/{provider_id}/verifications`) drives the run. The endpoint is `current_admin_user`-gated; non-superusers get `403`.
+
+### Why `record_audit_for` + explicit commit (not `mutate`)
+
+The `mutate(...)` context manager is a snapshot-before / mutate / record_audit / commit ritual built around a pre-existing target — it snapshots `before` from the row that's already in the DB. Verification rows are *created* each run, so there's no pre-existing target. `record_audit_for` plus an explicit commit matches the favorites cluster's edge-add/remove pattern (`src/domain/logic/favorites/handlers.py`), which has the same shape (no pre-existing target on add).
+
+### Name fields gap (followup tracking)
+
+`run_provider_verification` reads provider names via `_provider_names(provider)`, which falls back to `user.username` in the first-name slot because the `User` model has no `first_name` / `last_name` columns today. The scoring layer's similarity check lands far below threshold against the NPPES first/last names, so every verification routes to `needs_review` until proper name fields are added. The safe default is on purpose: a human reviewer confirms identity rather than the pipeline auto-verifying against a name we never actually had. Adding `first_name` / `last_name` to `User` is a separate ticket.
+
+### Intake post-create hook
+
+Triggering verification automatically after `POST /providers` succeeds was scoped out of this PR per #528 — the framework's CRUD handler doesn't have a `post_create_hook`, and adding one to the dispatcher is more scope than #528 should carry. Track as a follow-up issue.
