@@ -22,7 +22,16 @@ import pytest
 from sqlalchemy import select
 
 from scripts.dev import seed
-from src.domain.models import OpeningDetail, Post, ReferralDetail
+from src.domain.models import (
+    OpeningDetail,
+    Organization,
+    Post,
+    Provider,
+    ProviderCertification,
+    ProviderEducation,
+    ProviderLicensure,
+    ReferralDetail,
+)
 from tests.fixtures import async_test_sessionmaker
 from tests.helpers import create_test_user
 
@@ -163,6 +172,173 @@ async def test_cr_skips_when_owner_missing(db_test_session_manager):
 
 
 # --- created_at variance --------------------------------------------------
+
+
+# --- org type variety + hierarchy -----------------------------------------
+
+
+async def test_seed_opening_creates_orgs_with_declared_types(db_test_session_manager):
+    """Each provider fixture declares an `org_type` (default
+    `solo_practice`). The seed honors it on Org create so the directory
+    isn't a wall of identical solo-practice rows."""
+    await _insert_all_fixture_users()
+    await seed.seed_opening()
+
+    async with async_test_sessionmaker() as session:
+        result = await session.execute(select(Organization))
+        orgs_by_name = {o.name: o for o in result.scalars().all()}
+
+    expected = {
+        f["provider"]["practice_name"]: f["provider"]["org_type"]
+        for f in seed.FIXTURE_OPENING
+    }
+    for name, want_type in expected.items():
+        assert name in orgs_by_name, f"Org '{name}' was not seeded"
+        assert (
+            orgs_by_name[name].type == want_type
+        ), f"Org '{name}' got type {orgs_by_name[name].type!r}, expected {want_type!r}"
+    # Coverage: the seeded set spans more than just `solo_practice`.
+    seen_types = {o.type for o in orgs_by_name.values()}
+    assert len(seen_types) >= 3, f"Expected variety, got: {seen_types}"
+
+
+async def test_seed_standalone_orgs_creates_health_system_parent(
+    db_test_session_manager,
+):
+    """`seed_standalone_orgs()` populates the hierarchy roots that
+    Provider fixtures attach to via `parent_org_name`. Specifically the
+    Children's Health Council health_system row that RISE IOP at CHC
+    nests under."""
+    await _insert_all_fixture_users()
+
+    created, skipped = await seed.seed_standalone_orgs()
+
+    assert created == len(seed.FIXTURE_STANDALONE_ORGS)
+    assert skipped == 0
+    async with async_test_sessionmaker() as session:
+        result = await session.execute(
+            select(Organization).where(Organization.name == "Children's Health Council")
+        )
+        chc = result.scalar_one()
+    assert chc.type == "health_system"
+    # Roots are their own root.
+    assert chc.root_org_id == chc.id
+    assert chc.parent_org_id is None
+
+
+async def test_seed_opening_attaches_clinic_to_health_system_parent(
+    db_test_session_manager,
+):
+    """RISE IOP at CHC declares `parent_org_name=Children's Health Council`.
+    After `seed_standalone_orgs()` + `seed_opening()`, the child's
+    `parent_org_id` + `root_org_id` reflect the parent."""
+    await _insert_all_fixture_users()
+    await seed.seed_standalone_orgs()
+    await seed.seed_opening()
+
+    async with async_test_sessionmaker() as session:
+        parent = (
+            await session.execute(
+                select(Organization).where(
+                    Organization.name == "Children's Health Council"
+                )
+            )
+        ).scalar_one()
+        child = (
+            await session.execute(
+                select(Organization).where(Organization.name == "RISE IOP at CHC")
+            )
+        ).scalar_one()
+    assert child.parent_org_id == parent.id
+    assert child.root_org_id == parent.id
+
+
+# --- credentials ----------------------------------------------------------
+
+
+async def test_seed_credentials_inserts_rows_attached_to_provider(
+    db_test_session_manager,
+):
+    """`seed_credentials()` populates each Provider's licensures /
+    educations / certifications. Pins that at least one of each kind
+    landed and that they correctly attach to the seeded Provider."""
+    await _insert_all_fixture_users()
+    await seed.seed_opening()
+
+    created, _ = await seed.seed_credentials()
+    assert created > 0
+
+    async with async_test_sessionmaker() as session:
+        provider = (
+            await session.execute(
+                select(Provider)
+                .join(Organization, Organization.id == Provider.org_id)
+                .where(Organization.name == "Lakeside Therapy Collective")
+            )
+        ).scalar_one()
+        lic_count = (
+            (
+                await session.execute(
+                    select(ProviderLicensure).where(
+                        ProviderLicensure.provider_id == provider.id
+                    )
+                )
+            )
+            .scalars()
+            .all()
+        )
+        edu_count = (
+            (
+                await session.execute(
+                    select(ProviderEducation).where(
+                        ProviderEducation.provider_id == provider.id
+                    )
+                )
+            )
+            .scalars()
+            .all()
+        )
+        cert_count = (
+            (
+                await session.execute(
+                    select(ProviderCertification).where(
+                        ProviderCertification.provider_id == provider.id
+                    )
+                )
+            )
+            .scalars()
+            .all()
+        )
+    # Lakeside fixture: 2 licensures (multi-state), 1 education, 2 certs.
+    assert len(lic_count) == 2
+    assert {l.issuing_state for l in lic_count} == {"CA", "NV"}
+    assert len(edu_count) == 1
+    assert len(cert_count) == 2
+
+
+async def test_seed_credentials_rerun_is_idempotent(db_test_session_manager):
+    """Re-running `seed_credentials()` doesn't duplicate rows."""
+    await _insert_all_fixture_users()
+    await seed.seed_opening()
+
+    first_created, first_skipped = await seed.seed_credentials()
+    second_created, second_skipped = await seed.seed_credentials()
+
+    assert first_created > 0
+    assert second_created == 0
+    assert second_skipped == first_created
+
+
+async def test_seed_credentials_skips_when_provider_missing(db_test_session_manager):
+    """No Providers seeded → every credential fixture is skipped, no
+    error raised."""
+    await _insert_all_fixture_users()
+    # Deliberately skip seed_opening — no Providers to attach to.
+
+    created, skipped = await seed.seed_credentials()
+
+    assert created == 0
+    assert skipped == len(seed.FIXTURE_CREDENTIALS)
 
 
 async def test_seed_spreads_created_at_across_days(db_test_session_manager):
