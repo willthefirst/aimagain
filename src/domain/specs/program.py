@@ -1,18 +1,9 @@
-"""`PROGRAM_ENTITY`: PR 4 of the Org/Program roadmap (#537).
+"""`PROGRAM_ENTITY`: a treatment offering owned by an :class:`Organization`.
 
-A :class:`Program` is a treatment offering owned by an
-:class:`Organization`. The spec declares both per-spec hooks
-introduced by the prior framework work — ``form_extras_path`` (PR
-#534, for the Org-picker dropdown) and ``payload_authz_path`` (PR
-#535, for wire-side authorization on the cross-entity FK) — so the
-route file stays a single :func:`mount_entity` call with no bespoke
-handler overrides. This is the conformance check that PR #534 + #535
-fully generalized PR 3's bespoke-handler workaround.
-
-Read by:
-  - ``src/domain/routes/programs.py`` — single ``mount_entity`` call.
-  - ``src/framework/audit/test_audit_action_drift.py`` — pins that
-    the spec's CRUD audit triple is declared on ``AuditAction``.
+The spec declares both per-spec hooks — ``form_extras_path`` (for the
+Org-picker dropdown) and ``payload_authz_path`` (for wire-side
+authorization on the cross-entity FK) — so the route file stays a
+single :func:`mount_entity` call with no bespoke handler overrides.
 """
 
 from typing import Final
@@ -59,16 +50,13 @@ PROGRAM_ENTITY: Final[EntitySpec] = EntitySpec(
     list_order_by=Program.created_at.desc(),
     create_redirect=_program_form_redirect,
     update_redirect=_program_form_redirect,
-    # The create/edit form's Org-picker is scoped per-viewer to the
-    # user's owned Organizations (#537). The framework invokes the
-    # extras callable on both the create path (target=None) and the
-    # edit path (target=<row>) — see ``EntitySpec.form_extras_path``.
+    # The create/edit form's Org-picker is scoped per-viewer to the user's
+    # owned Organizations. The framework invokes the extras callable on
+    # both the create path (target=None) and the edit path (target=<row>)
+    # — see ``EntitySpec.form_extras_path``.
     form_extras_path="src.domain.logic.programs.handlers.program_form_extras",
     form_extras_repos=(("organization_repo", OrganizationRepository),),
-    # Wire-side authz: a user may only attach a Program to an Org they
-    # own (#537). The framework's ``payload_authz`` hook (PR #535) lets
-    # the rule live on the spec instead of duplicating create/update
-    # wiring in a bespoke handler.
+    # Wire-side authz: a user may only attach a Program to an Org they own.
     payload_authz_path=(
         "src.domain.logic.programs.handlers._assert_program_payload_org_ownership"
     ),

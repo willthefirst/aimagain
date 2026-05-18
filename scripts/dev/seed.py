@@ -84,12 +84,11 @@ FIXTURE_USERS: list[FixtureUser] = [
 ]
 
 
-# Real-world canonical examples that drive the schema-evolution work in
-# the issue series spawned by #420. Each fixture declares its Provider
+# Real-world canonical examples. Each fixture declares its Provider
 # profile (practice + location + delivery format) alongside the PA
-# announcement (#448). The seed creates/reuses the Provider, then
-# points the PA's `provider_id` at it. `days_ago` spreads `created_at`
-# across the last ~6 months so the listing page shows date variance.
+# announcement. The seed creates/reuses the Provider, then points the
+# PA's `provider_id` at it. `days_ago` spreads `created_at` across the
+# last ~6 months so the listing page shows date variance.
 FIXTURE_PROVIDER_AVAILABILITY: list[FixtureProviderAvailability] = [
     {
         "owner_email": "alice@example.com",
@@ -905,8 +904,8 @@ async def seed_provider_availability() -> tuple[int, int]:
         for fixture in FIXTURE_PROVIDER_AVAILABILITY:
             # The fixture declares `practice_name` as a convenience key
             # for the seeded Organization's name — it is NOT a column on
-            # Provider anymore (#524). Strip it before splatting the
-            # fixture dict into `Provider(**...)`.
+            # Provider. Strip it before splatting the fixture dict into
+            # `Provider(**...)`.
             provider_fields = dict(fixture["provider"])
             practice_name = provider_fields.pop("practice_name")
             owner_result = await session.execute(
@@ -1160,7 +1159,7 @@ class FixtureProgramAvailability(TypedDict):
     detail: dict[str, Any]
 
 
-# Program-availability post fixtures (#541). ``org_name`` + ``program_name``
+# Program-availability post fixtures. ``org_name`` + ``program_name``
 # match a Program seeded by :func:`seed_programs`; the seed looks them up
 # and skips if the Program isn't present. Mirrors PA fixtures'
 # idempotency shape.
@@ -1193,7 +1192,7 @@ FIXTURE_PROGRAM_AVAILABILITY: list[FixtureProgramAvailability] = [
 
 
 async def seed_program_availability() -> tuple[int, int]:
-    """Seed Program-availability posts (#541). Idempotent on
+    """Seed Program-availability posts. Idempotent on
     ``(kind='program_availability', owner_id, program_id)`` — re-running
     against an existing fixture skips."""
     created = 0

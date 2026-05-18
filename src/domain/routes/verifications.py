@@ -1,11 +1,10 @@
 """Bespoke router for the verification trigger endpoint.
 
 `Verification` has no EntitySpec — there's no public CRUD surface, the
-nightly job (#530) writes most rows, and the only HTTP entry point is
-this single admin-only retrigger. The bespoke shape follows
-`auth_pages` / `favorites` (see `src/domain/routes/README.md` §
-"Bespoke routes"); wired into `src/main.py` alongside the other
-hand-rolled routers.
+nightly job writes most rows, and the only HTTP entry point is this
+single admin-only retrigger. The bespoke shape follows `auth_pages` /
+`favorites` (see `src/domain/routes/README.md` § "Bespoke routes");
+wired into `src/main.py` alongside the other hand-rolled routers.
 
 Response shape: `201 Created` with the new `Verification` row's id and
 a `Location` header pointing at the (future) per-verification read

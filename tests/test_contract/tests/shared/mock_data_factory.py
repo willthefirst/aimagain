@@ -170,6 +170,44 @@ class MockDataFactory:
         }
 
     @classmethod
+    def create_organization_create_dependency_config(cls) -> Dict[str, Any]:
+        """Mock for the factory-built `_handle_create_organization`.
+
+        The route under test (`POST /organizations`) reads `id` off the
+        handler's return value to build the response body and the
+        `Location` / `HX-Redirect` headers. A `SimpleNamespace` exposing
+        `id` is sufficient. The framework stitches the auto-bound handler
+        onto the route module, so contract patches target
+        `src.domain.routes.organizations._handle_create_organization`.
+        """
+        stub_organization = SimpleNamespace(
+            id=UUID("88888888-8888-8888-8888-888888888888"),
+        )
+        return {
+            "src.domain.routes.organizations._handle_create_organization": {
+                "return_value_config": stub_organization
+            }
+        }
+
+    @classmethod
+    def create_program_create_dependency_config(cls) -> Dict[str, Any]:
+        """Mock for the factory-built `_handle_create_program`.
+
+        The route under test (`POST /programs`) reads `id` off the
+        handler's return value to build the response body and the
+        `Location` / `HX-Redirect` headers. A `SimpleNamespace` exposing
+        `id` is sufficient.
+        """
+        stub_program = SimpleNamespace(
+            id=UUID("99999999-9999-9999-9999-999999999999"),
+        )
+        return {
+            "src.domain.routes.programs._handle_create_program": {
+                "return_value_config": stub_program
+            }
+        }
+
+    @classmethod
     def create_provider_update_dependency_config(cls) -> Dict[str, Any]:
         """Mock for `handle_update_provider`.
 

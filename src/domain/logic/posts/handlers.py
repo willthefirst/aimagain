@@ -1,4 +1,4 @@
-"""Per-spec hook callables for the `Post` entity (#541).
+"""Per-spec hook callables for the `Post` entity.
 
 One callable today — :func:`_assert_post_payload_target_ownership` —
 driven by ``POST_ENTITY.payload_authz_path``. The post entity has no
@@ -8,12 +8,10 @@ entire wire-side authorization surface for posts.
 Why it dispatches on ``payload.kind``: two of the three kinds reference
 a cross-entity FK in the payload (``provider_availability.provider_id``
 points at a Provider; ``program_availability.program_id`` points at a
-Program — #541). Each needs the same "the requesting user must own the
-target row" check. The cleaner long-term shape is per-kind authz on
+Program). Each needs the same "the requesting user must own the target
+row" check. The cleaner long-term shape is per-kind authz on
 :class:`PostKindSpec` (registry-per-kind ``payload_authz_path``); a
 type-switching dispatcher is acceptable while the kind set is small.
-File as tech-debt if the dispatcher's branch count grows or a third
-kind needs the same shape.
 
 ``client_referral`` has no target FK and is intentionally skipped: a
 CR post describes a hypothetical client, not a row a third party owns.

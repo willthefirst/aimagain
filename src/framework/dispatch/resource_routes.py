@@ -23,10 +23,7 @@ backend write capability are independent.
 
 Sub-resources nest under a parent by setting `parent=parent_spec`. The
 mount functions walk the chain to build paths like
-`/providers/{provider_id}/licensures/{licensure_id}`. Parent-chain
-support lands incrementally; until slice 8 (#253) only `mount_delete`
-exists, and it asserts `parent is None` so callers don't silently fall
-into an unsupported case.
+`/providers/{provider_id}/licensures/{licensure_id}`.
 
 Adding a new mount function (e.g. `mount_list`, `mount_create`) follows
 the same pattern: read knobs from the spec, build the route, delegate to
@@ -146,9 +143,7 @@ class ResourceSpec:
         invoked by ``project_view`` to decide whether ``private_fields``
         should appear in the projected view. Required when
         ``private_fields`` is non-empty.
-      parent: another ``ResourceSpec`` for sub-resources. Slice 8 (#253)
-        wires this through; until then ``mount_delete`` asserts
-        ``parent is None``.
+      parent: another ``ResourceSpec`` for sub-resources.
     """
 
     collection: str

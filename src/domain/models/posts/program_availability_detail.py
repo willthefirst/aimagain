@@ -10,8 +10,8 @@ _TABLE = "program_availability_details"
 class ProgramAvailabilityDetail(Base):
     """1:1 detail row for posts of kind = 'program_availability'.
 
-    The Program-level equivalent of :class:`ProviderAvailabilityDetail`
-    (#541). The Program announces intake openings as a *group offering* —
+    The Program-level equivalent of :class:`ProviderAvailabilityDetail`.
+    The Program announces intake openings as a *group offering* —
     the referrer is choosing an intake door (the Program) and trusting
     the Org to assign a clinician internally. Distinct from
     ``provider_availability``, which names a specific clinician.

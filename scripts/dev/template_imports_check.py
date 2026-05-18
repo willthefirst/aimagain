@@ -10,7 +10,7 @@ Templates live in two roots:
   ``<a>/`` may only reference: a root-level file (``base.html``), its own
   ``<a>/``, ``_shared/`` (the cross-resource macro library), or ``views/``
   (the generic list/detail/form chrome). Anything else belongs in
-  ``_shared/`` (#206).
+  ``_shared/``.
 
 The check accepts ``files or directories``; with no args it scans both
 roots.

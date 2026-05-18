@@ -105,6 +105,43 @@ async def test_create_program_happy_path(
     assert rows[0].actor_id == logged_in_user.id
 
 
+async def test_create_program_with_blank_optional_form_fields_succeeds(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user: User,
+):
+    """Regression: ``programs/form_new.html`` posts blank optional
+    inputs as ``""`` — including ``description=``, ``start_date=``,
+    ``end_date=``, ``state_preference=`` (left at placeholder). Prior
+    to the model-level coercion on ``WirePayload``
+    (:func:`_coerce_blank_strings_on_nullable_scalars`), `date | None`
+    and `Literal[...] | None` 422'd before the `None` arm was even
+    considered — same class of bug as #550 on `parent_org_id`. Pin the
+    accepting behavior here so the next regression on `WirePayload`
+    surfaces at this layer."""
+    org_id = await _seed_org(db_test_session_manager, owner_id=logged_in_user.id)
+    response = await authenticated_client.post(
+        "/programs",
+        data=_program_payload(
+            org_id=org_id,
+            description="",
+            state_preference="",
+            start_date="",
+            end_date="",
+        ),
+    )
+    assert response.status_code == 201, response.text
+    new_id = uuid.UUID(response.json()["id"])
+
+    async with db_test_session_manager() as session:
+        loaded = await session.get(Program, new_id)
+        assert loaded is not None
+        assert loaded.description is None
+        assert loaded.state_preference is None
+        assert loaded.start_date is None
+        assert loaded.end_date is None
+
+
 async def test_create_program_rejects_org_owned_by_another_user(
     authenticated_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],

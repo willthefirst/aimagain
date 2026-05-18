@@ -119,8 +119,8 @@ def make_client_referral_detail(**overrides: Any) -> ClientReferralDetail:
 
 
 # Program-availability mirrors PA's shape: an FK to the target row plus the
-# same per-announcement field set (#541). Pydantic-side and ORM-side
-# factories below use the same defaults to keep round-trip tests aligned.
+# same per-announcement field set. Pydantic-side and ORM-side factories
+# below use the same defaults to keep round-trip tests aligned.
 
 _PROGRAM_AVAILABILITY_DEFAULTS: dict[str, Any] = {
     "description": None,
@@ -142,7 +142,7 @@ _STUB_PROGRAM_ID = uuid.UUID("00000000-0000-0000-0000-000000000002")
 
 
 def program_availability_payload(**overrides: Any) -> dict[str, Any]:
-    """Build a wire-valid `kind='program_availability'` create/update payload (#541).
+    """Build a wire-valid `kind='program_availability'` create/update payload.
     Returns a fresh dict each call. `program_id` defaults to a stub UUID
     that passes Pydantic validation but does *not* exist in the DB —
     tests that actually persist must pass a real program_id override."""
@@ -179,9 +179,9 @@ def make_provider_availability_detail(
     *, provider_id: UUID, **overrides: Any
 ) -> ProviderAvailabilityDetail:
     """Build a `ProviderAvailabilityDetail` ORM row with spec-compliant
-    defaults. `provider_id` is a required kwarg — PA points at a Provider
-    (#448), and forgetting the FK should be a `TypeError` at construction
-    rather than a NOT NULL violation at flush."""
+    defaults. `provider_id` is a required kwarg — PA points at a Provider,
+    and forgetting the FK should be a `TypeError` at construction rather
+    than a NOT NULL violation at flush."""
     return ProviderAvailabilityDetail(
         provider_id=provider_id, **{**_PROVIDER_AVAILABILITY_DEFAULTS, **overrides}
     )
@@ -245,9 +245,9 @@ def provider_payload(**overrides: Any) -> dict[str, Any]:
     Returns a fresh flat dict each call. Sub-entity arrays are intentionally
     omitted — credentials are added via the dedicated sub-resource endpoints.
 
-    ``org_id`` is required on the wire (#524). Callers that hit a real DB
-    must pass an existing Organization's id; pure schema-validation tests
-    that don't persist can pass any UUID."""
+    ``org_id`` is required on the wire. Callers that hit a real DB must
+    pass an existing Organization's id; pure schema-validation tests that
+    don't persist can pass any UUID."""
     return _drop_none({**_PROVIDER_DEFAULTS, **overrides})
 
 

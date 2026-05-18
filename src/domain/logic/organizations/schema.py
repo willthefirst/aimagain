@@ -1,13 +1,11 @@
 """Wire schemas for the `Organization` directory entity.
 
-PR 1 of the Org/Program roadmap (#516) — standalone `Organization`, no
-Provider-side fields here. `Read` exposes every persisted column,
-including the denormalized `root_org_id` (callers benefit from being
-able to filter subtrees client-side without a separate fetch). `Create`
-accepts only fields the client controls: `owner_id` and `root_org_id`
-are server-derived (owner from the requesting user; root from the
-parent chain per the repository invariant — see
-``src/domain/models/organizations/README.md``).
+`Read` exposes every persisted column, including the denormalized
+`root_org_id` (callers can filter subtrees client-side without a
+separate fetch). `Create` accepts only fields the client controls:
+`owner_id` and `root_org_id` are server-derived (owner from the
+requesting user; root from the parent chain per the repository
+invariant — see ``src/domain/models/organizations/README.md``).
 
 `Update` is a partial patch of the same client-controlled fields.
 Moving a node in the tree (`parent_org_id` change) is allowed via
@@ -47,6 +45,8 @@ class OrganizationCreate(WirePayload):
 
     name: Annotated[StrippedText, HtmlPattern(maxlength=200)]
     type: Literal[*ORGANIZATION_TYPES]
+    # Blank HTML form input (`""`) is coerced to `None` at the
+    # `WirePayload` layer — see `_coerce_blank_strings_on_nullable_scalars`.
     parent_org_id: uuid.UUID | None = None
 
 

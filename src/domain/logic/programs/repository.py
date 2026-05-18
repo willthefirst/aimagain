@@ -4,7 +4,7 @@ Mostly delegates to ``BaseRepository`` for the generic CRUD path the
 framework's mount layer calls. The one custom read — ``list_for_user``
 — mirrors :meth:`OrganizationRepository.list_for_user` /
 :meth:`ProviderRepository.list_for_user` so the same per-user scoping
-pattern works on the ``program_availability`` post form (#541).
+pattern works on the ``program_availability`` post form.
 """
 
 import uuid
@@ -21,11 +21,11 @@ class ProgramRepository(BaseRepository):
     async def list_for_user(self, user_id: uuid.UUID) -> Sequence[Program]:
         """Lists every Program owned by ``user_id``, newest first.
 
-        Mirrors :meth:`OrganizationRepository.list_for_user` (#524) and
+        Mirrors :meth:`OrganizationRepository.list_for_user` and
         :meth:`ProviderRepository.list_for_user`. Drives the
         ``program_availability`` post create/edit form's Program-picker
-        dropdown (#541) and pairs with the wire-level ownership check
-        in ``POST_ENTITY.payload_authz_path``."""
+        dropdown and pairs with the wire-level ownership check in
+        ``POST_ENTITY.payload_authz_path``."""
         stmt = (
             select(Program)
             .filter(Program.owner_id == user_id)

@@ -16,7 +16,8 @@ anything used by exactly one schema module today.
 """
 
 import re
-from typing import Annotated, ClassVar
+import types
+from typing import Annotated, ClassVar, Literal, Union, get_args, get_origin
 
 from pydantic import AfterValidator, BaseModel, ConfigDict, model_validator
 
@@ -78,6 +79,60 @@ ZipText = Annotated[
 StrippedOptionalText = Annotated[str | None, AfterValidator(_strip_optional)]
 
 
+# --- Empty-string-to-None coercion on nullable scalars ------------------
+
+
+def _peel_annotated(annotation):
+    """Annotated[X, ...] → X; pass through otherwise."""
+    if get_origin(annotation) is Annotated:
+        return get_args(annotation)[0]
+    return annotation
+
+
+def _is_blank_coercible_field(annotation) -> bool:
+    """True if `annotation` is `T | None` where ``T`` is a scalar that
+    can't honestly hold the empty string — UUID, date, int, float,
+    bool, Decimal, Literal, etc.
+
+    HTML forms can't omit a field — a blank ``<input>`` posts ``""``.
+    Pydantic's union resolution tries ``T`` first and 422s when ``""``
+    isn't a valid ``T``, never getting to the ``None`` arm. The
+    only correct interpretation of a blank input on a nullable
+    non-string scalar is ``None``, so coerce at the model layer
+    *before* per-field validation runs.
+
+    Skip ``str | None`` — empty string is itself a valid ``str``, and
+    blank-collapsing is opt-in via ``StrippedOptionalText`` where the
+    domain wants it.
+
+    Skip container types (``list``/``set``/``tuple``/``dict``) and
+    ``BaseModel`` subclasses — those never receive a bare empty
+    string from a form (their inputs are arrays or dicts), so the
+    coercion is a no-op anyway; declaring it as a no-op keeps the
+    detector honest rather than relying on the runtime value-shape
+    check downstream.
+    """
+    annotation = _peel_annotated(annotation)
+    origin = get_origin(annotation)
+    if origin not in (Union, types.UnionType):
+        return False
+    args = get_args(annotation)
+    non_none = [a for a in args if a is not type(None)]
+    if len(args) != 2 or len(non_none) != 1:
+        return False
+    inner = _peel_annotated(non_none[0])
+    if inner is str:
+        return False
+    inner_origin = get_origin(inner)
+    if inner_origin is Literal:
+        return True
+    if inner_origin in (list, set, tuple, dict, frozenset):
+        return False
+    if isinstance(inner, type) and issubclass(inner, BaseModel):
+        return False
+    return True
+
+
 # --- At-least-one-field rule --------------------------------------------
 
 
@@ -129,9 +184,31 @@ class WirePayload(BaseModel):
     of being silently dropped. PATCH/Update variants inherit
     :class:`PartialUpdate` instead — it owns the same config plus the
     at-least-one-field rule.
+
+    Every nullable non-string scalar field on a subclass automatically
+    gets the empty-string→None coercion documented on
+    :func:`_is_blank_coercible_field`. The rule applies once at this
+    layer so individual schemas don't reach for per-field
+    ``BeforeValidator`` aliases — the same way ``extra="forbid"`` is
+    declared once here rather than on each schema's ``model_config``.
     """
 
     model_config = ConfigDict(extra="forbid")
+
+    @model_validator(mode="before")
+    @classmethod
+    def _coerce_blank_strings_on_nullable_scalars(cls, data):
+        if not isinstance(data, dict):
+            return data
+        for name, field in cls.model_fields.items():
+            if name not in data:
+                continue
+            value = data[name]
+            if not isinstance(value, str) or value.strip() != "":
+                continue
+            if _is_blank_coercible_field(field.annotation):
+                data[name] = None
+        return data
 
 
 class ReadProjection(BaseModel):

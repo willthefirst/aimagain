@@ -477,7 +477,7 @@ CERTIFICATION_TYPES: Final[tuple[str, ...]] = (
     "other",
 )
 
-# Outcome of a single nightly verification attempt (#526). `verified` —
+# Outcome of a single nightly verification attempt. `verified` —
 # all checks passed; `needs_review` — a soft mismatch worth a human look
 # (e.g. NPPES name similarity below threshold); `failed` — a hard
 # disqualifier (NPI not in NPPES, or an OIG/LEIE match). One row per

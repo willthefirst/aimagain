@@ -27,8 +27,7 @@ class Program(BaseModel):
 
     No insurance fields here — intentional grammar. Insurance is
     modeled on the Provider (who delivers care) and on the Post (the
-    referral situation), not on the Program. PR 4 of the Org/Program
-    roadmap (#537).
+    referral situation), not on the Program.
     """
 
     __tablename__ = _TABLE
@@ -53,12 +52,10 @@ class Program(BaseModel):
         "Organization", back_populates="programs", lazy="selectin"
     )
 
-    # Reverse of ``ProgramAvailabilityDetail.program_id`` (#541). Posts
-    # of ``kind='program_availability'`` point at the Program via this
-    # FK; the relationship is rarely traversed from the Program side
-    # (templates dereference ``post.program_availability_detail.program``
-    # instead), but it pins the cascade contract and keeps the back-
-    # populated symmetry explicit.
+    # Reverse of ``ProgramAvailabilityDetail.program_id``. Rarely traversed
+    # from the Program side (templates dereference
+    # ``post.program_availability_detail.program`` instead), but it pins
+    # the cascade contract and keeps the back-populated symmetry explicit.
     program_availability_details = relationship(
         "ProgramAvailabilityDetail", back_populates="program"
     )

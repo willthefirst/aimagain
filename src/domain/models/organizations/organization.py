@@ -17,7 +17,7 @@ class Organization(BaseModel):
     systems, and solo-practice shells. ``Organization.name`` is the
     source of truth for the practice's display name; every Provider
     points at exactly one Org via ``Provider.org_id`` and templates
-    read ``provider.org.name`` directly (#524).
+    read ``provider.org.name`` directly.
 
     Hierarchy is modeled as a self-referential tree via ``parent_org_id``
     (nullable; a root org has ``parent_org_id IS NULL``). ``root_org_id``
@@ -54,12 +54,8 @@ class Organization(BaseModel):
         remote_side="Organization.id",
         foreign_keys=[parent_org_id],
     )
-    # Providers that belong to this Org. PR 2 of the roadmap (#520).
-    # Cascade is FK-side ``RESTRICT`` (deleting an Org with Providers
-    # fails loudly rather than silently orphaning); the ORM relationship
-    # is read-only from the Org side. PR 3+ adds the create form that
-    # picks an Org explicitly.
+    # FK-side ``RESTRICT`` on both relationships — deleting an Org with
+    # Providers or Programs fails loudly rather than silently orphaning.
+    # ORM relationships are read-only from the Org side.
     providers = relationship("Provider", back_populates="org")
-    # Programs that belong to this Org. PR 4 of the roadmap (#537).
-    # Same ``RESTRICT`` FK posture as ``providers``.
     programs = relationship("Program", back_populates="organization")

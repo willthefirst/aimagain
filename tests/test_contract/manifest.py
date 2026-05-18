@@ -7,7 +7,9 @@ from typing import Any, Callable, Optional
 import pytest
 
 from .infrastructure.servers.consumer import (
+    _setup_organization_create_form_stub,
     _setup_post_owner_actions_stub,
+    _setup_program_create_form_stub,
     _setup_provider_create_form_stub,
     _setup_provider_edit_form_stub,
     _setup_users_admin_actions_stub,
@@ -87,6 +89,24 @@ CONTRACT_PAIRS: list[ContractPair] = [
         consumer_setup_fn=_setup_provider_edit_form_stub,
         provider_state="Provider 44444444-4444-4444-4444-444444444444 exists and is owned by the requester",
         pytest_marks=(pytest.mark.provider, pytest.mark.providers),
+    ),
+    ContractPair(
+        consumer_name="organization-create-form",
+        provider_name="organizations-api",
+        pact_port=1241,
+        handler_mocks_factory=MockDataFactory.create_organization_create_dependency_config,
+        consumer_setup_fn=_setup_organization_create_form_stub,
+        provider_state="User can create an organization",
+        pytest_marks=(pytest.mark.provider, pytest.mark.organizations),
+    ),
+    ContractPair(
+        consumer_name="program-create-form",
+        provider_name="programs-api",
+        pact_port=1242,
+        handler_mocks_factory=MockDataFactory.create_program_create_dependency_config,
+        consumer_setup_fn=_setup_program_create_form_stub,
+        provider_state="User can create a program",
+        pytest_marks=(pytest.mark.provider, pytest.mark.programs),
     ),
 ]
 
