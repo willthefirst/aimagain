@@ -15,8 +15,8 @@ from src.domain.models import (
     POST_KINDS,
     Post,
 )
-from src.domain.models.posts.client_referral_detail import ClientReferralDetail
 from src.domain.models.posts.post_kinds import PostKindSpec
+from src.domain.models.posts.referral_detail import ReferralDetail
 from src.domain.routes import posts as posts_routes
 
 
@@ -98,7 +98,7 @@ def test_explicit_template_paths_override_convention():
     — passing `create_template="..."` skips the default."""
     spec = PostKindSpec(
         name="weird",
-        detail_model=ClientReferralDetail,
+        detail_model=ReferralDetail,
         detail_relationship="weird_detail",
         detail_fields=(),
         list_label="weird",

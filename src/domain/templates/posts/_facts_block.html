@@ -22,8 +22,8 @@ Two modes:
     shown in expanded mode — the headline still carries it but the
     detail page is detail-y enough to repeat it as a labeled row.
 
-The ages row is labeled ``Age`` for `client_referral` (one seeker) and
-``Ages`` for `provider_availability` / `program_availability` (cohort
+The ages row is labeled ``Age`` for `referral` (one seeker) and
+``Ages`` for `opening` / `program_availability` (cohort
 the practice accepts). The row renders at most once per card — the
 ``location_chunk and not expanded`` branch above takes precedence on
 list cards (where the headline already carries the age + gender combo
@@ -46,20 +46,19 @@ Reads from `view` (the `post_card_view` dict). Display-label dicts
       {%- if view.location_chunk.city -%}{{ view.location_chunk.city }}, {% endif -%}{{ view.location_chunk.state }}
     </dd></div>
     {%- elif view.ages %}
-    {#- Label is kind-aware: a `client_referral` post represents a
-        single seeker (one Age), while `provider_availability` and
-        `program_availability` describe a cohort the practice/program
-        accepts (Ages, plural). -#}
-    <div><dt>{% if view.kind == "client_referral" %}Age{% else %}Ages{% endif %}</dt><dd>
+    {#- Label is kind-aware: a `referral` post represents a single
+        seeker (one Age), while `opening` and `program_availability`
+        describe a cohort the practice/program accepts (Ages, plural). -#}
+    <div><dt>{% if view.kind == "referral" %}Age{% else %}Ages{% endif %}</dt><dd>
       {%- set ages = [] -%}
       {%- for g in view.ages -%}{%- set _ = ages.append(CLIENT_AGE_GROUP_LABELS[g]) -%}{%- endfor -%}
       {{ ages | join(", ") }}
     </dd></div>
     {%- endif %}
-    {%- if view.genders and (expanded or view.kind != "client_referral") %}
+    {%- if view.genders and (expanded or view.kind != "referral") %}
     {#- Compact mode hides CR gender (it's in the headline). Expanded
         mode shows it for every kind that has one. -#}
-    <div><dt>{% if view.kind == "client_referral" %}Gender{% else %}Genders{% endif %}</dt><dd>
+    <div><dt>{% if view.kind == "referral" %}Gender{% else %}Genders{% endif %}</dt><dd>
       {%- set gs = [] -%}
       {%- for g in view.genders -%}{%- set _ = gs.append(GENDER_LABELS[g]) -%}{%- endfor -%}
       {{ gs | join(", ") }}

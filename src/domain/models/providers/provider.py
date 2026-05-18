@@ -29,7 +29,7 @@ class Provider(LocationMixin, BaseModel):
     lists (licensures, educations, certifications) via cascade. A user may
     own multiple `Provider` rows — `uq_provider_profiles_user_id` was
     dropped in `8f20a93effc9` to allow it — so the `owner_id` FK is
-    intentionally non-unique. Distinct from `ProviderAvailabilityDetail`,
+    intentionally non-unique. Distinct from `OpeningDetail`,
     which is a per-Post detail row tied to one outreach `Post`.
 
     Inherits the ``(city, state, zip)`` location columns from

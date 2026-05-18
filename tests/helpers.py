@@ -7,15 +7,15 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 # Need ORM models
 from src.domain.models import (
-    ClientReferralDetail,
+    OpeningDetail,
     Organization,
     Program,
     ProgramAvailabilityDetail,
     Provider,
-    ProviderAvailabilityDetail,
     ProviderCertification,
     ProviderEducation,
     ProviderLicensure,
+    ReferralDetail,
     User,
 )
 
@@ -50,7 +50,7 @@ def create_test_user(
 # exercise route / repo / schema behavior, so these factories supply
 # spec-compliant defaults and let callers override per field.
 
-_CLIENT_REFERRAL_DEFAULTS: dict[str, Any] = {
+_REFERRAL_DEFAULTS: dict[str, Any] = {
     "location_city": "Springfield",
     "location_state": "IL",
     "location_zip": "62701",
@@ -67,7 +67,7 @@ _CLIENT_REFERRAL_DEFAULTS: dict[str, Any] = {
     "insurance_carrier": None,
 }
 
-_PROVIDER_AVAILABILITY_DEFAULTS: dict[str, Any] = {
+_OPENING_DEFAULTS: dict[str, Any] = {
     "description": None,
     "referral_instructions": None,
     "website": None,
@@ -88,11 +88,11 @@ _PROVIDER_AVAILABILITY_DEFAULTS: dict[str, Any] = {
 }
 
 
-def client_referral_payload(**overrides: Any) -> dict[str, Any]:
-    """Build a wire-valid `kind='client_referral'` create/update payload.
+def referral_payload(**overrides: Any) -> dict[str, Any]:
+    """Build a wire-valid `kind='referral'` create/update payload.
     Returns a fresh dict each call. Pass overrides by field name to
     customize."""
-    return {"kind": "client_referral", **_CLIENT_REFERRAL_DEFAULTS, **overrides}
+    return {"kind": "referral", **_REFERRAL_DEFAULTS, **overrides}
 
 
 # Stub provider_id for schema-validation tests that never hit the DB.
@@ -100,22 +100,22 @@ def client_referral_payload(**overrides: Any) -> dict[str, Any]:
 _STUB_PROVIDER_ID = uuid.UUID("00000000-0000-0000-0000-000000000001")
 
 
-def provider_availability_payload(**overrides: Any) -> dict[str, Any]:
-    """Build a wire-valid `kind='provider_availability'` create/update payload.
+def opening_payload(**overrides: Any) -> dict[str, Any]:
+    """Build a wire-valid `kind='opening'` create/update payload.
     Returns a fresh dict each call. `provider_id` defaults to a stub UUID
     that passes Pydantic validation but does *not* exist in the DB —
     tests that actually persist must pass a real provider_id override."""
     return {
-        "kind": "provider_availability",
+        "kind": "opening",
         "provider_id": str(_STUB_PROVIDER_ID),
-        **_PROVIDER_AVAILABILITY_DEFAULTS,
+        **_OPENING_DEFAULTS,
         **overrides,
     }
 
 
-def make_client_referral_detail(**overrides: Any) -> ClientReferralDetail:
-    """Build a `ClientReferralDetail` ORM row with spec-compliant defaults."""
-    return ClientReferralDetail(**{**_CLIENT_REFERRAL_DEFAULTS, **overrides})
+def make_referral_detail(**overrides: Any) -> ReferralDetail:
+    """Build a `ReferralDetail` ORM row with spec-compliant defaults."""
+    return ReferralDetail(**{**_REFERRAL_DEFAULTS, **overrides})
 
 
 # Program-availability mirrors PA's shape: an FK to the target row plus the
@@ -161,7 +161,7 @@ def make_program_availability_detail(
     defaults. `program_id` is a required kwarg — making it required
     turns "I forgot the FK" into a `TypeError` at the factory call site
     instead of a `NOT NULL` violation at flush time (mirrors
-    :func:`make_provider_availability_detail`)."""
+    :func:`make_opening_detail`)."""
     return ProgramAvailabilityDetail(
         program_id=program_id, **{**_PROGRAM_AVAILABILITY_DEFAULTS, **overrides}
     )
@@ -175,16 +175,12 @@ def make_program(
     return Program(owner_id=owner_id, org_id=org_id, name=name, **overrides)
 
 
-def make_provider_availability_detail(
-    *, provider_id: UUID, **overrides: Any
-) -> ProviderAvailabilityDetail:
-    """Build a `ProviderAvailabilityDetail` ORM row with spec-compliant
+def make_opening_detail(*, provider_id: UUID, **overrides: Any) -> OpeningDetail:
+    """Build a `OpeningDetail` ORM row with spec-compliant
     defaults. `provider_id` is a required kwarg — PA points at a Provider,
     and forgetting the FK should be a `TypeError` at construction rather
     than a NOT NULL violation at flush."""
-    return ProviderAvailabilityDetail(
-        provider_id=provider_id, **{**_PROVIDER_AVAILABILITY_DEFAULTS, **overrides}
-    )
+    return OpeningDetail(provider_id=provider_id, **{**_OPENING_DEFAULTS, **overrides})
 
 
 # --- Provider + credential sub-table factories ---------------------------

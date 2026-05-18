@@ -34,13 +34,13 @@ import sqlalchemy
 
 from src.domain.logic.users.schema import UserRead
 from src.domain.models import POST_KINDS
-from src.domain.models.posts.client_referral_detail import ClientReferralDetail
+from src.domain.models.posts.opening_detail import (
+    OpeningDetail,
+)
 from src.domain.models.posts.program_availability_detail import (
     ProgramAvailabilityDetail,
 )
-from src.domain.models.posts.provider_availability_detail import (
-    ProviderAvailabilityDetail,
-)
+from src.domain.models.posts.referral_detail import ReferralDetail
 
 # Per-kind detail model — keyed by the same discriminator that
 # `POST_KINDS` uses. Lives in test code (not the production spec) so
@@ -49,8 +49,8 @@ from src.domain.models.posts.provider_availability_detail import (
 # entry to `_ENUM_DEFAULTS` (if the new detail row has CHECK-Text
 # columns).
 _DETAIL_MODELS: dict[str, type] = {
-    "client_referral": ClientReferralDetail,
-    "provider_availability": ProviderAvailabilityDetail,
+    "referral": ReferralDetail,
+    "opening": OpeningDetail,
     "program_availability": ProgramAvailabilityDetail,
 }
 
@@ -69,7 +69,7 @@ _DETAIL_MODELS: dict[str, type] = {
 # on the linked Provider / Program rather than on the detail row
 # itself.
 _ENUM_DEFAULTS: dict[str, dict[str, Any]] = {
-    "client_referral": {
+    "referral": {
         "location_in_person": "no",
         "location_virtual": "no",
         "gender": "prefer_not_to_say",
@@ -81,7 +81,7 @@ _ENUM_DEFAULTS: dict[str, dict[str, Any]] = {
         # ...`) renders nothing.
         "insurance_carrier": None,
     },
-    "provider_availability": {},
+    "opening": {},
     "program_availability": {},
 }
 

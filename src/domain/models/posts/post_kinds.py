@@ -5,9 +5,9 @@ from typing import Final
 
 from src.framework.persistence.polymorphic import DiscriminatorRegistry
 
-from .client_referral_detail import ClientReferralDetail
+from .opening_detail import OpeningDetail
 from .program_availability_detail import ProgramAvailabilityDetail
-from .provider_availability_detail import ProviderAvailabilityDetail
+from .referral_detail import ReferralDetail
 
 
 @dataclass(frozen=True)
@@ -56,18 +56,18 @@ def _detail_fields(detail_model: type) -> tuple[str, ...]:
 POST_KINDS: Final[DiscriminatorRegistry[PostKindSpec]] = DiscriminatorRegistry(
     column="kind",
     specs={
-        "client_referral": PostKindSpec(
-            name="client_referral",
-            detail_model=ClientReferralDetail,
-            detail_relationship="client_referral_detail",
-            detail_fields=_detail_fields(ClientReferralDetail),
+        "referral": PostKindSpec(
+            name="referral",
+            detail_model=ReferralDetail,
+            detail_relationship="referral_detail",
+            detail_fields=_detail_fields(ReferralDetail),
             list_label="client referral",
         ),
-        "provider_availability": PostKindSpec(
-            name="provider_availability",
-            detail_model=ProviderAvailabilityDetail,
-            detail_relationship="provider_availability_detail",
-            detail_fields=_detail_fields(ProviderAvailabilityDetail),
+        "opening": PostKindSpec(
+            name="opening",
+            detail_model=OpeningDetail,
+            detail_relationship="opening_detail",
+            detail_fields=_detail_fields(OpeningDetail),
             list_label="provider availability",
         ),
         "program_availability": PostKindSpec(

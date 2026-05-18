@@ -145,7 +145,7 @@ async def handle_create(
         # Read detail fields off the serialized dump, not via
         # ``getattr``, so wire-flat / schema-nested fields (e.g. the
         # post-#451 ``location: Location`` value object on
-        # :class:`ClientReferralCreate`, which serializes back to flat
+        # :class:`ReferralCreate`, which serializes back to flat
         # ``location_city`` / ``location_state`` / ``location_zip`` keys
         # via ``flatten_location_on_dump``) line up with the ORM
         # model's flat columns enumerated in ``detail_fields``.

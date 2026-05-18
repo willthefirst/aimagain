@@ -7,45 +7,43 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from src.domain.models import (
-    ClientReferralDetail,
+    OpeningDetail,
     Post,
     Program,
     Provider,
-    ProviderAvailabilityDetail,
+    ReferralDetail,
     User,
 )
 from src.framework.audit.repository import AuditRepository
 from tests.helpers import (
-    client_referral_payload,
     create_test_user,
-    make_client_referral_detail,
+    make_opening_detail,
     make_organization_row,
     make_program,
-    make_provider_availability_detail,
     make_provider_with_org,
+    make_referral_detail,
+    opening_payload,
     program_availability_payload,
     promote_to_admin,
-    provider_availability_payload,
+    referral_payload,
 )
 
 # Mark all tests in this module as async
 pytestmark = pytest.mark.asyncio
 
 
-def _client_referral_post(*, description: str, owner_id, **overrides) -> Post:
-    """Build a `kind='client_referral'` Post + its spec-compliant detail.
+def _referral_post(*, description: str, owner_id, **overrides) -> Post:
+    """Build a `kind='referral'` Post + its spec-compliant detail.
     Per-field overrides flow through to the detail row."""
-    post = Post(kind="client_referral", owner_id=owner_id)
-    post.client_referral_detail = make_client_referral_detail(
-        description=description, **overrides
-    )
+    post = Post(kind="referral", owner_id=owner_id)
+    post.referral_detail = make_referral_detail(description=description, **overrides)
     return post
 
 
-def _provider_availability_post(
+def _opening_post(
     *, practice_name: str, owner_id, provider: Provider | None = None, **overrides
 ) -> Post:
-    """Build a `kind='provider_availability'` Post + its spec-compliant
+    """Build a `kind='opening'` Post + its spec-compliant
     detail + the linked Provider profile. The Provider is auto-created
     with the given `practice_name` unless one is passed explicitly.
     SQLAlchemy save-update cascade persists the Provider when the Post
@@ -57,17 +55,17 @@ def _provider_availability_post(
         )
     if provider.id is None:
         provider.id = uuid.uuid4()
-    post = Post(kind="provider_availability", owner_id=owner_id)
-    detail = make_provider_availability_detail(provider_id=provider.id, **overrides)
+    post = Post(kind="opening", owner_id=owner_id)
+    detail = make_opening_detail(provider_id=provider.id, **overrides)
     # Wire the Provider through the relationship so save-update cascade
     # persists it when the Post is added to a session.
     detail.provider = provider
-    post.provider_availability_detail = detail
+    post.opening_detail = detail
     return post
 
 
 def _make_test_post(owner: User, *, description: str | None = None) -> Post:
-    return _client_referral_post(
+    return _referral_post(
         description=description or f"post-{uuid.uuid4()}",
         owner_id=owner.id,
     )
@@ -76,12 +74,12 @@ def _make_test_post(owner: User, *, description: str | None = None) -> Post:
 # --- Listing -------------------------------------------------------------
 
 
-async def test_list_client_referral_item_shape(
+async def test_list_referral_item_shape(
     authenticated_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user: User,
 ):
-    """A `client_referral` renders as a card `<article>` in
+    """A `referral` renders as a card `<article>` in
     `#posts-list`. The header reads "<Age noun> <gender> (<range>)"
     (e.g. "Adolescent male (14–18)") and links to the detail page;
     state is demoted to the demographics column as a `📍 City, ST`
@@ -93,7 +91,7 @@ async def test_list_client_referral_item_shape(
     the CSS turns into a 4px left-edge color)."""
     author = create_test_user(username=f"author-{uuid.uuid4()}")
     description = f"item-{uuid.uuid4()}"
-    post = _client_referral_post(
+    post = _referral_post(
         description=description,
         owner_id=author.id,
         location_city="Seattle",
@@ -117,7 +115,7 @@ async def test_list_client_referral_item_shape(
     tree = HTMLParser(response.text)
     item = tree.css_first("#posts-list > article")
     assert item is not None
-    assert item.attributes.get("data-kind") == "client_referral"
+    assert item.attributes.get("data-kind") == "referral"
 
     # Header line: link text is the age + gender combo (no state —
     # state moved to the demographics column for CR). Modality chips
@@ -173,19 +171,19 @@ async def test_list_client_referral_item_shape(
     assert mailto.text(strip=True) == "Email"
 
 
-async def test_list_client_referral_header_is_age_gender_combo(
+async def test_list_referral_header_is_age_gender_combo(
     authenticated_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user: User,
 ):
-    """The `client_referral` card header reads `<Age noun> [<gender>]
+    """The `referral` card header reads `<Age noun> [<gender>]
     (<range>)` — the age + gender combo is the identity for a CR (CR
     posts have no client name). Gender values that don't slot in
     (`prefer_not_to_say`, `gender_diverse`) drop the gender word, and
     the headline becomes `<Age noun> (<range>)`. State lives in the
     demographics column (a location chunk), not in the header."""
     author = create_test_user(username=f"author-{uuid.uuid4()}")
-    post = _client_referral_post(
+    post = _referral_post(
         description="",
         owner_id=author.id,
         location_city="Boise",
@@ -213,12 +211,12 @@ async def test_list_client_referral_header_is_age_gender_combo(
     assert location.css_first("dd").text(strip=True) == "Boise, ID"
 
 
-async def test_list_provider_availability_item_shape(
+async def test_list_opening_item_shape(
     authenticated_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user: User,
 ):
-    """A `provider_availability` card header is `{practice_name},
+    """A `opening` card header is `{practice_name},
     {state} ({format})` — PA posts identify by their practice, so the
     practice name fills the title slot (the `Provider Availability`
     kind label would be redundant noise). Kind is signaled by the
@@ -227,7 +225,7 @@ async def test_list_provider_availability_item_shape(
     provider's `in_network_carriers` (non-empty wins the badge)."""
     author = create_test_user(username=f"author-{uuid.uuid4()}")
     practice_name = f"Practice-{uuid.uuid4()}"
-    post = _provider_availability_post(
+    post = _opening_post(
         practice_name=practice_name,
         owner_id=author.id,
         provider=make_provider_with_org(
@@ -245,7 +243,7 @@ async def test_list_provider_availability_item_shape(
     async with db_test_session_manager() as session:
         async with session.begin():
             session.add(author)
-            session.add(post.provider_availability_detail.provider)
+            session.add(post.opening_detail.provider)
             session.add(post)
 
     response = await authenticated_client.get("/posts")
@@ -253,7 +251,7 @@ async def test_list_provider_availability_item_shape(
     tree = HTMLParser(response.text)
     item = tree.css_first("#posts-list > article")
     assert item is not None
-    assert item.attributes.get("data-kind") == "provider_availability"
+    assert item.attributes.get("data-kind") == "opening"
 
     # No text kind-chip in the listing row.
     assert item.css_first("[data-kind-chip]") is None
@@ -291,19 +289,19 @@ async def test_list_services_column_heading_is_kind_aware(
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user: User,
 ):
-    """The left-column heading reads "Seeking" for `client_referral`
-    and "Providing" for `provider_availability`. The generic "Services"
+    """The left-column heading reads "Seeking" for `referral`
+    and "Providing" for `opening`. The generic "Services"
     label carried opposite meanings on the two kinds (what the post is
     asking for vs. what the post is offering); the verb forms reuse
     the chip vocabulary that already names the left-edge colors."""
     author = create_test_user(username=f"author-{uuid.uuid4()}")
-    cr_post = _client_referral_post(
+    cr_post = _referral_post(
         description="cr",
         owner_id=author.id,
         services=["psychotherapy"],
     )
     pa_practice = f"Practice-{uuid.uuid4()}"
-    pa_post = _provider_availability_post(
+    pa_post = _opening_post(
         practice_name=pa_practice,
         owner_id=author.id,
         services=["psychotherapy"],
@@ -312,7 +310,7 @@ async def test_list_services_column_heading_is_kind_aware(
     async with db_test_session_manager() as session:
         async with session.begin():
             session.add(author)
-            session.add(pa_post.provider_availability_detail.provider)
+            session.add(pa_post.opening_detail.provider)
             session.add(cr_post)
             session.add(pa_post)
 
@@ -337,11 +335,11 @@ async def test_list_services_priority_sorted_psychotherapy_and_medmgmt_first(
     list regardless of storage order — they're the two services a
     reader is overwhelmingly likeliest to be scanning for, so they get
     top billing. The remaining services follow in
-    `CLIENT_REFERRAL_SERVICES` declaration order."""
+    `REFERRAL_SERVICES` declaration order."""
     author = create_test_user(username=f"author-{uuid.uuid4()}")
     # Storage order puts the priority items last; the template must
     # re-order so they appear first regardless of input order.
-    post = _client_referral_post(
+    post = _referral_post(
         description="cr",
         owner_id=author.id,
         services=[
@@ -377,13 +375,13 @@ async def test_list_demographics_diverge_by_kind(
     center column carries the "Ages" cohort chunk (and a "Genders"
     chunk when set), no location row."""
     author = create_test_user(username=f"author-{uuid.uuid4()}")
-    cr_post = _client_referral_post(
+    cr_post = _referral_post(
         description="cr",
         owner_id=author.id,
         age_groups=["adolescents_14_18"],
     )
     pa_practice = f"Practice-{uuid.uuid4()}"
-    pa_post = _provider_availability_post(
+    pa_post = _opening_post(
         practice_name=pa_practice,
         owner_id=author.id,
         age_groups=["adolescents_14_18", "adults_25_64"],
@@ -391,7 +389,7 @@ async def test_list_demographics_diverge_by_kind(
     async with db_test_session_manager() as session:
         async with session.begin():
             session.add(author)
-            session.add(pa_post.provider_availability_detail.provider)
+            session.add(pa_post.opening_detail.provider)
             session.add(cr_post)
             session.add(pa_post)
 
@@ -419,21 +417,21 @@ async def test_list_pa_footer_carries_email_cta_only(
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user: User,
 ):
-    """For a `provider_availability` card the footer band carries just
+    """For a `opening` card the footer band carries just
     the Email CTA — practice name is already in the headline, so the
     footer doesn't re-name the contact. The CTA is a Pico-styled
     `role="button"` anchor with the visible label "Email"; the raw
     address is in the `href` only."""
     author = create_test_user(username=f"author-{uuid.uuid4()}")
     practice_name = f"Practice-{uuid.uuid4()}"
-    post = _provider_availability_post(
+    post = _opening_post(
         practice_name=practice_name,
         owner_id=author.id,
     )
     async with db_test_session_manager() as session:
         async with session.begin():
             session.add(author)
-            session.add(post.provider_availability_detail.provider)
+            session.add(post.opening_detail.provider)
             session.add(post)
 
     response = await authenticated_client.get("/posts")
@@ -473,7 +471,7 @@ async def test_list_does_not_render_description_prose(
         "Looking for a long-term outpatient therapist for a 17-year-old "
         "(she/her) with complex PTSD. Aetna in-network preferred."
     )
-    post = _client_referral_post(description=description, owner_id=author.id)
+    post = _referral_post(description=description, owner_id=author.id)
     async with db_test_session_manager() as session:
         async with session.begin():
             session.add(author)
@@ -509,7 +507,7 @@ async def test_list_meta_is_a_dl_of_labeled_key_value_chunks(
     `<p>` with the bare username (no `@` prefix), matching how PA
     renders the practice name."""
     author = create_test_user(username=f"author-{uuid.uuid4()}")
-    post = _client_referral_post(
+    post = _referral_post(
         description="meta-shape",
         owner_id=author.id,
         location_city="Seattle",
@@ -587,7 +585,7 @@ async def test_list_renders_readable_date_format(
     from datetime import datetime, timezone
 
     author = create_test_user(username=f"author-{uuid.uuid4()}")
-    post = _client_referral_post(description="d", owner_id=author.id)
+    post = _referral_post(description="d", owner_id=author.id)
     # Force a known timestamp so the format assertion is stable.
     post.created_at = datetime(2025, 5, 15, 14, 30, tzinfo=timezone.utc)
     async with db_test_session_manager() as session:
@@ -618,7 +616,7 @@ async def test_detail_renders_breadcrumb(
     the page toolbar. The trailing `<li>` is marked `aria-current="page"`
     so screen readers identify it as the current page; visual styling
     comes from Pico's `nav[aria-label="breadcrumb"]` defaults."""
-    post = _client_referral_post(description="crumb-x", owner_id=logged_in_user.id)
+    post = _referral_post(description="crumb-x", owner_id=logged_in_user.id)
     async with db_test_session_manager() as session:
         async with session.begin():
             session.add(post)
@@ -650,18 +648,18 @@ async def test_detail_omits_kind_chip_and_meta_line(
     <user> · <date>" meta line — the breadcrumb above and the kind-
     colored left edge already convey kind + collection context, so
     repeating it as a chip in the card body is redundant."""
-    cr_post = _client_referral_post(
+    cr_post = _referral_post(
         description="cr",
         owner_id=logged_in_user.id,
         location_city="Boise",
         location_state="ID",
     )
-    pa_post = _provider_availability_post(
+    pa_post = _opening_post(
         practice_name=f"Practice-{uuid.uuid4()}", owner_id=logged_in_user.id
     )
     async with db_test_session_manager() as session:
         async with session.begin():
-            session.add(pa_post.provider_availability_detail.provider)
+            session.add(pa_post.opening_detail.provider)
             session.add(cr_post)
             session.add(pa_post)
         await session.refresh(cr_post)
@@ -680,12 +678,12 @@ async def test_detail_age_label_is_singular_for_cr_and_appears_once(
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user: User,
 ):
-    """A `client_referral` post represents one seeker, so the
+    """A `referral` post represents one seeker, so the
     demographics row labels their age cohort as ``Age`` (singular) and
     renders the row exactly once. The duplicate row that existed pre-
     refactor (one from the location/age elif, one from a CR-specific
     expanded block) was a bug."""
-    post = _client_referral_post(
+    post = _referral_post(
         description="age-label",
         owner_id=logged_in_user.id,
         age_groups=["adults_25_64"],
@@ -711,17 +709,17 @@ async def test_detail_ages_label_is_plural_for_pa_and_appears_once(
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user: User,
 ):
-    """A `provider_availability` post advertises a cohort the practice
+    """An `opening` post advertises a cohort the practice
     accepts, so the demographics row labels it ``Ages`` (plural) and
     renders the row exactly once."""
-    post = _provider_availability_post(
+    post = _opening_post(
         practice_name=f"Practice-{uuid.uuid4()}",
         owner_id=logged_in_user.id,
         age_groups=["adolescents_14_18", "adults_25_64"],
     )
     async with db_test_session_manager() as session:
         async with session.begin():
-            session.add(post.provider_availability_detail.provider)
+            session.add(post.opening_detail.provider)
             session.add(post)
         await session.refresh(post)
         post_id = post.id
@@ -822,7 +820,7 @@ async def test_non_owner_cannot_patch_post(
 ):
     """A non-owner non-admin gets 403 and the post is not mutated."""
     other = create_test_user(username=f"other-{uuid.uuid4()}")
-    post = _client_referral_post(description="orig", owner_id=other.id)
+    post = _referral_post(description="orig", owner_id=other.id)
     async with db_test_session_manager() as session:
         async with session.begin():
             session.add(other)
@@ -830,14 +828,14 @@ async def test_non_owner_cannot_patch_post(
 
     response = await authenticated_client.patch(
         f"/posts/{post.id}",
-        data={"kind": "client_referral", "description": "hijack"},
+        data={"kind": "referral", "description": "hijack"},
     )
     assert response.status_code == 403
 
     async with db_test_session_manager() as session:
         result = await session.execute(select(Post).filter(Post.id == post.id))
         refreshed = result.scalars().first()
-        assert refreshed.client_referral_detail.description == "orig"
+        assert refreshed.referral_detail.description == "orig"
 
 
 async def test_admin_can_patch_anyone_post(
@@ -847,7 +845,7 @@ async def test_admin_can_patch_anyone_post(
 ):
     await promote_to_admin(db_test_session_manager, logged_in_user.email)
     other = create_test_user(username=f"other-{uuid.uuid4()}")
-    post = _client_referral_post(description="orig", owner_id=other.id)
+    post = _referral_post(description="orig", owner_id=other.id)
     async with db_test_session_manager() as session:
         async with session.begin():
             session.add(other)
@@ -855,7 +853,7 @@ async def test_admin_can_patch_anyone_post(
 
     response = await authenticated_client.patch(
         f"/posts/{post.id}",
-        data={"kind": "client_referral", "description": "moderated"},
+        data={"kind": "referral", "description": "moderated"},
     )
     assert response.status_code == 200
     assert response.json()["description"] == "moderated"
@@ -942,28 +940,26 @@ async def test_list_filters_by_kind_seeking(
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user: User,
 ):
-    """`?kind=client_referral` keeps only seeking posts; the kind
+    """`?kind=referral` keeps only seeking posts; the kind
     `<select>` preselects the matching option."""
     author = create_test_user(username=f"author-{uuid.uuid4()}")
-    referral = _client_referral_post(
-        description=f"ref-{uuid.uuid4()}", owner_id=author.id
-    )
-    availability = _provider_availability_post(
+    referral = _referral_post(description=f"ref-{uuid.uuid4()}", owner_id=author.id)
+    availability = _opening_post(
         practice_name=f"clinic-{uuid.uuid4()}", owner_id=author.id
     )
     async with db_test_session_manager() as session:
         async with session.begin():
             session.add(author)
-            session.add(availability.provider_availability_detail.provider)
+            session.add(availability.opening_detail.provider)
             session.add(referral)
             session.add(availability)
 
-    response = await authenticated_client.get("/posts?kind=client_referral")
+    response = await authenticated_client.get("/posts?kind=referral")
     assert response.status_code == 200
     tree = HTMLParser(response.text)
     rows = tree.css("#posts-list > article")
     assert len(rows) == 1
-    assert rows[0].attributes.get("data-kind") == "client_referral"
+    assert rows[0].attributes.get("data-kind") == "referral"
     # The toolbar's filter link summarizes the active filter inline.
     link = tree.css_first("a.toolbar-filter-link")
     assert link is not None
@@ -990,15 +986,11 @@ async def test_list_filters_by_free_text_q_across_both_detail_tables(
     logged_in_user: User,
 ):
     """`?q=needle` finds posts whose description matches on either
-    `client_referral_detail` or `provider_availability_detail`."""
+    `referral_detail` or `opening_detail`."""
     author = create_test_user(username=f"author-{uuid.uuid4()}")
-    seeking_match = _client_referral_post(
-        description="needle-in-seeking", owner_id=author.id
-    )
-    seeking_miss = _client_referral_post(
-        description="haystack-only-here", owner_id=author.id
-    )
-    offering_match = _provider_availability_post(
+    seeking_match = _referral_post(description="needle-in-seeking", owner_id=author.id)
+    seeking_miss = _referral_post(description="haystack-only-here", owner_id=author.id)
+    offering_match = _opening_post(
         practice_name=f"clinic-{uuid.uuid4()}",
         owner_id=author.id,
         description="needle-in-offering",
@@ -1006,7 +998,7 @@ async def test_list_filters_by_free_text_q_across_both_detail_tables(
     async with db_test_session_manager() as session:
         async with session.begin():
             session.add(author)
-            session.add(offering_match.provider_availability_detail.provider)
+            session.add(offering_match.opening_detail.provider)
             session.add(seeking_match)
             session.add(seeking_miss)
             session.add(offering_match)
@@ -1019,7 +1011,7 @@ async def test_list_filters_by_free_text_q_across_both_detail_tables(
     # `haystack-*` seeker is filtered out.
     assert len(rows) == 2
     kinds = sorted(r.attributes.get("data-kind") for r in rows)
-    assert kinds == ["client_referral", "provider_availability"]
+    assert kinds == ["opening", "referral"]
     # The toolbar's filter link summarizes the active value inline.
     link = tree.css_first("a.toolbar-filter-link")
     assert link is not None
@@ -1031,13 +1023,11 @@ async def test_list_combines_kind_and_q_with_and(
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user: User,
 ):
-    """`?kind=client_referral&q=needle` ANDs both predicates — only
+    """`?kind=referral&q=needle` ANDs both predicates — only
     seeking posts whose description matches."""
     author = create_test_user(username=f"author-{uuid.uuid4()}")
-    seeking_match = _client_referral_post(
-        description="needle-seeking", owner_id=author.id
-    )
-    offering_with_needle = _provider_availability_post(
+    seeking_match = _referral_post(description="needle-seeking", owner_id=author.id)
+    offering_with_needle = _opening_post(
         practice_name=f"clinic-{uuid.uuid4()}",
         owner_id=author.id,
         description="needle-offering",
@@ -1045,16 +1035,16 @@ async def test_list_combines_kind_and_q_with_and(
     async with db_test_session_manager() as session:
         async with session.begin():
             session.add(author)
-            session.add(offering_with_needle.provider_availability_detail.provider)
+            session.add(offering_with_needle.opening_detail.provider)
             session.add(seeking_match)
             session.add(offering_with_needle)
 
-    response = await authenticated_client.get("/posts?kind=client_referral&q=needle")
+    response = await authenticated_client.get("/posts?kind=referral&q=needle")
     assert response.status_code == 200
     tree = HTMLParser(response.text)
     rows = tree.css("#posts-list > article")
     assert len(rows) == 1
-    assert rows[0].attributes.get("data-kind") == "client_referral"
+    assert rows[0].attributes.get("data-kind") == "referral"
 
 
 # --- Per-column filters: posted_by / state / city / age_group / language ---
@@ -1068,8 +1058,8 @@ async def test_list_filters_by_posted_by_username(
     """`?posted_by=substr` filters by ILIKE on owner.username."""
     alice = create_test_user(username=f"alice-{uuid.uuid4()}")
     bob = create_test_user(username=f"bob-{uuid.uuid4()}")
-    alice_post = _client_referral_post(description="a", owner_id=alice.id)
-    bob_post = _client_referral_post(description="b", owner_id=bob.id)
+    alice_post = _referral_post(description="a", owner_id=alice.id)
+    bob_post = _referral_post(description="b", owner_id=bob.id)
     async with db_test_session_manager() as session:
         async with session.begin():
             session.add(alice)
@@ -1095,16 +1085,16 @@ async def test_list_filters_by_state_across_polymorphic_paths(
     logged_in_user: User,
 ):
     """`?state=NY&state=NJ` matches both detail tables: seeking's
-    `client_referral_detail.location_state` and offering's
-    `provider_availability_detail.provider.location_state`."""
+    `referral_detail.location_state` and offering's
+    `opening_detail.provider.location_state`."""
     author = create_test_user(username=f"author-{uuid.uuid4()}")
-    seeking_ny = _client_referral_post(
+    seeking_ny = _referral_post(
         description="seeking-ny", owner_id=author.id, location_state="NY"
     )
-    seeking_ca = _client_referral_post(
+    seeking_ca = _referral_post(
         description="seeking-ca", owner_id=author.id, location_state="CA"
     )
-    offering_nj = _provider_availability_post(
+    offering_nj = _opening_post(
         practice_name=f"clinic-{uuid.uuid4()}",
         owner_id=author.id,
         provider=make_provider_with_org(
@@ -1113,7 +1103,7 @@ async def test_list_filters_by_state_across_polymorphic_paths(
             location_state="NJ",
         ),
     )
-    offering_tx = _provider_availability_post(
+    offering_tx = _opening_post(
         practice_name=f"clinic-{uuid.uuid4()}",
         owner_id=author.id,
         provider=make_provider_with_org(
@@ -1125,8 +1115,8 @@ async def test_list_filters_by_state_across_polymorphic_paths(
     async with db_test_session_manager() as session:
         async with session.begin():
             session.add(author)
-            session.add(offering_nj.provider_availability_detail.provider)
-            session.add(offering_tx.provider_availability_detail.provider)
+            session.add(offering_nj.opening_detail.provider)
+            session.add(offering_tx.opening_detail.provider)
             session.add(seeking_ny)
             session.add(seeking_ca)
             session.add(offering_nj)
@@ -1153,13 +1143,13 @@ async def test_list_filters_by_city_substring_across_polymorphic_paths(
 ):
     """`?city=spring` ILIKE-matches `location_city` on both detail tables."""
     author = create_test_user(username=f"author-{uuid.uuid4()}")
-    seeking_match = _client_referral_post(
+    seeking_match = _referral_post(
         description="s", owner_id=author.id, location_city="Springfield"
     )
-    seeking_miss = _client_referral_post(
+    seeking_miss = _referral_post(
         description="s", owner_id=author.id, location_city="Hartford"
     )
-    offering_match = _provider_availability_post(
+    offering_match = _opening_post(
         practice_name=f"clinic-{uuid.uuid4()}",
         owner_id=author.id,
         provider=make_provider_with_org(
@@ -1171,7 +1161,7 @@ async def test_list_filters_by_city_substring_across_polymorphic_paths(
     async with db_test_session_manager() as session:
         async with session.begin():
             session.add(author)
-            session.add(offering_match.provider_availability_detail.provider)
+            session.add(offering_match.opening_detail.provider)
             session.add(seeking_match)
             session.add(seeking_miss)
             session.add(offering_match)
@@ -1193,17 +1183,17 @@ async def test_list_filters_by_age_group_json_contains(
     """`?age_group=adults_25_64` matches posts whose detail's
     `age_groups` JSON array contains that token, on either side."""
     author = create_test_user(username=f"author-{uuid.uuid4()}")
-    seeking_match = _client_referral_post(
+    seeking_match = _referral_post(
         description="s",
         owner_id=author.id,
         age_groups=["adults_25_64"],
     )
-    seeking_miss = _client_referral_post(
+    seeking_miss = _referral_post(
         description="s",
         owner_id=author.id,
         age_groups=["children_0_5"],
     )
-    offering_match = _provider_availability_post(
+    offering_match = _opening_post(
         practice_name=f"clinic-{uuid.uuid4()}",
         owner_id=author.id,
         age_groups=["adults_25_64", "older_adults_65_plus"],
@@ -1211,7 +1201,7 @@ async def test_list_filters_by_age_group_json_contains(
     async with db_test_session_manager() as session:
         async with session.begin():
             session.add(author)
-            session.add(offering_match.provider_availability_detail.provider)
+            session.add(offering_match.opening_detail.provider)
             session.add(seeking_match)
             session.add(seeking_miss)
             session.add(offering_match)
@@ -1234,12 +1224,10 @@ async def test_list_filters_by_language_json_contains(
     array contains `"es"`. Tokens are double-quote-delimited so `"en"`
     doesn't accidentally match a token like `"en_GB"`."""
     author = create_test_user(username=f"author-{uuid.uuid4()}")
-    spanish_seeker = _client_referral_post(
+    spanish_seeker = _referral_post(
         description="s", owner_id=author.id, languages=["en", "es"]
     )
-    english_only = _client_referral_post(
-        description="e", owner_id=author.id, languages=["en"]
-    )
+    english_only = _referral_post(description="e", owner_id=author.id, languages=["en"])
     async with db_test_session_manager() as session:
         async with session.begin():
             session.add(author)
@@ -1286,8 +1274,8 @@ async def test_search_page_renders_one_control_per_filter(
     values = {r.attributes.get("value") for r in radios}
     assert values == {
         None,
-        "client_referral",
-        "provider_availability",
+        "referral",
+        "opening",
         "program_availability",
     }
 
@@ -1305,7 +1293,7 @@ async def test_toolbar_inline_active_filter_summary_collapses_beyond_two(
             session.add(author)
 
     response = await authenticated_client.get(
-        "/posts?kind=client_referral&q=needle&posted_by=alice"
+        "/posts?kind=referral&q=needle&posted_by=alice"
     )
     assert response.status_code == 200
     tree = HTMLParser(response.text)
@@ -1352,13 +1340,13 @@ async def test_toolbar_has_no_separator_between_filter_link_and_actions(
 # --- Chrome: edit form cancel link --------------------------------------
 
 
-async def test_edit_client_referral_form_renders_cancel(
+async def test_edit_referral_form_renders_cancel(
     authenticated_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user: User,
 ):
     """Edit form keeps a bottom Cancel link to the post detail page."""
-    post = _client_referral_post(description="x", owner_id=logged_in_user.id)
+    post = _referral_post(description="x", owner_id=logged_in_user.id)
     async with db_test_session_manager() as session:
         async with session.begin():
             session.add(post)
@@ -1383,7 +1371,7 @@ async def test_admin_can_open_edit_form_for_any_post(
 ):
     await promote_to_admin(db_test_session_manager, logged_in_user.email)
     other = create_test_user(username=f"other-{uuid.uuid4()}")
-    post = _client_referral_post(description="d", owner_id=other.id)
+    post = _referral_post(description="d", owner_id=other.id)
     async with db_test_session_manager() as session:
         async with session.begin():
             session.add(other)
@@ -1399,7 +1387,7 @@ async def test_non_owner_cannot_open_edit_form(
     logged_in_user: User,
 ):
     other = create_test_user(username=f"other-{uuid.uuid4()}")
-    post = _client_referral_post(description="d", owner_id=other.id)
+    post = _referral_post(description="d", owner_id=other.id)
     async with db_test_session_manager() as session:
         async with session.begin():
             session.add(other)
@@ -1417,7 +1405,7 @@ async def test_detail_page_shows_edit_link_for_owner(
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user: User,
 ):
-    post = _client_referral_post(description="d", owner_id=logged_in_user.id)
+    post = _referral_post(description="d", owner_id=logged_in_user.id)
     async with db_test_session_manager() as session:
         async with session.begin():
             session.add(post)
@@ -1437,7 +1425,7 @@ async def test_detail_page_shows_edit_link_for_admin(
 ):
     await promote_to_admin(db_test_session_manager, logged_in_user.email)
     other = create_test_user(username=f"other-{uuid.uuid4()}")
-    post = _client_referral_post(description="d", owner_id=other.id)
+    post = _referral_post(description="d", owner_id=other.id)
     async with db_test_session_manager() as session:
         async with session.begin():
             session.add(other)
@@ -1455,7 +1443,7 @@ async def test_detail_page_hides_edit_link_for_stranger(
     logged_in_user: User,
 ):
     other = create_test_user(username=f"other-{uuid.uuid4()}")
-    post = _client_referral_post(description="d", owner_id=other.id)
+    post = _referral_post(description="d", owner_id=other.id)
     async with db_test_session_manager() as session:
         async with session.begin():
             session.add(other)
@@ -1475,7 +1463,7 @@ async def test_detail_page_delete_button_for_owner(
 ):
     """The owner sees a Delete button wired to DELETE /posts/{id} with a
     confirmation prompt."""
-    post = _client_referral_post(description="d", owner_id=logged_in_user.id)
+    post = _referral_post(description="d", owner_id=logged_in_user.id)
     async with db_test_session_manager() as session:
         async with session.begin():
             session.add(post)
@@ -1497,7 +1485,7 @@ async def test_detail_page_delete_button_for_admin(
     """An admin viewing another user's post sees the Delete button too."""
     await promote_to_admin(db_test_session_manager, logged_in_user.email)
     other = create_test_user(username=f"other-{uuid.uuid4()}")
-    post = _client_referral_post(description="d", owner_id=other.id)
+    post = _referral_post(description="d", owner_id=other.id)
     async with db_test_session_manager() as session:
         async with session.begin():
             session.add(other)
@@ -1522,7 +1510,7 @@ async def test_admin_patch_audit_actor_is_admin_not_owner(
     the admin (the requester), not the post owner."""
     await promote_to_admin(db_test_session_manager, logged_in_user.email)
     other = create_test_user(username=f"other-{uuid.uuid4()}")
-    post = _client_referral_post(description="d", owner_id=other.id)
+    post = _referral_post(description="d", owner_id=other.id)
     async with db_test_session_manager() as session:
         async with session.begin():
             session.add(other)
@@ -1530,7 +1518,7 @@ async def test_admin_patch_audit_actor_is_admin_not_owner(
 
     response = await authenticated_client.patch(
         f"/posts/{post.id}",
-        data={"kind": "client_referral", "description": "moderated"},
+        data={"kind": "referral", "description": "moderated"},
     )
     assert response.status_code == 200
 
@@ -1555,7 +1543,7 @@ async def test_admin_delete_audit_actor_is_admin_not_owner(
     the admin (the requester), not the post owner."""
     await promote_to_admin(db_test_session_manager, logged_in_user.email)
     other = create_test_user(username=f"other-{uuid.uuid4()}")
-    post = _client_referral_post(description="d", owner_id=other.id)
+    post = _referral_post(description="d", owner_id=other.id)
     async with db_test_session_manager() as session:
         async with session.begin():
             session.add(other)
@@ -1577,18 +1565,18 @@ async def test_admin_delete_audit_actor_is_admin_not_owner(
 # --- Client referral kind: end-to-end ------------------------------------
 
 
-async def test_create_client_referral_happy_path(
+async def test_create_referral_happy_path(
     authenticated_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user: User,
 ):
-    """`POST /posts` with `kind='client_referral'` persists with the right
+    """`POST /posts` with `kind='referral'` persists with the right
     detail row and audit row."""
     description = f"needs-{uuid.uuid4()}"
 
     response = await authenticated_client.post(
         "/posts",
-        data=client_referral_payload(description=description),
+        data=referral_payload(description=description),
     )
 
     assert response.status_code == 201
@@ -1598,9 +1586,9 @@ async def test_create_client_referral_happy_path(
         result = await session.execute(select(Post).filter(Post.id == new_id))
         persisted = result.scalars().first()
         assert persisted is not None
-        assert persisted.kind == "client_referral"
-        assert persisted.client_referral_detail.description == description
-        assert persisted.client_referral_detail.location_state == "IL"
+        assert persisted.kind == "referral"
+        assert persisted.referral_detail.description == description
+        assert persisted.referral_detail.location_state == "IL"
         assert persisted.owner_id == logged_in_user.id
 
     async with db_test_session_manager() as session:
@@ -1609,23 +1597,23 @@ async def test_create_client_referral_happy_path(
         assert len(rows) == 1
         assert rows[0].action == "create_post"
         assert rows[0].before is None
-        expected = client_referral_payload(description=description)
+        expected = referral_payload(description=description)
         expected.pop("kind")
         assert rows[0].after == {
-            "kind": "client_referral",
+            "kind": "referral",
             "owner_id": str(logged_in_user.id),
             **expected,
         }
 
 
-async def test_create_client_referral_strips_whitespace(
+async def test_create_referral_strips_whitespace(
     authenticated_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user: User,
 ):
     response = await authenticated_client.post(
         "/posts",
-        data=client_referral_payload(description="  needs help  "),
+        data=referral_payload(description="  needs help  "),
     )
     assert response.status_code == 201
     new_id = uuid.UUID(response.json()["id"])
@@ -1633,29 +1621,27 @@ async def test_create_client_referral_strips_whitespace(
     async with db_test_session_manager() as session:
         result = await session.execute(select(Post).filter(Post.id == new_id))
         persisted = result.scalars().first()
-        assert persisted.client_referral_detail.description == "needs help"
+        assert persisted.referral_detail.description == "needs help"
 
 
 @pytest.mark.parametrize(
     "payload",
     [
-        {"kind": "client_referral"},  # missing every required field
-        client_referral_payload(description=""),
-        client_referral_payload(description="   "),
-        client_referral_payload(location_zip="abc"),  # non-numeric ZIP
-        client_referral_payload(location_state="ZZ"),  # not a US state
-        client_referral_payload(
-            network_preference="bring_cash"
-        ),  # not in NETWORK_PREFERENCES
-        client_referral_payload(
+        {"kind": "referral"},  # missing every required field
+        referral_payload(description=""),
+        referral_payload(description="   "),
+        referral_payload(location_zip="abc"),  # non-numeric ZIP
+        referral_payload(location_state="ZZ"),  # not a US state
+        referral_payload(network_preference="bring_cash"),  # not in NETWORK_PREFERENCES
+        referral_payload(
             insurance_carrier="my_local_co_op"
         ),  # not in INSURANCE_CARRIERS
-        client_referral_payload(title="bleed"),  # cross-kind field bleed
-        client_referral_payload(evil=True),  # unknown field
+        referral_payload(title="bleed"),  # cross-kind field bleed
+        referral_payload(evil=True),  # unknown field
         {"kind": "unknown_kind", "description": "ok"},
     ],
 )
-async def test_create_client_referral_rejects_invalid_payload(
+async def test_create_referral_rejects_invalid_payload(
     payload,
     authenticated_client: AsyncClient,
     logged_in_user: User,
@@ -1664,13 +1650,13 @@ async def test_create_client_referral_rejects_invalid_payload(
     assert response.status_code == 422
 
 
-async def test_get_client_referral_form_renders(
+async def test_get_referral_form_renders(
     authenticated_client: AsyncClient,
     logged_in_user: User,
 ):
-    """`GET /posts/form?kind=client_referral` renders the kind-specific
+    """`GET /posts/form?kind=referral` renders the kind-specific
     create form."""
-    response = await authenticated_client.get("/posts/form?kind=client_referral")
+    response = await authenticated_client.get("/posts/form?kind=referral")
     assert response.status_code == 200
     tree = HTMLParser(response.text)
     form = tree.css_first("form")
@@ -1679,17 +1665,17 @@ async def test_get_client_referral_form_renders(
     assert tree.css_first("textarea#description") is not None
     kind_input = tree.css_first('input[name="kind"]')
     assert kind_input is not None
-    assert kind_input.attributes.get("value") == "client_referral"
+    assert kind_input.attributes.get("value") == "referral"
 
 
-async def test_client_referral_form_renders_languages_multi_select(
+async def test_referral_form_renders_languages_multi_select(
     authenticated_client: AsyncClient,
     logged_in_user: User,
 ):
     """`languages` on CR renders via `field_for`'s multi_select arm (#428)
     — the unified `<select multiple>` widget shared by every multi-select
     field on the site."""
-    response = await authenticated_client.get("/posts/form?kind=client_referral")
+    response = await authenticated_client.get("/posts/form?kind=referral")
     assert response.status_code == 200
     tree = HTMLParser(response.text)
     select = tree.css_first('select[name="languages"][multiple]')
@@ -1698,14 +1684,14 @@ async def test_client_referral_form_renders_languages_multi_select(
     assert values == {"en", "es"}
 
 
-async def test_client_referral_form_renders_age_groups_multi_select(
+async def test_referral_form_renders_age_groups_multi_select(
     authenticated_client: AsyncClient,
     logged_in_user: User,
 ):
     """`age_groups` on CR renders via the multi-select arm (#432),
     mirroring PA's `age_groups` (#430) — the unified `<select multiple>`
     widget."""
-    response = await authenticated_client.get("/posts/form?kind=client_referral")
+    response = await authenticated_client.get("/posts/form?kind=referral")
     assert response.status_code == 200
     tree = HTMLParser(response.text)
     select = tree.css_first('select[name="age_groups"][multiple]')
@@ -1737,10 +1723,8 @@ async def test_get_post_form_no_kind_renders_picker(
     # not the picker.
     assert tree.css_first('input[name="kind"]') is None
     # Each registered kind has a link on the picker.
-    assert tree.css_first('a[href="/posts/form?kind=client_referral"]') is not None
-    assert (
-        tree.css_first('a[href="/posts/form?kind=provider_availability"]') is not None
-    )
+    assert tree.css_first('a[href="/posts/form?kind=referral"]') is not None
+    assert tree.css_first('a[href="/posts/form?kind=opening"]') is not None
 
 
 async def test_get_post_form_treats_empty_kind_as_absent(
@@ -1756,21 +1740,21 @@ async def test_get_post_form_treats_empty_kind_as_absent(
     assert response.status_code == 200
     tree = HTMLParser(response.text)
     assert tree.css_first('input[name="kind"]') is None
-    assert tree.css_first('a[href="/posts/form?kind=client_referral"]') is not None
+    assert tree.css_first('a[href="/posts/form?kind=referral"]') is not None
 
 
-async def test_list_renders_client_referral_row(
+async def test_list_renders_referral_row(
     authenticated_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user: User,
 ):
-    """`GET /posts` renders a client_referral card whose header link
+    """`GET /posts` renders a referral card whose header link
     is the age + gender combo (e.g. `Adult (25–64)` with the default
     `prefer_not_to_say` gender). State lives in the location chunk of
     the demographics column. The kind is also conveyed by the
     `data-kind` left-edge color."""
     author = create_test_user(username=f"author-{uuid.uuid4()}")
-    post = _client_referral_post(
+    post = _referral_post(
         description=f"crsummary-{uuid.uuid4()}",
         owner_id=author.id,
     )
@@ -1785,20 +1769,20 @@ async def test_list_renders_client_referral_row(
     tree = HTMLParser(response.text)
     item = tree.css_first("#posts-list > article")
     assert item is not None
-    assert item.attributes.get("data-kind") == "client_referral"
+    assert item.attributes.get("data-kind") == "referral"
     # Default fixture: age_groups=["adults_25_64"], gender="prefer_not_to_say".
     # State (IL) lives in the demographics location chunk, not the header.
     assert item.css_first("header.post-header a").text().strip() == "Adult (25–64)"
 
 
-async def test_get_client_referral_detail_renders(
+async def test_get_referral_detail_renders(
     authenticated_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user: User,
 ):
     author = create_test_user(username=f"author-{uuid.uuid4()}")
     description = f"detail-{uuid.uuid4()}"
-    post = _client_referral_post(description=description, owner_id=author.id)
+    post = _referral_post(description=description, owner_id=author.id)
 
     async with db_test_session_manager() as session:
         async with session.begin():
@@ -1816,15 +1800,15 @@ async def test_get_client_referral_detail_renders(
     assert author.email in page
 
 
-async def test_owner_can_open_client_referral_edit_form(
+async def test_owner_can_open_referral_edit_form(
     authenticated_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user: User,
 ):
-    """The owner of a client_referral sees the kind-specific edit form
+    """The owner of a referral sees the kind-specific edit form
     pre-filled with the current description."""
     description = f"edit-{uuid.uuid4()}"
-    post = _client_referral_post(description=description, owner_id=logged_in_user.id)
+    post = _referral_post(description=description, owner_id=logged_in_user.id)
     async with db_test_session_manager() as session:
         async with session.begin():
             session.add(post)
@@ -1840,17 +1824,17 @@ async def test_owner_can_open_client_referral_edit_form(
     assert description in description_input.text()
     kind_input = tree.css_first('input[name="kind"]')
     assert kind_input is not None
-    assert kind_input.attributes.get("value") == "client_referral"
+    assert kind_input.attributes.get("value") == "referral"
 
 
-async def test_owner_can_patch_client_referral_description(
+async def test_owner_can_patch_referral_description(
     authenticated_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user: User,
 ):
-    """`PATCH /posts/{id}` with `kind='client_referral'` updates the
+    """`PATCH /posts/{id}` with `kind='referral'` updates the
     description and returns a per-kind flat body."""
-    post = _client_referral_post(description="orig", owner_id=logged_in_user.id)
+    post = _referral_post(description="orig", owner_id=logged_in_user.id)
     async with db_test_session_manager() as session:
         async with session.begin():
             session.add(post)
@@ -1858,33 +1842,31 @@ async def test_owner_can_patch_client_referral_description(
     new_description = f"updated-{uuid.uuid4()}"
     response = await authenticated_client.patch(
         f"/posts/{post.id}",
-        data={"kind": "client_referral", "description": new_description},
+        data={"kind": "referral", "description": new_description},
     )
     assert response.status_code == 200
     assert response.headers.get("HX-Redirect") == f"/posts/{post.id}"
     body = response.json()
-    assert body["kind"] == "client_referral"
+    assert body["kind"] == "referral"
     assert body["description"] == new_description
     assert "title" not in body and "body" not in body
 
     async with db_test_session_manager() as session:
         result = await session.execute(select(Post).filter(Post.id == post.id))
         refreshed = result.scalars().first()
-        assert refreshed.client_referral_detail.description == new_description
+        assert refreshed.referral_detail.description == new_description
 
 
-async def test_patch_provider_availability_with_client_referral_payload_does_not_mutate(
+async def test_patch_opening_with_referral_payload_does_not_mutate(
     authenticated_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user: User,
 ):
-    """A provider_availability post can't be patched with a client_referral
+    """A opening post can't be patched with a referral
     payload — kind is part of the resource identity. The 400 must fire
     before any mutation, and no audit row may be written."""
     original = f"orig-{uuid.uuid4()}"
-    post = _provider_availability_post(
-        practice_name=original, owner_id=logged_in_user.id
-    )
+    post = _opening_post(practice_name=original, owner_id=logged_in_user.id)
     async with db_test_session_manager() as session:
         async with session.begin():
             session.add(post)
@@ -1892,17 +1874,17 @@ async def test_patch_provider_availability_with_client_referral_payload_does_not
 
     response = await authenticated_client.patch(
         f"/posts/{post_id}",
-        data={"kind": "client_referral", "description": "hijack"},
+        data={"kind": "referral", "description": "hijack"},
     )
     assert response.status_code == 400
 
     async with db_test_session_manager() as session:
         result = await session.execute(select(Post).filter(Post.id == post_id))
         refreshed = result.scalars().first()
-        assert refreshed.kind == "provider_availability"
+        assert refreshed.kind == "opening"
         # Practice name lives on the linked Provider's Organization (#524).
-        assert refreshed.provider_availability_detail.provider.org.name == original
-        assert refreshed.client_referral_detail is None
+        assert refreshed.opening_detail.provider.org.name == original
+        assert refreshed.referral_detail is None
 
     async with db_test_session_manager() as session:
         repo = AuditRepository(session)
@@ -1910,18 +1892,16 @@ async def test_patch_provider_availability_with_client_referral_payload_does_not
         assert rows == []
 
 
-async def test_patch_client_referral_with_provider_availability_payload_does_not_mutate(
+async def test_patch_referral_with_opening_payload_does_not_mutate(
     authenticated_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user: User,
 ):
-    """Reverse direction: a client_referral can't be patched with a
-    provider_availability payload either. Same invariant — kind is fixed
+    """Reverse direction: a referral can't be patched with a
+    opening payload either. Same invariant — kind is fixed
     once set."""
     original_description = f"orig-{uuid.uuid4()}"
-    post = _client_referral_post(
-        description=original_description, owner_id=logged_in_user.id
-    )
+    post = _referral_post(description=original_description, owner_id=logged_in_user.id)
     async with db_test_session_manager() as session:
         async with session.begin():
             session.add(post)
@@ -1933,16 +1913,16 @@ async def test_patch_client_referral_with_provider_availability_payload_does_not
         # comes from the post-validation kind-mismatch check, which is the
         # behavior under test. (Practice name moved to Provider post-#448
         # and is no longer a PA wire field, so it can't be used here.)
-        data={"kind": "provider_availability", "description": "hijack"},
+        data={"kind": "opening", "description": "hijack"},
     )
     assert response.status_code == 400
 
     async with db_test_session_manager() as session:
         result = await session.execute(select(Post).filter(Post.id == post_id))
         refreshed = result.scalars().first()
-        assert refreshed.kind == "client_referral"
-        assert refreshed.client_referral_detail.description == original_description
-        assert refreshed.provider_availability_detail is None
+        assert refreshed.kind == "referral"
+        assert refreshed.referral_detail.description == original_description
+        assert refreshed.opening_detail is None
 
     async with db_test_session_manager() as session:
         repo = AuditRepository(session)
@@ -1950,13 +1930,13 @@ async def test_patch_client_referral_with_provider_availability_payload_does_not
         assert rows == []
 
 
-async def test_owner_can_delete_client_referral(
+async def test_owner_can_delete_referral(
     authenticated_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user: User,
 ):
-    """`DELETE /posts/{id}` works for client_referral; cascades the detail."""
-    post = _client_referral_post(description="doomed", owner_id=logged_in_user.id)
+    """`DELETE /posts/{id}` works for referral; cascades the detail."""
+    post = _referral_post(description="doomed", owner_id=logged_in_user.id)
     async with db_test_session_manager() as session:
         async with session.begin():
             session.add(post)
@@ -1974,9 +1954,7 @@ async def test_owner_can_delete_client_referral(
         detail_row = (
             (
                 await session.execute(
-                    select(ClientReferralDetail).filter(
-                        ClientReferralDetail.post_id == post_id
-                    )
+                    select(ReferralDetail).filter(ReferralDetail.post_id == post_id)
                 )
             )
             .scalars()
@@ -1986,15 +1964,15 @@ async def test_owner_can_delete_client_referral(
         assert detail_row is None
 
 
-async def test_delete_client_referral_writes_audit_row(
+async def test_delete_referral_writes_audit_row(
     authenticated_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user: User,
 ):
-    """Audit before-snapshot for a client_referral delete uses the
+    """Audit before-snapshot for a referral delete uses the
     kind-specific snapshot shape."""
     description = f"doomed-{uuid.uuid4()}"
-    post = _client_referral_post(description=description, owner_id=logged_in_user.id)
+    post = _referral_post(description=description, owner_id=logged_in_user.id)
     async with db_test_session_manager() as session:
         async with session.begin():
             session.add(post)
@@ -2009,7 +1987,7 @@ async def test_delete_client_referral_writes_audit_row(
         assert len(rows) == 1
         assert rows[0].action == "delete_post"
         assert rows[0].before == {
-            **client_referral_payload(description=description),
+            **referral_payload(description=description),
             "owner_id": str(logged_in_user.id),
         }
         assert rows[0].after is None
@@ -2018,12 +1996,12 @@ async def test_delete_client_referral_writes_audit_row(
 # --- Provider availability kind: end-to-end ------------------------------
 
 
-async def test_create_provider_availability_happy_path(
+async def test_create_opening_happy_path(
     authenticated_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user: User,
 ):
-    """`POST /posts` with `kind='provider_availability'` persists with
+    """`POST /posts` with `kind='opening'` persists with
     the right detail row + audit row."""
     practice_name = f"Acme-{uuid.uuid4()}"
     # PA points at a Provider via `provider_id` (#448); seed one owned by
@@ -2037,7 +2015,7 @@ async def test_create_provider_availability_happy_path(
 
     response = await authenticated_client.post(
         "/posts",
-        data=provider_availability_payload(provider_id=str(provider.id)),
+        data=opening_payload(provider_id=str(provider.id)),
     )
 
     assert response.status_code == 201
@@ -2047,19 +2025,16 @@ async def test_create_provider_availability_happy_path(
         result = await session.execute(select(Post).filter(Post.id == new_id))
         persisted = result.scalars().first()
         assert persisted is not None
-        assert persisted.kind == "provider_availability"
-        assert persisted.provider_availability_detail.provider_id == provider.id
-        assert persisted.provider_availability_detail.provider.org.name == practice_name
+        assert persisted.kind == "opening"
+        assert persisted.opening_detail.provider_id == provider.id
+        assert persisted.opening_detail.provider.org.name == practice_name
         # Insurance posture / sliding-scale / cost live on Provider, not
         # PA. The `make_provider` factory defaults are: empty carrier list
         # (no in-network) + `accepts_out_of_network=True`, no sliding scale.
-        assert persisted.provider_availability_detail.provider.in_network_carriers == []
-        assert (
-            persisted.provider_availability_detail.provider.accepts_out_of_network
-            is True
-        )
-        assert persisted.provider_availability_detail.provider.sliding_scale is False
-        assert persisted.client_referral_detail is None
+        assert persisted.opening_detail.provider.in_network_carriers == []
+        assert persisted.opening_detail.provider.accepts_out_of_network is True
+        assert persisted.opening_detail.provider.sliding_scale is False
+        assert persisted.referral_detail is None
         assert persisted.owner_id == logged_in_user.id
 
     async with db_test_session_manager() as session:
@@ -2068,16 +2043,16 @@ async def test_create_provider_availability_happy_path(
         assert len(rows) == 1
         assert rows[0].action == "create_post"
         assert rows[0].before is None
-        expected = provider_availability_payload(provider_id=str(provider.id))
+        expected = opening_payload(provider_id=str(provider.id))
         expected.pop("kind")
         assert rows[0].after == {
-            "kind": "provider_availability",
+            "kind": "opening",
             "owner_id": str(logged_in_user.id),
             **expected,
         }
 
 
-async def test_create_provider_availability_strips_whitespace(
+async def test_create_opening_strips_whitespace(
     authenticated_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user: User,
@@ -2091,7 +2066,7 @@ async def test_create_provider_availability_strips_whitespace(
 
     response = await authenticated_client.post(
         "/posts",
-        data=provider_availability_payload(
+        data=opening_payload(
             provider_id=str(provider.id), description="  Lead pitch  "
         ),
     )
@@ -2101,19 +2076,19 @@ async def test_create_provider_availability_strips_whitespace(
     async with db_test_session_manager() as session:
         result = await session.execute(select(Post).filter(Post.id == new_id))
         persisted = result.scalars().first()
-        assert persisted.provider_availability_detail.description == "Lead pitch"
+        assert persisted.opening_detail.description == "Lead pitch"
 
 
 @pytest.mark.parametrize(
     "payload",
     [
-        {"kind": "provider_availability"},  # missing every required field
-        provider_availability_payload(payment_situation="cash_only"),
-        provider_availability_payload(title="bleed"),  # cross-kind bleed
-        provider_availability_payload(evil=True),  # unknown field
+        {"kind": "opening"},  # missing every required field
+        opening_payload(payment_situation="cash_only"),
+        opening_payload(title="bleed"),  # cross-kind bleed
+        opening_payload(evil=True),  # unknown field
     ],
 )
-async def test_create_provider_availability_rejects_invalid_payload(
+async def test_create_opening_rejects_invalid_payload(
     payload,
     authenticated_client: AsyncClient,
     logged_in_user: User,
@@ -2122,12 +2097,12 @@ async def test_create_provider_availability_rejects_invalid_payload(
     assert response.status_code == 422
 
 
-async def test_get_provider_availability_form_renders(
+async def test_get_opening_form_renders(
     authenticated_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user: User,
 ):
-    """`GET /posts/form?kind=provider_availability` renders the kind-specific
+    """`GET /posts/form?kind=opening` renders the kind-specific
     create form. Per #448, the form needs the user to own at least one
     Provider profile (otherwise it shows the create-a-provider stub)."""
     provider = make_provider_with_org(owner_id=logged_in_user.id)
@@ -2135,7 +2110,7 @@ async def test_get_provider_availability_form_renders(
         async with session.begin():
             session.add(provider)
 
-    response = await authenticated_client.get("/posts/form?kind=provider_availability")
+    response = await authenticated_client.get("/posts/form?kind=opening")
     assert response.status_code == 200
     tree = HTMLParser(response.text)
     form = tree.css_first("form")
@@ -2145,10 +2120,10 @@ async def test_get_provider_availability_form_renders(
     assert tree.css_first("select#provider_id") is not None
     kind_input = tree.css_first('input[name="kind"]')
     assert kind_input is not None
-    assert kind_input.attributes.get("value") == "provider_availability"
+    assert kind_input.attributes.get("value") == "opening"
 
 
-async def test_provider_availability_form_renders_free_text_fields(
+async def test_opening_form_renders_free_text_fields(
     authenticated_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user: User,
@@ -2163,7 +2138,7 @@ async def test_provider_availability_form_renders_free_text_fields(
         async with session.begin():
             session.add(provider)
 
-    response = await authenticated_client.get("/posts/form?kind=provider_availability")
+    response = await authenticated_client.get("/posts/form?kind=opening")
     assert response.status_code == 200
     tree = HTMLParser(response.text)
     assert tree.css_first("textarea#description") is not None
@@ -2173,7 +2148,7 @@ async def test_provider_availability_form_renders_free_text_fields(
     assert website.attributes.get("type") == "url"
 
 
-async def test_provider_availability_form_renders_languages_multi_select(
+async def test_opening_form_renders_languages_multi_select(
     authenticated_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user: User,
@@ -2186,7 +2161,7 @@ async def test_provider_availability_form_renders_languages_multi_select(
         async with session.begin():
             session.add(provider)
 
-    response = await authenticated_client.get("/posts/form?kind=provider_availability")
+    response = await authenticated_client.get("/posts/form?kind=opening")
     assert response.status_code == 200
     tree = HTMLParser(response.text)
     select = tree.css_first('select[name="languages"][multiple]')
@@ -2197,7 +2172,7 @@ async def test_provider_availability_form_renders_languages_multi_select(
     assert "Spanish" in response.text
 
 
-async def test_provider_availability_form_renders_age_groups_multi_select(
+async def test_opening_form_renders_age_groups_multi_select(
     authenticated_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user: User,
@@ -2210,7 +2185,7 @@ async def test_provider_availability_form_renders_age_groups_multi_select(
         async with session.begin():
             session.add(provider)
 
-    response = await authenticated_client.get("/posts/form?kind=provider_availability")
+    response = await authenticated_client.get("/posts/form?kind=opening")
     assert response.status_code == 200
     tree = HTMLParser(response.text)
     select = tree.css_first('select[name="age_groups"][multiple]')
@@ -2227,18 +2202,18 @@ async def test_provider_availability_form_renders_age_groups_multi_select(
     }
 
 
-async def test_list_renders_provider_availability_row(
+async def test_list_renders_opening_row(
     authenticated_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user: User,
 ):
-    """`GET /posts` renders a provider_availability card whose header
+    """`GET /posts` renders a opening card whose header
     link IS the practice name (PA posts identify by their practice;
     the `Provider Availability` kind label is dropped from the title
     as redundant)."""
     author = create_test_user(username=f"author-{uuid.uuid4()}")
     practice_name = f"Practice-{uuid.uuid4()}"
-    post = _provider_availability_post(practice_name=practice_name, owner_id=author.id)
+    post = _opening_post(practice_name=practice_name, owner_id=author.id)
 
     async with db_test_session_manager() as session:
         async with session.begin():
@@ -2250,18 +2225,18 @@ async def test_list_renders_provider_availability_row(
     tree = HTMLParser(response.text)
     item = tree.css_first("#posts-list > article")
     assert item is not None
-    assert item.attributes.get("data-kind") == "provider_availability"
+    assert item.attributes.get("data-kind") == "opening"
     assert practice_name in item.css_first("header.post-header a").text()
 
 
-async def test_get_provider_availability_detail_renders(
+async def test_get_opening_detail_renders(
     authenticated_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user: User,
 ):
     author = create_test_user(username=f"author-{uuid.uuid4()}")
     practice_name = f"Detail-{uuid.uuid4()}"
-    post = _provider_availability_post(practice_name=practice_name, owner_id=author.id)
+    post = _opening_post(practice_name=practice_name, owner_id=author.id)
 
     async with db_test_session_manager() as session:
         async with session.begin():
@@ -2279,17 +2254,15 @@ async def test_get_provider_availability_detail_renders(
     assert author.email in page
 
 
-async def test_owner_can_open_provider_availability_edit_form(
+async def test_owner_can_open_opening_edit_form(
     authenticated_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user: User,
 ):
-    """The owner of a provider_availability sees the kind-specific edit
+    """The owner of a opening sees the kind-specific edit
     form with the linked Provider preselected in the dropdown."""
     practice_name = f"Edit-{uuid.uuid4()}"
-    post = _provider_availability_post(
-        practice_name=practice_name, owner_id=logged_in_user.id
-    )
+    post = _opening_post(practice_name=practice_name, owner_id=logged_in_user.id)
     async with db_test_session_manager() as session:
         async with session.begin():
             session.add(post)
@@ -2308,10 +2281,10 @@ async def test_owner_can_open_provider_availability_edit_form(
     assert selected.text(strip=True) == practice_name
     kind_input = tree.css_first('input[name="kind"]')
     assert kind_input is not None
-    assert kind_input.attributes.get("value") == "provider_availability"
+    assert kind_input.attributes.get("value") == "opening"
 
 
-async def test_owner_can_patch_provider_availability_description(
+async def test_owner_can_patch_opening_description(
     authenticated_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user: User,
@@ -2319,7 +2292,7 @@ async def test_owner_can_patch_provider_availability_description(
     """Patch a PA field (`description`) and confirm round-trip + read body.
     (Practice name moved to Provider post-#448 and is no longer a PA wire
     field — the parallel test for renaming a practice lives on Provider.)"""
-    post = _provider_availability_post(practice_name="orig", owner_id=logged_in_user.id)
+    post = _opening_post(practice_name="orig", owner_id=logged_in_user.id)
     async with db_test_session_manager() as session:
         async with session.begin():
             session.add(post)
@@ -2328,32 +2301,30 @@ async def test_owner_can_patch_provider_availability_description(
     response = await authenticated_client.patch(
         f"/posts/{post.id}",
         data={
-            "kind": "provider_availability",
+            "kind": "opening",
             "description": new_description,
         },
     )
     assert response.status_code == 200
     assert response.headers.get("HX-Redirect") == f"/posts/{post.id}"
     body = response.json()
-    assert body["kind"] == "provider_availability"
+    assert body["kind"] == "opening"
     assert body["description"] == new_description
     assert "title" not in body and "body" not in body
 
     async with db_test_session_manager() as session:
         result = await session.execute(select(Post).filter(Post.id == post.id))
         refreshed = result.scalars().first()
-        assert refreshed.provider_availability_detail.description == new_description
+        assert refreshed.opening_detail.description == new_description
 
 
-async def test_owner_can_delete_provider_availability(
+async def test_owner_can_delete_opening(
     authenticated_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user: User,
 ):
-    """`DELETE /posts/{id}` works for provider_availability; cascades the detail."""
-    post = _provider_availability_post(
-        practice_name="doomed", owner_id=logged_in_user.id
-    )
+    """`DELETE /posts/{id}` works for opening; cascades the detail."""
+    post = _opening_post(practice_name="doomed", owner_id=logged_in_user.id)
     async with db_test_session_manager() as session:
         async with session.begin():
             session.add(post)
@@ -2371,9 +2342,7 @@ async def test_owner_can_delete_provider_availability(
         detail_row = (
             (
                 await session.execute(
-                    select(ProviderAvailabilityDetail).filter(
-                        ProviderAvailabilityDetail.post_id == post_id
-                    )
+                    select(OpeningDetail).filter(OpeningDetail.post_id == post_id)
                 )
             )
             .scalars()
@@ -2383,7 +2352,7 @@ async def test_owner_can_delete_provider_availability(
         assert detail_row is None
 
 
-async def test_delete_provider_availability_writes_audit_row(
+async def test_delete_opening_writes_audit_row(
     authenticated_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user: User,
@@ -2392,10 +2361,8 @@ async def test_delete_provider_availability_writes_audit_row(
     six fields that moved to Provider (`practice_name`, `location_*`,
     `*_sessions`)."""
     practice_name = f"doomed-{uuid.uuid4()}"
-    post = _provider_availability_post(
-        practice_name=practice_name, owner_id=logged_in_user.id
-    )
-    provider_id = post.provider_availability_detail.provider_id
+    post = _opening_post(practice_name=practice_name, owner_id=logged_in_user.id)
+    provider_id = post.opening_detail.provider_id
     async with db_test_session_manager() as session:
         async with session.begin():
             session.add(post)
@@ -2410,7 +2377,7 @@ async def test_delete_provider_availability_writes_audit_row(
         assert len(rows) == 1
         assert rows[0].action == "delete_post"
         assert rows[0].before == {
-            **provider_availability_payload(provider_id=str(provider_id)),
+            **opening_payload(provider_id=str(provider_id)),
             "owner_id": str(logged_in_user.id),
         }
         assert rows[0].after is None
@@ -2463,8 +2430,8 @@ async def test_create_program_availability_happy_path(
         assert persisted is not None
         assert persisted.kind == "program_availability"
         assert persisted.program_availability_detail.program_id == program.id
-        assert persisted.provider_availability_detail is None
-        assert persisted.client_referral_detail is None
+        assert persisted.opening_detail is None
+        assert persisted.referral_detail is None
         assert persisted.owner_id == logged_in_user.id
 
     async with db_test_session_manager() as session:
@@ -2612,7 +2579,7 @@ async def test_patch_program_availability_rejects_unowned_program(
 # --- Provider-availability payload_authz coverage (gap closed by #541) ---
 
 
-async def test_create_provider_availability_rejects_unowned_provider(
+async def test_create_opening_rejects_unowned_provider(
     authenticated_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user: User,
@@ -2631,12 +2598,12 @@ async def test_create_provider_availability_rejects_unowned_provider(
 
     response = await authenticated_client.post(
         "/posts",
-        data=provider_availability_payload(provider_id=str(provider.id)),
+        data=opening_payload(provider_id=str(provider.id)),
     )
     assert response.status_code == 403
 
 
-async def test_create_provider_availability_rejects_nonexistent_provider(
+async def test_create_opening_rejects_nonexistent_provider(
     authenticated_client: AsyncClient,
     logged_in_user: User,
 ):
@@ -2644,6 +2611,6 @@ async def test_create_provider_availability_rejects_nonexistent_provider(
     bogus = uuid.uuid4()
     response = await authenticated_client.post(
         "/posts",
-        data=provider_availability_payload(provider_id=str(bogus)),
+        data=opening_payload(provider_id=str(bogus)),
     )
     assert response.status_code == 404

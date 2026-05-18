@@ -86,9 +86,9 @@ def test_does_not_flag_entity_form_url_with_id():
 
 
 def test_does_not_flag_relative_url():
-    """Query-only links (``?kind=client_referral``) are fine as-is —
+    """Query-only links (``?kind=referral``) are fine as-is —
     they don't anchor at a collection root."""
-    assert _scan('<a href="?kind=client_referral">x</a>') == []
+    assert _scan('<a href="?kind=referral">x</a>') == []
 
 
 def test_does_not_flag_root_link():

@@ -25,7 +25,7 @@ class LocationMixin:
     """``(city, state, zip)`` postal-address column group.
 
     Mixed into :class:`~src.domain.models.providers.Provider` and
-    :class:`~src.domain.models.posts.client_referral_detail.ClientReferralDetail`.
+    :class:`~src.domain.models.posts.referral_detail.ReferralDetail`.
     Both consumers want ``nullable=False`` on all three columns and a
     ``location_state`` CHECK constraint against ``US_STATES``; the
     constraint stays on the consuming table (CHECK names are table-

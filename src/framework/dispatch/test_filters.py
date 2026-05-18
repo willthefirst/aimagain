@@ -43,7 +43,7 @@ def test_choice_filter_single_value_url_contract():
     f = ChoiceFilter(
         name="kind",
         label="Type",
-        choices=(("client_referral", "Seeking"), ("provider_availability", "Offering")),
+        choices=(("referral", "Seeking"), ("opening", "Offering")),
     )
     assert f.multi is False
     assert f.annotation == (str | None)
@@ -69,11 +69,11 @@ def test_choice_filter_multi_url_contract_is_list_of_str():
 def test_choice_filter_value_type_tightens_annotation():
     """A `Literal` `value_type` constrains the param to declared
     values — FastAPI rejects unknown ones with 422 at the route layer."""
-    kinds = Literal["client_referral", "provider_availability"]
+    kinds = Literal["referral", "opening"]
     f = ChoiceFilter(
         name="kind",
         label="Type",
-        choices=(("client_referral", "Seeking"),),
+        choices=(("referral", "Seeking"),),
         value_type=kinds,
     )
     # annotation should be `kinds | None`

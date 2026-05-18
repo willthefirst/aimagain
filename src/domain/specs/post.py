@@ -1,7 +1,7 @@
 """`POST_ENTITY`: single declaration of the post resource.
 
 Posts is the codebase's only polymorphic entity — each post has a
-``kind`` discriminator (`client_referral`, `provider_availability`,
+``kind`` discriminator (`referral`, `opening`,
 …) whose per-variant detail row lives in a separate table. The
 discriminator binding is declared on the spec via
 ``discriminator=POST_KINDS``; layer files that need the registry's
@@ -87,8 +87,8 @@ POST_ENTITY: Final[EntitySpec] = EntitySpec(
             name="kind",
             label="Type",
             choices=(
-                ("client_referral", "Seeking"),
-                ("provider_availability", "Providing"),
+                ("referral", "Seeking"),
+                ("opening", "Providing"),
                 ("program_availability", "Program offering"),
             ),
             radio=True,

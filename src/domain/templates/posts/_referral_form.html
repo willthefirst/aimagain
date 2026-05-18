@@ -1,7 +1,7 @@
-{# Shared form body for `kind='client_referral'`.
+{# Shared form body for `kind='referral'`.
 
-Used by both `posts/new_client_referral.html` (create, no prefill) and
-`posts/edit_client_referral.html` (update, prefilled). Caller passes:
+Used by both `posts/new_referral.html` (create, no prefill) and
+`posts/edit_referral.html` (update, prefilled). Caller passes:
 
   - `hx_method`: "post" or "patch"
   - `action`: the form submit URL
@@ -19,10 +19,10 @@ which FastAPI/Pydantic parses as a list.
 #}
 {%- from "_shared/form_fields.html" import text_field, textarea_field, select_field, time_grid_field, multi_select_field, field_for -%}
 {%- from "_shared/forms.html" import form_actions -%}
-{%- macro client_referral_form(hx_method, action, submit_label, post=None, schema=None, cancel_url=None) -%}
-{%- set d = post.client_referral_detail if post else None -%}
+{%- macro referral_form(hx_method, action, submit_label, post=None, schema=None, cancel_url=None) -%}
+{%- set d = post.referral_detail if post else None -%}
 <form hx-{{ hx_method }}="{{ action }}">
-  <input type="hidden" name="kind" value="client_referral" />
+  <input type="hidden" name="kind" value="referral" />
 
   <fieldset>
     <legend>Client location</legend>
@@ -52,7 +52,7 @@ which FastAPI/Pydantic parses as a list.
 
   <fieldset>
     <legend>Services</legend>
-    {{ multi_select_field("services", "Services", CLIENT_REFERRAL_SERVICES, labels=CLIENT_REFERRAL_SERVICE_LABELS, current=d.services if d else None) }}
+    {{ multi_select_field("services", "Services", REFERRAL_SERVICES, labels=REFERRAL_SERVICE_LABELS, current=d.services if d else None) }}
     <small>Optional.</small>
     {{ text_field("treatment_modality", "Psychotherapy modality", current=d.treatment_modality if d else None, required=false) }}
     <small>Optional. e.g. DBT, EMDR.</small>
@@ -63,7 +63,7 @@ which FastAPI/Pydantic parses as a list.
      (optional — null when network_preference='no_preference'). The
      carrier <div> is hidden whenever no_preference is selected; a tiny
      inline script (below) toggles on change. Server-side, the
-     ClientReferralCreate schema accepts a null carrier with any
+     ReferralCreate schema accepts a null carrier with any
      network_preference, so the hidden control just leaves the field
      unset rather than enforcing the invariant on the wire. #}
   <fieldset>

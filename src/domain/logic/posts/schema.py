@@ -54,13 +54,13 @@ from src.domain.logic.value_objects.location import (
 from src.domain.models import POST_KINDS
 from src.domain.models.enums import (
     CLIENT_AGE_GROUPS,
-    CLIENT_REFERRAL_SERVICES,
     DESIRED_TIME_SLOTS,
     GENDERS,
     INSURANCE_CARRIERS,
     LANGUAGES,
     LOCATION_AVAILABILITY_OPTIONS,
     NETWORK_PREFERENCES,
+    REFERRAL_SERVICES,
     TREATMENT_SETTINGS,
 )
 from src.framework.rendering.form_fields import HtmlTextarea, HtmlUrl
@@ -72,7 +72,7 @@ from src.framework.schema_validators import (
     WirePayload,
 )
 
-# `description` and `referral_instructions` on `provider_availability` are
+# `description` and `referral_instructions` on `opening` are
 # free-form prose long enough to want a multi-line control. The marker
 # only affects form rendering (`field_for` picks `<textarea>` over
 # `<input>`); the validator chain is identical to `StrippedOptionalText`.
@@ -123,9 +123,9 @@ DesiredTimesField = Annotated[
     list[Literal[*DESIRED_TIME_SLOTS]], BeforeValidator(_scalar_to_list)
 ]
 ServicesField = Annotated[
-    list[Literal[*CLIENT_REFERRAL_SERVICES]], BeforeValidator(_scalar_to_list)
+    list[Literal[*REFERRAL_SERVICES]], BeforeValidator(_scalar_to_list)
 ]
-# `provider_availability.services` is required-min-1 on the wire; layer
+# `opening.services` is required-min-1 on the wire; layer
 # the constraint over the shared alias so the scalar-coercion still runs
 # first. `min_length` only fires on the list arm of `T | None`, so the
 # same alias works for `T` (Create/Read/AuditSnapshot) and `T | None`
@@ -134,21 +134,21 @@ RequiredServicesField = Annotated[ServicesField, Field(min_length=1)]
 SettingsField = Annotated[
     list[Literal[*TREATMENT_SETTINGS]], BeforeValidator(_scalar_to_list)
 ]
-# `provider_availability.settings` is required-min-1 on the wire; same
+# `opening.settings` is required-min-1 on the wire; same
 # pattern as services.
 RequiredSettingsField = Annotated[SettingsField, Field(min_length=1)]
 LanguagesField = Annotated[list[Literal[*LANGUAGES]], BeforeValidator(_scalar_to_list)]
-# `provider_availability.languages` is required-min-1 on the wire — every
+# `opening.languages` is required-min-1 on the wire — every
 # practice speaks at least one language, and the unfilterable "no
 # languages" state is meaningless. Mirrors services / settings.
 RequiredLanguagesField = Annotated[LanguagesField, Field(min_length=1)]
 AgeGroupsField = Annotated[
     list[Literal[*CLIENT_AGE_GROUPS]], BeforeValidator(_scalar_to_list)
 ]
-# `provider_availability.age_groups` is required-min-1 on the wire — every
+# `opening.age_groups` is required-min-1 on the wire — every
 # practice serves at least one age bucket.
 RequiredAgeGroupsField = Annotated[AgeGroupsField, Field(min_length=1)]
-# `provider_availability.genders` is a multi-checkbox on the wire, same
+# `opening.genders` is a multi-checkbox on the wire, same
 # normalization shape as services/settings/age_groups. Empty list is
 # allowed — "no restriction stated" / serves any gender.
 GendersField = Annotated[list[Literal[*GENDERS]], BeforeValidator(_scalar_to_list)]
@@ -201,8 +201,8 @@ class _PostReadBase(ReadProjection):
         return gather_flat_location(_flatten_post_to_dict(data) or data)
 
 
-class ClientReferralRead(_PostReadBase):
-    kind: Literal["client_referral"]
+class ReferralRead(_PostReadBase):
+    kind: Literal["referral"]
     # `(city, state, zip)` modeled as a single :class:`Location` value
     # object but kept flat on the wire/JSON shape — ``_flatten_post_to_dict``
     # produces a flat dict from the ORM, ``gather_flat_location`` nests the
@@ -217,7 +217,7 @@ class ClientReferralRead(_PostReadBase):
     description: str
     services: ServicesField = []
     treatment_modality: str | None = None
-    # See :class:`ClientReferralCreate` for the carrier/preference split.
+    # See :class:`ReferralCreate` for the carrier/preference split.
     network_preference: Literal[*NETWORK_PREFERENCES]
     insurance_carrier: OptionalInsuranceCarrier = None
 
@@ -229,15 +229,15 @@ class ClientReferralRead(_PostReadBase):
         return flatten_location_on_dump(self, handler(self))
 
 
-class ProviderAvailabilityRead(_PostReadBase):
-    kind: Literal["provider_availability"]
+class OpeningRead(_PostReadBase):
+    kind: Literal["opening"]
     description: str | None = None
     referral_instructions: str | None = None
     website: str | None = None
     # Practice + location + delivery-format + insurance posture all live
     # on the linked Provider (#448, #449). Read projections expose the
     # FK; templates dereference via
-    # `post.provider_availability_detail.provider.<field>`.
+    # `post.opening_detail.provider.<field>`.
     provider_id: uuid.UUID
     desired_times: DesiredTimesField = []
     schedule_text: str | None = None
@@ -270,7 +270,7 @@ class ProgramAvailabilityRead(_PostReadBase):
 
 
 PostRead = Annotated[
-    Union[ClientReferralRead, ProviderAvailabilityRead, ProgramAvailabilityRead],
+    Union[ReferralRead, OpeningRead, ProgramAvailabilityRead],
     Field(discriminator="kind"),
 ]
 post_read_adapter: TypeAdapter = TypeAdapter(PostRead)
@@ -284,8 +284,8 @@ post_read_adapter: TypeAdapter = TypeAdapter(PostRead)
 # bleed is rejected by the discriminated union one level up.
 
 
-class ClientReferralCreate(WirePayload):
-    """Create payload for `kind='client_referral'`. Field set follows the
+class ReferralCreate(WirePayload):
+    """Create payload for `kind='referral'`. Field set follows the
     client-referral intake form.
 
     The ``(city, state, zip)`` triple is a single :class:`Location` value
@@ -293,7 +293,7 @@ class ClientReferralCreate(WirePayload):
     (``gather_flat_location`` rolls them into the nested block).
     """
 
-    kind: Literal["client_referral"]
+    kind: Literal["referral"]
     location: Location
     location_in_person: Literal[*LOCATION_AVAILABILITY_OPTIONS]
     location_virtual: Literal[*LOCATION_AVAILABILITY_OPTIONS]
@@ -332,11 +332,11 @@ class ClientReferralCreate(WirePayload):
         return flatten_location_on_dump(self, handler(self))
 
 
-class ProviderAvailabilityCreate(WirePayload):
-    """Create payload for `kind='provider_availability'`. Field set follows
+class OpeningCreate(WirePayload):
+    """Create payload for `kind='opening'`. Field set follows
     the provider-availability intake form."""
 
-    kind: Literal["provider_availability"]
+    kind: Literal["opening"]
     # Optional initially — graduates to required once seed posts confirm
     # the shape works.
     description: TextareaOptional = None
@@ -367,7 +367,7 @@ class ProviderAvailabilityCreate(WirePayload):
 
 class ProgramAvailabilityCreate(WirePayload):
     """Create payload for `kind='program_availability'`. Field set mirrors
-    :class:`ProviderAvailabilityCreate` one-to-one but swaps the Provider
+    :class:`OpeningCreate` one-to-one but swaps the Provider
     FK for a Program FK — the referrer is choosing a Program (intake door),
     not a specific clinician."""
 
@@ -393,7 +393,7 @@ class ProgramAvailabilityCreate(WirePayload):
 
 
 PostCreate = Annotated[
-    Union[ClientReferralCreate, ProviderAvailabilityCreate, ProgramAvailabilityCreate],
+    Union[ReferralCreate, OpeningCreate, ProgramAvailabilityCreate],
     Field(discriminator="kind"),
 ]
 post_create_adapter: TypeAdapter = TypeAdapter(PostCreate)
@@ -414,14 +414,14 @@ post_create_adapter: TypeAdapter = TypeAdapter(PostCreate)
 # Create and Update.
 
 
-class ClientReferralUpdate(PartialUpdate):
+class ReferralUpdate(PartialUpdate):
     # `kind` is the discriminator, always required on the wire; the
     # `PartialUpdate` "at least one field" rule excludes it via
     # `at_least_one_field_exclude`.
     at_least_one_field_exclude = frozenset({"kind"})
 
-    kind: Literal["client_referral"]
-    # See :class:`ClientReferralCreate` — flat on the wire, nested
+    kind: Literal["referral"]
+    # See :class:`ReferralCreate` — flat on the wire, nested
     # value object in Python, flat on dump.
     location: LocationPartial | None = None
     location_in_person: Literal[*LOCATION_AVAILABILITY_OPTIONS] | None = None
@@ -455,10 +455,10 @@ class ClientReferralUpdate(PartialUpdate):
         return flatten_location_on_dump(self, handler(self))
 
 
-class ProviderAvailabilityUpdate(PartialUpdate):
+class OpeningUpdate(PartialUpdate):
     at_least_one_field_exclude = frozenset({"kind"})
 
-    kind: Literal["provider_availability"]
+    kind: Literal["opening"]
     description: TextareaOptional = None
     referral_instructions: TextareaOptional = None
     website: UrlOptional = None
@@ -505,7 +505,7 @@ class ProgramAvailabilityUpdate(PartialUpdate):
 
 
 PostUpdate = Annotated[
-    Union[ClientReferralUpdate, ProviderAvailabilityUpdate, ProgramAvailabilityUpdate],
+    Union[ReferralUpdate, OpeningUpdate, ProgramAvailabilityUpdate],
     Field(discriminator="kind"),
 ]
 post_update_adapter: TypeAdapter = TypeAdapter(PostUpdate)
@@ -523,9 +523,9 @@ class _PostAuditSnapshotBase(ReadProjection):
         return gather_flat_location(_flatten_post_to_dict(data) or data)
 
 
-class ClientReferralAuditSnapshot(_PostAuditSnapshotBase):
-    kind: Literal["client_referral"]
-    # Mirrors :class:`ClientReferralRead`. Audit ``before`` / ``after``
+class ReferralAuditSnapshot(_PostAuditSnapshotBase):
+    kind: Literal["referral"]
+    # Mirrors :class:`ReferralRead`. Audit ``before`` / ``after``
     # snapshots stay flat on the wire — the serializer unrolls the nested
     # ``location`` block back to top-level keys.
     location: Location
@@ -541,14 +541,14 @@ class ClientReferralAuditSnapshot(_PostAuditSnapshotBase):
     network_preference: Literal[*NETWORK_PREFERENCES]
     insurance_carrier: OptionalInsuranceCarrier = None
 
-    # Flat-on-dump — see :class:`ClientReferralRead`.
+    # Flat-on-dump — see :class:`ReferralRead`.
     @model_serializer(mode="wrap")
     def _flatten_location(self, handler):
         return flatten_location_on_dump(self, handler(self))
 
 
-class ProviderAvailabilityAuditSnapshot(_PostAuditSnapshotBase):
-    kind: Literal["provider_availability"]
+class OpeningAuditSnapshot(_PostAuditSnapshotBase):
+    kind: Literal["opening"]
     description: str | None = None
     referral_instructions: str | None = None
     website: str | None = None
@@ -583,8 +583,8 @@ class ProgramAvailabilityAuditSnapshot(_PostAuditSnapshotBase):
 
 PostAuditSnapshot = Annotated[
     Union[
-        ClientReferralAuditSnapshot,
-        ProviderAvailabilityAuditSnapshot,
+        ReferralAuditSnapshot,
+        OpeningAuditSnapshot,
         ProgramAvailabilityAuditSnapshot,
     ],
     Field(discriminator="kind"),

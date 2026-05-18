@@ -19,7 +19,7 @@ of any registered top-level entity. Examples:
   ``href="/organizations/{{ id }}"``    — flagged (literal first segment)
   ``"/users/me"`` in any context        — flagged
   ``request.url.path == '/providers'``  — flagged
-  ``href="?kind=client_referral"``      — not flagged (relative, no `/`)
+  ``href="?kind=referral"``      — not flagged (relative, no `/`)
   ``href="{{ entity_url('post') }}"``   — not flagged (no literal segment)
   ``"/licensures"`` (sub of provider)   — not flagged (not top-level)
 

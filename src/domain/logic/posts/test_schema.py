@@ -24,11 +24,11 @@ import pytest
 from pydantic import ValidationError
 
 from src.domain.logic.posts.schema import (
-    ClientReferralCreate,
-    ClientReferralRead,
-    ClientReferralUpdate,
-    ProviderAvailabilityCreate,
-    ProviderAvailabilityUpdate,
+    OpeningCreate,
+    OpeningUpdate,
+    ReferralCreate,
+    ReferralRead,
+    ReferralUpdate,
     post_audit_snapshot,
     post_create_adapter,
     post_update_adapter,
@@ -39,9 +39,6 @@ from src.domain.models.enums import (
     CLIENT_AGE_GROUP_LABELS_SINGULAR,
     CLIENT_AGE_GROUPS,
     CLIENT_AGE_GROUPS_BY_KEY,
-    CLIENT_REFERRAL_SERVICE_ICONS,
-    CLIENT_REFERRAL_SERVICE_LABELS,
-    CLIENT_REFERRAL_SERVICES,
     DESIRED_TIME_SLOT_LABELS,
     DESIRED_TIME_SLOTS,
     GENDER_LABELS,
@@ -57,23 +54,26 @@ from src.domain.models.enums import (
     LOCATION_AVAILABILITY_OPTIONS,
     NETWORK_PREFERENCE_LABELS,
     NETWORK_PREFERENCES,
+    REFERRAL_SERVICE_ICONS,
+    REFERRAL_SERVICE_LABELS,
+    REFERRAL_SERVICES,
     TREATMENT_SETTINGS,
     TREATMENT_SETTINGS_ICONS,
 )
-from tests.helpers import client_referral_payload, provider_availability_payload
+from tests.helpers import opening_payload, referral_payload
 
 # --- PostCreate (discriminated union) -----------------------------------
 
 
-def test_post_create_dispatches_client_referral():
-    payload = client_referral_payload(description="needs a clinician")
+def test_post_create_dispatches_referral():
+    payload = referral_payload(description="needs a clinician")
     p = post_create_adapter.validate_python(payload)
-    assert isinstance(p, ClientReferralCreate)
-    assert p.kind == "client_referral"
+    assert isinstance(p, ReferralCreate)
+    assert p.kind == "referral"
     assert p.description == "needs a clinician"
     # Post-#451: ``(city, state, zip)`` live on the embedded
     # :class:`Location` value object. The form/JSON wire shape stays
-    # flat — see ``test_post_create_client_referral_dump_keeps_flat_location``.
+    # flat — see ``test_post_create_referral_dump_keeps_flat_location``.
     assert p.location.city == "Springfield"
     assert p.location.state == "IL"
     assert p.network_preference == "in_network_required"
@@ -82,7 +82,7 @@ def test_post_create_dispatches_client_referral():
 
 def test_post_create_requires_kind():
     """`kind` is required — no default fallback."""
-    payload = client_referral_payload()
+    payload = referral_payload()
     payload.pop("kind")
     with pytest.raises(ValidationError):
         post_create_adapter.validate_python(payload)
@@ -101,17 +101,17 @@ def test_post_create_rejects_retired_note_kind():
         )
 
 
-def test_post_create_strips_surrounding_whitespace_client_referral():
+def test_post_create_strips_surrounding_whitespace_referral():
     p = post_create_adapter.validate_python(
-        client_referral_payload(description="  help  ", location_city="  Boise  ")
+        referral_payload(description="  help  ", location_city="  Boise  ")
     )
     assert p.description == "help"
     assert p.location.city == "Boise"
 
 
-def test_post_create_client_referral_rejects_empty_description():
+def test_post_create_referral_rejects_empty_description():
     with pytest.raises(ValidationError):
-        post_create_adapter.validate_python(client_referral_payload(description="   "))
+        post_create_adapter.validate_python(referral_payload(description="   "))
 
 
 @pytest.mark.parametrize(
@@ -127,119 +127,109 @@ def test_post_create_client_referral_rejects_empty_description():
         "network_preference",
     ],
 )
-def test_post_create_client_referral_requires_all_required_fields(missing_field):
-    payload = client_referral_payload()
+def test_post_create_referral_requires_all_required_fields(missing_field):
+    payload = referral_payload()
     payload.pop(missing_field)
     with pytest.raises(ValidationError):
         post_create_adapter.validate_python(payload)
 
 
-def test_post_create_client_referral_optional_fields_default_none():
-    p = post_create_adapter.validate_python(client_referral_payload())
+def test_post_create_referral_optional_fields_default_none():
+    p = post_create_adapter.validate_python(referral_payload())
     assert p.treatment_modality is None
 
 
-def test_post_create_client_referral_default_languages():
+def test_post_create_referral_default_languages():
     """`languages` defaults to ['en'] — keeps "submit with defaults" valid
     even though the field is required min-1 (#428)."""
-    payload = client_referral_payload()
+    payload = referral_payload()
     payload.pop("languages")
     p = post_create_adapter.validate_python(payload)
     assert p.languages == ["en"]
 
 
-def test_post_create_client_referral_accepts_multiple_languages():
-    p = post_create_adapter.validate_python(
-        client_referral_payload(languages=["en", "es"])
-    )
+def test_post_create_referral_accepts_multiple_languages():
+    p = post_create_adapter.validate_python(referral_payload(languages=["en", "es"]))
     assert p.languages == ["en", "es"]
 
 
-def test_post_create_client_referral_rejects_empty_languages():
+def test_post_create_referral_rejects_empty_languages():
     with pytest.raises(ValidationError):
-        post_create_adapter.validate_python(client_referral_payload(languages=[]))
+        post_create_adapter.validate_python(referral_payload(languages=[]))
 
 
-def test_post_create_client_referral_rejects_unknown_language_token():
+def test_post_create_referral_rejects_unknown_language_token():
     with pytest.raises(ValidationError):
-        post_create_adapter.validate_python(client_referral_payload(languages=["xx"]))
+        post_create_adapter.validate_python(referral_payload(languages=["xx"]))
 
 
-def test_post_create_client_referral_accepts_multiple_age_groups():
+def test_post_create_referral_accepts_multiple_age_groups():
     """CR's `age_groups` accepts a multi-bucket list (#432) —
     the original single-valued `client_dem_ages` forced referrers to
     pick one when a child straddled buckets."""
     p = post_create_adapter.validate_python(
-        client_referral_payload(age_groups=["children_6_10", "preteens_11_13"])
+        referral_payload(age_groups=["children_6_10", "preteens_11_13"])
     )
     assert p.age_groups == ["children_6_10", "preteens_11_13"]
 
 
-def test_post_create_client_referral_rejects_empty_age_groups():
+def test_post_create_referral_rejects_empty_age_groups():
     with pytest.raises(ValidationError):
-        post_create_adapter.validate_python(client_referral_payload(age_groups=[]))
+        post_create_adapter.validate_python(referral_payload(age_groups=[]))
 
 
-def test_post_create_client_referral_strips_optional_to_none():
-    p = post_create_adapter.validate_python(
-        client_referral_payload(treatment_modality="   ")
-    )
+def test_post_create_referral_strips_optional_to_none():
+    p = post_create_adapter.validate_python(referral_payload(treatment_modality="   "))
     assert p.treatment_modality is None
 
 
-def test_post_create_client_referral_rejects_invalid_zip():
+def test_post_create_referral_rejects_invalid_zip():
     with pytest.raises(ValidationError):
-        post_create_adapter.validate_python(client_referral_payload(location_zip="abc"))
+        post_create_adapter.validate_python(referral_payload(location_zip="abc"))
+    with pytest.raises(ValidationError):
+        post_create_adapter.validate_python(referral_payload(location_zip="1234"))
+
+
+def test_post_create_referral_rejects_unknown_state():
+    with pytest.raises(ValidationError):
+        post_create_adapter.validate_python(referral_payload(location_state="ZZ"))
+
+
+def test_post_create_referral_rejects_unknown_age_group():
+    with pytest.raises(ValidationError):
+        post_create_adapter.validate_python(referral_payload(age_groups=["too_old"]))
+
+
+def test_post_create_referral_rejects_unknown_network_preference():
     with pytest.raises(ValidationError):
         post_create_adapter.validate_python(
-            client_referral_payload(location_zip="1234")
+            referral_payload(network_preference="bring_cash")
         )
 
 
-def test_post_create_client_referral_rejects_unknown_state():
+def test_post_create_referral_rejects_unknown_insurance_carrier():
     with pytest.raises(ValidationError):
         post_create_adapter.validate_python(
-            client_referral_payload(location_state="ZZ")
+            referral_payload(insurance_carrier="my_local_co_op")
         )
 
 
-def test_post_create_client_referral_rejects_unknown_age_group():
-    with pytest.raises(ValidationError):
-        post_create_adapter.validate_python(
-            client_referral_payload(age_groups=["too_old"])
-        )
-
-
-def test_post_create_client_referral_rejects_unknown_network_preference():
-    with pytest.raises(ValidationError):
-        post_create_adapter.validate_python(
-            client_referral_payload(network_preference="bring_cash")
-        )
-
-
-def test_post_create_client_referral_rejects_unknown_insurance_carrier():
-    with pytest.raises(ValidationError):
-        post_create_adapter.validate_python(
-            client_referral_payload(insurance_carrier="my_local_co_op")
-        )
-
-
-def test_post_create_client_referral_allows_null_insurance_carrier():
+def test_post_create_referral_allows_null_insurance_carrier():
     """Carrier is nullable — self-pay / unknown / no carrier all map to
     NULL on the wire. The form hides the field when network_preference
     = no_preference; the schema accepts a null carrier with any
     network_preference value."""
     for pref in NETWORK_PREFERENCES:
         p = post_create_adapter.validate_python(
-            client_referral_payload(network_preference=pref, insurance_carrier=None)
+            referral_payload(network_preference=pref, insurance_carrier=None)
         )
         assert p.network_preference == pref
         assert p.insurance_carrier is None
 
 
-def test_post_create_client_referral_accepts_carrier_with_required():
+def test_post_create_referral_accepts_carrier_with_required():
     p = post_create_adapter.validate_python(
-        client_referral_payload(
+        referral_payload(
             network_preference="in_network_required",
             insurance_carrier="cigna",
         )
@@ -252,35 +242,35 @@ def test_post_create_rejects_owner_id():
     """owner_id is server-managed; clients sending it must be rejected."""
     with pytest.raises(ValidationError):
         post_create_adapter.validate_python(
-            client_referral_payload(owner_id=str(uuid.uuid4()))
+            referral_payload(owner_id=str(uuid.uuid4()))
         )
 
 
-def test_post_create_rejects_unknown_fields_on_client_referral():
+def test_post_create_rejects_unknown_fields_on_referral():
     with pytest.raises(ValidationError):
-        post_create_adapter.validate_python(client_referral_payload(evil=True))
+        post_create_adapter.validate_python(referral_payload(evil=True))
 
 
 # --- PostUpdate (discriminated union) -----------------------------------
 
 
-def test_post_update_client_referral_accepts_description():
+def test_post_update_referral_accepts_description():
     p = post_update_adapter.validate_python(
-        {"kind": "client_referral", "description": "fresh"}
+        {"kind": "referral", "description": "fresh"}
     )
-    assert isinstance(p, ClientReferralUpdate)
+    assert isinstance(p, ReferralUpdate)
     assert p.description == "fresh"
 
 
-def test_post_update_client_referral_accepts_partial_other_field():
+def test_post_update_referral_accepts_partial_other_field():
     """Any one editable field is enough for a partial update. After
     #451, ``location_city`` arrives flat and rolls into the nested
     ``location: LocationPartial`` field; ``description`` stays absent
     on this patch."""
     p = post_update_adapter.validate_python(
-        {"kind": "client_referral", "location_city": "Boise"}
+        {"kind": "referral", "location_city": "Boise"}
     )
-    assert isinstance(p, ClientReferralUpdate)
+    assert isinstance(p, ReferralUpdate)
     assert p.location is not None
     assert p.location.city == "Boise"
     assert p.description is None
@@ -301,73 +291,69 @@ def test_post_update_rejects_retired_note_kind():
         post_update_adapter.validate_python({"kind": "note", "title": "x"})
 
 
-def test_post_update_strips_whitespace_client_referral():
+def test_post_update_strips_whitespace_referral():
     p = post_update_adapter.validate_python(
-        {"kind": "client_referral", "description": "  hi  "}
+        {"kind": "referral", "description": "  hi  "}
     )
     assert p.description == "hi"
 
 
-def test_post_update_client_referral_requires_at_least_one_field():
+def test_post_update_referral_requires_at_least_one_field():
     """An empty PATCH (just `kind`) must 422."""
     with pytest.raises(ValidationError):
-        post_update_adapter.validate_python({"kind": "client_referral"})
+        post_update_adapter.validate_python({"kind": "referral"})
 
 
-def test_post_update_client_referral_explicit_nulls_only_is_rejected():
+def test_post_update_referral_explicit_nulls_only_is_rejected():
     """All editable fields explicitly null still counts as no-op → 422."""
     with pytest.raises(ValidationError):
         post_update_adapter.validate_python(
-            {"kind": "client_referral", "description": None, "location_city": None}
+            {"kind": "referral", "description": None, "location_city": None}
         )
 
 
-def test_post_update_client_referral_rejects_whitespace_only_description():
+def test_post_update_referral_rejects_whitespace_only_description():
     with pytest.raises(ValidationError):
-        post_update_adapter.validate_python(
-            {"kind": "client_referral", "description": "   "}
-        )
+        post_update_adapter.validate_python({"kind": "referral", "description": "   "})
 
 
-def test_post_update_client_referral_rejects_invalid_zip():
+def test_post_update_referral_rejects_invalid_zip():
     with pytest.raises(ValidationError):
-        post_update_adapter.validate_python(
-            {"kind": "client_referral", "location_zip": "12"}
-        )
+        post_update_adapter.validate_python({"kind": "referral", "location_zip": "12"})
 
 
-def test_post_update_client_referral_rejects_owner_id():
+def test_post_update_referral_rejects_owner_id():
     with pytest.raises(ValidationError):
         post_update_adapter.validate_python(
             {
-                "kind": "client_referral",
+                "kind": "referral",
                 "description": "d",
                 "owner_id": str(uuid.uuid4()),
             }
         )
 
 
-def test_post_update_client_referral_rejects_unknown_field():
+def test_post_update_referral_rejects_unknown_field():
     with pytest.raises(ValidationError):
         post_update_adapter.validate_python(
-            {"kind": "client_referral", "description": "d", "evil": True}
+            {"kind": "referral", "description": "d", "evil": True}
         )
 
 
 # --- post_audit_snapshot ------------------------------------------------
 
 
-def test_audit_snapshot_for_client_referral_post():
+def test_audit_snapshot_for_referral_post():
     owner_id = uuid.uuid4()
-    detail_attrs = client_referral_payload()
+    detail_attrs = referral_payload()
     detail_attrs.pop("kind")
     post = SimpleNamespace(
-        kind="client_referral",
+        kind="referral",
         owner_id=owner_id,
-        client_referral_detail=SimpleNamespace(**detail_attrs),
+        referral_detail=SimpleNamespace(**detail_attrs),
     )
     snap = post_audit_snapshot(post)
-    assert snap["kind"] == "client_referral"
+    assert snap["kind"] == "referral"
     assert snap["owner_id"] == str(owner_id)
     assert snap["description"] == detail_attrs["description"]
     assert snap["location_city"] == detail_attrs["location_city"]
@@ -382,20 +368,20 @@ def test_audit_snapshot_unknown_kind_raises():
     post = SimpleNamespace(
         kind="not_a_kind",
         owner_id=uuid.uuid4(),
-        client_referral_detail=None,
-        provider_availability_detail=None,
+        referral_detail=None,
+        opening_detail=None,
     )
     with pytest.raises(ValidationError):
         post_audit_snapshot(post)
 
 
-# --- provider_availability variants -------------------------------------
+# --- opening variants -------------------------------------
 
 
-def test_post_create_dispatches_provider_availability():
-    p = post_create_adapter.validate_python(provider_availability_payload())
-    assert isinstance(p, ProviderAvailabilityCreate)
-    assert p.kind == "provider_availability"
+def test_post_create_dispatches_opening():
+    p = post_create_adapter.validate_python(opening_payload())
+    assert isinstance(p, OpeningCreate)
+    assert p.kind == "opening"
     # Insurance posture moved to Provider in #449; PA no longer carries
     # `sliding_scale` / `payment_situation` / `cost` on the wire.
 
@@ -404,42 +390,36 @@ def test_post_create_dispatches_provider_availability():
     "token",
     ["group_therapy", "family_therapy", "couples_therapy"],
 )
-def test_post_create_provider_availability_accepts_new_services_tokens(token):
+def test_post_create_opening_accepts_new_services_tokens(token):
     """The three service tokens added in #440 validate on PA Create."""
-    p = post_create_adapter.validate_python(
-        provider_availability_payload(services=[token])
-    )
+    p = post_create_adapter.validate_python(opening_payload(services=[token]))
     assert p.services == [token]
 
 
-def test_post_create_provider_availability_accepts_schedule_text():
+def test_post_create_opening_accepts_schedule_text():
     """`schedule_text` is the free-text companion to `desired_times` for
     cohort dates / fixed program hours (#442)."""
     p = post_create_adapter.validate_python(
-        provider_availability_payload(schedule_text="M-F 9am-5pm, starts May 11")
+        opening_payload(schedule_text="M-F 9am-5pm, starts May 11")
     )
     assert p.schedule_text == "M-F 9am-5pm, starts May 11"
 
 
-def test_post_create_provider_availability_schedule_text_strips_whitespace():
-    p = post_create_adapter.validate_python(
-        provider_availability_payload(schedule_text="   ")
-    )
+def test_post_create_opening_schedule_text_strips_whitespace():
+    p = post_create_adapter.validate_python(opening_payload(schedule_text="   "))
     assert p.schedule_text is None
 
 
-def test_post_update_provider_availability_accepts_schedule_text_only():
+def test_post_update_opening_accepts_schedule_text_only():
     p = post_update_adapter.validate_python(
-        {"kind": "provider_availability", "schedule_text": "New cohort starts Jun 1"}
+        {"kind": "opening", "schedule_text": "New cohort starts Jun 1"}
     )
     assert p.schedule_text == "New cohort starts Jun 1"
 
 
-def test_post_create_provider_availability_accepts_day_program_setting():
+def test_post_create_opening_accepts_day_program_setting():
     """`day_program` setting added in #440 for program-style posts."""
-    p = post_create_adapter.validate_python(
-        provider_availability_payload(settings=["day_program"])
-    )
+    p = post_create_adapter.validate_python(opening_payload(settings=["day_program"]))
     assert p.settings == ["day_program"]
 
 
@@ -447,77 +427,67 @@ def test_post_create_provider_availability_accepts_day_program_setting():
     "token",
     ["group_therapy", "family_therapy", "couples_therapy"],
 )
-def test_post_create_client_referral_accepts_new_services_tokens(token):
-    """CR shares the `CLIENT_REFERRAL_SERVICES` vocab with PA; widening
+def test_post_create_referral_accepts_new_services_tokens(token):
+    """CR shares the `REFERRAL_SERVICES` vocab with PA; widening
     propagates to both (#440)."""
-    p = post_create_adapter.validate_python(client_referral_payload(services=[token]))
+    p = post_create_adapter.validate_python(referral_payload(services=[token]))
     assert p.services == [token]
 
 
 @pytest.mark.parametrize("token", NETWORK_PREFERENCES)
-def test_post_create_client_referral_accepts_all_network_preference_tokens(token):
+def test_post_create_referral_accepts_all_network_preference_tokens(token):
     """Every `NETWORK_PREFERENCES` token validates as a CR
     `network_preference` value."""
-    p = post_create_adapter.validate_python(
-        client_referral_payload(network_preference=token)
-    )
+    p = post_create_adapter.validate_python(referral_payload(network_preference=token))
     assert p.network_preference == token
 
 
 @pytest.mark.parametrize("token", INSURANCE_CARRIERS)
-def test_post_create_client_referral_accepts_all_insurance_carriers(token):
+def test_post_create_referral_accepts_all_insurance_carriers(token):
     """Every `INSURANCE_CARRIERS` token validates as a CR
     `insurance_carrier` value (shared vocab with Provider)."""
-    p = post_create_adapter.validate_python(
-        client_referral_payload(insurance_carrier=token)
-    )
+    p = post_create_adapter.validate_python(referral_payload(insurance_carrier=token))
     assert p.insurance_carrier == token
 
 
-def test_post_create_client_referral_rejects_retired_in_network_token():
+def test_post_create_referral_rejects_retired_in_network_token():
     """The old `insurance` enum is gone. A payload sending the legacy
     field gets ignored as an unknown field (extra='forbid' on
     WirePayload), so this 422s."""
     with pytest.raises(ValidationError):
-        post_create_adapter.validate_python(
-            client_referral_payload(insurance="in_network")
-        )
+        post_create_adapter.validate_python(referral_payload(insurance="in_network"))
 
 
-def test_post_create_provider_availability_default_languages():
+def test_post_create_opening_default_languages():
     """`languages` defaults to ['en'] — keeps the submit-with-defaults case
     valid even though the field is required min-1 (#425)."""
-    payload = provider_availability_payload()
+    payload = opening_payload()
     payload.pop("languages")
     p = post_create_adapter.validate_python(payload)
     assert p.languages == ["en"]
 
 
-def test_post_create_provider_availability_accepts_multiple_languages():
-    p = post_create_adapter.validate_python(
-        provider_availability_payload(languages=["en", "es"])
-    )
+def test_post_create_opening_accepts_multiple_languages():
+    p = post_create_adapter.validate_python(opening_payload(languages=["en", "es"]))
     assert p.languages == ["en", "es"]
 
 
-def test_post_create_provider_availability_rejects_empty_languages():
+def test_post_create_opening_rejects_empty_languages():
     """`languages` is required min-1; an empty list 422s, mirroring services."""
     with pytest.raises(ValidationError):
-        post_create_adapter.validate_python(provider_availability_payload(languages=[]))
+        post_create_adapter.validate_python(opening_payload(languages=[]))
 
 
-def test_post_create_provider_availability_rejects_unknown_language_token():
+def test_post_create_opening_rejects_unknown_language_token():
     with pytest.raises(ValidationError):
-        post_create_adapter.validate_python(
-            provider_availability_payload(languages=["xx"])
-        )
+        post_create_adapter.validate_python(opening_payload(languages=["xx"]))
 
 
-def test_post_create_provider_availability_accepts_multiple_age_groups():
+def test_post_create_opening_accepts_multiple_age_groups():
     """`age_groups` accepts a multi-bucket list — Katie Reeves spans 3
     buckets, that's the whole point of #430."""
     p = post_create_adapter.validate_python(
-        provider_availability_payload(
+        opening_payload(
             age_groups=["adolescents_14_18", "young_adults_19_24", "adults_25_64"]
         )
     )
@@ -528,24 +498,22 @@ def test_post_create_provider_availability_accepts_multiple_age_groups():
     ]
 
 
-def test_post_create_provider_availability_rejects_empty_age_groups():
+def test_post_create_opening_rejects_empty_age_groups():
+    with pytest.raises(ValidationError):
+        post_create_adapter.validate_python(opening_payload(age_groups=[]))
+
+
+def test_post_create_opening_rejects_unknown_age_group_token():
     with pytest.raises(ValidationError):
         post_create_adapter.validate_python(
-            provider_availability_payload(age_groups=[])
+            opening_payload(age_groups=["not_a_bucket"])
         )
 
 
-def test_post_create_provider_availability_rejects_unknown_age_group_token():
-    with pytest.raises(ValidationError):
-        post_create_adapter.validate_python(
-            provider_availability_payload(age_groups=["not_a_bucket"])
-        )
-
-
-def test_post_update_provider_availability_accepts_age_groups_only():
+def test_post_update_opening_accepts_age_groups_only():
     p = post_update_adapter.validate_python(
         {
-            "kind": "provider_availability",
+            "kind": "opening",
             "age_groups": ["young_adults_19_24", "adults_25_64"],
         }
     )
@@ -559,32 +527,30 @@ def test_post_update_provider_availability_accepts_age_groups_only():
         "age_groups",
     ],
 )
-def test_post_create_provider_availability_requires_required_fields(missing_field):
-    payload = provider_availability_payload()
+def test_post_create_opening_requires_required_fields(missing_field):
+    payload = opening_payload()
     payload.pop(missing_field)
     with pytest.raises(ValidationError):
         post_create_adapter.validate_python(payload)
 
 
-def test_post_create_rejects_unknown_fields_on_provider_availability():
+def test_post_create_rejects_unknown_fields_on_opening():
     with pytest.raises(ValidationError):
-        post_create_adapter.validate_python(provider_availability_payload(evil=True))
+        post_create_adapter.validate_python(opening_payload(evil=True))
 
 
 def test_post_create_rejects_cross_kind_field_bleed():
     """Cross-kind field bleed must not validate. `location_in_person`
     is a client-referral-only field; it has no place in a PA payload."""
     with pytest.raises(ValidationError):
-        post_create_adapter.validate_python(
-            provider_availability_payload(location_in_person="yes")
-        )
+        post_create_adapter.validate_python(opening_payload(location_in_person="yes"))
 
 
-def test_post_create_provider_availability_accepts_free_text_fields():
+def test_post_create_opening_accepts_free_text_fields():
     """`description`, `referral_instructions`, `website` round-trip through
     the Create schema."""
     p = post_create_adapter.validate_python(
-        provider_availability_payload(
+        opening_payload(
             description="Lead narrative pitch.",
             referral_instructions="Email the intake coordinator.",
             website="example.com",
@@ -595,9 +561,9 @@ def test_post_create_provider_availability_accepts_free_text_fields():
     assert p.website == "example.com"
 
 
-def test_post_create_provider_availability_free_text_fields_default_none():
+def test_post_create_opening_free_text_fields_default_none():
     """All three new fields are optional; absent → None."""
-    payload = provider_availability_payload()
+    payload = opening_payload()
     for field in ("description", "referral_instructions", "website"):
         payload.pop(field, None)
     p = post_create_adapter.validate_python(payload)
@@ -606,9 +572,9 @@ def test_post_create_provider_availability_free_text_fields_default_none():
     assert p.website is None
 
 
-def test_post_create_provider_availability_strips_free_text_whitespace():
+def test_post_create_opening_strips_free_text_whitespace():
     p = post_create_adapter.validate_python(
-        provider_availability_payload(
+        opening_payload(
             description="  trim me  ",
             referral_instructions="   ",
         )
@@ -618,72 +584,70 @@ def test_post_create_provider_availability_strips_free_text_whitespace():
     assert p.referral_instructions is None
 
 
-def test_post_update_provider_availability_accepts_description_only():
+def test_post_update_opening_accepts_description_only():
     """A PATCH that only sets `description` is a valid partial update."""
     p = post_update_adapter.validate_python(
-        {"kind": "provider_availability", "description": "Updated pitch."}
+        {"kind": "opening", "description": "Updated pitch."}
     )
     assert p.description == "Updated pitch."
 
 
-def test_post_update_provider_availability_accepts_provider_id_only():
+def test_post_update_opening_accepts_provider_id_only():
     """A PATCH that only repoints `provider_id` is a valid partial update.
     Replaces the pre-#449 `sliding_scale`-only test, since insurance posture
     now lives on Provider."""
     new_provider_id = uuid.uuid4()
     p = post_update_adapter.validate_python(
-        {"kind": "provider_availability", "provider_id": str(new_provider_id)}
+        {"kind": "opening", "provider_id": str(new_provider_id)}
     )
-    assert isinstance(p, ProviderAvailabilityUpdate)
+    assert isinstance(p, OpeningUpdate)
     assert p.provider_id == new_provider_id
 
 
-def test_post_update_provider_availability_strips_whitespace():
+def test_post_update_opening_strips_whitespace():
     """`description` is a free-text PA field — whitespace stripping still
     applies. (Practice-name stripping moved to Provider with #448.)"""
     p = post_update_adapter.validate_python(
-        {"kind": "provider_availability", "description": "  Renamed  "}
+        {"kind": "opening", "description": "  Renamed  "}
     )
     assert p.description == "Renamed"
 
 
-def test_post_update_provider_availability_requires_at_least_one_field():
+def test_post_update_opening_requires_at_least_one_field():
     with pytest.raises(ValidationError):
-        post_update_adapter.validate_python({"kind": "provider_availability"})
+        post_update_adapter.validate_python({"kind": "opening"})
 
 
-def test_post_update_provider_availability_rejects_whitespace_only():
+def test_post_update_opening_rejects_whitespace_only():
     with pytest.raises(ValidationError):
-        post_update_adapter.validate_python(
-            {"kind": "provider_availability", "description": "   "}
-        )
+        post_update_adapter.validate_python({"kind": "opening", "description": "   "})
 
 
-def test_post_update_provider_availability_rejects_unknown_field():
+def test_post_update_opening_rejects_unknown_field():
     with pytest.raises(ValidationError):
         post_update_adapter.validate_python(
             {
-                "kind": "provider_availability",
+                "kind": "opening",
                 "description": "Acme",
                 "evil": True,
             }
         )
 
 
-def test_audit_snapshot_for_provider_availability_post():
-    """Snapshotting a `kind='provider_availability'` post flattens through
-    `provider_availability_detail`."""
+def test_audit_snapshot_for_opening_post():
+    """Snapshotting a `kind='opening'` post flattens through
+    `opening_detail`."""
     owner_id = uuid.uuid4()
-    detail_attrs = provider_availability_payload()
+    detail_attrs = opening_payload()
     detail_attrs.pop("kind")
     post = SimpleNamespace(
-        kind="provider_availability",
+        kind="opening",
         owner_id=owner_id,
-        client_referral_detail=None,
-        provider_availability_detail=SimpleNamespace(**detail_attrs),
+        referral_detail=None,
+        opening_detail=SimpleNamespace(**detail_attrs),
     )
     snap = post_audit_snapshot(post)
-    assert snap["kind"] == "provider_availability"
+    assert snap["kind"] == "opening"
     assert snap["owner_id"] == str(owner_id)
     # Per #448, the audit row records the FK to the Provider, not the
     # dereferenced practice fields. Practice-name/location/sessions live
@@ -721,19 +685,19 @@ def _literal_args(model_cls, field_name: str) -> tuple[str, ...]:
         # Read variants. ``location_state`` moved into the
         # :class:`Location` value object in #451 — see the lockstep
         # test in ``src/domain/logic/value_objects/test_location.py``.
-        (ClientReferralRead, "location_in_person", LOCATION_AVAILABILITY_OPTIONS),
-        (ClientReferralRead, "location_virtual", LOCATION_AVAILABILITY_OPTIONS),
-        (ClientReferralRead, "network_preference", NETWORK_PREFERENCES),
-        (ClientReferralRead, "insurance_carrier", INSURANCE_CARRIERS),
-        (ClientReferralRead, "gender", GENDERS),
+        (ReferralRead, "location_in_person", LOCATION_AVAILABILITY_OPTIONS),
+        (ReferralRead, "location_virtual", LOCATION_AVAILABILITY_OPTIONS),
+        (ReferralRead, "network_preference", NETWORK_PREFERENCES),
+        (ReferralRead, "insurance_carrier", INSURANCE_CARRIERS),
+        (ReferralRead, "gender", GENDERS),
         # Create variants
-        (ClientReferralCreate, "network_preference", NETWORK_PREFERENCES),
-        (ClientReferralCreate, "insurance_carrier", INSURANCE_CARRIERS),
-        (ClientReferralCreate, "gender", GENDERS),
+        (ReferralCreate, "network_preference", NETWORK_PREFERENCES),
+        (ReferralCreate, "insurance_carrier", INSURANCE_CARRIERS),
+        (ReferralCreate, "gender", GENDERS),
         # Update variants (Optional[Literal[*TUPLE]])
-        (ClientReferralUpdate, "network_preference", NETWORK_PREFERENCES),
-        (ClientReferralUpdate, "insurance_carrier", INSURANCE_CARRIERS),
-        (ClientReferralUpdate, "gender", GENDERS),
+        (ReferralUpdate, "network_preference", NETWORK_PREFERENCES),
+        (ReferralUpdate, "insurance_carrier", INSURANCE_CARRIERS),
+        (ReferralUpdate, "gender", GENDERS),
     ],
 )
 def test_schema_literals_match_model_tuples(model_cls, field, expected):
@@ -750,8 +714,8 @@ def test_schema_literals_match_model_tuples(model_cls, field, expected):
 @pytest.mark.parametrize(
     "payload_factory,kind",
     [
-        (client_referral_payload, "client_referral"),
-        (provider_availability_payload, "provider_availability"),
+        (referral_payload, "referral"),
+        (opening_payload, "opening"),
     ],
 )
 def test_post_create_desired_times_defaults_to_empty_list(payload_factory, kind):
@@ -763,7 +727,7 @@ def test_post_create_desired_times_defaults_to_empty_list(payload_factory, kind)
 
 @pytest.mark.parametrize(
     "payload_factory",
-    [client_referral_payload, provider_availability_payload],
+    [referral_payload, opening_payload],
 )
 def test_post_create_desired_times_accepts_subset(payload_factory):
     p = post_create_adapter.validate_python(
@@ -774,7 +738,7 @@ def test_post_create_desired_times_accepts_subset(payload_factory):
 
 @pytest.mark.parametrize(
     "payload_factory",
-    [client_referral_payload, provider_availability_payload],
+    [referral_payload, opening_payload],
 )
 def test_post_create_desired_times_coerces_scalar_to_singleton_list(payload_factory):
     """htmx's `json-enc` collapses a 1-checkbox-checked group to a scalar
@@ -786,7 +750,7 @@ def test_post_create_desired_times_coerces_scalar_to_singleton_list(payload_fact
     assert p.desired_times == ["monday_am"]
 
 
-@pytest.mark.parametrize("kind", ["client_referral", "provider_availability"])
+@pytest.mark.parametrize("kind", ["referral", "opening"])
 def test_post_update_desired_times_coerces_scalar_to_singleton_list(kind):
     p = post_update_adapter.validate_python(
         {"kind": kind, "desired_times": "monday_am"}
@@ -796,7 +760,7 @@ def test_post_update_desired_times_coerces_scalar_to_singleton_list(kind):
 
 @pytest.mark.parametrize(
     "payload_factory",
-    [client_referral_payload, provider_availability_payload],
+    [referral_payload, opening_payload],
 )
 def test_post_create_desired_times_rejects_unknown_token(payload_factory):
     with pytest.raises(ValidationError):
@@ -807,7 +771,7 @@ def test_post_create_desired_times_rejects_unknown_token(payload_factory):
 
 @pytest.mark.parametrize(
     "kind",
-    ["client_referral", "provider_availability"],
+    ["referral", "opening"],
 )
 def test_post_update_desired_times_replaces_with_explicit_list(kind):
     """Sending an explicit list (including `[]`) replaces the persisted
@@ -823,7 +787,7 @@ def test_post_update_desired_times_replaces_with_explicit_list(kind):
 
 @pytest.mark.parametrize(
     "kind",
-    ["client_referral", "provider_availability"],
+    ["referral", "opening"],
 )
 def test_post_update_desired_times_rejects_unknown_token(kind):
     with pytest.raises(ValidationError):
@@ -835,13 +799,13 @@ def test_post_update_desired_times_rejects_unknown_token(kind):
 # --- services multi-select ----------------------------------------------
 #
 # Same shape as `desired_times` (scalar coercion + Literal vocabulary) on
-# both kinds, plus a min-1 invariant on `provider_availability` that the
+# both kinds, plus a min-1 invariant on `opening` that the
 # `RequiredServicesField` annotation enforces on Create and Update.
 
 
-def test_post_create_client_referral_services_defaults_to_empty_list():
+def test_post_create_referral_services_defaults_to_empty_list():
     """CR's `services` is optional with `[]` default — omitting it is fine."""
-    payload = client_referral_payload()
+    payload = referral_payload()
     payload.pop("services", None)
     p = post_create_adapter.validate_python(payload)
     assert p.services == []
@@ -849,7 +813,7 @@ def test_post_create_client_referral_services_defaults_to_empty_list():
 
 @pytest.mark.parametrize(
     "payload_factory",
-    [client_referral_payload, provider_availability_payload],
+    [referral_payload, opening_payload],
 )
 def test_post_create_services_accepts_subset(payload_factory):
     p = post_create_adapter.validate_python(
@@ -860,7 +824,7 @@ def test_post_create_services_accepts_subset(payload_factory):
 
 @pytest.mark.parametrize(
     "payload_factory",
-    [client_referral_payload, provider_availability_payload],
+    [referral_payload, opening_payload],
 )
 def test_post_create_services_coerces_scalar_to_singleton_list(payload_factory):
     """Same json-enc 1-checkbox-collapses-to-scalar story as `desired_times`
@@ -871,33 +835,33 @@ def test_post_create_services_coerces_scalar_to_singleton_list(payload_factory):
 
 @pytest.mark.parametrize(
     "payload_factory",
-    [client_referral_payload, provider_availability_payload],
+    [referral_payload, opening_payload],
 )
 def test_post_create_services_rejects_unknown_token(payload_factory):
     with pytest.raises(ValidationError):
         post_create_adapter.validate_python(payload_factory(services=["telekinesis"]))
 
 
-def test_post_create_provider_availability_services_accepts_empty_list():
+def test_post_create_opening_services_accepts_empty_list():
     """PA's `services` was required-min-1; #433 relaxed to optional. An
     explicit `[]` validates."""
-    p = post_create_adapter.validate_python(provider_availability_payload(services=[]))
+    p = post_create_adapter.validate_python(opening_payload(services=[]))
     assert p.services == []
 
 
-def test_post_create_provider_availability_services_absent_defaults_empty():
+def test_post_create_opening_services_absent_defaults_empty():
     """Omitting `services` entirely on PA falls back to `[]` per #433."""
-    payload = provider_availability_payload()
+    payload = opening_payload()
     payload.pop("services")
     p = post_create_adapter.validate_python(payload)
     assert p.services == []
 
 
-def test_post_create_provider_availability_accepts_omitted_optional_fields():
+def test_post_create_opening_accepts_omitted_optional_fields():
     """`services` and `settings` are optional on PA Create (#433) — omitting
     them defaults to `[]`. (Practice/location/session fields moved to
     Provider per #448 and are no longer wire fields on PA.)"""
-    payload = provider_availability_payload()
+    payload = opening_payload()
     for field in ("services", "settings"):
         payload.pop(field, None)
     p = post_create_adapter.validate_python(payload)
@@ -907,39 +871,37 @@ def test_post_create_provider_availability_accepts_omitted_optional_fields():
 
 @pytest.mark.parametrize(
     "kind",
-    ["client_referral", "provider_availability"],
+    ["referral", "opening"],
 )
 def test_post_update_services_coerces_scalar_to_singleton_list(kind):
     p = post_update_adapter.validate_python({"kind": kind, "services": "evaluation"})
     assert p.services == ["evaluation"]
 
 
-def test_post_update_client_referral_services_accepts_empty_list():
+def test_post_update_referral_services_accepts_empty_list():
     """CR's `services` is optional, so PATCHing `services: []` clears the
     selection — same semantics as `desired_times`."""
-    p = post_update_adapter.validate_python({"kind": "client_referral", "services": []})
+    p = post_update_adapter.validate_python({"kind": "referral", "services": []})
     assert p.services == []
 
 
-def test_post_update_provider_availability_services_rejects_empty_list():
+def test_post_update_opening_services_rejects_empty_list():
     """PA preserves the min-1 invariant on PATCH: explicit `[]` 422s; `None`
     (leave-unchanged) is the supported way to not mutate the field."""
     with pytest.raises(ValidationError):
-        post_update_adapter.validate_python(
-            {"kind": "provider_availability", "services": []}
-        )
+        post_update_adapter.validate_python({"kind": "opening", "services": []})
 
 
-def test_post_update_provider_availability_services_accepts_non_empty_list():
+def test_post_update_opening_services_accepts_non_empty_list():
     p = post_update_adapter.validate_python(
-        {"kind": "provider_availability", "services": ["psychotherapy"]}
+        {"kind": "opening", "services": ["psychotherapy"]}
     )
     assert p.services == ["psychotherapy"]
 
 
 @pytest.mark.parametrize(
     "kind",
-    ["client_referral", "provider_availability"],
+    ["referral", "opening"],
 )
 def test_post_update_services_rejects_unknown_token(kind):
     with pytest.raises(ValidationError):
@@ -960,7 +922,7 @@ def test_post_update_services_rejects_unknown_token(kind):
         (NETWORK_PREFERENCES, NETWORK_PREFERENCE_LABELS),
         (INSURANCE_CARRIERS, INSURANCE_CARRIER_LABELS),
         (DESIRED_TIME_SLOTS, DESIRED_TIME_SLOT_LABELS),
-        (CLIENT_REFERRAL_SERVICES, CLIENT_REFERRAL_SERVICE_LABELS),
+        (REFERRAL_SERVICES, REFERRAL_SERVICE_LABELS),
         (GENDERS, GENDER_LABELS),
     ],
 )
@@ -980,7 +942,7 @@ def test_labels_cover_their_tuples(values, labels):
     "values,icons",
     [
         (CLIENT_AGE_GROUPS, CLIENT_AGE_GROUP_ICONS),
-        (CLIENT_REFERRAL_SERVICES, CLIENT_REFERRAL_SERVICE_ICONS),
+        (REFERRAL_SERVICES, REFERRAL_SERVICE_ICONS),
         (TREATMENT_SETTINGS, TREATMENT_SETTINGS_ICONS),
         (INSURANCE_POSTURES, INSURANCE_POSTURE_ICONS),
         (INSURANCE_POSTURES, INSURANCE_POSTURE_LABELS),

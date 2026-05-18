@@ -56,7 +56,7 @@ with at least one Program available.
   <fieldset>
     <legend>Featured services</legend>
     <div class="grid">
-      {{ multi_select_field("services", "Services", CLIENT_REFERRAL_SERVICES, labels=CLIENT_REFERRAL_SERVICE_LABELS, current=d.services if d else None) }}
+      {{ multi_select_field("services", "Services", REFERRAL_SERVICES, labels=REFERRAL_SERVICE_LABELS, current=d.services if d else None) }}
       {{ multi_select_field("settings", "Treatment settings", TREATMENT_SETTINGS, labels=TREATMENT_SETTINGS_LABELS, current=d.settings if d else None) }}
     </div>
     <small>Both lists optional.</small>
