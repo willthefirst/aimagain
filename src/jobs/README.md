@@ -28,6 +28,7 @@ The `JOB_RUN_STARTED` action is bespoke (no spec home) — see [`../framework/au
 
 - `scheduler.py` — `make_scheduler()` constructs an `AsyncIOScheduler`; `register_jobs(scheduler)` adds every job. Kept separate so tests can introspect registrations without `.start()`-ing.
 - `hello_world.py` — smallest job that exercises the rails. Cadence comes from `JOBS_HELLO_WORLD_INTERVAL_MIN` (default `60`); set it to `1` locally to watch the audit row appear.
+- `nightly_verification.py` — runs the provider-verification orchestrator (`run_provider_verification` from [`../domain/logic/verifications/handlers.py`](../domain/logic/verifications/handlers.py)) for every non-deleted provider, sequentially, with `actor_id=None`. Schedule comes from `JOBS_NIGHTLY_VERIFICATION_CRON` (default `0 3 * * *` — daily at 03:00 server-local). Per-provider failures are logged and skipped; the loop never re-raises so one bad lookup can't strand the rest of the batch. Each per-provider call commits its own transaction inside the orchestrator.
 - `test_*.py` — colocated unit tests per the repo's [definition of done](../../CLAUDE.md#definition-of-done).
 
 ## Disabling the scheduler
