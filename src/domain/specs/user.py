@@ -20,6 +20,7 @@ from typing import Final
 
 from src.auth_config import current_active_user
 from src.domain.logic.providers.repository import ProviderRepository
+from src.domain.logic.users.repository import get_user_repository
 from src.domain.logic.users.schema import (
     UserActivationAuditSnapshot,
     UserActivationUpdate,
@@ -36,7 +37,6 @@ from src.framework.dispatch.entity_spec import (
     RouteSet,
     StateAxis,
 )
-from src.framework.persistence.dependencies import get_user_repository
 
 
 def _activation_response_to_dict(user: User) -> dict:

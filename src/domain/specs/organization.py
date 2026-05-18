@@ -12,6 +12,7 @@ Read by:
 
 from typing import Final
 
+from src.domain.logic.organizations.repository import get_organization_repository
 from src.domain.logic.organizations.schema import (
     OrganizationCreate,
     OrganizationRead,
@@ -29,7 +30,6 @@ from src.framework.dispatch.entity_spec import (
     Redirects,
     RouteSet,
 )
-from src.framework.persistence.dependencies import get_organization_repository
 
 _organization_form_redirect = Redirects.to_edit_form("organizations", "organization_id")
 

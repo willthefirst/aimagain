@@ -2,6 +2,7 @@ from sqlalchemy import select
 
 from src.domain.models import User
 from src.framework.persistence.base_repository import BaseRepository
+from src.framework.persistence.dependencies import register_repository
 
 
 class UserRepository(BaseRepository):
@@ -20,3 +21,6 @@ class UserRepository(BaseRepository):
     async def delete_user(self, user: User) -> None:
         """Hard-deletes the user row; the caller commits."""
         await self._delete(user)
+
+
+get_user_repository = register_repository(UserRepository)
