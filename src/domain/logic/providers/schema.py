@@ -199,16 +199,15 @@ class ProviderRead(ReadProjection):
     owner_id: uuid.UUID
     created_at: datetime
     updated_at: datetime
-    # `org_id` is the FK to the Provider's Organization (#524). `org_name`
-    # is the practice's display name, sourced from ``provider.org.name``
-    # via the model-validator below — every reader (templates, audit
-    # snapshots, contract tests) reads `org_name` rather than dereferencing
-    # the relationship inline.
+    # `org_name` is the practice's display name, sourced from
+    # ``provider.org.name`` via the model-validator below — every reader
+    # (templates, audit snapshots, contract tests) reads `org_name` rather
+    # than dereferencing the relationship inline.
     org_id: uuid.UUID
     org_name: str
-    # National Provider Identifier; 10 ASCII digits or `None`. Used by
-    # the verification pipeline (#525–#528) to look up the provider in
-    # NPPES. No UNIQUE constraint at the DB layer yet.
+    # National Provider Identifier; 10 ASCII digits or `None`. Used by the
+    # verification pipeline to look up the provider in NPPES. No UNIQUE
+    # constraint at the DB layer yet.
     npi: str | None = None
     # `(city, state, zip)` arrive flat — from ORM attributes via
     # ``from_attributes`` or from a flat dict — and dump flat (JSON
@@ -216,7 +215,7 @@ class ProviderRead(ReadProjection):
     # ``location_zip`` at the top level). ``gather_flat_location`` rolls
     # the flat input into a nested ``location`` block before validation
     # so the ``Location`` value object owns the cleaning rules; the
-    # ``@model_serializer`` below unrolls it back to flat on dump (#451).
+    # ``@model_serializer`` below unrolls it back to flat on dump.
     location: Location
     in_person_sessions: str
     virtual_sessions: str
@@ -244,13 +243,13 @@ class ProviderCreate(WirePayload):
     wire.
 
     The ``(city, state, zip)`` location triple is modeled as a single
-    :class:`Location` value object (#451). On the wire it stays flat —
-    form posts and JSON bodies send ``location_city`` / ``location_state``
-    / ``location_zip`` at the top level — the ``gather_flat_location``
-    pre-validator rolls those keys into a nested ``location`` block,
-    and the ``@model_serializer`` flattens the dump back to flat keys
-    so JSON responses, ORM-hydrating ``model_dump()``, and audit
-    snapshots keep the pre-#451 shape.
+    :class:`Location` value object. On the wire it stays flat — form posts
+    and JSON bodies send ``location_city`` / ``location_state`` /
+    ``location_zip`` at the top level — the ``gather_flat_location``
+    pre-validator rolls those keys into a nested ``location`` block, and
+    the ``@model_serializer`` flattens the dump back to flat keys so JSON
+    responses, ORM-hydrating ``model_dump()``, and audit snapshots keep
+    the flat shape.
     """
 
     # The practice's display name lives on the linked Organization
@@ -259,7 +258,7 @@ class ProviderCreate(WirePayload):
     # come back to this form. The dropdown is rendered by the form
     # template from an `orgs` context var the form_new handler injects.
     org_id: uuid.UUID
-    # Optional on create; backfill is operator-driven (#525). Empty input
+    # Optional on create; backfill is operator-driven. Empty input
     # normalizes to `None` so an unfilled form field doesn't 422.
     npi: NpiText = None
     location: Location

@@ -1,8 +1,8 @@
 """Wire schemas for `Verification`.
 
 Server-only surface. `Verification` has no public CRUD endpoints — the
-nightly job (#530) and a superuser-only retrigger endpoint (#528) both
-write rows via :class:`VerificationCreate`, and the admin UI reads via
+nightly job and a superuser-only retrigger endpoint both write rows via
+:class:`VerificationCreate`, and the admin UI reads via
 :class:`VerificationRead`. There are no `Update` / `Delete` schemas
 because verification rows are append-only by convention.
 """

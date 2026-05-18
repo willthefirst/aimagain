@@ -11,9 +11,9 @@ class ProviderAvailabilityDetail(Base):
     """1:1 detail row for posts of kind = 'provider_availability'.
 
     Practice + location + delivery-format fields live on the linked
-    `Provider` via `provider_id` (#448); insurance posture + sliding-scale
-    + cost moved to `Provider` in #449. This row only carries fields that
-    are *per-announcement*, not steady-state practice properties.
+    `Provider` via `provider_id`; insurance posture + sliding-scale +
+    cost also live on `Provider`. This row only carries fields that are
+    *per-announcement*, not steady-state practice properties.
     """
 
     __tablename__ = _TABLE
@@ -38,9 +38,9 @@ class ProviderAvailabilityDetail(Base):
     desired_times = Column(
         JSON, nullable=False, server_default=text("'[]'"), default=list
     )
-    # Companion to `desired_times` for cohort dates / fixed program hours
-    # (#442). The grid handles "what times of the week am I open"; this
-    # captions "May 25 cohort, M-F 9-5". Both can coexist.
+    # Companion to `desired_times` for cohort dates / fixed program hours.
+    # The grid handles "what times of the week am I open"; this captions
+    # "May 25 cohort, M-F 9-5". Both can coexist.
     schedule_text = Column(Text, nullable=True)
 
     # Section 4 — featured services

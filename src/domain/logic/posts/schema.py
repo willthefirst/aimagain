@@ -146,8 +146,7 @@ AgeGroupsField = Annotated[
     list[Literal[*CLIENT_AGE_GROUPS]], BeforeValidator(_scalar_to_list)
 ]
 # `provider_availability.age_groups` is required-min-1 on the wire — every
-# practice serves at least one age bucket. Replaces the single-valued
-# `age_group` (#430).
+# practice serves at least one age bucket.
 RequiredAgeGroupsField = Annotated[AgeGroupsField, Field(min_length=1)]
 # `provider_availability.genders` is a multi-checkbox on the wire, same
 # normalization shape as services/settings/age_groups. Empty list is
@@ -205,10 +204,9 @@ class _PostReadBase(ReadProjection):
 class ClientReferralRead(_PostReadBase):
     kind: Literal["client_referral"]
     # `(city, state, zip)` modeled as a single :class:`Location` value
-    # object (#451) but kept flat on the wire/JSON shape for backward
-    # compatibility — ``_flatten_post_to_dict`` produces a flat dict
-    # from the ORM, ``gather_flat_location`` then nests the three keys,
-    # and ``flatten_location_on_dump`` reverses on dump.
+    # object but kept flat on the wire/JSON shape — ``_flatten_post_to_dict``
+    # produces a flat dict from the ORM, ``gather_flat_location`` nests the
+    # three keys, and ``flatten_location_on_dump`` reverses on dump.
     location: Location
     location_in_person: Literal[*LOCATION_AVAILABILITY_OPTIONS]
     location_virtual: Literal[*LOCATION_AVAILABILITY_OPTIONS]
@@ -224,9 +222,8 @@ class ClientReferralRead(_PostReadBase):
     insurance_carrier: OptionalInsuranceCarrier = None
 
     # Flat-on-dump: keep ``location_city`` / ``location_state`` /
-    # ``location_zip`` at the top level of JSON responses (#451). The
-    # parent's ``_flatten_post`` already calls ``gather_flat_location``
-    # on the way in.
+    # ``location_zip`` at the top level of JSON responses. The parent's
+    # ``_flatten_post`` already calls ``gather_flat_location`` on the way in.
     @model_serializer(mode="wrap")
     def _flatten_location(self, handler):
         return flatten_location_on_dump(self, handler(self))
@@ -257,9 +254,9 @@ class ProgramAvailabilityRead(_PostReadBase):
     description: str | None = None
     referral_instructions: str | None = None
     website: str | None = None
-    # FK to the Program this announcement is for (#541). The Program's
-    # name, state preference, intake window, and owning Org all live on
-    # the linked row; templates dereference via
+    # FK to the Program this announcement is for. The Program's name,
+    # state preference, intake window, and owning Org all live on the
+    # linked row; templates dereference via
     # `post.program_availability_detail.program.<field>`.
     program_id: uuid.UUID
     desired_times: DesiredTimesField = []
@@ -292,8 +289,8 @@ class ClientReferralCreate(WirePayload):
     client-referral intake form.
 
     The ``(city, state, zip)`` triple is a single :class:`Location` value
-    object (#451); form posts still send the three keys flat at the top
-    level (``gather_flat_location`` rolls them into the nested block).
+    object; form posts still send the three keys flat at the top level
+    (``gather_flat_location`` rolls them into the nested block).
     """
 
     kind: Literal["client_referral"]
@@ -301,12 +298,10 @@ class ClientReferralCreate(WirePayload):
     location_in_person: Literal[*LOCATION_AVAILABILITY_OPTIONS]
     location_virtual: Literal[*LOCATION_AVAILABILITY_OPTIONS]
     desired_times: DesiredTimesField = []
-    # Required min-1 on the wire — replaces the old single-valued
-    # `client_dem_ages` (#432). Mirrors PA's `age_groups` (#430).
+    # Required min-1 on the wire. Mirrors PA's `age_groups`.
     age_groups: RequiredAgeGroupsField
-    # Required min-1 on the wire — replaces the old yes/no
-    # `language_preferred` flag (#428). Defaults to `["en"]` so the
-    # form's "submit with defaults" case still validates.
+    # Required min-1 on the wire. Defaults to `["en"]` so the form's
+    # "submit with defaults" case still validates.
     languages: RequiredLanguagesField = ["en"]
     # Gender identity of the referred client. Defaults to
     # `prefer_not_to_say` so existing form submissions that don't
@@ -342,30 +337,28 @@ class ProviderAvailabilityCreate(WirePayload):
     the provider-availability intake form."""
 
     kind: Literal["provider_availability"]
-    # Optional initially — graduates to required in a later issue once
-    # seed posts confirm the shape works (#422).
+    # Optional initially — graduates to required once seed posts confirm
+    # the shape works.
     description: TextareaOptional = None
     referral_instructions: TextareaOptional = None
     website: UrlOptional = None
     # FK to one of the requesting user's Provider profiles. The form
     # restricts the dropdown to providers owned by the user; the route
     # handler also verifies ownership at write time so a wire-level
-    # attacker can't reference another user's provider (#448).
+    # attacker can't reference another user's provider.
     provider_id: uuid.UUID
     desired_times: DesiredTimesField = []
     # Free-text companion to `desired_times` for cohort dates / fixed
-    # program hours (#442). Single-line input; not a textarea.
+    # program hours. Single-line input; not a textarea.
     schedule_text: StrippedOptionalText = None
     services: ServicesField = []
     settings: SettingsField = []
     treatment_modality: StrippedOptionalText = None
-    # Required min-1 on the wire — replaces the old single-valued
-    # `age_group` (#430). No default; every PA post must declare at
-    # least one bucket explicitly.
+    # Required min-1 on the wire. No default; every PA post must declare
+    # at least one bucket explicitly.
     age_groups: RequiredAgeGroupsField
-    # Required min-1 on the wire — replaces the old yes/no
-    # `non_english_services` flag (#425). Defaults to `["en"]` so the
-    # form's "submit with defaults" case still validates.
+    # Required min-1 on the wire. Defaults to `["en"]` so the form's
+    # "submit with defaults" case still validates.
     languages: RequiredLanguagesField = ["en"]
     # Genders this practice serves. Optional; empty = "no restriction
     # stated" / serves any. Multi-checkbox on the wire.
@@ -373,19 +366,19 @@ class ProviderAvailabilityCreate(WirePayload):
 
 
 class ProgramAvailabilityCreate(WirePayload):
-    """Create payload for `kind='program_availability'` (#541). Field set
-    mirrors :class:`ProviderAvailabilityCreate` one-to-one but swaps the
-    Provider FK for a Program FK — the referrer is choosing a Program
-    (intake door), not a specific clinician."""
+    """Create payload for `kind='program_availability'`. Field set mirrors
+    :class:`ProviderAvailabilityCreate` one-to-one but swaps the Provider
+    FK for a Program FK — the referrer is choosing a Program (intake door),
+    not a specific clinician."""
 
     kind: Literal["program_availability"]
     description: TextareaOptional = None
     referral_instructions: TextareaOptional = None
     website: UrlOptional = None
-    # FK to one of the requesting user's Programs (#541). The form
-    # restricts the dropdown to Programs owned by the user; the spec's
-    # `payload_authz_path` verifies ownership at write time so a wire-
-    # level attacker can't reference another user's Program.
+    # FK to one of the requesting user's Programs. The form restricts the
+    # dropdown to Programs owned by the user; the spec's `payload_authz_path`
+    # verifies ownership at write time so a wire-level attacker can't
+    # reference another user's Program.
     program_id: uuid.UUID
     desired_times: DesiredTimesField = []
     schedule_text: StrippedOptionalText = None
@@ -429,7 +422,7 @@ class ClientReferralUpdate(PartialUpdate):
 
     kind: Literal["client_referral"]
     # See :class:`ClientReferralCreate` — flat on the wire, nested
-    # value object in Python, flat on dump (#451).
+    # value object in Python, flat on dump.
     location: LocationPartial | None = None
     location_in_person: Literal[*LOCATION_AVAILABILITY_OPTIONS] | None = None
     location_virtual: Literal[*LOCATION_AVAILABILITY_OPTIONS] | None = None
@@ -532,9 +525,9 @@ class _PostAuditSnapshotBase(ReadProjection):
 
 class ClientReferralAuditSnapshot(_PostAuditSnapshotBase):
     kind: Literal["client_referral"]
-    # Mirrors :class:`ClientReferralRead` (#451). Audit ``before`` /
-    # ``after`` snapshots stay flat on the wire — the serializer
-    # unrolls the nested ``location`` block back to top-level keys.
+    # Mirrors :class:`ClientReferralRead`. Audit ``before`` / ``after``
+    # snapshots stay flat on the wire — the serializer unrolls the nested
+    # ``location`` block back to top-level keys.
     location: Location
     location_in_person: Literal[*LOCATION_AVAILABILITY_OPTIONS]
     location_virtual: Literal[*LOCATION_AVAILABILITY_OPTIONS]
@@ -548,7 +541,7 @@ class ClientReferralAuditSnapshot(_PostAuditSnapshotBase):
     network_preference: Literal[*NETWORK_PREFERENCES]
     insurance_carrier: OptionalInsuranceCarrier = None
 
-    # Flat-on-dump (#451) — see :class:`ClientReferralRead`.
+    # Flat-on-dump — see :class:`ClientReferralRead`.
     @model_serializer(mode="wrap")
     def _flatten_location(self, handler):
         return flatten_location_on_dump(self, handler(self))

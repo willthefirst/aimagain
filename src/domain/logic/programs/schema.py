@@ -1,9 +1,8 @@
 """Wire schemas for the `Program` entity.
 
 A :class:`Program` is a treatment offering owned by an
-:class:`Organization` (PR 4 of the Org/Program roadmap, #537). The
-wire surface mirrors Provider's shape post-#524 — ``ProgramRead``
-carries an inline ``org_name`` (sourced from
+:class:`Organization`. The wire surface mirrors Provider's shape —
+``ProgramRead`` carries an inline ``org_name`` (sourced from
 ``program.organization.name`` via ``from_attributes``) so templates
 and audit snapshots read a flat string without dereferencing the
 relationship.

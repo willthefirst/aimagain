@@ -16,9 +16,8 @@ import httpx
 
 logger = logging.getLogger(__name__)
 
-# Free public registry. No documented rate limit; the nightly job (#530)
-# runs sequentially anyway. v2.1 is the current contract per the NPPES
-# API docs.
+# Free public registry. No documented rate limit; the nightly job runs
+# sequentially anyway. v2.1 is the current contract per the NPPES API docs.
 _NPPES_ENDPOINT = "https://npiregistry.cms.hhs.gov/api/"
 _NPPES_VERSION = "2.1"
 _DEFAULT_TIMEOUT_SECONDS = 10.0

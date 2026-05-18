@@ -924,10 +924,10 @@ Exception handling:
     args = parser.parse_args()
 
     if HTMLParser is None:
-        # Hard-fail rather than warn-and-skip per file: a missing parser
-        # used to cause every HTML/Jinja template to be silently skipped,
-        # so a real violation could pass `dev lint` locally and only
-        # surface in CI (#198).
+        # Hard-fail rather than warn-and-skip per file: warn-and-skip
+        # used to mean every HTML/Jinja template silently skipped, so a
+        # real violation could pass `dev lint` locally and only surface
+        # in CI.
         print(
             "Error: selectolax is not installed in this interpreter "
             f"({sys.executable}). HTML/Jinja templates cannot be checked. "

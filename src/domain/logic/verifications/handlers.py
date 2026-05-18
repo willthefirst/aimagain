@@ -1,11 +1,10 @@
 """Verification orchestrator + bespoke trigger endpoint handler.
 
 `run_provider_verification` is the single callable both the nightly job
-(#530) and the superuser retrigger endpoint here invoke. It composes
-the NPPES + OIG + scoring primitives from #527 with the persistence
-rails from #526 and a caller-owned `httpx.AsyncClient`, writes one
-`Verification` row plus one matching audit row in a single transaction,
-and commits.
+and the superuser retrigger endpoint here invoke. It composes the
+NPPES + OIG + scoring primitives with the persistence rails and a
+caller-owned `httpx.AsyncClient`, writes one `Verification` row plus
+one matching audit row in a single transaction, and commits.
 
 Why `record_audit_for(...)` and an explicit commit, not `mutate(...)`:
 `mutate` is a snapshot-before / mutate / record_audit / commit ritual
@@ -86,7 +85,7 @@ async def run_provider_verification(
 
     `actor_id=None` is legal — `AuditLog.actor_id` is nullable with
     `ON DELETE SET NULL` (`src/framework/audit/log.py`), and the
-    nightly job (#530) runs with no requesting user.
+    nightly job runs with no requesting user.
 
     Raises `NotFoundError` if `provider_id` does not exist. Network /
     file failures inside NPPES / OIG degrade to "not found" / "no
@@ -156,10 +155,10 @@ async def handle_create_provider_verification(
 ) -> Verification:
     """Superuser-only manual retrigger of the verification pipeline.
 
-    Provider owners get verification automatically from the nightly job
-    (#530); this endpoint exists for admins to force a re-check on
-    demand. Constructs a single-use `httpx.AsyncClient` for the call
-    duration — the orchestrator owns the client's lifecycle.
+    Provider owners get verification automatically from the nightly job;
+    this endpoint exists for admins to force a re-check on demand.
+    Constructs a single-use `httpx.AsyncClient` for the call duration —
+    the orchestrator owns the client's lifecycle.
     """
     if not requesting_user.is_superuser:
         raise ForbiddenError(detail="Verification retrigger is admin-only")

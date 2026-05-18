@@ -116,7 +116,7 @@ async def provider_form_extras(
 
     Loads the requesting user's visible Organizations into the context
     for the Org-picker dropdown — Provider create/update takes
-    ``org_id`` (#524), and the form needs a populated select. The
+    ``org_id``, and the form needs a populated select. The
     framework invokes this on both the create path (``target=None``)
     and the edit path (``target=<provider row>``); the dropdown is the
     same either way — the template handles pre-selecting the row's

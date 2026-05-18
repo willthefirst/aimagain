@@ -15,8 +15,8 @@ _ck = partial(named_check_in, _TABLE)
 class Verification(BaseModel):
     """One row per nightly verification attempt against a `Provider`.
     Append-only by convention — no UI exposes update or delete, the
-    orchestrator (issue A4 / #528) only ever calls `repo.record(...)`.
-    `created_at` is the effective `checked_at`.
+    orchestrator only ever calls `repo.record(...)`. `created_at` is
+    the effective `checked_at`.
     """
 
     __tablename__ = _TABLE
@@ -35,9 +35,8 @@ class Verification(BaseModel):
     # Free-form bag of string flags surfaced in the audit / UI for the
     # human reviewer, e.g. `nppes_npi_not_found`, `oig_excluded:npi_match`,
     # `nppes_name_mismatch`. The closed vocabulary lives in
-    # `src/domain/logic/verifications/scoring.py` (issue A3 / #527); not
-    # CHECK'd at the DB layer because the set grows as new flag-emitting
-    # checks land.
+    # `src/domain/logic/verifications/scoring.py`; not CHECK'd at the DB
+    # layer because the set grows as new flag-emitting checks land.
     flags = Column(JSON, nullable=False, server_default=text("'[]'"), default=list)
 
     # Raw NPPES API response payload (or `None` if the call failed or
