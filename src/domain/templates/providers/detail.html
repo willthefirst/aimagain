@@ -1,5 +1,6 @@
 {% extends "views/detail.html" %}
 {%- from "_shared/actions.html" import confirm_delete_button -%}
+{%- from "providers/_credential_row.html" import credential_row -%}
 
 {% set resource_url = entity_url('provider') %}
 
@@ -70,14 +71,14 @@
   <section>
     <h2>Licensures</h2>
     {% if provider.licensures %}
-    <ul>
+    <div class="credential-list">
       {%- for lic in provider.licensures %}
-      <li>
-        <strong>{{ LICENSE_TYPES_LABELS[lic.license_type] }}</strong>
-        <small>{{ lic.license_number }} ({{ lic.issuing_state }}){% if lic.expiration_date %}, expires {{ lic.expiration_date }}{% endif %}</small>
-      </li>
+      {{ credential_row(
+          LICENSE_TYPES_LABELS[lic.license_type],
+          ["#" ~ lic.license_number, lic.issuing_state, ("Expires " ~ lic.expiration_date) if lic.expiration_date else None],
+      ) }}
       {%- endfor %}
-    </ul>
+    </div>
     {% else %}
     <p>No licensures listed.</p>
     {% endif %}
@@ -86,14 +87,14 @@
   <details>
     <summary><strong>Education</strong></summary>
     {% if provider.educations %}
-    <ul>
+    <div class="credential-list">
       {%- for edu in provider.educations %}
-      <li>
-        <strong>{{ EDUCATION_TYPES_LABELS[edu.education_type] }}</strong>
-        <small>{{ edu.institution }}{% if edu.month_completed %}, {{ edu.month_completed }}{% endif %}</small>
-      </li>
+      {{ credential_row(
+          EDUCATION_TYPES_LABELS[edu.education_type],
+          [edu.institution, edu.month_completed],
+      ) }}
       {%- endfor %}
-    </ul>
+    </div>
     {% else %}
     <p>No education entries listed.</p>
     {% endif %}
@@ -102,14 +103,14 @@
   <details>
     <summary><strong>Certifications</strong></summary>
     {% if provider.certifications %}
-    <ul>
+    <div class="credential-list">
       {%- for cert in provider.certifications %}
-      <li>
-        <strong>{{ CERTIFICATION_TYPES_LABELS[cert.certification_type] }}</strong>
-        <small>{{ cert.certifying_body }}{% if cert.expiration_date %}, expires {{ cert.expiration_date }}{% endif %}</small>
-      </li>
+      {{ credential_row(
+          CERTIFICATION_TYPES_LABELS[cert.certification_type],
+          [cert.certifying_body, ("Expires " ~ cert.expiration_date) if cert.expiration_date else None],
+      ) }}
       {%- endfor %}
-    </ul>
+    </div>
     {% else %}
     <p>No certifications listed.</p>
     {% endif %}

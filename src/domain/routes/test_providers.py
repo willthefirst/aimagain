@@ -914,6 +914,50 @@ async def test_owner_can_open_edit_form(
     )
 
 
+async def test_owner_edit_form_renders_credentials_as_rows(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user: User,
+):
+    """Credential lists render as `.credential-row` blocks (not raw
+    `<li>`s) — bold type label, muted meta line, owner-side Delete
+    button. The owning `<section>` already provides the framing; rows
+    stay flat to avoid the card-on-card look."""
+    provider_id = await _seed_provider_for(
+        db_test_session_manager,
+        user_id=logged_in_user.id,
+        practice_name="Acme Counseling",
+    )
+    licensure = make_provider_licensure(
+        provider_id=provider_id,
+        license_type="lcsw",
+        license_number="L-12345",
+        issuing_state="CA",
+    )
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            session.add(licensure)
+
+    response = await authenticated_client.get(f"/providers/{provider_id}/form")
+    tree = HTMLParser(response.text)
+    rows = tree.css(".credential-list .credential-row")
+    assert len(rows) >= 1
+    first = rows[0]
+    assert (
+        first.css_first("strong").text(strip=True)
+        == "Licensed Clinical Social Worker (LCSW)"
+    )
+    meta = first.css_first(".credential-row-text small")
+    assert meta is not None
+    assert "L-12345" in meta.text()
+    assert "CA" in meta.text()
+    delete = first.css_first(
+        f'button[hx-delete="/providers/{provider_id}/licensures/{licensure.id}"]'
+    )
+    assert delete is not None
+    assert delete.text(strip=True) == "Delete"
+
+
 async def test_admin_can_open_edit_form_for_any_provider(
     authenticated_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],

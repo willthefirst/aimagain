@@ -1,8 +1,7 @@
 {% extends "views/form_edit.html" %}
 {%- from "_shared/form_fields.html" import text_field, select_field, radio_bool_field, multi_select_field -%}
 {%- from "_shared/forms.html" import inline_add_form, form_actions -%}
-{%- from "_shared/sections.html" import list_or_empty -%}
-{%- from "_shared/actions.html" import confirm_delete_button -%}
+{%- from "providers/_credential_row.html" import credential_row -%}
 
 {% set resource_url = entity_url('provider') %}
 {% set resource_detail_url = entity_url('provider', id=provider.id) %}
@@ -66,13 +65,20 @@
 
 <section>
   <h2>Licensures</h2>
-  {% call(lic) list_or_empty(provider.licensures, "No licensures yet.") %}
-  <li>
-    <strong>{{ LICENSE_TYPES_LABELS[lic.license_type] }}</strong>
-    &mdash; {{ lic.license_number }} ({{ lic.issuing_state }}){% if lic.expiration_date %}, expires {{ lic.expiration_date }}{% endif %}
-    {{ confirm_delete_button(entity_url('provider', id=provider.id) ~ "/licensures/" ~ lic.id, "Remove this licensure?") }}
-  </li>
-  {% endcall %}
+  {% if provider.licensures %}
+  <div class="credential-list">
+    {%- for lic in provider.licensures %}
+    {{ credential_row(
+        LICENSE_TYPES_LABELS[lic.license_type],
+        ["#" ~ lic.license_number, lic.issuing_state, ("Expires " ~ lic.expiration_date) if lic.expiration_date else None],
+        delete_url=entity_url('provider', id=provider.id) ~ "/licensures/" ~ lic.id|string,
+        delete_confirm="Remove this licensure?",
+    ) }}
+    {%- endfor %}
+  </div>
+  {% else %}
+  <p>No licensures yet.</p>
+  {% endif %}
 
   {% call inline_add_form(entity_url('provider', id=provider.id) ~ "/licensures", "Add licensure", "Add licensure") %}
     {{ select_field("license_type", "License type", LICENSE_TYPES, labels=LICENSE_TYPES_LABELS, placeholder=true) }}
@@ -84,13 +90,20 @@
 
 <section>
   <h2>Education</h2>
-  {% call(edu) list_or_empty(provider.educations, "No education entries yet.") %}
-  <li>
-    <strong>{{ EDUCATION_TYPES_LABELS[edu.education_type] }}</strong>
-    &mdash; {{ edu.institution }}{% if edu.month_completed %}, {{ edu.month_completed }}{% endif %}
-    {{ confirm_delete_button(entity_url('provider', id=provider.id) ~ "/educations/" ~ edu.id, "Remove this education entry?") }}
-  </li>
-  {% endcall %}
+  {% if provider.educations %}
+  <div class="credential-list">
+    {%- for edu in provider.educations %}
+    {{ credential_row(
+        EDUCATION_TYPES_LABELS[edu.education_type],
+        [edu.institution, edu.month_completed],
+        delete_url=entity_url('provider', id=provider.id) ~ "/educations/" ~ edu.id|string,
+        delete_confirm="Remove this education entry?",
+    ) }}
+    {%- endfor %}
+  </div>
+  {% else %}
+  <p>No education entries yet.</p>
+  {% endif %}
 
   {% call inline_add_form(entity_url('provider', id=provider.id) ~ "/educations", "Add education", "Add education") %}
     {{ select_field("education_type", "Education type", EDUCATION_TYPES, labels=EDUCATION_TYPES_LABELS, placeholder=true) }}
@@ -101,13 +114,20 @@
 
 <section>
   <h2>Certifications</h2>
-  {% call(cert) list_or_empty(provider.certifications, "No certifications yet.") %}
-  <li>
-    <strong>{{ CERTIFICATION_TYPES_LABELS[cert.certification_type] }}</strong>
-    &mdash; {{ cert.certifying_body }}{% if cert.expiration_date %}, expires {{ cert.expiration_date }}{% endif %}
-    {{ confirm_delete_button(entity_url('provider', id=provider.id) ~ "/certifications/" ~ cert.id, "Remove this certification?") }}
-  </li>
-  {% endcall %}
+  {% if provider.certifications %}
+  <div class="credential-list">
+    {%- for cert in provider.certifications %}
+    {{ credential_row(
+        CERTIFICATION_TYPES_LABELS[cert.certification_type],
+        [cert.certifying_body, ("Expires " ~ cert.expiration_date) if cert.expiration_date else None],
+        delete_url=entity_url('provider', id=provider.id) ~ "/certifications/" ~ cert.id|string,
+        delete_confirm="Remove this certification?",
+    ) }}
+    {%- endfor %}
+  </div>
+  {% else %}
+  <p>No certifications yet.</p>
+  {% endif %}
 
   {% call inline_add_form(entity_url('provider', id=provider.id) ~ "/certifications", "Add certification", "Add certification") %}
     {{ select_field("certification_type", "Certification type", CERTIFICATION_TYPES, labels=CERTIFICATION_TYPES_LABELS, placeholder=true) }}
