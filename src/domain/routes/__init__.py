@@ -15,6 +15,13 @@ directly by :mod:`src.main` and not registered here — they aren't
 ``EntitySpec``-shaped.
 """
 
-from . import favorites, organizations, posts, providers, users
+from . import favorites, organizations, posts, programs, providers, users
 
-__all__ = ["favorites", "organizations", "posts", "providers", "users"]
+__all__ = [
+    "favorites",
+    "organizations",
+    "posts",
+    "programs",
+    "providers",
+    "users",
+]

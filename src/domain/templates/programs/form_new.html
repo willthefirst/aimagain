@@ -1,0 +1,47 @@
+{% extends "views/form_new.html" %}
+{%- from "_shared/form_fields.html" import field_for, radio_bool_field, text_field -%}
+
+{% set resource_url = "/programs" %}
+
+{% block resource_label %}Programs{% endblock %}
+
+{% block content %}
+<p>A program is a treatment offering — a cohort, intensive outpatient, or day program — owned by an organization.</p>
+
+{# `org_id` is the FK to the owning Organization. The dropdown is
+   scoped per-viewer by `program_form_extras` (the spec's
+   `form_extras_path`) — it lists only the Orgs the requesting user
+   owns. Superusers see every Org. To attach to a new Organization,
+   create it via /organizations/new first. #}
+<form hx-post="/programs">
+  <fieldset>
+    <legend>Program</legend>
+    <label for="org_id">
+      Organization
+      <select id="org_id" name="org_id" required>
+        <option value="" disabled selected>--</option>
+        {%- for o in organizations %}
+        <option value="{{ o.id }}">{{ o.name }}</option>
+        {%- endfor %}
+      </select>
+      <small>Don't see your organization? <a href="/organizations/new">Create one first</a>.</small>
+    </label>
+    {{ field_for(schema, "name", "Name") }}
+    {{ field_for(schema, "description", "Description (optional)") }}
+  </fieldset>
+
+  <fieldset>
+    <legend>State &amp; dates</legend>
+    {{ field_for(schema, "state_preference", "State served (optional)") }}
+    {{ text_field("start_date", "Start date (optional, YYYY-MM-DD)", required=false, pattern="\\d{4}-\\d{2}-\\d{2}", maxlength=10) }}
+    {{ text_field("end_date", "End date (optional, YYYY-MM-DD)", required=false, pattern="\\d{4}-\\d{2}-\\d{2}", maxlength=10) }}
+  </fieldset>
+
+  <fieldset>
+    <legend>Intake</legend>
+    {{ radio_bool_field("accepting_referrals", "Accepting referrals?", current=true, required=false) }}
+  </fieldset>
+
+  <button type="submit">Create program</button>
+</form>
+{% endblock %}

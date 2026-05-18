@@ -40,6 +40,7 @@ from src.domain.models import (
     ClientReferralDetail,
     Organization,
     Post,
+    Program,
     Provider,
     ProviderAvailabilityDetail,
     User,
@@ -1045,16 +1046,123 @@ async def seed_client_referral() -> tuple[int, int]:
     return created, skipped
 
 
+class FixtureProgram(TypedDict):
+    owner_email: str
+    org_name: str
+    name: str
+    description: str
+    state_preference: str | None
+    accepting_referrals: bool
+
+
+# Programs attached to seeded Orgs. ``org_name`` matches an Org created
+# by ``seed_provider_availability`` (Org names are the practice's
+# display name post-#524). The seed finds-or-creates the Org idempotently
+# if PA seeding ran first, then attaches the Program by name.
+FIXTURE_PROGRAMS: list[FixtureProgram] = [
+    {
+        "owner_email": "alice@example.com",
+        "org_name": "RISE IOP at CHC",
+        "name": "RISE Intensive Outpatient",
+        "description": (
+            "Comprehensive DBT intensive outpatient program for high school "
+            "students with high acuity. Rolling intake; M-F 8:30am-4:30pm."
+        ),
+        "state_preference": "CA",
+        "accepting_referrals": True,
+    },
+    {
+        "owner_email": "alice@example.com",
+        "org_name": "RISE IOP at CHC",
+        "name": "RISE Summer Cohort",
+        "description": (
+            "Time-bounded summer cohort of the RISE IOP program, scoped to "
+            "rising 11th and 12th graders. Two waves: June and August."
+        ),
+        "state_preference": "CA",
+        "accepting_referrals": True,
+    },
+]
+
+
+async def seed_programs() -> tuple[int, int]:
+    """Seed Programs attached to already-seeded Orgs. Idempotent on
+    ``(org_name, name)``."""
+    created = 0
+    skipped = 0
+
+    async with async_session_maker() as session:
+        for fixture in FIXTURE_PROGRAMS:
+            owner_result = await session.execute(
+                select(User).where(User.email == fixture["owner_email"])
+            )
+            owner = owner_result.scalar_one_or_none()
+            if owner is None:
+                print(
+                    f"⚠️  Program '{fixture['name']}': "
+                    f"owner {fixture['owner_email']} not found, skipping"
+                )
+                skipped += 1
+                continue
+
+            org_result = await session.execute(
+                select(Organization).where(Organization.name == fixture["org_name"])
+            )
+            org = org_result.scalar_one_or_none()
+            if org is None:
+                print(
+                    f"⚠️  Program '{fixture['name']}': "
+                    f"org '{fixture['org_name']}' not found "
+                    "(was provider-availability seeded?), skipping"
+                )
+                skipped += 1
+                continue
+
+            existing = await session.execute(
+                select(Program).where(
+                    Program.org_id == org.id, Program.name == fixture["name"]
+                )
+            )
+            if existing.scalar_one_or_none() is not None:
+                print(
+                    f"⏭️  Program '{fixture['name']}' at '{fixture['org_name']}' "
+                    "already exists, skipping"
+                )
+                skipped += 1
+                continue
+
+            session.add(
+                Program(
+                    owner_id=owner.id,
+                    org_id=org.id,
+                    name=fixture["name"],
+                    description=fixture["description"],
+                    state_preference=fixture["state_preference"],
+                    accepting_referrals=fixture["accepting_referrals"],
+                )
+            )
+            print(
+                f"✅ Created Program '{fixture['name']}' at " f"'{fixture['org_name']}'"
+            )
+            created += 1
+
+        await session.commit()
+
+    return created, skipped
+
+
 async def seed_all() -> int:
     users_created, users_skipped = await seed_users()
     pa_created, pa_skipped = await seed_provider_availability()
     cr_created, cr_skipped = await seed_client_referral()
+    programs_created, programs_skipped = await seed_programs()
 
     print(
         f"\n🌱 Seed complete:"
         f" {users_created} users created ({users_skipped} skipped),"
         f" {pa_created} provider-availability posts created ({pa_skipped} skipped),"
-        f" {cr_created} client-referral posts created ({cr_skipped} skipped)"
+        f" {cr_created} client-referral posts created ({cr_skipped} skipped),"
+        f" {programs_created} programs created ({programs_skipped} skipped)"
     )
     if users_created > 0:
         print(f"   Password for all fixture users: {SHARED_PASSWORD}")
