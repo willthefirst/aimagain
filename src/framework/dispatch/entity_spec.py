@@ -354,25 +354,40 @@ class EntitySpec:
     # entities leave as None.
     singleton_alias: tuple[str, Callable[..., Any]] | None = None
 
-    # Detail / list extras (per-viewer / per-list customization) --------
-    # `detail_extras_path` and `list_extras_path` are dotted import paths
-    # (e.g. `"src.domain.logic.users.handlers.user_detail_extras"`) to the
+    # Detail / list / form extras (per-viewer / per-list / per-form
+    # customization) ----------------------------------------------------
+    # `detail_extras_path`, `list_extras_path`, and `form_extras_path`
+    # are dotted import paths (e.g.
+    # `"src.domain.logic.users.handlers.user_detail_extras"`) to the
     # per-viewer extras callable consumed by `make_detail_handler` /
-    # `make_list_handler`. The path is resolved lazily via
+    # `make_list_handler` / `make_new_form_handler` +
+    # `make_edit_form_handler`. The path is resolved lazily via
     # `importlib.import_module` + `getattr` at mount time, *after* both
     # the spec module and the logic module have been imported — so the
     # spec module never has to import from `src.logic.<entity>`, which
     # would close the cycle (logic modules import from the spec). Same
     # late-binding trick `StateAxis.handler_path` already uses.
     #
-    # `detail_extras_repos` / `list_extras_repos` declare typed repo
-    # kwargs the extras callable receives. Repository classes live below
-    # specs in the import order, so the type-class import is cycle-safe
-    # and the field carries real classes (not strings).
+    # `detail_extras_repos` / `list_extras_repos` / `form_extras_repos`
+    # declare typed repo kwargs the extras callable receives. Repository
+    # classes live below specs in the import order, so the type-class
+    # import is cycle-safe and the field carries real classes (not strings).
+    #
+    # The `form_extras_path` callable is invoked by *both* the create-form
+    # and edit-form handlers; signature is
+    # ``async def f(*, target: Model | None, requesting_user: User,
+    # request: Request, <repo_kwargs>) -> dict[str, Any]``. ``target`` is
+    # ``None`` on the create path and the loaded row on the edit path —
+    # extras callables that need to pre-select the current row's values
+    # (Org-picker, etc.) read it; create-only extras can ignore it. The
+    # returned dict merges into the form template context (last-write-
+    # wins, mirroring detail/list).
     detail_extras_path: str | None = None
     detail_extras_repos: tuple[tuple[str, type], ...] = ()
     list_extras_path: str | None = None
     list_extras_repos: tuple[tuple[str, type], ...] = ()
+    form_extras_path: str | None = None
+    form_extras_repos: tuple[tuple[str, type], ...] = ()
 
     # Static context bindings -------------------------------------------
     # Constant key→value pairs that `handle_detail` / `handle_list` merge
@@ -633,6 +648,20 @@ class EntitySpec:
             raise ValueError(
                 f"EntitySpec({self.name!r}) declares list_extras_repos but "
                 "no list_extras_path — the typed-repo kwargs would have "
+                "no consumer."
+            )
+        if self.form_extras_path is not None and not (
+            self.routes.form_new or self.routes.form_edit
+        ):
+            raise ValueError(
+                f"EntitySpec({self.name!r}) declares form_extras_path but "
+                "neither routes.form_new nor routes.form_edit is True — "
+                "the extras would never run."
+            )
+        if self.form_extras_repos and self.form_extras_path is None:
+            raise ValueError(
+                f"EntitySpec({self.name!r}) declares form_extras_repos but "
+                "no form_extras_path — the typed-repo kwargs would have "
                 "no consumer."
             )
         if self.read_schema is not None:
