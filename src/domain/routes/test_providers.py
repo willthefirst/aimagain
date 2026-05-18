@@ -164,6 +164,65 @@ async def test_create_provider_allows_multiple_per_user(
         assert {p.org.name for p in owned} == {"First", "Second"}
 
 
+async def test_create_provider_rejects_org_owned_by_another_user(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user: User,
+):
+    """Attaching a Provider is permissioned by Org ownership (#524). A
+    user POSTing with another user's `org_id` is forbidden — 403 keeps
+    the boundary visible (the dropdown wouldn't have surfaced this Org
+    in the first place; this guard catches curl callers)."""
+    other = create_test_user(username=f"other-{uuid.uuid4()}")
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            session.add(other)
+    other_org_id = await _seed_org(
+        db_test_session_manager, owner_id=other.id, name="Other's Org"
+    )
+
+    response = await authenticated_client.post(
+        "/providers", data=provider_payload(org_id=str(other_org_id))
+    )
+    assert response.status_code == 403
+
+
+async def test_create_provider_rejects_nonexistent_org(
+    authenticated_client: AsyncClient,
+    logged_in_user: User,
+):
+    """A POST with an `org_id` that doesn't exist returns 404 — no
+    leak about other users' Org ids, and avoids the 500 the DB FK
+    would otherwise produce."""
+    bogus = uuid.uuid4()
+    response = await authenticated_client.post(
+        "/providers", data=provider_payload(org_id=str(bogus))
+    )
+    assert response.status_code == 404
+
+
+async def test_create_provider_allows_superuser_to_attach_to_any_org(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user: User,
+):
+    """Superusers bypass the Org-ownership check — mirrors the
+    `OWNER_OR_ADMIN` policy on the Org row itself."""
+    await promote_to_admin(db_test_session_manager, logged_in_user.email)
+    other = create_test_user(username=f"other-{uuid.uuid4()}")
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            session.add(other)
+    other_org_id = await _seed_org(
+        db_test_session_manager, owner_id=other.id, name="Other's Org"
+    )
+
+    response = await authenticated_client.post(
+        "/providers", data=provider_payload(org_id=str(other_org_id))
+    )
+    assert response.status_code == 201
+
+
 # --- Provider reads -------------------------------------------------------
 
 
@@ -520,6 +579,31 @@ async def test_patch_provider_returns_403_if_not_owner(
     assert response.status_code == 403
 
 
+async def test_patch_provider_rejects_reassign_to_unowned_org(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user: User,
+):
+    """A PATCH that swaps ``org_id`` to another user's Org is forbidden
+    — same boundary as create (#524)."""
+    other = create_test_user(username=f"other-{uuid.uuid4()}")
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            session.add(other)
+    other_org_id = await _seed_org(
+        db_test_session_manager, owner_id=other.id, name="Not Mine"
+    )
+    provider_id = await _seed_provider_for(
+        db_test_session_manager, user_id=logged_in_user.id, practice_name="Mine"
+    )
+
+    response = await authenticated_client.patch(
+        f"/providers/{provider_id}",
+        data={"org_id": str(other_org_id)},
+    )
+    assert response.status_code == 403
+
+
 # --- Provider delete ------------------------------------------------------
 
 
@@ -644,13 +728,13 @@ async def test_get_provider_form_renders(
     assert form is not None
     assert form.attributes.get("hx-post") == "/providers"
     # Org-picker dropdown — replaces the old free-text practice_name input.
-    # Lists every Org in the directory (#524).
+    # Lists the Orgs the requesting user owns (#524).
     org_select = tree.css_first('select[name="org_id"]')
     assert org_select is not None
     org_options = org_select.css("option")
     assert any(
         o.text(strip=True) == "Seeded Org" for o in org_options
-    ), "Org dropdown should include every seeded Organization"
+    ), "Org dropdown should include every Org the user owns"
     city = tree.css_first('input[name="location_city"]')
     assert city is not None
     assert city.attributes.get("maxlength") == "120"
@@ -682,6 +766,30 @@ async def test_get_provider_form_renders(
     carrier_select = tree.css_first('select[name="in_network_carriers"][multiple]')
     assert carrier_select is not None
     assert len(carrier_select.css("option")) == 11
+
+
+async def test_get_provider_form_scopes_org_dropdown_to_user(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user: User,
+):
+    """The Org dropdown lists only the requesting user's Orgs (#524).
+    Another user's Org must not leak into the picker."""
+    other = create_test_user(username=f"other-{uuid.uuid4()}")
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            session.add(other)
+    await _seed_org(db_test_session_manager, owner_id=logged_in_user.id, name="Mine")
+    await _seed_org(db_test_session_manager, owner_id=other.id, name="Theirs")
+
+    response = await authenticated_client.get("/providers/form")
+    assert response.status_code == 200
+    tree = HTMLParser(response.text)
+    option_texts = {
+        o.text(strip=True) for o in tree.css('select[name="org_id"] option')
+    }
+    assert "Mine" in option_texts
+    assert "Theirs" not in option_texts
 
 
 # --- Edit form page (GET /providers/{id}/form) -------------------
