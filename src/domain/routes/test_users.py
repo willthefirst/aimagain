@@ -493,6 +493,43 @@ async def test_detail_omits_inline_create_provider_for_other_user(
     assert _inline_create_provider_link(tree) is None
 
 
+# --- Chrome: font preload (icon-flicker fix) ----------------------------
+
+
+async def test_base_template_preloads_lucide_icon_font(
+    authenticated_client: AsyncClient,
+):
+    """``base.html`` emits a `<link rel="preload">` for the Lucide
+    woff2 font ahead of the stylesheet `<link>` so the icon font
+    fetch runs in parallel with the CSS fetch rather than waiting for
+    it to parse. This eliminates the icon-flicker that's otherwise
+    visible on every first paint while ``<i class="icon-x">`` elements
+    render as blank space waiting for the font.
+
+    Pin the contract: the preload URL MUST match the CSS's woff2 URL
+    *exactly* (including the cache-buster query) or the browser sees
+    them as different resources and the preload is wasted."""
+    response = await authenticated_client.get("/users/me")
+    assert response.status_code == 200
+    tree = HTMLParser(response.text)
+    preload = tree.css_first('link[rel="preload"][as="font"]')
+    assert preload is not None, "Lucide woff2 preload <link> is missing"
+    href = preload.attributes.get("href") or ""
+    assert "lucide.woff2" in href
+    assert preload.attributes.get("type") == "font/woff2"
+    # Required for cross-origin font preloads — without it, the
+    # browser fetches the font twice (once preload, once for real).
+    assert "crossorigin" in preload.attributes
+    # The companion stylesheet `<link>` references the same font URL
+    # via its `@font-face` rule; the preload's href must include the
+    # CSS's cache-buster so the browser deduplicates the requests.
+    assert "?t=" in href, (
+        "preload href must include the lucide.css cache-buster query "
+        "(`?t=...`); without exact-URL match the browser issues a "
+        "second font request and the preload is wasted"
+    )
+
+
 # --- Chrome: nav active state -------------------------------------------
 
 
