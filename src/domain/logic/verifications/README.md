@@ -11,6 +11,11 @@ Persistence + pure-function primitives for the provider verification pipeline. T
 - `scoring.py` — `score_verification(...)` table-driven rules over `(NppesResult, OigResult, provider name)` → `Score(status, flags, name_match_score)`. No I/O.
 - `handlers.py` — `run_provider_verification(...)` orchestrator + `handle_create_provider_verification(...)` admin-only retrigger. Composes the primitives with persistence + audit + an `httpx.AsyncClient`. The bespoke route lives at [`../../routes/verifications.py`](../../routes/verifications.py) and is wired into `src/main.py` next to the other hand-rolled routers.
 
+The orchestrator has two callers:
+
+1. **`handle_create_provider_verification`** in this file (admin retrigger; `actor_id=requesting_user.id`).
+2. **`run_nightly_verification`** in [`../../../jobs/nightly_verification.py`](../../../jobs/nightly_verification.py) (daily APScheduler job; `actor_id=None`).
+
 (`__init__.py` is intentionally empty — these are imported directly via `src.domain.logic.verifications.nppes`/`.oig`/`.scoring`/`.repository`/`.schema`/`.handlers`.)
 
 ## Why pure functions, not classes

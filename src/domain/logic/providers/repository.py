@@ -38,6 +38,21 @@ class ProviderRepository(BaseRepository):
             limit=limit,
         )
 
+    async def list_for_verification(self) -> Sequence[Provider]:
+        """Return providers eligible for the nightly verification job
+        (`src/jobs/nightly_verification.py`).
+
+        Eligibility today is the minimum that's clearly correct:
+        non-deleted providers. We deliberately do NOT skip rows
+        verified within the last 24h — NPPES has no published rate
+        limit and the per-call timeout (10s) bounds total runtime, so
+        a "verified yesterday" provider re-verifying tonight is cheap
+        and keeps the daily badge fresh. Revisit this filter when
+        rate-limiting actually bites or the provider count grows past
+        O(1000).
+        """
+        return await self._list(select(Provider).filter(Provider.deleted_at.is_(None)))
+
     async def list_providers(
         self,
         *,
