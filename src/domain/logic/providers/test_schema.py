@@ -247,6 +247,71 @@ def test_provider_update_accepts_empty_carrier_list_patch():
     assert p.in_network_carriers == []
 
 
+# --- NPI validator ------------------------------------------------------
+
+
+@pytest.mark.parametrize("npi", ["1234567890", "0000000000", "9999999999"])
+def test_provider_create_accepts_10_digit_npi(npi):
+    p = ProviderCreate(**_provider_create_kwargs(npi=npi))
+    assert p.npi == npi
+
+
+@pytest.mark.parametrize("blank", [None, "", "   "])
+def test_provider_create_normalizes_blank_npi_to_none(blank):
+    p = ProviderCreate(**_provider_create_kwargs(npi=blank))
+    assert p.npi is None
+
+
+def test_provider_create_omitted_npi_defaults_to_none():
+    p = ProviderCreate(**_provider_create_kwargs())
+    assert p.npi is None
+
+
+@pytest.mark.parametrize(
+    "bad", ["123", "123456789", "12345678901", "12345abcde", "  123456 7890"]
+)
+def test_provider_create_rejects_malformed_npi(bad):
+    with pytest.raises(ValidationError):
+        ProviderCreate(**_provider_create_kwargs(npi=bad))
+
+
+def test_provider_update_accepts_npi_patch():
+    p = ProviderUpdate(npi="1234567890")
+    assert p.npi == "1234567890"
+
+
+def test_provider_update_rejects_malformed_npi():
+    with pytest.raises(ValidationError):
+        ProviderUpdate(npi="abc")
+
+
+def test_provider_read_round_trips_npi():
+    """`ProviderRead.model_validate` carries `npi` through unchanged."""
+    now = _now()
+    pid = uuid.uuid4()
+    p = ProviderRead.model_validate(
+        {
+            "id": pid,
+            "owner_id": uuid.uuid4(),
+            "created_at": now,
+            "updated_at": now,
+            "org_id": uuid.uuid4(),
+            "org_name": "Sunrise",
+            "npi": "1234567890",
+            "location_city": "Boise",
+            "location_state": "ID",
+            "location_zip": "83702",
+            "in_person_sessions": "yes",
+            "virtual_sessions": "no",
+            "accepts_out_of_network": True,
+            "in_network_carriers": [],
+            "sliding_scale": False,
+            "cost": None,
+        }
+    )
+    assert p.npi == "1234567890"
+
+
 def test_provider_create_accepts_cost_and_sliding_scale():
     p = ProviderCreate(
         **_provider_create_kwargs(

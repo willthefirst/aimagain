@@ -32,6 +32,7 @@
       {{ text_field("location_city", "City", current=provider.location_city, maxlength=120) }}
       {{ select_field("location_state", "State", US_STATES, current=provider.location_state) }}
       {{ text_field("location_zip", "ZIP", current=provider.location_zip, pattern="\\d{5}", maxlength=5) }}
+      {{ text_field("npi", "NPI (10-digit National Provider Identifier, optional)", current=provider.npi, required=false, pattern="\\d{10}", maxlength=10) }}
     </fieldset>
     <fieldset>
       <legend>Session availability</legend>

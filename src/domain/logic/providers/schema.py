@@ -32,11 +32,12 @@ A guardrail test in `test_provider.py`
 universes aligned with the source tuples.
 """
 
+import re
 import uuid
 from datetime import date, datetime
 from typing import Annotated, Any, Literal
 
-from pydantic import BeforeValidator, model_serializer, model_validator
+from pydantic import AfterValidator, BeforeValidator, model_serializer, model_validator
 
 from src.domain.logic.value_objects.location import (
     Location,
@@ -52,6 +53,7 @@ from src.domain.models.enums import (
     LOCATION_AVAILABILITY_OPTIONS,
     US_STATES,
 )
+from src.framework.rendering.form_fields import HtmlPattern
 from src.framework.schema_validators import (
     PartialUpdate,
     ReadProjection,
@@ -59,6 +61,35 @@ from src.framework.schema_validators import (
     StrippedText,
     WirePayload,
 )
+
+_NPI_RE = re.compile(r"^[0-9]{10}$")
+
+
+def _validate_npi(v: str | None) -> str | None:
+    """Accept exactly 10 ASCII digits, normalize whitespace and the
+    empty string to ``None``. NPI's CHECK constraint at the DB layer
+    enforces the same shape; this validator is the wire-side gate so
+    bad input 422s before it reaches a transaction.
+    """
+    if v is None:
+        return None
+    v = v.strip()
+    if v == "":
+        return None
+    if not _NPI_RE.match(v):
+        raise ValueError("must be a 10-digit NPI")
+    return v
+
+
+# NPI is a National Provider Identifier — 10 ASCII digits. The HTML
+# `pattern` hint mirrors the validator so the form's `<input>` rejects
+# bad values client-side too. Local to this module because only the
+# provider entity has the column (rule-of-three).
+NpiText = Annotated[
+    str | None,
+    AfterValidator(_validate_npi),
+    HtmlPattern(pattern=r"\d{10}", maxlength=10),
+]
 
 
 def _scalar_to_list(v):
@@ -175,6 +206,10 @@ class ProviderRead(ReadProjection):
     # the relationship inline.
     org_id: uuid.UUID
     org_name: str
+    # National Provider Identifier; 10 ASCII digits or `None`. Used by
+    # the verification pipeline (#525–#528) to look up the provider in
+    # NPPES. No UNIQUE constraint at the DB layer yet.
+    npi: str | None = None
     # `(city, state, zip)` arrive flat — from ORM attributes via
     # ``from_attributes`` or from a flat dict — and dump flat (JSON
     # responses still expose ``location_city`` / ``location_state`` /
@@ -224,6 +259,9 @@ class ProviderCreate(WirePayload):
     # come back to this form. The dropdown is rendered by the form
     # template from an `orgs` context var the form_new handler injects.
     org_id: uuid.UUID
+    # Optional on create; backfill is operator-driven (#525). Empty input
+    # normalizes to `None` so an unfilled form field doesn't 422.
+    npi: NpiText = None
     location: Location
     in_person_sessions: Literal[*LOCATION_AVAILABILITY_OPTIONS]
     virtual_sessions: Literal[*LOCATION_AVAILABILITY_OPTIONS]
@@ -266,6 +304,9 @@ class ProviderUpdate(PartialUpdate):
     # different row in `organizations`. `org.name` changes by editing
     # the Organization itself, not via this schema.
     org_id: uuid.UUID | None = None
+    # Patch the NPI by writing a 10-digit string or empty (→ `None`,
+    # clearing the field). Same validator as :class:`ProviderCreate`.
+    npi: NpiText = None
     location: LocationPartial | None = None
     in_person_sessions: Literal[*LOCATION_AVAILABILITY_OPTIONS] | None = None
     virtual_sessions: Literal[*LOCATION_AVAILABILITY_OPTIONS] | None = None
