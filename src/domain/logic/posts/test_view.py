@@ -322,12 +322,15 @@ def test_view_pa_basics():
 
 
 def test_view_pa_headline_is_org_name_state_from_provider():
-    """PA's identity is the practice — `provider.org.name` — with
-    state shown in the header line (the provider's `location_state`).
-    Unlike CR, the state isn't demoted to the demographics column."""
+    """PA's identity is the practice — `provider.org.name`. State
+    surfaces via `location_chunk` (the demographics-column icon-only
+    row), matching the CR treatment so referral + opening cards
+    consistently locate their location in the same place. The header
+    line stays uncluttered for both kinds."""
     v = post_card_view(_make_pa_post())
     assert v["headline"] == "Acme Counseling"
-    assert v["header_state"] == "NY"
+    assert v["header_state"] is None
+    assert v["location_chunk"] == {"city": "Brooklyn", "state": "NY", "zip": "11201"}
 
 
 def test_view_pa_in_person_virtual_come_from_provider():
@@ -381,12 +384,39 @@ def test_view_pa_referral_none_when_both_empty():
     assert v["referral"] is None
 
 
-def test_view_pa_no_location_chunk():
-    """PA's location lives on the linked Provider and surfaces via
-    `header_state` + `full_address`. The CR-shaped `location_chunk`
-    is intentionally None for PA so the demographics column doesn't
-    render the icon-only row."""
+def test_view_pa_location_chunk_pulled_from_provider():
+    """PA's `location_chunk` reads city/state/zip from the linked
+    Provider so the listing card renders the same icon-only
+    `entity-location` row referral cards do. Detail page still gets
+    the full address via `full_address` for the expanded rows."""
     v = post_card_view(_make_pa_post())
+    assert v["location_chunk"] == {"city": "Brooklyn", "state": "NY", "zip": "11201"}
+    assert v["full_address"] == "Brooklyn, NY 11201"
+
+
+def test_view_pa_no_location_chunk_when_provider_missing():
+    """Defensive — a PA stub without a `provider` relationship returns
+    `location_chunk=None` instead of crashing. Mirrors the same
+    defensive path the existing PA-missing-provider test covers for
+    other provider-derived fields."""
+    post = SimpleNamespace(
+        kind="opening",
+        opening_detail=SimpleNamespace(
+            provider=None,
+            services=[],
+            settings=[],
+            age_groups=[],
+            languages=[],
+            genders=[],
+            treatment_modality=None,
+            description=None,
+            schedule_text=None,
+            desired_times=[],
+            website=None,
+            referral_instructions=None,
+        ),
+    )
+    v = post_card_view(post)
     assert v["location_chunk"] is None
 
 

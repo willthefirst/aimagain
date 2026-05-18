@@ -163,11 +163,13 @@ def post_card_view(post) -> dict[str, Any]:
         headline: the card's identity line — CR is ``referral_headline``
             (age + gender combo); PA is the practice's org name;
             program is the program name.
-        header_state: the state shown next to the headline. PA reads
-            from ``provider.location_state``; program reads from
-            ``program.state_preference``; CR is ``None`` because its
-            state lives in ``location_chunk`` (the demographics-column
-            location row), not in the header line.
+        header_state: the state shown next to the headline. Program
+            reads from ``program.state_preference``; CR and PA leave
+            this ``None`` and surface their state via the
+            demographics-column ``location_chunk`` row instead — that
+            keeps the header line uncluttered and makes the two
+            availability-vs-seeker kinds consistent on where location
+            appears in the card.
         in_person / virtual: the post's in-person/virtual posture as
             `LOCATION_AVAILABILITY_OPTIONS` values. CR reads them off
             its own detail row; PA reads them from the linked
@@ -184,10 +186,11 @@ def post_card_view(post) -> dict[str, Any]:
             (program-availability has no posture). Same value
             ``insurance_posture_for_post`` returns.
         treatment_modality: free-text modality string or ``None``.
-        location_chunk: ``{city, state, zip}`` for CR's demographics
-            column; ``None`` for PA and program (PA's location is on
-            the linked Provider and surfaces via ``header_state`` and
-            ``full_address``; program has no location of its own).
+        location_chunk: ``{city, state, zip}`` for CR (from the
+            detail row) and PA (from the linked Provider) — the
+            demographics-column icon-only row both render. ``None``
+            for program (no location of its own; ``state_preference``
+            still surfaces via ``header_state``).
         description: free-text description or ``None``. CR's
             description is NOT NULL on the model but the function
             stays defensive for stubs that omit it.
@@ -287,7 +290,21 @@ def post_card_view(post) -> dict[str, Any]:
         p = getattr(d, "provider", None)
         base.update(
             headline=(p.org.name if p and getattr(p, "org", None) else None),
-            header_state=(getattr(p, "location_state", None) if p else None),
+            # `header_state` stays None — opening's location lives in
+            # the demographics column via `location_chunk` (same row
+            # treatment as referral). Both kinds match on where
+            # location surfaces, so the list card's header line stays
+            # uncluttered for both.
+            header_state=None,
+            location_chunk=(
+                _location_chunk(
+                    getattr(p, "location_city", None),
+                    getattr(p, "location_state", None),
+                    getattr(p, "location_zip", None),
+                )
+                if p
+                else None
+            ),
             in_person=(getattr(p, "in_person_sessions", None) if p else None),
             virtual=(getattr(p, "virtual_sessions", None) if p else None),
             services=list(getattr(d, "services", None) or []),
