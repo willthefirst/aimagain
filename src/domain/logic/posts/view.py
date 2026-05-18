@@ -4,12 +4,12 @@ The listing row in `src/domain/templates/posts/_item.html` needs a single
 4-state "insurance posture" axis to render as one icon badge. The two
 kinds model the underlying data asymmetrically:
 
-  * `client_referral` — `network_preference` enum
+  * `referral` — `network_preference` enum
     (`in_network_required` / `in_network_preferred` / `no_preference`)
     paired with a nullable `insurance_carrier`. The posture is derived
     from `network_preference` alone — the carrier doesn't change the
     badge.
-  * `provider_availability` → linked `Provider` — the
+  * `opening` → linked `Provider` — the
     `in_network_carriers` list (empty = no in-network) plus the
     `accepts_out_of_network` / `sliding_scale` booleans.
 
@@ -19,7 +19,7 @@ ordering of branches is the priority the row should show: if a
 provider accepts in-network plans, that's the posture, even if they
 also offer sliding scale — the in-network signal is louder.
 
-`client_referral_headline(detail)` composes the CR card's headline
+`referral_headline(detail)` composes the CR card's headline
 text from `age_groups[0]` + `gender`. CR posts describe one client,
 so the first age group is the client's age (the schema still allows
 multi for forward-compat but only the first drives the title).
@@ -67,8 +67,8 @@ def insurance_posture_for_post(post) -> str | None:
     happen for persisted posts, but the row template tolerates it).
     """
     kind = getattr(post, "kind", None)
-    if kind == "client_referral":
-        detail = getattr(post, "client_referral_detail", None)
+    if kind == "referral":
+        detail = getattr(post, "referral_detail", None)
         if detail is None:
             return None
         # Map the referrer's posture to the unified posture vocabulary.
@@ -81,8 +81,8 @@ def insurance_posture_for_post(post) -> str | None:
             "in_network_preferred": "out_of_network",
             "no_preference": "self_pay",
         }.get(detail.network_preference)
-    if kind == "provider_availability":
-        detail = getattr(post, "provider_availability_detail", None)
+    if kind == "opening":
+        detail = getattr(post, "opening_detail", None)
         provider = getattr(detail, "provider", None) if detail is not None else None
         if provider is None:
             return None
@@ -105,8 +105,8 @@ def insurance_posture_for_post(post) -> str | None:
 
 
 _KIND_VERB = {
-    "client_referral": "Seeking",
-    "provider_availability": "Providing",
+    "referral": "Seeking",
+    "opening": "Providing",
     "program_availability": "Providing",
 }
 
@@ -154,13 +154,13 @@ def post_card_view(post) -> dict[str, Any]:
     ``{% for x in view.xs %}`` without further nullability handling.
 
     Returns:
-        kind: the discriminator (`client_referral` /
-            `provider_availability` / `program_availability`).
+        kind: the discriminator (`referral` /
+            `opening` / `program_availability`).
         kind_verb: ``"Seeking"`` for CR, ``"Providing"`` for the two
             availability kinds. Mirrors the kind-chip vocabulary the
             list card's left-edge color uses (orange = Seeking, cyan
             = Providing).
-        headline: the card's identity line — CR is ``client_referral_headline``
+        headline: the card's identity line — CR is ``referral_headline``
             (age + gender combo); PA is the practice's org name;
             program is the program name.
         header_state: the state shown next to the headline. PA reads
@@ -250,12 +250,12 @@ def post_card_view(post) -> dict[str, Any]:
         "referral": None,
     }
 
-    if kind == "client_referral":
-        d = getattr(post, "client_referral_detail", None)
+    if kind == "referral":
+        d = getattr(post, "referral_detail", None)
         if d is None:
             return base
         base.update(
-            headline=client_referral_headline(d),
+            headline=referral_headline(d),
             in_person=getattr(d, "location_in_person", None),
             virtual=getattr(d, "location_virtual", None),
             services=list(getattr(d, "services", None) or []),
@@ -280,8 +280,8 @@ def post_card_view(post) -> dict[str, Any]:
         )
         return base
 
-    if kind == "provider_availability":
-        d = getattr(post, "provider_availability_detail", None)
+    if kind == "opening":
+        d = getattr(post, "opening_detail", None)
         if d is None:
             return base
         p = getattr(d, "provider", None)
@@ -365,8 +365,8 @@ def post_card_view(post) -> dict[str, Any]:
     return base
 
 
-def client_referral_headline(detail) -> str:
-    """Build the listing-card headline for a `client_referral`.
+def referral_headline(detail) -> str:
+    """Build the listing-card headline for a `referral`.
 
     Format: `"<Age noun> [<gender>] (<range>)"` — e.g. `"Adult male
     (25–64)"`, `"Adolescent female (14–18)"`, or `"Adult (25–64)"`

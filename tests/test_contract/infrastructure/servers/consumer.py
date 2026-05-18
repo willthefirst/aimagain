@@ -142,7 +142,7 @@ def _setup_post_owner_actions_stub(app: FastAPI) -> None:
         # owner-or-admin gate is a don't-care (current_user is a
         # superuser).
         post = make_post_stub(
-            "client_referral",
+            "referral",
             post_id=post_id,
             owner_id=post_id,
             owner_username="post_owner",

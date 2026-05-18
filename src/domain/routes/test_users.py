@@ -42,8 +42,8 @@ async def test_base_template_renders_primary_nav_when_authenticated(
     # selector picks up only the section shortcuts (Referrals /
     # Openings / Directory) in render order.
     assert section_hrefs == [
-        "/posts?kind=client_referral",
-        "/posts?kind=provider_availability",
+        "/posts?kind=referral",
+        "/posts?kind=opening",
         "/providers",
     ]
 
@@ -56,17 +56,17 @@ async def test_primary_nav_highlights_active_section(
     Referrals and Openings shortcuts only light up when both the path
     and the `kind` query param match. Directory matches any path under
     `/providers`."""
-    referrals = await authenticated_client.get("/posts?kind=client_referral")
+    referrals = await authenticated_client.get("/posts?kind=referral")
     tree = HTMLParser(referrals.text)
     assert (
         tree.css_first(
-            'nav[aria-label="Primary"] a[href="/posts?kind=client_referral"]'
+            'nav[aria-label="Primary"] a[href="/posts?kind=referral"]'
         ).attributes.get("aria-current")
         == "page"
     )
     assert (
         tree.css_first(
-            'nav[aria-label="Primary"] a[href="/posts?kind=provider_availability"]'
+            'nav[aria-label="Primary"] a[href="/posts?kind=opening"]'
         ).attributes.get("aria-current")
         is None
     )

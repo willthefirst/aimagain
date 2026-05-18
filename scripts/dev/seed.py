@@ -9,10 +9,10 @@ Idempotent:
   - Providers are matched by (owner_id, org_id); existing rows are
     reused so PA fixtures can always point at a real Provider.
   - Provider-availability posts are matched by
-    (kind='provider_availability', owner_id, provider_id); existing
+    (kind='opening', owner_id, provider_id); existing
     rows are skipped.
   - Client-referral posts are matched by
-    (kind='client_referral', owner_id, description); duplicates are
+    (kind='referral', owner_id, description); duplicates are
     skipped. Descriptions are verbose enough that this collision is
     essentially never a real-data conflict.
 
@@ -37,13 +37,13 @@ from src.auth_config import UserManager
 from src.db import async_session_maker
 from src.domain.logic.users.schema import UserCreate
 from src.domain.models import (
-    ClientReferralDetail,
+    OpeningDetail,
     Organization,
     Post,
     Program,
     ProgramAvailabilityDetail,
     Provider,
-    ProviderAvailabilityDetail,
+    ReferralDetail,
     User,
 )
 
@@ -56,14 +56,14 @@ class FixtureUser(TypedDict):
     is_superuser: bool
 
 
-class FixtureProviderAvailability(TypedDict):
+class FixtureOpening(TypedDict):
     owner_email: str
     days_ago: int
     provider: dict[str, Any]
     detail: dict[str, Any]
 
 
-class FixtureClientReferral(TypedDict):
+class FixtureReferral(TypedDict):
     owner_email: str
     days_ago: int
     detail: dict[str, Any]
@@ -89,7 +89,7 @@ FIXTURE_USERS: list[FixtureUser] = [
 # announcement. The seed creates/reuses the Provider, then points the
 # PA's `provider_id` at it. `days_ago` spreads `created_at` across the
 # last ~6 months so the listing page shows date variance.
-FIXTURE_PROVIDER_AVAILABILITY: list[FixtureProviderAvailability] = [
+FIXTURE_OPENING: list[FixtureOpening] = [
     {
         "owner_email": "alice@example.com",
         "days_ago": 2,
@@ -531,7 +531,7 @@ FIXTURE_PROVIDER_AVAILABILITY: list[FixtureProviderAvailability] = [
 # their clients — the description is the part a reader scans on the
 # listings page. Spread across states, age bands, insurance postures,
 # and service needs so the /posts filters actually narrow on real data.
-FIXTURE_CLIENT_REFERRAL: list[FixtureClientReferral] = [
+FIXTURE_REFERRAL: list[FixtureReferral] = [
     {
         "owner_email": "bob@example.com",
         "days_ago": 0,
@@ -895,13 +895,13 @@ async def seed_users() -> tuple[int, int]:
     return created, skipped
 
 
-async def seed_provider_availability() -> tuple[int, int]:
+async def seed_opening() -> tuple[int, int]:
     created = 0
     skipped = 0
     providers_created = 0
 
     async with async_session_maker() as session:
-        for fixture in FIXTURE_PROVIDER_AVAILABILITY:
+        for fixture in FIXTURE_OPENING:
             # The fixture declares `practice_name` as a convenience key
             # for the seeded Organization's name — it is NOT a column on
             # Provider. Strip it before splatting the fixture dict into
@@ -960,13 +960,13 @@ async def seed_provider_availability() -> tuple[int, int]:
             existing = await session.execute(
                 select(Post)
                 .join(
-                    ProviderAvailabilityDetail,
-                    ProviderAvailabilityDetail.post_id == Post.id,
+                    OpeningDetail,
+                    OpeningDetail.post_id == Post.id,
                 )
                 .where(
-                    Post.kind == "provider_availability",
+                    Post.kind == "opening",
                     Post.owner_id == owner.id,
-                    ProviderAvailabilityDetail.provider_id == provider.id,
+                    OpeningDetail.provider_id == provider.id,
                 )
             )
             if existing.scalar_one_or_none() is not None:
@@ -977,9 +977,9 @@ async def seed_provider_availability() -> tuple[int, int]:
                 skipped += 1
                 continue
 
-            post = Post(kind="provider_availability", owner_id=owner.id)
+            post = Post(kind="opening", owner_id=owner.id)
             _shift_created_at(post, fixture["days_ago"])
-            post.provider_availability_detail = ProviderAvailabilityDetail(
+            post.opening_detail = OpeningDetail(
                 provider_id=provider.id, **fixture["detail"]
             )
             session.add(post)
@@ -993,7 +993,7 @@ async def seed_provider_availability() -> tuple[int, int]:
     return created, skipped
 
 
-async def seed_client_referral() -> tuple[int, int]:
+async def seed_referral() -> tuple[int, int]:
     """Seed client-referral posts (the seeking side). Idempotent on
     `(kind, owner_id, description)`: descriptions are verbose enough
     that re-running matches the same row, never a collision with a
@@ -1002,7 +1002,7 @@ async def seed_client_referral() -> tuple[int, int]:
     skipped = 0
 
     async with async_session_maker() as session:
-        for fixture in FIXTURE_CLIENT_REFERRAL:
+        for fixture in FIXTURE_REFERRAL:
             owner_result = await session.execute(
                 select(User).where(User.email == fixture["owner_email"])
             )
@@ -1019,11 +1019,11 @@ async def seed_client_referral() -> tuple[int, int]:
 
             existing = await session.execute(
                 select(Post)
-                .join(ClientReferralDetail, ClientReferralDetail.post_id == Post.id)
+                .join(ReferralDetail, ReferralDetail.post_id == Post.id)
                 .where(
-                    Post.kind == "client_referral",
+                    Post.kind == "referral",
                     Post.owner_id == owner.id,
-                    ClientReferralDetail.description == description,
+                    ReferralDetail.description == description,
                 )
             )
             if existing.scalar_one_or_none() is not None:
@@ -1034,9 +1034,9 @@ async def seed_client_referral() -> tuple[int, int]:
                 skipped += 1
                 continue
 
-            post = Post(kind="client_referral", owner_id=owner.id)
+            post = Post(kind="referral", owner_id=owner.id)
             _shift_created_at(post, fixture["days_ago"])
-            post.client_referral_detail = ClientReferralDetail(**fixture["detail"])
+            post.referral_detail = ReferralDetail(**fixture["detail"])
             session.add(post)
             print(f"✅ Created CR post '{short}' by {fixture['owner_email']}")
             created += 1
@@ -1056,7 +1056,7 @@ class FixtureProgram(TypedDict):
 
 
 # Programs attached to seeded Orgs. ``org_name`` matches an Org created
-# by ``seed_provider_availability`` (Org names are the practice's
+# by ``seed_opening`` (Org names are the practice's
 # display name post-#524). The seed finds-or-creates the Org idempotently
 # if PA seeding ran first, then attaches the Program by name.
 FIXTURE_PROGRAMS: list[FixtureProgram] = [
@@ -1270,8 +1270,8 @@ async def seed_program_availability() -> tuple[int, int]:
 
 async def seed_all() -> int:
     users_created, users_skipped = await seed_users()
-    pa_created, pa_skipped = await seed_provider_availability()
-    cr_created, cr_skipped = await seed_client_referral()
+    pa_created, pa_skipped = await seed_opening()
+    cr_created, cr_skipped = await seed_referral()
     programs_created, programs_skipped = await seed_programs()
     # Program-availability runs AFTER seed_programs() since it joins on a
     # Program seeded above.

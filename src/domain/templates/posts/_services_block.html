@@ -5,7 +5,7 @@ PA/program); the `<ul>` items combine a Lucide icon with the service's
 display label. Priority sort puts `psychotherapy` and
 `medication_management` first since those are the two services
 scanners most often look for; the rest follow in
-`CLIENT_REFERRAL_SERVICES` declaration order. PA+program `settings`
+`REFERRAL_SERVICES` declaration order. PA+program `settings`
 render under the same `<ul>` after the services.
 
 Reads from `view` (the `post_card_view` dict):
@@ -15,7 +15,7 @@ Reads from `view` (the `post_card_view` dict):
 
 Renders nothing when both lists are empty so the H4 doesn't stand
 alone. The display-label and icon-name dicts come in via Jinja
-globals (`CLIENT_REFERRAL_SERVICE_LABELS` / `_ICONS`, same for
+globals (`REFERRAL_SERVICE_LABELS` / `_ICONS`, same for
 `TREATMENT_SETTINGS_*`) registered in `src/domain/template_globals.py`. #}
 {% macro _service_item(value, label_dict, icon_dict) -%}
 <li><i class="icon-{{ icon_dict[value] }}" aria-hidden="true"></i>{{ label_dict[value] }}</li>
@@ -28,10 +28,10 @@ globals (`CLIENT_REFERRAL_SERVICE_LABELS` / `_ICONS`, same for
   {%- set _priority = ["psychotherapy", "medication_management"] %}
   <ul>
     {%- for s in _priority if s in view.services %}
-    {{ _service_item(s, CLIENT_REFERRAL_SERVICE_LABELS, CLIENT_REFERRAL_SERVICE_ICONS) }}
+    {{ _service_item(s, REFERRAL_SERVICE_LABELS, REFERRAL_SERVICE_ICONS) }}
     {%- endfor %}
     {%- for s in view.services if s not in _priority %}
-    {{ _service_item(s, CLIENT_REFERRAL_SERVICE_LABELS, CLIENT_REFERRAL_SERVICE_ICONS) }}
+    {{ _service_item(s, REFERRAL_SERVICE_LABELS, REFERRAL_SERVICE_ICONS) }}
     {%- endfor %}
     {%- for s in view.settings %}
     {{ _service_item(s, TREATMENT_SETTINGS_LABELS, TREATMENT_SETTINGS_ICONS) }}

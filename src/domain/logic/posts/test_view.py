@@ -5,16 +5,16 @@ from types import SimpleNamespace
 import pytest
 
 from src.domain.logic.posts.view import (
-    client_referral_headline,
     insurance_posture_for_post,
     post_card_view,
+    referral_headline,
 )
 
 
 def _cr_post(network_preference: str, insurance_carrier: str | None = None):
     return SimpleNamespace(
-        kind="client_referral",
-        client_referral_detail=SimpleNamespace(
+        kind="referral",
+        referral_detail=SimpleNamespace(
             network_preference=network_preference,
             insurance_carrier=insurance_carrier,
         ),
@@ -27,8 +27,8 @@ def _pa_post(**provider_attrs):
     provider_attrs.setdefault("sliding_scale", False)
     provider_attrs.setdefault("cost", None)
     return SimpleNamespace(
-        kind="provider_availability",
-        provider_availability_detail=SimpleNamespace(
+        kind="opening",
+        opening_detail=SimpleNamespace(
             provider=SimpleNamespace(**provider_attrs),
         ),
     )
@@ -82,11 +82,11 @@ def test_posture_returns_none_for_unknown_kind():
 
 
 def test_posture_returns_none_when_detail_missing():
-    post = SimpleNamespace(kind="client_referral", client_referral_detail=None)
+    post = SimpleNamespace(kind="referral", referral_detail=None)
     assert insurance_posture_for_post(post) is None
 
 
-# --- client_referral_headline -------------------------------------------
+# --- referral_headline -------------------------------------------
 
 
 @pytest.mark.parametrize(
@@ -104,12 +104,12 @@ def test_posture_returns_none_when_detail_missing():
         ("older_adults_65_plus", "prefer_not_to_say", "Older adult (65+)"),
     ],
 )
-def test_client_referral_headline_composes_age_and_gender(age, gender, expected):
+def test_referral_headline_composes_age_and_gender(age, gender, expected):
     detail = SimpleNamespace(age_groups=[age], gender=gender)
-    assert client_referral_headline(detail) == expected
+    assert referral_headline(detail) == expected
 
 
-def test_client_referral_headline_uses_first_age_group_only():
+def test_referral_headline_uses_first_age_group_only():
     """CR posts describe one client; the schema allows multi age_groups
     for forward-compat but the headline picks the first value so the
     title stays a single "<noun> (<range>)" phrase."""
@@ -117,14 +117,14 @@ def test_client_referral_headline_uses_first_age_group_only():
         age_groups=["adolescents_14_18", "adults_25_64"],
         gender="female",
     )
-    assert client_referral_headline(detail) == "Adolescent female (14–18)"
+    assert referral_headline(detail) == "Adolescent female (14–18)"
 
 
-def test_client_referral_headline_falls_back_when_age_groups_empty():
+def test_referral_headline_falls_back_when_age_groups_empty():
     """Defensive — schema requires min-1, but the helper degrades
     gracefully if a future code path hands us an empty list."""
     detail = SimpleNamespace(age_groups=[], gender="male")
-    assert client_referral_headline(detail) == "Client Referral"
+    assert referral_headline(detail) == "Client Referral"
 
 
 # --- post_card_view -----------------------------------------------------
@@ -158,8 +158,8 @@ def _make_cr_post(**detail_overrides):
     )
     defaults.update(detail_overrides)
     return SimpleNamespace(
-        kind="client_referral",
-        client_referral_detail=SimpleNamespace(**defaults),
+        kind="referral",
+        referral_detail=SimpleNamespace(**defaults),
     )
 
 
@@ -195,8 +195,8 @@ def _make_pa_post(*, provider_attrs=None, **detail_overrides):
     )
     d.update(detail_overrides)
     return SimpleNamespace(
-        kind="provider_availability",
-        provider_availability_detail=SimpleNamespace(
+        kind="opening",
+        opening_detail=SimpleNamespace(
             provider=SimpleNamespace(**p),
             **d,
         ),
@@ -235,14 +235,14 @@ def _make_program_post(*, program_attrs=None, **detail_overrides):
     )
 
 
-# --- post_card_view: client_referral ------------------------------------
+# --- post_card_view: referral ------------------------------------
 
 
 def test_view_cr_basics():
     """Per-kind discriminators map to the unified verb vocabulary the
     card's left-edge color and `_services_block` H4 both read from."""
     v = post_card_view(_make_cr_post())
-    assert v["kind"] == "client_referral"
+    assert v["kind"] == "referral"
     assert v["kind_verb"] == "Seeking"
 
 
@@ -312,12 +312,12 @@ def test_view_cr_no_referral_section():
     assert v["referral"] is None
 
 
-# --- post_card_view: provider_availability ------------------------------
+# --- post_card_view: opening ------------------------------
 
 
 def test_view_pa_basics():
     v = post_card_view(_make_pa_post())
-    assert v["kind"] == "provider_availability"
+    assert v["kind"] == "opening"
     assert v["kind_verb"] == "Providing"
 
 
@@ -449,10 +449,8 @@ def test_view_cr_missing_detail_returns_base_skeleton():
     """A CR post with no detail relationship (shouldn't happen at
     rest, but the helper stays defensive for stub data) returns the
     skeleton with kind/kind_verb still populated."""
-    v = post_card_view(
-        SimpleNamespace(kind="client_referral", client_referral_detail=None)
-    )
-    assert v["kind"] == "client_referral"
+    v = post_card_view(SimpleNamespace(kind="referral", referral_detail=None))
+    assert v["kind"] == "referral"
     assert v["kind_verb"] == "Seeking"
     assert v["headline"] is None
     assert v["location_chunk"] is None
@@ -463,8 +461,8 @@ def test_view_pa_missing_provider_returns_partial_view():
     in test stubs. View-model populates the detail-row fields it can
     and leaves provider-derived fields at None."""
     post = SimpleNamespace(
-        kind="provider_availability",
-        provider_availability_detail=SimpleNamespace(
+        kind="opening",
+        opening_detail=SimpleNamespace(
             provider=None,
             services=["psychotherapy"],
             settings=[],
@@ -498,4 +496,4 @@ def test_view_returns_dict_for_jinja_attribute_access():
     works without surprises."""
     v = post_card_view(_make_cr_post())
     assert isinstance(v, dict)
-    assert v["kind"] == "client_referral"
+    assert v["kind"] == "referral"

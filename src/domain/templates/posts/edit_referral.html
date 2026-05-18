@@ -1,0 +1,12 @@
+{% extends "views/form_edit.html" %}
+{% from "posts/_referral_form.html" import referral_form %}
+
+{% set resource_url = entity_url('post') %}
+{% set resource_detail_url = entity_url('post', id=post.id) %}
+
+{% block resource_label %}Posts{% endblock %}
+{% block current_label %}Post{% endblock %}
+
+{% block content %}
+{{ referral_form("patch", entity_url('post', id=post.id), "Save changes", post=post, schema=referral_create_schema, cancel_url=entity_url('post', id=post.id)) }}
+{% endblock %}

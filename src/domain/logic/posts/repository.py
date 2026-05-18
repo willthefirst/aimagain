@@ -3,10 +3,10 @@ from collections.abc import Sequence
 from sqlalchemy import or_, select
 
 from src.domain.models import (
-    ClientReferralDetail,
+    OpeningDetail,
     Post,
     Provider,
-    ProviderAvailabilityDetail,
+    ReferralDetail,
     User,
 )
 from src.framework.persistence.base_repository import BaseRepository
@@ -18,8 +18,8 @@ class PostRepository(BaseRepository):
 
     Every column rendered on `/posts` is filterable. The polymorphic
     body means most predicates ``OR`` across two paths — the
-    seeking side reads from ``ClientReferralDetail``, the offering
-    side from ``ProviderAvailabilityDetail`` (and its linked
+    seeking side reads from ``ReferralDetail``, the offering
+    side from ``OpeningDetail`` (and its linked
     ``Provider``). Each post has a row in at most one of the two
     detail tables, so the ``OR`` coalesces the two paths into a
     single "matches" boolean without duplicating rows.
@@ -32,7 +32,7 @@ class PostRepository(BaseRepository):
     * ``posted_by`` (Text) — ILIKE substring over the owner's
       ``username``.
     * ``state`` (Choice, multi) — ``location_state`` ``IN`` across
-      ``ClientReferralDetail`` (seeking) and the offering side's
+      ``ReferralDetail`` (seeking) and the offering side's
       linked ``Provider``.
     * ``city`` (Text) — ILIKE substring across the same two location
       paths as ``state``.
@@ -75,16 +75,16 @@ class PostRepository(BaseRepository):
             stmt = stmt.outerjoin(User, User.id == Post.owner_id)
         if needs_detail_join:
             stmt = stmt.outerjoin(
-                ClientReferralDetail,
-                ClientReferralDetail.post_id == Post.id,
+                ReferralDetail,
+                ReferralDetail.post_id == Post.id,
             ).outerjoin(
-                ProviderAvailabilityDetail,
-                ProviderAvailabilityDetail.post_id == Post.id,
+                OpeningDetail,
+                OpeningDetail.post_id == Post.id,
             )
         if needs_provider_join:
             stmt = stmt.outerjoin(
                 Provider,
-                Provider.id == ProviderAvailabilityDetail.provider_id,
+                Provider.id == OpeningDetail.provider_id,
             )
 
         if kind is not None:
@@ -93,8 +93,8 @@ class PostRepository(BaseRepository):
             needle = f"%{q}%"
             stmt = stmt.filter(
                 or_(
-                    ClientReferralDetail.description.ilike(needle),
-                    ProviderAvailabilityDetail.description.ilike(needle),
+                    ReferralDetail.description.ilike(needle),
+                    OpeningDetail.description.ilike(needle),
                 )
             )
         if posted_by:
@@ -102,7 +102,7 @@ class PostRepository(BaseRepository):
         if state:
             stmt = stmt.filter(
                 or_(
-                    ClientReferralDetail.location_state.in_(state),
+                    ReferralDetail.location_state.in_(state),
                     Provider.location_state.in_(state),
                 )
             )
@@ -110,7 +110,7 @@ class PostRepository(BaseRepository):
             needle = f"%{city}%"
             stmt = stmt.filter(
                 or_(
-                    ClientReferralDetail.location_city.ilike(needle),
+                    ReferralDetail.location_city.ilike(needle),
                     Provider.location_city.ilike(needle),
                 )
             )
@@ -136,8 +136,8 @@ def _json_array_contains_any(values: list[str], column_name: str):
     When this table moves to Postgres with a ``JSONB`` column, prefer
     ``col ?| array[values]`` over this LIKE-based predicate.
     """
-    cr_col = getattr(ClientReferralDetail, column_name)
-    pa_col = getattr(ProviderAvailabilityDetail, column_name)
+    cr_col = getattr(ReferralDetail, column_name)
+    pa_col = getattr(OpeningDetail, column_name)
     clauses = []
     for v in values:
         token = f'%"{v}"%'

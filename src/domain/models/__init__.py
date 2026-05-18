@@ -15,7 +15,7 @@ from .enums import (
 )
 from .favorites.user_favorite import UserFavorite
 from .organizations.organization import Organization
-from .posts.client_referral_detail import ClientReferralDetail
+from .posts.opening_detail import OpeningDetail
 from .posts.post import Post
 from .posts.post_kinds import (
     POST_KIND_BY_DETAIL_MODEL,
@@ -24,7 +24,7 @@ from .posts.post_kinds import (
     PostKindSpec,
 )
 from .posts.program_availability_detail import ProgramAvailabilityDetail
-from .posts.provider_availability_detail import ProviderAvailabilityDetail
+from .posts.referral_detail import ReferralDetail
 from .programs.program import Program
 from .providers.provider import Provider
 from .providers.provider_certification import ProviderCertification
@@ -37,7 +37,7 @@ __all__ = [
     "Base",
     "BaseModel",
     "CLIENT_AGE_GROUPS",
-    "ClientReferralDetail",
+    "ReferralDetail",
     "INSURANCE_CARRIERS",
     "LOCATION_AVAILABILITY_OPTIONS",
     "NETWORK_PREFERENCES",
@@ -50,7 +50,7 @@ __all__ = [
     "PostKindSpec",
     "Program",
     "ProgramAvailabilityDetail",
-    "ProviderAvailabilityDetail",
+    "OpeningDetail",
     "ProviderCertification",
     "ProviderEducation",
     "ProviderLicensure",

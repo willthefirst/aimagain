@@ -23,7 +23,7 @@ import pytest
 from src.domain.models import POST_KINDS
 from tests.test_contract.tests.shared.mock_data_factory import make_post_stub
 
-_KINDS = ["client_referral", "provider_availability", "program_availability"]
+_KINDS = ["referral", "opening", "program_availability"]
 
 
 # --- Defaults: per-column type-dispatch --------------------------------
@@ -48,7 +48,7 @@ def test_json_columns_default_to_empty_list(kind):
 def test_pa_and_program_settings_default_to_empty_list():
     """PA + program detail rows carry `settings`; CR does not. The
     default applies wherever the column exists."""
-    for kind in ("provider_availability", "program_availability"):
+    for kind in ("opening", "program_availability"):
         post = make_post_stub(kind, owner_id=uuid.uuid4())
         detail = getattr(post, POST_KINDS[kind].detail_relationship)
         assert detail.settings == []
@@ -56,7 +56,7 @@ def test_pa_and_program_settings_default_to_empty_list():
 
 def test_pa_and_program_genders_default_to_empty_list():
     """PA + program hold `genders` as a list; CR has a scalar `gender`."""
-    for kind in ("provider_availability", "program_availability"):
+    for kind in ("opening", "program_availability"):
         post = make_post_stub(kind, owner_id=uuid.uuid4())
         detail = getattr(post, POST_KINDS[kind].detail_relationship)
         assert detail.genders == []
@@ -66,10 +66,10 @@ def test_uuid_columns_get_fresh_uuids():
     """PA's `provider_id` and program's `program_id` are Uuid columns
     — the stub generates a fresh UUID per call so two consecutive
     stubs don't share an id."""
-    pa1 = make_post_stub("provider_availability", owner_id=uuid.uuid4())
-    pa2 = make_post_stub("provider_availability", owner_id=uuid.uuid4())
-    pid1 = pa1.provider_availability_detail.provider_id
-    pid2 = pa2.provider_availability_detail.provider_id
+    pa1 = make_post_stub("opening", owner_id=uuid.uuid4())
+    pa2 = make_post_stub("opening", owner_id=uuid.uuid4())
+    pid1 = pa1.opening_detail.provider_id
+    pid2 = pa2.opening_detail.provider_id
     assert isinstance(pid1, uuid.UUID)
     assert isinstance(pid2, uuid.UUID)
     assert pid1 != pid2
@@ -78,15 +78,15 @@ def test_uuid_columns_get_fresh_uuids():
 def test_text_columns_get_stub_string():
     """Free-text columns (CR's `description`, PA's `schedule_text`,
     etc.) fall through to the readable ``"stub <name>"`` placeholder."""
-    cr = make_post_stub("client_referral", owner_id=uuid.uuid4())
-    assert cr.client_referral_detail.description == "stub description"
-    assert cr.client_referral_detail.location_city == "stub location_city"
-    assert cr.client_referral_detail.treatment_modality == "stub treatment_modality"
+    cr = make_post_stub("referral", owner_id=uuid.uuid4())
+    assert cr.referral_detail.description == "stub description"
+    assert cr.referral_detail.location_city == "stub location_city"
+    assert cr.referral_detail.treatment_modality == "stub treatment_modality"
 
-    pa = make_post_stub("provider_availability", owner_id=uuid.uuid4())
-    assert pa.provider_availability_detail.description == "stub description"
-    assert pa.provider_availability_detail.schedule_text == "stub schedule_text"
-    assert pa.provider_availability_detail.website == "stub website"
+    pa = make_post_stub("opening", owner_id=uuid.uuid4())
+    assert pa.opening_detail.description == "stub description"
+    assert pa.opening_detail.schedule_text == "stub schedule_text"
+    assert pa.opening_detail.website == "stub website"
 
 
 # --- Defaults: enum-typed Text columns (per-kind registry) -------------
@@ -95,9 +95,9 @@ def test_text_columns_get_stub_string():
 def test_cr_enum_defaults_render_via_label_dict():
     """CR's enum-typed Text columns must default to valid enum
     members so the detail template's display-label lookup resolves.
-    Pin each column to its `_ENUM_DEFAULTS["client_referral"]` value."""
-    cr = make_post_stub("client_referral", owner_id=uuid.uuid4())
-    d = cr.client_referral_detail
+    Pin each column to its `_ENUM_DEFAULTS["referral"]` value."""
+    cr = make_post_stub("referral", owner_id=uuid.uuid4())
+    d = cr.referral_detail
     assert d.location_in_person == "no"
     assert d.location_virtual == "no"
     assert d.gender == "prefer_not_to_say"
@@ -114,12 +114,12 @@ def test_pa_has_no_enum_text_columns_on_detail_row():
     in_network_carriers, ...) live on the linked Provider, not on the
     detail row itself. The detail row has no CHECK-constrained Text
     columns, so the enum-defaults registry for PA is empty."""
-    pa = make_post_stub("provider_availability", owner_id=uuid.uuid4())
+    pa = make_post_stub("opening", owner_id=uuid.uuid4())
     # All fields on the detail row are list-typed JSON, Uuid, or
     # plain Text — none are enum-checked.
-    assert isinstance(pa.provider_availability_detail.services, list)
-    assert isinstance(pa.provider_availability_detail.provider_id, uuid.UUID)
-    assert pa.provider_availability_detail.description == "stub description"
+    assert isinstance(pa.opening_detail.services, list)
+    assert isinstance(pa.opening_detail.provider_id, uuid.UUID)
+    assert pa.opening_detail.description == "stub description"
 
 
 # --- Overrides ---------------------------------------------------------
@@ -131,13 +131,13 @@ def test_field_overrides_replace_defaults():
     doesn't fit (e.g. supplying a populated services list to render
     multiple icon rows)."""
     post = make_post_stub(
-        "client_referral",
+        "referral",
         owner_id=uuid.uuid4(),
         services=["psychotherapy", "medication_management"],
         gender="female",
         description="Looking for a therapist.",
     )
-    d = post.client_referral_detail
+    d = post.referral_detail
     assert d.services == ["psychotherapy", "medication_management"]
     assert d.gender == "female"
     assert d.description == "Looking for a therapist."
@@ -150,11 +150,11 @@ def test_field_overrides_for_unknown_field_are_passed_through():
     for adding `provider` (PA) / `program` (program) relationships
     that the column-driven defaults can't populate."""
     post = make_post_stub(
-        "provider_availability",
+        "opening",
         owner_id=uuid.uuid4(),
         provider=object(),  # arbitrary stand-in for the relationship
     )
-    assert post.provider_availability_detail.provider is not None
+    assert post.opening_detail.provider is not None
 
 
 # --- Acceptance: template render canary --------------------------------
@@ -237,13 +237,13 @@ def test_stub_sets_post_metadata():
     pid = uuid.uuid4()
     oid = uuid.uuid4()
     post = make_post_stub(
-        "client_referral",
+        "referral",
         post_id=pid,
         owner_id=oid,
         owner_username="alice",
     )
     assert post.id == pid
-    assert post.kind == "client_referral"
+    assert post.kind == "referral"
     assert post.owner_id == oid
     assert post.owner.username == "alice"
     assert isinstance(post.created_at, datetime)

@@ -33,14 +33,14 @@ class Post(BaseModel):
     )
 
     owner = relationship("User", lazy="joined")
-    client_referral_detail = relationship(
-        "ClientReferralDetail",
+    referral_detail = relationship(
+        "ReferralDetail",
         uselist=False,
         cascade="all, delete-orphan",
         lazy="selectin",
     )
-    provider_availability_detail = relationship(
-        "ProviderAvailabilityDetail",
+    opening_detail = relationship(
+        "OpeningDetail",
         uselist=False,
         cascade="all, delete-orphan",
         lazy="selectin",

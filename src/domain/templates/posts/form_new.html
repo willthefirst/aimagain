@@ -13,7 +13,7 @@
    `?kind=…`, which the handler routes to the kind-specific create
    form. Two kinds today; add another `<p><a>…</a></p>` per kind. #}
 {% block content %}
-<p><a href="{{ entity_form_url('post') }}?kind=client_referral" role="button">Refer a client to a provider</a></p>
-<p><a href="{{ entity_form_url('post') }}?kind=provider_availability" role="button">Announce availability for new clients</a></p>
+<p><a href="{{ entity_form_url('post') }}?kind=referral" role="button">Refer a client to a provider</a></p>
+<p><a href="{{ entity_form_url('post') }}?kind=opening" role="button">Announce availability for new clients</a></p>
 <p><a href="{{ entity_form_url('post') }}?kind=program_availability" role="button">Announce program intake</a></p>
 {% endblock %}

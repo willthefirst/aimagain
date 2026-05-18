@@ -93,7 +93,7 @@ CLIENT_AGE_GROUPS: Final[tuple[str, ...]] = (
 # today — and grows as real posts demand more entries.
 LANGUAGES: Final[tuple[str, ...]] = ("en", "es")
 
-# Referrer's posture toward in-network matching for a `client_referral`.
+# Referrer's posture toward in-network matching for a `referral`.
 # Paired with `insurance_carrier` (nullable, from `INSURANCE_CARRIERS`) on
 # the same detail row: `network_preference` describes *strictness*,
 # `insurance_carrier` describes *which carrier* (null = self-pay /
@@ -106,7 +106,7 @@ NETWORK_PREFERENCES: Final[tuple[str, ...]] = (
 )
 
 # Carrier vocabulary for `Provider.in_network_carriers` and
-# `ClientReferralDetail.insurance_carrier`. Single-sourced so the
+# `ReferralDetail.insurance_carrier`. Single-sourced so the
 # referral side (one carrier per patient) and the provider side (the
 # list of carriers the practice accepts) share tokens. On the provider
 # side an empty list means "no in-network"; nullable on the referral
@@ -146,10 +146,10 @@ DESIRED_TIME_SLOTS: Final[tuple[str, ...]] = tuple(
 )
 
 # Service-line categories. The same vocabulary appears on both forms:
-# optional `services` on `client_referral` (empty list allowed) and
-# required-min-1 `services` on `provider_availability`. Required-ness
+# optional `services` on `referral` (empty list allowed) and
+# required-min-1 `services` on `opening`. Required-ness
 # differs but the value set is shared, so the tuple is single-sourced.
-CLIENT_REFERRAL_SERVICES: Final[tuple[str, ...]] = (
+REFERRAL_SERVICES: Final[tuple[str, ...]] = (
     "evaluation",
     "medication_management",
     "psychotherapy",
@@ -167,8 +167,8 @@ CLIENT_REFERRAL_SERVICES: Final[tuple[str, ...]] = (
 # is the umbrella token for genderqueer / agender / two-spirit / etc.;
 # `prefer_not_to_say` is the privacy-respecting opt-out.
 #
-# Used as a scalar on `client_referral` (`gender`: the client's identity)
-# and as a multi-value list on `provider_availability` (`genders`: the
+# Used as a scalar on `referral` (`gender`: the client's identity)
+# and as a multi-value list on `opening` (`genders`: the
 # practice serves these).
 GENDERS: Final[tuple[str, ...]] = (
     "female",
@@ -180,7 +180,7 @@ GENDERS: Final[tuple[str, ...]] = (
     "prefer_not_to_say",
 )
 
-# Treatment settings categories. `provider_availability` only; required-min-1.
+# Treatment settings categories. `opening` only; required-min-1.
 TREATMENT_SETTINGS: Final[tuple[str, ...]] = (
     "outpatient",
     "iop",
@@ -288,7 +288,7 @@ DESIRED_TIME_SLOT_LABELS: Final[dict[str, str]] = {
     for day in DESIRED_TIME_DAYS
     for part in DESIRED_TIME_PARTS
 }
-CLIENT_REFERRAL_SERVICE_LABELS: Final[dict[str, str]] = {
+REFERRAL_SERVICE_LABELS: Final[dict[str, str]] = {
     "evaluation": "Evaluation",
     "medication_management": "Medication management",
     "psychotherapy": "Psychotherapy",
@@ -319,10 +319,10 @@ GENDER_LABELS: Final[dict[str, str]] = {
 # --- Unified insurance posture -----------------------------------------
 #
 # The two post kinds model "insurance situation" with asymmetric vocab:
-#   * `client_referral` — `network_preference` enum
+#   * `referral` — `network_preference` enum
 #     (`in_network_required` / `in_network_preferred` / `no_preference`)
 #     paired with a nullable `insurance_carrier`.
-#   * `provider_availability` → linked `Provider` carries the
+#   * `opening` → linked `Provider` carries the
 #     `in_network_carriers` list (empty = no in-network) plus the
 #     `accepts_out_of_network` / `sliding_scale` booleans.
 #
@@ -370,7 +370,7 @@ CLIENT_AGE_GROUP_ICONS: Final[dict[str, str]] = {
     "adults_25_64": "user",
     "older_adults_65_plus": "user-round",
 }
-CLIENT_REFERRAL_SERVICE_ICONS: Final[dict[str, str]] = {
+REFERRAL_SERVICE_ICONS: Final[dict[str, str]] = {
     "evaluation": "clipboard-list",
     "medication_management": "pill",
     "psychotherapy": "message-circle",

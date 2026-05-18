@@ -1,5 +1,5 @@
 {% extends "views/form_edit.html" %}
-{% from "posts/_client_referral_form.html" import client_referral_form %}
+{% from "posts/_opening_form.html" import opening_form %}
 
 {% set resource_url = entity_url('post') %}
 {% set resource_detail_url = entity_url('post', id=post.id) %}
@@ -8,5 +8,5 @@
 {% block current_label %}Post{% endblock %}
 
 {% block content %}
-{{ client_referral_form("patch", entity_url('post', id=post.id), "Save changes", post=post, schema=client_referral_create_schema, cancel_url=entity_url('post', id=post.id)) }}
+{{ opening_form("patch", entity_url('post', id=post.id), "Save changes", post=post, schema=opening_create_schema, current_user=current_user, cancel_url=entity_url('post', id=post.id)) }}
 {% endblock %}

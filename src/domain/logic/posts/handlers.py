@@ -6,18 +6,18 @@ bespoke CRUD handlers; this hook plus the spec declaration is the
 entire wire-side authorization surface for posts.
 
 Why it dispatches on ``payload.kind``: two of the three kinds reference
-a cross-entity FK in the payload (``provider_availability.provider_id``
+a cross-entity FK in the payload (``opening.provider_id``
 points at a Provider; ``program_availability.program_id`` points at a
 Program). Each needs the same "the requesting user must own the target
 row" check. The cleaner long-term shape is per-kind authz on
 :class:`PostKindSpec` (registry-per-kind ``payload_authz_path``); a
 type-switching dispatcher is acceptable while the kind set is small.
 
-``client_referral`` has no target FK and is intentionally skipped: a
+``referral`` has no target FK and is intentionally skipped: a
 CR post describes a hypothetical client, not a row a third party owns.
 
 History: prior to #541 the post entity had **no** wire-side authz on
-its FK fields. ``provider_availability.provider_id`` was nominally
+its FK fields. ``opening.provider_id`` was nominally
 "verified at write time" (per the schema docstring) but no handler
 implemented the check — a wire-level attacker could post a PA
 referencing any Provider's id. This module closes that gap as a
@@ -50,11 +50,11 @@ async def _assert_post_payload_target_ownership(
 
     Dispatches on ``payload.kind``:
 
-    * ``provider_availability`` — checks ``payload.provider_id`` against
+    * ``opening`` — checks ``payload.provider_id`` against
       ``Provider.owner_id``.
     * ``program_availability`` — checks ``payload.program_id`` against
       ``Program.owner_id``.
-    * ``client_referral`` — no target FK; no-op.
+    * ``referral`` — no target FK; no-op.
 
     404 when the target row doesn't exist (no info leak about other
     users' ids); 403 when it exists but belongs to someone else. PATCH
@@ -65,7 +65,7 @@ async def _assert_post_payload_target_ownership(
     See module docstring for why the dispatcher lives here rather than
     on :class:`PostKindSpec` per-kind."""
     kind = getattr(payload, "kind", None)
-    if kind == "provider_availability":
+    if kind == "opening":
         provider_id = getattr(payload, "provider_id", None)
         if provider_id is None:
             return
@@ -89,4 +89,4 @@ async def _assert_post_payload_target_ownership(
                 detail="You may only post availability for a Program you own"
             )
         return
-    # client_referral and any future kind without a target FK: no-op.
+    # referral and any future kind without a target FK: no-op.

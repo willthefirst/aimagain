@@ -7,7 +7,7 @@ Colocation puts the test in front of any agent editing the code. See [`../CLAUDE
 ## What lives here
 
 - `fixtures.py` — shared pytest fixtures (`test_client`, `authenticated_client`, `db_test_session_manager`, `logged_in_user`, ...). Loaded globally via `pytest_plugins = ["tests.fixtures"]` in the repo-root `conftest.py`, so colocated tests anywhere under `src/` see them.
-- `helpers.py` — non-fixture utilities: `create_test_user`, `promote_to_admin`, per-kind post factories (`client_referral_payload`, `provider_availability_payload`, `make_client_referral_detail`, `make_provider_availability_detail`). Factories supply spec-required defaults so tests only override the fields they're asserting on; defaults sit next to the factory functions so updating spec defaults is a one-place change.
+- `helpers.py` — non-fixture utilities: `create_test_user`, `promote_to_admin`, per-kind post factories (`referral_payload`, `opening_payload`, `make_referral_detail`, `make_opening_detail`). Factories supply spec-required defaults so tests only override the fields they're asserting on; defaults sit next to the factory functions so updating spec defaults is a one-place change.
 - `test_contract/` — Pact contract tests for HTML form ↔ API endpoint pairs. See [`test_contract/README.md`](test_contract/README.md).
 
 Module-specific fixtures go in a `conftest.py` next to that module's tests, not here.

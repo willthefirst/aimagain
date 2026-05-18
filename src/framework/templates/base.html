@@ -81,8 +81,8 @@
         margin: 0;
         border-left: 4px solid var(--pico-muted-border-color);
       }
-      .post-card[data-kind="client_referral"] { border-left-color: darkorange; }
-      .post-card[data-kind="provider_availability"] { border-left-color: darkcyan; }
+      .post-card[data-kind="referral"] { border-left-color: darkorange; }
+      .post-card[data-kind="opening"] { border-left-color: darkcyan; }
       .post-card[data-kind="program_availability"] { border-left-color: darkcyan; }
       /* Header band: Pico provides the background tint + bottom
          border; we only configure the in-row flex layout (headline,
@@ -364,8 +364,8 @@
        lights Referrals/Openings — detail pages drop the query param. #}
     {%- set _post_kind = request.query_params.get('kind') if is_authenticated else none -%}
     {%- set _on_posts_list = is_authenticated and request.url.path == entity_url('post') -%}
-    {%- set _on_referrals = _on_posts_list and _post_kind == 'client_referral' -%}
-    {%- set _on_openings = _on_posts_list and _post_kind == 'provider_availability' -%}
+    {%- set _on_referrals = _on_posts_list and _post_kind == 'referral' -%}
+    {%- set _on_openings = _on_posts_list and _post_kind == 'opening' -%}
     {%- set _directory_path = entity_url('provider') -%}
     {%- set _on_directory = is_authenticated and (request.url.path == _directory_path or request.url.path.startswith(_directory_path + '/')) -%}
     <header class="container">
@@ -374,8 +374,8 @@
           {# title-case-ignore: "Bedlam Connect" is a brand name #}
           <li><strong><a href="/" class="contrast">Bedlam Connect</a></strong></li>
           {% if is_authenticated %}
-          <li><a href="{{ entity_url('post') }}?kind=client_referral"{% if _on_referrals %} aria-current="page" class="contrast"{% endif %}>Referrals</a></li>
-          <li><a href="{{ entity_url('post') }}?kind=provider_availability"{% if _on_openings %} aria-current="page" class="contrast"{% endif %}>Openings</a></li>
+          <li><a href="{{ entity_url('post') }}?kind=referral"{% if _on_referrals %} aria-current="page" class="contrast"{% endif %}>Referrals</a></li>
+          <li><a href="{{ entity_url('post') }}?kind=opening"{% if _on_openings %} aria-current="page" class="contrast"{% endif %}>Openings</a></li>
           <li><a href="{{ entity_url('provider') }}"{% if _on_directory %} aria-current="page" class="contrast"{% endif %}>Directory</a></li>
           {% endif %}
         </ul>

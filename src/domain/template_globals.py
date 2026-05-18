@@ -16,14 +16,14 @@ Two trigger points cover the real load paths:
 """
 
 from src.domain.logic.posts.schema import (
-    ClientReferralCreate,
+    OpeningCreate,
     ProgramAvailabilityCreate,
-    ProviderAvailabilityCreate,
+    ReferralCreate,
 )
 from src.domain.logic.posts.view import (
-    client_referral_headline,
     insurance_posture_for_post,
     post_card_view,
+    referral_headline,
 )
 from src.domain.models import enums
 from src.framework.rendering.form_fields import register_choice_labels
@@ -59,8 +59,8 @@ register_template_globals(
     DESIRED_TIME_DAY_SHORT_LABELS=enums.DESIRED_TIME_DAY_SHORT_LABELS,
     DESIRED_TIME_PARTS=enums.DESIRED_TIME_PARTS,
     DESIRED_TIME_PART_LABELS=enums.DESIRED_TIME_PART_LABELS,
-    CLIENT_REFERRAL_SERVICES=enums.CLIENT_REFERRAL_SERVICES,
-    CLIENT_REFERRAL_SERVICE_LABELS=enums.CLIENT_REFERRAL_SERVICE_LABELS,
+    REFERRAL_SERVICES=enums.REFERRAL_SERVICES,
+    REFERRAL_SERVICE_LABELS=enums.REFERRAL_SERVICE_LABELS,
     TREATMENT_SETTINGS=enums.TREATMENT_SETTINGS,
     TREATMENT_SETTINGS_LABELS=enums.TREATMENT_SETTINGS_LABELS,
     GENDERS=enums.GENDERS,
@@ -71,7 +71,7 @@ register_template_globals(
     # the icons dict too (`test_icons_cover_their_tuples` guard fires
     # otherwise).
     CLIENT_AGE_GROUP_ICONS=enums.CLIENT_AGE_GROUP_ICONS,
-    CLIENT_REFERRAL_SERVICE_ICONS=enums.CLIENT_REFERRAL_SERVICE_ICONS,
+    REFERRAL_SERVICE_ICONS=enums.REFERRAL_SERVICE_ICONS,
     TREATMENT_SETTINGS_ICONS=enums.TREATMENT_SETTINGS_ICONS,
     INSURANCE_POSTURES=enums.INSURANCE_POSTURES,
     INSURANCE_POSTURE_LABELS=enums.INSURANCE_POSTURE_LABELS,
@@ -92,12 +92,12 @@ register_template_globals(
     # `*Create` schemas as Jinja globals lets the kind's form templates
     # pass the right schema to `field_for` without context-routing
     # changes. Per-kind form templates pick which to pass.
-    provider_availability_create_schema=ProviderAvailabilityCreate,
+    opening_create_schema=OpeningCreate,
     program_availability_create_schema=ProgramAvailabilityCreate,
-    client_referral_create_schema=ClientReferralCreate,
+    referral_create_schema=ReferralCreate,
     # Post-specific view helpers.
     insurance_posture=insurance_posture_for_post,
-    client_referral_headline=client_referral_headline,
+    referral_headline=referral_headline,
     # `post_card_view(post)` is the unified view-model both the listing
     # card (`posts/_item.html`) and the detail page (`posts/detail.html`)
     # read from — see its docstring in `src.domain.logic.posts.view`.
@@ -117,9 +117,7 @@ register_choice_labels(enums.CLIENT_AGE_GROUPS, enums.CLIENT_AGE_GROUP_LABELS)
 register_choice_labels(enums.LANGUAGES, enums.LANGUAGE_LABELS)
 register_choice_labels(enums.NETWORK_PREFERENCES, enums.NETWORK_PREFERENCE_LABELS)
 register_choice_labels(enums.INSURANCE_CARRIERS, enums.INSURANCE_CARRIER_LABELS)
-register_choice_labels(
-    enums.CLIENT_REFERRAL_SERVICES, enums.CLIENT_REFERRAL_SERVICE_LABELS
-)
+register_choice_labels(enums.REFERRAL_SERVICES, enums.REFERRAL_SERVICE_LABELS)
 register_choice_labels(enums.TREATMENT_SETTINGS, enums.TREATMENT_SETTINGS_LABELS)
 register_choice_labels(enums.GENDERS, enums.GENDER_LABELS)
 register_choice_labels(enums.LICENSE_TYPES, enums.LICENSE_TYPES_LABELS)

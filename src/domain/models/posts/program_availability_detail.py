@@ -10,13 +10,13 @@ _TABLE = "program_availability_details"
 class ProgramAvailabilityDetail(Base):
     """1:1 detail row for posts of kind = 'program_availability'.
 
-    The Program-level equivalent of :class:`ProviderAvailabilityDetail`.
+    The Program-level equivalent of :class:`OpeningDetail`.
     The Program announces intake openings as a *group offering* —
     the referrer is choosing an intake door (the Program) and trusting
     the Org to assign a clinician internally. Distinct from
-    ``provider_availability``, which names a specific clinician.
+    ``opening``, which names a specific clinician.
 
-    Field set mirrors :class:`ProviderAvailabilityDetail` one-to-one
+    Field set mirrors :class:`OpeningDetail` one-to-one
     (description / referral_instructions / website / desired_times /
     schedule_text / services / settings / treatment_modality / age_groups
     / languages / genders); these are per-announcement attributes, not
@@ -38,7 +38,7 @@ class ProgramAvailabilityDetail(Base):
     # state preference, intake window, and owning Org all live on the
     # linked row — looked up via ``program.*`` in templates and read
     # projections. ``ondelete='CASCADE'`` mirrors
-    # ``ProviderAvailabilityDetail.provider_id``: deleting the Program
+    # ``OpeningDetail.provider_id``: deleting the Program
     # tears down its announcements with it (a post about a deleted
     # Program is stale by construction).
     program_id = Column(

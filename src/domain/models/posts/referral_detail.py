@@ -15,12 +15,12 @@ from ..enums import (
     named_check_in,
 )
 
-_TABLE = "client_referral_details"
+_TABLE = "referral_details"
 _ck = partial(named_check_in, _TABLE)
 
 
-class ClientReferralDetail(LocationMixin, Base):
-    """1:1 detail row for posts of kind = 'client_referral'.
+class ReferralDetail(LocationMixin, Base):
+    """1:1 detail row for posts of kind = 'referral'.
 
     Inherits ``(city, state, zip)`` location columns from
     :class:`LocationMixin`; the ``location_state`` CHECK constraint stays

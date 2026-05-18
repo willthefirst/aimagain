@@ -4,11 +4,11 @@ from sqlalchemy.types import Uuid
 
 from src.framework.persistence.base_model import Base
 
-_TABLE = "provider_availability_details"
+_TABLE = "opening_details"
 
 
-class ProviderAvailabilityDetail(Base):
-    """1:1 detail row for posts of kind = 'provider_availability'.
+class OpeningDetail(Base):
+    """1:1 detail row for posts of kind = 'opening'.
 
     Practice + location + delivery-format fields live on the linked
     `Provider` via `provider_id`; insurance posture + sliding-scale +
