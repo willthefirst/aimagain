@@ -11,25 +11,36 @@
 {% endif %}
 {% endblock %}
 
+{# Program detail uses the `.entity-card` chrome shared with
+   posts/detail.html and providers/detail.html. Description renders as
+   `.entity-description` lead prose above the facts dl when present
+   (matches posts/detail.html's optional description block). #}
 {% block content %}
-<article>
-  <section>
-    <h2>Program</h2>
+<article class="entity-card">
+  <header class="entity-header">
+    <strong>{{ program.name }}</strong>
+    {%- if program.state_preference %}
+    <small>{{ program.state_preference }}</small>
+    {%- endif %}
+  </header>
+
+  {%- if program.description %}
+  <p class="entity-description">{{ program.description }}</p>
+  {%- endif %}
+
+  <section class="entity-facts">
     <dl>
-      <dt>Name</dt><dd>{{ program.name }}</dd>
-      <dt>Organization</dt><dd><a href="{{ entity_url('organization', id=program.org_id) }}">{{ program.organization.name }}</a></dd>
-      {% if program.description %}
-      <dt>Description</dt><dd>{{ program.description }}</dd>
-      {% endif %}
-      <dt>State served</dt><dd>{{ program.state_preference or "—" }}</dd>
-      {% if program.start_date %}
-      <dt>Start date</dt><dd>{{ program.start_date }}</dd>
-      {% endif %}
-      {% if program.end_date %}
-      <dt>End date</dt><dd>{{ program.end_date }}</dd>
-      {% endif %}
-      <dt>Accepting referrals</dt>
-      <dd>{{ "Yes" if program.accepting_referrals else "No" }}</dd>
+      <div><dt>Organization</dt><dd><a href="{{ entity_url('organization', id=program.org_id) }}">{{ program.organization.name }}</a></dd></div>
+      {%- if program.state_preference %}
+      <div><dt>State served</dt><dd>{{ program.state_preference }}</dd></div>
+      {%- endif %}
+      {%- if program.start_date %}
+      <div><dt>Start date</dt><dd>{{ program.start_date }}</dd></div>
+      {%- endif %}
+      {%- if program.end_date %}
+      <div><dt>End date</dt><dd>{{ program.end_date }}</dd></div>
+      {%- endif %}
+      <div><dt>Accepting referrals</dt><dd>{{ "Yes" if program.accepting_referrals else "No" }}</dd></div>
     </dl>
   </section>
 </article>

@@ -8,52 +8,65 @@
 {% block current_label %}{{ target_user.username }}{% endblock %}
 
 {% block actions %}
+{# Favorites moved into the toolbar action menu (was buried in a
+   `<p><a>` inside content). Self-only — viewing someone else's
+   profile shouldn't expose their private favorites list. The admin
+   actions partial appends Deactivate / Delete after this when the
+   viewer is an admin looking at someone else. #}
+{% if is_self %}
+<li><a href="{{ entity_url('user_favorite') }}" role="button" class="outline">Favorites</a></li>
+{% endif %}
 {% include "users/_admin_actions.html" %}
 {% endblock %}
 
+{# User detail uses the `.entity-card` chrome shared with the other
+   detail pages. The Providers section is a separate card below the
+   main user card — embedded card-in-card would read as visual noise,
+   so the page is two stacked cards: identity + private-fields on top,
+   the providers index table on bottom. #}
 {% block content %}
-<article>
-  <h2>{{ target_user.username }}</h2>
-  {# Private rows (email, active, verified) are gated by `can_view_private`,
-     computed in handle_get_user_detail as `is_self OR is_admin(viewer)`.
-     The handler also omits these fields from the `target_user` projection
-     for non-authorized viewers, so a forgotten guard here cannot re-leak. #}
+<article class="entity-card">
+  <header class="entity-header">
+    <strong>{{ target_user.username }}</strong>
+  </header>
+
+  {# Private rows (email, active, verified) are gated by
+     `can_view_private`, computed in handle_get_user_detail as
+     `is_self OR is_admin(viewer)`. The handler also omits these
+     fields from the `target_user` projection for non-authorized
+     viewers, so a forgotten guard here cannot re-leak. #}
   {% if can_view_private %}
-  <dl>
-    <dt>Email</dt><dd>{{ target_user.email }}</dd>
-    <dt>Active</dt><dd>{{ "yes" if target_user.is_active else "no" }}</dd>
-    <dt>Verified</dt><dd>{{ "yes" if target_user.is_verified else "no" }}</dd>
-  </dl>
-  {% endif %}
-
-  {# Favorites moved out of the primary nav in the nav-slim phase;
-     the entry point for the user's own favorites lives here on the
-     Me page so it's reachable without typing the URL. Only shown to
-     the user themselves — viewing someone else's profile shouldn't
-     expose their private favorites list. #}
-  {% if is_self %}
-  <p><a href="{{ entity_url('user_favorite') }}">Favorites</a></p>
-  {% endif %}
-
-  <section>
-    <h2>Providers</h2>
-    {% call index_table(
-      items=providers,
-      headers=provider_headers,
-      row=provider_row,
-      id="user-detail-providers",
-    ) %}
-    <p id="user-detail-providers-empty">No providers yet.</p>
-    {% endcall %}
-    {# Self-only Create CTA — the profile is the natural discovery
-       point for "make my own provider". The dedicated
-       `/users/me/providers` page carries the same action in its
-       toolbar (added in 3b59933f); this inline button is the version
-       a user sees on the profile preview, without an extra click. #}
-    {% if is_self %}
-    <p><a href="{{ entity_form_url('provider') }}" role="button" class="outline">Create provider</a></p>
-    {% endif %}
+  <section class="entity-facts">
+    <dl>
+      <div><dt>Email</dt><dd>{{ target_user.email }}</dd></div>
+      <div><dt>Active</dt><dd>{{ "Yes" if target_user.is_active else "No" }}</dd></div>
+      <div><dt>Verified</dt><dd>{{ "Yes" if target_user.is_verified else "No" }}</dd></div>
+    </dl>
   </section>
+  {% endif %}
+</article>
 
+<article class="entity-card">
+  <header class="entity-header">
+    <strong>Providers</strong>
+  </header>
+  {% call index_table(
+    items=providers,
+    headers=provider_headers,
+    row=provider_row,
+    id="user-detail-providers",
+  ) %}
+  <p id="user-detail-providers-empty">No providers yet.</p>
+  {% endcall %}
+  {# Self-only Create CTA — the profile is the natural discovery
+     point for "make my own provider". The dedicated
+     `/users/me/providers` page carries the same action in its
+     toolbar (added in 3b59933f); this inline button is the version
+     a user sees on the profile preview, without an extra click. #}
+  {% if is_self %}
+  <footer class="entity-footer">
+    <a href="{{ entity_form_url('provider') }}" role="button" class="outline">Create provider</a>
+  </footer>
+  {% endif %}
 </article>
 {% endblock %}
