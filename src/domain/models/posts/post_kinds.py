@@ -6,6 +6,7 @@ from typing import Final
 from src.framework.persistence.polymorphic import DiscriminatorRegistry
 
 from .client_referral_detail import ClientReferralDetail
+from .program_availability_detail import ProgramAvailabilityDetail
 from .provider_availability_detail import ProviderAvailabilityDetail
 
 
@@ -68,6 +69,13 @@ POST_KINDS: Final[DiscriminatorRegistry[PostKindSpec]] = DiscriminatorRegistry(
             detail_relationship="provider_availability_detail",
             detail_fields=_detail_fields(ProviderAvailabilityDetail),
             list_label="provider availability",
+        ),
+        "program_availability": PostKindSpec(
+            name="program_availability",
+            detail_model=ProgramAvailabilityDetail,
+            detail_relationship="program_availability_detail",
+            detail_fields=_detail_fields(ProgramAvailabilityDetail),
+            list_label="program availability",
         ),
     },
 )

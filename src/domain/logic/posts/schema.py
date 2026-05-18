@@ -252,8 +252,28 @@ class ProviderAvailabilityRead(_PostReadBase):
     genders: GendersField = []
 
 
+class ProgramAvailabilityRead(_PostReadBase):
+    kind: Literal["program_availability"]
+    description: str | None = None
+    referral_instructions: str | None = None
+    website: str | None = None
+    # FK to the Program this announcement is for (#541). The Program's
+    # name, state preference, intake window, and owning Org all live on
+    # the linked row; templates dereference via
+    # `post.program_availability_detail.program.<field>`.
+    program_id: uuid.UUID
+    desired_times: DesiredTimesField = []
+    schedule_text: str | None = None
+    services: ServicesField = []
+    settings: SettingsField = []
+    treatment_modality: str | None = None
+    age_groups: AgeGroupsField = []
+    languages: LanguagesField = []
+    genders: GendersField = []
+
+
 PostRead = Annotated[
-    Union[ClientReferralRead, ProviderAvailabilityRead],
+    Union[ClientReferralRead, ProviderAvailabilityRead, ProgramAvailabilityRead],
     Field(discriminator="kind"),
 ]
 post_read_adapter: TypeAdapter = TypeAdapter(PostRead)
@@ -352,8 +372,35 @@ class ProviderAvailabilityCreate(WirePayload):
     genders: GendersField = []
 
 
+class ProgramAvailabilityCreate(WirePayload):
+    """Create payload for `kind='program_availability'` (#541). Field set
+    mirrors :class:`ProviderAvailabilityCreate` one-to-one but swaps the
+    Provider FK for a Program FK — the referrer is choosing a Program
+    (intake door), not a specific clinician."""
+
+    kind: Literal["program_availability"]
+    description: TextareaOptional = None
+    referral_instructions: TextareaOptional = None
+    website: UrlOptional = None
+    # FK to one of the requesting user's Programs (#541). The form
+    # restricts the dropdown to Programs owned by the user; the spec's
+    # `payload_authz_path` verifies ownership at write time so a wire-
+    # level attacker can't reference another user's Program.
+    program_id: uuid.UUID
+    desired_times: DesiredTimesField = []
+    schedule_text: StrippedOptionalText = None
+    services: ServicesField = []
+    settings: SettingsField = []
+    treatment_modality: StrippedOptionalText = None
+    # Required min-1 on the wire — mirrors PA's age_groups.
+    age_groups: RequiredAgeGroupsField
+    # Required min-1 on the wire — mirrors PA's languages.
+    languages: RequiredLanguagesField = ["en"]
+    genders: GendersField = []
+
+
 PostCreate = Annotated[
-    Union[ClientReferralCreate, ProviderAvailabilityCreate],
+    Union[ClientReferralCreate, ProviderAvailabilityCreate, ProgramAvailabilityCreate],
     Field(discriminator="kind"),
 ]
 post_create_adapter: TypeAdapter = TypeAdapter(PostCreate)
@@ -443,8 +490,29 @@ class ProviderAvailabilityUpdate(PartialUpdate):
     genders: GendersField | None = None
 
 
+class ProgramAvailabilityUpdate(PartialUpdate):
+    at_least_one_field_exclude = frozenset({"kind"})
+
+    kind: Literal["program_availability"]
+    description: TextareaOptional = None
+    referral_instructions: TextareaOptional = None
+    website: UrlOptional = None
+    # FK to a Program owned by the requesting user. `None` = leave
+    # unchanged. The spec's `payload_authz_path` verifies ownership on
+    # update too — repointing at an unowned Program is 403.
+    program_id: uuid.UUID | None = None
+    desired_times: DesiredTimesField | None = None
+    schedule_text: StrippedOptionalText = None
+    services: RequiredServicesField | None = None
+    settings: RequiredSettingsField | None = None
+    treatment_modality: StrippedOptionalText = None
+    age_groups: RequiredAgeGroupsField | None = None
+    languages: RequiredLanguagesField | None = None
+    genders: GendersField | None = None
+
+
 PostUpdate = Annotated[
-    Union[ClientReferralUpdate, ProviderAvailabilityUpdate],
+    Union[ClientReferralUpdate, ProviderAvailabilityUpdate, ProgramAvailabilityUpdate],
     Field(discriminator="kind"),
 ]
 post_update_adapter: TypeAdapter = TypeAdapter(PostUpdate)
@@ -504,10 +572,27 @@ class ProviderAvailabilityAuditSnapshot(_PostAuditSnapshotBase):
     genders: GendersField = []
 
 
+class ProgramAvailabilityAuditSnapshot(_PostAuditSnapshotBase):
+    kind: Literal["program_availability"]
+    description: str | None = None
+    referral_instructions: str | None = None
+    website: str | None = None
+    program_id: uuid.UUID
+    desired_times: DesiredTimesField = []
+    schedule_text: str | None = None
+    services: ServicesField = []
+    settings: SettingsField = []
+    treatment_modality: str | None = None
+    age_groups: AgeGroupsField = []
+    languages: LanguagesField = []
+    genders: GendersField = []
+
+
 PostAuditSnapshot = Annotated[
     Union[
         ClientReferralAuditSnapshot,
         ProviderAvailabilityAuditSnapshot,
+        ProgramAvailabilityAuditSnapshot,
     ],
     Field(discriminator="kind"),
 ]

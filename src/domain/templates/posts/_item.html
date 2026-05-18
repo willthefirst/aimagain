@@ -102,6 +102,21 @@ per-kind, so a single-kind filter doesn't need to suppress anything.
   {%- set virtual = d.location_virtual -%}
   {%- set services = d.services or [] -%}
   {%- set settings_list = [] -%}
+{%- elif post.kind == "program_availability" -%}
+  {%- set d = post.program_availability_detail -%}
+  {%- set prog = d.program -%}
+  {#- Program-availability posts identify as their Program; the Program
+      name is the lead, the owning Org's name follows as a small
+      qualifier (#541). State comes from the Program's
+      `state_preference` (Programs may serve a state distinct from the
+      Org's primary state). In-person/virtual posture isn't tracked at
+      the Program level today, so the modality-chip pair is empty. -#}
+  {%- set headline_text = prog.name -%}
+  {%- set state = prog.state_preference if prog else None -%}
+  {%- set in_person = None -%}
+  {%- set virtual = None -%}
+  {%- set services = d.services or [] -%}
+  {%- set settings_list = d.settings or [] -%}
 {%- else -%}
   {%- set d = post.provider_availability_detail -%}
   {%- set p = d.provider -%}
@@ -166,10 +181,11 @@ per-kind, so a single-kind filter doesn't need to suppress anything.
           {{ ages | join(", ") }}
         </dd></div>
         {%- endif %}
-        {#- PA gender chunk: `genders` is a list (may be empty, which
-            means "no restriction stated" — omit the chunk entirely).
-            CR's gender lives in the headline, so no CR branch here. -#}
-        {%- if post.kind == "provider_availability" and d.genders %}
+        {#- PA / program-availability gender chunk: `genders` is a list
+            (may be empty, which means "no restriction stated" — omit
+            the chunk entirely). CR's gender lives in the headline, so
+            no CR branch here. -#}
+        {%- if post.kind in ("provider_availability", "program_availability") and d.genders %}
         <div><dt>Genders</dt><dd>
           {%- set gs = [] -%}
           {%- for g in d.genders -%}{%- set _ = gs.append(GENDER_LABELS[g]) -%}{%- endfor -%}

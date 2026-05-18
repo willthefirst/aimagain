@@ -41,6 +41,7 @@ from src.domain.models import (
     Organization,
     Post,
     Program,
+    ProgramAvailabilityDetail,
     Provider,
     ProviderAvailabilityDetail,
     User,
@@ -1151,18 +1152,140 @@ async def seed_programs() -> tuple[int, int]:
     return created, skipped
 
 
+class FixtureProgramAvailability(TypedDict):
+    owner_email: str
+    org_name: str
+    program_name: str
+    days_ago: int
+    detail: dict[str, Any]
+
+
+# Program-availability post fixtures (#541). ``org_name`` + ``program_name``
+# match a Program seeded by :func:`seed_programs`; the seed looks them up
+# and skips if the Program isn't present. Mirrors PA fixtures'
+# idempotency shape.
+FIXTURE_PROGRAM_AVAILABILITY: list[FixtureProgramAvailability] = [
+    {
+        "owner_email": "alice@example.com",
+        "org_name": "RISE IOP at CHC",
+        "program_name": "RISE Intensive Outpatient",
+        "days_ago": 2,
+        "detail": {
+            "description": (
+                "RISE IOP currently has openings in the rolling intake. "
+                "DBT-based intensive outpatient, M-F 8:30am-4:30pm. "
+                "Adolescents and young adults; high-acuity presentations "
+                "welcome."
+            ),
+            "referral_instructions": (
+                "Email intake coordinator with the referred client's first "
+                "name, age, primary diagnosis, and current level of care."
+            ),
+            "website": "https://example.com/rise-iop",
+            "services": ["psychotherapy", "evaluation"],
+            "settings": ["iop"],
+            "age_groups": ["adolescents_14_18", "young_adults_19_24"],
+            "languages": ["en"],
+            "genders": [],
+        },
+    },
+]
+
+
+async def seed_program_availability() -> tuple[int, int]:
+    """Seed Program-availability posts (#541). Idempotent on
+    ``(kind='program_availability', owner_id, program_id)`` — re-running
+    against an existing fixture skips."""
+    created = 0
+    skipped = 0
+
+    async with async_session_maker() as session:
+        for fixture in FIXTURE_PROGRAM_AVAILABILITY:
+            owner_result = await session.execute(
+                select(User).where(User.email == fixture["owner_email"])
+            )
+            owner = owner_result.scalar_one_or_none()
+            if owner is None:
+                print(
+                    f"⚠️  Program-availability post for "
+                    f"'{fixture['program_name']}': "
+                    f"owner {fixture['owner_email']} not found, skipping"
+                )
+                skipped += 1
+                continue
+
+            program_result = await session.execute(
+                select(Program)
+                .join(Organization, Organization.id == Program.org_id)
+                .where(
+                    Organization.name == fixture["org_name"],
+                    Program.name == fixture["program_name"],
+                )
+            )
+            program = program_result.scalar_one_or_none()
+            if program is None:
+                print(
+                    f"⚠️  Program-availability post for "
+                    f"'{fixture['program_name']}': Program not found "
+                    "(was programs seeded?), skipping"
+                )
+                skipped += 1
+                continue
+
+            existing = await session.execute(
+                select(Post)
+                .join(
+                    ProgramAvailabilityDetail,
+                    ProgramAvailabilityDetail.post_id == Post.id,
+                )
+                .where(
+                    Post.kind == "program_availability",
+                    Post.owner_id == owner.id,
+                    ProgramAvailabilityDetail.program_id == program.id,
+                )
+            )
+            if existing.scalar_one_or_none() is not None:
+                print(
+                    f"⏭️  Program-availability post for "
+                    f"'{fixture['program_name']}' already exists, skipping"
+                )
+                skipped += 1
+                continue
+
+            post = Post(kind="program_availability", owner_id=owner.id)
+            _shift_created_at(post, fixture["days_ago"])
+            post.program_availability_detail = ProgramAvailabilityDetail(
+                program_id=program.id, **fixture["detail"]
+            )
+            session.add(post)
+            print(
+                f"✅ Created Program-availability post for "
+                f"'{fixture['program_name']}' by {fixture['owner_email']}"
+            )
+            created += 1
+
+        await session.commit()
+
+    return created, skipped
+
+
 async def seed_all() -> int:
     users_created, users_skipped = await seed_users()
     pa_created, pa_skipped = await seed_provider_availability()
     cr_created, cr_skipped = await seed_client_referral()
     programs_created, programs_skipped = await seed_programs()
+    # Program-availability runs AFTER seed_programs() since it joins on a
+    # Program seeded above.
+    prog_av_created, prog_av_skipped = await seed_program_availability()
 
     print(
         f"\n🌱 Seed complete:"
         f" {users_created} users created ({users_skipped} skipped),"
         f" {pa_created} provider-availability posts created ({pa_skipped} skipped),"
         f" {cr_created} client-referral posts created ({cr_skipped} skipped),"
-        f" {programs_created} programs created ({programs_skipped} skipped)"
+        f" {programs_created} programs created ({programs_skipped} skipped),"
+        f" {prog_av_created} program-availability posts created "
+        f"({prog_av_skipped} skipped)"
     )
     if users_created > 0:
         print(f"   Password for all fixture users: {SHARED_PASSWORD}")

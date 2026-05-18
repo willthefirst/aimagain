@@ -78,6 +78,14 @@ def insurance_posture_for_post(post) -> str | None:
         if provider.sliding_scale or provider.cost:
             return "self_pay"
         return "please_contact"
+    if kind == "program_availability":
+        # Program-availability has no insurance posture today — insurance
+        # is modeled on the Provider (who delivers care) and on the
+        # Client-referral Post (the referral situation), not on the
+        # Program (#537 docstring on `Program`). Return None so the
+        # listing row omits the chunk entirely; the detail page does
+        # the same.
+        return None
     return None
 
 

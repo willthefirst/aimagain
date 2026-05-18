@@ -1,0 +1,13 @@
+# Programs cluster
+
+The SQLAlchemy model for the `programs` table. A :class:`Program` is a treatment offering owned by an :class:`Organization` — distinct from :class:`Provider` (a clinician). PR 4 of the Org/Program roadmap (#537).
+
+The model file's own docstring documents the column-level grammar (ownership, `state_preference` independence from the parent Org, no insurance fields). This README captures only the cross-file ties that aren't visible from inside `program.py`:
+
+- **Reverse FKs** — :class:`Program` is referenced from:
+  - :class:`Provider.org_id` is on the parent Org, not the Program — Providers attach to Orgs, not Programs (the Program is the intake door; the Provider does the clinical work).
+  - :class:`ProgramAvailabilityDetail.program_id` (#541) — posts of kind `program_availability` announce a Program's intake openings. `program.program_availability_details` back-populates the relationship. Deleting a Program cascades through to its program-availability posts (a post about a deleted Program is stale by construction).
+
+- **Form / authz wiring** — Program edits go through the framework's factory-built `mount_entity`; the `payload_authz_path` declared on `PROGRAM_ENTITY` enforces "the user may only attach a Program to an Org they own" (#537). The program-availability post create flow has its own `payload_authz` check on `POST_ENTITY` (#541) enforcing "the user may only post Program-availability for a Program they own" — same shape, different entity boundary.
+
+- **Repository hook** — :class:`ProgramRepository.list_for_user` (#541) returns the requesting user's owned Programs, newest first; consumed by `User.programs` (eager `selectin` reverse FK) which the program-availability create form reads to populate the Program-picker dropdown.

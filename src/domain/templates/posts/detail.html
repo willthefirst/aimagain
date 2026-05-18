@@ -138,6 +138,65 @@
     {% endif %}
   </section>
   {% endif %}
+
+{% elif post.kind == "program_availability" %}
+{% set d = post.program_availability_detail %}
+{% set prog = d.program %}
+  <p>
+    <span data-kind-chip="provider_availability">Providing</span>
+    <small>by <a href="/users/{{ post.owner_id }}">{{ post.owner.username }}</a> &middot; {{ post.created_at | format_post_date }}</small>
+  </p>
+
+  {% if d.description %}
+  <p>{{ d.description }}</p>
+  {% endif %}
+
+  <dl>
+    <dt>Program</dt>
+    <dd><a href="/programs/{{ prog.id }}">{{ prog.name }}</a></dd>
+    <dt>Organization</dt>
+    <dd>{{ prog.organization.name }}</dd>
+    {% if prog.state_preference %}
+    <dt>State</dt>
+    <dd>{{ prog.state_preference }}</dd>
+    {% endif %}
+    {% if d.desired_times %}
+    <dt>Desired times</dt>
+    <dd>{% for slot in d.desired_times %}{{ DESIRED_TIME_SLOT_LABELS[slot] }}{% if not loop.last %}, {% endif %}{% endfor %}</dd>
+    {% endif %}
+    {% if d.schedule_text %}
+    <dt>Schedule notes</dt>
+    <dd>{{ d.schedule_text }}</dd>
+    {% endif %}
+    {% if d.services %}
+    <dt>Services</dt>
+    <dd>{% for s in d.services %}{{ CLIENT_REFERRAL_SERVICE_LABELS[s] }}{% if not loop.last %}, {% endif %}{% endfor %}</dd>
+    {% endif %}
+    {% if d.treatment_modality %}
+    <dt>Treatment modality</dt>
+    <dd>{{ d.treatment_modality }}</dd>
+    {% endif %}
+    <dt>Age groups</dt>
+    <dd>{% for g in d.age_groups %}{{ CLIENT_AGE_GROUP_LABELS[g] }}{% if not loop.last %}, {% endif %}{% endfor %}</dd>
+    <dt>Languages</dt>
+    <dd>{% for l in d.languages %}{{ LANGUAGE_LABELS[l] }}{% if not loop.last %}, {% endif %}{% endfor %}</dd>
+    {% if d.genders %}
+    <dt>Genders served</dt>
+    <dd>{% for g in d.genders %}{{ GENDER_LABELS[g] }}{% if not loop.last %}, {% endif %}{% endfor %}</dd>
+    {% endif %}
+  </dl>
+
+  {% if d.referral_instructions or d.website %}
+  <section>
+    <h2>How to refer</h2>
+    {% if d.website %}
+    <p><a href="{{ d.website }}" target="_blank" rel="noopener noreferrer">{{ d.website }}</a></p>
+    {% endif %}
+    {% if d.referral_instructions %}
+    <p>{{ d.referral_instructions }}</p>
+    {% endif %}
+  </section>
+  {% endif %}
 {% endif %}
 </article>
 {% endblock %}

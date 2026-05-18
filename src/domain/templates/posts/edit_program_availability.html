@@ -1,0 +1,14 @@
+{% extends "views/form_edit.html" %}
+{% from "posts/_program_availability_form.html" import program_availability_form %}
+
+{% set resource_url = "/posts" %}
+{% set resource_detail_url = "/posts/" ~ post.id %}
+
+{% block resource_label %}Posts{% endblock %}
+{% block current_label %}Post{% endblock %}
+
+{% block content %}
+{{ program_availability_form("patch", "/posts/" ~ post.id, "Save changes", post=post, schema=program_availability_create_schema, current_user=current_user) }}
+
+<p><a href="/posts/{{ post.id }}" role="button" class="secondary outline">Cancel</a></p>
+{% endblock %}

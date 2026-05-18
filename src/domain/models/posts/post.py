@@ -45,3 +45,9 @@ class Post(BaseModel):
         cascade="all, delete-orphan",
         lazy="selectin",
     )
+    program_availability_detail = relationship(
+        "ProgramAvailabilityDetail",
+        uselist=False,
+        cascade="all, delete-orphan",
+        lazy="selectin",
+    )
