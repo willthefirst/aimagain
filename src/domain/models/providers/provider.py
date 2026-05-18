@@ -1,6 +1,6 @@
 from functools import partial
 
-from sqlalchemy import JSON, Boolean, Column, ForeignKey, Text, text
+from sqlalchemy import JSON, Boolean, CheckConstraint, Column, ForeignKey, Text, text
 from sqlalchemy.orm import relationship
 from sqlalchemy.types import Uuid
 
@@ -11,6 +11,18 @@ from ..enums import LOCATION_AVAILABILITY_OPTIONS, US_STATES, named_check_in
 
 _TABLE = "providers"
 _ck = partial(named_check_in, _TABLE)
+
+# `npi` is either NULL or exactly 10 ASCII digits — the NPPES registry
+# (issue A3) lookups expect that shape. SQLite-flavored `GLOB`; the
+# project is single-dialect (sqlite+aiosqlite for both dev and prod —
+# see `.env.test`, deployment Dockerfile). The Pydantic validator
+# `_validate_npi` in `src/domain/logic/providers/schema.py` is the
+# primary wire-side enforcement; this CHECK is defense-in-depth.
+_NPI_FORMAT_CHECK = CheckConstraint(
+    "npi IS NULL OR (length(npi) = 10 "
+    "AND npi GLOB '[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]')",
+    name=f"ck_{_TABLE}_npi_format",
+)
 
 
 class Provider(LocationMixin, BaseModel):
@@ -31,6 +43,7 @@ class Provider(LocationMixin, BaseModel):
         _ck("location_state", US_STATES),
         _ck("in_person_sessions", LOCATION_AVAILABILITY_OPTIONS),
         _ck("virtual_sessions", LOCATION_AVAILABILITY_OPTIONS),
+        _NPI_FORMAT_CHECK,
     )
 
     owner_id = Column(
@@ -49,6 +62,11 @@ class Provider(LocationMixin, BaseModel):
         nullable=False,
     )
     org = relationship("Organization", back_populates="providers", lazy="selectin")
+    # National Provider Identifier — 10 ASCII digits, optional. Nullable
+    # because backfill is operator-driven (existing rows ship without one).
+    # No UNIQUE constraint yet — duplicates may exist before the field is
+    # curated; a follow-up can tighten this once data is clean.
+    npi = Column(Text, nullable=True)
     in_person_sessions = Column(Text, nullable=False)
     virtual_sessions = Column(Text, nullable=False)
 

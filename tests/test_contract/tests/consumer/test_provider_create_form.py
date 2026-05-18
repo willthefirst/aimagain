@@ -55,17 +55,20 @@ async def test_consumer_provider_create_form_submits(
     expected_request_headers = {
         "Content-Type": Like("application/x-www-form-urlencoded")
     }
-    # `cost` is an empty text input — the browser includes empty-valued
-    # text inputs in the form body. The bool radios for
+    # `cost` and `npi` are empty text inputs — the browser includes
+    # empty-valued text inputs in the form body. The bool radios for
     # `accepts_out_of_network` / `sliding_scale` are not pre-checked on
     # the create form, so they're absent. The carrier multi-select is
     # similarly empty. `org_id` carries the Organization picked from the
-    # dropdown (#524); the stub server seeds one Org.
+    # dropdown (#524); the stub server seeds one Org. `npi` lives in the
+    # Practice fieldset (right after `location_zip`) so its empty value
+    # serializes between `location_zip` and `in_person_sessions` (#525).
     expected_request_body = (
         "org_id=66666666-6666-6666-6666-666666666666"
         "&location_city=Brooklyn"
         "&location_state=NY"
         "&location_zip=11201"
+        "&npi="
         "&in_person_sessions=yes"
         "&virtual_sessions=please_contact"
         "&cost="

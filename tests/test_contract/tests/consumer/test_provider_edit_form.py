@@ -62,12 +62,15 @@ async def test_consumer_provider_edit_form_submits(origin_with_routes: str, page
     # OON off, no sliding scale). The form pre-checks the "No" radio for
     # each Boolean (since `current=False`) and renders `cost` as an empty
     # text input. `in_network_carriers` is a multi-select with no current
-    # selection so it doesn't appear in the encoded form body.
+    # selection so it doesn't appear in the encoded form body. `npi` is
+    # an empty optional text input on the stub (#525), so it serializes
+    # as `npi=` right after `location_zip`.
     expected_request_body = (
         "org_id=55555555-5555-5555-5555-555555555555"
         "&location_city=Bayside"
         "&location_state=NY"
         "&location_zip=11201"
+        "&npi="
         "&in_person_sessions=yes"
         "&virtual_sessions=please_contact"
         "&accepts_out_of_network=false"

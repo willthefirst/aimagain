@@ -145,6 +145,44 @@ async def test_update_provider_changes_fields_visible_on_refetch(
         assert row.location_city == "Chicago"
 
 
+async def test_npi_round_trips(
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+):
+    """A 10-digit `npi` persists and reads back unchanged."""
+    user = await _seed_user(db_test_session_manager)
+    created = await _seed_provider(
+        db_test_session_manager,
+        owner_id=user.id,
+        practice_name="NPI Test",
+        npi="1234567890",
+    )
+
+    async with db_test_session_manager() as session:
+        row = (
+            (await session.execute(select(Provider).filter(Provider.id == created.id)))
+            .scalars()
+            .first()
+        )
+        assert row.npi == "1234567890"
+
+
+async def test_npi_defaults_to_null(
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+):
+    user = await _seed_user(db_test_session_manager)
+    created = await _seed_provider(
+        db_test_session_manager, owner_id=user.id, practice_name="No NPI"
+    )
+
+    async with db_test_session_manager() as session:
+        row = (
+            (await session.execute(select(Provider).filter(Provider.id == created.id)))
+            .scalars()
+            .first()
+        )
+        assert row.npi is None
+
+
 async def test_insurance_fields_round_trip(
     db_test_session_manager: async_sessionmaker[AsyncSession],
 ):

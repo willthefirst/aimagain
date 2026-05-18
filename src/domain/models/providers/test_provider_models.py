@@ -141,6 +141,72 @@ async def test_delete_provider_cascades_credentials(
             assert rows == [], f"{cls.__name__} rows survived parent delete"
 
 
+async def test_provider_accepts_null_npi(
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+):
+    """`npi` is nullable — existing rows ship without one."""
+    user = create_test_user()
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            session.add(user)
+            session.add(_make_provider(user))
+
+    async with db_test_session_manager() as session:
+        provider = (
+            (
+                await session.execute(
+                    select(Provider).filter(Provider.owner_id == user.id)
+                )
+            )
+            .scalars()
+            .first()
+        )
+        assert provider is not None
+        assert provider.npi is None
+
+
+async def test_provider_accepts_10_digit_npi(
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+):
+    user = create_test_user()
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            session.add(user)
+            session.add(_make_provider(user, npi="1234567890"))
+
+    async with db_test_session_manager() as session:
+        provider = (
+            (
+                await session.execute(
+                    select(Provider).filter(Provider.owner_id == user.id)
+                )
+            )
+            .scalars()
+            .first()
+        )
+        assert provider is not None
+        assert provider.npi == "1234567890"
+
+
+@pytest.mark.parametrize("bad_npi", ["123", "12345678901", "12345abcde", "          "])
+async def test_provider_npi_check_constraint_rejects_malformed(
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    bad_npi: str,
+):
+    """`ck_providers_npi_format` rejects anything that isn't NULL or
+    exactly 10 ASCII digits — defense-in-depth against a wire payload
+    that skipped the Pydantic validator."""
+    user = create_test_user()
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            session.add(user)
+
+    with pytest.raises(IntegrityError):
+        async with db_test_session_manager() as session:
+            async with session.begin():
+                session.add(_make_provider(user, npi=bad_npi))
+
+
 async def test_invalid_license_type_violates_check_constraint(
     db_test_session_manager: async_sessionmaker[AsyncSession],
 ):
