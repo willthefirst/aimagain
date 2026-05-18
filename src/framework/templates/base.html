@@ -14,8 +14,30 @@
        version deliberately. The CSS defines `<i class="icon-<name>">`
        per Lucide icon (e.g. `icon-baby`, `icon-shield-check`); see the
        icon dicts in `src/domain/models/enums.py` for the per-enum
-       mappings. The font itself is pulled via the CSS's relative
-       `url(./lucide.woff2)`, so no second `<link>` is needed. #}
+       mappings.
+
+       The `<link rel="preload">` for the woff2 is the cure for icon
+       flicker on first paint: without it, the browser fetches
+       `lucide.css` first, parses it, discovers the `@font-face` rule's
+       relative `url("lucide.woff2?t=...")` reference, and only THEN
+       fetches the 220kb font — every `<i class="icon-x">` renders as
+       blank space for the duration. Preloading kicks the font fetch
+       off in parallel with the CSS, so by the time the CSS's
+       `@font-face` resolves, the woff2 is already in browser cache and
+       the first paint includes the icons.
+
+       The cache-buster `?t=1736516416702` is baked into the pinned
+       version's CSS (see `curl -s
+       https://unpkg.com/lucide-static@0.471.0/font/lucide.css`).
+       Browsers match preloads to actual requests by exact URL, so the
+       two URLs MUST share the same query string. Bump the timestamp
+       here in lockstep with any version bump above. #}
+    <link
+      rel="preload"
+      as="font"
+      type="font/woff2"
+      crossorigin
+      href="https://unpkg.com/lucide-static@0.471.0/font/lucide.woff2?t=1736516416702" />
     <link
       rel="stylesheet"
       href="https://unpkg.com/lucide-static@0.471.0/font/lucide.css" />
