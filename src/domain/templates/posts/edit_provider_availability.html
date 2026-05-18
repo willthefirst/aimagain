@@ -8,7 +8,5 @@
 {% block current_label %}Post{% endblock %}
 
 {% block content %}
-{{ provider_availability_form("patch", entity_url('post', id=post.id), "Save changes", post=post, schema=provider_availability_create_schema, current_user=current_user) }}
-
-<p><a href="{{ entity_url('post', id=post.id) }}" role="button" class="secondary outline">Cancel</a></p>
+{{ provider_availability_form("patch", entity_url('post', id=post.id), "Save changes", post=post, schema=provider_availability_create_schema, current_user=current_user, cancel_url=entity_url('post', id=post.id)) }}
 {% endblock %}

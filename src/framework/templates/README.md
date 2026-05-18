@@ -92,7 +92,7 @@ Files prefixed with `_` (e.g. `_breadcrumb.html`, `_toolbar.html`, `_provider_ro
 ## Shared macros (`_shared/`)
 
 - `form_fields.html` — `text_field`, `textarea_field`, `select_field`, `radio_bool_field`, `multi_select_field`, `time_grid_field`, and the schema-driven `field_for`. `<select>` macros iterate over the controlled-vocabulary tuples from [`../../domain/models/enums.py`](../../domain/models/enums.py) and resolve labels from `*_LABELS` — both registered as Jinja globals in [`../rendering/templating.py`](../rendering/templating.py). Adding a value to a tuple flows automatically to every form using these macros.
-- `forms.html` — `inline_add_form(...)`: single-fieldset form skeleton for sub-resource add forms.
+- `forms.html` — `inline_add_form(...)` (single-fieldset form skeleton for sub-resource add forms) and `form_actions(submit_label, cancel_url=None, delete_url=None, delete_confirm=None)` (the standardized Save / Cancel / Delete cluster at the bottom of every entity create/edit form — see [Entity form pages](#entity-form-pages)).
 - `sections.html` — `list_or_empty(...)`: `<ul>` or empty-state. Caller passes the `<li>` body via `{% call(item) %}...{% endcall %}`.
 - `actions.html` — `confirm_delete_button(...)`: HTMX `hx-delete` button with confirm dialog.
 - `index_table.html` — `index_table(items, headers, row, empty, id=None, row_kwargs={})`: the standard index-page table chrome (`<table role="grid">` wrapped in a Pico [`<div class="overflow-auto">`](https://picocss.com/docs/overflow-auto) for horizontal scroll on narrow viewports; with a `<p>` empty state). Headers and rows come from a cluster-local `<resource>/_columns.html` that exports `<resource>_headers()` and `<resource>_row(item, **row_kwargs)`. Every `/<collection>` list page renders through it — see `providers/list.html` for the canonical use. When the cluster's column macros read resource-specific Jinja context (e.g. `LICENSE_TYPES` flowing in via `EntitySpec.static_context`), import them `with context`. Pages with rich empty states (CTAs, per-viewer branches) invoke the macro via `{% call index_table(...) %}<p id="…">…</p>{% endcall %}` and provide their own empty body. Bespoke list pages that skip the macro (`organizations/list.html`, `programs/list.html`) wrap their own `<table>` in the same `overflow-auto` div for consistency — by-id selectors and descendant CSS still target the table.
@@ -103,6 +103,15 @@ Files prefixed with `_` (e.g. `_breadcrumb.html`, `_toolbar.html`, `_provider_ro
 `index_table` also supports `header_kwargs={}` for headers that vary by page state. Not every list uses the table shape — `/posts` renders a `<ul id="posts-list">` (Pico-default styling, no custom CSS) via `posts/_item.html::post_item(post, active_kind=None)` instead, since the polymorphic kinds need a description-led row (kind chip + lead text + per-chunk metadata) that the table's fixed columns can't express.
 
 The search-page form (`views/search.html`) reads the `Filter` instances declared on the spec; the macro picks the right control by `f.kind`, `f.multi`, and `f.radio` (search input for `TextFilter`; `<select>` with "Any" for single-choice; a Pico toggle radio-button group for `ChoiceFilter(radio=True)`; the shared `<select multiple>` widget — same macro as the create/edit forms' `multi_select_field` — for multi-choice). `select_field` (for create/edit) is required by default with an optional disabled placeholder.
+
+## Entity form pages
+
+`views/form_new.html` and `views/form_edit.html` both wrap their `{% block content %}` in `<div class="entity-form-page">`. The wrapper is what makes the form vocabulary consistent across entities:
+
+- **`--form-max-width: 720px`** caps the form on large screens via `.entity-form-page > form { max-width: var(--form-max-width); }`. Mobile is unchanged.
+- **`<div class="grid">`** (Pico's built-in responsive grid utility) is the way to put two or three short fields on one row. Auto-collapses to one column under 768px, so mobile stays single-column. Use it for natural pairs/triples (City/State/ZIP, Start date/End date, In-person/Virtual sessions) — not for long fields.
+- **`{{ form_actions(submit_label, cancel_url=..., delete_url=..., delete_confirm=...) }}`** is the canonical bottom-of-form action cluster. Save lives left; Cancel next to it; Delete is right-aligned via `.form-actions-destructive { margin-left: auto }` so a misfire on the wrong button stays unlikely. On mobile the cluster wraps to full-width column. Every entity create/edit form should end with this macro instead of hand-rolling a `<button>` or `<p><a>Cancel</a></p>`.
+- **Helper text** uses `<small>...</small>` below the input rather than parenthetical hints inside the label. Pico styles it muted automatically.
 
 ## Schema-driven `field_for`
 

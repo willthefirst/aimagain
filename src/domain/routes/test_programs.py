@@ -281,6 +281,33 @@ async def test_form_edit_pre_selects_attached_org(
     assert selected.attributes.get("value") == str(org_id)
 
 
+async def test_form_edit_renders_save_cancel_delete_cluster(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user: User,
+):
+    """Edit pages render the standardized `form_actions` cluster with
+    Save (submit), Cancel (link to detail), and Delete (hx-delete with
+    confirm). Delete carries the `form-actions-destructive` class so the
+    CSS pushes it to the right of the cluster, separated from Save."""
+    org_id = await _seed_org(db_test_session_manager, owner_id=logged_in_user.id)
+    program_id = await _seed_program_for(
+        db_test_session_manager, owner_id=logged_in_user.id, org_id=org_id
+    )
+    response = await authenticated_client.get(f"/programs/{program_id}/form")
+    tree = HTMLParser(response.text)
+    cluster = tree.css_first(".form-actions")
+    assert cluster is not None
+    assert cluster.css_first('button[type="submit"]') is not None
+    cancel = cluster.css_first(f'a[href="/programs/{program_id}"][role="button"]')
+    assert cancel is not None
+    assert cancel.text(strip=True) == "Cancel"
+    delete = cluster.css_first(f'button[hx-delete="/programs/{program_id}"]')
+    assert delete is not None
+    assert "form-actions-destructive" in (delete.attributes.get("class") or "")
+    assert delete.attributes.get("hx-confirm")
+
+
 # --- Update --------------------------------------------------------------
 
 

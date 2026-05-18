@@ -7,5 +7,5 @@
 
 {% block content %}
 <p>Per <code>notes/forms_spec.md</code>. No PII.</p>
-{{ client_referral_form("post", entity_url('post'), "Create client referral", schema=client_referral_create_schema) }}
+{{ client_referral_form("post", entity_url('post'), "Create client referral", schema=client_referral_create_schema, cancel_url=entity_url('post')) }}
 {% endblock %}

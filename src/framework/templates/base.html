@@ -255,6 +255,42 @@
       @media (max-width: 768px) {
         nav[aria-label="breadcrumb"] { display: none; }
       }
+      /* Entity create/edit forms — cap form width on large screens so
+         short fields don't stretch across the whole container, and
+         standardize the Save/Cancel/Delete action cluster. The wrapper
+         `.entity-form-page` is emitted by `views/form_new.html` and
+         `views/form_edit.html`; per-entity templates extend those, so
+         they pick up the cap without per-template wiring. */
+      :root { --form-max-width: 720px; }
+      .entity-form-page > form,
+      .entity-form-page > section > form {
+        max-width: var(--form-max-width);
+      }
+      /* Right-aligned cluster for Save / Cancel / Delete. Save sits on
+         the left as the primary action; Cancel sits next to it; Delete
+         is pushed to the far right via `margin-left: auto` so a stray
+         click on the wrong target stays unlikely. On mobile the cluster
+         wraps and each control becomes full-width (Pico's default
+         `<button>` width), with Delete reset back below the others. */
+      .form-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+        align-items: center;
+        max-width: var(--form-max-width);
+        margin-block-start: var(--pico-spacing);
+      }
+      .form-actions > .form-actions-destructive { margin-left: auto; }
+      .form-actions > button,
+      .form-actions > [role="button"] { margin: 0; }
+      @media (max-width: 540px) {
+        .form-actions { flex-direction: column; align-items: stretch; }
+        .form-actions > .form-actions-destructive { margin-left: 0; }
+      }
+      /* Pico's `<fieldset>` carries a top margin that visually competes
+         with the cap above — flatten the rhythm so siblings sit at a
+         consistent gap inside the capped form. */
+      .entity-form-page form > fieldset { margin-block-start: var(--pico-spacing); }
     </style>
     <script
       src="https://unpkg.com/htmx.org@2.0.4"

@@ -1,5 +1,6 @@
 {% extends "views/form_new.html" %}
 {%- from "_shared/form_fields.html" import select_field, text_field -%}
+{%- from "_shared/forms.html" import form_actions -%}
 
 {% set resource_url = entity_url('organization') %}
 
@@ -9,11 +10,14 @@
 <form hx-post="{{ entity_url('organization') }}">
   <fieldset>
     <legend>Organization</legend>
-    {{ text_field("name", "Name", maxlength=200) }}
-    {{ select_field("type", "Type", ORGANIZATION_TYPES, labels=ORGANIZATION_TYPES_LABELS, placeholder=true) }}
-    {{ text_field("parent_org_id", "Parent organization ID (optional)", required=false) }}
+    <div class="grid">
+      {{ text_field("name", "Name", maxlength=200) }}
+      {{ select_field("type", "Type", ORGANIZATION_TYPES, labels=ORGANIZATION_TYPES_LABELS, placeholder=true) }}
+    </div>
+    {{ text_field("parent_org_id", "Parent organization ID", required=false) }}
+    <small>Leave blank for a root organization. Most users do.</small>
   </fieldset>
 
-  <button type="submit">Create organization</button>
+  {{ form_actions("Create organization", cancel_url=entity_url('organization')) }}
 </form>
 {% endblock %}
