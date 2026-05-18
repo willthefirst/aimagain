@@ -27,7 +27,11 @@ app = [
     "aiosqlite",
     "pydantic-settings",
     "asyncstdlib",
-    "apscheduler>=3.10,<4"
+    "apscheduler>=3.10,<4",
+    # Outbound HTTP for the verification pipeline's NPPES lookups
+    # (`src/domain/logic/verifications/nppes.py`). Runtime dep — must
+    # ship in the production image, not just `[test]`.
+    "httpx",
 ]
 
 dev = [
