@@ -308,12 +308,14 @@ _EDIT_FORM_SHAPE = _FactoryShape(
     name_template="_handle_get_{name}_edit_form",
     include_request=True,
     include_target_id=True,
+    accepts_extras=True,
 )
 _NEW_FORM_SHAPE = _FactoryShape(
     name_template="_handle_get_{name}_new_form",
     include_request=True,
     include_kind_for_polymorphic=True,
     omit_repo=True,
+    accepts_extras=True,
 )
 _DETAIL_SHAPE = _FactoryShape(
     name_template="_handle_get_{name}_detail",
@@ -437,8 +439,17 @@ async def handle_get_edit_form(
     target_id: UUID,
     repo: BaseRepository,
     requesting_user: User,
+    extras: Callable[..., Awaitable[dict[str, Any]]] | None = None,
+    extra_kwargs: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
-    """Generic edit-form handler driven by `spec`."""
+    """Generic edit-form handler driven by `spec`.
+
+    When `extras` is set (threaded in by `make_edit_form_handler` from
+    the spec's `form_extras_path`), the callable is invoked with
+    ``target=<loaded row>``, ``request``, ``requesting_user``, and any
+    typed-repo kwargs declared via `form_extras_repos`. The returned
+    dict merges into the form context (last-write-wins, mirroring
+    `handle_detail` / `handle_list`)."""
     target = await repo.get_by_model_id(spec.model, target_id)
     if target is None:
         raise NotFoundError(detail=f"{spec.name.capitalize()} not found")
@@ -457,11 +468,33 @@ async def handle_get_edit_form(
     if spec.discriminator is not None:
         kind = getattr(target, spec.discriminator.column)
         context["template_name"] = spec.discriminator[kind].edit_template
+
+    if extras is not None:
+        extras_kwargs = {
+            "target": target,
+            "request": request,
+            "requesting_user": requesting_user,
+        }
+        if extra_kwargs:
+            extras_kwargs.update(extra_kwargs)
+        context.update(await extras(**extras_kwargs))
+
     return context
 
 
-def make_edit_form_handler(spec: EntitySpec):
-    return _make_factory_handler(spec, _EDIT_FORM_SHAPE, handle_get_edit_form)
+def make_edit_form_handler(
+    spec: EntitySpec,
+    *,
+    extras: Callable[..., Awaitable[dict[str, Any]]] | None = None,
+    extra_repos: tuple[tuple[str, type], ...] = (),
+):
+    return _make_factory_handler(
+        spec,
+        _EDIT_FORM_SHAPE,
+        handle_get_edit_form,
+        extras=extras,
+        extra_repos=extra_repos,
+    )
 
 
 async def handle_get_new_form(
@@ -470,6 +503,8 @@ async def handle_get_new_form(
     request: Request,
     requesting_user: User,
     kind: str | None = None,
+    extras: Callable[..., Awaitable[dict[str, Any]]] | None = None,
+    extra_kwargs: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Generic create-form handler driven by `spec`.
 
@@ -499,11 +534,33 @@ async def handle_get_new_form(
         # spec's `create_adapter` is the TypeAdapter wrapper, so we bind
         # the underlying class instead.
         context["schema"] = spec.create_adapter_class
+
+    if extras is not None:
+        extras_kwargs = {
+            "target": None,
+            "request": request,
+            "requesting_user": requesting_user,
+        }
+        if extra_kwargs:
+            extras_kwargs.update(extra_kwargs)
+        context.update(await extras(**extras_kwargs))
+
     return context
 
 
-def make_new_form_handler(spec: EntitySpec):
-    return _make_factory_handler(spec, _NEW_FORM_SHAPE, handle_get_new_form)
+def make_new_form_handler(
+    spec: EntitySpec,
+    *,
+    extras: Callable[..., Awaitable[dict[str, Any]]] | None = None,
+    extra_repos: tuple[tuple[str, type], ...] = (),
+):
+    return _make_factory_handler(
+        spec,
+        _NEW_FORM_SHAPE,
+        handle_get_new_form,
+        extras=extras,
+        extra_repos=extra_repos,
+    )
 
 
 async def handle_detail(
