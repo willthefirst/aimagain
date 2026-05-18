@@ -9,8 +9,8 @@ import pytest
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from src.domain.models import AuditLog
 from src.framework.audit.core import AuditAction
+from src.framework.audit.log import AuditLog
 from src.jobs import hello_world
 
 pytestmark = pytest.mark.asyncio
