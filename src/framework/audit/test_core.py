@@ -11,7 +11,6 @@ import pytest
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from src.domain.models import AuditLog
 from src.framework.audit.core import (
     AuditAction,
     AuditedResource,
@@ -20,6 +19,7 @@ from src.framework.audit.core import (
     mutate,
     record_audit,
 )
+from src.framework.audit.log import AuditLog
 from src.framework.audit.repository import AuditRepository
 from src.framework.persistence.base_repository import BaseRepository
 from tests.helpers import create_test_user

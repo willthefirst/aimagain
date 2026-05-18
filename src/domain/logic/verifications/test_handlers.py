@@ -26,7 +26,8 @@ from src.domain.logic.verifications.handlers import (
     run_provider_verification,
 )
 from src.domain.logic.verifications.repository import VerificationRepository
-from src.domain.models import AuditLog, Provider, User, Verification
+from src.domain.models import Provider, User, Verification
+from src.framework.audit.log import AuditLog
 from src.framework.audit.repository import AuditRepository
 from src.framework.http.exceptions import NotFoundError
 from tests.helpers import create_test_user, make_provider_with_org
