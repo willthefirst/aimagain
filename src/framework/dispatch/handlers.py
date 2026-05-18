@@ -8,7 +8,7 @@ from uuid import UUID
 from fastapi import Request
 from pydantic import BaseModel
 
-from src.domain.models import User
+from src.framework.actor import Actor
 from src.framework.audit.core import mutate
 from src.framework.audit.repository import AuditRepository
 from src.framework.authz import is_admin
@@ -32,7 +32,7 @@ async def handle_delete(
     target_id: UUID,
     repo: BaseRepository,
     audit_repo: AuditRepository,
-    requesting_user: User,
+    requesting_user: Actor,
     parent_id: UUID | None = None,
 ) -> None:
     """Generic delete handler driven by `spec`."""
@@ -94,7 +94,7 @@ async def handle_create(
     payload: BaseModel,
     repo: BaseRepository,
     audit_repo: AuditRepository,
-    requesting_user: User,
+    requesting_user: Actor,
     parent_id: UUID | None = None,
     payload_authz: Callable[..., Awaitable[None]] | None = None,
     payload_authz_kwargs: dict[str, Any] | None = None,
@@ -208,7 +208,7 @@ async def handle_update(
     payload: BaseModel,
     repo: BaseRepository,
     audit_repo: AuditRepository,
-    requesting_user: User,
+    requesting_user: Actor,
     parent_id: UUID | None = None,
     payload_authz: Callable[..., Awaitable[None]] | None = None,
     payload_authz_kwargs: dict[str, Any] | None = None,
@@ -468,7 +468,7 @@ def _make_factory_handler(
         sig_params.append(_param("repo", BaseRepository))
     if shape.include_audit_repo:
         sig_params.append(_param("audit_repo", AuditRepository))
-    user_ann = User | None if shape.user_optional else User
+    user_ann = Actor | None if shape.user_optional else Actor
     sig_params.append(_param("requesting_user", user_ann))
     for name, repo_type in extra_repos:
         sig_params.append(_param(name, repo_type))
@@ -555,7 +555,7 @@ async def handle_get_edit_form(
     request: Request,
     target_id: UUID,
     repo: BaseRepository,
-    requesting_user: User,
+    requesting_user: Actor,
     extras: Callable[..., Awaitable[dict[str, Any]]] | None = None,
     extra_kwargs: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
@@ -618,7 +618,7 @@ async def handle_get_new_form(
     spec: EntitySpec,
     *,
     request: Request,
-    requesting_user: User,
+    requesting_user: Actor,
     kind: str | None = None,
     extras: Callable[..., Awaitable[dict[str, Any]]] | None = None,
     extra_kwargs: dict[str, Any] | None = None,
@@ -686,7 +686,7 @@ async def handle_detail(
     request: Request,
     target_id: UUID,
     repo: BaseRepository,
-    requesting_user: User | None,
+    requesting_user: Actor | None,
     extras: Callable[..., Awaitable[dict[str, Any]]] | None = None,
     extra_kwargs: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
@@ -800,7 +800,7 @@ async def handle_list(
     *,
     request: Request,
     repo: BaseRepository,
-    requesting_user: User | None,
+    requesting_user: Actor | None,
     filter_values: dict[str, Any],
     extras: Callable[..., Awaitable[dict[str, Any]]] | None = None,
     extra_kwargs: dict[str, Any] | None = None,
