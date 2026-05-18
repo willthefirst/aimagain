@@ -13,7 +13,7 @@
 {% include "posts/_owner_actions.html" %}
 {% endblock %}
 
-{# Detail-page layout: same `.post-card` shape the list cards use
+{# Detail-page layout: same `.entity-card` shape the list cards use
    (kind-colored left edge, Pico's article framing, header band,
    two-column body grid, footer band), with detail-only sections
    appended in reading order between the header and the body grid:
@@ -38,8 +38,8 @@
    visual element in the card reads from `view` (the dict view-model). #}
 {% block content %}
 {%- set view = post_card_view(post) -%}
-<article class="post-card" data-kind="{{ post.kind }}">
-  <header class="post-header">
+<article class="entity-card" data-kind="{{ post.kind }}">
+  <header class="entity-header">
     <strong>{{ view.headline }}{% if view.header_state %}, {{ view.header_state }}{% endif %}</strong>
     {{ modality_chips(view.in_person, view.virtual) }}
     <small>{{ post.created_at | format_post_date }}</small>
@@ -49,7 +49,7 @@
   <p>{{ view.description }}</p>
   {%- endif %}
 
-  <div class="post-grid">
+  <div class="entity-grid">
     {{ services_block(view) }}
     {{ facts_block(view, expanded=True) }}
   </div>
@@ -58,7 +58,7 @@
   {{ how_to_refer(view) }}
   {%- endif %}
 
-  <footer class="post-footer">
+  <footer class="entity-footer">
     <a href="mailto:{{ post.owner.email }}" target="_blank" rel="noopener noreferrer" role="button" class="secondary outline">Email</a>
   </footer>
 </article>

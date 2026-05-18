@@ -11,7 +11,7 @@ Reads from `view.referral`, which is ``{website, instructions}`` or
 ``None``. The caller has already gated on `view.referral` so the
 macro doesn't re-check. #}
 {% macro how_to_refer(view) -%}
-<section class="post-how-to-refer">
+<section class="entity-how-to-refer">
   <h4>How to refer</h4>
   {%- if view.referral.website %}
   <p><a href="{{ view.referral.website }}" target="_blank" rel="noopener noreferrer">{{ view.referral.website }}</a></p>

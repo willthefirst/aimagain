@@ -2,7 +2,7 @@
 
 Each fact is wrapped in a `<div>` so CSS can style chunks
 individually (e.g. the CR location chunk gets an icon-only `<dt>`
-via `div.post-location`, suppressing the trailing colon the generic
+via `div.entity-location`, suppressing the trailing colon the generic
 `dt::after` rule applies to other rows).
 
 Two modes:
@@ -35,14 +35,14 @@ Reads from `view` (the `post_card_view` dict). Display-label dicts
 `INSURANCE_CARRIER_LABELS`, `NETWORK_PREFERENCE_LABELS`,
 `DESIRED_TIME_SLOT_LABELS`) are Jinja globals. #}
 {% macro facts_block(view, expanded=False) -%}
-<section class="post-facts">
+<section class="entity-facts">
   <dl>
     {%- if view.location_chunk and not expanded %}
     {#- Compact mode: icon-only "City, ST". The icon-only treatment
         is a list-density choice; expanded mode uses the labeled
         "Address" row below instead so the row reads consistently
         with its siblings. -#}
-    <div class="post-location"><dt aria-label="Location"><i class="icon-map-pinned" aria-hidden="true"></i></dt><dd>
+    <div class="entity-location"><dt aria-label="Location"><i class="icon-map-pinned" aria-hidden="true"></i></dt><dd>
       {%- if view.location_chunk.city -%}{{ view.location_chunk.city }}, {% endif -%}{{ view.location_chunk.state }}
     </dd></div>
     {%- elif view.ages %}

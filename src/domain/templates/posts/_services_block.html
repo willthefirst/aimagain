@@ -22,7 +22,7 @@ globals (`REFERRAL_SERVICE_LABELS` / `_ICONS`, same for
 {%- endmacro %}
 
 {% macro services_block(view) -%}
-<section class="post-services">
+<section class="entity-icon-list">
   {%- if view.services or view.settings %}
   <h4>{{ view.kind_verb }}</h4>
   {%- set _priority = ["psychotherapy", "medication_management"] %}
