@@ -1239,6 +1239,15 @@ def mount_entity(
             "— pick one. Extras are for the factory-built path; an "
             "explicit handler owns its own."
         )
+    if entity.form_extras_path is not None and (
+        "form_new" in handlers or "form_edit" in handlers
+    ):
+        raise ValueError(
+            f"mount_entity({entity.name!r}): spec declares "
+            "form_extras_path alongside an explicit handlers['form_new'] "
+            "or handlers['form_edit'] — pick one. Extras are for the "
+            "factory-built path; an explicit handler owns its own."
+        )
 
     detail_extras = (
         _resolve_dotted_path(entity, entity.detail_extras_path, "detail_extras_path")
@@ -1248,6 +1257,11 @@ def mount_entity(
     list_extras = (
         _resolve_dotted_path(entity, entity.list_extras_path, "list_extras_path")
         if entity.list_extras_path is not None
+        else None
+    )
+    form_extras = (
+        _resolve_dotted_path(entity, entity.form_extras_path, "form_extras_path")
+        if entity.form_extras_path is not None
         else None
     )
 
@@ -1288,6 +1302,12 @@ def mount_entity(
                 entity,
                 extras=list_extras,
                 extra_repos=entity.list_extras_repos,
+            )
+        elif verb in ("form_new", "form_edit"):
+            built = maker(
+                entity,
+                extras=form_extras,
+                extra_repos=entity.form_extras_repos,
             )
         else:
             built = maker(entity)
