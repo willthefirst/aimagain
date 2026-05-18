@@ -1257,41 +1257,66 @@ def mount_entity(
     # `make_<verb>_handler(entity)` and stitched onto the route module so
     # `<routes module>._handle_<verb>_<entity>` is a real attribute. That's
     # the path contract-test monkey-patches use.
-    auto_bound: dict[str, Callable[..., Awaitable[Any]]] = {}
-    needs_auto_bind = any(
-        getattr(entity.routes, v) and v not in handlers
-        for v in _TOP_LEVEL_AUTO_BIND_VERBS
-    )
-    if needs_auto_bind:
-        import sys
+    #
+    # Explicit handlers (passed via `handlers={...}`) are *also* stitched
+    # onto the route module under the same canonical name, with their
+    # `__module__` / `__name__` rewritten so `_resolve_handler` reads the
+    # current binding from the route module. Without this, contract-test
+    # monkey-patches against `<routes module>._handle_<verb>_<entity>`
+    # would silently miss explicit handlers.
+    import sys
 
-        module = _detect_caller_module()
-        factory_makers = _owned_factory_makers()
-        mod = sys.modules[module]
-        for verb in _TOP_LEVEL_AUTO_BIND_VERBS:
-            if not getattr(entity.routes, verb):
-                continue
-            if verb in handlers:
-                continue
-            maker = factory_makers[verb]
-            if verb == "detail":
-                built = maker(
-                    entity,
-                    extras=detail_extras,
-                    extra_repos=entity.detail_extras_repos,
-                )
-            elif verb == "list":
-                built = maker(
-                    entity,
-                    extras=list_extras,
-                    extra_repos=entity.list_extras_repos,
-                )
-            else:
-                built = maker(entity)
-            built.__module__ = module
-            built.__qualname__ = built.__name__
-            setattr(mod, built.__name__, built)
-            auto_bound[verb] = built
+    module = _detect_caller_module()
+    factory_makers = _owned_factory_makers()
+    mod = sys.modules[module]
+
+    auto_bound: dict[str, Callable[..., Awaitable[Any]]] = {}
+    for verb in _TOP_LEVEL_AUTO_BIND_VERBS:
+        if not getattr(entity.routes, verb):
+            continue
+        if verb in handlers:
+            continue
+        maker = factory_makers[verb]
+        if verb == "detail":
+            built = maker(
+                entity,
+                extras=detail_extras,
+                extra_repos=entity.detail_extras_repos,
+            )
+        elif verb == "list":
+            built = maker(
+                entity,
+                extras=list_extras,
+                extra_repos=entity.list_extras_repos,
+            )
+        else:
+            built = maker(entity)
+        built.__module__ = module
+        built.__qualname__ = built.__name__
+        setattr(mod, built.__name__, built)
+        auto_bound[verb] = built
+
+    # Stitch explicit handlers onto the route module under the canonical
+    # `_handle_<verb>_<entity>` name. Mutating `__module__` / `__name__`
+    # makes `_resolve_handler(fn)` look up the current binding on the
+    # route module, so contract-test monkey-patches against the canonical
+    # path take effect just like they do for factory-built handlers.
+    # The factory shapes name new/edit forms `_handle_get_<name>_new_form` /
+    # `_handle_get_<name>_edit_form`; mirror those exactly so the patch
+    # path is identical whether the verb is factory-bound or explicit.
+    for verb, fn in handlers.items():
+        if verb not in _TOP_LEVEL_AUTO_BIND_VERBS:
+            continue
+        if verb == "form_new":
+            canonical_name = f"_handle_get_{entity.name}_new_form"
+        elif verb == "form_edit":
+            canonical_name = f"_handle_get_{entity.name}_edit_form"
+        else:
+            canonical_name = f"_handle_{verb}_{entity.name}"
+        fn.__module__ = module
+        fn.__name__ = canonical_name
+        fn.__qualname__ = canonical_name
+        setattr(mod, canonical_name, fn)
 
     # Lookup order: explicit handlers win over auto-bound factories.
     effective_handlers: dict[str, Callable[..., Awaitable[Any]]] = {

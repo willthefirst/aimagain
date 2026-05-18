@@ -24,6 +24,7 @@ from fastapi import Request
 from src.domain.logic.favorites.repository import UserFavoriteRepository
 from src.domain.logic.organizations.repository import OrganizationRepository
 from src.domain.logic.providers.repository import ProviderRepository
+from src.domain.logic.providers.schema import ProviderCreate, ProviderUpdate
 from src.domain.logic.users.repository import UserRepository
 from src.domain.models import (
     Organization,
@@ -31,9 +32,12 @@ from src.domain.models import (
     User,
 )
 from src.domain.specs.provider import PROVIDER_ENTITY
+from src.framework.audit.repository import AuditRepository
 from src.framework.dispatch.handlers import (
+    handle_create,
     handle_get_edit_form,
     handle_get_new_form,
+    handle_update,
 )
 from src.framework.dispatch.pagination import (
     DEFAULT_PAGE_SIZE,
@@ -50,15 +54,42 @@ logger = logging.getLogger(__name__)
 # --- Provider handlers ----------------------------------------------------
 
 
-async def _list_all_orgs(org_repo: OrganizationRepository) -> list[Organization]:
-    """Return every Organization in the directory, newest first. Used by
-    the Provider create/edit form's Org-picker dropdown — any user may
-    attach their Provider to any Org (#524), so the list is unfiltered."""
-    return list(
-        await org_repo.list_default(
-            Organization, order_by=Organization.created_at.desc()
+async def _orgs_visible_to(
+    org_repo: OrganizationRepository, user: User
+) -> list[Organization]:
+    """Return the Organizations a user may attach their Provider to.
+
+    Owners see only the Orgs they own; superusers see every Org. Drives
+    the Provider create/edit form's Org-picker dropdown and pairs with
+    the wire-level ownership check in :func:`_assert_org_belongs_to`
+    (#524 retro: Org ownership is the boundary for who may attach
+    Providers — mirrors ``Organization.write_authz``)."""
+    if user.is_superuser:
+        return list(
+            await org_repo.list_default(
+                Organization, order_by=Organization.created_at.desc()
+            )
         )
-    )
+    return list(await org_repo.list_for_user(user.id))
+
+
+async def _assert_org_belongs_to(
+    org_repo: OrganizationRepository, *, org_id: UUID, user: User
+) -> None:
+    """Reject a Provider create/update whose ``org_id`` points at an Org
+    the requesting user doesn't own (superusers bypass).
+
+    404 when the Org doesn't exist (no info leak about other users' Org
+    ids); 403 when it exists but belongs to someone else. Same shape as
+    ``OWNER_OR_ADMIN`` on the Org row itself — attaching a Provider is
+    "writing the Org's Provider list," so the same boundary applies."""
+    org = await org_repo._get_by_id(Organization, org_id)
+    if org is None:
+        raise NotFoundError(detail=f"Organization {org_id} not found")
+    if not user.is_superuser and org.owner_id != user.id:
+        raise ForbiddenError(
+            detail="You may only attach a Provider to an Organization you own"
+        )
 
 
 async def handle_get_provider_new_form(
@@ -67,14 +98,14 @@ async def handle_get_provider_new_form(
     requesting_user: User,
     organization_repo: OrganizationRepository,
 ) -> dict[str, Any]:
-    """Provider create-form handler. Extends the framework's default
-    by loading every Organization into the context for the Org-picker
-    dropdown — Provider create takes ``org_id`` (#524), and the form
-    needs a populated select."""
+    """Provider create-form handler. Extends the framework's default by
+    loading the user's visible Organizations into the context for the
+    Org-picker dropdown — Provider create takes ``org_id`` (#524), and
+    the form needs a populated select."""
     context = await handle_get_new_form(
         PROVIDER_ENTITY, request=request, requesting_user=requesting_user
     )
-    context["orgs"] = await _list_all_orgs(organization_repo)
+    context["orgs"] = await _orgs_visible_to(organization_repo, requesting_user)
     return context
 
 
@@ -87,9 +118,9 @@ async def handle_get_provider_edit_form(
     organization_repo: OrganizationRepository,
 ) -> dict[str, Any]:
     """Provider edit-form handler. Mirror of the new-form handler — the
-    Org-picker dropdown lists every Org, with the Provider's current
-    ``org_id`` pre-selected (the template handles the `selected`
-    attribute). ``provider_id`` is the URL's path param
+    Org-picker dropdown lists the user's visible Orgs, with the
+    Provider's current ``org_id`` pre-selected (the template handles
+    the `selected` attribute). ``provider_id`` is the URL's path param
     (``PROVIDER_ENTITY.id_param``); it's forwarded to the framework's
     ``handle_get_edit_form`` as ``target_id``."""
     context = await handle_get_edit_form(
@@ -99,8 +130,61 @@ async def handle_get_provider_edit_form(
         repo=repo,
         requesting_user=requesting_user,
     )
-    context["orgs"] = await _list_all_orgs(organization_repo)
+    context["orgs"] = await _orgs_visible_to(organization_repo, requesting_user)
     return context
+
+
+async def handle_create_provider(
+    *,
+    payload: ProviderCreate,
+    repo: ProviderRepository,
+    audit_repo: AuditRepository,
+    requesting_user: User,
+    organization_repo: OrganizationRepository,
+) -> Provider:
+    """Provider create handler. Validates ``payload.org_id`` points at an
+    Org the requesting user owns (or any Org for superusers) before
+    delegating to the framework's generic ``handle_create`` — the
+    dropdown only renders user-owned Orgs, so this check guards the
+    wire against curl callers (#524)."""
+    await _assert_org_belongs_to(
+        organization_repo, org_id=payload.org_id, user=requesting_user
+    )
+    return await handle_create(
+        PROVIDER_ENTITY,
+        payload=payload,
+        repo=repo,
+        audit_repo=audit_repo,
+        requesting_user=requesting_user,
+    )
+
+
+async def handle_update_provider(
+    *,
+    provider_id: UUID,
+    payload: ProviderUpdate,
+    repo: ProviderRepository,
+    audit_repo: AuditRepository,
+    requesting_user: User,
+    organization_repo: OrganizationRepository,
+) -> Provider:
+    """Provider update handler. When the PATCH payload touches
+    ``org_id``, verify the new Org is owned by the requesting user
+    (same rule as create). PATCHes that leave ``org_id`` unset pass
+    straight through. ``provider_id`` is the URL's path param —
+    forwarded to ``handle_update`` as ``target_id``."""
+    if payload.org_id is not None:
+        await _assert_org_belongs_to(
+            organization_repo, org_id=payload.org_id, user=requesting_user
+        )
+    return await handle_update(
+        PROVIDER_ENTITY,
+        target_id=provider_id,
+        payload=payload,
+        repo=repo,
+        audit_repo=audit_repo,
+        requesting_user=requesting_user,
+    )
 
 
 async def provider_detail_extras(
