@@ -22,6 +22,13 @@ Two modes:
     shown in expanded mode — the headline still carries it but the
     detail page is detail-y enough to repeat it as a labeled row.
 
+The ages row is labeled ``Age`` for `client_referral` (one seeker) and
+``Ages`` for `provider_availability` / `program_availability` (cohort
+the practice accepts). The row renders at most once per card — the
+``location_chunk and not expanded`` branch above takes precedence on
+list cards (where the headline already carries the age + gender combo
+for CR), so the kind-aware label only appears in expanded mode for CR.
+
 Reads from `view` (the `post_card_view` dict). Display-label dicts
 (`CLIENT_AGE_GROUP_LABELS`, `GENDER_LABELS`, `LANGUAGE_LABELS`,
 `INSURANCE_POSTURE_LABELS`, `LOCATION_AVAILABILITY_LABELS`,
@@ -39,17 +46,11 @@ Reads from `view` (the `post_card_view` dict). Display-label dicts
       {%- if view.location_chunk.city -%}{{ view.location_chunk.city }}, {% endif -%}{{ view.location_chunk.state }}
     </dd></div>
     {%- elif view.ages %}
-    <div><dt>Ages</dt><dd>
-      {%- set ages = [] -%}
-      {%- for g in view.ages -%}{%- set _ = ages.append(CLIENT_AGE_GROUP_LABELS[g]) -%}{%- endfor -%}
-      {{ ages | join(", ") }}
-    </dd></div>
-    {%- endif %}
-    {%- if expanded and view.kind == "client_referral" and view.ages %}
-    {#- CR's headline carries the first age + gender combo; the
-        detail page repeats it as a labeled row so the demographics
-        column is symmetric across kinds. -#}
-    <div><dt>Ages</dt><dd>
+    {#- Label is kind-aware: a `client_referral` post represents a
+        single seeker (one Age), while `provider_availability` and
+        `program_availability` describe a cohort the practice/program
+        accepts (Ages, plural). -#}
+    <div><dt>{% if view.kind == "client_referral" %}Age{% else %}Ages{% endif %}</dt><dd>
       {%- set ages = [] -%}
       {%- for g in view.ages -%}{%- set _ = ages.append(CLIENT_AGE_GROUP_LABELS[g]) -%}{%- endfor -%}
       {{ ages | join(", ") }}

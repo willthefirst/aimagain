@@ -2,7 +2,6 @@
 {%- from "posts/_modality_chips.html" import modality_chips -%}
 {%- from "posts/_services_block.html" import services_block -%}
 {%- from "posts/_facts_block.html" import facts_block -%}
-{%- from "posts/_meta_line.html" import meta_line -%}
 {%- from "posts/_how_to_refer.html" import how_to_refer -%}
 
 {% set resource_url = entity_url('post') %}
@@ -21,18 +20,19 @@
 
      1. Header band — headline + modality chips + date (same shape
         as the list card's header, but the headline is plain text,
-        not a link to itself).
-     2. Meta line — kind chip + "by user · date" byline.
-     3. Description prose — the post's lead text (required for CR;
+        not a link to itself). The breadcrumb above the card and
+        the kind-colored left edge already convey the "kind +
+        collection" context the page used to repeat as a meta line.
+     2. Description prose — the post's lead text (required for CR;
         optional for PA / program).
-     4. Body grid — services-with-icons (left) + demographics `<dl>`
+     3. Body grid — services-with-icons (left) + demographics `<dl>`
         (right) in expanded mode (the facts block surfaces
         detail-only rows: full address, practice/program link,
         desired times, schedule notes, network preference, sliding
         scale, cost).
-     5. How to refer — PA / program only, when website or
+     4. How to refer — PA / program only, when website or
         instructions are set.
-     6. Footer — Email CTA (same as list card).
+     5. Footer — Email CTA (same as list card).
 
    Per-kind branching lives in `post_card_view` (one place). Every
    visual element in the card reads from `view` (the dict view-model). #}
@@ -45,10 +45,8 @@
     <small>{{ post.created_at | format_post_date }}</small>
   </header>
 
-  {{ meta_line(view, post.owner, post.owner_id, post.created_at) }}
-
   {%- if view.description %}
-  <p class="post-description">{{ view.description }}</p>
+  <p>{{ view.description }}</p>
   {%- endif %}
 
   <div class="post-grid">

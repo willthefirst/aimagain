@@ -203,12 +203,12 @@ def test_stub_renders_detail_html_without_errors():
             current_user_id=uuid.uuid4(),
             is_development=False,
         )
-        # Sanity: the kind chip lands in the output. If a render
-        # error caused a stack trace partway through, the chip would
-        # be absent.
-        assert f'data-kind-chip="{kind}"' in html, (
-            f"detail.html for kind={kind!r} did not render the kind chip; "
-            f"either the template crashed or the meta-line partial regressed"
+        # Sanity: the post card lands in the output with the right
+        # `data-kind`. If a render error caused a stack trace partway
+        # through, the article wouldn't be present.
+        assert f'data-kind="{kind}"' in html, (
+            f"detail.html for kind={kind!r} did not render the post card; "
+            f"the template probably crashed mid-render"
         )
 
 
