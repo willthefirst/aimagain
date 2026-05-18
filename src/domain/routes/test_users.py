@@ -446,6 +446,53 @@ async def test_detail_lists_owned_providers(
     assert hrefs == {f"/providers/{first.id}", f"/providers/{second.id}"}
 
 
+def _inline_create_provider_link(tree: HTMLParser):
+    """The detail page's Providers section renders the self-only
+    Create CTA as `<p><a role="button">Create provider</a></p>` after
+    the providers table. Distinct from the toolbar variant on
+    `/users/{id}/providers` — this one is the profile inline preview."""
+    for anchor in tree.css('section a[role="button"]'):
+        if "Create provider" in (anchor.text() or ""):
+            return anchor
+    return None
+
+
+async def test_detail_shows_inline_create_provider_for_self(
+    authenticated_client: AsyncClient,
+    logged_in_user: User,
+):
+    """`/users/me` (and `/users/{my_id}`) renders an inline 'Create
+    provider' button inside the Providers section so the profile is
+    a self-discovery entry point — without the user clicking through
+    to the dedicated `/users/me/providers` page."""
+    response = await authenticated_client.get("/users/me")
+    assert response.status_code == 200
+    tree = HTMLParser(response.text)
+    action = _inline_create_provider_link(tree)
+    assert action is not None, "self profile is missing inline Create provider link"
+    assert action.attributes.get("href") == "/providers/form"
+
+
+async def test_detail_omits_inline_create_provider_for_other_user(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user: User,
+):
+    """Viewing another user's profile (including as admin) does NOT
+    surface the Create provider CTA — that affordance is self-only,
+    mirroring the toolbar variant on `/users/{id}/providers`."""
+    await promote_to_admin(db_test_session_manager, logged_in_user.email)
+    target = create_test_user(username=f"target-{uuid.uuid4()}")
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            session.add(target)
+
+    response = await authenticated_client.get(f"/users/{target.id}")
+    assert response.status_code == 200
+    tree = HTMLParser(response.text)
+    assert _inline_create_provider_link(tree) is None
+
+
 # --- Chrome: nav active state -------------------------------------------
 
 

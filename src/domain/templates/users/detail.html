@@ -45,6 +45,14 @@
     ) %}
     <p id="user-detail-providers-empty">No providers yet.</p>
     {% endcall %}
+    {# Self-only Create CTA — the profile is the natural discovery
+       point for "make my own provider". The dedicated
+       `/users/me/providers` page carries the same action in its
+       toolbar (added in 3b59933f); this inline button is the version
+       a user sees on the profile preview, without an extra click. #}
+    {% if is_self %}
+    <p><a href="{{ entity_form_url('provider') }}" role="button" class="outline">Create provider</a></p>
+    {% endif %}
   </section>
 
 </article>
