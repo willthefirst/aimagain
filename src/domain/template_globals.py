@@ -25,6 +25,7 @@ from src.domain.logic.posts.view import (
     post_card_view,
     referral_headline,
 )
+from src.domain.logic.providers.view import provider_card_view
 from src.domain.models import enums
 from src.framework.rendering.form_fields import register_choice_labels
 from src.framework.rendering.templating import register_template_globals
@@ -102,6 +103,10 @@ register_template_globals(
     # card (`posts/_item.html`) and the detail page (`posts/detail.html`)
     # read from — see its docstring in `src.domain.logic.posts.view`.
     post_card_view=post_card_view,
+    # `provider_card_view(provider)` is the unified view-model
+    # `providers/detail.html` reads from — see its docstring in
+    # `src.domain.logic.providers.view`.
+    provider_card_view=provider_card_view,
 )
 
 # Register the choice-tuple → labels-dict mapping that `field_spec` uses
