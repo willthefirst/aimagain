@@ -14,7 +14,12 @@ import uvicorn
 from fastapi import FastAPI, Request
 
 from src.auth_config import current_active_user, current_admin_user
+from src.domain.logic.programs.schema import ProgramCreate
 from src.domain.logic.providers.schema import ProviderCreate
+from src.domain.models.enums import (
+    ORGANIZATION_TYPES,
+    ORGANIZATION_TYPES_LABELS,
+)
 from src.domain.routes import auth_pages
 from src.framework import APIResponse
 
@@ -33,6 +38,11 @@ STUB_POST_ID = uuid.UUID("22222222-2222-2222-2222-222222222222")
 # `STUB_PROVIDER_ID` in `tests/test_contract/constants.py`.
 STUB_PROVIDER_ID = uuid.UUID("44444444-4444-4444-4444-444444444444")
 
+# Stable Org id seeded by the program-create stub page so the form's
+# `org_id` dropdown has a deterministic option to select; matches
+# `STUB_PROGRAM_FORM_ORG_ID` in `tests/test_contract/constants.py`.
+STUB_PROGRAM_FORM_ORG_ID = uuid.UUID("77777777-7777-7777-7777-777777777777")
+
 
 class ConsumerServerConfig:
     """Toggles for which page routes the consumer server should mount.
@@ -49,6 +59,8 @@ class ConsumerServerConfig:
         posts_owner_actions: bool = False,
         provider_create_form: bool = False,
         provider_edit_form: bool = False,
+        organization_create_form: bool = False,
+        program_create_form: bool = False,
         mock_auth: bool = True,
     ):
         self.auth_pages = auth_pages
@@ -56,6 +68,8 @@ class ConsumerServerConfig:
         self.posts_owner_actions = posts_owner_actions
         self.provider_create_form = provider_create_form
         self.provider_edit_form = provider_edit_form
+        self.organization_create_form = organization_create_form
+        self.program_create_form = program_create_form
         self.mock_auth = mock_auth
 
 
@@ -241,6 +255,67 @@ def _setup_provider_edit_form_stub(app: FastAPI) -> None:
         )
 
 
+def _setup_organization_create_form_stub(app: FastAPI) -> None:
+    """Mount a stub page that renders the real `organizations/form_new.html`
+    template, so the create-form's HTMX submit is exercised without a
+    database. The template reads `ORGANIZATION_TYPES` /
+    `ORGANIZATION_TYPES_LABELS` directly from context (the production
+    path injects them from `ORGANIZATION_ENTITY.static_context`), so the
+    stub does the same."""
+
+    class _StubAttrs:
+        def __init__(self, **kwargs):
+            self.__dict__.update(kwargs)
+
+    @app.get("/organizations/form")
+    async def organization_create_form_stub_page(request: Request):
+        current_user = _StubAttrs(
+            id=uuid.UUID("00000000-0000-0000-0000-000000000005"),
+            username="organization_owner",
+            is_superuser=False,
+        )
+        return APIResponse.html_response(
+            template_name="organizations/form_new.html",
+            context={
+                "current_user": current_user,
+                "ORGANIZATION_TYPES": ORGANIZATION_TYPES,
+                "ORGANIZATION_TYPES_LABELS": ORGANIZATION_TYPES_LABELS,
+            },
+            request=request,
+        )
+
+
+def _setup_program_create_form_stub(app: FastAPI) -> None:
+    """Mount a stub page that renders the real `programs/form_new.html`
+    template, so the create-form's HTMX submit is exercised without a
+    database. The form's `org_id` dropdown reads `organizations` from
+    context (production path: `program_form_extras` scopes the list to
+    the user's owned Orgs); the stub seeds one Org so the pact body is
+    deterministic."""
+
+    class _StubAttrs:
+        def __init__(self, **kwargs):
+            self.__dict__.update(kwargs)
+
+    @app.get("/programs/form")
+    async def program_create_form_stub_page(request: Request):
+        current_user = _StubAttrs(
+            id=uuid.UUID("00000000-0000-0000-0000-000000000006"),
+            username="program_owner",
+            is_superuser=False,
+        )
+        org = _StubAttrs(id=STUB_PROGRAM_FORM_ORG_ID, name="Acme Counseling")
+        return APIResponse.html_response(
+            template_name="programs/form_new.html",
+            context={
+                "current_user": current_user,
+                "schema": ProgramCreate,
+                "organizations": [org],
+            },
+            request=request,
+        )
+
+
 def setup_consumer_app_routes(app: FastAPI, config: ConsumerServerConfig) -> None:
     if config.auth_pages:
         app.include_router(auth_pages.auth_pages_api_router)
@@ -252,6 +327,10 @@ def setup_consumer_app_routes(app: FastAPI, config: ConsumerServerConfig) -> Non
         _setup_provider_create_form_stub(app)
     if config.provider_edit_form:
         _setup_provider_edit_form_stub(app)
+    if config.organization_create_form:
+        _setup_organization_create_form_stub(app)
+    if config.program_create_form:
+        _setup_program_create_form_stub(app)
 
 
 def run_consumer_server_process(
