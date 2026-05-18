@@ -240,6 +240,10 @@ class QualityCommands:
                 "🐍 Checking Python cluster boundaries...",
                 [sys.executable, "scripts/dev/python_cluster_imports_check.py"],
             ),
+            (
+                "🔗 Checking template route literals...",
+                [sys.executable, "scripts/dev/template_route_check.py"],
+            ),
         ]
 
         exit_code = 0

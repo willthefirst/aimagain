@@ -1,14 +1,14 @@
 {% extends "views/form_edit.html" %}
 {% from "posts/_provider_availability_form.html" import provider_availability_form %}
 
-{% set resource_url = "/posts" %}
-{% set resource_detail_url = "/posts/" ~ post.id %}
+{% set resource_url = entity_url('post') %}
+{% set resource_detail_url = entity_url('post', id=post.id) %}
 
 {% block resource_label %}Posts{% endblock %}
 {% block current_label %}Post{% endblock %}
 
 {% block content %}
-{{ provider_availability_form("patch", "/posts/" ~ post.id, "Save changes", post=post, schema=provider_availability_create_schema, current_user=current_user) }}
+{{ provider_availability_form("patch", entity_url('post', id=post.id), "Save changes", post=post, schema=provider_availability_create_schema, current_user=current_user) }}
 
-<p><a href="/posts/{{ post.id }}" role="button" class="secondary outline">Cancel</a></p>
+<p><a href="{{ entity_url('post', id=post.id) }}" role="button" class="secondary outline">Cancel</a></p>
 {% endblock %}

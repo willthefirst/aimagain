@@ -26,7 +26,7 @@ renders nothing when the viewer is not an admin (its existing guard).
 {% macro user_row(user, can_admin_actions=False) -%}
 <tr data-row-id="{{ user.id }}">
   <td data-label="Username" class="primary">
-    <a href="/users/{{ user.id }}">{{ user.username }}</a>
+    <a href="{{ entity_url('user', id=user.id) }}">{{ user.username }}</a>
   </td>
   <td data-label="Status">
     {%- if user.is_active -%}

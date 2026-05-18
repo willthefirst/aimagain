@@ -1,6 +1,6 @@
 {% extends "views/detail.html" %}
 
-{% set resource_url = "/providers" %}
+{% set resource_url = entity_url('provider') %}
 
 {% block resource_label %}Providers{% endblock %}
 {% block current_label %}{{ provider.org.name }}{% endblock %}
@@ -17,20 +17,20 @@
   {% if is_favorited %}
   <li><button type="button"
           class="secondary outline"
-          hx-delete="/users/me/favorites/{{ provider.id }}"
+          hx-delete="{{ entity_url('user_favorite', id=provider.id) }}"
           hx-confirm="Remove this provider from your favorites?">
     Unfavorite
   </button></li>
   {% else %}
   <li><button type="button"
           class="outline"
-          hx-post="/users/me/favorites/{{ provider.id }}">
+          hx-post="{{ entity_url('user_favorite', id=provider.id) }}">
     Favorite
   </button></li>
   {% endif %}
 {% endif %}
 {% if can_edit %}
-<li><a href="/providers/{{ provider.id }}/form" role="button" class="outline">Edit provider</a></li>
+<li><a href="{{ entity_form_url('provider', id=provider.id) }}" role="button" class="outline">Edit provider</a></li>
 {% endif %}
 {% endblock %}
 
@@ -39,7 +39,7 @@
   <section>
     <h2>Practice</h2>
     <dl>
-      <dt>Practice name</dt><dd><a href="/organizations/{{ provider.org_id }}">{{ provider.org.name }}</a></dd>
+      <dt>Practice name</dt><dd><a href="{{ entity_url('organization', id=provider.org_id) }}">{{ provider.org.name }}</a></dd>
       <dt>City</dt><dd>{{ provider.location_city }}</dd>
       <dt>State</dt><dd>{{ provider.location_state }}</dd>
       <dt>ZIP</dt><dd>{{ provider.location_zip }}</dd>

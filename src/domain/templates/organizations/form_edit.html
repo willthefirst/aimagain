@@ -2,8 +2,8 @@
 {%- from "_shared/form_fields.html" import select_field, text_field -%}
 {%- from "_shared/actions.html" import confirm_delete_button -%}
 
-{% set resource_url = "/organizations" %}
-{% set resource_detail_url = "/organizations/" ~ organization.id %}
+{% set resource_url = entity_url('organization') %}
+{% set resource_detail_url = entity_url('organization', id=organization.id) %}
 
 {% block resource_label %}Organizations{% endblock %}
 {% block current_label %}{{ organization.name }}{% endblock %}
@@ -11,7 +11,7 @@
 {% block content %}
 <section>
   <h2>Organization</h2>
-  <form hx-patch="/organizations/{{ organization.id }}">
+  <form hx-patch="{{ entity_url('organization', id=organization.id) }}">
     <fieldset>
       <legend>Identity</legend>
       {{ text_field("name", "Name", current=organization.name, maxlength=200) }}
@@ -31,8 +31,8 @@
 
 <section>
   <h2>Delete</h2>
-  {{ confirm_delete_button("/organizations/" ~ organization.id, "Delete this organization?") }}
+  {{ confirm_delete_button(entity_url('organization', id=organization.id), "Delete this organization?") }}
 </section>
 
-<p><a href="/organizations/{{ organization.id }}" role="button" class="secondary outline">Cancel</a></p>
+<p><a href="{{ entity_url('organization', id=organization.id) }}" role="button" class="secondary outline">Cancel</a></p>
 {% endblock %}

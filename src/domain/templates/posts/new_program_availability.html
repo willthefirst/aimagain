@@ -1,15 +1,15 @@
 {% extends "views/form_new.html" %}
 {% from "posts/_program_availability_form.html" import program_availability_form %}
 
-{% set resource_url = "/posts" %}
+{% set resource_url = entity_url('post') %}
 
 {% block resource_label %}Posts{% endblock %}
 
 {% block content %}
 {% if not current_user.programs %}
-<p>You need a program before posting program availability. <a href="/programs/form">Create a program</a>, then return here.</p>
+<p>You need a program before posting program availability. <a href="{{ entity_form_url('program') }}">Create a program</a>, then return here.</p>
 {% else %}
 <p>Per <code>notes/forms_spec.md</code>. No PII.</p>
-{{ program_availability_form("post", "/posts", "Create program availability", schema=program_availability_create_schema, current_user=current_user) }}
+{{ program_availability_form("post", entity_url('post'), "Create program availability", schema=program_availability_create_schema, current_user=current_user) }}
 {% endif %}
 {% endblock %}

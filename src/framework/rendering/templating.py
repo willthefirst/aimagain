@@ -11,6 +11,7 @@ from src.domain.logic.posts.schema import (
 from src.domain.models import enums
 from src.framework.config import settings
 from src.framework.rendering.form_fields import field_spec, register_choice_labels
+from src.framework.rendering.route_urls import entity_form_url, entity_url
 
 auto_reload = settings.ENVIRONMENT == "development"
 
@@ -111,6 +112,14 @@ _env.globals.update(
     # core → schemas import direction clean (see layer matrix in
     # `src/README.md`).
     field_spec=field_spec,
+    # `entity_url(name, *, id=None)` / `entity_form_url(name, *, id=None)`
+    # are the canonical way to reference parent-resource URLs from
+    # templates. Hardcoding `/<collection>/...` literals in `href` /
+    # `hx-*` / `action` is forbidden by the `template_route_check.py`
+    # lint — see that script and `src/framework/rendering/route_urls.py`
+    # for the rule and rationale.
+    entity_url=entity_url,
+    entity_form_url=entity_form_url,
     # Polymorphic posts have no single create-schema (the top-level
     # adapter is a discriminated union); the per-kind route handler
     # can't inject a `schema` context var without per-kind plumbing in

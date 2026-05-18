@@ -3,7 +3,7 @@
 {% block resource_label %}Programs{% endblock %}
 
 {% block actions %}
-<li><a href="/programs/form" role="button">Create program</a></li>
+<li><a href="{{ entity_form_url('program') }}" role="button">Create program</a></li>
 {% endblock %}
 
 {% block content %}
@@ -20,8 +20,8 @@
   <tbody>
     {%- for program in programs %}
     <tr>
-      <td><a href="/programs/{{ program.id }}">{{ program.name }}</a></td>
-      <td><a href="/organizations/{{ program.org_id }}">{{ program.organization.name }}</a></td>
+      <td><a href="{{ entity_url('program', id=program.id) }}">{{ program.name }}</a></td>
+      <td><a href="{{ entity_url('organization', id=program.org_id) }}">{{ program.organization.name }}</a></td>
       <td>{{ program.state_preference or "—" }}</td>
       <td>{{ "Yes" if program.accepting_referrals else "No" }}</td>
     </tr>

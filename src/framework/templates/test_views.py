@@ -41,9 +41,14 @@ def _make_env() -> Environment:
         loader=ChoiceLoader([stub_loader, framework_loader]),
         autoescape=select_autoescape(["html", "xml"]),
     )
-    # The shared `_toolbar.html` / `_breadcrumb.html` macros render
-    # `breadcrumb(items)` which is pure HTML and needs no globals; no
-    # context wiring required for these tests.
+    # `base.html` references the `entity_url` / `entity_form_url`
+    # Jinja globals registered in production by
+    # `src.framework.rendering.templating`. Mirror them here so the
+    # chrome renders without needing a full app boot.
+    from src.framework.rendering.route_urls import entity_form_url, entity_url
+
+    env.globals["entity_url"] = entity_url
+    env.globals["entity_form_url"] = entity_form_url
     return env
 
 

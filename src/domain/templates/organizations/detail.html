@@ -1,13 +1,13 @@
 {% extends "views/detail.html" %}
 
-{% set resource_url = "/organizations" %}
+{% set resource_url = entity_url('organization') %}
 
 {% block resource_label %}Organizations{% endblock %}
 {% block current_label %}{{ organization.name }}{% endblock %}
 
 {% block actions %}
 {% if can_edit %}
-<li><a href="/organizations/{{ organization.id }}/form" role="button" class="outline">Edit organization</a></li>
+<li><a href="{{ entity_form_url('organization', id=organization.id) }}" role="button" class="outline">Edit organization</a></li>
 {% endif %}
 {% endblock %}
 
@@ -19,7 +19,7 @@
       <dt>Name</dt><dd>{{ organization.name }}</dd>
       <dt>Type</dt><dd>{{ ORGANIZATION_TYPES_LABELS[organization.type] }}</dd>
       <dt>Parent organization</dt>
-      <dd>{% if organization.parent_org_id %}<a href="/organizations/{{ organization.parent_org_id }}">{{ organization.parent_org_id }}</a>{% else %}— (root)
+      <dd>{% if organization.parent_org_id %}<a href="{{ entity_url('organization', id=organization.parent_org_id) }}">{{ organization.parent_org_id }}</a>{% else %}— (root)
       {% endif %}</dd>
     </dl>
   </section>

@@ -1,12 +1,12 @@
 {% extends "views/form_new.html" %}
 {%- from "_shared/form_fields.html" import select_field, text_field -%}
 
-{% set resource_url = "/organizations" %}
+{% set resource_url = entity_url('organization') %}
 
 {% block resource_label %}Organizations{% endblock %}
 
 {% block content %}
-<form hx-post="/organizations">
+<form hx-post="{{ entity_url('organization') }}">
   <fieldset>
     <legend>Organization</legend>
     {{ text_field("name", "Name", maxlength=200) }}

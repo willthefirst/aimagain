@@ -132,7 +132,7 @@ per-kind, so a single-kind filter doesn't need to suppress anything.
 {%- set posture = insurance_posture(post) -%}
 <article data-row-id="{{ post.id }}" data-kind="{{ post.kind }}">
   <header class="post-header">
-    <strong><a href="/posts/{{ post.id }}">{{ headline_text }}{% if state %}, {{ state }}{% endif %}</a></strong>
+    <strong><a href="{{ entity_url('post', id=post.id) }}">{{ headline_text }}{% if state %}, {{ state }}{% endif %}</a></strong>
     {{ _modality_chips(in_person, virtual) }}
     <small>{{ post.created_at | format_post_date }}</small>
   </header>

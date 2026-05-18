@@ -99,6 +99,8 @@ A form page MAY host multiple `<form>` HTML tags posting to different action end
 
 **Every form-bearing resource MUST have a contract test pair** in [`tests/test_contract/`](../../../tests/test_contract/README.md). One consumer test (browser drives the form, asserts the request shape via Pact) and one provider test (running provider verified against the pact). Contract tests catch template ↔ route drift that no single colocated test can — adding them is part of the definition of done for any new HTML form.
 
+**Templates MUST reference parent-resource and form-page URLs through `entity_url` / `entity_form_url`** (Jinja globals registered by [`src/framework/rendering/route_urls.py`](../../framework/rendering/route_urls.py)). Hardcoded paths like `href="/organizations/form"` are forbidden by [`scripts/dev/template_route_check.py`](../../../scripts/dev/template_route_check.py) — the helpers read the URL from the entity registry, so a `url_collection` rename or a grammar shape change is a one-place edit. Subresource URLs (state axes, field clusters) pass through `entity_url(name, id=..., subresource="...")`; multi-segment nested URLs concatenate the leaf path onto a helper call.
+
 ### 4. revisions
 
 When edits to a `published` resource must not be destructive (audit, review, autosave):
