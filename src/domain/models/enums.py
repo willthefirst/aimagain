@@ -198,7 +198,7 @@ TREATMENT_SETTINGS: Final[tuple[str, ...]] = (
 # they cover. The form-render macro in
 # `src/framework/templates/_shared/form_fields.html` looks up labels via these
 # dicts; missing keys fail at render time. A guardrail test in
-# `src/schemas/test_post.py` asserts every value in a tuple has a label.
+# `src/domain/logic/posts/test_schema.py` asserts every value in a tuple has a label.
 #
 # `US_STATES` deliberately has no label dict — the value (USPS
 # abbreviation) is the right user-facing label.

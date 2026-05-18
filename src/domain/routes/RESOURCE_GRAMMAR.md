@@ -23,7 +23,7 @@ Rules:
 - **`PATCH` is for ordinary, multi-field edits only.** It MUST NOT carry status transitions, role changes, password changes, or anything else with different rules — those go to subresources.
 - **`DELETE`'s semantics are resource-defined.** Non-lifecycle resource: hard delete. Lifecycle-adopting resource: soft (transition to `archived`), with `DELETE /<r>/{id}/data` as the hard-delete escape hatch.
 - **No `PUT` on the parent.** `PATCH` is the honest verb for partial edits.
-- **All inputs MUST be validated by a Pydantic schema** (see `src/schemas/README.md`).
+- **All inputs MUST be validated by a Pydantic schema** declared in the entity's logic cluster (`src/domain/logic/<entity>/schema.py`).
 
 ### PUT vs PATCH on subresources
 

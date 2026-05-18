@@ -121,4 +121,4 @@ Handlers pass only resource-specific data. Chrome scalars (`is_authenticated`, `
 ## Tests
 
 - `test_views.py` (colocated): renders each view-type template via stub child templates and pins the breadcrumb / toolbar / content contract. A regression in the chrome wiring is caught here even before any domain page is changed.
-- Per-entity rendering is exercised indirectly via route tests under [`../../domain/routes/`](../../domain/routes/). When adding a template, extend the relevant route test (or add one) to cover its rendering. Selectors must scope to a stable handle (`id`, `class`, `data-testid`) rather than relying on a page having only one `<ul>` / `<form>` / `<table>` — see [`../../../tests/README.md`](../../../tests/README.md).
+- Per-entity rendering is exercised indirectly via route tests under [`../../domain/routes/`](../../domain/routes/). Selector conventions for template tests live in [`../../../tests/README.md`](../../../tests/README.md).

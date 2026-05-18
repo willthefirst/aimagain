@@ -30,6 +30,10 @@ The discipline check accepts any of the three. If a handler `commit`s without on
 - `log.py` — the `AuditLog` SQLAlchemy model (append-only; FK to `users.id` with `SET NULL`; `(resource_type, resource_id)` lookups).
 - `repository.py` — `AuditRepository`, deliberately exposing only writes + read-by-id. No `update_*` / `delete_*` — audit rows are immutable.
 
+## System actor
+
+Writes that aren't driven by a request (scheduled jobs, system-triggered runs) pass `actor_id=None`. `AuditLog.actor_id` is `nullable=True` with `ON DELETE SET NULL` (see [`log.py`](log.py)), so the row outlives any specific user.
+
 ## The discipline check
 
 `test_audit_discipline.py` parses each `handlers.py` under `src/domain/` (recursively), walks every `async def handle_*` function, and fails the test if the function calls `.commit()` without an audit-recording call. Opt-out: add `audit-discipline-ignore` to the function's docstring with a brief reason. Use sparingly.

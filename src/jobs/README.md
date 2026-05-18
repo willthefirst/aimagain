@@ -20,7 +20,7 @@ If a future job's logic is naturally owned by one entity (e.g. nightly verificat
 Every job in this directory MUST:
 
 1. **Open its own session via `async_session_maker`** — never a FastAPI `Depends`, since there is no request at job-execution time.
-2. **Write an audit row** via `record_audit(...)` (or `record_audit_for(...)`/`async with mutate(...)`) for every meaningful state change, then commit. The system-actor convention is `actor_id=None`; `AuditLog.actor_id` is `nullable=True` with `ON DELETE SET NULL` ([`../framework/audit/log.py`](../framework/audit/log.py)).
+2. **Write an audit row** via `record_audit(...)` (or `record_audit_for(...)`/`async with mutate(...)`) for every meaningful state change, then commit. Jobs pass `actor_id=None` — see [System actor](../framework/audit/README.md#system-actor).
 
 The `JOB_RUN_STARTED` action is bespoke (no spec home) — see [`../framework/audit/test_audit_action_drift.py`](../framework/audit/test_audit_action_drift.py).
 
