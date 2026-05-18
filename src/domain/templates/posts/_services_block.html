@@ -1,0 +1,42 @@
+{# Services-with-icons block — the post card's left column.
+
+`<h4>` carries the kind-aware verb (`Seeking` for CR, `Providing` for
+PA/program); the `<ul>` items combine a Lucide icon with the service's
+display label. Priority sort puts `psychotherapy` and
+`medication_management` first since those are the two services
+scanners most often look for; the rest follow in
+`CLIENT_REFERRAL_SERVICES` declaration order. PA+program `settings`
+render under the same `<ul>` after the services.
+
+Reads from `view` (the `post_card_view` dict):
+  - view.kind_verb — H4 heading text
+  - view.services — service enum values
+  - view.settings — setting enum values (PA + program; empty for CR)
+
+Renders nothing when both lists are empty so the H4 doesn't stand
+alone. The display-label and icon-name dicts come in via Jinja
+globals (`CLIENT_REFERRAL_SERVICE_LABELS` / `_ICONS`, same for
+`TREATMENT_SETTINGS_*`) registered in `src/domain/template_globals.py`. #}
+{% macro _service_item(value, label_dict, icon_dict) -%}
+<li><i class="icon-{{ icon_dict[value] }}" aria-hidden="true"></i>{{ label_dict[value] }}</li>
+{%- endmacro %}
+
+{% macro services_block(view) -%}
+<section class="post-services">
+  {%- if view.services or view.settings %}
+  <h4>{{ view.kind_verb }}</h4>
+  {%- set _priority = ["psychotherapy", "medication_management"] %}
+  <ul>
+    {%- for s in _priority if s in view.services %}
+    {{ _service_item(s, CLIENT_REFERRAL_SERVICE_LABELS, CLIENT_REFERRAL_SERVICE_ICONS) }}
+    {%- endfor %}
+    {%- for s in view.services if s not in _priority %}
+    {{ _service_item(s, CLIENT_REFERRAL_SERVICE_LABELS, CLIENT_REFERRAL_SERVICE_ICONS) }}
+    {%- endfor %}
+    {%- for s in view.settings %}
+    {{ _service_item(s, TREATMENT_SETTINGS_LABELS, TREATMENT_SETTINGS_ICONS) }}
+    {%- endfor %}
+  </ul>
+  {%- endif %}
+</section>
+{%- endmacro %}
