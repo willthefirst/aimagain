@@ -7,18 +7,11 @@ from fastapi.responses import JSONResponse, RedirectResponse
 
 from src.auth_config import auth_backend, fastapi_users
 from src.db import check_database_health
+from src.domain import routes  # noqa: F401  # populates entity_registry
 from src.domain.logic.users.schema import UserRead
-from src.domain.routes import auth_routes
+from src.domain.routes import auth_pages, auth_routes
+from src.framework.dispatch.registry import entity_registry
 from src.framework.http.middleware import StripEmptyQueryParamsMiddleware
-
-from .domain.routes import (
-    auth_pages,
-    favorites,
-    organizations,
-    posts,
-    providers,
-    users,
-)
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -100,18 +93,15 @@ app.include_router(
     tags=["auth"],
 )
 app.include_router(auth_pages.auth_pages_api_router)
-# `/users/me` and `/users/me/providers` are mounted on `users_api_router`
-# itself via `singleton_alias=("me", current_active_user)` on `mount_detail`
-# / `mount_related_list` — the mounts register the literal `/me*` paths
-# before the parametric `/{user_id}` so FastAPI matches them first.
-app.include_router(users.users_api_router, tags=["users"])
-app.include_router(posts.posts_api_router, tags=["posts"])
-app.include_router(providers.providers_api_router, tags=["providers"])
-app.include_router(organizations.organizations_api_router, tags=["organizations"])
-# `/users/me/favorites/*` is mounted on its own router (favorites_api_router)
-# rather than on users_api_router, because favorites is its own resource
-# cluster — the path just happens to live under /users/me for self-scoping.
-app.include_router(favorites.favorites_api_router, tags=["favorites"])
+
+# Every entity route file calls `register_entity(SPEC)` at import time
+# (see `src/framework/dispatch/registry.py`). The package import above
+# (`from src.domain import routes`) executes those calls. Mounting is
+# then a single iteration over `entity_registry` — no `include_router`
+# line to forget per entity. Owned-subentity specs mount nested under
+# their parent's route file and are not registered here.
+for _spec, _router in entity_registry.entries():
+    app.include_router(_router, tags=[_spec.url_collection])
 
 
 @app.get("/health")

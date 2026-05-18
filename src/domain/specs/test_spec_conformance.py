@@ -1,33 +1,18 @@
-"""Parametrized conformance suite for every `EntitySpec`."""
+"""Parametrized conformance suite for every `EntitySpec`.
+
+The spec registry lives at :data:`src.domain.specs.ALL_ENTITY_SPECS` —
+one re-export per entity in ``src/domain/specs/__init__.py``. Adding a
+new spec means adding two lines there; this suite then runs every
+invariant check against it.
+"""
 
 import pytest
 from pydantic import BaseModel, TypeAdapter
 
-from src.domain.specs.organization import ORGANIZATION_ENTITY
-from src.domain.specs.post import POST_ENTITY
-from src.domain.specs.provider import PROVIDER_ENTITY
-from src.domain.specs.provider_certification import CERTIFICATION_ENTITY
-from src.domain.specs.provider_education import EDUCATION_ENTITY
-from src.domain.specs.provider_licensure import LICENSURE_ENTITY
-from src.domain.specs.user import USER_ENTITY
-from src.domain.specs.user_favorite import FAVORITE_ENTITY
+from src.domain.specs import ALL_ENTITY_SPECS
 from src.framework.audit.core import AuditAction
 from src.framework.dispatch.entity_spec import EntitySpec
 from src.framework.dispatch.resource_routes import ResourceSpec
-
-# Canonical registry of every entity spec the codebase declares today.
-# Order matches the source-tree walk order; tests should not depend on
-# the order, but it keeps failures readable.
-ALL_ENTITY_SPECS: tuple[EntitySpec, ...] = (
-    USER_ENTITY,
-    PROVIDER_ENTITY,
-    LICENSURE_ENTITY,
-    EDUCATION_ENTITY,
-    CERTIFICATION_ENTITY,
-    POST_ENTITY,
-    FAVORITE_ENTITY,
-    ORGANIZATION_ENTITY,
-)
 
 
 def _spec_ids(spec: EntitySpec) -> str:

@@ -1,33 +1,15 @@
-"""Drift guard: every `AuditAction` member is justified by a spec."""
+"""Drift guard: every `AuditAction` member is justified by a spec.
 
-from src.domain.specs.organization import ORGANIZATION_ENTITY
-from src.domain.specs.post import POST_ENTITY
-from src.domain.specs.provider import PROVIDER_ENTITY
-from src.domain.specs.provider_certification import CERTIFICATION_ENTITY
-from src.domain.specs.provider_education import EDUCATION_ENTITY
-from src.domain.specs.provider_licensure import LICENSURE_ENTITY
-from src.domain.specs.user import USER_ENTITY
-from src.domain.specs.user_favorite import FAVORITE_ENTITY
+The CRUD / edge / state-axis partition is derived by iterating
+:data:`src.domain.specs.ALL_ENTITY_SPECS` — no hand-listed tuple per
+audit shape. Adding a new entity means adding it to that re-export
+tuple and the matching ``CREATE_<STEM>`` / ``UPDATE_<STEM>`` /
+``DELETE_<STEM>`` members to :class:`AuditAction`; this drift guard
+flags any missing piece.
+"""
+
+from src.domain.specs import ALL_ENTITY_SPECS
 from src.framework.audit.core import AuditAction
-
-# All CRUD-shaped specs whose `audit` binding should account for a
-# `CREATE_<STEM>`/`UPDATE_<STEM>`/`DELETE_<STEM>` triple.
-_CRUD_SPECS = (
-    USER_ENTITY,
-    POST_ENTITY,
-    PROVIDER_ENTITY,
-    LICENSURE_ENTITY,
-    EDUCATION_ENTITY,
-    CERTIFICATION_ENTITY,
-    ORGANIZATION_ENTITY,
-)
-
-# Edge-shaped specs whose `edge_audit.actions` declares each member directly.
-_EDGE_SPECS = (FAVORITE_ENTITY,)
-
-# Specs whose state axes declare standalone audit actions outside the
-# CRUD triple. Each `state_axes[i].action` is its own enum member.
-_STATE_AXIS_SPECS = (USER_ENTITY,)
 
 # Bespoke members not modeled by any spec. `REGISTER` is fired by the
 # fastapi-users self-signup flow in `src/logic/auth/auth_processing.py`
@@ -39,13 +21,13 @@ _BESPOKE: frozenset[str] = frozenset({"REGISTER"})
 
 def _expected_members() -> set[str]:
     expected: set[str] = set(_BESPOKE)
-    for spec in _CRUD_SPECS:
-        stem = (spec.audit_action_stem or spec.name).upper()
-        expected.update({f"CREATE_{stem}", f"UPDATE_{stem}", f"DELETE_{stem}"})
-    for spec in _EDGE_SPECS:
-        for action in spec.edge_audit.actions.values():
-            expected.add(action.name)
-    for spec in _STATE_AXIS_SPECS:
+    for spec in ALL_ENTITY_SPECS:
+        if spec.audit is not None:
+            stem = (spec.audit_action_stem or spec.name).upper()
+            expected.update({f"CREATE_{stem}", f"UPDATE_{stem}", f"DELETE_{stem}"})
+        if spec.edge_audit is not None:
+            for action in spec.edge_audit.actions.values():
+                expected.add(action.name)
         for axis in spec.state_axes:
             expected.add(axis.action.name)
     return expected

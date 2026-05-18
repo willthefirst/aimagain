@@ -1,12 +1,8 @@
 from src.domain.specs.user import USER_ENTITY
-from src.framework import make_entity_router
+from src.framework.dispatch.registry import register_entity
 from src.framework.dispatch.resource_routes import mount_entity
 
-router = make_entity_router(USER_ENTITY)
-# Re-export the underlying APIRouter under the historic name so
-# `main.py`'s `app.include_router(users.users_api_router, ...)` keeps
-# resolving without churn.
-users_api_router = router.router
+router = register_entity(USER_ENTITY)
 
 
 # Every verb is factory-built or spec-resolved:

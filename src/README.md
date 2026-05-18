@@ -55,6 +55,15 @@ The work is concentrated. For each step, also add or extend the colocated `test_
 
 For polymorphic entities (`Post` / `kind`), see [`domain/models/posts/post_kinds.py`](domain/models/posts/post_kinds.py). The spec sets `discriminator=<registry>` and the framework's `handle_create` / `handle_update` dispatch through it automatically.
 
+### Cross-cutting registries
+
+Beyond the per-entity scaffolding, an entity is registered with a few cross-cutting parts of the system. Each registry is structurally enforced — there is no manual checklist to keep in sync:
+
+- **`AuditAction` enum** ([`framework/audit/core.py`](framework/audit/core.py)) — add `CREATE_<STEM>` / `UPDATE_<STEM>` / `DELETE_<STEM>` for CRUD entities (or the edge/state-axis equivalents). **Fails at import** if missing: spec construction calls `make_audited_resource(...)` which looks up the action via `AuditAction[f"CREATE_{stem}"]` and raises `KeyError` if absent.
+- **`_REPO_TYPE_RESOLVERS`** ([`framework/persistence/dependencies.py`](framework/persistence/dependencies.py)) — register the repository class in `_REPO_TYPES`. **Fails at import** if missing: the public `get_<entity>_repository` binding is generated from the registry, so the spec module's `from ...dependencies import get_X_repository` raises `ImportError` if `X` isn't registered.
+- **`entity_registry`** ([`framework/dispatch/registry.py`](framework/dispatch/registry.py)) — every entity route file calls `register_entity(SPEC)` at import time. The call constructs the `BaseRouter`, appends `(spec, fastapi_router)` to the global registry, and returns the router so the file can mount handlers on it. [`main.py`](main.py) iterates the registry once to `include_router` each entry — there is no `include_router(...)` line to add per entity.
+- **`ALL_ENTITY_SPECS`** — declared in [`domain/specs/__init__.py`](domain/specs/__init__.py) as a one-line re-export per entity. The conformance suite and audit-drift guard iterate this tuple; adding a new spec means appending one entry. Forgetting it makes the spec invisible to the conformance suite, which the existing parametrized tests then flag.
+
 ## Error handling
 
 Domain handlers raise the API exception subclasses directly — `NotFoundError`, `ForbiddenError`, `BadRequestError`, etc. from [`framework/http/exceptions.py`](framework/http/exceptions.py). Those are `HTTPException` subclasses, so the `@handle_route_errors` decorator passes them through unchanged. fastapi-users exceptions raised during registration/auth get translated by `handle_fastapi_users_error`. Everything else becomes a generic 500.

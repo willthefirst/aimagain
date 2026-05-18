@@ -1,5 +1,51 @@
-# Per-entity `EntitySpec` instances. One file per entity.
-#
-# `<entity>.py` exports `<ENTITY>_ENTITY: EntitySpec` — the single
-# declaration that route files and logic-layer handlers both read
-# from. See `src/framework/dispatch/entity_spec.py` for the dataclass.
+"""Every `EntitySpec` instance lives here, one per module.
+
+This ``__init__`` re-exports each entity spec so other modules can
+``from src.domain.specs import ALL_ENTITY_SPECS`` without filesystem
+walking. The conformance suite and the audit-drift guard iterate
+:data:`ALL_ENTITY_SPECS` directly.
+
+Adding a new entity:
+
+1. Create ``<entity>.py`` next to the others, exporting
+   ``<ENTITY>_ENTITY: Final[EntitySpec]``.
+2. Add the matching ``from .<entity> import <ENTITY>_ENTITY`` line
+   below and the entry to ``ALL_ENTITY_SPECS``.
+
+Forgetting step 2 leaves the spec invisible to the conformance suite
+and the audit-drift guard — they iterate this tuple.
+"""
+
+from src.framework.dispatch.entity_spec import EntitySpec
+
+from .organization import ORGANIZATION_ENTITY
+from .post import POST_ENTITY
+from .provider import PROVIDER_ENTITY
+from .provider_certification import CERTIFICATION_ENTITY
+from .provider_education import EDUCATION_ENTITY
+from .provider_licensure import LICENSURE_ENTITY
+from .user import USER_ENTITY
+from .user_favorite import FAVORITE_ENTITY
+
+ALL_ENTITY_SPECS: tuple[EntitySpec, ...] = (
+    ORGANIZATION_ENTITY,
+    POST_ENTITY,
+    PROVIDER_ENTITY,
+    CERTIFICATION_ENTITY,
+    EDUCATION_ENTITY,
+    LICENSURE_ENTITY,
+    USER_ENTITY,
+    FAVORITE_ENTITY,
+)
+
+__all__ = [
+    "ALL_ENTITY_SPECS",
+    "CERTIFICATION_ENTITY",
+    "EDUCATION_ENTITY",
+    "FAVORITE_ENTITY",
+    "LICENSURE_ENTITY",
+    "ORGANIZATION_ENTITY",
+    "POST_ENTITY",
+    "PROVIDER_ENTITY",
+    "USER_ENTITY",
+]
