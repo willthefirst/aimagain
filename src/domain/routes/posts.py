@@ -1,5 +1,5 @@
 from src.domain.specs.post import POST_ENTITY
-from src.framework.dispatch.registry import register_entity
+from src.framework import register_entity
 from src.framework.dispatch.resource_routes import mount_entity
 
 router = register_entity(POST_ENTITY)

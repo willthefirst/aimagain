@@ -20,7 +20,7 @@ from src.domain.logic.favorites.handlers import (
     handle_remove_favorite,
 )
 from src.domain.specs.user_favorite import FAVORITE_ENTITY
-from src.framework.dispatch.registry import register_entity
+from src.framework import register_entity
 from src.framework.dispatch.resource_routes import mount_edge_routes
 
 router = register_entity(FAVORITE_ENTITY)

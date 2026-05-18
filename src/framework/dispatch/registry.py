@@ -12,7 +12,7 @@ Lifecycle:
 
 * Each entity route file under ``src/domain/routes/`` calls
   :func:`register_entity` at import time; the call constructs the
-  ``BaseRouter`` (via :func:`make_entity_router`), appends the
+  ``BaseRouter`` (via :func:`_make_entity_router`), appends the
   ``(spec, fastapi_router)`` pair to the module-level registry, and
   returns the ``BaseRouter`` so the caller can mount handlers on it.
 * ``src/domain/routes/__init__.py`` imports every entity route module —
@@ -32,7 +32,7 @@ from typing import TYPE_CHECKING, Final
 
 from fastapi import APIRouter
 
-from .base_router import BaseRouter, make_entity_router
+from .base_router import BaseRouter, _make_entity_router
 
 if TYPE_CHECKING:
     from .entity_spec import EntitySpec
@@ -86,7 +86,7 @@ def register_entity(spec: "EntitySpec") -> BaseRouter:
 
     .. code-block:: python
 
-        router = make_entity_router(SPEC)
+        router = _make_entity_router(SPEC)
         spec_api_router = router.router
 
     with
@@ -98,6 +98,6 @@ def register_entity(spec: "EntitySpec") -> BaseRouter:
     The caller still mounts handlers on ``router`` exactly as before —
     ``register_entity`` only adds the registry bookkeeping.
     """
-    router = make_entity_router(spec)
+    router = _make_entity_router(spec)
     entity_registry.register(spec, router.router)
     return router

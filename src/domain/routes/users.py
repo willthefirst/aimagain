@@ -1,5 +1,5 @@
 from src.domain.specs.user import USER_ENTITY
-from src.framework.dispatch.registry import register_entity
+from src.framework import register_entity
 from src.framework.dispatch.resource_routes import mount_entity
 
 router = register_entity(USER_ENTITY)
@@ -15,4 +15,4 @@ router = register_entity(USER_ENTITY)
 #   - providers — related-list subresource, same `handler_path` path.
 # Detail extras (`user_detail_extras` + the provider repo it needs)
 # live on the spec via `detail_extras_path`.
-mount_entity(router, USER_ENTITY, handlers={})
+mount_entity(router, USER_ENTITY)
