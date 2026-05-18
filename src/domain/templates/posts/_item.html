@@ -45,13 +45,13 @@ per-kind, so a single-kind filter doesn't need to suppress anything. #}
 
 {% macro post_item(post, active_kind=None) -%}
 {%- set view = post_card_view(post) -%}
-<article class="post-card" data-row-id="{{ post.id }}" data-kind="{{ post.kind }}">
-  <header class="post-header">
+<article class="entity-card" data-row-id="{{ post.id }}" data-kind="{{ post.kind }}">
+  <header class="entity-header">
     <strong><a href="{{ entity_url('post', id=post.id) }}">{{ view.headline }}{% if view.header_state %}, {{ view.header_state }}{% endif %}</a></strong>
     {{ modality_chips(view.in_person, view.virtual) }}
     <small>{{ post.created_at | format_post_date }}</small>
   </header>
-  <div class="post-grid">
+  <div class="entity-grid">
     {{ services_block(view) }}
     {{ facts_block(view) }}
   </div>
@@ -61,7 +61,7 @@ per-kind, so a single-kind filter doesn't need to suppress anything. #}
       address lives only in the `href`. `target="_blank" rel="noopener
       noreferrer"` is harmless on `mailto:` URLs and matches the
       pattern used for the PA `website` link on the detail page. -#}
-  <footer class="post-footer">
+  <footer class="entity-footer">
     <a href="mailto:{{ post.owner.email }}" target="_blank" rel="noopener noreferrer" role="button" class="secondary outline">Email</a>
   </footer>
 </article>

@@ -120,14 +120,14 @@ async def test_list_referral_item_shape(
     # Header line: link text is the age + gender combo (no state —
     # state moved to the demographics column for CR). Modality chips
     # (icon + short label) sit next to the headline.
-    header_link = item.css_first("header.post-header a")
+    header_link = item.css_first("header.entity-header a")
     assert header_link is not None
     assert header_link.attributes.get("href") == f"/posts/{post.id}"
     # `age_groups[0]` = adolescents_14_18 + gender=male.
     assert header_link.text(strip=True) == "Adolescent male (14–18)"
     modality_chips = [
         chip.text(strip=True)
-        for chip in item.css("header.post-header > .post-modality")
+        for chip in item.css("header.entity-header > .post-modality")
     ]
     assert modality_chips == ["Virtual", "In-person"]
 
@@ -138,7 +138,7 @@ async def test_list_referral_item_shape(
     assert description not in item.text()
 
     # Services column lists each service with an inline icon and label.
-    service_items = item.css("section.post-services > ul > li")
+    service_items = item.css("section.entity-icon-list > ul > li")
     service_labels = [li.text(strip=True) for li in service_items]
     assert "Psychotherapy" in service_labels
     assert "Medication management" in service_labels
@@ -148,8 +148,8 @@ async def test_list_referral_item_shape(
     # Demographics column: location chunk (City, ST) + languages +
     # insurance posture. CR's age + gender live in the headline, not
     # here.
-    facts_text = item.css_first("section.post-facts").text()
-    location = item.css_first("section.post-facts dl > div.post-location")
+    facts_text = item.css_first("section.entity-facts").text()
+    location = item.css_first("section.entity-facts dl > div.entity-location")
     assert location is not None
     assert location.css_first("dt > i[class^=icon-]") is not None
     assert location.css_first("dd").text(strip=True) == "Seattle, WA"
@@ -159,10 +159,10 @@ async def test_list_referral_item_shape(
     assert "Adolescent" not in facts_text
     assert "Adult" not in facts_text
 
-    # Contact band lives in `<footer class="post-footer">` — just the
+    # Contact band lives in `<footer class="entity-footer">` — just the
     # Email CTA. The username + practice name no longer render in the
     # footer; the headline already identifies who you're contacting.
-    footer = item.css_first("footer.post-footer")
+    footer = item.css_first("footer.entity-footer")
     assert author.username not in footer.text()
     mailto = footer.css_first("a")
     assert mailto is not None
@@ -200,13 +200,13 @@ async def test_list_referral_header_is_age_gender_combo(
     assert response.status_code == 200
     tree = HTMLParser(response.text)
     item = tree.css_first("#posts-list > article")
-    lead = item.css_first("header.post-header a")
+    lead = item.css_first("header.entity-header a")
     assert lead is not None
     assert lead.text(strip=True) == "Young adult female (19–24)"
     # State is *not* in the header anymore.
-    assert "ID" not in item.css_first("header.post-header").text()
+    assert "ID" not in item.css_first("header.entity-header").text()
     # ...but it does appear in the demographics column's location chunk.
-    location = item.css_first("section.post-facts dl > div.post-location")
+    location = item.css_first("section.entity-facts dl > div.entity-location")
     assert location is not None
     assert location.css_first("dd").text(strip=True) == "Boise, ID"
 
@@ -259,23 +259,23 @@ async def test_list_opening_item_shape(
     # Header link text: practice name + state. The in-person posture
     # renders as a `<span.post-modality>` chip (icon + label) next to
     # the link; virtual=no, so no virtual chip.
-    lead = item.css_first("header.post-header a")
+    lead = item.css_first("header.entity-header a")
     assert lead is not None
     assert lead.text(strip=True) == f"{practice_name}, OR"
     modality_chips = [
         chip.text(strip=True)
-        for chip in item.css("header.post-header > .post-modality")
+        for chip in item.css("header.entity-header > .post-modality")
     ]
     assert modality_chips == ["In-person"]
 
     # Demographics column shows the posture; non-empty in_network_carriers
     # wins the priority even though sliding_scale is also set.
-    facts_text = item.css_first("section.post-facts").text()
+    facts_text = item.css_first("section.entity-facts").text()
     assert "In-network" in facts_text
 
-    # Contact band lives in `<footer class="post-footer">` — just the
+    # Contact band lives in `<footer class="entity-footer">` — just the
     # Email CTA. Practice name is in the headline, not duplicated here.
-    footer = item.css_first("footer.post-footer")
+    footer = item.css_first("footer.entity-footer")
     footer_text = footer.text()
     assert practice_name not in footer_text
     assert author.username not in footer_text
@@ -320,8 +320,8 @@ async def test_list_services_column_heading_is_kind_aware(
     cards = {
         a.attributes.get("data-row-id"): a for a in tree.css("#posts-list > article")
     }
-    cr_heading = cards[str(cr_post.id)].css_first("section.post-services h4")
-    pa_heading = cards[str(pa_post.id)].css_first("section.post-services h4")
+    cr_heading = cards[str(cr_post.id)].css_first("section.entity-icon-list h4")
+    pa_heading = cards[str(pa_post.id)].css_first("section.entity-icon-list h4")
     assert cr_heading is not None and cr_heading.text(strip=True) == "Seeking"
     assert pa_heading is not None and pa_heading.text(strip=True) == "Providing"
 
@@ -357,7 +357,7 @@ async def test_list_services_priority_sorted_psychotherapy_and_medmgmt_first(
     response = await authenticated_client.get("/posts")
     assert response.status_code == 200
     tree = HTMLParser(response.text)
-    items = tree.css("#posts-list > article section.post-services > ul > li")
+    items = tree.css("#posts-list > article section.entity-icon-list > ul > li")
     labels = [li.text(strip=True) for li in items]
     assert labels[:2] == ["Psychotherapy", "Medication management"]
     # The non-priority items keep enum declaration order.
@@ -401,15 +401,21 @@ async def test_list_demographics_diverge_by_kind(
     }
     cr_card = cards[str(cr_post.id)]
     pa_card = cards[str(pa_post.id)]
-    cr_labels = [dt.text(strip=True) for dt in cr_card.css("section.post-facts dl dt")]
-    pa_labels = [dt.text(strip=True) for dt in pa_card.css("section.post-facts dl dt")]
+    cr_labels = [
+        dt.text(strip=True) for dt in cr_card.css("section.entity-facts dl dt")
+    ]
+    pa_labels = [
+        dt.text(strip=True) for dt in pa_card.css("section.entity-facts dl dt")
+    ]
     # CR omits Age + Gender (they're in the headline) and adds a
     # location chunk whose `<dt>` is icon-only (empty text).
     assert "Age" not in cr_labels and "Gender" not in cr_labels
-    assert cr_card.css_first("section.post-facts dl > div.post-location") is not None
+    assert (
+        cr_card.css_first("section.entity-facts dl > div.entity-location") is not None
+    )
     # PA carries the cohort chunk; no location row.
     assert "Ages" in pa_labels and "Age" not in pa_labels
-    assert pa_card.css_first("section.post-facts dl > div.post-location") is None
+    assert pa_card.css_first("section.entity-facts dl > div.entity-location") is None
 
 
 async def test_list_pa_footer_carries_email_cta_only(
@@ -437,7 +443,7 @@ async def test_list_pa_footer_carries_email_cta_only(
     response = await authenticated_client.get("/posts")
     assert response.status_code == 200
     tree = HTMLParser(response.text)
-    footer = tree.css_first("#posts-list > article footer.post-footer")
+    footer = tree.css_first("#posts-list > article footer.entity-footer")
     assert footer is not None
     text = footer.text()
     # Neither name renders in the footer — only the Email CTA.
@@ -494,7 +500,7 @@ async def test_list_meta_is_a_dl_of_labeled_key_value_chunks(
 ):
     """Each metadata fact is a `<dt>`/`<dd>` pair (wrapped in a
     `<div>`, the HTML5 grouping construct inside `<dl>`) in the
-    demographics column (`section.post-facts`). For CR the first
+    demographics column (`section.entity-facts`). For CR the first
     chunk is a location row: an icon-only `<dt>` (`aria-label`
     carries the meaning) + `City, ST` value. Other chunks have a
     visible text `<dt>` label (e.g. "Insurance"). Modality lives in
@@ -532,13 +538,13 @@ async def test_list_meta_is_a_dl_of_labeled_key_value_chunks(
     # Demographics `<dl>` chunks for CR. English-only languages are
     # dropped (default); insurance posture renders; age + gender are
     # absent (they're in the headline).
-    meta_chunks = item.css("section.post-facts dl > div")
+    meta_chunks = item.css("section.entity-facts dl > div")
     # Location + Insurance = 2 chunks.
     assert len(meta_chunks) == 2
     labels = [chunk.css_first("dt").text(strip=True) for chunk in meta_chunks]
     # First `<dt>` is icon-only (no visible text); second is "Insurance".
     assert labels == ["", "Insurance"]
-    assert meta_chunks[0].attributes.get("class") == "post-location"
+    assert meta_chunks[0].attributes.get("class") == "entity-location"
     assert meta_chunks[0].css_first("dt").attributes.get("aria-label") == "Location"
     assert meta_chunks[0].css_first("dt > i[class^=icon-]") is not None
     values = [chunk.css_first("dd").text(strip=True) for chunk in meta_chunks]
@@ -548,12 +554,12 @@ async def test_list_meta_is_a_dl_of_labeled_key_value_chunks(
     # (virtual=no). The fixture's gender default is `prefer_not_to_say`,
     # so the gender word drops out. State lives in the location chunk
     # of the demographics column, not in the header.
-    header_text = item.css_first("header.post-header").text()
+    header_text = item.css_first("header.entity-header").text()
     assert "Adolescent (14–18)" in header_text
     assert "WA" not in header_text
     modality_chips = [
         chip.text(strip=True)
-        for chip in item.css("header.post-header > .post-modality")
+        for chip in item.css("header.entity-header > .post-modality")
     ]
     assert modality_chips == ["In-person"]
 
@@ -561,10 +567,10 @@ async def test_list_meta_is_a_dl_of_labeled_key_value_chunks(
     # the Email CTA in the footer. The footer carries only the CTA;
     # the name (username for CR, practice for PA) lives in the
     # headline, not duplicated here.
-    header_link = item.css_first("header.post-header a")
+    header_link = item.css_first("header.entity-header a")
     assert header_link is not None
     assert header_link.attributes.get("href") == f"/posts/{post.id}"
-    footer = item.css_first("footer.post-footer")
+    footer = item.css_first("footer.entity-footer")
     assert author.username not in footer.text()
     mailto = footer.css_first("a")
     assert mailto is not None
@@ -598,7 +604,7 @@ async def test_list_renders_readable_date_format(
     tree = HTMLParser(response.text)
     item = tree.css_first("#posts-list > article")
     assert item is not None
-    date_cell = item.css_first("header.post-header small")
+    date_cell = item.css_first("header.entity-header small")
     assert date_cell is not None
     rendered = date_cell.text(strip=True)
     # `May 15` for current-year posts; `May 15, 2025` once we cross a
@@ -670,7 +676,7 @@ async def test_detail_omits_kind_chip_and_meta_line(
         assert response.status_code == 200
         tree = HTMLParser(response.text)
         assert tree.css_first("article [data-kind-chip]") is None
-        assert tree.css_first("article .post-meta") is None
+        assert tree.css_first("article .entity-meta") is None
 
 
 async def test_detail_age_label_is_singular_for_cr_and_appears_once(
@@ -698,7 +704,7 @@ async def test_detail_age_label_is_singular_for_cr_and_appears_once(
     assert response.status_code == 200
     tree = HTMLParser(response.text)
     labels = [
-        dt.text(strip=True) for dt in tree.css("article section.post-facts dl dt")
+        dt.text(strip=True) for dt in tree.css("article section.entity-facts dl dt")
     ]
     assert labels.count("Age") == 1
     assert "Ages" not in labels
@@ -728,7 +734,7 @@ async def test_detail_ages_label_is_plural_for_pa_and_appears_once(
     assert response.status_code == 200
     tree = HTMLParser(response.text)
     labels = [
-        dt.text(strip=True) for dt in tree.css("article section.post-facts dl dt")
+        dt.text(strip=True) for dt in tree.css("article section.entity-facts dl dt")
     ]
     assert labels.count("Ages") == 1
     assert "Age" not in labels
@@ -770,7 +776,7 @@ async def test_list_posts_one_post(
     assert len(items) == 1
     # The description doesn't appear in the listing row (lives on the
     # detail page); the card header link is what we look for.
-    assert items[0].css_first("header.post-header a") is not None
+    assert items[0].css_first("header.entity-header a") is not None
     assert "No posts found" not in tree.body.text()
 
 
@@ -1772,7 +1778,7 @@ async def test_list_renders_referral_row(
     assert item.attributes.get("data-kind") == "referral"
     # Default fixture: age_groups=["adults_25_64"], gender="prefer_not_to_say".
     # State (IL) lives in the demographics location chunk, not the header.
-    assert item.css_first("header.post-header a").text().strip() == "Adult (25–64)"
+    assert item.css_first("header.entity-header a").text().strip() == "Adult (25–64)"
 
 
 async def test_get_referral_detail_renders(
@@ -2226,7 +2232,7 @@ async def test_list_renders_opening_row(
     item = tree.css_first("#posts-list > article")
     assert item is not None
     assert item.attributes.get("data-kind") == "opening"
-    assert practice_name in item.css_first("header.post-header a").text()
+    assert practice_name in item.css_first("header.entity-header a").text()
 
 
 async def test_get_opening_detail_renders(
