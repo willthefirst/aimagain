@@ -641,47 +641,54 @@ async def test_detail_renders_breadcrumb(
     assert items[-1].css_first("a") is None
 
 
-async def test_detail_renders_kind_chip_in_header(
+async def test_detail_omits_kind_chip_and_meta_line(
     authenticated_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user: User,
 ):
-    """The detail page header carries the kind chip + posted-by/posted-
-    at metadata. App-wide H1 removal dropped the synthesized title
-    that used to mirror the listing row; the chip now carries the
-    "where am I" information."""
-    post = _client_referral_post(
-        description="header-echo",
+    """The detail page no longer renders a `data-kind-chip` "Seeking by
+    <user> · <date>" meta line — the breadcrumb above and the kind-
+    colored left edge already convey kind + collection context, so
+    repeating it as a chip in the card body is redundant."""
+    cr_post = _client_referral_post(
+        description="cr",
         owner_id=logged_in_user.id,
         location_city="Boise",
         location_state="ID",
     )
+    pa_post = _provider_availability_post(
+        practice_name=f"Practice-{uuid.uuid4()}", owner_id=logged_in_user.id
+    )
     async with db_test_session_manager() as session:
         async with session.begin():
-            session.add(post)
-        await session.refresh(post)
-        post_id = post.id
+            session.add(pa_post.provider_availability_detail.provider)
+            session.add(cr_post)
+            session.add(pa_post)
+        await session.refresh(cr_post)
+        await session.refresh(pa_post)
 
-    response = await authenticated_client.get(f"/posts/{post_id}")
-    assert response.status_code == 200
-    tree = HTMLParser(response.text)
-    chip = tree.css_first("article [data-kind-chip]")
-    assert chip is not None
-    assert chip.attributes.get("data-kind-chip") == "client_referral"
-    assert chip.text(strip=True) == "Seeking"
+    for post_id in (cr_post.id, pa_post.id):
+        response = await authenticated_client.get(f"/posts/{post_id}")
+        assert response.status_code == 200
+        tree = HTMLParser(response.text)
+        assert tree.css_first("article [data-kind-chip]") is None
+        assert tree.css_first("article .post-meta") is None
 
 
-async def test_detail_provider_availability_uses_providing_label(
+async def test_detail_age_label_is_singular_for_cr_and_appears_once(
     authenticated_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user: User,
 ):
-    """The provider_availability detail header uses the standardized
-    `Providing` chip — matched to the listing row, replacing the
-    earlier `Offering` label."""
-    practice_name = f"Practice-{uuid.uuid4()}"
-    post = _provider_availability_post(
-        practice_name=practice_name, owner_id=logged_in_user.id
+    """A `client_referral` post represents one seeker, so the
+    demographics row labels their age cohort as ``Age`` (singular) and
+    renders the row exactly once. The duplicate row that existed pre-
+    refactor (one from the location/age elif, one from a CR-specific
+    expanded block) was a bug."""
+    post = _client_referral_post(
+        description="age-label",
+        owner_id=logged_in_user.id,
+        age_groups=["adults_25_64"],
     )
     async with db_test_session_manager() as session:
         async with session.begin():
@@ -692,9 +699,41 @@ async def test_detail_provider_availability_uses_providing_label(
     response = await authenticated_client.get(f"/posts/{post_id}")
     assert response.status_code == 200
     tree = HTMLParser(response.text)
-    chip = tree.css_first("article [data-kind-chip]")
-    assert chip is not None
-    assert chip.text(strip=True) == "Providing"
+    labels = [
+        dt.text(strip=True) for dt in tree.css("article section.post-facts dl dt")
+    ]
+    assert labels.count("Age") == 1
+    assert "Ages" not in labels
+
+
+async def test_detail_ages_label_is_plural_for_pa_and_appears_once(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user: User,
+):
+    """A `provider_availability` post advertises a cohort the practice
+    accepts, so the demographics row labels it ``Ages`` (plural) and
+    renders the row exactly once."""
+    post = _provider_availability_post(
+        practice_name=f"Practice-{uuid.uuid4()}",
+        owner_id=logged_in_user.id,
+        age_groups=["adolescents_14_18", "adults_25_64"],
+    )
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            session.add(post.provider_availability_detail.provider)
+            session.add(post)
+        await session.refresh(post)
+        post_id = post.id
+
+    response = await authenticated_client.get(f"/posts/{post_id}")
+    assert response.status_code == 200
+    tree = HTMLParser(response.text)
+    labels = [
+        dt.text(strip=True) for dt in tree.css("article section.post-facts dl dt")
+    ]
+    assert labels.count("Ages") == 1
+    assert "Age" not in labels
 
 
 async def test_list_posts_empty(
@@ -1770,7 +1809,11 @@ async def test_get_client_referral_detail_renders(
     assert response.status_code == 200
     page = response.text
     assert description in page
-    assert author.username in page
+    # The author's username no longer renders on the detail page —
+    # the redundant meta line ("Seeking by <user> · <date>") was
+    # removed; the author's identity surfaces only via the
+    # mailto: link in the footer (`post.owner.email`, not username).
+    assert author.email in page
 
 
 async def test_owner_can_open_client_referral_edit_form(
@@ -2229,7 +2272,11 @@ async def test_get_provider_availability_detail_renders(
     assert response.status_code == 200
     page = response.text
     assert practice_name in page
-    assert author.username in page
+    # The author's username no longer renders on the detail page —
+    # the redundant meta line ("Providing by <user> · <date>") was
+    # removed; the author's identity surfaces only via the
+    # mailto: link in the footer (`post.owner.email`, not username).
+    assert author.email in page
 
 
 async def test_owner_can_open_provider_availability_edit_form(
