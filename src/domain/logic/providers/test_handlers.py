@@ -29,13 +29,13 @@ from src.domain.logic.providers.schema import (
 )
 from src.domain.logic.users.repository import UserRepository
 from src.domain.models import (
-    AuditLog,
     Provider,
     ProviderLicensure,
     User,
 )
 from src.domain.specs.provider import PROVIDER_ENTITY
 from src.framework.audit.core import AuditAction
+from src.framework.audit.log import AuditLog
 from src.framework.audit.repository import AuditRepository
 from src.framework.dispatch.handlers import handle_create, handle_detail, handle_list
 from src.framework.http.exceptions import ForbiddenError, NotFoundError

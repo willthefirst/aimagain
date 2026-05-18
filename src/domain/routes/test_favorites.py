@@ -14,7 +14,8 @@ from selectolax.parser import HTMLParser
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from src.domain.models import AuditLog, User, UserFavorite
+from src.domain.models import User, UserFavorite
+from src.framework.audit.log import AuditLog
 from tests.helpers import create_test_user, make_provider_with_org
 
 pytestmark = pytest.mark.asyncio
