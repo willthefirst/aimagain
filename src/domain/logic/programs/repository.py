@@ -14,6 +14,7 @@ from sqlalchemy import select
 
 from src.domain.models import Program
 from src.framework.persistence.base_repository import BaseRepository
+from src.framework.persistence.dependencies import register_repository
 
 
 class ProgramRepository(BaseRepository):
@@ -31,3 +32,6 @@ class ProgramRepository(BaseRepository):
             .order_by(Program.created_at.desc())
         )
         return await self._list(stmt)
+
+
+get_program_repository = register_repository(ProgramRepository)

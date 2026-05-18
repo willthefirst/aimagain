@@ -1,15 +1,24 @@
 """FastAPI Depends resolvers for every repository class.
 
-Each repository takes the same constructor — a single ``AsyncSession`` —
-so the resolver shape is identical across entities. The resolvers are
-built once via :func:`_make_repo_resolver` rather than written by hand;
-adding a new repository class is a single entry in :data:`_REPO_TYPES`.
+Every repository takes the same constructor — a single ``AsyncSession`` —
+so the resolver shape is identical across entities. The factory function
+:func:`make_repo_resolver` is the single home for that shape.
 
-The public ``get_<entity>_repository`` names exist as module-level
-bindings so spec files (``src/domain/specs/<entity>.py``) keep
-importing them directly. The type → resolver registry is built from
-the same source, so a generated resolver and its registry entry can't
-drift.
+Two ways an entity hooks itself in:
+
+* **Domain repositories** call :func:`register_repository` at module load
+  (see ``src/domain/logic/<entity>/repository.py``). The call returns the
+  generated ``Depends`` provider; the repo module binds it to a
+  public ``get_<entity>_repository`` name so spec files can
+  ``from src.domain.logic.<entity>.repository import get_<entity>_repository``.
+* **Framework-owned repositories** (`BaseRepository`, `AuditRepository`)
+  are registered here directly — they live under ``framework/`` and the
+  registration call belongs in the same package.
+
+The registry is what the dispatch synthesis reads via
+:func:`resolver_for` to inject extra typed repos automatically. Without
+registration, the synthesis raises :class:`UnknownRepoTypeError` at app
+startup — a forgotten registration never reaches request-handling.
 """
 
 import re
@@ -19,16 +28,8 @@ from fastapi import Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.db import get_db_session
-from src.domain.logic.favorites.repository import UserFavoriteRepository
-from src.domain.logic.organizations.repository import OrganizationRepository
-from src.domain.logic.posts.repository import PostRepository
-from src.domain.logic.programs.repository import ProgramRepository
-from src.domain.logic.providers.repository import ProviderRepository
-from src.domain.logic.users.repository import UserRepository
-from src.domain.logic.verifications.repository import VerificationRepository
 from src.framework.audit.repository import AuditRepository
-
-from .base_repository import BaseRepository
+from src.framework.persistence.base_repository import BaseRepository
 
 _CAMEL_TO_SNAKE_RE = re.compile(r"(?<!^)(?=[A-Z])")
 
@@ -38,12 +39,12 @@ def _camel_to_snake(name: str) -> str:
     return _CAMEL_TO_SNAKE_RE.sub("_", name).lower()
 
 
-def _make_repo_resolver(cls: type[BaseRepository]) -> Callable[..., Any]:
+def make_repo_resolver(cls: type[BaseRepository]) -> Callable[..., Any]:
     """Build a FastAPI ``Depends``-style resolver for `cls`.
 
-    Every repository's constructor is ``cls(session: AsyncSession)``, so
-    the resolver body is identical — wrap that single call in a closure
-    that FastAPI's dep system can `Depends(...)`.
+    Public so domain repository modules can build their own resolver if
+    they prefer to register and bind in two separate steps. Most callers
+    use :func:`register_repository` instead, which does both.
     """
 
     def _resolver(session: AsyncSession = Depends(get_db_session)) -> Any:
@@ -55,50 +56,43 @@ def _make_repo_resolver(cls: type[BaseRepository]) -> Callable[..., Any]:
     return _resolver
 
 
-# Single source of truth for "which repository classes participate in
-# dep injection." Adding a new repo class means one entry here plus the
-# matching public-name binding below; the registry stays in sync because
-# it is built from this tuple.
-_REPO_TYPES: tuple[type[BaseRepository], ...] = (
-    UserRepository,
-    BaseRepository,
-    AuditRepository,
-    ProviderRepository,
-    UserFavoriteRepository,
-    PostRepository,
-    OrganizationRepository,
-    ProgramRepository,
-    VerificationRepository,
-)
-
-
 # Type → resolver registry consumed by the mount-layer signature
-# synthesis (see ``src/framework/dispatch/resource_routes.py``). A handler param
-# typed ``repo: ProviderRepository`` resolves to
+# synthesis (see ``src/framework/dispatch/resource_routes.py``). A handler
+# param typed ``repo: ProviderRepository`` resolves to
 # ``Depends(_REPO_TYPE_RESOLVERS[ProviderRepository])`` automatically.
-_REPO_TYPE_RESOLVERS: dict[type, Callable[..., Any]] = {
-    cls: _make_repo_resolver(cls) for cls in _REPO_TYPES
-}
+_REPO_TYPE_RESOLVERS: dict[type, Callable[..., Any]] = {}
 
 
-# Public symbols — direct bindings to the generated resolvers so spec
-# files can ``from src.framework.persistence.dependencies import get_X_repository``
-# the same way they always have.
-get_user_repository = _REPO_TYPE_RESOLVERS[UserRepository]
-get_base_repository = _REPO_TYPE_RESOLVERS[BaseRepository]
-get_audit_repository = _REPO_TYPE_RESOLVERS[AuditRepository]
-get_provider_repository = _REPO_TYPE_RESOLVERS[ProviderRepository]
-get_user_favorite_repository = _REPO_TYPE_RESOLVERS[UserFavoriteRepository]
-get_post_repository = _REPO_TYPE_RESOLVERS[PostRepository]
-get_organization_repository = _REPO_TYPE_RESOLVERS[OrganizationRepository]
-get_program_repository = _REPO_TYPE_RESOLVERS[ProgramRepository]
-get_verification_repository = _REPO_TYPE_RESOLVERS[VerificationRepository]
+def register_repository(cls: type[BaseRepository]) -> Callable[..., Any]:
+    """Register `cls` for FastAPI dep injection and return the resolver.
+
+    Called from each ``src/domain/logic/<entity>/repository.py`` after
+    the class is declared::
+
+        class ProviderRepository(BaseRepository):
+            ...
+
+        get_provider_repository = register_repository(ProviderRepository)
+
+    Spec files then ``from .repository import get_provider_repository``.
+    Returning the resolver lets the caller do register-and-bind in one
+    line; the value is also accessible later via :func:`resolver_for`.
+    """
+    resolver = make_repo_resolver(cls)
+    _REPO_TYPE_RESOLVERS[cls] = resolver
+    return resolver
+
+
+# Framework-owned repositories register at module load — they live under
+# ``framework/`` so this is the canonical site, not a re-export.
+get_base_repository = register_repository(BaseRepository)
+get_audit_repository = register_repository(AuditRepository)
 
 
 class UnknownRepoTypeError(KeyError):
     """Raised when a handler asks for a repo type that is not in
-    `_REPO_TYPE_RESOLVERS`. The error names the type and points at this
-    module so the fix is obvious."""
+    `_REPO_TYPE_RESOLVERS`. The error names the type and points at
+    `register_repository` so the fix is obvious."""
 
 
 def resolver_for(repo_type: type) -> Callable[..., Any]:
@@ -106,13 +100,14 @@ def resolver_for(repo_type: type) -> Callable[..., Any]:
 
     Raises `UnknownRepoTypeError` with a clear message if the type is not
     registered. The mount layer surfaces this at app startup, so a
-    forgotten registry entry fails before serving traffic.
+    forgotten registration fails before serving traffic.
     """
     try:
         return _REPO_TYPE_RESOLVERS[repo_type]
     except KeyError:
         raise UnknownRepoTypeError(
             f"No Depends resolver registered for repository type "
-            f"{repo_type!r}. Add an entry to `_REPO_TYPES` in "
-            f"src/framework/persistence/dependencies.py."
+            f"{repo_type!r}. The owning repository module should call "
+            f"`register_repository({repo_type.__name__})` after the class "
+            f"declaration."
         ) from None

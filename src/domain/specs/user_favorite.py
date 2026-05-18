@@ -24,6 +24,7 @@ mount helpers later; A4 doesn't.
 
 from typing import Final
 
+from src.domain.logic.favorites.repository import get_user_favorite_repository
 from src.domain.logic.favorites.schema import UserFavoriteAuditSnapshot
 from src.domain.models import UserFavorite
 from src.domain.specs.provider import PROVIDER_ENTITY
@@ -37,7 +38,6 @@ from src.framework.dispatch.entity_spec import (
     RouteSet,
     Templates,
 )
-from src.framework.persistence.dependencies import get_user_favorite_repository
 
 FAVORITE_EDGE_AUDIT: Final[EdgeAudit] = EdgeAudit(
     resource_type="user_favorite",

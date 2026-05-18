@@ -10,6 +10,7 @@ from src.domain.models import (
     User,
 )
 from src.framework.persistence.base_repository import BaseRepository
+from src.framework.persistence.dependencies import register_repository
 
 
 class PostRepository(BaseRepository):
@@ -142,3 +143,6 @@ def _json_array_contains_any(values: list[str], column_name: str):
         token = f'%"{v}"%'
         clauses.append(or_(cr_col.like(token), pa_col.like(token)))
     return or_(*clauses)
+
+
+get_post_repository = register_repository(PostRepository)

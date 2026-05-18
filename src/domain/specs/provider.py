@@ -20,6 +20,7 @@ from typing import Final
 
 from src.domain.logic.favorites.repository import UserFavoriteRepository
 from src.domain.logic.organizations.repository import OrganizationRepository
+from src.domain.logic.providers.repository import get_provider_repository
 from src.domain.logic.providers.schema import (
     ProviderCreate,
     ProviderRead,
@@ -43,7 +44,6 @@ from src.framework.dispatch.entity_spec import (
     RouteSet,
 )
 from src.framework.dispatch.filters import ChoiceFilter
-from src.framework.persistence.dependencies import get_provider_repository
 
 # After create or update, redirect to the edit form so the user can
 # keep editing the parent + its credentials. The same callable is reused

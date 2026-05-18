@@ -5,6 +5,7 @@ from sqlalchemy import select
 
 from src.domain.models import Provider, ProviderLicensure
 from src.framework.persistence.base_repository import BaseRepository
+from src.framework.persistence.dependencies import register_repository
 
 
 class ProviderRepository(BaseRepository):
@@ -86,3 +87,6 @@ class ProviderRepository(BaseRepository):
     # The framework's `handle_create` calls `repo.create(Provider(...))`
     # (the public alias on `BaseRepository`) directly — no `create_provider`
     # wrapper needed. Inline credential rows append via `repo.add_child`.
+
+
+get_provider_repository = register_repository(ProviderRepository)
