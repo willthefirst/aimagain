@@ -60,9 +60,7 @@ def test_form_route_literal_matches_registry():
     `POST_KIND_NAMES` drifting from the route's accepted-kinds list."""
     import inspect
 
-    routes = [
-        r for r in posts_routes.posts_api_router.routes if r.path == "/posts/form"
-    ]
+    routes = [r for r in posts_routes.router.router.routes if r.path == "/posts/form"]
     assert len(routes) == 1, "expected exactly one /posts/form route"
     params = inspect.signature(routes[0].endpoint).parameters
     # Optional[Literal[...]] → Union[Literal[...], None] → args are

@@ -111,14 +111,10 @@ def make_entity_router(entity: "EntitySpec") -> BaseRouter:
     ``/users/me/favorites``) set ``prefix_override`` on the spec.
     Default tags are ``[entity.url_collection]``.
 
-    Replaces the 4-line scaffold that every route file used to repeat:
-
-        users_api_router = APIRouter(prefix="/users")
-        router = BaseRouter(router=users_api_router, default_tags=["users"])
-
-    Route files now do ``router = make_entity_router(USER_ENTITY)``; the
-    underlying ``APIRouter`` is accessible as ``router.router`` for
-    ``app.include_router(...)`` in ``main.py``.
+    Route files don't call this directly — they call
+    :func:`src.framework.dispatch.registry.register_entity`, which wraps
+    this helper with the registry append. See that function's docstring
+    for the full lifecycle.
     """
     prefix = (
         entity.prefix_override

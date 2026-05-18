@@ -1,9 +1,8 @@
 from src.domain.specs.post import POST_ENTITY
-from src.framework import make_entity_router
+from src.framework.dispatch.registry import register_entity
 from src.framework.dispatch.resource_routes import mount_entity
 
-router = make_entity_router(POST_ENTITY)
-posts_api_router = router.router
+router = register_entity(POST_ENTITY)
 
 
 # Every verb is factory-built. The `post_kinds` tuple the list page

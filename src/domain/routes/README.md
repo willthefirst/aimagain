@@ -6,18 +6,17 @@ The URL shape, lifecycle, and subresource conventions every resource MUST follow
 
 ## Adding a CRUD resource
 
-1. Declare the spec in [`../specs/<entity>.py`](../specs/) with a colocated `test_<entity>.py`.
-2. Create `<entity>.py` here. Call `mount_entity` once; framework verbs auto-bind via `make_<verb>_handler(<ENTITY>_ENTITY)` and get stitched onto the route module as `_handle_<verb>_<entity>` for contract-test patches.
-3. Register the router in [`../../main.py`](../../main.py). Order matters when literal segments would shadow parametric ones.
+1. Declare the spec in [`../specs/<entity>.py`](../specs/) with a colocated `test_<entity>.py`, and add it to the `ALL_ENTITY_SPECS` re-export in [`../specs/__init__.py`](../specs/__init__.py).
+2. Create `<entity>.py` here. Call `register_entity(<ENTITY>_ENTITY)` (returns a `BaseRouter`) and `mount_entity(...)`. The `register_entity` call wraps `make_entity_router` and appends `(spec, router)` to the framework's [`entity_registry`](../../framework/dispatch/registry.py) — `main.py` iterates that registry once, so there is no per-entity `include_router(...)` line to add.
+3. Add the new module to the import list in [`__init__.py`](__init__.py); the explicit imports are what trigger the `register_entity` side effect.
 4. Add `test_<entity>.py` for resource-specific behavior (the framework verbs are already covered under [`../../framework/dispatch/`](../../framework/dispatch/)).
 
 ```python
-from src.framework import make_entity_router
-from src.framework.dispatch.resource_routes import mount_entity
 from src.domain.specs.<entity> import <ENTITY>_ENTITY
+from src.framework.dispatch.registry import register_entity
+from src.framework.dispatch.resource_routes import mount_entity
 
-router = make_entity_router(<ENTITY>_ENTITY)
-<entity>_api_router = router.router
+router = register_entity(<ENTITY>_ENTITY)
 
 mount_entity(router, <ENTITY>_ENTITY)
 ```
