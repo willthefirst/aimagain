@@ -1784,6 +1784,139 @@ async def test_make_new_form_handler_delegates_to_handle_get_new_form():
     assert context["current_user"] is user
 
 
+# --- form_extras (create- + edit-form extras) framework tests ------------
+
+
+@pytest.mark.asyncio
+async def test_new_form_invokes_form_extras_with_target_none():
+    """`handle_get_new_form` calls the `extras` callable with
+    `target=None` (no row is loaded on the create path) and merges the
+    returned dict into the context."""
+    captured: dict[str, Any] = {}
+
+    async def extras(**kwargs):
+        captured.update(kwargs)
+        return {"orgs": ["a", "b"]}
+
+    spec = EntitySpec(
+        name="widget",
+        url_collection="widgets",
+        id_param="widget_id",
+        model=_FixtureRow,
+        audit=_audit(),
+        create_adapter=_FormSchema,
+        routes=RouteSet(create=True, form_new=True),
+    )
+    user = _user()
+    request = SimpleNamespace()
+
+    context = await handle_get_new_form(
+        spec,
+        request=request,
+        requesting_user=user,
+        extras=extras,
+        extra_kwargs={"organization_repo": "REPO_SENTINEL"},
+    )
+
+    assert captured["target"] is None
+    assert captured["request"] is request
+    assert captured["requesting_user"] is user
+    assert captured["organization_repo"] == "REPO_SENTINEL"
+    assert context["orgs"] == ["a", "b"]
+
+
+@pytest.mark.asyncio
+async def test_edit_form_invokes_form_extras_with_target_row():
+    """`handle_get_edit_form` calls the `extras` callable with the
+    loaded row bound to `target` and merges the returned dict into the
+    context (last-write-wins over spec.static_context)."""
+    captured: dict[str, Any] = {}
+
+    async def extras(**kwargs):
+        captured.update(kwargs)
+        return {"orgs": ["x"]}
+
+    spec = _top_level_spec(write_authz=None)
+    target_id = uuid4()
+    target = _FixtureRow(id=target_id)
+    repo = _FakeRepo()
+    repo.seed(_FixtureRow, target)
+    user = _user()
+    request = SimpleNamespace()
+
+    context = await handle_get_edit_form(
+        spec,
+        request=request,
+        target_id=target_id,
+        repo=repo,
+        requesting_user=user,
+        extras=extras,
+        extra_kwargs={"organization_repo": "REPO_SENTINEL"},
+    )
+
+    assert captured["target"] is target
+    assert captured["request"] is request
+    assert captured["requesting_user"] is user
+    assert captured["organization_repo"] == "REPO_SENTINEL"
+    assert context["orgs"] == ["x"]
+    assert context["widget"] is target
+
+
+def test_make_edit_form_handler_includes_extra_repos_in_signature():
+    """`extra_repos=` declared on the factory adds typed-repo kwargs to
+    the synthesized signature so FastAPI's DI can resolve them."""
+
+    class _RepoMarker:
+        pass
+
+    spec = EntitySpec(
+        name="widget",
+        url_collection="widgets",
+        id_param="widget_id",
+        model=_FixtureRow,
+        audit=_audit(),
+    )
+
+    async def extras(**_):
+        return {}
+
+    handler = make_edit_form_handler(
+        spec,
+        extras=extras,
+        extra_repos=(("organization_repo", _RepoMarker),),
+    )
+    sig = inspect.signature(handler)
+    assert "organization_repo" in sig.parameters
+    assert sig.parameters["organization_repo"].annotation is _RepoMarker
+
+
+def test_make_new_form_handler_includes_extra_repos_in_signature():
+    class _RepoMarker:
+        pass
+
+    spec = EntitySpec(
+        name="widget",
+        url_collection="widgets",
+        id_param="widget_id",
+        model=_FixtureRow,
+        audit=_audit(),
+        create_adapter=_FormSchema,
+        routes=RouteSet(create=True, form_new=True),
+    )
+
+    async def extras(**_):
+        return {}
+
+    handler = make_new_form_handler(
+        spec,
+        extras=extras,
+        extra_repos=(("organization_repo", _RepoMarker),),
+    )
+    sig = inspect.signature(handler)
+    assert "organization_repo" in sig.parameters
+    assert sig.parameters["organization_repo"].annotation is _RepoMarker
+
+
 # --- handle_detail framework tests ---------------------------------------
 
 
