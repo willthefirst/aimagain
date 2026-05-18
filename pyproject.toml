@@ -104,6 +104,8 @@ markers = [
     "users: contract pairs whose provider is `users-api`",
     "posts: contract pairs whose provider is `posts-api`",
     "providers: contract pairs whose provider is `providers-api`",
+    "organizations: contract pairs whose provider is `organizations-api`",
+    "programs: contract pairs whose provider is `programs-api`",
 ]
 
 [tool.title-case-check]

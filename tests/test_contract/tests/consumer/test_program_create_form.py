@@ -1,0 +1,115 @@
+"""Consumer contract: filling and submitting the program create form.
+
+Verifies that the HTMX-decorated form rendered by
+`templates/programs/form_new.html` (mounted via the `program_create_form`
+stub on the consumer server) issues a `POST /programs` form-encoded
+request with the field names and shapes the route's `ProgramCreate`
+schema expects. The form's `org_id` dropdown is populated by
+`program_form_extras` in production (scoped to the user's owned Orgs);
+the stub seeds one Org so the pact body is deterministic.
+
+`description` (optional text) is left blank — the browser still
+submits ``description=`` and the schema's ``StrippedOptionalText``
+coerces it to ``None``.
+
+`start_date` / `end_date` are filled with concrete dates rather than
+left blank: a blank text input posts ``start_date=`` (empty string),
+which `date | None` rejects with a 422 — the same class of bug as the
+fixed-in-#550 `parent_org_id` 422, here lurking on the date fields.
+Tracked separately (see issue #551, which broadens to nullable dates).
+"""
+
+import pytest
+from pact import Like
+from playwright.async_api import Page
+
+from tests.test_contract.constants import (
+    CONSUMER_NAME_PROGRAM_CREATE_FORM,
+    NETWORK_TIMEOUT_MS,
+    PACT_PORT_PROGRAM_CREATE,
+    PROGRAM_CREATE_API_PATH,
+    PROGRAM_CREATE_FORM_PAGE_PATH,
+    PROVIDER_NAME_PROGRAMS,
+    PROVIDER_STATE_USER_CAN_CREATE_PROGRAM,
+    STUB_PROGRAM_FORM_ORG_ID,
+)
+from tests.test_contract.tests.shared.helpers import (
+    setup_pact,
+    setup_playwright_pact_interception,
+)
+
+
+@pytest.mark.parametrize(
+    "origin_with_routes",
+    [{"program_create_form": True, "auth_pages": False}],
+    indirect=True,
+)
+@pytest.mark.asyncio(loop_scope="session")
+async def test_consumer_program_create_form_submits(
+    origin_with_routes: str, page: Page
+):
+    """Fill the create form on the stubbed page; assert the intercepted
+    request matches the contracted shape."""
+    pact = setup_pact(
+        CONSUMER_NAME_PROGRAM_CREATE_FORM,
+        PROVIDER_NAME_PROGRAMS,
+        port=PACT_PORT_PROGRAM_CREATE,
+    )
+    mock_server_uri = pact.uri
+    form_page_url = f"{origin_with_routes}{PROGRAM_CREATE_FORM_PAGE_PATH}"
+    full_mock_url = f"{mock_server_uri}{PROGRAM_CREATE_API_PATH}"
+
+    expected_request_headers = {
+        "Content-Type": Like("application/x-www-form-urlencoded")
+    }
+    # DOM-order field serialization. The radio `accepting_referrals`
+    # is pre-checked at "true" by the template (`current=true`), so it
+    # submits without user interaction. Dates are real values, not
+    # blanks — see module docstring.
+    expected_request_body = (
+        f"org_id={STUB_PROGRAM_FORM_ORG_ID}"
+        "&name=Intensive+Outpatient"
+        "&description="
+        "&state_preference=NY"
+        "&start_date=2026-06-01"
+        "&end_date=2026-12-31"
+        "&accepting_referrals=true"
+    )
+
+    (
+        pact.given(PROVIDER_STATE_USER_CAN_CREATE_PROGRAM)
+        .upon_receiving("a request to create a program via web form")
+        .with_request(
+            method="POST",
+            path=PROGRAM_CREATE_API_PATH,
+            headers=expected_request_headers,
+            body=expected_request_body,
+        )
+        .will_respond_with(
+            status=201,
+            headers={"HX-Redirect": Like("/programs/abc/form")},
+            body={"id": Like("99999999-9999-9999-9999-999999999999")},
+        )
+    )
+
+    await setup_playwright_pact_interception(
+        page=page,
+        api_path_to_intercept=PROGRAM_CREATE_API_PATH,
+        mock_pact_url=full_mock_url,
+        http_method="POST",
+    )
+
+    with pact:
+        await page.goto(form_page_url)
+        await page.wait_for_selector('select[name="org_id"]')
+        await page.locator('select[name="org_id"]').select_option(
+            str(STUB_PROGRAM_FORM_ORG_ID)
+        )
+        await page.locator('input[name="name"]').fill("Intensive Outpatient")
+        await page.locator('select[name="state_preference"]').select_option("NY")
+        await page.locator('input[name="start_date"]').fill("2026-06-01")
+        await page.locator('input[name="end_date"]').fill("2026-12-31")
+        await page.locator("button[type='submit']").click()
+        await page.wait_for_timeout(NETWORK_TIMEOUT_MS)
+
+    # Pact verification happens automatically on context exit.
