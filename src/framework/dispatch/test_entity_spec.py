@@ -716,6 +716,42 @@ def test_search_template_default_by_convention():
     assert spec.templates.search == "widgets/search.html"
 
 
+def test_payload_authz_path_without_create_or_update_route_raises():
+    """`payload_authz` fires from `handle_create` / `handle_update`;
+    declaring a path on a spec that opts into neither verb is dead
+    config — surface at construction time."""
+    with pytest.raises(ValueError, match="payload_authz_path"):
+        _make_spec(
+            routes=RouteSet(),  # neither create nor update
+            payload_authz_path="some.module.fn",
+        )
+
+
+def test_payload_authz_repos_without_path_raises():
+    """`payload_authz_repos` without `payload_authz_path` is dead config
+    — the typed-repo kwargs would have no consumer. Mirrors the
+    extras_repos guard."""
+    with pytest.raises(ValueError, match="payload_authz_repos"):
+        _make_spec(
+            routes=RouteSet(create=True),
+            create_adapter=_DummyBody,
+            payload_authz_repos=(("x", SimpleNamespace),),
+        )
+
+
+def test_payload_authz_path_with_create_route_constructs():
+    """Happy path: `payload_authz_path` + `payload_authz_repos` declared
+    alongside an opted-in create route — fields round-trip onto the spec."""
+    spec = _make_spec(
+        routes=RouteSet(create=True),
+        create_adapter=_DummyBody,
+        payload_authz_path="some.module.fn",
+        payload_authz_repos=(("organization_repo", SimpleNamespace),),
+    )
+    assert spec.payload_authz_path == "some.module.fn"
+    assert spec.payload_authz_repos == (("organization_repo", SimpleNamespace),)
+
+
 def test_to_resource_spec_walks_parent_chain():
     """`to_resource_spec()` on a child propagates the parent chain so
     the mount layer can build nested paths."""
