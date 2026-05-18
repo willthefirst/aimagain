@@ -216,13 +216,13 @@ async def test_list_opening_item_shape(
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user: User,
 ):
-    """A `opening` card header is `{practice_name},
-    {state} ({format})` — PA posts identify by their practice, so the
-    practice name fills the title slot (the `Provider Availability`
-    kind label would be redundant noise). Kind is signaled by the
-    `data-kind` left-edge color, not a text chip. Insurance posture
-    is rendered in the demographics column, derived from the linked
-    provider's `in_network_carriers` (non-empty wins the badge)."""
+    """An `opening` card header is just the practice name —
+    location surfaces via the icon-only `entity-location` row in the
+    demographics column (same treatment referral cards use), not in
+    the header line. Kind is signaled by the `data-kind` left-edge
+    color, not a text chip. Insurance posture is rendered in the
+    demographics column, derived from the linked provider's
+    `in_network_carriers` (non-empty wins the badge)."""
     author = create_test_user(username=f"author-{uuid.uuid4()}")
     practice_name = f"Practice-{uuid.uuid4()}"
     post = _opening_post(
@@ -256,12 +256,16 @@ async def test_list_opening_item_shape(
     # No text kind-chip in the listing row.
     assert item.css_first("[data-kind-chip]") is None
 
-    # Header link text: practice name + state. The in-person posture
-    # renders as a `<span.post-modality>` chip (icon + label) next to
-    # the link; virtual=no, so no virtual chip.
+    # Header link text: just the practice name (location moves to the
+    # demographics column via `entity-location`). The in-person
+    # posture renders as a `<span.post-modality>` chip (icon + label)
+    # next to the link; virtual=no, so no virtual chip.
     lead = item.css_first("header.entity-header a")
     assert lead is not None
-    assert lead.text(strip=True) == f"{practice_name}, OR"
+    assert lead.text(strip=True) == practice_name
+    location_row = item.css_first("section.entity-facts dl > div.entity-location")
+    assert location_row is not None
+    assert "Portland, OR" in location_row.text()
     modality_chips = [
         chip.text(strip=True)
         for chip in item.css("header.entity-header > .post-modality")
@@ -413,9 +417,13 @@ async def test_list_demographics_diverge_by_kind(
     assert (
         cr_card.css_first("section.entity-facts dl > div.entity-location") is not None
     )
-    # PA carries the cohort chunk; no location row.
+    # PA carries the cohort chunk AND the icon-only location row
+    # (same shape as CR's location chunk) — both kinds locate their
+    # location in the demographics column for visual consistency.
     assert "Ages" in pa_labels and "Age" not in pa_labels
-    assert pa_card.css_first("section.entity-facts dl > div.entity-location") is None
+    assert (
+        pa_card.css_first("section.entity-facts dl > div.entity-location") is not None
+    )
 
 
 async def test_list_pa_footer_carries_email_cta_only(
