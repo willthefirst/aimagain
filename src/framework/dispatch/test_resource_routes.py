@@ -1111,6 +1111,13 @@ async def _stub_form_extras(**_kw):
     return {}
 
 
+async def _stub_payload_authz(**_kw):
+    """Module-level callable targeted via `payload_authz_path` in the
+    `payload_authz` wiring tests. Real attribute (not a lambda) so
+    `importlib.import_module` + `getattr` can find it."""
+    return None
+
+
 def _stub_audit() -> _AuditedResource:
     return _AuditedResource(
         type="thing",
@@ -1918,6 +1925,106 @@ def test_spec_form_extras_repos_without_path_raises():
             templates=_Templates(form_new="w/new.html"),
             form_extras_repos=(("x", UserRepository),),
         )
+
+
+def test_mount_entity_resolves_payload_authz_path():
+    """`payload_authz_path` on the spec resolves via `importlib` at
+    mount time and threads into the factory-built create handler; the
+    synthesis adds the typed-repo kwargs (from `payload_authz_repos`)
+    to the built handler's signature."""
+    from pydantic import TypeAdapter
+
+    spec = _EntitySpec(
+        name="widget",
+        url_collection="widgets",
+        id_param="widget_id",
+        model=SimpleNamespace,
+        audit=_stub_audit(),
+        routes=_RouteSet(create=True),
+        create_adapter=TypeAdapter(_AxisBody),
+        payload_authz_path=f"{__name__}._stub_payload_authz",
+        payload_authz_repos=(("organization_repo", UserRepository),),
+    )
+
+    captured, restore = _capture_top_level_mounts()
+    try:
+        mount_entity(None, spec, handlers={})
+    finally:
+        restore()
+
+    create_handler = next(k["handler"] for n, k in captured if n == "mount_create")
+    import inspect as _inspect
+
+    params = _inspect.signature(create_handler).parameters
+    assert "organization_repo" in params
+
+
+def test_mount_entity_payload_authz_with_explicit_create_handler_raises():
+    """`payload_authz_path` is for the factory-built path; declaring it
+    on the spec alongside an explicit `handlers["create"]` is
+    ambiguous (the explicit handler would silently bypass the hook)."""
+    from pydantic import TypeAdapter
+
+    spec = _EntitySpec(
+        name="widget",
+        url_collection="widgets",
+        id_param="widget_id",
+        model=SimpleNamespace,
+        audit=_stub_audit(),
+        routes=_RouteSet(create=True),
+        create_adapter=TypeAdapter(_AxisBody),
+        payload_authz_path=f"{__name__}._stub_payload_authz",
+    )
+
+    async def my_create(**_kw):  # pragma: no cover
+        return None
+
+    with pytest.raises(ValueError, match="payload_authz_path"):
+        mount_entity(None, spec, handlers={"create": my_create})
+
+
+def test_mount_entity_payload_authz_with_explicit_update_handler_raises():
+    """Same guard for update — declaring `payload_authz_path` alongside
+    an explicit `handlers['update']` is rejected."""
+    from pydantic import TypeAdapter
+
+    spec = _EntitySpec(
+        name="widget",
+        url_collection="widgets",
+        id_param="widget_id",
+        model=SimpleNamespace,
+        audit=_stub_audit(),
+        routes=_RouteSet(update=True),
+        update_adapter=TypeAdapter(_AxisBody),
+        payload_authz_path=f"{__name__}._stub_payload_authz",
+    )
+
+    async def my_update(**_kw):  # pragma: no cover
+        return None
+
+    with pytest.raises(ValueError, match="payload_authz_path"):
+        mount_entity(None, spec, handlers={"update": my_update})
+
+
+def test_mount_entity_payload_authz_dotted_path_missing_attr_raises():
+    """Bad dotted path produces the standard error chain from
+    `_resolve_dotted_path` — same machinery `handler_path` /
+    `detail_extras_path` use."""
+    from pydantic import TypeAdapter
+
+    spec = _EntitySpec(
+        name="widget",
+        url_collection="widgets",
+        id_param="widget_id",
+        model=SimpleNamespace,
+        audit=_stub_audit(),
+        routes=_RouteSet(create=True),
+        create_adapter=TypeAdapter(_AxisBody),
+        payload_authz_path=f"{__name__}._does_not_exist_42",
+    )
+
+    with pytest.raises(AttributeError):
+        mount_entity(None, spec, handlers={})
 
 
 def test_mount_delete_404_propagates_from_handler():

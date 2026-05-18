@@ -102,6 +102,15 @@ PROVIDER_ENTITY: Final[EntitySpec] = EntitySpec(
     # edit path (target=<row>) — see `EntitySpec.form_extras_path`.
     form_extras_path="src.domain.logic.providers.handlers.provider_form_extras",
     form_extras_repos=(("organization_repo", OrganizationRepository),),
+    # Write-time check: a user may only attach a Provider to an Org they
+    # own (#524). Replaces the bespoke `handle_create_provider` /
+    # `handle_update_provider` PR #531 introduced as a workaround —
+    # the framework's `payload_authz` hook (#532) lets the rule live
+    # on the spec instead of duplicating the create/update wiring.
+    payload_authz_path=(
+        "src.domain.logic.providers.handlers._assert_provider_payload_org_ownership"
+    ),
+    payload_authz_repos=(("organization_repo", OrganizationRepository),),
     # Provider templates render credential-type display labels and the
     # tuples behind the filter/select dropdowns. Tying them to the spec
     # (instead of Jinja globals) means a new credential-type tuple

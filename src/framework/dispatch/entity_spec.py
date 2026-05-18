@@ -389,6 +389,49 @@ class EntitySpec:
     form_extras_path: str | None = None
     form_extras_repos: tuple[tuple[str, type], ...] = ()
 
+    # Write-time payload-FK authorization -------------------------------
+    # `payload_authz_path` is a dotted import path to an async callable
+    # invoked by `handle_create` / `handle_update` AFTER the parent /
+    # target row has been loaded and `write_authz` (which gates the
+    # target row itself) has run, and BEFORE the payload is used to
+    # build / patch the model. Use it to gate FKs *referenced in the
+    # payload* — e.g. "the requesting user must own the Org the
+    # payload's `org_id` points at." This is distinct from `write_authz`,
+    # which gates the target row; `payload_authz` runs in addition to,
+    # not instead of, `write_authz`.
+    #
+    # Contract of the callable:
+    #
+    #   async def hook(
+    #       *,
+    #       payload: BaseModel,             # the validated create/update payload
+    #       requesting_user: User,          # post-auth user
+    #       **typed_repos,                  # one kwarg per entry in payload_authz_repos
+    #   ) -> None:
+    #       ...
+    #
+    # Raises `ForbiddenError` / `NotFoundError` on rejection; returns
+    # `None` on success.
+    #
+    # Superuser bypass is the callable's responsibility. The framework
+    # does NOT short-circuit when `requesting_user.is_superuser` — each
+    # hook owns its own policy (e.g. "superusers may attach to any Org").
+    #
+    # `payload_authz_repos` declares typed repo kwargs the callable
+    # receives. Mirrors `detail_extras_repos` exactly: repository
+    # classes live below specs in the import order, so the type-class
+    # import is cycle-safe and the field carries real classes (not
+    # strings). The dotted-string `payload_authz_path` sidesteps the
+    # remaining spec → logic cycle.
+    #
+    # Mount-time guard: declaring `payload_authz_path` alongside an
+    # explicit `handlers["create"]` or `handlers["update"]` is rejected
+    # by `mount_entity` — the explicit handler would silently bypass
+    # the spec hook. Mirrors the existing `detail_extras_path` +
+    # `handlers["detail"]` precedent.
+    payload_authz_path: str | None = None
+    payload_authz_repos: tuple[tuple[str, type], ...] = ()
+
     # Static context bindings -------------------------------------------
     # Constant key→value pairs that `handle_detail` / `handle_list` merge
     # into the template context after the framework's auto-injected keys
@@ -662,6 +705,23 @@ class EntitySpec:
             raise ValueError(
                 f"EntitySpec({self.name!r}) declares form_extras_repos but "
                 "no form_extras_path — the typed-repo kwargs would have "
+                "no consumer."
+            )
+        # `payload_authz` runs from `handle_create` / `handle_update`;
+        # declaring the path without either route is dead config (the
+        # hook would never fire).
+        if self.payload_authz_path is not None and not (
+            self.routes.create or self.routes.update
+        ):
+            raise ValueError(
+                f"EntitySpec({self.name!r}) declares payload_authz_path but "
+                "neither routes.create nor routes.update is True — the "
+                "hook would never run."
+            )
+        if self.payload_authz_repos and self.payload_authz_path is None:
+            raise ValueError(
+                f"EntitySpec({self.name!r}) declares payload_authz_repos but "
+                "no payload_authz_path — the typed-repo kwargs would have "
                 "no consumer."
             )
         if self.read_schema is not None:

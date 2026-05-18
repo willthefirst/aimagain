@@ -37,7 +37,7 @@ History (Org/Program roadmap):
 
 **Attaching a Provider to an Org.** The provider create/edit form picks from a dropdown of the **Orgs the requesting user owns** (superusers see every Org). The wire enforces the same boundary: `POST /providers` and `PATCH /providers/{id}` reject an `org_id` that points at an Org the requesting user doesn't own — 403 if it exists, 404 if it doesn't (no leak of other users' Org ids). A user who needs to attach to an Org they don't own must first be granted ownership (invite/grant flow not yet built; for now, create your own Org via `/organizations/new`).
 
-The check lives in `handle_create_provider` / `handle_update_provider` ([`../../logic/providers/handlers.py`](../../logic/providers/handlers.py)); the dropdown is scoped by `_orgs_visible_to(...)` in the same module. This matches the `OWNER_OR_ADMIN` policy on the Org row itself — attaching a Provider is effectively writing to the Org's Provider list, so the same boundary applies.
+The check lives in `_assert_provider_payload_org_ownership` ([`../../logic/providers/handlers.py`](../../logic/providers/handlers.py)) — bound to `PROVIDER_ENTITY.payload_authz_path` so the framework's factory-built create / update handlers invoke it automatically (#532). The dropdown is scoped by `_orgs_visible_to(...)` in the same module. This matches the `OWNER_OR_ADMIN` policy on the Org row itself — attaching a Provider is effectively writing to the Org's Provider list, so the same boundary applies.
 
 ## Adding a new credential sub-record type
 

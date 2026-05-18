@@ -1383,6 +1383,233 @@ def test_make_update_handler_name_includes_entity():
     assert handler.__name__ == "_handle_update_widget"
 
 
+# --- payload_authz framework tests ---------------------------------------
+
+
+class _StubOrgRepo:
+    """Stand-in typed repo passed through `payload_authz_repos`. The
+    callable receives an instance via the named kwarg; we just assert
+    identity to confirm the framework threads it through."""
+
+
+@pytest.mark.asyncio
+async def test_create_invokes_payload_authz_with_payload_user_and_repos():
+    """Happy path: `payload_authz` is awaited with `payload=`,
+    `requesting_user=`, plus the declared typed repos. Create proceeds
+    and the audit row is written."""
+    audit_used = _audit()
+    spec = EntitySpec(
+        name="widget",
+        url_collection="widgets",
+        id_param="widget_id",
+        model=_AnyRow,
+        audit=audit_used,
+    )
+    repo = _create_fake_repo()
+    audit_repo = _FakeAuditRepo()
+    user = _user()
+    org_repo = _StubOrgRepo()
+
+    seen: list[dict[str, _Any]] = []
+
+    async def authz(*, payload, requesting_user, organization_repo):
+        seen.append(
+            {
+                "payload": payload,
+                "user": requesting_user,
+                "org_repo": organization_repo,
+            }
+        )
+
+    payload = _StandardPayload(practice_name="P", location_city="C")
+    created = await handle_create(
+        spec,
+        payload=payload,
+        repo=repo,
+        audit_repo=audit_repo,
+        requesting_user=user,
+        payload_authz=authz,
+        payload_authz_kwargs={"organization_repo": org_repo},
+    )
+
+    assert len(seen) == 1
+    assert seen[0]["payload"] is payload
+    assert seen[0]["user"] is user
+    assert seen[0]["org_repo"] is org_repo
+    assert created.practice_name == "P"
+    assert len(repo.created_rows) == 1
+    assert len(audit_repo.calls) == 1
+    assert audit_repo.calls[0]["action"] == audit_used.create
+
+
+@pytest.mark.asyncio
+async def test_create_payload_authz_forbidden_aborts_before_model_construction():
+    """`payload_authz` raising `ForbiddenError` aborts before the model
+    is built — no row created, no audit row written."""
+    spec = EntitySpec(
+        name="widget",
+        url_collection="widgets",
+        id_param="widget_id",
+        model=_AnyRow,
+        audit=_audit(),
+    )
+    repo = _create_fake_repo()
+    audit_repo = _FakeAuditRepo()
+
+    async def authz(*, payload, requesting_user):
+        raise ForbiddenError(detail="nope")
+
+    with pytest.raises(ForbiddenError):
+        await handle_create(
+            spec,
+            payload=_StandardPayload(),
+            repo=repo,
+            audit_repo=audit_repo,
+            requesting_user=_user(),
+            payload_authz=authz,
+        )
+
+    assert repo.created_rows == []
+    assert audit_repo.calls == []
+
+
+@pytest.mark.asyncio
+async def test_create_payload_authz_notfound_propagates():
+    """`NotFoundError` raised by `payload_authz` propagates unchanged —
+    no swallowing inside the framework."""
+    spec = EntitySpec(
+        name="widget",
+        url_collection="widgets",
+        id_param="widget_id",
+        model=_AnyRow,
+        audit=_audit(),
+    )
+
+    async def authz(*, payload, requesting_user):
+        raise NotFoundError(detail="org gone")
+
+    with pytest.raises(NotFoundError):
+        await handle_create(
+            spec,
+            payload=_StandardPayload(),
+            repo=_create_fake_repo(),
+            audit_repo=_FakeAuditRepo(),
+            requesting_user=_user(),
+            payload_authz=authz,
+        )
+
+
+@pytest.mark.asyncio
+async def test_update_invokes_payload_authz_after_404_before_patch():
+    """`payload_authz` fires after the target loads and `write_authz`
+    runs (no-op here) and before the patch. Raising aborts the patch."""
+    spec = EntitySpec(
+        name="widget",
+        url_collection="widgets",
+        id_param="widget_id",
+        model=_AnyRow,
+        audit=_audit(),
+    )
+    repo = _update_fake_repo()
+    target_id = uuid4()
+    repo.seed(_AnyRow, _AnyRow(id=target_id, practice_name="Old"))
+    audit_repo = _FakeAuditRepo()
+
+    async def authz(*, payload, requesting_user):
+        raise ForbiddenError(detail="payload says no")
+
+    with pytest.raises(ForbiddenError):
+        await handle_update(
+            spec,
+            target_id=target_id,
+            payload=_UpdatePayload(practice_name="New"),
+            repo=repo,
+            audit_repo=audit_repo,
+            requesting_user=_user(),
+            payload_authz=authz,
+        )
+
+    assert repo.patched == []
+    assert audit_repo.calls == []
+
+
+@pytest.mark.asyncio
+async def test_update_payload_authz_skipped_when_target_missing():
+    """When the target 404s, the 404 fires first — `payload_authz` is
+    never called. Keeps the framework's error-precedence stable."""
+    spec = EntitySpec(
+        name="widget",
+        url_collection="widgets",
+        id_param="widget_id",
+        model=_AnyRow,
+        audit=_audit(),
+    )
+    seen: list[_Any] = []
+
+    async def authz(*, payload, requesting_user):
+        seen.append(payload)
+
+    with pytest.raises(NotFoundError):
+        await handle_update(
+            spec,
+            target_id=uuid4(),  # never seeded
+            payload=_UpdatePayload(),
+            repo=_update_fake_repo(),
+            audit_repo=_FakeAuditRepo(),
+            requesting_user=_user(),
+            payload_authz=authz,
+        )
+
+    assert seen == []
+
+
+def test_make_create_handler_with_payload_authz_signature():
+    """Synthesized create-handler signature includes declared
+    `payload_authz_repos` kwargs as typed params."""
+    spec = EntitySpec(
+        name="widget",
+        url_collection="widgets",
+        id_param="widget_id",
+        model=_AnyRow,
+        audit=_audit(),
+    )
+
+    async def authz(**_kw):  # pragma: no cover
+        return None
+
+    handler = make_create_handler(
+        spec,
+        payload_authz=authz,
+        payload_authz_repos=(("organization_repo", _StubOrgRepo),),
+    )
+    sig = inspect.signature(handler)
+    assert "organization_repo" in sig.parameters
+    assert sig.parameters["organization_repo"].annotation is _StubOrgRepo
+
+
+def test_make_update_handler_with_payload_authz_signature():
+    """Same for update."""
+    spec = EntitySpec(
+        name="widget",
+        url_collection="widgets",
+        id_param="widget_id",
+        model=_AnyRow,
+        audit=_audit(),
+    )
+
+    async def authz(**_kw):  # pragma: no cover
+        return None
+
+    handler = make_update_handler(
+        spec,
+        payload_authz=authz,
+        payload_authz_repos=(("organization_repo", _StubOrgRepo),),
+    )
+    sig = inspect.signature(handler)
+    assert "organization_repo" in sig.parameters
+    assert sig.parameters["organization_repo"].annotation is _StubOrgRepo
+
+
 # --- handle_get_edit_form framework tests --------------------------------
 
 

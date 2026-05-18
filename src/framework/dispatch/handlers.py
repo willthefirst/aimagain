@@ -96,8 +96,17 @@ async def handle_create(
     audit_repo: AuditRepository,
     requesting_user: User,
     parent_id: UUID | None = None,
+    payload_authz: Callable[..., Awaitable[None]] | None = None,
+    payload_authz_kwargs: dict[str, Any] | None = None,
 ) -> Any:
-    """Generic create handler driven by `spec`."""
+    """Generic create handler driven by `spec`.
+
+    `payload_authz` (if supplied) is invoked AFTER the parent row has
+    been loaded and `write_authz` has run on it (if applicable), and
+    BEFORE the payload is used to build the model. The callable is
+    expected to raise `ForbiddenError` / `NotFoundError` on rejection;
+    `payload_authz_kwargs` supplies any spec-declared typed repo kwargs.
+    See `EntitySpec.payload_authz_path` for the contract."""
     if spec.audit is None:
         raise ValueError(
             f"handle_create: spec {spec.name!r} has no audit binding; "
@@ -115,10 +124,22 @@ async def handle_create(
             raise NotFoundError(detail=f"{spec.parent.name.capitalize()} not found")
         if spec.write_authz is not None:
             spec.write_authz(parent, requesting_user, action=f"create this {spec.name}")
+        if payload_authz is not None:
+            await payload_authz(
+                payload=payload,
+                requesting_user=requesting_user,
+                **(payload_authz_kwargs or {}),
+            )
         child = spec.model(**payload.model_dump())
         created = await repo.add_child(parent, spec.url_collection, child)
 
     elif spec.discriminator is not None:
+        if payload_authz is not None:
+            await payload_authz(
+                payload=payload,
+                requesting_user=requesting_user,
+                **(payload_authz_kwargs or {}),
+            )
         kind = payload.kind
         kind_spec = spec.discriminator[kind]
         # Read detail fields off the serialized dump, not via
@@ -140,6 +161,12 @@ async def handle_create(
         )
 
     else:
+        if payload_authz is not None:
+            await payload_authz(
+                payload=payload,
+                requesting_user=requesting_user,
+                **(payload_authz_kwargs or {}),
+            )
         # Inline-child collections (e.g. provider's licensures /
         # educations / certifications) come in on the payload alongside
         # the parent's own fields. Exclude them from the parent
@@ -183,8 +210,16 @@ async def handle_update(
     audit_repo: AuditRepository,
     requesting_user: User,
     parent_id: UUID | None = None,
+    payload_authz: Callable[..., Awaitable[None]] | None = None,
+    payload_authz_kwargs: dict[str, Any] | None = None,
 ) -> Any:
-    """Generic update handler driven by `spec`."""
+    """Generic update handler driven by `spec`.
+
+    `payload_authz` (if supplied) is invoked AFTER the target 404 check
+    and AFTER `write_authz` has run on parent-or-target, and BEFORE the
+    payload is consumed (discriminator dispatch / patch). When the
+    target 404s, the hook is never called — the 404 fires first. See
+    `EntitySpec.payload_authz_path` for the contract."""
     if spec.audit is None:
         raise ValueError(
             f"handle_update: spec {spec.name!r} has no audit binding; "
@@ -212,6 +247,13 @@ async def handle_update(
     else:
         if spec.write_authz is not None:
             spec.write_authz(target, requesting_user, action=f"update this {spec.name}")
+
+    if payload_authz is not None:
+        await payload_authz(
+            payload=payload,
+            requesting_user=requesting_user,
+            **(payload_authz_kwargs or {}),
+        )
 
     if spec.discriminator is not None:
         payload_kind = payload.kind
@@ -283,6 +325,12 @@ class _FactoryShape:
     omit_repo: bool = False
     # Polymorphic entities' create-form takes `?kind=` as a query param.
     include_kind_for_polymorphic: bool = False
+    # Verbs that route through `payload_authz` (create / update). When
+    # True, `_make_factory_handler` accepts optional `payload_authz`
+    # and `payload_authz_repos` kwargs, synthesizes signature params
+    # for each declared typed repo, and forwards the resolved callable
+    # plus the collected typed-repo dict to the underlying handler.
+    payload_authz_call: bool = False
 
 
 _DELETE_SHAPE = _FactoryShape(
@@ -296,6 +344,7 @@ _CREATE_SHAPE = _FactoryShape(
     include_payload=True,
     include_parent_id=True,
     include_audit_repo=True,
+    payload_authz_call=True,
 )
 _UPDATE_SHAPE = _FactoryShape(
     name_template="_handle_update_{name}",
@@ -303,6 +352,7 @@ _UPDATE_SHAPE = _FactoryShape(
     include_payload=True,
     include_parent_id=True,
     include_audit_repo=True,
+    payload_authz_call=True,
 )
 _EDIT_FORM_SHAPE = _FactoryShape(
     name_template="_handle_get_{name}_edit_form",
@@ -346,10 +396,47 @@ def _make_factory_handler(
     *,
     extras: Callable[..., Awaitable[dict[str, Any]]] | None = None,
     extra_repos: tuple[tuple[str, type], ...] = (),
+    payload_authz: Callable[..., Awaitable[None]] | None = None,
+    payload_authz_repos: tuple[tuple[str, type], ...] = (),
 ):
-    """Build the wrapper the mount layer introspects and calls."""
+    """Build the wrapper the mount layer introspects and calls.
+
+    For shapes with ``payload_authz_call=True`` (create / update), each
+    entry in ``payload_authz_repos`` becomes an extra signature
+    parameter (``name: RepoType``); at call time the collected kwargs
+    are forwarded to the underlying handler as ``payload_authz_kwargs``
+    alongside the ``payload_authz`` callable itself.
+    """
     id_param = spec.id_param
     parent_id_param = spec.parent.id_param if spec.parent is not None else None
+    # Collision detection: ``payload_authz_repos`` names mustn't shadow
+    # the fixed signature params the factory generates (``payload``,
+    # ``repo``, ``audit_repo``, ``requesting_user``, the entity's
+    # ``id_param``, and the parent's ``id_param`` if any). Synthesizing
+    # a duplicate `inspect.Parameter` would silently overwrite the
+    # earlier slot; surface the misconfig loudly.
+    payload_authz_repo_names = (
+        tuple(name for name, _ in payload_authz_repos)
+        if shape.payload_authz_call
+        else ()
+    )
+    if shape.payload_authz_call and payload_authz_repo_names:
+        reserved = {
+            "payload",
+            "repo",
+            "audit_repo",
+            "requesting_user",
+            id_param,
+        }
+        if parent_id_param is not None:
+            reserved.add(parent_id_param)
+        clashes = [n for n in payload_authz_repo_names if n in reserved]
+        if clashes:
+            raise ValueError(
+                f"_make_factory_handler({spec.name!r}): payload_authz_repos "
+                f"name(s) {clashes!r} collide with the factory-generated "
+                "signature params — pick distinct names."
+            )
     # `spec.filters` accepts raw `QueryParam` (legacy) or `Filter`
     # subclasses (URL + UI metadata). Both expose the URL shape via the
     # same `name` / `annotation` pair — `Filter` via `to_query_param()`.
@@ -385,6 +472,9 @@ def _make_factory_handler(
     sig_params.append(_param("requesting_user", user_ann))
     for name, repo_type in extra_repos:
         sig_params.append(_param(name, repo_type))
+    if shape.payload_authz_call:
+        for name, repo_type in payload_authz_repos:
+            sig_params.append(_param(name, repo_type))
 
     async def _handler(**kwargs: Any) -> Any:
         call_kwargs: dict[str, Any] = {
@@ -412,6 +502,11 @@ def _make_factory_handler(
             collected = {n: kwargs[n] for n in extra_repo_names}
             call_kwargs["extras"] = extras
             call_kwargs["extra_kwargs"] = collected if collected else None
+        if shape.payload_authz_call and payload_authz is not None:
+            call_kwargs["payload_authz"] = payload_authz
+            call_kwargs["payload_authz_kwargs"] = {
+                n: kwargs[n] for n in payload_authz_repo_names
+            }
         return await handler_fn(spec, **call_kwargs)
 
     _handler.__signature__ = inspect.Signature(parameters=sig_params)  # type: ignore[attr-defined]
@@ -424,12 +519,34 @@ def make_delete_handler(spec: EntitySpec):
     return _make_factory_handler(spec, _DELETE_SHAPE, handle_delete)
 
 
-def make_create_handler(spec: EntitySpec):
-    return _make_factory_handler(spec, _CREATE_SHAPE, handle_create)
+def make_create_handler(
+    spec: EntitySpec,
+    *,
+    payload_authz: Callable[..., Awaitable[None]] | None = None,
+    payload_authz_repos: tuple[tuple[str, type], ...] = (),
+):
+    return _make_factory_handler(
+        spec,
+        _CREATE_SHAPE,
+        handle_create,
+        payload_authz=payload_authz,
+        payload_authz_repos=payload_authz_repos,
+    )
 
 
-def make_update_handler(spec: EntitySpec):
-    return _make_factory_handler(spec, _UPDATE_SHAPE, handle_update)
+def make_update_handler(
+    spec: EntitySpec,
+    *,
+    payload_authz: Callable[..., Awaitable[None]] | None = None,
+    payload_authz_repos: tuple[tuple[str, type], ...] = (),
+):
+    return _make_factory_handler(
+        spec,
+        _UPDATE_SHAPE,
+        handle_update,
+        payload_authz=payload_authz,
+        payload_authz_repos=payload_authz_repos,
+    )
 
 
 async def handle_get_edit_form(
