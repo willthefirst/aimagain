@@ -4,8 +4,8 @@
 {%- from "_shared/sections.html" import list_or_empty -%}
 {%- from "_shared/actions.html" import confirm_delete_button -%}
 
-{% set resource_url = "/providers" %}
-{% set resource_detail_url = "/providers/" ~ provider.id %}
+{% set resource_url = entity_url('provider') %}
+{% set resource_detail_url = entity_url('provider', id=provider.id) %}
 
 {% block resource_label %}Providers{% endblock %}
 {% block current_label %}{{ provider.org.name }}{% endblock %}
@@ -15,9 +15,9 @@
   <h2>Practice</h2>
   {# `org_id` PATCH reassigns the Provider to a different Organization;
      `org.name` itself changes by editing the Organization (not via this
-     form). To use a new Organization, create one at
-     <a href="/organizations/form">/organizations/form</a> first. See #524. #}
-  <form hx-patch="/providers/{{ provider.id }}">
+     form). To use a new Organization, create one via
+     `entity_form_url('organization')` first. See #524. #}
+  <form hx-patch="{{ entity_url('provider', id=provider.id) }}">
     <fieldset>
       <legend>Practice location</legend>
       <label for="org_id">
@@ -27,7 +27,7 @@
           <option value="{{ o.id }}"{% if o.id == provider.org_id %} selected{% endif %}>{{ o.name }}</option>
           {%- endfor %}
         </select>
-        <small>Don't see your organization? <a href="/organizations/form">Create one first</a>.</small>
+        <small>Don't see your organization? <a href="{{ entity_form_url('organization') }}">Create one first</a>.</small>
       </label>
       {{ text_field("location_city", "City", current=provider.location_city, maxlength=120) }}
       {{ select_field("location_state", "State", US_STATES, current=provider.location_state) }}
@@ -57,11 +57,11 @@
   <li>
     <strong>{{ LICENSE_TYPES_LABELS[lic.license_type] }}</strong>
     &mdash; {{ lic.license_number }} ({{ lic.issuing_state }}){% if lic.expiration_date %}, expires {{ lic.expiration_date }}{% endif %}
-    {{ confirm_delete_button("/providers/" ~ provider.id ~ "/licensures/" ~ lic.id, "Remove this licensure?") }}
+    {{ confirm_delete_button(entity_url('provider', id=provider.id) ~ "/licensures/" ~ lic.id, "Remove this licensure?") }}
   </li>
   {% endcall %}
 
-  {% call inline_add_form("/providers/" ~ provider.id ~ "/licensures", "Add licensure", "Add licensure") %}
+  {% call inline_add_form(entity_url('provider', id=provider.id) ~ "/licensures", "Add licensure", "Add licensure") %}
     {{ select_field("license_type", "License type", LICENSE_TYPES, labels=LICENSE_TYPES_LABELS, placeholder=true) }}
     {{ text_field("license_number", "License number", maxlength=120) }}
     {{ select_field("issuing_state", "Issuing state", US_STATES, placeholder=true) }}
@@ -75,11 +75,11 @@
   <li>
     <strong>{{ EDUCATION_TYPES_LABELS[edu.education_type] }}</strong>
     &mdash; {{ edu.institution }}{% if edu.month_completed %}, {{ edu.month_completed }}{% endif %}
-    {{ confirm_delete_button("/providers/" ~ provider.id ~ "/educations/" ~ edu.id, "Remove this education entry?") }}
+    {{ confirm_delete_button(entity_url('provider', id=provider.id) ~ "/educations/" ~ edu.id, "Remove this education entry?") }}
   </li>
   {% endcall %}
 
-  {% call inline_add_form("/providers/" ~ provider.id ~ "/educations", "Add education", "Add education") %}
+  {% call inline_add_form(entity_url('provider', id=provider.id) ~ "/educations", "Add education", "Add education") %}
     {{ select_field("education_type", "Education type", EDUCATION_TYPES, labels=EDUCATION_TYPES_LABELS, placeholder=true) }}
     {{ text_field("institution", "Institution", maxlength=200) }}
     {{ text_field("month_completed", "Month completed (YYYY-MM)", required=false, pattern="\\d{4}-\\d{2}", maxlength=7) }}
@@ -92,16 +92,16 @@
   <li>
     <strong>{{ CERTIFICATION_TYPES_LABELS[cert.certification_type] }}</strong>
     &mdash; {{ cert.certifying_body }}{% if cert.expiration_date %}, expires {{ cert.expiration_date }}{% endif %}
-    {{ confirm_delete_button("/providers/" ~ provider.id ~ "/certifications/" ~ cert.id, "Remove this certification?") }}
+    {{ confirm_delete_button(entity_url('provider', id=provider.id) ~ "/certifications/" ~ cert.id, "Remove this certification?") }}
   </li>
   {% endcall %}
 
-  {% call inline_add_form("/providers/" ~ provider.id ~ "/certifications", "Add certification", "Add certification") %}
+  {% call inline_add_form(entity_url('provider', id=provider.id) ~ "/certifications", "Add certification", "Add certification") %}
     {{ select_field("certification_type", "Certification type", CERTIFICATION_TYPES, labels=CERTIFICATION_TYPES_LABELS, placeholder=true) }}
     {{ text_field("certifying_body", "Certifying body", maxlength=200) }}
     {{ text_field("expiration_date", "Expiration date (YYYY-MM-DD)", required=false, pattern="\\d{4}-\\d{2}-\\d{2}", maxlength=10) }}
   {% endcall %}
 </section>
 
-<p><a href="/providers/{{ provider.id }}" role="button" class="secondary outline">Cancel</a></p>
+<p><a href="{{ entity_url('provider', id=provider.id) }}" role="button" class="secondary outline">Cancel</a></p>
 {% endblock %}

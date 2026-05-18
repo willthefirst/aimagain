@@ -1,13 +1,13 @@
 {% extends "views/detail.html" %}
 
-{% set resource_url = "/programs" %}
+{% set resource_url = entity_url('program') %}
 
 {% block resource_label %}Programs{% endblock %}
 {% block current_label %}{{ program.name }}{% endblock %}
 
 {% block actions %}
 {% if can_edit %}
-<li><a href="/programs/{{ program.id }}/form" role="button" class="outline">Edit program</a></li>
+<li><a href="{{ entity_form_url('program', id=program.id) }}" role="button" class="outline">Edit program</a></li>
 {% endif %}
 {% endblock %}
 
@@ -17,7 +17,7 @@
     <h2>Program</h2>
     <dl>
       <dt>Name</dt><dd>{{ program.name }}</dd>
-      <dt>Organization</dt><dd><a href="/organizations/{{ program.org_id }}">{{ program.organization.name }}</a></dd>
+      <dt>Organization</dt><dd><a href="{{ entity_url('organization', id=program.org_id) }}">{{ program.organization.name }}</a></dd>
       {% if program.description %}
       <dt>Description</dt><dd>{{ program.description }}</dd>
       {% endif %}

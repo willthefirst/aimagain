@@ -1,7 +1,7 @@
 {% extends "views/form_new.html" %}
 {%- from "_shared/form_fields.html" import field_for, radio_bool_field, text_field -%}
 
-{% set resource_url = "/programs" %}
+{% set resource_url = entity_url('program') %}
 
 {% block resource_label %}Programs{% endblock %}
 
@@ -12,8 +12,8 @@
    scoped per-viewer by `program_form_extras` (the spec's
    `form_extras_path`) — it lists only the Orgs the requesting user
    owns. Superusers see every Org. To attach to a new Organization,
-   create it via /organizations/form first. #}
-<form hx-post="/programs">
+   create it via `entity_form_url('organization')` first. #}
+<form hx-post="{{ entity_url('program') }}">
   <fieldset>
     <legend>Program</legend>
     <label for="org_id">
@@ -24,7 +24,7 @@
         <option value="{{ o.id }}">{{ o.name }}</option>
         {%- endfor %}
       </select>
-      <small>Don't see your organization? <a href="/organizations/form">Create one first</a>.</small>
+      <small>Don't see your organization? <a href="{{ entity_form_url('organization') }}">Create one first</a>.</small>
     </label>
     {{ field_for(schema, "name", "Name") }}
     {{ field_for(schema, "description", "Description (optional)") }}

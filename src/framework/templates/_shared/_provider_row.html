@@ -29,7 +29,7 @@ so the table stays narrow.
 {%- set issuing_states = provider.licensures | map(attribute='issuing_state') | unique | sort | list -%}
 <tr data-row-id="{{ provider.id }}">
   <td data-label="Practice" class="primary">
-    <a href="/providers/{{ provider.id }}">{{ provider.org.name }}</a>
+    <a href="{{ entity_url('provider', id=provider.id) }}">{{ provider.org.name }}</a>
   </td>
   <td data-label="Location">{{ provider.location_city }}, {{ provider.location_state }}</td>
   <td data-label="Licensed in">

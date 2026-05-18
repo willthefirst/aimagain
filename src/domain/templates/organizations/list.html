@@ -3,7 +3,7 @@
 {% block resource_label %}Organizations{% endblock %}
 
 {% block actions %}
-<li><a href="/organizations/form" role="button">Create organization</a></li>
+<li><a href="{{ entity_form_url('organization') }}" role="button">Create organization</a></li>
 {% endblock %}
 
 {% block content %}
@@ -19,9 +19,9 @@
   <tbody>
     {%- for org in organizations %}
     <tr>
-      <td><a href="/organizations/{{ org.id }}">{{ org.name }}</a></td>
+      <td><a href="{{ entity_url('organization', id=org.id) }}">{{ org.name }}</a></td>
       <td>{{ ORGANIZATION_TYPES_LABELS[org.type] }}</td>
-      <td>{% if org.parent_org_id %}<a href="/organizations/{{ org.parent_org_id }}">Parent</a>{% else %}—{% endif %}</td>
+      <td>{% if org.parent_org_id %}<a href="{{ entity_url('organization', id=org.parent_org_id) }}">Parent</a>{% else %}—{% endif %}</td>
     </tr>
     {%- endfor %}
   </tbody>

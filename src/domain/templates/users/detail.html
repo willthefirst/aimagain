@@ -2,7 +2,7 @@
 {%- from "_shared/index_table.html" import index_table -%}
 {%- from "_shared/_provider_row.html" import provider_headers, provider_row -%}
 
-{% set resource_url = "/users" %}
+{% set resource_url = entity_url('user') %}
 
 {% block resource_label %}Users{% endblock %}
 {% block current_label %}{{ target_user.username }}{% endblock %}
@@ -32,7 +32,7 @@
      the user themselves — viewing someone else's profile shouldn't
      expose their private favorites list. #}
   {% if is_self %}
-  <p><a href="/users/me/favorites">Favorites</a></p>
+  <p><a href="{{ entity_url('user_favorite') }}">Favorites</a></p>
   {% endif %}
 
   <section>

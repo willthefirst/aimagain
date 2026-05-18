@@ -9,8 +9,8 @@
    fit. #}
 {% block breadcrumb %}
 {{ breadcrumb([
-  ("Users", "/users"),
-  (target_user.username, "/users/" ~ target_user.id),
+  ("Users", entity_url('user')),
+  (target_user.username, entity_url('user', id=target_user.id)),
   ("Providers", none),
 ]) }}
 {% endblock %}
@@ -25,7 +25,7 @@
 <p id="user-providers-empty">
   {% if is_self %}
   You have not created any providers yet.
-  <a href="/providers/form" role="button" class="outline">Create your first provider</a>
+  <a href="{{ entity_form_url('provider') }}" role="button" class="outline">Create your first provider</a>
   {% else %}
   This user has no providers yet.
   {% endif %}

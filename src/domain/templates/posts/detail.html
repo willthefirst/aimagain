@@ -1,6 +1,6 @@
 {% extends "views/detail.html" %}
 
-{% set resource_url = "/posts" %}
+{% set resource_url = entity_url('post') %}
 
 {% block resource_label %}Posts{% endblock %}
 {% block current_label %}Post{% endblock %}
@@ -24,7 +24,7 @@
 {% set d = post.client_referral_detail %}
   <p>
     <span data-kind-chip="client_referral">Seeking</span>
-    <small>by <a href="/users/{{ post.owner_id }}">{{ post.owner.username }}</a> · {{ post.created_at | format_post_date }}</small>
+    <small>by <a href="{{ entity_url('user', id=post.owner_id) }}">{{ post.owner.username }}</a> · {{ post.created_at | format_post_date }}</small>
   </p>
 
   <p>{{ d.description }}</p>
@@ -67,7 +67,7 @@
 {% set p = d.provider %}
   <p>
     <span data-kind-chip="provider_availability">Providing</span>
-    <small>by <a href="/users/{{ post.owner_id }}">{{ post.owner.username }}</a> · {{ post.created_at | format_post_date }}</small>
+    <small>by <a href="{{ entity_url('user', id=post.owner_id) }}">{{ post.owner.username }}</a> · {{ post.created_at | format_post_date }}</small>
   </p>
 
   {% if d.description %}
@@ -76,7 +76,7 @@
 
   <dl>
     <dt>Practice</dt>
-    <dd><a href="/providers/{{ p.id }}">{{ p.org.name }}</a></dd>
+    <dd><a href="{{ entity_url('provider', id=p.id) }}">{{ p.org.name }}</a></dd>
     <dt>Location</dt>
     <dd>{{ p.location_city }}, {{ p.location_state }} {{ p.location_zip }}</dd>
     <dt>In-person sessions</dt>
@@ -144,7 +144,7 @@
 {% set prog = d.program %}
   <p>
     <span data-kind-chip="provider_availability">Providing</span>
-    <small>by <a href="/users/{{ post.owner_id }}">{{ post.owner.username }}</a> &middot; {{ post.created_at | format_post_date }}</small>
+    <small>by <a href="{{ entity_url('user', id=post.owner_id) }}">{{ post.owner.username }}</a> &middot; {{ post.created_at | format_post_date }}</small>
   </p>
 
   {% if d.description %}
@@ -153,7 +153,7 @@
 
   <dl>
     <dt>Program</dt>
-    <dd><a href="/programs/{{ prog.id }}">{{ prog.name }}</a></dd>
+    <dd><a href="{{ entity_url('program', id=prog.id) }}">{{ prog.name }}</a></dd>
     <dt>Organization</dt>
     <dd>{{ prog.organization.name }}</dd>
     {% if prog.state_preference %}

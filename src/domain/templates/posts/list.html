@@ -8,7 +8,7 @@
    picks the kind there, then lands on the kind-specific create form.
    The action is a `<li>` because the toolbar's right zone is a
    `<menu class="toolbar-right">` of commands. #}
-<li><a href="/posts/form" role="button">Create post</a></li>
+<li><a href="{{ entity_form_url('post') }}" role="button">Create post</a></li>
 {% endblock %}
 
 {% block content %}

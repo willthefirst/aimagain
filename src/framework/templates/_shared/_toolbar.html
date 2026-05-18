@@ -35,7 +35,7 @@ Cap on how many filter chips appear inline before collapsing to
           active_filters=active_filters,
           search_url=search_url,
         ) %}
-          <li><a href="/posts/form" role="button">Create</a></li>
+          <li><a href="{{ entity_form_url('post') }}" role="button">Create</a></li>
         {% endcall %}
 
 Pages with no toolbar content leave `{% block toolbar %}` empty
