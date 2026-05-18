@@ -10,6 +10,6 @@
 <p>You need a program before posting program availability. <a href="{{ entity_form_url('program') }}">Create a program</a>, then return here.</p>
 {% else %}
 <p>Per <code>notes/forms_spec.md</code>. No PII.</p>
-{{ program_availability_form("post", entity_url('post'), "Create program availability", schema=program_availability_create_schema, current_user=current_user) }}
+{{ program_availability_form("post", entity_url('post'), "Create program availability", schema=program_availability_create_schema, current_user=current_user, cancel_url=entity_url('post')) }}
 {% endif %}
 {% endblock %}

@@ -28,4 +28,10 @@ back to the resource's detail page on the middle one).
 {{ breadcrumb([(collection_label, resource_url), ("New", none)]) }}
 {% endblock %}
 
+{# `entity-form-page` carries the shared visual contract for entity
+   create/edit pages: caps the form width on large screens via
+   `--form-max-width` and brackets the form-action cluster. See
+   `src/framework/templates/README.md` § "Entity form pages". #}
+<div class="entity-form-page">
 {% block content %}{% endblock %}
+</div>

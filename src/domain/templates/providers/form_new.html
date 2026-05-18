@@ -1,5 +1,6 @@
 {% extends "views/form_new.html" %}
 {%- from "_shared/form_fields.html" import field_for, radio_bool_field, text_field -%}
+{%- from "_shared/forms.html" import form_actions -%}
 
 {% set resource_url = entity_url('provider') %}
 
@@ -10,8 +11,8 @@
 
 {# `org_id` is the FK to the Provider's Organization (the practice's
    display name lives on `org.name`). The dropdown lists every Org in
-   the directory; any user may attach their Provider to any Org (#524).
-   To create a new Organization, visit the create form
+   the directory; any user may attach their Provider to any Org. To
+   create a new Organization, visit the create form
    (use `entity_form_url('organization')`) first; this PR doesn't
    bundle inline-create into the Provider form. #}
 <form hx-post="{{ entity_url('provider') }}">
@@ -27,16 +28,21 @@
       </select>
       <small>Don't see your organization? <a href="{{ entity_form_url('organization') }}">Create one first</a>.</small>
     </label>
-    {{ field_for(schema, "location_city", "City") }}
-    {{ field_for(schema, "location_state", "State") }}
-    {{ field_for(schema, "location_zip", "ZIP") }}
-    {{ field_for(schema, "npi", "NPI (10-digit National Provider Identifier, optional)") }}
+    <div class="grid">
+      {{ field_for(schema, "location_city", "City") }}
+      {{ field_for(schema, "location_state", "State") }}
+      {{ field_for(schema, "location_zip", "ZIP") }}
+    </div>
+    {{ field_for(schema, "npi", "NPI") }}
+    <small>10-digit National Provider Identifier. Optional.</small>
   </fieldset>
 
   <fieldset>
     <legend>Session availability</legend>
-    {{ field_for(schema, "in_person_sessions", "In-person sessions") }}
-    {{ field_for(schema, "virtual_sessions", "Virtual sessions") }}
+    <div class="grid">
+      {{ field_for(schema, "in_person_sessions", "In-person sessions") }}
+      {{ field_for(schema, "virtual_sessions", "Virtual sessions") }}
+    </div>
   </fieldset>
 
   {# Insurance & payment. `in_network_carriers` is a multi-select — an
@@ -44,12 +50,16 @@
      independent. No cross-field invariant. #}
   <fieldset>
     <legend>Insurance &amp; payment</legend>
-    {{ field_for(schema, "in_network_carriers", "In-network carriers (leave empty for none)") }}
-    {{ radio_bool_field("accepts_out_of_network", "Accepts out-of-network?", required=false) }}
-    {{ radio_bool_field("sliding_scale", "Sliding scale?", required=false) }}
-    {{ text_field("cost", "Cost (optional, free text)", required=false) }}
+    {{ field_for(schema, "in_network_carriers", "In-network carriers") }}
+    <small>Leave empty for none.</small>
+    <div class="grid">
+      {{ radio_bool_field("accepts_out_of_network", "Accepts out-of-network?", required=false) }}
+      {{ radio_bool_field("sliding_scale", "Sliding scale?", required=false) }}
+    </div>
+    {{ text_field("cost", "Cost", required=false) }}
+    <small>Free text. Optional.</small>
   </fieldset>
 
-  <button type="submit">Create provider</button>
+  {{ form_actions("Create provider", cancel_url=entity_url('provider')) }}
 </form>
 {% endblock %}
