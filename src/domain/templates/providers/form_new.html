@@ -12,7 +12,7 @@
    display name lives on `org.name`). The dropdown lists every Org in
    the directory; any user may attach their Provider to any Org (#524).
    To create a new Organization, visit
-   <a href="/organizations/new">/organizations/new</a> first; this PR
+   <a href="/organizations/form">/organizations/form</a> first; this PR
    doesn't bundle inline-create into the Provider form. #}
 <form hx-post="/providers">
   <fieldset>
@@ -25,7 +25,7 @@
         <option value="{{ o.id }}">{{ o.name }}</option>
         {%- endfor %}
       </select>
-      <small>Don't see your organization? <a href="/organizations/new">Create one first</a>.</small>
+      <small>Don't see your organization? <a href="/organizations/form">Create one first</a>.</small>
     </label>
     {{ field_for(schema, "location_city", "City") }}
     {{ field_for(schema, "location_state", "State") }}

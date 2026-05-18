@@ -149,6 +149,44 @@ async def test_patch_updates_name(
         assert loaded.name == "Renamed Org"
 
 
+async def test_create_organization_with_blank_parent_org_id_coerces_to_none(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user: User,
+):
+    """Regression: HTML `form_new.html` posts ``parent_org_id=""`` when
+    the optional input is left blank. Prior to `OptionalUuid` this 422'd
+    on the wire — see ``OrganizationCreate.parent_org_id`` and
+    ``framework.schema_validators.OptionalUuid``."""
+    response = await authenticated_client.post(
+        "/organizations",
+        data=_org_payload(parent_org_id=""),
+    )
+    assert response.status_code == 201, response.text
+    new_id = uuid.UUID(response.json()["id"])
+
+    async with db_test_session_manager() as session:
+        loaded = await session.get(Organization, new_id)
+        assert loaded is not None
+        assert loaded.parent_org_id is None
+
+
+async def test_get_organizations_form_resolves(
+    authenticated_client: AsyncClient,
+    logged_in_user: User,
+):
+    """Pins the create-form URL the templates link to.
+
+    The grammar mandates ``GET /<collection>/form`` (not ``/new``). A
+    prior set of provider/program templates linked to ``/organizations/new``,
+    which silently matched ``GET /organizations/{organization_id}`` and
+    returned a UUID-parse 422 in prod. Keep this test alongside the
+    `/new` should-not-resolve assertion in `test_routes_meta` once that
+    audit lands."""
+    response = await authenticated_client.get("/organizations/form")
+    assert response.status_code == 200
+
+
 async def test_delete_removes_org(
     authenticated_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],
