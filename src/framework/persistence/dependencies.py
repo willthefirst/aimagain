@@ -25,6 +25,7 @@ from src.domain.logic.posts.repository import PostRepository
 from src.domain.logic.programs.repository import ProgramRepository
 from src.domain.logic.providers.repository import ProviderRepository
 from src.domain.logic.users.repository import UserRepository
+from src.domain.logic.verifications.repository import VerificationRepository
 from src.framework.audit.repository import AuditRepository
 
 from .base_repository import BaseRepository
@@ -67,6 +68,7 @@ _REPO_TYPES: tuple[type[BaseRepository], ...] = (
     PostRepository,
     OrganizationRepository,
     ProgramRepository,
+    VerificationRepository,
 )
 
 
@@ -90,6 +92,7 @@ get_user_favorite_repository = _REPO_TYPE_RESOLVERS[UserFavoriteRepository]
 get_post_repository = _REPO_TYPE_RESOLVERS[PostRepository]
 get_organization_repository = _REPO_TYPE_RESOLVERS[OrganizationRepository]
 get_program_repository = _REPO_TYPE_RESOLVERS[ProgramRepository]
+get_verification_repository = _REPO_TYPE_RESOLVERS[VerificationRepository]
 
 
 class UnknownRepoTypeError(KeyError):
