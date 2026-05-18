@@ -7,10 +7,22 @@ monkey-patch business-logic handlers, so Pact verification exercises only the
 route layer.
 
 `make_post_stub(kind, **field_overrides)` is the registry-backed builder
-for Post-shaped `SimpleNamespace` stubs — the per-kind detail
-relationship name and field tuple come from `POST_KINDS` in
-`src/domain/models/posts/post_kinds.py`, so adding/renaming a kind's fields does not
-require touching contract test code.
+for Post-shaped `SimpleNamespace` stubs. The per-kind detail relationship
+name and field tuple come from `POST_KINDS`, and the per-column default
+values are inferred from the SQLAlchemy column type (JSON → ``[]``,
+Boolean → ``False``, Uuid → ``uuid4()``, DateTime → ``now()``) so the
+detail page renders without crashing on list-typed fields. For Text
+columns that hold enum values (CHECK-constrained), `_ENUM_DEFAULTS`
+supplies a per-kind realistic value so the template's display-label
+lookup resolves.
+
+Adding or renaming a column on a detail model is a one-place change —
+the spec's `detail_fields` picks it up, and the type-introspecting
+default picks the right primitive. New enum-typed columns need a
+matching entry in `_ENUM_DEFAULTS`; the test
+`test_mock_data_factory.test_make_post_stub_renders_detail_html` is
+the canary that catches a missing entry by surfacing the template
+crash at test time rather than waiting for a contract pair to fail.
 """
 
 from datetime import datetime, timezone
@@ -18,8 +30,92 @@ from types import SimpleNamespace
 from typing import Any, Dict
 from uuid import UUID, uuid4
 
+import sqlalchemy
+
 from src.domain.logic.users.schema import UserRead
 from src.domain.models import POST_KINDS
+from src.domain.models.posts.client_referral_detail import ClientReferralDetail
+from src.domain.models.posts.program_availability_detail import (
+    ProgramAvailabilityDetail,
+)
+from src.domain.models.posts.provider_availability_detail import (
+    ProviderAvailabilityDetail,
+)
+
+# Per-kind detail model — keyed by the same discriminator that
+# `POST_KINDS` uses. Lives in test code (not the production spec) so
+# the test-only stub factory doesn't push its concerns onto the
+# production registry. Adding a new kind: add an entry here and an
+# entry to `_ENUM_DEFAULTS` (if the new detail row has CHECK-Text
+# columns).
+_DETAIL_MODELS: dict[str, type] = {
+    "client_referral": ClientReferralDetail,
+    "provider_availability": ProviderAvailabilityDetail,
+    "program_availability": ProgramAvailabilityDetail,
+}
+
+
+# Per-kind defaults for Text columns that hold enum values
+# (CHECK-constrained to a vocabulary in `src.domain.models.enums`).
+# Without these, columns like `gender` would default to `"stub gender"`
+# — a string the detail template's display-label lookup
+# (`GENDER_LABELS["stub gender"]`) can't resolve, which crashes the
+# render. Values chosen here are *valid* enum members, picked for
+# neutrality where possible (`gender = "prefer_not_to_say"` rather
+# than the alphabetical first option).
+#
+# An empty dict for a kind means "no enum-typed Text columns on this
+# detail row" — PA and program-availability hold their enum values
+# on the linked Provider / Program rather than on the detail row
+# itself.
+_ENUM_DEFAULTS: dict[str, dict[str, Any]] = {
+    "client_referral": {
+        "location_in_person": "no",
+        "location_virtual": "no",
+        "gender": "prefer_not_to_say",
+        "network_preference": "no_preference",
+        "location_state": "NY",
+        # `insurance_carrier` is nullable and only meaningful when
+        # `network_preference != "no_preference"`. Default to None so
+        # the detail template's gating (`if d.insurance_carrier and
+        # ...`) renders nothing.
+        "insurance_carrier": None,
+    },
+    "provider_availability": {},
+    "program_availability": {},
+}
+
+
+def _column_default(col: sqlalchemy.Column, kind: str) -> Any:
+    """Pick a realistic default for a detail-row column.
+
+    Type-dispatch table:
+
+      JSON         → ``[]`` (template iterates these as lists; a
+                     string default would iterate chars and crash
+                     label-dict lookups)
+      Boolean      → ``False``
+      Uuid         → ``uuid4()`` (one fresh id per stub instance)
+      DateTime     → ``datetime.now(timezone.utc)`` (no DateTime
+                     columns on detail rows today; included for
+                     forward-compat)
+      Text         → ``_ENUM_DEFAULTS[kind][col.name]`` if the column
+                     is registered there (enum-typed); else
+                     ``f"stub {col.name}"``.
+    """
+    col_type = col.type
+    if isinstance(col_type, sqlalchemy.JSON):
+        return []
+    if isinstance(col_type, sqlalchemy.Boolean):
+        return False
+    if isinstance(col_type, sqlalchemy.types.Uuid):
+        return uuid4()
+    if isinstance(col_type, (sqlalchemy.DateTime, sqlalchemy.types.DateTime)):
+        return datetime.now(timezone.utc)
+    kind_enum_defaults = _ENUM_DEFAULTS.get(kind, {})
+    if col.name in kind_enum_defaults:
+        return kind_enum_defaults[col.name]
+    return f"stub {col.name}"
 
 
 def make_post_stub(
@@ -36,13 +132,24 @@ def make_post_stub(
     `POST_KINDS[kind]`); the other kinds' detail relationships are
     set to `None` so template `{% if post.X %}` checks behave correctly.
 
-    Detail fields default to `f"stub {field}"`; override individually
-    via `**field_overrides`. Unknown overrides for the kind are passed
-    through onto the detail `SimpleNamespace` (caller's responsibility
-    not to send cross-kind fields).
+    Detail fields default per their SQLAlchemy column type via
+    :func:`_column_default` — list-typed fields get ``[]``, enum-typed
+    Text fields get the registry value from :data:`_ENUM_DEFAULTS`,
+    other Text fields get ``f"stub {name}"``. Override individually
+    via ``**field_overrides``. Unknown overrides for the kind are
+    passed through onto the detail `SimpleNamespace` (caller's
+    responsibility not to send cross-kind fields).
     """
     spec = POST_KINDS[kind]
-    detail_values: dict[str, Any] = {f: f"stub {f}" for f in spec.detail_fields}
+    detail_model = _DETAIL_MODELS[kind]
+    spec_field_names = set(spec.detail_fields)
+    detail_values: dict[str, Any] = {}
+    for col in detail_model.__table__.columns:
+        if col.name not in spec_field_names:
+            # `spec.detail_fields` excludes `post_id` — skip anything
+            # the spec wouldn't consider a user-facing field.
+            continue
+        detail_values[col.name] = _column_default(col, kind)
     detail_values.update(field_overrides)
     detail = SimpleNamespace(**detail_values)
 

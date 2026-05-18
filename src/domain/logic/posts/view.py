@@ -83,9 +83,9 @@ def insurance_posture_for_post(post) -> str | None:
         }.get(detail.network_preference)
     if kind == "provider_availability":
         detail = getattr(post, "provider_availability_detail", None)
-        if detail is None or detail.provider is None:
+        provider = getattr(detail, "provider", None) if detail is not None else None
+        if provider is None:
             return None
-        provider = detail.provider
         if provider.in_network_carriers:
             return "in_network"
         if provider.accepts_out_of_network:
