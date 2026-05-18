@@ -134,37 +134,18 @@ def _setup_post_owner_actions_stub(app: FastAPI) -> None:
 
     @app.get("/posts/{post_id}")
     async def post_owner_actions_stub_page(request: Request, post_id: uuid.UUID):
-        # The detail template reads the per-kind detail relationship;
-        # `make_post_stub` populates it off `POST_KINDS`. Owner id
-        # equals post id here so the partial's owner-or-admin gate is a
-        # don't-care (current_user is a superuser).
-        #
-        # List- and enum-typed fields need realistic values rather than
-        # the `"stub <fieldname>"` defaults `make_post_stub` produces —
-        # the detail template iterates list fields and looks each item
-        # up in a display-label dict, which crashes when the field is a
-        # string ("stub age_groups" → iterating chars → KeyError on
-        # "s" in `CLIENT_AGE_GROUP_LABELS`). Scalar enum fields
-        # (location_in_person etc.) get the same treatment — the
-        # template renders their display label, which fails the
-        # lookup on a non-enum value. Hardcoding realistic values
-        # lets the detail page render so the Delete button is
-        # reachable and the contract surface (the button's HTTP shape)
-        # can be exercised.
+        # `make_post_stub` populates the per-kind detail relationship
+        # with realistic per-column defaults (JSON columns → `[]`,
+        # enum-typed Text columns → values from `_ENUM_DEFAULTS`) so
+        # the detail template renders cleanly without per-stub
+        # overrides. Owner id equals post id here so the partial's
+        # owner-or-admin gate is a don't-care (current_user is a
+        # superuser).
         post = make_post_stub(
             "client_referral",
             post_id=post_id,
             owner_id=post_id,
             owner_username="post_owner",
-            age_groups=["adults_25_64"],
-            languages=["en"],
-            services=[],
-            desired_times=[],
-            location_in_person="yes",
-            location_virtual="no",
-            gender="prefer_not_to_say",
-            network_preference="no_preference",
-            insurance_carrier=None,
         )
         # The mock auth in `run_consumer_server_process` makes current_user a
         # superuser when `posts_owner_actions=True`, so the partial's
