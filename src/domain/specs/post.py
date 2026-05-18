@@ -23,6 +23,8 @@ from src.domain.logic.posts.schema import (
     post_read_adapter,
     post_update_adapter,
 )
+from src.domain.logic.programs.repository import ProgramRepository
+from src.domain.logic.providers.repository import ProviderRepository
 from src.domain.models import POST_KINDS, Post
 from src.domain.models.enums import (
     CLIENT_AGE_GROUP_LABELS,
@@ -87,6 +89,7 @@ POST_ENTITY: Final[EntitySpec] = EntitySpec(
             choices=(
                 ("client_referral", "Seeking"),
                 ("provider_availability", "Providing"),
+                ("program_availability", "Program offering"),
             ),
             radio=True,
             value_type=Literal[*POST_KINDS.names],  # type: ignore[valid-type]
@@ -126,6 +129,21 @@ POST_ENTITY: Final[EntitySpec] = EntitySpec(
         ),
     ),
     update_redirect=Redirects.to_detail("posts", "post_id"),
+    # Wire-side authz on per-kind FK fields (#541). Dispatches on
+    # ``payload.kind``: PA's ``provider_id`` and Program-availability's
+    # ``program_id`` must point at rows the requesting user owns
+    # (superusers bypass). Pre-#541 there was *no* check on PA's
+    # ``provider_id`` despite the schema docstring claiming one;
+    # generalizing for the new kind closed that gap. See
+    # ``src/domain/logic/posts/handlers.py`` for the dispatcher and the
+    # tech-debt note on a per-kind registry shape.
+    payload_authz_path=(
+        "src.domain.logic.posts.handlers._assert_post_payload_target_ownership"
+    ),
+    payload_authz_repos=(
+        ("provider_repo", ProviderRepository),
+        ("program_repo", ProgramRepository),
+    ),
     discriminator=POST_KINDS,
     # The list page renders per-kind "New X" links from this tuple —
     # consumed by `src/domain/templates/posts/list.html`. Computed once at

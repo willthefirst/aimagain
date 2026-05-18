@@ -27,3 +27,13 @@ class User(SQLAlchemyBaseUserTable[uuid.UUID], BaseModel):
         lazy="selectin",
         viewonly=True,
     )
+    # Reverse of `Program.owner_id`. Mirrors `providers` above — the
+    # `program_availability` create form (#541) reads this off
+    # `current_user` to populate the Program-picker dropdown. Lazy
+    # `selectin` keeps the form's eager-load shape identical to PA.
+    programs = relationship(
+        "Program",
+        foreign_keys="Program.owner_id",
+        lazy="selectin",
+        viewonly=True,
+    )

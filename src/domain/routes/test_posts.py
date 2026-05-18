@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from src.domain.models import (
     ClientReferralDetail,
     Post,
+    Program,
     Provider,
     ProviderAvailabilityDetail,
     User,
@@ -18,8 +19,11 @@ from tests.helpers import (
     client_referral_payload,
     create_test_user,
     make_client_referral_detail,
+    make_organization_row,
+    make_program,
     make_provider_availability_detail,
     make_provider_with_org,
+    program_availability_payload,
     promote_to_admin,
     provider_availability_payload,
 )
@@ -1241,7 +1245,12 @@ async def test_search_page_renders_one_control_per_filter(
     # `None` on the attribute dict).
     radios = form.css('input[type="radio"][name="kind"]')
     values = {r.attributes.get("value") for r in radios}
-    assert values == {None, "client_referral", "provider_availability"}
+    assert values == {
+        None,
+        "client_referral",
+        "provider_availability",
+        "program_availability",
+    }
 
 
 async def test_toolbar_inline_active_filter_summary_collapses_beyond_two(
@@ -2358,3 +2367,236 @@ async def test_delete_provider_availability_writes_audit_row(
             "owner_id": str(logged_in_user.id),
         }
         assert rows[0].after is None
+
+
+# --- Program availability kind: end-to-end -------------------------------
+
+
+async def _seed_program_for_user(
+    db_test_session_manager,
+    *,
+    owner_id: uuid.UUID,
+    org_name: str = "RISE IOP at CHC",
+    program_name: str = "RISE Intensive Outpatient",
+) -> Program:
+    """Seed an Org + a Program owned by ``owner_id`` (#541). Returns the
+    persisted Program. The Org is found-or-created by name so multiple
+    Programs in one test can share the same Org."""
+    org = make_organization_row(owner_id=owner_id, name=org_name)
+    program = make_program(owner_id=owner_id, org_id=org.id, name=program_name)
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            session.add(org)
+            session.add(program)
+        await session.refresh(program)
+    return program
+
+
+async def test_create_program_availability_happy_path(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user: User,
+):
+    """`POST /posts` with `kind='program_availability'` persists the
+    parent + detail rows and writes a single `create_post` audit row."""
+    program = await _seed_program_for_user(
+        db_test_session_manager, owner_id=logged_in_user.id
+    )
+
+    response = await authenticated_client.post(
+        "/posts",
+        data=program_availability_payload(program_id=str(program.id)),
+    )
+    assert response.status_code == 201
+    new_id = uuid.UUID(response.json()["id"])
+
+    async with db_test_session_manager() as session:
+        result = await session.execute(select(Post).filter(Post.id == new_id))
+        persisted = result.scalars().first()
+        assert persisted is not None
+        assert persisted.kind == "program_availability"
+        assert persisted.program_availability_detail.program_id == program.id
+        assert persisted.provider_availability_detail is None
+        assert persisted.client_referral_detail is None
+        assert persisted.owner_id == logged_in_user.id
+
+    async with db_test_session_manager() as session:
+        repo = AuditRepository(session)
+        rows = await repo.list_for_resource(resource_type="post", resource_id=new_id)
+        assert len(rows) == 1
+        assert rows[0].action == "create_post"
+
+
+async def test_create_program_availability_rejects_unowned_program(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user: User,
+):
+    """``payload_authz`` (#541): a POST whose ``program_id`` points at
+    another user's Program returns 403."""
+    other = create_test_user(username=f"other-{uuid.uuid4()}")
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            session.add(other)
+    other_program = await _seed_program_for_user(
+        db_test_session_manager,
+        owner_id=other.id,
+        org_name=f"Others-{uuid.uuid4()}",
+    )
+
+    response = await authenticated_client.post(
+        "/posts",
+        data=program_availability_payload(program_id=str(other_program.id)),
+    )
+    assert response.status_code == 403
+
+
+async def test_create_program_availability_rejects_nonexistent_program(
+    authenticated_client: AsyncClient,
+    logged_in_user: User,
+):
+    """A POST with a bogus ``program_id`` returns 404 (no info leak;
+    also avoids the 500 the FK would otherwise produce)."""
+    bogus = uuid.uuid4()
+    response = await authenticated_client.post(
+        "/posts", data=program_availability_payload(program_id=str(bogus))
+    )
+    assert response.status_code == 404
+
+
+async def test_create_program_availability_superuser_bypass(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user: User,
+):
+    """Superusers bypass the ``payload_authz`` Program-ownership check."""
+    await promote_to_admin(db_test_session_manager, logged_in_user.email)
+    other = create_test_user(username=f"other-{uuid.uuid4()}")
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            session.add(other)
+    other_program = await _seed_program_for_user(
+        db_test_session_manager,
+        owner_id=other.id,
+        org_name=f"Others-{uuid.uuid4()}",
+    )
+
+    response = await authenticated_client.post(
+        "/posts",
+        data=program_availability_payload(program_id=str(other_program.id)),
+    )
+    assert response.status_code == 201
+
+
+async def test_get_program_availability_form_renders_program_picker(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user: User,
+):
+    """`GET /posts/form?kind=program_availability` renders a Program-
+    picker scoped to the user's owned Programs (#541)."""
+    program = await _seed_program_for_user(
+        db_test_session_manager, owner_id=logged_in_user.id
+    )
+    # An unowned Program in the DB to confirm it does NOT appear.
+    other = create_test_user(username=f"other-{uuid.uuid4()}")
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            session.add(other)
+    other_program = await _seed_program_for_user(
+        db_test_session_manager,
+        owner_id=other.id,
+        org_name=f"Others-{uuid.uuid4()}",
+        program_name="Other Program",
+    )
+
+    response = await authenticated_client.get("/posts/form?kind=program_availability")
+    assert response.status_code == 200
+    tree = HTMLParser(response.text)
+    select = tree.css_first("select#program_id")
+    assert select is not None
+    values = {opt.attributes.get("value") for opt in select.css("option")}
+    assert str(program.id) in values
+    assert str(other_program.id) not in values
+    kind_input = tree.css_first('input[name="kind"]')
+    assert kind_input is not None
+    assert kind_input.attributes.get("value") == "program_availability"
+
+
+async def test_patch_program_availability_rejects_unowned_program(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user: User,
+):
+    """The ``payload_authz`` hook fires on PATCH too — repointing
+    ``program_id`` at another user's Program is 403."""
+    program = await _seed_program_for_user(
+        db_test_session_manager, owner_id=logged_in_user.id
+    )
+
+    # Create the post the normal way.
+    response = await authenticated_client.post(
+        "/posts", data=program_availability_payload(program_id=str(program.id))
+    )
+    assert response.status_code == 201
+    post_id = uuid.UUID(response.json()["id"])
+
+    # Now an unowned target Program.
+    other = create_test_user(username=f"other-{uuid.uuid4()}")
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            session.add(other)
+    other_program = await _seed_program_for_user(
+        db_test_session_manager,
+        owner_id=other.id,
+        org_name=f"Others-{uuid.uuid4()}",
+    )
+
+    response = await authenticated_client.patch(
+        f"/posts/{post_id}",
+        data={
+            "kind": "program_availability",
+            "program_id": str(other_program.id),
+        },
+    )
+    assert response.status_code == 403
+
+
+# --- Provider-availability payload_authz coverage (gap closed by #541) ---
+
+
+async def test_create_provider_availability_rejects_unowned_provider(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user: User,
+):
+    """Coverage for the security gap closed alongside #541: pre-existing
+    PA posts had a schema docstring claiming "the route handler verifies
+    ownership at write time" but no handler implemented the check.
+    The dispatching ``payload_authz`` callable on `POST_ENTITY` closes
+    that gap — a POST referencing another user's Provider is 403."""
+    other = create_test_user(username=f"other-{uuid.uuid4()}")
+    provider = make_provider_with_org(owner_id=other.id, practice_name="Other Co")
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            session.add(other)
+            session.add(provider)
+
+    response = await authenticated_client.post(
+        "/posts",
+        data=provider_availability_payload(provider_id=str(provider.id)),
+    )
+    assert response.status_code == 403
+
+
+async def test_create_provider_availability_rejects_nonexistent_provider(
+    authenticated_client: AsyncClient,
+    logged_in_user: User,
+):
+    """A POST with a bogus ``provider_id`` returns 404 (no info leak)."""
+    bogus = uuid.uuid4()
+    response = await authenticated_client.post(
+        "/posts",
+        data=provider_availability_payload(provider_id=str(bogus)),
+    )
+    assert response.status_code == 404

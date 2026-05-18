@@ -5,6 +5,7 @@ from jinja2 import Environment, FileSystemLoader, select_autoescape
 
 from src.domain.logic.posts.schema import (
     ClientReferralCreate,
+    ProgramAvailabilityCreate,
     ProviderAvailabilityCreate,
 )
 from src.domain.models import enums
@@ -119,6 +120,7 @@ _env.globals.update(
     # pass the right schema to `field_for` without context-routing
     # changes. Per-kind form templates pick which to pass.
     provider_availability_create_schema=ProviderAvailabilityCreate,
+    program_availability_create_schema=ProgramAvailabilityCreate,
     client_referral_create_schema=ClientReferralCreate,
 )
 

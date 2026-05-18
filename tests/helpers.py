@@ -9,6 +9,8 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from src.domain.models import (
     ClientReferralDetail,
     Organization,
+    Program,
+    ProgramAvailabilityDetail,
     Provider,
     ProviderAvailabilityDetail,
     ProviderCertification,
@@ -114,6 +116,63 @@ def provider_availability_payload(**overrides: Any) -> dict[str, Any]:
 def make_client_referral_detail(**overrides: Any) -> ClientReferralDetail:
     """Build a `ClientReferralDetail` ORM row with spec-compliant defaults."""
     return ClientReferralDetail(**{**_CLIENT_REFERRAL_DEFAULTS, **overrides})
+
+
+# Program-availability mirrors PA's shape: an FK to the target row plus the
+# same per-announcement field set (#541). Pydantic-side and ORM-side
+# factories below use the same defaults to keep round-trip tests aligned.
+
+_PROGRAM_AVAILABILITY_DEFAULTS: dict[str, Any] = {
+    "description": None,
+    "referral_instructions": None,
+    "website": None,
+    "desired_times": [],
+    "schedule_text": None,
+    "services": ["evaluation"],
+    "settings": ["outpatient"],
+    "treatment_modality": None,
+    "age_groups": ["adults_25_64"],
+    "languages": ["en"],
+    "genders": [],
+}
+
+# Stub program_id for schema-validation tests that never hit the DB.
+# Real round-trip tests pass an actual Program's id via the kwarg.
+_STUB_PROGRAM_ID = uuid.UUID("00000000-0000-0000-0000-000000000002")
+
+
+def program_availability_payload(**overrides: Any) -> dict[str, Any]:
+    """Build a wire-valid `kind='program_availability'` create/update payload (#541).
+    Returns a fresh dict each call. `program_id` defaults to a stub UUID
+    that passes Pydantic validation but does *not* exist in the DB —
+    tests that actually persist must pass a real program_id override."""
+    return {
+        "kind": "program_availability",
+        "program_id": str(_STUB_PROGRAM_ID),
+        **_PROGRAM_AVAILABILITY_DEFAULTS,
+        **overrides,
+    }
+
+
+def make_program_availability_detail(
+    *, program_id: UUID, **overrides: Any
+) -> ProgramAvailabilityDetail:
+    """Build a `ProgramAvailabilityDetail` ORM row with spec-compliant
+    defaults. `program_id` is a required kwarg — making it required
+    turns "I forgot the FK" into a `TypeError` at the factory call site
+    instead of a `NOT NULL` violation at flush time (mirrors
+    :func:`make_provider_availability_detail`)."""
+    return ProgramAvailabilityDetail(
+        program_id=program_id, **{**_PROGRAM_AVAILABILITY_DEFAULTS, **overrides}
+    )
+
+
+def make_program(
+    *, owner_id: UUID, org_id: UUID, name: str = "RISE IOP", **overrides: Any
+) -> Program:
+    """Build a `Program` ORM row. ``owner_id`` and ``org_id`` are required
+    kwargs — both columns are NOT NULL on the model."""
+    return Program(owner_id=owner_id, org_id=org_id, name=name, **overrides)
 
 
 def make_provider_availability_detail(

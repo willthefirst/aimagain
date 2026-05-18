@@ -17,11 +17,19 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from sqlalchemy.types import Uuid
 
-from src.domain.models import ClientReferralDetail, Post, ProviderAvailabilityDetail
+from src.domain.models import (
+    ClientReferralDetail,
+    Post,
+    ProgramAvailabilityDetail,
+    ProviderAvailabilityDetail,
+)
 from src.framework.persistence.base_repository import BaseRepository
 from tests.helpers import (
     create_test_user,
     make_client_referral_detail,
+    make_organization_row,
+    make_program,
+    make_program_availability_detail,
     make_provider_availability_detail,
     make_provider_with_org,
 )
@@ -495,6 +503,107 @@ async def test_delete_post_cascades_provider_availability_detail(
             .first()
         )
         assert post_row is None
+        assert detail_row is None
+
+
+# --- Program availability kind ------------------------------------------
+
+
+async def _seed_owner_and_program(db_test_session_manager, *, name: str = "RISE IOP"):
+    """Seed a User + an Organization + a Program owned by the User
+    (#541). Returns ``(owner, program)``. Program-availability detail
+    rows point at a Program via ``program_id`` FK; persistence tests
+    that flush a row need a real Program row in the DB to satisfy the
+    FK."""
+    owner = create_test_user(username=f"owner-{uuid.uuid4()}")
+    org = make_organization_row(owner_id=owner.id, name=f"{name} Org")
+    program = make_program(owner_id=owner.id, org_id=org.id, name=name)
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            session.add(owner)
+            session.add(org)
+            session.add(program)
+        await session.refresh(program)
+    return owner, program
+
+
+async def test_create_post_persists_parent_and_program_availability_detail(
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+):
+    owner, program = await _seed_owner_and_program(
+        db_test_session_manager, name="RISE IOP"
+    )
+
+    async with db_test_session_manager() as session:
+        repo = BaseRepository(session)
+        post = Post(kind="program_availability", owner_id=owner.id)
+        detail = make_program_availability_detail(program_id=program.id)
+        created = await _create_post(repo, post, detail)
+        await session.commit()
+        post_id = created.id
+
+    async with db_test_session_manager() as session:
+        post_row = (
+            (await session.execute(select(Post).filter(Post.id == post_id)))
+            .scalars()
+            .first()
+        )
+        detail_row = (
+            (
+                await session.execute(
+                    select(ProgramAvailabilityDetail).filter(
+                        ProgramAvailabilityDetail.post_id == post_id
+                    )
+                )
+            )
+            .scalars()
+            .first()
+        )
+        assert post_row is not None
+        assert post_row.kind == "program_availability"
+        assert detail_row is not None
+        assert detail_row.program_id == program.id
+        # Dereferences the back_populated relationship so the template
+        # `post.program_availability_detail.program.name` access path
+        # is exercised at the ORM level here too.
+        assert detail_row.program.name == "RISE IOP"
+
+
+async def test_delete_post_cascades_program_availability_detail(
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+):
+    """Deleting a program_availability parent removes its detail row via
+    FK CASCADE — mirrors the PA cascade test."""
+    owner, program = await _seed_owner_and_program(db_test_session_manager)
+
+    async with db_test_session_manager() as session:
+        repo = BaseRepository(session)
+        created = await _create_post(
+            repo,
+            Post(kind="program_availability", owner_id=owner.id),
+            make_program_availability_detail(program_id=program.id),
+        )
+        await session.commit()
+        post_id = created.id
+
+    async with db_test_session_manager() as session:
+        repo = BaseRepository(session)
+        post = await repo.get_by_model_id(Post, post_id)
+        await repo.delete(post)
+        await session.commit()
+
+    async with db_test_session_manager() as session:
+        detail_row = (
+            (
+                await session.execute(
+                    select(ProgramAvailabilityDetail).filter(
+                        ProgramAvailabilityDetail.post_id == post_id
+                    )
+                )
+            )
+            .scalars()
+            .first()
+        )
         assert detail_row is None
 
 
