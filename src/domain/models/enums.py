@@ -476,6 +476,17 @@ CERTIFICATION_TYPES: Final[tuple[str, ...]] = (
     "ccatp",
     "other",
 )
+
+# Outcome of a single nightly verification attempt (#526). `verified` —
+# all checks passed; `needs_review` — a soft mismatch worth a human look
+# (e.g. NPPES name similarity below threshold); `failed` — a hard
+# disqualifier (NPI not in NPPES, or an OIG/LEIE match). One row per
+# attempt is appended; the latest row's status is what the UI surfaces.
+VERIFICATION_STATUSES: Final[tuple[str, ...]] = (
+    "verified",
+    "needs_review",
+    "failed",
+)
 CERTIFICATION_TYPES_LABELS: Final[dict[str, str]] = {
     "emdr": "EMDR",
     "dbt": "DBT Certification",

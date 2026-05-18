@@ -63,6 +63,16 @@ class AuditAction(str, Enum):
     ADD_FAVORITE = "add_favorite"
     REMOVE_FAVORITE = "remove_favorite"
     JOB_RUN_STARTED = "job_run_started"
+    # `Verification` is append-only — only `CREATE_VERIFICATION` ever
+    # fires. The triple is here (not just CREATE) because the
+    # verification logic cluster declares a single `AuditedResource`
+    # via `make_audited_resource(...)` (#528 / A4), and that helper
+    # requires all three members. See `_BESPOKE` in
+    # `test_audit_action_drift.py` for why these don't tie to an
+    # EntitySpec.
+    CREATE_VERIFICATION = "create_verification"
+    UPDATE_VERIFICATION = "update_verification"
+    DELETE_VERIFICATION = "delete_verification"
 
 
 Verb = Literal["create", "update", "delete"]

@@ -26,6 +26,7 @@ from .providers.provider_certification import ProviderCertification
 from .providers.provider_education import ProviderEducation
 from .providers.provider_licensure import ProviderLicensure
 from .users.user import User
+from .verifications.verification import Verification
 
 __all__ = [
     "AuditLog",
@@ -52,5 +53,6 @@ __all__ = [
     "US_STATES",
     "User",
     "UserFavorite",
+    "Verification",
     "metadata",
 ]

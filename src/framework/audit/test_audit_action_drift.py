@@ -19,10 +19,27 @@ from src.framework.audit.core import AuditAction
 # - `JOB_RUN_STARTED` is fired by APScheduler-driven background jobs in
 #   `src/jobs/` (system actor; `resource_type="job"`; per-run `resource_id`).
 #   There is no spec home: a "job ran" event has no `AuditedResource` shape.
+# - `CREATE_VERIFICATION` / `UPDATE_VERIFICATION` / `DELETE_VERIFICATION`
+#   back the `AuditedResource` declared in
+#   `src/domain/logic/verifications/handlers.py` (#528 / A4). Verification
+#   has no public CRUD surface — the orchestrator writes append-only rows
+#   from a bespoke trigger endpoint — so there is no EntitySpec for the
+#   drift checker to derive these from. `make_audited_resource("verification", ...)`
+#   still requires the full CREATE/UPDATE/DELETE triple as a precondition,
+#   which is why UPDATE and DELETE are listed even though only CREATE is
+#   wired to a callsite today.
 #
 # Keep tight: add an entry only when adding a corresponding
-# `record_audit(action=...)` callsite.
-_BESPOKE: frozenset[str] = frozenset({"REGISTER", "JOB_RUN_STARTED"})
+# `record_audit(action=...)` callsite or `AuditedResource` declaration.
+_BESPOKE: frozenset[str] = frozenset(
+    {
+        "REGISTER",
+        "JOB_RUN_STARTED",
+        "CREATE_VERIFICATION",
+        "UPDATE_VERIFICATION",
+        "DELETE_VERIFICATION",
+    }
+)
 
 
 def _expected_members() -> set[str]:

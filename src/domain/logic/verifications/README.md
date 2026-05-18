@@ -1,14 +1,18 @@
 # Verifications logic cluster
 
-Pure-function primitives for the provider verification pipeline. The orchestrator (#528) composes them with the persistence rails (#526) and an `httpx.AsyncClient` it owns.
+Persistence + pure-function primitives for the provider verification pipeline. The orchestrator (#528) composes them with an `httpx.AsyncClient` it owns.
 
 ## Files
 
+- `repository.py` — `VerificationRepository`. Append-only persistence. `record(...)` writes a single attempt; `latest_for_provider(...)` / `list_for_provider(...)` drive the admin UI's per-provider history view. No `update` / `delete` methods by design (see the model README's "Append-only by convention" section).
+- `schema.py` — `VerificationRead`, `VerificationCreate`. Both are server-only: there is no public CRUD endpoint; the orchestrator (#528) and the admin readers compose them directly.
 - `nppes.py` — `nppes_lookup(npi, *, http)` against the public CMS registry. Errors / timeouts degrade to `NppesResult(found=False, raw=None)` plus a logged warning — never raises.
 - `oig.py` — `oig_check(*, first_name, last_name, npi)` against the OIG/LEIE exclusion list (loaded from a CSV on disk). Module-level cache by absolute path; missing CSV degrades to "no match" with a single startup warning.
 - `scoring.py` — `score_verification(...)` table-driven rules over `(NppesResult, OigResult, provider name)` → `Score(status, flags, name_match_score)`. No I/O.
 
-(`__init__.py` is intentionally empty — these are imported directly via `src.domain.logic.verifications.nppes`/`.oig`/`.scoring`.)
+(`__init__.py` is intentionally empty — these are imported directly via `src.domain.logic.verifications.nppes`/`.oig`/`.scoring`/`.repository`/`.schema`.)
+
+Issue #528 will add `handlers.py` with the orchestrator + the bespoke trigger endpoint.
 
 ## Why pure functions, not classes
 
