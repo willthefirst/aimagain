@@ -15,6 +15,12 @@
 ]) }}
 {% endblock %}
 
+{% block actions %}
+{% if is_self %}
+<li><a href="{{ entity_form_url('provider') }}" role="button" class="outline">Create provider</a></li>
+{% endif %}
+{% endblock %}
+
 {% block content %}
 {% call index_table(
   items=providers,
@@ -25,7 +31,6 @@
 <p id="user-providers-empty">
   {% if is_self %}
   You have not created any providers yet.
-  <a href="{{ entity_form_url('provider') }}" role="button" class="outline">Create your first provider</a>
   {% else %}
   This user has no providers yet.
   {% endif %}

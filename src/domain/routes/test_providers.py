@@ -275,6 +275,48 @@ async def test_get_provider_hides_edit_link_for_non_owner(
     assert tree.css_first(f'a[href="/providers/{provider_id}/form"]') is None
 
 
+def _delete_provider_button(tree: HTMLParser, provider_id: uuid.UUID):
+    return tree.css_first(f'button[hx-delete="/providers/{provider_id}"]')
+
+
+async def test_get_provider_renders_delete_button_for_owner(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user: User,
+):
+    """The owner's detail view carries a Delete button in the toolbar
+    actions alongside Edit. The button is an `hx-delete` confirm button
+    (per `_shared/actions.html::confirm_delete_button`)."""
+    provider_id = await _seed_provider_for(
+        db_test_session_manager, user_id=logged_in_user.id, practice_name="Mine"
+    )
+
+    response = await authenticated_client.get(f"/providers/{provider_id}")
+    tree = HTMLParser(response.text)
+    button = _delete_provider_button(tree, provider_id)
+    assert button is not None
+    assert "Delete" in button.text()
+    assert button.attributes.get("hx-confirm")
+
+
+async def test_get_provider_hides_delete_button_for_non_owner(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user: User,
+):
+    """A non-owner viewing another user's provider sees neither the Edit
+    link nor the Delete button — both gated on `can_edit`."""
+    other = create_test_user(username=f"other-{uuid.uuid4()}")
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            session.add(other)
+    provider_id = await _seed_provider_for(db_test_session_manager, user_id=other.id)
+
+    response = await authenticated_client.get(f"/providers/{provider_id}")
+    tree = HTMLParser(response.text)
+    assert _delete_provider_button(tree, provider_id) is None
+
+
 # --- Provider listing -----------------------------------------------------
 
 
