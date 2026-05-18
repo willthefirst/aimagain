@@ -14,6 +14,7 @@ import uvicorn
 from fastapi import FastAPI, Request
 
 from src.auth_config import current_active_user, current_admin_user
+from src.domain import template_globals  # noqa: F401  # populates Jinja env globals
 from src.domain.logic.programs.schema import ProgramCreate
 from src.domain.logic.providers.schema import ProviderCreate
 from src.domain.models.enums import (
