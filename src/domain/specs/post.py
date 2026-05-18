@@ -17,6 +17,7 @@ Read by:
 
 from typing import Final, Literal
 
+from src.domain.logic.posts.repository import get_post_repository
 from src.domain.logic.posts.schema import (
     post_audit_snapshot,
     post_create_adapter,
@@ -41,7 +42,6 @@ from src.framework.dispatch.entity_spec import (
     RouteSet,
 )
 from src.framework.dispatch.filters import ChoiceFilter, TextFilter
-from src.framework.persistence.dependencies import get_post_repository
 
 POST_ENTITY: Final[EntitySpec] = EntitySpec(
     name="post",

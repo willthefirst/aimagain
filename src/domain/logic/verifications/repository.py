@@ -6,6 +6,7 @@ from sqlalchemy import select
 
 from src.domain.models import Verification
 from src.framework.persistence.base_repository import BaseRepository
+from src.framework.persistence.dependencies import register_repository
 
 
 class VerificationRepository(BaseRepository):
@@ -69,3 +70,6 @@ class VerificationRepository(BaseRepository):
             .order_by(Verification.created_at.desc())
         )
         return await self._list(stmt, offset=offset, limit=limit)
+
+
+get_verification_repository = register_repository(VerificationRepository)

@@ -20,18 +20,20 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, Response, status
 
 from src.auth_config import current_admin_user
-from src.domain.logic.providers.repository import ProviderRepository
+from src.domain.logic.providers.repository import (
+    ProviderRepository,
+    get_provider_repository,
+)
 from src.domain.logic.verifications.handlers import (
     handle_create_provider_verification,
 )
-from src.domain.logic.verifications.repository import VerificationRepository
-from src.domain.models import User
-from src.framework.audit.repository import AuditRepository
-from src.framework.persistence.dependencies import (
-    get_audit_repository,
-    get_provider_repository,
+from src.domain.logic.verifications.repository import (
+    VerificationRepository,
     get_verification_repository,
 )
+from src.domain.models import User
+from src.framework.audit.repository import AuditRepository
+from src.framework.persistence.dependencies import get_audit_repository
 
 verifications_api_router = APIRouter(tags=["Verifications"])
 
