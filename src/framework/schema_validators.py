@@ -16,9 +16,16 @@ anything used by exactly one schema module today.
 """
 
 import re
+import uuid
 from typing import Annotated, ClassVar
 
-from pydantic import AfterValidator, BaseModel, ConfigDict, model_validator
+from pydantic import (
+    AfterValidator,
+    BaseModel,
+    BeforeValidator,
+    ConfigDict,
+    model_validator,
+)
 
 from src.framework.rendering.form_fields import HtmlPattern
 
@@ -61,6 +68,20 @@ def _strip_optional(v: str | None) -> str | None:
     return v or None
 
 
+def _empty_str_to_none(v: object) -> object:
+    """Coerce empty/whitespace-only strings to ``None`` *before* the
+    field's own type validator runs. HTML forms can't omit a field —
+    a blank `<input>` posts as ``""`` — so optional non-string fields
+    typed as ``T | None`` need this BeforeValidator or Pydantic 422s
+    trying to parse ``""`` as the inner type (e.g. UUID).
+
+    Pass-through for non-strings so the actual type validator still
+    runs on real values."""
+    if isinstance(v, str) and v.strip() == "":
+        return None
+    return v
+
+
 # --- Annotated field types ----------------------------------------------
 #
 # Attach the cleaning rule to the field's type, not to a per-class
@@ -76,6 +97,11 @@ ZipText = Annotated[
     str, AfterValidator(_validate_zip), HtmlPattern(pattern=r"\d{5}", maxlength=5)
 ]
 StrippedOptionalText = Annotated[str | None, AfterValidator(_strip_optional)]
+# Optional UUID field whose source is an HTML form. A blank input posts
+# as ``""``; without `_empty_str_to_none` Pydantic 422s before the
+# `None` arm of `UUID | None` is considered. Use this alias for *any*
+# nullable-UUID Create/Update wire field bound to a `<input>`.
+OptionalUuid = Annotated[uuid.UUID | None, BeforeValidator(_empty_str_to_none)]
 
 
 # --- At-least-one-field rule --------------------------------------------
