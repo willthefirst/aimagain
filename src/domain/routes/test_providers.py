@@ -560,17 +560,22 @@ async def test_provider_detail_favorite_toggle_lives_in_toolbar(
     assert tree.css_first(f"article {favorite_selector}") is None
 
 
-async def test_provider_form_new_omits_bottom_back_link(
+async def test_provider_form_new_renders_form_actions_cluster(
     authenticated_client: AsyncClient,
     logged_in_user: User,
 ):
-    """`GET /providers/form` renders the create form with no redundant
-    bottom "Back to providers" link — primary nav is the way back."""
+    """`GET /providers/form` renders the standardized Save/Cancel
+    cluster (the `form_actions` macro). Cancel on the create page
+    points at the collection so a user can bail without leaving the
+    app's resource scope — matches the edit page's bottom Cancel."""
     response = await authenticated_client.get("/providers/form")
     assert response.status_code == 200
     tree = HTMLParser(response.text)
-    bottom_back = tree.css_first('a[href="/providers"][role="button"]')
-    assert bottom_back is None
+    actions = tree.css_first(".form-actions")
+    assert actions is not None
+    cancel = tree.css_first('.form-actions a[href="/providers"][role="button"]')
+    assert cancel is not None
+    assert cancel.text(strip=True) == "Cancel"
 
 
 async def test_provider_form_edit_renders_cancel(

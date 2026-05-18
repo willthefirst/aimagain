@@ -26,3 +26,32 @@ Example:
   <button type="submit">{{ submit_label }}</button>
 </form>
 {%- endmacro %}
+
+{# Standardized Save / Cancel / Delete cluster rendered at the bottom of
+every entity create/edit form. Visually a single right-aligned row on
+desktop, stacked column on mobile (see `.form-actions` in base.html).
+
+Slot semantics:
+  - `submit_label` — visible text on the Save button. Required.
+  - `cancel_url` — if set, renders a Cancel link styled as a secondary
+    outline button pointing at this URL. Create forms usually pass the
+    collection list; edit forms usually pass the resource's detail
+    page.
+  - `delete_url` + `delete_confirm` — if both set, renders a Delete
+    button issuing `hx-delete=<url>` with an `hx-confirm` dialog.
+    Delete sits right-aligned, separated from Save/Cancel to reduce
+    misfire risk.
+
+The Delete button uses `type="button"` so htmx-driven delete fires
+without submitting the enclosing form. #}
+{% macro form_actions(submit_label, cancel_url=None, delete_url=None, delete_confirm=None) -%}
+<div class="form-actions">
+  <button type="submit">{{ submit_label }}</button>
+  {%- if cancel_url %}
+  <a href="{{ cancel_url }}" role="button" class="secondary outline">Cancel</a>
+  {%- endif %}
+  {%- if delete_url and delete_confirm %}
+  <button type="button" class="contrast form-actions-destructive" hx-delete="{{ delete_url }}" hx-confirm="{{ delete_confirm }}">Delete</button>
+  {%- endif %}
+</div>
+{%- endmacro %}

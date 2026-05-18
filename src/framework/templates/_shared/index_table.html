@@ -39,14 +39,22 @@ scope to it.
 #}
 {% macro index_table(items, headers, row, empty=None, id=None, row_kwargs={}, header_kwargs={}) -%}
 {% if items %}
-<table{% if id %} id="{{ id }}"{% endif %} role="grid">
-  <thead><tr>{{ headers(**header_kwargs) }}</tr></thead>
-  <tbody>
-    {%- for item in items %}
+{# Pico's `overflow-auto` wrapper (https://picocss.com/docs/overflow-auto)
+   gives the table a horizontal scroll container on narrow viewports so a
+   wide row doesn't blow out the page width. Applied here so every list
+   that goes through `index_table` gets the same treatment — bespoke
+   tables outside this macro (e.g. organizations/programs) wrap
+   themselves. #}
+<div class="overflow-auto">
+  <table{% if id %} id="{{ id }}"{% endif %} role="grid">
+    <thead><tr>{{ headers(**header_kwargs) }}</tr></thead>
+    <tbody>
+      {%- for item in items %}
 {{ row(item, **row_kwargs) }}
-    {%- endfor %}
-  </tbody>
-</table>
+      {%- endfor %}
+    </tbody>
+  </table>
+</div>
 {%- else -%}
 {% if caller %}{{ caller() }}{% else %}<p>{{ empty }}</p>{% endif %}
 {%- endif %}

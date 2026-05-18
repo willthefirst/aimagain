@@ -18,34 +18,44 @@ checkboxes as `desired_times=monday_am&desired_times=friday_pm`,
 which FastAPI/Pydantic parses as a list.
 #}
 {%- from "_shared/form_fields.html" import text_field, textarea_field, select_field, time_grid_field, multi_select_field, field_for -%}
-{%- macro client_referral_form(hx_method, action, submit_label, post=None, schema=None) -%}
+{%- from "_shared/forms.html" import form_actions -%}
+{%- macro client_referral_form(hx_method, action, submit_label, post=None, schema=None, cancel_url=None) -%}
 {%- set d = post.client_referral_detail if post else None -%}
 <form hx-{{ hx_method }}="{{ action }}">
   <input type="hidden" name="kind" value="client_referral" />
 
   <fieldset>
     <legend>Client location</legend>
-    {{ text_field("location_city", "City", current=d.location_city if d else None) }}
-    {{ select_field("location_state", "State", US_STATES, current=d.location_state if d else None, placeholder=true) }}
-    {{ text_field("location_zip", "ZIP", current=d.location_zip if d else None, pattern="\\d{5}", maxlength=5) }}
-    {{ select_field("location_in_person", "In-person sessions", LOCATION_AVAILABILITY_OPTIONS, labels=LOCATION_AVAILABILITY_LABELS, current=d.location_in_person if d else None, placeholder=true) }}
-    {{ select_field("location_virtual", "Virtual sessions", LOCATION_AVAILABILITY_OPTIONS, labels=LOCATION_AVAILABILITY_LABELS, current=d.location_virtual if d else None, placeholder=true) }}
-    {{ time_grid_field("desired_times", "Desired times (optional)", current=d.desired_times if d else None) }}
+    <div class="grid">
+      {{ text_field("location_city", "City", current=d.location_city if d else None) }}
+      {{ select_field("location_state", "State", US_STATES, current=d.location_state if d else None, placeholder=true) }}
+      {{ text_field("location_zip", "ZIP", current=d.location_zip if d else None, pattern="\\d{5}", maxlength=5) }}
+    </div>
+    <div class="grid">
+      {{ select_field("location_in_person", "In-person sessions", LOCATION_AVAILABILITY_OPTIONS, labels=LOCATION_AVAILABILITY_LABELS, current=d.location_in_person if d else None, placeholder=true) }}
+      {{ select_field("location_virtual", "Virtual sessions", LOCATION_AVAILABILITY_OPTIONS, labels=LOCATION_AVAILABILITY_LABELS, current=d.location_virtual if d else None, placeholder=true) }}
+    </div>
+    {{ time_grid_field("desired_times", "Desired times", current=d.desired_times if d else None) }}
+    <small>Optional.</small>
   </fieldset>
 
   <fieldset>
     <legend>Demographics</legend>
-    {{ field_for(schema, "age_groups", "Age groups (select all that apply)", current=d.age_groups if d else None) }}
+    {{ field_for(schema, "age_groups", "Age groups", current=d.age_groups if d else None) }}
+    <small>Select all that apply.</small>
     {{ field_for(schema, "languages", "Languages spoken", current=d.languages if d else None) }}
     {{ select_field("gender", "Gender identity", GENDERS, labels=GENDER_LABELS, current=d.gender if d else None) }}
   </fieldset>
 
-  {{ textarea_field("description", "Description (no PII)", current=d.description if d else None) }}
+  {{ textarea_field("description", "Description", current=d.description if d else None) }}
+  <small>No PII.</small>
 
   <fieldset>
     <legend>Services</legend>
-    {{ multi_select_field("services", "Services (optional)", CLIENT_REFERRAL_SERVICES, labels=CLIENT_REFERRAL_SERVICE_LABELS, current=d.services if d else None) }}
-    {{ text_field("treatment_modality", "Psychotherapy modality (optional, e.g. DBT, EMDR)", current=d.treatment_modality if d else None, required=false) }}
+    {{ multi_select_field("services", "Services", CLIENT_REFERRAL_SERVICES, labels=CLIENT_REFERRAL_SERVICE_LABELS, current=d.services if d else None) }}
+    <small>Optional.</small>
+    {{ text_field("treatment_modality", "Psychotherapy modality", current=d.treatment_modality if d else None, required=false) }}
+    <small>Optional. e.g. DBT, EMDR.</small>
   </fieldset>
 
   {# Insurance: two controls. `network_preference` is the referrer's
@@ -58,13 +68,15 @@ which FastAPI/Pydantic parses as a list.
      unset rather than enforcing the invariant on the wire. #}
   <fieldset>
     <legend>Insurance</legend>
-    {{ select_field("network_preference", "Network preference", NETWORK_PREFERENCES, labels=NETWORK_PREFERENCE_LABELS, current=d.network_preference if d else None, placeholder=true) }}
-    <div data-cr-carrier{% if d and d.network_preference == "no_preference" %} hidden{% endif %}>
-      {{ select_field("insurance_carrier", "Insurance carrier", INSURANCE_CARRIERS, labels=INSURANCE_CARRIER_LABELS, current=d.insurance_carrier if d else None, placeholder=true, required=false) }}
+    <div class="grid">
+      {{ select_field("network_preference", "Network preference", NETWORK_PREFERENCES, labels=NETWORK_PREFERENCE_LABELS, current=d.network_preference if d else None, placeholder=true) }}
+      <div data-cr-carrier{% if d and d.network_preference == "no_preference" %} hidden{% endif %}>
+        {{ select_field("insurance_carrier", "Insurance carrier", INSURANCE_CARRIERS, labels=INSURANCE_CARRIER_LABELS, current=d.insurance_carrier if d else None, placeholder=true, required=false) }}
+      </div>
     </div>
   </fieldset>
 
-  <button type="submit">{{ submit_label }}</button>
+  {{ form_actions(submit_label, cancel_url=cancel_url) }}
 </form>
 <script>
   // Hide the insurance_carrier control when the referrer has no

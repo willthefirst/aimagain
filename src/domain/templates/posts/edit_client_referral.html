@@ -8,7 +8,5 @@
 {% block current_label %}Post{% endblock %}
 
 {% block content %}
-{{ client_referral_form("patch", entity_url('post', id=post.id), "Save changes", post=post, schema=client_referral_create_schema) }}
-
-<p><a href="{{ entity_url('post', id=post.id) }}" role="button" class="secondary outline">Cancel</a></p>
+{{ client_referral_form("patch", entity_url('post', id=post.id), "Save changes", post=post, schema=client_referral_create_schema, cancel_url=entity_url('post', id=post.id)) }}
 {% endblock %}

@@ -1,5 +1,6 @@
 {% extends "views/form_new.html" %}
 {%- from "_shared/form_fields.html" import field_for, radio_bool_field, text_field -%}
+{%- from "_shared/forms.html" import form_actions -%}
 
 {% set resource_url = entity_url('program') %}
 
@@ -27,14 +28,24 @@
       <small>Don't see your organization? <a href="{{ entity_form_url('organization') }}">Create one first</a>.</small>
     </label>
     {{ field_for(schema, "name", "Name") }}
-    {{ field_for(schema, "description", "Description (optional)") }}
+    {{ field_for(schema, "description", "Description", required=false) }}
+    <small>Optional.</small>
   </fieldset>
 
   <fieldset>
     <legend>State &amp; dates</legend>
-    {{ field_for(schema, "state_preference", "State served (optional)") }}
-    {{ text_field("start_date", "Start date (optional, YYYY-MM-DD)", required=false, pattern="\\d{4}-\\d{2}-\\d{2}", maxlength=10) }}
-    {{ text_field("end_date", "End date (optional, YYYY-MM-DD)", required=false, pattern="\\d{4}-\\d{2}-\\d{2}", maxlength=10) }}
+    {{ field_for(schema, "state_preference", "State served", required=false) }}
+    <div class="grid">
+      <label>
+        Start date
+        <input type="date" name="start_date" />
+      </label>
+      <label>
+        End date
+        <input type="date" name="end_date" />
+      </label>
+    </div>
+    <small>All three above are optional.</small>
   </fieldset>
 
   <fieldset>
@@ -42,6 +53,6 @@
     {{ radio_bool_field("accepting_referrals", "Accepting referrals?", current=true, required=false) }}
   </fieldset>
 
-  <button type="submit">Create program</button>
+  {{ form_actions("Create program", cancel_url=entity_url('program')) }}
 </form>
 {% endblock %}
