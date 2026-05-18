@@ -1,4 +1,8 @@
-from src.framework.audit.log import AuditLog
+# Side-effect import: AuditLog is framework-owned (`framework/audit/log.py`)
+# but the class declaration must run before Alembic reads `metadata` here,
+# otherwise `audit_log` won't be registered for autogenerate. Direct
+# consumers should import from `src.framework.audit.log`, not from here.
+from src.framework.audit.log import AuditLog  # noqa: F401
 from src.framework.persistence.base_model import Base, BaseModel, metadata
 
 from .enums import (
@@ -30,7 +34,6 @@ from .users.user import User
 from .verifications.verification import Verification
 
 __all__ = [
-    "AuditLog",
     "Base",
     "BaseModel",
     "CLIENT_AGE_GROUPS",

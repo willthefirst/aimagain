@@ -1,50 +1,56 @@
-"""Tests for `dependencies.py` — the generated resolver factory.
+"""Tests for `dependencies.py` — the repository DI registry.
 
-Verifies that every repository class in `_REPO_TYPES` has a working
-resolver registered in `_REPO_TYPE_RESOLVERS`, that the public
-`get_<entity>_repository` names map to the generated resolvers, and
-that `resolver_for` raises `UnknownRepoTypeError` for an unregistered
-class.
+The registry is populated by side-effect: framework-owned repositories
+register at import time of `dependencies.py` itself; domain repositories
+register at import time of their own module. These tests exercise the
+registration primitive directly and verify the imported entity resolvers
+are wired correctly.
 """
 
 import pytest
 
-from src.domain.logic.favorites.repository import UserFavoriteRepository
-from src.domain.logic.providers.repository import ProviderRepository
-from src.domain.logic.users.repository import UserRepository
+from src.domain.logic.favorites.repository import (
+    UserFavoriteRepository,
+    get_user_favorite_repository,
+)
+from src.domain.logic.providers.repository import (
+    ProviderRepository,
+    get_provider_repository,
+)
+from src.domain.logic.users.repository import UserRepository, get_user_repository
 from src.framework.audit.repository import AuditRepository
-from src.framework.persistence import dependencies as deps
 from src.framework.persistence.base_repository import BaseRepository
 from src.framework.persistence.dependencies import (
     _REPO_TYPE_RESOLVERS,
-    _REPO_TYPES,
     UnknownRepoTypeError,
     get_audit_repository,
     get_base_repository,
-    get_provider_repository,
-    get_user_favorite_repository,
-    get_user_repository,
+    make_repo_resolver,
+    register_repository,
     resolver_for,
 )
 
-
-def test_every_repo_type_has_a_resolver():
-    for cls in _REPO_TYPES:
-        assert cls in _REPO_TYPE_RESOLVERS
+# --- register_repository ----------------------------------------------------
 
 
-def test_public_names_match_registry():
-    """The public `get_<entity>_repository` exports are direct bindings
-    to the generated resolvers — same callables, not lookalikes."""
-    pairs = [
-        (UserRepository, get_user_repository),
-        (BaseRepository, get_base_repository),
-        (AuditRepository, get_audit_repository),
-        (ProviderRepository, get_provider_repository),
-        (UserFavoriteRepository, get_user_favorite_repository),
-    ]
-    for cls, public_resolver in pairs:
-        assert _REPO_TYPE_RESOLVERS[cls] is public_resolver
+class SampleRepository(BaseRepository):
+    pass
+
+
+def test_register_repository_returns_resolver_and_indexes_by_class():
+    resolver = register_repository(SampleRepository)
+    assert _REPO_TYPE_RESOLVERS[SampleRepository] is resolver
+    assert resolver_for(SampleRepository) is resolver
+
+
+def test_register_repository_builds_named_resolver():
+    """`__name__` follows `get_<snake_case>_repository` so stack traces
+    stay readable when FastAPI logs the dep chain."""
+    resolver = register_repository(SampleRepository)
+    assert resolver.__name__ == "get_sample_repository"
+
+
+# --- resolver_for -----------------------------------------------------------
 
 
 def test_resolver_for_returns_registered_resolver():
@@ -55,8 +61,41 @@ def test_resolver_for_raises_on_unknown_type():
     class _NotARepo:
         pass
 
-    with pytest.raises(UnknownRepoTypeError):
+    with pytest.raises(UnknownRepoTypeError) as exc_info:
         resolver_for(_NotARepo)
+    # The error message names the missing class and tells the caller
+    # which function to call — the fix should be obvious from the trace.
+    assert "_NotARepo" in str(exc_info.value)
+    assert "register_repository" in str(exc_info.value)
+
+
+# --- framework-owned bootstrap ---------------------------------------------
+
+
+def test_framework_owned_repositories_are_preregistered():
+    """`BaseRepository` and `AuditRepository` live under `framework/` and
+    register at the bottom of `dependencies.py`. Without this, the
+    dispatch synthesis would error before any domain repo imports."""
+    assert BaseRepository in _REPO_TYPE_RESOLVERS
+    assert AuditRepository in _REPO_TYPE_RESOLVERS
+    assert get_base_repository is _REPO_TYPE_RESOLVERS[BaseRepository]
+    assert get_audit_repository is _REPO_TYPE_RESOLVERS[AuditRepository]
+
+
+# --- domain-side resolvers --------------------------------------------------
+
+
+def test_domain_resolvers_are_bound_by_their_module():
+    """Each domain repo module owns its own `get_<entity>_repository`
+    binding (returned by `register_repository`). Spec files import that
+    binding, not the framework module."""
+    pairs = [
+        (UserRepository, get_user_repository),
+        (ProviderRepository, get_provider_repository),
+        (UserFavoriteRepository, get_user_favorite_repository),
+    ]
+    for cls, public_resolver in pairs:
+        assert _REPO_TYPE_RESOLVERS[cls] is public_resolver
 
 
 def test_generated_resolver_returns_an_instance():
@@ -70,8 +109,13 @@ def test_generated_resolver_returns_an_instance():
     assert isinstance(provider_repo, ProviderRepository)
 
 
-def test_resolver_name_matches_convention():
-    """``_resolver.__name__`` should be ``get_<snake_case>_repository`` so
-    stack traces stay readable."""
-    assert deps.get_user_repository.__name__ == "get_user_repository"
-    assert deps.get_user_favorite_repository.__name__ == "get_user_favorite_repository"
+# --- make_repo_resolver -----------------------------------------------------
+
+
+def test_make_repo_resolver_is_independent_of_registration():
+    """The factory is public so callers that want to build a resolver
+    without registering can; `register_repository` composes both."""
+    resolver = make_repo_resolver(SampleRepository)
+    assert resolver.__name__ == "get_sample_repository"
+    sentinel_session = object()
+    assert isinstance(resolver(session=sentinel_session), SampleRepository)

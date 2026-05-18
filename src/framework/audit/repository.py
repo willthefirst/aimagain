@@ -9,7 +9,7 @@ from uuid import UUID
 
 from sqlalchemy import select
 
-from src.domain.models import AuditLog
+from src.framework.audit.log import AuditLog
 from src.framework.persistence.base_repository import BaseRepository
 
 

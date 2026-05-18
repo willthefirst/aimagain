@@ -9,6 +9,7 @@ single :func:`mount_entity` call with no bespoke handler overrides.
 from typing import Final
 
 from src.domain.logic.organizations.repository import OrganizationRepository
+from src.domain.logic.programs.repository import get_program_repository
 from src.domain.logic.programs.schema import (
     ProgramCreate,
     ProgramRead,
@@ -22,7 +23,6 @@ from src.framework.dispatch.entity_spec import (
     Redirects,
     RouteSet,
 )
-from src.framework.persistence.dependencies import get_program_repository
 
 _program_form_redirect = Redirects.to_edit_form("programs", "program_id")
 

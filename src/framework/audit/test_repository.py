@@ -11,7 +11,8 @@ import uuid
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from src.domain.models import AuditLog, User
+from src.domain.models import User
+from src.framework.audit.log import AuditLog
 from src.framework.audit.repository import AuditRepository
 from tests.helpers import create_test_user
 

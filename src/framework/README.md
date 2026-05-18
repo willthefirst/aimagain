@@ -28,4 +28,8 @@ Per-mount docstrings in [`dispatch/resource_routes.py`](dispatch/resource_routes
 
 ## Import discipline
 
-Framework code reads specs **via parameters, not via imports** — nothing under this directory imports from `src/domain/` at module load time. The model hub at `src/domain/models/__init__.py` is allowed as a runtime import (the SQLAlchemy classes the repos operate on).
+Framework code reads specs **via parameters, not via imports**. Framework-owned SQLAlchemy classes (`Base`, `BaseModel`, `AuditLog`) live under `framework/` and are imported directly there; the audit framework owns `AuditLog` at [`audit/log.py`](audit/log.py), not through a domain re-export.
+
+The auth-resolved actor is typed via the structural [`Actor` protocol](actor.py), so generic handlers (`dispatch/handlers.py`), audit (`audit/core.py`), authz predicates (`authz.py`), and chrome context (`http/responses.py`) take `Actor` / `Actor | None` instead of a concrete domain `User`. The domain's `User` model satisfies the protocol by structure; tests can pass a `SimpleNamespace`.
+
+Repository DI follows the same direction: each `src/domain/logic/<entity>/repository.py` calls `register_repository(<EntityRepository>)` (defined in [`persistence/dependencies.py`](persistence/dependencies.py)) at module load, binding the returned resolver to `get_<entity>_repository`. Spec files then `from src.domain.logic.<entity>.repository import get_<entity>_repository`. The framework keeps the type → resolver registry it reads at mount time, but doesn't know which entity classes exist.

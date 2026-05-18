@@ -5,6 +5,7 @@ from sqlalchemy import select
 
 from src.domain.models import Provider, UserFavorite
 from src.framework.persistence.base_repository import BaseRepository
+from src.framework.persistence.dependencies import register_repository
 
 
 class UserFavoriteRepository(BaseRepository):
@@ -58,3 +59,6 @@ class UserFavoriteRepository(BaseRepository):
         return (
             await self.get_by_pair(user_id=user_id, provider_id=provider_id)
         ) is not None
+
+
+get_user_favorite_repository = register_repository(UserFavoriteRepository)

@@ -13,7 +13,8 @@ from uuid import UUID
 
 from pydantic import BaseModel
 
-from src.domain.models import AuditLog, User
+from src.framework.actor import Actor
+from src.framework.audit.log import AuditLog
 from src.framework.audit.repository import AuditRepository
 
 logger = logging.getLogger(__name__)
@@ -170,7 +171,7 @@ async def mutate(
     repo: Any,
     audit_repo: AuditRepository,
     *,
-    actor: User,
+    actor: Actor,
     target: Any,
     resource: AuditedResource,
     verb: Verb,

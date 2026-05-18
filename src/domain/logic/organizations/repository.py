@@ -21,6 +21,7 @@ from sqlalchemy import select
 from src.domain.models import Organization
 from src.framework.http.exceptions import NotFoundError
 from src.framework.persistence.base_repository import BaseRepository
+from src.framework.persistence.dependencies import register_repository
 
 
 class OrganizationRepository(BaseRepository):
@@ -82,3 +83,6 @@ class OrganizationRepository(BaseRepository):
             obj.parent_org_id = new_parent_id
             obj.root_org_id = obj.id if resolved_root is None else resolved_root
         return await self._patch(obj, **fields)
+
+
+get_organization_repository = register_repository(OrganizationRepository)

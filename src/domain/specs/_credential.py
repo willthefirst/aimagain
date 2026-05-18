@@ -13,6 +13,7 @@ through it.
 
 from pydantic import BaseModel, TypeAdapter
 
+from src.domain.logic.providers.repository import get_provider_repository
 from src.domain.specs.provider import PROVIDER_ENTITY, _provider_form_redirect
 from src.framework.dispatch.entity_spec import (
     AUTHENTICATED,
@@ -20,7 +21,6 @@ from src.framework.dispatch.entity_spec import (
     EntitySpec,
     RouteSet,
 )
-from src.framework.persistence.dependencies import get_provider_repository
 
 
 def make_provider_credential_entity(
