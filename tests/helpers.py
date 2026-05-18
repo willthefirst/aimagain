@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 # Need ORM models
 from src.domain.models import (
     ClientReferralDetail,
+    Organization,
     Provider,
     ProviderAvailabilityDetail,
     ProviderCertification,
@@ -204,8 +205,74 @@ def certification_payload(**overrides: Any) -> dict[str, Any]:
 
 
 def make_provider(*, owner_id: UUID, **overrides: Any) -> Provider:
-    """Build a `Provider` ORM row with CHECK-valid defaults."""
+    """Build a `Provider` ORM row with CHECK-valid defaults.
+
+    PR 2 of the Org roadmap (#520) introduced ``Provider.org_id`` as a
+    NOT NULL FK. Callers persisting the returned row must either:
+
+    * pass ``org_id=<existing-org.id>`` in ``overrides`` (Org persisted
+      separately via ``make_organization_row`` + ``session.add``); or
+    * route the create through ``ProviderRepository.create``, which
+      find-or-creates an Org from ``practice_name``.
+
+    Bare ORM constructors without one of the above will trip the
+    ``NOT NULL`` constraint at flush time.
+    """
     return Provider(owner_id=owner_id, **{**_PROVIDER_DEFAULTS, **overrides})
+
+
+def make_organization_row(
+    *,
+    owner_id: UUID,
+    name: str = "Acme Health",
+    type_: str = "solo_practice",
+    org_id: UUID | None = None,
+) -> Organization:
+    """Build a root ``Organization`` ORM row that satisfies the
+    ``root_org_id`` invariant (root: ``root_org_id = id``,
+    ``parent_org_id = NULL``).
+
+    Assigns ``id`` eagerly so callers can pass ``org.id`` straight into
+    a sibling ``make_provider`` without an intermediate flush — mirrors
+    the eager assignment ``OrganizationRepository.create`` does."""
+    obj = Organization(
+        id=org_id or uuid.uuid4(),
+        name=name,
+        type=type_,
+        owner_id=owner_id,
+    )
+    obj.root_org_id = obj.id
+    return obj
+
+
+def make_provider_with_org(
+    *,
+    owner_id: UUID,
+    practice_name: str = "Acme Health",
+    org: Organization | None = None,
+    **overrides: Any,
+) -> Provider:
+    """Build a Provider wired to a matching Organization (PR 2 mirror
+    invariant: ``provider.practice_name == org.name``).
+
+    The Org is attached via ``provider.org = org`` rather than just
+    ``org_id`` so SQLAlchemy's default save-update cascade picks the
+    Org up when the Provider is added to a session — callers can stay
+    on the single-add ``session.add(provider)`` shape they used before
+    PR 2 introduced ``org_id``.
+
+    Pass ``org=<instance>`` when multiple Providers share an Org;
+    practice_name is taken from the Org in that case."""
+    if org is None:
+        org = make_organization_row(owner_id=owner_id, name=practice_name)
+    provider = make_provider(
+        owner_id=owner_id,
+        org_id=org.id,
+        practice_name=org.name,
+        **{k: v for k, v in overrides.items() if k != "practice_name"},
+    )
+    provider.org = org
+    return provider
 
 
 def make_provider_licensure(

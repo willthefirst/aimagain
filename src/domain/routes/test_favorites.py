@@ -15,7 +15,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from src.domain.models import AuditLog, User, UserFavorite
-from tests.helpers import create_test_user, make_provider
+from tests.helpers import create_test_user, make_provider_with_org
 
 pytestmark = pytest.mark.asyncio
 
@@ -26,7 +26,7 @@ async def _seed_provider(
     practice_name: str = "Acme Health",
 ) -> uuid.UUID:
     owner = create_test_user(username=f"owner-{uuid.uuid4()}")
-    provider = make_provider(owner_id=owner.id, practice_name=practice_name)
+    provider = make_provider_with_org(owner_id=owner.id, practice_name=practice_name)
     async with db_test_session_manager() as session:
         async with session.begin():
             session.add(owner)

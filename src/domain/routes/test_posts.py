@@ -18,8 +18,8 @@ from tests.helpers import (
     client_referral_payload,
     create_test_user,
     make_client_referral_detail,
-    make_provider,
     make_provider_availability_detail,
+    make_provider_with_org,
     promote_to_admin,
     provider_availability_payload,
 )
@@ -48,7 +48,9 @@ def _provider_availability_post(
     is added to a session — callers do `session.add(post)` and the
     Provider goes in too with the right FK order."""
     if provider is None:
-        provider = make_provider(owner_id=owner_id, practice_name=practice_name)
+        provider = make_provider_with_org(
+            owner_id=owner_id, practice_name=practice_name
+        )
     if provider.id is None:
         provider.id = uuid.uuid4()
     post = Post(kind="provider_availability", owner_id=owner_id)
@@ -224,7 +226,7 @@ async def test_list_provider_availability_item_shape(
     post = _provider_availability_post(
         practice_name=practice_name,
         owner_id=author.id,
-        provider=make_provider(
+        provider=make_provider_with_org(
             owner_id=author.id,
             practice_name=practice_name,
             location_city="Portland",
@@ -1062,7 +1064,7 @@ async def test_list_filters_by_state_across_polymorphic_paths(
     offering_nj = _provider_availability_post(
         practice_name=f"clinic-{uuid.uuid4()}",
         owner_id=author.id,
-        provider=make_provider(
+        provider=make_provider_with_org(
             owner_id=author.id,
             practice_name=f"clinic-{uuid.uuid4()}",
             location_state="NJ",
@@ -1071,7 +1073,7 @@ async def test_list_filters_by_state_across_polymorphic_paths(
     offering_tx = _provider_availability_post(
         practice_name=f"clinic-{uuid.uuid4()}",
         owner_id=author.id,
-        provider=make_provider(
+        provider=make_provider_with_org(
             owner_id=author.id,
             practice_name=f"clinic-{uuid.uuid4()}",
             location_state="TX",
@@ -1117,7 +1119,7 @@ async def test_list_filters_by_city_substring_across_polymorphic_paths(
     offering_match = _provider_availability_post(
         practice_name=f"clinic-{uuid.uuid4()}",
         owner_id=author.id,
-        provider=make_provider(
+        provider=make_provider_with_org(
             owner_id=author.id,
             practice_name=f"clinic-{uuid.uuid4()}",
             location_city="Spring Hill",
@@ -1974,7 +1976,9 @@ async def test_create_provider_availability_happy_path(
     practice_name = f"Acme-{uuid.uuid4()}"
     # PA points at a Provider via `provider_id` (#448); seed one owned by
     # the requesting user so the FK resolves at write time.
-    provider = make_provider(owner_id=logged_in_user.id, practice_name=practice_name)
+    provider = make_provider_with_org(
+        owner_id=logged_in_user.id, practice_name=practice_name
+    )
     async with db_test_session_manager() as session:
         async with session.begin():
             session.add(provider)
@@ -2031,7 +2035,7 @@ async def test_create_provider_availability_strips_whitespace(
 ):
     """Whitespace stripping applies to PA's remaining free-text wire fields.
     (Practice-name whitespace stripping is exercised on Provider post-#448.)"""
-    provider = make_provider(owner_id=logged_in_user.id)
+    provider = make_provider_with_org(owner_id=logged_in_user.id)
     async with db_test_session_manager() as session:
         async with session.begin():
             session.add(provider)
@@ -2077,7 +2081,7 @@ async def test_get_provider_availability_form_renders(
     """`GET /posts/form?kind=provider_availability` renders the kind-specific
     create form. Per #448, the form needs the user to own at least one
     Provider profile (otherwise it shows the create-a-provider stub)."""
-    provider = make_provider(owner_id=logged_in_user.id)
+    provider = make_provider_with_org(owner_id=logged_in_user.id)
     async with db_test_session_manager() as session:
         async with session.begin():
             session.add(provider)
@@ -2105,7 +2109,7 @@ async def test_provider_availability_form_renders_free_text_fields(
     marker on the schema), `website` as `<input type="url">` (driven by
     `HtmlUrl` — #446). A regression where either marker stops being picked
     up would render fields as the wrong control and silently break the form."""
-    provider = make_provider(owner_id=logged_in_user.id)
+    provider = make_provider_with_org(owner_id=logged_in_user.id)
     async with db_test_session_manager() as session:
         async with session.begin():
             session.add(provider)
@@ -2128,7 +2132,7 @@ async def test_provider_availability_form_renders_languages_multi_select(
     """`languages` renders as a `<select multiple>` via `field_for`'s
     `list[Literal[*T]]` arm (#425). Confirms the schema-driven multi-
     select dispatch is wired end-to-end through the unified widget."""
-    provider = make_provider(owner_id=logged_in_user.id)
+    provider = make_provider_with_org(owner_id=logged_in_user.id)
     async with db_test_session_manager() as session:
         async with session.begin():
             session.add(provider)
@@ -2152,7 +2156,7 @@ async def test_provider_availability_form_renders_age_groups_multi_select(
     """`age_groups` renders as a 7-option `<select multiple>` via
     `field_for`'s `list[Literal[*T]]` arm (#430). First 7-option consumer
     of the multi-select rails."""
-    provider = make_provider(owner_id=logged_in_user.id)
+    provider = make_provider_with_org(owner_id=logged_in_user.id)
     async with db_test_session_manager() as session:
         async with session.begin():
             session.add(provider)

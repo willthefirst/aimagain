@@ -11,7 +11,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from src.domain.models import Provider, User, UserFavorite
-from tests.helpers import create_test_user, make_provider
+from tests.helpers import create_test_user, make_provider_with_org
 
 pytestmark = pytest.mark.asyncio
 
@@ -21,7 +21,7 @@ async def _seed_user_and_provider(
 ) -> tuple[User, Provider]:
     user = create_test_user()
     owner = create_test_user()
-    provider = make_provider(owner_id=owner.id)
+    provider = make_provider_with_org(owner_id=owner.id)
     async with db_test_session_manager() as session:
         async with session.begin():
             session.add(user)

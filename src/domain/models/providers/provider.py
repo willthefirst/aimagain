@@ -39,6 +39,16 @@ class Provider(LocationMixin, BaseModel):
         nullable=False,
     )
     user = relationship("User")
+    # `org_id` is the source of truth for which Organization this
+    # Provider belongs to. `practice_name` is a denormalized mirror of
+    # `org.name` — see the README for the invariant + lifetime.
+    # TODO(roadmap-pr-3): drop `practice_name` and read `org.name`.
+    org_id = Column(
+        Uuid(as_uuid=True),
+        ForeignKey("organizations.id", ondelete="RESTRICT"),
+        nullable=False,
+    )
+    org = relationship("Organization", back_populates="providers")
     practice_name = Column(Text, nullable=False)
     in_person_sessions = Column(Text, nullable=False)
     virtual_sessions = Column(Text, nullable=False)

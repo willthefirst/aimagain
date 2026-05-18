@@ -38,10 +38,10 @@ from src.framework.dispatch.handlers import handle_create, handle_detail, handle
 from src.framework.http.exceptions import ForbiddenError, NotFoundError
 from tests.helpers import (
     create_test_user,
-    make_provider,
     make_provider_certification,
     make_provider_education,
     make_provider_licensure,
+    make_provider_with_org,
 )
 
 pytestmark = pytest.mark.asyncio
@@ -86,7 +86,7 @@ async def _seed_provider(
     with_education: bool = False,
     with_certification: bool = False,
 ) -> tuple[uuid.UUID, uuid.UUID | None, uuid.UUID | None, uuid.UUID | None]:
-    provider = make_provider(owner_id=user_id)
+    provider = make_provider_with_org(owner_id=user_id)
     async with db_test_session_manager() as session:
         async with session.begin():
             session.add(provider)

@@ -18,22 +18,30 @@ from src.domain.models import (
     ProviderEducation,
     ProviderLicensure,
 )
-from tests.helpers import create_test_user
+from tests.helpers import create_test_user, make_organization_row
 
 pytestmark = pytest.mark.asyncio
 
 
 def _make_provider(user, **overrides) -> Provider:
+    """Build an unbound Provider wired to a fresh root Organization so
+    the PR 2 NOT-NULL ``org_id`` + mirror invariant hold at flush time.
+    Save-update cascade picks the Org up via ``provider.org``; callers
+    can keep their pre-PR-2 ``session.add(provider)`` shape."""
+    practice_name = overrides.pop("practice_name", "Acme Health")
+    org = make_organization_row(owner_id=user.id, name=practice_name)
     defaults = dict(
         user=user,
-        practice_name="Acme Health",
+        practice_name=practice_name,
         location_city="Springfield",
         location_state="IL",
         location_zip="62701",
         in_person_sessions="yes",
         virtual_sessions="no",
     )
-    return Provider(**{**defaults, **overrides})
+    provider = Provider(org_id=org.id, **{**defaults, **overrides})
+    provider.org = org
+    return provider
 
 
 async def test_create_provider_persists(
@@ -72,17 +80,7 @@ async def test_provider_allows_multiple_per_user(
 
     async with db_test_session_manager() as session:
         async with session.begin():
-            session.add(
-                Provider(
-                    owner_id=user.id,
-                    practice_name="Other Practice",
-                    location_city="Springfield",
-                    location_state="IL",
-                    location_zip="62701",
-                    in_person_sessions="yes",
-                    virtual_sessions="no",
-                )
-            )
+            session.add(_make_provider(user, practice_name="Other Practice"))
 
         result = await session.execute(
             select(Provider).filter(Provider.owner_id == user.id)

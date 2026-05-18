@@ -53,3 +53,9 @@ class Organization(BaseModel):
         remote_side="Organization.id",
         foreign_keys=[parent_org_id],
     )
+    # Providers that belong to this Org. PR 2 of the roadmap (#520).
+    # Cascade is FK-side ``RESTRICT`` (deleting an Org with Providers
+    # fails loudly rather than silently orphaning); the ORM relationship
+    # is read-only from the Org side. PR 3+ adds the create form that
+    # picks an Org explicitly.
+    providers = relationship("Provider", back_populates="org")
