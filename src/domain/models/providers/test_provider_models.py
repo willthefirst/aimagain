@@ -24,15 +24,15 @@ pytestmark = pytest.mark.asyncio
 
 
 def _make_provider(user, **overrides) -> Provider:
-    """Build an unbound Provider wired to a fresh root Organization so
-    the PR 2 NOT-NULL ``org_id`` + mirror invariant hold at flush time.
-    Save-update cascade picks the Org up via ``provider.org``; callers
-    can keep their pre-PR-2 ``session.add(provider)`` shape."""
+    """Build an unbound Provider wired to a fresh root Organization.
+    The practice's display name lives on ``provider.org.name`` (#524);
+    ``practice_name=...`` kwarg here names the *Organization*. Save-
+    update cascade picks the Org up via ``provider.org`` so callers
+    keep their single ``session.add(provider)`` shape."""
     practice_name = overrides.pop("practice_name", "Acme Health")
     org = make_organization_row(owner_id=user.id, name=practice_name)
     defaults = dict(
         user=user,
-        practice_name=practice_name,
         location_city="Springfield",
         location_state="IL",
         location_zip="62701",
@@ -64,7 +64,7 @@ async def test_create_provider_persists(
             .first()
         )
         assert provider is not None
-        assert provider.practice_name == "Acme Health"
+        assert provider.org.name == "Acme Health"
 
 
 async def test_provider_allows_multiple_per_user(
@@ -87,7 +87,7 @@ async def test_provider_allows_multiple_per_user(
         )
         providers = result.scalars().all()
         assert len(providers) == 2
-        assert {p.practice_name for p in providers} == {"Acme Health", "Other Practice"}
+        assert {p.org.name for p in providers} == {"Acme Health", "Other Practice"}
 
 
 async def test_delete_provider_cascades_credentials(

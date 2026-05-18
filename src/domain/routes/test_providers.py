@@ -16,6 +16,7 @@ from src.domain.models import (
 from src.framework.audit.repository import AuditRepository
 from tests.helpers import (
     create_test_user,
+    make_organization_row,
     make_provider_certification,
     make_provider_education,
     make_provider_licensure,
@@ -28,6 +29,22 @@ pytestmark = pytest.mark.asyncio
 
 
 # --- Helpers -------------------------------------------------------------
+
+
+async def _seed_org(
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    *,
+    owner_id: uuid.UUID,
+    name: str = "Acme Therapy",
+) -> uuid.UUID:
+    """Insert a root Organization and return its id. Used by tests that
+    POST to ``/providers`` — the wire schema requires ``org_id`` (#524)
+    so each create test needs an Org persisted up front."""
+    org = make_organization_row(owner_id=owner_id, name=name)
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            session.add(org)
+    return org.id
 
 
 async def _seed_provider_for(
@@ -80,9 +97,12 @@ async def test_create_provider_happy_path(
 ):
     """POST /providers with a form-encoded body returns 201 + id and
     persists the provider and an audit row."""
+    org_id = await _seed_org(
+        db_test_session_manager, owner_id=logged_in_user.id, name="Acme Therapy"
+    )
     response = await authenticated_client.post(
         "/providers",
-        data=provider_payload(practice_name="Acme Therapy"),
+        data=provider_payload(org_id=str(org_id)),
     )
 
     assert response.status_code == 201
@@ -95,7 +115,8 @@ async def test_create_provider_happy_path(
         persisted = result.scalars().first()
         assert persisted is not None
         assert persisted.owner_id == logged_in_user.id
-        assert persisted.practice_name == "Acme Therapy"
+        assert persisted.org_id == org_id
+        assert persisted.org.name == "Acme Therapy"
 
     rows = await _audit_rows_for(
         db_test_session_manager,
@@ -114,14 +135,20 @@ async def test_create_provider_allows_multiple_per_user(
 ):
     """A user may own multiple providers. Two successive POSTs both
     return 201 and persist as distinct rows owned by the same user."""
+    org_first = await _seed_org(
+        db_test_session_manager, owner_id=logged_in_user.id, name="First"
+    )
+    org_second = await _seed_org(
+        db_test_session_manager, owner_id=logged_in_user.id, name="Second"
+    )
     first = await authenticated_client.post(
-        "/providers", data=provider_payload(practice_name="First")
+        "/providers", data=provider_payload(org_id=str(org_first))
     )
     assert first.status_code == 201
     first_id = uuid.UUID(first.json()["id"])
 
     second = await authenticated_client.post(
-        "/providers", data=provider_payload(practice_name="Second")
+        "/providers", data=provider_payload(org_id=str(org_second))
     )
     assert second.status_code == 201
     second_id = uuid.UUID(second.json()["id"])
@@ -134,7 +161,7 @@ async def test_create_provider_allows_multiple_per_user(
         )
         owned = result.scalars().all()
         assert {p.id for p in owned} == {first_id, second_id}
-        assert {p.practice_name for p in owned} == {"First", "Second"}
+        assert {p.org.name for p in owned} == {"First", "Second"}
 
 
 # --- Provider reads -------------------------------------------------------
@@ -448,17 +475,23 @@ async def test_patch_provider_updates_fields(
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user: User,
 ):
+    """PATCH /providers/{id} can reassign the Provider to a different Org
+    (``org_id``) or change other practice fields like location. Editing
+    the practice's *name* now happens on the Organization itself (#524)."""
     provider_id = await _seed_provider_for(
         db_test_session_manager, user_id=logged_in_user.id, practice_name="Old Name"
+    )
+    new_org_id = await _seed_org(
+        db_test_session_manager, owner_id=logged_in_user.id, name="New Org"
     )
 
     response = await authenticated_client.patch(
         f"/providers/{provider_id}",
-        data={"practice_name": "New Name"},
+        data={"org_id": str(new_org_id)},
     )
 
     assert response.status_code == 200
-    assert response.json()["practice_name"] == "New Name"
+    assert response.json()["org_id"] == str(new_org_id)
     assert response.headers["HX-Redirect"] == f"/providers/{provider_id}/form"
 
     async with db_test_session_manager() as session:
@@ -467,7 +500,7 @@ async def test_patch_provider_updates_fields(
             .scalars()
             .first()
         )
-        assert refreshed.practice_name == "New Name"
+        assert refreshed.org_id == new_org_id
 
 
 async def test_patch_provider_returns_403_if_not_owner(
@@ -476,10 +509,13 @@ async def test_patch_provider_returns_403_if_not_owner(
     logged_in_user: User,
 ):
     _, other_provider_id = await _seed_other_user_with_provider(db_test_session_manager)
+    new_org_id = await _seed_org(
+        db_test_session_manager, owner_id=logged_in_user.id, name="Hijack Org"
+    )
 
     response = await authenticated_client.patch(
         f"/providers/{other_provider_id}",
-        data={"practice_name": "Hijack"},
+        data={"org_id": str(new_org_id)},
     )
     assert response.status_code == 403
 
@@ -592,22 +628,29 @@ async def test_patch_licensure_returns_404_for_mismatched_provider(
 
 async def test_get_provider_form_renders(
     authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user: User,
 ):
     """`GET /providers/form` renders the create form posting to
     the JSON API."""
+    # Seed an Org so the Org-picker dropdown has at least one option to render.
+    await _seed_org(
+        db_test_session_manager, owner_id=logged_in_user.id, name="Seeded Org"
+    )
     response = await authenticated_client.get("/providers/form")
     assert response.status_code == 200
     tree = HTMLParser(response.text)
     form = tree.css_first("form")
     assert form is not None
     assert form.attributes.get("hx-post") == "/providers"
-    # Required practice fields are present, with `maxlength` /
-    # `pattern` attributes derived from the `ProviderCreate` schema's
-    # `HtmlPattern` markers via `field_for` → `field_spec`.
-    practice = tree.css_first('input[name="practice_name"]')
-    assert practice is not None
-    assert practice.attributes.get("maxlength") == "200"
+    # Org-picker dropdown — replaces the old free-text practice_name input.
+    # Lists every Org in the directory (#524).
+    org_select = tree.css_first('select[name="org_id"]')
+    assert org_select is not None
+    org_options = org_select.css("option")
+    assert any(
+        o.text(strip=True) == "Seeded Org" for o in org_options
+    ), "Org dropdown should include every seeded Organization"
     city = tree.css_first('input[name="location_city"]')
     assert city is not None
     assert city.attributes.get("maxlength") == "120"
@@ -666,9 +709,11 @@ async def test_owner_can_open_edit_form(
     response = await authenticated_client.get(f"/providers/{provider_id}/form")
     assert response.status_code == 200
     tree = HTMLParser(response.text)
-    practice_input = tree.css_first('input[name="practice_name"]')
-    assert practice_input is not None
-    assert practice_input.attributes.get("value") == "Acme Counseling"
+    org_select = tree.css_first('select[name="org_id"]')
+    assert org_select is not None
+    selected = org_select.css_first("option[selected]")
+    assert selected is not None
+    assert selected.text(strip=True) == "Acme Counseling"
     practice_form = tree.css_first(f'form[hx-patch="/providers/{provider_id}"]')
     assert practice_form is not None
     # The seeded licensure should be rendered in the licensures list.

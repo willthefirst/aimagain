@@ -295,6 +295,6 @@ async def test_list_my_favorites_returns_only_self_edges(
             requesting_user=me,
         )
 
-    names = [p.practice_name for p in context["providers"]]
+    names = [p.org.name for p in context["providers"]]
     assert names == ["Mine"]
     assert context["current_user"] == me

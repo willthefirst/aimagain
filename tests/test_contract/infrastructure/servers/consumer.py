@@ -166,13 +166,23 @@ def _setup_provider_create_form_stub(app: FastAPI) -> None:
             username="provider_user",
             is_superuser=False,
         )
+        # The Org-picker dropdown reads `orgs` from the template context
+        # (#524). One stub Org keeps the contract test deterministic.
+        org = _StubAttrs(
+            id=uuid.UUID("66666666-6666-6666-6666-666666666666"),
+            name="Acme Counseling",
+        )
         return APIResponse.html_response(
             template_name="providers/form_new.html",
             # `schema` is what the template's `field_for` macro
             # introspects to derive each control — same key the
             # production `make_new_form_handler` binds from
             # `spec.create_adapter`.
-            context={"current_user": current_user, "schema": ProviderCreate},
+            context={
+                "current_user": current_user,
+                "schema": ProviderCreate,
+                "orgs": [org],
+            },
             request=request,
         )
 
@@ -190,9 +200,16 @@ def _setup_provider_edit_form_stub(app: FastAPI) -> None:
 
     @app.get("/providers/{provider_id}/form")
     async def provider_edit_form_stub_page(request: Request, provider_id: uuid.UUID):
+        org_id = uuid.UUID("55555555-5555-5555-5555-555555555555")
+        org = _StubAttrs(id=org_id, name="Acme Counseling")
         provider = _StubAttrs(
             id=provider_id,
-            practice_name="Acme Counseling",
+            # `org_id` + `org.name` replaces the former `practice_name`
+            # column (#524). The form template reads `provider.org_id`
+            # for the dropdown's selected option and iterates the
+            # `orgs` context var to render options.
+            org_id=org_id,
+            org=org,
             location_city="Brooklyn",
             location_state="NY",
             location_zip="11201",
@@ -215,7 +232,11 @@ def _setup_provider_edit_form_stub(app: FastAPI) -> None:
         )
         return APIResponse.html_response(
             template_name="providers/form_edit.html",
-            context={"provider": provider, "current_user": current_user},
+            context={
+                "provider": provider,
+                "current_user": current_user,
+                "orgs": [org],
+            },
             request=request,
         )
 

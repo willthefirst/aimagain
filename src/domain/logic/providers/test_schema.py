@@ -55,7 +55,7 @@ def _provider_create_kwargs(**overrides):
     ``location`` value object before validation.
     """
     base = {
-        "practice_name": "Sunrise Counseling",
+        "org_id": uuid.uuid4(),
         "location_city": "Boise",
         "location_state": "ID",
         "location_zip": "83702",
@@ -155,17 +155,21 @@ def test_provider_update_accepts_single_field():
     supplied the field stays ``None`` (the gather pre-validator only
     creates the nested block when a flat ``location_<sub>`` key is
     present)."""
-    upd = ProviderUpdate(practice_name="New Name")
-    assert upd.practice_name == "New Name"
+    new_org = uuid.uuid4()
+    upd = ProviderUpdate(org_id=new_org)
+    assert upd.org_id == new_org
     assert upd.location is None
 
 
 # --- Create payload smoke tests -----------------------------------------
 
 
-def test_provider_create_strips_practice_name():
-    p = ProviderCreate(**_provider_create_kwargs(practice_name="  Sunrise  "))
-    assert p.practice_name == "Sunrise"
+def test_provider_create_requires_org_id():
+    """``org_id`` is required on the wire (#524). Omitting it 422s."""
+    kwargs = _provider_create_kwargs()
+    kwargs.pop("org_id")
+    with pytest.raises(ValidationError):
+        ProviderCreate(**kwargs)
 
 
 def test_provider_create_rejects_non_5_digit_zip():
@@ -309,13 +313,15 @@ def test_provider_read_validates_from_nested_dict():
     """`ProviderRead.model_validate` should construct the nested
     sub-entity Read schemas without needing real ORM objects."""
     provider_id = uuid.uuid4()
+    org_id = uuid.uuid4()
     now = _now()
     payload = {
         "id": provider_id,
         "owner_id": uuid.uuid4(),
         "created_at": now,
         "updated_at": now,
-        "practice_name": "Sunrise",
+        "org_id": org_id,
+        "org_name": "Sunrise",
         "location_city": "Boise",
         "location_state": "ID",
         "location_zip": "83702",
@@ -363,7 +369,8 @@ def test_provider_read_validates_from_nested_dict():
 
     provider = ProviderRead.model_validate(payload)
 
-    assert provider.practice_name == "Sunrise"
+    assert provider.org_name == "Sunrise"
+    assert provider.org_id == org_id
     assert len(provider.licensures) == 1
     assert provider.licensures[0].license_type == "lcsw"
     assert provider.educations[0].month_completed == "2010-05"

@@ -3,10 +3,11 @@
 Verifies that the practice-fields HTMX form rendered by
 `templates/providers/form_edit.html` (mounted via the
 `provider_edit_form` stub on the consumer server) issues a
-`PATCH /providers/{id}` form-encoded request with at least the
-`practice_name` field. The contract surface is the form wiring (method,
-path, Content-Type, field name); the response on success is a 200 JSON
-with `HX-Redirect` to the same edit page so the user lands back on it.
+`PATCH /providers/{id}` form-encoded request with the practice fields
+the route expects. After #524 the practice's display name lives on
+``provider.org.name``, so the form's "what Organization?" knob is an
+``org_id`` `<select>`; the form still PATCHes ``location_*`` and
+session/insurance fields directly on the Provider.
 
 Sub-resource pacts (licensures, educations, certifications) are not
 covered here — each would warrant its own pair if it diverges from this
@@ -53,18 +54,18 @@ async def test_consumer_provider_edit_form_submits(origin_with_routes: str, page
     expected_request_headers = {
         "Content-Type": Like("application/x-www-form-urlencoded")
     }
-    # The form posts every prefilled field; the practice_name override is
-    # what the test changes. Other fields keep their stub values from the
-    # consumer-server stub. The body shape is the contract; concrete values
-    # are ergonomic for the verifier.
+    # The form posts every prefilled field; the test changes
+    # `location_city` to confirm the PATCH wiring. Other fields keep
+    # their stub values. `org_id` is the Org the stub's Provider is
+    # already attached to (its `<option selected>` in the dropdown).
     # The stub's insurance posture is self-pay-only (empty carrier list,
     # OON off, no sliding scale). The form pre-checks the "No" radio for
     # each Boolean (since `current=False`) and renders `cost` as an empty
     # text input. `in_network_carriers` is a multi-select with no current
     # selection so it doesn't appear in the encoded form body.
     expected_request_body = (
-        "practice_name=Bayside+Counseling"
-        "&location_city=Brooklyn"
+        "org_id=55555555-5555-5555-5555-555555555555"
+        "&location_city=Bayside"
         "&location_state=NY"
         "&location_zip=11201"
         "&in_person_sessions=yes"
@@ -99,8 +100,8 @@ async def test_consumer_provider_edit_form_submits(origin_with_routes: str, page
 
     with pact:
         await page.goto(edit_page_url)
-        await page.wait_for_selector('input[name="practice_name"]')
-        await page.locator('input[name="practice_name"]').fill("Bayside Counseling")
+        await page.wait_for_selector('select[name="org_id"]')
+        await page.locator('input[name="location_city"]').fill("Bayside")
         # Submit the practice-fields form (the first one on the page).
         await page.locator(
             f'form[hx-patch="{PROVIDER_PATCH_API_PATH}"] button[type="submit"]'

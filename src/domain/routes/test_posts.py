@@ -1848,8 +1848,8 @@ async def test_patch_provider_availability_with_client_referral_payload_does_not
         result = await session.execute(select(Post).filter(Post.id == post_id))
         refreshed = result.scalars().first()
         assert refreshed.kind == "provider_availability"
-        # Practice name lives on the linked Provider post-#448; dereference.
-        assert refreshed.provider_availability_detail.provider.practice_name == original
+        # Practice name lives on the linked Provider's Organization (#524).
+        assert refreshed.provider_availability_detail.provider.org.name == original
         assert refreshed.client_referral_detail is None
 
     async with db_test_session_manager() as session:
@@ -1997,10 +1997,7 @@ async def test_create_provider_availability_happy_path(
         assert persisted is not None
         assert persisted.kind == "provider_availability"
         assert persisted.provider_availability_detail.provider_id == provider.id
-        assert (
-            persisted.provider_availability_detail.provider.practice_name
-            == practice_name
-        )
+        assert persisted.provider_availability_detail.provider.org.name == practice_name
         # Insurance posture / sliding-scale / cost live on Provider, not
         # PA. The `make_provider` factory defaults are: empty carrier list
         # (no in-network) + `accepts_out_of_network=True`, no sliding scale.

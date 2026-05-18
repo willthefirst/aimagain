@@ -14,9 +14,10 @@ _ck = partial(named_check_in, _TABLE)
 
 class Organization(BaseModel):
     """First-class directory entity for clinics, group practices, health
-    systems, and solo-practice shells. PR 1 of the Org/Program roadmap —
-    standalone here; the migration of ``Provider.practice_name`` onto an
-    ``org_id`` FK is a follow-up PR.
+    systems, and solo-practice shells. ``Organization.name`` is the
+    source of truth for the practice's display name; every Provider
+    points at exactly one Org via ``Provider.org_id`` and templates
+    read ``provider.org.name`` directly (#524).
 
     Hierarchy is modeled as a self-referential tree via ``parent_org_id``
     (nullable; a root org has ``parent_org_id IS NULL``). ``root_org_id``
