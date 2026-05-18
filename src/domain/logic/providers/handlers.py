@@ -35,8 +35,6 @@ from src.domain.specs.provider import PROVIDER_ENTITY
 from src.framework.audit.repository import AuditRepository
 from src.framework.dispatch.handlers import (
     handle_create,
-    handle_get_edit_form,
-    handle_get_new_form,
     handle_update,
 )
 from src.framework.dispatch.pagination import (
@@ -92,46 +90,27 @@ async def _assert_org_belongs_to(
         )
 
 
-async def handle_get_provider_new_form(
+async def provider_form_extras(
     *,
-    request: Request,
+    target: Provider | None,
     requesting_user: User,
     organization_repo: OrganizationRepository,
+    **_: Any,
 ) -> dict[str, Any]:
-    """Provider create-form handler. Extends the framework's default by
-    loading the user's visible Organizations into the context for the
-    Org-picker dropdown — Provider create takes ``org_id`` (#524), and
-    the form needs a populated select."""
-    context = await handle_get_new_form(
-        PROVIDER_ENTITY, request=request, requesting_user=requesting_user
-    )
-    context["orgs"] = await _orgs_visible_to(organization_repo, requesting_user)
-    return context
+    """Per-viewer form extras for `make_new_form_handler` /
+    `make_edit_form_handler` against `PROVIDER_ENTITY`.
 
-
-async def handle_get_provider_edit_form(
-    *,
-    request: Request,
-    provider_id: UUID,
-    repo: ProviderRepository,
-    requesting_user: User,
-    organization_repo: OrganizationRepository,
-) -> dict[str, Any]:
-    """Provider edit-form handler. Mirror of the new-form handler — the
-    Org-picker dropdown lists the user's visible Orgs, with the
-    Provider's current ``org_id`` pre-selected (the template handles
-    the `selected` attribute). ``provider_id`` is the URL's path param
-    (``PROVIDER_ENTITY.id_param``); it's forwarded to the framework's
-    ``handle_get_edit_form`` as ``target_id``."""
-    context = await handle_get_edit_form(
-        PROVIDER_ENTITY,
-        request=request,
-        target_id=provider_id,
-        repo=repo,
-        requesting_user=requesting_user,
-    )
-    context["orgs"] = await _orgs_visible_to(organization_repo, requesting_user)
-    return context
+    Loads the requesting user's visible Organizations into the context
+    for the Org-picker dropdown — Provider create/update takes
+    ``org_id`` (#524), and the form needs a populated select. The
+    framework invokes this on both the create path (``target=None``)
+    and the edit path (``target=<provider row>``); the dropdown is the
+    same either way — the template handles pre-selecting the row's
+    current ``org_id`` via the standard `selected` attribute.
+    """
+    return {
+        "orgs": await _orgs_visible_to(organization_repo, requesting_user),
+    }
 
 
 async def handle_create_provider(

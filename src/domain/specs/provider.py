@@ -19,6 +19,7 @@ Read by:
 from typing import Final
 
 from src.domain.logic.favorites.repository import UserFavoriteRepository
+from src.domain.logic.organizations.repository import OrganizationRepository
 from src.domain.logic.providers.schema import (
     ProviderCreate,
     ProviderRead,
@@ -95,6 +96,12 @@ PROVIDER_ENTITY: Final[EntitySpec] = EntitySpec(
     # Per-viewer detail extras live on the spec — see `EntitySpec`.
     detail_extras_path="src.domain.logic.providers.handlers.provider_detail_extras",
     detail_extras_repos=(("user_favorite_repo", UserFavoriteRepository),),
+    # The create/edit form's Org-picker dropdown is scoped per-viewer to
+    # the user's owned Organizations (#524). The framework invokes the
+    # extras callable on both the create path (target=None) and the
+    # edit path (target=<row>) — see `EntitySpec.form_extras_path`.
+    form_extras_path="src.domain.logic.providers.handlers.provider_form_extras",
+    form_extras_repos=(("organization_repo", OrganizationRepository),),
     # Provider templates render credential-type display labels and the
     # tuples behind the filter/select dropdowns. Tying them to the spec
     # (instead of Jinja globals) means a new credential-type tuple
