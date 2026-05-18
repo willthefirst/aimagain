@@ -26,7 +26,7 @@ renders a spread of dates rather than a wall of identical timestamps.
 import asyncio
 import sys
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 from typing import Any, TypedDict
 
 # Local import to avoid circulars at module import time
@@ -43,6 +43,9 @@ from src.domain.models import (
     Program,
     ProgramAvailabilityDetail,
     Provider,
+    ProviderCertification,
+    ProviderEducation,
+    ProviderLicensure,
     ReferralDetail,
     User,
 )
@@ -95,6 +98,7 @@ FIXTURE_OPENING: list[FixtureOpening] = [
         "days_ago": 2,
         "provider": {
             "practice_name": "Katie Reeves, PhD",
+            "org_type": "solo_practice",
             # Telehealth-only practice — no city/ZIP in the source
             # example. The Provider model still requires these fields,
             # so we record placeholders documenting the telehealth
@@ -138,6 +142,7 @@ FIXTURE_OPENING: list[FixtureOpening] = [
         "days_ago": 14,
         "provider": {
             "practice_name": "Camp BooHoo",
+            "org_type": "other",
             "location_city": "Santa Clara",
             "location_state": "CA",
             # Venue (fairgrounds) has no specific ZIP — keep the
@@ -179,6 +184,8 @@ FIXTURE_OPENING: list[FixtureOpening] = [
         "days_ago": 30,
         "provider": {
             "practice_name": "RISE IOP at CHC",
+            "org_type": "clinic",
+            "parent_org_name": "Children's Health Council",
             "location_city": "Palo Alto",
             "location_state": "CA",
             "location_zip": "94304",
@@ -224,6 +231,7 @@ FIXTURE_OPENING: list[FixtureOpening] = [
         "days_ago": 5,
         "provider": {
             "practice_name": "Lakeside Therapy Collective",
+            "org_type": "group_practice",
             "location_city": "Seattle",
             "location_state": "WA",
             "location_zip": "98101",
@@ -259,6 +267,7 @@ FIXTURE_OPENING: list[FixtureOpening] = [
         "days_ago": 1,
         "provider": {
             "practice_name": "Greenfield Psychiatry",
+            "org_type": "solo_practice",
             "location_city": "Brooklyn",
             "location_state": "NY",
             "location_zip": "11215",
@@ -299,6 +308,7 @@ FIXTURE_OPENING: list[FixtureOpening] = [
         "days_ago": 9,
         "provider": {
             "practice_name": "Rivera Family Psychology",
+            "org_type": "solo_practice",
             "location_city": "Austin",
             "location_state": "TX",
             "location_zip": "78704",
@@ -344,6 +354,7 @@ FIXTURE_OPENING: list[FixtureOpening] = [
         "days_ago": 21,
         "provider": {
             "practice_name": "Beacon Hill Family Therapy",
+            "org_type": "group_practice",
             "location_city": "Boston",
             "location_state": "MA",
             "location_zip": "02114",
@@ -391,6 +402,7 @@ FIXTURE_OPENING: list[FixtureOpening] = [
         "days_ago": 60,
         "provider": {
             "practice_name": "Mountainview Residential",
+            "org_type": "clinic",
             "location_city": "Boulder",
             "location_state": "CO",
             "location_zip": "80302",
@@ -437,6 +449,7 @@ FIXTURE_OPENING: list[FixtureOpening] = [
         "days_ago": 45,
         "provider": {
             "practice_name": "Cascade PHP",
+            "org_type": "clinic",
             "location_city": "Tacoma",
             "location_state": "WA",
             "location_zip": "98402",
@@ -483,6 +496,7 @@ FIXTURE_OPENING: list[FixtureOpening] = [
         "days_ago": 110,
         "provider": {
             "practice_name": "North Loop Counseling",
+            "org_type": "group_practice",
             "location_city": "Minneapolis",
             "location_state": "MN",
             "location_zip": "55401",
@@ -850,6 +864,25 @@ FIXTURE_REFERRAL: list[FixtureReferral] = [
 ]
 
 
+# Standalone Organizations seeded WITHOUT a Provider attached — used today
+# for hierarchy roots (a health_system whose Provider rows live under
+# child clinic Orgs, e.g. Children's Health Council → "RISE IOP at CHC").
+# Provider fixtures reference these by name via `parent_org_name`.
+class FixtureStandaloneOrg(TypedDict):
+    owner_email: str
+    name: str
+    type: str
+
+
+FIXTURE_STANDALONE_ORGS: list[FixtureStandaloneOrg] = [
+    {
+        "owner_email": "alice@example.com",
+        "name": "Children's Health Council",
+        "type": "health_system",
+    },
+]
+
+
 def _shift_created_at(post: Post, days_ago: int) -> None:
     """Override the `server_default=func.now()` on `Post.created_at` with
     a deterministic offset so the listings feed shows a spread of dates.
@@ -895,6 +928,52 @@ async def seed_users() -> tuple[int, int]:
     return created, skipped
 
 
+async def seed_standalone_orgs() -> tuple[int, int]:
+    """Seed Organizations that exist independent of any Provider. Used
+    today for hierarchy roots (a health_system Org whose child clinics
+    each carry their own Providers). Idempotent on `name`.
+
+    Runs BEFORE `seed_opening` because Provider fixtures may declare a
+    `parent_org_name` that needs to resolve to a row here.
+    """
+    created = 0
+    skipped = 0
+
+    async with async_session_maker() as session:
+        for fixture in FIXTURE_STANDALONE_ORGS:
+            existing = await session.execute(
+                select(Organization).where(Organization.name == fixture["name"])
+            )
+            if existing.scalar_one_or_none() is not None:
+                print(f"⏭️  org '{fixture['name']}' already exists, skipping")
+                skipped += 1
+                continue
+            owner_result = await session.execute(
+                select(User).where(User.email == fixture["owner_email"])
+            )
+            owner = owner_result.scalar_one_or_none()
+            if owner is None:
+                print(
+                    f"⚠️  org '{fixture['name']}': "
+                    f"owner {fixture['owner_email']} not found, skipping"
+                )
+                skipped += 1
+                continue
+            org = Organization(
+                id=uuid.uuid4(),
+                name=fixture["name"],
+                type=fixture["type"],
+                owner_id=owner.id,
+            )
+            org.root_org_id = org.id
+            session.add(org)
+            print(f"✅ Created standalone org '{fixture['name']}' ({fixture['type']})")
+            created += 1
+        await session.commit()
+
+    return created, skipped
+
+
 async def seed_opening() -> tuple[int, int]:
     created = 0
     skipped = 0
@@ -922,19 +1001,42 @@ async def seed_opening() -> tuple[int, int]:
 
             # Find-or-create the Organization keyed on the fixture's
             # practice_name — the Org's `name` is the practice's display
-            # name post-#524.
+            # name. The fixture optionally declares `org_type` (default
+            # `solo_practice`) and `parent_org_name` (default None, i.e.
+            # the Org is a root). When a parent name is set, the parent
+            # must already be seeded — `seed_standalone_orgs()` runs
+            # before this function for that reason.
+            org_type = provider_fields.pop("org_type", "solo_practice")
+            parent_org_name = provider_fields.pop("parent_org_name", None)
             org_result = await session.execute(
                 select(Organization).where(Organization.name == practice_name)
             )
             org = org_result.scalar_one_or_none()
             if org is None:
+                parent_org_id = None
+                root_org_id = None
+                if parent_org_name:
+                    parent_result = await session.execute(
+                        select(Organization).where(Organization.name == parent_org_name)
+                    )
+                    parent = parent_result.scalar_one_or_none()
+                    if parent is None:
+                        print(
+                            f"⚠️  PA post '{practice_name}': "
+                            f"parent org '{parent_org_name}' not found, "
+                            f"creating as root instead"
+                        )
+                    else:
+                        parent_org_id = parent.id
+                        root_org_id = parent.root_org_id or parent.id
                 org = Organization(
                     id=uuid.uuid4(),
                     name=practice_name,
-                    type="solo_practice",
+                    type=org_type,
                     owner_id=owner.id,
+                    parent_org_id=parent_org_id,
                 )
-                org.root_org_id = org.id
+                org.root_org_id = root_org_id or org.id
                 session.add(org)
                 await session.flush()
 
@@ -1268,9 +1370,449 @@ async def seed_program_availability() -> tuple[int, int]:
     return created, skipped
 
 
+# Provider credential fixtures keyed by `(owner_email, org_name)` — that
+# pair uniquely identifies a seeded Provider via the find-or-create rule
+# in `seed_opening`. Each entry's three lists are inserted as
+# `ProviderLicensure` / `ProviderEducation` / `ProviderCertification`
+# rows linked back to the Provider. Idempotency: rows are matched on
+# `(provider_id, <natural-key>)` so re-running the seed is a no-op.
+class FixtureCredentialSet(TypedDict):
+    owner_email: str
+    org_name: str
+    licensures: list[dict[str, Any]]
+    educations: list[dict[str, Any]]
+    certifications: list[dict[str, Any]]
+
+
+FIXTURE_CREDENTIALS: list[FixtureCredentialSet] = [
+    {
+        "owner_email": "alice@example.com",
+        "org_name": "Katie Reeves, PhD",
+        "licensures": [
+            {
+                "license_type": "psyd",
+                "license_number": "PSY-21089",
+                "issuing_state": "CA",
+                "expiration_date": "2027-08-31",
+            },
+        ],
+        "educations": [
+            {
+                "education_type": "phd",
+                "institution": "Stanford University",
+                "month_completed": "2008-06",
+            },
+        ],
+        "certifications": [
+            {
+                "certification_type": "emdr",
+                "certifying_body": "EMDR International Association",
+                "expiration_date": None,
+            },
+        ],
+    },
+    {
+        "owner_email": "alice@example.com",
+        "org_name": "Camp BooHoo",
+        "licensures": [
+            {
+                "license_type": "lcsw",
+                "license_number": "LCS-44012",
+                "issuing_state": "CA",
+                "expiration_date": "2026-12-31",
+            },
+        ],
+        "educations": [
+            {
+                "education_type": "msw",
+                "institution": "University of Southern California",
+                "month_completed": "2015-05",
+            },
+        ],
+        "certifications": [],
+    },
+    {
+        "owner_email": "alice@example.com",
+        "org_name": "RISE IOP at CHC",
+        "licensures": [
+            {
+                "license_type": "md",
+                "license_number": "MD-A-78321",
+                "issuing_state": "CA",
+                "expiration_date": "2028-03-31",
+            },
+        ],
+        "educations": [
+            {
+                "education_type": "md",
+                "institution": "UC San Francisco School of Medicine",
+                "month_completed": "2010-06",
+            },
+        ],
+        "certifications": [
+            {
+                "certification_type": "dbt",
+                "certifying_body": "Linehan Board",
+                "expiration_date": None,
+            },
+        ],
+    },
+    {
+        "owner_email": "dr_chen@example.com",
+        "org_name": "Lakeside Therapy Collective",
+        # Multi-state licensure — exercises the issuing_state filter on
+        # /providers.
+        "licensures": [
+            {
+                "license_type": "lcsw",
+                "license_number": "LCS-31118",
+                "issuing_state": "CA",
+                "expiration_date": "2027-04-30",
+            },
+            {
+                "license_type": "lcsw",
+                "license_number": "C28-991",
+                "issuing_state": "NV",
+                "expiration_date": "2027-06-30",
+            },
+        ],
+        "educations": [
+            {
+                "education_type": "msw",
+                "institution": "UC Berkeley",
+                "month_completed": "2012-05",
+            },
+        ],
+        "certifications": [
+            {
+                "certification_type": "dbt",
+                "certifying_body": "Behavioral Tech",
+                "expiration_date": "2026-09-30",
+            },
+            {
+                "certification_type": "gottman_1",
+                "certifying_body": "The Gottman Institute",
+                "expiration_date": None,
+            },
+        ],
+    },
+    {
+        "owner_email": "dr_patel@example.com",
+        "org_name": "Greenfield Psychiatry",
+        "licensures": [
+            {
+                "license_type": "pmhnp",
+                "license_number": "NP-55012",
+                "issuing_state": "CA",
+                "expiration_date": "2027-11-30",
+            },
+        ],
+        "educations": [
+            {
+                "education_type": "ma_ms",
+                "institution": "Johns Hopkins School of Nursing",
+                "month_completed": "2018-12",
+            },
+        ],
+        "certifications": [
+            {
+                "certification_type": "ccatp",
+                "certifying_body": "Evergreen Certifications",
+                "expiration_date": None,
+            },
+        ],
+    },
+    {
+        "owner_email": "dr_rivera@example.com",
+        "org_name": "Rivera Family Psychology",
+        "licensures": [
+            {
+                "license_type": "lmft",
+                "license_number": "MFC-22001",
+                "issuing_state": "CA",
+                "expiration_date": "2026-08-31",
+            },
+        ],
+        "educations": [
+            {
+                "education_type": "ma_ms",
+                "institution": "Pepperdine University",
+                "month_completed": "2016-05",
+            },
+        ],
+        "certifications": [
+            {
+                "certification_type": "gottman_2",
+                "certifying_body": "The Gottman Institute",
+                "expiration_date": None,
+            },
+        ],
+    },
+    {
+        "owner_email": "dr_okafor@example.com",
+        "org_name": "Beacon Hill Family Therapy",
+        # Multi-state licensure across MA + NY.
+        "licensures": [
+            {
+                "license_type": "lmft",
+                "license_number": "LMFT-MA-1099",
+                "issuing_state": "MA",
+                "expiration_date": "2027-05-31",
+            },
+            {
+                "license_type": "lmft",
+                "license_number": "LMFT-NY-22301",
+                "issuing_state": "NY",
+                "expiration_date": "2027-09-30",
+            },
+        ],
+        "educations": [
+            {
+                "education_type": "ma_ms",
+                "institution": "Boston University",
+                "month_completed": "2014-06",
+            },
+        ],
+        "certifications": [
+            {
+                "certification_type": "gottman_3",
+                "certifying_body": "The Gottman Institute",
+                "expiration_date": None,
+            },
+            {
+                "certification_type": "cpr",
+                "certifying_body": "American Red Cross",
+                "expiration_date": "2026-03-31",
+            },
+        ],
+    },
+    {
+        "owner_email": "dr_jansen@example.com",
+        "org_name": "Mountainview Residential",
+        "licensures": [
+            {
+                "license_type": "pmhnp",
+                "license_number": "PMHNP-CA-887",
+                "issuing_state": "CA",
+                "expiration_date": "2028-01-31",
+            },
+        ],
+        "educations": [
+            {
+                "education_type": "ma_ms",
+                "institution": "UCSF School of Nursing",
+                "month_completed": "2017-12",
+            },
+        ],
+        "certifications": [
+            {
+                "certification_type": "ccatp",
+                "certifying_body": "Evergreen Certifications",
+                "expiration_date": None,
+            },
+            {
+                "certification_type": "dbt",
+                "certifying_body": "Behavioral Tech",
+                "expiration_date": "2027-02-28",
+            },
+        ],
+    },
+    {
+        "owner_email": "dr_chen@example.com",
+        "org_name": "Cascade PHP",
+        "licensures": [
+            {
+                "license_type": "do",
+                "license_number": "DO-OR-4421",
+                "issuing_state": "OR",
+                "expiration_date": "2027-07-31",
+            },
+        ],
+        "educations": [
+            {
+                "education_type": "do",
+                "institution": "Western University of Health Sciences",
+                "month_completed": "2011-06",
+            },
+        ],
+        "certifications": [
+            {
+                "certification_type": "cpr",
+                "certifying_body": "American Heart Association",
+                "expiration_date": "2026-06-30",
+            },
+        ],
+    },
+    {
+        "owner_email": "bob@example.com",
+        "org_name": "North Loop Counseling",
+        "licensures": [
+            {
+                "license_type": "lpc",
+                "license_number": "LPC-MN-7012",
+                "issuing_state": "MN",
+                "expiration_date": "2027-03-31",
+            },
+            {
+                "license_type": "lmhc",
+                "license_number": "LMHC-WI-2210",
+                "issuing_state": "WI",
+                "expiration_date": "2026-10-31",
+            },
+        ],
+        "educations": [
+            {
+                "education_type": "ba_bs",
+                "institution": "University of Minnesota",
+                "month_completed": "2010-05",
+            },
+            {
+                "education_type": "edd",
+                "institution": "Walden University",
+                "month_completed": "2020-12",
+            },
+        ],
+        "certifications": [
+            {
+                "certification_type": "cbt",
+                "certifying_body": "Beck Institute",
+                "expiration_date": None,
+            },
+        ],
+    },
+]
+
+
+def _parse_date(value: Any) -> date | None:
+    """Convert a fixture date (string `"YYYY-MM-DD"` or already-`date` or
+    `None`) to the Python `date` SQLite expects on a `Date` column."""
+    if value is None or isinstance(value, date):
+        return value
+    return date.fromisoformat(value)
+
+
+async def seed_credentials() -> tuple[int, int]:
+    """Seed Provider credential rows (licensures / education /
+    certifications). Idempotent on `(provider_id, license_number)` /
+    `(provider_id, institution, month_completed)` /
+    `(provider_id, certification_type, certifying_body)`.
+
+    Runs AFTER `seed_opening` since it joins by `(owner_email, org_name)`
+    to find the Provider row to attach credentials to. Missing
+    Providers are logged and skipped — never the seed's fault, always
+    a fixture data issue.
+    """
+    created = 0
+    skipped = 0
+
+    async with async_session_maker() as session:
+        for fixture in FIXTURE_CREDENTIALS:
+            owner_result = await session.execute(
+                select(User).where(User.email == fixture["owner_email"])
+            )
+            owner = owner_result.scalar_one_or_none()
+            if owner is None:
+                print(
+                    f"⚠️  credentials for '{fixture['org_name']}': "
+                    f"owner {fixture['owner_email']} not found, skipping"
+                )
+                skipped += 1
+                continue
+            org_result = await session.execute(
+                select(Organization).where(Organization.name == fixture["org_name"])
+            )
+            org = org_result.scalar_one_or_none()
+            if org is None:
+                print(
+                    f"⚠️  credentials for '{fixture['org_name']}': "
+                    f"org not found (did seed_opening run?), skipping"
+                )
+                skipped += 1
+                continue
+            provider_result = await session.execute(
+                select(Provider).where(
+                    Provider.owner_id == owner.id,
+                    Provider.org_id == org.id,
+                )
+            )
+            provider = provider_result.scalar_one_or_none()
+            if provider is None:
+                print(
+                    f"⚠️  credentials for '{fixture['org_name']}': "
+                    f"provider not found, skipping"
+                )
+                skipped += 1
+                continue
+
+            for lic in fixture["licensures"]:
+                existing = await session.execute(
+                    select(ProviderLicensure).where(
+                        ProviderLicensure.provider_id == provider.id,
+                        ProviderLicensure.license_number == lic["license_number"],
+                    )
+                )
+                if existing.scalar_one_or_none() is not None:
+                    skipped += 1
+                    continue
+                row_fields = dict(lic)
+                row_fields["expiration_date"] = _parse_date(
+                    row_fields.get("expiration_date")
+                )
+                session.add(ProviderLicensure(provider_id=provider.id, **row_fields))
+                created += 1
+            for edu in fixture["educations"]:
+                existing = await session.execute(
+                    select(ProviderEducation).where(
+                        ProviderEducation.provider_id == provider.id,
+                        ProviderEducation.institution == edu["institution"],
+                        ProviderEducation.month_completed == edu.get("month_completed"),
+                    )
+                )
+                if existing.scalar_one_or_none() is not None:
+                    skipped += 1
+                    continue
+                session.add(ProviderEducation(provider_id=provider.id, **edu))
+                created += 1
+            for cert in fixture["certifications"]:
+                existing = await session.execute(
+                    select(ProviderCertification).where(
+                        ProviderCertification.provider_id == provider.id,
+                        ProviderCertification.certification_type
+                        == cert["certification_type"],
+                        ProviderCertification.certifying_body
+                        == cert["certifying_body"],
+                    )
+                )
+                if existing.scalar_one_or_none() is not None:
+                    skipped += 1
+                    continue
+                row_fields = dict(cert)
+                row_fields["expiration_date"] = _parse_date(
+                    row_fields.get("expiration_date")
+                )
+                session.add(
+                    ProviderCertification(provider_id=provider.id, **row_fields)
+                )
+                created += 1
+            print(
+                f"✅ Seeded credentials for '{fixture['org_name']}' "
+                f"({len(fixture['licensures'])} licensures, "
+                f"{len(fixture['educations'])} education, "
+                f"{len(fixture['certifications'])} certifications)"
+            )
+        await session.commit()
+
+    return created, skipped
+
+
 async def seed_all() -> int:
     users_created, users_skipped = await seed_users()
+    # Standalone Orgs (hierarchy roots) before Providers so the latter
+    # can attach via `parent_org_name`.
+    standalone_orgs_created, standalone_orgs_skipped = await seed_standalone_orgs()
     pa_created, pa_skipped = await seed_opening()
+    # Credentials run AFTER seed_opening since they attach to Providers.
+    credentials_created, credentials_skipped = await seed_credentials()
     cr_created, cr_skipped = await seed_referral()
     programs_created, programs_skipped = await seed_programs()
     # Program-availability runs AFTER seed_programs() since it joins on a
@@ -1280,7 +1822,11 @@ async def seed_all() -> int:
     print(
         f"\n🌱 Seed complete:"
         f" {users_created} users created ({users_skipped} skipped),"
+        f" {standalone_orgs_created} standalone orgs created "
+        f"({standalone_orgs_skipped} skipped),"
         f" {pa_created} provider-availability posts created ({pa_skipped} skipped),"
+        f" {credentials_created} credential rows created "
+        f"({credentials_skipped} skipped),"
         f" {cr_created} client-referral posts created ({cr_skipped} skipped),"
         f" {programs_created} programs created ({programs_skipped} skipped),"
         f" {prog_av_created} program-availability posts created "
