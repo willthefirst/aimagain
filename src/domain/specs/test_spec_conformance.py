@@ -268,6 +268,23 @@ def test_list_extras_repos_requires_list_extras_path(spec: EntitySpec) -> None:
     assert spec.list_extras_path is not None
 
 
+@_PARAM_ALL
+def test_form_extras_path_requires_form_route(spec: EntitySpec) -> None:
+    """Spec construction would have raised if this held false; the
+    conformance suite pins the invariant across every entity so adding
+    a new one doesn't accidentally re-create the bug."""
+    if spec.form_extras_path is None:
+        pytest.skip(f"{spec.name!r} has no form_extras_path")
+    assert spec.routes.form_new or spec.routes.form_edit
+
+
+@_PARAM_ALL
+def test_form_extras_repos_requires_form_extras_path(spec: EntitySpec) -> None:
+    if not spec.form_extras_repos:
+        pytest.skip(f"{spec.name!r} has no form_extras_repos")
+    assert spec.form_extras_path is not None
+
+
 # --- Visibility ----------------------------------------------------------
 
 

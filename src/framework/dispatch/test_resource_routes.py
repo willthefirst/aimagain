@@ -1105,6 +1105,12 @@ async def _stub_list_extras(**_kw):
     return {}
 
 
+async def _stub_form_extras(**_kw):
+    """Module-level extras callable targeted via `form_extras_path` in
+    the form-extras threading tests."""
+    return {}
+
+
 def _stub_audit() -> _AuditedResource:
     return _AuditedResource(
         type="thing",
@@ -1780,6 +1786,138 @@ def test_spec_list_extras_path_threaded_to_factory():
         restore()
     list_handler = next(k["handler"] for n, k in captured if n == "mount_list")
     assert list_handler.__name__ == "_handle_list_widget"
+
+
+def test_mount_entity_form_extras_threaded_to_factory():
+    """`form_extras_path` on the spec resolves via `importlib` at mount
+    time and threads into *both* `make_new_form_handler` and
+    `make_edit_form_handler`; the synthesis adds the typed-repo kwargs
+    (from `form_extras_repos`) to each built handler's signature."""
+    from pydantic import TypeAdapter
+
+    spec = _EntitySpec(
+        name="widget",
+        url_collection="widgets",
+        id_param="widget_id",
+        model=SimpleNamespace,
+        audit=_stub_audit(),
+        create_adapter=TypeAdapter(_AxisBody),
+        update_adapter=TypeAdapter(_AxisBody),
+        routes=_RouteSet(form_new=True, form_edit=True),
+        templates=_Templates(
+            form_new="w/new.html",
+            form_edit="w/edit.html",
+        ),
+        form_extras_path=f"{__name__}._stub_form_extras",
+        form_extras_repos=(("organization_repo", UserRepository),),
+    )
+
+    captured, restore = _capture_top_level_mounts()
+    try:
+        mount_entity(None, spec, handlers={})
+    finally:
+        restore()
+
+    import inspect
+
+    # `mount_form` is called twice (new + edit); both handlers must
+    # carry the typed-repo kwarg.
+    form_calls = [k for n, k in captured if n == "mount_form"]
+    assert len(form_calls) == 2
+    for call in form_calls:
+        params = inspect.signature(call["handler"]).parameters
+        assert "organization_repo" in params
+
+
+def test_mount_entity_form_extras_with_explicit_form_new_handler_raises():
+    """`form_extras_path` is for the factory-built path; declaring it
+    on the spec alongside an explicit `handlers["form_new"]` is
+    ambiguous (the explicit handler would silently win) — surface at
+    mount time."""
+    from pydantic import TypeAdapter
+
+    spec = _EntitySpec(
+        name="widget",
+        url_collection="widgets",
+        id_param="widget_id",
+        model=SimpleNamespace,
+        audit=_stub_audit(),
+        create_adapter=TypeAdapter(_AxisBody),
+        routes=_RouteSet(form_new=True),
+        templates=_Templates(form_new="w/new.html"),
+        form_extras_path=f"{__name__}._stub_form_extras",
+    )
+
+    async def my_form_new(**_kw):  # pragma: no cover
+        return {}
+
+    with pytest.raises(ValueError, match="form_extras_path"):
+        mount_entity(
+            None,
+            spec,
+            handlers={"form_new": my_form_new},
+        )
+
+
+def test_mount_entity_form_extras_with_explicit_form_edit_handler_raises():
+    """Mirror of the form_new check — also fires when the explicit
+    handler is `form_edit`."""
+    from pydantic import TypeAdapter
+
+    spec = _EntitySpec(
+        name="widget",
+        url_collection="widgets",
+        id_param="widget_id",
+        model=SimpleNamespace,
+        audit=_stub_audit(),
+        update_adapter=TypeAdapter(_AxisBody),
+        routes=_RouteSet(form_edit=True),
+        templates=_Templates(form_edit="w/edit.html"),
+        form_extras_path=f"{__name__}._stub_form_extras",
+    )
+
+    async def my_form_edit(**_kw):  # pragma: no cover
+        return {}
+
+    with pytest.raises(ValueError, match="form_extras_path"):
+        mount_entity(
+            None,
+            spec,
+            handlers={"form_edit": my_form_edit},
+        )
+
+
+def test_spec_form_extras_without_form_route_raises():
+    """Declaring form_extras_path on a spec whose neither form route is
+    opted in is dead config — the extras would never run. Surfaces at
+    spec construction time."""
+    with pytest.raises(ValueError, match="routes.form_new"):
+        _EntitySpec(
+            name="widget",
+            url_collection="widgets",
+            id_param="widget_id",
+            model=SimpleNamespace,
+            audit=_stub_audit(),
+            routes=_RouteSet(),  # both form_new and form_edit off
+            form_extras_path=f"{__name__}._stub_form_extras",
+        )
+
+
+def test_spec_form_extras_repos_without_path_raises():
+    """`form_extras_repos` without `form_extras_path` is dead config —
+    the typed-repo kwargs would have no consumer. Surfaces at spec
+    construction time."""
+    with pytest.raises(ValueError, match="form_extras_repos"):
+        _EntitySpec(
+            name="widget",
+            url_collection="widgets",
+            id_param="widget_id",
+            model=SimpleNamespace,
+            audit=_stub_audit(),
+            routes=_RouteSet(form_new=True),
+            templates=_Templates(form_new="w/new.html"),
+            form_extras_repos=(("x", UserRepository),),
+        )
 
 
 def test_mount_delete_404_propagates_from_handler():
