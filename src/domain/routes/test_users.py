@@ -726,6 +726,56 @@ async def test_get_my_providers_empty_state(
     assert "have not created" in empty.text()
 
 
+def _create_provider_action(tree: HTMLParser):
+    for anchor in tree.css('menu.toolbar-right > li > a[role="button"]'):
+        if "Create provider" in (anchor.text() or ""):
+            return anchor
+    return None
+
+
+async def test_get_my_providers_shows_create_action_in_toolbar(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user: User,
+):
+    """Self viewing their own provider list sees a 'Create provider'
+    toolbar action — present both in the empty state and after the
+    user has created one (so they can create additional providers)."""
+    empty_response = await authenticated_client.get("/users/me/providers")
+    empty_tree = HTMLParser(empty_response.text)
+    empty_action = _create_provider_action(empty_tree)
+    assert empty_action is not None
+    assert empty_action.attributes.get("href") == "/providers/form"
+
+    await _seed_user_provider(
+        db_test_session_manager, user_id=logged_in_user.id, practice_name="First"
+    )
+
+    with_one_response = await authenticated_client.get("/users/me/providers")
+    with_one_tree = HTMLParser(with_one_response.text)
+    assert _create_provider_action(with_one_tree) is not None
+
+
+async def test_get_user_providers_omits_create_action_for_other_user(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user: User,
+):
+    """An admin viewing another user's provider list does NOT see the
+    self-only 'Create provider' toolbar action — admins manage their
+    own providers, not on behalf of others."""
+    await promote_to_admin(db_test_session_manager, logged_in_user.email)
+    target = create_test_user(username=f"target-{uuid.uuid4()}")
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            session.add(target)
+
+    response = await authenticated_client.get(f"/users/{target.id}/providers")
+    assert response.status_code == 200
+    tree = HTMLParser(response.text)
+    assert _create_provider_action(tree) is None
+
+
 async def test_get_user_providers_self(
     authenticated_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],
