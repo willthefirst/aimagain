@@ -447,11 +447,11 @@ async def test_detail_lists_owned_providers(
 
 
 def _inline_create_provider_link(tree: HTMLParser):
-    """The detail page's Providers section renders the self-only
-    Create CTA as `<p><a role="button">Create provider</a></p>` after
-    the providers table. Distinct from the toolbar variant on
+    """The detail page's Providers card renders the self-only Create
+    CTA as `<a role="button">Create provider</a>` inside the
+    `.entity-card`'s `<footer>`. Distinct from the toolbar variant on
     `/users/{id}/providers` — this one is the profile inline preview."""
-    for anchor in tree.css('section a[role="button"]'):
+    for anchor in tree.css(".entity-card a[role='button']"):
         if "Create provider" in (anchor.text() or ""):
             return anchor
     return None
