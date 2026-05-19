@@ -155,3 +155,55 @@ def test_view_returns_dict_for_jinja_attribute_access():
     v = provider_card_view(_stub_provider())
     assert isinstance(v, dict)
     assert v["practice_name"] == "Acme Counseling"
+
+
+def test_view_prefers_affiliation_over_legacy_provider_columns():
+    """Regression for #629 PR 3 — per-role attrs source from
+    ``provider.affiliation`` first, falling back to the legacy
+    column on ``provider`` only when the affiliation is absent or
+    has no value for the field.
+
+    The PR 2 migration mirrored the per-role columns onto
+    ``affiliations``; PR 3 switches reads onto the new column set.
+    PR 4 will drop the legacy columns and the fallback path. The
+    test pins the precedence by giving the two sides disagreeing
+    values and asserting the affiliation value wins.
+    """
+    provider = _stub_provider(
+        # Legacy columns on `provider` carry the "old" values
+        in_person_sessions="no",
+        virtual_sessions="no",
+        sliding_scale=False,
+        cost="$50/session",
+        location_city="Old City",
+        location_state="NY",
+        location_zip="00000",
+        in_network_carriers=[],
+        accepts_out_of_network=False,
+        # `affiliation` carries the post-PR-3 source of truth
+        affiliation=SimpleNamespace(
+            in_person_sessions="yes",
+            virtual_sessions="please_contact",
+            sliding_scale=True,
+            cost="$200/session",
+            location_city="New City",
+            location_state="CA",
+            location_zip="90210",
+            in_network_carriers=["aetna"],
+            accepts_out_of_network=True,
+        ),
+    )
+    v = provider_card_view(provider)
+    assert v["in_person_label"] is not None
+    # affiliation says yes → label maps to the Yes branch, not the
+    # legacy "no" → "No" branch.
+    assert "yes" in v["in_person_label"].lower() or v["in_person_label"] == "Yes"
+    assert v["sliding_scale_label"] == "Yes"
+    assert v["cost"] == "$200/session"
+    assert "New City" in v["full_address"]
+    assert "CA" in v["full_address"]
+    assert "90210" in v["full_address"]
+    # Affiliation has both Aetna in-network and accepts_oon=True →
+    # summary mentions both.
+    assert "Aetna" in v["insurance_summary"]
+    assert "Out-of-network" in v["insurance_summary"]
