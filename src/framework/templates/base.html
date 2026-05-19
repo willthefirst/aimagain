@@ -86,9 +86,13 @@
       .entity-card[data-kind="program_availability"] { border-left-color: darkcyan; }
       /* Header band: Pico provides the background tint + bottom
          border; we only configure the in-row flex layout (headline,
-         modality chips, right-aligned date). */
+         modality chips, right-aligned date). `flex-wrap: wrap` keeps
+         the modality chip + right-aligned `<small>` date visible on
+         narrow viewports — without it they clip past the card's right
+         edge at ≤375px (#577). */
       .entity-card > header.entity-header {
         display: flex;
+        flex-wrap: wrap;
         align-items: baseline;
         gap: 0.5rem;
       }
