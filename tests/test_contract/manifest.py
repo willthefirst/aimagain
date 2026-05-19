@@ -11,7 +11,6 @@ from .infrastructure.servers.consumer import (
     _setup_post_owner_actions_stub,
     _setup_program_create_form_stub,
     _setup_provider_create_form_stub,
-    _setup_provider_edit_form_stub,
     _setup_users_admin_actions_stub,
 )
 from .tests.shared.mock_data_factory import MockDataFactory
@@ -81,15 +80,24 @@ CONTRACT_PAIRS: list[ContractPair] = [
         provider_state="User can create a provider",
         pytest_marks=(pytest.mark.provider, pytest.mark.providers),
     ),
-    ContractPair(
-        consumer_name="provider-edit-form",
-        provider_name="providers-api",
-        pact_port=1240,
-        handler_mocks_factory=MockDataFactory.create_provider_update_dependency_config,
-        consumer_setup_fn=_setup_provider_edit_form_stub,
-        provider_state="Provider 44444444-4444-4444-4444-444444444444 exists and is owned by the requester",
-        pytest_marks=(pytest.mark.provider, pytest.mark.providers),
-    ),
+    # `provider-edit-form` pair temporarily dropped from the manifest in
+    # #642 PR 1 — the contract was "PATCH /providers/{id} accepts
+    # location_*, sessions, insurance, sliding_scale, cost as a single
+    # form-encoded body" but those fields moved into inline affiliation
+    # rows. The wire endpoint shifted from `PATCH /providers/{id}` to
+    # `PATCH /providers/{id}/affiliations/{affiliation_id}` and the body
+    # shape changed. Re-add a replacement pair (or decide affiliation
+    # editing doesn't need a separate contract) when working #647.
+    #
+    # ContractPair(
+    #     consumer_name="provider-edit-form",
+    #     provider_name="providers-api",
+    #     pact_port=1240,
+    #     handler_mocks_factory=MockDataFactory.create_provider_update_dependency_config,
+    #     consumer_setup_fn=_setup_provider_edit_form_stub,
+    #     provider_state="Provider 44444444-4444-4444-4444-444444444444 exists and is owned by the requester",
+    #     pytest_marks=(pytest.mark.provider, pytest.mark.providers),
+    # ),
     ContractPair(
         consumer_name="organization-create-form",
         provider_name="organizations-api",
