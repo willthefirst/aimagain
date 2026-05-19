@@ -65,6 +65,8 @@ Every page extending `base.html` lands the same three-strip chrome above its con
 
 **Primary nav** lives in `base.html` and renders on every screen (authed *and* anonymous). The left-side slot carries the brand link plus (when authed) section shortcuts: Referrals (`/posts?kind=referral`), Openings (`/posts?kind=opening`), Directory (`/providers`). The right-side slot (`#primary-nav`) swaps the profile icon for a Login link depending on `is_authenticated`. Active state is matched against `request.url.path` plus `request.query_params['kind']` for the kind-partitioned Posts links. Pages don't extend it.
 
+The active tab carries `aria-current="page"` plus `class="contrast"`, and `base.html` styles `nav[aria-label="Primary"] a[aria-current="page"]` with a bottom underline + font-weight bump so the section reads at a glance — Pico's default `aria-current` tint alone was too subtle (#589). The rule scopes to the primary nav so breadcrumb / pagination links that also set `aria-current` keep their lighter treatment. Bare `/posts` and post detail / form URLs intentionally don't light any section tab — the canonical Referrals/Openings URLs are the filtered `/posts?kind=…` pages, and an unfiltered list is ambiguous between the two. `test_views.py` pins the URL → active-tab mapping.
+
 **Breadcrumb zone bar** (`{% block breadcrumb %}`, macro in `_shared/_breadcrumb.html`) renders Pico's native breadcrumb above the toolbar. Every authenticated page extends the block — chrome consistency is the goal. The shape follows the resource hierarchy `list > detail > edit/new`, each level appending one segment:
 
 | Page type        | URL example                    | Breadcrumb                            |
