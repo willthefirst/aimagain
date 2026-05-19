@@ -56,7 +56,7 @@ The work is concentrated. For each step, also add or extend the colocated `test_
 5. **Route** — create `domain/routes/<entity>.py` and call `mount_entity(router, <ENTITY>_ENTITY, handlers={...}, owned_subentities=(...))` once. The dispatcher stitches factory-built handlers onto the route module (auto-detected from the caller frame) as `_handle_<verb>_<entity>` so contract-test patches resolve through it. See [`domain/routes/README.md`](domain/routes/README.md).
 6. **Template (if rendering HTML)** — add the Jinja2 template in [`domain/templates/<entity>/`](domain/templates/README.md) extending the relevant view-type template from [`framework/templates/views/`](framework/templates/README.md).
 
-For polymorphic entities (`Post` / `kind`), see [`domain/models/posts/post_kinds.py`](domain/models/posts/post_kinds.py). The spec sets `discriminator=<registry>` and the framework's `handle_create` / `handle_update` dispatch through it automatically.
+For polymorphic entities the URL layer exposes each kind as its own resource family via a kind-locked `EntitySpec` (set `discriminator=<registry>` AND `discriminator_value="<kind>"` on each face). The framework forces `kind = discriminator_value` on list filters, raises 404 when a target's `kind` doesn't match on detail/update/delete/edit-form, and skips the picker `?kind=` synthesis on form_new. Today: `Post` exposed as `/referrals`, `/openings`, `/intakes` — see [`domain/specs/posts/`](domain/specs/posts/) and [`domain/models/posts/post_kinds.py`](domain/models/posts/post_kinds.py).
 
 ### Cross-cutting registries
 
