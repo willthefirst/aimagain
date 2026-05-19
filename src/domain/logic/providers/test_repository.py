@@ -231,11 +231,14 @@ async def test_insurance_fields_default_to_oon_only(
         assert row.cost is None
 
 
-async def test_delete_provider_cascades_licensures(
+async def test_delete_provider_leaves_clinician_credentials_intact(
     db_test_session_manager: async_sessionmaker[AsyncSession],
 ):
-    """Deleting a provider must remove its sub-rows via cascade. Covers
-    licensures explicitly and education/certification incidentally."""
+    """After #635 PR A, credential sub-rows FK to `clinicians.id` instead
+    of `providers.id` — deleting the Provider no longer cascades to them.
+    The Provider row is removed; credentials stay attached to the
+    Clinician (which survives the Provider delete in the multi-affiliation
+    model). Mirrors the model-level test in `test_provider_models.py`."""
     user = await _seed_user(db_test_session_manager)
 
     async with db_test_session_manager() as session:
@@ -245,17 +248,22 @@ async def test_delete_provider_cascades_licensures(
             await session.flush()
             session.add(
                 make_provider_licensure(
-                    provider_id=provider.id, license_type="lcsw", issuing_state="IL"
+                    clinician_id=provider.clinician_id,
+                    license_type="lcsw",
+                    issuing_state="IL",
                 )
             )
             session.add(
                 make_provider_licensure(
-                    provider_id=provider.id, license_type="lpc", issuing_state="CA"
+                    clinician_id=provider.clinician_id,
+                    license_type="lpc",
+                    issuing_state="CA",
                 )
             )
-            session.add(make_provider_education(provider_id=provider.id))
-            session.add(make_provider_certification(provider_id=provider.id))
+            session.add(make_provider_education(clinician_id=provider.clinician_id))
+            session.add(make_provider_certification(clinician_id=provider.clinician_id))
             provider_id = provider.id
+            clinician_id = provider.clinician_id
 
     async with db_test_session_manager() as session:
         repo = ProviderRepository(session)
@@ -274,7 +282,7 @@ async def test_delete_provider_cascades_licensures(
             (
                 await session.execute(
                     select(ProviderLicensure).filter(
-                        ProviderLicensure.provider_id == provider_id
+                        ProviderLicensure.clinician_id == clinician_id
                     )
                 )
             )
@@ -285,7 +293,7 @@ async def test_delete_provider_cascades_licensures(
             (
                 await session.execute(
                     select(ProviderEducation).filter(
-                        ProviderEducation.provider_id == provider_id
+                        ProviderEducation.clinician_id == clinician_id
                     )
                 )
             )
@@ -296,7 +304,7 @@ async def test_delete_provider_cascades_licensures(
             (
                 await session.execute(
                     select(ProviderCertification).filter(
-                        ProviderCertification.provider_id == provider_id
+                        ProviderCertification.clinician_id == clinician_id
                     )
                 )
             )
@@ -304,9 +312,9 @@ async def test_delete_provider_cascades_licensures(
             .all()
         )
         assert provider_row is None
-        assert licensure_rows == []
-        assert education_rows == []
-        assert certification_rows == []
+        assert len(licensure_rows) == 2
+        assert len(education_rows) == 1
+        assert len(certification_rows) == 1
 
 
 # --- list_providers ------------------------------------------------------
@@ -347,12 +355,16 @@ async def test_list_providers_filtered_by_license_type(
             await session.flush()
             session.add(
                 make_provider_licensure(
-                    provider_id=provider_a.id, license_type="lcsw", issuing_state="IL"
+                    clinician_id=provider_a.clinician_id,
+                    license_type="lcsw",
+                    issuing_state="IL",
                 )
             )
             session.add(
                 make_provider_licensure(
-                    provider_id=provider_b.id, license_type="lpc", issuing_state="IL"
+                    clinician_id=provider_b.clinician_id,
+                    license_type="lpc",
+                    issuing_state="IL",
                 )
             )
             keep_id = provider_a.id
@@ -379,12 +391,16 @@ async def test_list_providers_filtered_by_issuing_state(
             await session.flush()
             session.add(
                 make_provider_licensure(
-                    provider_id=provider_a.id, license_type="lcsw", issuing_state="CA"
+                    clinician_id=provider_a.clinician_id,
+                    license_type="lcsw",
+                    issuing_state="CA",
                 )
             )
             session.add(
                 make_provider_licensure(
-                    provider_id=provider_b.id, license_type="lcsw", issuing_state="IL"
+                    clinician_id=provider_b.clinician_id,
+                    license_type="lcsw",
+                    issuing_state="IL",
                 )
             )
             keep_id = provider_a.id
@@ -415,19 +431,25 @@ async def test_list_providers_combined_filter_is_anded(
             # A: matches both filters
             session.add(
                 make_provider_licensure(
-                    provider_id=provider_a.id, license_type="lcsw", issuing_state="CA"
+                    clinician_id=provider_a.clinician_id,
+                    license_type="lcsw",
+                    issuing_state="CA",
                 )
             )
             # B: matches license_type only
             session.add(
                 make_provider_licensure(
-                    provider_id=provider_b.id, license_type="lcsw", issuing_state="IL"
+                    clinician_id=provider_b.clinician_id,
+                    license_type="lcsw",
+                    issuing_state="IL",
                 )
             )
             # C: matches issuing_state only
             session.add(
                 make_provider_licensure(
-                    provider_id=provider_c.id, license_type="lpc", issuing_state="CA"
+                    clinician_id=provider_c.clinician_id,
+                    license_type="lpc",
+                    issuing_state="CA",
                 )
             )
             keep_id = provider_a.id
@@ -484,7 +506,7 @@ async def test_list_providers_distinct_when_multiple_licensures_match(
             await session.flush()
             session.add(
                 make_provider_licensure(
-                    provider_id=provider.id,
+                    clinician_id=provider.clinician_id,
                     license_type="lcsw",
                     issuing_state="IL",
                     license_number="L-1",
@@ -492,7 +514,7 @@ async def test_list_providers_distinct_when_multiple_licensures_match(
             )
             session.add(
                 make_provider_licensure(
-                    provider_id=provider.id,
+                    clinician_id=provider.clinician_id,
                     license_type="lcsw",
                     issuing_state="CA",
                     license_number="L-2",

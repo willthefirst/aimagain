@@ -10,9 +10,13 @@ Authorization is uniform: a provider can mutate only their own provider and
 its sub-rows; a superuser can mutate any. Read handlers are open to any
 authenticated user.
 
-Sub-resource handlers also assert that the URL's `provider_id` matches the
-sub-row's `provider_id`. Without this, `/providers/A/licensures/B` would
-silently mutate a licensure belonging to a different provider.
+Sub-resource handlers also assert URL-vs-row consistency so that
+`/providers/A/licensures/B` cannot mutate a licensure belonging to a
+different provider. After #635 PR A credentials FK to `clinicians.id`,
+not `providers.id`; the consistency check loads the URL's provider and
+compares `licensure.clinician_id == provider.clinician_id`. Wired through
+`EntitySpec.child_parent_match_attr="clinician_id"` on the credential
+specs in `src/domain/specs/_credential.py`.
 
 The wire-level "you may only attach a Provider to an Org you own" rule
 is declared on `PROVIDER_ENTITY.payload_authz_path` and resolved to

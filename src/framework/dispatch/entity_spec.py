@@ -186,6 +186,18 @@ class EntitySpec:
 
     # Parent (owned subentity link) --------------------------------------
     parent: "EntitySpec | None" = None
+    # Subresource handlers (``handle_delete`` / ``handle_update``) enforce
+    # URL-vs-row consistency so ``/parents/A/children/B`` cannot mutate a
+    # child belonging to parent B. By default the check compares the
+    # child's ``<parent.name>_id`` attribute to the URL's ``parent_id``.
+    # Set this when the child's FK targets a *non-parent* table that the
+    # parent also references — e.g. provider credentials FK to
+    # ``clinicians.id`` (#635 PR A) but URL-mount under ``/providers/...``.
+    # When set, the framework loads the parent and compares
+    # ``getattr(child, child_parent_match_attr) ==
+    # getattr(parent, child_parent_match_attr)`` instead. The default
+    # ``None`` keeps the cheap "child holds the FK directly" check.
+    child_parent_match_attr: str | None = None
 
     # FastAPI deps -------------------------------------------------------
     repo_dep: Callable[..., Any] | None = None

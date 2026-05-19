@@ -330,29 +330,43 @@ def make_provider_with_org(
 
 
 def make_provider_licensure(
-    *, provider_id: UUID, **overrides: Any
+    *,
+    clinician_id: UUID,
+    **overrides: Any,
 ) -> ProviderLicensure:
-    """Build a `ProviderLicensure` ORM row with CHECK-valid defaults."""
+    """Build a `ProviderLicensure` ORM row with CHECK-valid defaults.
+    Credentials FK to `clinicians.id` after #635 PR A — pass
+    `clinician_id=provider.clinician_id` after the provider has been
+    flushed (or `provider.clinician.id` if the clinician is flushed)."""
     return ProviderLicensure(
-        provider_id=provider_id, **{**_PROVIDER_LICENSURE_DEFAULTS, **overrides}
+        clinician_id=clinician_id,
+        **{**_PROVIDER_LICENSURE_DEFAULTS, **overrides},
     )
 
 
 def make_provider_education(
-    *, provider_id: UUID, **overrides: Any
+    *,
+    clinician_id: UUID,
+    **overrides: Any,
 ) -> ProviderEducation:
-    """Build a `ProviderEducation` ORM row with CHECK-valid defaults."""
+    """Build a `ProviderEducation` ORM row. See
+    :func:`make_provider_licensure` for the FK contract."""
     return ProviderEducation(
-        provider_id=provider_id, **{**_PROVIDER_EDUCATION_DEFAULTS, **overrides}
+        clinician_id=clinician_id,
+        **{**_PROVIDER_EDUCATION_DEFAULTS, **overrides},
     )
 
 
 def make_provider_certification(
-    *, provider_id: UUID, **overrides: Any
+    *,
+    clinician_id: UUID,
+    **overrides: Any,
 ) -> ProviderCertification:
-    """Build a `ProviderCertification` ORM row with CHECK-valid defaults."""
+    """Build a `ProviderCertification` ORM row. See
+    :func:`make_provider_licensure` for the FK contract."""
     return ProviderCertification(
-        provider_id=provider_id, **{**_PROVIDER_CERTIFICATION_DEFAULTS, **overrides}
+        clinician_id=clinician_id,
+        **{**_PROVIDER_CERTIFICATION_DEFAULTS, **overrides},
     )
 
 

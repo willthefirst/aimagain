@@ -92,21 +92,15 @@ class Provider(LocationMixin, BaseModel):
         lazy="selectin",
     )
 
-    licensures = relationship(
-        "ProviderLicensure",
-        cascade="all, delete-orphan",
-        lazy="selectin",
-    )
-    educations = relationship(
-        "ProviderEducation",
-        cascade="all, delete-orphan",
-        lazy="selectin",
-    )
-    certifications = relationship(
-        "ProviderCertification",
-        cascade="all, delete-orphan",
-        lazy="selectin",
-    )
+    # Credential sub-tables moved their FK from `providers.id` to
+    # `clinicians.id` in #635 PR A — credentials are person-level.
+    # `licensures` / `educations` / `certifications` survive as
+    # `@property` proxies below so route handlers, templates, view-
+    # models, and the framework's `repo.add_child(parent, "licensures",
+    # ...)` path keep working unchanged: appending into the returned
+    # collection appends to `clinician.licensures` (an SQLAlchemy
+    # `InstrumentedList`) and sets the new row's `clinician_id`
+    # automatically.
 
     def __init__(self, **kwargs):
         """Auto-create the side rows so the framework's generic
@@ -202,6 +196,27 @@ class Provider(LocationMixin, BaseModel):
         ``org`` hasn't been populated yet (pre-flush ORM constructions);
         every persisted row has a NOT NULL ``org_id``."""
         return self.org.name if self.org is not None else None
+
+    @property
+    def licensures(self):
+        """Person-level credential list — proxies through
+        `provider.clinician.licensures` after the FK move (#635 PR A).
+        Returns the SQLAlchemy `InstrumentedList`, so `.append(...)`
+        from `repo.add_child(parent, "licensures", row)` adds to the
+        clinician's collection and the FK setter on
+        `Clinician.licensures` populates `licensure.clinician_id`
+        automatically."""
+        return [] if self.clinician is None else self.clinician.licensures
+
+    @property
+    def educations(self):
+        """Person-level credential list — see :py:attr:`licensures`."""
+        return [] if self.clinician is None else self.clinician.educations
+
+    @property
+    def certifications(self):
+        """Person-level credential list — see :py:attr:`licensures`."""
+        return [] if self.clinician is None else self.clinician.certifications
 
 
 # Per-role attributes the directory's read path reads off

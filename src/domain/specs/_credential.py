@@ -53,6 +53,11 @@ def make_provider_credential_entity(
         id_param=id_param,
         model=model,
         parent=PROVIDER_ENTITY,
+        # Credentials FK to `clinicians.id` after #635 PR A — they URL-mount
+        # under `/providers/{provider_id}/...` but their persisted FK isn't
+        # `provider_id`. The framework's URL-vs-row consistency check loads
+        # the parent and compares `child.clinician_id == provider.clinician_id`.
+        child_parent_match_attr="clinician_id",
         repo_dep=get_provider_repository,
         auth_deps=AUTHENTICATED,
         auth_policy=OWNER_OR_ADMIN,

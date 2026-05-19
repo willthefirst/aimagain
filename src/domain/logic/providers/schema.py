@@ -114,10 +114,16 @@ class _ProviderSubrowBase(ReadProjection):
     """Common fields for every provider sub-row Read schema (licensure /
     education / certification). Subclasses add entity-specific fields.
     Also serves as the audit-snapshot shape (see module docstring).
+
+    Credentials FK to `clinicians.id` after #635 PR A — they're person-
+    level data shared across affiliations. The wire surface carries
+    `clinician_id` (the persisted FK); the URL still scopes mutations
+    through `/providers/{provider_id}/...` so clients use the URL for
+    the provider context.
     """
 
     id: uuid.UUID
-    provider_id: uuid.UUID
+    clinician_id: uuid.UUID
     created_at: datetime
     updated_at: datetime
 
