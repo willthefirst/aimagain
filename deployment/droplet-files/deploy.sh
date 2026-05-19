@@ -187,6 +187,16 @@ log "Deploying: $NEW (port $NEW_PORT)"
 # Clean up any existing containers for the new instance
 cleanup_containers "bedlam-connect-$NEW"
 
+# Free disk before pulling — `docker image prune -af` removes images not
+# attached to any container (running OR stopped). Blue/green keeps exactly
+# one image attached at this point (the running CURRENT-color container
+# holds a ref to its image ID via its tag), so this only deletes orphans
+# from prior deploys. Without it, every CD push accumulates one unreferenced
+# image (~hundreds of MB) and `docker pull` eventually fails with
+# "no space left on device" during layer registration.
+log "Pruning unreferenced Docker images to free disk..."
+run_cmd docker image prune -af || true
+
 # Pull latest image
 log "Pulling latest Docker image..."
 if run_cmd docker pull ghcr.io/willthefirst/bedlam-connect:latest; then
