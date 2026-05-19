@@ -48,9 +48,9 @@ detail page so both views share the same visual vocabulary.
 `active_kind` accepted for backward compatibility with `list.html`
 but ignored — the cards' `data-kind` left-edge color is constant
 per-kind, so a single-kind filter doesn't need to suppress anything. #}
-{%- from "posts/_modality_chips.html" import modality_chips -%}
-{%- from "posts/_services_block.html" import services_block -%}
-{%- from "posts/_facts_block.html" import facts_block -%}
+{%- from "_shared/posts/_modality_chips.html" import modality_chips -%}
+{%- from "_shared/posts/_services_block.html" import services_block -%}
+{%- from "_shared/posts/_facts_block.html" import facts_block -%}
 
 {% macro post_item(post, active_kind=None) -%}
 {%- set view = post_card_view(post) -%}
