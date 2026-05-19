@@ -626,10 +626,17 @@ async def test_detail_renders_breadcrumb(
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user: User,
 ):
-    """Post detail renders the Pico breadcrumb (`Posts › Post`) above
-    the page toolbar. The trailing `<li>` is marked `aria-current="page"`
-    so screen readers identify it as the current page; visual styling
-    comes from Pico's `nav[aria-label="breadcrumb"]` defaults."""
+    """Post detail renders the Pico breadcrumb (`Posts › <headline>`)
+    above the page toolbar. The trailing `<li>` is marked
+    `aria-current="page"` so screen readers identify it as the current
+    page; visual styling comes from Pico's `nav[aria-label="breadcrumb"]`
+    defaults.
+
+    The leaf reuses `post_card_view(post).headline` — the same identity
+    string the entity-card's header renders — so the breadcrumb and the
+    page heading stay in lock-step (see #593). For a default referral
+    factory post (`adults_25_64` + `prefer_not_to_say`) the headline is
+    `"Adult (25–64)"`."""
     post = _referral_post(description="crumb-x", owner_id=logged_in_user.id)
     async with db_test_session_manager() as session:
         async with session.begin():
@@ -643,7 +650,7 @@ async def test_detail_renders_breadcrumb(
     crumb = tree.css_first('nav[aria-label="breadcrumb"]')
     assert crumb is not None
     items = crumb.css("ul > li")
-    assert [li.text(strip=True) for li in items] == ["Posts", "Post"]
+    assert [li.text(strip=True) for li in items] == ["Posts", "Adult (25–64)"]
     parent_link = items[0].css_first("a")
     assert parent_link is not None
     assert parent_link.attributes.get("href") == "/posts"
@@ -651,6 +658,31 @@ async def test_detail_renders_breadcrumb(
     assert items[-1].attributes.get("aria-current") == "page"
     # Current page has no link inside — it's the leaf.
     assert items[-1].css_first("a") is None
+
+
+async def test_detail_breadcrumb_leaf_uses_opening_practice_name(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user: User,
+):
+    """For `kind='opening'`, the breadcrumb leaf is the practice
+    (provider org) name — the same string the entity-card's header
+    renders. Pins the per-kind branching in `post_card_view.headline`
+    against the breadcrumb (#593)."""
+    practice_name = f"Beacon Hill Family Therapy-{uuid.uuid4()}"
+    post = _opening_post(practice_name=practice_name, owner_id=logged_in_user.id)
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            session.add(post.opening_detail.provider)
+            session.add(post)
+        await session.refresh(post)
+        post_id = post.id
+
+    response = await authenticated_client.get(f"/posts/{post_id}")
+    assert response.status_code == 200
+    tree = HTMLParser(response.text)
+    items = tree.css('nav[aria-label="breadcrumb"] ul > li')
+    assert [li.text(strip=True) for li in items] == ["Posts", practice_name]
 
 
 async def test_detail_omits_kind_chip_and_meta_line(
@@ -1292,6 +1324,19 @@ async def test_search_page_renders_one_control_per_filter(
         "opening",
         "program_availability",
     }
+    # Regression for #599 — the search-form Clear link must use the
+    # outline variant so it shares the rest of the app's secondary
+    # button vocabulary (Cancel, Filters, Edit). Pico's filled
+    # `.secondary` (dark-gray) was a third button style with no
+    # other callers.
+    clear_links = [
+        a for a in form.css("a[role='button']") if a.text().strip() == "Clear"
+    ]
+    assert len(clear_links) == 1, "search form must render one Clear link"
+    clear_class = (clear_links[0].attributes.get("class") or "").split()
+    assert (
+        "secondary" in clear_class and "outline" in clear_class
+    ), f"Clear link must use `secondary outline`, got {clear_class!r}"
 
 
 async def test_toolbar_inline_active_filter_summary_collapses_beyond_two(
@@ -1728,17 +1773,43 @@ async def test_get_post_form_no_kind_renders_picker(
 ):
     """`GET /posts/form` without a `kind` query parameter renders the
     kind picker (`posts/form_new.html`) — not a kind-specific create
-    form. The picker has one link per kind round-tripping back with
-    `?kind=…`."""
+    form. The picker is a `.kind-picker` chooser with one option card
+    per kind: each card is an `<a class="kind-picker-option">`
+    carrying a Lucide icon, a title, and a 1-line description, and
+    its href round-trips back to `/posts/form?kind=…`."""
     response = await authenticated_client.get("/posts/form")
     assert response.status_code == 200
     tree = HTMLParser(response.text)
     # No `<input name="kind">` — that lives on the kind-specific forms,
     # not the picker.
     assert tree.css_first('input[name="kind"]') is None
-    # Each registered kind has a link on the picker.
-    assert tree.css_first('a[href="/posts/form?kind=referral"]') is not None
-    assert tree.css_first('a[href="/posts/form?kind=opening"]') is not None
+    # The chooser wrapper is the new `kind-picker` class — pin it so
+    # any future rewrite has to update this test deliberately.
+    assert tree.css_first(".kind-picker") is not None
+    # Each registered kind has an option card with the kind-specific
+    # accent (`data-kind`), title, and description.
+    referral_option = tree.css_first(
+        'a.kind-picker-option[data-kind="referral"][href="/posts/form?kind=referral"]'
+    )
+    assert referral_option is not None
+    assert referral_option.css_first(".kind-picker-icon") is not None
+    assert "Refer a client to a provider" in referral_option.text()
+    assert "needs care" in referral_option.text()
+
+    opening_option = tree.css_first(
+        'a.kind-picker-option[data-kind="opening"][href="/posts/form?kind=opening"]'
+    )
+    assert opening_option is not None
+    assert "Announce availability for new clients" in opening_option.text()
+    assert "open slots" in opening_option.text()
+
+    program_option = tree.css_first(
+        'a.kind-picker-option[data-kind="program_availability"]'
+        '[href="/posts/form?kind=program_availability"]'
+    )
+    assert program_option is not None
+    assert "Announce program intake" in program_option.text()
+    assert "cohort" in program_option.text()
 
 
 async def test_get_post_form_treats_empty_kind_as_absent(

@@ -69,7 +69,12 @@
 
   <section class="entity-facts">
     <dl>
-      <div><dt>Practice name</dt><dd><a href="{{ view.practice_url }}">{{ view.practice_name }}</a></dd></div>
+      {#- The provider's name lives in the header `<strong>`; the facts
+          row labelled "Organization" preserves the link to the owning
+          org so users can still navigate from the provider to the
+          practice page. Previously a "Practice name" row repeated the
+          same text under a duplicate label (#594). -#}
+      <div><dt>Organization</dt><dd><a href="{{ view.practice_url }}">{{ view.practice_name }}</a></dd></div>
       {%- if view.full_address %}
       <div class="entity-location"><dt aria-label="Address"><i class="icon-map-pinned" aria-hidden="true"></i></dt><dd>{{ view.full_address }}</dd></div>
       {%- endif %}
