@@ -89,7 +89,19 @@ async def test_base_template_renders_primary_nav_for_anonymous_visitors(
     Anonymous visitors get the brand link plus a Login shortcut on the
     right (no `/users/me` link, which would 401). The `{% if
     is_authenticated %}` branch lives inside `#primary-nav` so the
-    nav scaffold is always present and only its right-side item swaps."""
+    nav scaffold is always present and only its right-side item swaps.
+
+    On `/auth/login` itself the Login shortcut is rendered as a
+    non-link `<span aria-current="page">` so the chrome doesn't offer a
+    self-referential click target (see issue #591); that branch is
+    pinned in ``test_primary_nav_suppresses_self_referential_login_link``
+    below.
+    """
+    # Every anonymous-accessible page in production is under
+    # `/auth/...`, and the issue-#591 suppression covers all of them,
+    # so there is no end-to-end path that exercises the clickable-`<a>`
+    # branch — that branch is pinned by the isolation-level unit test
+    # in ``src/framework/templates/test_views.py``.
     response = await test_client.get("/auth/login")
 
     assert response.status_code == 200
@@ -99,14 +111,46 @@ async def test_base_template_renders_primary_nav_for_anonymous_visitors(
     # Brand link is present on the left.
     brand = nav.css_first('a[href="/"]')
     assert brand is not None
-    # Right-side slot has the Login link; no profile link.
-    nav_items = tree.css("#primary-nav > li > a")
-    hrefs = {a.attributes.get("href") for a in nav_items}
-    assert hrefs == {"/auth/login"}
-    # The current Login link is marked aria-current="page".
-    login_link = tree.css_first('#primary-nav a[href="/auth/login"]')
-    assert login_link is not None
-    assert login_link.attributes.get("aria-current") == "page"
+    # Right-side slot has the Login indicator (rendered as a non-link
+    # span on auth-flow pages); no profile link.
+    profile_link = tree.css_first('#primary-nav a[href="/users/me"]')
+    assert profile_link is None
+    # No clickable `<a href="/auth/login">` on the login page itself.
+    assert tree.css_first('#primary-nav a[href="/auth/login"]') is None
+    # The Login indicator is a `<span aria-current="page">`.
+    login_indicator = tree.css_first('#primary-nav span[aria-current="page"]')
+    assert login_indicator is not None
+    assert login_indicator.text().strip() == "Login"
+
+
+@pytest.mark.parametrize(
+    "path",
+    [
+        "/auth/login",
+        "/auth/register",
+        "/auth/forgot-password",
+    ],
+)
+async def test_primary_nav_suppresses_self_referential_login_link(
+    test_client: AsyncClient,
+    path: str,
+):
+    """On every anonymous-accessible auth-flow page the top-right
+    Login shortcut must not link to `/auth/login` — clicking a header
+    link that points where you already are (or to a sibling auth page
+    that has the same chrome) is the bug filed in issue #591. The
+    suppression covers `/auth/login`, `/auth/register`, and
+    `/auth/forgot-password` so the chrome reads consistently across
+    the public auth flow."""
+    response = await test_client.get(path)
+    assert response.status_code == 200
+    tree = HTMLParser(response.text)
+    assert tree.css_first('#primary-nav a[href="/auth/login"]') is None
+    login_indicator = tree.css_first('#primary-nav span[aria-current="page"]')
+    assert (
+        login_indicator is not None
+    ), f"expected #primary-nav to carry a non-link Login indicator on {path}"
+    assert login_indicator.text().strip() == "Login"
 
 
 # --- Listing -------------------------------------------------------------
