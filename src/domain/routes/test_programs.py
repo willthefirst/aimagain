@@ -218,6 +218,28 @@ async def test_list_programs_renders(
     assert "Listable Program" in response.text
 
 
+async def test_list_programs_empty_state_has_inline_create_cta(
+    authenticated_client: AsyncClient,
+    logged_in_user: User,
+):
+    """When no programs exist for the viewer, the empty state itself
+    pulls the eye to the next action — a "Create program" button inline,
+    not just the toolbar one above. Pins #598 so the CTA can't silently
+    regress to a bare "No programs found." paragraph.
+    """
+    response = await authenticated_client.get("/programs")
+    assert response.status_code == 200
+    tree = HTMLParser(response.text)
+
+    empty = tree.css_first("#programs-empty-state")
+    assert empty is not None, "empty-state container missing"
+
+    cta = empty.css_first("a[role='button']")
+    assert cta is not None, "inline Create CTA missing from empty state"
+    assert "Create program" in cta.text()
+    assert cta.attributes.get("href") == "/programs/form"
+
+
 async def test_detail_renders(
     authenticated_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],
