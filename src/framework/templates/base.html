@@ -155,28 +155,35 @@
         padding: 0.1rem 0;
       }
       /* Demographics `<dl>`: one `<div>` per fact, "Label: value"
-         layout — `<dt>` inline with a colon, `<dd>` inline after. */
-      .entity-card > .entity-grid section.entity-facts > dl {
+         layout — `<dt>` inline with a colon, `<dd>` inline after.
+         Scoped to `.entity-card section.entity-facts` (not
+         `.entity-card > .entity-grid section.entity-facts`) so the
+         inline `<dt>`/`<dd>` rules apply on detail pages that don't
+         use the 2-column `.entity-grid` wrapper (org, program, user,
+         provider). Without this, the icon-only `<dt>` in
+         `<div class="entity-location">` falls back to block layout
+         and renders on its own line above the value. */
+      .entity-card section.entity-facts > dl {
         margin: 0;
         padding: 0;
       }
-      .entity-card > .entity-grid section.entity-facts > dl > div {
+      .entity-card section.entity-facts > dl > div {
         padding: 0.1rem 0;
       }
-      .entity-card > .entity-grid section.entity-facts dt {
+      .entity-card section.entity-facts dt {
         display: inline;
         font-weight: 600;
       }
-      .entity-card > .entity-grid section.entity-facts dt::after { content: ": "; }
+      .entity-card section.entity-facts dt::after { content: ": "; }
       /* CR location chunk: `<dt>` is icon-only (`aria-label` carries
          meaning for screen readers), so suppress the trailing colon
          that the generic rule above adds to every `<dt>`. Icon →
          `<dd>` spacing comes from the icon's own `margin-inline-end`
          (set in the global icon rule below), which extends past
          the inline `<dt>` into the inline flow. */
-      .entity-card > .entity-grid section.entity-facts dl > div.entity-location > dt::after { content: ""; }
-      .entity-card > .entity-grid section.entity-facts dl > div.entity-location > dt { font-weight: normal; }
-      .entity-card > .entity-grid section.entity-facts dd { display: inline; margin: 0; }
+      .entity-card section.entity-facts dl > div.entity-location > dt::after { content: ""; }
+      .entity-card section.entity-facts dl > div.entity-location > dt { font-weight: normal; }
+      .entity-card section.entity-facts dd { display: inline; margin: 0; }
       /* Detail-only "how to refer" section — sits below the body
          grid, before the footer. Margin-top echoes the grid's
          vertical rhythm; the heading is the standard `<h4>`. */
