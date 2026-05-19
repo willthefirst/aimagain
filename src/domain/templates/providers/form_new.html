@@ -1,5 +1,5 @@
 {% extends "views/form_new.html" %}
-{%- from "_shared/form_fields.html" import field_for, radio_bool_field, text_field -%}
+{%- from "_shared/form_fields.html" import entity_select_field, field_for, radio_bool_field, text_field -%}
 {%- from "_shared/forms.html" import form_actions -%}
 
 {% set resource_url = entity_url('provider') %}
@@ -18,23 +18,18 @@
 <form hx-post="{{ entity_url('provider') }}">
   <fieldset>
     <legend>Practice</legend>
-    <label for="org_id">
-      Organization
-      <select id="org_id" name="org_id" required>
-        <option value="" disabled selected>--</option>
-        {%- for o in orgs %}
-        <option value="{{ o.id }}">{{ o.name }}</option>
-        {%- endfor %}
-      </select>
-      <small>Don't see your organization? <a href="{{ entity_form_url('organization') }}">Create one first</a>.</small>
-    </label>
+    {{ entity_select_field(
+         "org_id",
+         "Organization",
+         orgs,
+         help='Don\'t see your organization? <a href="' ~ entity_form_url('organization') ~ '">Create one first</a>.',
+    ) }}
     <div class="grid">
       {{ field_for(schema, "location_city", "City") }}
       {{ field_for(schema, "location_state", "State") }}
       {{ field_for(schema, "location_zip", "ZIP") }}
     </div>
-    {{ field_for(schema, "npi", "NPI") }}
-    <small>10-digit National Provider Identifier. Optional.</small>
+    {{ field_for(schema, "npi", "NPI", help="10-digit National Provider Identifier. Optional.") }}
   </fieldset>
 
   <fieldset>
@@ -50,14 +45,12 @@
      independent. No cross-field invariant. #}
   <fieldset>
     <legend>Insurance &amp; payment</legend>
-    {{ field_for(schema, "in_network_carriers", "In-network carriers") }}
-    <small>Leave empty for none.</small>
+    {{ field_for(schema, "in_network_carriers", "In-network carriers", help="Leave empty for none.") }}
     <div class="grid">
       {{ radio_bool_field("accepts_out_of_network", "Accepts out-of-network?", required=false) }}
       {{ radio_bool_field("sliding_scale", "Sliding scale?", required=false) }}
     </div>
-    {{ text_field("cost", "Cost", required=false) }}
-    <small>Free text. Optional.</small>
+    {{ text_field("cost", "Cost", required=false, help="Free text. Optional.") }}
   </fieldset>
 
   {{ form_actions("Create provider", cancel_url=entity_url('provider')) }}

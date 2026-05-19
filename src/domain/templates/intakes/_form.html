@@ -47,10 +47,8 @@ with at least one Program available.
 
   <fieldset>
     <legend>Availability</legend>
-    {{ time_grid_field("desired_times", "Desired times", current=d.desired_times if d else None) }}
-    <small>Optional.</small>
-    {{ field_for(schema, "schedule_text", "Schedule notes", current=d.schedule_text if d else None) }}
-    <small>e.g. start date, cohort dates, fixed program hours.</small>
+    {{ time_grid_field("desired_times", "Desired times", current=d.desired_times if d else None, help="Optional.") }}
+    {{ field_for(schema, "schedule_text", "Schedule notes", current=d.schedule_text if d else None, help="e.g. start date, cohort dates, fixed program hours.") }}
   </fieldset>
 
   <fieldset>
@@ -60,10 +58,8 @@ with at least one Program available.
       {{ multi_select_field("settings", "Treatment settings", TREATMENT_SETTINGS, labels=TREATMENT_SETTINGS_LABELS, current=d.settings if d else None) }}
     </div>
     <small>Both lists optional.</small>
-    {{ text_field("treatment_modality", "Treatment modality", current=d.treatment_modality if d else None, required=false) }}
-    <small>Optional. e.g. DBT, EMDR.</small>
-    {{ field_for(schema, "age_groups", "Age groups", current=d.age_groups if d else None) }}
-    <small>Select all that apply.</small>
+    {{ text_field("treatment_modality", "Treatment modality", current=d.treatment_modality if d else None, required=false, help="Optional. e.g. DBT, EMDR.") }}
+    {{ field_for(schema, "age_groups", "Age groups", current=d.age_groups if d else None, help="Select all that apply.") }}
     <div class="grid">
       {{ field_for(schema, "languages", "Languages spoken", current=d.languages if d else None) }}
       {{ multi_select_field("genders", "Genders served", GENDERS, labels=GENDER_LABELS, current=d.genders if d else None) }}
