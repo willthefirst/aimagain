@@ -234,6 +234,55 @@ def test_entity_card_header_wraps_on_narrow_viewports() -> None:
     ), "entity-header must set `flex-wrap: wrap` to avoid #577 clipping"
 
 
+def test_entity_facts_dl_is_two_column_grid_on_single_section_detail() -> None:
+    """Regression for #586 — the demographics `<dl>` on single-section
+    detail pages (org, program, user, provider) was rendering as a
+    single block-stacked column, leaving 60–70% of the card's horizontal
+    space empty. The grid rule must apply only when `<section
+    class="entity-facts">` is a *direct child* of `.entity-card` — when
+    it's nested inside `.entity-grid` (posts detail), the outer 2-column
+    grid already splits the body and a second inner split would create
+    a sub-grid inside the right column."""
+    import re
+
+    env = _make_env()
+    _add_child(
+        env,
+        "stub.html",
+        """
+        {% extends "views/list.html" %}
+        {% block resource_label %}Providers{% endblock %}
+        {% block content %}body{% endblock %}
+        """,
+    )
+
+    html = env.get_template("stub.html").render(
+        request=_request_stub(),
+        is_authenticated=False,
+        is_development=False,
+    )
+
+    # Match the direct-child grid rule. `>` between `.entity-card` and
+    # `section.entity-facts` is load-bearing — the looser descendant
+    # selector would also catch posts/detail.html where the `.dl` lives
+    # inside `.entity-grid`.
+    match = re.search(
+        r"\.entity-card\s*>\s*section\.entity-facts\s*>\s*dl\s*\{[^}]*\}",
+        html,
+    )
+    assert (
+        match is not None
+    ), "missing `.entity-card > section.entity-facts > dl` grid rule (#586)"
+    rule = match.group(0)
+    assert "display: grid" in rule, "entity-facts dl must use CSS grid (#586)"
+    assert (
+        "auto-fit" in rule
+    ), "entity-facts dl must use auto-fit so columns collapse on narrow viewports (#586)"
+    assert (
+        "minmax(" in rule
+    ), "entity-facts dl must use minmax(...) so each column has a min track size (#586)"
+
+
 def test_index_table_rows_stack_on_narrow_viewports() -> None:
     """Regression for #578 — every `index_table` row whose `<td>` cells
     carry `data-label` must stack into "Label: value" lines on ≤640px

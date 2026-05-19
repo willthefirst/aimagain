@@ -166,10 +166,31 @@
          use the 2-column `.entity-grid` wrapper (org, program, user,
          provider). Without this, the icon-only `<dt>` in
          `<div class="entity-location">` falls back to block layout
-         and renders on its own line above the value. */
+         and renders on its own line above the value.
+
+         The `<dl>` itself is a CSS grid so the per-fact `<div>`s
+         flow into two columns on tablet/desktop and reflow to a
+         single column on narrow viewports (#586 — the detail page
+         was wasting 60–70% of horizontal space because each fact's
+         `<div>` was a block-level row that filled the card width).
+         Scoped to `.entity-card > section.entity-facts > dl` (direct
+         child of the card) so the 2-column grid only applies to the
+         single-section detail pages (org, program, user, provider).
+         Posts detail wraps its `entity-facts` inside `.entity-grid`,
+         which is already a 2-column layout — letting the inner `<dl>`
+         re-split would create a sub-grid inside the right column.
+         `auto-fit, minmax(...)` is the responsive idiom: the columns
+         expand to fill the card on wide viewports and collapse to one
+         column as the available width drops below the min track size. */
       .entity-card section.entity-facts > dl {
         margin: 0;
         padding: 0;
+      }
+      .entity-card > section.entity-facts > dl {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr));
+        column-gap: 1.5rem;
+        row-gap: 0.1rem;
       }
       .entity-card section.entity-facts > dl > div {
         padding: 0.1rem 0;
