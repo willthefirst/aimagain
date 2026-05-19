@@ -31,6 +31,16 @@
   </table>
 </div>
 {% else %}
-<p>No programs found.</p>
+{# Empty state owns its own CTA so the next action is in the eye-line of
+   the user, not buried in the toolbar above. The toolbar's "Create
+   program" still renders (this branch fires only when the list itself
+   is empty) — the inline button is a second affordance, not a
+   replacement. #}
+<div id="programs-empty-state">
+  <p>No programs yet.</p>
+  <p>
+    <a href="{{ entity_form_url('program') }}" role="button">Create program</a>
+  </p>
+</div>
 {% endif %}
 {% endblock %}
