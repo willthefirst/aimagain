@@ -425,6 +425,103 @@ def test_destructive_action_macros_emit_danger_class() -> None:
     ), "form_actions Delete button must emit class containing 'danger'"
 
 
+def test_form_actions_cancel_uses_secondary_outline() -> None:
+    """Regression for #599 — the canonical Cancel affordance on every
+    entity create/edit form must render with `class="secondary outline"`
+    (the project's single "secondary" role per the 4-role vocabulary in
+    `base.html` and the framework README). Without this pin, Cancel
+    could drift back to bare `.outline` (blue-outlined) and break
+    consistency with Cancel buttons elsewhere."""
+    env = _make_env()
+    _add_child(
+        env,
+        "stub.html",
+        """
+        {% from "_shared/forms.html" import form_actions %}
+        <div id="cluster">
+          {{ form_actions("Save", cancel_url="/orgs/1") }}
+        </div>
+        """,
+    )
+    html = env.get_template("stub.html").render()
+    tree = HTMLParser(html)
+    cancel = tree.css_first('#cluster a[role="button"]')
+    assert cancel is not None
+    classes = (cancel.attributes.get("class") or "").split()
+    assert "secondary" in classes and "outline" in classes, (
+        "form_actions Cancel must emit class='secondary outline' "
+        f"(got {cancel.attributes.get('class')!r})"
+    )
+
+
+def test_search_view_clear_uses_tertiary_class() -> None:
+    """Regression for #599 — Clear next to Apply on the search page must
+    render with `class="tertiary"` (text-only link-button). Pre-#599 it
+    used `class="secondary"` (filled gray), which read as a third
+    full-weight button competing with Apply."""
+    env = _make_env()
+    _add_child(
+        env,
+        "stub.html",
+        """
+        {% extends "views/search.html" %}
+        {% block resource_label %}Posts{% endblock %}
+        """,
+    )
+    html = env.get_template("stub.html").render(
+        request=_request_stub(),
+        is_authenticated=False,
+        is_development=False,
+        list_action="/posts",
+        declared_filters=[],
+        filter_values={},
+    )
+    tree = HTMLParser(html)
+    clear = None
+    for a in tree.css('a[role="button"]'):
+        if (a.text() or "").strip() == "Clear":
+            clear = a
+            break
+    assert clear is not None, "search.html must render a Clear link-button"
+    classes = (clear.attributes.get("class") or "").split()
+    assert "tertiary" in classes, (
+        "Clear must emit class containing 'tertiary' "
+        f"(got {clear.attributes.get('class')!r})"
+    )
+
+
+def test_base_html_defines_tertiary_button_style() -> None:
+    """Regression for #599 — `.tertiary` button style must be defined in
+    base.html so `class="tertiary"` renders as a text-only link-button.
+    Without this rule the class is a no-op and Clear falls back to
+    Pico's filled primary."""
+    import re
+
+    env = _make_env()
+    _add_child(
+        env,
+        "stub.html",
+        """
+        {% extends "views/list.html" %}
+        {% block resource_label %}Posts{% endblock %}
+        {% block content %}body{% endblock %}
+        """,
+    )
+    html = env.get_template("stub.html").render(
+        request=_request_stub(),
+        is_authenticated=False,
+        is_development=False,
+    )
+    match = re.search(
+        r"button\.tertiary,[^{]*\{[^}]*background-color:\s*transparent[^}]*\}",
+        html,
+        re.DOTALL,
+    )
+    assert (
+        match is not None
+    ), "base.html must define `button.tertiary` with transparent background"
+
+
 def test_base_html_defines_danger_button_style() -> None:
     """Regression for #579 — `.danger` button style must be defined in
     base.html with a red token. Without it, `class="danger"` falls back

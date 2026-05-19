@@ -371,16 +371,33 @@
         .form-actions { flex-direction: column; align-items: stretch; }
         .form-actions > .form-actions-destructive { margin-left: 0; }
       }
-      /* Destructive button style. Pico v2 ships primary (filled blue),
-         `.secondary`, `.contrast`, and the `.outline` modifier, but no
-         destructive-action color — every Delete in the app picked a
-         different style (primary blue, contrast black, secondary
-         outline) and read as the page's main CTA at the same visual
-         weight as Save/Create (#579). `.danger` is the single canonical
-         destructive class: filled red by default, red-outlined under
-         `.outline` for inline subentity deletes (credential rows) so
-         the row's main affordance doesn't shout. Reuses Pico's red
-         tokens so the color tracks the theme. */
+      /* Button role vocabulary. Pico v2 ships primary (filled blue),
+         `.secondary`, `.contrast`, and the `.outline` modifier, but the
+         project pre-#599 was using at least three different non-primary
+         treatments (filled gray `.secondary`, blue-outlined `.outline`,
+         gray-outlined `.secondary outline`) for what was semantically
+         the same "side action" role. The canonical four roles are:
+
+           * Primary — filled blue. Pico default `<button>` /
+             `<a role="button">` with no role class. Main page CTAs:
+             Create, Save, Apply, Login, Register.
+           * Secondary — `class="secondary outline"`. Single canonical
+             non-primary, non-destructive treatment. Used for Cancel,
+             Edit, Favorite/Unfavorite, Deactivate/Reactivate, Email,
+             and inline "see related" affordances.
+           * Danger — `class="danger"` (filled red) or
+             `class="danger outline"` (red-outlined, for inline
+             subentity deletes like credential rows). The single
+             canonical destructive class — closed by #579/#605.
+           * Tertiary — `class="tertiary"`. Text-only link-button for
+             inline reset/clear affordances (the search page's Clear)
+             where a third button at full button weight would compete
+             with Apply/Cancel. No background, no border; underline on
+             hover.
+
+         `.danger` reuses Pico's red tokens so the color tracks the
+         theme; `.tertiary` reuses the link/primary token so its color
+         tracks light/dark mode without per-mode overrides. */
       button.danger,
       [role="button"].danger,
       input[type="button"].danger,
@@ -406,6 +423,26 @@
         --pico-background-color: var(--pico-color-red-50);
         --pico-color: var(--pico-color-red-650);
         --pico-border-color: var(--pico-color-red-650);
+      }
+      /* Tertiary button — text-only link-button for inline reset /
+         clear affordances (the search page's Clear). Pico's `<button>`
+         baseline is filled, so this overrides the background, border,
+         and padding to render as a link with hover underline. Kept as a
+         button (vs an `<a>`) so callers don't have to switch tag when
+         the action toggles between a link target and a JS handler. */
+      button.tertiary,
+      [role="button"].tertiary {
+        --pico-background-color: transparent;
+        --pico-border-color: transparent;
+        --pico-color: var(--pico-primary);
+        padding-inline: 0;
+      }
+      button.tertiary:is(:hover, :active, :focus),
+      [role="button"].tertiary:is(:hover, :active, :focus) {
+        --pico-background-color: transparent;
+        --pico-border-color: transparent;
+        --pico-color: var(--pico-primary-hover);
+        text-decoration: underline;
       }
       /* Pico's `<fieldset>` carries a top margin that visually competes
          with the cap above — flatten the rhythm so siblings sit at a

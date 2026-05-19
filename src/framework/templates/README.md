@@ -85,6 +85,19 @@ Inline / subresource actions inside the page body (per-row delete buttons on `pr
 
 Edit forms keep a bottom `<a class="secondary outline">Cancel</a>` pointing at the resource's detail page — a deliberate "abandon this edit" affordance.
 
+### Button role vocabulary
+
+Every button or `<a role="button">` in the app picks one of four roles. The role is encoded by the CSS class on the element; the four styles are defined in [`base.html`](base.html) under the "Button role vocabulary" block.
+
+| Role        | Class                              | When to use                                                                                  |
+| ----------- | ---------------------------------- | -------------------------------------------------------------------------------------------- |
+| Primary     | *(no class)*                       | The page's main CTA — Create, Save, Apply, Login, Register, kind-picker options.             |
+| Secondary   | `secondary outline`                | Every non-primary, non-destructive action — Cancel, Edit, Favorite/Unfavorite, Deactivate/Reactivate, Email, Favorites, inline "see related" links. |
+| Danger      | `danger` (or `danger outline`)     | Destructive actions — Delete on toolbar, Delete on form, Delete on inline subentity rows. See [`_shared/actions.html`](_shared/actions.html) and [`_shared/forms.html`](_shared/forms.html). |
+| Tertiary    | `tertiary`                         | Text-only inline reset/clear — the search page's Clear. Renders as a link with hover underline; no background, no border. |
+
+Pre-#599 the project carried three different "secondary" treatments — filled gray `.secondary`, blue-outlined bare `.outline`, and gray-outlined `.secondary outline` — for what was semantically the same role. The four-role vocabulary above replaces all three with `secondary outline`, and reserves `tertiary` for the one place a fourth visual weight is genuinely needed (Clear next to Apply in the search form).
+
 ## Partial convention
 
 Files prefixed with `_` (e.g. `_breadcrumb.html`, `_toolbar.html`, `_provider_row.html`) are partials, `{% include %}`d from full pages — never rendered directly by routes. A partial documents its required context in a `{# ... #}` comment at the top and guards visibility on a single named flag (`{% if can_edit %}`). The handler computes the flag using [`../authz.py`](../authz.py) predicates; partials never introspect `current_user` to decide visibility. Backend authorization is enforced separately in the logic layer — the template guard is presentation only.

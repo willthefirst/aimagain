@@ -27,14 +27,14 @@
   </button></li>
   {% else %}
   <li><button type="button"
-          class="outline"
+          class="secondary outline"
           hx-post="{{ entity_url('user_favorite', id=provider.id) }}">
     Favorite
   </button></li>
   {% endif %}
 {% endif %}
 {% if can_edit %}
-<li><a href="{{ entity_form_url('provider', id=provider.id) }}" role="button" class="outline">Edit provider</a></li>
+<li><a href="{{ entity_form_url('provider', id=provider.id) }}" role="button" class="secondary outline">Edit provider</a></li>
 <li>{{ confirm_delete_button(entity_url('provider', id=provider.id), "Permanently delete this provider? Credentials attached to it will be removed too. This cannot be undone.") }}</li>
 {% endif %}
 {% endblock %}
