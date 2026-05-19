@@ -52,42 +52,76 @@ def _role_attr(provider, attr, default=None):
 
 
 def _insurance_summary(provider) -> str:
-    """Compose a single-string insurance phrase from the provider's
-    in-network / out-of-network / self-pay posture.
+    """Compose a single-string insurance phrase that unions a Provider's
+    insurance posture across **every** affiliation it holds.
+
+    After #642 PR 3 the directory listing shows one row per Provider that
+    reflects all affiliations (not just the primary). The Insurance cell
+    reads this phrase, so the summary unions across rows:
+
+      - ``in_network_carriers``: union of carrier codes across all
+        affiliations (first-seen order preserved, deduped).
+      - ``accepts_out_of_network``: ``True`` if **any** affiliation
+        accepts OON.
+      - ``sliding_scale``: ``True`` if **any** affiliation offers sliding
+        scale — surfaces in the row as a trailing ``"· sliding"`` so
+        callers don't need to render it as a separate badge.
 
     Returns one of:
-      - ``"In-network (Aetna, BCBS) · Out-of-network"``  (both)
-      - ``"In-network (Aetna)"``                         (in-network only)
-      - ``"Out-of-network"``                             (oon only)
-      - ``"Self-pay only"``                              (neither)
+      - ``"In-network (Aetna, Anthem / BCBS) · Out-of-network · sliding"``
+      - ``"In-network (Aetna) · sliding"``
+      - ``"Out-of-network"``
+      - ``"Self-pay only"``  (no carriers, no OON anywhere)
 
-    Collapses the three nested conditionals the old detail template
-    inlined; the template now reads a single ``view.insurance_summary``
-    string. The display-label lookup
+    Falls back to the legacy single-record path (``_role_attr``) when
+    ``provider.affiliations`` is empty/absent — covers ``SimpleNamespace``
+    test stubs that don't wire the 1:N relationship.
+
+    Display-label lookup
     (:data:`src.domain.models.enums.INSURANCE_CARRIER_LABELS`) happens
     here so the template doesn't need to know about it. Importing the
     label dict at module top would close a cluster-boundary import
     chain back into `models`; deferring to call time keeps the
     dependency graph quiet.
-
-    Reads source from ``provider.primary_affiliation`` — the single
-    source of truth after #635 PR B dropped the duplicated columns,
-    and the directory listing's per-row dereferencing rule after #642
-    PR 1 introduced multi-affiliation Providers.
     """
     from src.domain.models.enums import INSURANCE_CARRIER_LABELS
 
-    carriers = list(_role_attr(provider, "in_network_carriers", []) or [])
-    accepts_oon = bool(_role_attr(provider, "accepts_out_of_network", False))
-    if not carriers and not accepts_oon:
-        return "Self-pay only"
+    affiliations = list(getattr(provider, "affiliations", None) or [])
+    if affiliations:
+        carriers: list[str] = []
+        seen: set[str] = set()
+        for aff in affiliations:
+            for c in list(getattr(aff, "in_network_carriers", None) or []):
+                if c not in seen:
+                    seen.add(c)
+                    carriers.append(c)
+        accepts_oon = any(
+            bool(getattr(aff, "accepts_out_of_network", False)) for aff in affiliations
+        )
+        sliding = any(
+            bool(getattr(aff, "sliding_scale", False)) for aff in affiliations
+        )
+    else:
+        # No affiliations on the row — fall through to the legacy
+        # single-record path so test stubs that set the columns on the
+        # provider stub (or via `primary_affiliation`) keep working.
+        carriers = list(_role_attr(provider, "in_network_carriers", []) or [])
+        accepts_oon = bool(_role_attr(provider, "accepts_out_of_network", False))
+        sliding = bool(_role_attr(provider, "sliding_scale", False))
+
     parts: list[str] = []
     if carriers:
         labels = ", ".join(INSURANCE_CARRIER_LABELS[c] for c in carriers)
         parts.append(f"In-network ({labels})")
     if accepts_oon:
         parts.append("Out-of-network")
-    return " · ".join(parts)
+    if not parts:
+        base = "Self-pay only"
+    else:
+        base = " · ".join(parts)
+    if sliding:
+        base = f"{base} · sliding"
+    return base
 
 
 def _affiliation_insurance_summary(affiliation) -> str:

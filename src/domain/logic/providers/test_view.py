@@ -119,6 +119,97 @@ def test_insurance_summary_both():
     assert _insurance_summary(p) == "In-network (Aetna) · Out-of-network"
 
 
+# --- _insurance_summary across multiple affiliations -------------------
+#
+# After #642 PR 3 the directory listing reads `_insurance_summary` and
+# expects it to union across every affiliation the Provider holds.
+
+
+def test_insurance_summary_unions_carriers_across_affiliations():
+    """Two affiliations each with their own in-network carrier roll up
+    into one ``In-network (...)`` clause with both carriers listed.
+    Order is first-seen-per-affiliation, then within-affiliation order."""
+    a = _stub_affiliation(in_network_carriers=["aetna"], accepts_out_of_network=False)
+    b = _stub_affiliation(
+        in_network_carriers=["anthem_bcbs"], accepts_out_of_network=False
+    )
+    p = _stub_provider(affiliations=[a, b])
+    assert _insurance_summary(p) == "In-network (Aetna, Anthem / BCBS)"
+
+
+def test_insurance_summary_dedupes_repeated_carriers():
+    """A clinician with two affiliations that both take Aetna shouldn't
+    show ``Aetna, Aetna`` — carrier codes dedupe across the union."""
+    a = _stub_affiliation(in_network_carriers=["aetna"], accepts_out_of_network=False)
+    b = _stub_affiliation(in_network_carriers=["aetna"], accepts_out_of_network=False)
+    p = _stub_provider(affiliations=[a, b])
+    assert _insurance_summary(p) == "In-network (Aetna)"
+
+
+def test_insurance_summary_oon_if_any_affiliation_accepts():
+    """Mixed posture: one affiliation accepts OON, the other doesn't.
+    The roll-up still says Out-of-network (``any``, not ``all``)."""
+    a = _stub_affiliation(in_network_carriers=[], accepts_out_of_network=True)
+    b = _stub_affiliation(in_network_carriers=[], accepts_out_of_network=False)
+    p = _stub_provider(affiliations=[a, b])
+    assert _insurance_summary(p) == "Out-of-network"
+
+
+def test_insurance_summary_self_pay_when_all_affiliations_self_pay():
+    """Every affiliation is self-pay-only → roll-up is ``Self-pay only``."""
+    a = _stub_affiliation(in_network_carriers=[], accepts_out_of_network=False)
+    b = _stub_affiliation(in_network_carriers=[], accepts_out_of_network=False)
+    p = _stub_provider(affiliations=[a, b])
+    assert _insurance_summary(p) == "Self-pay only"
+
+
+def test_insurance_summary_appends_sliding_when_any_affiliation_has_it():
+    """Any affiliation offering sliding scale surfaces in the row as a
+    trailing ``· sliding`` so the cell carries the full posture in one
+    string (the row macro no longer renders sliding as a separate
+    badge)."""
+    a = _stub_affiliation(
+        in_network_carriers=["aetna"], accepts_out_of_network=False, sliding_scale=False
+    )
+    b = _stub_affiliation(
+        in_network_carriers=[], accepts_out_of_network=False, sliding_scale=True
+    )
+    p = _stub_provider(affiliations=[a, b])
+    assert _insurance_summary(p) == "In-network (Aetna) · sliding"
+
+
+def test_insurance_summary_full_combination():
+    """The "everything on" case: in-network carriers from each
+    affiliation, at least one accepts OON, at least one has sliding
+    scale. All three clauses appear, joined by ``· `` in order."""
+    a = _stub_affiliation(
+        in_network_carriers=["aetna"],
+        accepts_out_of_network=False,
+        sliding_scale=False,
+    )
+    b = _stub_affiliation(
+        in_network_carriers=["anthem_bcbs"],
+        accepts_out_of_network=True,
+        sliding_scale=True,
+    )
+    p = _stub_provider(affiliations=[a, b])
+    assert (
+        _insurance_summary(p)
+        == "In-network (Aetna, Anthem / BCBS) · Out-of-network · sliding"
+    )
+
+
+def test_insurance_summary_sliding_alone_with_self_pay():
+    """A clinician whose only insurance posture across affiliations is
+    sliding-scale-only self-pay still surfaces sliding. ``Self-pay only``
+    sits in the base; ``· sliding`` trails."""
+    a = _stub_affiliation(
+        in_network_carriers=[], accepts_out_of_network=False, sliding_scale=True
+    )
+    p = _stub_provider(affiliations=[a])
+    assert _insurance_summary(p) == "Self-pay only · sliding"
+
+
 # --- provider_card_view ------------------------------------------------
 
 

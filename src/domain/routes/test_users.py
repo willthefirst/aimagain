@@ -491,8 +491,12 @@ async def test_detail_lists_owned_providers(
     assert tree.css_first("#user-detail-providers-empty") is None
     rows = tree.css("#user-detail-providers tbody tr")
     assert len(rows) == 2
-    hrefs = {a.attributes.get("href") for a in tree.css("#user-detail-providers a")}
-    assert hrefs == {f"/providers/{first.id}", f"/providers/{second.id}"}
+    # After #642 PR 3 the Practice cell anchors to the owning Org per
+    # affiliation (each Provider here has its own auto-built Org via
+    # `make_provider_with_org`). The Provider id rides on the row's
+    # `data-row-id`; assert both Providers surface via that attribute.
+    row_ids = {row.attributes.get("data-row-id") for row in rows}
+    assert row_ids == {str(first.id), str(second.id)}
 
 
 def _inline_create_provider_link(tree: HTMLParser):

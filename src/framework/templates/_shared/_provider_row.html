@@ -12,10 +12,29 @@ Filters for the `/providers` index are declared on
 `/providers/search` page (via `views/search.html`) — there's no
 provider-specific filter partial to maintain.
 
-The Insurance cell composes the same posture summary used on the
-provider detail card (#449): "In-net" / "Out-net" / "Self-pay", with
-optional "· sliding" when sliding scale is on. Folded into one column
-so the table stays narrow.
+After #642 PR 3 each cell reflects **every** affiliation the Provider
+holds — not just the primary one.
+
+  - Practice cell: one anchor per affiliation pointing at the owning
+    Organization (`/organizations/{aff.org_id}`), joined by `" · "`.
+    Two affiliations at the same Org keep both chips (they may be
+    different locations); the cell intentionally does not dedupe by
+    `org_id`. The `<td>` keeps `class="primary"` so the responsive
+    mobile-stack pattern (see `_shared/index_table.html` and
+    `base.html` #578) still treats the cell as the row's headline.
+  - Location cell: `"City, ST"` per affiliation, joined by `" · "`,
+    with adjacent duplicate strings deduped (a clinician with two
+    affiliations both in Brooklyn, NY renders one chip — see the
+    `seen` set below).
+  - Insurance cell: rendered from
+    `src.domain.logic.providers.view._insurance_summary`, which unions
+    in-network carriers, out-of-network acceptance, and sliding-scale
+    posture across every affiliation.
+
+PR 4 will introduce a per-Clinician identity column (with a link to
+the provider/clinician detail page); for now the row links out to
+its Orgs only and the `data-row-id` carries the Provider id for
+tests / future per-row chrome.
 #}
 
 {% macro provider_headers() -%}
@@ -26,12 +45,42 @@ so the table stays narrow.
 {%- endmacro %}
 
 {% macro provider_row(provider) -%}
+{%- set view = provider_card_view(provider) -%}
 {%- set issuing_states = provider.licensures | map(attribute='issuing_state') | unique | sort | list -%}
+{%- set affiliations = provider.affiliations | list -%}
+{# Dedupe identical "City, ST" strings (e.g. two affiliations in
+   Brooklyn, NY shouldn't render "Brooklyn, NY · Brooklyn, NY"). Org
+   chips intentionally don't dedupe — two affiliations at the same
+   Org may be different physical locations and both deserve a link. #}
+{%- set locations = [] -%}
+{%- for aff in affiliations -%}
+  {%- set loc -%}
+    {%- if aff.location_city or aff.location_state -%}
+      {{ aff.location_city }}{% if aff.location_city and aff.location_state %}, {% endif %}{{ aff.location_state }}
+    {%- endif -%}
+  {%- endset -%}
+  {%- set loc = loc | trim -%}
+  {%- if loc and loc not in locations -%}
+    {%- set _ = locations.append(loc) -%}
+  {%- endif -%}
+{%- endfor -%}
 <tr data-row-id="{{ provider.id }}">
   <td data-label="Practice" class="primary">
-    <a href="{{ entity_url('provider', id=provider.id) }}">{{ provider.org.name }}</a>
+    {%- if affiliations -%}
+      {%- for aff in affiliations -%}
+        <a href="{{ entity_url('organization', id=aff.org_id) }}">{{ aff.org.name }}</a>{% if not loop.last %} · {% endif %}
+      {%- endfor -%}
+    {%- else -%}
+      &mdash;
+    {%- endif -%}
   </td>
-  <td data-label="Location">{{ provider.location_city }}, {{ provider.location_state }}</td>
+  <td data-label="Location">
+    {%- if locations -%}
+      {{ locations | join(' · ') }}
+    {%- else -%}
+      &mdash;
+    {%- endif -%}
+  </td>
   <td data-label="Licensed in">
     {%- if issuing_states -%}
       {{ issuing_states | join(', ') }}
@@ -39,17 +88,6 @@ so the table stays narrow.
       &mdash;
     {%- endif -%}
   </td>
-  <td data-label="Insurance">
-    {%- if provider.in_network_carriers and provider.accepts_out_of_network -%}
-      In-net &amp; out-net
-    {%- elif provider.in_network_carriers -%}
-      In-net
-    {%- elif provider.accepts_out_of_network -%}
-      Out-net
-    {%- else -%}
-      Self-pay
-    {%- endif -%}
-    {%- if provider.sliding_scale %} <small>· sliding</small>{% endif -%}
-  </td>
+  <td data-label="Insurance">{{ view.insurance_summary }}</td>
 </tr>
 {%- endmacro %}

@@ -416,7 +416,15 @@ async def test_list_providers_renders_html(
     db_test_session_manager: async_sessionmaker[AsyncSession],
 ):
     """`GET /providers` renders an HTML page with one entry per
-    persisted provider, regardless of which user owns it."""
+    persisted provider, regardless of which user owns it.
+
+    After #642 PR 3 the Practice cell no longer wraps in an
+    `a[href="/providers/{id}"]` anchor — each org name is its own
+    link to the owning Organization. The Provider id still rides on
+    the row via `data-row-id` so per-row chrome (and tests) can scope
+    to it; the next-PR clinician name column will surface the
+    provider-detail link. The headline assertion here pins the org
+    link shape and the row's `data-row-id`."""
     other = create_test_user(username=f"other-{uuid.uuid4()}")
     async with db_test_session_manager() as session:
         async with session.begin():
@@ -432,8 +440,161 @@ async def test_list_providers_renders_html(
     tree = HTMLParser(response.text)
     rows = tree.css("#providers-table tbody tr")
     assert len(rows) == 1
-    assert tree.css_first(f'a[href="/providers/{provider_id}"]') is not None
-    assert "Open House" in response.text
+    assert rows[0].attributes.get("data-row-id") == str(provider_id)
+    # Org name renders as a link to the owning Organization.
+    practice_cell = rows[0].css_first('td[data-label="Practice"]')
+    assert practice_cell is not None
+    org_anchor = practice_cell.css_first("a[href^='/organizations/']")
+    assert org_anchor is not None
+    assert org_anchor.text(strip=True) == "Open House"
+
+
+async def test_list_providers_row_shows_all_affiliations(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user: User,
+):
+    """After #642 PR 3 each Provider row reflects **every** affiliation
+    it holds, not just the primary. Seed a Provider with two
+    affiliations at different Orgs / cities and assert both org names
+    and both city/state pairs render inside the single row's Practice
+    and Location cells. The Insurance cell unions in-network carriers
+    across affiliations — pin one carrier per side and assert both
+    show up."""
+    from src.domain.models import Affiliation
+
+    provider_id = await _seed_provider_for(
+        db_test_session_manager,
+        user_id=logged_in_user.id,
+        practice_name="Bedlam Health",
+        location_city="Brooklyn",
+        location_state="NY",
+        location_zip="11201",
+        in_network_carriers=["aetna"],
+    )
+    second_org_id = await _seed_org(
+        db_test_session_manager,
+        owner_id=logged_in_user.id,
+        name="Wellspring",
+    )
+    clinician_id = await _clinician_id_for(db_test_session_manager, provider_id)
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            session.add(
+                Affiliation(
+                    provider_id=provider_id,
+                    clinician_id=clinician_id,
+                    org_id=second_org_id,
+                    location_city="Queens",
+                    location_state="NY",
+                    location_zip="11101",
+                    in_person_sessions="yes",
+                    virtual_sessions="please_contact",
+                    accepts_out_of_network=True,
+                    in_network_carriers=["anthem_bcbs"],
+                    sliding_scale=False,
+                    cost=None,
+                )
+            )
+
+    response = await authenticated_client.get("/providers")
+
+    assert response.status_code == 200
+    tree = HTMLParser(response.text)
+    rows = tree.css(f'tr[data-row-id="{provider_id}"]')
+    assert (
+        len(rows) == 1
+    ), "expected a single row per Provider (not one per affiliation)"
+    practice_cell = rows[0].css_first('td[data-label="Practice"]')
+    location_cell = rows[0].css_first('td[data-label="Location"]')
+    insurance_cell = rows[0].css_first('td[data-label="Insurance"]')
+    assert practice_cell is not None
+    assert location_cell is not None
+    assert insurance_cell is not None
+    practice_text = practice_cell.text(strip=True)
+    location_text = location_cell.text(strip=True)
+    insurance_text = insurance_cell.text(strip=True)
+    assert "Bedlam Health" in practice_text
+    assert "Wellspring" in practice_text
+    assert "Brooklyn" in location_text
+    assert "Queens" in location_text
+    # Each org chip is its own link to the owning Organization.
+    org_links = practice_cell.css("a[href^='/organizations/']")
+    org_hrefs = {a.attributes.get("href") for a in org_links}
+    assert f"/organizations/{second_org_id}" in org_hrefs
+    assert len(org_links) == 2, "expected one anchor per affiliation"
+    # Insurance cell unions in-network carriers from both affiliations.
+    assert "Aetna" in insurance_text
+    # `anthem_bcbs` renders as "Anthem / BCBS" via INSURANCE_CARRIER_LABELS.
+    assert "Anthem" in insurance_text or "BCBS" in insurance_text
+    # The second affiliation accepts OON → roll-up surfaces Out-of-network.
+    assert "Out-of-network" in insurance_text
+
+
+async def test_list_providers_row_dedupes_identical_locations(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user: User,
+):
+    """Two affiliations in the same city+state collapse to one chip in
+    the Location cell — guards against "Brooklyn, NY · Brooklyn, NY"
+    when a clinician holds two affiliations at different Orgs in the
+    same city. Org chips intentionally don't dedupe (each Org is its
+    own link)."""
+    from src.domain.models import Affiliation
+
+    provider_id = await _seed_provider_for(
+        db_test_session_manager,
+        user_id=logged_in_user.id,
+        practice_name="Bedlam Health",
+        location_city="Brooklyn",
+        location_state="NY",
+        location_zip="11201",
+    )
+    second_org_id = await _seed_org(
+        db_test_session_manager,
+        owner_id=logged_in_user.id,
+        name="Wellspring",
+    )
+    clinician_id = await _clinician_id_for(db_test_session_manager, provider_id)
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            session.add(
+                Affiliation(
+                    provider_id=provider_id,
+                    clinician_id=clinician_id,
+                    org_id=second_org_id,
+                    location_city="Brooklyn",
+                    location_state="NY",
+                    location_zip="11201",
+                    in_person_sessions="yes",
+                    virtual_sessions="please_contact",
+                    accepts_out_of_network=False,
+                    in_network_carriers=[],
+                    sliding_scale=False,
+                    cost=None,
+                )
+            )
+
+    response = await authenticated_client.get("/providers")
+    assert response.status_code == 200
+    tree = HTMLParser(response.text)
+    location_cell = tree.css_first(
+        f'tr[data-row-id="{provider_id}"] td[data-label="Location"]'
+    )
+    assert location_cell is not None
+    location_text = location_cell.text(strip=True)
+    # "Brooklyn, NY" appears exactly once after the dedupe.
+    assert (
+        location_text.count("Brooklyn") == 1
+    ), f"expected one Brooklyn chip, got: {location_text!r}"
+    # Both org chips still render (org_id dedup is intentionally
+    # off — two affiliations at different Orgs both get a link).
+    practice_cell = tree.css_first(
+        f'tr[data-row-id="{provider_id}"] td[data-label="Practice"]'
+    )
+    assert practice_cell is not None
+    assert len(practice_cell.css("a[href^='/organizations/']")) == 2
 
 
 async def test_list_providers_shows_licensure_states(
@@ -575,8 +736,10 @@ async def test_list_providers_filters_by_license_type(
     tree = HTMLParser(response.text)
     rows = tree.css("#providers-table tbody tr")
     assert len(rows) == 1
-    assert tree.css_first(f'a[href="/providers/{provider_a}"]') is not None
-    assert tree.css_first(f'a[href="/providers/{provider_b}"]') is None
+    # After #642 PR 3 the row scopes by `data-row-id` (the Provider id);
+    # the row's Practice cell anchors out to Orgs, not to the provider.
+    assert tree.css_first(f'tr[data-row-id="{provider_a}"]') is not None
+    assert tree.css_first(f'tr[data-row-id="{provider_b}"]') is None
     # The toolbar's filter link summarizes the active filter inline.
     link = tree.css_first("a.toolbar-filter-link")
     assert link is not None
