@@ -494,7 +494,17 @@ def _make_factory_handler(
             sig_params.append(_param(qp.name, qp.annotation))
     if shape.include_payload:
         sig_params.append(_param("payload", BaseModel))
-    if shape.include_kind_for_polymorphic and spec.discriminator is not None:
+    # The polymorphic-supertype create-form takes `?kind=` as a query
+    # param so the picker can dispatch to the right kind's template.
+    # Kind-locked faces (`discriminator_value` set) bypass the picker
+    # entirely — the handler uses `spec.discriminator_value` directly,
+    # so no `kind` route param is registered.
+    include_kind_param = (
+        shape.include_kind_for_polymorphic
+        and spec.discriminator is not None
+        and spec.discriminator_value is None
+    )
+    if include_kind_param:
         sig_params.append(_param("kind", str))
     if not shape.omit_repo:
         sig_params.append(_param("repo", BaseRepository))
@@ -514,7 +524,7 @@ def _make_factory_handler(
         }
         if not shape.omit_repo:
             call_kwargs["repo"] = kwargs["repo"]
-        if shape.include_kind_for_polymorphic and spec.discriminator is not None:
+        if include_kind_param:
             call_kwargs["kind"] = kwargs["kind"]
         if shape.include_request:
             call_kwargs["request"] = kwargs["request"]
