@@ -576,10 +576,18 @@
        `/users/me`); anonymous visitors see a Login link. The brand
        link goes to `/`, which redirects authed users to `/posts` and
        unauthed users to the login page — safe on either side of the
-       auth gate. #}
+       auth gate.
+
+       Self-reference suppression: when an anonymous visitor is already
+       on an auth-flow page (`/auth/login`, `/auth/register`,
+       `/auth/forgot-password`, `/auth/reset-password`), the right-side
+       Login shortcut renders as a non-link `<span>` so the chrome
+       doesn't offer a click target that points where the user already
+       is. The `<span>` keeps `aria-current="page"` for assistive tech.
+    #}
     {%- set _profile_path = entity_url('user', id='me') -%}
     {%- set _on_profile = is_authenticated and (request.url.path == _profile_path or request.url.path.startswith(_profile_path + '/')) -%}
-    {%- set _on_login = request.url.path == '/auth/login' -%}
+    {%- set _on_auth_flow = request.url.path == '/auth/login' or request.url.path == '/auth/register' or request.url.path == '/auth/forgot-password' or request.url.path.startswith('/auth/reset-password') -%}
     {# Section shortcuts. Posts is one route partitioned by `?kind=`, so
        Referrals/Openings disambiguate via the query param; Directory is
        its own route under `/providers`. Active-state matching keeps
@@ -636,12 +644,17 @@
           </li>
           {% else %}
           <li>
-            {# `class="contrast"` is dropped on the active state so the
-               Login link color stays consistent across /auth/login vs
-               /auth/register / /auth/forgot-password (#592). The
-               aria-current semantics still convey the active state to
-               assistive tech. #}
-            <a href="/auth/login"{% if _on_login %} aria-current="page"{% endif %}>Login</a>
+            {# When the visitor is already on the auth flow (login /
+               register / forgot-password) we render Login as a
+               non-clickable `<span>` instead of a self-referential
+               link (#591). When it *is* rendered as a link, it carries
+               no `class="contrast"` so the link color stays consistent
+               across the auth pages (#592). #}
+            {% if _on_auth_flow %}
+            <span aria-current="page" class="contrast">Login</span>
+            {% else %}
+            <a href="/auth/login">Login</a>
+            {% endif %}
           </li>
           {% endif %}
         </ul>

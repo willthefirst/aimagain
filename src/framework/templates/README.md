@@ -67,6 +67,8 @@ Every page extending `base.html` lands the same three-strip chrome above its con
 
 The active tab carries `aria-current="page"` plus `class="contrast"`, and `base.html` styles `nav[aria-label="Primary"] a[aria-current="page"]` with a bottom underline + font-weight bump so the section reads at a glance — Pico's default `aria-current` tint alone was too subtle (#589). The rule scopes to the primary nav so breadcrumb / pagination links that also set `aria-current` keep their lighter treatment. Bare `/posts` and post detail / form URLs intentionally don't light any section tab — the canonical Referrals/Openings URLs are the filtered `/posts?kind=…` pages, and an unfiltered list is ambiguous between the two. `test_views.py` pins the URL → active-tab mapping.
 
+On the public auth-flow pages (`/auth/login`, `/auth/register`, `/auth/forgot-password`, `/auth/reset-password/...`) the right-side Login shortcut is rendered as a non-link `<span aria-current="page">Login</span>` instead of an `<a>` — the chrome must not offer a self-referential click target on the page the visitor is already on (or on a sibling auth page where the same Login link would still be a no-op). Pinned by ``test_views.py::test_primary_nav_suppresses_login_link_on_auth_flow_paths``.
+
 **Breadcrumb zone bar** (`{% block breadcrumb %}`, macro in `_shared/_breadcrumb.html`) renders Pico's native breadcrumb above the toolbar. Every authenticated page extends the block — chrome consistency is the goal. The shape follows the resource hierarchy `list > detail > edit/new`, each level appending one segment:
 
 | Page type        | URL example                    | Breadcrumb                            |
