@@ -289,10 +289,15 @@ async def test_seed_credentials_inserts_rows_attached_to_provider(
     assert created > 0
 
     async with async_test_sessionmaker() as session:
+        # `Provider.org_id` moved to `Affiliation.org_id` in #635 PR B —
+        # join through the 1:1 `affiliations.provider_id` link.
+        from src.domain.models import Affiliation
+
         provider = (
             await session.execute(
                 select(Provider)
-                .join(Organization, Organization.id == Provider.org_id)
+                .join(Affiliation, Affiliation.provider_id == Provider.id)
+                .join(Organization, Organization.id == Affiliation.org_id)
                 .where(Organization.name == "Lakeside Therapy Collective")
             )
         ).scalar_one()

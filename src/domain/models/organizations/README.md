@@ -1,12 +1,12 @@
 # Organizations cluster
 
-First-class directory entity for clinics, group practices, health systems, and solo-practice shells. PR 2 of the Org/Program roadmap (#520) wired Provider to Organization via `Provider.org_id` and surfaces a `providers` collection here.
+First-class directory entity for clinics, group practices, health systems, and solo-practice shells. PR 2 of the Org/Program roadmap (#520) wired Provider to Organization via an `org_id` FK; in #635 PR B that FK moved to `affiliations.org_id` (along with the rest of the per-role columns), so the Org→Provider path now navigates `affiliations` rather than a back-relationship on this table.
 
 The parent layer's conventions (BaseModel inheritance, FK CASCADE, migration workflow) live in [`../README.md`](../README.md); this README covers what's specific to organizations.
 
 ## Files
 
-- `organization.py` — `Organization`. Hierarchy via a nullable self-FK `parent_org_id` and a denormalized non-nullable `root_org_id`. Tied to a `User` via non-unique `owner_id` FK + CASCADE (mirrors `Provider.owner_id` — one user may own many orgs). Enum column `type` CHECKs against `ORGANIZATION_TYPES` from [`../enums.py`](../enums.py). Exposes a `providers` collection via the `Provider.org_id` FK (PR 2 of the roadmap, #520); the FK is `ON DELETE RESTRICT`, so deleting an Org with Providers fails loudly rather than silently orphaning them.
+- `organization.py` — `Organization`. Hierarchy via a nullable self-FK `parent_org_id` and a denormalized non-nullable `root_org_id`. Tied to a `User` via non-unique `owner_id` FK + CASCADE (one user may own many orgs). Enum column `type` CHECKs against `ORGANIZATION_TYPES` from [`../enums.py`](../enums.py). The Org→Provider direction is reached through `Affiliation.org_id` (RESTRICT — deleting an Org with attached Affiliations fails loudly); there is no `Organization.providers` back-relationship after #635 PR B. The `Organization.programs` collection (RESTRICT) remains for the Program child.
 
 ## The `parent_org_id` + `root_org_id` invariant
 

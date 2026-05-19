@@ -106,15 +106,18 @@ async def test_provider_construct_with_existing_affiliation_skips_auto_create():
 
 
 @pytest.mark.asyncio
-async def test_provider_per_role_writes_mirror_to_affiliation():
-    """Regression for #629 PR 4 — `setattr(provider, '<per-role>', value)`
-    must mirror the write onto `provider.affiliation` so PR 3's
-    affiliation-first reads see the post-edit value. Without the
-    mirror, `repo.patch(provider, location_city='Queens')` would
-    update `providers.location_city` but leave
-    `affiliations.location_city` stale, and the directory's
-    `provider_card_view._role_attr` would return the pre-edit
-    affiliation value."""
+async def test_provider_per_role_writes_land_on_affiliation():
+    """After #635 PR B the per-role columns no longer live on
+    `providers` — they live only on `affiliations`. The `Provider`
+    ORM class exposes each per-role attr as a `@property` whose setter
+    proxies through to `provider.affiliation`, so the framework's
+    `repo.patch(provider, location_city='Queens')` (which calls
+    `setattr(provider, ...)`) lands the write directly on the
+    affiliation row. This is the per-PR-B replacement for the
+    retired SQLAlchemy `set`-event mirror listener — writes target
+    affiliation in the first place rather than being mirrored onto
+    it after the fact.
+    """
     user = _make_user("dave")
     org = _make_org("Acme", user.id)
     provider = _make_provider(owner=user, org=org)
@@ -132,6 +135,12 @@ async def test_provider_per_role_writes_mirror_to_affiliation():
     assert aff.sliding_scale is True
     assert aff.cost == "$300/session"
     assert aff.in_network_carriers == ["bcbs", "cigna"]
+    # Reads through the Provider's property proxies return the same
+    # value the affiliation now holds — `ProviderRead.model_validate`
+    # picks up post-edit values via `from_attributes`.
+    assert provider.location_city == "Queens"
+    assert provider.in_person_sessions == "no"
+    assert provider.sliding_scale is True
 
 
 @pytest.mark.asyncio

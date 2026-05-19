@@ -32,22 +32,20 @@ def _full_address(
 
 
 def _role_attr(provider, attr, default=None):
-    """Source a per-role attribute from `provider.affiliation` first,
-    falling back to the legacy column on `provider` itself.
+    """Source a per-role attribute from `provider.affiliation`.
 
-    The PR 2 migration populates ``provider.affiliation`` with a
-    1:1 mirror of the per-role columns currently still on
-    ``providers``; PR 3 switches the directory's read path here.
-    PR 4 will drop the duplicated columns from ``providers`` and
-    this helper's fallback path with them.
-
-    Test stubs typed as `SimpleNamespace` may set the legacy attr
-    without an affiliation — the fallback keeps those passing
-    until PR 4 retires the legacy field set.
+    Post-#635 PR B the per-role columns no longer live on `providers` —
+    affiliation is the single source of truth. The `Provider` ORM class
+    still surfaces `provider.location_city` etc. as `@property` proxies
+    over the affiliation, but `provider_card_view` also accepts test
+    stubs that set fields on a `SimpleNamespace` without wiring an
+    affiliation; for those, fall through to the attribute on the
+    provider directly (the property proxies live on the real ORM class,
+    not the stub).
     """
     affiliation = getattr(provider, "affiliation", None)
-    if affiliation is not None and getattr(affiliation, attr, None) is not None:
-        return getattr(affiliation, attr)
+    if affiliation is not None:
+        return getattr(affiliation, attr, default)
     return getattr(provider, attr, default)
 
 
@@ -70,8 +68,8 @@ def _insurance_summary(provider) -> str:
     chain back into `models`; deferring to call time keeps the
     dependency graph quiet.
 
-    Reads source from ``provider.affiliation`` first, falling back
-    to the legacy columns on ``provider`` itself (#629 PR 3).
+    Reads source from ``provider.affiliation`` — the single source of
+    truth after #635 PR B dropped the duplicated columns.
     """
     from src.domain.models.enums import INSURANCE_CARRIER_LABELS
 
@@ -105,7 +103,7 @@ def provider_card_view(provider) -> dict[str, Any]:
         practice_url: ``/organizations/<org_id>`` link to the parent
             Organization — preserves the cross-resource navigation
             the old template emitted inline.
-        full_address: ``"City, ST ZIP"`` composed from
+        full_address: ``"City, ST ZIP"`` composed from the affiliation's
             ``LocationMixin`` columns. ``None`` if every part is empty.
         in_person_label / virtual_label: display labels for the
             ``location_availability`` enum values
@@ -123,21 +121,18 @@ def provider_card_view(provider) -> dict[str, Any]:
     from src.domain.models.enums import LOCATION_AVAILABILITY_LABELS
 
     org = getattr(provider, "org", None)
-    # Per-role attrs come from `provider.affiliation` after #629 PR 3 —
-    # the directory's source-of-truth for "what is this clinician's
-    # role at this org." `npi` continues to come from
-    # `provider.clinician` (PR 1). Legacy columns on `providers` are
-    # the PR-2-era mirror and `_role_attr` falls back to them when
-    # affiliation is absent (test stubs); PR 4 drops both the columns
-    # and the fallback.
+    # Per-role attrs come from `provider.affiliation` — the directory's
+    # source-of-truth for "what is this clinician's role at this org"
+    # after #635 PR B dropped the duplicated columns from `providers`.
+    # `npi` continues to come from `provider.clinician` (#629 PR 1).
+    # `_role_attr` still falls back to attributes on the `provider`
+    # object itself for `SimpleNamespace` test stubs that don't wire
+    # an affiliation.
     clinician = getattr(provider, "clinician", None)
+    org_id = _role_attr(provider, "org_id")
     return {
         "practice_name": (getattr(org, "name", None) if org else None),
-        "practice_url": (
-            f"/organizations/{provider.org_id}"
-            if getattr(provider, "org_id", None) is not None
-            else None
-        ),
+        "practice_url": (f"/organizations/{org_id}" if org_id is not None else None),
         "full_address": _full_address(
             _role_attr(provider, "location_city"),
             _role_attr(provider, "location_state"),
