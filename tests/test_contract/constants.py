@@ -16,9 +16,14 @@ TARGET_USER_ID = uuid.UUID("11111111-1111-1111-1111-111111111111")
 USER_ACTIVATION_API_PATH = f"/users/{TARGET_USER_ID}/activation"
 
 # Stable post id used as the path id for the owner-actions pact.
+# Post-#628 the URL family is per-kind; `referral` is the canonical
+# kind for this contract — the owner-actions partial is shared across
+# all three families and the HTMX wire shape is identical, so picking
+# one kind covers the contract surface (the consumer stub mounts
+# `/referrals/{post_id}`).
 STUB_POST_ID = uuid.UUID("22222222-2222-2222-2222-222222222222")
-POST_DELETE_API_PATH = f"/posts/{STUB_POST_ID}"
-POST_DETAIL_PAGE_PATH = f"/posts/{STUB_POST_ID}"
+POST_DELETE_API_PATH = f"/referrals/{STUB_POST_ID}"
+POST_DETAIL_PAGE_PATH = f"/referrals/{STUB_POST_ID}"
 
 # Provider create form pact.
 PROVIDER_CREATE_API_PATH = "/providers"
