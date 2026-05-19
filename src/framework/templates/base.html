@@ -484,6 +484,50 @@
          with the cap above — flatten the rhythm so siblings sit at a
          consistent gap inside the capped form. */
       .entity-form-page form > fieldset { margin-block-start: var(--pico-spacing); }
+      /* Per-field width caps. The form container is already capped at
+         `--form-max-width` above, but inside that cap a 5-digit ZIP and
+         a 200-char Name still both render at the full container width —
+         a 5-character field stretching to 720px reads as sloppy (#585).
+         Cap each short input to a width that matches its expected
+         content. Scoped to `.entity-form-page` so search forms and any
+         other non-entity-form usage keep Pico's defaults.
+
+         Selectors target `name="…"` rather than introducing new utility
+         classes: the field name is already the canonical identifier
+         (it's what the schema validates and what the macro emits), so
+         caps tracking a renamed field is a single grep here, and new
+         forms that reuse the same field name pick up the cap for free.
+         `<select name="…">` and `<input name="…">` both apply.
+
+         Widths chosen for typical content (a few characters of padding
+         past the longest legitimate value): 5-digit ZIP ~100px, two-
+         letter state code ~100px, 10-digit NPI ~160px, ISO dates and
+         partial-dates ~180px, short numeric IDs ~160px. `max-width` (not
+         `width`) so the field can still shrink below the cap on narrow
+         viewports — the Pico-default `width: 100%` keeps the field
+         filling its column until the cap kicks in. */
+      .entity-form-page input[name="location_zip"],
+      .entity-form-page input[name="location_state"],
+      .entity-form-page select[name="location_state"],
+      .entity-form-page select[name="issuing_state"],
+      .entity-form-page select[name="state_preference"] {
+        max-width: 8rem;
+      }
+      .entity-form-page input[name="npi"],
+      .entity-form-page input[name="license_number"],
+      .entity-form-page input[name="parent_org_id"],
+      .entity-form-page input[name="expiration_date"],
+      .entity-form-page input[name="month_completed"],
+      .entity-form-page input[name="start_date"],
+      .entity-form-page input[name="end_date"],
+      .entity-form-page input[type="date"] {
+        max-width: 12rem;
+      }
+      .entity-form-page input[name="location_city"],
+      .entity-form-page input[name="cost"],
+      .entity-form-page input[name="treatment_modality"] {
+        max-width: 20rem;
+      }
       /* Credential rows (provider licensures / education / certifications)
          render as flat rows inside an outer `<section>` (edit) or
          `<article>` (detail), so a card-on-card pattern would read as
@@ -576,10 +620,18 @@
        `/users/me`); anonymous visitors see a Login link. The brand
        link goes to `/`, which redirects authed users to `/posts` and
        unauthed users to the login page — safe on either side of the
-       auth gate. #}
+       auth gate.
+
+       Self-reference suppression: when an anonymous visitor is already
+       on an auth-flow page (`/auth/login`, `/auth/register`,
+       `/auth/forgot-password`, `/auth/reset-password`), the right-side
+       Login shortcut renders as a non-link `<span>` so the chrome
+       doesn't offer a click target that points where the user already
+       is. The `<span>` keeps `aria-current="page"` for assistive tech.
+    #}
     {%- set _profile_path = entity_url('user', id='me') -%}
     {%- set _on_profile = is_authenticated and (request.url.path == _profile_path or request.url.path.startswith(_profile_path + '/')) -%}
-    {%- set _on_login = request.url.path == '/auth/login' -%}
+    {%- set _on_auth_flow = request.url.path == '/auth/login' or request.url.path == '/auth/register' or request.url.path == '/auth/forgot-password' or request.url.path.startswith('/auth/reset-password') -%}
     {# Section shortcuts. Posts is one route partitioned by `?kind=`, so
        Referrals/Openings disambiguate via the query param; Directory is
        its own route under `/providers`. Active-state matching keeps
@@ -636,12 +688,17 @@
           </li>
           {% else %}
           <li>
-            {# `class="contrast"` is dropped on the active state so the
-               Login link color stays consistent across /auth/login vs
-               /auth/register / /auth/forgot-password (#592). The
-               aria-current semantics still convey the active state to
-               assistive tech. #}
-            <a href="/auth/login"{% if _on_login %} aria-current="page"{% endif %}>Login</a>
+            {# When the visitor is already on the auth flow (login /
+               register / forgot-password) we render Login as a
+               non-clickable `<span>` instead of a self-referential
+               link (#591). When it *is* rendered as a link, it carries
+               no `class="contrast"` so the link color stays consistent
+               across the auth pages (#592). #}
+            {% if _on_auth_flow %}
+            <span aria-current="page" class="contrast">Login</span>
+            {% else %}
+            <a href="/auth/login">Login</a>
+            {% endif %}
           </li>
           {% endif %}
         </ul>

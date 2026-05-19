@@ -493,6 +493,80 @@ def test_breadcrumb_page_heading_visible_on_mobile() -> None:
     ), 'unscoped `nav[aria-label="breadcrumb"] { display: none }` in a mobile @media block would hide the page heading on list pages (#588)'
 
 
+def test_entity_form_page_caps_short_field_widths() -> None:
+    """Regression for #585 — every input inside `.entity-form-page`
+    that holds a short, bounded value (5-digit ZIP, 2-letter state,
+    10-digit NPI, ISO date, short numeric ID) must carry a `max-width`
+    cap so it doesn't stretch to the full form-container width on
+    desktop. The cap is applied via `name`-attribute selectors in
+    `base.html` so per-template wiring isn't required — adding a field
+    with one of the capped names anywhere inside an `.entity-form-page`
+    picks up the right width automatically."""
+    import re
+
+    env = _make_env()
+    _add_child(
+        env,
+        "stub.html",
+        """
+        {% extends "views/form_new.html" %}
+        {% set resource_url = "/providers" %}
+        {% block resource_label %}Providers{% endblock %}
+        {% block content %}<form id="x"></form>{% endblock %}
+        """,
+    )
+    html = env.get_template("stub.html").render(
+        request=_request_stub(),
+        is_authenticated=False,
+        is_development=False,
+    )
+
+    # The ZIP / state-code group caps at the narrow tier.
+    narrow = re.search(
+        r"\.entity-form-page\s+input\[name=\"location_zip\"\][^{]*\{[^}]*max-width:\s*8rem",
+        html,
+        re.DOTALL,
+    )
+    assert narrow is not None, (
+        "base.html must cap `location_zip` width inside `.entity-form-page` "
+        "so a 5-digit ZIP doesn't stretch the form container (#585)"
+    )
+
+    # NPI + ISO-date group caps at the medium tier.
+    medium = re.search(
+        r"\.entity-form-page\s+input\[name=\"npi\"\][^{]*\{[^}]*max-width:\s*12rem",
+        html,
+        re.DOTALL,
+    )
+    assert medium is not None, (
+        "base.html must cap `npi` width inside `.entity-form-page` so a "
+        "10-digit NPI doesn't stretch the form container (#585)"
+    )
+
+    # State <select> shares the narrow cap.
+    state = re.search(
+        r"\.entity-form-page\s+select\[name=\"location_state\"\][^{]*\{[^}]*max-width:\s*8rem",
+        html,
+        re.DOTALL,
+    )
+    assert state is not None, (
+        'base.html must cap `<select name="location_state">` width inside '
+        "`.entity-form-page` (#585)"
+    )
+
+    # Generic date-input cap so any `<input type=\"date\">` (e.g. the
+    # program start/end-date fields) picks up the cap without naming.
+    date_input = re.search(
+        r"\.entity-form-page\s+input\[type=\"date\"\][^{]*\{[^}]*max-width:\s*12rem",
+        html,
+        re.DOTALL,
+    )
+    assert date_input is not None, (
+        'base.html must cap `<input type="date">` width inside '
+        "`.entity-form-page` so program start/end dates don't stretch (#585)"
+    )
+
+
 def test_base_html_defines_danger_button_style() -> None:
     """Regression for #579 — `.danger` button style must be defined in
     base.html with a red token. Without it, `class="danger"` falls back
@@ -578,18 +652,32 @@ def _active_tab_labels(html: str) -> list[str]:
     return [a.text(strip=True) for a in nav.css("a[aria-current='page']")]
 
 
+def _render_base_for_path(path: str) -> str:
+    """Render ``base.html`` for an anonymous visitor at the given path.
+
+    The base template only differs from a child render in that nothing
+    fills `{% block content %}`; we still get the full nav scaffold.
+    """
+    env = _make_env()
+    return env.get_template("base.html").render(
+        request=_request_stub(path),
+        is_authenticated=False,
+        is_development=False,
+    )
+
+
 def test_login_link_color_is_consistent_across_auth_pages() -> None:
     """Regression for #592 — the top-right Login link must not carry
     `class="contrast"` on `/auth/login` (which previously rendered the
     link black) while the same link on `/auth/register` and
     `/auth/forgot-password` rendered blue. Drop the contrast class so
-    the link's color stays the same color anywhere it's still rendered
-    (orthogonal to #591 which may hide the link entirely).
+    the link's color stays the same color anywhere it's still rendered.
 
-    Anonymous path — the primary-nav active-state logic (#618) adds
-    `class="contrast"` to authenticated nav links, but the Login link
-    in the top-right zone is anonymous-only, so the two rules don't
-    cross."""
+    After #591 lands, the Login link is replaced by a `<span>` on
+    auth-flow paths so there's no `<a href="/auth/login">` to check on
+    those paths — the assertion-on-the-empty-set still holds, and the
+    test stays useful as a guard against re-introducing a colored link
+    if the suppression rule is ever loosened."""
     env = _make_env()
     _add_child(
         env,
@@ -615,6 +703,9 @@ def test_login_link_color_is_consistent_across_auth_pages() -> None:
             assert (
                 "contrast" not in classes
             ), f"on {path}, Login link must not use `class='contrast'`: got {classes!r}"
+
+
+# --- Primary nav: section active-state + Login shortcut --------------
 
 
 def test_primary_nav_directory_active_on_providers_list() -> None:
@@ -670,3 +761,45 @@ def test_primary_nav_active_link_carries_strong_style_hook() -> None:
     active = nav.css_first("a[aria-current='page']")
     assert active is not None
     assert "contrast" in (active.attributes.get("class") or "")
+
+
+def test_primary_nav_renders_login_link_off_auth_flow() -> None:
+    """When an anonymous visitor is *not* on an auth-flow page, the
+    top-right Login shortcut renders as a clickable `<a
+    href="/auth/login">` — the default chrome state."""
+    html = _render_base_for_path("/")
+    tree = HTMLParser(html)
+    link = tree.css_first('#primary-nav a[href="/auth/login"]')
+    assert link is not None
+    # No `<span aria-current="page">` on a non-auth path.
+    assert tree.css_first('#primary-nav span[aria-current="page"]') is None
+    # When rendered as a link, no `class="contrast"` — keeps color
+    # consistent with how the link would render anywhere else in the
+    # chrome (#592). The auth-flow `<span>` variant carries `contrast`
+    # because it's a non-link indicator, not a navigation target.
+    classes = (link.attributes.get("class") or "").split()
+    assert (
+        "contrast" not in classes
+    ), f"Login link must not use `class='contrast'`: got {classes!r}"
+
+
+def test_primary_nav_suppresses_login_link_on_auth_flow_paths() -> None:
+    """Issue #591: on `/auth/login`, `/auth/register`,
+    `/auth/forgot-password`, and any `/auth/reset-password/...` path,
+    the top-right Login shortcut renders as a non-link
+    `<span aria-current="page">Login</span>` so the chrome doesn't
+    offer a self-referential click target."""
+    for path in (
+        "/auth/login",
+        "/auth/register",
+        "/auth/forgot-password",
+        "/auth/reset-password/some-token",
+    ):
+        html = _render_base_for_path(path)
+        tree = HTMLParser(html)
+        assert (
+            tree.css_first('#primary-nav a[href="/auth/login"]') is None
+        ), f"expected no /auth/login link on {path}"
+        indicator = tree.css_first('#primary-nav span[aria-current="page"]')
+        assert indicator is not None, f"expected Login indicator on {path}"
+        assert indicator.text().strip() == "Login"
