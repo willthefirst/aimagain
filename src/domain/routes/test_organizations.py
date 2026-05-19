@@ -9,11 +9,13 @@ import uuid
 
 import pytest
 from httpx import AsyncClient
+from selectolax.parser import HTMLParser
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from src.domain.models import Organization, User
 from src.framework.audit.repository import AuditRepository
+from tests.helpers import create_test_user, make_organization_row
 
 pytestmark = pytest.mark.asyncio
 
@@ -128,6 +130,10 @@ async def test_detail_renders(
     detail_resp = await authenticated_client.get(f"/organizations/{new_id}")
     assert detail_resp.status_code == 200
     assert "Detail-Org" in detail_resp.text
+    # Regression for #594 — the name appears in the header `<strong>`
+    # only; the facts `<dl>` must not include a `<dt>Name</dt>` row
+    # that duplicates the same string.
+    assert "<dt>Name</dt>" not in detail_resp.text
 
 
 async def test_patch_updates_name(
@@ -185,6 +191,166 @@ async def test_get_organizations_form_resolves(
     audit lands."""
     response = await authenticated_client.get("/organizations/form")
     assert response.status_code == 200
+
+
+# --- Parent-Org picker (issue #581) --------------------------------------
+
+
+async def _seed_org(
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    *,
+    owner_id: uuid.UUID,
+    name: str = "Acme Health",
+) -> uuid.UUID:
+    org = make_organization_row(owner_id=owner_id, name=name)
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            session.add(org)
+    return org.id
+
+
+async def test_form_new_renders_parent_org_select_with_root_option(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user: User,
+):
+    """Pins the new picker structure from issue #581: a ``<select
+    name="parent_org_id">`` with a "(root — no parent)" default option
+    plus one ``<option>`` per Org visible to the requesting user.
+    """
+    mine_a = await _seed_org(
+        db_test_session_manager, owner_id=logged_in_user.id, name="Mine A"
+    )
+    mine_b = await _seed_org(
+        db_test_session_manager, owner_id=logged_in_user.id, name="Mine B"
+    )
+
+    response = await authenticated_client.get("/organizations/form")
+    assert response.status_code == 200
+    tree = HTMLParser(response.text)
+    select = tree.css_first('select[name="parent_org_id"]')
+    assert select is not None, "parent-org picker should be a <select>"
+    options = select.css("option")
+    # Root option + one option per visible Org. selectolax surfaces
+    # `value=""` as ``None`` in the attribute dict, so we test the root
+    # option by position + the absence of a value.
+    assert len(options) == 3
+    assert options[0].attributes.get("value") is None
+    assert "selected" in options[0].attributes
+    assert "root" in options[0].text().lower()
+    values = {opt.attributes.get("value") for opt in options}
+    # `None` is the root option's value (empty-string attribute).
+    assert values == {None, str(mine_a), str(mine_b)}
+    # Free-text input from the prior UI is gone.
+    assert tree.css_first('input[name="parent_org_id"]') is None
+
+
+async def test_form_new_scopes_to_owned_orgs(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user: User,
+):
+    """Non-superusers see only Orgs they own in the picker — same scope
+    as the Program/Provider form pickers (see ``_orgs_visible_to``)."""
+    mine = await _seed_org(
+        db_test_session_manager, owner_id=logged_in_user.id, name="Mine"
+    )
+    other = create_test_user(username=f"other-{uuid.uuid4()}")
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            session.add(other)
+    other_org = await _seed_org(
+        db_test_session_manager, owner_id=other.id, name="Other's"
+    )
+
+    response = await authenticated_client.get("/organizations/form")
+    assert response.status_code == 200
+    tree = HTMLParser(response.text)
+    values = {
+        opt.attributes.get("value")
+        for opt in tree.css('select[name="parent_org_id"] option')
+    }
+    assert str(mine) in values
+    assert str(other_org) not in values
+
+
+async def test_form_edit_excludes_self_from_picker(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user: User,
+):
+    """On edit, the org being edited is excluded from the picker
+    options so the user can't pin a self-loop (org as its own parent).
+    """
+    self_id = await _seed_org(
+        db_test_session_manager, owner_id=logged_in_user.id, name="Self"
+    )
+    sibling_id = await _seed_org(
+        db_test_session_manager, owner_id=logged_in_user.id, name="Sibling"
+    )
+
+    response = await authenticated_client.get(f"/organizations/{self_id}/form")
+    assert response.status_code == 200
+    tree = HTMLParser(response.text)
+    values = {
+        opt.attributes.get("value")
+        for opt in tree.css('select[name="parent_org_id"] option')
+    }
+    assert str(self_id) not in values
+    assert str(sibling_id) in values
+    # The "(root — no parent)" option remains as an explicit detach.
+    # selectolax surfaces `value=""` as `None` in the attribute dict.
+    assert None in values
+
+
+async def test_form_edit_preselects_current_parent(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user: User,
+):
+    """Edit form pre-selects the row's current ``parent_org_id`` in the
+    picker; if the row is a root, the "(root — no parent)" option is
+    selected instead.
+    """
+    parent_resp = await authenticated_client.post(
+        "/organizations", data=_org_payload(name="Parent")
+    )
+    parent_id = uuid.UUID(parent_resp.json()["id"])
+    child_resp = await authenticated_client.post(
+        "/organizations",
+        data=_org_payload(name="Child", type="clinic", parent_org_id=str(parent_id)),
+    )
+    child_id = uuid.UUID(child_resp.json()["id"])
+
+    response = await authenticated_client.get(f"/organizations/{child_id}/form")
+    assert response.status_code == 200
+    tree = HTMLParser(response.text)
+    selected = tree.css_first('select[name="parent_org_id"] option[selected]')
+    assert selected is not None
+    assert selected.attributes.get("value") == str(parent_id)
+
+
+async def test_form_edit_preselects_root_for_top_level_org(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user: User,
+):
+    """A root org (no parent) edits with the "(root — no parent)" option
+    pre-selected."""
+    create_resp = await authenticated_client.post(
+        "/organizations", data=_org_payload(name="Top-Level")
+    )
+    org_id = uuid.UUID(create_resp.json()["id"])
+
+    response = await authenticated_client.get(f"/organizations/{org_id}/form")
+    assert response.status_code == 200
+    tree = HTMLParser(response.text)
+    selected = tree.css_first('select[name="parent_org_id"] option[selected]')
+    assert selected is not None
+    # `value=""` is rendered as the root option; selectolax surfaces an
+    # empty-string attribute as ``None``.
+    assert selected.attributes.get("value") is None
+    assert "root" in selected.text().lower()
 
 
 async def test_delete_removes_org(

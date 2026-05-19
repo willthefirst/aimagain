@@ -5,9 +5,15 @@
 {%- from "posts/_how_to_refer.html" import how_to_refer -%}
 
 {% set resource_url = entity_url('post') %}
+{# `view.headline` is the same identity string the entity-card's header
+   renders ("Adult male (25–64)" for referrals, the practice org name
+   for openings, the program name for program-availability). Computing
+   it once at module scope keeps the breadcrumb leaf and the in-card
+   headline in lock-step — see #593. #}
+{%- set view = post_card_view(post) -%}
 
 {% block resource_label %}Posts{% endblock %}
-{% block current_label %}Post{% endblock %}
+{% block current_label %}{{ view.headline or 'Post' }}{% endblock %}
 
 {% block actions %}
 {% include "posts/_owner_actions.html" %}
@@ -37,7 +43,6 @@
    Per-kind branching lives in `post_card_view` (one place). Every
    visual element in the card reads from `view` (the dict view-model). #}
 {% block content %}
-{%- set view = post_card_view(post) -%}
 <article class="entity-card" data-kind="{{ post.kind }}">
   <header class="entity-header">
     <strong>{{ view.headline }}{% if view.header_state %}, {{ view.header_state }}{% endif %}</strong>

@@ -626,10 +626,17 @@ async def test_detail_renders_breadcrumb(
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user: User,
 ):
-    """Post detail renders the Pico breadcrumb (`Posts › Post`) above
-    the page toolbar. The trailing `<li>` is marked `aria-current="page"`
-    so screen readers identify it as the current page; visual styling
-    comes from Pico's `nav[aria-label="breadcrumb"]` defaults."""
+    """Post detail renders the Pico breadcrumb (`Posts › <headline>`)
+    above the page toolbar. The trailing `<li>` is marked
+    `aria-current="page"` so screen readers identify it as the current
+    page; visual styling comes from Pico's `nav[aria-label="breadcrumb"]`
+    defaults.
+
+    The leaf reuses `post_card_view(post).headline` — the same identity
+    string the entity-card's header renders — so the breadcrumb and the
+    page heading stay in lock-step (see #593). For a default referral
+    factory post (`adults_25_64` + `prefer_not_to_say`) the headline is
+    `"Adult (25–64)"`."""
     post = _referral_post(description="crumb-x", owner_id=logged_in_user.id)
     async with db_test_session_manager() as session:
         async with session.begin():
@@ -643,7 +650,7 @@ async def test_detail_renders_breadcrumb(
     crumb = tree.css_first('nav[aria-label="breadcrumb"]')
     assert crumb is not None
     items = crumb.css("ul > li")
-    assert [li.text(strip=True) for li in items] == ["Posts", "Post"]
+    assert [li.text(strip=True) for li in items] == ["Posts", "Adult (25–64)"]
     parent_link = items[0].css_first("a")
     assert parent_link is not None
     assert parent_link.attributes.get("href") == "/posts"
@@ -651,6 +658,31 @@ async def test_detail_renders_breadcrumb(
     assert items[-1].attributes.get("aria-current") == "page"
     # Current page has no link inside — it's the leaf.
     assert items[-1].css_first("a") is None
+
+
+async def test_detail_breadcrumb_leaf_uses_opening_practice_name(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user: User,
+):
+    """For `kind='opening'`, the breadcrumb leaf is the practice
+    (provider org) name — the same string the entity-card's header
+    renders. Pins the per-kind branching in `post_card_view.headline`
+    against the breadcrumb (#593)."""
+    practice_name = f"Beacon Hill Family Therapy-{uuid.uuid4()}"
+    post = _opening_post(practice_name=practice_name, owner_id=logged_in_user.id)
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            session.add(post.opening_detail.provider)
+            session.add(post)
+        await session.refresh(post)
+        post_id = post.id
+
+    response = await authenticated_client.get(f"/posts/{post_id}")
+    assert response.status_code == 200
+    tree = HTMLParser(response.text)
+    items = tree.css('nav[aria-label="breadcrumb"] ul > li')
+    assert [li.text(strip=True) for li in items] == ["Posts", practice_name]
 
 
 async def test_detail_omits_kind_chip_and_meta_line(
@@ -1292,6 +1324,19 @@ async def test_search_page_renders_one_control_per_filter(
         "opening",
         "program_availability",
     }
+    # Regression for #599 — the search-form Clear link must use the
+    # outline variant so it shares the rest of the app's secondary
+    # button vocabulary (Cancel, Filters, Edit). Pico's filled
+    # `.secondary` (dark-gray) was a third button style with no
+    # other callers.
+    clear_links = [
+        a for a in form.css("a[role='button']") if a.text().strip() == "Clear"
+    ]
+    assert len(clear_links) == 1, "search form must render one Clear link"
+    clear_class = (clear_links[0].attributes.get("class") or "").split()
+    assert (
+        "secondary" in clear_class and "outline" in clear_class
+    ), f"Clear link must use `secondary outline`, got {clear_class!r}"
 
 
 async def test_toolbar_inline_active_filter_summary_collapses_beyond_two(

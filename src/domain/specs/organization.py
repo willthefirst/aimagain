@@ -4,7 +4,10 @@ practices, health systems, and solo-practice shells.
 
 from typing import Final
 
-from src.domain.logic.organizations.repository import get_organization_repository
+from src.domain.logic.organizations.repository import (
+    OrganizationRepository,
+    get_organization_repository,
+)
 from src.domain.logic.organizations.schema import (
     OrganizationCreate,
     OrganizationRead,
@@ -49,6 +52,16 @@ ORGANIZATION_ENTITY: Final[EntitySpec] = EntitySpec(
     list_order_by=Organization.created_at.desc(),
     create_redirect=_organization_form_redirect,
     update_redirect=_organization_form_redirect,
+    # The create/edit form's parent-Org picker is scoped per-viewer to
+    # the user's owned Organizations (superusers see all). Replaces the
+    # free-text UUID input — see issue #581. The framework invokes the
+    # extras callable on both the create path (target=None) and the
+    # edit path (target=<row>); the edit path excludes the row being
+    # edited from the options so the picker can't pin a self-loop.
+    form_extras_path=(
+        "src.domain.logic.organizations.handlers.organization_form_extras"
+    ),
+    form_extras_repos=(("organization_repo", OrganizationRepository),),
     # Templates pull dropdown labels from the spec — same pattern as
     # `PROVIDER_ENTITY.static_context` for credential vocabularies.
     static_context={

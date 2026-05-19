@@ -284,6 +284,94 @@ def test_index_table_rows_stack_on_narrow_viewports() -> None:
     ), "missing data-label ::before content rule"
 
 
+def test_in_cell_action_menu_lays_out_inline() -> None:
+    """Regression for #580 — `<menu>` inside a table cell must render
+    its `<li>` commands inline (single-line cluster), not stacked. The
+    `/users` table's Actions cell had Deactivate/Reactivate + Delete
+    stacking vertically and doubling row height. Scoping to `td >
+    menu` (not all `<menu>`) keeps the page toolbar `<menu>`
+    untouched."""
+    import re
+
+    env = _make_env()
+    _add_child(
+        env,
+        "stub.html",
+        """
+        {% extends "views/list.html" %}
+        {% block resource_label %}Users{% endblock %}
+        {% block content %}body{% endblock %}
+        """,
+    )
+    html = env.get_template("stub.html").render(
+        request=_request_stub(),
+        is_authenticated=False,
+        is_development=False,
+    )
+    match = re.search(
+        r"td\s*>\s*menu\s*\{[^}]*\}",
+        html,
+    )
+    assert match is not None, "missing `td > menu` rule in base.html"
+    assert "display: flex" in match.group(
+        0
+    ), "`td > menu` must use flex layout so `<li>` commands sit inline (#580)"
+
+
+def test_primary_nav_shows_admin_links_only_for_admins() -> None:
+    """Regression for #590 — `/organizations`, `/programs`, `/users` are
+    admin tools, not surfaces for ordinary viewers. Render the chrome
+    twice: once as an admin (the three links appear), once as a
+    non-admin authenticated user (the links don't render).
+    Referrals/Openings/Directory render for any authed user."""
+    env = _make_env()
+    _add_child(
+        env,
+        "stub.html",
+        """
+        {% extends "views/list.html" %}
+        {% block resource_label %}Posts{% endblock %}
+        {% block content %}body{% endblock %}
+        """,
+    )
+
+    admin_html = env.get_template("stub.html").render(
+        request=_request_stub(),
+        is_authenticated=True,
+        is_admin=True,
+        is_development=False,
+    )
+    nonadmin_html = env.get_template("stub.html").render(
+        request=_request_stub(),
+        is_authenticated=True,
+        is_admin=False,
+        is_development=False,
+    )
+
+    admin_tree = HTMLParser(admin_html)
+    admin_links = {
+        a.attributes.get("href") for a in admin_tree.css('nav[aria-label="Primary"] a')
+    }
+    assert "/organizations" in admin_links, "admin nav must include Organizations link"
+    assert "/programs" in admin_links, "admin nav must include Programs link"
+    assert "/users" in admin_links, "admin nav must include Users link"
+
+    nonadmin_tree = HTMLParser(nonadmin_html)
+    nonadmin_links = {
+        a.attributes.get("href")
+        for a in nonadmin_tree.css('nav[aria-label="Primary"] a')
+    }
+    assert (
+        "/organizations" not in nonadmin_links
+    ), "non-admin viewer must not see Organizations link"
+    assert (
+        "/programs" not in nonadmin_links
+    ), "non-admin viewer must not see Programs link"
+    assert "/users" not in nonadmin_links, "non-admin viewer must not see Users link"
+    # Referrals/Openings/Directory still present for the authed non-admin.
+    assert "/providers" in nonadmin_links
+
+
 def test_form_edit_view_renders_three_segment_breadcrumb() -> None:
     env = _make_env()
     _add_child(
@@ -400,3 +488,44 @@ class _RequestStub:
 
 def _request_stub() -> _RequestStub:
     return _RequestStub()
+
+
+def _request_stub_at(path: str) -> _RequestStub:
+    stub = _RequestStub()
+    stub.url = _RequestStub._Url()
+    stub.url.path = path
+    return stub
+
+
+def test_login_link_color_is_consistent_across_auth_pages() -> None:
+    """Regression for #592 — the top-right Login link must not carry
+    `class="contrast"` on `/auth/login` (which previously rendered the
+    link black) while the same link on `/auth/register` and
+    `/auth/forgot-password` rendered blue. Drop the contrast class so
+    the link's color stays the same color anywhere it's still rendered
+    (orthogonal to #591 which may hide the link entirely)."""
+    env = _make_env()
+    _add_child(
+        env,
+        "stub.html",
+        """
+        {% extends "views/list.html" %}
+        {% block resource_label %}Login{% endblock %}
+        {% block content %}body{% endblock %}
+        """,
+    )
+    for path in ("/auth/login", "/auth/register", "/auth/forgot-password"):
+        html = env.get_template("stub.html").render(
+            request=_request_stub_at(path),
+            is_authenticated=False,
+            is_development=False,
+        )
+        tree = HTMLParser(html)
+        login_links = [
+            a for a in tree.css('a[href="/auth/login"]') if a.text().strip() == "Login"
+        ]
+        for link in login_links:
+            classes = (link.attributes.get("class") or "").split()
+            assert (
+                "contrast" not in classes
+            ), f"on {path}, Login link must not use `class='contrast'`: got {classes!r}"

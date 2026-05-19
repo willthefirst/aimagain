@@ -60,6 +60,20 @@ def test_schemas_wired_correctly():
     assert ORGANIZATION_ENTITY.read_schema is OrganizationRead
 
 
+def test_form_extras_path_drives_parent_org_picker():
+    """Issue #581: the parent-Org picker is populated via the framework's
+    ``form_extras_path`` hook — same shape as Provider/Program."""
+    assert (
+        ORGANIZATION_ENTITY.form_extras_path
+        == "src.domain.logic.organizations.handlers.organization_form_extras"
+    )
+    from src.domain.logic.organizations.repository import OrganizationRepository
+
+    assert ORGANIZATION_ENTITY.form_extras_repos == (
+        ("organization_repo", OrganizationRepository),
+    )
+
+
 def test_static_context_carries_type_vocabulary():
     from src.domain.models.enums import (
         ORGANIZATION_TYPES,

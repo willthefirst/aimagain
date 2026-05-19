@@ -15,7 +15,11 @@
    posts/detail.html and providers/detail.html. The parent-organization
    row resolves the parent's *name* via the `parent` relationship —
    the previous template emitted the raw UUID as the link text, which
-   read as a bare hex number in the UI. #}
+   read as a bare hex number in the UI.
+
+   The name does NOT appear as a `<dt>Name</dt>` row in the facts list
+   because the header `<strong>` already carries it — duplicating the
+   primary identifier inside the body was filed as #594. #}
 {% block content %}
 <article class="entity-card">
   <header class="entity-header">
@@ -25,7 +29,6 @@
 
   <section class="entity-facts">
     <dl>
-      <div><dt>Name</dt><dd>{{ organization.name }}</dd></div>
       <div><dt>Type</dt><dd>{{ ORGANIZATION_TYPES_LABELS[organization.type] }}</dd></div>
       <div><dt>Parent organization</dt><dd>
         {%- if organization.parent_org_id and organization.parent -%}
