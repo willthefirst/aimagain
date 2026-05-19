@@ -33,6 +33,18 @@ from tests.test_contract.tests.shared.helpers import (
 )
 
 
+@pytest.mark.skip(
+    reason=(
+        "Pact stale after #642 PR 1: per-role fields (`location_*`, sessions, "
+        "insurance, sliding_scale, cost) moved out of the top-level provider "
+        "PATCH form into inline affiliation rows. The wire endpoint shifted "
+        "from `PATCH /providers/{id}` to `PATCH /providers/{id}/affiliations/"
+        "{affiliation_id}` and the encoded body shape changed. Tracked in "
+        "#647 — rewrite the pact pair for the affiliation PATCH surface, or "
+        "drop it if affiliation editing doesn't need a separate consumer "
+        "contract."
+    )
+)
 @pytest.mark.parametrize(
     "origin_with_routes",
     [{"provider_edit_form": True, "auth_pages": False}],
