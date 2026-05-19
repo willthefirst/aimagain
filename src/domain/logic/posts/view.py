@@ -93,7 +93,7 @@ def insurance_posture_for_post(post) -> str | None:
         if provider.sliding_scale or provider.cost:
             return "self_pay"
         return "please_contact"
-    if kind == "program_availability":
+    if kind == "intake":
         # Program-availability has no insurance posture today — insurance
         # is modeled on the Provider (who delivers care) and on the
         # Client-referral Post (the referral situation), not on the
@@ -107,7 +107,7 @@ def insurance_posture_for_post(post) -> str | None:
 _KIND_VERB = {
     "referral": "Seeking",
     "opening": "Providing",
-    "program_availability": "Providing",
+    "intake": "Providing",
 }
 
 
@@ -155,7 +155,7 @@ def post_card_view(post) -> dict[str, Any]:
 
     Returns:
         kind: the discriminator (`referral` /
-            `opening` / `program_availability`).
+            `opening` / `intake`).
         kind_verb: ``"Seeking"`` for CR, ``"Providing"`` for the two
             availability kinds. Mirrors the kind-chip vocabulary the
             list card's left-edge color uses (orange = Seeking, cyan
@@ -183,7 +183,7 @@ def post_card_view(post) -> dict[str, Any]:
             returns ``["prefer_not_to_say"]`` — the template still has
             the value if it wants to handle it specially).
         insurance_posture: one of ``INSURANCE_POSTURES`` or ``None``
-            (program-availability has no posture). Same value
+            (intake has no posture). Same value
             ``insurance_posture_for_post`` returns.
         treatment_modality: free-text modality string or ``None``.
         location_chunk: ``{city, state, zip}`` for CR (from the
@@ -345,8 +345,8 @@ def post_card_view(post) -> dict[str, Any]:
         )
         return base
 
-    if kind == "program_availability":
-        d = getattr(post, "program_availability_detail", None)
+    if kind == "intake":
+        d = getattr(post, "intake_detail", None)
         if d is None:
             return base
         prog = getattr(d, "program", None)

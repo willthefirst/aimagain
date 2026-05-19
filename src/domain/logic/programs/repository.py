@@ -4,7 +4,7 @@ Mostly delegates to ``BaseRepository`` for the generic CRUD path the
 framework's mount layer calls. The one custom read — ``list_for_user``
 — mirrors :meth:`OrganizationRepository.list_for_user` /
 :meth:`ProviderRepository.list_for_user` so the same per-user scoping
-pattern works on the ``program_availability`` post form.
+pattern works on the ``intake`` post form.
 """
 
 import uuid
@@ -23,7 +23,7 @@ class ProgramRepository(BaseRepository):
 
         Mirrors :meth:`OrganizationRepository.list_for_user` and
         :meth:`ProviderRepository.list_for_user`. Drives the
-        ``program_availability`` post create/edit form's Program-picker
+        ``intake`` post create/edit form's Program-picker
         dropdown and pairs with the wire-level ownership check in
         ``POST_ENTITY.payload_authz_path``."""
         stmt = (

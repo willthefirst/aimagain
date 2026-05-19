@@ -7,7 +7,7 @@ entire wire-side authorization surface for posts.
 
 Why it dispatches on ``payload.kind``: two of the three kinds reference
 a cross-entity FK in the payload (``opening.provider_id``
-points at a Provider; ``program_availability.program_id`` points at a
+points at a Provider; ``intake.program_id`` points at a
 Program). Each needs the same "the requesting user must own the target
 row" check. The cleaner long-term shape is per-kind authz on
 :class:`PostKindSpec` (registry-per-kind ``payload_authz_path``); a
@@ -52,7 +52,7 @@ async def _assert_post_payload_target_ownership(
 
     * ``opening`` — checks ``payload.provider_id`` against
       ``Provider.owner_id``.
-    * ``program_availability`` — checks ``payload.program_id`` against
+    * ``intake`` — checks ``payload.program_id`` against
       ``Program.owner_id``.
     * ``referral`` — no target FK; no-op.
 
@@ -77,7 +77,7 @@ async def _assert_post_payload_target_ownership(
                 detail="You may only post availability for a Provider you own"
             )
         return
-    if kind == "program_availability":
+    if kind == "intake":
         program_id = getattr(payload, "program_id", None)
         if program_id is None:
             return

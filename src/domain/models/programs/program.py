@@ -52,13 +52,11 @@ class Program(BaseModel):
         "Organization", back_populates="programs", lazy="selectin"
     )
 
-    # Reverse of ``ProgramAvailabilityDetail.program_id``. Rarely traversed
+    # Reverse of ``IntakeDetail.program_id``. Rarely traversed
     # from the Program side (templates dereference
-    # ``post.program_availability_detail.program`` instead), but it pins
+    # ``post.intake_detail.program`` instead), but it pins
     # the cascade contract and keeps the back-populated symmetry explicit.
-    program_availability_details = relationship(
-        "ProgramAvailabilityDetail", back_populates="program"
-    )
+    intake_details = relationship("IntakeDetail", back_populates="program")
 
     name = Column(Text, nullable=False)
     description = Column(Text, nullable=True)

@@ -227,8 +227,8 @@ def _make_program_post(*, program_attrs=None, **detail_overrides):
     )
     d.update(detail_overrides)
     return SimpleNamespace(
-        kind="program_availability",
-        program_availability_detail=SimpleNamespace(
+        kind="intake",
+        intake_detail=SimpleNamespace(
             program=SimpleNamespace(**p),
             **d,
         ),
@@ -420,12 +420,12 @@ def test_view_pa_no_location_chunk_when_provider_missing():
     assert v["location_chunk"] is None
 
 
-# --- post_card_view: program_availability -------------------------------
+# --- post_card_view: intake -------------------------------
 
 
 def test_view_program_basics():
     v = post_card_view(_make_program_post())
-    assert v["kind"] == "program_availability"
+    assert v["kind"] == "intake"
     assert v["kind_verb"] == "Providing"
 
 

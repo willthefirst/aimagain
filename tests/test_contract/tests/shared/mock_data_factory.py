@@ -34,11 +34,11 @@ import sqlalchemy
 
 from src.domain.logic.users.schema import UserRead
 from src.domain.models import POST_KINDS
+from src.domain.models.posts.intake_detail import (
+    IntakeDetail,
+)
 from src.domain.models.posts.opening_detail import (
     OpeningDetail,
-)
-from src.domain.models.posts.program_availability_detail import (
-    ProgramAvailabilityDetail,
 )
 from src.domain.models.posts.referral_detail import ReferralDetail
 
@@ -51,7 +51,7 @@ from src.domain.models.posts.referral_detail import ReferralDetail
 _DETAIL_MODELS: dict[str, type] = {
     "referral": ReferralDetail,
     "opening": OpeningDetail,
-    "program_availability": ProgramAvailabilityDetail,
+    "intake": IntakeDetail,
 }
 
 
@@ -65,7 +65,7 @@ _DETAIL_MODELS: dict[str, type] = {
 # than the alphabetical first option).
 #
 # An empty dict for a kind means "no enum-typed Text columns on this
-# detail row" — PA and program-availability hold their enum values
+# detail row" — PA and intake hold their enum values
 # on the linked Provider / Program rather than on the detail row
 # itself.
 _ENUM_DEFAULTS: dict[str, dict[str, Any]] = {
@@ -82,7 +82,7 @@ _ENUM_DEFAULTS: dict[str, dict[str, Any]] = {
         "insurance_carrier": None,
     },
     "opening": {},
-    "program_availability": {},
+    "intake": {},
 }
 
 

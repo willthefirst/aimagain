@@ -27,7 +27,7 @@ class User(SQLAlchemyBaseUserTable[uuid.UUID], BaseModel):
         viewonly=True,
     )
     # Reverse of `Program.owner_id`. Mirrors `providers` above — the
-    # `program_availability` create form populates the Program-picker
+    # `intake` create form populates the Program-picker
     # dropdown from this.
     programs = relationship(
         "Program",

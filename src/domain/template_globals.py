@@ -16,8 +16,8 @@ Two trigger points cover the real load paths:
 """
 
 from src.domain.logic.posts.schema import (
+    IntakeCreate,
     OpeningCreate,
-    ProgramAvailabilityCreate,
     ReferralCreate,
 )
 from src.domain.logic.posts.view import (
@@ -94,7 +94,7 @@ register_template_globals(
     # pass the right schema to `field_for` without context-routing
     # changes. Per-kind form templates pick which to pass.
     opening_create_schema=OpeningCreate,
-    program_availability_create_schema=ProgramAvailabilityCreate,
+    intake_create_schema=IntakeCreate,
     referral_create_schema=ReferralCreate,
     # Post-specific view helpers.
     insurance_posture=insurance_posture_for_post,

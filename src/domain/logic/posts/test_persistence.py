@@ -18,18 +18,18 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from sqlalchemy.types import Uuid
 
 from src.domain.models import (
+    IntakeDetail,
     OpeningDetail,
     Post,
-    ProgramAvailabilityDetail,
     ReferralDetail,
 )
 from src.framework.persistence.base_repository import BaseRepository
 from tests.helpers import (
     create_test_user,
+    make_intake_detail,
     make_opening_detail,
     make_organization_row,
     make_program,
-    make_program_availability_detail,
     make_provider_with_org,
     make_referral_detail,
 )
@@ -501,7 +501,7 @@ async def _seed_owner_and_program(db_test_session_manager, *, name: str = "RISE 
     return owner, program
 
 
-async def test_create_post_persists_parent_and_program_availability_detail(
+async def test_create_post_persists_parent_and_intake_detail(
     db_test_session_manager: async_sessionmaker[AsyncSession],
 ):
     owner, program = await _seed_owner_and_program(
@@ -510,8 +510,8 @@ async def test_create_post_persists_parent_and_program_availability_detail(
 
     async with db_test_session_manager() as session:
         repo = BaseRepository(session)
-        post = Post(kind="program_availability", owner_id=owner.id)
-        detail = make_program_availability_detail(program_id=program.id)
+        post = Post(kind="intake", owner_id=owner.id)
+        detail = make_intake_detail(program_id=program.id)
         created = await _create_post(repo, post, detail)
         await session.commit()
         post_id = created.id
@@ -525,28 +525,26 @@ async def test_create_post_persists_parent_and_program_availability_detail(
         detail_row = (
             (
                 await session.execute(
-                    select(ProgramAvailabilityDetail).filter(
-                        ProgramAvailabilityDetail.post_id == post_id
-                    )
+                    select(IntakeDetail).filter(IntakeDetail.post_id == post_id)
                 )
             )
             .scalars()
             .first()
         )
         assert post_row is not None
-        assert post_row.kind == "program_availability"
+        assert post_row.kind == "intake"
         assert detail_row is not None
         assert detail_row.program_id == program.id
         # Dereferences the back_populated relationship so the template
-        # `post.program_availability_detail.program.name` access path
+        # `post.intake_detail.program.name` access path
         # is exercised at the ORM level here too.
         assert detail_row.program.name == "RISE IOP"
 
 
-async def test_delete_post_cascades_program_availability_detail(
+async def test_delete_post_cascades_intake_detail(
     db_test_session_manager: async_sessionmaker[AsyncSession],
 ):
-    """Deleting a program_availability parent removes its detail row via
+    """Deleting a intake parent removes its detail row via
     FK CASCADE — mirrors the PA cascade test."""
     owner, program = await _seed_owner_and_program(db_test_session_manager)
 
@@ -554,8 +552,8 @@ async def test_delete_post_cascades_program_availability_detail(
         repo = BaseRepository(session)
         created = await _create_post(
             repo,
-            Post(kind="program_availability", owner_id=owner.id),
-            make_program_availability_detail(program_id=program.id),
+            Post(kind="intake", owner_id=owner.id),
+            make_intake_detail(program_id=program.id),
         )
         await session.commit()
         post_id = created.id
@@ -570,9 +568,7 @@ async def test_delete_post_cascades_program_availability_detail(
         detail_row = (
             (
                 await session.execute(
-                    select(ProgramAvailabilityDetail).filter(
-                        ProgramAvailabilityDetail.post_id == post_id
-                    )
+                    select(IntakeDetail).filter(IntakeDetail.post_id == post_id)
                 )
             )
             .scalars()

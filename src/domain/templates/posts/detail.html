@@ -7,7 +7,7 @@
 {% set resource_url = entity_url('post') %}
 {# `view.headline` is the same identity string the entity-card's header
    renders ("Adult male (25–64)" for referrals, the practice org name
-   for openings, the program name for program-availability). Computing
+   for openings, the program name for intake). Computing
    it once at module scope keeps the breadcrumb leaf and the in-card
    headline in lock-step — see #593. #}
 {%- set view = post_card_view(post) -%}

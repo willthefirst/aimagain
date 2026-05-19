@@ -23,7 +23,7 @@ import pytest
 from src.domain.models import POST_KINDS
 from tests.test_contract.tests.shared.mock_data_factory import make_post_stub
 
-_KINDS = ["referral", "opening", "program_availability"]
+_KINDS = ["referral", "opening", "intake"]
 
 
 # --- Defaults: per-column type-dispatch --------------------------------
@@ -48,7 +48,7 @@ def test_json_columns_default_to_empty_list(kind):
 def test_pa_and_program_settings_default_to_empty_list():
     """PA + program detail rows carry `settings`; CR does not. The
     default applies wherever the column exists."""
-    for kind in ("opening", "program_availability"):
+    for kind in ("opening", "intake"):
         post = make_post_stub(kind, owner_id=uuid.uuid4())
         detail = getattr(post, POST_KINDS[kind].detail_relationship)
         assert detail.settings == []
@@ -56,7 +56,7 @@ def test_pa_and_program_settings_default_to_empty_list():
 
 def test_pa_and_program_genders_default_to_empty_list():
     """PA + program hold `genders` as a list; CR has a scalar `gender`."""
-    for kind in ("opening", "program_availability"):
+    for kind in ("opening", "intake"):
         post = make_post_stub(kind, owner_id=uuid.uuid4())
         detail = getattr(post, POST_KINDS[kind].detail_relationship)
         assert detail.genders == []

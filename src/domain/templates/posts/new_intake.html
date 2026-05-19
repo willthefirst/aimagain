@@ -1,0 +1,15 @@
+{% extends "views/form_new.html" %}
+{% from "posts/_intake_form.html" import intake_form %}
+
+{% set resource_url = entity_url('post') %}
+
+{% block resource_label %}Posts{% endblock %}
+
+{% block content %}
+{% if not current_user.programs %}
+<p>You need a program before posting intake. <a href="{{ entity_form_url('program') }}">Create a program</a>, then return here.</p>
+{% else %}
+<p>Per <code>notes/forms_spec.md</code>. No PII.</p>
+{{ intake_form("post", entity_url('post'), "Create intake", schema=intake_create_schema, current_user=current_user, cancel_url=entity_url('post')) }}
+{% endif %}
+{% endblock %}

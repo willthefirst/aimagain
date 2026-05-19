@@ -89,7 +89,7 @@ POST_ENTITY: Final[EntitySpec] = EntitySpec(
             choices=(
                 ("referral", "Seeking"),
                 ("opening", "Providing"),
-                ("program_availability", "Program offering"),
+                ("intake", "Intake"),
             ),
             radio=True,
             value_type=Literal[*POST_KINDS.names],  # type: ignore[valid-type]

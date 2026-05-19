@@ -1,6 +1,6 @@
 # Posts templates
 
-Polymorphic intake (`referral` / `opening` / `program_availability`) — pages extend `base.html` directly because the kind-picker and the per-kind forms don't fit the resource grammar's single-form-page shape.
+Polymorphic intake (`referral` / `opening` / `intake`) — pages extend `base.html` directly because the kind-picker and the per-kind forms don't fit the resource grammar's single-form-page shape.
 
 ## Kind picker
 

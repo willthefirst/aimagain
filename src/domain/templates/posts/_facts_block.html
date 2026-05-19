@@ -26,7 +26,7 @@ Two modes:
     detail page is detail-y enough to repeat it as a labeled row.
 
 The ages row is labeled ``Age`` for `referral` (one seeker) and
-``Ages`` for `opening` / `program_availability` (cohort
+``Ages`` for `opening` / `intake` (cohort
 the practice accepts). The row renders at most once per card — the
 ``location_chunk and not expanded`` branch above takes precedence on
 list cards (where the headline already carries the age + gender combo
@@ -52,7 +52,7 @@ Reads from `view` (the `post_card_view` dict). Display-label dicts
     </dd></div>
     {%- endif %}
     {%- if view.ages and view.kind != "referral" %}
-    {#- `opening` and `program_availability` describe a cohort the
+    {#- `opening` and `intake` describe a cohort the
         practice/program accepts — labeled `Ages` (plural). Referral
         skips this row because its age lives in the headline; the
         `expanded` block below repeats it for the detail page. -#}

@@ -15,6 +15,7 @@ from .enums import (
 )
 from .favorites.user_favorite import UserFavorite
 from .organizations.organization import Organization
+from .posts.intake_detail import IntakeDetail
 from .posts.opening_detail import OpeningDetail
 from .posts.post import Post
 from .posts.post_kinds import (
@@ -23,7 +24,6 @@ from .posts.post_kinds import (
     POST_KINDS,
     PostKindSpec,
 )
-from .posts.program_availability_detail import ProgramAvailabilityDetail
 from .posts.referral_detail import ReferralDetail
 from .programs.program import Program
 from .providers.provider import Provider
@@ -49,7 +49,7 @@ __all__ = [
     "Post",
     "PostKindSpec",
     "Program",
-    "ProgramAvailabilityDetail",
+    "IntakeDetail",
     "OpeningDetail",
     "ProviderCertification",
     "ProviderEducation",
