@@ -1,13 +1,15 @@
 """Tests guarding the post-kinds registry as the single source of truth.
 
 The registry in `src/domain/models/posts/post_kinds.py` claims to drive every
-cross-cutting site (model CHECK, route Literal, form-template dicts,
-detail-class lookup). These tests assert that claim — if a future
-change re-encodes the kind set inline somewhere, the relevant test here
-fails.
-"""
+cross-cutting site (model CHECK, detail-class lookup, per-kind
+detail-relationship name). These tests assert that claim — if a
+future change re-encodes the kind set inline somewhere, the relevant
+test here fails.
 
-from typing import get_args
+(Pre-#628 the registry also drove the `/posts/form` `?kind=` Literal;
+that route is gone now, each kind has its own URL family driving
+form-template defaults via `spec.templates.form_new` instead.)
+"""
 
 from src.domain.models import (
     POST_KIND_BY_DETAIL_MODEL,
@@ -17,7 +19,6 @@ from src.domain.models import (
 )
 from src.domain.models.posts.post_kinds import PostKindSpec
 from src.domain.models.posts.referral_detail import ReferralDetail
-from src.domain.routes import posts as posts_routes
 
 
 def test_kind_names_matches_registered_kinds():
@@ -51,25 +52,6 @@ def test_kind_by_detail_model_inverse_matches_registry():
     )
     for spec in POST_KINDS.values():
         assert POST_KIND_BY_DETAIL_MODEL[spec.detail_model] is spec
-
-
-def test_form_route_literal_matches_registry():
-    """The `?kind=` Query parameter on `GET /posts/form` is typed as
-    `Optional[Literal[*POST_KIND_NAMES]]` — the kind picker (`?kind=`
-    absent / None) round-trips through the same route. Guards against
-    `POST_KIND_NAMES` drifting from the route's accepted-kinds list."""
-    import inspect
-
-    routes = [r for r in posts_routes.router.router.routes if r.path == "/posts/form"]
-    assert len(routes) == 1, "expected exactly one /posts/form route"
-    params = inspect.signature(routes[0].endpoint).parameters
-    # Optional[Literal[...]] → Union[Literal[...], None] → args are
-    # (Literal[...], NoneType). Find the Literal arm and unwrap it.
-    union_args = get_args(params["kind"].annotation)
-    assert type(None) in union_args, "kind param should accept None (the picker)"
-    literal_arm = next(a for a in union_args if a is not type(None))
-    literal_values = get_args(literal_arm)
-    assert set(literal_values) == set(POST_KIND_NAMES)
 
 
 def test_each_spec_detail_relationship_matches_kind_name():

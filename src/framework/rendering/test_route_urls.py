@@ -27,8 +27,16 @@ def test_entity_url_collection_path_for_provider():
     assert entity_url("provider") == "/providers"
 
 
-def test_entity_url_collection_path_for_post():
-    assert entity_url("post") == "/posts"
+def test_entity_url_collection_path_for_referral():
+    assert entity_url("referral") == "/referrals"
+
+
+def test_entity_url_collection_path_for_opening():
+    assert entity_url("opening") == "/openings"
+
+
+def test_entity_url_collection_path_for_intake():
+    assert entity_url("intake") == "/intakes"
 
 
 def test_entity_url_collection_path_for_user():
@@ -103,8 +111,16 @@ def test_entity_form_url_create_form_for_provider():
     assert entity_form_url("provider") == "/providers/form"
 
 
-def test_entity_form_url_create_form_for_post():
-    assert entity_form_url("post") == "/posts/form"
+def test_entity_form_url_create_form_for_referral():
+    assert entity_form_url("referral") == "/referrals/form"
+
+
+def test_entity_form_url_create_form_for_opening():
+    assert entity_form_url("opening") == "/openings/form"
+
+
+def test_entity_form_url_create_form_for_intake():
+    assert entity_form_url("intake") == "/intakes/form"
 
 
 def test_entity_form_url_edit_form_for_user():
