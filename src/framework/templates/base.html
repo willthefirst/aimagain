@@ -576,6 +576,23 @@
         max-width: 28rem;
         margin-inline: auto;
       }
+      /* Primary-nav active tab. Pico styles `aria-current="page"` only
+         subtly (a faint background tint); on a horizontal nav the cue
+         is easy to miss, and the issue audit (#589) flagged the
+         inconsistency. The rule below targets links carrying
+         `aria-current="page"` inside the `<nav aria-label="Primary">`
+         strip and adds a thicker bottom border + weight bump so the
+         active section reads at a glance on every page. Scoped to
+         the primary nav so breadcrumb / pagination links that also
+         set `aria-current` (single-segment trail, current page in
+         pager) keep their lighter treatment. */
+      nav[aria-label="Primary"] a[aria-current="page"] {
+        font-weight: 600;
+        border-bottom: 2px solid currentColor;
+        /* Compensate for the border so the text baseline doesn't
+           jump between active and inactive tabs. */
+        padding-bottom: calc(var(--pico-nav-link-spacing-vertical, 0.5rem) - 2px);
+      }
     </style>
     <script
       src="https://unpkg.com/htmx.org@2.0.4"

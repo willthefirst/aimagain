@@ -613,15 +613,43 @@ class _RequestStub:
     query_params: dict[str, str] = {}
 
 
-def _request_stub() -> _RequestStub:
-    return _RequestStub()
-
-
-def _request_stub_at(path: str) -> _RequestStub:
+def _request_stub(path: str = "/", query: dict[str, str] | None = None) -> _RequestStub:
     stub = _RequestStub()
     stub.url = _RequestStub._Url()
     stub.url.path = path
+    stub.query_params = query or {}
     return stub
+
+
+def _render_chrome(path: str, query: dict[str, str] | None = None) -> str:
+    """Render the primary-nav chrome from `base.html` (via any view-type
+    template) at a given URL + query string. Authenticated path — the
+    section shortcuts are gated on `is_authenticated`."""
+    env = _make_env()
+    _add_child(
+        env,
+        "stub.html",
+        """
+        {% extends "views/list.html" %}
+        {% block resource_label %}Stub{% endblock %}
+        {% block content %}body{% endblock %}
+        """,
+    )
+    return env.get_template("stub.html").render(
+        request=_request_stub(path=path, query=query),
+        is_authenticated=True,
+        is_development=False,
+    )
+
+
+def _active_tab_labels(html: str) -> list[str]:
+    """Extract the link text of every primary-nav anchor carrying
+    `aria-current="page"`. Returns labels (e.g. ``["Directory"]``) so
+    assertions read naturally."""
+    tree = HTMLParser(html)
+    nav = tree.css_first('nav[aria-label="Primary"]')
+    assert nav is not None, "primary nav missing"
+    return [a.text(strip=True) for a in nav.css("a[aria-current='page']")]
 
 
 def test_login_link_color_is_consistent_across_auth_pages() -> None:
@@ -630,7 +658,12 @@ def test_login_link_color_is_consistent_across_auth_pages() -> None:
     link black) while the same link on `/auth/register` and
     `/auth/forgot-password` rendered blue. Drop the contrast class so
     the link's color stays the same color anywhere it's still rendered
-    (orthogonal to #591 which may hide the link entirely)."""
+    (orthogonal to #591 which may hide the link entirely).
+
+    Anonymous path — the primary-nav active-state logic (#618) adds
+    `class="contrast"` to authenticated nav links, but the Login link
+    in the top-right zone is anonymous-only, so the two rules don't
+    cross."""
     env = _make_env()
     _add_child(
         env,
@@ -643,7 +676,7 @@ def test_login_link_color_is_consistent_across_auth_pages() -> None:
     )
     for path in ("/auth/login", "/auth/register", "/auth/forgot-password"):
         html = env.get_template("stub.html").render(
-            request=_request_stub_at(path),
+            request=_request_stub(path=path),
             is_authenticated=False,
             is_development=False,
         )
@@ -656,3 +689,58 @@ def test_login_link_color_is_consistent_across_auth_pages() -> None:
             assert (
                 "contrast" not in classes
             ), f"on {path}, Login link must not use `class='contrast'`: got {classes!r}"
+
+
+def test_primary_nav_directory_active_on_providers_list() -> None:
+    """`/providers` is the canonical Directory URL — its tab is active."""
+    assert _active_tab_labels(_render_chrome("/providers")) == ["Directory"]
+
+
+def test_primary_nav_directory_active_on_provider_detail() -> None:
+    """Subpaths under `/providers` (detail, edit) keep Directory lit so
+    the chrome stays consistent through the full provider drill-down."""
+    assert _active_tab_labels(_render_chrome("/providers/42")) == ["Directory"]
+    assert _active_tab_labels(_render_chrome("/providers/42/form")) == ["Directory"]
+
+
+def test_primary_nav_referrals_active_on_posts_kind_referral() -> None:
+    """`/posts?kind=referral` is the canonical Referrals URL."""
+    assert _active_tab_labels(_render_chrome("/posts", query={"kind": "referral"})) == [
+        "Referrals"
+    ]
+
+
+def test_primary_nav_openings_active_on_posts_kind_opening() -> None:
+    """`/posts?kind=opening` is the canonical Openings URL."""
+    assert _active_tab_labels(_render_chrome("/posts", query={"kind": "opening"})) == [
+        "Openings"
+    ]
+
+
+def test_primary_nav_no_section_tab_on_bare_posts_list() -> None:
+    """Bare `/posts` (no `?kind=`) is ambiguous between Referrals and
+    Openings — neither tab claims it. The toolbar/list-page content
+    carries the context instead."""
+    assert _active_tab_labels(_render_chrome("/posts")) == []
+
+
+def test_primary_nav_no_section_tab_on_post_detail() -> None:
+    """Post detail URLs (`/posts/<id>`) drop the `?kind=` query param,
+    so the section tabs intentionally don't light up — the post's own
+    breadcrumb carries the context instead. Keeps the rule simple:
+    only the canonical filtered list lights a section tab."""
+    assert _active_tab_labels(_render_chrome("/posts/42")) == []
+
+
+def test_primary_nav_active_link_carries_strong_style_hook() -> None:
+    """The active link adds `class="contrast"` so the Pico color cue
+    fires alongside the CSS rule that thickens the underline. Pinning
+    both attributes ensures a future refactor that drops one notices
+    the other."""
+    html = _render_chrome("/providers")
+    tree = HTMLParser(html)
+    nav = tree.css_first('nav[aria-label="Primary"]')
+    assert nav is not None
+    active = nav.css_first("a[aria-current='page']")
+    assert active is not None
+    assert "contrast" in (active.attributes.get("class") or "")
