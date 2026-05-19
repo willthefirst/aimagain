@@ -1,11 +1,15 @@
 {# Reusable owner actions for a post.
 
    Required context:
-     post     — the post being acted on
-     can_edit — boolean; the handler composes this via
-                `is_owner(post, user) or is_admin(user)` from
-                `src/logic/_authz.py`. The partial does not introspect
-                `current_user`; the rule lives in the predicate module.
+     post        — the post being acted on
+     entity_name — the URL family this post belongs to (``"referral"``,
+                   ``"opening"``, or ``"intake"``); injected by
+                   `handle_detail` from `spec.name`.
+     can_edit    — boolean; the handler composes this via
+                   `is_owner(post, user) or is_admin(user)` from
+                   `src/logic/_authz.py`. The partial does not
+                   introspect `current_user`; the rule lives in the
+                   predicate module.
 
    Renders nothing unless `can_edit` is truthy. Each action is a
    `<li>` because this partial renders inside the toolbar `<menu>`
@@ -17,6 +21,6 @@
 #}
 {%- from "_shared/actions.html" import confirm_delete_button -%}
 {% if can_edit %}
-<li><a href="{{ entity_form_url('post', id=post.id) }}" role="button" class="outline">Edit</a></li>
-<li>{{ confirm_delete_button(entity_url('post', id=post.id), "Permanently delete this post? This cannot be undone.") }}</li>
+<li><a href="{{ entity_form_url(entity_name, id=post.id) }}" role="button" class="outline">Edit</a></li>
+<li>{{ confirm_delete_button(entity_url(entity_name, id=post.id), "Permanently delete this " ~ entity_name ~ "? This cannot be undone.") }}</li>
 {% endif %}

@@ -15,7 +15,7 @@
 {% if posts %}
 <section id="posts-list">
   {%- for post in posts %}
-  {{ post_item(post, active_kind=selected_kind) }}
+  {{ post_item(post, "post") }}
   {%- endfor %}
 </section>
 {% else %}

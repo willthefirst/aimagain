@@ -1,37 +1,38 @@
-{# Shared form body for `kind='opening'`.
+{# Shared form body for `kind='intake'` (#541).
 
-Used by both `posts/new_opening.html` (create) and
-`posts/edit_opening.html` (update). Caller passes:
+Used by both `intakes/form_new.html` (create) and
+`intakes/form_edit.html` (update). Caller passes:
 
   - `hx_method`: "post" or "patch"
   - `action`: the form submit URL
   - `submit_label`: the visible submit-button text
   - `post`: the persisted Post (for edit) or `None` (for create)
-  - `current_user`: the requesting User; `current_user.providers` is
-    the dropdown's option source (#448).
+  - `current_user`: the requesting User; `current_user.programs` is
+    the dropdown's option source (mirrors PA's `current_user.providers`
+    pattern from #448).
 
-Practice + location + delivery format all live on the linked Provider
-via `provider_id` (#448) — this form is the *announcement*, not the
-practice. The wrapper templates `new_opening.html` /
-`edit_opening.html` redirect to the provider-create flow
-when `current_user.providers` is empty, so this macro always renders
-with at least one provider available.
+The owning Org of each Program surfaces in the option label so the
+referrer sees "<Program> · <Org>" rather than two unrelated names.
+The wrapper templates `new_intake.html` /
+`edit_intake.html` redirect to the program-create flow
+when `current_user.programs` is empty, so this macro always renders
+with at least one Program available.
 #}
 {%- from "_shared/form_fields.html" import text_field, textarea_field, select_field, time_grid_field, multi_select_field, field_for -%}
 {%- from "_shared/forms.html" import form_actions -%}
-{%- macro opening_form(hx_method, action, submit_label, post=None, schema=None, current_user=None, cancel_url=None) -%}
-{%- set d = post.opening_detail if post else None -%}
+{%- macro intake_form(hx_method, action, submit_label, post=None, schema=None, current_user=None, cancel_url=None) -%}
+{%- set d = post.intake_detail if post else None -%}
 <form hx-{{ hx_method }}="{{ action }}">
-  <input type="hidden" name="kind" value="opening" />
+  <input type="hidden" name="kind" value="intake" />
 
-  <label for="provider_id">
-    Which provider profile is this availability for?
-    <select id="provider_id" name="provider_id" required>
+  <label for="program_id">
+    Which program is this availability for?
+    <select id="program_id" name="program_id" required>
       {%- if not d %}
       <option value="" disabled selected>--</option>
       {%- endif %}
-      {%- for p in current_user.providers %}
-      <option value="{{ p.id }}"{% if d and d.provider_id == p.id %} selected{% endif %}>{{ p.org.name }}</option>
+      {%- for p in current_user.programs %}
+      <option value="{{ p.id }}"{% if d and d.program_id == p.id %} selected{% endif %}>{{ p.name }} &middot; {{ p.organization.name }}</option>
       {%- endfor %}
     </select>
   </label>

@@ -1,0 +1,12 @@
+{% extends "views/form_edit.html" %}
+{% from "intakes/_form.html" import intake_form %}
+
+{% set resource_url = entity_url('intake') %}
+{% set resource_detail_url = entity_url('intake', id=intake.id) %}
+
+{% block resource_label %}Intakes{% endblock %}
+{% block current_label %}Intake{% endblock %}
+
+{% block content %}
+{{ intake_form("patch", entity_url('intake', id=intake.id), "Save changes", post=intake, schema=intake_create_schema, current_user=current_user, cancel_url=entity_url('intake', id=intake.id)) }}
+{% endblock %}

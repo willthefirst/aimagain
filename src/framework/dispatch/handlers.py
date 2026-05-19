@@ -609,6 +609,7 @@ async def handle_get_edit_form(
     context: dict[str, Any] = {
         "request": request,
         spec.name: target,
+        "entity_name": spec.name,
         "current_user": requesting_user,
     }
     # Spec-declared constants (enum labels, schema classes the form
@@ -678,6 +679,7 @@ async def handle_get_new_form(
     """
     context: dict[str, Any] = {
         "request": request,
+        "entity_name": spec.name,
         "current_user": requesting_user,
     }
     if spec.static_context:
@@ -751,6 +753,12 @@ async def handle_detail(
     context: dict[str, Any] = {
         "request": request,
         spec.name: target,
+        # Shared partials (e.g. `_shared/posts/_owner_actions.html`)
+        # read `entity_name` to build kind-aware URLs via
+        # `entity_url(entity_name, ...)`. Set on every detail render so
+        # included partials don't have to walk back through caller
+        # context.
+        "entity_name": spec.name,
         "current_user": requesting_user,
     }
     if spec.can_write is not None:
@@ -900,6 +908,11 @@ async def handle_list(
     context: dict[str, Any] = {
         "request": request,
         spec.url_collection: items,
+        # Shared partials (e.g. `_shared/posts/_item.html`) take the URL
+        # family name as a macro arg; setting it once in context lets
+        # the list template call `{{ post_item(post, entity_name) }}`
+        # without repeating the kind string everywhere.
+        "entity_name": spec.name,
         "current_user": requesting_user,
         "can_admin_actions": is_admin(requesting_user),
         "page_meta": page_meta,

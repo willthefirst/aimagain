@@ -1,0 +1,11 @@
+{% extends "views/form_new.html" %}
+{% from "referrals/_form.html" import referral_form %}
+
+{% set resource_url = entity_url('referral') %}
+
+{% block resource_label %}Referrals{% endblock %}
+
+{% block content %}
+<p>Per <code>notes/forms_spec.md</code>. No PII.</p>
+{{ referral_form("post", entity_url('referral'), "Create referral", schema=referral_create_schema, cancel_url=entity_url('referral')) }}
+{% endblock %}
