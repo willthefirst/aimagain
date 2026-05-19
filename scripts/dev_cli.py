@@ -193,8 +193,14 @@ class TestCommands:
     # showed the path is easy to forget.
     PATH_ALIASES = {"contract": "tests/test_contract"}
 
-    def __init__(self, runner: CLIRunner):
+    def __init__(self, runner: CLIRunner, quality: "QualityCommands") -> None:
         self.runner = runner
+        # `quality` is invoked as the test-loop pre-step (auto fmt, then
+        # lint-gate) so a Black violation doesn't slip past `dev test` and
+        # surface only at `dev lint` time. See issue #648 for the friction
+        # this prevents. Injected (not constructed) so tests can stub the
+        # pre-step without spawning real subprocesses.
+        self.quality = quality
 
     def run_tests(
         self,
@@ -203,7 +209,31 @@ class TestCommands:
         markers: Optional[str] = None,
         keywords: Optional[str] = None,
         paths: Optional[List[str]] = None,
+        skip_lint: bool = False,
     ) -> int:
+        # Inner-loop guard (#648). Default sequence: auto-fmt → lint →
+        # pytest. Lint failures stop before pytest so the agent fixes
+        # them once instead of running tests then re-running after the
+        # lint surprise. `--skip-lint` is the escape hatch for the
+        # "I know my code's dirty, I'm debugging a failing test" case.
+        if not skip_lint:
+            fmt_rc = self.quality.fmt()
+            if fmt_rc != 0:
+                print(
+                    "❌ Formatter failed before tests could run. Fix the "
+                    "underlying issue or re-run with `dev test --skip-lint` "
+                    "to bypass the pre-step."
+                )
+                return fmt_rc
+            lint_rc = self.quality.lint()
+            if lint_rc != 0:
+                print(
+                    "❌ Lint failed before tests could run. Fix the "
+                    "violations above or re-run with `dev test --skip-lint` "
+                    "to bypass the pre-step."
+                )
+                return lint_rc
+
         print("🧪 Running tests...")
 
         cmd = ["pytest"]
@@ -513,8 +543,11 @@ class DevCLI:
     def __init__(self):
         self.runner = CLIRunner()
         self.dev = DevCommands(self.runner)
-        self.test = TestCommands(self.runner)
+        # `quality` is constructed first so it can be injected into
+        # `TestCommands` (which runs fmt → lint as a pre-step before
+        # pytest — see issue #648).
         self.quality = QualityCommands(self.runner)
+        self.test = TestCommands(self.runner, self.quality)
         self.setup = SetupCommands(self.runner)
         self.seed_cmd = SeedCommands(self.runner)
         self.routes_cmd = RoutesCommands(self.runner)
@@ -595,7 +628,7 @@ Examples:
     def _add_test_parser(self, subparsers):
         parser = subparsers.add_parser(
             "test",
-            help="Run tests",
+            help="Run tests (auto-runs fmt + lint first; pass --skip-lint to bypass)",
             description=(
                 "Run pytest. Each path may be a directory, file, or "
                 "`file::testname` selector; pass several to run unrelated "
@@ -603,6 +636,13 @@ Examples:
                 "a shortcut that expands to `tests/test_contract` — that "
                 "directory is excluded from default collection (binds ports, "
                 "needs a Playwright browser) and is easy to forget the path to."
+                "\n\n"
+                "By default this runs `dev fmt` then `dev lint` before "
+                "pytest, so a Black/isort violation can't slip past tests "
+                "and surface only at lint time (#648). On any lint failure "
+                "pytest is not invoked. Pass --skip-lint to bypass the "
+                "pre-step (useful when iterating on a failing test with "
+                "intentionally messy code)."
             ),
         )
         parser.add_argument(
@@ -618,13 +658,27 @@ Examples:
             "-k", "--keywords", help="Run tests matching keyword expressions"
         )
         parser.add_argument(
+            "--skip-lint",
+            action="store_true",
+            help=(
+                "Skip the auto fmt+lint pre-step and run pytest directly. "
+                "Use when iterating on a failing test with intentionally "
+                "dirty formatting."
+            ),
+        )
+        parser.add_argument(
             "paths",
             nargs="*",
             help="One or more test paths or files (forwarded to pytest)",
         )
         parser.set_defaults(
             func=lambda args: self.test.run_tests(
-                args.verbose, args.tb, args.markers, args.keywords, args.paths
+                args.verbose,
+                args.tb,
+                args.markers,
+                args.keywords,
+                args.paths,
+                args.skip_lint,
             )
         )
 
