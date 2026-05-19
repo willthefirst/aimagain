@@ -13,6 +13,26 @@ dev test                  # runs the test suite
 
 `dev --help` lists every command. See [`scripts/README.md`](scripts/README.md) for what's there.
 
+### Dev auto-login
+
+After `dev seed` populates the seed admin user, bookmark:
+
+```
+http://localhost:8000/dev/login-as-seed-user
+```
+
+Hitting it issues the same session cookie a real login would (for the user named by `DEV_LOGIN_EMAIL`, defaulting to `admin@example.com`) and redirects to `/posts`. Saves a form submission every time you reopen the browser to the dev server. The route is only mounted when `ENVIRONMENT=development` — production never registers it. See [`src/domain/routes/dev_auth.py`](src/domain/routes/dev_auth.py) for the security guards.
+
+### Playwright MCP for design review <!-- title-case-ignore: "MCP" is the Anthropic acronym (Model Context Protocol) -->
+
+Claude Code can drive a real browser against the dev server to navigate, click, resize, and screenshot — useful for "load `/posts` at iPhone width and check the location row" tasks. The MCP entry is pre-configured in [`.claude/settings.json`](.claude/settings.json); the one-time browser install is:
+
+```bash
+dev playwright-setup      # installs Chromium (~150MB)
+```
+
+After that, restart Claude Code. The agent navigates to `/dev/login-as-seed-user` as its first tool call and proceeds authenticated.
+
 ## Documentation map
 
 Each fact lives in the README closest to the code that defines it; other docs link to it. See [`CLAUDE.md`](CLAUDE.md) for the contract.

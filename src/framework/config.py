@@ -11,6 +11,14 @@ class Settings(BaseSettings):
     DATABASE_URL: str
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
     ENVIRONMENT: str = "production"
+    # Seed-user email the dev-only auto-login route logs in as. Read
+    # by `src.domain.routes.dev_auth` when `ENVIRONMENT="development"`
+    # — the route is not mounted in any other environment so this
+    # value is inert in production. Defaults to the admin user
+    # `seed.py` creates so a fresh `dev seed` + `dev up` lands the
+    # developer (or the Playwright MCP agent) authenticated without
+    # extra config.
+    DEV_LOGIN_EMAIL: str = "admin@example.com"
 
     model_config = ConfigDict(env_file=".env", env_file_encoding="utf-8")
 
