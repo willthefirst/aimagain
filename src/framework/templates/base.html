@@ -283,6 +283,30 @@
          visual weight. The `.toolbar button` rule above reaches each
          action via descendant selector. */
       menu { list-style: none; padding: 0; margin: 0; }
+      /* In-row action menus inside table cells render their `<li>`
+         commands inline so the actions sit on a single row instead of
+         stacking each `<li>` on its own line (#580 — the `/users`
+         table's Deactivate/Delete cluster previously doubled row
+         height). Scoped to `td > menu` so the page toolbar `<menu>`
+         (which has its own flex layout) is untouched, and so that
+         bespoke tables outside `index_table` pick up the same
+         treatment if they ever need an Actions cell. Buttons inside
+         the cell shrink to a compact size so two-or-three-action
+         clusters don't dominate the row width. */
+      td > menu {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 0.25rem;
+      }
+      td > menu > li { margin: 0; }
+      td > menu > li > button,
+      td > menu > li > [role="button"] {
+        margin: 0;
+        padding-block: 0.25rem;
+        padding-inline: 0.5rem;
+        font-size: 0.875rem;
+      }
       /* Breadcrumb zone bar. Pico already styles the markup
          (`nav[aria-label="breadcrumb"] ul` becomes an inline list
          with a separator via `li + li::before`); the only thing this
