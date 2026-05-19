@@ -136,6 +136,53 @@ async def test_detail_renders(
     assert "<dt>Name</dt>" not in detail_resp.text
 
 
+async def test_detail_root_org_omits_parent_organization_row(
+    authenticated_client: AsyncClient,
+    logged_in_user: User,
+):
+    """Issue #595 — root organizations rendered `Parent organization: —
+    (root)`, a mixed empty-state convention. Root orgs now omit the
+    parent row entirely (matches the optional-field grammar used by
+    posts/providers/programs detail templates)."""
+    create_resp = await authenticated_client.post(
+        "/organizations", data=_org_payload(name="Root-Org")
+    )
+    new_id = uuid.UUID(create_resp.json()["id"])
+    detail_resp = await authenticated_client.get(f"/organizations/{new_id}")
+    assert detail_resp.status_code == 200
+    # The row is dropped — neither the placeholder text nor the dt label
+    # appears for a root org.
+    assert "Parent organization" not in detail_resp.text
+    assert "(root)" not in detail_resp.text
+
+
+async def test_detail_child_org_renders_parent_link(
+    authenticated_client: AsyncClient,
+    logged_in_user: User,
+):
+    """Counterpart to the root-omits test: when the org has a parent,
+    the parent row renders with the parent's name as the link text."""
+    parent_resp = await authenticated_client.post(
+        "/organizations", data=_org_payload(name="Parent-Org")
+    )
+    parent_id = uuid.UUID(parent_resp.json()["id"])
+
+    child_resp = await authenticated_client.post(
+        "/organizations",
+        data=_org_payload(
+            name="Child-Org", type="clinic", parent_org_id=str(parent_id)
+        ),
+    )
+    child_id = uuid.UUID(child_resp.json()["id"])
+
+    detail_resp = await authenticated_client.get(f"/organizations/{child_id}")
+    assert detail_resp.status_code == 200
+    assert "Parent organization" in detail_resp.text
+    # Parent name resolved as the link text (not the raw UUID).
+    assert "Parent-Org" in detail_resp.text
+    assert f"/organizations/{parent_id}" in detail_resp.text
+
+
 async def test_patch_updates_name(
     authenticated_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],
