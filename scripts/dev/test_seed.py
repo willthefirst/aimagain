@@ -226,6 +226,26 @@ async def test_seed_standalone_orgs_creates_health_system_parent(
     assert chc.parent_org_id is None
 
 
+async def test_provider_fixtures_have_no_placeholder_locations():
+    """Pins #596: no provider fixture renders the `(telehealth), CA 00000`
+    sentinel that read like a placeholder bug on the providers list.
+    Practices that only deliver care virtually still declare a real
+    business city + ZIP; the (in_person, virtual) flags carry the
+    telehealth-only signal at the wire layer."""
+    for fixture in seed.FIXTURE_OPENING:
+        provider = fixture["provider"]
+        assert provider["location_city"] != "(telehealth)", (
+            f"{provider['practice_name']!r} still uses the (telehealth) "
+            "city sentinel — pick a real city; the virtual_sessions flag "
+            "carries the telehealth signal."
+        )
+        assert provider["location_zip"] != "00000", (
+            f"{provider['practice_name']!r} still uses the 00000 ZIP "
+            "sentinel — pick a plausible ZIP for the practice's "
+            "business address."
+        )
+
+
 async def test_seed_opening_attaches_clinic_to_health_system_parent(
     db_test_session_manager,
 ):
