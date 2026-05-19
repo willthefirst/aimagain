@@ -24,46 +24,49 @@
    two-column body grid, footer band), with detail-only sections
    appended in reading order between the header and the body grid:
 
-     1. Header band — headline + modality chips + date (same shape
-        as the list card's header, but the headline is plain text,
-        not a link to itself). The breadcrumb above the card and
-        the kind-colored left edge already convey the "kind +
-        collection" context the page used to repeat as a meta line.
+     1. Header band — Pico `<hgroup>` pairing an `<h3>` headline
+        (plain text on detail, not a link to itself) with a
+        `<small>` meta line (date · modality). Same shape as the
+        list card so modality reads the same wherever it appears.
+        The breadcrumb above the card and the kind-colored left
+        edge already convey the "kind + collection" context the
+        page used to repeat as a meta line.
      2. Description prose — the post's lead text (required for CR;
         optional for PA / program).
-     3. Body grid — services-with-icons (left) + demographics `<dl>`
-        (right) in expanded mode (the facts block surfaces
-        detail-only rows: full address, practice/program link,
-        desired times, schedule notes, network preference, sliding
-        scale, cost).
+     3. Body — services-with-icons, then the demographics `<dl>`,
+        stacked vertically (single column). The facts block surfaces
+        detail-only rows in expanded mode: full address,
+        practice/program link, desired times, schedule notes,
+        network preference, sliding scale, cost.
      4. How to refer — PA / program only, when website or
         instructions are set.
-     5. Footer — Email CTA (same as list card).
+     5. Footer — Email CTA (same as list card), left-aligned via
+        Pico's default footer flow.
 
    Per-kind branching lives in `post_card_view` (one place). Every
    visual element in the card reads from `view` (the dict view-model). #}
 {% block content %}
+{%- set modality = modality_chips(view.in_person, view.virtual) | trim -%}
 <article class="entity-card" data-kind="{{ post.kind }}">
-  <header class="entity-header">
-    <strong>{{ view.headline }}{% if view.header_state %}, {{ view.header_state }}{% endif %}</strong>
-    {{ modality_chips(view.in_person, view.virtual) }}
-    <small>{{ post.created_at | format_post_date }}</small>
+  <header>
+    <hgroup>
+      <h3>{{ view.headline }}{% if view.header_state %}, {{ view.header_state }}{% endif %}</h3>
+      <small>{{ post.created_at | format_post_date }}{% if modality %} · {{ modality }}{% endif %}</small>
+    </hgroup>
   </header>
 
   {%- if view.description %}
   <p>{{ view.description }}</p>
   {%- endif %}
 
-  <div class="entity-grid">
-    {{ services_block(view) }}
-    {{ facts_block(view, expanded=True) }}
-  </div>
+  {{ services_block(view) }}
+  {{ facts_block(view, expanded=True) }}
 
   {%- if view.referral %}
   {{ how_to_refer(view) }}
   {%- endif %}
 
-  <footer class="entity-footer">
+  <footer>
     <a href="mailto:{{ post.owner.email }}" target="_blank" rel="noopener noreferrer" role="button" class="secondary outline">Email</a>
   </footer>
 </article>
