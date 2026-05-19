@@ -19,8 +19,14 @@ DATABASE_URL=sqlite+aiosqlite:///./data/app.db
 SECRET=dev-only-do-not-use-in-prod-aaaaaaaa
 ACCESS_TOKEN_EXPIRE_MINUTES=60
 
-# Development — enables template auto-reload
+# Development — enables template auto-reload AND mounts the
+# `/dev/login-as-seed-user` shortcut (see README "Dev auto-login").
 ENVIRONMENT=development
+
+# Seed user the dev-only `/dev/login-as-seed-user` route logs in as.
+# Defaults to the admin user `dev seed` creates; uncomment + override
+# to log in as a different seed-data user.
+# DEV_LOGIN_EMAIL=admin@example.com
 """
 
 
@@ -420,6 +426,50 @@ class RoutesCommands:
         return 0
 
 
+class PlaywrightCommands:
+    """One-time setup for the Playwright MCP server.
+
+    The MCP entry in `.claude/settings.json` invokes
+    `npx @playwright/mcp@latest`; that fetches and runs the server
+    fresh each time without a pre-install step. The browser binary
+    (Chromium) is the only thing that needs to be installed locally.
+    This command runs `npx playwright install chromium` and prints
+    the bookmark URL + a pointer to the auto-login route.
+    """
+
+    def __init__(self, runner: CLIRunner):
+        self.runner = runner
+
+    def setup(self) -> int:
+        print("🎭 Installing Chromium for Playwright (one-time, ~150MB)...")
+        result = self.runner.run_command(
+            ["npx", "--yes", "playwright", "install", "chromium"]
+        )
+        if result != 0:
+            print(
+                "❌ Chromium install failed. Confirm Node + npm are installed; "
+                "see https://nodejs.org/."
+            )
+            return result
+
+        print("\n✅ Playwright Chromium installed.")
+        print("\nNext steps:")
+        print("  1. Start the dev server:    dev up")
+        print("  2. Seed the dev DB:         dev seed")
+        print("  3. Log in (bookmark this):")
+        print("       http://localhost:8000/dev/login-as-seed-user")
+        print(
+            "     Visiting it sets the session cookie for the seed admin user "
+            "and redirects to /posts."
+        )
+        print(
+            "\nClaude Code's Playwright MCP entry is already configured in "
+            "`.claude/settings.json`. After restarting Claude Code, the agent "
+            "can navigate / click / screenshot via the same auto-login URL."
+        )
+        return 0
+
+
 class SetupCommands:
     def __init__(self, runner: CLIRunner):
         self.runner = runner
@@ -470,6 +520,7 @@ class DevCLI:
         self.routes_cmd = RoutesCommands(self.runner)
         self.promote_admin_cmd = PromoteAdminCommands(self.runner)
         self.migrate_cmd = MigrateCommands(self.runner)
+        self.playwright_cmd = PlaywrightCommands(self.runner)
 
     def create_parser(self) -> argparse.ArgumentParser:
         """Create the argument parser with all commands."""
@@ -505,6 +556,7 @@ Examples:
         self._add_routes_parser(subparsers)
         self._add_promote_admin_parser(subparsers)
         self._add_migrate_parser(subparsers)
+        self._add_playwright_setup_parser(subparsers)
 
         return parser
 
@@ -611,6 +663,19 @@ Examples:
             ),
         )
         parser.set_defaults(func=lambda args: self.setup.setup())
+
+    def _add_playwright_setup_parser(self, subparsers):
+        parser = subparsers.add_parser(
+            "playwright-setup",
+            help="Install Chromium for the Playwright MCP server",
+            description=(
+                "One-time browser install for the Playwright MCP entry "
+                "wired up in `.claude/settings.json`. Also prints the "
+                "auto-login bookmark URL (`/dev/login-as-seed-user`) so "
+                "the dev knows where to point their browser."
+            ),
+        )
+        parser.set_defaults(func=lambda args: self.playwright_cmd.setup())
 
     def _add_seed_parser(self, subparsers):
         parser = subparsers.add_parser(

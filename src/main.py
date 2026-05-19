@@ -10,7 +10,8 @@ from src.db import check_database_health
 from src.domain import routes  # noqa: F401  # populates entity_registry
 from src.domain import template_globals  # noqa: F401  # populates Jinja env globals
 from src.domain.logic.users.schema import UserRead
-from src.domain.routes import auth_pages, auth_routes, verifications
+from src.domain.routes import auth_pages, auth_routes, dev_auth, verifications
+from src.framework.config import settings
 from src.framework.dispatch.registry import entity_registry
 from src.framework.http.middleware import StripEmptyQueryParamsMiddleware
 from src.jobs.scheduler import make_scheduler, register_jobs
@@ -124,6 +125,13 @@ app.include_router(verifications.verifications_api_router)
 # repeat them on `include_router`.
 for _, _router in entity_registry.entries():
     app.include_router(_router)
+
+# Dev-only routes. Mounted iff `ENVIRONMENT == "development"`; the
+# `/dev/login-as-seed-user` shortcut doesn't exist in production. The
+# `mount_dev_routes` indirection makes the gating behavior testable
+# without monkeypatching the global `app` instance. See
+# `src/domain/routes/dev_auth.py` for the full security rationale.
+dev_auth.mount_dev_routes(app, environment=settings.ENVIRONMENT)
 
 
 @app.get("/health")
