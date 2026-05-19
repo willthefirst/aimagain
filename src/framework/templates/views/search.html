@@ -37,7 +37,11 @@ the spec.
 
   <menu>
     <li><button type="submit">Apply</button></li>
-    <li><a href="{{ list_action }}" role="button" class="secondary">Clear</a></li>
+    {# Use the outline variant so Clear matches the rest of the
+       app's secondary-action vocabulary (Cancel, Filters, Edit,
+       Unfavorite) — Pico's filled `.secondary` was a third button
+       style with no other callers (#599). #}
+    <li><a href="{{ list_action }}" role="button" class="secondary outline">Clear</a></li>
   </menu>
 
 </form>

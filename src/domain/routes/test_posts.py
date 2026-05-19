@@ -1292,6 +1292,19 @@ async def test_search_page_renders_one_control_per_filter(
         "opening",
         "program_availability",
     }
+    # Regression for #599 — the search-form Clear link must use the
+    # outline variant so it shares the rest of the app's secondary
+    # button vocabulary (Cancel, Filters, Edit). Pico's filled
+    # `.secondary` (dark-gray) was a third button style with no
+    # other callers.
+    clear_links = [
+        a for a in form.css("a[role='button']") if a.text().strip() == "Clear"
+    ]
+    assert len(clear_links) == 1, "search form must render one Clear link"
+    clear_class = (clear_links[0].attributes.get("class") or "").split()
+    assert (
+        "secondary" in clear_class and "outline" in clear_class
+    ), f"Clear link must use `secondary outline`, got {clear_class!r}"
 
 
 async def test_toolbar_inline_active_filter_summary_collapses_beyond_two(
