@@ -1,9 +1,19 @@
 {# Generic detail-view chrome.
 
-A detail view (`/posts/{id}`, `/providers/{id}`, `/users/{id}`) renders
-a two-segment breadcrumb (collection → current item) and an optional
-toolbar of primary resource actions (Edit, Delete, Favorite, ...). The
-template wires both by convention so the child only fills the body.
+A detail view (`/openings/{id}`, `/providers/{id}`, `/users/{id}`)
+renders a single-segment breadcrumb (link back to the collection)
+above a toolbar row that pairs the resource's `<h1>` with the
+primary actions (Edit, Delete, Favorite, ...). GOV.UK-style: the
+breadcrumb does not repeat the current page label — the `<h1>` in
+the toolbar carries it, so every visible crumb stays an actionable
+link.
+
+Layout per page:
+
+    <breadcrumb: link to collection>
+    <h1: current item>    <actions...>
+    <hr>
+    <content>
 
 Child contract:
 
@@ -11,22 +21,23 @@ Child contract:
     resource_label — short string label for the collection segment of
                      the breadcrumb (e.g. "Providers").
     current_label  — short string label for the current item (e.g.
-                     `{{ provider.org.name }}`).
+                     `{{ provider.org.name }}`). Used as both the
+                     `<h1>` heading and (by convention) the document
+                     title.
     content        — the resource detail body.
 
   Required context (set via `{% set %}` after `{% extends %}`):
     resource_url   — URL the collection segment links to (e.g.
-                     "/providers"). The current segment renders as plain
-                     text with `aria-current="page"`.
+                     "/providers").
 
   Optional blocks:
-    actions        — toolbar right-zone content: Edit, Delete, Favorite,
-                     admin actions, etc. Each action is a `<li>` because
-                     the right zone is a `<menu class="toolbar-right">`
-                     (list of commands, pushed to the right edge). The
-                     toolbar shell is suppressed when this block is empty.
-    breadcrumb     — full breadcrumb override for nested-detail pages
-                     that don't fit the two-segment shape.
+    actions        — toolbar right-zone content: Edit, Delete,
+                     Favorite, admin actions, etc. Each action is a
+                     `<li>` because the right zone is a
+                     `<menu class="toolbar-right">` (list of
+                     commands, pushed to the right edge).
+    breadcrumb     — full breadcrumb override for nested-detail
+                     pages that need a multi-segment chain.
 #}
 {% extends "base.html" %}
 {%- from "_shared/_toolbar.html" import page_toolbar -%}
@@ -34,19 +45,13 @@ Child contract:
 
 {% block breadcrumb %}
 {%- set collection_label %}{% block resource_label %}{% endblock %}{% endset -%}
-{%- set current %}{% block current_label %}{% endblock %}{% endset -%}
-{{ breadcrumb([(collection_label, resource_url), (current, none)]) }}
+{{ breadcrumb([(collection_label | trim, resource_url)]) }}
 {% endblock %}
 
 {% block toolbar %}
+{%- set current %}{% block current_label %}{% endblock %}{% endset -%}
 {%- set actions_body %}{% block actions %}{% endblock %}{% endset -%}
-{%- if actions_body | trim %}
-{# Detail-page toolbar reuses the shared two-zone primitive with
-   no search/filter args, so the left zone is empty and the action
-   `<menu class="toolbar-right">` lands at the same right edge as
-   list-page actions (Create, Export...). #}
-{% call page_toolbar() %}{{ actions_body }}{% endcall %}
-{%- endif %}
+{% call page_toolbar(heading=current | trim) %}{{ actions_body }}{% endcall %}
 {% endblock %}
 
 {% block content %}{% endblock %}

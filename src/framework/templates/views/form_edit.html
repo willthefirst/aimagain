@@ -1,8 +1,17 @@
 {# Generic edit-form view chrome.
 
-An edit-form view (`/posts/{id}/form`, `/providers/{id}/form`) renders
-a three-segment breadcrumb (collection → current item → "Edit") and no
-toolbar — the form's Save and Cancel buttons own the actions.
+An edit-form view (`/openings/{id}/form`, `/providers/{id}/form`)
+renders a two-segment breadcrumb (collection → detail page, both
+links) above a toolbar row carrying the page `<h1>`. The form's
+own Save and Cancel buttons own the primary actions, so the
+toolbar row itself usually has no right-side actions.
+
+Layout per page:
+
+    <breadcrumb: link to collection › link back to detail>
+    <h1: "Edit <current_label>">
+    <hr>
+    <form>
 
 Child contract:
 
@@ -10,7 +19,9 @@ Child contract:
     resource_label — short string label for the collection segment of
                      the breadcrumb (e.g. "Providers").
     current_label  — short string label for the resource being edited
-                     (e.g. `{{ provider.org.name }}`).
+                     (e.g. `{{ provider.org.name }}`). Used in the
+                     toolbar `<h1>` as "Edit <current_label>" and as
+                     the link text for the second breadcrumb segment.
     content        — the `<form>` body. By convention forms keep a
                      `<a class="secondary outline">Cancel</a>` linking
                      to `resource_detail_url` so abandoning an edit is
@@ -19,23 +30,28 @@ Child contract:
 
   Required context:
     resource_url        — URL the collection segment links to.
-    resource_detail_url — URL the current-item segment links to (e.g.
-                          `"/providers/" ~ provider.id`).
+    resource_detail_url — URL the current-item breadcrumb segment
+                          links to (e.g. `"/providers/" ~ provider.id`).
 
   Optional blocks:
     breadcrumb          — full breadcrumb override for nested-edit pages.
 #}
 {% extends "base.html" %}
 {%- from "_shared/_breadcrumb.html" import breadcrumb -%}
+{%- from "_shared/_toolbar.html" import page_toolbar -%}
 
 {% block breadcrumb %}
 {%- set collection_label %}{% block resource_label %}{% endblock %}{% endset -%}
 {%- set current %}{% block current_label %}{% endblock %}{% endset -%}
 {{ breadcrumb([
-  (collection_label, resource_url),
-  (current, resource_detail_url),
-  ("Edit", none),
+  (collection_label | trim, resource_url),
+  (current | trim, resource_detail_url),
 ]) }}
+{% endblock %}
+
+{% block toolbar %}
+{%- set current = self.current_label() | trim -%}
+{% call page_toolbar(heading="Edit " ~ current) %}{% endcall %}
 {% endblock %}
 
 {# `entity-form-page` — see `views/form_new.html`. #}

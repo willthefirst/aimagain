@@ -56,10 +56,13 @@ def _add_child(env: Environment, name: str, body: str) -> None:
     env.loader.loaders[0].mapping[name] = textwrap.dedent(body).lstrip()
 
 
-def test_list_view_renders_single_segment_breadcrumb() -> None:
-    """``views/list.html`` fills the `breadcrumb` block with a
-    single-segment `breadcrumb([(resource_label, None)])` call. The
-    child only declares the label."""
+def test_list_view_renders_h1_in_toolbar_and_omits_breadcrumb() -> None:
+    """``views/list.html`` puts the `resource_label` into the
+    toolbar `<h1>` (the page title) and renders no breadcrumb —
+    a single-segment "Providers" trail would duplicate what the
+    active global-nav tab already communicates, so list pages
+    skip the breadcrumb entirely. The child only declares the
+    label."""
     env = _make_env()
     _add_child(
         env,
@@ -77,19 +80,22 @@ def test_list_view_renders_single_segment_breadcrumb() -> None:
         is_development=False,
     )
 
-    # Single-segment breadcrumb: the label appears inside the
-    # `<nav aria-label="breadcrumb">` strip with `aria-current="page"`
-    # (no `<a>` for the trailing segment).
-    assert 'aria-label="breadcrumb"' in html
-    assert 'aria-current="page"' in html
-    assert "Providers" in html
+    tree = HTMLParser(html)
+    # No breadcrumb on list pages.
+    assert tree.css_first('nav[aria-label="breadcrumb"]') is None
+    # The heading lives in the toolbar `<h1>`.
+    toolbar_h1 = tree.css_first("div.toolbar h1")
+    assert toolbar_h1 is not None
+    assert toolbar_h1.text(strip=True) == "Providers"
     # Content block lands in the page body.
     assert '<div id="body">ok</div>' in html
 
 
-def test_list_view_omits_toolbar_when_no_filters_no_actions() -> None:
-    """The toolbar shell renders only when filters or actions are
-    present — empty pages don't emit a stray `<hr />`."""
+def test_list_view_renders_toolbar_with_h1_even_without_actions() -> None:
+    """The toolbar shell always renders on list pages now because
+    it owns the page `<h1>`; previously it was suppressed when
+    neither filter link nor actions were present. The shell still
+    renders cleanly with the heading alone."""
     env = _make_env()
     _add_child(
         env,
@@ -107,11 +113,14 @@ def test_list_view_omits_toolbar_when_no_filters_no_actions() -> None:
         is_development=False,
     )
 
-    # Parse rather than substring-match: `base.html`'s CSS comment
-    # references `<div class="toolbar">` verbatim to document the
-    # shape, so a naive `in html` check would false-positive.
     tree = HTMLParser(html)
-    assert tree.css_first("div.toolbar") is None
+    toolbar = tree.css_first("div.toolbar")
+    assert toolbar is not None
+    h1 = toolbar.css_first("h1")
+    assert h1 is not None and h1.text(strip=True) == "Users"
+    # No filter link and no action menu when child opts out.
+    assert toolbar.css_first("a.toolbar-filter-link") is None
+    assert toolbar.css_first("menu.toolbar-right") is None
 
 
 def test_list_view_renders_actions_block_in_toolbar_right() -> None:
@@ -338,7 +347,12 @@ def test_primary_nav_shows_admin_links_only_for_admins() -> None:
     assert "/providers" in nonadmin_links
 
 
-def test_form_edit_view_renders_three_segment_breadcrumb() -> None:
+def test_form_edit_view_renders_breadcrumb_and_edit_heading() -> None:
+    """``views/form_edit.html`` renders a two-segment breadcrumb
+    (collection link › detail link) and an `<h1>"Edit <current>"`
+    in the toolbar. The current item is not repeated as a non-link
+    crumb — the H1 carries it, so every visible crumb stays an
+    actionable link (GOV.UK pattern)."""
     env = _make_env()
     _add_child(
         env,
@@ -359,10 +373,16 @@ def test_form_edit_view_renders_three_segment_breadcrumb() -> None:
         is_development=False,
     )
 
-    assert 'href="/providers"' in html
-    assert 'href="/providers/42"' in html
-    assert "Sunrise Therapy" in html
-    assert ">Edit</li>" in html or ">Edit<" in html
+    tree = HTMLParser(html)
+    crumbs = tree.css('nav[aria-label="breadcrumb"] li')
+    assert [li.css_first("a").attributes.get("href") for li in crumbs] == [
+        "/providers",
+        "/providers/42",
+    ], "form-edit breadcrumb must be exactly two link segments"
+    # H1 in the toolbar reads "Edit <current>".
+    h1 = tree.css_first("div.toolbar h1")
+    assert h1 is not None
+    assert h1.text(strip=True) == "Edit Sunrise Therapy"
 
 
 def test_form_actions_buttons_fill_row_width_on_desktop() -> None:
@@ -540,19 +560,21 @@ def test_destructive_action_macros_emit_danger_class() -> None:
     ), "form_actions Delete button must emit class containing 'danger'"
 
 
-def test_breadcrumb_page_heading_visible_on_mobile() -> None:
-    """Regression for #588 — the single-segment breadcrumb on every
-    list page (`Organizations`, `Posts`, `Providers`, `Users`) doubles
-    as the page heading and must stay visible at the 375px mobile
-    viewport. Earlier the mobile rule hid `nav[aria-label="breadcrumb"]`
-    unconditionally under `@media (max-width: 768px)`, dropping the
-    page-heading context on mobile list pages and leaving only the
-    Filters/Create row as the top of the page.
+def test_list_page_heading_visible_on_mobile() -> None:
+    """Regression for #588 — the list-page heading (`Organizations`,
+    `Posts`, `Providers`, `Users`) must stay visible at the 375px
+    mobile viewport.
 
-    The fix scopes the hide to multi-segment breadcrumbs only via the
-    `:has(li + li)` selector — single-segment list-page breadcrumbs
-    stay visible; multi-segment detail/form breadcrumbs (location
-    context) still collapse on mobile.
+    Earlier the heading lived in a single-segment breadcrumb above
+    the toolbar, and a `@media (max-width: 768px)` rule unconditionally
+    hid `nav[aria-label="breadcrumb"]` — dropping the page-heading
+    context on mobile list pages.
+
+    The breadcrumb-toolbar consolidation moved the heading into the
+    toolbar `<h1>` (and removed the breadcrumb from list pages
+    entirely), so the heading is now part of the same row as Filters /
+    Create. This test pins the new arrangement: the `<h1>` is rendered
+    inside the toolbar and carries no mobile-hide rule.
     """
     import re
 
@@ -572,25 +594,21 @@ def test_breadcrumb_page_heading_visible_on_mobile() -> None:
         is_development=False,
     )
 
-    # Find every `@media (max-width: 768px)` block and verify none of
-    # them blanket-hide `nav[aria-label="breadcrumb"]` — the rule must
-    # be scoped to multi-segment via `:has(li + li)`.
-    blocks_768 = re.findall(
-        r"@media\s*\(\s*max-width:\s*768px\s*\)\s*\{(.*?)\n      \}",
-        html,
-        re.DOTALL,
-    )
-    assert blocks_768, "no @media (max-width: 768px) block in base.html"
-    combined = "\n".join(blocks_768)
-    assert (
-        'nav[aria-label="breadcrumb"]:has(li + li)' in combined
-    ), "mobile breadcrumb hide must be scoped to `:has(li + li)` so single-segment list-page breadcrumbs stay visible (#588)"
-    # And the unscoped version must not appear — that would re-hide
-    # the page heading on mobile list pages.
+    tree = HTMLParser(html)
+    h1 = tree.css_first("div.toolbar h1")
+    assert h1 is not None, "list-page heading must live in the toolbar <h1>"
+    assert h1.text(strip=True) == "Providers"
+
+    # The CSS must not blanket-hide the toolbar or its `<h1>` on
+    # narrow viewports — the page heading has to stay visible.
     assert not re.search(
-        r"nav\[aria-label=\"breadcrumb\"\]\s*\{\s*display:\s*none",
-        combined,
-    ), 'unscoped `nav[aria-label="breadcrumb"] { display: none }` in a mobile @media block would hide the page heading on list pages (#588)'
+        r"@media[^{]*max-width[^{]*\{[^}]*\.toolbar[^}]*display:\s*none",
+        html,
+    ), "toolbar must not be hidden on mobile — the page heading lives there"
+    assert not re.search(
+        r"@media[^{]*max-width[^{]*\{[^}]*\.toolbar\s+h1[^}]*display:\s*none",
+        html,
+    ), "toolbar h1 must not be hidden on mobile — that's the page heading"
 
 
 def test_entity_form_page_caps_short_field_widths() -> None:

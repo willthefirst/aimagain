@@ -26,14 +26,18 @@ the spec.
 #}
 {% extends "base.html" %}
 {%- from "_shared/_breadcrumb.html" import breadcrumb -%}
+{%- from "_shared/_toolbar.html" import page_toolbar -%}
 
 {% block breadcrumb %}
 {%- set label %}{% block resource_label %}{% endblock %}{% endset -%}
-{{ breadcrumb([(label, list_action), ("Search", none)]) }}
+{{ breadcrumb([(label | trim, list_action)]) }}
+{% endblock %}
+
+{% block toolbar %}
+{% call page_toolbar(heading=self.resource_label() | trim ~ " search") %}{% endcall %}
 {% endblock %}
 
 {% block content %}
-<h1>{{ self.resource_label() }} search</h1>
 
 <form method="get" action="{{ list_action }}" class="search-form">
 

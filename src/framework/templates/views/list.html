@@ -1,54 +1,58 @@
 {# Generic list-view chrome.
 
-A list view (`/posts`, `/providers`, `/users`, `/users/me/favorites`,
-`/users/{id}/providers`) renders the same chrome: primary nav (from
-`base.html`), single-segment breadcrumb naming the resource, then a
-single toolbar strip. All toolbar content right-aligns: the filter
-link (when the spec opts into `routes.search`) and the action menu.
-The filter link reads `Filters` when none are applied and switches
-to an inline summary when any are; the search page's own form owns
-clearing.
+A list view (`/openings`, `/providers`, `/users`,
+`/users/me/favorites`, `/users/{id}/providers`) renders the page
+heading + actions in a single toolbar row above the list body. No
+breadcrumb: a single-segment "Openings" trail duplicates what the
+active global-nav tab already communicates (the breadcrumb guide
+flags this case explicitly), so list pages skip the breadcrumb
+block and let the `<h1>` in the toolbar carry the section name.
+Detail/form pages keep the breadcrumb for real ancestry.
+
+Toolbar row contents (left-to-right):
+  - `<h1>` heading (resource_label)
+  - filter link (when `routes.search` is opted in)
+  - action `<menu>` (Create, Export, ...)
 
 Child contract:
 
   Required blocks:
-    resource_label — short string label for the breadcrumb segment
-                     (e.g. "Providers"). Plain text, no markup.
+    resource_label — short string label for the toolbar `<h1>`
+                     and the page title (e.g. "Providers").
+                     Plain text, no markup.
     content        — the table or list body (typically an
                      `index_table(...)` call or a hand-rolled `<ul>`).
 
   Optional blocks:
-    actions        — toolbar action `<menu>` content (Create button,
-                     Export link). Each action is a `<li>` because
-                     the menu is `<menu class="toolbar-right">` (a
-                     commands list). Empty by default.
+    actions        — toolbar action `<menu>` content (Create
+                     button, Export link). Each action is a
+                     `<li>` because the menu is
+                     `<menu class="toolbar-right">` (a commands
+                     list). Empty by default.
     breadcrumb     — full breadcrumb override for subresource lists
-                     with multi-segment chains.
+                     with multi-segment chains (e.g.
+                     `/users/{id}/providers`). The default list
+                     view renders no breadcrumb; this override lets
+                     subresource list pages opt back in when there's
+                     real ancestry worth showing.
 
   Context the framework's `handle_list` injects (children don't set
   these by hand):
     active_filters, search_url, page_meta, paginator_base_query.
 #}
 {% extends "base.html" %}
-{%- from "_shared/_breadcrumb.html" import breadcrumb -%}
 {%- from "_shared/_toolbar.html" import page_toolbar -%}
 {%- from "_shared/pagination.html" import pagination -%}
 
-{% block breadcrumb %}
-{%- set label %}{% block resource_label %}{% endblock %}{% endset -%}
-{{ breadcrumb([(label, none)]) }}
-{% endblock %}
-
 {% block toolbar %}
+{%- set label %}{% block resource_label %}{% endblock %}{% endset -%}
 {%- set actions_body %}{% block actions %}{% endblock %}{% endset -%}
 {%- set has_search = search_url is defined and search_url -%}
-{%- set has_actions = actions_body | trim -%}
-{%- if has_search or has_actions %}
 {% call page_toolbar(
+  heading=label | trim,
   active_filters=active_filters|default([]),
   search_url=search_url if has_search else none
 ) %}{{ actions_body }}{% endcall %}
-{%- endif %}
 {% endblock %}
 
 {% block content %}{% endblock %}
