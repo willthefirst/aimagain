@@ -303,20 +303,22 @@ async def test_detail_hides_private_fields_from_strangers(
     assert "<dt>Verified</dt>" not in body
 
 
-async def test_detail_shows_private_fields_to_self(
+async def test_detail_shows_email_to_self_but_hides_admin_flags(
     authenticated_client: AsyncClient,
     logged_in_user: User,
 ):
     """The user viewing their own profile (via /users/me or
-    /users/<own-id>) sees their email, active, and verified rows."""
+    /users/<own-id>) sees their email but NOT the `Active` /
+    `Verified` rows — those are admin-facing moderation flags and
+    read as internal state on a personal profile."""
     response = await authenticated_client.get("/users/me")
 
     assert response.status_code == 200
     body = response.text
     assert logged_in_user.email in body
     assert "<dt>Email</dt>" in body
-    assert "<dt>Active</dt>" in body
-    assert "<dt>Verified</dt>" in body
+    assert "<dt>Active</dt>" not in body
+    assert "<dt>Verified</dt>" not in body
 
 
 async def test_detail_shows_private_fields_to_admin(
@@ -341,6 +343,11 @@ async def test_detail_shows_private_fields_to_admin(
     body = response.text
     assert target_email in body
     assert "<dt>Email</dt>" in body
+    # Admin viewing someone else still sees the moderation flags —
+    # they're hidden only on self-view (see
+    # `test_detail_shows_email_to_self_but_hides_admin_flags`).
+    assert "<dt>Active</dt>" in body
+    assert "<dt>Verified</dt>" in body
 
 
 async def test_detail_shows_admin_actions_for_admin(

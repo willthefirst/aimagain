@@ -30,17 +30,25 @@
     <strong>{{ target_user.username }}</strong>
   </header>
 
-  {# Private rows (email, active, verified) are gated by
-     `can_view_private`, computed in handle_get_user_detail as
-     `is_self OR is_admin(viewer)`. The handler also omits these
-     fields from the `target_user` projection for non-authorized
-     viewers, so a forgotten guard here cannot re-leak. #}
+  {# Private rows are gated by `can_view_private`, computed in
+     handle_get_user_detail as `is_self OR is_admin(viewer)`. The
+     handler also omits these fields from the `target_user`
+     projection for non-authorized viewers, so a forgotten guard
+     here cannot re-leak.
+
+     `Active` / `Verified` are admin-facing moderation flags — they
+     read as internal state, not something a user needs on their
+     own profile. They render only when an admin is viewing
+     someone else (`can_view_private and not is_self`). Email
+     stays for both self and admin-other. #}
   {% if can_view_private %}
   <section class="entity-facts">
     <dl>
       <div><dt>Email</dt><dd>{{ target_user.email }}</dd></div>
+      {% if not is_self %}
       <div><dt>Active</dt><dd>{{ "Yes" if target_user.is_active else "No" }}</dd></div>
       <div><dt>Verified</dt><dd>{{ "Yes" if target_user.is_verified else "No" }}</dd></div>
+      {% endif %}
     </dl>
   </section>
   {% endif %}
