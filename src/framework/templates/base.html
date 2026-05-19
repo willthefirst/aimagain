@@ -227,23 +227,42 @@
       .entity-form-page > section > form {
         max-width: var(--form-max-width);
       }
-      /* Right-aligned cluster for Save / Cancel / Delete. Save sits on
-         the left as the primary action; Cancel sits next to it; Delete
-         is pushed to the far right via `margin-left: auto` so a stray
-         click on the wrong target stays unlikely. On mobile the cluster
-         wraps and each control becomes full-width (Pico's default
-         `<button>` width), with Delete reset back below the others. */
+      /* Save / Cancel / Delete cluster — pinned to the form's full
+         content width so the row aligns with the rest of the form's
+         fields instead of clustering at the left edge as content-
+         width flex items.
+
+         Layout shape:
+           Save + Cancel each `flex: 1 1 0` so they grow to fill the
+           row (50/50 with no Delete; ~40/40 with Delete present, since
+           Delete is content-width). Delete (`form-actions-destructive`)
+           keeps its content width and `margin-left: auto` pushes it to
+           the far right so a stray click on the wrong target stays
+           unlikely.
+
+         The cluster is a `<div class="form-actions">` rendered by the
+         shared `form_actions` macro
+         (`framework/templates/_shared/forms.html`). All entity
+         create/edit forms route through that macro — no per-template
+         action markup. On mobile (≤540px) the cluster wraps to a
+         column and each control becomes full-width, with Delete reset
+         back below the others. */
       .form-actions {
         display: flex;
         flex-wrap: wrap;
         gap: 0.5rem;
-        align-items: center;
-        max-width: var(--form-max-width);
+        align-items: stretch;
         margin-block-start: var(--pico-spacing);
       }
-      .form-actions > .form-actions-destructive { margin-left: auto; }
-      .form-actions > button,
-      .form-actions > [role="button"] { margin: 0; }
+      .form-actions > button:not(.form-actions-destructive),
+      .form-actions > [role="button"]:not(.form-actions-destructive) {
+        flex: 1 1 0;
+        margin: 0;
+      }
+      .form-actions > .form-actions-destructive {
+        margin: 0;
+        margin-left: auto;
+      }
       @media (max-width: 540px) {
         .form-actions { flex-direction: column; align-items: stretch; }
         .form-actions > .form-actions-destructive { margin-left: 0; }

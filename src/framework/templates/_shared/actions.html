@@ -1,4 +1,43 @@
-{# Reusable button macros for HTMX-driven action affordances. #}
+{# Reusable button macros for HTMX-driven action affordances.
+
+## Action-style vocabulary
+
+Every clickable affordance in the app picks one of these four visual
+treatments. Pages stay readable when an Edit button always looks like
+an Edit button regardless of where it lives.
+
+| Action axis     | Pico classes               | Examples                                            |
+|-----------------|----------------------------|-----------------------------------------------------|
+| Primary CTA     | (none — Pico default)      | Create org, Save, Submit, Apply, "Add licensure"    |
+| Secondary       | `class="outline"`          | Edit, Favorite (toggle on), Favorites (nav link)    |
+| Neutral         | `class="secondary outline"`| Cancel, Clear, Email, Unfavorite, Deactivate        |
+| Destructive     | `class="danger"`           | Delete (every form / row / toolbar)                 |
+
+Rules:
+  - **Primary** is filled blue. One per page conceptually — Create on a
+    list page, Save on a form page, Apply on a search page.
+  - **Secondary** is outlined blue. Used for follow-up actions next to
+    a primary (Edit on a detail page) or for "additive" toggles
+    (Favorite-add).
+  - **Neutral** is outlined muted. Used for non-destructive escapes
+    (Cancel, Clear) and contextual "do this thing" affordances that
+    aren't the page's primary (Email, Unfavorite, admin Deactivate).
+  - **Destructive** is filled red. Reserved for irreversible mutations
+    — always `class="danger"`, never the outlined-danger variant (the
+    softer outlined treatment hid the visual weight that keeps misfire
+    risk low — #579). Pinned by
+    `test_views.py::test_no_template_uses_outlined_danger_for_delete`.
+
+When an action fits one of these axes, **use the matching class
+combination directly** (or the macro below for Delete) — don't
+introduce new classes. When it genuinely doesn't fit, that's a
+vocabulary gap; widen this table rather than one-off the class.
+
+`_shared/forms.html::form_actions` is the canonical assembly for the
+Save / Cancel / Delete cluster at the bottom of an entity form. Inline
+deletes (sub-resource rows, owner-action toolbars) compose
+`confirm_delete_button` below directly.
+#}
 
 {# Confirm-then-delete button. Renders an `hx-delete` button with an
 `hx-confirm` dialog. Used by owner/admin action partials and by inline
