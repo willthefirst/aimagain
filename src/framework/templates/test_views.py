@@ -311,6 +311,79 @@ def test_form_edit_view_renders_three_segment_breadcrumb() -> None:
     assert ">Edit</li>" in html or ">Edit<" in html
 
 
+def test_destructive_action_macros_emit_danger_class() -> None:
+    """Regression for #579 — every Delete affordance must carry
+    `class="danger"` (defined in base.html). Pins the two macros that
+    own the destructive-button vocabulary:
+
+    1. `_shared/actions.html::confirm_delete_button` — used by toolbar
+       owner/admin actions and inline subentity rows.
+    2. `_shared/forms.html::form_actions` — the standard
+       Save/Cancel/Delete cluster at the bottom of every entity form.
+    """
+    env = _make_env()
+    _add_child(
+        env,
+        "stub.html",
+        """
+        {% from "_shared/actions.html" import confirm_delete_button %}
+        {% from "_shared/forms.html" import form_actions %}
+        <div id="toolbar-delete">
+          {{ confirm_delete_button("/posts/1", "Sure?") }}
+        </div>
+        <div id="form-delete">
+          {{ form_actions("Save", cancel_url="/posts/1", delete_url="/posts/1", delete_confirm="Sure?") }}
+        </div>
+        """,
+    )
+    html = env.get_template("stub.html").render()
+
+    tree = HTMLParser(html)
+    toolbar = tree.css_first("#toolbar-delete button")
+    assert toolbar is not None
+    assert "danger" in (
+        toolbar.attributes.get("class") or ""
+    ), "confirm_delete_button must emit class containing 'danger'"
+
+    form_delete = tree.css_first("#form-delete .form-actions-destructive")
+    assert form_delete is not None
+    assert "danger" in (
+        form_delete.attributes.get("class") or ""
+    ), "form_actions Delete button must emit class containing 'danger'"
+
+
+def test_base_html_defines_danger_button_style() -> None:
+    """Regression for #579 — `.danger` button style must be defined in
+    base.html with a red token. Without it, `class="danger"` falls back
+    to Pico's primary blue and the destructive button looks like the
+    page's main CTA."""
+    import re
+
+    env = _make_env()
+    _add_child(
+        env,
+        "stub.html",
+        """
+        {% extends "views/list.html" %}
+        {% block resource_label %}Posts{% endblock %}
+        {% block content %}body{% endblock %}
+        """,
+    )
+    html = env.get_template("stub.html").render(
+        request=_request_stub(),
+        is_authenticated=False,
+        is_development=False,
+    )
+    match = re.search(
+        r"button\.danger,[^{]*\{[^}]*--pico-color-red-[^}]*\}",
+        html,
+        re.DOTALL,
+    )
+    assert (
+        match is not None
+    ), "base.html must define `button.danger` with a Pico red token"
+
+
 class _RequestStub:
     """Minimal stand-in for the FastAPI ``Request`` that `base.html`
     references via `request.url.path` in the primary-nav section."""
