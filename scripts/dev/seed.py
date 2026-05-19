@@ -99,14 +99,16 @@ FIXTURE_OPENING: list[FixtureOpening] = [
         "provider": {
             "practice_name": "Katie Reeves, PhD",
             "org_type": "solo_practice",
-            # Telehealth-only practice — no city/ZIP in the source
-            # example. The Provider model still requires these fields,
-            # so we record placeholders documenting the telehealth
-            # posture; the announcement narrative covers the real
-            # delivery context.
-            "location_city": "(telehealth)",
+            # Telehealth-only practice — sessions happen over video, but
+            # the practice is legally registered at a real Bay Area
+            # business address. The (in_person=no, virtual=yes) flags
+            # carry the "telehealth-only" signal at the wire layer; the
+            # address columns stay populated with a plausible value so
+            # the providers list doesn't render a "(telehealth), CA
+            # 00000" sentinel that reads like a placeholder bug.
+            "location_city": "Mountain View",
             "location_state": "CA",
-            "location_zip": "00000",
+            "location_zip": "94040",
             "in_person_sessions": "no",
             "virtual_sessions": "yes",
             "accepts_out_of_network": False,
@@ -450,6 +452,7 @@ FIXTURE_OPENING: list[FixtureOpening] = [
         "provider": {
             "practice_name": "Cascade PHP",
             "org_type": "clinic",
+            "parent_org_name": "Cascade Health Network",
             "location_city": "Tacoma",
             "location_state": "WA",
             "location_zip": "98402",
@@ -878,6 +881,11 @@ FIXTURE_STANDALONE_ORGS: list[FixtureStandaloneOrg] = [
     {
         "owner_email": "alice@example.com",
         "name": "Children's Health Council",
+        "type": "health_system",
+    },
+    {
+        "owner_email": "dr_chen@example.com",
+        "name": "Cascade Health Network",
         "type": "health_system",
     },
 ]
