@@ -144,6 +144,12 @@
          so the whole cluster lands at the right edge whether one
          or both pieces are present. */
       .toolbar { display: flex; align-items: center; flex-wrap: wrap; gap: 0.75rem; }
+      /* Toolbar carries the page `<h1>` on the left. Reset Pico's
+         block-level heading margins so the heading sits cleanly in
+         the flex row (Pico defaults add ~1rem above/below); the
+         size stays at Pico's default `h1` so the heading reads as
+         the page title. */
+      .toolbar h1 { margin: 0; }
       /* Pico's default `<button>` is `display: block; width: 100%`
          (form-shaped); the toolbar overrides to natural-width inline
          buttons. Reaches every nested `<button>` / `[role="button"]`
@@ -188,33 +194,16 @@
         padding-inline: 0.5rem;
         font-size: 0.875rem;
       }
-      /* Breadcrumb zone bar. Pico already styles the markup
-         (`nav[aria-label="breadcrumb"] ul` becomes an inline list
-         with a separator via `li + li::before`); the only thing this
-         project adds is the strip's frame — subtle background +
-         bottom border to set it apart from page content — and the
-         divider character via the Pico-exposed
-         `--pico-nav-breadcrumb-divider`. Hidden on narrow viewports;
-         the location context isn't worth the row on mobile. */
+      /* Breadcrumb. Inline text only — no band chrome (background,
+         border, padding). Pico already styles `nav[aria-label="breadcrumb"]
+         ul` as an inline list with a separator via `li + li::before`;
+         we just set the divider character via the Pico-exposed
+         `--pico-nav-breadcrumb-divider`. The breadcrumb sits as a thin
+         line above the toolbar row that carries the `<h1>`, so the
+         chrome between the global nav and the content is one band
+         instead of two. */
       nav[aria-label="breadcrumb"] {
         --pico-nav-breadcrumb-divider: '›';
-        background: var(--pico-card-background-color);
-        border-bottom: var(--pico-border-width) solid var(--pico-muted-border-color);
-        padding: calc(var(--pico-spacing) * 0.5) var(--pico-spacing);
-        margin: 0 0 var(--pico-spacing) 0;
-      }
-      /* On mobile, only the *current page* segment is worth the row —
-         list pages render a single-segment breadcrumb that doubles as
-         the page heading ("Organizations", "Posts", "Providers",
-         "Users") and must stay visible (#588). Detail/form pages whose
-         breadcrumb carries multiple segments hide it on mobile: the
-         intermediate links are location context, not the page heading,
-         and the toolbar already gives the page its actions.
-         `:has(li + li)` matches a nav containing two or more `<li>`s —
-         i.e. any multi-segment breadcrumb. Single-segment breadcrumbs
-         (one `<li>`) don't match and stay visible. */
-      @media (max-width: 768px) {
-        nav[aria-label="breadcrumb"]:has(li + li) { display: none; }
       }
       /* Entity create/edit forms — cap form width on large screens so
          short fields don't stretch across the whole container, and

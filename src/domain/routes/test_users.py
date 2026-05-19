@@ -292,14 +292,16 @@ async def test_get_user_detail_renders(
     assert target_username in tree.body.text()
 
 
-async def test_get_user_detail_renders_breadcrumb(
+async def test_get_user_detail_renders_breadcrumb_and_heading(
     authenticated_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user: User,
 ):
-    """User detail follows the standard `list → detail` breadcrumb
-    shape: `Users › <username>`. The first item links to the user
-    list; the trailing username is the current page (`aria-current`)."""
+    """User detail uses the consolidated chrome: a one-segment
+    breadcrumb that links back to `/users` and a toolbar `<h1>` that
+    carries the current user's name. The current item is NOT
+    repeated as a non-link crumb — every visible breadcrumb item is
+    an actionable link (GOV.UK pattern)."""
     target_username = f"target-{uuid.uuid4()}"
     target = create_test_user(username=target_username)
     async with db_test_session_manager() as session:
@@ -310,12 +312,14 @@ async def test_get_user_detail_renders_breadcrumb(
     assert response.status_code == 200
     tree = HTMLParser(response.text)
     items = tree.css('nav[aria-label="breadcrumb"] ul > li')
-    assert [li.text(strip=True) for li in items] == ["Users", target_username]
+    assert [li.text(strip=True) for li in items] == ["Users"]
     parent = items[0].css_first("a")
     assert parent is not None
     assert parent.attributes.get("href") == "/users"
-    assert items[-1].attributes.get("aria-current") == "page"
-    assert items[-1].css_first("a") is None
+    # Current item lives in the toolbar <h1>, not the breadcrumb.
+    h1 = tree.css_first("div.toolbar h1")
+    assert h1 is not None
+    assert h1.text(strip=True) == target_username
 
 
 async def test_detail_hides_private_fields_from_strangers(

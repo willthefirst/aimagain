@@ -1,31 +1,53 @@
 {# Generic create-form view chrome.
 
-A create-form view (`/posts/form`, `/providers/form`) renders a two-segment
-breadcrumb (collection → "New") and no toolbar — the submit button at
-the bottom of the form is the primary action. The child fills the form.
+A create-form view (`/openings/form`, `/providers/form`) renders a
+single-segment breadcrumb (link back to the collection) above a
+toolbar row that carries the page `<h1>`. The form's own submit
+button at the bottom is the primary action, so the toolbar row
+itself usually has no right-side actions.
+
+Layout per page:
+
+    <breadcrumb: link to collection>
+    <h1: "New" — or override with child's `current_label`>
+    <hr>
+    <form>
 
 Child contract:
 
   Required blocks:
-    resource_label — short string label for the collection segment of
-                     the breadcrumb (e.g. "Providers").
+    resource_label — short string label for the collection segment
+                     of the breadcrumb (e.g. "Providers").
     content        — the `<form>` body.
 
   Required context:
-    resource_url   — URL the collection segment links to (e.g. "/providers").
+    resource_url   — URL the collection segment links to (e.g.
+                     "/providers").
 
   Optional blocks:
-    breadcrumb     — full breadcrumb override for nested-create pages.
+    current_label  — override the toolbar `<h1>` text (default
+                     "New"). Children typically set this to
+                     something more specific like "New provider"
+                     or "New opening" when the singular reads
+                     better than the bare verb.
+    breadcrumb     — full breadcrumb override for nested-create
+                     pages.
 
-Edit-form chrome is in `form_edit.html` (three segments, with a link
-back to the resource's detail page on the middle one).
+Edit-form chrome is in `form_edit.html` (adds the detail-page link
+as a second crumb between collection and the H1).
 #}
 {% extends "base.html" %}
 {%- from "_shared/_breadcrumb.html" import breadcrumb -%}
+{%- from "_shared/_toolbar.html" import page_toolbar -%}
 
 {% block breadcrumb %}
 {%- set collection_label %}{% block resource_label %}{% endblock %}{% endset -%}
-{{ breadcrumb([(collection_label, resource_url), ("New", none)]) }}
+{{ breadcrumb([(collection_label | trim, resource_url)]) }}
+{% endblock %}
+
+{% block toolbar %}
+{%- set current %}{% block current_label %}New{% endblock %}{% endset -%}
+{% call page_toolbar(heading=current | trim) %}{% endcall %}
 {% endblock %}
 
 {# `entity-form-page` carries the shared visual contract for entity

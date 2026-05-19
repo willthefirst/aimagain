@@ -1,9 +1,13 @@
 {# Top-of-page zone bar primitive.
 
-Every page that needs page-scoped controls renders one toolbar
-strip above its content, followed by an `<hr />` separator. All
-content right-aligns. The bar carries up to two items:
+Every page renders one toolbar strip above its content, followed
+by an `<hr />` separator. The row carries up to three things,
+left-to-right:
 
+  Heading (`<h1>`) — the page title. Required arg. Lives in the
+    same row as the actions so the chrome compacts to a single
+    band (the breadcrumb above is plain inline text carrying
+    ancestry only; the H1 is here).
   Filter link (`a.toolbar-filter-link`) — opens the dedicated
     `/<collection>/search` page. Always reads `Filters` when none
     are active; switches to a short inline summary
@@ -22,26 +26,26 @@ content right-aligns. The bar carries up to two items:
 Cap on how many filter chips appear inline before collapsing to
 `+N more filters`. Keeps the link readable on narrow viewports.
 
-    Detail page (actions only):
+    Detail page (heading + actions):
 
-        {% call page_toolbar() %}
+        {% call page_toolbar(heading="Will's Org") %}
           <li><a href=".../form" role="button">Edit</a></li>
           <li>{{ confirm_delete_button(...) }}</li>
         {% endcall %}
 
-    List page (filter link + actions):
+    List page (heading + filter link + actions):
 
         {% call page_toolbar(
+          heading="Openings",
           active_filters=active_filters,
           search_url=search_url,
         ) %}
           <li><a href="{{ entity_form_url('post') }}" role="button">Create</a></li>
         {% endcall %}
 
-Pages with no toolbar content leave `{% block toolbar %}` empty
-(or omit it). The shell is suppressed when neither a filter link
-nor a caller body is present, so empty pages don't emit a stray
-`<hr />`.
+    Form page (heading only):
+
+        {% call page_toolbar(heading="Edit Will's Org") %}{% endcall %}
 #}
 
 {% set _ACTIVE_FILTER_INLINE_LIMIT = 2 %}
@@ -50,6 +54,11 @@ nor a caller body is present, so empty pages don't emit a stray
 {# Render the toolbar.
 
 Args:
+  heading: page title — rendered as an `<h1>` on the left of the
+    toolbar row. Required: every page-scoped toolbar owns the
+    page heading (the breadcrumb above carries ancestry only;
+    the heading lives in the same row as the page actions so the
+    chrome compacts into a single band).
   active_filters: list of `{name, value, label}` descriptors (one
     per active value; multi-valued filters fan out). Empty when
     no filter is applied.
@@ -59,6 +68,7 @@ Args:
     `routes.search`).
 #}
 {% macro page_toolbar(
+  heading,
   active_filters=(),
   search_url=none
 ) -%}
@@ -70,6 +80,8 @@ Args:
 {%- set actions_html = caller() if caller else "" -%}
 {%- set has_actions = actions_html | trim -%}
 <div class="toolbar">
+
+  <h1>{{ heading }}</h1>
 
   {%- if search_url %}
   <a href="{{ search_url }}" class="toolbar-filter-link">
