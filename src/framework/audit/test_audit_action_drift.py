@@ -46,8 +46,17 @@ def _expected_members() -> set[str]:
     expected: set[str] = set(_BESPOKE)
     for spec in ALL_ENTITY_SPECS:
         if spec.audit is not None:
-            stem = (spec.audit_action_stem or spec.name).upper()
-            expected.update({f"CREATE_{stem}", f"UPDATE_{stem}", f"DELETE_{stem}"})
+            # The stem for the *enum member name* comes off the
+            # AuditedResource's own create/update/delete action names,
+            # not from `spec.name` directly — kind-locked faces of a
+            # polymorphic supertype (`discriminator_value` set) share
+            # one AuditedResource whose stem is the supertype name
+            # ("post"), not the face name ("referral" etc.). Reading
+            # through `spec.audit` keeps the test correct for both
+            # shapes without a special case.
+            expected.add(spec.audit.create.name)
+            expected.add(spec.audit.update.name)
+            expected.add(spec.audit.delete.name)
         if spec.edge_audit is not None:
             for action in spec.edge_audit.actions.values():
                 expected.add(action.name)
