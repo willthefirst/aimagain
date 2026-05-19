@@ -11,10 +11,19 @@ from src.domain.logic.providers.view import (
 
 def _stub_provider(**overrides):
     """Realistic Provider stub. Defaults populate every field with a
-    sensible value so tests can override only what they care about."""
+    sensible value so tests can override only what they care about.
+
+    `npi` lives on the linked ``Clinician`` after #629 PR 1 — the view
+    reads ``provider.clinician.npi``. Tests still pass `npi=...` for
+    ergonomics; the stub builder rolls the kwarg into a nested
+    ``clinician`` SimpleNamespace so the view sees the same shape it
+    sees in production.
+    """
+    npi = overrides.pop("npi", None)
     defaults = dict(
         org_id="org-1",
         org=SimpleNamespace(name="Acme Counseling"),
+        clinician=SimpleNamespace(npi=npi),
         location_city="Brooklyn",
         location_state="NY",
         location_zip="11201",
@@ -24,7 +33,6 @@ def _stub_provider(**overrides):
         accepts_out_of_network=False,
         sliding_scale=False,
         cost=None,
-        npi=None,
         licensures=[],
         educations=[],
         certifications=[],

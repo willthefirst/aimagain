@@ -193,9 +193,11 @@ async def test_provider_npi_check_constraint_rejects_malformed(
     db_test_session_manager: async_sessionmaker[AsyncSession],
     bad_npi: str,
 ):
-    """`ck_providers_npi_format` rejects anything that isn't NULL or
+    """`ck_clinicians_npi_format` rejects anything that isn't NULL or
     exactly 10 ASCII digits — defense-in-depth against a wire payload
-    that skipped the Pydantic validator."""
+    that skipped the Pydantic validator. After #629 PR 1 the column
+    lives on `clinicians.npi`; `Provider(npi=...)` auto-creates the
+    linked `Clinician` and the CHECK fires on flush there."""
     user = create_test_user()
     async with db_test_session_manager() as session:
         async with session.begin():

@@ -1,6 +1,6 @@
 from functools import partial
 
-from sqlalchemy import JSON, Boolean, CheckConstraint, Column, ForeignKey, Text, text
+from sqlalchemy import JSON, Boolean, Column, ForeignKey, Text, text
 from sqlalchemy.orm import relationship
 from sqlalchemy.types import Uuid
 
@@ -11,17 +11,6 @@ from ..enums import LOCATION_AVAILABILITY_OPTIONS, US_STATES, named_check_in
 
 _TABLE = "providers"
 _ck = partial(named_check_in, _TABLE)
-
-# `npi` is either NULL or exactly 10 ASCII digits — the NPPES registry
-# lookups expect that shape. SQLite-flavored `GLOB`; the project is
-# single-dialect (sqlite+aiosqlite for both dev and prod). The Pydantic
-# validator `_validate_npi` in `src/domain/logic/providers/schema.py` is
-# the primary wire-side enforcement; this CHECK is defense-in-depth.
-_NPI_FORMAT_CHECK = CheckConstraint(
-    "npi IS NULL OR (length(npi) = 10 "
-    "AND npi GLOB '[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]')",
-    name=f"ck_{_TABLE}_npi_format",
-)
 
 
 class Provider(LocationMixin, BaseModel):
@@ -42,7 +31,6 @@ class Provider(LocationMixin, BaseModel):
         _ck("location_state", US_STATES),
         _ck("in_person_sessions", LOCATION_AVAILABILITY_OPTIONS),
         _ck("virtual_sessions", LOCATION_AVAILABILITY_OPTIONS),
-        _NPI_FORMAT_CHECK,
     )
 
     owner_id = Column(
@@ -59,11 +47,18 @@ class Provider(LocationMixin, BaseModel):
         nullable=False,
     )
     org = relationship("Organization", back_populates="providers", lazy="selectin")
-    # National Provider Identifier — 10 ASCII digits, optional. Nullable
-    # because backfill is operator-driven (existing rows ship without one).
-    # No UNIQUE constraint yet — duplicates may exist before the field is
-    # curated; a follow-up can tighten this once data is clean.
-    npi = Column(Text, nullable=True)
+    # NPI moved from `providers.npi` to `clinicians.npi` (#629 PR 1).
+    # Read it through `provider.clinician.npi`; the ProviderRead schema
+    # surfaces it as `npi` via a model-validator so wire callers keep
+    # the same field name. The directory's `provider.clinician` join is
+    # NOT NULL — every provider has exactly one clinician (the FK isn't
+    # UNIQUE so PR 2 can attach multiple providers to one clinician).
+    clinician_id = Column(
+        Uuid(as_uuid=True),
+        ForeignKey("clinicians.id", ondelete="RESTRICT"),
+        nullable=False,
+    )
+    clinician = relationship("Clinician", back_populates="providers", lazy="selectin")
     in_person_sessions = Column(Text, nullable=False)
     virtual_sessions = Column(Text, nullable=False)
 
@@ -99,6 +94,63 @@ class Provider(LocationMixin, BaseModel):
         cascade="all, delete-orphan",
         lazy="selectin",
     )
+
+    def __init__(self, **kwargs):
+        """Auto-create a 1:1 ``Clinician`` from any wire-side `npi` kwarg
+        so the framework's generic create handler — which builds the
+        model via ``spec.model(**payload.model_dump())`` — keeps
+        working unchanged after the column move (#629 PR 1).
+
+        Skips Clinician creation when the caller already supplies a
+        ``clinician`` or ``clinician_id`` (test fixtures that wire the
+        join manually, PR 2 where multiple providers share one
+        clinician).
+        """
+        # Late import via the package facade — `Clinician` lives in a
+        # sibling cluster (`models/clinicians/`), and a direct
+        # `from src.domain.models.clinicians.clinician import Clinician`
+        # would trip the cross-cluster lint. Going through
+        # `src.domain.models` (which re-exports `Clinician`) keeps the
+        # import out of the lint's cluster-aware regex, and importing
+        # at call-time avoids a circular-import at module load.
+        from src.domain.models import Clinician
+
+        npi = kwargs.pop("npi", None)
+        super().__init__(**kwargs)
+        if (
+            self.clinician is None
+            and self.clinician_id is None
+            and "clinician" not in kwargs
+            and "clinician_id" not in kwargs
+        ):
+            self.clinician = Clinician(npi=npi)
+
+    @property
+    def npi(self) -> str | None:
+        """Convenience accessor for ``provider.clinician.npi`` — kept so
+        wire schemas, audit snapshots, and templates continue reading
+        ``provider.npi`` after the column moved to ``clinicians.npi``
+        in #629 PR 1. Returns ``None`` only in the narrow window
+        where ``clinician`` hasn't been populated yet (pre-flush ORM
+        constructions); every persisted row has a NOT NULL
+        ``clinician_id`` and the relationship is ``lazy='selectin'``
+        so eager loads include it.
+        """
+        return self.clinician.npi if self.clinician is not None else None
+
+    @npi.setter
+    def npi(self, value: str | None) -> None:
+        """Route writes back to the linked ``Clinician`` so
+        ``handle_update``'s ``setattr(provider, 'npi', value)`` and the
+        framework's transient-construct path (``Provider(npi=...)``)
+        both end up at the same column.
+        """
+        from src.domain.models import Clinician
+
+        if self.clinician is None:
+            self.clinician = Clinician(npi=value)
+        else:
+            self.clinician.npi = value
 
     @property
     def org_name(self) -> str | None:

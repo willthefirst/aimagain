@@ -5,6 +5,7 @@
 from src.framework.audit.log import AuditLog  # noqa: F401
 from src.framework.persistence.base_model import Base, BaseModel, metadata
 
+from .clinicians.clinician import Clinician
 from .enums import (
     CLIENT_AGE_GROUPS,
     INSURANCE_CARRIERS,
@@ -37,6 +38,7 @@ __all__ = [
     "Base",
     "BaseModel",
     "CLIENT_AGE_GROUPS",
+    "Clinician",
     "ReferralDetail",
     "INSURANCE_CARRIERS",
     "LOCATION_AVAILABILITY_OPTIONS",

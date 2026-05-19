@@ -99,6 +99,9 @@ def provider_card_view(provider) -> dict[str, Any]:
     from src.domain.models.enums import LOCATION_AVAILABILITY_LABELS
 
     org = getattr(provider, "org", None)
+    # `npi` moved to `clinicians.npi` in #629 PR 1 — read through the
+    # `provider.clinician` relationship (NOT NULL since the same PR).
+    clinician = getattr(provider, "clinician", None)
     return {
         "practice_name": (getattr(org, "name", None) if org else None),
         "practice_url": (
@@ -122,7 +125,7 @@ def provider_card_view(provider) -> dict[str, Any]:
             "Yes" if getattr(provider, "sliding_scale", False) else "No"
         ),
         "cost": getattr(provider, "cost", None),
-        "npi": getattr(provider, "npi", None),
+        "npi": getattr(clinician, "npi", None) if clinician is not None else None,
         "licensures": list(getattr(provider, "licensures", None) or []),
         "educations": list(getattr(provider, "educations", None) or []),
         "certifications": list(getattr(provider, "certifications", None) or []),
