@@ -348,6 +348,29 @@ class EntitySpec:
     # direct registry imports — the spec only declares the binding.
     discriminator: DiscriminatorRegistry | None = None
 
+    # Kind-locked face of a polymorphic supertype. When set, this spec
+    # is one of *N* URL families over a shared polymorphic model — the
+    # framework treats `discriminator_value` as a route-time constant:
+    #
+    #   - list:     forces `kind = <value>` on the query (no user-
+    #               settable `kind` filter on this family's list page)
+    #   - detail/update/delete/form_edit: 404 unless
+    #     `target.kind == discriminator_value`
+    #   - create:   stamps `kind = <value>` onto the request body
+    #               *before* adapter validation so the discriminated-
+    #               union picks the correct variant
+    #   - form_new: no `?kind=` query-param picker is synthesized — the
+    #               form goes straight to the create page for this kind
+    #
+    # Mutually exclusive with `discriminator`: a spec is either the
+    # supertype (carrying the registry) or a kind-locked face (carrying
+    # one value); never both. Validated in `__post_init__`.
+    #
+    # The column name read off the model is `Post.kind` today — pinned
+    # by convention rather than spec-declared, since the only consumer
+    # is the polymorphic post supertype.
+    discriminator_value: str | None = None
+
     # Templates ----------------------------------------------------------
     templates: Templates = field(default_factory=Templates)
 
@@ -516,6 +539,29 @@ class EntitySpec:
             raise ValueError(
                 f"EntitySpec({self.name!r}) declares duplicate state-axis "
                 f"names: {axis_names}"
+            )
+        # `discriminator` (registry on the supertype) and
+        # `discriminator_value` (single value on a kind-locked face) are
+        # mutually exclusive — a spec is either the supertype carrying
+        # the registry or one of its faces carrying one value, never
+        # both. Declaring both is a model error caught here.
+        if self.discriminator is not None and self.discriminator_value is not None:
+            raise ValueError(
+                f"EntitySpec({self.name!r}) declares both discriminator and "
+                f"discriminator_value — a spec is either the polymorphic "
+                "supertype (registry) or a kind-locked face (single value), "
+                "never both."
+            )
+        # `discriminator_value` set on an entity whose model lacks a
+        # `kind` column is dead: the framework reads `target.kind` to
+        # enforce the lock on detail/update/delete. Surface the misconfig
+        # at import time.
+        if self.discriminator_value is not None and not hasattr(self.model, "kind"):
+            raise ValueError(
+                f"EntitySpec({self.name!r}) sets discriminator_value="
+                f"{self.discriminator_value!r} but model "
+                f"{self.model.__name__} has no `kind` attribute — the "
+                "framework reads `target.kind` to enforce the lock."
             )
         # Build the audit snapshotter for each axis that declares an
         # `audit_snapshot` schema. Mirrors the CRUD-side
