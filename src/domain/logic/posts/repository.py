@@ -132,6 +132,22 @@ class PostRepository(BaseRepository):
         stmt = stmt.order_by(Post.created_at.desc())
         return await self._list(stmt, offset=offset, limit=limit)
 
+    # The three URL families (`/referrals`, `/openings`, `/intakes`)
+    # all route their list through `list_posts` — the `kind` kwarg is
+    # forced by the framework's `discriminator_value` lock before the
+    # call lands here. `handle_list` looks up
+    # `repo.list_<spec.url_collection>`, so each face needs its own
+    # method name that delegates. Three thin shims keep the convention
+    # (one bespoke-named method per spec) without duplicating the SQL.
+    async def list_referrals(self, **kwargs) -> Sequence[Post]:
+        return await self.list_posts(**kwargs)
+
+    async def list_openings(self, **kwargs) -> Sequence[Post]:
+        return await self.list_posts(**kwargs)
+
+    async def list_intakes(self, **kwargs) -> Sequence[Post]:
+        return await self.list_posts(**kwargs)
+
 
 def _json_array_contains_any(values: list[str], column_name: str):
     """Return a WHERE predicate matching rows where ``column_name``'s

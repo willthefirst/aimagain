@@ -25,10 +25,11 @@ async def test_base_template_renders_primary_nav_when_authenticated(
     logged_in_user: User,
 ):
     """Authenticated pages render the primary nav with section
-    shortcuts (Referrals / Openings / Directory) on the left and a
-    single `/users/me` profile shortcut on the right. Other section
-    links (Users / Favorites) and the create-post CTA are reachable
-    from within their pages rather than from the top-level chrome."""
+    shortcuts (Referrals / Openings / Intakes / Directory) on the left
+    and a single `/users/me` profile shortcut on the right. Other
+    section links (Users / Favorites) and the create-post CTA are
+    reachable from within their pages rather than from the top-level
+    chrome."""
     response = await authenticated_client.get("/users")
 
     assert response.status_code == 200
@@ -39,11 +40,12 @@ async def test_base_template_renders_primary_nav_when_authenticated(
     section_items = tree.css('nav[aria-label="Primary"] > ul:first-of-type > li > a')
     section_hrefs = [a.attributes.get("href") for a in section_items]
     # Brand link is `<li><strong><a>` so the `> li > a` direct-child
-    # selector picks up only the section shortcuts (Referrals /
-    # Openings / Directory) in render order.
+    # selector picks up only the section shortcuts in render order.
+    # Each post-kind family is its own top-level URL (#628).
     assert section_hrefs == [
-        "/posts?kind=referral",
-        "/posts?kind=opening",
+        "/referrals",
+        "/openings",
+        "/intakes",
         "/providers",
     ]
 
@@ -52,22 +54,22 @@ async def test_primary_nav_highlights_active_section(
     authenticated_client: AsyncClient,
     logged_in_user: User,
 ):
-    """The Posts list is one route partitioned by `?kind=`, so the
-    Referrals and Openings shortcuts only light up when both the path
-    and the `kind` query param match. Directory matches any path under
-    `/providers`."""
-    referrals = await authenticated_client.get("/posts?kind=referral")
+    """Each post kind has its own URL family; the matching tab lights
+    on the family's list page (and any subpath) — same path-prefix
+    rule Directory uses. The old `?kind=` query-param disambiguation
+    is gone along with the shared `/posts` route (#628)."""
+    referrals = await authenticated_client.get("/referrals")
     tree = HTMLParser(referrals.text)
     assert (
-        tree.css_first(
-            'nav[aria-label="Primary"] a[href="/posts?kind=referral"]'
-        ).attributes.get("aria-current")
+        tree.css_first('nav[aria-label="Primary"] a[href="/referrals"]').attributes.get(
+            "aria-current"
+        )
         == "page"
     )
     assert (
-        tree.css_first(
-            'nav[aria-label="Primary"] a[href="/posts?kind=opening"]'
-        ).attributes.get("aria-current")
+        tree.css_first('nav[aria-label="Primary"] a[href="/openings"]').attributes.get(
+            "aria-current"
+        )
         is None
     )
 

@@ -720,33 +720,47 @@ def test_primary_nav_directory_active_on_provider_detail() -> None:
     assert _active_tab_labels(_render_chrome("/providers/42/form")) == ["Directory"]
 
 
-def test_primary_nav_referrals_active_on_posts_kind_referral() -> None:
-    """`/posts?kind=referral` is the canonical Referrals URL."""
-    assert _active_tab_labels(_render_chrome("/posts", query={"kind": "referral"})) == [
-        "Referrals"
-    ]
+def test_primary_nav_referrals_active_on_referrals_list() -> None:
+    """`/referrals` is the canonical Referrals URL — its tab is active."""
+    assert _active_tab_labels(_render_chrome("/referrals")) == ["Referrals"]
 
 
-def test_primary_nav_openings_active_on_posts_kind_opening() -> None:
-    """`/posts?kind=opening` is the canonical Openings URL."""
-    assert _active_tab_labels(_render_chrome("/posts", query={"kind": "opening"})) == [
-        "Openings"
-    ]
+def test_primary_nav_referrals_active_on_referrals_subpath() -> None:
+    """Subpaths under `/referrals` (detail, edit, form) keep the
+    Referrals tab lit — same path-prefix rule Directory uses."""
+    assert _active_tab_labels(_render_chrome("/referrals/42")) == ["Referrals"]
+    assert _active_tab_labels(_render_chrome("/referrals/42/form")) == ["Referrals"]
+    assert _active_tab_labels(_render_chrome("/referrals/form")) == ["Referrals"]
 
 
-def test_primary_nav_no_section_tab_on_bare_posts_list() -> None:
-    """Bare `/posts` (no `?kind=`) is ambiguous between Referrals and
-    Openings — neither tab claims it. The toolbar/list-page content
-    carries the context instead."""
-    assert _active_tab_labels(_render_chrome("/posts")) == []
+def test_primary_nav_openings_active_on_openings_list() -> None:
+    """`/openings` is the canonical Openings URL."""
+    assert _active_tab_labels(_render_chrome("/openings")) == ["Openings"]
 
 
-def test_primary_nav_no_section_tab_on_post_detail() -> None:
-    """Post detail URLs (`/posts/<id>`) drop the `?kind=` query param,
-    so the section tabs intentionally don't light up — the post's own
-    breadcrumb carries the context instead. Keeps the rule simple:
-    only the canonical filtered list lights a section tab."""
-    assert _active_tab_labels(_render_chrome("/posts/42")) == []
+def test_primary_nav_openings_active_on_openings_subpath() -> None:
+    assert _active_tab_labels(_render_chrome("/openings/42")) == ["Openings"]
+    assert _active_tab_labels(_render_chrome("/openings/42/form")) == ["Openings"]
+
+
+def test_primary_nav_intakes_active_on_intakes_list() -> None:
+    """`/intakes` is the canonical Intakes URL."""
+    assert _active_tab_labels(_render_chrome("/intakes")) == ["Intakes"]
+
+
+def test_primary_nav_intakes_active_on_intakes_subpath() -> None:
+    assert _active_tab_labels(_render_chrome("/intakes/42")) == ["Intakes"]
+
+
+def test_primary_nav_no_post_tab_when_outside_post_families() -> None:
+    """The three post URL families are mutually exclusive — when none
+    of them owns the request path, none of `Referrals`/`Openings`/
+    `Intakes` is active. (`/providers` lights Directory, which is
+    asserted separately above.)"""
+    labels = _active_tab_labels(_render_chrome("/providers"))
+    assert "Referrals" not in labels
+    assert "Openings" not in labels
+    assert "Intakes" not in labels
 
 
 def test_primary_nav_renders_login_link_off_auth_flow() -> None:
