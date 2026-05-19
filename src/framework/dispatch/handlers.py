@@ -616,8 +616,17 @@ async def handle_get_edit_form(
     if spec.static_context:
         context.update(spec.static_context)
     if spec.discriminator is not None:
-        kind = getattr(target, spec.discriminator.column)
-        context["template_name"] = spec.discriminator[kind].edit_template
+        if spec.discriminator_value is not None:
+            # Kind-locked face: template defaults via
+            # `spec.templates.form_edit` (e.g. `referrals/form_edit.html`).
+            # Leave `template_name` unset so the mount layer falls back.
+            # `_assert_kind_lock` above already guarantees
+            # `target.kind == spec.discriminator_value` so the schema
+            # class can be picked unambiguously.
+            context["schema"] = spec.update_adapter_class
+        else:
+            kind = getattr(target, spec.discriminator.column)
+            context["template_name"] = spec.discriminator[kind].edit_template
 
     if extras is not None:
         extras_kwargs = {
@@ -674,14 +683,14 @@ async def handle_get_new_form(
     if spec.static_context:
         context.update(spec.static_context)
     if spec.discriminator is not None:
-        # Kind-locked face: the URL family is bound to one kind, so the
-        # picker step is skipped and we go straight to the kind-specific
-        # create template. `kind` query-param is absent on this spec
-        # (mount_entity doesn't synthesize it for kind-locked faces).
         if spec.discriminator_value is not None:
-            context["template_name"] = spec.discriminator[
-                spec.discriminator_value
-            ].create_template
+            # Kind-locked face: the URL family is bound to one kind, so
+            # the picker step is skipped and the template defaults via
+            # `spec.templates.form_new` (e.g. `referrals/form_new.html`).
+            # Leave `template_name` unset so the mount layer falls back
+            # to the spec's default. The form_new template still needs
+            # the schema class for `field_for(schema, ...)`.
+            context["schema"] = spec.create_adapter_class
         elif kind is not None:
             context["template_name"] = spec.discriminator[kind].create_template
         # When `kind is None` on a non-locked supertype, leave
