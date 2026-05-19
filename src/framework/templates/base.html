@@ -607,9 +607,9 @@
        flow. The right-side slot (`#primary-nav`) adapts: authed users
        see the profile icon (with `aria-current="page"` while on
        `/users/me`); anonymous visitors see a Login link. The brand
-       link goes to `/`, which redirects authed users to `/posts` and
-       unauthed users to the login page — safe on either side of the
-       auth gate.
+       link goes to `/`, which redirects authed users to `/openings`
+       (the highest-trafficked URL family) and unauthed users to the
+       login page — safe on either side of the auth gate.
 
        Self-reference suppression: when an anonymous visitor is already
        on an auth-flow page (`/auth/login`, `/auth/register`,
@@ -621,16 +621,20 @@
     {%- set _profile_path = entity_url('user', id='me') -%}
     {%- set _on_profile = is_authenticated and (request.url.path == _profile_path or request.url.path.startswith(_profile_path + '/')) -%}
     {%- set _on_auth_flow = request.url.path == '/auth/login' or request.url.path == '/auth/register' or request.url.path == '/auth/forgot-password' or request.url.path.startswith('/auth/reset-password') -%}
-    {# Section shortcuts. Posts is one route partitioned by `?kind=`, so
-       Referrals/Openings disambiguate via the query param; Directory is
-       its own route under `/providers`. Active-state matching keeps
-       sub-paths highlighted (e.g. `/providers/42/edit` keeps Directory
-       lit) while only the bare `/posts` list with the matching `?kind=`
-       lights Referrals/Openings — detail pages drop the query param. #}
-    {%- set _post_kind = request.query_params.get('kind') if is_authenticated else none -%}
-    {%- set _on_posts_list = is_authenticated and request.url.path == entity_url('post') -%}
-    {%- set _on_referrals = _on_posts_list and _post_kind == 'referral' -%}
-    {%- set _on_openings = _on_posts_list and _post_kind == 'opening' -%}
+    {# Section shortcuts. Each kind has its own URL family — `/referrals`,
+       `/openings`, `/intakes` — so the active-state rule is the same
+       path-prefix shape used everywhere else in the nav (#628):
+       the tab lights on the family's list page and any subpath
+       (`/referrals/42`, `/referrals/42/form`). The old `?kind=` query
+       param disappeared along with `/posts` — there's no longer a
+       shared list page that needs disambiguation. Directory is its
+       own route under `/providers`. #}
+    {%- set _referrals_path = entity_url('referral') -%}
+    {%- set _on_referrals = is_authenticated and (request.url.path == _referrals_path or request.url.path.startswith(_referrals_path + '/')) -%}
+    {%- set _openings_path = entity_url('opening') -%}
+    {%- set _on_openings = is_authenticated and (request.url.path == _openings_path or request.url.path.startswith(_openings_path + '/')) -%}
+    {%- set _intakes_path = entity_url('intake') -%}
+    {%- set _on_intakes = is_authenticated and (request.url.path == _intakes_path or request.url.path.startswith(_intakes_path + '/')) -%}
     {%- set _directory_path = entity_url('provider') -%}
     {%- set _on_directory = is_authenticated and (request.url.path == _directory_path or request.url.path.startswith(_directory_path + '/')) -%}
     {# Admin section shortcuts — `/organizations`, `/programs`, `/users`
@@ -655,8 +659,9 @@
           {# title-case-ignore: "Bedlam Connect" is a brand name #}
           <li><strong><a href="/">Bedlam Connect</a></strong></li>
           {% if is_authenticated %}
-          <li><a href="{{ entity_url('post') }}?kind=referral"{% if _on_referrals %} aria-current="page"{% endif %}>Referrals</a></li>
-          <li><a href="{{ entity_url('post') }}?kind=opening"{% if _on_openings %} aria-current="page"{% endif %}>Openings</a></li>
+          <li><a href="{{ entity_url('referral') }}"{% if _on_referrals %} aria-current="page"{% endif %}>Referrals</a></li>
+          <li><a href="{{ entity_url('opening') }}"{% if _on_openings %} aria-current="page"{% endif %}>Openings</a></li>
+          <li><a href="{{ entity_url('intake') }}"{% if _on_intakes %} aria-current="page"{% endif %}>Intakes</a></li>
           <li><a href="{{ entity_url('provider') }}"{% if _on_directory %} aria-current="page"{% endif %}>Directory</a></li>
           {% if is_admin %}
           <li><a href="{{ entity_url('organization') }}"{% if _on_orgs %} aria-current="page"{% endif %}>Organizations</a></li>
