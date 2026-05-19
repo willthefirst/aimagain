@@ -96,6 +96,7 @@ async def _seed_provider(
             session.add(provider)
         await session.refresh(provider)
         provider_id = provider.id
+        clinician_id = provider.clinician_id
 
     licensure_id: uuid.UUID | None = None
     education_id: uuid.UUID | None = None
@@ -103,13 +104,13 @@ async def _seed_provider(
     async with db_test_session_manager() as session:
         async with session.begin():
             if with_licensure:
-                lic = make_provider_licensure(provider_id=provider_id)
+                lic = make_provider_licensure(clinician_id=clinician_id)
                 session.add(lic)
             if with_education:
-                edu = make_provider_education(provider_id=provider_id)
+                edu = make_provider_education(clinician_id=clinician_id)
                 session.add(edu)
             if with_certification:
-                cert = make_provider_certification(provider_id=provider_id)
+                cert = make_provider_certification(clinician_id=clinician_id)
                 session.add(cert)
         if with_licensure:
             await session.refresh(lic)
@@ -204,8 +205,13 @@ async def test_list_providers_filters_by_license_type(
     # Add a non-matching licensure to provider_b
     async with db_test_session_manager() as session:
         async with session.begin():
+            clinician_b = (
+                await session.execute(
+                    select(Provider.clinician_id).where(Provider.id == provider_b)
+                )
+            ).scalar_one()
             session.add(
-                make_provider_licensure(provider_id=provider_b, license_type="lpc")
+                make_provider_licensure(clinician_id=clinician_b, license_type="lpc")
             )
 
     async with db_test_session_manager() as session:
@@ -515,7 +521,7 @@ async def test_create_provider_with_inline_children_captures_them_in_audit(
             (
                 await session.execute(
                     select(ProviderLicensure).filter(
-                        ProviderLicensure.provider_id == created.id
+                        ProviderLicensure.clinician_id == created.clinician_id
                     )
                 )
             )

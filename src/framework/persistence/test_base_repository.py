@@ -180,20 +180,22 @@ async def test_count_respects_distinct_with_join(
     async with db_test_session_manager() as session:
         async with session.begin():
             session.add(provider)
+        await session.refresh(provider)
+        clinician_id = provider.clinician_id
 
     # Two licensures matching `license_type='lcsw'` on the same provider.
     async with db_test_session_manager() as session:
         async with session.begin():
             session.add(
                 make_provider_licensure(
-                    provider_id=provider.id,
+                    clinician_id=clinician_id,
                     license_type="lcsw",
                     license_number="L-1",
                 )
             )
             session.add(
                 make_provider_licensure(
-                    provider_id=provider.id,
+                    clinician_id=clinician_id,
                     license_type="lcsw",
                     license_number="L-2",
                 )
@@ -201,7 +203,9 @@ async def test_count_respects_distinct_with_join(
 
     stmt = (
         select(Provider)
-        .join(ProviderLicensure, ProviderLicensure.provider_id == Provider.id)
+        .join(
+            ProviderLicensure, ProviderLicensure.clinician_id == Provider.clinician_id
+        )
         .filter(ProviderLicensure.license_type == "lcsw")
         .distinct()
     )

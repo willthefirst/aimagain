@@ -300,7 +300,7 @@ async def test_seed_credentials_inserts_rows_attached_to_provider(
             (
                 await session.execute(
                     select(ProviderLicensure).where(
-                        ProviderLicensure.provider_id == provider.id
+                        ProviderLicensure.clinician_id == provider.clinician_id
                     )
                 )
             )
@@ -311,7 +311,7 @@ async def test_seed_credentials_inserts_rows_attached_to_provider(
             (
                 await session.execute(
                     select(ProviderEducation).where(
-                        ProviderEducation.provider_id == provider.id
+                        ProviderEducation.clinician_id == provider.clinician_id
                     )
                 )
             )
@@ -322,7 +322,7 @@ async def test_seed_credentials_inserts_rows_attached_to_provider(
             (
                 await session.execute(
                     select(ProviderCertification).where(
-                        ProviderCertification.provider_id == provider.id
+                        ProviderCertification.clinician_id == provider.clinician_id
                     )
                 )
             )

@@ -61,16 +61,23 @@ async def handle_delete(
                 f"handle_delete: spec {spec.name!r} has parent "
                 f"{spec.parent.name!r} but no parent_id was supplied."
             )
-        # Subentity convention: the child's FK column is named
-        # `<parent.name>_id`. Verify the URL's parent id matches the
-        # child's persisted FK — otherwise `/parents/A/children/B`
-        # would silently delete a child owned by parent B.
-        parent_fk_attr = f"{spec.parent.name}_id"
-        if getattr(target, parent_fk_attr) != parent_id:
-            raise NotFoundError(detail=f"{spec.name.capitalize()} not found")
         parent = await repo.get_by_model_id(spec.parent.model, parent_id)
         if parent is None:
             raise NotFoundError(detail=f"{spec.parent.name.capitalize()} not found")
+        # Verify the URL's parent id matches the child's logical parent —
+        # otherwise `/parents/A/children/B` would silently mutate a child
+        # owned by parent B. Default convention: child holds `<parent.name>_id`
+        # equal to `parent.id`. Specs with a shared non-parent FK
+        # (e.g. provider credentials FK to `clinicians.id`) override via
+        # `child_parent_match_attr`.
+        if spec.child_parent_match_attr is not None:
+            attr = spec.child_parent_match_attr
+            if getattr(target, attr) != getattr(parent, attr):
+                raise NotFoundError(detail=f"{spec.name.capitalize()} not found")
+        else:
+            parent_fk_attr = f"{spec.parent.name}_id"
+            if getattr(target, parent_fk_attr) != parent_id:
+                raise NotFoundError(detail=f"{spec.name.capitalize()} not found")
         if spec.write_authz is not None:
             spec.write_authz(parent, requesting_user, action=f"delete this {spec.name}")
     else:
@@ -236,12 +243,17 @@ async def handle_update(
                 f"handle_update: spec {spec.name!r} has parent "
                 f"{spec.parent.name!r} but no parent_id was supplied."
             )
-        parent_fk_attr = f"{spec.parent.name}_id"
-        if getattr(target, parent_fk_attr) != parent_id:
-            raise NotFoundError(detail=f"{spec.name.capitalize()} not found")
         parent = await repo.get_by_model_id(spec.parent.model, parent_id)
         if parent is None:
             raise NotFoundError(detail=f"{spec.parent.name.capitalize()} not found")
+        if spec.child_parent_match_attr is not None:
+            attr = spec.child_parent_match_attr
+            if getattr(target, attr) != getattr(parent, attr):
+                raise NotFoundError(detail=f"{spec.name.capitalize()} not found")
+        else:
+            parent_fk_attr = f"{spec.parent.name}_id"
+            if getattr(target, parent_fk_attr) != parent_id:
+                raise NotFoundError(detail=f"{spec.name.capitalize()} not found")
         if spec.write_authz is not None:
             spec.write_authz(parent, requesting_user, action=f"update this {spec.name}")
     else:

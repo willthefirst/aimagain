@@ -399,7 +399,7 @@ def test_provider_read_validates_from_nested_dict():
         "licensures": [
             {
                 "id": uuid.uuid4(),
-                "provider_id": provider_id,
+                "clinician_id": uuid.uuid4(),
                 "created_at": now,
                 "updated_at": now,
                 "license_type": "lcsw",
@@ -411,7 +411,7 @@ def test_provider_read_validates_from_nested_dict():
         "educations": [
             {
                 "id": uuid.uuid4(),
-                "provider_id": provider_id,
+                "clinician_id": uuid.uuid4(),
                 "created_at": now,
                 "updated_at": now,
                 "education_type": "msw",
@@ -422,7 +422,7 @@ def test_provider_read_validates_from_nested_dict():
         "certifications": [
             {
                 "id": uuid.uuid4(),
-                "provider_id": provider_id,
+                "clinician_id": uuid.uuid4(),
                 "created_at": now,
                 "updated_at": now,
                 "certification_type": "emdr",

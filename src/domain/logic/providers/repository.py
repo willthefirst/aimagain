@@ -73,7 +73,7 @@ class ProviderRepository(BaseRepository):
         if license_type or issuing_state:
             stmt = stmt.join(
                 ProviderLicensure,
-                ProviderLicensure.provider_id == Provider.id,
+                ProviderLicensure.clinician_id == Provider.clinician_id,
             )
             if license_type:
                 stmt = stmt.filter(ProviderLicensure.license_type.in_(license_type))

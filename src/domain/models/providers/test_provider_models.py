@@ -90,11 +90,15 @@ async def test_provider_allows_multiple_per_user(
         assert {p.org.name for p in providers} == {"Acme Health", "Other Practice"}
 
 
-async def test_delete_provider_cascades_credentials(
+async def test_delete_provider_leaves_clinician_credentials_intact(
     db_test_session_manager: async_sessionmaker[AsyncSession],
 ):
-    """Deleting a `Provider` removes its licensures, educations,
-    and certifications via the FK CASCADE."""
+    """After #635 PR A, credential sub-tables FK to `clinicians.id`,
+    not `providers.id`. Deleting a Provider no longer cascades to
+    the credentials — they're person-level data and stay attached to
+    the Clinician (which survives the Provider delete in the target
+    multi-affiliation model). The Provider cascade is preserved for
+    Affiliation; tested in `src/domain/models/affiliations/`."""
     user = create_test_user()
     async with db_test_session_manager() as session:
         async with session.begin():
@@ -121,6 +125,7 @@ async def test_delete_provider_cascades_credentials(
             )
             session.add(provider)
         provider_id = provider.id
+        clinician_id = provider.clinician_id
 
     async with db_test_session_manager() as session:
         async with session.begin():
@@ -132,13 +137,16 @@ async def test_delete_provider_cascades_credentials(
             rows = (
                 (
                     await session.execute(
-                        select(cls).filter(cls.provider_id == provider_id)
+                        select(cls).filter(cls.clinician_id == clinician_id)
                     )
                 )
                 .scalars()
                 .all()
             )
-            assert rows == [], f"{cls.__name__} rows survived parent delete"
+            assert len(rows) == 1, (
+                f"{cls.__name__} rows attached to clinician should survive "
+                "Provider delete (#635 PR A)"
+            )
 
 
 async def test_provider_accepts_null_npi(
@@ -219,14 +227,14 @@ async def test_invalid_license_type_violates_check_constraint(
             session.add(user)
             provider = _make_provider(user)
             session.add(provider)
-        provider_id = provider.id
+        clinician_id = provider.clinician_id
 
     with pytest.raises(IntegrityError):
         async with db_test_session_manager() as session:
             async with session.begin():
                 session.add(
                     ProviderLicensure(
-                        provider_id=provider_id,
+                        clinician_id=clinician_id,
                         license_type="not_a_real_license",
                         license_number="X-1",
                         issuing_state="IL",

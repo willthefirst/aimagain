@@ -12,8 +12,10 @@ _ck = partial(named_check_in, _TABLE)
 
 
 class ProviderEducation(BaseModel):
-    """One row per educational credential held by a provider. CASCADE on
-    the parent FK keeps the credential list in lockstep with the `Provider`.
+    """One row per educational credential held by a clinician. CASCADE
+    on the parent FK keeps the credential list in lockstep with the
+    `Clinician`. Person-level data — the FK moved from `providers.id`
+    to `clinicians.id` in #635 PR A.
 
     `month_completed` is stored as a "YYYY-MM" string rather than a Date
     because the form captures month-precision only.
@@ -22,9 +24,9 @@ class ProviderEducation(BaseModel):
     __tablename__ = _TABLE
     __table_args__ = (_ck("education_type", EDUCATION_TYPES),)
 
-    provider_id = Column(
+    clinician_id = Column(
         Uuid(as_uuid=True),
-        ForeignKey("providers.id", ondelete="CASCADE"),
+        ForeignKey("clinicians.id", ondelete="CASCADE"),
         nullable=False,
     )
     education_type = Column(Text, nullable=False)

@@ -62,6 +62,22 @@ async def _seed_provider_for(
         return provider.id
 
 
+async def _clinician_id_for(
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    provider_id: uuid.UUID,
+) -> uuid.UUID:
+    """Look up the `clinician_id` for a previously-seeded provider —
+    credential sub-tables FK to `clinicians.id` after #635 PR A, but
+    test fixtures still carry `provider_id` around. One small lookup
+    bridges the two."""
+    async with db_test_session_manager() as session:
+        return (
+            await session.execute(
+                select(Provider.clinician_id).where(Provider.id == provider_id)
+            )
+        ).scalar_one()
+
+
 async def _seed_other_user_with_provider(
     db_test_session_manager: async_sessionmaker[AsyncSession],
 ) -> tuple[uuid.UUID, uuid.UUID]:
@@ -236,8 +252,9 @@ async def test_get_provider_renders_detail_page(
     provider_id = await _seed_provider_for(
         db_test_session_manager, user_id=logged_in_user.id, practice_name="Mine"
     )
+    clinician_id = await _clinician_id_for(db_test_session_manager, provider_id)
     licensure = make_provider_licensure(
-        provider_id=provider_id, license_type="lcsw", license_number="L-99999"
+        clinician_id=clinician_id, license_type="lcsw", license_number="L-99999"
     )
     async with db_test_session_manager() as session:
         async with session.begin():
@@ -368,16 +385,21 @@ async def test_list_providers_shows_licensure_states(
         practice_name="Multi-state Care",
         location_state="CT",
     )
+    clinician_id = await _clinician_id_for(db_test_session_manager, provider_id)
     async with db_test_session_manager() as session:
         async with session.begin():
             session.add(
                 make_provider_licensure(
-                    provider_id=provider_id, license_type="lcsw", issuing_state="CA"
+                    clinician_id=clinician_id,
+                    license_type="lcsw",
+                    issuing_state="CA",
                 )
             )
             session.add(
                 make_provider_licensure(
-                    provider_id=provider_id, license_type="lpc", issuing_state="CT"
+                    clinician_id=clinician_id,
+                    license_type="lpc",
+                    issuing_state="CT",
                 )
             )
 
@@ -465,14 +487,16 @@ async def test_list_providers_filters_by_license_type(
     provider_b = await _seed_provider_for(
         db_test_session_manager, user_id=user_b.id, practice_name="B clinic"
     )
+    clinician_a = await _clinician_id_for(db_test_session_manager, provider_a)
+    clinician_b = await _clinician_id_for(db_test_session_manager, provider_b)
 
     async with db_test_session_manager() as session:
         async with session.begin():
             session.add(
-                make_provider_licensure(provider_id=provider_a, license_type="psyd")
+                make_provider_licensure(clinician_id=clinician_a, license_type="psyd")
             )
             session.add(
-                make_provider_licensure(provider_id=provider_b, license_type="lcsw")
+                make_provider_licensure(clinician_id=clinician_b, license_type="lcsw")
             )
 
     response = await authenticated_client.get("/providers?license_type=psyd")
@@ -691,19 +715,23 @@ async def test_patch_provider_rejects_reassign_to_unowned_org(
 # --- Provider delete ------------------------------------------------------
 
 
-async def test_delete_provider_returns_204_and_cascades(
+async def test_delete_provider_returns_204_and_leaves_credentials(
     authenticated_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user: User,
 ):
+    """After #635 PR A, credentials FK to `clinicians.id`. Deleting a
+    Provider returns 204 but leaves the person-level credentials attached
+    to the Clinician (which survives — Provider→Clinician is RESTRICT)."""
     provider_id = await _seed_provider_for(
         db_test_session_manager, user_id=logged_in_user.id
     )
+    clinician_id = await _clinician_id_for(db_test_session_manager, provider_id)
     async with db_test_session_manager() as session:
         async with session.begin():
-            session.add(make_provider_licensure(provider_id=provider_id))
-            session.add(make_provider_education(provider_id=provider_id))
-            session.add(make_provider_certification(provider_id=provider_id))
+            session.add(make_provider_licensure(clinician_id=clinician_id))
+            session.add(make_provider_education(clinician_id=clinician_id))
+            session.add(make_provider_certification(clinician_id=clinician_id))
 
     response = await authenticated_client.delete(f"/providers/{provider_id}")
     assert response.status_code == 204
@@ -712,28 +740,28 @@ async def test_delete_provider_returns_204_and_cascades(
         assert (
             await session.execute(select(Provider).filter(Provider.id == provider_id))
         ).scalars().first() is None
-        # Sub-rows cascade-deleted via FK ON DELETE CASCADE + ORM cascade.
+        # Credentials stay attached to the Clinician.
         assert (
             await session.execute(
                 select(ProviderLicensure).filter(
-                    ProviderLicensure.provider_id == provider_id
+                    ProviderLicensure.clinician_id == clinician_id
                 )
             )
-        ).scalars().first() is None
+        ).scalars().first() is not None
         assert (
             await session.execute(
                 select(ProviderEducation).filter(
-                    ProviderEducation.provider_id == provider_id
+                    ProviderEducation.clinician_id == clinician_id
                 )
             )
-        ).scalars().first() is None
+        ).scalars().first() is not None
         assert (
             await session.execute(
                 select(ProviderCertification).filter(
-                    ProviderCertification.provider_id == provider_id
+                    ProviderCertification.clinician_id == clinician_id
                 )
             )
-        ).scalars().first() is None
+        ).scalars().first() is not None
 
 
 # --- Licensure sub-resource ---------------------------------------------
@@ -747,7 +775,8 @@ async def test_patch_licensure_updates_fields(
     provider_id = await _seed_provider_for(
         db_test_session_manager, user_id=logged_in_user.id
     )
-    licensure = make_provider_licensure(provider_id=provider_id, license_number="L-1")
+    clinician_id = await _clinician_id_for(db_test_session_manager, provider_id)
+    licensure = make_provider_licensure(clinician_id=clinician_id, license_number="L-1")
     async with db_test_session_manager() as session:
         async with session.begin():
             session.add(licensure)
@@ -774,7 +803,10 @@ async def test_patch_licensure_returns_404_for_mismatched_provider(
         db_test_session_manager, user_id=logged_in_user.id
     )
     _, other_provider_id = await _seed_other_user_with_provider(db_test_session_manager)
-    other_licensure = make_provider_licensure(provider_id=other_provider_id)
+    other_clinician_id = await _clinician_id_for(
+        db_test_session_manager, other_provider_id
+    )
+    other_licensure = make_provider_licensure(clinician_id=other_clinician_id)
     async with db_test_session_manager() as session:
         async with session.begin():
             session.add(other_licensure)
@@ -891,8 +923,9 @@ async def test_owner_can_open_edit_form(
         user_id=logged_in_user.id,
         practice_name="Acme Counseling",
     )
+    clinician_id = await _clinician_id_for(db_test_session_manager, provider_id)
     licensure = make_provider_licensure(
-        provider_id=provider_id, license_type="lcsw", license_number="L-12345"
+        clinician_id=clinician_id, license_type="lcsw", license_number="L-12345"
     )
     async with db_test_session_manager() as session:
         async with session.begin():
@@ -939,8 +972,9 @@ async def test_owner_edit_form_renders_credentials_as_rows(
         user_id=logged_in_user.id,
         practice_name="Acme Counseling",
     )
+    clinician_id = await _clinician_id_for(db_test_session_manager, provider_id)
     licensure = make_provider_licensure(
-        provider_id=provider_id,
+        clinician_id=clinician_id,
         license_type="lcsw",
         license_number="L-12345",
         issuing_state="CA",

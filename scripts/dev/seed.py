@@ -1752,10 +1752,11 @@ async def seed_credentials() -> tuple[int, int]:
                 skipped += 1
                 continue
 
+            clinician_id = provider.clinician_id
             for lic in fixture["licensures"]:
                 existing = await session.execute(
                     select(ProviderLicensure).where(
-                        ProviderLicensure.provider_id == provider.id,
+                        ProviderLicensure.clinician_id == clinician_id,
                         ProviderLicensure.license_number == lic["license_number"],
                     )
                 )
@@ -1766,12 +1767,12 @@ async def seed_credentials() -> tuple[int, int]:
                 row_fields["expiration_date"] = _parse_date(
                     row_fields.get("expiration_date")
                 )
-                session.add(ProviderLicensure(provider_id=provider.id, **row_fields))
+                session.add(ProviderLicensure(clinician_id=clinician_id, **row_fields))
                 created += 1
             for edu in fixture["educations"]:
                 existing = await session.execute(
                     select(ProviderEducation).where(
-                        ProviderEducation.provider_id == provider.id,
+                        ProviderEducation.clinician_id == clinician_id,
                         ProviderEducation.institution == edu["institution"],
                         ProviderEducation.month_completed == edu.get("month_completed"),
                     )
@@ -1779,12 +1780,12 @@ async def seed_credentials() -> tuple[int, int]:
                 if existing.scalar_one_or_none() is not None:
                     skipped += 1
                     continue
-                session.add(ProviderEducation(provider_id=provider.id, **edu))
+                session.add(ProviderEducation(clinician_id=clinician_id, **edu))
                 created += 1
             for cert in fixture["certifications"]:
                 existing = await session.execute(
                     select(ProviderCertification).where(
-                        ProviderCertification.provider_id == provider.id,
+                        ProviderCertification.clinician_id == clinician_id,
                         ProviderCertification.certification_type
                         == cert["certification_type"],
                         ProviderCertification.certifying_body
@@ -1799,7 +1800,7 @@ async def seed_credentials() -> tuple[int, int]:
                     row_fields.get("expiration_date")
                 )
                 session.add(
-                    ProviderCertification(provider_id=provider.id, **row_fields)
+                    ProviderCertification(clinician_id=clinician_id, **row_fields)
                 )
                 created += 1
             print(

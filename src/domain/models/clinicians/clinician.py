@@ -68,3 +68,28 @@ class Clinician(BaseModel):
         back_populates="clinician",
         cascade="all, delete-orphan",
     )
+
+    # Person-level credential lists. FKs moved from `providers.id` to
+    # `clinicians.id` in #635 PR A so a clinician's licenses /
+    # educations / certifications follow them across affiliations.
+    # CASCADE on the FK + delete-orphan here keeps the rows in
+    # lockstep — deleting the clinician wipes the credential lists.
+    # `Provider.licensures / educations / certifications` survive as
+    # `@property` proxies into these relationships, so route handlers,
+    # templates, and the framework's `repo.add_child(parent,
+    # "licensures", licensure)` path keep working unchanged.
+    licensures = relationship(
+        "ProviderLicensure",
+        cascade="all, delete-orphan",
+        lazy="selectin",
+    )
+    educations = relationship(
+        "ProviderEducation",
+        cascade="all, delete-orphan",
+        lazy="selectin",
+    )
+    certifications = relationship(
+        "ProviderCertification",
+        cascade="all, delete-orphan",
+        lazy="selectin",
+    )
