@@ -174,6 +174,20 @@
       .entity-card section.entity-facts > dl > div {
         padding: 0.1rem 0;
       }
+      /* Two-column dl on desktop for non-grid detail cards (org,
+         program, user, provider). Without this the facts list packs
+         into the left third of the card and wastes the right two
+         thirds (#586). Targets `.entity-card > section.entity-facts`
+         (direct child) so post-detail — where `entity-facts` sits
+         inside `.entity-grid`'s right column already — keeps its
+         single-column layout. */
+      @media (min-width: 768px) {
+        .entity-card > section.entity-facts > dl {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          column-gap: 1.5rem;
+        }
+      }
       .entity-card section.entity-facts dt {
         display: inline;
         font-weight: 600;
@@ -471,6 +485,22 @@
     {%- set _on_openings = _on_posts_list and _post_kind == 'opening' -%}
     {%- set _directory_path = entity_url('provider') -%}
     {%- set _on_directory = is_authenticated and (request.url.path == _directory_path or request.url.path.startswith(_directory_path + '/')) -%}
+    {# Admin section shortcuts — `/organizations`, `/programs`, `/users`
+       were unreachable from the nav (#590). They're not product
+       surfaces for ordinary viewers, so render the links only for
+       admins (`is_admin` is a chrome scalar from
+       `framework.http.responses.html_response`). Each highlights when
+       on its collection list or any sub-path. #}
+    {%- set _orgs_path = entity_url('organization') -%}
+    {%- set _on_orgs = is_admin and (request.url.path == _orgs_path or request.url.path.startswith(_orgs_path + '/')) -%}
+    {%- set _programs_path = entity_url('program') -%}
+    {%- set _on_programs = is_admin and (request.url.path == _programs_path or request.url.path.startswith(_programs_path + '/')) -%}
+    {# Users nav lights on the collection list and on per-user detail/
+       edit pages, but NOT on `/users/me` — the profile icon already
+       owns that path. The admin-only guard avoids double-lighting when
+       a regular user lands on their own profile. #}
+    {%- set _users_path = entity_url('user') -%}
+    {%- set _on_users = is_admin and (request.url.path == _users_path or (request.url.path.startswith(_users_path + '/') and not _on_profile)) -%}
     <header class="container">
       <nav aria-label="Primary">
         <ul>
@@ -480,6 +510,11 @@
           <li><a href="{{ entity_url('post') }}?kind=referral"{% if _on_referrals %} aria-current="page" class="contrast"{% endif %}>Referrals</a></li>
           <li><a href="{{ entity_url('post') }}?kind=opening"{% if _on_openings %} aria-current="page" class="contrast"{% endif %}>Openings</a></li>
           <li><a href="{{ entity_url('provider') }}"{% if _on_directory %} aria-current="page" class="contrast"{% endif %}>Directory</a></li>
+          {% if is_admin %}
+          <li><a href="{{ entity_url('organization') }}"{% if _on_orgs %} aria-current="page" class="contrast"{% endif %}>Organizations</a></li>
+          <li><a href="{{ entity_url('program') }}"{% if _on_programs %} aria-current="page" class="contrast"{% endif %}>Programs</a></li>
+          <li><a href="{{ entity_url('user') }}"{% if _on_users %} aria-current="page" class="contrast"{% endif %}>Users</a></li>
+          {% endif %}
           {% endif %}
         </ul>
         <ul id="primary-nav">
@@ -494,7 +529,12 @@
           </li>
           {% else %}
           <li>
-            <a href="/auth/login"{% if _on_login %} aria-current="page" class="contrast"{% endif %}>Login</a>
+            {# `class="contrast"` is dropped on the active state so the
+               Login link color stays consistent across /auth/login vs
+               /auth/register / /auth/forgot-password (#592). The
+               aria-current semantics still convey the active state to
+               assistive tech. #}
+            <a href="/auth/login"{% if _on_login %} aria-current="page"{% endif %}>Login</a>
           </li>
           {% endif %}
         </ul>
