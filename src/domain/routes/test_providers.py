@@ -820,6 +820,208 @@ async def test_patch_licensure_returns_404_for_mismatched_provider(
     assert response.status_code == 404
 
 
+# --- Affiliation sub-resource CRUD (#642 PR 1) --------------------------
+
+
+async def test_post_affiliation_creates_additional_row(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user: User,
+):
+    """`POST /providers/{id}/affiliations` adds a new Affiliation to
+    the Provider. After #642 PR 1 the UNIQUE on `affiliations.provider_id`
+    is gone, so the framework's generic create handler succeeds for
+    every row past the first one (which `Provider.__init__` already
+    built from the wire payload)."""
+    from src.domain.models import Affiliation
+
+    provider_id = await _seed_provider_for(
+        db_test_session_manager, user_id=logged_in_user.id
+    )
+    second_org_id = await _seed_org(
+        db_test_session_manager,
+        owner_id=logged_in_user.id,
+        name="Second Practice",
+    )
+
+    response = await authenticated_client.post(
+        f"/providers/{provider_id}/affiliations",
+        data={
+            "org_id": str(second_org_id),
+            "location_city": "Queens",
+            "location_state": "NY",
+            "location_zip": "11101",
+            "in_person_sessions": "yes",
+            "virtual_sessions": "please_contact",
+            "accepts_out_of_network": "true",
+            "sliding_scale": "true",
+            "cost": "$220/session",
+        },
+    )
+
+    assert response.status_code in (200, 201), response.text
+    async with db_test_session_manager() as session:
+        rows = (
+            (
+                await session.execute(
+                    select(Affiliation).where(Affiliation.provider_id == provider_id)
+                )
+            )
+            .scalars()
+            .all()
+        )
+    assert len(rows) == 2
+    extra = next(a for a in rows if a.location_city == "Queens")
+    assert extra.org_id == second_org_id
+    assert extra.clinician_id == rows[0].clinician_id
+    assert extra.sliding_scale is True
+    assert extra.cost == "$220/session"
+
+
+async def test_patch_affiliation_updates_fields(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user: User,
+):
+    """`PATCH /providers/{id}/affiliations/{aff_id}` partially updates
+    the row. Pinned because the framework's update handler resolves the
+    affiliation through the new `AffiliationRepository`."""
+    provider_id = await _seed_provider_for(
+        db_test_session_manager, user_id=logged_in_user.id
+    )
+    # The Provider's `__init__` already built one Affiliation — patch it.
+    async with db_test_session_manager() as session:
+        from src.domain.models import Affiliation
+
+        aff_id = (
+            await session.execute(
+                select(Affiliation.id).where(Affiliation.provider_id == provider_id)
+            )
+        ).scalar_one()
+
+    response = await authenticated_client.patch(
+        f"/providers/{provider_id}/affiliations/{aff_id}",
+        data={"sliding_scale": "true", "cost": "$999/session"},
+    )
+
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["sliding_scale"] is True
+    assert body["cost"] == "$999/session"
+
+
+async def test_delete_affiliation_removes_row(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user: User,
+):
+    """`DELETE /providers/{id}/affiliations/{aff_id}` removes the row.
+    The Provider can be left with zero Affiliations — readers fall
+    back to `None` via the property proxies. (PR 3's Clinician-row
+    rollup is the user-facing fix for empty-affiliations Providers.)"""
+    from src.domain.models import Affiliation
+
+    provider_id = await _seed_provider_for(
+        db_test_session_manager, user_id=logged_in_user.id
+    )
+    async with db_test_session_manager() as session:
+        aff_id = (
+            await session.execute(
+                select(Affiliation.id).where(Affiliation.provider_id == provider_id)
+            )
+        ).scalar_one()
+
+    response = await authenticated_client.delete(
+        f"/providers/{provider_id}/affiliations/{aff_id}"
+    )
+
+    assert response.status_code in (200, 204)
+    async with db_test_session_manager() as session:
+        remaining = (
+            (
+                await session.execute(
+                    select(Affiliation).where(Affiliation.provider_id == provider_id)
+                )
+            )
+            .scalars()
+            .all()
+        )
+    assert remaining == []
+
+
+async def test_delete_affiliation_returns_404_for_mismatched_provider(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user: User,
+):
+    """An affiliation_id that belongs to a different provider must 404 —
+    the framework's URL-vs-row consistency check (configured via
+    `child_parent_match_attr="provider_id"` on `AFFILIATION_ENTITY`)
+    blocks cross-provider deletes."""
+    from src.domain.models import Affiliation
+
+    my_provider_id = await _seed_provider_for(
+        db_test_session_manager, user_id=logged_in_user.id
+    )
+    _, other_provider_id = await _seed_other_user_with_provider(db_test_session_manager)
+    async with db_test_session_manager() as session:
+        other_aff_id = (
+            await session.execute(
+                select(Affiliation.id).where(
+                    Affiliation.provider_id == other_provider_id
+                )
+            )
+        ).scalar_one()
+
+    response = await authenticated_client.delete(
+        f"/providers/{my_provider_id}/affiliations/{other_aff_id}"
+    )
+    assert response.status_code == 404
+
+
+async def test_owner_edit_form_renders_affiliations_section(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user: User,
+):
+    """The clinician edit page surfaces every Affiliation row in a
+    dedicated "Affiliations" section with inline add and per-row
+    delete — #642 PR 1's UI. The Provider's initial Affiliation
+    (built by `Provider.__init__` from the create payload) appears
+    prefilled."""
+    provider_id = await _seed_provider_for(
+        db_test_session_manager, user_id=logged_in_user.id
+    )
+
+    response = await authenticated_client.get(f"/providers/{provider_id}/form")
+    assert response.status_code == 200
+    tree = HTMLParser(response.text)
+
+    headings = [h.text(strip=True) for h in tree.css("h2")]
+    assert "Affiliations" in headings
+
+    # The inline add form posts to /providers/{id}/affiliations.
+    add_form = tree.css_first(f'form[hx-post="/providers/{provider_id}/affiliations"]')
+    assert add_form is not None
+    assert add_form.css_first('select[name="org_id"]') is not None
+    assert add_form.css_first('input[name="location_city"]') is not None
+
+    # The existing primary affiliation renders as a row with a
+    # delete button pointing at its own URL.
+    from src.domain.models import Affiliation
+
+    async with db_test_session_manager() as session:
+        aff_id = (
+            await session.execute(
+                select(Affiliation.id).where(Affiliation.provider_id == provider_id)
+            )
+        ).scalar_one()
+    delete_button = tree.css_first(
+        f'button[hx-delete="/providers/{provider_id}/affiliations/{aff_id}"]'
+    )
+    assert delete_button is not None
+
+
 # --- Education / certification happy paths ------------------------------
 
 
@@ -985,22 +1187,29 @@ async def test_owner_edit_form_renders_credentials_as_rows(
 
     response = await authenticated_client.get(f"/providers/{provider_id}/form")
     tree = HTMLParser(response.text)
-    rows = tree.css(".credential-list .credential-row")
-    assert len(rows) >= 1
-    first = rows[0]
-    assert (
-        first.css_first("strong").text(strip=True)
-        == "Licensed Clinical Social Worker (LCSW)"
-    )
-    meta = first.css_first(".credential-row-text small")
-    assert meta is not None
-    assert "L-12345" in meta.text()
-    assert "CA" in meta.text()
-    delete = first.css_first(
+    # After #642 PR 1 the affiliations section also renders rows via
+    # `.credential-list .credential-row` (it reuses the same partial);
+    # locate the licensure row by its hx-delete URL, not by section
+    # ordering.
+    delete = tree.css_first(
         f'button[hx-delete="/providers/{provider_id}/licensures/{licensure.id}"]'
     )
     assert delete is not None
     assert delete.text(strip=True) == "Delete"
+    row = delete.parent  # `.credential-row`
+    while row is not None and "credential-row" not in (
+        row.attributes.get("class") or ""
+    ):
+        row = row.parent
+    assert row is not None
+    assert (
+        row.css_first("strong").text(strip=True)
+        == "Licensed Clinical Social Worker (LCSW)"
+    )
+    meta = row.css_first(".credential-row-text small")
+    assert meta is not None
+    assert "L-12345" in meta.text()
+    assert "CA" in meta.text()
 
 
 async def test_admin_can_open_edit_form_for_any_provider(

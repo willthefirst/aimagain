@@ -11,9 +11,14 @@ _TABLE = "providers"
 # they were dropped in #635 PR B and now live only on `affiliations`.
 # The Provider constructor consumes them as kwargs and forwards them
 # into a fresh `Affiliation`; the `@property` proxies below route
-# reads and writes to `provider.affiliation.X` so the framework's
-# `repo.patch(provider, ...)` and the schema's `from_attributes`
-# path keep working unchanged.
+# reads and writes to `provider.primary_affiliation.X` so the
+# framework's `repo.patch(provider, ...)` and the schema's
+# `from_attributes` path keep working unchanged. A Provider may hold
+# multiple Affiliations after #642 PR 1; the proxies always target
+# the primary (oldest by `created_at`) — visual surfaces that still
+# need to dereference "the" affiliation per row read through it. PR 3
+# rolls the directory listing up by Clinician, after which the
+# primary fallback only matters for the post-opening dropdown labels.
 _PER_ROLE_ATTRS = (
     "org_id",
     "location_city",
@@ -42,10 +47,13 @@ class Provider(BaseModel):
     SQLAlchemy column constructor and forwards them into a transient
     `Affiliation` instead — so the framework's generic create handler
     (`spec.model(**payload.model_dump())`) keeps producing fully-wired
-    rows from a wire-flat payload. The `@property` proxies route reads
-    and writes for those attrs through `provider.affiliation.X`, so
-    `repo.patch(provider, org_id=X)` and `ProviderRead.model_validate(provider)`
-    both keep working unchanged.
+    rows from a wire-flat payload. That transient row becomes the
+    Provider's first / primary `Affiliation`; the user may add more
+    later via the inline list on the edit page (#642 PR 1). The
+    `@property` proxies route reads and writes for those attrs through
+    `provider.primary_affiliation.X`, so `repo.patch(provider, org_id=X)`
+    and `ProviderRead.model_validate(provider)` both keep working
+    unchanged — they target the primary affiliation.
 
     A user may own multiple `Provider` rows — `uq_provider_profiles_user_id`
     was dropped in `8f20a93effc9` to allow it — so the `owner_id` FK is
@@ -74,19 +82,38 @@ class Provider(BaseModel):
     )
     clinician = relationship("Clinician", back_populates="providers", lazy="selectin")
 
-    # 1:1 link to the `Affiliation` row that holds every per-role
-    # attribute for this provider. The transitional `affiliations.provider_id`
-    # UNIQUE FK on the affiliation side remains as the 1:1 join; the
-    # natural next cleanup (if `providers` ever drops to a view or
-    # gets renamed) is to retarget that FK at `clinicians.id` and drop
-    # the column from `affiliations`.
-    affiliation = relationship(
+    # 1:N link to the `Affiliation` rows that hold the per-role
+    # attributes. Ordered by `created_at` (oldest first) so
+    # ``primary_affiliation`` deterministically picks the original
+    # affiliation as the "default" the directory listing reads through
+    # — PR 3 collapses the listing to one row per Clinician, after
+    # which the primary fallback only matters for the post-opening
+    # form's dropdown (see `src/domain/templates/openings/_form.html`).
+    affiliations = relationship(
         "Affiliation",
         back_populates="provider",
-        uselist=False,
+        order_by="Affiliation.created_at",
         cascade="all, delete-orphan",
         lazy="selectin",
     )
+
+    @property
+    def primary_affiliation(self):
+        """The Provider's "default" affiliation — the oldest row by
+        ``created_at`` (which is also the original transient
+        affiliation `Provider.__init__` built from the wire payload).
+
+        Read paths that still need to dereference a single affiliation
+        per row — the directory listing (until PR 3 rolls it up by
+        Clinician), the post-opening form's dropdown labels — go
+        through this property. The per-role `@property` proxies on
+        Provider also delegate to it so existing read paths keep
+        working unchanged.
+
+        Returns ``None`` only in the narrow window where the Provider
+        has no affiliations (pre-flush construction without per-role
+        kwargs, or after every affiliation has been deleted)."""
+        return self.affiliations[0] if self.affiliations else None
 
     # Credential sub-tables moved their FK from `providers.id` to
     # `clinicians.id` in #635 PR A — credentials are person-level.
@@ -140,23 +167,28 @@ class Provider(BaseModel):
             and "clinician_id" not in kwargs
         ):
             self.clinician = Clinician(npi=npi)
-        if self.affiliation is None and "affiliation" not in kwargs:
+        if not self.affiliations and "affiliations" not in kwargs:
             # Mirror the affiliation column defaults explicitly (column
             # `server_default`s only fire at flush) so the transient
-            # row passes its NOT NULL columns.
-            self.affiliation = Affiliation(
-                clinician=self.clinician,
-                org_id=per_role.get("org_id"),
-                location_city=per_role.get("location_city"),
-                location_state=per_role.get("location_state"),
-                location_zip=per_role.get("location_zip"),
-                in_person_sessions=per_role.get("in_person_sessions"),
-                virtual_sessions=per_role.get("virtual_sessions"),
-                accepts_out_of_network=per_role.get("accepts_out_of_network", True),
-                in_network_carriers=per_role.get("in_network_carriers") or [],
-                sliding_scale=per_role.get("sliding_scale", False),
-                cost=per_role.get("cost"),
-            )
+            # row passes its NOT NULL columns. This becomes the
+            # Provider's `primary_affiliation`; the user may later add
+            # more affiliations via the inline list on the edit page
+            # (#642 PR 1).
+            self.affiliations = [
+                Affiliation(
+                    clinician=self.clinician,
+                    org_id=per_role.get("org_id"),
+                    location_city=per_role.get("location_city"),
+                    location_state=per_role.get("location_state"),
+                    location_zip=per_role.get("location_zip"),
+                    in_person_sessions=per_role.get("in_person_sessions"),
+                    virtual_sessions=per_role.get("virtual_sessions"),
+                    accepts_out_of_network=per_role.get("accepts_out_of_network", True),
+                    in_network_carriers=per_role.get("in_network_carriers") or [],
+                    sliding_scale=per_role.get("sliding_scale", False),
+                    cost=per_role.get("cost"),
+                )
+            ]
 
     @property
     def npi(self) -> str | None:
@@ -186,15 +218,15 @@ class Provider(BaseModel):
             self.clinician.npi = value
 
     # --- Per-role property proxies ----------------------------------
-    # These delegate reads and writes to `provider.affiliation.X`. The
-    # actual columns were dropped from `providers` in #635 PR B; the
-    # properties exist so:
+    # These delegate reads and writes to `provider.primary_affiliation.X`.
+    # The actual columns were dropped from `providers` in #635 PR B;
+    # the properties exist so:
     #
     #   * `ProviderRead.model_validate(provider)` keeps working (the
     #     schema reads `provider.org_id`, `provider.location_city`, etc.
     #     via `from_attributes`).
     #   * `repo.patch(provider, location_city="X")` lands on
-    #     `affiliation.location_city` because `_patch` calls
+    #     `primary_affiliation.location_city` because `_patch` calls
     #     `setattr(provider, "location_city", "X")`, which hits the
     #     property setter below.
     #   * Templates and `posts.view` callers that read
@@ -202,25 +234,26 @@ class Provider(BaseModel):
 
     @property
     def org_id(self):
-        aff = self.affiliation
+        aff = self.primary_affiliation
         return aff.org_id if aff is not None else None
 
     @org_id.setter
     def org_id(self, value) -> None:
-        if self.affiliation is not None:
-            self.affiliation.org_id = value
+        if self.primary_affiliation is not None:
+            self.primary_affiliation.org_id = value
 
     @property
     def org(self):
-        """Proxy through `provider.affiliation.org` so callers reading
-        ``provider.org.name`` (templates, view models) keep working."""
-        aff = self.affiliation
+        """Proxy through `provider.primary_affiliation.org` so callers
+        reading ``provider.org.name`` (templates, view models) keep
+        working."""
+        aff = self.primary_affiliation
         return aff.org if aff is not None else None
 
     @org.setter
     def org(self, value) -> None:
-        if self.affiliation is not None:
-            self.affiliation.org = value
+        if self.primary_affiliation is not None:
+            self.primary_affiliation.org = value
 
     @property
     def org_name(self) -> str | None:
@@ -235,95 +268,95 @@ class Provider(BaseModel):
 
     @property
     def location_city(self) -> str | None:
-        aff = self.affiliation
+        aff = self.primary_affiliation
         return aff.location_city if aff is not None else None
 
     @location_city.setter
     def location_city(self, value) -> None:
-        if self.affiliation is not None:
-            self.affiliation.location_city = value
+        if self.primary_affiliation is not None:
+            self.primary_affiliation.location_city = value
 
     @property
     def location_state(self) -> str | None:
-        aff = self.affiliation
+        aff = self.primary_affiliation
         return aff.location_state if aff is not None else None
 
     @location_state.setter
     def location_state(self, value) -> None:
-        if self.affiliation is not None:
-            self.affiliation.location_state = value
+        if self.primary_affiliation is not None:
+            self.primary_affiliation.location_state = value
 
     @property
     def location_zip(self) -> str | None:
-        aff = self.affiliation
+        aff = self.primary_affiliation
         return aff.location_zip if aff is not None else None
 
     @location_zip.setter
     def location_zip(self, value) -> None:
-        if self.affiliation is not None:
-            self.affiliation.location_zip = value
+        if self.primary_affiliation is not None:
+            self.primary_affiliation.location_zip = value
 
     @property
     def in_person_sessions(self) -> str | None:
-        aff = self.affiliation
+        aff = self.primary_affiliation
         return aff.in_person_sessions if aff is not None else None
 
     @in_person_sessions.setter
     def in_person_sessions(self, value) -> None:
-        if self.affiliation is not None:
-            self.affiliation.in_person_sessions = value
+        if self.primary_affiliation is not None:
+            self.primary_affiliation.in_person_sessions = value
 
     @property
     def virtual_sessions(self) -> str | None:
-        aff = self.affiliation
+        aff = self.primary_affiliation
         return aff.virtual_sessions if aff is not None else None
 
     @virtual_sessions.setter
     def virtual_sessions(self, value) -> None:
-        if self.affiliation is not None:
-            self.affiliation.virtual_sessions = value
+        if self.primary_affiliation is not None:
+            self.primary_affiliation.virtual_sessions = value
 
     @property
     def accepts_out_of_network(self) -> bool | None:
-        aff = self.affiliation
+        aff = self.primary_affiliation
         return aff.accepts_out_of_network if aff is not None else None
 
     @accepts_out_of_network.setter
     def accepts_out_of_network(self, value) -> None:
-        if self.affiliation is not None:
-            self.affiliation.accepts_out_of_network = value
+        if self.primary_affiliation is not None:
+            self.primary_affiliation.accepts_out_of_network = value
 
     @property
     def in_network_carriers(self) -> list:
-        aff = self.affiliation
+        aff = self.primary_affiliation
         if aff is None or aff.in_network_carriers is None:
             return []
         return aff.in_network_carriers
 
     @in_network_carriers.setter
     def in_network_carriers(self, value) -> None:
-        if self.affiliation is not None:
-            self.affiliation.in_network_carriers = value
+        if self.primary_affiliation is not None:
+            self.primary_affiliation.in_network_carriers = value
 
     @property
     def sliding_scale(self) -> bool | None:
-        aff = self.affiliation
+        aff = self.primary_affiliation
         return aff.sliding_scale if aff is not None else None
 
     @sliding_scale.setter
     def sliding_scale(self, value) -> None:
-        if self.affiliation is not None:
-            self.affiliation.sliding_scale = value
+        if self.primary_affiliation is not None:
+            self.primary_affiliation.sliding_scale = value
 
     @property
     def cost(self) -> str | None:
-        aff = self.affiliation
+        aff = self.primary_affiliation
         return aff.cost if aff is not None else None
 
     @cost.setter
     def cost(self, value) -> None:
-        if self.affiliation is not None:
-            self.affiliation.cost = value
+        if self.primary_affiliation is not None:
+            self.primary_affiliation.cost = value
 
     @property
     def licensures(self):

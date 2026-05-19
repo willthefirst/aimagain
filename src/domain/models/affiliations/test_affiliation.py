@@ -66,11 +66,15 @@ async def test_provider_construct_auto_creates_affiliation_with_per_role_attrs()
     with the same per-role attributes so the framework's generic create
     handler — which builds the model via
     `spec.model(**payload.model_dump())` — keeps producing rows that
-    PR 3's reads can navigate to via `provider.affiliation`."""
+    PR 3's reads can navigate to via `provider.primary_affiliation`.
+    The transient row is the first / primary affiliation for the
+    Provider; #642 PR 1 lets the user add more later via the inline
+    list on the edit page."""
     user = _make_user("alice")
     org = _make_org("Acme", user.id)
     provider = _make_provider(owner=user, org=org)
-    aff = provider.affiliation
+    assert len(provider.affiliations) == 1
+    aff = provider.primary_affiliation
     assert aff is not None
     assert aff.org_id == org.id
     assert aff.in_person_sessions == "yes"
@@ -88,7 +92,7 @@ async def test_provider_construct_auto_creates_affiliation_with_per_role_attrs()
 
 
 @pytest.mark.asyncio
-async def test_provider_construct_with_existing_affiliation_skips_auto_create():
+async def test_provider_construct_with_existing_affiliations_skips_auto_create():
     """Test fixtures wiring the join manually must not be clobbered."""
     user = _make_user("bob")
     org = _make_org("Acme", user.id)
@@ -101,8 +105,9 @@ async def test_provider_construct_with_existing_affiliation_skips_auto_create():
         in_network_carriers=[],
         sliding_scale=False,
     )
-    provider = _make_provider(owner=user, org=org, affiliation=existing)
-    assert provider.affiliation is existing
+    provider = _make_provider(owner=user, org=org, affiliations=[existing])
+    assert provider.affiliations == [existing]
+    assert provider.primary_affiliation is existing
 
 
 @pytest.mark.asyncio
@@ -110,18 +115,17 @@ async def test_provider_per_role_writes_land_on_affiliation():
     """After #635 PR B the per-role columns no longer live on
     `providers` — they live only on `affiliations`. The `Provider`
     ORM class exposes each per-role attr as a `@property` whose setter
-    proxies through to `provider.affiliation`, so the framework's
-    `repo.patch(provider, location_city='Queens')` (which calls
-    `setattr(provider, ...)`) lands the write directly on the
-    affiliation row. This is the per-PR-B replacement for the
-    retired SQLAlchemy `set`-event mirror listener — writes target
-    affiliation in the first place rather than being mirrored onto
-    it after the fact.
+    proxies through to `provider.primary_affiliation`, so the
+    framework's `repo.patch(provider, location_city='Queens')` (which
+    calls `setattr(provider, ...)`) lands the write directly on the
+    primary affiliation row. After #642 PR 1 a Provider may hold
+    multiple Affiliations — the per-role property proxies target the
+    primary one (oldest by `created_at`).
     """
     user = _make_user("dave")
     org = _make_org("Acme", user.id)
     provider = _make_provider(owner=user, org=org)
-    aff = provider.affiliation
+    aff = provider.primary_affiliation
     assert aff is not None
 
     provider.location_city = "Queens"
@@ -144,10 +148,10 @@ async def test_provider_per_role_writes_land_on_affiliation():
 
 
 @pytest.mark.asyncio
-async def test_provider_affiliation_persists_via_cascade(session):
-    """`Provider.affiliation` has `cascade="all, delete-orphan"`, so
-    persisting a Provider with a transient Affiliation flushes both
-    rows in one shot — no explicit `session.add(provider.affiliation)`
+async def test_provider_affiliations_persist_via_cascade(session):
+    """`Provider.affiliations` has `cascade="all, delete-orphan"`, so
+    persisting a Provider with transient Affiliations flushes every
+    row in one shot — no explicit `session.add(...)` per affiliation
     needed."""
     user = _make_user("carol")
     org = _make_org("Acme", user.id)
@@ -155,6 +159,85 @@ async def test_provider_affiliation_persists_via_cascade(session):
     session.add_all([user, org, provider])
     await session.flush()
     await session.refresh(provider)
-    assert provider.affiliation is not None
-    assert provider.affiliation.id is not None
-    assert provider.affiliation.provider_id == provider.id
+    assert len(provider.affiliations) == 1
+    aff = provider.primary_affiliation
+    assert aff is not None
+    assert aff.id is not None
+    assert aff.provider_id == provider.id
+
+
+@pytest.mark.asyncio
+async def test_provider_supports_multiple_affiliations(session):
+    """A Provider may hold multiple Affiliations after #642 PR 1 (the
+    UNIQUE on ``affiliations.provider_id`` was dropped in
+    ``7c3c296c9429``). Each row persists in the same transaction; the
+    cascade rule still wipes them all on Provider delete."""
+    from src.domain.models import Affiliation
+
+    user = _make_user("erin")
+    org_a = _make_org("Acme", user.id)
+    org_b = _make_org("Beta", user.id)
+    provider = _make_provider(owner=user, org=org_a)
+    # Append a second affiliation at a different org with different
+    # per-role attributes — the kind of row #642 PR 1's inline list
+    # exists to manage.
+    provider.affiliations.append(
+        Affiliation(
+            clinician=provider.clinician,
+            org_id=org_b.id,
+            location_city="Manhattan",
+            location_state="NY",
+            location_zip="10001",
+            in_person_sessions="no",
+            virtual_sessions="yes",
+            accepts_out_of_network=False,
+            in_network_carriers=[],
+            sliding_scale=True,
+            cost="$200/session",
+        )
+    )
+    session.add_all([user, org_a, org_b, provider])
+    await session.flush()
+    await session.refresh(provider)
+    assert len(provider.affiliations) == 2
+    # Both rows point at the same Provider.
+    assert all(a.provider_id == provider.id for a in provider.affiliations)
+
+
+@pytest.mark.asyncio
+async def test_primary_affiliation_picks_oldest_by_created_at(session):
+    """`primary_affiliation` returns the oldest Affiliation by
+    ``created_at`` — the SQLAlchemy `order_by` on `Provider.affiliations`
+    pins the ordering. After #642 PR 1 the directory listing and the
+    post-opening dropdown labels both dereference through this property
+    so the per-row affiliation is deterministic."""
+    import datetime as _dt
+
+    from src.domain.models import Affiliation
+
+    user = _make_user("frank")
+    org_a = _make_org("Acme", user.id)
+    org_b = _make_org("Beta", user.id)
+    provider = _make_provider(owner=user, org=org_a)
+    older_aff = provider.affiliations[0]
+    # Pin the older affiliation's created_at so the comparison is
+    # deterministic regardless of flush clock resolution.
+    older_aff.created_at = _dt.datetime(2024, 1, 1, tzinfo=_dt.timezone.utc)
+    newer = Affiliation(
+        clinician=provider.clinician,
+        org_id=org_b.id,
+        location_city="Manhattan",
+        location_state="NY",
+        location_zip="10001",
+        in_person_sessions="no",
+        virtual_sessions="yes",
+        accepts_out_of_network=False,
+        in_network_carriers=[],
+        sliding_scale=True,
+    )
+    newer.created_at = _dt.datetime(2025, 1, 1, tzinfo=_dt.timezone.utc)
+    provider.affiliations.append(newer)
+    session.add_all([user, org_a, org_b, provider])
+    await session.flush()
+    await session.refresh(provider)
+    assert provider.primary_affiliation is older_aff

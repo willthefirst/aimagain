@@ -1,6 +1,6 @@
 from functools import partial
 
-from sqlalchemy import JSON, Boolean, Column, ForeignKey, Text, text
+from sqlalchemy import JSON, Boolean, Column, ForeignKey, Text, event, text
 from sqlalchemy.orm import relationship
 from sqlalchemy.types import Uuid
 
@@ -46,19 +46,23 @@ class Affiliation(LocationMixin, BaseModel):
         _ck("virtual_sessions", LOCATION_AVAILABILITY_OPTIONS),
     )
 
-    # Transitional 1:1 link to the legacy `providers` row this
-    # affiliation was backfilled from. UNIQUE so the join is
-    # cardinality-safe for PR 3's reads. Dropped in PR 4 along
-    # with the legacy `providers` table.
+    # FK back to the owning `providers` row. CASCADE so deleting the
+    # Provider sweeps its affiliations with it. No longer UNIQUE
+    # (dropped in `7c3c296c9429`, #642 PR 1) — a Provider can carry
+    # multiple Affiliations; the clinician edit page surfaces them
+    # as an inline list (same UX as licensures). Reads that still
+    # need to dereference "the" affiliation per row use
+    # `Provider.primary_affiliation`, which picks the oldest row by
+    # `created_at`; PR 3 (this issue) collapses the directory listing
+    # to one row per Clinician instead.
     provider_id = Column(
         Uuid(as_uuid=True),
         ForeignKey("providers.id", ondelete="CASCADE"),
         nullable=False,
-        unique=True,
     )
     provider = relationship(
         "Provider",
-        back_populates="affiliation",
+        back_populates="affiliations",
         foreign_keys=[provider_id],
         lazy="selectin",
     )
@@ -81,7 +85,11 @@ class Affiliation(LocationMixin, BaseModel):
     # `providers`. The two tables hold the same data through the PR 2/
     # PR 3 transition; PR 3 switches reads to `affiliations` and PR 4
     # drops these columns from `providers`. The `(city, state, zip)`
-    # triple comes from `LocationMixin`.
+    # triple comes from `LocationMixin`. After #642 PR 1 (the directory
+    # re-platform) `clinician_id` is auto-filled from the parent
+    # provider when an Affiliation is appended into
+    # `Provider.affiliations` — see the event listener at the bottom
+    # of this module.
     in_person_sessions = Column(Text, nullable=False)
     virtual_sessions = Column(Text, nullable=False)
     accepts_out_of_network = Column(
@@ -94,3 +102,31 @@ class Affiliation(LocationMixin, BaseModel):
         Boolean, nullable=False, server_default=text("0"), default=False
     )
     cost = Column(Text, nullable=True)
+
+
+@event.listens_for(Affiliation.provider, "set")
+def _inherit_clinician_id_from_provider(affiliation, provider, _oldvalue, _initiator):
+    """When an Affiliation is attached to a Provider (either by direct
+    assignment or by appending into `provider.affiliations`), default
+    its ``clinician_id`` to the provider's so the wire payload doesn't
+    need to carry the FK explicitly.
+
+    Without this, the framework's generic create handler (``POST
+    /providers/{id}/affiliations``) would have to either accept
+    ``clinician_id`` on the wire (leaking an internal join) or be
+    extended to peek at the parent — the listener keeps the contract
+    "wire mirrors the user-facing form fields" intact.
+
+    The listener never overwrites an explicit value (test fixtures
+    that wire the join manually stay intact); the first
+    ``Provider.__init__`` path also pre-populates ``clinician`` on the
+    transient Affiliation directly so this listener is a no-op there.
+    """
+    if affiliation.clinician_id is None and provider is not None:
+        clinician_id = getattr(provider, "clinician_id", None)
+        if clinician_id is not None:
+            affiliation.clinician_id = clinician_id
+        else:
+            clinician = getattr(provider, "clinician", None)
+            if clinician is not None:
+                affiliation.clinician = clinician
