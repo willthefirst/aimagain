@@ -161,28 +161,33 @@ def test_field_overrides_for_unknown_field_are_passed_through():
 
 
 def test_stub_renders_detail_html_without_errors():
-    """The canary test for the whole factory: render the real
-    ``posts/detail.html`` template against each kind's stub. If a
-    future detail-model column needs special treatment (e.g. a new
-    enum-typed Text column) and someone forgot to add an
-    `_ENUM_DEFAULTS` entry, the template crashes here at test time
-    rather than waiting for a contract pair to fail with a Playwright
-    timeout."""
+    """The canary test for the whole factory: render each kind's
+    detail template against its stub. If a future detail-model column
+    needs special treatment (e.g. a new enum-typed Text column) and
+    someone forgot to add an `_ENUM_DEFAULTS` entry, the template
+    crashes here at test time rather than waiting for a contract pair
+    to fail with a Playwright timeout.
+
+    Post-#628 each kind has its own detail template at
+    ``<family>/detail.html`` (the shared post-card partials still
+    live under ``_shared/posts/``); the canary walks all three."""
     from src.framework.rendering.templating import templates
 
     env = templates.env
-    template = env.get_template("posts/detail.html")
 
+    _KIND_TO_FAMILY = {
+        "referral": "referrals",
+        "opening": "openings",
+        "intake": "intakes",
+    }
     for kind in _KINDS:
+        family = _KIND_TO_FAMILY[kind]
+        template = env.get_template(f"{family}/detail.html")
         post = make_post_stub(kind, owner_id=uuid.uuid4())
-        # `views/detail.html` needs `request`, but for a smoke
-        # render the chrome accepts a minimal mock. The point isn't
-        # to verify chrome — it's to render the kind-specific body
-        # without exception.
 
         class _RequestStub:
             class _Url:
-                path = "/posts/stub"
+                path = f"/{family}/stub"
 
             url = _Url()
 
@@ -193,8 +198,13 @@ def test_stub_renders_detail_html_without_errors():
 
             query_params = _QueryParams()
 
+        # Each family's detail template reads the post under its own
+        # context key (`referral` / `opening` / `intake`); the
+        # framework injects this as `spec.name`. Bind both — extra
+        # keys are harmless.
         html = template.render(
-            post=post,
+            **{kind: post},
+            entity_name=kind,
             request=_RequestStub(),
             can_edit=True,
             is_authenticated=True,
@@ -207,8 +217,8 @@ def test_stub_renders_detail_html_without_errors():
         # `data-kind`. If a render error caused a stack trace partway
         # through, the article wouldn't be present.
         assert f'data-kind="{kind}"' in html, (
-            f"detail.html for kind={kind!r} did not render the post card; "
-            f"the template probably crashed mid-render"
+            f"{family}/detail.html for kind={kind!r} did not render the post "
+            "card; the template probably crashed mid-render"
         )
 
 
