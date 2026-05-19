@@ -49,10 +49,17 @@ class Organization(BaseModel):
     )
 
     user = relationship("User")
+    # ``lazy="selectin"`` so the detail template can resolve the parent's
+    # *name* without re-issuing IO inside Jinja (async sessions disallow
+    # implicit lazy-loads). Same pattern as ``Provider.org`` — any
+    # relationship a template dereferences must be eagerly loaded at the
+    # session boundary.
     parent = relationship(
         "Organization",
         remote_side="Organization.id",
         foreign_keys=[parent_org_id],
+        lazy="selectin",
+        join_depth=1,
     )
     # FK-side ``RESTRICT`` on both relationships — deleting an Org with
     # Providers or Programs fails loudly rather than silently orphaning.

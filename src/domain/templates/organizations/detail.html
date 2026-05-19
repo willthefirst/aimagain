@@ -19,7 +19,14 @@
 
    The name does NOT appear as a `<dt>Name</dt>` row in the facts list
    because the header `<strong>` already carries it — duplicating the
-   primary identifier inside the body was filed as #594. #}
+   primary identifier inside the body was filed as #594.
+
+   Root organizations (no `parent_org_id`) omit the parent row entirely
+   rather than rendering placeholder text — matching the optional-field
+   grammar used by posts/providers/programs detail templates (e.g.
+   `{% if view.cost %}` in providers/detail.html). The root status is
+   already conveyed by absence; a "— (root)" placeholder mixed two
+   empty-state conventions (em-dash + parenthetical). #}
 {% block content %}
 <article class="entity-card">
   <header class="entity-header">
@@ -30,15 +37,15 @@
   <section class="entity-facts">
     <dl>
       <div><dt>Type</dt><dd>{{ ORGANIZATION_TYPES_LABELS[organization.type] }}</dd></div>
+      {%- if organization.parent_org_id %}
       <div><dt>Parent organization</dt><dd>
-        {%- if organization.parent_org_id and organization.parent -%}
+        {%- if organization.parent -%}
         <a href="{{ entity_url('organization', id=organization.parent_org_id) }}">{{ organization.parent.name }}</a>
-        {%- elif organization.parent_org_id -%}
-        <a href="{{ entity_url('organization', id=organization.parent_org_id) }}">{{ organization.parent_org_id }}</a>
         {%- else -%}
-        — (root)
+        <a href="{{ entity_url('organization', id=organization.parent_org_id) }}">{{ organization.parent_org_id }}</a>
         {%- endif -%}
       </dd></div>
+      {%- endif %}
     </dl>
   </section>
 </article>
