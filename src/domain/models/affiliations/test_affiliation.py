@@ -106,6 +106,35 @@ async def test_provider_construct_with_existing_affiliation_skips_auto_create():
 
 
 @pytest.mark.asyncio
+async def test_provider_per_role_writes_mirror_to_affiliation():
+    """Regression for #629 PR 4 — `setattr(provider, '<per-role>', value)`
+    must mirror the write onto `provider.affiliation` so PR 3's
+    affiliation-first reads see the post-edit value. Without the
+    mirror, `repo.patch(provider, location_city='Queens')` would
+    update `providers.location_city` but leave
+    `affiliations.location_city` stale, and the directory's
+    `provider_card_view._role_attr` would return the pre-edit
+    affiliation value."""
+    user = _make_user("dave")
+    org = _make_org("Acme", user.id)
+    provider = _make_provider(owner=user, org=org)
+    aff = provider.affiliation
+    assert aff is not None
+
+    provider.location_city = "Queens"
+    provider.in_person_sessions = "no"
+    provider.sliding_scale = True
+    provider.cost = "$300/session"
+    provider.in_network_carriers = ["bcbs", "cigna"]
+
+    assert aff.location_city == "Queens"
+    assert aff.in_person_sessions == "no"
+    assert aff.sliding_scale is True
+    assert aff.cost == "$300/session"
+    assert aff.in_network_carriers == ["bcbs", "cigna"]
+
+
+@pytest.mark.asyncio
 async def test_provider_affiliation_persists_via_cascade(session):
     """`Provider.affiliation` has `cascade="all, delete-orphan"`, so
     persisting a Provider with a transient Affiliation flushes both

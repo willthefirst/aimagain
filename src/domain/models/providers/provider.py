@@ -1,6 +1,6 @@
 from functools import partial
 
-from sqlalchemy import JSON, Boolean, Column, ForeignKey, Text, text
+from sqlalchemy import JSON, Boolean, Column, ForeignKey, Text, event, text
 from sqlalchemy.orm import relationship
 from sqlalchemy.types import Uuid
 
@@ -202,3 +202,48 @@ class Provider(LocationMixin, BaseModel):
         ``org`` hasn't been populated yet (pre-flush ORM constructions);
         every persisted row has a NOT NULL ``org_id``."""
         return self.org.name if self.org is not None else None
+
+
+# Per-role attributes the directory's read path reads off
+# ``provider.affiliation`` (#629 PR 3). PR 3 swapped reads but left
+# writes still landing on the `providers.X` columns — every patch via
+# `repo.patch(provider, ...)` set the provider column but left the
+# linked affiliation stale, so reads would show pre-edit data until
+# the next backfill. PR 4 closes the gap by mirroring per-role
+# attribute writes onto `provider.affiliation` via a SQLAlchemy
+# `set` attribute event. The forthcoming column-drop PR (tracked
+# in a follow-up issue) retires this sync once `providers.X`
+# columns are gone and writes target affiliation directly.
+_PER_ROLE_COLUMNS = (
+    "org_id",
+    "location_city",
+    "location_state",
+    "location_zip",
+    "in_person_sessions",
+    "virtual_sessions",
+    "accepts_out_of_network",
+    "in_network_carriers",
+    "sliding_scale",
+    "cost",
+)
+
+
+def _mirror_to_affiliation(target, value, _oldvalue, initiator):
+    """Mirror a `Provider.<per-role>` write onto the linked
+    `Affiliation.<per-role>` so PR-3's affiliation-first reads see
+    the post-edit value. Quiet no-op when the affiliation isn't
+    loaded yet (e.g. pre-construction kwarg assignment runs before
+    `__init__` finishes wiring the back-relationship)."""
+    affiliation = getattr(target, "affiliation", None)
+    if affiliation is None:
+        return
+    setattr(affiliation, initiator.key, value)
+
+
+for _attr in _PER_ROLE_COLUMNS:
+    event.listen(
+        getattr(Provider, _attr),
+        "set",
+        _mirror_to_affiliation,
+        propagate=True,
+    )
