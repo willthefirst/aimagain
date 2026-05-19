@@ -26,6 +26,24 @@ from src.framework.persistence.base_repository import BaseRepository
 from src.framework.rendering.projections import project_view
 
 
+def _assert_kind_lock(spec: EntitySpec, target: Any) -> None:
+    """For kind-locked faces (`discriminator_value` set), raise 404 when
+    ``target.kind`` does not match the spec's bound value.
+
+    Used by detail / update / delete / form_edit so a row of one kind
+    can never be reached via another kind's URL family
+    (e.g. ``/referrals/{opening_id}`` 404s). The 404 surface (rather
+    than 400) keeps the wrong-family URL indistinguishable from a
+    truly-missing row — a stronger boundary than a leaky "exists but
+    wrong family" signal."""
+    if spec.discriminator_value is None:
+        return
+    column = spec.discriminator.column
+    target_kind = getattr(target, column)
+    if target_kind != spec.discriminator_value:
+        raise NotFoundError(detail=f"{spec.name.capitalize()} not found")
+
+
 async def handle_delete(
     spec: EntitySpec,
     *,
@@ -45,6 +63,7 @@ async def handle_delete(
     target = await repo.get_by_model_id(spec.model, target_id)
     if target is None:
         raise NotFoundError(detail=f"{spec.name.capitalize()} not found")
+    _assert_kind_lock(spec, target)
 
     # Self-target guard for user-shaped entities — the comparison only
     # matches when `target.id` IS the requesting user's id (i.e. the row
@@ -236,6 +255,7 @@ async def handle_update(
     target = await repo.get_by_model_id(spec.model, target_id)
     if target is None:
         raise NotFoundError(detail=f"{spec.name.capitalize()} not found")
+    _assert_kind_lock(spec, target)
 
     if spec.parent is not None:
         if parent_id is None:
@@ -582,6 +602,7 @@ async def handle_get_edit_form(
     target = await repo.get_by_model_id(spec.model, target_id)
     if target is None:
         raise NotFoundError(detail=f"{spec.name.capitalize()} not found")
+    _assert_kind_lock(spec, target)
     if spec.write_authz is not None:
         spec.write_authz(target, requesting_user, action=f"edit this {spec.name}")
 
@@ -653,10 +674,19 @@ async def handle_get_new_form(
     if spec.static_context:
         context.update(spec.static_context)
     if spec.discriminator is not None:
-        if kind is not None:
+        # Kind-locked face: the URL family is bound to one kind, so the
+        # picker step is skipped and we go straight to the kind-specific
+        # create template. `kind` query-param is absent on this spec
+        # (mount_entity doesn't synthesize it for kind-locked faces).
+        if spec.discriminator_value is not None:
+            context["template_name"] = spec.discriminator[
+                spec.discriminator_value
+            ].create_template
+        elif kind is not None:
             context["template_name"] = spec.discriminator[kind].create_template
-        # When `kind is None`, leave `template_name` unset so the route
-        # falls through to `spec.form_template` (the picker).
+        # When `kind is None` on a non-locked supertype, leave
+        # `template_name` unset so the route falls through to
+        # `spec.form_template` (the picker).
     elif spec.create_adapter_class is not None:
         # Non-polymorphic create forms render fields via
         # `field_for(schema, ...)` (reads `schema.model_fields`); the
@@ -707,6 +737,7 @@ async def handle_detail(
     target = await repo.get_by_model_id(spec.model, target_id)
     if target is None:
         raise NotFoundError(detail=f"{spec.name.capitalize()} not found")
+    _assert_kind_lock(spec, target)
 
     context: dict[str, Any] = {
         "request": request,
@@ -829,6 +860,13 @@ async def handle_list(
     page_number = parse_page(request)
     per_page = spec.page_size or DEFAULT_PAGE_SIZE
     list_kwargs: dict[str, Any] = dict(filter_values)
+    # Kind-locked face of a polymorphic supertype — force `kind` to the
+    # bound value so the URL family only ever lists its own kind. The
+    # user-facing filter form drops the `kind` choice (the spec strips
+    # it from `filters`), so `filter_values` won't carry it from query
+    # params; an attacker-supplied `?kind=other` is silently ignored.
+    if spec.discriminator_value is not None:
+        list_kwargs[spec.discriminator.column] = spec.discriminator_value
     if spec.list_exclude_self and requesting_user is not None:
         list_kwargs["exclude_self"] = requesting_user
     list_kwargs["offset"] = offset_for(page_number, per_page)

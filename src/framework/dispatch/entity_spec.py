@@ -540,18 +540,28 @@ class EntitySpec:
                 f"EntitySpec({self.name!r}) declares duplicate state-axis "
                 f"names: {axis_names}"
             )
-        # `discriminator` (registry on the supertype) and
-        # `discriminator_value` (single value on a kind-locked face) are
-        # mutually exclusive — a spec is either the supertype carrying
-        # the registry or one of its faces carrying one value, never
-        # both. Declaring both is a model error caught here.
-        if self.discriminator is not None and self.discriminator_value is not None:
+        # A kind-locked face declares both `discriminator` (the supertype's
+        # registry, needed for detail-model dispatch on create/update) and
+        # `discriminator_value` (the single value this face is bound to).
+        # `discriminator_value` without `discriminator` is incoherent — the
+        # handler couldn't look up the per-kind detail model.
+        if self.discriminator_value is not None and self.discriminator is None:
             raise ValueError(
-                f"EntitySpec({self.name!r}) declares both discriminator and "
-                f"discriminator_value — a spec is either the polymorphic "
-                "supertype (registry) or a kind-locked face (single value), "
-                "never both."
+                f"EntitySpec({self.name!r}) sets discriminator_value="
+                f"{self.discriminator_value!r} but no discriminator registry "
+                "— a kind-locked face still needs the registry to look up "
+                "its detail model on create/update."
             )
+        # `discriminator_value` must be a value the registry knows about,
+        # else create/update dispatch will KeyError at request time.
+        if self.discriminator_value is not None:
+            registry_names = self.discriminator.names
+            if self.discriminator_value not in registry_names:
+                raise ValueError(
+                    f"EntitySpec({self.name!r}) sets discriminator_value="
+                    f"{self.discriminator_value!r} but the discriminator "
+                    f"registry only knows {registry_names!r}."
+                )
         # `discriminator_value` set on an entity whose model lacks a
         # `kind` column is dead: the framework reads `target.kind` to
         # enforce the lock on detail/update/delete. Surface the misconfig

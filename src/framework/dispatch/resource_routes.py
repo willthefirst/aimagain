@@ -1387,14 +1387,18 @@ def mount_entity(
         consumed.add("create")
     if entity.routes.form_new:
         query_params: tuple[QueryParam, ...] = ()
-        if entity.discriminator is not None:
-            # Polymorphic entities' create-form `?kind=` query param
+        if entity.discriminator is not None and entity.discriminator_value is None:
+            # Polymorphic supertype's create-form `?kind=` query param
             # derives its Literal universe from the discriminator
             # registry — single source of truth for the kind names.
             # Default is `None`, which lets the handler render the
             # picker template (`spec.form_template`) when no kind is
             # specified, rather than silently defaulting to the first
             # registered kind.
+            #
+            # Kind-locked faces (`discriminator_value` set) skip this
+            # synthesis — there's no picker on a single-kind URL family;
+            # the form goes straight to the kind-specific create page.
             from typing import Literal, Optional
 
             names = entity.discriminator.names

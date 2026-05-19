@@ -387,21 +387,43 @@ def test_discriminator_value_defaults_to_none():
     assert spec.discriminator_value is None
 
 
-def test_discriminator_value_round_trips_on_kind_locked_face():
-    spec = _make_spec(model=_KindedModel, discriminator_value="x")
-    assert spec.discriminator_value == "x"
-
-
-def test_discriminator_and_discriminator_value_mutually_exclusive():
-    """A spec is either the polymorphic supertype (carrying the registry)
-    or a kind-locked face (carrying one value), never both."""
+def _kinded_registry():
+    """Build a `DiscriminatorRegistry` with two kind values for the
+    kind-lock tests."""
     from src.framework.persistence.polymorphic import DiscriminatorRegistry
 
-    registry = DiscriminatorRegistry(
-        column="kind", specs={"x": "spec-x", "y": "spec-y"}
+    return DiscriminatorRegistry(column="kind", specs={"x": "spec-x", "y": "spec-y"})
+
+
+def test_discriminator_value_round_trips_on_kind_locked_face():
+    spec = _make_spec(
+        model=_KindedModel,
+        discriminator=_kinded_registry(),
+        discriminator_value="x",
     )
-    with pytest.raises(ValueError, match="declares both discriminator"):
-        _make_spec(model=_KindedModel, discriminator=registry, discriminator_value="x")
+    assert spec.discriminator_value == "x"
+    # Face still carries the registry — handle_create/handle_update need
+    # it to look up the per-kind detail model.
+    assert spec.discriminator is not None
+
+
+def test_discriminator_value_without_discriminator_raises():
+    """A kind-locked face still needs the registry to look up its
+    per-kind detail model on create/update — `discriminator_value`
+    without `discriminator` is incoherent."""
+    with pytest.raises(ValueError, match="no discriminator registry"):
+        _make_spec(model=_KindedModel, discriminator_value="x")
+
+
+def test_discriminator_value_must_be_in_registry():
+    """`discriminator_value` must match one of the registry's kind names,
+    else dispatch would KeyError at request time."""
+    with pytest.raises(ValueError, match="registry only knows"):
+        _make_spec(
+            model=_KindedModel,
+            discriminator=_kinded_registry(),
+            discriminator_value="not-a-kind",
+        )
 
 
 def test_discriminator_value_requires_kind_attr_on_model():
@@ -410,7 +432,7 @@ def test_discriminator_value_requires_kind_attr_on_model():
     silently no-op. Caught at construction time instead."""
     # `SimpleNamespace` is the `_make_spec` default model; it has no `kind`.
     with pytest.raises(ValueError, match="no `kind` attribute"):
-        _make_spec(discriminator_value="x")
+        _make_spec(discriminator=_kinded_registry(), discriminator_value="x")
 
 
 def test_audit_snapshot_builds_audited_resource_from_schema():
