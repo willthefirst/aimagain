@@ -20,6 +20,8 @@ Subresource lists (e.g. `/users/{id}/providers`) override `{% block breadcrumb %
 
 Pages that don't fit the resource grammar — the `/auth/*` flow's centered single-card layout, the `/posts/*` polymorphic create/edit forms — extend `base.html` directly and compose the `_shared/` macros by hand. See [`posts/README.md`](posts/README.md) for the two-layer `_<variant>_form.html` + `new_<variant>.html` pattern used for polymorphic intake.
 
+The auth-flow pages (`auth/login.html`, `auth/register.html`, `auth/forgot_password.html`, `auth/reset_password.html`) each render a single `<article class="auth-page">` card. The `.auth-page` rule in [`../../framework/templates/base.html`](../../framework/templates/base.html) caps the card at 28rem and centers it horizontally — without the class the card stretches to the full `<main class="container">` width on tablet/desktop.
+
 ## Tests
 
 Exercised indirectly via route tests under [`../routes/`](../routes/). Selector and fixture conventions live in [`../../../tests/README.md`](../../../tests/README.md).
