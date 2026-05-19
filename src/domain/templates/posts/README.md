@@ -8,6 +8,8 @@ Each kind ships a pair: a `_<kind>_form.html` macro `(hx_method, action, submit_
 
 `list.html` / `detail.html` / `_item.html` carry kind-aware branches (`{% if post.kind == "<kind>" %}`). When a new kind ships, add the branch in both. Filter and chip vocabularies come from `ChoiceFilter("kind", ...)` in [`../../specs/post.py`](../../specs/post.py).
 
+`detail.html`'s breadcrumb leaf (`current_label` block) reads `view.headline` — the same identity string the entity-card's header renders, computed once via `post_card_view(post)` at module scope so the leaf and the heading can't drift. Per-kind branching for the headline (CR age-cohort phrase / opening practice name / program name) lives in [`../../logic/posts/view.py`](../../logic/posts/view.py)`::post_card_view`; templates never re-derive it. When a new kind ships, the breadcrumb picks up automatically as long as `post_card_view` returns a non-empty `headline` for it (falls back to `"Post"`).
+
 ## Insurance posture
 
 The unified 4-state insurance posture is derived per-post by [`../../logic/posts/view.py`](../../logic/posts/view.py)`::insurance_posture_for_post` (registered as the `insurance_posture` Jinja global) — collapses the asymmetric CR (`network_preference` + nullable `insurance_carrier`) and PA (Provider's `in_network_carriers` + `accepts_out_of_network` / `sliding_scale` flags) into one labeled chunk.
