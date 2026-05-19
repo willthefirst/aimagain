@@ -368,6 +368,23 @@
         color: var(--pico-muted-color);
       }
       .credential-row > button { margin: 0; flex: 0 0 auto; }
+      /* Auth-page form card — `/auth/login`, `/auth/register`,
+         `/auth/forgot-password`, `/auth/reset-password/<token>`. Each
+         page extends `base.html` directly (not the entity-form grammar)
+         and renders a single `<article class="auth-page">` card. The
+         article sits inside the `<main class="container">` which Pico
+         already centers and caps; without the rules below the card
+         itself still stretches to the container's full width (~720px
+         on tablet, ~1300px on desktop, #584). Cap at 28rem (~448px) —
+         narrower than `--form-max-width` since the auth forms are
+         visually dense (2–3 short fields) and a tighter card reads as
+         a clear focal point on landing. Centered via `margin-inline:
+         auto`. Mobile (< 28rem) is unchanged since the cap is wider
+         than the viewport. */
+      .auth-page {
+        max-width: 28rem;
+        margin-inline: auto;
+      }
     </style>
     <script
       src="https://unpkg.com/htmx.org@2.0.4"

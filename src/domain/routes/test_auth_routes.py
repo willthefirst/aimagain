@@ -155,6 +155,10 @@ async def test_get_register_page(test_client: AsyncClient):
     # Page-title text is no longer wrapped in an `<h1>` (per app-wide
     # H1 removal); the form's submit button still says "Register".
     assert "Register" in response.text
+    # Card wrapper — `.auth-page` caps the form at 28rem and centers it
+    # so it doesn't stretch to the `<main class="container">` width on
+    # tablet/desktop (#584). The `.auth-page` rule lives in `base.html`.
+    assert '<article class="auth-page">' in response.text
 
 
 async def test_get_login_page(test_client: AsyncClient):
@@ -162,6 +166,8 @@ async def test_get_login_page(test_client: AsyncClient):
     assert response.status_code == 200
     assert "text/html" in response.headers["content-type"]
     assert "Login" in response.text
+    # See `test_get_register_page` for `.auth-page` rationale (#584).
+    assert '<article class="auth-page">' in response.text
 
 
 async def test_get_forgot_password_page(test_client: AsyncClient):
@@ -173,6 +179,8 @@ async def test_get_forgot_password_page(test_client: AsyncClient):
     # identify the page.
     assert "/auth/forgot-password" in response.text
     assert "Send reset link" in response.text
+    # See `test_get_register_page` for `.auth-page` rationale (#584).
+    assert '<article class="auth-page">' in response.text
 
 
 async def test_get_reset_password_page(test_client: AsyncClient):
@@ -185,6 +193,8 @@ async def test_get_reset_password_page(test_client: AsyncClient):
         f'value="{reset_token}"' in response.text
         or f'data-token="{reset_token}"' in response.text
     )
+    # See `test_get_register_page` for `.auth-page` rationale (#584).
+    assert '<article class="auth-page">' in response.text
 
 
 async def test_unauthorized_redirect_for_browser_requests(test_client: AsyncClient):
