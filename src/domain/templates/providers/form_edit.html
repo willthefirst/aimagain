@@ -136,7 +136,10 @@
   {% endcall %}
 </section>
 
-<div class="form-actions">
-  <a href="{{ entity_url('provider', id=provider.id) }}" role="button" class="secondary outline">Cancel</a>
-</div>
+{# Page-level Cancel — the credentials sections above use inline-add /
+   per-row delete forms that don't share submit/cancel state with the
+   Practice form. Routing through `form_actions` (with no
+   `submit_label`) keeps the visual width consistent with the rest of
+   the form-action clusters on the page. #}
+{{ form_actions(cancel_url=entity_url('provider', id=provider.id)) }}
 {% endblock %}

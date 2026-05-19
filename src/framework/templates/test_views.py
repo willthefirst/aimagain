@@ -399,6 +399,140 @@ def test_form_edit_view_renders_three_segment_breadcrumb() -> None:
     assert ">Edit</li>" in html or ">Edit<" in html
 
 
+def test_form_actions_buttons_fill_row_width_on_desktop() -> None:
+    """Save / Cancel must stretch (`flex: 1 1 0`) so the cluster fills
+    the form's content width instead of clustering at the left edge as
+    content-width flex items — without the rule the row visibly fell
+    short of the form's right edge while every other element
+    (fieldsets, inputs) filled the form. The Delete button keeps its
+    content width (the `:not(.form-actions-destructive)` selector
+    excludes it) and `margin-left: auto` pushes it to the far right.
+    Pinned against `base.html` so a future CSS edit that drops the
+    grow rule fails here loudly."""
+    import re
+
+    env = _make_env()
+    _add_child(
+        env,
+        "stub.html",
+        """
+        {% extends "views/form_new.html" %}
+        {% set resource_url = "/widgets" %}
+        {% block resource_label %}Widgets{% endblock %}
+        {% block content %}<form></form>{% endblock %}
+        """,
+    )
+    html = env.get_template("stub.html").render(
+        request=_request_stub(),
+        is_authenticated=False,
+        is_development=False,
+    )
+    # The non-destructive Save/Cancel rule must `flex: 1` (any
+    # `1 1 0` / `1` variant) so they grow. Match the property
+    # against any value that starts with `1`.
+    grow_rule = re.search(
+        r"\.form-actions\s*>\s*button:not\(\.form-actions-destructive\)[^{]*\{[^}]*flex:\s*1",
+        html,
+        re.DOTALL,
+    )
+    assert grow_rule is not None, (
+        ".form-actions > button:not(.form-actions-destructive) must declare "
+        "`flex: 1 ...` so Save/Cancel fill the row's width — without it the "
+        "cluster falls short of the form's right edge"
+    )
+    role_button_rule = re.search(
+        r"\.form-actions\s*>\s*\[role=\"button\"\]:not\(\.form-actions-destructive\)[^{]*\{[^}]*flex:\s*1",
+        html,
+        re.DOTALL,
+    )
+    assert role_button_rule is not None, (
+        '`[role="button"]` (Cancel link styled as button) must follow the '
+        "same flex-grow rule as `<button>` — without it the Cancel half of "
+        "the row stays content-width"
+    )
+    # And the destructive button must NOT grow — Delete keeps its
+    # content width on the right edge.
+    destructive_rule = re.search(
+        r"\.form-actions\s*>\s*\.form-actions-destructive\b[^{]*\{[^}]*margin-left:\s*auto",
+        html,
+        re.DOTALL,
+    )
+    assert destructive_rule is not None, (
+        ".form-actions-destructive must declare `margin-left: auto` so "
+        "Delete stays right-aligned and content-sized"
+    )
+
+
+def test_form_actions_macro_supports_cancel_only_for_page_level_clusters() -> None:
+    """The `form_actions` macro accepts `submit_label=None` so multi-
+    section pages (e.g. `providers/form_edit.html`) can render a
+    page-level Cancel-only cluster without a redundant Save button.
+    Pinned because the bare `<div class="form-actions">` that used to
+    live in that template diverged from the macro's styling on the
+    desktop width fix — every cluster must route through the macro."""
+    env = _make_env()
+    _add_child(
+        env,
+        "stub.html",
+        """
+        {% from "_shared/forms.html" import form_actions %}
+        <div id="cancel-only">
+          {{ form_actions(cancel_url="/widgets/1") }}
+        </div>
+        """,
+    )
+    html = env.get_template("stub.html").render()
+    tree = HTMLParser(html)
+    cluster = tree.css_first("#cancel-only .form-actions")
+    assert cluster is not None, "macro must still render `.form-actions` wrapper"
+    # No submit button when `submit_label` is omitted.
+    assert (
+        cluster.css_first("button[type='submit']") is None
+    ), "Cancel-only cluster must not render a stray Save button"
+    # Cancel link is present and points at the supplied URL.
+    cancel = cluster.css_first("a[role='button']")
+    assert cancel is not None
+    assert cancel.attributes.get("href") == "/widgets/1"
+
+
+def test_no_template_uses_outlined_danger_for_delete() -> None:
+    """Every Delete affordance uses `class="danger"` (filled red) —
+    the outlined-danger treatment (`class="danger outline"`) softens
+    the visual weight and lets a destructive misfire look like a
+    no-op Edit, which is the whole reason `.danger` (filled) exists
+    (#579). The action-vocabulary table in `_shared/actions.html`
+    documents this; this test scans the template tree so a future
+    drift fails here loudly rather than waiting for a UI review.
+    """
+    import re
+    from pathlib import Path
+
+    templates_roots = [
+        Path("src/framework/templates"),
+        Path("src/domain/templates"),
+    ]
+    # Match any class attribute that includes BOTH `danger` and
+    # `outline` (in any order, possibly with other classes). The
+    # whitespace boundary lets `class="danger outline"` and
+    # `class="outline danger"` both fail; a class containing the
+    # substring `danger` in a longer token (`.danger-icon`) wouldn't
+    # match because `\b` anchors on word boundary.
+    violations: list[str] = []
+    for root in templates_roots:
+        for path in root.rglob("*.html"):
+            text = path.read_text(encoding="utf-8")
+            for match in re.finditer(r'class="([^"]*)"', text):
+                classes = match.group(1).split()
+                if "danger" in classes and "outline" in classes:
+                    violations.append(f"{path}: {match.group(0)}")
+
+    assert not violations, (
+        "outlined-danger violates the action-style vocabulary "
+        '(see `_shared/actions.html`) — Delete must be `class="danger"` '
+        '(filled), not `class="danger outline"`. Found:\n  ' + "\n  ".join(violations)
+    )
+
+
 def test_destructive_action_macros_emit_danger_class() -> None:
     """Regression for #579 — every Delete affordance must carry
     `class="danger"` (defined in base.html). Pins the two macros that
