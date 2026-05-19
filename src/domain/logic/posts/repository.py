@@ -3,6 +3,7 @@ from collections.abc import Sequence
 from sqlalchemy import or_, select
 
 from src.domain.models import (
+    Affiliation,
     OpeningDetail,
     Post,
     Provider,
@@ -82,9 +83,18 @@ class PostRepository(BaseRepository):
                 OpeningDetail.post_id == Post.id,
             )
         if needs_provider_join:
+            # The location columns moved off `providers` to `affiliations`
+            # in #635 PR B; join through the 1:1 `affiliations.provider_id`
+            # FK to reach them. The `Provider` join stays in case future
+            # state/city filters want to be Provider-attribute-conditional
+            # (e.g. only-non-deleted providers), but it isn't required by
+            # the current predicates.
             stmt = stmt.outerjoin(
                 Provider,
                 Provider.id == OpeningDetail.provider_id,
+            ).outerjoin(
+                Affiliation,
+                Affiliation.provider_id == Provider.id,
             )
 
         if kind is not None:
@@ -103,7 +113,7 @@ class PostRepository(BaseRepository):
             stmt = stmt.filter(
                 or_(
                     ReferralDetail.location_state.in_(state),
-                    Provider.location_state.in_(state),
+                    Affiliation.location_state.in_(state),
                 )
             )
         if city:
@@ -111,7 +121,7 @@ class PostRepository(BaseRepository):
             stmt = stmt.filter(
                 or_(
                     ReferralDetail.location_city.ilike(needle),
-                    Provider.location_city.ilike(needle),
+                    Affiliation.location_city.ilike(needle),
                 )
             )
         if age_group:

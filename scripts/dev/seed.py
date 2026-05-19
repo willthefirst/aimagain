@@ -37,6 +37,7 @@ from src.auth_config import UserManager
 from src.db import async_session_maker
 from src.domain.logic.users.schema import UserCreate
 from src.domain.models import (
+    Affiliation,
     IntakeDetail,
     OpeningDetail,
     Organization,
@@ -1049,11 +1050,16 @@ async def seed_opening() -> tuple[int, int]:
                 await session.flush()
 
             # Find-or-create the Provider for (owner_id, org_id).
-            # Reusing across reseeds keeps the FK stable.
+            # Reusing across reseeds keeps the FK stable. The `org_id`
+            # column moved off `providers` to `affiliations` in #635
+            # PR B, so the (owner, org) lookup joins through the 1:1
+            # `affiliations.provider_id` link.
             provider_result = await session.execute(
-                select(Provider).where(
+                select(Provider)
+                .join(Affiliation, Affiliation.provider_id == Provider.id)
+                .where(
                     Provider.owner_id == owner.id,
-                    Provider.org_id == org.id,
+                    Affiliation.org_id == org.id,
                 )
             )
             provider = provider_result.scalar_one_or_none()
@@ -1738,9 +1744,11 @@ async def seed_credentials() -> tuple[int, int]:
                 skipped += 1
                 continue
             provider_result = await session.execute(
-                select(Provider).where(
+                select(Provider)
+                .join(Affiliation, Affiliation.provider_id == Provider.id)
+                .where(
                     Provider.owner_id == owner.id,
-                    Provider.org_id == org.id,
+                    Affiliation.org_id == org.id,
                 )
             )
             provider = provider_result.scalar_one_or_none()

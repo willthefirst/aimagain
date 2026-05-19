@@ -61,8 +61,11 @@ class Organization(BaseModel):
         lazy="selectin",
         join_depth=1,
     )
-    # FK-side ``RESTRICT`` on both relationships — deleting an Org with
-    # Providers or Programs fails loudly rather than silently orphaning.
-    # ORM relationships are read-only from the Org side.
-    providers = relationship("Provider", back_populates="org")
+    # FK-side ``RESTRICT`` on Programs — deleting an Org with attached
+    # Programs fails loudly rather than silently orphaning. The Org →
+    # Provider path moved to Org → Affiliation in #635 PR B (the
+    # `org_id` column was dropped from `providers`); callers that
+    # want "providers at this org" now navigate `org.affiliations` and
+    # read `affiliation.provider`. ORM relationships are read-only
+    # from the Org side.
     programs = relationship("Program", back_populates="organization")

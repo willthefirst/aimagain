@@ -1,37 +1,59 @@
-from functools import partial
-
-from sqlalchemy import JSON, Boolean, Column, ForeignKey, Text, event, text
+from sqlalchemy import Column, ForeignKey
 from sqlalchemy.orm import relationship
 from sqlalchemy.types import Uuid
 
 from src.framework.persistence.base_model import BaseModel
-from src.framework.persistence.mixins import LocationMixin
-
-from ..enums import LOCATION_AVAILABILITY_OPTIONS, US_STATES, named_check_in
 
 _TABLE = "providers"
-_ck = partial(named_check_in, _TABLE)
 
 
-class Provider(LocationMixin, BaseModel):
-    """Long-lived provider directory entry. Owns the provider's credential
-    lists (licensures, educations, certifications) via cascade. A user may
-    own multiple `Provider` rows — `uq_provider_profiles_user_id` was
-    dropped in `8f20a93effc9` to allow it — so the `owner_id` FK is
-    intentionally non-unique. Distinct from `OpeningDetail`,
-    which is a per-Post detail row tied to one outreach `Post`.
+# Per-role attributes that no longer live as columns on `providers` —
+# they were dropped in #635 PR B and now live only on `affiliations`.
+# The Provider constructor consumes them as kwargs and forwards them
+# into a fresh `Affiliation`; the `@property` proxies below route
+# reads and writes to `provider.affiliation.X` so the framework's
+# `repo.patch(provider, ...)` and the schema's `from_attributes`
+# path keep working unchanged.
+_PER_ROLE_ATTRS = (
+    "org_id",
+    "location_city",
+    "location_state",
+    "location_zip",
+    "in_person_sessions",
+    "virtual_sessions",
+    "accepts_out_of_network",
+    "in_network_carriers",
+    "sliding_scale",
+    "cost",
+)
 
-    Inherits the ``(city, state, zip)`` location columns from
-    :class:`LocationMixin`. The ``location_state`` CHECK constraint lives
-    in ``__table_args__`` below because CHECK names are table-prefixed.
+
+class Provider(BaseModel):
+    """Long-lived provider directory entry.
+
+    After #635 PR B `providers` is a thin structural table — it holds
+    only `id`, `owner_id`, `clinician_id`, and the audit timestamps.
+    Every per-role attribute (`org_id`, the `(city, state, zip)` triple,
+    `in_person_sessions`, `virtual_sessions`, the insurance posture,
+    `sliding_scale`, `cost`) lives on the linked
+    :class:`~src.domain.models.affiliations.Affiliation` row.
+
+    The Provider constructor splits incoming per-role kwargs out of the
+    SQLAlchemy column constructor and forwards them into a transient
+    `Affiliation` instead — so the framework's generic create handler
+    (`spec.model(**payload.model_dump())`) keeps producing fully-wired
+    rows from a wire-flat payload. The `@property` proxies route reads
+    and writes for those attrs through `provider.affiliation.X`, so
+    `repo.patch(provider, org_id=X)` and `ProviderRead.model_validate(provider)`
+    both keep working unchanged.
+
+    A user may own multiple `Provider` rows — `uq_provider_profiles_user_id`
+    was dropped in `8f20a93effc9` to allow it — so the `owner_id` FK is
+    intentionally non-unique. Distinct from `OpeningDetail`, which is a
+    per-Post detail row tied to one outreach `Post`.
     """
 
     __tablename__ = _TABLE
-    __table_args__ = (
-        _ck("location_state", US_STATES),
-        _ck("in_person_sessions", LOCATION_AVAILABILITY_OPTIONS),
-        _ck("virtual_sessions", LOCATION_AVAILABILITY_OPTIONS),
-    )
 
     owner_id = Column(
         Uuid(as_uuid=True),
@@ -39,14 +61,6 @@ class Provider(LocationMixin, BaseModel):
         nullable=False,
     )
     user = relationship("User")
-    # `provider.org.name` is the practice's display name — there is no
-    # separate `practice_name` column.
-    org_id = Column(
-        Uuid(as_uuid=True),
-        ForeignKey("organizations.id", ondelete="RESTRICT"),
-        nullable=False,
-    )
-    org = relationship("Organization", back_populates="providers", lazy="selectin")
     # NPI moved from `providers.npi` to `clinicians.npi` (#629 PR 1).
     # Read it through `provider.clinician.npi`; the ProviderRead schema
     # surfaces it as `npi` via a model-validator so wire callers keep
@@ -59,31 +73,13 @@ class Provider(LocationMixin, BaseModel):
         nullable=False,
     )
     clinician = relationship("Clinician", back_populates="providers", lazy="selectin")
-    in_person_sessions = Column(Text, nullable=False)
-    virtual_sessions = Column(Text, nullable=False)
 
-    # Insurance posture. `in_network_carriers` is the set of carriers the
-    # practice accepts in-network — an empty list means "no in-network".
-    # `accepts_out_of_network` is independent: a practice may accept
-    # in-network, out-of-network, both, or neither (self-pay only).
-    # Default is `True` — most practices accept OON, and forcing the
-    # opt-out matches the real-world prior.
-    accepts_out_of_network = Column(
-        Boolean, nullable=False, server_default=text("1"), default=True
-    )
-    in_network_carriers = Column(
-        JSON, nullable=False, server_default=text("'[]'"), default=list
-    )
-    sliding_scale = Column(
-        Boolean, nullable=False, server_default=text("0"), default=False
-    )
-    cost = Column(Text, nullable=True)
-
-    # Transitional 1:1 back-relationship to the `Affiliation` row this
-    # provider was backfilled into (#629 PR 2). PR 3 switches the
-    # directory UI to read per-role attrs through `provider.affiliation`;
-    # PR 4 drops both the duplicated columns from `providers` and this
-    # back-relationship along with the legacy `providers` table.
+    # 1:1 link to the `Affiliation` row that holds every per-role
+    # attribute for this provider. The transitional `affiliations.provider_id`
+    # UNIQUE FK on the affiliation side remains as the 1:1 join; the
+    # natural next cleanup (if `providers` ever drops to a view or
+    # gets renamed) is to retarget that FK at `clinicians.id` and drop
+    # the column from `affiliations`.
     affiliation = relationship(
         "Affiliation",
         back_populates="provider",
@@ -105,22 +101,23 @@ class Provider(LocationMixin, BaseModel):
     def __init__(self, **kwargs):
         """Auto-create the side rows so the framework's generic
         ``spec.model(**payload.model_dump())`` create path keeps
-        working unchanged through the multi-PR split (#629).
+        working unchanged through the multi-PR split (#629 / #635).
 
-        - PR 1: any wire-side ``npi=`` kwarg becomes a fresh
-          ``Clinician`` attached as ``self.clinician``.
-        - PR 2: the per-role kwargs (``org_id``, ``location_*``,
+        - Any wire-side ``npi=`` kwarg becomes a fresh ``Clinician``
+          attached as ``self.clinician`` (the column moved off
+          ``providers`` in #629 PR 1).
+        - The per-role kwargs (``org_id``, ``location_*``,
           ``in_person_sessions``, ``virtual_sessions``,
           ``accepts_out_of_network``, ``in_network_carriers``,
-          ``sliding_scale``, ``cost``) ALSO populate a fresh
-          ``Affiliation`` attached as ``self.affiliation``, so
-          every new Provider has a linked Affiliation from day
-          one — PR 3 swaps reads onto Affiliation and PR 4 drops
-          the duplicated columns once nothing reads `providers`.
+          ``sliding_scale``, ``cost``) are peeled off `kwargs` and
+          forwarded into a fresh ``Affiliation`` — those columns no
+          longer exist on `providers` (#635 PR B). The Provider
+          constructor itself sees only the structural columns
+          (`owner_id`, `clinician_id`).
 
-        Skips Clinician/Affiliation auto-create when the caller
-        already supplies the relationship or its FK (test
-        fixtures that wire the join manually).
+        Skips Clinician / Affiliation auto-create when the caller
+        already supplies the relationship or its FK (test fixtures
+        that wire the join manually).
         """
         # Late import via the package facade — sibling clusters
         # (`models/clinicians/`, `models/affiliations/`) can't be
@@ -132,6 +129,9 @@ class Provider(LocationMixin, BaseModel):
         from src.domain.models import Affiliation, Clinician
 
         npi = kwargs.pop("npi", None)
+        # Peel per-role kwargs off before the SQLAlchemy column
+        # constructor sees them — they target Affiliation now.
+        per_role = {k: kwargs.pop(k) for k in list(_PER_ROLE_ATTRS) if k in kwargs}
         super().__init__(**kwargs)
         if (
             self.clinician is None
@@ -141,23 +141,21 @@ class Provider(LocationMixin, BaseModel):
         ):
             self.clinician = Clinician(npi=npi)
         if self.affiliation is None and "affiliation" not in kwargs:
-            # Pull from the original kwargs (Column defaults only apply
-            # at flush, not at construction — `self.accepts_out_of_network`
-            # would be None before flush even though the column default
-            # is True). Mirror Provider's column defaults explicitly so
-            # the transient Affiliation passes its NOT NULL columns.
+            # Mirror the affiliation column defaults explicitly (column
+            # `server_default`s only fire at flush) so the transient
+            # row passes its NOT NULL columns.
             self.affiliation = Affiliation(
                 clinician=self.clinician,
-                org_id=kwargs.get("org_id"),
-                location_city=kwargs.get("location_city"),
-                location_state=kwargs.get("location_state"),
-                location_zip=kwargs.get("location_zip"),
-                in_person_sessions=kwargs.get("in_person_sessions"),
-                virtual_sessions=kwargs.get("virtual_sessions"),
-                accepts_out_of_network=kwargs.get("accepts_out_of_network", True),
-                in_network_carriers=kwargs.get("in_network_carriers") or [],
-                sliding_scale=kwargs.get("sliding_scale", False),
-                cost=kwargs.get("cost"),
+                org_id=per_role.get("org_id"),
+                location_city=per_role.get("location_city"),
+                location_state=per_role.get("location_state"),
+                location_zip=per_role.get("location_zip"),
+                in_person_sessions=per_role.get("in_person_sessions"),
+                virtual_sessions=per_role.get("virtual_sessions"),
+                accepts_out_of_network=per_role.get("accepts_out_of_network", True),
+                in_network_carriers=per_role.get("in_network_carriers") or [],
+                sliding_scale=per_role.get("sliding_scale", False),
+                cost=per_role.get("cost"),
             )
 
     @property
@@ -187,6 +185,43 @@ class Provider(LocationMixin, BaseModel):
         else:
             self.clinician.npi = value
 
+    # --- Per-role property proxies ----------------------------------
+    # These delegate reads and writes to `provider.affiliation.X`. The
+    # actual columns were dropped from `providers` in #635 PR B; the
+    # properties exist so:
+    #
+    #   * `ProviderRead.model_validate(provider)` keeps working (the
+    #     schema reads `provider.org_id`, `provider.location_city`, etc.
+    #     via `from_attributes`).
+    #   * `repo.patch(provider, location_city="X")` lands on
+    #     `affiliation.location_city` because `_patch` calls
+    #     `setattr(provider, "location_city", "X")`, which hits the
+    #     property setter below.
+    #   * Templates and `posts.view` callers that read
+    #     `provider.location_city` directly keep working unchanged.
+
+    @property
+    def org_id(self):
+        aff = self.affiliation
+        return aff.org_id if aff is not None else None
+
+    @org_id.setter
+    def org_id(self, value) -> None:
+        if self.affiliation is not None:
+            self.affiliation.org_id = value
+
+    @property
+    def org(self):
+        """Proxy through `provider.affiliation.org` so callers reading
+        ``provider.org.name`` (templates, view models) keep working."""
+        aff = self.affiliation
+        return aff.org if aff is not None else None
+
+    @org.setter
+    def org(self, value) -> None:
+        if self.affiliation is not None:
+            self.affiliation.org = value
+
     @property
     def org_name(self) -> str | None:
         """Convenience accessor for ``provider.org.name`` — the practice's
@@ -195,7 +230,100 @@ class Provider(LocationMixin, BaseModel):
         is unloaded. Returns ``None`` only in the narrow window where
         ``org`` hasn't been populated yet (pre-flush ORM constructions);
         every persisted row has a NOT NULL ``org_id``."""
-        return self.org.name if self.org is not None else None
+        org = self.org
+        return org.name if org is not None else None
+
+    @property
+    def location_city(self) -> str | None:
+        aff = self.affiliation
+        return aff.location_city if aff is not None else None
+
+    @location_city.setter
+    def location_city(self, value) -> None:
+        if self.affiliation is not None:
+            self.affiliation.location_city = value
+
+    @property
+    def location_state(self) -> str | None:
+        aff = self.affiliation
+        return aff.location_state if aff is not None else None
+
+    @location_state.setter
+    def location_state(self, value) -> None:
+        if self.affiliation is not None:
+            self.affiliation.location_state = value
+
+    @property
+    def location_zip(self) -> str | None:
+        aff = self.affiliation
+        return aff.location_zip if aff is not None else None
+
+    @location_zip.setter
+    def location_zip(self, value) -> None:
+        if self.affiliation is not None:
+            self.affiliation.location_zip = value
+
+    @property
+    def in_person_sessions(self) -> str | None:
+        aff = self.affiliation
+        return aff.in_person_sessions if aff is not None else None
+
+    @in_person_sessions.setter
+    def in_person_sessions(self, value) -> None:
+        if self.affiliation is not None:
+            self.affiliation.in_person_sessions = value
+
+    @property
+    def virtual_sessions(self) -> str | None:
+        aff = self.affiliation
+        return aff.virtual_sessions if aff is not None else None
+
+    @virtual_sessions.setter
+    def virtual_sessions(self, value) -> None:
+        if self.affiliation is not None:
+            self.affiliation.virtual_sessions = value
+
+    @property
+    def accepts_out_of_network(self) -> bool | None:
+        aff = self.affiliation
+        return aff.accepts_out_of_network if aff is not None else None
+
+    @accepts_out_of_network.setter
+    def accepts_out_of_network(self, value) -> None:
+        if self.affiliation is not None:
+            self.affiliation.accepts_out_of_network = value
+
+    @property
+    def in_network_carriers(self) -> list:
+        aff = self.affiliation
+        if aff is None or aff.in_network_carriers is None:
+            return []
+        return aff.in_network_carriers
+
+    @in_network_carriers.setter
+    def in_network_carriers(self, value) -> None:
+        if self.affiliation is not None:
+            self.affiliation.in_network_carriers = value
+
+    @property
+    def sliding_scale(self) -> bool | None:
+        aff = self.affiliation
+        return aff.sliding_scale if aff is not None else None
+
+    @sliding_scale.setter
+    def sliding_scale(self, value) -> None:
+        if self.affiliation is not None:
+            self.affiliation.sliding_scale = value
+
+    @property
+    def cost(self) -> str | None:
+        aff = self.affiliation
+        return aff.cost if aff is not None else None
+
+    @cost.setter
+    def cost(self, value) -> None:
+        if self.affiliation is not None:
+            self.affiliation.cost = value
 
     @property
     def licensures(self):
@@ -217,48 +345,3 @@ class Provider(LocationMixin, BaseModel):
     def certifications(self):
         """Person-level credential list — see :py:attr:`licensures`."""
         return [] if self.clinician is None else self.clinician.certifications
-
-
-# Per-role attributes the directory's read path reads off
-# ``provider.affiliation`` (#629 PR 3). PR 3 swapped reads but left
-# writes still landing on the `providers.X` columns — every patch via
-# `repo.patch(provider, ...)` set the provider column but left the
-# linked affiliation stale, so reads would show pre-edit data until
-# the next backfill. PR 4 closes the gap by mirroring per-role
-# attribute writes onto `provider.affiliation` via a SQLAlchemy
-# `set` attribute event. The forthcoming column-drop PR (tracked
-# in a follow-up issue) retires this sync once `providers.X`
-# columns are gone and writes target affiliation directly.
-_PER_ROLE_COLUMNS = (
-    "org_id",
-    "location_city",
-    "location_state",
-    "location_zip",
-    "in_person_sessions",
-    "virtual_sessions",
-    "accepts_out_of_network",
-    "in_network_carriers",
-    "sliding_scale",
-    "cost",
-)
-
-
-def _mirror_to_affiliation(target, value, _oldvalue, initiator):
-    """Mirror a `Provider.<per-role>` write onto the linked
-    `Affiliation.<per-role>` so PR-3's affiliation-first reads see
-    the post-edit value. Quiet no-op when the affiliation isn't
-    loaded yet (e.g. pre-construction kwarg assignment runs before
-    `__init__` finishes wiring the back-relationship)."""
-    affiliation = getattr(target, "affiliation", None)
-    if affiliation is None:
-        return
-    setattr(affiliation, initiator.key, value)
-
-
-for _attr in _PER_ROLE_COLUMNS:
-    event.listen(
-        getattr(Provider, _attr),
-        "set",
-        _mirror_to_affiliation,
-        propagate=True,
-    )
