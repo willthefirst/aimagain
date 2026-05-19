@@ -200,6 +200,40 @@ def test_form_new_view_appends_new_segment() -> None:
     assert '<form id="x"></form>' in html
 
 
+def test_entity_card_header_wraps_on_narrow_viewports() -> None:
+    """Regression for #577 — `.entity-card > header.entity-header` must
+    set `flex-wrap: wrap` so the modality chip + right-aligned `<small>`
+    date stay visible at ≤375px viewports. Without it the chip and date
+    clip past the card's right edge on mobile."""
+    import re
+
+    env = _make_env()
+    _add_child(
+        env,
+        "stub.html",
+        """
+        {% extends "views/list.html" %}
+        {% block resource_label %}Posts{% endblock %}
+        {% block content %}body{% endblock %}
+        """,
+    )
+
+    html = env.get_template("stub.html").render(
+        request=_request_stub(),
+        is_authenticated=False,
+        is_development=False,
+    )
+
+    match = re.search(
+        r"\.entity-card\s*>\s*header\.entity-header\s*\{[^}]*\}",
+        html,
+    )
+    assert match is not None, "entity-header rule missing from base.html"
+    assert "flex-wrap: wrap" in match.group(
+        0
+    ), "entity-header must set `flex-wrap: wrap` to avoid #577 clipping"
+
+
 def test_form_edit_view_renders_three_segment_breadcrumb() -> None:
     env = _make_env()
     _add_child(
