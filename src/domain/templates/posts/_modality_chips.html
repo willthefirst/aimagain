@@ -1,19 +1,28 @@
-{# Two-chip modality posture for the post card's header line.
+{# Modality posture as a plain-text fragment for the post card's meta line.
+
+Replaces the legacy `<span class="post-modality">` chips. The card
+header now uses Pico's `<hgroup>` pattern (`<h3>` title + `<small>`
+meta line), and the meta line is just text — date · modality —
+separated by middots. Returning plain labels lets the caller drop
+custom CSS classes for the chips and rely on Pico defaults inside
+`<small>` for muted, smaller text.
 
 `in_person` and `virtual` are `LOCATION_AVAILABILITY_OPTIONS` values
 (`yes` / `no` / `please_contact`). A `please_contact` on either arm
-collapses to a single "Contact for format" chip — the posture is
-unknown so neither glyph applies. When both are `no` (or None), no
-chip renders.
+collapses to a single "Contact for format" label — posture is unknown
+so neither glyph applies. When both arms are `no` (or `None`), the
+macro renders nothing; the caller checks `| trim` to decide whether
+to emit a separator.
 
 Used by `posts/_item.html` (the list card) and `posts/detail.html`
-(the detail page, post PR C). Same visual treatment in both views
-so the modality posture reads the same wherever it appears. #}
+(the detail page) so modality reads the same wherever it appears. #}
 {% macro modality_chips(in_person, virtual) -%}
 {%- if in_person == "please_contact" or virtual == "please_contact" -%}
-<span class="post-modality">Contact for format</span>
+Contact for format
 {%- else -%}
-{%- if virtual == "yes" %}<span class="post-modality"><i class="icon-video" aria-hidden="true"></i>Virtual</span>{% endif -%}
-{%- if in_person == "yes" %}<span class="post-modality"><i class="icon-map-pin" aria-hidden="true"></i>In-person</span>{% endif -%}
+{%- set labels = [] -%}
+{%- if virtual == "yes" %}{%- set _ = labels.append("Virtual") -%}{% endif -%}
+{%- if in_person == "yes" %}{%- set _ = labels.append("In-person") -%}{% endif -%}
+{{ labels | join(' · ') }}
 {%- endif -%}
 {%- endmacro %}
