@@ -4,11 +4,11 @@ from sqlalchemy.types import Uuid
 
 from src.framework.persistence.base_model import Base
 
-_TABLE = "program_availability_details"
+_TABLE = "intake_details"
 
 
-class ProgramAvailabilityDetail(Base):
-    """1:1 detail row for posts of kind = 'program_availability'.
+class IntakeDetail(Base):
+    """1:1 detail row for posts of kind = 'intake'.
 
     The Program-level equivalent of :class:`OpeningDetail`.
     The Program announces intake openings as a *group offering* —
@@ -46,9 +46,7 @@ class ProgramAvailabilityDetail(Base):
         ForeignKey("programs.id", ondelete="CASCADE"),
         nullable=False,
     )
-    program = relationship(
-        "Program", back_populates="program_availability_details", lazy="selectin"
-    )
+    program = relationship("Program", back_populates="intake_details", lazy="selectin")
 
     # Section 3 — availability
     desired_times = Column(

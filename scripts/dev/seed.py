@@ -37,11 +37,11 @@ from src.auth_config import UserManager
 from src.db import async_session_maker
 from src.domain.logic.users.schema import UserCreate
 from src.domain.models import (
+    IntakeDetail,
     OpeningDetail,
     Organization,
     Post,
     Program,
-    ProgramAvailabilityDetail,
     Provider,
     ProviderCertification,
     ProviderEducation,
@@ -1261,7 +1261,7 @@ async def seed_programs() -> tuple[int, int]:
     return created, skipped
 
 
-class FixtureProgramAvailability(TypedDict):
+class FixtureIntake(TypedDict):
     owner_email: str
     org_name: str
     program_name: str
@@ -1273,7 +1273,7 @@ class FixtureProgramAvailability(TypedDict):
 # match a Program seeded by :func:`seed_programs`; the seed looks them up
 # and skips if the Program isn't present. Mirrors PA fixtures'
 # idempotency shape.
-FIXTURE_PROGRAM_AVAILABILITY: list[FixtureProgramAvailability] = [
+FIXTURE_PROGRAM_AVAILABILITY: list[FixtureIntake] = [
     {
         "owner_email": "alice@example.com",
         "org_name": "RISE IOP at CHC",
@@ -1301,9 +1301,9 @@ FIXTURE_PROGRAM_AVAILABILITY: list[FixtureProgramAvailability] = [
 ]
 
 
-async def seed_program_availability() -> tuple[int, int]:
+async def seed_intake() -> tuple[int, int]:
     """Seed Program-availability posts. Idempotent on
-    ``(kind='program_availability', owner_id, program_id)`` — re-running
+    ``(kind='intake', owner_id, program_id)`` — re-running
     against an existing fixture skips."""
     created = 0
     skipped = 0
@@ -1344,13 +1344,13 @@ async def seed_program_availability() -> tuple[int, int]:
             existing = await session.execute(
                 select(Post)
                 .join(
-                    ProgramAvailabilityDetail,
-                    ProgramAvailabilityDetail.post_id == Post.id,
+                    IntakeDetail,
+                    IntakeDetail.post_id == Post.id,
                 )
                 .where(
-                    Post.kind == "program_availability",
+                    Post.kind == "intake",
                     Post.owner_id == owner.id,
-                    ProgramAvailabilityDetail.program_id == program.id,
+                    IntakeDetail.program_id == program.id,
                 )
             )
             if existing.scalar_one_or_none() is not None:
@@ -1361,9 +1361,9 @@ async def seed_program_availability() -> tuple[int, int]:
                 skipped += 1
                 continue
 
-            post = Post(kind="program_availability", owner_id=owner.id)
+            post = Post(kind="intake", owner_id=owner.id)
             _shift_created_at(post, fixture["days_ago"])
-            post.program_availability_detail = ProgramAvailabilityDetail(
+            post.intake_detail = IntakeDetail(
                 program_id=program.id, **fixture["detail"]
             )
             session.add(post)
@@ -1825,7 +1825,7 @@ async def seed_all() -> int:
     programs_created, programs_skipped = await seed_programs()
     # Program-availability runs AFTER seed_programs() since it joins on a
     # Program seeded above.
-    prog_av_created, prog_av_skipped = await seed_program_availability()
+    prog_av_created, prog_av_skipped = await seed_intake()
 
     print(
         f"\n🌱 Seed complete:"
@@ -1837,7 +1837,7 @@ async def seed_all() -> int:
         f"({credentials_skipped} skipped),"
         f" {cr_created} client-referral posts created ({cr_skipped} skipped),"
         f" {programs_created} programs created ({programs_skipped} skipped),"
-        f" {prog_av_created} program-availability posts created "
+        f" {prog_av_created} intake posts created "
         f"({prog_av_skipped} skipped)"
     )
     if users_created > 0:

@@ -7,10 +7,10 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 # Need ORM models
 from src.domain.models import (
+    IntakeDetail,
     OpeningDetail,
     Organization,
     Program,
-    ProgramAvailabilityDetail,
     Provider,
     ProviderCertification,
     ProviderEducation,
@@ -141,28 +141,26 @@ _PROGRAM_AVAILABILITY_DEFAULTS: dict[str, Any] = {
 _STUB_PROGRAM_ID = uuid.UUID("00000000-0000-0000-0000-000000000002")
 
 
-def program_availability_payload(**overrides: Any) -> dict[str, Any]:
-    """Build a wire-valid `kind='program_availability'` create/update payload.
+def intake_payload(**overrides: Any) -> dict[str, Any]:
+    """Build a wire-valid `kind='intake'` create/update payload.
     Returns a fresh dict each call. `program_id` defaults to a stub UUID
     that passes Pydantic validation but does *not* exist in the DB —
     tests that actually persist must pass a real program_id override."""
     return {
-        "kind": "program_availability",
+        "kind": "intake",
         "program_id": str(_STUB_PROGRAM_ID),
         **_PROGRAM_AVAILABILITY_DEFAULTS,
         **overrides,
     }
 
 
-def make_program_availability_detail(
-    *, program_id: UUID, **overrides: Any
-) -> ProgramAvailabilityDetail:
-    """Build a `ProgramAvailabilityDetail` ORM row with spec-compliant
+def make_intake_detail(*, program_id: UUID, **overrides: Any) -> IntakeDetail:
+    """Build a `IntakeDetail` ORM row with spec-compliant
     defaults. `program_id` is a required kwarg — making it required
     turns "I forgot the FK" into a `TypeError` at the factory call site
     instead of a `NOT NULL` violation at flush time (mirrors
     :func:`make_opening_detail`)."""
-    return ProgramAvailabilityDetail(
+    return IntakeDetail(
         program_id=program_id, **{**_PROGRAM_AVAILABILITY_DEFAULTS, **overrides}
     )
 

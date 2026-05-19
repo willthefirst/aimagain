@@ -17,13 +17,13 @@ from src.domain.models import (
 from src.framework.audit.repository import AuditRepository
 from tests.helpers import (
     create_test_user,
+    intake_payload,
     make_opening_detail,
     make_organization_row,
     make_program,
     make_provider_with_org,
     make_referral_detail,
     opening_payload,
-    program_availability_payload,
     promote_to_admin,
     referral_payload,
 )
@@ -1322,7 +1322,7 @@ async def test_search_page_renders_one_control_per_filter(
         None,
         "referral",
         "opening",
-        "program_availability",
+        "intake",
     }
     # Regression for #599 — the search-form Clear link must use the
     # outline variant so it shares the rest of the app's secondary
@@ -1922,8 +1922,7 @@ async def test_get_post_form_no_kind_renders_picker(
     assert "open slots" in opening_option.text()
 
     program_option = tree.css_first(
-        'a.kind-picker-option[data-kind="program_availability"]'
-        '[href="/posts/form?kind=program_availability"]'
+        'a.kind-picker-option[data-kind="intake"]' '[href="/posts/form?kind=intake"]'
     )
     assert program_option is not None
     assert "Announce program intake" in program_option.text()
@@ -2609,12 +2608,12 @@ async def _seed_program_for_user(
     return program
 
 
-async def test_create_program_availability_happy_path(
+async def test_create_intake_happy_path(
     authenticated_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user: User,
 ):
-    """`POST /posts` with `kind='program_availability'` persists the
+    """`POST /posts` with `kind='intake'` persists the
     parent + detail rows and writes a single `create_post` audit row."""
     program = await _seed_program_for_user(
         db_test_session_manager, owner_id=logged_in_user.id
@@ -2622,7 +2621,7 @@ async def test_create_program_availability_happy_path(
 
     response = await authenticated_client.post(
         "/posts",
-        data=program_availability_payload(program_id=str(program.id)),
+        data=intake_payload(program_id=str(program.id)),
     )
     assert response.status_code == 201
     new_id = uuid.UUID(response.json()["id"])
@@ -2631,8 +2630,8 @@ async def test_create_program_availability_happy_path(
         result = await session.execute(select(Post).filter(Post.id == new_id))
         persisted = result.scalars().first()
         assert persisted is not None
-        assert persisted.kind == "program_availability"
-        assert persisted.program_availability_detail.program_id == program.id
+        assert persisted.kind == "intake"
+        assert persisted.intake_detail.program_id == program.id
         assert persisted.opening_detail is None
         assert persisted.referral_detail is None
         assert persisted.owner_id == logged_in_user.id
@@ -2644,7 +2643,7 @@ async def test_create_program_availability_happy_path(
         assert rows[0].action == "create_post"
 
 
-async def test_create_program_availability_rejects_unowned_program(
+async def test_create_intake_rejects_unowned_program(
     authenticated_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user: User,
@@ -2663,12 +2662,12 @@ async def test_create_program_availability_rejects_unowned_program(
 
     response = await authenticated_client.post(
         "/posts",
-        data=program_availability_payload(program_id=str(other_program.id)),
+        data=intake_payload(program_id=str(other_program.id)),
     )
     assert response.status_code == 403
 
 
-async def test_create_program_availability_rejects_nonexistent_program(
+async def test_create_intake_rejects_nonexistent_program(
     authenticated_client: AsyncClient,
     logged_in_user: User,
 ):
@@ -2676,12 +2675,12 @@ async def test_create_program_availability_rejects_nonexistent_program(
     also avoids the 500 the FK would otherwise produce)."""
     bogus = uuid.uuid4()
     response = await authenticated_client.post(
-        "/posts", data=program_availability_payload(program_id=str(bogus))
+        "/posts", data=intake_payload(program_id=str(bogus))
     )
     assert response.status_code == 404
 
 
-async def test_create_program_availability_superuser_bypass(
+async def test_create_intake_superuser_bypass(
     authenticated_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user: User,
@@ -2700,17 +2699,17 @@ async def test_create_program_availability_superuser_bypass(
 
     response = await authenticated_client.post(
         "/posts",
-        data=program_availability_payload(program_id=str(other_program.id)),
+        data=intake_payload(program_id=str(other_program.id)),
     )
     assert response.status_code == 201
 
 
-async def test_get_program_availability_form_renders_program_picker(
+async def test_get_intake_form_renders_program_picker(
     authenticated_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user: User,
 ):
-    """`GET /posts/form?kind=program_availability` renders a Program-
+    """`GET /posts/form?kind=intake` renders a Program-
     picker scoped to the user's owned Programs (#541)."""
     program = await _seed_program_for_user(
         db_test_session_manager, owner_id=logged_in_user.id
@@ -2727,7 +2726,7 @@ async def test_get_program_availability_form_renders_program_picker(
         program_name="Other Program",
     )
 
-    response = await authenticated_client.get("/posts/form?kind=program_availability")
+    response = await authenticated_client.get("/posts/form?kind=intake")
     assert response.status_code == 200
     tree = HTMLParser(response.text)
     select = tree.css_first("select#program_id")
@@ -2737,10 +2736,10 @@ async def test_get_program_availability_form_renders_program_picker(
     assert str(other_program.id) not in values
     kind_input = tree.css_first('input[name="kind"]')
     assert kind_input is not None
-    assert kind_input.attributes.get("value") == "program_availability"
+    assert kind_input.attributes.get("value") == "intake"
 
 
-async def test_patch_program_availability_rejects_unowned_program(
+async def test_patch_intake_rejects_unowned_program(
     authenticated_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user: User,
@@ -2753,7 +2752,7 @@ async def test_patch_program_availability_rejects_unowned_program(
 
     # Create the post the normal way.
     response = await authenticated_client.post(
-        "/posts", data=program_availability_payload(program_id=str(program.id))
+        "/posts", data=intake_payload(program_id=str(program.id))
     )
     assert response.status_code == 201
     post_id = uuid.UUID(response.json()["id"])
@@ -2772,7 +2771,7 @@ async def test_patch_program_availability_rejects_unowned_program(
     response = await authenticated_client.patch(
         f"/posts/{post_id}",
         data={
-            "kind": "program_availability",
+            "kind": "intake",
             "program_id": str(other_program.id),
         },
     )
