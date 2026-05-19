@@ -336,8 +336,18 @@
         padding: calc(var(--pico-spacing) * 0.5) var(--pico-spacing);
         margin: 0 0 var(--pico-spacing) 0;
       }
+      /* On mobile, only the *current page* segment is worth the row —
+         list pages render a single-segment breadcrumb that doubles as
+         the page heading ("Organizations", "Posts", "Providers",
+         "Users") and must stay visible (#588). Detail/form pages whose
+         breadcrumb carries multiple segments hide it on mobile: the
+         intermediate links are location context, not the page heading,
+         and the toolbar already gives the page its actions.
+         `:has(li + li)` matches a nav containing two or more `<li>`s —
+         i.e. any multi-segment breadcrumb. Single-segment breadcrumbs
+         (one `<li>`) don't match and stay visible. */
       @media (max-width: 768px) {
-        nav[aria-label="breadcrumb"] { display: none; }
+        nav[aria-label="breadcrumb"]:has(li + li) { display: none; }
       }
       /* Entity create/edit forms — cap form width on large screens so
          short fields don't stretch across the whole container, and
