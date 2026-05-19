@@ -51,7 +51,7 @@ without submitting the enclosing form. #}
   <a href="{{ cancel_url }}" role="button" class="secondary outline">Cancel</a>
   {%- endif %}
   {%- if delete_url and delete_confirm %}
-  <button type="button" class="contrast form-actions-destructive" hx-delete="{{ delete_url }}" hx-confirm="{{ delete_confirm }}">Delete</button>
+  <button type="button" class="danger form-actions-destructive" hx-delete="{{ delete_url }}" hx-confirm="{{ delete_confirm }}">Delete</button>
   {%- endif %}
 </div>
 {%- endmacro %}
