@@ -749,20 +749,6 @@ def test_primary_nav_no_section_tab_on_post_detail() -> None:
     assert _active_tab_labels(_render_chrome("/posts/42")) == []
 
 
-def test_primary_nav_active_link_carries_strong_style_hook() -> None:
-    """The active link adds `class="contrast"` so the Pico color cue
-    fires alongside the CSS rule that thickens the underline. Pinning
-    both attributes ensures a future refactor that drops one notices
-    the other."""
-    html = _render_chrome("/providers")
-    tree = HTMLParser(html)
-    nav = tree.css_first('nav[aria-label="Primary"]')
-    assert nav is not None
-    active = nav.css_first("a[aria-current='page']")
-    assert active is not None
-    assert "contrast" in (active.attributes.get("class") or "")
-
-
 def test_primary_nav_renders_login_link_off_auth_flow() -> None:
     """When an anonymous visitor is *not* on an auth-flow page, the
     top-right Login shortcut renders as a clickable `<a
@@ -773,10 +759,10 @@ def test_primary_nav_renders_login_link_off_auth_flow() -> None:
     assert link is not None
     # No `<span aria-current="page">` on a non-auth path.
     assert tree.css_first('#primary-nav span[aria-current="page"]') is None
-    # When rendered as a link, no `class="contrast"` — keeps color
-    # consistent with how the link would render anywhere else in the
-    # chrome (#592). The auth-flow `<span>` variant carries `contrast`
-    # because it's a non-link indicator, not a navigation target.
+    # No `class="contrast"` anywhere in the nav — Pico styles the
+    # link with its default chrome treatment and the active-section
+    # cue with its default `aria-current="page"` treatment, no custom
+    # contrast utility needed (#592 + nav-pico-defaults cleanup).
     classes = (link.attributes.get("class") or "").split()
     assert (
         "contrast" not in classes

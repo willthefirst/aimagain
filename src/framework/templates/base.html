@@ -582,23 +582,6 @@
         max-width: 28rem;
         margin-inline: auto;
       }
-      /* Primary-nav active tab. Pico styles `aria-current="page"` only
-         subtly (a faint background tint); on a horizontal nav the cue
-         is easy to miss, and the issue audit (#589) flagged the
-         inconsistency. The rule below targets links carrying
-         `aria-current="page"` inside the `<nav aria-label="Primary">`
-         strip and adds a thicker bottom border + weight bump so the
-         active section reads at a glance on every page. Scoped to
-         the primary nav so breadcrumb / pagination links that also
-         set `aria-current` (single-segment trail, current page in
-         pager) keep their lighter treatment. */
-      nav[aria-label="Primary"] a[aria-current="page"] {
-        font-weight: 600;
-        border-bottom: 2px solid currentColor;
-        /* Compensate for the border so the text baseline doesn't
-           jump between active and inactive tabs. */
-        padding-bottom: calc(var(--pico-nav-link-spacing-vertical, 0.5rem) - 2px);
-      }
     </style>
     <script
       src="https://unpkg.com/htmx.org@2.0.4"
@@ -670,25 +653,25 @@
       <nav aria-label="Primary">
         <ul>
           {# title-case-ignore: "Bedlam Connect" is a brand name #}
-          <li><strong><a href="/" class="contrast">Bedlam Connect</a></strong></li>
+          <li><strong><a href="/">Bedlam Connect</a></strong></li>
           {% if is_authenticated %}
-          <li><a href="{{ entity_url('post') }}?kind=referral"{% if _on_referrals %} aria-current="page" class="contrast"{% endif %}>Referrals</a></li>
-          <li><a href="{{ entity_url('post') }}?kind=opening"{% if _on_openings %} aria-current="page" class="contrast"{% endif %}>Openings</a></li>
-          <li><a href="{{ entity_url('provider') }}"{% if _on_directory %} aria-current="page" class="contrast"{% endif %}>Directory</a></li>
+          <li><a href="{{ entity_url('post') }}?kind=referral"{% if _on_referrals %} aria-current="page"{% endif %}>Referrals</a></li>
+          <li><a href="{{ entity_url('post') }}?kind=opening"{% if _on_openings %} aria-current="page"{% endif %}>Openings</a></li>
+          <li><a href="{{ entity_url('provider') }}"{% if _on_directory %} aria-current="page"{% endif %}>Directory</a></li>
           {% if is_admin %}
-          <li><a href="{{ entity_url('organization') }}"{% if _on_orgs %} aria-current="page" class="contrast"{% endif %}>Organizations</a></li>
-          <li><a href="{{ entity_url('program') }}"{% if _on_programs %} aria-current="page" class="contrast"{% endif %}>Programs</a></li>
-          <li><a href="{{ entity_url('user') }}"{% if _on_users %} aria-current="page" class="contrast"{% endif %}>Users</a></li>
+          <li><a href="{{ entity_url('organization') }}"{% if _on_orgs %} aria-current="page"{% endif %}>Organizations</a></li>
+          <li><a href="{{ entity_url('program') }}"{% if _on_programs %} aria-current="page"{% endif %}>Programs</a></li>
+          <li><a href="{{ entity_url('user') }}"{% if _on_users %} aria-current="page"{% endif %}>Users</a></li>
           {% endif %}
           {% endif %}
         </ul>
         <ul id="primary-nav">
           {% if is_authenticated %}
           <li>
-            <a href="{{ entity_url('user', id='me') }}" aria-label="Profile"{% if _on_profile %} aria-current="page" class="contrast"{% endif %}>
+            <a href="{{ entity_url('user', id='me') }}" aria-label="Profile"{% if _on_profile %} aria-current="page"{% endif %}>
               {# Lucide `user` icon, inlined. `currentColor` makes it
-                 inherit the link color (including Pico's `.contrast`
-                 active state). #}
+                 inherit the link color, including Pico's default
+                 `aria-current="page"` treatment. #}
               <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
             </a>
           </li>
@@ -697,11 +680,12 @@
             {# When the visitor is already on the auth flow (login /
                register / forgot-password) we render Login as a
                non-clickable `<span>` instead of a self-referential
-               link (#591). When it *is* rendered as a link, it carries
-               no `class="contrast"` so the link color stays consistent
-               across the auth pages (#592). #}
+               link (#591). The `<span>` keeps `aria-current="page"`
+               so assistive tech still hears it as the current section;
+               Pico styles the indicator using its default current-page
+               treatment. #}
             {% if _on_auth_flow %}
-            <span aria-current="page" class="contrast">Login</span>
+            <span aria-current="page">Login</span>
             {% else %}
             <a href="/auth/login">Login</a>
             {% endif %}
