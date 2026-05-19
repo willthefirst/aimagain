@@ -1,0 +1,50 @@
+{% extends "views/detail.html" %}
+{%- from "_shared/posts/_modality_chips.html" import modality_chips -%}
+{%- from "_shared/posts/_services_block.html" import services_block -%}
+{%- from "_shared/posts/_facts_block.html" import facts_block -%}
+{%- from "_shared/posts/_how_to_refer.html" import how_to_refer -%}
+
+{% set resource_url = entity_url('intake') %}
+{# `view.headline` is the same identity string the entity-card's header
+   renders. Computing it once at module scope keeps the breadcrumb leaf
+   and the in-card headline in lock-step — see #593. #}
+{%- set view = post_card_view(intake) -%}
+
+{% block resource_label %}Intakes{% endblock %}
+{% block current_label %}{{ view.headline or 'Intakes'|truncate(40) }}{% endblock %}
+
+{% block actions %}
+{% with post=intake %}{% include "_shared/posts/_owner_actions.html" %}{% endwith %}
+{% endblock %}
+
+{# Detail-page layout: same `.entity-card` shape the list cards use,
+   with detail-only sections (description, services, expanded facts,
+   how-to-refer, footer) stacked vertically. Per-kind branching lives
+   in `post_card_view` (one place); every visual element in the card
+   reads from `view`. #}
+{% block content %}
+{%- set modality = modality_chips(view.in_person, view.virtual) | trim -%}
+<article class="entity-card" data-kind="{{ intake.kind }}">
+  <header>
+    <hgroup>
+      <h3>{{ view.headline }}{% if view.header_state %}, {{ view.header_state }}{% endif %}</h3>
+      <small>{{ intake.created_at | format_post_date }}{% if modality %} · {{ modality }}{% endif %}</small>
+    </hgroup>
+  </header>
+
+  {%- if view.description %}
+  <p>{{ view.description }}</p>
+  {%- endif %}
+
+  {{ services_block(view) }}
+  {{ facts_block(view, expanded=True) }}
+
+  {%- if view.referral %}
+  {{ how_to_refer(view) }}
+  {%- endif %}
+
+  <footer>
+    <a href="mailto:{{ intake.owner.email }}" target="_blank" rel="noopener noreferrer" role="button" class="secondary outline">Email</a>
+  </footer>
+</article>
+{% endblock %}

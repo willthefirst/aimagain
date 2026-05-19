@@ -45,20 +45,21 @@ that read from `view`; this file composes them into the card frame.
 PR C of the list/detail unification reuses the same partials on the
 detail page so both views share the same visual vocabulary.
 
-`active_kind` accepted for backward compatibility with `list.html`
-but ignored — the cards' `data-kind` left-edge color is constant
-per-kind, so a single-kind filter doesn't need to suppress anything. #}
+`entity_name` is the URL family the card links into — ``"referral"``,
+``"opening"``, or ``"intake"``. Each family's `list.html` passes its
+own name so the card's headline anchor resolves to the correct URL
+family (e.g. `/referrals/{id}` for referrals' list). #}
 {%- from "_shared/posts/_modality_chips.html" import modality_chips -%}
 {%- from "_shared/posts/_services_block.html" import services_block -%}
 {%- from "_shared/posts/_facts_block.html" import facts_block -%}
 
-{% macro post_item(post, active_kind=None) -%}
+{% macro post_item(post, entity_name) -%}
 {%- set view = post_card_view(post) -%}
 {%- set modality = modality_chips(view.in_person, view.virtual) | trim -%}
 <article class="entity-card" data-row-id="{{ post.id }}" data-kind="{{ post.kind }}">
   <header>
     <hgroup>
-      <h3><a href="{{ entity_url('post', id=post.id) }}">{{ view.headline }}{% if view.header_state %}, {{ view.header_state }}{% endif %}</a></h3>
+      <h3><a href="{{ entity_url(entity_name, id=post.id) }}">{{ view.headline }}{% if view.header_state %}, {{ view.header_state }}{% endif %}</a></h3>
       <small>{{ post.created_at | format_post_date }}{% if modality %} · {{ modality }}{% endif %}</small>
     </hgroup>
   </header>

@@ -1,15 +1,15 @@
 {% extends "views/form_new.html" %}
-{% from "posts/_opening_form.html" import opening_form %}
+{% from "openings/_form.html" import opening_form %}
 
-{% set resource_url = entity_url('post') %}
+{% set resource_url = entity_url('opening') %}
 
-{% block resource_label %}Posts{% endblock %}
+{% block resource_label %}Openings{% endblock %}
 
 {% block content %}
 {% if not current_user.providers %}
 <p>You need a provider profile before posting availability. <a href="{{ entity_form_url('provider') }}">Create your provider profile</a>, then return here.</p>
 {% else %}
 <p>Per <code>notes/forms_spec.md</code>. No PII.</p>
-{{ opening_form("post", entity_url('post'), "Create provider availability", schema=opening_create_schema, current_user=current_user, cancel_url=entity_url('post')) }}
+{{ opening_form("post", entity_url('opening'), "Create opening", schema=opening_create_schema, current_user=current_user, cancel_url=entity_url('opening')) }}
 {% endif %}
 {% endblock %}
