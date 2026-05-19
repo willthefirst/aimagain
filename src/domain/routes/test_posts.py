@@ -1773,17 +1773,43 @@ async def test_get_post_form_no_kind_renders_picker(
 ):
     """`GET /posts/form` without a `kind` query parameter renders the
     kind picker (`posts/form_new.html`) — not a kind-specific create
-    form. The picker has one link per kind round-tripping back with
-    `?kind=…`."""
+    form. The picker is a `.kind-picker` chooser with one option card
+    per kind: each card is an `<a class="kind-picker-option">`
+    carrying a Lucide icon, a title, and a 1-line description, and
+    its href round-trips back to `/posts/form?kind=…`."""
     response = await authenticated_client.get("/posts/form")
     assert response.status_code == 200
     tree = HTMLParser(response.text)
     # No `<input name="kind">` — that lives on the kind-specific forms,
     # not the picker.
     assert tree.css_first('input[name="kind"]') is None
-    # Each registered kind has a link on the picker.
-    assert tree.css_first('a[href="/posts/form?kind=referral"]') is not None
-    assert tree.css_first('a[href="/posts/form?kind=opening"]') is not None
+    # The chooser wrapper is the new `kind-picker` class — pin it so
+    # any future rewrite has to update this test deliberately.
+    assert tree.css_first(".kind-picker") is not None
+    # Each registered kind has an option card with the kind-specific
+    # accent (`data-kind`), title, and description.
+    referral_option = tree.css_first(
+        'a.kind-picker-option[data-kind="referral"][href="/posts/form?kind=referral"]'
+    )
+    assert referral_option is not None
+    assert referral_option.css_first(".kind-picker-icon") is not None
+    assert "Refer a client to a provider" in referral_option.text()
+    assert "needs care" in referral_option.text()
+
+    opening_option = tree.css_first(
+        'a.kind-picker-option[data-kind="opening"][href="/posts/form?kind=opening"]'
+    )
+    assert opening_option is not None
+    assert "Announce availability for new clients" in opening_option.text()
+    assert "open slots" in opening_option.text()
+
+    program_option = tree.css_first(
+        'a.kind-picker-option[data-kind="program_availability"]'
+        '[href="/posts/form?kind=program_availability"]'
+    )
+    assert program_option is not None
+    assert "Announce program intake" in program_option.text()
+    assert "cohort" in program_option.text()
 
 
 async def test_get_post_form_treats_empty_kind_as_absent(
