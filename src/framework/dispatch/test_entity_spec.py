@@ -373,6 +373,46 @@ def test_discriminator_accepts_registry_instance():
     assert spec.discriminator.names == ("a", "b")
 
 
+class _KindedModel:
+    """Stand-in polymorphic model with a `kind` attr so kind-locked
+    specs can pass the model-has-kind validator."""
+
+    kind = "x"
+
+
+def test_discriminator_value_defaults_to_none():
+    """Only kind-locked faces of a polymorphic supertype set this; the
+    supertype itself and non-polymorphic entities leave it None."""
+    spec = _make_spec()
+    assert spec.discriminator_value is None
+
+
+def test_discriminator_value_round_trips_on_kind_locked_face():
+    spec = _make_spec(model=_KindedModel, discriminator_value="x")
+    assert spec.discriminator_value == "x"
+
+
+def test_discriminator_and_discriminator_value_mutually_exclusive():
+    """A spec is either the polymorphic supertype (carrying the registry)
+    or a kind-locked face (carrying one value), never both."""
+    from src.framework.persistence.polymorphic import DiscriminatorRegistry
+
+    registry = DiscriminatorRegistry(
+        column="kind", specs={"x": "spec-x", "y": "spec-y"}
+    )
+    with pytest.raises(ValueError, match="declares both discriminator"):
+        _make_spec(model=_KindedModel, discriminator=registry, discriminator_value="x")
+
+
+def test_discriminator_value_requires_kind_attr_on_model():
+    """`discriminator_value` is enforced via `target.kind == value` at
+    request time — a model with no `kind` attribute would make the lock
+    silently no-op. Caught at construction time instead."""
+    # `SimpleNamespace` is the `_make_spec` default model; it has no `kind`.
+    with pytest.raises(ValueError, match="no `kind` attribute"):
+        _make_spec(discriminator_value="x")
+
+
 def test_audit_snapshot_builds_audited_resource_from_schema():
     """`audit_snapshot=<schema>` triggers `make_audited_resource(name, schema)`
     at construction time so each CRUD entity doesn't repeat the call."""
