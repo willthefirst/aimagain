@@ -25,6 +25,12 @@ root_org_id = (id if parent_org_id IS NULL else parent.root_org_id)
 
 Today only `Organization` itself writes the table, so the invariant is enforced in `src/domain/logic/organizations/repository.py` (`create`). When PR 2+ widens write paths, every writer MUST apply the same rule — or move the rule into a DB trigger. There is no `CHECK` constraint enforcing the equation today (SQLite CHECKs can't express the self-join), so the rule is convention enforced by the repository.
 
+## Self-referential `parent` is `lazy="selectin"` with `join_depth=1`
+
+`Organization.parent` is a self-referential relationship (the parent of an Org is another Org). The detail template dereferences `organization.parent.name` to render the parent's display name; under FastAPI's async sessions, an implicit lazy-load at template-render time fails with `MissingGreenlet`.
+
+The fix is `lazy="selectin"` so the parent is loaded at the same session boundary as the target row. `join_depth=1` is required on a self-referential `selectin` — without it SQLAlchemy's cycle guard suppresses the eager-load and the strategy silently falls back to plain lazy-load (the exact failure mode that prompted this configuration). One hop is enough for the template; deeper ancestry is not used.
+
 ## Why this cluster, not flat siblings
 
 `organizations/` matches the per-entity cluster grammar in [`../README.md`](../README.md) — every entity with at least one model file gets its own directory. The Program entity (PR 4 of the Org/Program roadmap, #537) is owned by Organization but lives in its own [`../programs/`](../programs/) cluster — same parent-cluster grammar applied recursively, not nested inside `organizations/`.
