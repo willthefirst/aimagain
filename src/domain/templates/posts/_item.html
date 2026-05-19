@@ -9,29 +9,38 @@ id="posts-list">` of `<article>` children.
 
 Layout per card:
 
-  ┌──────────────────────────────────────────────────────────────┐
-  │ <header>  Adult male (25–64)  📹 Virtual  📍 In-person   May 17 │
-  │                                                              │
-  │ Seeking                      │  📍 City, ST                  │
-  │   • icon name                │  Languages: …                 │
-  │   • icon name                │  Insurance: …                 │
-  │                              │  Modality: …                  │
-  │                                                              │
-  │ <footer>                                     [✉ Email]        │
-  └──────────────────────────────────────────────────────────────┘
+  ┌──────────────────────────────────────────────┐
+  │ <header>  Adult male (25–64)                 │
+  │           May 17 · Virtual · In-person       │
+  │                                              │
+  │ Seeking                                      │
+  │   • icon name                                │
+  │   • icon name                                │
+  │                                              │
+  │ 📍 City, ST                                   │
+  │ Languages: …                                 │
+  │ Insurance: …                                 │
+  │ Modality: …                                  │
+  │                                              │
+  │ <footer>  [✉ Email]                          │
+  └──────────────────────────────────────────────┘
 
-The card is `<article>` with `<header>`, two-column body, and
-`<footer>` — Pico's automatic styling tints header and footer as
-the top/bottom bands of the card. The header line carries the
-headline link, modality chips, and a right-aligned date. The body
-is two `<section>`s side-by-side: services with inline icons
-(left), demographics `<dl>` (right). The footer carries one element
-— the Email CTA — right-aligned.
+The card is `<article>` with `<header>`, a stacked single-column
+body, and `<footer>` — Pico's automatic styling tints header and
+footer as the top/bottom bands of the card. The header band is a
+Pico `<hgroup>` pairing an `<h3>` headline link with a `<small>`
+meta line (date · modality, separated by middots). The `<h3>`
+anchors the card visually — Pico's heading scale gives it size +
+weight without custom CSS, which is the rule we want to lean on so
+the chrome stays framework-portable. The body stacks two
+`<section>`s vertically: services with inline icons, then the
+demographics `<dl>`. The footer carries one element — the Email
+CTA — in the default left-aligned footer flow.
 
 Per-kind branching and field selection live in
 `src.domain.logic.posts.view.post_card_view`, which collapses CR /
 PA / intake detail shapes into one flat `view` dict.
-The three blocks (modality chips, services, facts) are partials
+The three blocks (modality text, services, facts) are partials
 that read from `view`; this file composes them into the card frame.
 PR C of the list/detail unification reuses the same partials on the
 detail page so both views share the same visual vocabulary.
@@ -45,23 +54,23 @@ per-kind, so a single-kind filter doesn't need to suppress anything. #}
 
 {% macro post_item(post, active_kind=None) -%}
 {%- set view = post_card_view(post) -%}
+{%- set modality = modality_chips(view.in_person, view.virtual) | trim -%}
 <article class="entity-card" data-row-id="{{ post.id }}" data-kind="{{ post.kind }}">
-  <header class="entity-header">
-    <strong><a href="{{ entity_url('post', id=post.id) }}">{{ view.headline }}{% if view.header_state %}, {{ view.header_state }}{% endif %}</a></strong>
-    {{ modality_chips(view.in_person, view.virtual) }}
-    <small>{{ post.created_at | format_post_date }}</small>
+  <header>
+    <hgroup>
+      <h3><a href="{{ entity_url('post', id=post.id) }}">{{ view.headline }}{% if view.header_state %}, {{ view.header_state }}{% endif %}</a></h3>
+      <small>{{ post.created_at | format_post_date }}{% if modality %} · {{ modality }}{% endif %}</small>
+    </hgroup>
   </header>
-  <div class="entity-grid">
-    {{ services_block(view) }}
-    {{ facts_block(view) }}
-  </div>
+  {{ services_block(view) }}
+  {{ facts_block(view) }}
 
   {#- Footer carries just the Email CTA — Pico-styled `role="button"
       class="secondary outline"` with the label "Email". The raw
       address lives only in the `href`. `target="_blank" rel="noopener
       noreferrer"` is harmless on `mailto:` URLs and matches the
       pattern used for the PA `website` link on the detail page. -#}
-  <footer class="entity-footer">
+  <footer>
     <a href="mailto:{{ post.owner.email }}" target="_blank" rel="noopener noreferrer" role="button" class="secondary outline">Email</a>
   </footer>
 </article>
