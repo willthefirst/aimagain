@@ -1,5 +1,5 @@
 {% extends "views/form_new.html" %}
-{%- from "_shared/form_fields.html" import field_for, radio_bool_field, text_field -%}
+{%- from "_shared/form_fields.html" import entity_select_field, field_for, radio_bool_field, text_field -%}
 {%- from "_shared/forms.html" import form_actions -%}
 
 {% set resource_url = entity_url('program') %}
@@ -17,33 +17,22 @@
 <form hx-post="{{ entity_url('program') }}">
   <fieldset>
     <legend>Program</legend>
-    <label for="org_id">
-      Organization
-      <select id="org_id" name="org_id" required>
-        <option value="" disabled selected>--</option>
-        {%- for o in organizations %}
-        <option value="{{ o.id }}">{{ o.name }}</option>
-        {%- endfor %}
-      </select>
-      <small>Don't see your organization? <a href="{{ entity_form_url('organization') }}">Create one first</a>.</small>
-    </label>
+    {{ entity_select_field(
+         "org_id",
+         "Organization",
+         organizations,
+         help='Don\'t see your organization? <a href="' ~ entity_form_url('organization') ~ '">Create one first</a>.',
+    ) }}
     {{ field_for(schema, "name", "Name") }}
-    {{ field_for(schema, "description", "Description", required=false) }}
-    <small>Optional.</small>
+    {{ field_for(schema, "description", "Description", required=false, help="Optional.") }}
   </fieldset>
 
   <fieldset>
     <legend>State &amp; dates</legend>
     {{ field_for(schema, "state_preference", "State served", required=false) }}
     <div class="grid">
-      <label>
-        Start date
-        <input type="date" name="start_date" />
-      </label>
-      <label>
-        End date
-        <input type="date" name="end_date" />
-      </label>
+      {{ text_field("start_date", "Start date", required=false, type="date") }}
+      {{ text_field("end_date", "End date", required=false, type="date") }}
     </div>
     <small>All three above are optional.</small>
   </fieldset>

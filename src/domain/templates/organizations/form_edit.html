@@ -1,5 +1,5 @@
 {% extends "views/form_edit.html" %}
-{%- from "_shared/form_fields.html" import select_field, text_field -%}
+{%- from "_shared/form_fields.html" import entity_select_field, select_field, text_field -%}
 {%- from "_shared/forms.html" import form_actions -%}
 
 {% set resource_url = entity_url('organization') %}
@@ -30,16 +30,15 @@
        `ORGANIZATION_ENTITY.form_extras_path`) and excludes the row
        being edited so the picker can't pin a self-loop. Empty value
        = root organization (no parent). #}
-    <label for="parent_org_id">
-      Parent organization
-      <select id="parent_org_id" name="parent_org_id">
-        <option value=""{% if not organization.parent_org_id %} selected{% endif %}>(root — no parent)</option>
-        {%- for o in parent_org_options %}
-        <option value="{{ o.id }}"{% if o.id == organization.parent_org_id %} selected{% endif %}>{{ o.name }}</option>
-        {%- endfor %}
-      </select>
-      <small>Leave as "(root — no parent)" for a top-level organization.</small>
-    </label>
+    {{ entity_select_field(
+         "parent_org_id",
+         "Parent organization",
+         parent_org_options,
+         current=organization.parent_org_id,
+         blank_label="(root — no parent)",
+         required=false,
+         help='Leave as "(root — no parent)" for a top-level organization.',
+    ) }}
   </fieldset>
   {{ form_actions(
       "Save organization",
