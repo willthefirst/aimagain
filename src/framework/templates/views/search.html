@@ -10,16 +10,22 @@ Control selection (read by `_search_field`):
   * `TextFilter`           → `<input type="search">`
   * `ChoiceFilter`         → `<select>` with "Any" placeholder
   * `ChoiceFilter radio`   → toggle radio-button group (`role="group"`)
-  * `ChoiceFilter multi`   → `<select multiple>` (the single multiselect
-                              widget shared with form fields, see
-                              `_shared/form_fields.html::multi_select_field`)
+  * `ChoiceFilter multi`   → `<fieldset class="search-checkbox-fieldset">`
+                              with one `<input type="checkbox" name="<filter>">`
+                              per choice. Multiple checked boxes serialize
+                              as repeated `name=v` pairs under
+                              application/x-www-form-urlencoded, which
+                              FastAPI parses into a `list[str]` via the
+                              filter's `list[...] | None` annotation. The
+                              fieldset adds `.search-checkbox-grid` when the
+                              choice set is large enough to read better as
+                              a multi-column layout on desktop (see #583).
 
 Children supply only `resource_label`; the form body is built from
 the spec.
 #}
 {% extends "base.html" %}
 {%- from "_shared/_breadcrumb.html" import breadcrumb -%}
-{%- from "_shared/form_fields.html" import multi_select_field -%}
 
 {% block breadcrumb %}
 {%- set label %}{% block resource_label %}{% endblock %}{% endset -%}
@@ -60,7 +66,21 @@ the spec.
 </label>
 {%- elif f.kind == "choice" -%}
 {%- if f.multi -%}
-{{ multi_select_field(f.name, f.display_label, f.choices|map(attribute=0)|list, labels=dict(f.choices), current=value) }}
+{%- set selected = value or [] -%}
+{# Long choice sets (US states, license-type lists) get a multi-column
+   grid on desktop so the form doesn't become absurdly tall. The
+   threshold (>12) keeps short multi-selects — Age groups, Languages —
+   as a single column where each option already reads cleanly. #}
+{%- set grid_class = " search-checkbox-grid" if f.choices|length > 12 else "" -%}
+<fieldset class="search-checkbox-fieldset{{ grid_class }}">
+  <legend>{{ f.display_label }}</legend>
+  {%- for v, l in f.choices %}
+  <label>
+    <input type="checkbox" name="{{ f.name }}" value="{{ v }}"{% if v in selected %} checked{% endif %} />
+    {{ l }}
+  </label>
+  {%- endfor %}
+</fieldset>
 {%- elif f.radio -%}
 <fieldset class="toggle-radio">
   <legend>{{ f.display_label }}</legend>

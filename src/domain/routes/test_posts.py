@@ -1339,6 +1339,124 @@ async def test_search_page_renders_one_control_per_filter(
     ), f"Clear link must use `secondary outline`, got {clear_class!r}"
 
 
+async def test_search_page_renders_multi_choice_filters_as_checkbox_fieldsets(
+    authenticated_client: AsyncClient,
+    logged_in_user: User,
+):
+    """`/posts/search` renders every `ChoiceFilter(multi=True)` as a
+    `<fieldset class="search-checkbox-fieldset">` of single-click
+    checkboxes — replacing the previous native `<select multiple>`
+    listbox whose cmd/ctrl-click UX (and tiny scroll viewport for the
+    50-state list) the audit flagged (#583).
+
+    Pins three contracts: (1) no `<select multiple>` survives on the
+    search form, (2) every multi filter has at least one checkbox
+    sharing the filter name, and (3) the long-list filter (State, 50+
+    options) carries the `.search-checkbox-grid` class so the form
+    renders in responsive multi-column layout on desktop instead of
+    becoming 50 rows tall.
+    """
+    response = await authenticated_client.get("/posts/search")
+    assert response.status_code == 200
+    tree = HTMLParser(response.text)
+    form = tree.css_first("form.search-form")
+    assert form is not None
+
+    # The legacy multi-select widget should be gone from the search form.
+    assert form.css_first("select[multiple]") is None
+
+    # Each multi filter renders one checkbox per choice, all under
+    # one `<fieldset class="search-checkbox-fieldset">`.
+    for filter_name in ("state", "age_group", "language"):
+        boxes = form.css(f'input[type="checkbox"][name="{filter_name}"]')
+        assert boxes, f"{filter_name} should render at least one checkbox"
+
+    # Long choice sets (State has 50+ entries) opt into the
+    # multi-column grid layout so the form doesn't grow absurdly tall.
+    state_box = form.css_first('input[type="checkbox"][name="state"]')
+    assert state_box is not None
+    state_fieldset = state_box.parent
+    while state_fieldset is not None and state_fieldset.tag != "fieldset":
+        state_fieldset = state_fieldset.parent
+    assert state_fieldset is not None
+    assert "search-checkbox-grid" in (state_fieldset.attributes.get("class") or "")
+
+    # Short choice sets (Age groups has fewer than 12 entries) stay as
+    # a single column — they read better top-to-bottom and don't need
+    # the column treatment.
+    age_box = form.css_first('input[type="checkbox"][name="age_group"]')
+    assert age_box is not None
+    age_fieldset = age_box.parent
+    while age_fieldset is not None and age_fieldset.tag != "fieldset":
+        age_fieldset = age_fieldset.parent
+    assert age_fieldset is not None
+    assert "search-checkbox-grid" not in (age_fieldset.attributes.get("class") or "")
+
+
+async def test_search_page_multi_value_filter_applies_as_list(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user: User,
+):
+    """Submitting the search form with two boxes checked produces a
+    URL like `/posts?language=en&language=es`, which FastAPI parses
+    into a `list[str]` via the filter's `list[str] | None` annotation
+    and the repo applies as a multi-value filter. The checkbox-fieldset
+    migration must not break this wire contract — repeated form fields
+    still serialize as repeated `name=v` pairs.
+
+    Also re-renders the search page with both values active and pins
+    that each corresponding checkbox surfaces as `checked` (so the
+    form round-trips the active filter state)."""
+    author = create_test_user(username=f"multi-age-{uuid.uuid4()}")
+    teens = _referral_post(
+        description="t", owner_id=author.id, age_groups=["adolescents_14_18"]
+    )
+    young_adults = _referral_post(
+        description="y", owner_id=author.id, age_groups=["young_adults_19_24"]
+    )
+    older = _referral_post(
+        description="o", owner_id=author.id, age_groups=["older_adults_65_plus"]
+    )
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            session.add(author)
+            session.add(teens)
+            session.add(young_adults)
+            session.add(older)
+
+    response = await authenticated_client.get(
+        "/posts?age_group=adolescents_14_18&age_group=young_adults_19_24"
+    )
+    assert response.status_code == 200
+    tree = HTMLParser(response.text)
+    row_ids = {
+        r.attributes.get("data-row-id") for r in tree.css("#posts-list > article")
+    }
+    assert row_ids == {str(teens.id), str(young_adults.id)}
+
+    # The search page re-renders the form with both values checked.
+    search = await authenticated_client.get(
+        "/posts/search?age_group=adolescents_14_18&age_group=young_adults_19_24"
+    )
+    assert search.status_code == 200
+    search_tree = HTMLParser(search.text)
+    for value in ("adolescents_14_18", "young_adults_19_24"):
+        box = search_tree.css_first(
+            f'input[type="checkbox"][name="age_group"][value="{value}"]'
+        )
+        assert box is not None
+        assert (
+            "checked" in box.attributes
+        ), f"age_group={value} should round-trip as checked"
+    # And an unchecked value really is unchecked.
+    unchecked_box = search_tree.css_first(
+        'input[type="checkbox"][name="age_group"][value="older_adults_65_plus"]'
+    )
+    assert unchecked_box is not None
+    assert "checked" not in unchecked_box.attributes
+
+
 async def test_toolbar_inline_active_filter_summary_collapses_beyond_two(
     authenticated_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],

@@ -4,7 +4,7 @@ A ``Filter`` is a richer ``QueryParam`` — same URL contract (it
 becomes a FastAPI ``Query(...)`` on the list route via
 ``to_query_param()``) plus rendering metadata the templates read to
 pick the right HTML control (search input, single ``<select>``,
-multi ``<select>``, checkboxes).
+multi-choice ``<fieldset>`` of checkboxes, radio-toggle group).
 
 The split is deliberate: the URL shape and the UI shape change for
 different reasons. A column may stay queryable from a URL while the
@@ -98,15 +98,18 @@ class TextFilter(Filter):
 
 @dataclass(frozen=True)
 class ChoiceFilter(Filter):
-    """Fixed-value filter rendered as ``<select>`` (or multi-select).
+    """Fixed-value filter rendered as ``<select>`` or a checkbox group.
 
     ``choices`` is a tuple of ``(value, label)`` pairs. ``multi=True``
-    renders ``<select multiple size=N>`` and parses repeated query
-    params (``?<name>=a&<name>=b``) into a list; ``multi=False``
-    renders a single ``<select>`` with an "Any" placeholder. Pass
-    ``radio=True`` (single-select only) to render a Pico-style toggle
-    radio-button group instead — an "Any" reset option is prepended
-    automatically. ``radio`` is ignored when ``multi=True``.
+    renders a ``<fieldset class="search-checkbox-fieldset">`` of
+    single-click checkboxes (one per choice) and parses repeated query
+    params (``?<name>=a&<name>=b``) into a list — replacing the prior
+    ``<select multiple>`` listbox whose cmd/ctrl-click UX the audit
+    flagged (#583). ``multi=False`` renders a single ``<select>`` with
+    an "Any" placeholder. Pass ``radio=True`` (single-select only) to
+    render a Pico-style toggle radio-button group instead — an "Any"
+    reset option is prepended automatically. ``radio`` is ignored when
+    ``multi=True``.
 
     The ``annotation`` defaults to permissive (``str | None`` /
     ``list[str]``) so adding a value to the choice set doesn't

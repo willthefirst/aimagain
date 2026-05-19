@@ -417,8 +417,8 @@ async def test_list_providers_renders_empty_state(
 ):
     """With no persisted providers, the page renders a friendly empty
     message instead of an empty `<table>`. The list page's toolbar
-    links to `/providers/search`; the multi-select widgets live there,
-    not on the list page."""
+    links to `/providers/search`; the multi-choice filter widgets live
+    there, not on the list page."""
     response = await authenticated_client.get("/providers")
     assert response.status_code == 200
     assert "No providers found" in response.text
@@ -428,18 +428,23 @@ async def test_list_providers_renders_empty_state(
     link = tree.css_first("a.toolbar-filter-link")
     assert link is not None
     assert (link.attributes.get("href") or "").startswith("/providers/search")
-    # The filter widgets live on the search page — both filters are
-    # now multi-select (`<select multiple>`) with no preselected option
-    # when no filter is active.
+    # The filter widgets live on the search page — multi-choice
+    # `ChoiceFilter`s now render as a `<fieldset>` of single-click
+    # checkboxes (#583), not the previous native `<select multiple>`
+    # listbox. No checkbox is preselected when the filter is inactive.
     search_response = await authenticated_client.get("/providers/search")
     assert search_response.status_code == 200
     search_tree = HTMLParser(search_response.text)
-    for select_name in ("license_type", "issuing_state"):
-        select = search_tree.css_first(f'select[name="{select_name}"][multiple]')
-        assert select is not None
-        assert not select.css(
-            "option[selected]"
-        ), f"{select_name} should have no preselected option when filter is inactive"
+    for filter_name in ("license_type", "issuing_state"):
+        boxes = search_tree.css(f'input[type="checkbox"][name="{filter_name}"]')
+        assert boxes, f"{filter_name} should render at least one checkbox"
+        assert not any(
+            "checked" in b.attributes for b in boxes
+        ), f"{filter_name} should have no preselected checkbox when filter is inactive"
+    # The legacy `<select multiple>` listbox should be gone from the
+    # search form — the regression this guards is "checkbox swap
+    # forgot to remove the old control".
+    assert search_tree.css_first("form.search-form select[multiple]") is None
 
 
 async def test_list_providers_filters_by_license_type(
@@ -484,13 +489,15 @@ async def test_list_providers_filters_by_license_type(
     link_text = link.text()
     assert "psyd" in link_text.lower() or "PsyD" in link_text
     # The search page re-renders the form with the active value preselected.
+    # Multi-choice filters now render as checkboxes (#583), so the
+    # active value surfaces as a `checked` `<input type="checkbox">`.
     search = await authenticated_client.get("/providers/search?license_type=psyd")
     assert search.status_code == 200
-    selected = HTMLParser(search.text).css_first(
-        'select[name="license_type"] option[selected]'
+    checked = HTMLParser(search.text).css_first(
+        'input[type="checkbox"][name="license_type"][value="psyd"]'
     )
-    assert selected is not None
-    assert selected.attributes.get("value") == "psyd"
+    assert checked is not None
+    assert "checked" in checked.attributes
 
 
 async def test_list_providers_treats_empty_filter_values_as_absent(

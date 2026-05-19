@@ -528,6 +528,40 @@
       .entity-form-page input[name="treatment_modality"] {
         max-width: 20rem;
       }
+      /* Search-page multi-choice filters render as a `<fieldset>` of
+         single-click checkboxes (replacing the previous native
+         `<select multiple>` listbox — #583). The default layout is one
+         option per line so short choice sets (Age groups, Languages)
+         read top-to-bottom. Long sets opt into `.search-checkbox-grid`
+         which lays the options out in 2–3 responsive columns so a
+         50-state list doesn't stretch the form to 50 rows tall. */
+      .search-checkbox-fieldset {
+        margin-block-start: var(--pico-spacing);
+      }
+      .search-checkbox-fieldset > label {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        margin-block: 0.125rem;
+      }
+      .search-checkbox-fieldset > label > input[type="checkbox"] {
+        margin: 0;
+        flex: 0 0 auto;
+      }
+      .search-checkbox-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(12rem, 1fr));
+        column-gap: var(--pico-spacing);
+        row-gap: 0.125rem;
+      }
+      .search-checkbox-grid > legend {
+        grid-column: 1 / -1;
+      }
+      @media (max-width: 540px) {
+        .search-checkbox-grid {
+          grid-template-columns: 1fr;
+        }
+      }
       /* Credential rows (provider licensures / education / certifications)
          render as flat rows inside an outer `<section>` (edit) or
          `<article>` (detail), so a card-on-card pattern would read as
