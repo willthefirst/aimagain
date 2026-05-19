@@ -253,6 +253,10 @@ async def test_get_provider_renders_detail_page(
     # Owner sees an Edit link, no edit forms (read-only).
     assert tree.css_first(f'a[href="/providers/{provider_id}/form"]') is not None
     assert tree.css_first("form") is None
+    # Regression for #594 — the practice name lives in the header
+    # `<strong>` only. The facts list relabels its row "Organization"
+    # so the same string is not repeated under a "Practice name" `<dt>`.
+    assert "<dt>Practice name</dt>" not in response.text
 
 
 async def test_get_provider_hides_edit_link_for_non_owner(
