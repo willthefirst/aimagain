@@ -493,6 +493,80 @@ def test_breadcrumb_page_heading_visible_on_mobile() -> None:
     ), 'unscoped `nav[aria-label="breadcrumb"] { display: none }` in a mobile @media block would hide the page heading on list pages (#588)'
 
 
+def test_entity_form_page_caps_short_field_widths() -> None:
+    """Regression for #585 — every input inside `.entity-form-page`
+    that holds a short, bounded value (5-digit ZIP, 2-letter state,
+    10-digit NPI, ISO date, short numeric ID) must carry a `max-width`
+    cap so it doesn't stretch to the full form-container width on
+    desktop. The cap is applied via `name`-attribute selectors in
+    `base.html` so per-template wiring isn't required — adding a field
+    with one of the capped names anywhere inside an `.entity-form-page`
+    picks up the right width automatically."""
+    import re
+
+    env = _make_env()
+    _add_child(
+        env,
+        "stub.html",
+        """
+        {% extends "views/form_new.html" %}
+        {% set resource_url = "/providers" %}
+        {% block resource_label %}Providers{% endblock %}
+        {% block content %}<form id="x"></form>{% endblock %}
+        """,
+    )
+    html = env.get_template("stub.html").render(
+        request=_request_stub(),
+        is_authenticated=False,
+        is_development=False,
+    )
+
+    # The ZIP / state-code group caps at the narrow tier.
+    narrow = re.search(
+        r"\.entity-form-page\s+input\[name=\"location_zip\"\][^{]*\{[^}]*max-width:\s*8rem",
+        html,
+        re.DOTALL,
+    )
+    assert narrow is not None, (
+        "base.html must cap `location_zip` width inside `.entity-form-page` "
+        "so a 5-digit ZIP doesn't stretch the form container (#585)"
+    )
+
+    # NPI + ISO-date group caps at the medium tier.
+    medium = re.search(
+        r"\.entity-form-page\s+input\[name=\"npi\"\][^{]*\{[^}]*max-width:\s*12rem",
+        html,
+        re.DOTALL,
+    )
+    assert medium is not None, (
+        "base.html must cap `npi` width inside `.entity-form-page` so a "
+        "10-digit NPI doesn't stretch the form container (#585)"
+    )
+
+    # State <select> shares the narrow cap.
+    state = re.search(
+        r"\.entity-form-page\s+select\[name=\"location_state\"\][^{]*\{[^}]*max-width:\s*8rem",
+        html,
+        re.DOTALL,
+    )
+    assert state is not None, (
+        'base.html must cap `<select name="location_state">` width inside '
+        "`.entity-form-page` (#585)"
+    )
+
+    # Generic date-input cap so any `<input type=\"date\">` (e.g. the
+    # program start/end-date fields) picks up the cap without naming.
+    date_input = re.search(
+        r"\.entity-form-page\s+input\[type=\"date\"\][^{]*\{[^}]*max-width:\s*12rem",
+        html,
+        re.DOTALL,
+    )
+    assert date_input is not None, (
+        'base.html must cap `<input type="date">` width inside '
+        "`.entity-form-page` so program start/end dates don't stretch (#585)"
+    )
+
+
 def test_base_html_defines_danger_button_style() -> None:
     """Regression for #579 — `.danger` button style must be defined in
     base.html with a red token. Without it, `class="danger"` falls back
