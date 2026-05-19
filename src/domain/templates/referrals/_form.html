@@ -35,27 +35,22 @@ which FastAPI/Pydantic parses as a list.
       {{ select_field("location_in_person", "In-person sessions", LOCATION_AVAILABILITY_OPTIONS, labels=LOCATION_AVAILABILITY_LABELS, current=d.location_in_person if d else None, placeholder=true) }}
       {{ select_field("location_virtual", "Virtual sessions", LOCATION_AVAILABILITY_OPTIONS, labels=LOCATION_AVAILABILITY_LABELS, current=d.location_virtual if d else None, placeholder=true) }}
     </div>
-    {{ time_grid_field("desired_times", "Desired times", current=d.desired_times if d else None) }}
-    <small>Optional.</small>
+    {{ time_grid_field("desired_times", "Desired times", current=d.desired_times if d else None, help="Optional.") }}
   </fieldset>
 
   <fieldset>
     <legend>Demographics</legend>
-    {{ field_for(schema, "age_groups", "Age groups", current=d.age_groups if d else None) }}
-    <small>Select all that apply.</small>
+    {{ field_for(schema, "age_groups", "Age groups", current=d.age_groups if d else None, help="Select all that apply.") }}
     {{ field_for(schema, "languages", "Languages spoken", current=d.languages if d else None) }}
     {{ select_field("gender", "Gender identity", GENDERS, labels=GENDER_LABELS, current=d.gender if d else None) }}
   </fieldset>
 
-  {{ textarea_field("description", "Description", current=d.description if d else None) }}
-  <small>No PII.</small>
+  {{ textarea_field("description", "Description", current=d.description if d else None, help="No PII.") }}
 
   <fieldset>
     <legend>Services</legend>
-    {{ multi_select_field("services", "Services", REFERRAL_SERVICES, labels=REFERRAL_SERVICE_LABELS, current=d.services if d else None) }}
-    <small>Optional.</small>
-    {{ text_field("treatment_modality", "Psychotherapy modality", current=d.treatment_modality if d else None, required=false) }}
-    <small>Optional. e.g. DBT, EMDR.</small>
+    {{ multi_select_field("services", "Services", REFERRAL_SERVICES, labels=REFERRAL_SERVICE_LABELS, current=d.services if d else None, help="Optional.") }}
+    {{ text_field("treatment_modality", "Psychotherapy modality", current=d.treatment_modality if d else None, required=false, help="Optional. e.g. DBT, EMDR.") }}
   </fieldset>
 
   {# Insurance: two controls. `network_preference` is the referrer's

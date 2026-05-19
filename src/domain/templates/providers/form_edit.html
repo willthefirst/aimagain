@@ -1,5 +1,5 @@
 {% extends "views/form_edit.html" %}
-{%- from "_shared/form_fields.html" import text_field, select_field, radio_bool_field, multi_select_field -%}
+{%- from "_shared/form_fields.html" import entity_select_field, text_field, select_field, radio_bool_field, multi_select_field -%}
 {%- from "_shared/forms.html" import inline_add_form, form_actions -%}
 {%- from "providers/_credential_row.html" import credential_row -%}
 
@@ -19,22 +19,19 @@
   <form hx-patch="{{ entity_url('provider', id=provider.id) }}">
     <fieldset>
       <legend>Practice location</legend>
-      <label for="org_id">
-        Organization
-        <select id="org_id" name="org_id" required>
-          {%- for o in orgs %}
-          <option value="{{ o.id }}"{% if o.id == provider.org_id %} selected{% endif %}>{{ o.name }}</option>
-          {%- endfor %}
-        </select>
-        <small>Don't see your organization? <a href="{{ entity_form_url('organization') }}">Create one first</a>.</small>
-      </label>
+      {{ entity_select_field(
+           "org_id",
+           "Organization",
+           orgs,
+           current=provider.org_id,
+           help='Don\'t see your organization? <a href="' ~ entity_form_url('organization') ~ '">Create one first</a>.',
+      ) }}
       <div class="grid">
         {{ text_field("location_city", "City", current=provider.location_city, maxlength=120) }}
         {{ select_field("location_state", "State", US_STATES, current=provider.location_state) }}
         {{ text_field("location_zip", "ZIP", current=provider.location_zip, pattern="\\d{5}", maxlength=5) }}
       </div>
-      {{ text_field("npi", "NPI", current=provider.npi, required=false, pattern="\\d{10}", maxlength=10) }}
-      <small>10-digit National Provider Identifier. Optional.</small>
+      {{ text_field("npi", "NPI", current=provider.npi, required=false, pattern="\\d{10}", maxlength=10, help="10-digit National Provider Identifier. Optional.") }}
     </fieldset>
     <fieldset>
       <legend>Session availability</legend>
@@ -46,14 +43,12 @@
     {# Insurance & payment. Empty carrier list = no in-network. #}
     <fieldset>
       <legend>Insurance &amp; payment</legend>
-      {{ multi_select_field("in_network_carriers", "In-network carriers", INSURANCE_CARRIERS, labels=INSURANCE_CARRIER_LABELS, current=provider.in_network_carriers) }}
-      <small>Leave empty for none.</small>
+      {{ multi_select_field("in_network_carriers", "In-network carriers", INSURANCE_CARRIERS, labels=INSURANCE_CARRIER_LABELS, current=provider.in_network_carriers, help="Leave empty for none.") }}
       <div class="grid">
         {{ radio_bool_field("accepts_out_of_network", "Accepts out-of-network?", current=provider.accepts_out_of_network, required=false) }}
         {{ radio_bool_field("sliding_scale", "Sliding scale?", current=provider.sliding_scale, required=false) }}
       </div>
-      {{ text_field("cost", "Cost", current=provider.cost, required=false) }}
-      <small>Free text. Optional.</small>
+      {{ text_field("cost", "Cost", current=provider.cost, required=false, help="Free text. Optional.") }}
     </fieldset>
     {# Practice-details form keeps its own action cluster; credentials
        are managed via the inline add/remove forms below. Delete for
