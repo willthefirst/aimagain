@@ -352,6 +352,59 @@ def test_destructive_action_macros_emit_danger_class() -> None:
     ), "form_actions Delete button must emit class containing 'danger'"
 
 
+def test_breadcrumb_page_heading_visible_on_mobile() -> None:
+    """Regression for #588 — the single-segment breadcrumb on every
+    list page (`Organizations`, `Posts`, `Providers`, `Users`) doubles
+    as the page heading and must stay visible at the 375px mobile
+    viewport. Earlier the mobile rule hid `nav[aria-label="breadcrumb"]`
+    unconditionally under `@media (max-width: 768px)`, dropping the
+    page-heading context on mobile list pages and leaving only the
+    Filters/Create row as the top of the page.
+
+    The fix scopes the hide to multi-segment breadcrumbs only via the
+    `:has(li + li)` selector — single-segment list-page breadcrumbs
+    stay visible; multi-segment detail/form breadcrumbs (location
+    context) still collapse on mobile.
+    """
+    import re
+
+    env = _make_env()
+    _add_child(
+        env,
+        "stub.html",
+        """
+        {% extends "views/list.html" %}
+        {% block resource_label %}Providers{% endblock %}
+        {% block content %}body{% endblock %}
+        """,
+    )
+    html = env.get_template("stub.html").render(
+        request=_request_stub(),
+        is_authenticated=False,
+        is_development=False,
+    )
+
+    # Find every `@media (max-width: 768px)` block and verify none of
+    # them blanket-hide `nav[aria-label="breadcrumb"]` — the rule must
+    # be scoped to multi-segment via `:has(li + li)`.
+    blocks_768 = re.findall(
+        r"@media\s*\(\s*max-width:\s*768px\s*\)\s*\{(.*?)\n      \}",
+        html,
+        re.DOTALL,
+    )
+    assert blocks_768, "no @media (max-width: 768px) block in base.html"
+    combined = "\n".join(blocks_768)
+    assert (
+        'nav[aria-label="breadcrumb"]:has(li + li)' in combined
+    ), "mobile breadcrumb hide must be scoped to `:has(li + li)` so single-segment list-page breadcrumbs stay visible (#588)"
+    # And the unscoped version must not appear — that would re-hide
+    # the page heading on mobile list pages.
+    assert not re.search(
+        r"nav\[aria-label=\"breadcrumb\"\]\s*\{\s*display:\s*none",
+        combined,
+    ), 'unscoped `nav[aria-label="breadcrumb"] { display: none }` in a mobile @media block would hide the page heading on list pages (#588)'
+
+
 def test_base_html_defines_danger_button_style() -> None:
     """Regression for #579 — `.danger` button style must be defined in
     base.html with a red token. Without it, `class="danger"` falls back
