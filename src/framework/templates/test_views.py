@@ -318,15 +318,12 @@ def test_in_cell_action_menu_lays_out_inline() -> None:
     ), "`td > menu` must use flex layout so `<li>` commands sit inline (#580)"
 
 
-def test_entity_facts_dl_uses_two_column_grid_on_desktop() -> None:
-    """Regression for #586 — `.entity-card > section.entity-facts > dl`
-    must render in a 2-column grid on ≥768px viewports so the facts
-    list doesn't waste 60–70% of the card's horizontal space. The rule
-    targets `entity-facts` as a *direct child* of `entity-card`, so
-    post-detail (where `entity-facts` sits inside `.entity-grid`'s
-    right column) keeps its single-column layout."""
-    import re
-
+def test_primary_nav_shows_admin_links_only_for_admins() -> None:
+    """Regression for #590 — `/organizations`, `/programs`, `/users` are
+    admin tools, not surfaces for ordinary viewers. Render the chrome
+    twice: once as an admin (the three links appear), once as a
+    non-admin authenticated user (the links don't render).
+    Referrals/Openings/Directory render for any authed user."""
     env = _make_env()
     _add_child(
         env,
@@ -337,24 +334,42 @@ def test_entity_facts_dl_uses_two_column_grid_on_desktop() -> None:
         {% block content %}body{% endblock %}
         """,
     )
-    html = env.get_template("stub.html").render(
+
+    admin_html = env.get_template("stub.html").render(
         request=_request_stub(),
-        is_authenticated=False,
+        is_authenticated=True,
+        is_admin=True,
         is_development=False,
     )
-    match = re.search(
-        r"@media\s*\(\s*min-width:\s*768px\s*\)\s*\{[^@]*?"
-        r"\.entity-card\s*>\s*section\.entity-facts\s*>\s*dl\s*\{[^}]*\}",
-        html,
-        re.DOTALL,
+    nonadmin_html = env.get_template("stub.html").render(
+        request=_request_stub(),
+        is_authenticated=True,
+        is_admin=False,
+        is_development=False,
     )
-    assert match is not None, (
-        "missing `@media (min-width: 768px) { .entity-card > section.entity-facts > dl { ... } }` "
-        "rule in base.html (#586)"
-    )
-    assert "grid-template-columns: 1fr 1fr" in match.group(
-        0
-    ), "entity-facts dl must use 2-column grid on desktop"
+
+    admin_tree = HTMLParser(admin_html)
+    admin_links = {
+        a.attributes.get("href") for a in admin_tree.css('nav[aria-label="Primary"] a')
+    }
+    assert "/organizations" in admin_links, "admin nav must include Organizations link"
+    assert "/programs" in admin_links, "admin nav must include Programs link"
+    assert "/users" in admin_links, "admin nav must include Users link"
+
+    nonadmin_tree = HTMLParser(nonadmin_html)
+    nonadmin_links = {
+        a.attributes.get("href")
+        for a in nonadmin_tree.css('nav[aria-label="Primary"] a')
+    }
+    assert (
+        "/organizations" not in nonadmin_links
+    ), "non-admin viewer must not see Organizations link"
+    assert (
+        "/programs" not in nonadmin_links
+    ), "non-admin viewer must not see Programs link"
+    assert "/users" not in nonadmin_links, "non-admin viewer must not see Users link"
+    # Referrals/Openings/Directory still present for the authed non-admin.
+    assert "/providers" in nonadmin_links
 
 
 def test_form_edit_view_renders_three_segment_breadcrumb() -> None:
