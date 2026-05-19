@@ -2,6 +2,10 @@
 
 Polymorphic intake (`referral` / `opening` / `program_availability`) — pages extend `base.html` directly because the kind-picker and the per-kind forms don't fit the resource grammar's single-form-page shape.
 
+## Kind picker
+
+`form_new.html` renders `GET /posts/form` (no `?kind=`) as a `.kind-picker` chooser — one `<a class="kind-picker-option" data-kind="…">` per registered kind, each with a Lucide icon + title + 1-line description, round-tripping back to the same route with `?kind=…`. Adding a kind means adding another option block here, and extending the `[data-kind="…"]` border rule in [`../../../framework/templates/base.html`](../../../framework/templates/base.html) if the new kind needs its own accent color. The chooser shares the `--form-max-width` envelope with the per-kind forms it routes to.
+
 ## Two-layer per-kind forms
 
 Each kind ships a pair: a `_<kind>_form.html` macro `(hx_method, action, submit_label, post=None)` that renders the full intake form (shared field macros from [`../../../framework/templates/_shared/form_fields.html`](../../../framework/templates/_shared/form_fields.html)), and a thin `new_<kind>.html` / `edit_<kind>.html` wrapper that calls the macro with the right method/action. Adding a kind = add the macro + two wrappers and register their paths on the kind's `PostKindSpec` in [`../../models/posts/post_kinds.py`](../../models/posts/post_kinds.py); the route layer reads `spec.create_template` / `spec.edit_template`.
