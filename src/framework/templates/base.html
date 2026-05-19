@@ -283,6 +283,16 @@
          visual weight. The `.toolbar button` rule above reaches each
          action via descendant selector. */
       menu { list-style: none; padding: 0; margin: 0; }
+      /* In-row action clusters (e.g. the Actions cell on `/users`). Pico's
+         default `<button>` is `display: block; width: 100%` (form-shaped),
+         so a `<menu>` of `<li><button>` children stacks vertically and
+         doubles the row height (#580). `menu.row-actions` flips the
+         cluster to an inline flex row with a small gap, and forces each
+         child button back to natural width. Mirrors the `.toolbar`
+         override pattern above — same problem, different container. */
+      menu.row-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; }
+      menu.row-actions > li { display: contents; }
+      menu.row-actions button, menu.row-actions [role="button"] { width: auto; margin: 0; }
       /* Breadcrumb zone bar. Pico already styles the markup
          (`nav[aria-label="breadcrumb"] ul` becomes an inline list
          with a separator via `li + li::before`); the only thing this

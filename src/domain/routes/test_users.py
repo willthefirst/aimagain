@@ -225,6 +225,41 @@ async def test_list_shows_reactivate_for_deactivated_user(
     assert activation_button.text().strip() == "Reactivate"
 
 
+async def test_list_row_actions_render_inline(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user: User,
+):
+    """Row-action buttons share a single `<menu class="row-actions">`
+    container so they render inline rather than stacked (#580). The
+    class is the hook for the `menu.row-actions` flex rule in
+    `base.html`; without it Pico's default block-level `<button>`
+    stacks Deactivate above Delete and doubles row height."""
+    await promote_to_admin(db_test_session_manager, logged_in_user.email)
+    other = create_test_user(username=f"target-{uuid.uuid4()}")
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            session.add(other)
+
+    response = await authenticated_client.get("/users")
+    tree = HTMLParser(response.text)
+    row = tree.css_first(f"tr[data-row-id='{other.id}']")
+    assert row is not None, "Expected the target user's row in the table"
+    actions_menu = row.css_first("td[data-label='Actions'] menu.row-actions")
+    assert actions_menu is not None, (
+        "Actions cell must wrap row-action buttons in `menu.row-actions` "
+        "for the inline flex layout to apply"
+    )
+    # Both buttons live inside the same menu — confirms they share one
+    # flex container rather than being split into separate stacks.
+    activation_button = actions_menu.css_first(
+        f"button[hx-put='/users/{other.id}/activation']"
+    )
+    delete_button = actions_menu.css_first(f"button[hx-delete='/users/{other.id}']")
+    assert activation_button is not None
+    assert delete_button is not None
+
+
 # --- Detail page ---------------------------------------------------------
 
 

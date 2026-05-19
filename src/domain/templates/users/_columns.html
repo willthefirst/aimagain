@@ -10,6 +10,13 @@ the user detail page; the same `<li>` shape needs a `<menu>` parent
 here to stay valid HTML). The cell `<menu>` is a list of commands —
 same semantics as the toolbar, different layout context.
 
+The `class="row-actions"` on the `<menu>` flips the cluster to an
+inline flex row at every viewport (#580). Without it, Pico's default
+`<button>` is `display: block; width: 100%` (form-shaped), so each
+action stacks vertically and doubles row height. See `base.html` for
+the `menu.row-actions` rule — single source of truth for in-row
+action clusters.
+
 Macros isolate `{% include %}` from the page-level rendering
 context, so `can_admin_actions` is threaded through as a `row_kwargs`
 arg by `users/list.html` and re-bound via `{% with %}` here. The
@@ -36,7 +43,7 @@ renders nothing when the viewer is not an admin (its existing guard).
     {%- endif -%}
   </td>
   <td data-label="Actions">
-    <menu>
+    <menu class="row-actions">
     {%- with target_user = user, can_admin_actions = can_admin_actions -%}
       {%- include "users/_admin_actions.html" -%}
     {%- endwith -%}
