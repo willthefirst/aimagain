@@ -13,15 +13,31 @@ the conformance suite reports the entity missing from the registry.
 Non-entity routers (auth, fastapi-users-provided routers) are imported
 directly by :mod:`src.main` and not registered here — they aren't
 ``EntitySpec``-shaped.
+
+The `Post` SQLAlchemy supertype is internal-only; the URL layer
+exposes each kind via its own resource family
+(:mod:`referrals` / :mod:`openings` / :mod:`intakes`). No `/posts`
+collection or detail URL exists.
 """
 
-from . import favorites, organizations, posts, programs, providers, users
+from . import (
+    favorites,
+    intakes,
+    openings,
+    organizations,
+    programs,
+    providers,
+    referrals,
+    users,
+)
 
 __all__ = [
     "favorites",
+    "intakes",
+    "openings",
     "organizations",
-    "posts",
     "programs",
     "providers",
+    "referrals",
     "users",
 ]

@@ -88,7 +88,10 @@ async def unauthorized_exception_handler(request: Request, exc: HTTPException):
 
 @app.get("/")
 def read_root():
-    return RedirectResponse(url="/posts", status_code=302)
+    # `/openings` is the highest-trafficked URL family — see #628's
+    # split rationale. Anonymous visitors landing on `/` redirect here;
+    # auth gating happens at the route, not at root.
+    return RedirectResponse(url="/openings", status_code=302)
 
 
 app.include_router(
