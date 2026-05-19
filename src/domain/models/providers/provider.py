@@ -79,6 +79,19 @@ class Provider(LocationMixin, BaseModel):
     )
     cost = Column(Text, nullable=True)
 
+    # Transitional 1:1 back-relationship to the `Affiliation` row this
+    # provider was backfilled into (#629 PR 2). PR 3 switches the
+    # directory UI to read per-role attrs through `provider.affiliation`;
+    # PR 4 drops both the duplicated columns from `providers` and this
+    # back-relationship along with the legacy `providers` table.
+    affiliation = relationship(
+        "Affiliation",
+        back_populates="provider",
+        uselist=False,
+        cascade="all, delete-orphan",
+        lazy="selectin",
+    )
+
     licensures = relationship(
         "ProviderLicensure",
         cascade="all, delete-orphan",
@@ -96,24 +109,33 @@ class Provider(LocationMixin, BaseModel):
     )
 
     def __init__(self, **kwargs):
-        """Auto-create a 1:1 ``Clinician`` from any wire-side `npi` kwarg
-        so the framework's generic create handler — which builds the
-        model via ``spec.model(**payload.model_dump())`` — keeps
-        working unchanged after the column move (#629 PR 1).
+        """Auto-create the side rows so the framework's generic
+        ``spec.model(**payload.model_dump())`` create path keeps
+        working unchanged through the multi-PR split (#629).
 
-        Skips Clinician creation when the caller already supplies a
-        ``clinician`` or ``clinician_id`` (test fixtures that wire the
-        join manually, PR 2 where multiple providers share one
-        clinician).
+        - PR 1: any wire-side ``npi=`` kwarg becomes a fresh
+          ``Clinician`` attached as ``self.clinician``.
+        - PR 2: the per-role kwargs (``org_id``, ``location_*``,
+          ``in_person_sessions``, ``virtual_sessions``,
+          ``accepts_out_of_network``, ``in_network_carriers``,
+          ``sliding_scale``, ``cost``) ALSO populate a fresh
+          ``Affiliation`` attached as ``self.affiliation``, so
+          every new Provider has a linked Affiliation from day
+          one — PR 3 swaps reads onto Affiliation and PR 4 drops
+          the duplicated columns once nothing reads `providers`.
+
+        Skips Clinician/Affiliation auto-create when the caller
+        already supplies the relationship or its FK (test
+        fixtures that wire the join manually).
         """
-        # Late import via the package facade — `Clinician` lives in a
-        # sibling cluster (`models/clinicians/`), and a direct
-        # `from src.domain.models.clinicians.clinician import Clinician`
-        # would trip the cross-cluster lint. Going through
-        # `src.domain.models` (which re-exports `Clinician`) keeps the
-        # import out of the lint's cluster-aware regex, and importing
-        # at call-time avoids a circular-import at module load.
-        from src.domain.models import Clinician
+        # Late import via the package facade — sibling clusters
+        # (`models/clinicians/`, `models/affiliations/`) can't be
+        # imported directly per the cross-cluster lint. Going
+        # through `src.domain.models` (which re-exports both)
+        # keeps the import out of the lint's cluster-aware regex,
+        # and importing at call-time avoids a circular import at
+        # module load.
+        from src.domain.models import Affiliation, Clinician
 
         npi = kwargs.pop("npi", None)
         super().__init__(**kwargs)
@@ -124,6 +146,25 @@ class Provider(LocationMixin, BaseModel):
             and "clinician_id" not in kwargs
         ):
             self.clinician = Clinician(npi=npi)
+        if self.affiliation is None and "affiliation" not in kwargs:
+            # Pull from the original kwargs (Column defaults only apply
+            # at flush, not at construction — `self.accepts_out_of_network`
+            # would be None before flush even though the column default
+            # is True). Mirror Provider's column defaults explicitly so
+            # the transient Affiliation passes its NOT NULL columns.
+            self.affiliation = Affiliation(
+                clinician=self.clinician,
+                org_id=kwargs.get("org_id"),
+                location_city=kwargs.get("location_city"),
+                location_state=kwargs.get("location_state"),
+                location_zip=kwargs.get("location_zip"),
+                in_person_sessions=kwargs.get("in_person_sessions"),
+                virtual_sessions=kwargs.get("virtual_sessions"),
+                accepts_out_of_network=kwargs.get("accepts_out_of_network", True),
+                in_network_carriers=kwargs.get("in_network_carriers") or [],
+                sliding_scale=kwargs.get("sliding_scale", False),
+                cost=kwargs.get("cost"),
+            )
 
     @property
     def npi(self) -> str | None:
