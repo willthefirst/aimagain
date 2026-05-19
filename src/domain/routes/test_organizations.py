@@ -128,6 +128,10 @@ async def test_detail_renders(
     detail_resp = await authenticated_client.get(f"/organizations/{new_id}")
     assert detail_resp.status_code == 200
     assert "Detail-Org" in detail_resp.text
+    # Regression for #594 — the name appears in the header `<strong>`
+    # only; the facts `<dl>` must not include a `<dt>Name</dt>` row
+    # that duplicates the same string.
+    assert "<dt>Name</dt>" not in detail_resp.text
 
 
 async def test_patch_updates_name(
