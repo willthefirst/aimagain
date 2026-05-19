@@ -22,9 +22,24 @@
     {# `root_org_id` is server-managed — see
        src/domain/models/organizations/README.md. The form exposes
        `parent_org_id` only; the repository recomputes `root_org_id`
-       when a reparent happens. #}
-    {{ text_field("parent_org_id", "Parent organization ID", current=organization.parent_org_id, required=false) }}
-    <small>Leave blank for a root organization.</small>
+       when a reparent happens.
+
+       Parent-Org picker — replaces the free-text UUID input from
+       issue #581. `parent_org_options` is populated by
+       `organization_form_extras` (see
+       `ORGANIZATION_ENTITY.form_extras_path`) and excludes the row
+       being edited so the picker can't pin a self-loop. Empty value
+       = root organization (no parent). #}
+    <label for="parent_org_id">
+      Parent organization
+      <select id="parent_org_id" name="parent_org_id">
+        <option value=""{% if not organization.parent_org_id %} selected{% endif %}>(root — no parent)</option>
+        {%- for o in parent_org_options %}
+        <option value="{{ o.id }}"{% if o.id == organization.parent_org_id %} selected{% endif %}>{{ o.name }}</option>
+        {%- endfor %}
+      </select>
+      <small>Leave as "(root — no parent)" for a top-level organization.</small>
+    </label>
   </fieldset>
   {{ form_actions(
       "Save organization",

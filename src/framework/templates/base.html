@@ -174,6 +174,20 @@
       .entity-card section.entity-facts > dl > div {
         padding: 0.1rem 0;
       }
+      /* Two-column dl on desktop for non-grid detail cards (org,
+         program, user, provider). Without this the facts list packs
+         into the left third of the card and wastes the right two
+         thirds (#586). Targets `.entity-card > section.entity-facts`
+         (direct child) so post-detail — where `entity-facts` sits
+         inside `.entity-grid`'s right column already — keeps its
+         single-column layout. */
+      @media (min-width: 768px) {
+        .entity-card > section.entity-facts > dl {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          column-gap: 1.5rem;
+        }
+      }
       .entity-card section.entity-facts dt {
         display: inline;
         font-weight: 600;
@@ -283,6 +297,30 @@
          visual weight. The `.toolbar button` rule above reaches each
          action via descendant selector. */
       menu { list-style: none; padding: 0; margin: 0; }
+      /* In-row action menus inside table cells render their `<li>`
+         commands inline so the actions sit on a single row instead of
+         stacking each `<li>` on its own line (#580 — the `/users`
+         table's Deactivate/Delete cluster previously doubled row
+         height). Scoped to `td > menu` so the page toolbar `<menu>`
+         (which has its own flex layout) is untouched, and so that
+         bespoke tables outside `index_table` pick up the same
+         treatment if they ever need an Actions cell. Buttons inside
+         the cell shrink to a compact size so two-or-three-action
+         clusters don't dominate the row width. */
+      td > menu {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 0.25rem;
+      }
+      td > menu > li { margin: 0; }
+      td > menu > li > button,
+      td > menu > li > [role="button"] {
+        margin: 0;
+        padding-block: 0.25rem;
+        padding-inline: 0.5rem;
+        font-size: 0.875rem;
+      }
       /* Breadcrumb zone bar. Pico already styles the markup
          (`nav[aria-label="breadcrumb"] ul` becomes an inline list
          with a separator via `li + li::before`); the only thing this
@@ -332,6 +370,105 @@
       @media (max-width: 540px) {
         .form-actions { flex-direction: column; align-items: stretch; }
         .form-actions > .form-actions-destructive { margin-left: 0; }
+      }
+      /* Kind-picker chooser — used by `posts/form_new.html` (the
+         `/posts/form` page when the request omits `?kind=`). Each
+         `<a class="kind-picker-option">` is a full-bleed card the user
+         clicks to enter the kind-specific create form: Lucide icon on
+         the left, two-line text stack (title + 1-line description) on
+         the right. The `data-kind` attribute mirrors the convention
+         used on `.entity-card` so the kind palette stays consistent
+         across post surfaces. Pico styles `<a>` as inline text; the
+         rules here promote each option to a block-level card with
+         border, padding, and a hover/focus accent. The cap reuses
+         `--form-max-width` so the chooser shares the page-width
+         envelope with the per-kind create forms it routes to. */
+      .kind-picker {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+        max-width: var(--form-max-width);
+      }
+      .kind-picker-option {
+        display: grid;
+        grid-template-columns: auto 1fr;
+        grid-template-rows: auto auto;
+        column-gap: 1rem;
+        align-items: center;
+        padding: 1rem;
+        border: var(--pico-border-width) solid var(--pico-muted-border-color);
+        border-left: 4px solid var(--pico-muted-border-color);
+        border-radius: var(--pico-border-radius);
+        background: var(--pico-card-background-color);
+        color: inherit;
+        text-decoration: none;
+      }
+      .kind-picker-option[data-kind="referral"] { border-left-color: darkorange; }
+      .kind-picker-option[data-kind="opening"] { border-left-color: darkcyan; }
+      .kind-picker-option[data-kind="program_availability"] { border-left-color: darkcyan; }
+      .kind-picker-option:is(:hover, :focus-visible) {
+        border-color: var(--pico-primary);
+        background: var(--pico-card-sectioning-background-color);
+        text-decoration: none;
+      }
+      .kind-picker-icon {
+        grid-row: 1 / span 2;
+        grid-column: 1;
+        font-size: 1.75rem;
+        margin-inline-end: 0;
+        color: var(--pico-primary);
+      }
+      .kind-picker-title {
+        grid-row: 1;
+        grid-column: 2;
+        font-weight: 600;
+        font-size: 1.05rem;
+      }
+      .kind-picker-description {
+        grid-row: 2;
+        grid-column: 2;
+        color: var(--pico-muted-color);
+        font-size: 0.9rem;
+        line-height: 1.35;
+      }
+      /* Destructive button style. Pico v2 ships primary (filled blue),
+         `.secondary`, `.contrast`, and the `.outline` modifier, but no
+         destructive-action color — every Delete in the app picked a
+         different style (primary blue, contrast black, secondary
+         outline) and read as the page's main CTA at the same visual
+         weight as Save/Create (#579). `.danger` is the single canonical
+         destructive class: filled red by default, red-outlined under
+         `.outline` for inline subentity deletes (credential rows) so
+         the row's main affordance doesn't shout. Reuses Pico's red
+         tokens so the color tracks the theme. */
+      button.danger,
+      [role="button"].danger,
+      input[type="button"].danger,
+      input[type="reset"].danger,
+      input[type="submit"].danger {
+        --pico-background-color: var(--pico-color-red-550);
+        --pico-border-color: var(--pico-color-red-550);
+        --pico-color: var(--pico-color-azure-50);
+      }
+      button.danger:is(:hover, :active, :focus),
+      [role="button"].danger:is(:hover, :active, :focus) {
+        --pico-background-color: var(--pico-color-red-600);
+        --pico-border-color: var(--pico-color-red-600);
+      }
+      button.danger.outline,
+      [role="button"].danger.outline {
+        --pico-background-color: transparent;
+        --pico-color: var(--pico-color-red-550);
+        --pico-border-color: var(--pico-color-red-550);
+      }
+      button.danger.outline:is(:hover, :active, :focus),
+      [role="button"].danger.outline:is(:hover, :active, :focus) {
+        --pico-background-color: var(--pico-color-red-50);
+        --pico-color: var(--pico-color-red-650);
+        --pico-border-color: var(--pico-color-red-650);
       }
       /* Pico's `<fieldset>` carries a top margin that visually competes
          with the cap above — flatten the rhythm so siblings sit at a
@@ -428,6 +565,22 @@
     {%- set _on_openings = _on_posts_list and _post_kind == 'opening' -%}
     {%- set _directory_path = entity_url('provider') -%}
     {%- set _on_directory = is_authenticated and (request.url.path == _directory_path or request.url.path.startswith(_directory_path + '/')) -%}
+    {# Admin section shortcuts — `/organizations`, `/programs`, `/users`
+       were unreachable from the nav (#590). They're not product
+       surfaces for ordinary viewers, so render the links only for
+       admins (`is_admin` is a chrome scalar from
+       `framework.http.responses.html_response`). Each highlights when
+       on its collection list or any sub-path. #}
+    {%- set _orgs_path = entity_url('organization') -%}
+    {%- set _on_orgs = is_admin and (request.url.path == _orgs_path or request.url.path.startswith(_orgs_path + '/')) -%}
+    {%- set _programs_path = entity_url('program') -%}
+    {%- set _on_programs = is_admin and (request.url.path == _programs_path or request.url.path.startswith(_programs_path + '/')) -%}
+    {# Users nav lights on the collection list and on per-user detail/
+       edit pages, but NOT on `/users/me` — the profile icon already
+       owns that path. The admin-only guard avoids double-lighting when
+       a regular user lands on their own profile. #}
+    {%- set _users_path = entity_url('user') -%}
+    {%- set _on_users = is_admin and (request.url.path == _users_path or (request.url.path.startswith(_users_path + '/') and not _on_profile)) -%}
     <header class="container">
       <nav aria-label="Primary">
         <ul>
@@ -437,6 +590,11 @@
           <li><a href="{{ entity_url('post') }}?kind=referral"{% if _on_referrals %} aria-current="page" class="contrast"{% endif %}>Referrals</a></li>
           <li><a href="{{ entity_url('post') }}?kind=opening"{% if _on_openings %} aria-current="page" class="contrast"{% endif %}>Openings</a></li>
           <li><a href="{{ entity_url('provider') }}"{% if _on_directory %} aria-current="page" class="contrast"{% endif %}>Directory</a></li>
+          {% if is_admin %}
+          <li><a href="{{ entity_url('organization') }}"{% if _on_orgs %} aria-current="page" class="contrast"{% endif %}>Organizations</a></li>
+          <li><a href="{{ entity_url('program') }}"{% if _on_programs %} aria-current="page" class="contrast"{% endif %}>Programs</a></li>
+          <li><a href="{{ entity_url('user') }}"{% if _on_users %} aria-current="page" class="contrast"{% endif %}>Users</a></li>
+          {% endif %}
           {% endif %}
         </ul>
         <ul id="primary-nav">
@@ -451,7 +609,12 @@
           </li>
           {% else %}
           <li>
-            <a href="/auth/login"{% if _on_login %} aria-current="page" class="contrast"{% endif %}>Login</a>
+            {# `class="contrast"` is dropped on the active state so the
+               Login link color stays consistent across /auth/login vs
+               /auth/register / /auth/forgot-password (#592). The
+               aria-current semantics still convey the active state to
+               assistive tech. #}
+            <a href="/auth/login"{% if _on_login %} aria-current="page"{% endif %}>Login</a>
           </li>
           {% endif %}
         </ul>

@@ -2,7 +2,11 @@
 
 {# Confirm-then-delete button. Renders an `hx-delete` button with an
 `hx-confirm` dialog. Used by owner/admin action partials and by inline
-sub-resource list rows (e.g. providers/form_edit.html licensure delete). #}
+sub-resource list rows (e.g. providers/form_edit.html licensure delete).
+`class="danger"` (defined in base.html — #579) gives every Delete the
+same red destructive-action style; without it Pico defaults to the
+filled primary blue, which read as the page's main CTA and let
+destructive clicks happen at the same visual weight as Save/Create. #}
 {% macro confirm_delete_button(url, confirm_message, label="Delete") -%}
-<button type="button" hx-delete="{{ url }}" hx-confirm="{{ confirm_message }}">{{ label }}</button>
+<button type="button" class="danger" hx-delete="{{ url }}" hx-confirm="{{ confirm_message }}">{{ label }}</button>
 {%- endmacro %}
