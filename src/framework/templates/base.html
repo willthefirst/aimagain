@@ -194,6 +194,38 @@
       .entity-card > .entity-how-to-refer { margin: 0; }
       .entity-card > .entity-how-to-refer h4 { margin: 0 0 0.4rem 0; font-size: 1rem; }
       .entity-card > .entity-how-to-refer p { margin: 0.25rem 0; }
+      /* Responsive index tables. Pico's `.overflow-auto` wrapper gives
+         every `index_table` table a horizontal scroll container, but
+         on narrow viewports the right-edge columns still slide past
+         the viewport with no affordance that they exist (#578). When
+         the row macro emits `data-label` on each `<td>` (the
+         convention documented in `_shared/index_table.html`), stack
+         the row into "Label: value" lines on ≤640px so every column
+         stays visible without horizontal scroll. The `.primary` cell
+         (canonically the row's headline link) suppresses its label —
+         the headline carries its own context. Tables without
+         `data-label` (organizations, programs) fall back to the
+         existing horizontal scroll. */
+      @media (max-width: 640px) {
+        .overflow-auto table[role="grid"] thead { display: none; }
+        .overflow-auto table[role="grid"] tr {
+          display: block;
+          padding: 0.5rem 0;
+          border-bottom: var(--pico-border-width) solid var(--pico-muted-border-color);
+        }
+        .overflow-auto table[role="grid"] tbody tr:last-child { border-bottom: 0; }
+        .overflow-auto table[role="grid"] td[data-label] {
+          display: block;
+          padding: 0.15rem 0;
+          border: 0;
+        }
+        .overflow-auto table[role="grid"] td[data-label]::before {
+          content: attr(data-label) ": ";
+          font-weight: 600;
+          margin-inline-end: 0.25rem;
+        }
+        .overflow-auto table[role="grid"] td[data-label].primary::before { content: ""; }
+      }
       /* Lucide icons — single source of truth for sizing AND
          spacing. `color: inherit` lets each icon pick up the
          surrounding text color (so an icon inside a `<small>` or a

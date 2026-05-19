@@ -44,7 +44,12 @@ scope to it.
    wide row doesn't blow out the page width. Applied here so every list
    that goes through `index_table` gets the same treatment — bespoke
    tables outside this macro (e.g. organizations/programs) wrap
-   themselves. #}
+   themselves. On ≤640px viewports, `.overflow-auto table[role="grid"]`
+   rows with `data-label` cells stack vertically into "Label: value"
+   lines (see base.html — #578), so row macros should put a
+   `data-label="..."` on every `<td>` whose meaning isn't already
+   carried by the cell content. The `class="primary"` cell suppresses
+   its label since the headline link is self-describing. #}
 <div class="overflow-auto">
   <table{% if id %} id="{{ id }}"{% endif %} role="grid">
     <thead><tr>{{ headers(**header_kwargs) }}</tr></thead>

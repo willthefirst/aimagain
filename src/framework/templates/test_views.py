@@ -234,6 +234,56 @@ def test_entity_card_header_wraps_on_narrow_viewports() -> None:
     ), "entity-header must set `flex-wrap: wrap` to avoid #577 clipping"
 
 
+def test_index_table_rows_stack_on_narrow_viewports() -> None:
+    """Regression for #578 — every `index_table` row whose `<td>` cells
+    carry `data-label` must stack into "Label: value" lines on ≤640px
+    viewports so off-screen columns (e.g. `/providers` Insurance) stay
+    visible without horizontal scroll. Pin the CSS rule's presence by
+    matching the stacking rules under a `max-width: 640px` `@media`
+    block scoped to `.overflow-auto table[role="grid"]`."""
+    import re
+
+    env = _make_env()
+    _add_child(
+        env,
+        "stub.html",
+        """
+        {% extends "views/list.html" %}
+        {% block resource_label %}Providers{% endblock %}
+        {% block content %}body{% endblock %}
+        """,
+    )
+
+    html = env.get_template("stub.html").render(
+        request=_request_stub(),
+        is_authenticated=False,
+        is_development=False,
+    )
+
+    # Two `@media (max-width: 640px)` blocks exist in base.html (the
+    # entity-grid collapse and this one); concatenate every match body
+    # and assert the stacking rules appear in at least one. Bespoke
+    # tables (organizations/programs) that don't emit `data-label`
+    # stay on the horizontal-scroll path because the rules scope to
+    # `.overflow-auto table[role="grid"] td[data-label]`.
+    all_640_blocks = re.findall(
+        r"@media\s*\(\s*max-width:\s*640px\s*\)\s*\{(.*?)\n      \}",
+        html,
+        re.DOTALL,
+    )
+    assert all_640_blocks, "no @media (max-width: 640px) block in base.html"
+    combined = "\n".join(all_640_blocks)
+    assert (
+        '.overflow-auto table[role="grid"] thead' in combined
+    ), "missing thead hide rule for responsive index-table stacking"
+    assert (
+        "td[data-label]" in combined
+    ), "missing td[data-label] rule for responsive index-table stacking"
+    assert (
+        "content: attr(data-label)" in combined
+    ), "missing data-label ::before content rule"
+
+
 def test_form_edit_view_renders_three_segment_breadcrumb() -> None:
     env = _make_env()
     _add_child(
