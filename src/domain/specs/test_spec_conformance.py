@@ -57,9 +57,19 @@ def test_exactly_one_audit_binding_is_set(spec: EntitySpec) -> None:
 @_PARAM_ALL
 def test_crud_audit_type_matches_name(spec: EntitySpec) -> None:
     """For CRUD-shaped entities, ``audit.type`` is the persisted
-    ``resource_type`` string — by convention it equals ``spec.name``."""
+    ``resource_type`` string — by convention it equals ``spec.name``.
+
+    Kind-locked faces of a polymorphic supertype (``discriminator_value``
+    set) are the exception: all three faces share one
+    ``AuditedResource`` so the persisted ``resource_type`` stays at
+    the supertype name regardless of which URL family wrote the row.
+    This keeps audit-log readers that filter by
+    ``resource_type='post'`` working across the URL split."""
     if spec.audit is None:
         pytest.skip(f"{spec.name!r} is an edge entity")
+    if spec.discriminator_value is not None:
+        # Shared-audit invariant is pinned in test_post_faces.py.
+        return
     assert spec.audit.type == spec.name
 
 
@@ -68,9 +78,15 @@ def test_crud_audit_actions_match_stem(spec: EntitySpec) -> None:
     """The create / update / delete actions resolve from
     ``AuditAction[f'CREATE_{stem}']`` where ``stem`` defaults to
     ``spec.name`` and can be overridden via ``audit_action_stem``.
-    This pins the convention so it stays load-bearing."""
+    This pins the convention so it stays load-bearing.
+
+    Kind-locked faces share the supertype's `AuditedResource`, so the
+    action enums match the supertype name, not `spec.name`. The
+    shared-identity invariant is pinned in `test_post_faces.py`."""
     if spec.audit is None:
         pytest.skip(f"{spec.name!r} is an edge entity")
+    if spec.discriminator_value is not None:
+        return
     stem = (spec.audit_action_stem or spec.name).upper()
     assert spec.audit.create == AuditAction[f"CREATE_{stem}"]
     assert spec.audit.update == AuditAction[f"UPDATE_{stem}"]
