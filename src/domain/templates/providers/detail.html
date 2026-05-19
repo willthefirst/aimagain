@@ -40,58 +40,77 @@
 {% endblock %}
 
 {# Provider detail uses the same `.entity-card` chrome the posts/detail
-   page does. The body is single-column (no `.entity-grid` split) —
-   Provider has no left-column equivalent of posts' services-block, so
-   the practice facts and credentials lists stack vertically inside the
-   card.
+   page does. After #642 PR 2 the page is **stacked sections**:
+
+     1. Header card — clinician identity (NPI). Reads naturally as
+        "here's this person".
+     2. One affiliation card per row in `view.affiliations` — each
+        carries the per-role attributes ("here are the practices they
+        work at") and links out to the owning Organization. Each card
+        is tagged `data-testid="affiliation-card"` so route-level
+        tests can count them without scraping the heading text.
+     3. Credentials (licensures, educations, certifications) — these
+        are **person-level** (FK to `clinicians.id` after #635 PR A),
+        shared across every affiliation, so they render once at the
+        bottom, not inside each affiliation card.
 
    Per-kind branching and field selection live in
-   `src.domain.logic.providers.view.provider_card_view`, which
-   collapses the brittle three-conditional insurance phrase into one
-   string and pre-resolves the location-availability display labels.
-   Templates never reach for `provider.org.name` directly — they read
-   `view.practice_name`.
-
-   The Licensures, Education, and Certifications sections render
-   inline (the old template hid the latter two behind `<details>`;
-   per the detail-view standardization plan we use collapsibles
-   sparingly, so all three credentials sections render flat in the
-   same way). #}
+   `src.domain.logic.providers.view.provider_card_view` /
+   `affiliation_card_view`, which collapse the brittle three-conditional
+   insurance phrase into one string and pre-resolve the location-
+   availability display labels. Templates never reach for
+   `affiliation.org.name` directly — they read `aff.org_name`. #}
 {% block content %}
 {%- set view = provider_card_view(provider) -%}
 <article class="entity-card">
   <header class="entity-header">
     <strong>{{ view.practice_name }}</strong>
-    {%- if view.full_address %}
-    <small>{{ view.full_address }}</small>
+    {%- if view.npi %}
+    {# title-case-ignore: NPI is an industry abbreviation (National Provider Identifier) #}
+    <small>NPI {{ view.npi }}</small>
+    {%- endif %}
+  </header>
+</article>
+
+{# Stacked affiliation cards — one per row in `provider.affiliations`.
+   Reads as "At <Org A>: ... · At <Org B>: ...". Each card links its
+   heading to the owning Organization so the cross-resource navigation
+   the old (single-card) layout exposed via the "Organization" facts
+   row still works. The directory listing (`list.html`) is unchanged
+   — it continues to read `view.practice_name` / the flat per-role
+   keys off the primary affiliation; #642 PR 3 rolls it up. #}
+{% for aff in view.affiliations %}
+<article class="entity-card" data-testid="affiliation-card" data-affiliation-org-id="{{ aff.org_id }}">
+  <header class="entity-header">
+    <strong>At <a href="{{ aff.org_url }}">{{ aff.org_name }}</a></strong>
+    {%- if aff.full_address %}
+    <small>{{ aff.full_address }}</small>
     {%- endif %}
   </header>
 
   <section class="entity-facts">
     <dl>
-      {#- The provider's name lives in the header `<strong>`; the facts
-          row labelled "Organization" preserves the link to the owning
-          org so users can still navigate from the provider to the
-          practice page. Previously a "Practice name" row repeated the
-          same text under a duplicate label (#594). -#}
-      <div><dt>Organization</dt><dd><a href="{{ view.practice_url }}">{{ view.practice_name }}</a></dd></div>
-      {%- if view.full_address %}
-      <div class="entity-location"><dt aria-label="Address"><i class="icon-map-pinned" aria-hidden="true"></i></dt><dd>{{ view.full_address }}</dd></div>
+      {%- if aff.full_address %}
+      <div class="entity-location"><dt aria-label="Address"><i class="icon-map-pinned" aria-hidden="true"></i></dt><dd>{{ aff.full_address }}</dd></div>
       {%- endif %}
-      <div><dt>In-person sessions</dt><dd>{{ view.in_person_label }}</dd></div>
-      <div><dt>Virtual sessions</dt><dd>{{ view.virtual_label }}</dd></div>
-      <div><dt>Insurance</dt><dd>{{ view.insurance_summary }}</dd></div>
-      <div><dt>Sliding scale</dt><dd>{{ view.sliding_scale_label }}</dd></div>
-      {%- if view.cost %}
-      <div><dt>Cost</dt><dd>{{ view.cost }}</dd></div>
-      {%- endif %}
-      {%- if view.npi %}
-      {# title-case-ignore: NPI is an industry abbreviation (National Provider Identifier) #}
-      <div><dt>NPI</dt><dd>{{ view.npi }}</dd></div>
+      <div><dt>In-person sessions</dt><dd>{{ aff.in_person_label }}</dd></div>
+      <div><dt>Virtual sessions</dt><dd>{{ aff.virtual_label }}</dd></div>
+      <div><dt>Insurance</dt><dd>{{ aff.insurance_summary }}</dd></div>
+      <div><dt>Sliding scale</dt><dd>{{ aff.sliding_scale_label }}</dd></div>
+      {%- if aff.cost %}
+      <div><dt>Cost</dt><dd>{{ aff.cost }}</dd></div>
       {%- endif %}
     </dl>
   </section>
+</article>
+{% endfor %}
 
+{# Credentials are clinician-level (FK to `clinicians.id` after #635
+   PR A) — they belong to the person, not to any single affiliation,
+   so they render once below the stacked affiliation cards. The
+   list-per-section grammar is the same the old single-card layout
+   used; only the parent card changed. #}
+<article class="entity-card">
   <section>
     <h4>Licensures</h4>
     {% if view.licensures %}

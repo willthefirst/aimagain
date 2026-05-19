@@ -90,6 +90,80 @@ def _insurance_summary(provider) -> str:
     return " · ".join(parts)
 
 
+def _affiliation_insurance_summary(affiliation) -> str:
+    """Same shape as :func:`_insurance_summary` but sourced directly
+    from an ``Affiliation`` (not a ``Provider``). The detail page's
+    stacked-sections layout (#642 PR 2) renders one insurance line per
+    affiliation, so we need a per-affiliation summarizer alongside the
+    per-provider one the directory listing still uses."""
+    from src.domain.models.enums import INSURANCE_CARRIER_LABELS
+
+    carriers = list(getattr(affiliation, "in_network_carriers", None) or [])
+    accepts_oon = bool(getattr(affiliation, "accepts_out_of_network", False))
+    if not carriers and not accepts_oon:
+        return "Self-pay only"
+    parts: list[str] = []
+    if carriers:
+        labels = ", ".join(INSURANCE_CARRIER_LABELS[c] for c in carriers)
+        parts.append(f"In-network ({labels})")
+    if accepts_oon:
+        parts.append("Out-of-network")
+    return " · ".join(parts)
+
+
+def affiliation_card_view(affiliation, org=None) -> dict[str, Any]:
+    """Normalize a single ``Affiliation`` into the per-role dict shape
+    one stacked-section card on the provider detail page reads from
+    (#642 PR 2).
+
+    Mirrors the per-role keys ``provider_card_view`` exposes at the top
+    level (``full_address``, ``in_person_label``, ``virtual_label``,
+    ``insurance_summary``, ``sliding_scale_label``, ``cost``) so the
+    template's "one card per affiliation" loop reads the same flat
+    dict shape it has always read — only now once per row.
+
+    ``org`` defaults to ``affiliation.org``; callers can override (e.g.
+    test stubs that don't wire the relationship).
+
+    Returns:
+        org_id / org_name / org_url: identity of the practice this
+            affiliation belongs to (heading of the card).
+        full_address: ``"City, ST ZIP"`` composed from the affiliation's
+            ``LocationMixin`` columns. ``None`` if every part is empty.
+        in_person_label / virtual_label: display labels for the
+            ``location_availability`` enum values.
+        insurance_summary: per-affiliation insurance phrase.
+        sliding_scale_label: ``"Yes"`` or ``"No"``.
+        cost: pass-through optional free-text.
+    """
+    from src.domain.models.enums import LOCATION_AVAILABILITY_LABELS
+
+    if org is None:
+        org = getattr(affiliation, "org", None)
+    org_id = getattr(affiliation, "org_id", None)
+    return {
+        "org_id": org_id,
+        "org_name": (getattr(org, "name", None) if org else None),
+        "org_url": (f"/organizations/{org_id}" if org_id is not None else None),
+        "full_address": _full_address(
+            getattr(affiliation, "location_city", None),
+            getattr(affiliation, "location_state", None),
+            getattr(affiliation, "location_zip", None),
+        ),
+        "in_person_label": LOCATION_AVAILABILITY_LABELS.get(
+            getattr(affiliation, "in_person_sessions", None) or ""
+        ),
+        "virtual_label": LOCATION_AVAILABILITY_LABELS.get(
+            getattr(affiliation, "virtual_sessions", None) or ""
+        ),
+        "insurance_summary": _affiliation_insurance_summary(affiliation),
+        "sliding_scale_label": (
+            "Yes" if getattr(affiliation, "sliding_scale", False) else "No"
+        ),
+        "cost": getattr(affiliation, "cost", None),
+    }
+
+
 def provider_card_view(provider) -> dict[str, Any]:
     """Normalize a `Provider` row into the flat shape
     ``providers/detail.html`` reads from.
@@ -103,12 +177,14 @@ def provider_card_view(provider) -> dict[str, Any]:
 
     Returns:
         practice_name: ``provider.org.name`` (the practice's display
-            name).
+            name — the *primary* affiliation's org). Mirrored as
+            ``affiliations[0].org_name`` for non-detail callers.
         practice_url: ``/organizations/<org_id>`` link to the parent
             Organization — preserves the cross-resource navigation
             the old template emitted inline.
-        full_address: ``"City, ST ZIP"`` composed from the affiliation's
-            ``LocationMixin`` columns. ``None`` if every part is empty.
+        full_address: ``"City, ST ZIP"`` composed from the primary
+            affiliation's ``LocationMixin`` columns. ``None`` if every
+            part is empty.
         in_person_label / virtual_label: display labels for the
             ``location_availability`` enum values
             (``in_person_sessions`` / ``virtual_sessions``).
@@ -120,7 +196,16 @@ def provider_card_view(provider) -> dict[str, Any]:
         npi: pass-through optional 10-digit NPI.
         licensures / educations / certifications: pass-through ORM
             collections (the template iterates them via the existing
-            ``credential_row`` partial; no shape change).
+            ``credential_row`` partial; no shape change). These are
+            clinician-level (FK to ``clinicians.id`` after #635 PR A)
+            and render once on the detail page, not per-affiliation.
+        affiliations: list of per-affiliation dicts (one per row in
+            ``provider.affiliations``) shaped by
+            :func:`affiliation_card_view`. The detail page renders one
+            stacked card per entry (#642 PR 2). The flat per-role keys
+            above still read off ``provider.primary_affiliation`` so
+            the directory listing and other non-detail callers don't
+            break.
     """
     from src.domain.models.enums import LOCATION_AVAILABILITY_LABELS
 
@@ -131,13 +216,17 @@ def provider_card_view(provider) -> dict[str, Any]:
     # `providers`. After #642 PR 1, a Provider may hold multiple
     # Affiliations; the listing reads through the primary (oldest)
     # one — PR 3 swaps the listing to one row per Clinician with
-    # stacked affiliations.
+    # stacked affiliations. PR 2 (this PR) adds the `affiliations`
+    # list below so the *detail* page renders one card per
+    # affiliation while the directory listing's read path stays
+    # unchanged.
     # `npi` continues to come from `provider.clinician` (#629 PR 1).
     # `_role_attr` still falls back to attributes on the `provider`
     # object itself for `SimpleNamespace` test stubs that don't wire
     # an affiliation.
     clinician = getattr(provider, "clinician", None)
     org_id = _role_attr(provider, "org_id")
+    affiliations = list(getattr(provider, "affiliations", None) or [])
     return {
         "practice_name": (getattr(org, "name", None) if org else None),
         "practice_url": (f"/organizations/{org_id}" if org_id is not None else None),
@@ -161,4 +250,8 @@ def provider_card_view(provider) -> dict[str, Any]:
         "licensures": list(getattr(provider, "licensures", None) or []),
         "educations": list(getattr(provider, "educations", None) or []),
         "certifications": list(getattr(provider, "certifications", None) or []),
+        "affiliations": [
+            affiliation_card_view(aff, getattr(aff, "org", None))
+            for aff in affiliations
+        ],
     }

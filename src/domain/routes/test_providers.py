@@ -276,6 +276,76 @@ async def test_get_provider_renders_detail_page(
     assert "<dt>Practice name</dt>" not in response.text
 
 
+async def test_get_provider_detail_renders_stacked_affiliation_cards(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user: User,
+):
+    """`GET /providers/{id}` renders one stacked card per Affiliation
+    after #642 PR 2. Seed a Provider with two affiliations (the one
+    `Provider.__init__` builds from the create payload + a second one
+    appended) and assert both org names render and both
+    `[data-testid="affiliation-card"]` blocks appear, in the order
+    `provider.affiliations` returns (oldest first by `created_at`).
+    """
+    from src.domain.models import Affiliation
+
+    provider_id = await _seed_provider_for(
+        db_test_session_manager,
+        user_id=logged_in_user.id,
+        practice_name="Bedlam Health",
+        location_city="Brooklyn",
+        location_state="NY",
+        location_zip="11201",
+    )
+    # Append a second Affiliation at a different Org.
+    second_org_id = await _seed_org(
+        db_test_session_manager,
+        owner_id=logged_in_user.id,
+        name="Wellspring",
+    )
+    clinician_id = await _clinician_id_for(db_test_session_manager, provider_id)
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            session.add(
+                Affiliation(
+                    provider_id=provider_id,
+                    clinician_id=clinician_id,
+                    org_id=second_org_id,
+                    location_city="Queens",
+                    location_state="NY",
+                    location_zip="11101",
+                    in_person_sessions="yes",
+                    virtual_sessions="please_contact",
+                    accepts_out_of_network=True,
+                    in_network_carriers=[],
+                    sliding_scale=True,
+                    cost="$220/session",
+                )
+            )
+
+    response = await authenticated_client.get(f"/providers/{provider_id}")
+
+    assert response.status_code == 200
+    tree = HTMLParser(response.text)
+    cards = tree.css('article[data-testid="affiliation-card"]')
+    assert len(cards) == 2, f"expected one card per affiliation, got {len(cards)}"
+    # Both org names render — one card per practice.
+    assert "Bedlam Health" in response.text
+    assert "Wellspring" in response.text
+    # Per-affiliation address rendered inside each card (not just at
+    # the provider header) — the location belongs to the affiliation.
+    assert "Brooklyn" in response.text
+    assert "Queens" in response.text
+    # Each card links its heading to the owning Organization.
+    org_links_in_cards = []
+    for card in cards:
+        anchor = card.css_first("header.entity-header a[href^='/organizations/']")
+        assert anchor is not None
+        org_links_in_cards.append(anchor.attributes.get("href"))
+    assert f"/organizations/{second_org_id}" in org_links_in_cards
+
+
 async def test_get_provider_hides_edit_link_for_non_owner(
     authenticated_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],

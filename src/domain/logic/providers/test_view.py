@@ -5,8 +5,34 @@ from types import SimpleNamespace
 from src.domain.logic.providers.view import (
     _full_address,
     _insurance_summary,
+    affiliation_card_view,
     provider_card_view,
 )
+
+
+def _stub_affiliation(**overrides):
+    """Realistic Affiliation stub. Mirrors the per-role columns on the
+    real ``Affiliation`` ORM row plus the ``org`` relationship the
+    view-model reads through.
+
+    ``org`` defaults to a SimpleNamespace; pass ``org=None`` to drop the
+    relationship for an "org missing" branch test.
+    """
+    defaults = dict(
+        org_id="org-1",
+        org=SimpleNamespace(name="Acme Counseling"),
+        location_city="Brooklyn",
+        location_state="NY",
+        location_zip="11201",
+        in_person_sessions="yes",
+        virtual_sessions="please_contact",
+        in_network_carriers=["aetna"],
+        accepts_out_of_network=False,
+        sliding_scale=False,
+        cost=None,
+    )
+    defaults.update(overrides)
+    return SimpleNamespace(**defaults)
 
 
 def _stub_provider(**overrides):
@@ -18,6 +44,12 @@ def _stub_provider(**overrides):
     ergonomics; the stub builder rolls the kwarg into a nested
     ``clinician`` SimpleNamespace so the view sees the same shape it
     sees in production.
+
+    ``affiliations`` defaults to an empty list — most tests pin the
+    flat per-role keys (sourced via ``_role_attr`` from the stub's own
+    attributes or its ``primary_affiliation``) and don't care about the
+    stacked-sections list. Pass ``affiliations=[_stub_affiliation(...)]``
+    when exercising the detail-page's per-affiliation rendering.
     """
     npi = overrides.pop("npi", None)
     defaults = dict(
@@ -36,6 +68,7 @@ def _stub_provider(**overrides):
         licensures=[],
         educations=[],
         certifications=[],
+        affiliations=[],
     )
     defaults.update(overrides)
     return SimpleNamespace(**defaults)
@@ -209,3 +242,89 @@ def test_view_prefers_affiliation_over_legacy_provider_columns():
     # summary mentions both.
     assert "Aetna" in v["insurance_summary"]
     assert "Out-of-network" in v["insurance_summary"]
+
+
+# --- affiliation_card_view -----------------------------------------------
+
+
+def test_affiliation_card_view_shape():
+    """`affiliation_card_view(aff)` returns the per-role dict shape one
+    stacked-section card on the provider detail page reads from
+    (#642 PR 2). Pins the keys the template enumerates so a rename in
+    `view.py` is caught here before the template renders blanks."""
+    aff = _stub_affiliation(
+        org_id="org-7",
+        org=SimpleNamespace(name="Bedlam Health"),
+        location_city="Queens",
+        location_state="NY",
+        location_zip="11101",
+        in_person_sessions="yes",
+        virtual_sessions="no",
+        in_network_carriers=["aetna"],
+        accepts_out_of_network=True,
+        sliding_scale=True,
+        cost="$220/session",
+    )
+    card = affiliation_card_view(aff)
+    assert card["org_id"] == "org-7"
+    assert card["org_name"] == "Bedlam Health"
+    assert card["org_url"] == "/organizations/org-7"
+    assert card["full_address"] == "Queens, NY 11101"
+    assert card["in_person_label"] == "Yes"
+    assert card["virtual_label"] == "No"
+    assert card["insurance_summary"] == "In-network (Aetna) · Out-of-network"
+    assert card["sliding_scale_label"] == "Yes"
+    assert card["cost"] == "$220/session"
+
+
+def test_affiliation_card_view_uses_explicit_org_when_passed():
+    """``affiliation_card_view`` accepts an explicit ``org`` so the view-
+    model isn't forced to read through ``affiliation.org`` — useful when
+    the relationship hasn't been eager-loaded."""
+    aff = _stub_affiliation(org=None, org_id="org-9")
+    card = affiliation_card_view(aff, SimpleNamespace(name="Explicit Org"))
+    assert card["org_name"] == "Explicit Org"
+    assert card["org_url"] == "/organizations/org-9"
+
+
+# --- provider_card_view.affiliations -------------------------------------
+
+
+def test_view_returns_affiliations_list_one_per_row():
+    """The detail page (#642 PR 2) renders one card per row in
+    ``provider.affiliations``. The view-model exposes that as a list of
+    per-affiliation dicts so the template loops a single list — no
+    template-side dereferencing of ``affiliation.org.name``."""
+    aff_a = _stub_affiliation(
+        org_id="org-a",
+        org=SimpleNamespace(name="Bedlam Health"),
+        location_city="Brooklyn",
+        sliding_scale=False,
+        cost=None,
+    )
+    aff_b = _stub_affiliation(
+        org_id="org-b",
+        org=SimpleNamespace(name="Wellspring"),
+        location_city="Queens",
+        sliding_scale=True,
+        cost="$220/session",
+    )
+    v = provider_card_view(_stub_provider(affiliations=[aff_a, aff_b]))
+    assert isinstance(v["affiliations"], list)
+    assert len(v["affiliations"]) == 2
+    assert v["affiliations"][0]["org_name"] == "Bedlam Health"
+    assert v["affiliations"][0]["org_url"] == "/organizations/org-a"
+    assert v["affiliations"][0]["sliding_scale_label"] == "No"
+    assert v["affiliations"][1]["org_name"] == "Wellspring"
+    assert v["affiliations"][1]["org_url"] == "/organizations/org-b"
+    assert v["affiliations"][1]["sliding_scale_label"] == "Yes"
+    assert v["affiliations"][1]["cost"] == "$220/session"
+
+
+def test_view_affiliations_is_empty_list_when_provider_has_none():
+    """A Provider with zero affiliations (e.g. after every Affiliation
+    was deleted via the inline list on the edit page — #642 PR 1)
+    still returns a list, not ``None``, so the template's ``{% for %}``
+    renders the empty case without an extra guard."""
+    v = provider_card_view(_stub_provider(affiliations=[]))
+    assert v["affiliations"] == []
