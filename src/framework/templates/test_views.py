@@ -488,3 +488,44 @@ class _RequestStub:
 
 def _request_stub() -> _RequestStub:
     return _RequestStub()
+
+
+def _request_stub_at(path: str) -> _RequestStub:
+    stub = _RequestStub()
+    stub.url = _RequestStub._Url()
+    stub.url.path = path
+    return stub
+
+
+def test_login_link_color_is_consistent_across_auth_pages() -> None:
+    """Regression for #592 — the top-right Login link must not carry
+    `class="contrast"` on `/auth/login` (which previously rendered the
+    link black) while the same link on `/auth/register` and
+    `/auth/forgot-password` rendered blue. Drop the contrast class so
+    the link's color stays the same color anywhere it's still rendered
+    (orthogonal to #591 which may hide the link entirely)."""
+    env = _make_env()
+    _add_child(
+        env,
+        "stub.html",
+        """
+        {% extends "views/list.html" %}
+        {% block resource_label %}Login{% endblock %}
+        {% block content %}body{% endblock %}
+        """,
+    )
+    for path in ("/auth/login", "/auth/register", "/auth/forgot-password"):
+        html = env.get_template("stub.html").render(
+            request=_request_stub_at(path),
+            is_authenticated=False,
+            is_development=False,
+        )
+        tree = HTMLParser(html)
+        login_links = [
+            a for a in tree.css('a[href="/auth/login"]') if a.text().strip() == "Login"
+        ]
+        for link in login_links:
+            classes = (link.attributes.get("class") or "").split()
+            assert (
+                "contrast" not in classes
+            ), f"on {path}, Login link must not use `class='contrast'`: got {classes!r}"

@@ -529,7 +529,12 @@
           </li>
           {% else %}
           <li>
-            <a href="/auth/login"{% if _on_login %} aria-current="page" class="contrast"{% endif %}>Login</a>
+            {# `class="contrast"` is dropped on the active state so the
+               Login link color stays consistent across /auth/login vs
+               /auth/register / /auth/forgot-password (#592). The
+               aria-current semantics still convey the active state to
+               assistive tech. #}
+            <a href="/auth/login"{% if _on_login %} aria-current="page"{% endif %}>Login</a>
           </li>
           {% endif %}
         </ul>
