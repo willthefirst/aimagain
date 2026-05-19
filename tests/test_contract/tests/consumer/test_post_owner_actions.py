@@ -1,11 +1,15 @@
 """Consumer contract: clicking Delete on the post owner-actions partial.
 
 Verifies that the HTMX-decorated button rendered by
-`templates/posts/_owner_actions.html` (mounted via the `posts_owner_actions`
-stub on the consumer server) issues a `DELETE /posts/{id}` and that the
-response carries the `HX-Redirect: /posts` header htmx follows on success.
-The contract surface is the partial plus the consuming detail page; method,
-path, and the redirect header must agree with the route on the provider side.
+`templates/_shared/posts/_owner_actions.html` (mounted via the
+`posts_owner_actions` stub on the consumer server, which renders
+`referrals/detail.html`) issues a `DELETE /referrals/{id}` and that
+the response carries the `HX-Redirect: /referrals` header htmx
+follows on success. Post-#628 the partial is shared across three
+URL families (`/referrals`, `/openings`, `/intakes`); the contract
+surface is the partial + detail page wiring, so the stub picks one
+kind. Method, path, and the redirect header must agree with the
+route on the provider side.
 """
 
 import pytest
@@ -48,7 +52,7 @@ async def test_consumer_delete_button_click(origin_with_routes: str, page: Page)
         pact.given(PROVIDER_STATE_POST_EXISTS_AND_OWNED)
         .upon_receiving("a request to delete a post via the owner-actions partial")
         .with_request(method="DELETE", path=POST_DELETE_API_PATH)
-        .will_respond_with(status=204, headers={"HX-Redirect": "/posts"})
+        .will_respond_with(status=204, headers={"HX-Redirect": "/referrals"})
     )
 
     await setup_playwright_pact_interception(
@@ -63,8 +67,10 @@ async def test_consumer_delete_button_click(origin_with_routes: str, page: Page)
 
     with pact:
         await page.goto(detail_page_url)
-        await page.wait_for_selector("button[hx-delete^='/posts/']")
-        await page.locator("button[hx-delete^='/posts/']", has_text="Delete").click()
+        await page.wait_for_selector("button[hx-delete^='/referrals/']")
+        await page.locator(
+            "button[hx-delete^='/referrals/']", has_text="Delete"
+        ).click()
         await page.wait_for_timeout(NETWORK_TIMEOUT_MS)
 
     # Pact verification happens automatically on context exit.
