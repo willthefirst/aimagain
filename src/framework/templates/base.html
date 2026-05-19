@@ -174,6 +174,20 @@
       .entity-card section.entity-facts > dl > div {
         padding: 0.1rem 0;
       }
+      /* Two-column dl on desktop for non-grid detail cards (org,
+         program, user, provider). Without this the facts list packs
+         into the left third of the card and wastes the right two
+         thirds (#586). Targets `.entity-card > section.entity-facts`
+         (direct child) so post-detail — where `entity-facts` sits
+         inside `.entity-grid`'s right column already — keeps its
+         single-column layout. */
+      @media (min-width: 768px) {
+        .entity-card > section.entity-facts > dl {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          column-gap: 1.5rem;
+        }
+      }
       .entity-card section.entity-facts dt {
         display: inline;
         font-weight: 600;

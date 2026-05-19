@@ -318,6 +318,45 @@ def test_in_cell_action_menu_lays_out_inline() -> None:
     ), "`td > menu` must use flex layout so `<li>` commands sit inline (#580)"
 
 
+def test_entity_facts_dl_uses_two_column_grid_on_desktop() -> None:
+    """Regression for #586 — `.entity-card > section.entity-facts > dl`
+    must render in a 2-column grid on ≥768px viewports so the facts
+    list doesn't waste 60–70% of the card's horizontal space. The rule
+    targets `entity-facts` as a *direct child* of `entity-card`, so
+    post-detail (where `entity-facts` sits inside `.entity-grid`'s
+    right column) keeps its single-column layout."""
+    import re
+
+    env = _make_env()
+    _add_child(
+        env,
+        "stub.html",
+        """
+        {% extends "views/list.html" %}
+        {% block resource_label %}Posts{% endblock %}
+        {% block content %}body{% endblock %}
+        """,
+    )
+    html = env.get_template("stub.html").render(
+        request=_request_stub(),
+        is_authenticated=False,
+        is_development=False,
+    )
+    match = re.search(
+        r"@media\s*\(\s*min-width:\s*768px\s*\)\s*\{[^@]*?"
+        r"\.entity-card\s*>\s*section\.entity-facts\s*>\s*dl\s*\{[^}]*\}",
+        html,
+        re.DOTALL,
+    )
+    assert match is not None, (
+        "missing `@media (min-width: 768px) { .entity-card > section.entity-facts > dl { ... } }` "
+        "rule in base.html (#586)"
+    )
+    assert "grid-template-columns: 1fr 1fr" in match.group(
+        0
+    ), "entity-facts dl must use 2-column grid on desktop"
+
+
 def test_form_edit_view_renders_three_segment_breadcrumb() -> None:
     env = _make_env()
     _add_child(
