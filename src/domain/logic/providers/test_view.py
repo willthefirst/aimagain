@@ -159,15 +159,17 @@ def test_view_returns_dict_for_jinja_attribute_access():
 
 def test_view_prefers_affiliation_over_legacy_provider_columns():
     """Regression for #629 PR 3 — per-role attrs source from
-    ``provider.affiliation`` first, falling back to the legacy
+    ``provider.primary_affiliation`` first, falling back to the legacy
     column on ``provider`` only when the affiliation is absent or
     has no value for the field.
 
-    The PR 2 migration mirrored the per-role columns onto
-    ``affiliations``; PR 3 switches reads onto the new column set.
-    PR 4 will drop the legacy columns and the fallback path. The
-    test pins the precedence by giving the two sides disagreeing
-    values and asserting the affiliation value wins.
+    After #642 PR 1, a Provider may hold multiple Affiliations; the
+    view-model reads through ``primary_affiliation`` (the oldest by
+    ``created_at``) so the listing's per-row dereferencing is
+    deterministic — PR 3 (issue #642) collapses the listing to one
+    row per Clinician with stacked affiliations. The test pins the
+    precedence by giving the two sides disagreeing values and
+    asserting the affiliation value wins.
     """
     provider = _stub_provider(
         # Legacy columns on `provider` carry the "old" values
@@ -180,8 +182,8 @@ def test_view_prefers_affiliation_over_legacy_provider_columns():
         location_zip="00000",
         in_network_carriers=[],
         accepts_out_of_network=False,
-        # `affiliation` carries the post-PR-3 source of truth
-        affiliation=SimpleNamespace(
+        # `primary_affiliation` carries the post-PR-3 source of truth.
+        primary_affiliation=SimpleNamespace(
             in_person_sessions="yes",
             virtual_sessions="please_contact",
             sliding_scale=True,

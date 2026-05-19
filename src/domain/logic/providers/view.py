@@ -32,18 +32,20 @@ def _full_address(
 
 
 def _role_attr(provider, attr, default=None):
-    """Source a per-role attribute from `provider.affiliation`.
+    """Source a per-role attribute from `provider.primary_affiliation`.
 
     Post-#635 PR B the per-role columns no longer live on `providers` —
-    affiliation is the single source of truth. The `Provider` ORM class
-    still surfaces `provider.location_city` etc. as `@property` proxies
-    over the affiliation, but `provider_card_view` also accepts test
-    stubs that set fields on a `SimpleNamespace` without wiring an
-    affiliation; for those, fall through to the attribute on the
-    provider directly (the property proxies live on the real ORM class,
-    not the stub).
+    affiliation is the single source of truth. After #642 PR 1 a
+    Provider may hold multiple Affiliations; the directory listing and
+    the post-opening dropdown read through the primary one (oldest by
+    `created_at`). The `Provider` ORM class surfaces `provider.location_city`
+    etc. as `@property` proxies over `primary_affiliation`, but
+    `provider_card_view` also accepts test stubs that set fields on a
+    `SimpleNamespace` without wiring an affiliation; for those, fall
+    through to the attribute on the provider directly (the property
+    proxies live on the real ORM class, not the stub).
     """
-    affiliation = getattr(provider, "affiliation", None)
+    affiliation = getattr(provider, "primary_affiliation", None)
     if affiliation is not None:
         return getattr(affiliation, attr, default)
     return getattr(provider, attr, default)
@@ -68,8 +70,10 @@ def _insurance_summary(provider) -> str:
     chain back into `models`; deferring to call time keeps the
     dependency graph quiet.
 
-    Reads source from ``provider.affiliation`` — the single source of
-    truth after #635 PR B dropped the duplicated columns.
+    Reads source from ``provider.primary_affiliation`` — the single
+    source of truth after #635 PR B dropped the duplicated columns,
+    and the directory listing's per-row dereferencing rule after #642
+    PR 1 introduced multi-affiliation Providers.
     """
     from src.domain.models.enums import INSURANCE_CARRIER_LABELS
 
@@ -121,9 +125,13 @@ def provider_card_view(provider) -> dict[str, Any]:
     from src.domain.models.enums import LOCATION_AVAILABILITY_LABELS
 
     org = getattr(provider, "org", None)
-    # Per-role attrs come from `provider.affiliation` — the directory's
-    # source-of-truth for "what is this clinician's role at this org"
-    # after #635 PR B dropped the duplicated columns from `providers`.
+    # Per-role attrs come from `provider.primary_affiliation` — the
+    # directory's source-of-truth for "what is this clinician's role
+    # at this org" after #635 PR B dropped the duplicated columns from
+    # `providers`. After #642 PR 1, a Provider may hold multiple
+    # Affiliations; the listing reads through the primary (oldest)
+    # one — PR 3 swaps the listing to one row per Clinician with
+    # stacked affiliations.
     # `npi` continues to come from `provider.clinician` (#629 PR 1).
     # `_role_attr` still falls back to attributes on the `provider`
     # object itself for `SimpleNamespace` test stubs that don't wire

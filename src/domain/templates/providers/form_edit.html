@@ -59,6 +59,71 @@
 </section>
 
 <section>
+  {# Affiliations — clinician's practice-role rows. After #642 PR 1 a
+     Provider may hold multiple Affiliations; each row is independently
+     add/delete-able via /providers/{id}/affiliations[/{aff_id}]. The
+     "Practice" form above edits the primary affiliation (oldest by
+     created_at) via the Provider per-role property proxies; this
+     section surfaces the full list including additional rows. PR 3
+     (#642) collapses the directory listing to one row per Clinician
+     with stacked affiliations; PR 2 (#642) rewrites the detail page
+     to render the same stacked sections. #}
+  <h2>Affiliations</h2>
+  {% if provider.affiliations %}
+  <div class="credential-list">
+    {%- for aff in provider.affiliations %}
+    {%- set meta_parts = [
+        aff.location_city,
+        aff.location_state,
+        aff.location_zip,
+        ("In-person: " ~ LOCATION_AVAILABILITY_LABELS[aff.in_person_sessions]) if aff.in_person_sessions else None,
+        ("Virtual: " ~ LOCATION_AVAILABILITY_LABELS[aff.virtual_sessions]) if aff.virtual_sessions else None,
+        ("In-network: " ~ (aff.in_network_carriers | map('lower') | map('capitalize') | join(', '))) if aff.in_network_carriers else None,
+        "Out-of-network OK" if aff.accepts_out_of_network else None,
+        "Sliding scale" if aff.sliding_scale else None,
+        aff.cost,
+    ] -%}
+    {{ credential_row(
+        aff.org.name,
+        meta_parts,
+        delete_url=entity_url('provider', id=provider.id) ~ "/affiliations/" ~ aff.id|string,
+        delete_confirm="Remove this affiliation?",
+    ) }}
+    {%- endfor %}
+  </div>
+  {% else %}
+  <p>No affiliations yet.</p>
+  {% endif %}
+
+  {% call inline_add_form(entity_url('provider', id=provider.id) ~ "/affiliations", "Add affiliation", "Add affiliation") %}
+    <label for="aff_org_id">
+      Organization
+      <select id="aff_org_id" name="org_id" required>
+        <option value="" disabled selected>--</option>
+        {%- for o in orgs %}
+        <option value="{{ o.id }}">{{ o.name }}</option>
+        {%- endfor %}
+      </select>
+    </label>
+    <div class="grid">
+      {{ text_field("location_city", "City", maxlength=120) }}
+      {{ select_field("location_state", "State", US_STATES, placeholder=true) }}
+      {{ text_field("location_zip", "ZIP", pattern="\\d{5}", maxlength=5) }}
+    </div>
+    <div class="grid">
+      {{ select_field("in_person_sessions", "In-person sessions", LOCATION_AVAILABILITY_OPTIONS, labels=LOCATION_AVAILABILITY_LABELS, placeholder=true) }}
+      {{ select_field("virtual_sessions", "Virtual sessions", LOCATION_AVAILABILITY_OPTIONS, labels=LOCATION_AVAILABILITY_LABELS, placeholder=true) }}
+    </div>
+    {{ multi_select_field("in_network_carriers", "In-network carriers", INSURANCE_CARRIERS, labels=INSURANCE_CARRIER_LABELS) }}
+    <div class="grid">
+      {{ radio_bool_field("accepts_out_of_network", "Accepts out-of-network?", current=true, required=false) }}
+      {{ radio_bool_field("sliding_scale", "Sliding scale?", current=false, required=false) }}
+    </div>
+    {{ text_field("cost", "Cost", required=false) }}
+  {% endcall %}
+</section>
+
+<section>
   <h2>Licensures</h2>
   {% if provider.licensures %}
   <div class="credential-list">
