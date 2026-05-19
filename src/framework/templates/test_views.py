@@ -284,6 +284,40 @@ def test_index_table_rows_stack_on_narrow_viewports() -> None:
     ), "missing data-label ::before content rule"
 
 
+def test_in_cell_action_menu_lays_out_inline() -> None:
+    """Regression for #580 — `<menu>` inside a table cell must render
+    its `<li>` commands inline (single-line cluster), not stacked. The
+    `/users` table's Actions cell had Deactivate/Reactivate + Delete
+    stacking vertically and doubling row height. Scoping to `td >
+    menu` (not all `<menu>`) keeps the page toolbar `<menu>`
+    untouched."""
+    import re
+
+    env = _make_env()
+    _add_child(
+        env,
+        "stub.html",
+        """
+        {% extends "views/list.html" %}
+        {% block resource_label %}Users{% endblock %}
+        {% block content %}body{% endblock %}
+        """,
+    )
+    html = env.get_template("stub.html").render(
+        request=_request_stub(),
+        is_authenticated=False,
+        is_development=False,
+    )
+    match = re.search(
+        r"td\s*>\s*menu\s*\{[^}]*\}",
+        html,
+    )
+    assert match is not None, "missing `td > menu` rule in base.html"
+    assert "display: flex" in match.group(
+        0
+    ), "`td > menu` must use flex layout so `<li>` commands sit inline (#580)"
+
+
 def test_form_edit_view_renders_three_segment_breadcrumb() -> None:
     env = _make_env()
     _add_child(
