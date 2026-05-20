@@ -490,7 +490,10 @@
       src="https://unpkg.com/htmx.org@2.0.4"
       integrity="sha384-HGfztofotfshcF7+8n44JQL2oJmowVChPTg48S+jvZoztPfvwD79OC/LTtG6dMp+"
       crossorigin="anonymous"></script>
-    <script src="https://unpkg.com/htmx.org@2.0.4/dist/ext/json-enc.js"></script>
+    {# htmx 2 ships extensions as separate npm packages — the in-tree
+       `dist/ext/json-enc.js` is the htmx-1 build and logs a "v1 extension
+       with htmx 2" console warning. Use the htmx-2 package instead. #}
+    <script src="https://unpkg.com/htmx-ext-json-enc@2.0.2/json-enc.js"></script>
     {% block head %}{% endblock %} {% if is_development %}
     <!-- LiveReload script for development hot reloading -->
     <script>
