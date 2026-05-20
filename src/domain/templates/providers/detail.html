@@ -11,8 +11,12 @@
 
 {% set resource_url = entity_url('clinician') %}
 
+{%- set view = provider_card_view(provider) -%}
+
 {% block resource_label %}Clinicians{% endblock %}
 {% block current_label %}{{ provider.org.name }}{% endblock %}
+{# title-case-ignore: NPI is an industry abbreviation (National Provider Identifier) #}
+{% block subtitle %}{% if view.npi %}NPI {{ view.npi }}{% endif %}{% endblock %}
 
 {% block actions %}
 {# Primary resource actions (Favorite toggle, Edit, Delete) live in
@@ -68,17 +72,11 @@
    availability display labels. Templates never reach for
    `affiliation.org.name` directly — they read `aff.org_name`. #}
 {% block content %}
-{%- set view = provider_card_view(provider) -%}
-{# Identity card (practice_name + NPI) collapses to a single `<p>` —
-   the toolbar H1 above already carries `view.practice_name`, so an
-   in-card header would just restate it. NPI is the only non-duplicate
-   piece, so it survives as a one-line subtitle when present. #}
-{%- if view.npi %}
-{# title-case-ignore: NPI is an industry abbreviation (National Provider Identifier) #}
-<p><small>NPI {{ view.npi }}</small></p>
-{%- endif %}
+{# Identity card collapsed: the toolbar H1 carries `view.practice_name`
+   and the `subtitle` block above carries NPI. The page starts straight
+   into the affiliation cards.
 
-{# Stacked affiliation cards — one per row in `provider.affiliations`.
+   Stacked affiliation cards — one per row in `provider.affiliations`.
    Reads as "At <Org A>: ... · At <Org B>: ...". Each card links its
    heading to the owning Organization so the cross-resource navigation
    the old (single-card) layout exposed via the "Organization" facts
