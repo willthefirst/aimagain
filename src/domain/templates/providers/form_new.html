@@ -18,6 +18,19 @@
    model class is still `Provider` — only the user-facing surface
    flipped in #642 PR 4. #}
 <form hx-post="{{ entity_url('clinician') }}">
+  {# Person-level fields (name, NPI) — these live on the linked
+     `Clinician` row and follow the person across affiliations. Kept in
+     their own fieldset so the form reads "who is this clinician" →
+     "where do they practice" top-to-bottom. #}
+  <fieldset>
+    <legend>Clinician</legend>
+    <div class="grid">
+      {{ field_for(schema, "first_name", "First name") }}
+      {{ field_for(schema, "last_name", "Last name") }}
+    </div>
+    {{ field_for(schema, "npi", "NPI", help="10-digit National Provider Identifier. Optional.") }}
+  </fieldset>
+
   <fieldset>
     <legend>Practice</legend>
     {{ entity_select_field(
@@ -31,7 +44,6 @@
       {{ field_for(schema, "location_state", "State") }}
       {{ field_for(schema, "location_zip", "ZIP") }}
     </div>
-    {{ field_for(schema, "npi", "NPI", help="10-digit National Provider Identifier. Optional.") }}
   </fieldset>
 
   <fieldset>

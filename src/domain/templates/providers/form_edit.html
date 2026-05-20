@@ -15,7 +15,9 @@
 {% set resource_detail_url = entity_url('clinician', id=provider.id) %}
 
 {% block resource_label %}Clinicians{% endblock %}
-{% block current_label %}{{ provider.org.name }}{% endblock %}
+{# Same H1-fallback shape as the detail page — name when set, primary
+   affiliation's org name otherwise. #}
+{% block current_label %}{% if provider.first_name and provider.last_name %}{{ provider.first_name }} {{ provider.last_name }}{% else %}{{ provider.org.name }}{% endif %}{% endblock %}
 
 {% block content %}
 <section>
@@ -25,6 +27,17 @@
      form). To use a new Organization, create one via
      `entity_form_url('organization')` first. #}
   <form hx-patch="{{ entity_url('clinician', id=provider.id) }}">
+    {# Person-level fields (name, NPI) — these live on the linked
+       `Clinician` row, so they follow the person across affiliations.
+       Practice/location lives below. #}
+    <fieldset>
+      <legend>Clinician</legend>
+      <div class="grid">
+        {{ text_field("first_name", "First name", current=provider.first_name, required=false, maxlength=120) }}
+        {{ text_field("last_name", "Last name", current=provider.last_name, required=false, maxlength=120) }}
+      </div>
+      {{ text_field("npi", "NPI", current=provider.npi, required=false, pattern="\\d{10}", maxlength=10, help="10-digit National Provider Identifier. Optional.") }}
+    </fieldset>
     <fieldset>
       <legend>Practice location</legend>
       {{ entity_select_field(
@@ -39,7 +52,6 @@
         {{ select_field("location_state", "State", US_STATES, current=provider.location_state) }}
         {{ text_field("location_zip", "ZIP", current=provider.location_zip, pattern="\\d{5}", maxlength=5) }}
       </div>
-      {{ text_field("npi", "NPI", current=provider.npi, required=false, pattern="\\d{10}", maxlength=10, help="10-digit National Provider Identifier. Optional.") }}
     </fieldset>
     <fieldset>
       <legend>Session availability</legend>

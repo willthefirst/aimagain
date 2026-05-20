@@ -149,3 +149,69 @@ async def test_clinician_npi_check_constraint_rejects_non_ten_digits(session):
     session.add(clinician)
     with pytest.raises(IntegrityError):
         await session.flush()
+
+
+# --- first_name / last_name -------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_provider_construct_auto_creates_clinician_with_names():
+    """`Provider(first_name=..., last_name=...)` should land on the
+    auto-created Clinician — same kwarg-peeling pattern as `npi`. The
+    verification pipeline's `_clinician_names` reads through these."""
+    user = _make_user("eve")
+    org = _make_org("Acme", user.id)
+    provider = _make_provider(owner=user, org=org)
+    provider.first_name = "Eva"
+    provider.last_name = "Stone"
+    assert provider.clinician is not None
+    assert provider.clinician.first_name == "Eva"
+    assert provider.clinician.last_name == "Stone"
+    # Read proxies dereference through the clinician.
+    assert provider.first_name == "Eva"
+    assert provider.last_name == "Stone"
+
+
+@pytest.mark.asyncio
+async def test_provider_construct_passes_names_to_clinician():
+    """When `first_name` / `last_name` arrive as construct kwargs (the
+    framework's `spec.model(**payload.model_dump())` path), the
+    Provider constructor peels them off and forwards into the
+    auto-created Clinician — the same flow `npi` uses."""
+    user = _make_user("frank")
+    org = _make_org("Acme", user.id)
+    provider = Provider(
+        owner_id=user.id,
+        org_id=org.id,
+        first_name="Frank",
+        last_name="Tucker",
+        in_person_sessions="yes",
+        virtual_sessions="no",
+        accepts_out_of_network=True,
+        in_network_carriers=[],
+        sliding_scale=False,
+        location_city="Brooklyn",
+        location_state="NY",
+        location_zip="11201",
+    )
+    assert provider.clinician.first_name == "Frank"
+    assert provider.clinician.last_name == "Tucker"
+
+
+@pytest.mark.asyncio
+async def test_setting_provider_first_name_writes_to_linked_clinician(session):
+    """`setattr(provider, 'first_name', value)` — the path
+    `repo.patch(provider, first_name="X")` takes — must route to the
+    linked Clinician's column so updates persist."""
+    user = _make_user("gina")
+    org = _make_org("Acme", user.id)
+    provider = _make_provider(owner=user, org=org)
+    session.add_all([user, org, provider])
+    await session.flush()
+
+    provider.first_name = "Gina"
+    provider.last_name = "Hart"
+    await session.flush()
+    await session.refresh(provider)
+    assert provider.clinician.first_name == "Gina"
+    assert provider.clinician.last_name == "Hart"

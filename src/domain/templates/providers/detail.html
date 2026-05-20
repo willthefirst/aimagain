@@ -14,9 +14,14 @@
 {%- set view = provider_card_view(provider) -%}
 
 {% block resource_label %}Clinicians{% endblock %}
-{% block current_label %}{{ provider.org.name }}{% endblock %}
+{# H1 is the clinician's name when set; falls back to the primary
+   affiliation's organization name for legacy rows without name data.
+   The stacked affiliation cards below already list every org the
+   clinician practices at, so the org-as-H1 fallback only matters
+   while the name backfill is in progress. #}
+{% block current_label %}{% if provider.first_name and provider.last_name %}{{ provider.first_name }} {{ provider.last_name }}{% else %}{{ provider.org.name }}{% endif %}{% endblock %}
 {# title-case-ignore: NPI is an industry abbreviation (National Provider Identifier) #}
-{% block subtitle %}{% if view.npi %}NPI {{ view.npi }}{% endif %}{% endblock %}
+{% block subtitle %}{% if view.npi %}<span>NPI {{ view.npi }}</span>{% endif %}{% endblock %}
 
 {% block actions %}
 {# Primary resource actions (Favorite toggle, Edit, Delete) live in
