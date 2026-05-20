@@ -1,6 +1,5 @@
 {% extends "views/detail.html" %}
 {%- from "_shared/posts/_modality_chips.html" import modality_chips -%}
-{%- from "_shared/posts/_services_block.html" import services_block -%}
 {%- from "_shared/posts/_facts_block.html" import facts_block -%}
 {%- from "_shared/posts/_how_to_refer.html" import how_to_refer -%}
 
@@ -21,17 +20,17 @@
 {% endblock %}
 
 {# Detail-page layout: same `.entity-card` shape the list cards use,
-   with detail-only sections (description, services, expanded facts,
-   how-to-refer, footer) stacked vertically. Per-kind branching lives
-   in `post_card_view` (one place); every visual element in the card
-   reads from `view`. #}
+   with detail-only sections (description, expanded facts,
+   how-to-refer, footer) stacked vertically. The services row is the
+   first row of `_facts_block`'s `<dl>` — same partial as the list
+   card. Per-kind branching lives in `post_card_view` (one place);
+   every visual element in the card reads from `view`. #}
 {% block content %}
 <article class="entity-card" data-kind="{{ opening.kind }}">
   {%- if view.description %}
   <p>{{ view.description }}</p>
   {%- endif %}
 
-  {{ services_block(view) }}
   {{ facts_block(view, expanded=True) }}
 
   {%- if view.referral %}

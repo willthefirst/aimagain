@@ -130,13 +130,24 @@
         color: inherit;
         margin-inline-end: 0.25em;
       }
-      /* `<ul class="icon-list">` (rendered by the shared `icon_list`
+      /* `<ul class="glyph-list">` (rendered by the shared `icon_list`
          macro in `_shared/icon_list.html`). The Lucide glyph in each
          `<li>` is the only marker; strip the default disc bullet and
-         the left padding the bullet was indented from. The icon's
-         `margin-inline-end` rule above already provides the icon → label
-         gap, so this rule adds no per-item spacing. */
-      .icon-list { list-style: none; padding-left: 0; }
+         the left padding the bullet was indented from. The `<i>`
+         icon's `margin-inline-end` rule above already provides the
+         icon → label gap, so this rule adds no per-item spacing.
+
+         Pico v2 sets `list-style-type: square` on the `<li>` itself
+         (not on the `<ul>`), so `list-style: none` on the parent
+         alone is shadowed — the square marker still renders.
+         Repeating the rule on `.glyph-list li` strips it at the level
+         Pico targets.
+
+         Class is `glyph-list` (not `icon-list`) because Lucide ships
+         an `icon-list` font glyph whose `::before` character would
+         render on the `<ul>` itself if we matched the name. */
+      .glyph-list, .glyph-list li { list-style: none; }
+      .glyph-list { padding-left: 0; margin: 0; }
       /* Definition lists — the canonical "fact row" shape used by every
          list-card facts block and resource detail view (`_facts_block`,
          `providers/detail`, `programs/detail`, `users/detail`,

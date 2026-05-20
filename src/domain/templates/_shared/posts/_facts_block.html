@@ -1,4 +1,4 @@
-{# Demographics fact `<dl>` — the post card's right column.
+{# Demographics fact `<dl>` — the post card's body.
 
 Each fact is wrapped in a `<div>` so CSS can style chunks
 individually (e.g. the location chunk gets an icon-only `<dt>` via
@@ -8,6 +8,13 @@ posts surface their location via this row — referral reads it from
 the post's own detail row, opening reads it from the linked
 clinician (the underlying model class is still `Provider`); the
 rendering treatment is identical.
+
+The list leads with the services row (`view.kind_verb` — `Seeking`
+for CR, `Providing` for PA/program/intake) when the post has any
+services or settings to surface. Folded into the same `<dl>` as the
+demographic rows so the label column lines up across the whole card
+(see #663-followup) — previously the services were a sibling
+`<section>` above the `<dl>` and read as a separate block.
 
 Two modes:
 
@@ -37,10 +44,34 @@ Reads from `view` (the `post_card_view` dict). Display-label dicts
 (`CLIENT_AGE_GROUP_LABELS`, `GENDER_LABELS`, `LANGUAGE_LABELS`,
 `INSURANCE_POSTURE_LABELS`, `LOCATION_AVAILABILITY_LABELS`,
 `INSURANCE_CARRIER_LABELS`, `NETWORK_PREFERENCE_LABELS`,
-`DESIRED_TIME_SLOT_LABELS`) are Jinja globals. #}
+`DESIRED_TIME_SLOT_LABELS`, `REFERRAL_SERVICE_LABELS`,
+`REFERRAL_SERVICE_ICONS`, `TREATMENT_SETTINGS_LABELS`,
+`TREATMENT_SETTINGS_ICONS`) are Jinja globals. #}
+{%- from "_shared/icon_list.html" import icon_list -%}
 {% macro facts_block(view, expanded=False) -%}
 <section class="entity-facts">
   <dl>
+    {%- if view.services or view.settings %}
+    {#- Services / settings row. Verb (`Seeking` / `Providing`) is the
+        label; the value is an `icon_list` of services and settings.
+        Priority sort puts `psychotherapy` and `medication_management`
+        first since those are the two services scanners most often look
+        for; the rest follow in `REFERRAL_SERVICES` declaration order.
+        PA + program `settings` render after services in the same
+        list. -#}
+    {%- set _priority = ["psychotherapy", "medication_management"] -%}
+    {%- set _items = [] -%}
+    {%- for s in _priority if s in view.services -%}
+      {%- set _ = _items.append({"icon": REFERRAL_SERVICE_ICONS[s], "label": REFERRAL_SERVICE_LABELS[s]}) -%}
+    {%- endfor -%}
+    {%- for s in view.services if s not in _priority -%}
+      {%- set _ = _items.append({"icon": REFERRAL_SERVICE_ICONS[s], "label": REFERRAL_SERVICE_LABELS[s]}) -%}
+    {%- endfor -%}
+    {%- for s in view.settings -%}
+      {%- set _ = _items.append({"icon": TREATMENT_SETTINGS_ICONS[s], "label": TREATMENT_SETTINGS_LABELS[s]}) -%}
+    {%- endfor -%}
+    <div class="entity-services"><dt>{{ view.kind_verb }}</dt><dd>{{ icon_list(_items) }}</dd></div>
+    {%- endif %}
     {%- if view.location_chunk and not expanded %}
     {#- Compact mode: icon-only "City, ST". Both referral and opening
         kinds populate `location_chunk` so the row renders with the

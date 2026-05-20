@@ -20,7 +20,7 @@ Subresource lists (e.g. `/users/{id}/clinicians`) override `{% block breadcrumb 
 
 Pages that don't fit the resource grammar — the `/auth/*` flow's centered single-card layout — extend `base.html` directly and compose the `_shared/` macros by hand.
 
-The three post-kind URL families (`referrals/`, `openings/`, `intakes/`) each carry their own `list.html`, `detail.html`, `form_new.html`, `form_edit.html`, `search.html`, and `_form.html` (the create/edit form-body macro). The shared post-card partials (`_item`, `_facts_block`, `_how_to_refer`, `_modality_chips`, `_owner_actions`, `_services_block`) live in [`_shared/posts/`](_shared/posts/) and are imported by every family's list and detail page — see #628.
+The three post-kind URL families (`referrals/`, `openings/`, `intakes/`) each carry their own `list.html`, `detail.html`, `form_new.html`, `form_edit.html`, `search.html`, and `_form.html` (the create/edit form-body macro). The shared post-card partials (`_item`, `_facts_block`, `_how_to_refer`, `_modality_chips`, `_owner_actions`) live in [`_shared/posts/`](_shared/posts/) and are imported by every family's list and detail page — see #628. The services list is the first row of `_facts_block`'s `<dl>` rather than its own partial.
 
 The auth-flow pages (`auth/login.html`, `auth/register.html`, `auth/forgot_password.html`, `auth/reset_password.html`) each render a single `<article class="auth-page">` card. The `.auth-page` rule in [`../../framework/templates/base.html`](../../framework/templates/base.html) caps the card at 28rem and centers it horizontally — without the class the card stretches to the full `<main class="container">` width on tablet/desktop.
 
