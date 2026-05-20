@@ -229,8 +229,8 @@ class ReferralRead(_PostReadBase):
         return flatten_location_on_dump(self, handler(self))
 
 
-class OpeningRead(_PostReadBase):
-    kind: Literal["opening"]
+class ClinicianOpeningRead(_PostReadBase):
+    kind: Literal["clinician_opening"]
     description: str | None = None
     referral_instructions: str | None = None
     website: str | None = None
@@ -249,8 +249,8 @@ class OpeningRead(_PostReadBase):
     genders: GendersField = []
 
 
-class IntakeRead(_PostReadBase):
-    kind: Literal["intake"]
+class ProgramIntakeRead(_PostReadBase):
+    kind: Literal["program_intake"]
     description: str | None = None
     referral_instructions: str | None = None
     website: str | None = None
@@ -270,7 +270,7 @@ class IntakeRead(_PostReadBase):
 
 
 PostRead = Annotated[
-    Union[ReferralRead, OpeningRead, IntakeRead],
+    Union[ReferralRead, ClinicianOpeningRead, ProgramIntakeRead],
     Field(discriminator="kind"),
 ]
 post_read_adapter: TypeAdapter = TypeAdapter(PostRead)
@@ -332,11 +332,11 @@ class ReferralCreate(WirePayload):
         return flatten_location_on_dump(self, handler(self))
 
 
-class OpeningCreate(WirePayload):
-    """Create payload for `kind='opening'`. Field set follows
+class ClinicianOpeningCreate(WirePayload):
+    """Create payload for `kind='clinician_opening'`. Field set follows
     the provider-availability intake form."""
 
-    kind: Literal["opening"]
+    kind: Literal["clinician_opening"]
     # Optional initially — graduates to required once seed posts confirm
     # the shape works.
     description: TextareaOptional = None
@@ -365,13 +365,13 @@ class OpeningCreate(WirePayload):
     genders: GendersField = []
 
 
-class IntakeCreate(WirePayload):
+class ProgramIntakeCreate(WirePayload):
     """Create payload for `kind='intake'`. Field set mirrors
-    :class:`OpeningCreate` one-to-one but swaps the Provider
+    :class:`ClinicianOpeningCreate` one-to-one but swaps the Provider
     FK for a Program FK — the referrer is choosing a Program (intake door),
     not a specific clinician."""
 
-    kind: Literal["intake"]
+    kind: Literal["program_intake"]
     description: TextareaOptional = None
     referral_instructions: TextareaOptional = None
     website: UrlOptional = None
@@ -393,7 +393,7 @@ class IntakeCreate(WirePayload):
 
 
 PostCreate = Annotated[
-    Union[ReferralCreate, OpeningCreate, IntakeCreate],
+    Union[ReferralCreate, ClinicianOpeningCreate, ProgramIntakeCreate],
     Field(discriminator="kind"),
 ]
 post_create_adapter: TypeAdapter = TypeAdapter(PostCreate)
@@ -455,10 +455,10 @@ class ReferralUpdate(PartialUpdate):
         return flatten_location_on_dump(self, handler(self))
 
 
-class OpeningUpdate(PartialUpdate):
+class ClinicianOpeningUpdate(PartialUpdate):
     at_least_one_field_exclude = frozenset({"kind"})
 
-    kind: Literal["opening"]
+    kind: Literal["clinician_opening"]
     description: TextareaOptional = None
     referral_instructions: TextareaOptional = None
     website: UrlOptional = None
@@ -483,10 +483,10 @@ class OpeningUpdate(PartialUpdate):
     genders: GendersField | None = None
 
 
-class IntakeUpdate(PartialUpdate):
+class ProgramIntakeUpdate(PartialUpdate):
     at_least_one_field_exclude = frozenset({"kind"})
 
-    kind: Literal["intake"]
+    kind: Literal["program_intake"]
     description: TextareaOptional = None
     referral_instructions: TextareaOptional = None
     website: UrlOptional = None
@@ -505,7 +505,7 @@ class IntakeUpdate(PartialUpdate):
 
 
 PostUpdate = Annotated[
-    Union[ReferralUpdate, OpeningUpdate, IntakeUpdate],
+    Union[ReferralUpdate, ClinicianOpeningUpdate, ProgramIntakeUpdate],
     Field(discriminator="kind"),
 ]
 post_update_adapter: TypeAdapter = TypeAdapter(PostUpdate)
@@ -547,8 +547,8 @@ class ReferralAuditSnapshot(_PostAuditSnapshotBase):
         return flatten_location_on_dump(self, handler(self))
 
 
-class OpeningAuditSnapshot(_PostAuditSnapshotBase):
-    kind: Literal["opening"]
+class ClinicianOpeningAuditSnapshot(_PostAuditSnapshotBase):
+    kind: Literal["clinician_opening"]
     description: str | None = None
     referral_instructions: str | None = None
     website: str | None = None
@@ -565,8 +565,8 @@ class OpeningAuditSnapshot(_PostAuditSnapshotBase):
     genders: GendersField = []
 
 
-class IntakeAuditSnapshot(_PostAuditSnapshotBase):
-    kind: Literal["intake"]
+class ProgramIntakeAuditSnapshot(_PostAuditSnapshotBase):
+    kind: Literal["program_intake"]
     description: str | None = None
     referral_instructions: str | None = None
     website: str | None = None
@@ -584,8 +584,8 @@ class IntakeAuditSnapshot(_PostAuditSnapshotBase):
 PostAuditSnapshot = Annotated[
     Union[
         ReferralAuditSnapshot,
-        OpeningAuditSnapshot,
-        IntakeAuditSnapshot,
+        ClinicianOpeningAuditSnapshot,
+        ProgramIntakeAuditSnapshot,
     ],
     Field(discriminator="kind"),
 ]

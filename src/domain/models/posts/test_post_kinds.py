@@ -55,12 +55,21 @@ def test_kind_by_detail_model_inverse_matches_registry():
 
 
 def test_each_spec_detail_relationship_matches_kind_name():
-    """Per-kind detail relationships follow the `<kind>_detail` convention.
-    This is convention, not enforcement — if a future kind needs a
-    different relationship name, drop this test for that kind. But while
-    every kind agrees, asserting it catches typos."""
+    """Per-kind detail relationships follow the `<kind>_detail` convention
+    except where the kind value was renamed but the SQL table / ORM
+    relationship kept its historical name (renaming detail tables is
+    migration noise with no payoff). Exceptions are pinned explicitly
+    so a typo on a convention-following kind still gets caught."""
+    relationship_exceptions = {
+        # Rename `opening` → `clinician_opening` kept the historical
+        # `opening_details` table and `opening_detail` relationship.
+        "clinician_opening": "opening_detail",
+        # Same for `intake` → `program_intake`.
+        "program_intake": "intake_detail",
+    }
     for kind, spec in POST_KINDS.items():
-        assert spec.detail_relationship == f"{kind}_detail"
+        expected = relationship_exceptions.get(kind, f"{kind}_detail")
+        assert spec.detail_relationship == expected
 
 
 def test_template_paths_default_by_convention():

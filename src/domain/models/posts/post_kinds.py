@@ -63,19 +63,19 @@ POST_KINDS: Final[DiscriminatorRegistry[PostKindSpec]] = DiscriminatorRegistry(
             detail_fields=_detail_fields(ReferralDetail),
             list_label="client referral",
         ),
-        "opening": PostKindSpec(
-            name="opening",
+        "clinician_opening": PostKindSpec(
+            name="clinician_opening",
             detail_model=OpeningDetail,
             detail_relationship="opening_detail",
             detail_fields=_detail_fields(OpeningDetail),
-            list_label="provider availability",
+            list_label="clinician opening",
         ),
-        "intake": PostKindSpec(
-            name="intake",
+        "program_intake": PostKindSpec(
+            name="program_intake",
             detail_model=IntakeDetail,
             detail_relationship="intake_detail",
             detail_fields=_detail_fields(IntakeDetail),
-            list_label="intake",
+            list_label="program intake",
         ),
     },
 )

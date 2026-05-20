@@ -27,7 +27,7 @@ def _pa_post(**provider_attrs):
     provider_attrs.setdefault("sliding_scale", False)
     provider_attrs.setdefault("cost", None)
     return SimpleNamespace(
-        kind="opening",
+        kind="clinician_opening",
         opening_detail=SimpleNamespace(
             provider=SimpleNamespace(**provider_attrs),
         ),
@@ -195,7 +195,7 @@ def _make_pa_post(*, provider_attrs=None, **detail_overrides):
     )
     d.update(detail_overrides)
     return SimpleNamespace(
-        kind="opening",
+        kind="clinician_opening",
         opening_detail=SimpleNamespace(
             provider=SimpleNamespace(**p),
             **d,
@@ -227,7 +227,7 @@ def _make_program_post(*, program_attrs=None, **detail_overrides):
     )
     d.update(detail_overrides)
     return SimpleNamespace(
-        kind="intake",
+        kind="program_intake",
         intake_detail=SimpleNamespace(
             program=SimpleNamespace(**p),
             **d,
@@ -317,7 +317,7 @@ def test_view_cr_no_referral_section():
 
 def test_view_pa_basics():
     v = post_card_view(_make_pa_post())
-    assert v["kind"] == "opening"
+    assert v["kind"] == "clinician_opening"
     assert v["kind_verb"] == "Providing"
 
 
@@ -400,7 +400,7 @@ def test_view_pa_no_location_chunk_when_provider_missing():
     defensive path the existing PA-missing-provider test covers for
     other provider-derived fields."""
     post = SimpleNamespace(
-        kind="opening",
+        kind="clinician_opening",
         opening_detail=SimpleNamespace(
             provider=None,
             services=[],
@@ -425,7 +425,7 @@ def test_view_pa_no_location_chunk_when_provider_missing():
 
 def test_view_program_basics():
     v = post_card_view(_make_program_post())
-    assert v["kind"] == "intake"
+    assert v["kind"] == "program_intake"
     assert v["kind_verb"] == "Providing"
 
 
@@ -491,7 +491,7 @@ def test_view_pa_missing_provider_returns_partial_view():
     in test stubs. View-model populates the detail-row fields it can
     and leaves provider-derived fields at None."""
     post = SimpleNamespace(
-        kind="opening",
+        kind="clinician_opening",
         opening_detail=SimpleNamespace(
             provider=None,
             services=["psychotherapy"],

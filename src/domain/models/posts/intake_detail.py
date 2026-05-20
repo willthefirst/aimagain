@@ -8,7 +8,7 @@ _TABLE = "intake_details"
 
 
 class IntakeDetail(Base):
-    """1:1 detail row for posts of kind = 'intake'.
+    """1:1 detail row for posts of kind = 'program_intake'.
 
     The Program-level equivalent of :class:`OpeningDetail`.
     The Program announces intake openings as a *group offering* —

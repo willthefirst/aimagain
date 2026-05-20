@@ -23,7 +23,7 @@ with at least one provider available.
 {%- macro opening_form(hx_method, action, submit_label, post=None, schema=None, current_user=None, cancel_url=None) -%}
 {%- set d = post.opening_detail if post else None -%}
 <form hx-{{ hx_method }}="{{ action }}">
-  <input type="hidden" name="kind" value="opening" />
+  <input type="hidden" name="kind" value="clinician_opening" />
 
   {# Practice picker. After #642 PR 1 a Provider may carry multiple
      Affiliations (clinician × org practice-role rows); the dropdown

@@ -3,7 +3,7 @@
 Exercises the parent + per-kind-detail invariants the polymorphic-create
 path owns: create persists both rows in one flush, update writes per-kind
 fields to the correct detail row, delete cascades the detail via the FK.
-Covered for `kind='referral'` and `kind='opening'`.
+Covered for `kind='referral'` and `kind='clinician_opening'`.
 
 Posts have no bespoke repo class — these tests drive `BaseRepository`
 directly, which is what the framework injects for the post route.
@@ -300,7 +300,7 @@ async def test_create_post_persists_parent_and_opening_detail(
 
     async with db_test_session_manager() as session:
         repo = BaseRepository(session)
-        post = Post(kind="opening", owner_id=owner.id)
+        post = Post(kind="clinician_opening", owner_id=owner.id)
         detail = make_opening_detail(provider_id=provider.id)
         created = await _create_post(repo, post, detail)
         await session.commit()
@@ -322,7 +322,7 @@ async def test_create_post_persists_parent_and_opening_detail(
             .first()
         )
         assert post_row is not None
-        assert post_row.kind == "opening"
+        assert post_row.kind == "clinician_opening"
         assert detail_row is not None
         # Practice name lives on the linked Provider's Organization (#524).
         assert detail_row.provider_id == provider.id
@@ -345,7 +345,7 @@ async def test_create_post_round_trips_free_text_fields(
         )
         created = await _create_post(
             repo,
-            Post(kind="opening", owner_id=owner.id),
+            Post(kind="clinician_opening", owner_id=owner.id),
             detail,
         )
         await session.commit()
@@ -379,7 +379,7 @@ async def test_create_post_free_text_fields_default_null(
         repo = BaseRepository(session)
         created = await _create_post(
             repo,
-            Post(kind="opening", owner_id=owner.id),
+            Post(kind="clinician_opening", owner_id=owner.id),
             make_opening_detail(provider_id=provider.id),
         )
         await session.commit()
@@ -409,7 +409,7 @@ async def test_update_post_writes_to_opening_detail(
         repo = BaseRepository(session)
         created = await _create_post(
             repo,
-            Post(kind="opening", owner_id=owner.id),
+            Post(kind="clinician_opening", owner_id=owner.id),
             make_opening_detail(provider_id=provider.id, description="orig"),
         )
         await session.commit()
@@ -449,7 +449,7 @@ async def test_delete_post_cascades_opening_detail(
         repo = BaseRepository(session)
         created = await _create_post(
             repo,
-            Post(kind="opening", owner_id=owner.id),
+            Post(kind="clinician_opening", owner_id=owner.id),
             make_opening_detail(provider_id=provider.id),
         )
         await session.commit()
@@ -510,7 +510,7 @@ async def test_create_post_persists_parent_and_intake_detail(
 
     async with db_test_session_manager() as session:
         repo = BaseRepository(session)
-        post = Post(kind="intake", owner_id=owner.id)
+        post = Post(kind="program_intake", owner_id=owner.id)
         detail = make_intake_detail(program_id=program.id)
         created = await _create_post(repo, post, detail)
         await session.commit()
@@ -532,7 +532,7 @@ async def test_create_post_persists_parent_and_intake_detail(
             .first()
         )
         assert post_row is not None
-        assert post_row.kind == "intake"
+        assert post_row.kind == "program_intake"
         assert detail_row is not None
         assert detail_row.program_id == program.id
         # Dereferences the back_populated relationship so the template
@@ -552,7 +552,7 @@ async def test_delete_post_cascades_intake_detail(
         repo = BaseRepository(session)
         created = await _create_post(
             repo,
-            Post(kind="intake", owner_id=owner.id),
+            Post(kind="program_intake", owner_id=owner.id),
             make_intake_detail(program_id=program.id),
         )
         await session.commit()

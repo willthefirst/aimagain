@@ -27,8 +27,8 @@ def test_each_face_has_a_unique_url_collection():
 
 def test_each_face_locks_to_its_own_kind():
     assert REFERRAL_ENTITY.discriminator_value == "referral"
-    assert OPENING_ENTITY.discriminator_value == "opening"
-    assert INTAKE_ENTITY.discriminator_value == "intake"
+    assert OPENING_ENTITY.discriminator_value == "clinician_opening"
+    assert INTAKE_ENTITY.discriminator_value == "program_intake"
 
 
 def test_each_face_kind_is_registered_in_post_kinds():
@@ -84,17 +84,17 @@ def test_each_face_uses_per_kind_adapters():
     on `/referrals/form` go through `ReferralCreate` validation and only
     accept ``kind="referral"``."""
     from src.domain.logic.posts.schema import (
-        IntakeCreate,
-        IntakeUpdate,
-        OpeningCreate,
-        OpeningUpdate,
+        ClinicianOpeningCreate,
+        ClinicianOpeningUpdate,
+        ProgramIntakeCreate,
+        ProgramIntakeUpdate,
         ReferralCreate,
         ReferralUpdate,
     )
 
     assert REFERRAL_ENTITY.create_adapter_class is ReferralCreate
     assert REFERRAL_ENTITY.update_adapter_class is ReferralUpdate
-    assert OPENING_ENTITY.create_adapter_class is OpeningCreate
-    assert OPENING_ENTITY.update_adapter_class is OpeningUpdate
-    assert INTAKE_ENTITY.create_adapter_class is IntakeCreate
-    assert INTAKE_ENTITY.update_adapter_class is IntakeUpdate
+    assert OPENING_ENTITY.create_adapter_class is ClinicianOpeningCreate
+    assert OPENING_ENTITY.update_adapter_class is ClinicianOpeningUpdate
+    assert INTAKE_ENTITY.create_adapter_class is ProgramIntakeCreate
+    assert INTAKE_ENTITY.update_adapter_class is ProgramIntakeUpdate

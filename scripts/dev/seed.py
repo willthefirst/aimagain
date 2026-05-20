@@ -9,7 +9,7 @@ Idempotent:
   - Providers are matched by (owner_id, org_id); existing rows are
     reused so PA fixtures can always point at a real Provider.
   - Provider-availability posts are matched by
-    (kind='opening', owner_id, provider_id); existing
+    (kind='clinician_opening', owner_id, provider_id); existing
     rows are skipped.
   - Client-referral posts are matched by
     (kind='referral', owner_id, description); duplicates are
@@ -1080,7 +1080,7 @@ async def seed_opening() -> tuple[int, int]:
                     OpeningDetail.post_id == Post.id,
                 )
                 .where(
-                    Post.kind == "opening",
+                    Post.kind == "clinician_opening",
                     Post.owner_id == owner.id,
                     OpeningDetail.provider_id == provider.id,
                 )
@@ -1093,7 +1093,7 @@ async def seed_opening() -> tuple[int, int]:
                 skipped += 1
                 continue
 
-            post = Post(kind="opening", owner_id=owner.id)
+            post = Post(kind="clinician_opening", owner_id=owner.id)
             _shift_created_at(post, fixture["days_ago"])
             post.opening_detail = OpeningDetail(
                 provider_id=provider.id, **fixture["detail"]
@@ -1309,7 +1309,7 @@ FIXTURE_PROGRAM_AVAILABILITY: list[FixtureIntake] = [
 
 async def seed_intake() -> tuple[int, int]:
     """Seed Program-availability posts. Idempotent on
-    ``(kind='intake', owner_id, program_id)`` — re-running
+    ``(kind='program_intake', owner_id, program_id)`` — re-running
     against an existing fixture skips."""
     created = 0
     skipped = 0
@@ -1354,7 +1354,7 @@ async def seed_intake() -> tuple[int, int]:
                     IntakeDetail.post_id == Post.id,
                 )
                 .where(
-                    Post.kind == "intake",
+                    Post.kind == "program_intake",
                     Post.owner_id == owner.id,
                     IntakeDetail.program_id == program.id,
                 )
@@ -1367,7 +1367,7 @@ async def seed_intake() -> tuple[int, int]:
                 skipped += 1
                 continue
 
-            post = Post(kind="intake", owner_id=owner.id)
+            post = Post(kind="program_intake", owner_id=owner.id)
             _shift_created_at(post, fixture["days_ago"])
             post.intake_detail = IntakeDetail(
                 program_id=program.id, **fixture["detail"]

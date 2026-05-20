@@ -63,7 +63,9 @@ async def _insert_all_fixture_users() -> None:
 
 async def _all_pa_posts() -> list[Post]:
     async with async_test_sessionmaker() as session:
-        result = await session.execute(select(Post).where(Post.kind == "opening"))
+        result = await session.execute(
+            select(Post).where(Post.kind == "clinician_opening")
+        )
         return list(result.scalars().all())
 
 
