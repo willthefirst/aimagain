@@ -151,10 +151,15 @@
         dt { margin-bottom: 0.125rem; }
       }
       /* Form-field layout — the form-side mirror of the `<dl>` grid
-         above. Label sits in column 1 (`max-content`); input/select/
-         textarea fills column 2 (`1fr`). Helper `<small>` and grouped
-         `<fieldset>` controls also land in column 2 so the labels stay
-         in a clean vertical column down the page.
+         above. The key trick is **subgrid**: the parent `<form>` (and
+         every `<fieldset>` inside it) declares a 2-column grid track
+         once (`max-content 1fr`), and every `.form-field` row uses
+         `grid-template-columns: subgrid` to inherit those tracks. That
+         makes the label column the SAME width across every row in the
+         form — including across fieldset boundaries — instead of each
+         row sizing to its own label independently (the previous bug
+         where labels didn't align).
+
          Markup contract (emitted by `_shared/form_fields.html` macros):
 
            <label class="form-field" for="x">
@@ -164,43 +169,76 @@
            </label>
 
          Fieldset-shaped fields (radio_bool_field, time_grid_field)
-         use the same `.form-field` class on `<fieldset>` with the
-         label in `<legend class="form-field-label">` and the controls
-         wrapped in `<div class="form-field-control">` so the right
-         column holds the radio cluster atomically.
+         use the same class on `<fieldset>` with the label in
+         `<legend class="form-field-label">` and the controls wrapped
+         in `<div class="form-field-control">`.
 
-         Mobile (≤640px): collapse to a single column with the label
-         stacked above the control. Matches the `<dl>` collapse
+         Mobile (≤640px): the parent's grid collapses to a single
+         column; subgrids inherit that automatically and the labels
+         stack above the controls. Matches the `<dl>` collapse
          threshold so the form and the facts panel agree on when the
-         label-on-left layout becomes too cramped. */
-      .form-field {
+         label-on-left layout becomes too cramped.
+
+         Scoped to `.entity-form-page` so search forms, auth forms,
+         and any other `<form>` outside the entity create/edit chrome
+         keep their existing flow. */
+      .entity-form-page form,
+      .entity-form-page form > fieldset {
         display: grid;
         grid-template-columns: max-content 1fr;
         column-gap: 0.75rem;
+        row-gap: var(--pico-spacing);
+        align-items: baseline;
+      }
+      /* Fieldsets participate in the form's grid (subgrid) so labels
+         inside align with labels at the form's top level. Reset
+         Pico's fieldset chrome — these are logical groups, not visual
+         frames. */
+      .entity-form-page form > fieldset {
+        grid-template-columns: subgrid;
+        grid-column: 1 / -1;
+        border: 0;
+        padding: 0;
+        margin: 0;
+      }
+      /* Every direct child of the form/fieldset that ISN'T a
+         `.form-field` spans both columns of the parent grid: legends,
+         Pico `.grid` utility wrappers, fieldset-scoped helper
+         `<small>`s, the action cluster, hidden inputs, hand-rolled
+         `<label>`s that haven't been macro-converted, etc. */
+      .entity-form-page form > :not(.form-field):not(fieldset),
+      .entity-form-page form > fieldset > :not(.form-field) {
+        grid-column: 1 / -1;
+      }
+      /* Form-field row: subgrid so label sits in col 1, control col 2. */
+      .entity-form-page form .form-field {
+        display: grid;
+        grid-template-columns: subgrid;
+        grid-column: 1 / -1;
+        align-items: baseline;
         row-gap: 0.25rem;
-        align-items: center;
-        margin-block: 0;
+        margin: 0;
         padding: 0;
         border: 0;
       }
-      .form-field + .form-field { margin-block-start: var(--pico-spacing); }
       .form-field-label { font-weight: 600; }
-      .form-field > input,
-      .form-field > select,
-      .form-field > textarea,
-      .form-field > .form-field-control { margin: 0; }
-      .form-field > small {
+      .entity-form-page form .form-field > input,
+      .entity-form-page form .form-field > select,
+      .entity-form-page form .form-field > textarea,
+      .entity-form-page form .form-field > .form-field-control { margin: 0; min-width: 0; }
+      .entity-form-page form .form-field > small {
         grid-column: 2;
         margin: 0;
         color: var(--pico-muted-color);
       }
-      /* Multi-row controls (textarea, multi-select, time grid) align
-         their label to the first line of the control rather than the
-         vertical center, so a long textarea doesn't push the label
-         halfway down. */
-      .form-field:has(> textarea),
-      .form-field:has(> select[multiple]),
-      .form-field:has(> table) { align-items: start; }
+      /* Inline form-fields nested inside a Pico `.grid` utility (a
+         responsive 2-up row) fall back to a self-contained grid since
+         their parent (the `.grid` div) isn't the subgrid source. */
+      .entity-form-page form .grid > .form-field {
+        grid-template-columns: max-content 1fr;
+        grid-column: auto;
+      }
+      .entity-form-page form .grid > .form-field > small { grid-column: 2; }
       /* Radio cluster: yes/no labels inline inside the right column. */
       .form-field-control {
         display: flex;
@@ -214,9 +252,18 @@
         gap: 0.25rem;
       }
       @media (max-width: 640px) {
-        .form-field { grid-template-columns: 1fr; row-gap: 0.25rem; }
-        .form-field > small { grid-column: 1; }
-        .form-field-label { margin-bottom: 0.125rem; }
+        .entity-form-page form,
+        .entity-form-page form > fieldset {
+          grid-template-columns: 1fr;
+        }
+        .entity-form-page form .form-field > small,
+        .entity-form-page form .grid > .form-field,
+        .entity-form-page form .grid > .form-field > small {
+          grid-column: 1;
+        }
+        .entity-form-page form .grid > .form-field {
+          grid-template-columns: 1fr;
+        }
       }
       /* Inline meta list — the small print under a card heading or
          page H1 that joins several short facts with " · ". Templates
