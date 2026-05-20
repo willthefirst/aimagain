@@ -101,12 +101,12 @@ _STUB_PROVIDER_ID = uuid.UUID("00000000-0000-0000-0000-000000000001")
 
 
 def opening_payload(**overrides: Any) -> dict[str, Any]:
-    """Build a wire-valid `kind='opening'` create/update payload.
+    """Build a wire-valid `kind='clinician_opening'` create/update payload.
     Returns a fresh dict each call. `provider_id` defaults to a stub UUID
     that passes Pydantic validation but does *not* exist in the DB —
     tests that actually persist must pass a real provider_id override."""
     return {
-        "kind": "opening",
+        "kind": "clinician_opening",
         "provider_id": str(_STUB_PROVIDER_ID),
         **_OPENING_DEFAULTS,
         **overrides,
@@ -142,12 +142,12 @@ _STUB_PROGRAM_ID = uuid.UUID("00000000-0000-0000-0000-000000000002")
 
 
 def intake_payload(**overrides: Any) -> dict[str, Any]:
-    """Build a wire-valid `kind='intake'` create/update payload.
+    """Build a wire-valid `kind='program_intake'` create/update payload.
     Returns a fresh dict each call. `program_id` defaults to a stub UUID
     that passes Pydantic validation but does *not* exist in the DB —
     tests that actually persist must pass a real program_id override."""
     return {
-        "kind": "intake",
+        "kind": "program_intake",
         "program_id": str(_STUB_PROGRAM_ID),
         **_PROGRAM_AVAILABILITY_DEFAULTS,
         **overrides,

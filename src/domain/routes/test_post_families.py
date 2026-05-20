@@ -60,7 +60,7 @@ def _opening_post(
         )
     if provider.id is None:
         provider.id = uuid.uuid4()
-    post = Post(kind="opening", owner_id=owner_id)
+    post = Post(kind="clinician_opening", owner_id=owner_id)
     detail = make_opening_detail(provider_id=provider.id)
     detail.provider = provider
     post.opening_detail = detail
@@ -72,7 +72,7 @@ def _opening_post(
 # `spec.url_collection`).
 _FAMILIES = [
     ("referral", "referrals", _referral_post),
-    ("opening", "openings", _opening_post),
+    ("clinician_opening", "openings", _opening_post),
 ]
 
 
@@ -257,7 +257,7 @@ async def test_list_kind_query_param_does_not_override_lock(
             session.add(author)
             session.add(own)
 
-    other_kind = "opening" if kind == "referral" else "referral"
+    other_kind = "clinician_opening" if kind == "referral" else "referral"
     response = await authenticated_client.get(f"/{collection}?kind={other_kind}")
     assert response.status_code == 200
     tree = HTMLParser(response.text)

@@ -23,7 +23,7 @@ with at least one Program available.
 {%- macro intake_form(hx_method, action, submit_label, post=None, schema=None, current_user=None, cancel_url=None) -%}
 {%- set d = post.intake_detail if post else None -%}
 <form hx-{{ hx_method }}="{{ action }}">
-  <input type="hidden" name="kind" value="intake" />
+  <input type="hidden" name="kind" value="program_intake" />
 
   <label for="program_id">
     Which program is this availability for?

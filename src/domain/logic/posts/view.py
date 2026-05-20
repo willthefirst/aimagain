@@ -81,7 +81,7 @@ def insurance_posture_for_post(post) -> str | None:
             "in_network_preferred": "out_of_network",
             "no_preference": "self_pay",
         }.get(detail.network_preference)
-    if kind == "opening":
+    if kind == "clinician_opening":
         detail = getattr(post, "opening_detail", None)
         provider = getattr(detail, "provider", None) if detail is not None else None
         if provider is None:
@@ -93,7 +93,7 @@ def insurance_posture_for_post(post) -> str | None:
         if provider.sliding_scale or provider.cost:
             return "self_pay"
         return "please_contact"
-    if kind == "intake":
+    if kind == "program_intake":
         # Program-availability has no insurance posture today — insurance
         # is modeled on the Provider (who delivers care) and on the
         # Client-referral Post (the referral situation), not on the
@@ -106,8 +106,8 @@ def insurance_posture_for_post(post) -> str | None:
 
 _KIND_VERB = {
     "referral": "Seeking",
-    "opening": "Providing",
-    "intake": "Providing",
+    "clinician_opening": "Providing",
+    "program_intake": "Providing",
 }
 
 
@@ -283,7 +283,7 @@ def post_card_view(post) -> dict[str, Any]:
         )
         return base
 
-    if kind == "opening":
+    if kind == "clinician_opening":
         d = getattr(post, "opening_detail", None)
         if d is None:
             return base
@@ -345,7 +345,7 @@ def post_card_view(post) -> dict[str, Any]:
         )
         return base
 
-    if kind == "intake":
+    if kind == "program_intake":
         d = getattr(post, "intake_detail", None)
         if d is None:
             return base

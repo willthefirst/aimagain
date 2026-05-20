@@ -16,8 +16,8 @@ Two trigger points cover the real load paths:
 """
 
 from src.domain.logic.posts.schema import (
-    IntakeCreate,
-    OpeningCreate,
+    ClinicianOpeningCreate,
+    ProgramIntakeCreate,
     ReferralCreate,
 )
 from src.domain.logic.posts.view import (
@@ -93,8 +93,8 @@ register_template_globals(
     # `*Create` schemas as Jinja globals lets the kind's form templates
     # pass the right schema to `field_for` without context-routing
     # changes. Per-kind form templates pick which to pass.
-    opening_create_schema=OpeningCreate,
-    intake_create_schema=IntakeCreate,
+    opening_create_schema=ClinicianOpeningCreate,
+    intake_create_schema=ProgramIntakeCreate,
     referral_create_schema=ReferralCreate,
     # Post-specific view helpers.
     insurance_posture=insurance_posture_for_post,

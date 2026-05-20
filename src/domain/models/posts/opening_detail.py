@@ -8,7 +8,7 @@ _TABLE = "opening_details"
 
 
 class OpeningDetail(Base):
-    """1:1 detail row for posts of kind = 'opening'.
+    """1:1 detail row for posts of kind = 'clinician_opening'.
 
     Practice + location + delivery-format fields live on the linked
     `Provider` via `provider_id`; insurance posture + sliding-scale +

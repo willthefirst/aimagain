@@ -4,5 +4,5 @@ from src.framework.dispatch.resource_routes import mount_entity
 
 router = register_entity(INTAKE_ENTITY)
 
-# See `referrals.py` — same shape, locked to `kind='intake'`.
+# See `referrals.py` — same shape, locked to `kind='program_intake'`.
 mount_entity(router, INTAKE_ENTITY)

@@ -24,8 +24,8 @@ import pytest
 from pydantic import ValidationError
 
 from src.domain.logic.posts.schema import (
-    OpeningCreate,
-    OpeningUpdate,
+    ClinicianOpeningCreate,
+    ClinicianOpeningUpdate,
     ReferralCreate,
     ReferralRead,
     ReferralUpdate,
@@ -380,8 +380,8 @@ def test_audit_snapshot_unknown_kind_raises():
 
 def test_post_create_dispatches_opening():
     p = post_create_adapter.validate_python(opening_payload())
-    assert isinstance(p, OpeningCreate)
-    assert p.kind == "opening"
+    assert isinstance(p, ClinicianOpeningCreate)
+    assert p.kind == "clinician_opening"
     # Insurance posture moved to Provider in #449; PA no longer carries
     # `sliding_scale` / `payment_situation` / `cost` on the wire.
 
@@ -412,7 +412,7 @@ def test_post_create_opening_schedule_text_strips_whitespace():
 
 def test_post_update_opening_accepts_schedule_text_only():
     p = post_update_adapter.validate_python(
-        {"kind": "opening", "schedule_text": "New cohort starts Jun 1"}
+        {"kind": "clinician_opening", "schedule_text": "New cohort starts Jun 1"}
     )
     assert p.schedule_text == "New cohort starts Jun 1"
 
@@ -513,7 +513,7 @@ def test_post_create_opening_rejects_unknown_age_group_token():
 def test_post_update_opening_accepts_age_groups_only():
     p = post_update_adapter.validate_python(
         {
-            "kind": "opening",
+            "kind": "clinician_opening",
             "age_groups": ["young_adults_19_24", "adults_25_64"],
         }
     )
@@ -587,7 +587,7 @@ def test_post_create_opening_strips_free_text_whitespace():
 def test_post_update_opening_accepts_description_only():
     """A PATCH that only sets `description` is a valid partial update."""
     p = post_update_adapter.validate_python(
-        {"kind": "opening", "description": "Updated pitch."}
+        {"kind": "clinician_opening", "description": "Updated pitch."}
     )
     assert p.description == "Updated pitch."
 
@@ -598,9 +598,9 @@ def test_post_update_opening_accepts_provider_id_only():
     now lives on Provider."""
     new_provider_id = uuid.uuid4()
     p = post_update_adapter.validate_python(
-        {"kind": "opening", "provider_id": str(new_provider_id)}
+        {"kind": "clinician_opening", "provider_id": str(new_provider_id)}
     )
-    assert isinstance(p, OpeningUpdate)
+    assert isinstance(p, ClinicianOpeningUpdate)
     assert p.provider_id == new_provider_id
 
 
@@ -608,26 +608,28 @@ def test_post_update_opening_strips_whitespace():
     """`description` is a free-text PA field — whitespace stripping still
     applies. (Practice-name stripping moved to Provider with #448.)"""
     p = post_update_adapter.validate_python(
-        {"kind": "opening", "description": "  Renamed  "}
+        {"kind": "clinician_opening", "description": "  Renamed  "}
     )
     assert p.description == "Renamed"
 
 
 def test_post_update_opening_requires_at_least_one_field():
     with pytest.raises(ValidationError):
-        post_update_adapter.validate_python({"kind": "opening"})
+        post_update_adapter.validate_python({"kind": "clinician_opening"})
 
 
 def test_post_update_opening_rejects_whitespace_only():
     with pytest.raises(ValidationError):
-        post_update_adapter.validate_python({"kind": "opening", "description": "   "})
+        post_update_adapter.validate_python(
+            {"kind": "clinician_opening", "description": "   "}
+        )
 
 
 def test_post_update_opening_rejects_unknown_field():
     with pytest.raises(ValidationError):
         post_update_adapter.validate_python(
             {
-                "kind": "opening",
+                "kind": "clinician_opening",
                 "description": "Acme",
                 "evil": True,
             }
@@ -635,19 +637,19 @@ def test_post_update_opening_rejects_unknown_field():
 
 
 def test_audit_snapshot_for_opening_post():
-    """Snapshotting a `kind='opening'` post flattens through
+    """Snapshotting a `kind='clinician_opening'` post flattens through
     `opening_detail`."""
     owner_id = uuid.uuid4()
     detail_attrs = opening_payload()
     detail_attrs.pop("kind")
     post = SimpleNamespace(
-        kind="opening",
+        kind="clinician_opening",
         owner_id=owner_id,
         referral_detail=None,
         opening_detail=SimpleNamespace(**detail_attrs),
     )
     snap = post_audit_snapshot(post)
-    assert snap["kind"] == "opening"
+    assert snap["kind"] == "clinician_opening"
     assert snap["owner_id"] == str(owner_id)
     # Per #448, the audit row records the FK to the Provider, not the
     # dereferenced practice fields. Practice-name/location/sessions live
@@ -715,7 +717,7 @@ def test_schema_literals_match_model_tuples(model_cls, field, expected):
     "payload_factory,kind",
     [
         (referral_payload, "referral"),
-        (opening_payload, "opening"),
+        (opening_payload, "clinician_opening"),
     ],
 )
 def test_post_create_desired_times_defaults_to_empty_list(payload_factory, kind):
@@ -750,7 +752,7 @@ def test_post_create_desired_times_coerces_scalar_to_singleton_list(payload_fact
     assert p.desired_times == ["monday_am"]
 
 
-@pytest.mark.parametrize("kind", ["referral", "opening"])
+@pytest.mark.parametrize("kind", ["referral", "clinician_opening"])
 def test_post_update_desired_times_coerces_scalar_to_singleton_list(kind):
     p = post_update_adapter.validate_python(
         {"kind": kind, "desired_times": "monday_am"}
@@ -771,7 +773,7 @@ def test_post_create_desired_times_rejects_unknown_token(payload_factory):
 
 @pytest.mark.parametrize(
     "kind",
-    ["referral", "opening"],
+    ["referral", "clinician_opening"],
 )
 def test_post_update_desired_times_replaces_with_explicit_list(kind):
     """Sending an explicit list (including `[]`) replaces the persisted
@@ -787,7 +789,7 @@ def test_post_update_desired_times_replaces_with_explicit_list(kind):
 
 @pytest.mark.parametrize(
     "kind",
-    ["referral", "opening"],
+    ["referral", "clinician_opening"],
 )
 def test_post_update_desired_times_rejects_unknown_token(kind):
     with pytest.raises(ValidationError):
@@ -871,7 +873,7 @@ def test_post_create_opening_accepts_omitted_optional_fields():
 
 @pytest.mark.parametrize(
     "kind",
-    ["referral", "opening"],
+    ["referral", "clinician_opening"],
 )
 def test_post_update_services_coerces_scalar_to_singleton_list(kind):
     p = post_update_adapter.validate_python({"kind": kind, "services": "evaluation"})
@@ -889,19 +891,21 @@ def test_post_update_opening_services_rejects_empty_list():
     """PA preserves the min-1 invariant on PATCH: explicit `[]` 422s; `None`
     (leave-unchanged) is the supported way to not mutate the field."""
     with pytest.raises(ValidationError):
-        post_update_adapter.validate_python({"kind": "opening", "services": []})
+        post_update_adapter.validate_python(
+            {"kind": "clinician_opening", "services": []}
+        )
 
 
 def test_post_update_opening_services_accepts_non_empty_list():
     p = post_update_adapter.validate_python(
-        {"kind": "opening", "services": ["psychotherapy"]}
+        {"kind": "clinician_opening", "services": ["psychotherapy"]}
     )
     assert p.services == ["psychotherapy"]
 
 
 @pytest.mark.parametrize(
     "kind",
-    ["referral", "opening"],
+    ["referral", "clinician_opening"],
 )
 def test_post_update_services_rejects_unknown_token(kind):
     with pytest.raises(ValidationError):
