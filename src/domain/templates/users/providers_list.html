@@ -11,13 +11,13 @@
 {{ breadcrumb([
   ("Users", entity_url('user')),
   (target_user.username, entity_url('user', id=target_user.id)),
-  ("Providers", none),
+  ("Clinicians", none),
 ]) }}
 {% endblock %}
 
 {% block actions %}
 {% if is_self %}
-<li><a href="{{ entity_form_url('provider') }}" role="button">Create provider</a></li>
+<li><a href="{{ entity_form_url('clinician') }}" role="button">Create clinician</a></li>
 {% endif %}
 {% endblock %}
 
@@ -26,13 +26,13 @@
   items=providers,
   headers=provider_headers,
   row=provider_row,
-  id="user-providers",
+  id="user-clinicians",
 ) %}
-<p id="user-providers-empty">
+<p id="user-clinicians-empty">
   {% if is_self %}
-  You have not created any providers yet.
+  You have not created any clinician entries yet.
   {% else %}
-  This user has no providers yet.
+  This user has no clinician entries yet.
   {% endif %}
 </p>
 {% endcall %}

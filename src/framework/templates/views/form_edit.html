@@ -1,6 +1,6 @@
 {# Generic edit-form view chrome.
 
-An edit-form view (`/openings/{id}/form`, `/providers/{id}/form`)
+An edit-form view (`/openings/{id}/form`, `/clinicians/{id}/form`)
 renders a two-segment breadcrumb (collection → detail page, both
 links) above a toolbar row carrying the page `<h1>`. The form's
 own Save and Cancel buttons own the primary actions, so the
@@ -31,7 +31,7 @@ Child contract:
   Required context:
     resource_url        — URL the collection segment links to.
     resource_detail_url — URL the current-item breadcrumb segment
-                          links to (e.g. `"/providers/" ~ provider.id`).
+                          links to (e.g. `"/clinicians/" ~ provider.id`).
 
   Optional blocks:
     breadcrumb          — full breadcrumb override for nested-edit pages.

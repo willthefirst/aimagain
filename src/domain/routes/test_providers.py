@@ -38,7 +38,7 @@ async def _seed_org(
     name: str = "Acme Therapy",
 ) -> uuid.UUID:
     """Insert a root Organization and return its id. Used by tests that
-    POST to ``/providers`` — the wire schema requires ``org_id`` (#524)
+    POST to ``/clinicians`` — the wire schema requires ``org_id`` (#524)
     so each create test needs an Org persisted up front."""
     org = make_organization_row(owner_id=owner_id, name=name)
     async with db_test_session_manager() as session:
@@ -111,20 +111,20 @@ async def test_create_provider_happy_path(
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user: User,
 ):
-    """POST /providers with a form-encoded body returns 201 + id and
+    """POST /clinicians with a form-encoded body returns 201 + id and
     persists the provider and an audit row."""
     org_id = await _seed_org(
         db_test_session_manager, owner_id=logged_in_user.id, name="Acme Therapy"
     )
     response = await authenticated_client.post(
-        "/providers",
+        "/clinicians",
         data=provider_payload(org_id=str(org_id)),
     )
 
     assert response.status_code == 201
     new_id = uuid.UUID(response.json()["id"])
-    assert response.headers["Location"] == f"/providers/{new_id}"
-    assert response.headers["HX-Redirect"] == f"/providers/{new_id}/form"
+    assert response.headers["Location"] == f"/clinicians/{new_id}"
+    assert response.headers["HX-Redirect"] == f"/clinicians/{new_id}/form"
 
     async with db_test_session_manager() as session:
         result = await session.execute(select(Provider).filter(Provider.id == new_id))
@@ -136,7 +136,7 @@ async def test_create_provider_happy_path(
 
     rows = await _audit_rows_for(
         db_test_session_manager,
-        resource_type="provider",
+        resource_type="clinician",
         resource_id=new_id,
     )
     assert len(rows) == 1
@@ -158,13 +158,13 @@ async def test_create_provider_allows_multiple_per_user(
         db_test_session_manager, owner_id=logged_in_user.id, name="Second"
     )
     first = await authenticated_client.post(
-        "/providers", data=provider_payload(org_id=str(org_first))
+        "/clinicians", data=provider_payload(org_id=str(org_first))
     )
     assert first.status_code == 201
     first_id = uuid.UUID(first.json()["id"])
 
     second = await authenticated_client.post(
-        "/providers", data=provider_payload(org_id=str(org_second))
+        "/clinicians", data=provider_payload(org_id=str(org_second))
     )
     assert second.status_code == 201
     second_id = uuid.UUID(second.json()["id"])
@@ -198,7 +198,7 @@ async def test_create_provider_rejects_org_owned_by_another_user(
     )
 
     response = await authenticated_client.post(
-        "/providers", data=provider_payload(org_id=str(other_org_id))
+        "/clinicians", data=provider_payload(org_id=str(other_org_id))
     )
     assert response.status_code == 403
 
@@ -212,7 +212,7 @@ async def test_create_provider_rejects_nonexistent_org(
     would otherwise produce."""
     bogus = uuid.uuid4()
     response = await authenticated_client.post(
-        "/providers", data=provider_payload(org_id=str(bogus))
+        "/clinicians", data=provider_payload(org_id=str(bogus))
     )
     assert response.status_code == 404
 
@@ -234,7 +234,7 @@ async def test_create_provider_allows_superuser_to_attach_to_any_org(
     )
 
     response = await authenticated_client.post(
-        "/providers", data=provider_payload(org_id=str(other_org_id))
+        "/clinicians", data=provider_payload(org_id=str(other_org_id))
     )
     assert response.status_code == 201
 
@@ -247,7 +247,7 @@ async def test_get_provider_renders_detail_page(
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user: User,
 ):
-    """`GET /providers/{id}` renders the read-only HTML detail page
+    """`GET /clinicians/{id}` renders the read-only HTML detail page
     with practice fields and an Edit link for the owner."""
     provider_id = await _seed_provider_for(
         db_test_session_manager, user_id=logged_in_user.id, practice_name="Mine"
@@ -260,7 +260,7 @@ async def test_get_provider_renders_detail_page(
         async with session.begin():
             session.add(licensure)
 
-    response = await authenticated_client.get(f"/providers/{provider_id}")
+    response = await authenticated_client.get(f"/clinicians/{provider_id}")
 
     assert response.status_code == 200
     assert response.headers["content-type"].startswith("text/html")
@@ -268,7 +268,7 @@ async def test_get_provider_renders_detail_page(
     # Licensure section renders the seeded row.
     assert "L-99999" in response.text
     # Owner sees an Edit link, no edit forms (read-only).
-    assert tree.css_first(f'a[href="/providers/{provider_id}/form"]') is not None
+    assert tree.css_first(f'a[href="/clinicians/{provider_id}/form"]') is not None
     assert tree.css_first("form") is None
     # Regression for #594 — the practice name lives in the header
     # `<strong>` only. The facts list relabels its row "Organization"
@@ -281,7 +281,7 @@ async def test_get_provider_detail_renders_stacked_affiliation_cards(
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user: User,
 ):
-    """`GET /providers/{id}` renders one stacked card per Affiliation
+    """`GET /clinicians/{id}` renders one stacked card per Affiliation
     after #642 PR 2. Seed a Provider with two affiliations (the one
     `Provider.__init__` builds from the create payload + a second one
     appended) and assert both org names render and both
@@ -324,7 +324,7 @@ async def test_get_provider_detail_renders_stacked_affiliation_cards(
                 )
             )
 
-    response = await authenticated_client.get(f"/providers/{provider_id}")
+    response = await authenticated_client.get(f"/clinicians/{provider_id}")
 
     assert response.status_code == 200
     tree = HTMLParser(response.text)
@@ -359,15 +359,15 @@ async def test_get_provider_hides_edit_link_for_non_owner(
             session.add(other)
     provider_id = await _seed_provider_for(db_test_session_manager, user_id=other.id)
 
-    response = await authenticated_client.get(f"/providers/{provider_id}")
+    response = await authenticated_client.get(f"/clinicians/{provider_id}")
 
     assert response.status_code == 200
     tree = HTMLParser(response.text)
-    assert tree.css_first(f'a[href="/providers/{provider_id}/form"]') is None
+    assert tree.css_first(f'a[href="/clinicians/{provider_id}/form"]') is None
 
 
 def _delete_provider_button(tree: HTMLParser, provider_id: uuid.UUID):
-    return tree.css_first(f'button[hx-delete="/providers/{provider_id}"]')
+    return tree.css_first(f'button[hx-delete="/clinicians/{provider_id}"]')
 
 
 async def test_get_provider_renders_delete_button_for_owner(
@@ -382,7 +382,7 @@ async def test_get_provider_renders_delete_button_for_owner(
         db_test_session_manager, user_id=logged_in_user.id, practice_name="Mine"
     )
 
-    response = await authenticated_client.get(f"/providers/{provider_id}")
+    response = await authenticated_client.get(f"/clinicians/{provider_id}")
     tree = HTMLParser(response.text)
     button = _delete_provider_button(tree, provider_id)
     assert button is not None
@@ -403,7 +403,7 @@ async def test_get_provider_hides_delete_button_for_non_owner(
             session.add(other)
     provider_id = await _seed_provider_for(db_test_session_manager, user_id=other.id)
 
-    response = await authenticated_client.get(f"/providers/{provider_id}")
+    response = await authenticated_client.get(f"/clinicians/{provider_id}")
     tree = HTMLParser(response.text)
     assert _delete_provider_button(tree, provider_id) is None
 
@@ -415,11 +415,11 @@ async def test_list_providers_renders_html(
     authenticated_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],
 ):
-    """`GET /providers` renders an HTML page with one entry per
+    """`GET /clinicians` renders an HTML page with one entry per
     persisted provider, regardless of which user owns it.
 
     After #642 PR 3 the Practice cell no longer wraps in an
-    `a[href="/providers/{id}"]` anchor — each org name is its own
+    `a[href="/clinicians/{id}"]` anchor — each org name is its own
     link to the owning Organization. The Provider id still rides on
     the row via `data-row-id` so per-row chrome (and tests) can scope
     to it; the next-PR clinician name column will surface the
@@ -433,12 +433,12 @@ async def test_list_providers_renders_html(
         db_test_session_manager, user_id=other.id, practice_name="Open House"
     )
 
-    response = await authenticated_client.get("/providers")
+    response = await authenticated_client.get("/clinicians")
 
     assert response.status_code == 200
     assert response.headers["content-type"].startswith("text/html")
     tree = HTMLParser(response.text)
-    rows = tree.css("#providers-table tbody tr")
+    rows = tree.css("#clinicians-table tbody tr")
     assert len(rows) == 1
     assert rows[0].attributes.get("data-row-id") == str(provider_id)
     # Org name renders as a link to the owning Organization.
@@ -497,7 +497,7 @@ async def test_list_providers_row_shows_all_affiliations(
                 )
             )
 
-    response = await authenticated_client.get("/providers")
+    response = await authenticated_client.get("/clinicians")
 
     assert response.status_code == 200
     tree = HTMLParser(response.text)
@@ -576,7 +576,7 @@ async def test_list_providers_row_dedupes_identical_locations(
                 )
             )
 
-    response = await authenticated_client.get("/providers")
+    response = await authenticated_client.get("/clinicians")
     assert response.status_code == 200
     tree = HTMLParser(response.text)
     location_cell = tree.css_first(
@@ -634,7 +634,7 @@ async def test_list_providers_shows_licensure_states(
                 )
             )
 
-    response = await authenticated_client.get("/providers")
+    response = await authenticated_client.get("/clinicians")
 
     assert response.status_code == 200
     tree = HTMLParser(response.text)
@@ -648,21 +648,23 @@ async def test_list_providers_shows_licensure_states(
 async def test_list_providers_renders_create_toolbar_action(
     authenticated_client: AsyncClient,
 ):
-    """`/providers` (Directory) carries a 'Create provider' toolbar
+    """`/clinicians` (Directory) carries a 'Create clinician' toolbar
     button — matches the orgs/programs/posts list convention so an
     authenticated user always has a discoverable Create entry point.
     The route's auth is `AUTHENTICATED` (creation is not gated to
     owners/admins), so the button shows to every authenticated viewer."""
-    response = await authenticated_client.get("/providers")
+    response = await authenticated_client.get("/clinicians")
     assert response.status_code == 200
     tree = HTMLParser(response.text)
     action = None
     for anchor in tree.css('menu.toolbar-right > li > a[role="button"]'):
-        if "Create provider" in (anchor.text() or ""):
+        if "Create clinician" in (anchor.text() or ""):
             action = anchor
             break
-    assert action is not None, "Create provider toolbar action is missing on /providers"
-    assert action.attributes.get("href") == "/providers/form"
+    assert (
+        action is not None
+    ), "Create clinician toolbar action is missing on /clinicians"
+    assert action.attributes.get("href") == "/clinicians/form"
 
 
 async def test_list_providers_renders_empty_state(
@@ -670,22 +672,22 @@ async def test_list_providers_renders_empty_state(
 ):
     """With no persisted providers, the page renders a friendly empty
     message instead of an empty `<table>`. The list page's toolbar
-    links to `/providers/search`; the multi-choice filter widgets live
+    links to `/clinicians/search`; the multi-choice filter widgets live
     there, not on the list page."""
-    response = await authenticated_client.get("/providers")
+    response = await authenticated_client.get("/clinicians")
     assert response.status_code == 200
-    assert "No providers found" in response.text
+    assert "No clinicians found" in response.text
     tree = HTMLParser(response.text)
-    assert tree.css_first("#providers-table") is None
+    assert tree.css_first("#clinicians-table") is None
     # Filter link goes to the dedicated search page.
     link = tree.css_first("a.toolbar-filter-link")
     assert link is not None
-    assert (link.attributes.get("href") or "").startswith("/providers/search")
+    assert (link.attributes.get("href") or "").startswith("/clinicians/search")
     # The filter widgets live on the search page — multi-choice
     # `ChoiceFilter`s now render as a `<fieldset>` of single-click
     # checkboxes (#583), not the previous native `<select multiple>`
     # listbox. No checkbox is preselected when the filter is inactive.
-    search_response = await authenticated_client.get("/providers/search")
+    search_response = await authenticated_client.get("/clinicians/search")
     assert search_response.status_code == 200
     search_tree = HTMLParser(search_response.text)
     for filter_name in ("license_type", "issuing_state"):
@@ -730,11 +732,11 @@ async def test_list_providers_filters_by_license_type(
                 make_provider_licensure(clinician_id=clinician_b, license_type="lcsw")
             )
 
-    response = await authenticated_client.get("/providers?license_type=psyd")
+    response = await authenticated_client.get("/clinicians?license_type=psyd")
 
     assert response.status_code == 200
     tree = HTMLParser(response.text)
-    rows = tree.css("#providers-table tbody tr")
+    rows = tree.css("#clinicians-table tbody tr")
     assert len(rows) == 1
     # After #642 PR 3 the row scopes by `data-row-id` (the Provider id);
     # the row's Practice cell anchors out to Orgs, not to the provider.
@@ -748,7 +750,7 @@ async def test_list_providers_filters_by_license_type(
     # The search page re-renders the form with the active value preselected.
     # Multi-choice filters now render as checkboxes (#583), so the
     # active value surfaces as a `checked` `<input type="checkbox">`.
-    search = await authenticated_client.get("/providers/search?license_type=psyd")
+    search = await authenticated_client.get("/clinicians/search?license_type=psyd")
     assert search.status_code == 200
     checked = HTMLParser(search.text).css_first(
         'input[type="checkbox"][name="license_type"][value="psyd"]'
@@ -765,7 +767,7 @@ async def test_list_providers_treats_empty_filter_values_as_absent(
     `?license_type=&issuing_state=` — empty values, not absent. The
     `StripEmptyQueryParamsMiddleware` removes those pairs at request
     entry so the route's declared defaults fire and every provider
-    renders, the same as visiting `/providers` with no query string.
+    renders, the same as visiting `/clinicians` with no query string.
     Without the middleware the empty strings reach the repo's filter
     and zero rows match (the bug this regression test guards)."""
     other = create_test_user(username=f"empty-filter-{uuid.uuid4()}")
@@ -776,11 +778,13 @@ async def test_list_providers_treats_empty_filter_values_as_absent(
         db_test_session_manager, user_id=other.id, practice_name="Filter Test"
     )
 
-    response = await authenticated_client.get("/providers?license_type=&issuing_state=")
+    response = await authenticated_client.get(
+        "/clinicians?license_type=&issuing_state="
+    )
 
     assert response.status_code == 200
     tree = HTMLParser(response.text)
-    rows = tree.css("#providers-table tbody tr")
+    rows = tree.css("#clinicians-table tbody tr")
     assert len(rows) == 1, "Empty filter values should not exclude rows"
 
 
@@ -790,19 +794,19 @@ async def test_list_providers_treats_empty_filter_values_as_absent(
 async def test_providers_list_toolbar_renders_filter_link_and_create_action(
     authenticated_client: AsyncClient,
 ):
-    """`/providers` toolbar carries both the filter link (left) and a
-    'Create provider' action (right). The Create button matches the
+    """`/clinicians` toolbar carries both the filter link (left) and a
+    'Create clinician' action (right). The Create button matches the
     orgs/programs/posts list-page convention; the dedicated
     `test_list_providers_renders_create_toolbar_action` test above
     pins the action's `href` shape — this one pins the toolbar
     composition (filter ✕ actions both present)."""
-    response = await authenticated_client.get("/providers")
+    response = await authenticated_client.get("/clinicians")
     assert response.status_code == 200
     tree = HTMLParser(response.text)
     assert tree.css_first("a.toolbar-filter-link") is not None
     action_menu = tree.css_first("menu.toolbar-right")
     assert action_menu is not None
-    assert "Create provider" in action_menu.text()
+    assert "Create clinician" in action_menu.text()
 
 
 async def test_provider_detail_favorite_toggle_lives_in_toolbar(
@@ -819,7 +823,7 @@ async def test_provider_detail_favorite_toggle_lives_in_toolbar(
             session.add(other)
     provider_id = await _seed_provider_for(db_test_session_manager, user_id=other.id)
 
-    response = await authenticated_client.get(f"/providers/{provider_id}")
+    response = await authenticated_client.get(f"/clinicians/{provider_id}")
     assert response.status_code == 200
     tree = HTMLParser(response.text)
     favorite_selector = f'button[hx-post="/users/me/favorites/{provider_id}"]'
@@ -832,16 +836,16 @@ async def test_provider_form_new_renders_form_actions_cluster(
     authenticated_client: AsyncClient,
     logged_in_user: User,
 ):
-    """`GET /providers/form` renders the standardized Save/Cancel
+    """`GET /clinicians/form` renders the standardized Save/Cancel
     cluster (the `form_actions` macro). Cancel on the create page
     points at the collection so a user can bail without leaving the
     app's resource scope — matches the edit page's bottom Cancel."""
-    response = await authenticated_client.get("/providers/form")
+    response = await authenticated_client.get("/clinicians/form")
     assert response.status_code == 200
     tree = HTMLParser(response.text)
     actions = tree.css_first(".form-actions")
     assert actions is not None
-    cancel = tree.css_first('.form-actions a[href="/providers"][role="button"]')
+    cancel = tree.css_first('.form-actions a[href="/clinicians"][role="button"]')
     assert cancel is not None
     assert cancel.text(strip=True) == "Cancel"
 
@@ -851,7 +855,7 @@ async def test_provider_form_edit_renders_cancel(
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user: User,
 ):
-    """`GET /providers/{id}/form` keeps a bottom "Cancel" link pointing
+    """`GET /clinicians/{id}/form` keeps a bottom "Cancel" link pointing
     at the detail page (a deliberate "abandon this edit" affordance —
     see `src/framework/templates/README.md`)."""
     provider_id = await _seed_provider_for(
@@ -859,10 +863,10 @@ async def test_provider_form_edit_renders_cancel(
         user_id=logged_in_user.id,
         practice_name="Edit Me",
     )
-    response = await authenticated_client.get(f"/providers/{provider_id}/form")
+    response = await authenticated_client.get(f"/clinicians/{provider_id}/form")
     assert response.status_code == 200
     tree = HTMLParser(response.text)
-    cancel = tree.css_first(f'a[href="/providers/{provider_id}"][role="button"]')
+    cancel = tree.css_first(f'a[href="/clinicians/{provider_id}"][role="button"]')
     assert cancel is not None
     assert cancel.text(strip=True) == "Cancel"
 
@@ -875,7 +879,7 @@ async def test_patch_provider_updates_fields(
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user: User,
 ):
-    """PATCH /providers/{id} can reassign the Provider to a different Org
+    """PATCH /clinicians/{id} can reassign the Provider to a different Org
     (``org_id``) or change other practice fields like location. Editing
     the practice's *name* now happens on the Organization itself (#524)."""
     provider_id = await _seed_provider_for(
@@ -886,13 +890,13 @@ async def test_patch_provider_updates_fields(
     )
 
     response = await authenticated_client.patch(
-        f"/providers/{provider_id}",
+        f"/clinicians/{provider_id}",
         data={"org_id": str(new_org_id)},
     )
 
     assert response.status_code == 200
     assert response.json()["org_id"] == str(new_org_id)
-    assert response.headers["HX-Redirect"] == f"/providers/{provider_id}/form"
+    assert response.headers["HX-Redirect"] == f"/clinicians/{provider_id}/form"
 
     async with db_test_session_manager() as session:
         refreshed = (
@@ -914,7 +918,7 @@ async def test_patch_provider_returns_403_if_not_owner(
     )
 
     response = await authenticated_client.patch(
-        f"/providers/{other_provider_id}",
+        f"/clinicians/{other_provider_id}",
         data={"org_id": str(new_org_id)},
     )
     assert response.status_code == 403
@@ -939,7 +943,7 @@ async def test_patch_provider_rejects_reassign_to_unowned_org(
     )
 
     response = await authenticated_client.patch(
-        f"/providers/{provider_id}",
+        f"/clinicians/{provider_id}",
         data={"org_id": str(other_org_id)},
     )
     assert response.status_code == 403
@@ -966,7 +970,7 @@ async def test_delete_provider_returns_204_and_leaves_credentials(
             session.add(make_provider_education(clinician_id=clinician_id))
             session.add(make_provider_certification(clinician_id=clinician_id))
 
-    response = await authenticated_client.delete(f"/providers/{provider_id}")
+    response = await authenticated_client.delete(f"/clinicians/{provider_id}")
     assert response.status_code == 204
 
     async with db_test_session_manager() as session:
@@ -1017,7 +1021,7 @@ async def test_patch_licensure_updates_fields(
         licensure_id = licensure.id
 
     response = await authenticated_client.patch(
-        f"/providers/{provider_id}/licensures/{licensure_id}",
+        f"/clinicians/{provider_id}/licensures/{licensure_id}",
         data={"license_number": "L-2"},
     )
 
@@ -1047,7 +1051,7 @@ async def test_patch_licensure_returns_404_for_mismatched_provider(
         other_licensure_id = other_licensure.id
 
     response = await authenticated_client.patch(
-        f"/providers/{my_provider_id}/licensures/{other_licensure_id}",
+        f"/clinicians/{my_provider_id}/licensures/{other_licensure_id}",
         data={"license_number": "stolen"},
     )
     assert response.status_code == 404
@@ -1061,7 +1065,7 @@ async def test_post_affiliation_creates_additional_row(
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user: User,
 ):
-    """`POST /providers/{id}/affiliations` adds a new Affiliation to
+    """`POST /clinicians/{id}/affiliations` adds a new Affiliation to
     the Provider. After #642 PR 1 the UNIQUE on `affiliations.provider_id`
     is gone, so the framework's generic create handler succeeds for
     every row past the first one (which `Provider.__init__` already
@@ -1078,7 +1082,7 @@ async def test_post_affiliation_creates_additional_row(
     )
 
     response = await authenticated_client.post(
-        f"/providers/{provider_id}/affiliations",
+        f"/clinicians/{provider_id}/affiliations",
         data={
             "org_id": str(second_org_id),
             "location_city": "Queens",
@@ -1116,7 +1120,7 @@ async def test_patch_affiliation_updates_fields(
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user: User,
 ):
-    """`PATCH /providers/{id}/affiliations/{aff_id}` partially updates
+    """`PATCH /clinicians/{id}/affiliations/{aff_id}` partially updates
     the row. Pinned because the framework's update handler resolves the
     affiliation through the new `AffiliationRepository`."""
     provider_id = await _seed_provider_for(
@@ -1133,7 +1137,7 @@ async def test_patch_affiliation_updates_fields(
         ).scalar_one()
 
     response = await authenticated_client.patch(
-        f"/providers/{provider_id}/affiliations/{aff_id}",
+        f"/clinicians/{provider_id}/affiliations/{aff_id}",
         data={"sliding_scale": "true", "cost": "$999/session"},
     )
 
@@ -1148,7 +1152,7 @@ async def test_delete_affiliation_removes_row(
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user: User,
 ):
-    """`DELETE /providers/{id}/affiliations/{aff_id}` removes the row.
+    """`DELETE /clinicians/{id}/affiliations/{aff_id}` removes the row.
     The Provider can be left with zero Affiliations — readers fall
     back to `None` via the property proxies. (PR 3's Clinician-row
     rollup is the user-facing fix for empty-affiliations Providers.)"""
@@ -1165,7 +1169,7 @@ async def test_delete_affiliation_removes_row(
         ).scalar_one()
 
     response = await authenticated_client.delete(
-        f"/providers/{provider_id}/affiliations/{aff_id}"
+        f"/clinicians/{provider_id}/affiliations/{aff_id}"
     )
 
     assert response.status_code in (200, 204)
@@ -1207,7 +1211,7 @@ async def test_delete_affiliation_returns_404_for_mismatched_provider(
         ).scalar_one()
 
     response = await authenticated_client.delete(
-        f"/providers/{my_provider_id}/affiliations/{other_aff_id}"
+        f"/clinicians/{my_provider_id}/affiliations/{other_aff_id}"
     )
     assert response.status_code == 404
 
@@ -1226,15 +1230,15 @@ async def test_owner_edit_form_renders_affiliations_section(
         db_test_session_manager, user_id=logged_in_user.id
     )
 
-    response = await authenticated_client.get(f"/providers/{provider_id}/form")
+    response = await authenticated_client.get(f"/clinicians/{provider_id}/form")
     assert response.status_code == 200
     tree = HTMLParser(response.text)
 
     headings = [h.text(strip=True) for h in tree.css("h2")]
     assert "Affiliations" in headings
 
-    # The inline add form posts to /providers/{id}/affiliations.
-    add_form = tree.css_first(f'form[hx-post="/providers/{provider_id}/affiliations"]')
+    # The inline add form posts to /clinicians/{id}/affiliations.
+    add_form = tree.css_first(f'form[hx-post="/clinicians/{provider_id}/affiliations"]')
     assert add_form is not None
     assert add_form.css_first('select[name="org_id"]') is not None
     assert add_form.css_first('input[name="location_city"]') is not None
@@ -1250,7 +1254,7 @@ async def test_owner_edit_form_renders_affiliations_section(
             )
         ).scalar_one()
     delete_button = tree.css_first(
-        f'button[hx-delete="/providers/{provider_id}/affiliations/{aff_id}"]'
+        f'button[hx-delete="/clinicians/{provider_id}/affiliations/{aff_id}"]'
     )
     assert delete_button is not None
 
@@ -1258,7 +1262,7 @@ async def test_owner_edit_form_renders_affiliations_section(
 # --- Education / certification happy paths ------------------------------
 
 
-# --- Create form page (GET /providers/form) ----------------------
+# --- Create form page (GET /clinicians/form) ----------------------
 
 
 async def test_get_provider_form_renders(
@@ -1266,18 +1270,18 @@ async def test_get_provider_form_renders(
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user: User,
 ):
-    """`GET /providers/form` renders the create form posting to
+    """`GET /clinicians/form` renders the create form posting to
     the JSON API."""
     # Seed an Org so the Org-picker dropdown has at least one option to render.
     await _seed_org(
         db_test_session_manager, owner_id=logged_in_user.id, name="Seeded Org"
     )
-    response = await authenticated_client.get("/providers/form")
+    response = await authenticated_client.get("/clinicians/form")
     assert response.status_code == 200
     tree = HTMLParser(response.text)
     form = tree.css_first("form")
     assert form is not None
-    assert form.attributes.get("hx-post") == "/providers"
+    assert form.attributes.get("hx-post") == "/clinicians"
     # Org-picker dropdown — replaces the old free-text practice_name input.
     # Lists the Orgs the requesting user owns (#524).
     org_select = tree.css_first('select[name="org_id"]')
@@ -1333,7 +1337,7 @@ async def test_get_provider_form_scopes_org_dropdown_to_user(
     await _seed_org(db_test_session_manager, owner_id=logged_in_user.id, name="Mine")
     await _seed_org(db_test_session_manager, owner_id=other.id, name="Theirs")
 
-    response = await authenticated_client.get("/providers/form")
+    response = await authenticated_client.get("/clinicians/form")
     assert response.status_code == 200
     tree = HTMLParser(response.text)
     option_texts = {
@@ -1343,7 +1347,7 @@ async def test_get_provider_form_scopes_org_dropdown_to_user(
     assert "Theirs" not in option_texts
 
 
-# --- Edit form page (GET /providers/{id}/form) -------------------
+# --- Edit form page (GET /clinicians/{id}/form) -------------------
 
 
 async def test_owner_can_open_edit_form(
@@ -1366,7 +1370,7 @@ async def test_owner_can_open_edit_form(
         async with session.begin():
             session.add(licensure)
 
-    response = await authenticated_client.get(f"/providers/{provider_id}/form")
+    response = await authenticated_client.get(f"/clinicians/{provider_id}/form")
     assert response.status_code == 200
     tree = HTMLParser(response.text)
     org_select = tree.css_first('select[name="org_id"]')
@@ -1374,21 +1378,21 @@ async def test_owner_can_open_edit_form(
     selected = org_select.css_first("option[selected]")
     assert selected is not None
     assert selected.text(strip=True) == "Acme Counseling"
-    practice_form = tree.css_first(f'form[hx-patch="/providers/{provider_id}"]')
+    practice_form = tree.css_first(f'form[hx-patch="/clinicians/{provider_id}"]')
     assert practice_form is not None
     # The seeded licensure should be rendered in the licensures list.
     assert "L-12345" in response.text
     # Sub-section add forms target the right URLs.
     assert (
-        tree.css_first(f'form[hx-post="/providers/{provider_id}/licensures"]')
+        tree.css_first(f'form[hx-post="/clinicians/{provider_id}/licensures"]')
         is not None
     )
     assert (
-        tree.css_first(f'form[hx-post="/providers/{provider_id}/educations"]')
+        tree.css_first(f'form[hx-post="/clinicians/{provider_id}/educations"]')
         is not None
     )
     assert (
-        tree.css_first(f'form[hx-post="/providers/{provider_id}/certifications"]')
+        tree.css_first(f'form[hx-post="/clinicians/{provider_id}/certifications"]')
         is not None
     )
 
@@ -1418,14 +1422,14 @@ async def test_owner_edit_form_renders_credentials_as_rows(
         async with session.begin():
             session.add(licensure)
 
-    response = await authenticated_client.get(f"/providers/{provider_id}/form")
+    response = await authenticated_client.get(f"/clinicians/{provider_id}/form")
     tree = HTMLParser(response.text)
     # After #642 PR 1 the affiliations section also renders rows via
     # `.credential-list .credential-row` (it reuses the same partial);
     # locate the licensure row by its hx-delete URL, not by section
     # ordering.
     delete = tree.css_first(
-        f'button[hx-delete="/providers/{provider_id}/licensures/{licensure.id}"]'
+        f'button[hx-delete="/clinicians/{provider_id}/licensures/{licensure.id}"]'
     )
     assert delete is not None
     assert delete.text(strip=True) == "Delete"
@@ -1454,7 +1458,7 @@ async def test_admin_can_open_edit_form_for_any_provider(
     _other_user_id, provider_id = await _seed_other_user_with_provider(
         db_test_session_manager
     )
-    response = await authenticated_client.get(f"/providers/{provider_id}/form")
+    response = await authenticated_client.get(f"/clinicians/{provider_id}/form")
     assert response.status_code == 200
 
 
@@ -1466,7 +1470,7 @@ async def test_non_owner_cannot_open_edit_form(
     _other_user_id, provider_id = await _seed_other_user_with_provider(
         db_test_session_manager
     )
-    response = await authenticated_client.get(f"/providers/{provider_id}/form")
+    response = await authenticated_client.get(f"/clinicians/{provider_id}/form")
     assert response.status_code == 403
 
 
@@ -1481,7 +1485,7 @@ async def test_list_renders_no_pagination_footer_for_single_page(
     """A result that fits on a single page renders no Prev/Next chrome.
     Pins the `pagination` macro's single-page suppression rule."""
     await _seed_provider_for(db_test_session_manager, user_id=logged_in_user.id)
-    response = await authenticated_client.get("/providers")
+    response = await authenticated_client.get("/clinicians")
     assert response.status_code == 200
     tree = HTMLParser(response.text)
     assert tree.css_first('nav[aria-label="Pagination"]') is None
@@ -1502,20 +1506,20 @@ async def test_list_paginates_when_over_per_page(
     for _ in range(3):
         await _seed_provider_for(db_test_session_manager, user_id=logged_in_user.id)
 
-    response = await authenticated_client.get("/providers")
+    response = await authenticated_client.get("/clinicians")
     assert response.status_code == 200
     tree = HTMLParser(response.text)
-    rows = tree.css("#providers-table tbody tr")
+    rows = tree.css("#clinicians-table tbody tr")
     assert len(rows) == 2
     pagination = tree.css_first('nav[aria-label="Pagination"]')
     assert pagination is not None
     assert pagination.css_first('a[rel="next"]') is not None
     assert pagination.css_first('a[rel="prev"]') is None
 
-    response2 = await authenticated_client.get("/providers?page=2")
+    response2 = await authenticated_client.get("/clinicians?page=2")
     assert response2.status_code == 200
     tree2 = HTMLParser(response2.text)
-    rows2 = tree2.css("#providers-table tbody tr")
+    rows2 = tree2.css("#clinicians-table tbody tr")
     assert len(rows2) == 1
     pagination2 = tree2.css_first('nav[aria-label="Pagination"]')
     assert pagination2 is not None
@@ -1529,7 +1533,7 @@ async def test_list_pagination_preserves_query_params(
     logged_in_user: User,
     monkeypatch,
 ):
-    """A page-link from `/providers?foo=bar&page=1` round-trips
+    """A page-link from `/clinicians?foo=bar&page=1` round-trips
     `foo=bar` — the Next link must preserve query state so the user
     doesn't lose their filter when navigating. `base_query()` is
     filter-agnostic: anything in the URL except `page=` carries over,
@@ -1538,7 +1542,7 @@ async def test_list_pagination_preserves_query_params(
     for _ in range(2):
         await _seed_provider_for(db_test_session_manager, user_id=logged_in_user.id)
 
-    response = await authenticated_client.get("/providers?ignored_param=foo")
+    response = await authenticated_client.get("/clinicians?ignored_param=foo")
     assert response.status_code == 200
     tree = HTMLParser(response.text)
     next_link = tree.css_first('nav[aria-label="Pagination"] a[rel="next"]')

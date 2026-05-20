@@ -4,7 +4,7 @@ A `Provider` may hold multiple `Affiliation` rows after #642 PR 1 (the
 UNIQUE on `affiliations.provider_id` was dropped in `7c3c296c9429`).
 The clinician edit page surfaces them as an inline list — same UX
 pattern as licensures — so each row CRUDs through its own URLs under
-``/providers/{provider_id}/affiliations/{affiliation_id}``.
+``/clinicians/{clinician_id}/affiliations/{affiliation_id}``.
 
 The fields mirror the per-role attributes on `ProviderCreate` /
 `ProviderUpdate` (`src/domain/logic/providers/schema.py`) — both

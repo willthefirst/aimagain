@@ -23,8 +23,8 @@ def test_entity_url_collection_path_for_program():
     assert entity_url("program") == "/programs"
 
 
-def test_entity_url_collection_path_for_provider():
-    assert entity_url("provider") == "/providers"
+def test_entity_url_collection_path_for_clinician():
+    assert entity_url("clinician") == "/clinicians"
 
 
 def test_entity_url_collection_path_for_referral():
@@ -107,8 +107,8 @@ def test_entity_form_url_create_form_for_program():
     assert entity_form_url("program") == "/programs/form"
 
 
-def test_entity_form_url_create_form_for_provider():
-    assert entity_form_url("provider") == "/providers/form"
+def test_entity_form_url_create_form_for_clinician():
+    assert entity_form_url("clinician") == "/clinicians/form"
 
 
 def test_entity_form_url_create_form_for_referral():

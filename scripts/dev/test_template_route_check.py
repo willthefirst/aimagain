@@ -13,7 +13,7 @@ from scripts.dev.template_route_check import (
     _violations,
 )
 
-_COLLECTIONS = {"organizations", "providers", "posts", "users"}
+_COLLECTIONS = {"organizations", "clinicians", "posts", "users"}
 _PATTERN = _build_pattern(_COLLECTIONS)
 
 
@@ -81,7 +81,7 @@ def test_does_not_flag_entity_url_call():
 
 def test_does_not_flag_entity_form_url_with_id():
     assert (
-        _scan("<a href=\"{{ entity_form_url('provider', id=p.id) }}\">Edit</a>") == []
+        _scan("<a href=\"{{ entity_form_url('clinician', id=p.id) }}\">Edit</a>") == []
     )
 
 
@@ -115,12 +115,12 @@ def test_strips_jinja_comments():
     paths without tripping the lint."""
     text = (
         "{# Example:\n"
-        '  {{ inline_add_form("/providers/" ~ p.id ~ "/licensures") }}\n'
+        '  {{ inline_add_form("/clinicians/" ~ p.id ~ "/licensures") }}\n'
         "#}\n"
         '<form action="/posts">x</form>'
     )
     matches = _scan(text)
-    # Only the live `/posts`, not the `/providers/` inside the comment.
+    # Only the live `/posts`, not the `/clinicians/` inside the comment.
     assert matches == ["/posts"]
 
 

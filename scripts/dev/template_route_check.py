@@ -18,10 +18,10 @@ of any registered top-level entity. Examples:
   ``href="/posts/form"``                — flagged
   ``href="/organizations/{{ id }}"``    — flagged (literal first segment)
   ``"/users/me"`` in any context        — flagged
-  ``request.url.path == '/providers'``  — flagged
+  ``request.url.path == '/clinicians'``  — flagged
   ``href="?kind=referral"``      — not flagged (relative, no `/`)
   ``href="{{ entity_url('post') }}"``   — not flagged (no literal segment)
-  ``"/licensures"`` (sub of provider)   — not flagged (not top-level)
+  ``"/licensures"`` (sub of clinician)  — not flagged (not top-level)
 
 Jinja comments (``{# ... #}``) are stripped before scanning so docstring
 examples in macro headers don't false-positive.

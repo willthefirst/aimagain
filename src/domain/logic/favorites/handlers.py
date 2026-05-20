@@ -44,7 +44,7 @@ _EDGE_AUDIT = FAVORITE_ENTITY.edge_audit
 async def handle_add_favorite(
     provider_id: UUID,
     repo: UserFavoriteRepository,
-    provider_repo: ProviderRepository,
+    clinician_repo: ProviderRepository,
     audit_repo: AuditRepository,
     requesting_user: User,
 ) -> UserFavorite:
@@ -56,9 +56,13 @@ async def handle_add_favorite(
     404 if the target provider does not exist — keeps the existence of a
     deleted provider opaque to the favorites endpoint.
     """
-    provider = await provider_repo.get_by_model_id(Provider, provider_id)
+    # `clinician_repo` is the directory-listing entry repo — the underlying
+    # model class is still `Provider`; only the user-facing entity name
+    # flipped in #642 PR 4, which is what the framework's
+    # `to_repo_kwarg = f"{to_entity.name}_repo"` derivation reads.
+    provider = await clinician_repo.get_by_model_id(Provider, provider_id)
     if provider is None:
-        raise NotFoundError(detail="Provider not found")
+        raise NotFoundError(detail="Clinician not found")
 
     existing = await repo.get_by_pair(
         user_id=requesting_user.id, provider_id=provider_id

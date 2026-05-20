@@ -8,7 +8,11 @@ wired into `src/main.py` alongside the other hand-rolled routers.
 
 Response shape: `201 Created` with the new `Verification` row's id and
 a `Location` header pointing at the (future) per-verification read
-route (`/providers/{provider_id}/verifications/{verification_id}`).
+route (`/clinicians/{provider_id}/verifications/{verification_id}` —
+URL family renamed in #642 PR 4; the path-param keeps its
+`provider_id` kwarg name because the handler signature takes the
+Provider model id and the brief explicitly excluded handler-kwarg
+renames from this PR).
 The read route does not yet exist; the `Location` header is still
 correct per RFC 9110 — it identifies the resource, not a route that
 must already be implemented — and lands the URL shape so the future
@@ -39,7 +43,7 @@ verifications_api_router = APIRouter(tags=["Verifications"])
 
 
 @verifications_api_router.post(
-    "/providers/{provider_id}/verifications",
+    "/clinicians/{provider_id}/verifications",
     status_code=status.HTTP_201_CREATED,
     name="verifications:create",
 )
@@ -61,6 +65,6 @@ async def create_provider_verification(
         requesting_user=requesting_user,
     )
     response.headers["Location"] = (
-        f"/providers/{provider_id}/verifications/{verification.id}"
+        f"/clinicians/{provider_id}/verifications/{verification.id}"
     )
     return {"id": str(verification.id), "status": verification.status}

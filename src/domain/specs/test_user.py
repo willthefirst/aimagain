@@ -102,14 +102,17 @@ def test_state_axes_has_exactly_activation():
 # --- Subresources --------------------------------------------------------
 
 
-def test_subresources_has_related_providers_with_me_alias():
-    """`/users/{id}/providers` and `/users/me/providers` are the
+def test_subresources_has_related_clinicians_with_me_alias():
+    """`/users/{id}/clinicians` and `/users/me/clinicians` are the
     related-list — confirmed against the mount calls in
-    `src/domain/routes/users.py`."""
+    `src/domain/routes/users.py`. URL family renamed from `/providers`
+    to `/clinicians` in #642 PR 4; the template path stays
+    `users/providers_list.html` because the file lives in the
+    `providers/` template cluster (the model class is still `Provider`)."""
     assert len(USER_ENTITY.subresources) == 1
     sub = USER_ENTITY.subresources[0]
     assert isinstance(sub, RelatedListSubresource)
-    assert sub.child_spec.collection == "providers"
+    assert sub.child_spec.collection == "clinicians"
     assert sub.template == "users/providers_list.html"
     assert sub.singleton_alias is not None
     alias_segment, _alias_dep = sub.singleton_alias

@@ -1,7 +1,7 @@
 {# Generic list-view chrome.
 
-A list view (`/openings`, `/providers`, `/users`,
-`/users/me/favorites`, `/users/{id}/providers`) renders the page
+A list view (`/openings`, `/clinicians`, `/users`,
+`/users/me/favorites`, `/users/{id}/clinicians`) renders the page
 heading + actions in a single toolbar row above the list body. No
 breadcrumb: a single-segment "Openings" trail duplicates what the
 active global-nav tab already communicates (the breadcrumb guide
@@ -31,7 +31,7 @@ Child contract:
                      list). Empty by default.
     breadcrumb     — full breadcrumb override for subresource lists
                      with multi-segment chains (e.g.
-                     `/users/{id}/providers`). The default list
+                     `/users/{id}/clinicians`). The default list
                      view renders no breadcrumb; this override lets
                      subresource list pages opt back in when there's
                      real ancestry worth showing.

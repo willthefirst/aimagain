@@ -38,14 +38,14 @@ def test_filters_are_license_type_and_issuing_state():
 
 
 def test_create_and_update_redirect_to_edit_form():
-    target = "/providers/abc-123/form"
-    assert PROVIDER_ENTITY.create_redirect(provider_id="abc-123") == target
-    assert PROVIDER_ENTITY.update_redirect(provider_id="abc-123") == target
+    target = "/clinicians/abc-123/form"
+    assert PROVIDER_ENTITY.create_redirect(clinician_id="abc-123") == target
+    assert PROVIDER_ENTITY.update_redirect(clinician_id="abc-123") == target
 
 
 def test_delete_redirect_unset():
-    """Providers don't have a custom delete-redirect — the mount layer's
-    default (`/providers`) handles it."""
+    """Clinician entries don't have a custom delete-redirect — the mount
+    layer's default (`/clinicians`) handles it."""
     assert PROVIDER_ENTITY.delete_redirect is None
 
 

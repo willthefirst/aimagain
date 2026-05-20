@@ -1,16 +1,20 @@
-{# Shared provider-row macros — used by every list of providers.
+{# Shared clinician-row macros — used by every list of clinician
+directory entries (the underlying Python model class is still
+`Provider`; only the user-facing surface flipped in #642 PR 4).
 
 Lives in `_shared/` rather than `providers/` because four templates
-across three clusters render the same row (`/providers`,
-`/users/me/favorites`, `/users/{id}/providers`, and the embedded
-"Providers" section on the user detail page). Cross-cluster template
+across three clusters render the same row (`/clinicians`,
+`/users/me/favorites`, `/users/{id}/clinicians`, and the embedded
+"Clinicians" section on the user detail page). Cross-cluster template
 imports aren't allowed (see ../README.md "Layering rule"), so the
-shared shape goes here.
+shared shape goes here. The macros themselves keep the `provider_*`
+identifiers because callers haven't been renamed (and the framework
+templates layer doesn't depend on the entity-name flip).
 
-Filters for the `/providers` index are declared on
+Filters for the `/clinicians` index are declared on
 `PROVIDER_ENTITY.filters` and render on the dedicated
-`/providers/search` page (via `views/search.html`) — there's no
-provider-specific filter partial to maintain.
+`/clinicians/search` page (via `views/search.html`) — there's no
+clinician-specific filter partial to maintain.
 
 After #642 PR 3 each cell reflects **every** affiliation the Provider
 holds — not just the primary one.
@@ -31,10 +35,10 @@ holds — not just the primary one.
     in-network carriers, out-of-network acceptance, and sliding-scale
     posture across every affiliation.
 
-PR 4 will introduce a per-Clinician identity column (with a link to
-the provider/clinician detail page); for now the row links out to
-its Orgs only and the `data-row-id` carries the Provider id for
-tests / future per-row chrome.
+A future PR may introduce a per-Clinician identity column (with a
+link to the clinician detail page); for now the row links out to
+its Orgs only and the `data-row-id` carries the directory entry's
+Provider id for tests / future per-row chrome.
 #}
 
 {% macro provider_headers() -%}

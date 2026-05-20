@@ -261,21 +261,22 @@ class MockDataFactory:
 
     @classmethod
     def create_provider_create_dependency_config(cls) -> Dict[str, Any]:
-        """Mock for the factory-built `_handle_create_provider`.
+        """Mock for the factory-built `_handle_create_clinician`.
 
-        The route under test (`POST /providers`) reads `id` off
+        The route under test (`POST /clinicians`) reads `id` off
         the handler's return value to build the response body and the
         `Location` / `HX-Redirect` headers. A `SimpleNamespace` exposing
         `id` is sufficient. The framework stitches the auto-bound
-        handler onto the route module, so contract patches target
-        `src.domain.routes.providers._handle_create_provider` (not the
-        old bespoke handler in `provider_processing`).
+        handler onto the route module, naming it after `spec.name`; the
+        spec name flipped to `"clinician"` in #642 PR 4, so patches
+        target `_handle_create_clinician` (not the pre-rename
+        `_handle_create_provider`).
         """
         stub_provider = SimpleNamespace(
             id=UUID("33333333-3333-3333-3333-333333333333"),
         )
         return {
-            "src.domain.routes.providers._handle_create_provider": {
+            "src.domain.routes.providers._handle_create_clinician": {
                 "return_value_config": stub_provider
             }
         }
@@ -320,11 +321,14 @@ class MockDataFactory:
 
     @classmethod
     def create_provider_update_dependency_config(cls) -> Dict[str, Any]:
-        """Mock for `handle_update_provider`.
+        """Mock for `handle_update_clinician` (factory-built).
 
-        The route under test (`PATCH /providers/{id}`) packs the
-        handler's return value through `ProviderRead.model_validate` — so
-        the stub must expose every field that schema requires.
+        The route under test (`PATCH /clinicians/{id}`) packs the
+        handler's return value through `ProviderRead.model_validate` —
+        so the stub must expose every field that schema requires. The
+        framework names the auto-bound update handler after `spec.name`;
+        post-#642 PR 4 that's `clinician`, so the mock targets
+        `_handle_update_clinician`.
         """
         from datetime import datetime, timezone
 
@@ -356,11 +360,12 @@ class MockDataFactory:
         )
         # After B3 (#330) the per-entity `handle_update_provider` is gone;
         # the route binds `make_update_handler(PROVIDER_ENTITY)` and
-        # assigns it to the module-level `_handle_update_provider` attr
-        # so contract patches retarget here. The mount layer's
-        # `_resolve_handler` reads from `__module__`.
+        # assigns it to the module-level `_handle_update_<spec.name>`
+        # attr — `_handle_update_clinician` after #642 PR 4 — so contract
+        # patches retarget here. The mount layer's `_resolve_handler`
+        # reads from `__module__`.
         return {
-            "src.domain.routes.providers._handle_update_provider": {
+            "src.domain.routes.providers._handle_update_clinician": {
                 "return_value_config": stub_provider
             }
         }

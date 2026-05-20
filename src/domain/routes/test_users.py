@@ -46,7 +46,7 @@ async def test_base_template_renders_primary_nav_when_authenticated(
         "/referrals",
         "/openings",
         "/intakes",
-        "/providers",
+        "/clinicians",
     ]
 
 
@@ -73,12 +73,12 @@ async def test_primary_nav_highlights_active_section(
         is None
     )
 
-    directory = await authenticated_client.get("/providers")
+    directory = await authenticated_client.get("/clinicians")
     tree = HTMLParser(directory.text)
     assert (
-        tree.css_first('nav[aria-label="Primary"] a[href="/providers"]').attributes.get(
-            "aria-current"
-        )
+        tree.css_first(
+            'nav[aria-label="Primary"] a[href="/clinicians"]'
+        ).attributes.get("aria-current")
         == "page"
     )
 
@@ -465,10 +465,10 @@ async def test_detail_shows_providers_empty_state(
     response = await authenticated_client.get(f"/users/{target.id}")
     assert response.status_code == 200
     tree = HTMLParser(response.text)
-    assert tree.css_first("#user-detail-providers") is None
-    empty = tree.css_first("#user-detail-providers-empty")
+    assert tree.css_first("#user-detail-clinicians") is None
+    empty = tree.css_first("#user-detail-clinicians-empty")
     assert empty is not None
-    assert "No providers yet" in empty.text()
+    assert "No clinician entries yet" in empty.text()
 
 
 async def test_detail_lists_owned_providers(
@@ -492,8 +492,8 @@ async def test_detail_lists_owned_providers(
     response = await authenticated_client.get(f"/users/{target.id}")
     assert response.status_code == 200
     tree = HTMLParser(response.text)
-    assert tree.css_first("#user-detail-providers-empty") is None
-    rows = tree.css("#user-detail-providers tbody tr")
+    assert tree.css_first("#user-detail-clinicians-empty") is None
+    rows = tree.css("#user-detail-clinicians tbody tr")
     assert len(rows) == 2
     # After #642 PR 3 the Practice cell anchors to the owning Org per
     # affiliation (each Provider here has its own auto-built Org via
@@ -505,11 +505,11 @@ async def test_detail_lists_owned_providers(
 
 def _inline_create_provider_link(tree: HTMLParser):
     """The detail page's Providers card renders the self-only Create
-    CTA as `<a role="button">Create provider</a>` inside the
+    CTA as `<a role="button">Create clinician</a>` inside the
     `.entity-card`'s `<footer>`. Distinct from the toolbar variant on
-    `/users/{id}/providers` — this one is the profile inline preview."""
+    `/users/{id}/clinicians` — this one is the profile inline preview."""
     for anchor in tree.css(".entity-card a[role='button']"):
-        if "Create provider" in (anchor.text() or ""):
+        if "Create clinician" in (anchor.text() or ""):
             return anchor
     return None
 
@@ -521,13 +521,13 @@ async def test_detail_shows_inline_create_provider_for_self(
     """`/users/me` (and `/users/{my_id}`) renders an inline 'Create
     provider' button inside the Providers section so the profile is
     a self-discovery entry point — without the user clicking through
-    to the dedicated `/users/me/providers` page."""
+    to the dedicated `/users/me/clinicians` page."""
     response = await authenticated_client.get("/users/me")
     assert response.status_code == 200
     tree = HTMLParser(response.text)
     action = _inline_create_provider_link(tree)
-    assert action is not None, "self profile is missing inline Create provider link"
-    assert action.attributes.get("href") == "/providers/form"
+    assert action is not None, "self profile is missing inline Create clinician link"
+    assert action.attributes.get("href") == "/clinicians/form"
 
 
 async def test_detail_omits_inline_create_provider_for_other_user(
@@ -536,8 +536,8 @@ async def test_detail_omits_inline_create_provider_for_other_user(
     logged_in_user: User,
 ):
     """Viewing another user's profile (including as admin) does NOT
-    surface the Create provider CTA — that affordance is self-only,
-    mirroring the toolbar variant on `/users/{id}/providers`."""
+    surface the Create clinician CTA — that affordance is self-only,
+    mirroring the toolbar variant on `/users/{id}/clinicians`."""
     await promote_to_admin(db_test_session_manager, logged_in_user.email)
     target = create_test_user(username=f"target-{uuid.uuid4()}")
     async with db_test_session_manager() as session:
@@ -854,22 +854,22 @@ async def test_get_my_providers_empty_state(
     authenticated_client: AsyncClient,
     logged_in_user: User,
 ):
-    """`GET /users/me/providers` renders the empty state when the
+    """`GET /users/me/clinicians` renders the empty state when the
     current user owns no providers."""
-    response = await authenticated_client.get("/users/me/providers")
+    response = await authenticated_client.get("/users/me/clinicians")
 
     assert response.status_code == 200
     assert response.headers["content-type"].startswith("text/html")
     tree = HTMLParser(response.text)
-    assert tree.css_first("#user-providers") is None
-    empty = tree.css_first("#user-providers-empty")
+    assert tree.css_first("#user-clinicians") is None
+    empty = tree.css_first("#user-clinicians-empty")
     assert empty is not None
     assert "have not created" in empty.text()
 
 
 def _create_provider_action(tree: HTMLParser):
     for anchor in tree.css('menu.toolbar-right > li > a[role="button"]'):
-        if "Create provider" in (anchor.text() or ""):
+        if "Create clinician" in (anchor.text() or ""):
             return anchor
     return None
 
@@ -879,20 +879,20 @@ async def test_get_my_providers_shows_create_action_in_toolbar(
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user: User,
 ):
-    """Self viewing their own provider list sees a 'Create provider'
+    """Self viewing their own provider list sees a 'Create clinician'
     toolbar action — present both in the empty state and after the
     user has created one (so they can create additional providers)."""
-    empty_response = await authenticated_client.get("/users/me/providers")
+    empty_response = await authenticated_client.get("/users/me/clinicians")
     empty_tree = HTMLParser(empty_response.text)
     empty_action = _create_provider_action(empty_tree)
     assert empty_action is not None
-    assert empty_action.attributes.get("href") == "/providers/form"
+    assert empty_action.attributes.get("href") == "/clinicians/form"
 
     await _seed_user_provider(
         db_test_session_manager, user_id=logged_in_user.id, practice_name="First"
     )
 
-    with_one_response = await authenticated_client.get("/users/me/providers")
+    with_one_response = await authenticated_client.get("/users/me/clinicians")
     with_one_tree = HTMLParser(with_one_response.text)
     assert _create_provider_action(with_one_tree) is not None
 
@@ -903,7 +903,7 @@ async def test_get_user_providers_omits_create_action_for_other_user(
     logged_in_user: User,
 ):
     """An admin viewing another user's provider list does NOT see the
-    self-only 'Create provider' toolbar action — admins manage their
+    self-only 'Create clinician' toolbar action — admins manage their
     own providers, not on behalf of others."""
     await promote_to_admin(db_test_session_manager, logged_in_user.email)
     target = create_test_user(username=f"target-{uuid.uuid4()}")
@@ -911,7 +911,7 @@ async def test_get_user_providers_omits_create_action_for_other_user(
         async with session.begin():
             session.add(target)
 
-    response = await authenticated_client.get(f"/users/{target.id}/providers")
+    response = await authenticated_client.get(f"/users/{target.id}/clinicians")
     assert response.status_code == 200
     tree = HTMLParser(response.text)
     assert _create_provider_action(tree) is None
@@ -922,16 +922,16 @@ async def test_get_user_providers_self(
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user: User,
 ):
-    """`GET /users/{my_id}/providers` works for the current user
+    """`GET /users/{my_id}/clinicians` works for the current user
     (equivalent to the /me alias)."""
     await _seed_user_provider(
         db_test_session_manager, user_id=logged_in_user.id, practice_name="Mine"
     )
 
-    response = await authenticated_client.get(f"/users/{logged_in_user.id}/providers")
+    response = await authenticated_client.get(f"/users/{logged_in_user.id}/clinicians")
     assert response.status_code == 200
     tree = HTMLParser(response.text)
-    assert len(tree.css("#user-providers tbody tr")) == 1
+    assert len(tree.css("#user-clinicians tbody tr")) == 1
 
 
 async def test_get_user_providers_admin_can_view_other(
@@ -949,10 +949,10 @@ async def test_get_user_providers_admin_can_view_other(
         db_test_session_manager, user_id=target.id, practice_name="Target Practice"
     )
 
-    response = await authenticated_client.get(f"/users/{target.id}/providers")
+    response = await authenticated_client.get(f"/users/{target.id}/clinicians")
     assert response.status_code == 200
     tree = HTMLParser(response.text)
-    assert len(tree.css("#user-providers tbody tr")) == 1
+    assert len(tree.css("#user-clinicians tbody tr")) == 1
 
 
 async def test_get_user_providers_non_admin_forbidden_for_other(
@@ -966,7 +966,7 @@ async def test_get_user_providers_non_admin_forbidden_for_other(
         async with session.begin():
             session.add(target)
 
-    response = await authenticated_client.get(f"/users/{target.id}/providers")
+    response = await authenticated_client.get(f"/users/{target.id}/clinicians")
     assert response.status_code == 403
 
 
@@ -978,21 +978,27 @@ async def test_get_user_providers_404_for_unknown_user(
     """Admin requesting an unknown user's list gets 404 (not 403)."""
     await promote_to_admin(db_test_session_manager, logged_in_user.email)
 
-    response = await authenticated_client.get(f"/users/{uuid.uuid4()}/providers")
+    response = await authenticated_client.get(f"/users/{uuid.uuid4()}/clinicians")
     assert response.status_code == 404
 
 
-async def test_legacy_provider_profiles_paths_gone(
+async def test_legacy_provider_paths_gone(
     authenticated_client: AsyncClient,
     logged_in_user: User,
 ):
-    """The legacy `/provider-profiles*` paths have been renamed to `/providers*`.
-    Requests to any old path — top-level, /me alias, or user-scoped — no longer
-    match any route."""
+    """The legacy `/provider-profiles*` paths were renamed to `/providers*`
+    in an earlier PR; #642 PR 4 then flipped `/providers*` →
+    `/clinicians*` (no redirects — the design comment on issue #642
+    explicitly accepted bookmark breakage). Requests to either old URL
+    family — top-level, /me alias, or user-scoped — no longer match
+    any route."""
     for path in (
         "/provider-profiles",
         "/users/me/provider-profiles",
         f"/users/{logged_in_user.id}/provider-profiles",
+        "/providers",
+        "/users/me/providers",
+        f"/users/{logged_in_user.id}/providers",
     ):
         response = await authenticated_client.get(path)
         assert response.status_code == 404, f"{path} unexpectedly matched"

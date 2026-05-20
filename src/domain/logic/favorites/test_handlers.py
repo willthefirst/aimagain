@@ -86,7 +86,7 @@ async def test_add_favorite_creates_edge_and_audits(
         edge = await handle_add_favorite(
             provider_id=provider.id,
             repo=UserFavoriteRepository(session),
-            provider_repo=ProviderRepository(session),
+            clinician_repo=ProviderRepository(session),
             audit_repo=AuditRepository(session),
             requesting_user=user,
         )
@@ -124,7 +124,7 @@ async def test_add_favorite_is_idempotent_no_extra_audit(
         first = await handle_add_favorite(
             provider_id=provider.id,
             repo=UserFavoriteRepository(session),
-            provider_repo=ProviderRepository(session),
+            clinician_repo=ProviderRepository(session),
             audit_repo=AuditRepository(session),
             requesting_user=user,
         )
@@ -134,7 +134,7 @@ async def test_add_favorite_is_idempotent_no_extra_audit(
         second = await handle_add_favorite(
             provider_id=provider.id,
             repo=UserFavoriteRepository(session),
-            provider_repo=ProviderRepository(session),
+            clinician_repo=ProviderRepository(session),
             audit_repo=AuditRepository(session),
             requesting_user=user,
         )
@@ -175,7 +175,7 @@ async def test_add_favorite_provider_not_found(
             await handle_add_favorite(
                 provider_id=uuid.uuid4(),
                 repo=UserFavoriteRepository(session),
-                provider_repo=ProviderRepository(session),
+                clinician_repo=ProviderRepository(session),
                 audit_repo=AuditRepository(session),
                 requesting_user=user,
             )
@@ -191,7 +191,7 @@ async def test_remove_favorite_deletes_edge_and_audits(
         edge = await handle_add_favorite(
             provider_id=provider.id,
             repo=UserFavoriteRepository(session),
-            provider_repo=ProviderRepository(session),
+            clinician_repo=ProviderRepository(session),
             audit_repo=AuditRepository(session),
             requesting_user=user,
         )
@@ -277,14 +277,14 @@ async def test_list_my_favorites_returns_only_self_edges(
         await handle_add_favorite(
             provider_id=mine.id,
             repo=UserFavoriteRepository(session),
-            provider_repo=ProviderRepository(session),
+            clinician_repo=ProviderRepository(session),
             audit_repo=AuditRepository(session),
             requesting_user=me,
         )
         await handle_add_favorite(
             provider_id=theirs.id,
             repo=UserFavoriteRepository(session),
-            provider_repo=ProviderRepository(session),
+            clinician_repo=ProviderRepository(session),
             audit_repo=AuditRepository(session),
             requesting_user=other,
         )

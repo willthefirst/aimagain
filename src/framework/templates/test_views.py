@@ -344,7 +344,7 @@ def test_primary_nav_shows_admin_links_only_for_admins() -> None:
     ), "non-admin viewer must not see Programs link"
     assert "/users" not in nonadmin_links, "non-admin viewer must not see Users link"
     # Referrals/Openings/Directory still present for the authed non-admin.
-    assert "/providers" in nonadmin_links
+    assert "/clinicians" in nonadmin_links
 
 
 def test_form_edit_view_renders_breadcrumb_and_edit_heading() -> None:
@@ -826,16 +826,16 @@ def test_login_link_color_is_consistent_across_auth_pages() -> None:
 # --- Primary nav: section active-state + Login shortcut --------------
 
 
-def test_primary_nav_directory_active_on_providers_list() -> None:
-    """`/providers` is the canonical Directory URL — its tab is active."""
-    assert _active_tab_labels(_render_chrome("/providers")) == ["Directory"]
+def test_primary_nav_directory_active_on_clinicians_list() -> None:
+    """`/clinicians` is the canonical Directory URL — its tab is active."""
+    assert _active_tab_labels(_render_chrome("/clinicians")) == ["Directory"]
 
 
-def test_primary_nav_directory_active_on_provider_detail() -> None:
-    """Subpaths under `/providers` (detail, edit) keep Directory lit so
-    the chrome stays consistent through the full provider drill-down."""
-    assert _active_tab_labels(_render_chrome("/providers/42")) == ["Directory"]
-    assert _active_tab_labels(_render_chrome("/providers/42/form")) == ["Directory"]
+def test_primary_nav_directory_active_on_clinician_detail() -> None:
+    """Subpaths under `/clinicians` (detail, edit) keep Directory lit so
+    the chrome stays consistent through the full clinician drill-down."""
+    assert _active_tab_labels(_render_chrome("/clinicians/42")) == ["Directory"]
+    assert _active_tab_labels(_render_chrome("/clinicians/42/form")) == ["Directory"]
 
 
 def test_primary_nav_referrals_active_on_referrals_list() -> None:
@@ -873,9 +873,9 @@ def test_primary_nav_intakes_active_on_intakes_subpath() -> None:
 def test_primary_nav_no_post_tab_when_outside_post_families() -> None:
     """The three post URL families are mutually exclusive — when none
     of them owns the request path, none of `Referrals`/`Openings`/
-    `Intakes` is active. (`/providers` lights Directory, which is
+    `Intakes` is active. (`/clinicians` lights Directory, which is
     asserted separately above.)"""
-    labels = _active_tab_labels(_render_chrome("/providers"))
+    labels = _active_tab_labels(_render_chrome("/clinicians"))
     assert "Referrals" not in labels
     assert "Openings" not in labels
     assert "Intakes" not in labels

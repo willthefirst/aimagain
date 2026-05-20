@@ -1,4 +1,4 @@
-"""Route-level tests for `POST /providers/{provider_id}/verifications`.
+"""Route-level tests for `POST /clinicians/{provider_id}/verifications`.
 
 Covers the wire shape: superuser-only authorization, 404 on missing
 provider, 201 + `Location` header on the happy path, and a persisted
@@ -90,7 +90,7 @@ async def test_non_superuser_gets_403(
     returns 403 (not 401, since the user *is* authenticated)."""
     provider_id = await _seed_provider(db_test_session_manager)
     response = await authenticated_client.post(
-        f"/providers/{provider_id}/verifications"
+        f"/clinicians/{provider_id}/verifications"
     )
     assert response.status_code == 403
 
@@ -106,7 +106,7 @@ async def test_admin_happy_path_returns_201_and_persists(
     provider_id = await _seed_provider(db_test_session_manager, npi="1234567890")
 
     response = await authenticated_client.post(
-        f"/providers/{provider_id}/verifications"
+        f"/clinicians/{provider_id}/verifications"
     )
     assert response.status_code == 201
     body = response.json()
@@ -114,7 +114,7 @@ async def test_admin_happy_path_returns_201_and_persists(
     assert body["status"] in {"verified", "needs_review", "failed"}
     assert (
         response.headers["Location"]
-        == f"/providers/{provider_id}/verifications/{verification_id}"
+        == f"/clinicians/{provider_id}/verifications/{verification_id}"
     )
 
     async with db_test_session_manager() as session:
@@ -138,7 +138,7 @@ async def test_admin_404_for_missing_provider(
 ):
     await promote_to_admin(db_test_session_manager, logged_in_user.email)
     bogus = uuid.uuid4()
-    response = await authenticated_client.post(f"/providers/{bogus}/verifications")
+    response = await authenticated_client.post(f"/clinicians/{bogus}/verifications")
     assert response.status_code == 404
 
 
@@ -151,5 +151,5 @@ async def test_anon_gets_401_or_redirect(
     contract for this route is "anyone unauthorized doesn't get in"
     rather than a specific code, so accept 401 or 403."""
     provider_id = await _seed_provider(db_test_session_manager)
-    response = await test_client.post(f"/providers/{provider_id}/verifications")
+    response = await test_client.post(f"/clinicians/{provider_id}/verifications")
     assert response.status_code in {401, 403}

@@ -33,7 +33,7 @@ The grammar fits resource-shaped CRUD. These stay hand-written:
 |---|---|---|
 | `POST /auth/register` | `auth_routes.py` | Auth-flow protocol (token issuance, fastapi-users hooks). |
 | `GET /auth/{register,login,forgot-password,reset-password/{token}}` | `auth_pages.py` | Pure form rendering. |
-| `GET /users/me`, `GET /users/me/providers` | `users.py` | Singleton aliases — mounted via `singleton_alias=` on the existing `mount_detail` / `mount_related_list`. |
+| `GET /users/me`, `GET /users/me/clinicians` | `users.py` | Singleton aliases — mounted via `singleton_alias=` on the existing `mount_detail` / `mount_related_list`. |
 | `POST/DELETE/GET /users/me/favorites[/{provider_id}]` | `favorites.py` | M:N edge add/remove — no `mount_*` helper for edge mutations. |
 | `GET /`, `GET /health` | `../../main.py` | Utility endpoints. |
 

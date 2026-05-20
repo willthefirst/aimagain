@@ -3,7 +3,7 @@
 Verifies that the HTMX-decorated form rendered by
 `templates/providers/form_new.html` (mounted via the
 `provider_create_form` stub on the consumer server) issues a
-`POST /providers` form-encoded request with the practice and
+`POST /clinicians` form-encoded request with the practice and
 availability fields the route's `ProviderCreate` schema expects.
 The contract surface is the form wiring (method, path, Content-Type,
 field names) — the response on success is a 201 with `HX-Redirect` to
@@ -85,7 +85,7 @@ async def test_consumer_provider_create_form_submits(
         )
         .will_respond_with(
             status=201,
-            headers={"HX-Redirect": Like("/providers/abc")},
+            headers={"HX-Redirect": Like("/clinicians/abc")},
             body={"id": Like("33333333-3333-3333-3333-333333333333")},
         )
     )
