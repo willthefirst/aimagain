@@ -244,6 +244,10 @@ def _setup_provider_edit_form_stub(app: FastAPI) -> None:
             # `orgs` context var to render options.
             org_id=org_id,
             org=org,
+            # `npi` is an empty optional text input on the stub (#525);
+            # it serializes as `npi=` in the encoded body right after
+            # `location_zip`.
+            npi=None,
             location_city="Brooklyn",
             location_state="NY",
             location_zip="11201",
@@ -255,6 +259,11 @@ def _setup_provider_edit_form_stub(app: FastAPI) -> None:
             in_network_carriers=[],
             sliding_scale=False,
             cost=None,
+            # `affiliations` is the inline list (#642 PR 1) the template
+            # renders below the practice-fields form. Empty here so the
+            # "No affiliations yet." branch renders without adding extra
+            # forms that would compete for the practice form's selectors.
+            affiliations=[],
             licensures=[],
             educations=[],
             certifications=[],
@@ -266,8 +275,11 @@ def _setup_provider_edit_form_stub(app: FastAPI) -> None:
         )
         return APIResponse.html_response(
             template_name="providers/form_edit.html",
+            # The framework binds `context[spec.name] = target`; after
+            # #642 PR 4 the entity name is "clinician" (the template
+            # aliases it back to `provider` internally).
             context={
-                "provider": provider,
+                "clinician": provider,
                 "current_user": current_user,
                 "orgs": [org],
             },
