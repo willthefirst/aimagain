@@ -100,7 +100,7 @@
   <section class="entity-facts">
     <dl>
       {%- if aff.full_address %}
-      <div class="entity-location"><dt aria-label="Address"><i class="icon-map-pinned" aria-hidden="true"></i></dt><dd>{{ aff.full_address }}</dd></div>
+      <div><dt>Address</dt><dd>{{ aff.full_address }}</dd></div>
       {%- endif %}
       <div><dt>In-person sessions</dt><dd>{{ aff.in_person_label }}</dd></div>
       <div><dt>Virtual sessions</dt><dd>{{ aff.virtual_label }}</dd></div>
