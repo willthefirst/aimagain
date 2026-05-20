@@ -386,9 +386,9 @@ def test_view_pa_referral_none_when_both_empty():
 
 def test_view_pa_location_chunk_pulled_from_provider():
     """PA's `location_chunk` reads city/state/zip from the linked
-    Provider so the listing card renders the same icon-only
-    `entity-location` row referral cards do. Detail page still gets
-    the full address via `full_address` for the expanded rows."""
+    Provider so the listing card renders the same "Location" row
+    referral cards do. Detail page still gets the full address via
+    `full_address` for the expanded rows."""
     v = post_card_view(_make_pa_post())
     assert v["location_chunk"] == {"city": "Brooklyn", "state": "NY", "zip": "11201"}
     assert v["full_address"] == "Brooklyn, NY 11201"
