@@ -2,7 +2,7 @@
 
 ## Action-style vocabulary
 
-Every clickable affordance in the app picks one of these four visual
+Every clickable affordance in the app picks one of these three visual
 treatments. Pages stay readable when an Edit button always looks like
 an Edit button regardless of where it lives.
 
@@ -10,8 +10,7 @@ an Edit button regardless of where it lives.
 |-----------------|----------------------------|-----------------------------------------------------|
 | Primary CTA     | (none — Pico default)      | Create org, Save, Submit, Apply, "Add licensure"    |
 | Secondary       | `class="outline"`          | Edit, Favorite (toggle on), Favorites (nav link)    |
-| Neutral         | `class="secondary outline"`| Cancel, Clear, Email, Unfavorite, Deactivate        |
-| Destructive     | `class="danger"`           | Delete (every form / row / toolbar)                 |
+| Neutral         | `class="secondary outline"`| Cancel, Clear, Email, Unfavorite, Deactivate, Delete|
 
 Rules:
   - **Primary** is filled blue. One per page conceptually — Create on a
@@ -22,11 +21,10 @@ Rules:
   - **Neutral** is outlined muted. Used for non-destructive escapes
     (Cancel, Clear) and contextual "do this thing" affordances that
     aren't the page's primary (Email, Unfavorite, admin Deactivate).
-  - **Destructive** is filled red. Reserved for irreversible mutations
-    — always `class="danger"`, never the outlined-danger variant (the
-    softer outlined treatment hid the visual weight that keeps misfire
-    risk low — #579). Pinned by
-    `test_views.py::test_no_template_uses_outlined_danger_for_delete`.
+    Delete also renders as neutral while we work out a destructive
+    color treatment that survives Pico's button cascade — every
+    Delete still pairs the click with an `hx-confirm` dialog so a
+    misfire requires explicit confirmation.
 
 When an action fits one of these axes, **use the matching class
 combination directly** (or the macro below for Delete) — don't
@@ -59,14 +57,12 @@ Slot semantics:
   - `cancel_url` — neutral outline Cancel link. Form layout only.
   - `edit_url` + `edit_label` — secondary outline Edit link. Mainly
     toolbar, but valid in form layout too.
-  - `delete_url` + `delete_confirm` + `delete_label` — destructive
-    `class="danger"` button with `hx-confirm`. Form layout adds
-    `.form-actions-destructive` for right-alignment.
-
-The Delete button's `class="danger"` (filled red, defined in base.html
-— #579) keeps every Delete at the same visual weight; the outlined
-variant would let a destructive misfire look like a no-op Edit. Pinned
-by `test_no_template_uses_outlined_danger_for_delete`.
+  - `delete_url` + `delete_confirm` + `delete_label` — Delete button
+    with an `hx-confirm` dialog. Renders as neutral outline (same
+    treatment as Cancel) for now; the destructive color treatment
+    was removed when the custom `.danger` class wasn't taking effect.
+    The `hx-confirm` requirement is what keeps misfires unlikely.
+    Form layout adds `.form-actions-destructive` for right-alignment.
 
 Examples:
 
@@ -112,7 +108,7 @@ Examples:
 {%- endif %}
 {%- if delete_url and delete_confirm %}
 {%- if is_toolbar %}<li>{% endif -%}
-<button type="button" class="danger{% if not is_toolbar %} form-actions-destructive{% endif %}" hx-delete="{{ delete_url }}" hx-confirm="{{ delete_confirm }}">{{ delete_label }}</button>
+<button type="button" class="secondary outline{% if not is_toolbar %} form-actions-destructive{% endif %}" hx-delete="{{ delete_url }}" hx-confirm="{{ delete_confirm }}">{{ delete_label }}</button>
 {%- if is_toolbar %}</li>{% endif %}
 {%- endif %}
 {%- if not is_toolbar %}</div>{% endif -%}
@@ -122,7 +118,11 @@ Examples:
 `hx-confirm` dialog. Used by inline sub-resource list rows (e.g.
 providers/form_edit.html licensure delete) where a single Delete sits
 outside any action cluster. For Save/Cancel/Edit/Delete clusters, use
-the `actions` macro above. #}
+the `actions` macro above.
+
+Renders as neutral outline (matches Cancel) until a destructive color
+treatment that survives Pico's cascade is added back. The `hx-confirm`
+dialog is what keeps misfires unlikely. #}
 {% macro confirm_delete_button(url, confirm_message, label="Delete") -%}
-<button type="button" class="danger" hx-delete="{{ url }}" hx-confirm="{{ confirm_message }}">{{ label }}</button>
+<button type="button" class="secondary outline" hx-delete="{{ url }}" hx-confirm="{{ confirm_message }}">{{ label }}</button>
 {%- endmacro %}
