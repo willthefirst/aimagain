@@ -24,23 +24,23 @@ Layout per card:
 
 The card is `<article>` with `<header>`, a body block, and
 `<footer>` — Pico's automatic styling tints header and footer as the
-top/bottom bands of the card. The header band is a Pico `<hgroup>`
-pairing an `<h3>` headline link with a `<small>` meta line (date ·
-modality, separated by middots). The `<h3>` anchors the card
-visually — Pico's heading scale gives it size + weight without
-custom CSS, which is the rule we want to lean on so the chrome
-stays framework-portable. The body is one `<dl>` from
-`_facts_block` whose first row carries the services (`Seeking` /
-`Providing` verb + `icon_list` of services); subsequent rows carry
-the demographic facts. The footer carries one element — the Email
-CTA — in the default left-aligned footer flow.
+top/bottom bands of the card. The header band is an `<h3>` headline
+link followed by a `<small class="meta">` line of `<span>` items
+(date plus zero, one, or two modality chips). The `.meta` rule in
+`base.html` joins adjacent span siblings with " · " via CSS, so
+each item is its own element rather than a hardcoded join string.
+The body is one `<dl>` from `_facts_block` whose first row carries
+the services (`Seeking` / `Providing` verb + `icon_list` of
+services); subsequent rows carry the demographic facts. The footer
+carries one element — the Email CTA — in the default left-aligned
+footer flow.
 
 Per-kind branching and field selection live in
 `src.domain.logic.posts.view.post_card_view`, which collapses CR /
 PA / intake detail shapes into one flat `view` dict. `modality_chips`
-emits the meta-line modality string; `_facts_block` emits the
-single `<dl>` body. Detail templates reuse the same `_facts_block`
-partial so list and detail share the same visual vocabulary.
+emits the modality `<span>`s; `_facts_block` emits the single `<dl>`
+body. Detail templates reuse the same `_facts_block` partial so
+list and detail share the same visual vocabulary.
 
 `entity_name` is the URL family the card links into — ``"referral"``,
 ``"opening"``, or ``"intake"``. Each family's `list.html` passes its
@@ -51,13 +51,12 @@ family (e.g. `/referrals/{id}` for referrals' list). #}
 
 {% macro post_item(post, entity_name) -%}
 {%- set view = post_card_view(post) -%}
-{%- set modality = modality_chips(view.in_person, view.virtual) | trim -%}
 <article class="entity-card" data-row-id="{{ post.id }}" data-kind="{{ post.kind }}">
   <header>
-    <hgroup>
-      <h3><a href="{{ entity_url(entity_name, id=post.id) }}">{{ view.headline }}{% if view.header_state %}, {{ view.header_state }}{% endif %}</a></h3>
-      <small>{{ post.created_at | format_post_date }}{% if modality %} · {{ modality }}{% endif %}</small>
-    </hgroup>
+    <h3><a href="{{ entity_url(entity_name, id=post.id) }}">{{ view.headline }}{% if view.header_state %}, {{ view.header_state }}{% endif %}</a></h3>
+    <small class="meta">
+      <span>{{ post.created_at | format_post_date }}</span>{{ modality_chips(view.in_person, view.virtual) }}
+    </small>
   </header>
   {{ facts_block(view) }}
 
