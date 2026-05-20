@@ -212,6 +212,18 @@
       nav[aria-label="breadcrumb"] {
         --pico-nav-breadcrumb-divider: '›';
       }
+      /* Mobile back affordance. On narrow viewports the breadcrumb
+         macro's full `<ul>` chain is hidden and the inline
+         `<a class="breadcrumb-back">` is shown: a Lucide arrow-left
+         glyph plus the deepest clickable parent's label. On desktop
+         the `<a>` is hidden and the chain renders normally. Two
+         rules, no JS — the macro emits both elements unconditionally
+         and CSS does the swapping. */
+      .breadcrumb-back { display: none; }
+      @media (max-width: 540px) {
+        nav[aria-label="breadcrumb"] > ul { display: none; }
+        .breadcrumb-back { display: inline-flex; align-items: center; }
+      }
       /* Entity create/edit forms — cap form width on large screens so
          short fields don't stretch across the whole container, and
          standardize the Save/Cancel/Delete action cluster. The wrapper
