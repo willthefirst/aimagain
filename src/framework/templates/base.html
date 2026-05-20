@@ -182,6 +182,74 @@
         dl > div { display: block; }
         dt { margin-bottom: 0.125rem; }
       }
+      /* Form-field layout — the form-side mirror of the `<dl>` grid
+         above. Label sits in column 1 (`max-content`); input/select/
+         textarea fills column 2 (`1fr`). Helper `<small>` and grouped
+         `<fieldset>` controls also land in column 2 so the labels stay
+         in a clean vertical column down the page.
+         Markup contract (emitted by `_shared/form_fields.html` macros):
+
+           <label class="form-field" for="x">
+             <span class="form-field-label">Label</span>
+             <input id="x" ... />
+             <small id="x-helper">helper</small>     {# optional #}
+           </label>
+
+         Fieldset-shaped fields (radio_bool_field, time_grid_field)
+         use the same `.form-field` class on `<fieldset>` with the
+         label in `<legend class="form-field-label">` and the controls
+         wrapped in `<div class="form-field-control">` so the right
+         column holds the radio cluster atomically.
+
+         Mobile (≤640px): collapse to a single column with the label
+         stacked above the control. Matches the `<dl>` collapse
+         threshold so the form and the facts panel agree on when the
+         label-on-left layout becomes too cramped. */
+      .form-field {
+        display: grid;
+        grid-template-columns: max-content 1fr;
+        column-gap: 0.75rem;
+        row-gap: 0.25rem;
+        align-items: center;
+        margin-block: 0;
+        padding: 0;
+        border: 0;
+      }
+      .form-field + .form-field { margin-block-start: var(--pico-spacing); }
+      .form-field-label { font-weight: 600; }
+      .form-field > input,
+      .form-field > select,
+      .form-field > textarea,
+      .form-field > .form-field-control { margin: 0; }
+      .form-field > small {
+        grid-column: 2;
+        margin: 0;
+        color: var(--pico-muted-color);
+      }
+      /* Multi-row controls (textarea, multi-select, time grid) align
+         their label to the first line of the control rather than the
+         vertical center, so a long textarea doesn't push the label
+         halfway down. */
+      .form-field:has(> textarea),
+      .form-field:has(> select[multiple]),
+      .form-field:has(> table) { align-items: start; }
+      /* Radio cluster: yes/no labels inline inside the right column. */
+      .form-field-control {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 0.75rem;
+      }
+      .form-field-control > .form-field-inline {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.25rem;
+      }
+      @media (max-width: 640px) {
+        .form-field { grid-template-columns: 1fr; row-gap: 0.25rem; }
+        .form-field > small { grid-column: 1; }
+        .form-field-label { margin-bottom: 0.125rem; }
+      }
       /* Inline meta list — the small print under a card heading or
          page H1 that joins several short facts with " · ". Templates
          wrap each fact in its own element (`<span>{{ date }}</span>
