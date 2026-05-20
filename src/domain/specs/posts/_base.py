@@ -1,19 +1,22 @@
-"""Shared builder for the three kind-locked post faces.
+"""Shared builder for the post entity's URL faces.
 
 Posts is the codebase's only polymorphic entity: the `Post` model owns
 the cross-kind invariants (``author_id``, ``created_at``, audit shape)
 while three detail tables (``referral_details``, ``opening_details``,
-``intake_details``) carry the per-kind fields. Each kind has its own
-URL family — ``/referrals``, ``/openings``, ``/intakes`` — declared
-via `EntitySpec(discriminator_value=...)`. The supertype `Post` is no
-longer exposed at `/posts`; consumers walk the three faces.
+``intake_details``) carry the per-kind fields. Two URL families exist:
 
-`_post_face(...)` builds one face. All three faces share the same:
+  - ``/referrals`` — kind-locked leaf face (single kind, ``referral``).
+  - ``/openings`` — subset-supertype face listing both availability
+    subkinds (``clinician_opening``, ``program_intake``). Same
+    `?kind=X` create/edit dispatch pattern the old whole-supertype
+    `/posts` URL used, just scoped to two of the three kinds. The
+    supertype `Post` is not exposed directly.
+
+`_post_face(...)` builds either shape. Both share the same:
 
   - audit `AuditedResource` (built once in this module so the
     persisted ``audit_log.resource_type`` stays ``"post"`` across all
-    three families — no migration, audit-log readers don't see a
-    rename),
+    faces — no migration, audit-log readers don't see a rename),
   - `discriminator=POST_KINDS` registry (the framework's
     `handle_create` / `handle_update` reads through it to find each
     kind's `detail_model` / `detail_relationship`),
@@ -22,14 +25,15 @@ longer exposed at `/posts`; consumers walk the three faces.
   - payload-authz path (the per-kind FK-ownership dispatcher),
   - read schema, list ordering, repo dep, auth deps.
 
-Each face overrides only:
+Each face overrides:
 
-  - `name` (``referral`` / ``opening`` / ``intake``),
-  - `url_collection` (``referrals`` / ``openings`` / ``intakes``),
-  - `discriminator_value` (the bound kind),
-  - `create_adapter` / `update_adapter` (the per-kind schema, not the
-    discriminated union),
-  - `update_redirect` (kind-specific detail URL).
+  - `name` (``referral`` / ``openings``),
+  - `url_collection` (``referrals`` / ``openings``),
+  - `kind=` (single value → kind-locked leaf) **or** `kinds=` (tuple →
+    subset-supertype). Mutually exclusive.
+  - `create_adapter` / `update_adapter` (per-kind schema for a leaf
+    face; subset discriminated-union adapter for a subset face),
+  - `update_redirect` (per-kind / per-collection detail URL).
 """
 
 from typing import Final
@@ -114,16 +118,28 @@ def _post_face(
     *,
     name: str,
     url_collection: str,
-    kind: str,
+    kind: str | None = None,
+    kinds: tuple[str, ...] | None = None,
     create_adapter: type,
     update_adapter: type,
 ) -> EntitySpec:
-    """Construct one kind-locked face of the polymorphic post entity.
+    """Construct a post face — kind-locked leaf or subset-supertype.
 
-    ``kind`` must match one of `POST_KINDS.names` — the framework
-    validates this at spec construction time via the
-    `discriminator_value must be in registry` check.
+    Pass exactly one of:
+      - ``kind=<name>`` — kind-locked face bound to one of
+        `POST_KINDS.names`. Detail/update/delete 404 unless the row's
+        kind matches; create/edit form skip the `?kind=` picker.
+      - ``kinds=(<a>, <b>, ...)`` — subset-supertype face listing the
+        named subkinds. Detail/update/delete 404 unless the row's kind
+        is in the subset; create/edit form takes `?kind=X` and only
+        accepts values from the subset.
     """
+    if (kind is None) == (kinds is None):
+        raise ValueError(
+            "_post_face: pass exactly one of `kind=` (kind-locked leaf) "
+            "or `kinds=` (subset-supertype); got "
+            f"kind={kind!r}, kinds={kinds!r}"
+        )
     return EntitySpec(
         name=name,
         url_collection=url_collection,
@@ -151,8 +167,9 @@ def _post_face(
         update_redirect=Redirects.to_detail(url_collection, "post_id"),
         # Same per-kind FK-ownership check as the old `POST_ENTITY` — the
         # dispatcher reads `payload.kind` and validates the kind-specific
-        # FK fields (opening's `provider_id`, intake's `program_id`)
-        # against the requesting user's ownership.
+        # FK fields (clinician_opening's `provider_id`,
+        # program_intake's `program_id`) against the requesting user's
+        # ownership.
         payload_authz_path=(
             "src.domain.logic.posts.handlers._assert_post_payload_target_ownership"
         ),
@@ -162,4 +179,5 @@ def _post_face(
         ),
         discriminator=POST_KINDS,
         discriminator_value=kind,
+        discriminator_values=kinds,
     )

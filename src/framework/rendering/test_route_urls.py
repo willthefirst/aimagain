@@ -32,11 +32,21 @@ def test_entity_url_collection_path_for_referral():
 
 
 def test_entity_url_collection_path_for_opening():
+    """`/openings` is a subset-supertype face listing both
+    `clinician_opening` and `program_intake` subkinds. Entity name
+    stays singular ("opening" — the umbrella concept) following the
+    user/users naming convention."""
     assert entity_url("opening") == "/openings"
 
 
-def test_entity_url_collection_path_for_intake():
-    assert entity_url("intake") == "/intakes"
+def test_no_intake_entity():
+    """The kind-locked `/intakes` URL family was folded into
+    `/openings` — no separate `intake` entity name exists. Verifies the
+    rename is complete (calling `entity_url("intake")` raises)."""
+    import pytest
+
+    with pytest.raises(ValueError, match="Unknown entity name 'intake'"):
+        entity_url("intake")
 
 
 def test_entity_url_collection_path_for_user():
@@ -116,11 +126,10 @@ def test_entity_form_url_create_form_for_referral():
 
 
 def test_entity_form_url_create_form_for_opening():
+    """`/openings/form` is the create-form URL; the handler reads
+    `?kind=X` from the query string to dispatch to the subkind-specific
+    form template."""
     assert entity_form_url("opening") == "/openings/form"
-
-
-def test_entity_form_url_create_form_for_intake():
-    assert entity_form_url("intake") == "/intakes/form"
 
 
 def test_entity_form_url_edit_form_for_user():

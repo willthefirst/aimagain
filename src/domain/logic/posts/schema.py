@@ -398,6 +398,17 @@ PostCreate = Annotated[
 ]
 post_create_adapter: TypeAdapter = TypeAdapter(PostCreate)
 
+# Subset adapter for the `/openings` subset-supertype face — accepts
+# only the two availability subkinds. A `kind="referral"` payload is
+# rejected by Pydantic at validation time (the discriminator union has
+# no referral arm), so `POST /openings {kind:"referral"}` 422s before
+# reaching the handler.
+OpeningsCreate = Annotated[
+    Union[ClinicianOpeningCreate, ProgramIntakeCreate],
+    Field(discriminator="kind"),
+]
+openings_create_adapter: TypeAdapter = TypeAdapter(OpeningsCreate)
+
 
 # --- Update payloads (partial) ------------------------------------------
 #
@@ -509,6 +520,14 @@ PostUpdate = Annotated[
     Field(discriminator="kind"),
 ]
 post_update_adapter: TypeAdapter = TypeAdapter(PostUpdate)
+
+# Subset adapter for `/openings` PATCH — same shape as `OpeningsCreate`
+# above but over the partial-update variants.
+OpeningsUpdate = Annotated[
+    Union[ClinicianOpeningUpdate, ProgramIntakeUpdate],
+    Field(discriminator="kind"),
+]
+openings_update_adapter: TypeAdapter = TypeAdapter(OpeningsUpdate)
 
 
 # --- Audit snapshots ----------------------------------------------------

@@ -312,8 +312,8 @@ def test_radio_bool_field_with_help_emits_small_inside_fieldset() -> None:
     [
         # Every form-shaped template under domain/. Add new form
         # templates here so the orphan-small check runs against them.
-        "src/domain/templates/intakes/_form.html",
-        "src/domain/templates/openings/_form.html",
+        "src/domain/templates/openings/_form_clinician_opening.html",
+        "src/domain/templates/openings/_form_program_intake.html",
         "src/domain/templates/referrals/_form.html",
         "src/domain/templates/organizations/form_new.html",
         "src/domain/templates/organizations/form_edit.html",

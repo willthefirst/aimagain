@@ -15,14 +15,20 @@ directly by :mod:`src.main` and not registered here — they aren't
 ``EntitySpec``-shaped.
 
 The `Post` SQLAlchemy supertype is internal-only; the URL layer
-exposes each kind via its own resource family
-(:mod:`referrals` / :mod:`openings` / :mod:`intakes`). No `/posts`
-collection or detail URL exists.
+exposes two families:
+
+  - :mod:`referrals` — kind-locked leaf (`/referrals`,
+    `kind='referral'`).
+  - :mod:`openings` — subset-supertype listing both availability
+    subkinds (`/openings`, `kind ∈ {clinician_opening,
+    program_intake}`). The old `/intakes` URL was folded into
+    `/openings` (commit history reachable for archaeology).
+
+No `/posts` collection or detail URL exists.
 """
 
 from . import (
     favorites,
-    intakes,
     openings,
     organizations,
     programs,
@@ -33,7 +39,6 @@ from . import (
 
 __all__ = [
     "favorites",
-    "intakes",
     "openings",
     "organizations",
     "programs",

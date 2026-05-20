@@ -4,7 +4,8 @@
 {% block resource_label %}Openings{% endblock %}
 
 {% block actions %}
-<li><a href="{{ entity_form_url('opening') }}" role="button">Create opening</a></li>
+<li><a href="{{ entity_form_url('opening') }}?kind=clinician_opening" role="button">Create clinician opening</a></li>
+<li><a href="{{ entity_form_url('opening') }}?kind=program_intake" role="button">Create program intake</a></li>
 {% endblock %}
 
 {% block content %}

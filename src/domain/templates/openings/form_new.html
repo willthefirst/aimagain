@@ -1,14 +1,34 @@
-{% extends "views/form_new.html" %}
-{% from "openings/_form.html" import opening_form %}
+{# Picker template for the /openings subset-supertype face.
 
-{% set resource_url = entity_url('opening') %}
+Reached when a user visits `/openings/form` without `?kind=` — the
+framework's `handle_get_new_form` falls through to
+`spec.templates.form_new` (this file) when no kind is specified. The
+canonical entry points are the two CTAs on `/openings/list.html` that
+always include `?kind=`; this page exists for direct-URL access.
+
+`POST_KINDS` is merged into context by the framework's `static_context`
+pattern; the loop uses `OPENING_ENTITY.discriminator_values` to surface
+only the two availability subkinds (not `referral`).
+#}
+{% extends "views/form_new.html" %}
 
 {% block resource_label %}Openings{% endblock %}
+{% block current_label %}New{% endblock %}
 
 {% block content %}
-{% if not current_user.providers %}
-<p>You need a clinician profile before posting availability. <a href="{{ entity_form_url('clinician') }}">Create your clinician profile</a>, then return here.</p>
-{% else %}
-{{ opening_form("post", entity_url('opening'), "Create opening", schema=opening_create_schema, current_user=current_user, cancel_url=entity_url('opening')) }}
-{% endif %}
+<p>Pick what you're posting:</p>
+<nav>
+  <ul>
+    <li>
+      <a class="kind-picker-option" data-kind="clinician_opening"
+         href="{{ entity_form_url('opening') }}?kind=clinician_opening">Clinician opening</a>
+      <small>an individual clinician with availability on their caseload.</small>
+    </li>
+    <li>
+      <a class="kind-picker-option" data-kind="program_intake"
+         href="{{ entity_form_url('opening') }}?kind=program_intake">Program intake</a>
+      <small>an organization's program announcing open intake slots.</small>
+    </li>
+  </ul>
+</nav>
 {% endblock %}

@@ -59,15 +59,16 @@ def test_crud_audit_type_matches_name(spec: EntitySpec) -> None:
     """For CRUD-shaped entities, ``audit.type`` is the persisted
     ``resource_type`` string — by convention it equals ``spec.name``.
 
-    Kind-locked faces of a polymorphic supertype (``discriminator_value``
-    set) are the exception: all three faces share one
+    Faces of a polymorphic supertype (kind-locked via
+    ``discriminator_value`` *or* subset-supertype via
+    ``discriminator_values``) are the exception: they share one
     ``AuditedResource`` so the persisted ``resource_type`` stays at
     the supertype name regardless of which URL family wrote the row.
     This keeps audit-log readers that filter by
     ``resource_type='post'`` working across the URL split."""
     if spec.audit is None:
         pytest.skip(f"{spec.name!r} is an edge entity")
-    if spec.discriminator_value is not None:
+    if spec.discriminator_value is not None or spec.discriminator_values is not None:
         # Shared-audit invariant is pinned in test_post_faces.py.
         return
     assert spec.audit.type == spec.name
@@ -80,12 +81,13 @@ def test_crud_audit_actions_match_stem(spec: EntitySpec) -> None:
     ``spec.name`` and can be overridden via ``audit_action_stem``.
     This pins the convention so it stays load-bearing.
 
-    Kind-locked faces share the supertype's `AuditedResource`, so the
-    action enums match the supertype name, not `spec.name`. The
-    shared-identity invariant is pinned in `test_post_faces.py`."""
+    Polymorphic-supertype faces (kind-locked or subset-supertype) share
+    the supertype's `AuditedResource`, so the action enums match the
+    supertype name, not `spec.name`. The shared-identity invariant is
+    pinned in `test_post_faces.py`."""
     if spec.audit is None:
         pytest.skip(f"{spec.name!r} is an edge entity")
-    if spec.discriminator_value is not None:
+    if spec.discriminator_value is not None or spec.discriminator_values is not None:
         return
     stem = (spec.audit_action_stem or spec.name).upper()
     assert spec.audit.create == AuditAction[f"CREATE_{stem}"]
