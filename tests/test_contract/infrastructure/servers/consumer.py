@@ -182,15 +182,16 @@ def _setup_provider_create_form_stub(app: FastAPI) -> None:
     """Mount a stub page that renders the real `providers/form_new.html`
     template, so the create-form's HTMX submit is exercised without
     needing a database. The contract surface is the form's `POST
-    /providers` request shape; what we render here is the same
-    template production code paths render.
+    /clinicians` request shape (URL family renamed in #642 PR 4);
+    what we render here is the same template production code paths
+    render.
     """
 
     class _StubAttrs:
         def __init__(self, **kwargs):
             self.__dict__.update(kwargs)
 
-    @app.get("/providers/form")
+    @app.get("/clinicians/form")
     async def provider_create_form_stub_page(request: Request):
         current_user = _StubAttrs(
             id=uuid.UUID("00000000-0000-0000-0000-000000000003"),
@@ -222,14 +223,16 @@ def _setup_provider_edit_form_stub(app: FastAPI) -> None:
     """Mount a stub page that renders the real `providers/form_edit.html`
     template with a hardcoded provider, so the practice-fields PATCH form is
     exercised without needing a database. The contract surface is the form's
-    `PATCH /providers/{id}` request shape.
+    `PATCH /clinicians/{id}` request shape (URL family renamed in #642
+    PR 4; the path-param keeps its `provider_id` kwarg name because
+    the handler signature takes the Provider model id).
     """
 
     class _StubAttrs:
         def __init__(self, **kwargs):
             self.__dict__.update(kwargs)
 
-    @app.get("/providers/{provider_id}/form")
+    @app.get("/clinicians/{provider_id}/form")
     async def provider_edit_form_stub_page(request: Request, provider_id: uuid.UUID):
         org_id = uuid.UUID("55555555-5555-5555-5555-555555555555")
         org = _StubAttrs(id=org_id, name="Acme Counseling")

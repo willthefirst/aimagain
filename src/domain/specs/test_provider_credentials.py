@@ -43,9 +43,11 @@ def test_parent_is_provider_entity(entity, _stem):
 @pytest.mark.parametrize("entity,_stem", CREDENTIALS)
 def test_redirects_target_parent_form(entity, _stem):
     """Sub-row mutations send HTMX clients back to the parent edit form
-    — the user keeps editing the parent provider after each credential
-    write."""
-    target = "/providers/abc-123/form"
-    assert entity.create_redirect(provider_id="abc-123") == target
-    assert entity.update_redirect(provider_id="abc-123") == target
-    assert entity.delete_redirect(provider_id="abc-123") == target
+    — the user keeps editing the parent clinician entry after each
+    credential write. After #642 PR 4 the URL family is
+    `/clinicians/{clinician_id}/...`; the Python model class stays
+    `Provider`."""
+    target = "/clinicians/abc-123/form"
+    assert entity.create_redirect(clinician_id="abc-123") == target
+    assert entity.update_redirect(clinician_id="abc-123") == target
+    assert entity.delete_redirect(clinician_id="abc-123") == target

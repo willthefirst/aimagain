@@ -94,7 +94,7 @@ async def handle_delete(
             if getattr(target, attr) != getattr(parent, attr):
                 raise NotFoundError(detail=f"{spec.name.capitalize()} not found")
         else:
-            parent_fk_attr = f"{spec.parent.name}_id"
+            parent_fk_attr = spec.parent_fk_attr or f"{spec.parent.name}_id"
             if getattr(target, parent_fk_attr) != parent_id:
                 raise NotFoundError(detail=f"{spec.name.capitalize()} not found")
         if spec.write_authz is not None:
@@ -271,7 +271,7 @@ async def handle_update(
             if getattr(target, attr) != getattr(parent, attr):
                 raise NotFoundError(detail=f"{spec.name.capitalize()} not found")
         else:
-            parent_fk_attr = f"{spec.parent.name}_id"
+            parent_fk_attr = spec.parent_fk_attr or f"{spec.parent.name}_id"
             if getattr(target, parent_fk_attr) != parent_id:
                 raise NotFoundError(detail=f"{spec.name.capitalize()} not found")
         if spec.write_authz is not None:

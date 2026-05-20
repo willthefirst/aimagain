@@ -118,8 +118,9 @@ class _ProviderSubrowBase(ReadProjection):
     Credentials FK to `clinicians.id` after #635 PR A — they're person-
     level data shared across affiliations. The wire surface carries
     `clinician_id` (the persisted FK); the URL still scopes mutations
-    through `/providers/{provider_id}/...` so clients use the URL for
-    the provider context.
+    through `/clinicians/{clinician_id}/...` so clients use the URL
+    for the clinician context (URL family renamed in #642 PR 4; the
+    model class stays `Provider`).
     """
 
     id: uuid.UUID

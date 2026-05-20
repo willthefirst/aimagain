@@ -1475,7 +1475,7 @@ FIXTURE_CREDENTIALS: list[FixtureCredentialSet] = [
         "owner_email": "dr_chen@example.com",
         "org_name": "Lakeside Therapy Collective",
         # Multi-state licensure — exercises the issuing_state filter on
-        # /providers.
+        # /clinicians.
         "licensures": [
             {
                 "license_type": "lcsw",

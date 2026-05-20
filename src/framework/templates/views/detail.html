@@ -1,6 +1,6 @@
 {# Generic detail-view chrome.
 
-A detail view (`/openings/{id}`, `/providers/{id}`, `/users/{id}`)
+A detail view (`/openings/{id}`, `/clinicians/{id}`, `/users/{id}`)
 renders a single-segment breadcrumb (link back to the collection)
 above a toolbar row that pairs the resource's `<h1>` with the
 primary actions (Edit, Delete, Favorite, ...). GOV.UK-style: the
@@ -28,7 +28,8 @@ Child contract:
 
   Required context (set via `{% set %}` after `{% extends %}`):
     resource_url   — URL the collection segment links to (e.g.
-                     "/providers").
+                     "/clinicians"). The current segment renders as plain
+                     text with `aria-current="page"`.
 
   Optional blocks:
     actions        — toolbar right-zone content: Edit, Delete,

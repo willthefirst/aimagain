@@ -23,7 +23,7 @@ backend write capability are independent.
 
 Sub-resources nest under a parent by setting `parent=parent_spec`. The
 mount functions walk the chain to build paths like
-`/providers/{provider_id}/licensures/{licensure_id}`.
+`/clinicians/{clinician_id}/licensures/{licensure_id}`.
 
 Adding a new mount function (e.g. `mount_list`, `mount_create`) follows
 the same pattern: read knobs from the spec, build the route, delegate to
@@ -504,7 +504,7 @@ def mount_create(
     ``spec.create_redirect(...)`` if set, else ``Location``. The
     ``create_redirect`` callable receives the new id under ``spec.id_param``
     so it can build a per-resource target (e.g. providers redirect to
-    ``/providers/{id}/form`` after create).
+    ``/clinicians/{id}/form`` after create).
 
     Requires: ``spec.write_user_dep``, ``spec.create_adapter``.
     """
@@ -876,7 +876,8 @@ def mount_related_list(
     """Mount ``GET /<parent.collection>/{<parent.id_param>}/<child.collection>``.
 
     A scoped read of children belonging to a parent — e.g.
-    ``GET /users/{user_id}/providers`` lists the providers owned by a user.
+    ``GET /users/{user_id}/clinicians`` lists the clinician directory
+    entries owned by a user.
 
     Handler kwargs: ``request``, the parent id under
     ``parent_spec.id_param`` (e.g. ``user_id=...``), ``repo`` (the
@@ -896,7 +897,7 @@ def mount_related_list(
 
     ``singleton_alias=("me", current_active_user)`` additionally mounts
     ``GET /<parent.collection>/<alias>/<child.collection>`` (e.g.
-    ``/users/me/providers``). The parent id is sourced from
+    ``/users/me/clinicians``). The parent id is sourced from
     ``current_active_user().id`` and passed to the handler — same handler,
     same template, same response. The alias is purely an id-derivation
     convenience.
@@ -1555,8 +1556,8 @@ def _path_segments_under_router(spec: ResourceSpec, *, with_id: bool) -> str:
     """Build the route path *relative to the router's prefix*.
 
     The router's prefix is expected to be the topmost ancestor's
-    collection (e.g. ``APIRouter(prefix="/providers")`` for both
-    provider routes and licensure-under-provider routes). This function
+    collection (e.g. ``APIRouter(prefix="/clinicians")`` for both
+    clinician routes and licensure-under-clinician routes). This function
     produces the rest:
 
     ``/{provider_id}/licensures`` (no id) or

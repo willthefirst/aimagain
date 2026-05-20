@@ -531,14 +531,16 @@
        (`/referrals/42`, `/referrals/42/form`). The old `?kind=` query
        param disappeared along with `/posts` — there's no longer a
        shared list page that needs disambiguation. Directory is its
-       own route under `/providers`. #}
+       own route under `/clinicians` (renamed from `/providers` in
+       #642 PR 4 — the Python model class stays `Provider`, only the
+       URL family and user-facing entity name flipped). #}
     {%- set _referrals_path = entity_url('referral') -%}
     {%- set _on_referrals = is_authenticated and (request.url.path == _referrals_path or request.url.path.startswith(_referrals_path + '/')) -%}
     {%- set _openings_path = entity_url('opening') -%}
     {%- set _on_openings = is_authenticated and (request.url.path == _openings_path or request.url.path.startswith(_openings_path + '/')) -%}
     {%- set _intakes_path = entity_url('intake') -%}
     {%- set _on_intakes = is_authenticated and (request.url.path == _intakes_path or request.url.path.startswith(_intakes_path + '/')) -%}
-    {%- set _directory_path = entity_url('provider') -%}
+    {%- set _directory_path = entity_url('clinician') -%}
     {%- set _on_directory = is_authenticated and (request.url.path == _directory_path or request.url.path.startswith(_directory_path + '/')) -%}
     {# Admin section shortcuts — `/organizations`, `/programs`, `/users`
        were unreachable from the nav (#590). They're not product
@@ -565,7 +567,7 @@
           <li><a href="{{ entity_url('referral') }}"{% if _on_referrals %} aria-current="page"{% endif %}>Referrals</a></li>
           <li><a href="{{ entity_url('opening') }}"{% if _on_openings %} aria-current="page"{% endif %}>Openings</a></li>
           <li><a href="{{ entity_url('intake') }}"{% if _on_intakes %} aria-current="page"{% endif %}>Intakes</a></li>
-          <li><a href="{{ entity_url('provider') }}"{% if _on_directory %} aria-current="page"{% endif %}>Directory</a></li>
+          <li><a href="{{ entity_url('clinician') }}"{% if _on_directory %} aria-current="page"{% endif %}>Directory</a></li>
           {% if is_admin %}
           <li><a href="{{ entity_url('organization') }}"{% if _on_orgs %} aria-current="page"{% endif %}>Organizations</a></li>
           <li><a href="{{ entity_url('program') }}"{% if _on_programs %} aria-current="page"{% endif %}>Programs</a></li>

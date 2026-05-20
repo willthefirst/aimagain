@@ -43,7 +43,7 @@ async def test_add_favorite_returns_201_first_time(
     provider_id = await _seed_provider(db_test_session_manager)
     response = await authenticated_client.post(f"/users/me/favorites/{provider_id}")
     assert response.status_code == 201
-    assert response.headers["HX-Redirect"] == f"/providers/{provider_id}"
+    assert response.headers["HX-Redirect"] == f"/clinicians/{provider_id}"
     body = response.json()
     edge_id = uuid.UUID(body["id"])
 
@@ -111,7 +111,7 @@ async def test_remove_favorite_returns_204(
 
     response = await authenticated_client.delete(f"/users/me/favorites/{provider_id}")
     assert response.status_code == 204
-    assert response.headers["HX-Redirect"] == f"/providers/{provider_id}"
+    assert response.headers["HX-Redirect"] == f"/clinicians/{provider_id}"
 
     async with db_test_session_manager() as session:
         rows = (

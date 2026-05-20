@@ -2,20 +2,22 @@
 {%- from "_shared/form_fields.html" import entity_select_field, field_for, radio_bool_field, text_field -%}
 {%- from "_shared/forms.html" import form_actions -%}
 
-{% set resource_url = entity_url('provider') %}
+{% set resource_url = entity_url('clinician') %}
 
-{% block resource_label %}Providers{% endblock %}
+{% block resource_label %}Clinicians{% endblock %}
 
 {% block content %}
-<p>Practice details only. Add licensures, education, and certifications after creating the provider.</p>
+<p>Practice details only. Add licensures, education, and certifications after creating the clinician entry.</p>
 
-{# `org_id` is the FK to the Provider's Organization (the practice's
-   display name lives on `org.name`). The dropdown lists every Org in
-   the directory; any user may attach their Provider to any Org. To
-   create a new Organization, visit the create form
-   (use `entity_form_url('organization')`) first; this PR doesn't
-   bundle inline-create into the Provider form. #}
-<form hx-post="{{ entity_url('provider') }}">
+{# `org_id` is the FK to the directory entry's Organization (the
+   practice's display name lives on `org.name`). The dropdown lists
+   every Org in the directory; any user may attach their clinician
+   entry to any Org. To create a new Organization, visit the create form
+   (use `entity_form_url('organization')`) first; this form doesn't
+   bundle inline-create into the clinician create page. The underlying
+   model class is still `Provider` — only the user-facing surface
+   flipped in #642 PR 4. #}
+<form hx-post="{{ entity_url('clinician') }}">
   <fieldset>
     <legend>Practice</legend>
     {{ entity_select_field(
@@ -53,6 +55,6 @@
     {{ text_field("cost", "Cost", required=false, help="Free text. Optional.") }}
   </fieldset>
 
-  {{ form_actions("Create provider", cancel_url=entity_url('provider')) }}
+  {{ form_actions("Create clinician", cancel_url=entity_url('clinician')) }}
 </form>
 {% endblock %}

@@ -6,7 +6,8 @@ individually (e.g. the location chunk gets an icon-only `<dt>` via
 `dt::after` rule applies to other rows). Both referral and opening
 posts surface their location via this row — referral reads it from
 the post's own detail row, opening reads it from the linked
-Provider; the rendering treatment is identical.
+clinician (the underlying model class is still `Provider`); the
+rendering treatment is identical.
 
 Two modes:
 
@@ -102,7 +103,7 @@ Reads from `view` (the `post_card_view` dict). Display-label dicts
       </dd></div>
       {%- endif %}
       {%- if view.practice_link %}
-      <div><dt>Practice</dt><dd><a href="{{ entity_url('provider', id=view.practice_link.id) }}">{{ view.practice_link.name }}</a></dd></div>
+      <div><dt>Practice</dt><dd><a href="{{ entity_url('clinician', id=view.practice_link.id) }}">{{ view.practice_link.name }}</a></dd></div>
       {%- endif %}
       {%- if view.program_link %}
       <div><dt>Program</dt><dd><a href="{{ entity_url('program', id=view.program_link.id) }}">{{ view.program_link.name }}</a></dd></div>

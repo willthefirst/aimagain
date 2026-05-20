@@ -115,7 +115,7 @@ Only meaningful for lifecycle-adopting resources. Add lazily.
 
 ### 5. ownership lists
 
-When one resource owns a 1:N relationship to another (a user owns providers, an organization owns members), the owner-scoped list belongs on the **owner's** URL space, not the child's:
+When one resource owns a 1:N relationship to another (a user owns clinician directory entries, an organization owns members), the owner-scoped list belongs on the **owner's** URL space, not the child's:
 
 ```
 GET /<owner>/{owner_id}/<children>              list children owned by this owner
@@ -129,8 +129,8 @@ Auth on the owner-scoped list mirrors the owner's normal auth: self by default, 
 Examples:
 
 ```
-GET /users/{id}/providers              list providers owned by user
-GET /users/me/providers                ⇒ same handler with owner_id=session.user_id
+GET /users/{id}/clinicians             list clinician directory entries owned by user
+GET /users/me/clinicians               ⇒ same handler with owner_id=session.user_id
 ```
 
 Don't use this for *all* child relationships — only when "list everything owned by X" is a real consumer view. If consumers only ever want a single child by id (e.g. `/users/{id}/avatar`), use a state-axis or single-value subresource instead.

@@ -54,7 +54,7 @@ class ProviderRepository(BaseRepository):
         """
         return await self._list(select(Provider).filter(Provider.deleted_at.is_(None)))
 
-    async def list_providers(
+    async def list_clinicians(
         self,
         *,
         license_type: list[str] | None = None,
@@ -62,11 +62,15 @@ class ProviderRepository(BaseRepository):
         offset: int = 0,
         limit: int | None = None,
     ) -> Sequence[Provider]:
-        """Lists providers, newest first. Both filters are multi-select
-        lists; each non-empty list ANDs into the join (any-of within
-        the list, all-of across filters). When either filter is set,
+        """Lists clinician directory entries (rows of the `Provider`
+        model — the user-facing name flipped to "clinician" in #642
+        PR 4), newest first. The method name follows the framework's
+        `list_<url_collection>` convention; the underlying model
+        class stays `Provider`. Both filters are multi-select lists;
+        each non-empty list ANDs into the join (any-of within the
+        list, all-of across filters). When either filter is set,
         joins through `provider_licensures` and `.distinct()`s the
-        parents so a provider with multiple matching licensures
+        parents so a clinician with multiple matching licensures
         appears once. `offset`/`limit` come from the framework's
         pagination layer (see `src/framework/dispatch/pagination.py`)."""
         stmt = select(Provider)

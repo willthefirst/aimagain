@@ -1,4 +1,15 @@
-"""`PROVIDER_ENTITY`: single declaration of the provider resource.
+"""`PROVIDER_ENTITY`: single declaration of the clinician directory resource.
+
+`#642 PR 4` renamed the user-facing surface (URL family + entity name)
+from "provider" to "clinician" while keeping the `Provider` Python class
+and its model file intact — the rename is templates/URLs/audit-resource-
+type only. The Python-side identity stays `PROVIDER_ENTITY`; the spec's
+`name="clinician"` flows to `entity_url('clinician', ...)`, the
+`/clinicians/...` URL family, and `audit.type="clinician"`. Enum names
+(`CREATE_PROVIDER` etc.) are pinned via `audit_action_stem="provider"`
+so historical audit rows keep their labels. See
+`src/domain/models/providers/README.md` for the model-vs-UI vocabulary
+gap.
 
 Read by:
   - `src/domain/routes/providers.py` — derives `PROVIDER_SPEC` for the
@@ -9,7 +20,7 @@ Read by:
     `provider_education.py` / `provider_certification.py` — set
     ``parent=PROVIDER_ENTITY`` so the mount layer's parent-chain
     machinery builds nested paths like
-    ``/providers/{provider_id}/licensures/{licensure_id}``.
+    ``/clinicians/{clinician_id}/licensures/{licensure_id}``.
   - `src/domain/specs/user.py` — the related-list subresource
     `RelatedListSubresource(child_spec=PROVIDER_ENTITY.to_resource_spec(), ...)`
     on the user spec; closes the `api/common -> api/routes`
@@ -42,19 +53,27 @@ from src.framework.dispatch.entity_spec import (
     EntitySpec,
     Redirects,
     RouteSet,
+    Templates,
 )
 from src.framework.dispatch.filters import ChoiceFilter
 
 # After create or update, redirect to the edit form so the user can
 # keep editing the parent + its credentials. The same callable is reused
-# by the three credential subentities (their parent is this provider).
-_provider_form_redirect = Redirects.to_edit_form("providers", "provider_id")
+# by the three credential subentities (their parent is this clinician
+# directory entry).
+_provider_form_redirect = Redirects.to_edit_form("clinicians", "clinician_id")
 
 
 PROVIDER_ENTITY: Final[EntitySpec] = EntitySpec(
-    name="provider",
-    url_collection="providers",
-    id_param="provider_id",
+    name="clinician",
+    url_collection="clinicians",
+    id_param="clinician_id",
+    # `audit_action_stem` pins the persisted enum names at `CREATE_PROVIDER`
+    # / `UPDATE_PROVIDER` / `DELETE_PROVIDER` so existing audit rows keep
+    # their historical labels — the rename is user-facing only. `audit.type`
+    # still equals `spec.name` ("clinician") so *new* rows record the
+    # post-rename resource type while the action enum reads as the old name.
+    audit_action_stem="provider",
     model=Provider,
     # `owner_attr` defaults to "owner_id" — providers track their
     # owning user via Provider.owner_id.
@@ -74,7 +93,7 @@ PROVIDER_ENTITY: Final[EntitySpec] = EntitySpec(
         form_edit=True,
         search=True,
     ),
-    # Filters render on the dedicated `/providers/search` page; the
+    # Filters render on the dedicated `/clinicians/search` page; the
     # list-page toolbar carries only the "Filter · N" link and the
     # Create button.
     filters=(
@@ -93,6 +112,21 @@ PROVIDER_ENTITY: Final[EntitySpec] = EntitySpec(
     ),
     create_redirect=_provider_form_redirect,
     update_redirect=_provider_form_redirect,
+    # Template paths are pinned explicitly because the directory cluster
+    # is still `templates/providers/` (the Python model file lives at
+    # `models/providers/provider.py` and the brief kept that filename
+    # stable), but the spec's `url_collection` is now `"clinicians"` —
+    # the default would resolve to `clinicians/<verb>.html` which doesn't
+    # exist. Every opt-in route gets an explicit path here; conformance
+    # tests (`test_spec_conformance.py::test_templates_default_by_convention_for_opted_in_verbs`)
+    # tolerate the divergence.
+    templates=Templates(
+        list="providers/list.html",
+        detail="providers/detail.html",
+        form_new="providers/form_new.html",
+        form_edit="providers/form_edit.html",
+        search="providers/search.html",
+    ),
     # Per-viewer detail extras live on the spec — see `EntitySpec`.
     detail_extras_path="src.domain.logic.providers.handlers.provider_detail_extras",
     detail_extras_repos=(("user_favorite_repo", UserFavoriteRepository),),

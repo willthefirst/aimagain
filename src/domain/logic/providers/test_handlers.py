@@ -188,7 +188,10 @@ async def test_list_providers_returns_persisted_rows(
             requesting_user=None,
             filter_values={"license_type": None, "issuing_state": None},
         )
-        assert len(context["providers"]) == 2
+        # Framework binds `context[spec.url_collection] = items`; the
+        # collection flipped to "clinicians" in #642 PR 4. The list still
+        # holds `Provider` instances under the hood.
+        assert len(context["clinicians"]) == 2
         assert context["selected_license_type"] is None
         assert context["selected_issuing_state"] is None
 
@@ -223,7 +226,7 @@ async def test_list_providers_filters_by_license_type(
             requesting_user=None,
             filter_values={"license_type": ["lcsw"], "issuing_state": None},
         )
-        assert [p.id for p in context["providers"]] == [provider_a]
+        assert [p.id for p in context["clinicians"]] == [provider_a]
         assert context["selected_license_type"] == ["lcsw"]
 
 
@@ -243,7 +246,10 @@ async def test_get_provider_detail_returns_context(
             extras=provider_detail_extras,
             extra_kwargs={"user_favorite_repo": UserFavoriteRepository(session)},
         )
-        assert context["provider"].id == provider_id
+        # Framework binds `context[spec.name] = target`; the spec name
+        # flipped to "clinician" in #642 PR 4. The underlying row is
+        # still a `Provider` instance.
+        assert context["clinician"].id == provider_id
         assert context["current_user"] is user
         assert "request" in context
         # Owner viewing own provider → can_edit True. Non-owner / admin
@@ -457,7 +463,7 @@ async def test_create_provider_persists_row_and_writes_audit(
 
     rows = await _audit_rows_for(
         db_test_session_manager,
-        resource_type="provider",
+        resource_type="clinician",
         resource_id=created.id,
     )
     assert len(rows) == 1
@@ -505,7 +511,7 @@ async def test_create_provider_with_inline_children_captures_them_in_audit(
 
     rows = await _audit_rows_for(
         db_test_session_manager,
-        resource_type="provider",
+        resource_type="clinician",
         resource_id=created.id,
     )
     assert len(rows) == 1

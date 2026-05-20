@@ -20,10 +20,10 @@
 {% endblock %}
 
 {# User detail uses the `.entity-card` chrome shared with the other
-   detail pages. The Providers section is a separate card below the
+   detail pages. The Clinicians section is a separate card below the
    main user card — embedded card-in-card would read as visual noise,
    so the page is two stacked cards: identity + private-fields on top,
-   the providers index table on bottom. #}
+   the clinician-entries index table on bottom. #}
 {% block content %}
 <article class="entity-card">
   <header class="entity-header">
@@ -57,24 +57,24 @@
 
 <article class="entity-card">
   <header class="entity-header">
-    <strong>Providers</strong>
+    <strong>Clinicians</strong>
   </header>
   {% call index_table(
     items=providers,
     headers=provider_headers,
     row=provider_row,
-    id="user-detail-providers",
+    id="user-detail-clinicians",
   ) %}
-  <p id="user-detail-providers-empty">No providers yet.</p>
+  <p id="user-detail-clinicians-empty">No clinician entries yet.</p>
   {% endcall %}
   {# Self-only Create CTA — the profile is the natural discovery
-     point for "make my own provider". The dedicated
-     `/users/me/providers` page carries the same action in its
+     point for "make my own clinician entry". The dedicated
+     `/users/me/clinicians` page carries the same action in its
      toolbar (added in 3b59933f); this inline button is the version
      a user sees on the profile preview, without an extra click. #}
   {% if is_self %}
   <footer class="entity-footer">
-    <a href="{{ entity_form_url('provider') }}" role="button">Create provider</a>
+    <a href="{{ entity_form_url('clinician') }}" role="button">Create clinician</a>
   </footer>
   {% endif %}
 </article>

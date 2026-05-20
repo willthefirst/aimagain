@@ -2,16 +2,24 @@
 {%- from "_shared/index_table.html" import index_table -%}
 {%- from "_shared/_provider_row.html" import provider_headers, provider_row -%}
 
-{% block resource_label %}Providers{% endblock %}
+{% block resource_label %}Clinicians{% endblock %}
 
-{# `is_authenticated` is set by `handle_list_provider`'s context; any
-   authenticated user may create a Provider (the route's auth policy
-   only gates *mutations* of an existing row, not creation). The button
-   matches the toolbar-action convention used by `/organizations`,
-   `/programs`, and `/posts`. #}
+{# The framework binds `context[spec.url_collection] = items` —
+   after #642 PR 4 that's `clinicians`. Alias to `providers` so the
+   `index_table(items=providers, ...)` call below keeps the Python-side
+   vocabulary; the rows are still `Provider` instances. #}
+{% set providers = clinicians %}
+
+{# `is_authenticated` is set by `handle_list_clinician`'s context; any
+   authenticated user may create a Clinician directory entry (the
+   route's auth policy only gates *mutations* of an existing row, not
+   creation). The button matches the toolbar-action convention used by
+   `/organizations`, `/programs`, and `/posts`. The underlying Python
+   model class is still `Provider` — only the user-facing surface
+   flipped in #642 PR 4. #}
 {% block actions %}
 {% if is_authenticated %}
-<li><a href="{{ entity_form_url('provider') }}" role="button">Create provider</a></li>
+<li><a href="{{ entity_form_url('clinician') }}" role="button">Create clinician</a></li>
 {% endif %}
 {% endblock %}
 
@@ -20,7 +28,7 @@
   items=providers,
   headers=provider_headers,
   row=provider_row,
-  empty="No providers found.",
-  id="providers-table",
+  empty="No clinicians found.",
+  id="clinicians-table",
 ) }}
 {% endblock %}

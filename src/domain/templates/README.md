@@ -16,7 +16,7 @@ A resource cluster `<entity>/` typically contains:
 - `_columns.html` (cluster-local partial) — `<entity>_headers()` / `<entity>_row(item, **row_kwargs)` macros consumed by `_shared/index_table.html` from the list page. Lives in the cluster (rather than `_shared/`) when only the entity's own list uses it.
 - `_<role>_actions.html` (cluster-local partial) — owner/admin action button clusters for the entity, `{% include %}`d from the detail page's `actions` block.
 
-Subresource lists (e.g. `/users/{id}/providers`) override `{% block breadcrumb %}` to land a multi-segment chain (`Users › <username> › Providers`) while still inheriting the list view's toolbar + content shape from `views/list.html`. See `users/providers_list.html`.
+Subresource lists (e.g. `/users/{id}/clinicians`) override `{% block breadcrumb %}` to land a multi-segment chain (`Users › <username> › Clinicians`) while still inheriting the list view's toolbar + content shape from `views/list.html`. See `users/providers_list.html` (file name retained — the directory cluster is still `providers/` because the model class is `Provider`; only the user-facing surface flipped in #642 PR 4).
 
 Pages that don't fit the resource grammar — the `/auth/*` flow's centered single-card layout — extend `base.html` directly and compose the `_shared/` macros by hand.
 

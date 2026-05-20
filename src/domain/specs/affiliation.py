@@ -1,7 +1,9 @@
 """`AFFILIATION_ENTITY`: clinician × org practice-role sub-resource of `Provider`.
 
-Owned subentity of `Provider`: routes nest under
-``/providers/{provider_id}/affiliations/{affiliation_id}``. The
+Owned subentity of `Provider` (URL family `/clinicians/...` after
+#642 PR 4 — the Python model stays `Provider`, only the user-facing
+surface flipped). Routes nest under
+``/clinicians/{clinician_id}/affiliations/{affiliation_id}``. The
 clinician edit page surfaces them as an inline list (same UX pattern
 as licensures — see `src/domain/specs/provider_licensure.py`); each row
 is independently created, updated, or deleted via the framework's
@@ -41,10 +43,18 @@ AFFILIATION_ENTITY: Final[EntitySpec] = EntitySpec(
     # `child_parent_match_attr` is left at the default — the
     # framework's URL-vs-row consistency check then compares
     # `affiliation.provider_id == parent.id`, which is exactly the
-    # FK relationship we want. The provider-credential subentities
-    # override this attr because their FK targets `clinicians.id`
-    # rather than `providers.id`; affiliations don't have that
-    # detour, so the default suffices.
+    # FK relationship we want. `parent_fk_attr` overrides the
+    # default-path attr name: after #642 PR 4 the parent's
+    # `spec.name` is "clinician" (user-facing rename), but the
+    # FK column on `affiliations` kept its historical name
+    # `provider_id` (the model class stays `Provider`). Without the
+    # override the default would look for `affiliation.clinician_id
+    # == parent.id`, which is wrong (`clinician_id` is the FK to
+    # `clinicians.id`, not to the parent provider). The provider-
+    # credential subentities take a different escape hatch
+    # (`child_parent_match_attr`) because their FK targets a
+    # non-parent table.
+    parent_fk_attr="provider_id",
     repo_dep=get_affiliation_repository,
     auth_deps=AUTHENTICATED,
     auth_policy=OWNER_OR_ADMIN,

@@ -3,7 +3,7 @@
 Verifies that the practice-fields HTMX form rendered by
 `templates/providers/form_edit.html` (mounted via the
 `provider_edit_form` stub on the consumer server) issues a
-`PATCH /providers/{id}` form-encoded request with the practice fields
+`PATCH /clinicians/{id}` form-encoded request with the practice fields
 the route expects. After #524 the practice's display name lives on
 ``provider.org.name``, so the form's "what Organization?" knob is an
 ``org_id`` `<select>`; the form still PATCHes ``location_*`` and
@@ -38,7 +38,7 @@ from tests.test_contract.tests.shared.helpers import (
         "Pact stale after #642 PR 1: per-role fields (`location_*`, sessions, "
         "insurance, sliding_scale, cost) moved out of the top-level provider "
         "PATCH form into inline affiliation rows. The wire endpoint shifted "
-        "from `PATCH /providers/{id}` to `PATCH /providers/{id}/affiliations/"
+        "from `PATCH /clinicians/{id}` to `PATCH /clinicians/{id}/affiliations/"
         "{affiliation_id}` and the encoded body shape changed. Tracked in "
         "#647 — rewrite the pact pair for the affiliation PATCH surface, or "
         "drop it if affiliation editing doesn't need a separate consumer "
@@ -101,7 +101,7 @@ async def test_consumer_provider_edit_form_submits(origin_with_routes: str, page
         )
         .will_respond_with(
             status=200,
-            headers={"HX-Redirect": Like("/providers/abc/form")},
+            headers={"HX-Redirect": Like("/clinicians/abc/form")},
             body={"id": Like("44444444-4444-4444-4444-444444444444")},
         )
     )

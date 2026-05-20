@@ -25,15 +25,19 @@ STUB_POST_ID = uuid.UUID("22222222-2222-2222-2222-222222222222")
 POST_DELETE_API_PATH = f"/referrals/{STUB_POST_ID}"
 POST_DETAIL_PAGE_PATH = f"/referrals/{STUB_POST_ID}"
 
-# Provider create form pact.
-PROVIDER_CREATE_API_PATH = "/providers"
-PROVIDER_CREATE_FORM_PAGE_PATH = "/providers/form"
+# Clinician (formerly "provider") create form pact. URL family flipped
+# from `/providers` to `/clinicians` in #642 PR 4; the Pact participant
+# names (`CONSUMER_NAME_PROVIDER_*`, `PROVIDER_NAME_PROVIDERS`) keep
+# their historical identity so the pact-broker history reads
+# continuously across the rename.
+PROVIDER_CREATE_API_PATH = "/clinicians"
+PROVIDER_CREATE_FORM_PAGE_PATH = "/clinicians/form"
 
-# Provider edit form pact: parent practice-fields PATCH only.
+# Clinician edit form pact: parent practice-fields PATCH only.
 # (Sub-resource pacts — licensures, educations, certifications — deferred.)
 STUB_PROVIDER_ID = uuid.UUID("44444444-4444-4444-4444-444444444444")
-PROVIDER_PATCH_API_PATH = f"/providers/{STUB_PROVIDER_ID}"
-PROVIDER_EDIT_FORM_PAGE_PATH = f"/providers/{STUB_PROVIDER_ID}/form"
+PROVIDER_PATCH_API_PATH = f"/clinicians/{STUB_PROVIDER_ID}"
+PROVIDER_EDIT_FORM_PAGE_PATH = f"/clinicians/{STUB_PROVIDER_ID}/form"
 
 # Organization create form pact.
 ORGANIZATION_CREATE_API_PATH = "/organizations"

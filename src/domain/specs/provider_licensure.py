@@ -1,7 +1,8 @@
 """`LICENSURE_ENTITY`: provider's licensure credential subentity.
 
 Owned subentity of `Provider`: routes nest under
-``/providers/{provider_id}/licensures/{licensure_id}``. Shape is
+``/clinicians/{clinician_id}/licensures/{licensure_id}`` (URL family
+renamed in #642 PR 4; model class stays `Provider`). Shape is
 identical to the other provider credentials — see `_credential.py`
 for the shared factory.
 
