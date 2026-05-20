@@ -1,6 +1,5 @@
 {% extends "views/list.html" %}
-{%- from "_shared/index_table.html" import index_table -%}
-{%- from "_shared/_provider_row.html" import provider_headers, provider_row -%}
+{%- from "_shared/_clinician_card.html" import clinician_card -%}
 {%- from "_shared/_breadcrumb.html" import breadcrumb -%}
 
 {# Subresource list — three-segment breadcrumb instead of the default
@@ -22,12 +21,13 @@
 {% endblock %}
 
 {% block content %}
-{% call index_table(
-  items=providers,
-  headers=provider_headers,
-  row=provider_row,
-  id="user-clinicians",
-) %}
+{% if providers %}
+<section id="user-clinicians-list">
+  {%- for provider in providers %}
+  {{ clinician_card(provider) }}
+  {%- endfor %}
+</section>
+{% else %}
 <p id="user-clinicians-empty">
   {% if is_self %}
   You have not created any clinician entries yet.
@@ -35,5 +35,5 @@
   This user has no clinician entries yet.
   {% endif %}
 </p>
-{% endcall %}
+{% endif %}
 {% endblock %}

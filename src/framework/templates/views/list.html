@@ -20,8 +20,11 @@ Child contract:
     resource_label — short string label for the toolbar `<h1>`
                      and the page title (e.g. "Providers").
                      Plain text, no markup.
-    content        — the table or list body (typically an
-                     `index_table(...)` call or a hand-rolled `<ul>`).
+    content        — the list body (typically a
+                     `<section id="<collection>-list">` of
+                     `<article class="entity-card">` items rendered
+                     via `_shared/_card.html`; see `posts/openings/
+                     list.html` for the canonical example).
 
   Optional blocks:
     actions        — toolbar action `<menu>` content (Create

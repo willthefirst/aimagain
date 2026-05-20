@@ -8,13 +8,12 @@ Chrome, shared macros, and the generic view-type templates live in [`../../frame
 
 A resource cluster `<entity>/` typically contains:
 
-- `list.html` — extends `views/list.html`. Declares `resource_label`, an optional `actions` block (right-aligned toolbar items, each an `<li>` inside `<menu class="toolbar-right">`), and a `content` block (the table or list body). The toolbar's filter link is rendered automatically by `views/list.html` from spec-driven context (`active_filters`, `search_url`) that `handle_list` injects — no per-template wiring needed.
+- `list.html` — extends `views/list.html`. Declares `resource_label`, an optional `actions` block (right-aligned toolbar items, each an `<li>` inside `<menu class="toolbar-right">`), and a `content` block: a `<section id="<collection>-list">` of cards rendered through `_shared/_card.html` (or a resource-specific card macro like `_shared/_clinician_card.html`). The toolbar's filter link is rendered automatically by `views/list.html` from spec-driven context (`active_filters`, `search_url`) that `handle_list` injects — no per-template wiring needed.
 - `search.html` — extends `views/search.html`. One-line stub setting the `resource_label` breadcrumb for entities that opt into `routes.search=True`. Renders one form control per declared secondary `Filter` on the spec.
 - `detail.html` — extends `views/detail.html`. Declares `resource_label`, `current_label`, `resource_url`, optional `actions`, and `content`.
 - `form_new.html` — extends `views/form_new.html`. Declares `resource_label`, `resource_url`, and the form body in `content`.
 - `form_edit.html` — extends `views/form_edit.html`. Declares `resource_label`, `current_label`, `resource_url`, `resource_detail_url`, and the form body in `content`.
-- `_columns.html` (cluster-local partial) — `<entity>_headers()` / `<entity>_row(item, **row_kwargs)` macros consumed by `_shared/index_table.html` from the list page. Lives in the cluster (rather than `_shared/`) when only the entity's own list uses it.
-- `_<role>_actions.html` (cluster-local partial) — owner/admin action button clusters for the entity, `{% include %}`d from the detail page's `actions` block.
+- `_<role>_actions.html` (cluster-local partial) — owner/admin action button clusters for the entity, `{% include %}`d from the detail page's `actions` block or the card footer on the list page.
 
 Subresource lists (e.g. `/users/{id}/clinicians`) override `{% block breadcrumb %}` to land a multi-segment chain (`Users › <username> › Clinicians`) while still inheriting the list view's toolbar + content shape from `views/list.html`. See `users/providers_list.html` (file name retained — the directory cluster is still `providers/` because the model class is `Provider`; only the user-facing surface flipped in #642 PR 4).
 

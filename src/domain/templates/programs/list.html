@@ -1,4 +1,5 @@
 {% extends "views/list.html" %}
+{%- from "_shared/_card.html" import card -%}
 
 {% block resource_label %}Programs{% endblock %}
 
@@ -8,28 +9,25 @@
 
 {% block content %}
 {% if programs %}
-<div class="overflow-auto">
-  <table id="programs-table">
-    <thead>
-      <tr>
-        <th>Name</th>
-        <th>Organization</th>
-        <th>State</th>
-        <th>Accepting referrals</th>
-      </tr>
-    </thead>
-    <tbody>
-      {%- for program in programs %}
-      <tr>
-        <td><a href="{{ entity_url('program', id=program.id) }}">{{ program.name }}</a></td>
-        <td><a href="{{ entity_url('organization', id=program.org_id) }}">{{ program.organization.name }}</a></td>
-        <td>{{ program.state_preference or "—" }}</td>
-        <td>{{ "Yes" if program.accepting_referrals else "No" }}</td>
-      </tr>
-      {%- endfor %}
-    </tbody>
-  </table>
-</div>
+<section id="programs-list">
+  {%- for program in programs %}
+  {%- set subtitle %}
+  <span>{{ "Accepting referrals" if program.accepting_referrals else "Not accepting referrals" }}</span>
+  {%- if program.state_preference %}<span>{{ program.state_preference }}</span>{%- endif %}
+  {%- endset %}
+  {% call card(
+       id=program.id,
+       headline_url=entity_url('program', id=program.id),
+       headline=program.name,
+       subtitle=subtitle) -%}
+  <section class="entity-facts">
+    <dl>
+      <div><dt>Organization</dt><dd><a href="{{ entity_url('organization', id=program.org_id) }}">{{ program.organization.name }}</a></dd></div>
+    </dl>
+  </section>
+  {%- endcall %}
+  {%- endfor %}
+</section>
 {% else %}
 {# Empty state owns its own CTA so the next action is in the eye-line of
    the user, not buried in the toolbar above. The toolbar's "Create
