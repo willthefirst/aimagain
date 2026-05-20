@@ -23,7 +23,7 @@ import pytest
 from src.domain.models import POST_KINDS
 from tests.test_contract.tests.shared.mock_data_factory import make_post_stub
 
-_KINDS = ["referral", "opening", "intake"]
+_KINDS = ["referral", "clinician_opening", "program_intake"]
 
 
 # --- Defaults: per-column type-dispatch --------------------------------
@@ -48,7 +48,7 @@ def test_json_columns_default_to_empty_list(kind):
 def test_pa_and_program_settings_default_to_empty_list():
     """PA + program detail rows carry `settings`; CR does not. The
     default applies wherever the column exists."""
-    for kind in ("opening", "intake"):
+    for kind in ("clinician_opening", "program_intake"):
         post = make_post_stub(kind, owner_id=uuid.uuid4())
         detail = getattr(post, POST_KINDS[kind].detail_relationship)
         assert detail.settings == []
@@ -56,7 +56,7 @@ def test_pa_and_program_settings_default_to_empty_list():
 
 def test_pa_and_program_genders_default_to_empty_list():
     """PA + program hold `genders` as a list; CR has a scalar `gender`."""
-    for kind in ("opening", "intake"):
+    for kind in ("clinician_opening", "program_intake"):
         post = make_post_stub(kind, owner_id=uuid.uuid4())
         detail = getattr(post, POST_KINDS[kind].detail_relationship)
         assert detail.genders == []
@@ -66,8 +66,8 @@ def test_uuid_columns_get_fresh_uuids():
     """PA's `provider_id` and program's `program_id` are Uuid columns
     — the stub generates a fresh UUID per call so two consecutive
     stubs don't share an id."""
-    pa1 = make_post_stub("opening", owner_id=uuid.uuid4())
-    pa2 = make_post_stub("opening", owner_id=uuid.uuid4())
+    pa1 = make_post_stub("clinician_opening", owner_id=uuid.uuid4())
+    pa2 = make_post_stub("clinician_opening", owner_id=uuid.uuid4())
     pid1 = pa1.opening_detail.provider_id
     pid2 = pa2.opening_detail.provider_id
     assert isinstance(pid1, uuid.UUID)
@@ -83,7 +83,7 @@ def test_text_columns_get_stub_string():
     assert cr.referral_detail.location_city == "stub location_city"
     assert cr.referral_detail.treatment_modality == "stub treatment_modality"
 
-    pa = make_post_stub("opening", owner_id=uuid.uuid4())
+    pa = make_post_stub("clinician_opening", owner_id=uuid.uuid4())
     assert pa.opening_detail.description == "stub description"
     assert pa.opening_detail.schedule_text == "stub schedule_text"
     assert pa.opening_detail.website == "stub website"
@@ -114,7 +114,7 @@ def test_pa_has_no_enum_text_columns_on_detail_row():
     in_network_carriers, ...) live on the linked Provider, not on the
     detail row itself. The detail row has no CHECK-constrained Text
     columns, so the enum-defaults registry for PA is empty."""
-    pa = make_post_stub("opening", owner_id=uuid.uuid4())
+    pa = make_post_stub("clinician_opening", owner_id=uuid.uuid4())
     # All fields on the detail row are list-typed JSON, Uuid, or
     # plain Text — none are enum-checked.
     assert isinstance(pa.opening_detail.services, list)
@@ -150,7 +150,7 @@ def test_field_overrides_for_unknown_field_are_passed_through():
     for adding `provider` (PA) / `program` (program) relationships
     that the column-driven defaults can't populate."""
     post = make_post_stub(
-        "opening",
+        "clinician_opening",
         owner_id=uuid.uuid4(),
         provider=object(),  # arbitrary stand-in for the relationship
     )
@@ -168,20 +168,26 @@ def test_stub_renders_detail_html_without_errors():
     crashes here at test time rather than waiting for a contract pair
     to fail with a Playwright timeout.
 
-    Post-#628 each kind has its own detail template at
-    ``<family>/detail.html`` (the shared post-card partials still
-    live under ``_shared/posts/``); the canary walks all three."""
+    Two URL families exist: `/referrals` (kind-locked leaf) and
+    `/openings` (subset-supertype listing both availability subkinds).
+    The canary walks all three kinds; both availability subkinds
+    render through the same `openings/detail.html` because the
+    /openings face owns them end-to-end."""
     from src.framework.rendering.templating import templates
 
     env = templates.env
 
-    _KIND_TO_FAMILY = {
-        "referral": "referrals",
-        "opening": "openings",
-        "intake": "intakes",
+    # Map kind -> (URL family, context variable name used by the
+    # template). The variable name is `spec.name` from the entity spec
+    # that owns the URL family. /referrals uses `referral`; /openings
+    # uses `opening` (singular umbrella term, both subkinds bind to it).
+    _KIND_TO_FAMILY_AND_VAR = {
+        "referral": ("referrals", "referral"),
+        "clinician_opening": ("openings", "opening"),
+        "program_intake": ("openings", "opening"),
     }
     for kind in _KINDS:
-        family = _KIND_TO_FAMILY[kind]
+        family, var = _KIND_TO_FAMILY_AND_VAR[kind]
         template = env.get_template(f"{family}/detail.html")
         post = make_post_stub(kind, owner_id=uuid.uuid4())
 
@@ -198,13 +204,13 @@ def test_stub_renders_detail_html_without_errors():
 
             query_params = _QueryParams()
 
-        # Each family's detail template reads the post under its own
-        # context key (`referral` / `opening` / `intake`); the
-        # framework injects this as `spec.name`. Bind both — extra
-        # keys are harmless.
+        # The detail template reads the post under the face's
+        # `spec.name`-derived context key. /referrals uses `referral`;
+        # /openings uses `opening` (the umbrella name for both
+        # availability subkinds).
         html = template.render(
-            **{kind: post},
-            entity_name=kind,
+            **{var: post},
+            entity_name=var,
             request=_RequestStub(),
             can_edit=True,
             is_authenticated=True,

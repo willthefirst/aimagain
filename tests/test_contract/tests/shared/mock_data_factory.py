@@ -50,8 +50,8 @@ from src.domain.models.posts.referral_detail import ReferralDetail
 # columns).
 _DETAIL_MODELS: dict[str, type] = {
     "referral": ReferralDetail,
-    "opening": OpeningDetail,
-    "intake": IntakeDetail,
+    "clinician_opening": OpeningDetail,
+    "program_intake": IntakeDetail,
 }
 
 
@@ -81,8 +81,8 @@ _ENUM_DEFAULTS: dict[str, dict[str, Any]] = {
         # ...`) renders nothing.
         "insurance_carrier": None,
     },
-    "opening": {},
-    "intake": {},
+    "clinician_opening": {},
+    "program_intake": {},
 }
 
 
