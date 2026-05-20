@@ -24,6 +24,7 @@ def test_base_context_anonymous():
         "is_admin": False,
         "current_username": None,
         "current_user_id": None,
+        "has_provider_profile": False,
     }
 
 
@@ -35,6 +36,7 @@ def test_base_context_regular_user():
         "is_admin": False,
         "current_username": "alice",
         "current_user_id": user_id,
+        "has_provider_profile": False,
     }
 
 
@@ -43,6 +45,28 @@ def test_base_context_admin():
     ctx = base_context(user)
     assert ctx["is_admin"] is True
     assert ctx["is_authenticated"] is True
+
+
+def test_base_context_user_with_provider_profile():
+    """A user whose `providers` relationship is non-empty reads as
+    `has_provider_profile=True` — the chrome uses this to swap the
+    primary CTA from "Set up your profile" to "+ Post availability"."""
+    user = SimpleNamespace(
+        id=uuid.uuid4(),
+        username="alice",
+        is_superuser=False,
+        providers=[SimpleNamespace(id=uuid.uuid4())],
+    )
+    ctx = base_context(user)
+    assert ctx["has_provider_profile"] is True
+
+
+def test_base_context_user_without_providers_attr_defaults_false():
+    """Missing `providers` attribute (Actor protocol doesn't declare it)
+    defaults to `False` — same shape as a brand-new user who hasn't
+    created a clinician profile yet."""
+    user = SimpleNamespace(id=uuid.uuid4(), username="alice", is_superuser=False)
+    assert base_context(user)["has_provider_profile"] is False
 
 
 # --- existing helpers ----------------------------------------------------

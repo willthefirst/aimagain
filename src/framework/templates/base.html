@@ -675,6 +675,21 @@
         </ul>
         <ul id="primary-nav">
           {% if is_authenticated %}
+          {# Primary chrome CTA — adapts to onboarding state. First-time
+             users (no provider profile yet) see "Create clinician",
+             which takes them to `/clinicians/form` so they can unblock
+             posting. Returning users see "Create opening", the primary
+             Journey-1 action ("find new clients" → broadcast your
+             availability so referrers find you). The flag
+             `has_provider_profile` is a chrome scalar in
+             `src.framework.http.responses.base_context`. Labels mirror
+             the per-list-page toolbar verb ("Create <entity>") so the
+             vocabulary stays consistent across surfaces. #}
+          {% if has_provider_profile %}
+          <li><a role="button" href="{{ entity_form_url('opening') }}">Create opening</a></li>
+          {% else %}
+          <li><a role="button" href="{{ entity_form_url('clinician') }}">Create clinician</a></li>
+          {% endif %}
           <li>
             <a href="{{ entity_url('user', id='me') }}" aria-label="Profile"{% if _on_profile %} aria-current="page"{% endif %}>
               {# Lucide `user` icon, inlined. `currentColor` makes it
