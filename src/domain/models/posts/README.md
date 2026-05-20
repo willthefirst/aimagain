@@ -7,8 +7,22 @@ This subdirectory holds the SQLAlchemy models for the `posts` table and its per-
 - `post.py` — `Post`, the parent table for any post-shaped resource. Carries identity, ownership, timestamps, and the `kind` discriminator. The `ck_posts_kind` CHECK constraint is rendered from `POST_KINDS.check_sql()` in `post_kinds.py`. Adding a kind means adding a registry entry and a `relationship(...)` line to `Post`.
 - `post_kinds.py` — `POST_KINDS: DiscriminatorRegistry[PostKindSpec]`, the single source of truth for the kind set. Each `PostKindSpec` records the kind name, its detail-model class, the relationship attribute on `Post`, the detail row's user-facing field tuple (derived from the model's columns via `_detail_fields(model)`), the create/edit template paths, and the user-facing list label. The registry's bookkeeping (`names` tuple, `check_sql()`, reverse indexes) comes from the generic `DiscriminatorRegistry` in [`src/framework/persistence/polymorphic.py`](../../../framework/persistence/polymorphic.py); this file declares only the post-specific Spec shape and the registry instance. Every cross-cutting site reads from this registry — see [`../README.md` § "The `post_kinds` registry"](../README.md#the-post_kinds-registry) for the full list.
 - `referral_detail.py` — `ReferralDetail`, the detail row for `kind='referral'`. 1:1 with `posts` via `post_id` (PK + FK with CASCADE). Columns track the client-referral intake form; enum columns CHECK against tuples in [`../enums.py`](../enums.py); the `desired_times` and `services` JSON multi-selects have their vocabularies enforced on the wire by Pydantic (no SQL CHECK against array members). The `(city, state, zip)` triple comes from [`LocationMixin`](../../../framework/persistence/mixins.py) — same mixin `Provider` uses.
-- `opening_detail.py` — `OpeningDetail`, the detail row for `kind='opening'`. Same shape as `ReferralDetail` but tracks the provider-availability intake form; adds the `settings` JSON multi-select. `services` and `settings` are required-min-1 on the wire (vs. optional/absent on Client Referral).
-- `intake_detail.py` — `IntakeDetail`, the detail row for `kind='intake'` (#541). Same per-announcement field set as `OpeningDetail` but points at a `Program` via `program_id` instead of a `Provider` — the referrer is choosing an *intake door* (the Program) and trusting the owning Org to assign a clinician internally.
+- `opening_detail.py` — `OpeningDetail`, the detail row for `kind='clinician_opening'`. Same shape as `ReferralDetail` but tracks the clinician-availability form; adds the `settings` JSON multi-select. `services` and `settings` are required-min-1 on the wire (vs. optional/absent on Client Referral). Table name stays `opening_details` from before the kind rename (migration `9e1f7b3c4a2d`) — pure rename noise to drop it.
+- `intake_detail.py` — `IntakeDetail`, the detail row for `kind='program_intake'` (#541). Same per-announcement field set as `OpeningDetail` but points at a `Program` via `program_id` instead of a `Provider` — the referrer is choosing an *intake door* (the Program) and trusting the owning Org to assign a clinician internally. Table name stays `intake_details` for the same reason as `opening_details`.
+
+## Kind name history (audit-log readers)
+
+Audit-log rows persist the kind value that was current when the row was written. Two renames happened in `posts.kind`:
+
+| Migration | Old value | New value |
+|---|---|---|
+| `e9d8c7b6a5f4` | `provider_availability` | `opening` |
+| `e9d8c7b6a5f4` | `client_referral` | `referral` |
+| `4a8b2c5d9e1f` | `program_availability` | `intake` |
+| `9e1f7b3c4a2d` | `opening` | `clinician_opening` |
+| `9e1f7b3c4a2d` | `intake` | `program_intake` |
+
+`audit_log.before` / `audit_log.after` JSON snapshots reference whatever string was current when the row was written; they are intentionally not rewritten. Readers ranging over audit history should expect any of the historical names.
 - `test_post_kinds.py` — guardrail tests for the registry as the single source of truth. Asserts `POST_KIND_NAMES` matches the registry, the rendered `POST_KINDS.check_sql()` matches what `Post.__table_args__` actually produces, the route's `Literal[*POST_KIND_NAMES]` is in lockstep, the inverse `POST_KIND_BY_DETAIL_MODEL` lookup is well-formed, the per-kind relationship-name convention holds, and `PostKindSpec.detail_fields` matches the detail-model column list exactly. If anyone re-encodes the kind set inline somewhere, one of these tests fails.
 
 ## Why this cluster, not flat siblings
@@ -35,4 +49,13 @@ The remaining layers (Pydantic schemas, repository dispatch, logic handlers, rou
 
 ## Removing a kind
 
-Inverse: delete the registry entry, the detail model file, the `relationship(...)` line on `Post`, the four Pydantic variant classes in `src/domain/logic/posts/schema.py`, the per-kind templates under `src/domain/templates/posts/`, and ship a migration that drops the detail table and narrows the CHECK. No edits in routes, repositories, or logic — see [`../../routes/posts.py`](../../routes/posts.py) and the per-kind schema in [`../../logic/posts/schema.py`](../../logic/posts/schema.py); both read from the registry. The retired `note` kind (removed in migration `c2d3e4f5a6b7`) is the canonical example of how clean this is when the registry is the only source of truth.
+Inverse: delete the registry entry, the detail model file, the `relationship(...)` line on `Post`, the four Pydantic variant classes in `src/domain/logic/posts/schema.py`, the per-kind templates (under `src/domain/templates/posts/` by default; the two availability subkinds override to `src/domain/templates/openings/` — see `PostKindSpec.create_template` / `edit_template`), and ship a migration that drops the detail table and narrows the CHECK. If the kind was a member of the `/openings` subset face, also drop it from `OPENING_ENTITY.discriminator_values`. No edits in routes, repositories, or logic — see [`../../routes/openings.py`](../../routes/openings.py) and the per-kind schema in [`../../logic/posts/schema.py`](../../logic/posts/schema.py); both read from the registry. The retired `note` kind (removed in migration `c2d3e4f5a6b7`) is the canonical example of how clean this is when the registry is the only source of truth.
+
+## URL faces
+
+Two URL families expose the supertype:
+
+- **`/referrals`** — kind-locked leaf (`kind='referral'`). Spec: `REFERRAL_ENTITY`.
+- **`/openings`** — subset-supertype listing both availability subkinds (`kind ∈ {clinician_opening, program_intake}`). Same `?kind=X` create/edit dispatch pattern the old whole-supertype `/posts` URL used, scoped to two of the three kinds. Spec: `OPENING_ENTITY`. The framework's third face mode (`discriminator_values=...`) is the mechanism — see [`src/framework/dispatch/entity_spec.py`](../../../framework/dispatch/entity_spec.py) `discriminator_value` docstring for all three modes.
+
+`/intakes` was folded into `/openings` in commit `53fc7a71`; it is no longer mounted. The kind value `program_intake` survives unchanged; only the URL collection changed.

@@ -56,7 +56,13 @@ The work is concentrated. For each step, also add or extend the colocated `test_
 5. **Route** — create `domain/routes/<entity>.py` and call `mount_entity(router, <ENTITY>_ENTITY, handlers={...}, owned_subentities=(...))` once. The dispatcher stitches factory-built handlers onto the route module (auto-detected from the caller frame) as `_handle_<verb>_<entity>` so contract-test patches resolve through it. See [`domain/routes/README.md`](domain/routes/README.md).
 6. **Template (if rendering HTML)** — add the Jinja2 template in [`domain/templates/<entity>/`](domain/templates/README.md) extending the relevant view-type template from [`framework/templates/views/`](framework/templates/README.md).
 
-For polymorphic entities the URL layer exposes each kind as its own resource family via a kind-locked `EntitySpec` (set `discriminator=<registry>` AND `discriminator_value="<kind>"` on each face). The framework forces `kind = discriminator_value` on list filters, raises 404 when a target's `kind` doesn't match on detail/update/delete/edit-form, and skips the picker `?kind=` synthesis on form_new. Today: `Post` exposed as `/referrals`, `/openings`, `/intakes` — see [`domain/specs/posts/`](domain/specs/posts/) and [`domain/models/posts/post_kinds.py`](domain/models/posts/post_kinds.py).
+For polymorphic entities the URL layer can expose its kinds in one of three face shapes, all driven by `EntitySpec`'s `discriminator=<registry>` plus one of:
+
+- **kind-locked leaf** (`discriminator_value="<one kind>"`) — single-kind URL family; list forces `kind = <value>`; detail/update/delete/edit-form 404 on kind mismatch; form_new skips the `?kind=` picker.
+- **subset-supertype** (`discriminator_values=("<a>", "<b>", ...)`) — one URL family listing a *subset* of kinds; create / edit dispatch by `?kind=X` on the URL (rejecting kinds outside the subset); detail/update/delete 404 unless the row's kind is in the subset.
+- **whole-supertype** (neither set) — one URL family listing every kind; not currently used in this codebase (the old `/posts` was removed).
+
+Today: `Post` exposed as `/referrals` (kind-locked leaf, `kind='referral'`) and `/openings` (subset-supertype over `(clinician_opening, program_intake)`). See [`domain/specs/posts/`](domain/specs/posts/), [`domain/models/posts/post_kinds.py`](domain/models/posts/post_kinds.py), and the `discriminator_value` docstring in [`framework/dispatch/entity_spec.py`](framework/dispatch/entity_spec.py) for the full contract.
 
 ### Cross-cutting registries
 
