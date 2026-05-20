@@ -474,15 +474,12 @@ def test_actions_macro_supports_cancel_only_for_page_level_clusters() -> None:
     assert cancel.attributes.get("href") == "/widgets/1"
 
 
-def test_no_template_uses_outlined_danger_for_delete() -> None:
-    """Every Delete affordance uses `class="danger"` (filled red) —
-    the outlined-danger treatment (`class="danger outline"`) softens
-    the visual weight and lets a destructive misfire look like a
-    no-op Edit, which is the whole reason `.danger` (filled) exists
-    (#579). The action-vocabulary table in `_shared/actions.html`
-    documents this; this test scans the template tree so a future
-    drift fails here loudly rather than waiting for a UI review.
-    """
+def test_no_template_uses_danger_class() -> None:
+    """The custom `.danger` button class was removed when its Pico-token
+    overrides weren't taking effect. Guard against re-introducing
+    `class="danger"` anywhere in the template tree — if a destructive
+    color treatment is added back later, it should land via a new
+    selector + CSS in one place, not via per-template class strings."""
     import re
     from pathlib import Path
 
@@ -490,76 +487,19 @@ def test_no_template_uses_outlined_danger_for_delete() -> None:
         Path("src/framework/templates"),
         Path("src/domain/templates"),
     ]
-    # Match any class attribute that includes BOTH `danger` and
-    # `outline` (in any order, possibly with other classes). The
-    # whitespace boundary lets `class="danger outline"` and
-    # `class="outline danger"` both fail; a class containing the
-    # substring `danger` in a longer token (`.danger-icon`) wouldn't
-    # match because `\b` anchors on word boundary.
     violations: list[str] = []
     for root in templates_roots:
         for path in root.rglob("*.html"):
             text = path.read_text(encoding="utf-8")
             for match in re.finditer(r'class="([^"]*)"', text):
                 classes = match.group(1).split()
-                if "danger" in classes and "outline" in classes:
+                if "danger" in classes:
                     violations.append(f"{path}: {match.group(0)}")
 
     assert not violations, (
-        "outlined-danger violates the action-style vocabulary "
-        '(see `_shared/actions.html`) — Delete must be `class="danger"` '
-        '(filled), not `class="danger outline"`. Found:\n  ' + "\n  ".join(violations)
+        "the `.danger` class was removed; do not reintroduce it on "
+        "template markup. Found:\n  " + "\n  ".join(violations)
     )
-
-
-def test_destructive_action_macros_emit_danger_class() -> None:
-    """Regression for #579 — every Delete affordance must carry
-    `class="danger"` (defined in base.html). Pins the two macros that
-    own the destructive-button vocabulary:
-
-    1. `_shared/actions.html::confirm_delete_button` — used by toolbar
-       owner/admin actions and inline subentity rows.
-    2. `_shared/actions.html::actions` — the standard
-       Save/Cancel/Delete cluster at the bottom of every entity form
-       and the Edit/Delete cluster in every detail-page toolbar.
-    """
-    env = _make_env()
-    _add_child(
-        env,
-        "stub.html",
-        """
-        {% from "_shared/actions.html" import confirm_delete_button, actions %}
-        <div id="bare-delete">
-          {{ confirm_delete_button("/posts/1", "Sure?") }}
-        </div>
-        <div id="form-delete">
-          {{ actions("Save", cancel_url="/posts/1", delete_url="/posts/1", delete_confirm="Sure?") }}
-        </div>
-        <menu id="toolbar-delete">
-          {{ actions(wrapper="toolbar", delete_url="/posts/1", delete_confirm="Sure?") }}
-        </menu>
-        """,
-    )
-    html = env.get_template("stub.html").render()
-
-    tree = HTMLParser(html)
-    bare = tree.css_first("#bare-delete button")
-    assert bare is not None
-    assert "danger" in (
-        bare.attributes.get("class") or ""
-    ), "confirm_delete_button must emit class containing 'danger'"
-
-    form_delete = tree.css_first("#form-delete .form-actions-destructive")
-    assert form_delete is not None
-    assert "danger" in (
-        form_delete.attributes.get("class") or ""
-    ), "actions form-mode Delete must emit `danger` + `form-actions-destructive`"
-
-    toolbar_delete = tree.css_first("#toolbar-delete li button")
-    assert toolbar_delete is not None, "toolbar-mode Delete must be wrapped in <li>"
-    assert "danger" in (
-        toolbar_delete.attributes.get("class") or ""
-    ), "actions toolbar-mode Delete must emit class containing 'danger'"
 
 
 def test_list_page_heading_visible_on_mobile() -> None:
@@ -685,38 +625,6 @@ def test_entity_form_page_caps_short_field_widths() -> None:
         'base.html must cap `<input type="date">` width inside '
         "`.entity-form-page` so program start/end dates don't stretch (#585)"
     )
-
-
-def test_base_html_defines_danger_button_style() -> None:
-    """Regression for #579 — `.danger` button style must be defined in
-    base.html with a red token. Without it, `class="danger"` falls back
-    to Pico's primary blue and the destructive button looks like the
-    page's main CTA."""
-    import re
-
-    env = _make_env()
-    _add_child(
-        env,
-        "stub.html",
-        """
-        {% extends "views/list.html" %}
-        {% block resource_label %}Posts{% endblock %}
-        {% block content %}body{% endblock %}
-        """,
-    )
-    html = env.get_template("stub.html").render(
-        request=_request_stub(),
-        is_authenticated=False,
-        is_development=False,
-    )
-    match = re.search(
-        r"button\.danger,[^{]*\{[^}]*--pico-color-red-[^}]*\}",
-        html,
-        re.DOTALL,
-    )
-    assert (
-        match is not None
-    ), "base.html must define `button.danger` with a Pico red token"
 
 
 class _RequestStub:

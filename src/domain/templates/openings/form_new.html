@@ -9,7 +9,6 @@
 {% if not current_user.providers %}
 <p>You need a clinician profile before posting availability. <a href="{{ entity_form_url('clinician') }}">Create your clinician profile</a>, then return here.</p>
 {% else %}
-<p>Per <code>notes/forms_spec.md</code>. No PII.</p>
 {{ opening_form("post", entity_url('opening'), "Create opening", schema=opening_create_schema, current_user=current_user, cancel_url=entity_url('opening')) }}
 {% endif %}
 {% endblock %}

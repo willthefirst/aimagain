@@ -406,42 +406,6 @@
         font-size: 0.9rem;
         line-height: 1.35;
       }
-      /* Destructive button style. Pico v2 ships primary (filled blue),
-         `.secondary`, `.contrast`, and the `.outline` modifier, but no
-         destructive-action color — every Delete in the app picked a
-         different style (primary blue, contrast black, secondary
-         outline) and read as the page's main CTA at the same visual
-         weight as Save/Create (#579). `.danger` is the single canonical
-         destructive class: filled red by default, red-outlined under
-         `.outline` for inline subentity deletes (credential rows) so
-         the row's main affordance doesn't shout. Reuses Pico's red
-         tokens so the color tracks the theme. */
-      button.danger,
-      [role="button"].danger,
-      input[type="button"].danger,
-      input[type="reset"].danger,
-      input[type="submit"].danger {
-        --pico-background-color: var(--pico-color-red-550);
-        --pico-border-color: var(--pico-color-red-550);
-        --pico-color: var(--pico-color-azure-50);
-      }
-      button.danger:is(:hover, :active, :focus),
-      [role="button"].danger:is(:hover, :active, :focus) {
-        --pico-background-color: var(--pico-color-red-600);
-        --pico-border-color: var(--pico-color-red-600);
-      }
-      button.danger.outline,
-      [role="button"].danger.outline {
-        --pico-background-color: transparent;
-        --pico-color: var(--pico-color-red-550);
-        --pico-border-color: var(--pico-color-red-550);
-      }
-      button.danger.outline:is(:hover, :active, :focus),
-      [role="button"].danger.outline:is(:hover, :active, :focus) {
-        --pico-background-color: var(--pico-color-red-50);
-        --pico-color: var(--pico-color-red-650);
-        --pico-border-color: var(--pico-color-red-650);
-      }
       /* Pico's `<fieldset>` carries a top margin that visually competes
          with the cap above — flatten the rhythm so siblings sit at a
          consistent gap inside the capped form. */
