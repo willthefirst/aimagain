@@ -26,17 +26,20 @@ async def test_base_template_renders_primary_nav_when_authenticated(
 ):
     """Authenticated pages render the primary nav with section
     shortcuts (Referrals / Openings / Intakes / Directory) on the left
-    and a single `/users/me` profile shortcut on the right. Other
-    section links (Users / Favorites) and the create-post CTA are
-    reachable from within their pages rather than from the top-level
-    chrome."""
+    and on the right an adaptive primary CTA (Create-clinician for
+    first-time users without a provider profile, Create-opening for
+    returning users) plus the `/users/me` profile icon. Other section
+    links (Users / Favorites) are reachable from within their pages
+    rather than from the top-level chrome."""
     response = await authenticated_client.get("/users")
 
     assert response.status_code == 200
     tree = HTMLParser(response.text)
     profile_items = tree.css("#primary-nav > li > a")
     profile_hrefs = {a.attributes.get("href") for a in profile_items}
-    assert profile_hrefs == {"/users/me"}
+    # First-time user (no `Provider` row yet) — the CTA points at
+    # `/clinicians/form` so they can unblock posting.
+    assert profile_hrefs == {"/clinicians/form", "/users/me"}
     section_items = tree.css('nav[aria-label="Primary"] > ul:first-of-type > li > a')
     section_hrefs = [a.attributes.get("href") for a in section_items]
     # Brand link is `<li><strong><a>` so the `> li > a` direct-child
