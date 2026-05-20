@@ -1,12 +1,10 @@
-{% extends "views/form_edit.html" %}
-{% from "openings/_form.html" import opening_form %}
+{# Fallback edit-form template for the /openings subset-supertype face.
 
-{% set resource_url = entity_url('opening') %}
-{% set resource_detail_url = entity_url('opening', id=opening.id) %}
-
-{% block resource_label %}Openings{% endblock %}
-{% block current_label %}Opening{% endblock %}
-
-{% block content %}
-{{ opening_form("patch", entity_url('opening', id=opening.id), "Save changes", post=opening, schema=opening_create_schema, current_user=current_user, cancel_url=entity_url('opening', id=opening.id)) }}
-{% endblock %}
+The framework's `handle_get_edit_form` sets `template_name` to
+`posts/edit_<post.kind>.html` for subset-supertype faces, so the route
+normally renders the per-kind template directly. This file is the
+spec-default fallback at `openings/form_edit.html` — reached only if
+template-name dispatch somehow doesn't fire. Including the per-kind
+partial keeps the user-visible behavior identical either way.
+#}
+{% include "openings/edit_" ~ opening.kind ~ ".html" %}

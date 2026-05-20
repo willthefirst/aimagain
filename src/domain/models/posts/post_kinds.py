@@ -63,12 +63,18 @@ POST_KINDS: Final[DiscriminatorRegistry[PostKindSpec]] = DiscriminatorRegistry(
             detail_fields=_detail_fields(ReferralDetail),
             list_label="client referral",
         ),
+        # Both availability subkinds live under `openings/` (one URL
+        # collection per face). Overriding the default
+        # `posts/<verb>_<name>.html` keeps the templates within their
+        # face's directory and the cross-resource import lint clean.
         "clinician_opening": PostKindSpec(
             name="clinician_opening",
             detail_model=OpeningDetail,
             detail_relationship="opening_detail",
             detail_fields=_detail_fields(OpeningDetail),
             list_label="clinician opening",
+            create_template="openings/new_clinician_opening.html",
+            edit_template="openings/edit_clinician_opening.html",
         ),
         "program_intake": PostKindSpec(
             name="program_intake",
@@ -76,6 +82,8 @@ POST_KINDS: Final[DiscriminatorRegistry[PostKindSpec]] = DiscriminatorRegistry(
             detail_relationship="intake_detail",
             detail_fields=_detail_fields(IntakeDetail),
             list_label="program intake",
+            create_template="openings/new_program_intake.html",
+            edit_template="openings/edit_program_intake.html",
         ),
     },
 )

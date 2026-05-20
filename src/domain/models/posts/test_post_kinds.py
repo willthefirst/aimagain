@@ -77,11 +77,22 @@ def test_template_paths_default_by_convention():
     name when not explicitly set, following
     `posts/new_<name>.html` / `posts/edit_<name>.html`. Adding a kind
     therefore only needs the identity tuple — the template paths
-    follow automatically (the templates themselves still need to exist
-    on disk, but the registry entry doesn't restate them)."""
+    follow automatically.
+
+    Exception: the two availability subkinds (`clinician_opening`,
+    `program_intake`) live alongside the `/openings` URL collection's
+    templates rather than under `posts/`, because they're owned by the
+    `/openings` face end-to-end and the cross-resource import lint
+    rejects `openings/<verb>.html` importing from `posts/`. The
+    explicit overrides are pinned below."""
+    expected_template_dirs = {
+        "clinician_opening": "openings",
+        "program_intake": "openings",
+    }
     for kind, spec in POST_KINDS.items():
-        assert spec.create_template == f"posts/new_{kind}.html"
-        assert spec.edit_template == f"posts/edit_{kind}.html"
+        dirname = expected_template_dirs.get(kind, "posts")
+        assert spec.create_template == f"{dirname}/new_{kind}.html"
+        assert spec.edit_template == f"{dirname}/edit_{kind}.html"
 
 
 def test_explicit_template_paths_override_convention():

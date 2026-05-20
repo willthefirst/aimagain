@@ -1,0 +1,14 @@
+{% extends "views/form_new.html" %}
+{% from "openings/_form_clinician_opening.html" import opening_form %}
+
+{% set resource_url = entity_url('opening') %}
+
+{% block resource_label %}Openings{% endblock %}
+
+{% block content %}
+{% if not current_user.providers %}
+<p>You need a clinician profile before posting availability. <a href="{{ entity_form_url('clinician') }}">Create your clinician profile</a>, then return here.</p>
+{% else %}
+{{ opening_form("post", entity_url('opening'), "Create opening", schema=opening_create_schema, current_user=current_user, cancel_url=entity_url('opening')) }}
+{% endif %}
+{% endblock %}

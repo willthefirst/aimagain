@@ -1,0 +1,12 @@
+{% extends "views/form_edit.html" %}
+{% from "openings/_form_clinician_opening.html" import opening_form %}
+
+{% set resource_url = entity_url('opening') %}
+{% set resource_detail_url = entity_url('opening', id=opening.id) %}
+
+{% block resource_label %}Openings{% endblock %}
+{% block current_label %}Opening{% endblock %}
+
+{% block content %}
+{{ opening_form("patch", entity_url('opening', id=opening.id), "Save changes", post=opening, schema=opening_create_schema, current_user=current_user, cancel_url=entity_url('opening', id=opening.id)) }}
+{% endblock %}
