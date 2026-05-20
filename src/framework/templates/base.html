@@ -224,6 +224,18 @@
         nav[aria-label="breadcrumb"] > ul { display: none; }
         .breadcrumb-back { display: inline-flex; align-items: center; }
       }
+      /* Brand collapse on mobile. The two-word "Bedlam Connect" wraps
+         to two lines on narrow viewports once the primary nav fills the
+         row (see screenshot in #647-followup). The header markup emits
+         two spans — `.brand-full` (default) and `.brand-mark` (the
+         short form) — and the media query swaps them. No JS, two
+         rules. Threshold matches the breadcrumb back affordance above
+         so both kick in at the same width. */
+      .brand-mark { display: none; }
+      @media (max-width: 540px) {
+        .brand-full { display: none; }
+        .brand-mark { display: inline; }
+      }
       /* Entity create/edit forms — cap form width on large screens so
          short fields don't stretch across the whole container, and
          standardize the Save/Cancel/Delete action cluster. The wrapper
@@ -584,7 +596,14 @@
       <nav aria-label="Primary">
         <ul>
           {# title-case-ignore: "Bedlam Connect" is a brand name #}
-          <li><strong><a href="/">Bedlam Connect</a></strong></li>
+          {# Brand wraps the full label and a short "mark" form; only
+             one is visible at a time. CSS in the `<style>` block
+             above swaps them at ≤540px so the brand stays on one
+             line as the primary nav fills the row. #}
+          <li><strong><a href="/">
+            <span class="brand-full">Bedlam Connect</span>
+            <span class="brand-mark">Bedlam</span>
+          </a></strong></li>
           {% if is_authenticated %}
           <li><a href="{{ entity_url('referral') }}"{% if _on_referrals %} aria-current="page"{% endif %}>Referrals</a></li>
           <li><a href="{{ entity_url('opening') }}"{% if _on_openings %} aria-current="page"{% endif %}>Openings</a></li>
