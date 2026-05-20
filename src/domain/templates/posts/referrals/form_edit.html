@@ -1,5 +1,5 @@
 {% extends "views/form_edit.html" %}
-{% from "referrals/_form.html" import referral_form %}
+{% from "posts/referrals/_form.html" import referral_form %}
 
 {% set resource_url = entity_url('referral') %}
 {% set resource_detail_url = entity_url('referral', id=referral.id) %}

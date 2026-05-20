@@ -1,7 +1,7 @@
 """Consumer contract: clicking Delete on the post owner-actions partial.
 
 Verifies that the HTMX-decorated button rendered by
-`templates/_shared/posts/_owner_actions.html` (mounted via the
+`templates/posts/_shared/_owner_actions.html` (mounted via the
 `posts_owner_actions` stub on the consumer server, which renders
 `referrals/detail.html`) issues a `DELETE /referrals/{id}` and that
 the response carries the `HX-Redirect: /referrals` header htmx

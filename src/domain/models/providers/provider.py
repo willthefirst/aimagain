@@ -88,7 +88,7 @@ class Provider(BaseModel):
     # affiliation as the "default" the directory listing reads through
     # — PR 3 collapses the listing to one row per Clinician, after
     # which the primary fallback only matters for the post-opening
-    # form's dropdown (see `src/domain/templates/openings/_form.html`).
+    # form's dropdown (see `src/domain/templates/posts/openings/_form.html`).
     affiliations = relationship(
         "Affiliation",
         back_populates="provider",

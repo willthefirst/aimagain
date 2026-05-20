@@ -188,7 +188,7 @@ def test_stub_renders_detail_html_without_errors():
     }
     for kind in _KINDS:
         family, var = _KIND_TO_FAMILY_AND_VAR[kind]
-        template = env.get_template(f"{family}/detail.html")
+        template = env.get_template(f"posts/{family}/detail.html")
         post = make_post_stub(kind, owner_id=uuid.uuid4())
 
         class _RequestStub:

@@ -46,8 +46,8 @@ list and detail share the same visual vocabulary.
 ``"opening"``, or ``"intake"``. Each family's `list.html` passes its
 own name so the card's headline anchor resolves to the correct URL
 family (e.g. `/referrals/{id}` for referrals' list). #}
-{%- from "_shared/posts/_modality_chips.html" import modality_chips -%}
-{%- from "_shared/posts/_facts_block.html" import facts_block -%}
+{%- from "posts/_shared/_modality_chips.html" import modality_chips -%}
+{%- from "posts/_shared/_facts_block.html" import facts_block -%}
 
 {% macro post_item(post, entity_name) -%}
 {%- set view = post_card_view(post) -%}

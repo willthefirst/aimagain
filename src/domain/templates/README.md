@@ -20,12 +20,26 @@ Subresource lists (e.g. `/users/{id}/clinicians`) override `{% block breadcrumb 
 
 Pages that don't fit the resource grammar — the `/auth/*` flow's centered single-card layout — extend `base.html` directly and compose the `_shared/` macros by hand.
 
-The two post URL families have different template shapes:
+Post templates nest under a `posts/` cluster (sibling sub-clusters per URL family, plus a `_shared/` for cross-face partials):
 
-- **`referrals/`** (kind-locked leaf, `kind='referral'`): carries `list.html`, `detail.html`, `form_new.html`, `form_edit.html`, `search.html`, and `_form.html` (the create/edit form-body macro).
-- **`openings/`** (subset-supertype over `clinician_opening` + `program_intake`): carries `list.html`, `detail.html`, `search.html`, and *per-subkind* form templates — `new_<kind>.html` / `edit_<kind>.html` / `_form_<kind>.html` for each subkind. The handler sets `template_name = POST_KINDS[kind].create_template` (or `edit_template`) to pick the right form by the `?kind=` URL param or the row's stored kind. The `form_new.html` / `form_edit.html` files at the top of the directory are spec-default fallbacks (picker for `form_new`, kind-dispatching include for `form_edit`).
+```
+posts/
+├── _shared/              ← cross-face partials (_item, _facts_block, _owner_actions, …)
+├── referrals/            ← /referrals face (kind-locked leaf, kind='referral')
+│   ├── list.html, detail.html, search.html, form_new.html, form_edit.html
+│   └── _form.html (create/edit form-body macro)
+└── openings/             ← /openings face (subset-supertype over clinician_opening + program_intake)
+    ├── list.html, detail.html, search.html
+    ├── form_new.html (picker), form_edit.html (kind-dispatch fallback)
+    ├── new_clinician_opening.html, edit_clinician_opening.html, _form_clinician_opening.html
+    └── new_program_intake.html, edit_program_intake.html, _form_program_intake.html
+```
 
-The shared post-card partials (`_item`, `_facts_block`, `_how_to_refer`, `_modality_chips`, `_owner_actions`) live in [`_shared/posts/`](_shared/posts/) and are imported by both families' list and detail pages — see #628. The services list is the first row of `_facts_block`'s `<dl>` rather than its own partial.
+The handler sets `template_name = POST_KINDS[kind].create_template` (or `edit_template`) to pick the right per-subkind form by the `?kind=` URL param or the row's stored kind. The `_post_face` builder in [`../specs/posts/_base.py`](../specs/posts/_base.py) sets `templates=Templates(list="posts/<face>/list.html", …)` for each face's primary verbs.
+
+The cross-resource import lint ([`scripts/dev/template_imports_check.py`](../../../scripts/dev/template_imports_check.py)) permits a sub-cluster (`posts/<face>/`) to import from its parent cluster's `_shared/` (`posts/_shared/`) — that's how the per-face templates pull in shared post-card partials without crossing a boundary. Sibling sub-clusters (`posts/openings/` ↔ `posts/referrals/`) still can't import from each other.
+
+The services list is the first row of `_facts_block`'s `<dl>` rather than its own partial (see #628).
 
 The auth-flow pages (`auth/login.html`, `auth/register.html`, `auth/forgot_password.html`, `auth/reset_password.html`) each render a single `<article class="auth-page">` card. The `.auth-page` rule in [`../../framework/templates/base.html`](../../framework/templates/base.html) caps the card at 28rem and centers it horizontally — without the class the card stretches to the full `<main class="container">` width on tablet/desktop.
 

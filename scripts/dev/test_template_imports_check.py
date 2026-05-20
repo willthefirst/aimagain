@@ -105,8 +105,8 @@ def test_cross_resource_from_is_flagged(tmp_path: Path) -> None:
     v = violations[0]
     assert v.directive == "from"
     assert v.referenced == "posts/_form.html"
-    assert v.importing_dir == "providers"
-    assert v.referenced_dir == "posts"
+    assert v.importing_dir == "providers/"
+    assert v.referenced_dir == "posts/"
     assert "providers/ → posts/" in v.message()
     assert "_shared/" in v.message()
 
