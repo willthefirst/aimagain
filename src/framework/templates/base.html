@@ -600,9 +600,10 @@
        flow. The right-side slot (`#primary-nav`) adapts: authed users
        see the profile icon (with `aria-current="page"` while on
        `/users/me`); anonymous visitors see a Login link. The brand
-       link goes to `/`, which redirects authed users to `/openings`
-       (the highest-trafficked URL family) and unauthed users to the
-       login page — safe on either side of the auth gate.
+       link goes to `/`, which redirects authed users to `/referrals`
+       (the "find new clients" journey home — see
+       `src/main.py:read_root` for the bias rationale) and unauthed
+       users to the login page — safe on either side of the auth gate.
 
        Self-reference suppression: when an anonymous visitor is already
        on an auth-flow page (`/auth/login`, `/auth/register`,

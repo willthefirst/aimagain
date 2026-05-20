@@ -88,10 +88,13 @@ async def unauthorized_exception_handler(request: Request, exc: HTTPException):
 
 @app.get("/")
 def read_root():
-    # `/openings` is the highest-trafficked URL family — see #628's
-    # split rationale. Anonymous visitors landing on `/` redirect here;
-    # auth gating happens at the route, not at root.
-    return RedirectResponse(url="/openings", status_code=302)
+    # Home biases to the "find new clients" journey: `/referrals` is the
+    # list of clients other clinicians are looking to place — the surface
+    # a working clinician scans to fill their caseload. The mirror
+    # journey ("refer out") still has a top-level nav tab to `/openings`.
+    # Anonymous visitors landing on `/` redirect here; auth gating
+    # happens at the route, not at root.
+    return RedirectResponse(url="/referrals", status_code=302)
 
 
 app.include_router(
