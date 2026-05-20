@@ -77,8 +77,8 @@ Composite-label cases (e.g. "<Program> · <Org>") pre-build a list of
 {# ---- text-like inputs --------------------------------------------- #}
 
 {% macro text_field(name, label, current=None, required=True, pattern=None, maxlength=None, help=None, invalid=None, type="text", autocomplete=None) -%}
-<label for="{{ name }}">
-  {{ label }}
+<label class="form-field" for="{{ name }}">
+  <span class="form-field-label">{{ label }}</span>
   <input type="{{ type }}" id="{{ name }}" name="{{ name }}"
     {%- if current is not none %} value="{{ current }}"{% endif %}
     {%- if pattern %} pattern="{{ pattern }}"{% endif %}
@@ -92,8 +92,8 @@ Composite-label cases (e.g. "<Program> · <Org>") pre-build a list of
 {%- endmacro %}
 
 {% macro textarea_field(name, label, current=None, required=True, help=None, invalid=None) -%}
-<label for="{{ name }}">
-  {{ label }}
+<label class="form-field" for="{{ name }}">
+  <span class="form-field-label">{{ label }}</span>
   <textarea id="{{ name }}" name="{{ name }}"
     {%- if required %} required{% endif %}
     {%- if help %} aria-describedby="{{ name }}-helper"{% endif %}
@@ -112,8 +112,8 @@ Composite-label cases (e.g. "<Program> · <Org>") pre-build a list of
 {# ---- selects ------------------------------------------------------- #}
 
 {% macro select_field(name, label, options, labels=None, current=None, required=True, placeholder=False, help=None, invalid=None) -%}
-<label for="{{ name }}">
-  {{ label }}
+<label class="form-field" for="{{ name }}">
+  <span class="form-field-label">{{ label }}</span>
   <select id="{{ name }}" name="{{ name }}"
     {%- if required %} required{% endif %}
     {%- if help %} aria-describedby="{{ name }}-helper"{% endif %}
@@ -140,8 +140,8 @@ Composite-label cases (e.g. "<Program> · <Org>") pre-build a list of
    value), not this macro. #}
 {% macro multi_select_field(name, label, options, labels=None, current=None, help=None, invalid=None) -%}
 {%- set selected = current or [] -%}
-<label for="{{ name }}">
-  {{ label }}
+<label class="form-field" for="{{ name }}">
+  <span class="form-field-label">{{ label }}</span>
   <select id="{{ name }}" name="{{ name }}" multiple size="{{ [options|length, 8]|min }}"
     {%- if help %} aria-describedby="{{ name }}-helper"{% endif %}
     {%- if invalid is not none %} aria-invalid="{{ 'true' if invalid else 'false' }}"{% endif %}>
@@ -174,8 +174,8 @@ Composite-label cases (e.g. "<Program> · <Org>") pre-build a list of
    anyway, so callers don't need to coerce. #}
 {% macro entity_select_field(name, label, entities, current=None, required=True, blank_label=None, help=None, invalid=None, value_attr="id", label_attr="name") -%}
 {%- set current_s = current|string if current is not none else "" -%}
-<label for="{{ name }}">
-  {{ label }}
+<label class="form-field" for="{{ name }}">
+  <span class="form-field-label">{{ label }}</span>
   <select id="{{ name }}" name="{{ name }}"
     {%- if required %} required{% endif %}
     {%- if help %} aria-describedby="{{ name }}-helper"{% endif %}
@@ -202,17 +202,19 @@ Composite-label cases (e.g. "<Program> · <Org>") pre-build a list of
    inputs. Each radio carries `aria-describedby` so screen readers
    announce the helper text on either selection. #}
 {% macro radio_bool_field(name, label, current=None, required=True, help=None) -%}
-<fieldset>
-  <legend>{{ label }}</legend>
-  <label><input type="radio" name="{{ name }}" value="true"
-    {%- if current is sameas true %} checked{% endif %}
-    {%- if required %} required{% endif %}
-    {%- if help %} aria-describedby="{{ name }}-helper"{% endif %} />Yes</label>
-  <label><input type="radio" name="{{ name }}" value="false"
-    {%- if current is sameas false %} checked{% endif %}
-    {%- if required %} required{% endif %}
-    {%- if help %} aria-describedby="{{ name }}-helper"{% endif %} />No</label>
-  {{- _help_small(name, help) }}
+<fieldset class="form-field">
+  <legend class="form-field-label">{{ label }}</legend>
+  <div class="form-field-control">
+    <label class="form-field-inline"><input type="radio" name="{{ name }}" value="true"
+      {%- if current is sameas true %} checked{% endif %}
+      {%- if required %} required{% endif %}
+      {%- if help %} aria-describedby="{{ name }}-helper"{% endif %} />Yes</label>
+    <label class="form-field-inline"><input type="radio" name="{{ name }}" value="false"
+      {%- if current is sameas false %} checked{% endif %}
+      {%- if required %} required{% endif %}
+      {%- if help %} aria-describedby="{{ name }}-helper"{% endif %} />No</label>
+    {{- _help_small(name, help) }}
+  </div>
 </fieldset>
 {%- endmacro %}
 
@@ -249,8 +251,8 @@ Composite-label cases (e.g. "<Program> · <Org>") pre-build a list of
    empty array. #}
 {% macro time_grid_field(name, label, current=None, help=None) -%}
 {%- set selected = current or [] -%}
-<fieldset>
-  <legend>{{ label }}</legend>
+<fieldset class="form-field">
+  <legend class="form-field-label">{{ label }}</legend>
   <table>
     <thead>
       <tr>
