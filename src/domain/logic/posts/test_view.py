@@ -167,7 +167,7 @@ def _make_pa_post(*, provider_attrs=None, **detail_overrides):
     """Realistic PA stub. Defaults populate provider + detail fields."""
     p = dict(
         id="prov-1",
-        org=SimpleNamespace(name="Acme Counseling"),
+        org=SimpleNamespace(id="org-1", name="Acme Counseling"),
         location_city="Brooklyn",
         location_state="NY",
         location_zip="11201",
@@ -208,7 +208,7 @@ def _make_program_post(*, program_attrs=None, **detail_overrides):
         id="prog-1",
         name="RISE IOP",
         state_preference="CT",
-        organization=SimpleNamespace(name="Acme Health"),
+        organization=SimpleNamespace(id="org-h", name="Acme Health"),
     )
     if program_attrs:
         p.update(program_attrs)
@@ -303,6 +303,7 @@ def test_view_cr_cr_only_fields_set_pa_only_fields_none():
     assert v["accepts_out_of_network"] is None
     assert v["practice_link"] is None
     assert v["program_link"] is None
+    assert v["organization_link"] is None
 
 
 def test_view_cr_no_referral_section():
@@ -350,6 +351,13 @@ def test_view_pa_in_person_virtual_come_from_provider():
 def test_view_pa_practice_link_carries_id_and_org_name():
     v = post_card_view(_make_pa_post())
     assert v["practice_link"] == {"id": "prov-1", "name": "Acme Counseling"}
+
+
+def test_view_pa_organization_link_carries_org_id_and_name():
+    """Opening's org link reads through `provider.org` so the detail
+    page's `Organization` row is a one-click jump to the owning org."""
+    v = post_card_view(_make_pa_post())
+    assert v["organization_link"] == {"id": "org-1", "name": "Acme Counseling"}
 
 
 def test_view_pa_full_address_from_provider():
@@ -440,12 +448,13 @@ def test_view_program_link_carries_id_and_name():
     assert v["program_link"] == {"id": "prog-1", "name": "RISE IOP"}
 
 
-def test_view_program_organization_name_exposed_separately():
-    """Detail page surfaces the owning Org's name as a separate row
-    below the Program link. The view-model exposes it as a flat
-    field so the template doesn't reach for `prog.organization.name`."""
+def test_view_program_organization_link_carries_org_id_and_name():
+    """Detail page surfaces the owning Org as a clickable link below
+    the Program link — the view-model exposes `{id, name}` so the
+    template renders an `<a>` (mirrors `practice_link` /
+    `program_link`); a one-click jump to `/organizations/{id}`."""
     v = post_card_view(_make_program_post())
-    assert v["organization_name"] == "Acme Health"
+    assert v["organization_link"] == {"id": "org-h", "name": "Acme Health"}
 
 
 def test_view_program_no_in_person_virtual_no_insurance_no_address():
@@ -512,6 +521,7 @@ def test_view_pa_missing_provider_returns_partial_view():
     assert v["header_state"] is None
     assert v["full_address"] is None
     assert v["practice_link"] is None
+    assert v["organization_link"] is None
     assert v["sliding_scale"] is None
     # Detail-row fields independent of the provider relationship still
     # populate so the card can render whatever it can.

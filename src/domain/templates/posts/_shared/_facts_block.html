@@ -23,8 +23,9 @@ Two modes:
     insurance_posture, treatment_modality.
 
   expanded=True (detail page) — every chunk the compact mode shows
-    PLUS the detail-only rows: practice link (PA) / program +
-    organization (program), full address line, desired times,
+    PLUS the detail-only rows: practice link (PA) / program link
+    (program), organization link (PA + program — clickable jump to
+    `/organizations/{id}`), full address line, desired times,
     schedule notes (PA/program), network preference + insurance
     carrier (CR), sliding scale + cost (PA). Languages always render
     in expanded mode (the English-only suppression is a list-density
@@ -136,8 +137,8 @@ Reads from `view` (the `post_card_view` dict). Display-label dicts
       {%- if view.program_link %}
       <div><dt>Program</dt><dd><a href="{{ entity_url('program', id=view.program_link.id) }}">{{ view.program_link.name }}</a></dd></div>
       {%- endif %}
-      {%- if view.organization_name %}
-      <div><dt>Organization</dt><dd>{{ view.organization_name }}</dd></div>
+      {%- if view.organization_link %}
+      <div><dt>Organization</dt><dd><a href="{{ entity_url('organization', id=view.organization_link.id) }}">{{ view.organization_link.name }}</a></dd></div>
       {%- endif %}
       {%- if view.full_address %}
       <div><dt>Address</dt><dd>{{ view.full_address }}</dd></div>

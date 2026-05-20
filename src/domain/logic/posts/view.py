@@ -202,8 +202,12 @@ def post_card_view(post) -> dict[str, Any]:
             ``None`` for other kinds.
         program_link: ``{id, name}`` of program's linked Program;
             ``None`` for other kinds.
-        organization_name: program's owning organization name;
-            ``None`` for other kinds.
+        organization_link: ``{id, name}`` of the post's owning
+            Organization (PA reads through ``provider.org``; program
+            intake reads through ``program.organization``). ``None``
+            for referral (CR has no org linkage in the model). The
+            facts block renders this as a clickable link so any post
+            is one click from its org's detail page.
         full_address: ``"City, ST ZIP"`` string for the detail page's
             expanded location row. CR reads from its own location;
             PA reads from the linked Provider; program returns
@@ -242,7 +246,7 @@ def post_card_view(post) -> dict[str, Any]:
         "desired_times": [],
         "practice_link": None,
         "program_link": None,
-        "organization_name": None,
+        "organization_link": None,
         "full_address": None,
         "sliding_scale": None,
         "cost": None,
@@ -321,6 +325,14 @@ def post_card_view(post) -> dict[str, Any]:
                 if p and getattr(p, "org", None) and getattr(p, "id", None)
                 else None
             ),
+            organization_link=(
+                {"id": p.org.id, "name": p.org.name}
+                if p
+                and getattr(p, "org", None)
+                and getattr(p.org, "id", None)
+                and getattr(p.org, "name", None)
+                else None
+            ),
             full_address=(
                 _full_address(
                     getattr(p, "location_city", None),
@@ -367,9 +379,15 @@ def post_card_view(post) -> dict[str, Any]:
                 if prog and getattr(prog, "id", None) and getattr(prog, "name", None)
                 else None
             ),
-            organization_name=(
-                getattr(prog.organization, "name", None)
-                if prog and getattr(prog, "organization", None)
+            organization_link=(
+                {
+                    "id": prog.organization.id,
+                    "name": prog.organization.name,
+                }
+                if prog
+                and getattr(prog, "organization", None)
+                and getattr(prog.organization, "id", None)
+                and getattr(prog.organization, "name", None)
                 else None
             ),
             referral=_referral_or_none(
