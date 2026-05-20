@@ -27,20 +27,29 @@ from src.framework.rendering.projections import project_view
 
 
 def _assert_kind_lock(spec: EntitySpec, target: Any) -> None:
-    """For kind-locked faces (`discriminator_value` set), raise 404 when
-    ``target.kind`` does not match the spec's bound value.
+    """For kind-locked / subset-supertype faces, raise 404 when
+    ``target.kind`` is outside the face's bound kind set.
+
+    - Kind-locked (`discriminator_value` set): single allowed value.
+    - Subset-supertype (`discriminator_values` set): subset of allowed
+      values.
+    - Whole-supertype (neither set): no lock; any kind passes.
 
     Used by detail / update / delete / form_edit so a row of one kind
     can never be reached via another kind's URL family
-    (e.g. ``/referrals/{opening_id}`` 404s). The 404 surface (rather
-    than 400) keeps the wrong-family URL indistinguishable from a
-    truly-missing row — a stronger boundary than a leaky "exists but
-    wrong family" signal."""
-    if spec.discriminator_value is None:
+    (e.g. ``/referrals/{opening_id}`` 404s, or `/openings/{referral_id}`
+    404s on the subset face). The 404 surface (rather than 400) keeps
+    the wrong-family URL indistinguishable from a truly-missing row —
+    a stronger boundary than a leaky "exists but wrong family" signal."""
+    if spec.discriminator_value is None and spec.discriminator_values is None:
         return
     column = spec.discriminator.column
     target_kind = getattr(target, column)
-    if target_kind != spec.discriminator_value:
+    if spec.discriminator_value is not None:
+        ok = target_kind == spec.discriminator_value
+    else:
+        ok = target_kind in spec.discriminator_values
+    if not ok:
         raise NotFoundError(detail=f"{spec.name.capitalize()} not found")
 
 
@@ -704,6 +713,19 @@ async def handle_get_new_form(
             # the schema class for `field_for(schema, ...)`.
             context["schema"] = spec.create_adapter_class
         elif kind is not None:
+            # Subset-supertype face restricts `?kind=` to its declared
+            # subset — a user typing `/openings/form?kind=referral` must
+            # be rejected, not silently routed to the referral template.
+            if (
+                spec.discriminator_values is not None
+                and kind not in spec.discriminator_values
+            ):
+                raise BadRequestError(
+                    detail=(
+                        f"kind={kind!r} is not one of {spec.name}'s subkinds "
+                        f"({list(spec.discriminator_values)!r})"
+                    )
+                )
             context["template_name"] = spec.discriminator[kind].create_template
         # When `kind is None` on a non-locked supertype, leave
         # `template_name` unset so the route falls through to
@@ -887,13 +909,17 @@ async def handle_list(
     page_number = parse_page(request)
     per_page = spec.page_size or DEFAULT_PAGE_SIZE
     list_kwargs: dict[str, Any] = dict(filter_values)
-    # Kind-locked face of a polymorphic supertype — force `kind` to the
-    # bound value so the URL family only ever lists its own kind. The
+    # Kind-locked / subset-supertype face — force `kind` to the bound
+    # value(s) so the URL family only ever lists its own kind(s). The
     # user-facing filter form drops the `kind` choice (the spec strips
     # it from `filters`), so `filter_values` won't carry it from query
     # params; an attacker-supplied `?kind=other` is silently ignored.
+    # Subset faces pass a list — the repository's `kind` predicate
+    # widens to `kind IN (...)`.
     if spec.discriminator_value is not None:
         list_kwargs[spec.discriminator.column] = spec.discriminator_value
+    elif spec.discriminator_values is not None:
+        list_kwargs[spec.discriminator.column] = list(spec.discriminator_values)
     if spec.list_exclude_self and requesting_user is not None:
         list_kwargs["exclude_self"] = requesting_user
     list_kwargs["offset"] = offset_for(page_number, per_page)

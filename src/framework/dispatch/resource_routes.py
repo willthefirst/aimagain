@@ -1397,12 +1397,21 @@ def mount_entity(
             # specified, rather than silently defaulting to the first
             # registered kind.
             #
+            # Subset-supertype faces (`discriminator_values` set) narrow
+            # the Literal to their declared subset — `/openings/form?kind=
+            # referral` 422s at the FastAPI param layer rather than
+            # reaching the handler.
+            #
             # Kind-locked faces (`discriminator_value` set) skip this
             # synthesis — there's no picker on a single-kind URL family;
             # the form goes straight to the kind-specific create page.
             from typing import Literal, Optional
 
-            names = entity.discriminator.names
+            names = (
+                entity.discriminator_values
+                if entity.discriminator_values is not None
+                else entity.discriminator.names
+            )
             query_params = (QueryParam("kind", Optional[Literal[*names]], None),)
         mount_form(
             router,

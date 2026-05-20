@@ -54,7 +54,7 @@ class PostRepository(BaseRepository):
     async def list_posts(
         self,
         *,
-        kind: str | None = None,
+        kind: str | list[str] | None = None,
         q: str | None = None,
         posted_by: str | None = None,
         state: list[str] | None = None,
@@ -98,7 +98,13 @@ class PostRepository(BaseRepository):
             )
 
         if kind is not None:
-            stmt = stmt.filter(Post.kind == kind)
+            # `kind` accepts a single string (kind-locked face) or a list
+            # (subset-supertype face). The framework's `handle_list` passes
+            # a list when the spec declares `discriminator_values`.
+            if isinstance(kind, list):
+                stmt = stmt.filter(Post.kind.in_(kind))
+            else:
+                stmt = stmt.filter(Post.kind == kind)
         if q:
             needle = f"%{q}%"
             stmt = stmt.filter(
