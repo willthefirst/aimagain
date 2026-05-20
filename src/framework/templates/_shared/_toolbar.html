@@ -20,8 +20,14 @@ left-to-right:
     commands (Create, Edit, Delete, Favorite, ...). `<menu>` is
     HTML's native "list of commands" element. Detail-page and
     list-page actions land in the same place because the whole
-    cluster is right-aligned via `margin-left: auto` in
-    `base.html`.
+    cluster is right-aligned by being the second grid cell of
+    `.toolbar` (see `base.html`).
+
+The filter link and action menu are wrapped together in a
+`.toolbar-actions` cell so the toolbar grid reflows as a single
+unit: at ≥641px the heading and actions share one row; at ≤640px
+the whole actions cell drops below the heading atomically. The
+cluster never splits mid-toolbar.
 
 Cap on how many filter chips appear inline before collapsing to
 `+N more filters`. Keeps the link readable on narrow viewports.
@@ -83,23 +89,30 @@ Args:
 
   <h1>{{ heading }}</h1>
 
-  {%- if search_url %}
-  <a href="{{ search_url }}" class="toolbar-filter-link">
-    {%- if not active_filters -%}
-    Filters
-    {%- else -%}
-      {%- set shown = active_filters[:_ACTIVE_FILTER_INLINE_LIMIT] -%}
-      {%- set hidden = active_filters | length - shown | length -%}
-      {%- for tag in shown -%}{{ tag.label }}{%- if not loop.last %}, {% endif -%}{%- endfor -%}
-      {%- if hidden > 0 %}, +{{ hidden }} more filter{% if hidden != 1 %}s{% endif %}{%- endif -%}
-    {%- endif -%}
-  </a>
-  {%- endif %}
+  {%- if search_url or has_actions %}
+  {# Filter + menu live in one grid cell so the actions cluster
+     reflows as a single unit (atomic wrap). See `.toolbar`'s grid
+     in `base.html`. #}
+  <div class="toolbar-actions">
+    {%- if search_url %}
+    <a href="{{ search_url }}" class="toolbar-filter-link">
+      {%- if not active_filters -%}
+      Filters
+      {%- else -%}
+        {%- set shown = active_filters[:_ACTIVE_FILTER_INLINE_LIMIT] -%}
+        {%- set hidden = active_filters | length - shown | length -%}
+        {%- for tag in shown -%}{{ tag.label }}{%- if not loop.last %}, {% endif -%}{%- endfor -%}
+        {%- if hidden > 0 %}, +{{ hidden }} more filter{% if hidden != 1 %}s{% endif %}{%- endif -%}
+      {%- endif -%}
+    </a>
+    {%- endif %}
 
-  {%- if has_actions %}
-  <menu class="toolbar-right">
-    {{ actions_html }}
-  </menu>
+    {%- if has_actions %}
+    <menu class="toolbar-right">
+      {{ actions_html }}
+    </menu>
+    {%- endif %}
+  </div>
   {%- endif %}
 
 </div>
