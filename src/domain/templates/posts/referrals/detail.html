@@ -1,7 +1,7 @@
 {% extends "views/detail.html" %}
-{%- from "_shared/posts/_modality_chips.html" import modality_chips -%}
-{%- from "_shared/posts/_facts_block.html" import facts_block -%}
-{%- from "_shared/posts/_how_to_refer.html" import how_to_refer -%}
+{%- from "posts/_shared/_modality_chips.html" import modality_chips -%}
+{%- from "posts/_shared/_facts_block.html" import facts_block -%}
+{%- from "posts/_shared/_how_to_refer.html" import how_to_refer -%}
 
 {% set resource_url = entity_url('referral') %}
 {%- set view = post_card_view(referral) -%}
@@ -16,7 +16,7 @@
 {% block subtitle %}<span>{{ referral.created_at | format_post_date }}</span>{{ modality_chips(view.in_person, view.virtual) }}{% endblock %}
 
 {% block actions %}
-{% with post=referral %}{% include "_shared/posts/_owner_actions.html" %}{% endwith %}
+{% with post=referral %}{% include "posts/_shared/_owner_actions.html" %}{% endwith %}
 {% endblock %}
 
 {# Detail-page layout: same `.entity-card` shape the list cards use,

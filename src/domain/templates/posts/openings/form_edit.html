@@ -7,4 +7,4 @@ spec-default fallback at `openings/form_edit.html` — reached only if
 template-name dispatch somehow doesn't fire. Including the per-kind
 partial keeps the user-visible behavior identical either way.
 #}
-{% include "openings/edit_" ~ opening.kind ~ ".html" %}
+{% include "posts/openings/edit_" ~ opening.kind ~ ".html" %}

@@ -60,6 +60,7 @@ from src.framework.dispatch.entity_spec import (
     EntitySpec,
     Redirects,
     RouteSet,
+    Templates,
 )
 from src.framework.dispatch.filters import ChoiceFilter, TextFilter
 
@@ -164,6 +165,20 @@ def _post_face(
             search=True,
         ),
         filters=_POST_FILTERS,
+        # Post-face templates live under `templates/posts/<face>/` (the
+        # post cluster's own sub-directory) rather than the framework's
+        # default `templates/<url_collection>/`. The nesting reflects
+        # that post faces are sub-clusters of the post type — and the
+        # cross-resource import lint (which forbids
+        # `templates/<a>/ → templates/<b>/`) permits children to import
+        # from their parent cluster's `posts/_shared/`.
+        templates=Templates(
+            list=f"posts/{url_collection}/list.html",
+            detail=f"posts/{url_collection}/detail.html",
+            search=f"posts/{url_collection}/search.html",
+            form_new=f"posts/{url_collection}/form_new.html",
+            form_edit=f"posts/{url_collection}/form_edit.html",
+        ),
         update_redirect=Redirects.to_detail(url_collection, "post_id"),
         # Same per-kind FK-ownership check as the old `POST_ENTITY` — the
         # dispatcher reads `payload.kind` and validates the kind-specific

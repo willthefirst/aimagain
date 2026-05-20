@@ -75,19 +75,18 @@ def test_each_spec_detail_relationship_matches_kind_name():
 def test_template_paths_default_by_convention():
     """`create_template` / `edit_template` are derived from the kind
     name when not explicitly set, following
-    `posts/new_<name>.html` / `posts/edit_<name>.html`. Adding a kind
-    therefore only needs the identity tuple — the template paths
-    follow automatically.
+    `posts/new_<name>.html` / `posts/edit_<name>.html`.
 
-    Exception: the two availability subkinds (`clinician_opening`,
-    `program_intake`) live alongside the `/openings` URL collection's
-    templates rather than under `posts/`, because they're owned by the
-    `/openings` face end-to-end and the cross-resource import lint
-    rejects `openings/<verb>.html` importing from `posts/`. The
-    explicit overrides are pinned below."""
+    Two availability subkinds (`clinician_opening`, `program_intake`)
+    are owned by the `/openings` face end-to-end and live under
+    `posts/openings/` rather than directly at `posts/`. The cross-
+    resource import lint allows `posts/openings/` to import from
+    `posts/_shared/`, so the nesting reflects the type hierarchy
+    without breaking the lint. The explicit overrides are pinned
+    below."""
     expected_template_dirs = {
-        "clinician_opening": "openings",
-        "program_intake": "openings",
+        "clinician_opening": "posts/openings",
+        "program_intake": "posts/openings",
     }
     for kind, spec in POST_KINDS.items():
         dirname = expected_template_dirs.get(kind, "posts")

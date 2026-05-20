@@ -1,7 +1,7 @@
 {# Shared form body for `kind='clinician_opening'`.
 
-Used by both `openings/new_clinician_opening.html` (create) and
-`openings/edit_clinician_opening.html` (update). Caller passes:
+Used by both `posts/openings/new_clinician_opening.html` (create) and
+`posts/openings/edit_clinician_opening.html` (update). Caller passes:
 
   - `hx_method`: "post" or "patch"
   - `action`: the form submit URL
@@ -13,8 +13,8 @@ Used by both `openings/new_clinician_opening.html` (create) and
 
 Practice + location + delivery format all live on the linked Provider
 via `provider_id` (#448) — this form is the *announcement*, not the
-practice. The wrapper templates `openings/new_clinician_opening.html` /
-`openings/edit_clinician_opening.html` redirect to the provider-create flow
+practice. The wrapper templates `posts/openings/new_clinician_opening.html` /
+`posts/openings/edit_clinician_opening.html` redirect to the provider-create flow
 when `current_user.providers` is empty, so this macro always renders
 with at least one provider available.
 #}

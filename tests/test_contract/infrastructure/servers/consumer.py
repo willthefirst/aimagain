@@ -120,15 +120,15 @@ def _setup_users_admin_actions_stub(app: FastAPI) -> None:
 
 
 def _setup_post_owner_actions_stub(app: FastAPI) -> None:
-    """Mount a stub page that renders the real `referrals/detail.html`
+    """Mount a stub page that renders the real `posts/referrals/detail.html`
     template with hardcoded post + current_user, so the
-    `_shared/posts/_owner_actions.html` partial is exercised without
+    `posts/_shared/_owner_actions.html` partial is exercised without
     needing a database. The contract surface is the HTMX-decorated
     Delete button inside the partial; what we render here is the same
     partial production code paths render.
 
     `referral` is the canonical kind for this contract — the
-    owner-actions partial is shared across all three families and the
+    owner-actions partial is shared across both URL families and the
     HTMX wire shape is identical, so picking one kind covers the
     contract surface.
     """
@@ -162,7 +162,7 @@ def _setup_post_owner_actions_stub(app: FastAPI) -> None:
             is_superuser=True,
         )
         return APIResponse.html_response(
-            template_name="referrals/detail.html",
+            template_name="posts/referrals/detail.html",
             # The detail template reads `referral` from context (the
             # framework injects it as `spec.name`); `entity_name` lets
             # the shared `_owner_actions.html` partial build kind-aware
