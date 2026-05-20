@@ -27,44 +27,6 @@ Example:
 </form>
 {%- endmacro %}
 
-{# Standardized Save / Cancel / Delete cluster rendered at the bottom
-of every entity create/edit form. Visually a row that fills the form's
-content width on desktop, stacked column on mobile (see
-`.form-actions` in base.html — Save and Cancel each `flex: 1 1 0` so
-they grow to share the row; Delete keeps content width and is pushed
-right via `margin-left: auto`).
-
-Every entity create/edit form routes through this macro — no
-per-template action markup. The cluster's classes (`.form-actions`,
-`.form-actions-destructive`) live in `base.html` so all three buttons
-share one styling source of truth.
-
-Slot semantics:
-  - `submit_label` — visible text on the Save button. Required when
-    the cluster sits inside a `<form>`; omit (pass `None`) for
-    Cancel-only clusters on multi-section pages where the page-level
-    Cancel is the only action (e.g. `providers/form_edit.html`).
-  - `cancel_url` — if set, renders a Cancel link styled as a secondary
-    outline button pointing at this URL. Create forms usually pass
-    the collection list; edit forms usually pass the resource's
-    detail page.
-  - `delete_url` + `delete_confirm` — if both set, renders a Delete
-    button issuing `hx-delete=<url>` with an `hx-confirm` dialog.
-    Delete sits right-aligned, separated from Save/Cancel to reduce
-    misfire risk.
-
-The Delete button uses `type="button"` so htmx-driven delete fires
-without submitting the enclosing form. #}
-{% macro form_actions(submit_label=None, cancel_url=None, delete_url=None, delete_confirm=None) -%}
-<div class="form-actions">
-  {%- if submit_label %}
-  <button type="submit">{{ submit_label }}</button>
-  {%- endif %}
-  {%- if cancel_url %}
-  <a href="{{ cancel_url }}" role="button" class="secondary outline">Cancel</a>
-  {%- endif %}
-  {%- if delete_url and delete_confirm %}
-  <button type="button" class="danger form-actions-destructive" hx-delete="{{ delete_url }}" hx-confirm="{{ delete_confirm }}">Delete</button>
-  {%- endif %}
-</div>
-{%- endmacro %}
+{# The Save / Cancel / Delete cluster at the bottom of every entity
+create/edit form lives in `_shared/actions.html::actions` (renamed from
+the former `form_actions`). Import from there. #}

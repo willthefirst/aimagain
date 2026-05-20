@@ -1,6 +1,6 @@
 {% extends "views/form_new.html" %}
 {%- from "_shared/form_fields.html" import entity_select_field, select_field, text_field -%}
-{%- from "_shared/forms.html" import form_actions -%}
+{%- from "_shared/actions.html" import actions -%}
 
 {% set resource_url = entity_url('organization') %}
 
@@ -29,6 +29,6 @@
     ) }}
   </fieldset>
 
-  {{ form_actions("Create organization", cancel_url=entity_url('organization')) }}
+  {{ actions("Create organization", cancel_url=entity_url('organization')) }}
 </form>
 {% endblock %}

@@ -1,6 +1,6 @@
 {% extends "views/form_new.html" %}
 {%- from "_shared/form_fields.html" import entity_select_field, field_for, radio_bool_field, text_field -%}
-{%- from "_shared/forms.html" import form_actions -%}
+{%- from "_shared/actions.html" import actions -%}
 
 {% set resource_url = entity_url('program') %}
 
@@ -42,6 +42,6 @@
     {{ radio_bool_field("accepting_referrals", "Accepting referrals?", current=true, required=false) }}
   </fieldset>
 
-  {{ form_actions("Create program", cancel_url=entity_url('program')) }}
+  {{ actions("Create program", cancel_url=entity_url('program')) }}
 </form>
 {% endblock %}

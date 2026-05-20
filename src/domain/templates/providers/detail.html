@@ -1,5 +1,5 @@
 {% extends "views/detail.html" %}
-{%- from "_shared/actions.html" import confirm_delete_button -%}
+{%- from "_shared/actions.html" import actions -%}
 {%- from "providers/_credential_row.html" import credential_row -%}
 
 {# The framework binds `context[spec.name] = target`; after #642 PR 4 the
@@ -45,8 +45,13 @@
   {% endif %}
 {% endif %}
 {% if can_edit %}
-<li><a href="{{ entity_form_url('clinician', id=provider.id) }}" role="button" class="outline">Edit clinician</a></li>
-<li>{{ confirm_delete_button(entity_url('clinician', id=provider.id), "Permanently delete this clinician? Credentials attached to them will be removed too. This cannot be undone.") }}</li>
+{{ actions(
+    wrapper="toolbar",
+    edit_url=entity_form_url('clinician', id=provider.id),
+    edit_label="Edit clinician",
+    delete_url=entity_url('clinician', id=provider.id),
+    delete_confirm="Permanently delete this clinician? Credentials attached to them will be removed too. This cannot be undone.",
+) }}
 {% endif %}
 {% endblock %}
 
