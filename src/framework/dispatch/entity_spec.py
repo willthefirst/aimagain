@@ -361,28 +361,38 @@ class EntitySpec:
     # direct registry imports — the spec only declares the binding.
     discriminator: DiscriminatorRegistry | None = None
 
-    # Kind-locked face of a polymorphic supertype. When set, this spec
-    # is one of *N* URL families over a shared polymorphic model — the
-    # framework treats `discriminator_value` as a route-time constant:
+    # Face shape of a polymorphic supertype. A spec carrying `discriminator`
+    # picks one of three modes:
     #
-    #   - list:     forces `kind = <value>` on the query (no user-
-    #               settable `kind` filter on this family's list page)
-    #   - detail/update/delete/form_edit: 404 unless
-    #     `target.kind == discriminator_value`
-    #   - create:   stamps `kind = <value>` onto the request body
-    #               *before* adapter validation so the discriminated-
-    #               union picks the correct variant
-    #   - form_new: no `?kind=` query-param picker is synthesized — the
-    #               form goes straight to the create page for this kind
+    #   1. **kind-locked leaf** — `discriminator_value="<one kind>"`.
+    #      The URL family is bound to a single kind; list forces
+    #      `kind = <value>`, detail/update/delete/form_edit 404 unless
+    #      `target.kind == <value>`, create's discriminated-union adapter
+    #      (or per-kind adapter) sees the row as that kind, form_new
+    #      skips the `?kind=` picker.
+    #   2. **subset-supertype** — `discriminator_values=("<a>","<b>",...)`.
+    #      The URL family lists rows whose kind is in the subset; detail/
+    #      update/delete/form_edit 404 unless `target.kind in <subset>`;
+    #      create takes `kind` in the body (discriminated-union adapter
+    #      enforces membership); form_new requires `?kind=<one of subset>`.
+    #      Used by an umbrella URL that owns multiple subkinds end-to-end
+    #      (e.g. `/openings` listing both clinician openings and program
+    #      intakes; same `?kind=X` discriminator pattern the old `/posts`
+    #      face used, just scoped to a subset).
+    #   3. **whole-supertype** — both fields `None`. List takes any kind;
+    #      `?kind=` query param picks the create-form template; the
+    #      discriminated-union adapter handles dispatch on POST/PATCH.
+    #      No URL family uses this mode today (the old `/posts` was
+    #      removed); the mode is retained because the dispatch handlers
+    #      and `_make_factory_handler` already fall through to it.
     #
-    # Mutually exclusive with `discriminator`: a spec is either the
-    # supertype (carrying the registry) or a kind-locked face (carrying
-    # one value); never both. Validated in `__post_init__`.
-    #
-    # The column name read off the model is `Post.kind` today — pinned
-    # by convention rather than spec-declared, since the only consumer
-    # is the polymorphic post supertype.
+    # `discriminator_value` and `discriminator_values` are mutually
+    # exclusive. Both require `discriminator` to be set. Validated in
+    # `__post_init__`. The column name read off the model is `Post.kind`
+    # today — pinned by convention rather than spec-declared, since the
+    # only consumer is the polymorphic post supertype.
     discriminator_value: str | None = None
+    discriminator_values: tuple[str, ...] | None = None
 
     # Templates ----------------------------------------------------------
     templates: Templates = field(default_factory=Templates)
@@ -585,6 +595,58 @@ class EntitySpec:
                 f"{self.discriminator_value!r} but model "
                 f"{self.model.__name__} has no `kind` attribute — the "
                 "framework reads `target.kind` to enforce the lock."
+            )
+        # `discriminator_values` (subset-supertype face) is mutually
+        # exclusive with `discriminator_value` (kind-locked leaf face);
+        # both refer to the same registry, but a face is either bound
+        # to one kind or to a subset of kinds, never both.
+        if (
+            self.discriminator_values is not None
+            and self.discriminator_value is not None
+        ):
+            raise ValueError(
+                f"EntitySpec({self.name!r}) declares both `discriminator_value` "
+                f"({self.discriminator_value!r}) and `discriminator_values` "
+                f"({self.discriminator_values!r}); they are mutually exclusive "
+                "— a face is either kind-locked to one kind or scoped to a "
+                "subset of kinds."
+            )
+        # Subset-supertype requires the registry; without it the handler
+        # has no way to look up per-kind detail models on create/update.
+        if self.discriminator_values is not None and self.discriminator is None:
+            raise ValueError(
+                f"EntitySpec({self.name!r}) sets discriminator_values="
+                f"{self.discriminator_values!r} but no discriminator registry "
+                "— a subset-supertype face still needs the registry to look "
+                "up per-kind detail models on create/update."
+            )
+        # Every member of `discriminator_values` must be a value the
+        # registry knows about — else list/detail dispatch will KeyError
+        # or 404 silently at request time.
+        if self.discriminator_values is not None:
+            registry_names = self.discriminator.names
+            unknown = [v for v in self.discriminator_values if v not in registry_names]
+            if unknown:
+                raise ValueError(
+                    f"EntitySpec({self.name!r}) sets discriminator_values="
+                    f"{self.discriminator_values!r} but the discriminator "
+                    f"registry only knows {registry_names!r}; unknown "
+                    f"members: {unknown!r}."
+                )
+            if not self.discriminator_values:
+                raise ValueError(
+                    f"EntitySpec({self.name!r}) sets discriminator_values=() "
+                    "— an empty subset is meaningless (the list would always "
+                    "be empty)."
+                )
+        # `discriminator_values` set on a model without a `kind` column
+        # is dead — same rationale as the `discriminator_value` guard.
+        if self.discriminator_values is not None and not hasattr(self.model, "kind"):
+            raise ValueError(
+                f"EntitySpec({self.name!r}) sets discriminator_values="
+                f"{self.discriminator_values!r} but model "
+                f"{self.model.__name__} has no `kind` attribute — the "
+                "framework reads `target.kind` to enforce the subset."
             )
         # Build the audit snapshotter for each axis that declares an
         # `audit_snapshot` schema. Mirrors the CRUD-side

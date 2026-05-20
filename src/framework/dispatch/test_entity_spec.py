@@ -435,6 +435,75 @@ def test_discriminator_value_requires_kind_attr_on_model():
         _make_spec(discriminator=_kinded_registry(), discriminator_value="x")
 
 
+# --- Subset-supertype face (`discriminator_values`) -----------------------
+
+
+def test_discriminator_values_defaults_to_none():
+    """Only umbrella faces set this; kind-locked leaves and non-
+    polymorphic entities leave it None."""
+    spec = _make_spec()
+    assert spec.discriminator_values is None
+
+
+def test_discriminator_values_round_trips_on_subset_face():
+    spec = _make_spec(
+        model=_KindedModel,
+        discriminator=_kinded_registry(),
+        discriminator_values=("x", "y"),
+    )
+    assert spec.discriminator_values == ("x", "y")
+    assert spec.discriminator_value is None
+    assert spec.discriminator is not None
+
+
+def test_discriminator_values_and_discriminator_value_mutually_exclusive():
+    """A face is either kind-locked to one kind or scoped to a subset —
+    declaring both is ambiguous."""
+    with pytest.raises(ValueError, match="mutually exclusive"):
+        _make_spec(
+            model=_KindedModel,
+            discriminator=_kinded_registry(),
+            discriminator_value="x",
+            discriminator_values=("x", "y"),
+        )
+
+
+def test_discriminator_values_without_discriminator_raises():
+    """A subset-supertype face still needs the registry to look up
+    per-kind detail models on create/update."""
+    with pytest.raises(ValueError, match="no discriminator registry"):
+        _make_spec(model=_KindedModel, discriminator_values=("x", "y"))
+
+
+def test_discriminator_values_members_must_be_in_registry():
+    """Every entry must be a value the registry knows about."""
+    with pytest.raises(ValueError, match="registry only knows"):
+        _make_spec(
+            model=_KindedModel,
+            discriminator=_kinded_registry(),
+            discriminator_values=("x", "not-a-kind"),
+        )
+
+
+def test_discriminator_values_empty_raises():
+    """An empty subset is meaningless — the list would always be empty."""
+    with pytest.raises(ValueError, match="empty subset is meaningless"):
+        _make_spec(
+            model=_KindedModel,
+            discriminator=_kinded_registry(),
+            discriminator_values=(),
+        )
+
+
+def test_discriminator_values_requires_kind_attr_on_model():
+    """Same model-has-kind guard as `discriminator_value`."""
+    with pytest.raises(ValueError, match="no `kind` attribute"):
+        _make_spec(
+            discriminator=_kinded_registry(),
+            discriminator_values=("x", "y"),
+        )
+
+
 def test_audit_snapshot_builds_audited_resource_from_schema():
     """`audit_snapshot=<schema>` triggers `make_audited_resource(name, schema)`
     at construction time so each CRUD entity doesn't repeat the call."""
