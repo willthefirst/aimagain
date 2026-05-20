@@ -1,4 +1,4 @@
-"""Consumer contract: editing the practice fields on the provider edit form.
+"""Consumer contract: editing the practice fields on the clinician edit form.
 
 Verifies that the practice-fields HTMX form rendered by
 `templates/providers/form_edit.html` (mounted via the
@@ -9,9 +9,19 @@ the route expects. After #524 the practice's display name lives on
 ``org_id`` `<select>`; the form still PATCHes ``location_*`` and
 session/insurance fields directly on the Provider.
 
-Sub-resource pacts (licensures, educations, certifications) are not
-covered here — each would warrant its own pair if it diverges from this
-shape.
+After #642 PR 1 a Provider may hold multiple Affiliations and the
+edit page surfaces them as an inline list. The top-level
+`PATCH /clinicians/{id}` form is unchanged on the wire — the per-role
+fields it posts (`location_*`, sessions, insurance, `sliding_scale`,
+`cost`) are routed by Provider per-role property proxies to the primary
+(oldest) affiliation row. The affiliation sub-resource PATCH endpoint
+(`PATCH /clinicians/{id}/affiliations/{aff_id}`) exists in the framework
+but has no consumer UI today, so it is intentionally not contract-tested
+here — see #647.
+
+Sub-resource pacts (licensures, educations, certifications, plus the
+inline "Add affiliation" POST) are not covered here — each would warrant
+its own pair if it diverges from this shape.
 """
 
 import pytest
@@ -33,18 +43,6 @@ from tests.test_contract.tests.shared.helpers import (
 )
 
 
-@pytest.mark.skip(
-    reason=(
-        "Pact stale after #642 PR 1: per-role fields (`location_*`, sessions, "
-        "insurance, sliding_scale, cost) moved out of the top-level provider "
-        "PATCH form into inline affiliation rows. The wire endpoint shifted "
-        "from `PATCH /clinicians/{id}` to `PATCH /clinicians/{id}/affiliations/"
-        "{affiliation_id}` and the encoded body shape changed. Tracked in "
-        "#647 — rewrite the pact pair for the affiliation PATCH surface, or "
-        "drop it if affiliation editing doesn't need a separate consumer "
-        "contract."
-    )
-)
 @pytest.mark.parametrize(
     "origin_with_routes",
     [{"provider_edit_form": True, "auth_pages": False}],
@@ -113,14 +111,17 @@ async def test_consumer_provider_edit_form_submits(origin_with_routes: str, page
         http_method="PATCH",
     )
 
+    # The inline "Add affiliation" form below the practice section reuses
+    # the same input names (`location_city`, etc.), so every locator on
+    # this page must be scoped to the practice-fields form to avoid
+    # strict-mode multi-match.
+    practice_form = page.locator(f'form[hx-patch="{PROVIDER_PATCH_API_PATH}"]')
+
     with pact:
         await page.goto(edit_page_url)
         await page.wait_for_selector('select[name="org_id"]')
-        await page.locator('input[name="location_city"]').fill("Bayside")
-        # Submit the practice-fields form (the first one on the page).
-        await page.locator(
-            f'form[hx-patch="{PROVIDER_PATCH_API_PATH}"] button[type="submit"]'
-        ).click()
+        await practice_form.locator('input[name="location_city"]').fill("Bayside")
+        await practice_form.locator('button[type="submit"]').click()
         await page.wait_for_timeout(NETWORK_TIMEOUT_MS)
 
     # Pact verification happens automatically on context exit.
