@@ -351,69 +351,6 @@
         .form-actions { flex-direction: column; align-items: stretch; }
         .form-actions > .form-actions-destructive { margin-left: 0; }
       }
-      /* Kind-picker chooser — used by `posts/form_new.html` (the
-         `/posts/form` page when the request omits `?kind=`). Each
-         `<a class="kind-picker-option">` is a full-bleed card the user
-         clicks to enter the kind-specific create form: Lucide icon on
-         the left, two-line text stack (title + 1-line description) on
-         the right. The `data-kind` attribute mirrors the convention
-         used on the entity-card markup so the kind reads the same
-         across post surfaces. Pico styles `<a>` as inline text; the
-         rules here promote each option to a block-level card with
-         border, padding, and a hover/focus accent. The cap reuses
-         `--form-max-width` so the chooser shares the page-width
-         envelope with the per-kind create forms it routes to. */
-      .kind-picker {
-        list-style: none;
-        padding: 0;
-        margin: 0;
-        display: flex;
-        flex-direction: column;
-        gap: 0.75rem;
-        max-width: var(--form-max-width);
-      }
-      .kind-picker-option {
-        display: grid;
-        grid-template-columns: auto 1fr;
-        grid-template-rows: auto auto;
-        column-gap: 1rem;
-        align-items: center;
-        padding: 1rem;
-        border: var(--pico-border-width) solid var(--pico-muted-border-color);
-        border-left: 4px solid var(--pico-muted-border-color);
-        border-radius: var(--pico-border-radius);
-        background: var(--pico-card-background-color);
-        color: inherit;
-        text-decoration: none;
-      }
-      .kind-picker-option[data-kind="referral"] { border-left-color: darkorange; }
-      .kind-picker-option[data-kind="clinician_opening"] { border-left-color: darkcyan; }
-      .kind-picker-option[data-kind="program_intake"] { border-left-color: darkcyan; }
-      .kind-picker-option:is(:hover, :focus-visible) {
-        border-color: var(--pico-primary);
-        background: var(--pico-card-sectioning-background-color);
-        text-decoration: none;
-      }
-      .kind-picker-icon {
-        grid-row: 1 / span 2;
-        grid-column: 1;
-        font-size: 1.75rem;
-        margin-inline-end: 0;
-        color: var(--pico-primary);
-      }
-      .kind-picker-title {
-        grid-row: 1;
-        grid-column: 2;
-        font-weight: 600;
-        font-size: 1.05rem;
-      }
-      .kind-picker-description {
-        grid-row: 2;
-        grid-column: 2;
-        color: var(--pico-muted-color);
-        font-size: 0.9rem;
-        line-height: 1.35;
-      }
       /* Pico's `<fieldset>` carries a top margin that visually competes
          with the cap above — flatten the rhythm so siblings sit at a
          consistent gap inside the capped form. */
