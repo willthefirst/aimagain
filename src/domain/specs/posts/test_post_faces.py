@@ -69,24 +69,44 @@ def test_both_faces_share_the_post_kinds_registry():
         assert face.discriminator is POST_KINDS
 
 
-def test_faces_drop_kind_filter_on_search_form():
-    """The six surviving filters (q, posted_by, state, city, age_group,
-    language) appear on every face's search form. The seventh filter
-    (`kind`) lived on the old supertype only — `/referrals` is locked to
-    one kind, and `/openings` is bound to its subset by the framework's
-    `discriminator_values` lock, so a user-facing kind picker would be
-    redundant on both."""
-    for face in _FACES:
-        filter_names = [f.name for f in face.filters]
-        assert "kind" not in filter_names
-        assert set(filter_names) == {
-            "q",
-            "posted_by",
-            "state",
-            "city",
-            "age_group",
-            "language",
-        }
+def test_kind_locked_face_drops_kind_filter():
+    """`/referrals` is bound to one kind — a kind picker on the search
+    form would be a no-op. The shared `_POST_FILTERS` tuple already
+    omits `kind`."""
+    filter_names = [f.name for f in REFERRAL_ENTITY.filters]
+    assert "kind" not in filter_names
+    assert set(filter_names) == {
+        "q",
+        "posted_by",
+        "state",
+        "city",
+        "age_group",
+        "language",
+    }
+
+
+def test_subset_supertype_face_exposes_kind_filter_over_its_subkinds():
+    """`/openings` lists two subkinds (`clinician_opening`,
+    `program_intake`). The search page exposes a `kind` filter so
+    viewers can narrow to one subkind; the choices are exactly the
+    face's `discriminator_values`."""
+    filter_names = [f.name for f in OPENING_ENTITY.filters]
+    assert "kind" in filter_names
+    kind_filter = next(f for f in OPENING_ENTITY.filters if f.name == "kind")
+    assert kind_filter.choices == (
+        ("clinician_opening", "clinician opening"),
+        ("program_intake", "program intake"),
+    )
+    # The six non-kind post filters are still present.
+    assert set(filter_names) == {
+        "kind",
+        "q",
+        "posted_by",
+        "state",
+        "city",
+        "age_group",
+        "language",
+    }
 
 
 def test_referral_face_uses_per_kind_adapter():

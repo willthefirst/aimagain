@@ -141,6 +141,26 @@ def _post_face(
             "or `kinds=` (subset-supertype); got "
             f"kind={kind!r}, kinds={kinds!r}"
         )
+    # Subset-supertype faces expose a `kind` filter on their list /
+    # search page so a viewer can narrow to one subkind without leaving
+    # the umbrella URL. Kind-locked leaves can't filter further by
+    # definition — they're already bound to one kind — so the kind
+    # filter is added only when `kinds=` is set. Choices read the
+    # human label from `POST_KINDS[k].list_label`. The annotation
+    # stays permissive (default `list[str] | None`) so out-of-subset
+    # values silently drop in `handle_list` instead of 422-ing — same
+    # convention kind-locked faces follow for an attacker-supplied
+    # `?kind=other`.
+    if kinds is not None:
+        kind_filter = ChoiceFilter(
+            name="kind",
+            label="Type",
+            choices=tuple((k, POST_KINDS[k].list_label) for k in kinds),
+            multi=True,
+        )
+        face_filters: tuple = (kind_filter,) + _POST_FILTERS
+    else:
+        face_filters = _POST_FILTERS
     return EntitySpec(
         name=name,
         url_collection=url_collection,
@@ -164,7 +184,7 @@ def _post_face(
             form_edit=True,
             search=True,
         ),
-        filters=_POST_FILTERS,
+        filters=face_filters,
         # Post-face templates live under `templates/posts/<face>/` (the
         # post cluster's own sub-directory) rather than the framework's
         # default `templates/<url_collection>/`. The nesting reflects

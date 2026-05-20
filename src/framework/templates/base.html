@@ -613,19 +613,16 @@
         </ul>
         <ul id="primary-nav">
           {% if is_authenticated %}
-          {# Primary chrome CTA — adapts to onboarding state. First-time
-             users (no provider profile yet) see "Create clinician",
-             which takes them to `/clinicians/form` so they can unblock
-             posting. Returning users see "Create opening", the primary
-             Journey-1 action ("find new clients" → broadcast your
-             availability so referrers find you). The flag
+          {# Onboarding-only chrome CTA — first-time users (no provider
+             profile yet) see "Create clinician", which takes them to
+             `/clinicians/form` so they can unblock posting. Returning
+             users with a profile see no CTA in the nav: the page-level
+             "Create opening" / "Create referral" buttons on the
+             respective list views are the right surface for those
+             actions (one CTA per page, not duplicated in chrome).
              `has_provider_profile` is a chrome scalar in
-             `src.framework.http.responses.base_context`. Labels mirror
-             the per-list-page toolbar verb ("Create <entity>") so the
-             vocabulary stays consistent across surfaces. #}
-          {% if has_provider_profile %}
-          <li><a role="button" href="{{ entity_form_url('opening') }}">Create opening</a></li>
-          {% else %}
+             `src.framework.http.responses.base_context`. #}
+          {% if not has_provider_profile %}
           <li><a role="button" href="{{ entity_form_url('clinician') }}">Create clinician</a></li>
           {% endif %}
           <li>

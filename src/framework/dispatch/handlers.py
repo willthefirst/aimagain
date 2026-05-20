@@ -909,17 +909,35 @@ async def handle_list(
     page_number = parse_page(request)
     per_page = spec.page_size or DEFAULT_PAGE_SIZE
     list_kwargs: dict[str, Any] = dict(filter_values)
-    # Kind-locked / subset-supertype face — force `kind` to the bound
-    # value(s) so the URL family only ever lists its own kind(s). The
-    # user-facing filter form drops the `kind` choice (the spec strips
-    # it from `filters`), so `filter_values` won't carry it from query
-    # params; an attacker-supplied `?kind=other` is silently ignored.
-    # Subset faces pass a list — the repository's `kind` predicate
-    # widens to `kind IN (...)`.
+    # Kind-locked / subset-supertype face — bind `kind` to the face's
+    # discriminator. Kind-locked leaves stomp any user value (the URL
+    # family is bound to one kind regardless of `?kind=`). Subset faces
+    # respect a user-supplied `kind` filter when the spec declares one
+    # (intersecting the user's pick with the face's subset); when no
+    # user filter is set, fall back to the full subset.
     if spec.discriminator_value is not None:
         list_kwargs[spec.discriminator.column] = spec.discriminator_value
     elif spec.discriminator_values is not None:
-        list_kwargs[spec.discriminator.column] = list(spec.discriminator_values)
+        column = spec.discriminator.column
+        user_value = list_kwargs.get(column)
+        # Normalize user input to a set of kinds. The kind filter on a
+        # subset face is conventionally `multi=True` (a `ChoiceFilter`
+        # whose choices are the subset). Empty / unset → full subset.
+        if user_value:
+            if isinstance(user_value, list):
+                user_kinds = [k for k in user_value if k in spec.discriminator_values]
+            elif user_value in spec.discriminator_values:
+                user_kinds = [user_value]
+            else:
+                user_kinds = []
+        else:
+            user_kinds = []
+        # Empty intersection (user picked only kinds outside the subset,
+        # or didn't pick any) → use the full subset. The alternative
+        # (return zero rows when user's pick is invalid) is surprising;
+        # silently clamping matches kind-locked faces' behavior of
+        # ignoring ?kind=other.
+        list_kwargs[column] = user_kinds or list(spec.discriminator_values)
     if spec.list_exclude_self and requesting_user is not None:
         list_kwargs["exclude_self"] = requesting_user
     list_kwargs["offset"] = offset_for(page_number, per_page)
