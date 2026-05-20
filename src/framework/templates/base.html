@@ -130,6 +130,13 @@
         color: inherit;
         margin-inline-end: 0.25em;
       }
+      /* `<ul class="icon-list">` (rendered by the shared `icon_list`
+         macro in `_shared/icon_list.html`). The Lucide glyph in each
+         `<li>` is the only marker; strip the default disc bullet and
+         the left padding the bullet was indented from. The icon's
+         `margin-inline-end` rule above already provides the icon → label
+         gap, so this rule adds no per-item spacing. */
+      .icon-list { list-style: none; padding-left: 0; }
       /* Page-scoped zone bar. Every page that needs page-scoped
          controls renders a single `<div class="toolbar">` strip
          whose children all right-align:

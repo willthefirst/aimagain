@@ -1,0 +1,36 @@
+{# Bulleted-with-Lucide-glyphs list.
+
+The default `<ul>` disc bullet plus a leading Lucide icon double-marks
+every item (the screenshot in #647-followup showed this). This macro
+emits a `<ul class="icon-list">` whose list-style is stripped via
+`base.html`, letting the Lucide glyph serve as the only marker.
+
+Items are plain `{"icon": "pill", "label": "Medication management"}`
+dicts — pass whatever sequence of mappings the caller has, in display
+order. Lucide icon class names live in
+[`src/framework/static/icons/`](../../static/icons); the
+`[class^="icon-"]` rule in `base.html` gives every glyph its trailing
+`margin-inline-end: 0.25em` gap, so this macro adds no per-item
+spacing CSS.
+
+When a per-item label needs richer content than plain text (a link,
+strong emphasis), inline the `<li>` directly instead of passing through
+the macro — three lines of HTML stays cheaper than overloading the
+contract.
+
+Example:
+
+    {% from "_shared/icon_list.html" import icon_list %}
+    {{ icon_list([
+        {"icon": "pill",         "label": "Medication management"},
+        {"icon": "clipboard",    "label": "Evaluation"},
+        {"icon": "heart-handshake","label": "Couples therapy"},
+    ]) }}
+#}
+{% macro icon_list(items) -%}
+<ul class="icon-list">
+  {%- for item in items %}
+  <li><i class="icon-{{ item.icon }}" aria-hidden="true"></i>{{ item.label }}</li>
+  {%- endfor %}
+</ul>
+{%- endmacro %}
