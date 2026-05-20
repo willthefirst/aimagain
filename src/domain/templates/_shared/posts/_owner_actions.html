@@ -19,8 +19,12 @@
    src/logic/posts/post_processing.py — this `{% if %}` is
    presentation only.
 #}
-{%- from "_shared/actions.html" import confirm_delete_button -%}
+{%- from "_shared/actions.html" import actions -%}
 {% if can_edit %}
-<li><a href="{{ entity_form_url(entity_name, id=post.id) }}" role="button" class="outline">Edit</a></li>
-<li>{{ confirm_delete_button(entity_url(entity_name, id=post.id), "Permanently delete this " ~ entity_name ~ "? This cannot be undone.") }}</li>
+{{ actions(
+    wrapper="toolbar",
+    edit_url=entity_form_url(entity_name, id=post.id),
+    delete_url=entity_url(entity_name, id=post.id),
+    delete_confirm="Permanently delete this " ~ entity_name ~ "? This cannot be undone.",
+) }}
 {% endif %}

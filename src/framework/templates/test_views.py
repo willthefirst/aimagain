@@ -385,7 +385,7 @@ def test_form_edit_view_renders_breadcrumb_and_edit_heading() -> None:
     assert h1.text(strip=True) == "Edit Sunrise Therapy"
 
 
-def test_form_actions_buttons_fill_row_width_on_desktop() -> None:
+def test_actions_buttons_fill_row_width_on_desktop() -> None:
     """Save / Cancel must stretch (`flex: 1 1 0`) so the cluster fills
     the form's content width instead of clustering at the left edge as
     content-width flex items — without the rule the row visibly fell
@@ -449,21 +449,21 @@ def test_form_actions_buttons_fill_row_width_on_desktop() -> None:
     )
 
 
-def test_form_actions_macro_supports_cancel_only_for_page_level_clusters() -> None:
-    """The `form_actions` macro accepts `submit_label=None` so multi-
-    section pages (e.g. `providers/form_edit.html`) can render a
-    page-level Cancel-only cluster without a redundant Save button.
-    Pinned because the bare `<div class="form-actions">` that used to
-    live in that template diverged from the macro's styling on the
-    desktop width fix — every cluster must route through the macro."""
+def test_actions_macro_supports_cancel_only_for_page_level_clusters() -> None:
+    """The `actions` macro accepts `submit_label=None` so multi-section
+    pages (e.g. `providers/form_edit.html`) can render a page-level
+    Cancel-only cluster without a redundant Save button. Pinned because
+    the bare `<div class="form-actions">` that used to live in that
+    template diverged from the macro's styling on the desktop width fix
+    — every cluster must route through the macro."""
     env = _make_env()
     _add_child(
         env,
         "stub.html",
         """
-        {% from "_shared/forms.html" import form_actions %}
+        {% from "_shared/actions.html" import actions %}
         <div id="cancel-only">
-          {{ form_actions(cancel_url="/widgets/1") }}
+          {{ actions(cancel_url="/widgets/1") }}
         </div>
         """,
     )
@@ -526,38 +526,47 @@ def test_destructive_action_macros_emit_danger_class() -> None:
 
     1. `_shared/actions.html::confirm_delete_button` — used by toolbar
        owner/admin actions and inline subentity rows.
-    2. `_shared/forms.html::form_actions` — the standard
-       Save/Cancel/Delete cluster at the bottom of every entity form.
+    2. `_shared/actions.html::actions` — the standard
+       Save/Cancel/Delete cluster at the bottom of every entity form
+       and the Edit/Delete cluster in every detail-page toolbar.
     """
     env = _make_env()
     _add_child(
         env,
         "stub.html",
         """
-        {% from "_shared/actions.html" import confirm_delete_button %}
-        {% from "_shared/forms.html" import form_actions %}
-        <div id="toolbar-delete">
+        {% from "_shared/actions.html" import confirm_delete_button, actions %}
+        <div id="bare-delete">
           {{ confirm_delete_button("/posts/1", "Sure?") }}
         </div>
         <div id="form-delete">
-          {{ form_actions("Save", cancel_url="/posts/1", delete_url="/posts/1", delete_confirm="Sure?") }}
+          {{ actions("Save", cancel_url="/posts/1", delete_url="/posts/1", delete_confirm="Sure?") }}
         </div>
+        <menu id="toolbar-delete">
+          {{ actions(wrapper="toolbar", delete_url="/posts/1", delete_confirm="Sure?") }}
+        </menu>
         """,
     )
     html = env.get_template("stub.html").render()
 
     tree = HTMLParser(html)
-    toolbar = tree.css_first("#toolbar-delete button")
-    assert toolbar is not None
+    bare = tree.css_first("#bare-delete button")
+    assert bare is not None
     assert "danger" in (
-        toolbar.attributes.get("class") or ""
+        bare.attributes.get("class") or ""
     ), "confirm_delete_button must emit class containing 'danger'"
 
     form_delete = tree.css_first("#form-delete .form-actions-destructive")
     assert form_delete is not None
     assert "danger" in (
         form_delete.attributes.get("class") or ""
-    ), "form_actions Delete button must emit class containing 'danger'"
+    ), "actions form-mode Delete must emit `danger` + `form-actions-destructive`"
+
+    toolbar_delete = tree.css_first("#toolbar-delete li button")
+    assert toolbar_delete is not None, "toolbar-mode Delete must be wrapped in <li>"
+    assert "danger" in (
+        toolbar_delete.attributes.get("class") or ""
+    ), "actions toolbar-mode Delete must emit class containing 'danger'"
 
 
 def test_list_page_heading_visible_on_mobile() -> None:

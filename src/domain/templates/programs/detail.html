@@ -1,4 +1,5 @@
 {% extends "views/detail.html" %}
+{%- from "_shared/actions.html" import actions -%}
 
 {% set resource_url = entity_url('program') %}
 
@@ -7,7 +8,11 @@
 
 {% block actions %}
 {% if can_edit %}
-<li><a href="{{ entity_form_url('program', id=program.id) }}" role="button" class="outline">Edit program</a></li>
+{{ actions(
+    wrapper="toolbar",
+    edit_url=entity_form_url('program', id=program.id),
+    edit_label="Edit program",
+) }}
 {% endif %}
 {% endblock %}
 

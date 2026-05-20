@@ -1,6 +1,6 @@
 {% extends "views/form_edit.html" %}
 {%- from "_shared/form_fields.html" import entity_select_field, radio_bool_field, select_field, text_field -%}
-{%- from "_shared/forms.html" import form_actions -%}
+{%- from "_shared/actions.html" import actions -%}
 
 {% set resource_url = entity_url('program') %}
 {% set resource_detail_url = entity_url('program', id=program.id) %}
@@ -40,7 +40,7 @@
     <legend>Intake</legend>
     {{ radio_bool_field("accepting_referrals", "Accepting referrals?", current=program.accepting_referrals, required=false) }}
   </fieldset>
-  {{ form_actions(
+  {{ actions(
       "Save program",
       cancel_url=entity_url('program', id=program.id),
       delete_url=entity_url('program', id=program.id),

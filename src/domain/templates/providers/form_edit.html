@@ -1,6 +1,7 @@
 {% extends "views/form_edit.html" %}
 {%- from "_shared/form_fields.html" import entity_select_field, text_field, select_field, radio_bool_field, multi_select_field -%}
-{%- from "_shared/forms.html" import inline_add_form, form_actions -%}
+{%- from "_shared/forms.html" import inline_add_form -%}
+{%- from "_shared/actions.html" import actions -%}
 {%- from "providers/_credential_row.html" import credential_row -%}
 
 {# The framework binds `context[spec.name] = target`; after #642 PR 4 the
@@ -61,7 +62,7 @@
        are managed via the inline add/remove forms below. Delete for
        the Provider itself lives on the detail page's toolbar (see
        `providers/detail.html`). #}
-    {{ form_actions("Save practice details", cancel_url=entity_url('clinician', id=provider.id)) }}
+    {{ actions("Save practice details", cancel_url=entity_url('clinician', id=provider.id)) }}
   </form>
 </section>
 
@@ -205,8 +206,8 @@
 
 {# Page-level Cancel — the credentials sections above use inline-add /
    per-row delete forms that don't share submit/cancel state with the
-   Practice form. Routing through `form_actions` (with no
+   Practice form. Routing through `actions` (with no
    `submit_label`) keeps the visual width consistent with the rest of
    the form-action clusters on the page. #}
-{{ form_actions(cancel_url=entity_url('clinician', id=provider.id)) }}
+{{ actions(cancel_url=entity_url('clinician', id=provider.id)) }}
 {% endblock %}
