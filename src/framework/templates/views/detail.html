@@ -13,6 +13,7 @@ Layout per page:
     <breadcrumb: link to collection>
     <h1: current item>    <actions...>
     <hr>
+    <subtitle: optional one-line meta>
     <content>
 
 Child contract:
@@ -32,6 +33,14 @@ Child contract:
                      text with `aria-current="page"`.
 
   Optional blocks:
+    subtitle       — plain-text one-liner rendered as muted small text
+                     directly below the toolbar H1 (above content). Use
+                     for identity-adjacent meta that doesn't belong in
+                     the H1 itself — e.g. NPI on clinicians, date ·
+                     modality on posts. The chrome wraps the block's
+                     output in `<p><small>...</small></p>` so children
+                     only emit text; nothing renders when the block is
+                     empty.
     actions        — toolbar right-zone content: Edit, Delete,
                      Favorite, admin actions, etc. Each action is a
                      `<li>` because the right zone is a
@@ -53,6 +62,8 @@ Child contract:
 {%- set current %}{% block current_label %}{% endblock %}{% endset -%}
 {%- set actions_body %}{% block actions %}{% endblock %}{% endset -%}
 {% call page_toolbar(heading=current | trim) %}{{ actions_body }}{% endcall %}
+{%- set sub %}{% block subtitle %}{% endblock %}{% endset -%}
+{%- if sub | trim %}<p><small>{{ sub | trim | safe }}</small></p>{% endif %}
 {% endblock %}
 
 {% block content %}{% endblock %}
