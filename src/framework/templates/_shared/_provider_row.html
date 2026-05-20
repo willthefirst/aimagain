@@ -20,16 +20,18 @@ After #642 PR 3 each cell reflects **every** affiliation the Provider
 holds — not just the primary one.
 
   - Practice cell: one anchor per affiliation pointing at the owning
-    Organization (`/organizations/{aff.org_id}`), joined by `" · "`.
-    Two affiliations at the same Org keep both chips (they may be
-    different locations); the cell intentionally does not dedupe by
-    `org_id`. The `<td>` keeps `class="primary"` so the responsive
-    mobile-stack pattern (see `_shared/index_table.html` and
-    `base.html` #578) still treats the cell as the row's headline.
-  - Location cell: `"City, ST"` per affiliation, joined by `" · "`,
+    Organization (`/organizations/{aff.org_id}`). The cell carries
+    `class="primary meta"` — `.primary` for the responsive mobile-
+    stack pattern (see `_shared/index_table.html` and `base.html`
+    #578), `.meta` so adjacent anchor siblings render with " · "
+    between them via the CSS rule in `base.html`. Two affiliations at
+    the same Org keep both chips (they may be different locations);
+    the cell intentionally does not dedupe by `org_id`.
+  - Location cell: `"City, ST"` per affiliation wrapped in `<span>`,
     with adjacent duplicate strings deduped (a clinician with two
     affiliations both in Brooklyn, NY renders one chip — see the
-    `seen` set below).
+    `seen` set below). The cell carries `class="meta"` so the spans
+    render with " · " between them via the same CSS rule.
   - Insurance cell: rendered from
     `src.domain.logic.providers.view._insurance_summary`, which unions
     in-network carriers, out-of-network acceptance, and sliding-scale
@@ -69,18 +71,18 @@ Provider id for tests / future per-row chrome.
   {%- endif -%}
 {%- endfor -%}
 <tr data-row-id="{{ provider.id }}">
-  <td data-label="Practice" class="primary">
+  <td data-label="Practice" class="primary meta">
     {%- if affiliations -%}
       {%- for aff in affiliations -%}
-        <a href="{{ entity_url('organization', id=aff.org_id) }}">{{ aff.org.name }}</a>{% if not loop.last %} · {% endif %}
+        <a href="{{ entity_url('organization', id=aff.org_id) }}">{{ aff.org.name }}</a>
       {%- endfor -%}
     {%- else -%}
       &mdash;
     {%- endif -%}
   </td>
-  <td data-label="Location">
+  <td data-label="Location" class="meta">
     {%- if locations -%}
-      {{ locations | join(' · ') }}
+      {%- for loc in locations -%}<span>{{ loc }}</span>{%- endfor -%}
     {%- else -%}
       &mdash;
     {%- endif -%}

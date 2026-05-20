@@ -33,14 +33,16 @@ Child contract:
                      text with `aria-current="page"`.
 
   Optional blocks:
-    subtitle       — plain-text one-liner rendered as muted small text
-                     directly below the toolbar H1 (above content). Use
-                     for identity-adjacent meta that doesn't belong in
-                     the H1 itself — e.g. NPI on clinicians, date ·
+    subtitle       — one-liner rendered as muted small text directly
+                     below the toolbar H1 (above content). Use for
+                     identity-adjacent meta that doesn't belong in the
+                     H1 itself — e.g. NPI on clinicians, date +
                      modality on posts. The chrome wraps the block's
-                     output in `<p><small>...</small></p>` so children
-                     only emit text; nothing renders when the block is
-                     empty.
+                     output in `<p><small class="meta">...</small></p>`,
+                     so a block with multiple `<span>` (or `<a>`)
+                     children automatically gets " · " between
+                     siblings via the `.meta` CSS rule in base.html.
+                     Nothing renders when the block is empty.
     actions        — toolbar right-zone content: Edit, Delete,
                      Favorite, admin actions, etc. Each action is a
                      `<li>` because the right zone is a
@@ -63,7 +65,7 @@ Child contract:
 {%- set actions_body %}{% block actions %}{% endblock %}{% endset -%}
 {% call page_toolbar(heading=current | trim) %}{{ actions_body }}{% endcall %}
 {%- set sub %}{% block subtitle %}{% endblock %}{% endset -%}
-{%- if sub | trim %}<p><small>{{ sub | trim | safe }}</small></p>{% endif %}
+{%- if sub | trim %}<p><small class="meta">{{ sub | trim | safe }}</small></p>{% endif %}
 {% endblock %}
 
 {% block content %}{% endblock %}

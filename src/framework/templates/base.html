@@ -69,7 +69,7 @@
       /* Entity cards (`<article class="entity-card">`) intentionally
          carry no custom CSS — they rely on Pico's default `<article>`
          framing (background, border, padding, rounded corners) plus
-         semantic HTML inside (`<hgroup>`, `<h3>`, `<small>`, `<dl>`,
+         semantic HTML inside (`<header>`, `<h3>`, `<small>`, `<dl>`,
          etc.) so the chrome stays framework-portable. The
          `entity-card` / `entity-header` / `entity-facts` / etc.
          class names are kept on the markup as DOM hooks (tests query
@@ -182,6 +182,17 @@
         dl > div { display: block; }
         dt { margin-bottom: 0.125rem; }
       }
+      /* Inline meta list — the small print under a card heading or
+         page H1 that joins several short facts with " · ". Templates
+         wrap each fact in its own element (`<span>{{ date }}</span>
+         <span>Virtual</span>...`); this rule puts the middot between
+         every pair of adjacent siblings. The advantage over a
+         hardcoded `{{ items | join(' · ') }}` is locality: drop or
+         hide a single child and the surrounding separators redo
+         themselves; render zero or one child and nothing extra
+         appears. Works on any tag (`<span>`, `<a>`, etc.) — the
+         selector is purely structural. */
+      .meta > * + *::before { content: " · "; }
       /* Page-scoped zone bar. Every page that needs page-scoped
          controls renders a single `<div class="toolbar">` strip
          whose children all right-align:
