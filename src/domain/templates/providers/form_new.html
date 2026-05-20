@@ -67,6 +67,6 @@
     {{ text_field("cost", "Cost", required=false, help="Free text. Optional.") }}
   </fieldset>
 
-  {{ actions("Create clinician", cancel_url=entity_url('clinician')) }}
+  {{ actions(entity_create_label('clinician'), cancel_url=entity_url('clinician')) }}
 </form>
 {% endblock %}

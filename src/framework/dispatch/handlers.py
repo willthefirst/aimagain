@@ -696,10 +696,21 @@ async def handle_get_new_form(
       * `kind=<value>` → set `template_name` to the kind's
         `create_template` so the route renders the kind-specific form.
     """
+    # `create_heading` is the H1 the generic `views/form_new.html` chrome
+    # renders. Computing it here — instead of letting each child template
+    # override `{% block current_label %}` — funnels every "Create X"
+    # string through one helper (`create_label_for` / its Jinja-global
+    # twin `entity_create_label`), so the page H1 and the button that
+    # opened it can't drift. The handler-side construction is half of
+    # the structural pin (the other half is the Jinja global on the
+    # CTAs); pinned by `tests/test_form_chrome_labels.py`.
+    from src.framework.rendering.labels import create_label_for
+
     context: dict[str, Any] = {
         "request": request,
         "entity_name": spec.name,
         "current_user": requesting_user,
+        "create_heading": create_label_for(spec, kind=kind),
     }
     if spec.static_context:
         context.update(spec.static_context)
@@ -992,6 +1003,8 @@ async def handle_list(
     if spec.routes.search:
         from urllib.parse import urlencode
 
+        from src.framework.rendering.labels import filter_label_for
+
         active_pairs: list[tuple[str, str]] = []
         for fname, fvalue in filter_values.items():
             if fvalue is None or fvalue == "" or fvalue == []:
@@ -1004,8 +1017,14 @@ async def handle_list(
         qs = urlencode(active_pairs)
         base = f"/{spec.url_collection}/search"
         context["search_url"] = f"{base}?{qs}" if qs else base
+        # `filter_heading` is the canonical "Filter <plural>" string the
+        # toolbar's filter link reads when no filters are applied, and
+        # the search page's H1 reads on its own. Same helper feeds both
+        # surfaces — see `src/framework/rendering/labels.py`.
+        context["filter_heading"] = filter_label_for(spec)
     else:
         context["search_url"] = None
+        context["filter_heading"] = None
 
     # Spec-declared constants — same merge precedence as handle_detail.
     if spec.static_context:

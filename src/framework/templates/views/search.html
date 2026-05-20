@@ -34,7 +34,12 @@ the spec.
 {% endblock %}
 
 {% block toolbar %}
-{% call page_toolbar(heading=self.resource_label() | trim ~ " search") %}{% endcall %}
+{# `filter_heading` is sourced from `entity_filter_label(spec.name)` in
+   the search handler (see `mount_search` in
+   `framework/dispatch/resource_routes.py`). Same helper feeds the
+   list-page toolbar's filter link, so the button text and the page
+   title can't drift. #}
+{% call page_toolbar(heading=filter_heading) %}{% endcall %}
 {% endblock %}
 
 {% block content %}

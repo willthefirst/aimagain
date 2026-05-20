@@ -29,6 +29,6 @@
     ) }}
   </fieldset>
 
-  {{ actions("Create organization", cancel_url=entity_url('organization')) }}
+  {{ actions(entity_create_label('organization'), cancel_url=entity_url('organization')) }}
 </form>
 {% endblock %}

@@ -4,7 +4,7 @@
 {% block resource_label %}Programs{% endblock %}
 
 {% block actions %}
-<li><a href="{{ entity_form_url('program') }}" role="button">Create program</a></li>
+<li><a href="{{ entity_form_url('program') }}" role="button">{{ entity_create_label('program') }}</a></li>
 {% endblock %}
 
 {% block content %}
@@ -37,7 +37,7 @@
 <div id="programs-empty-state">
   <p>No programs yet.</p>
   <p>
-    <a href="{{ entity_form_url('program') }}" role="button">Create program</a>
+    <a href="{{ entity_form_url('program') }}" role="button">{{ entity_create_label('program') }}</a>
   </p>
 </div>
 {% endif %}

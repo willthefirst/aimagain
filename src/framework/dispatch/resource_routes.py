@@ -993,6 +993,8 @@ def mount_search(
     list_action = f"/{entity.url_collection}"
 
     async def _search_handler(**kwargs: Any) -> dict[str, Any]:
+        from src.framework.rendering.labels import filter_label_for
+
         request: Request = kwargs["request"]
         values: dict[str, Any] = {f.name: kwargs.get(f.name) for f in declared}
         ctx: dict[str, Any] = {
@@ -1002,6 +1004,12 @@ def mount_search(
             "filter_values": values,
             "list_action": list_action,
             "resource_label": entity.url_collection.capitalize(),
+            # `filter_heading` is the single canonical "Filter <plural>"
+            # string the search page H1 and the list-page toolbar's
+            # filter link both render — the structural pin that keeps
+            # the toolbar button and the page title in sync. See
+            # `src/framework/rendering/labels.py`.
+            "filter_heading": filter_label_for(entity),
         }
         if entity.static_context:
             ctx.update(entity.static_context)
