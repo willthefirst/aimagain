@@ -216,6 +216,12 @@ class ProviderRead(ReadProjection):
     # verification pipeline to look up the provider in NPPES. No UNIQUE
     # constraint at the DB layer yet.
     npi: str | None = None
+    # Legal first / last name — surfaced via `from_attributes` through
+    # `Provider.first_name` / `last_name`, which proxy to the linked
+    # `Clinician` (the actual column owner). Optional on read because
+    # backfill is operator-driven.
+    first_name: str | None = None
+    last_name: str | None = None
     # `(city, state, zip)` arrive flat — from ORM attributes via
     # ``from_attributes`` or from a flat dict — and dump flat (JSON
     # responses still expose ``location_city`` / ``location_state`` /
@@ -268,6 +274,12 @@ class ProviderCreate(WirePayload):
     # Optional on create; backfill is operator-driven. Empty input
     # normalizes to `None` so an unfilled form field doesn't 422.
     npi: NpiText = None
+    # Legal first / last name — both optional, both normalize empty
+    # string to `None` via `StrippedOptionalText` so an unfilled form
+    # field doesn't persist `""`. Forwarded to the linked Clinician
+    # via `Provider.__init__`'s kwarg peeling.
+    first_name: StrippedOptionalText = None
+    last_name: StrippedOptionalText = None
     location: Location
     in_person_sessions: Literal[*LOCATION_AVAILABILITY_OPTIONS]
     virtual_sessions: Literal[*LOCATION_AVAILABILITY_OPTIONS]
@@ -313,6 +325,12 @@ class ProviderUpdate(PartialUpdate):
     # Patch the NPI by writing a 10-digit string or empty (→ `None`,
     # clearing the field). Same validator as :class:`ProviderCreate`.
     npi: NpiText = None
+    # Patch the linked Clinician's first / last name. Empty input
+    # normalizes to `None` so submitting a blank field clears the
+    # column; absent fields pass through `exclude_unset=True` and
+    # don't touch the persisted value.
+    first_name: StrippedOptionalText = None
+    last_name: StrippedOptionalText = None
     location: LocationPartial | None = None
     in_person_sessions: Literal[*LOCATION_AVAILABILITY_OPTIONS] | None = None
     virtual_sessions: Literal[*LOCATION_AVAILABILITY_OPTIONS] | None = None

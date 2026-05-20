@@ -81,17 +81,60 @@ async def _seed_provider(
     *,
     npi: str | None = None,
     username: str = "owner",
+    first_name: str | None = None,
+    last_name: str | None = None,
 ) -> tuple[Provider, User]:
     owner = create_test_user(username=f"{username}-{uuid4()}")
     async with db_test_session_manager() as session:
         async with session.begin():
             session.add(owner)
-            provider = make_provider_with_org(owner_id=owner.id, npi=npi)
+            provider = make_provider_with_org(
+                owner_id=owner.id,
+                npi=npi,
+                first_name=first_name,
+                last_name=last_name,
+            )
             session.add(provider)
     return provider, owner
 
 
 # --- Status outcomes ----------------------------------------------------
+
+
+async def test_run_returns_verified_when_clinician_name_matches_nppes(
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+):
+    """When the clinician's first/last_name match NPPES' return, the
+    similarity scorer clears threshold → `verified`. Pins the
+    `_clinician_names` path that reads through to the linked Clinician
+    instead of the historical username fallback (which scored too low
+    to ever verify)."""
+    provider, _ = await _seed_provider(
+        db_test_session_manager,
+        npi="1234567890",
+        first_name="Eva",
+        last_name="Stone",
+    )
+    http = _mock_http({"1234567890": _nppes_basic_payload(first="Eva", last="Stone")})
+
+    async with db_test_session_manager() as session:
+        async with http:
+            verification = await run_provider_verification(
+                provider_id=provider.id,
+                verification_repo=VerificationRepository(session),
+                provider_repo=ProviderRepository(session),
+                audit_repo=AuditRepository(session),
+                http=http,
+                actor_id=None,
+            )
+
+    assert verification.status == "verified"
+    assert verification.oig_match is False
+    assert verification.name_match_score is not None
+    assert verification.name_match_score >= 0.9, (
+        f"expected high similarity on exact-name match, got "
+        f"{verification.name_match_score}"
+    )
 
 
 async def test_run_returns_needs_review_when_nppes_name_differs(

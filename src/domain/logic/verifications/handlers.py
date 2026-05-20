@@ -54,17 +54,26 @@ _NPPES_SKIPPED_FLAG = "nppes_skipped"
 _SKIPPED_NPPES = NppesResult(found=False, first_name=None, last_name=None, raw=None)
 
 
-def _user_names(owner: User | None) -> tuple[str, str]:
-    """Best-available (first, last) name for a provider's owning user.
+def _clinician_names(provider: Provider, owner: User | None) -> tuple[str, str]:
+    """Best-available (first, last) name for a provider's clinician.
 
-    The `User` model carries no first/last name fields today — see
-    `src/domain/models/users/user.py`. We fall back to `user.username`
-    in the first-name slot and leave last-name empty so the scoring
-    layer's similarity check lands far below threshold (`needs_review`)
-    until proper name fields are added. This is the safe default: every
-    verification routes to a human reviewer rather than silently
-    "verifying" against a name we never actually had.
+    Reads `provider.first_name` / `last_name` (proxies to the linked
+    `Clinician` row — the actual column owner). When BOTH are set,
+    those become the names the NPPES + OIG scorers compare against;
+    that's the path that lets a verification actually pass.
+
+    When either is missing — legacy rows that predate the columns, or a
+    half-filled edit form — falls back to `(user.username, "")`. The
+    username fallback scores far below threshold (`needs_review`), so
+    the verification routes to a human reviewer rather than silently
+    "verifying" against a name we never actually had. Same posture as
+    the original `_user_names`; this just reads from the right place
+    once the columns are available.
     """
+    first = (provider.first_name or "").strip()
+    last = (provider.last_name or "").strip()
+    if first and last:
+        return (first, last)
     if owner is None:
         return ("", "")
     return (owner.username or "", "")
@@ -101,7 +110,7 @@ async def run_provider_verification(
     # with the repos keeps everything inside the orchestrator's
     # transaction.
     owner = await verification_repo.session.get(User, provider.owner_id)
-    first_name, last_name = _user_names(owner)
+    first_name, last_name = _clinician_names(provider, owner)
 
     extra_flags: list[str] = []
     if provider.npi:

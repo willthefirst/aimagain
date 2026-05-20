@@ -99,6 +99,8 @@ FIXTURE_OPENING: list[FixtureOpening] = [
         "days_ago": 2,
         "provider": {
             "practice_name": "Katie Reeves, PhD",
+            "first_name": "Katie",
+            "last_name": "Reeves",
             "org_type": "solo_practice",
             # Telehealth-only practice — sessions happen over video, but
             # the practice is legally registered at a real Bay Area
@@ -145,6 +147,8 @@ FIXTURE_OPENING: list[FixtureOpening] = [
         "days_ago": 14,
         "provider": {
             "practice_name": "Camp BooHoo",
+            "first_name": "Maya",
+            "last_name": "Patel",
             "org_type": "other",
             "location_city": "Santa Clara",
             "location_state": "CA",
@@ -187,6 +191,8 @@ FIXTURE_OPENING: list[FixtureOpening] = [
         "days_ago": 30,
         "provider": {
             "practice_name": "RISE IOP at CHC",
+            "first_name": "James",
+            "last_name": "Chen",
             "org_type": "clinic",
             "parent_org_name": "Children's Health Council",
             "location_city": "Palo Alto",
@@ -234,6 +240,8 @@ FIXTURE_OPENING: list[FixtureOpening] = [
         "days_ago": 5,
         "provider": {
             "practice_name": "Lakeside Therapy Collective",
+            "first_name": "Sarah",
+            "last_name": "Goldberg",
             "org_type": "group_practice",
             "location_city": "Seattle",
             "location_state": "WA",
@@ -270,6 +278,8 @@ FIXTURE_OPENING: list[FixtureOpening] = [
         "days_ago": 1,
         "provider": {
             "practice_name": "Greenfield Psychiatry",
+            "first_name": "David",
+            "last_name": "Greenfield",
             "org_type": "solo_practice",
             "location_city": "Brooklyn",
             "location_state": "NY",
@@ -311,6 +321,8 @@ FIXTURE_OPENING: list[FixtureOpening] = [
         "days_ago": 9,
         "provider": {
             "practice_name": "Rivera Family Psychology",
+            "first_name": "Elena",
+            "last_name": "Rivera",
             "org_type": "solo_practice",
             "location_city": "Austin",
             "location_state": "TX",
@@ -357,6 +369,8 @@ FIXTURE_OPENING: list[FixtureOpening] = [
         "days_ago": 21,
         "provider": {
             "practice_name": "Beacon Hill Family Therapy",
+            "first_name": "Patrick",
+            "last_name": "O'Brien",
             "org_type": "group_practice",
             "location_city": "Boston",
             "location_state": "MA",
@@ -405,6 +419,8 @@ FIXTURE_OPENING: list[FixtureOpening] = [
         "days_ago": 60,
         "provider": {
             "practice_name": "Mountainview Residential",
+            "first_name": "Michael",
+            "last_name": "Lee",
             "org_type": "clinic",
             "location_city": "Boulder",
             "location_state": "CO",
@@ -452,6 +468,8 @@ FIXTURE_OPENING: list[FixtureOpening] = [
         "days_ago": 45,
         "provider": {
             "practice_name": "Cascade PHP",
+            "first_name": "Aisha",
+            "last_name": "Williams",
             "org_type": "clinic",
             "parent_org_name": "Cascade Health Network",
             "location_city": "Tacoma",
@@ -500,6 +518,8 @@ FIXTURE_OPENING: list[FixtureOpening] = [
         "days_ago": 110,
         "provider": {
             "practice_name": "North Loop Counseling",
+            "first_name": "Rachel",
+            "last_name": "Friedman",
             "org_type": "group_practice",
             "location_city": "Minneapolis",
             "location_state": "MN",

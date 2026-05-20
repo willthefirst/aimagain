@@ -130,9 +130,10 @@ class Provider(BaseModel):
         ``spec.model(**payload.model_dump())`` create path keeps
         working unchanged through the multi-PR split (#629 / #635).
 
-        - Any wire-side ``npi=`` kwarg becomes a fresh ``Clinician``
-          attached as ``self.clinician`` (the column moved off
-          ``providers`` in #629 PR 1).
+        - Any wire-side ``npi=`` / ``first_name=`` / ``last_name=``
+          kwarg becomes a fresh ``Clinician`` attached as
+          ``self.clinician`` (`npi` moved off ``providers`` in
+          #629 PR 1; the name columns landed alongside it).
         - The per-role kwargs (``org_id``, ``location_*``,
           ``in_person_sessions``, ``virtual_sessions``,
           ``accepts_out_of_network``, ``in_network_carriers``,
@@ -156,6 +157,8 @@ class Provider(BaseModel):
         from src.domain.models import Affiliation, Clinician
 
         npi = kwargs.pop("npi", None)
+        first_name = kwargs.pop("first_name", None)
+        last_name = kwargs.pop("last_name", None)
         # Peel per-role kwargs off before the SQLAlchemy column
         # constructor sees them — they target Affiliation now.
         per_role = {k: kwargs.pop(k) for k in list(_PER_ROLE_ATTRS) if k in kwargs}
@@ -166,7 +169,9 @@ class Provider(BaseModel):
             and "clinician" not in kwargs
             and "clinician_id" not in kwargs
         ):
-            self.clinician = Clinician(npi=npi)
+            self.clinician = Clinician(
+                npi=npi, first_name=first_name, last_name=last_name
+            )
         if not self.affiliations and "affiliations" not in kwargs:
             # Mirror the affiliation column defaults explicitly (column
             # `server_default`s only fire at flush) so the transient
@@ -216,6 +221,37 @@ class Provider(BaseModel):
             self.clinician = Clinician(npi=value)
         else:
             self.clinician.npi = value
+
+    # `first_name` / `last_name` — same proxy shape as `npi`. The
+    # columns live on `Clinician` (one person, many affiliations); the
+    # proxy here keeps `ProviderRead.model_validate(provider)` working
+    # via `from_attributes` and `repo.patch(provider, first_name="X")`
+    # landing on the linked clinician.
+    @property
+    def first_name(self) -> str | None:
+        return self.clinician.first_name if self.clinician is not None else None
+
+    @first_name.setter
+    def first_name(self, value: str | None) -> None:
+        from src.domain.models import Clinician
+
+        if self.clinician is None:
+            self.clinician = Clinician(first_name=value)
+        else:
+            self.clinician.first_name = value
+
+    @property
+    def last_name(self) -> str | None:
+        return self.clinician.last_name if self.clinician is not None else None
+
+    @last_name.setter
+    def last_name(self, value: str | None) -> None:
+        from src.domain.models import Clinician
+
+        if self.clinician is None:
+            self.clinician = Clinician(last_name=value)
+        else:
+            self.clinician.last_name = value
 
     # --- Per-role property proxies ----------------------------------
     # These delegate reads and writes to `provider.primary_affiliation.X`.
