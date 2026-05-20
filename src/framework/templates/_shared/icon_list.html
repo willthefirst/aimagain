@@ -2,8 +2,13 @@
 
 The default `<ul>` disc bullet plus a leading Lucide icon double-marks
 every item (the screenshot in #647-followup showed this). This macro
-emits a `<ul class="icon-list">` whose list-style is stripped via
+emits a `<ul class="glyph-list">` whose list-style is stripped via
 `base.html`, letting the Lucide glyph serve as the only marker.
+
+Class is `glyph-list` (not `icon-list`) because Lucide ships an
+`icon-list` glyph whose `::before` font-character would render
+on the `<ul>` itself if we used the same class name — collision
+with the icon-font namespace, not with our intent.
 
 Items are plain `{"icon": "pill", "label": "Medication management"}`
 dicts — pass whatever sequence of mappings the caller has, in display
@@ -28,7 +33,7 @@ Example:
     ]) }}
 #}
 {% macro icon_list(items) -%}
-<ul class="icon-list">
+<ul class="glyph-list">
   {%- for item in items %}
   <li><i class="icon-{{ item.icon }}" aria-hidden="true"></i>{{ item.label }}</li>
   {%- endfor %}

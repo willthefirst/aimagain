@@ -13,44 +13,40 @@ Layout per card:
   │ <header>  Adult male (25–64)                 │
   │           May 17 · Virtual · In-person       │
   │                                              │
-  │ Seeking                                      │
-  │   • icon name                                │
-  │   • icon name                                │
-  │                                              │
-  │ 📍 City, ST                                   │
-  │ Languages: …                                 │
-  │ Insurance: …                                 │
-  │ Modality: …                                  │
+  │ Seeking      icon-list of services           │
+  │ 📍           City, ST                         │
+  │ Languages    …                               │
+  │ Insurance    …                               │
+  │ Modality     …                               │
   │                                              │
   │ <footer>  [✉ Email]                          │
   └──────────────────────────────────────────────┘
 
-The card is `<article>` with `<header>`, a stacked single-column
-body, and `<footer>` — Pico's automatic styling tints header and
-footer as the top/bottom bands of the card. The header band is a
-Pico `<hgroup>` pairing an `<h3>` headline link with a `<small>`
-meta line (date · modality, separated by middots). The `<h3>`
-anchors the card visually — Pico's heading scale gives it size +
-weight without custom CSS, which is the rule we want to lean on so
-the chrome stays framework-portable. The body stacks two
-`<section>`s vertically: services with inline icons, then the
-demographics `<dl>`. The footer carries one element — the Email
+The card is `<article>` with `<header>`, a body block, and
+`<footer>` — Pico's automatic styling tints header and footer as the
+top/bottom bands of the card. The header band is a Pico `<hgroup>`
+pairing an `<h3>` headline link with a `<small>` meta line (date ·
+modality, separated by middots). The `<h3>` anchors the card
+visually — Pico's heading scale gives it size + weight without
+custom CSS, which is the rule we want to lean on so the chrome
+stays framework-portable. The body is one `<dl>` from
+`_facts_block` whose first row carries the services (`Seeking` /
+`Providing` verb + `icon_list` of services); subsequent rows carry
+the demographic facts. The footer carries one element — the Email
 CTA — in the default left-aligned footer flow.
 
 Per-kind branching and field selection live in
 `src.domain.logic.posts.view.post_card_view`, which collapses CR /
-PA / intake detail shapes into one flat `view` dict.
-The three blocks (modality text, services, facts) are partials
-that read from `view`; this file composes them into the card frame.
-PR C of the list/detail unification reuses the same partials on the
-detail page so both views share the same visual vocabulary.
+PA / intake detail shapes into one flat `view` dict. `modality_chips`
+emits the meta-line modality string; `_facts_block` emits the
+single `<dl>` body. Detail templates reuse the same `_facts_block`
+partial so list and detail share the same visual vocabulary.
 
 `entity_name` is the URL family the card links into — ``"referral"``,
 ``"opening"``, or ``"intake"``. Each family's `list.html` passes its
 own name so the card's headline anchor resolves to the correct URL
 family (e.g. `/referrals/{id}` for referrals' list). #}
 {%- from "_shared/posts/_modality_chips.html" import modality_chips -%}
-{%- from "_shared/posts/_services_block.html" import services_block -%}
 {%- from "_shared/posts/_facts_block.html" import facts_block -%}
 
 {% macro post_item(post, entity_name) -%}
@@ -63,7 +59,6 @@ family (e.g. `/referrals/{id}` for referrals' list). #}
       <small>{{ post.created_at | format_post_date }}{% if modality %} · {{ modality }}{% endif %}</small>
     </hgroup>
   </header>
-  {{ services_block(view) }}
   {{ facts_block(view) }}
 
   {#- Footer carries just the Email CTA — Pico-styled `role="button"
