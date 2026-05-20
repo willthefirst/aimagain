@@ -5,13 +5,13 @@
 {%- from "_shared/posts/_how_to_refer.html" import how_to_refer -%}
 
 {% set resource_url = entity_url('opening') %}
-{# `view.headline` is the same identity string the entity-card's header
-   renders. Computing it once at module scope keeps the breadcrumb leaf
-   and the in-card headline in lock-step — see #593. #}
 {%- set view = post_card_view(opening) -%}
 
 {% block resource_label %}Openings{% endblock %}
-{% block current_label %}{{ view.headline or 'Openings'|truncate(40) }}{% endblock %}
+{# The toolbar H1 carries the full identity string (`headline` plus
+   the optional `header_state` — e.g. "Will's Org, NY") so the
+   entity-card below doesn't need to repeat it. #}
+{% block current_label %}{{ view.headline or 'Openings'|truncate(40) }}{% if view.header_state %}, {{ view.header_state }}{% endif %}{% endblock %}
 
 {% block actions %}
 {% with post=opening %}{% include "_shared/posts/_owner_actions.html" %}{% endwith %}
@@ -26,10 +26,7 @@
 {%- set modality = modality_chips(view.in_person, view.virtual) | trim -%}
 <article class="entity-card" data-kind="{{ opening.kind }}">
   <header>
-    <hgroup>
-      <h3>{{ view.headline }}{% if view.header_state %}, {{ view.header_state }}{% endif %}</h3>
-      <small>{{ opening.created_at | format_post_date }}{% if modality %} · {{ modality }}{% endif %}</small>
-    </hgroup>
+    <small>{{ opening.created_at | format_post_date }}{% if modality %} · {{ modality }}{% endif %}</small>
   </header>
 
   {%- if view.description %}

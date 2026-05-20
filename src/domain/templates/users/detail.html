@@ -23,13 +23,15 @@
    detail pages. The Clinicians section is a separate card below the
    main user card — embedded card-in-card would read as visual noise,
    so the page is two stacked cards: identity + private-fields on top,
-   the clinician-entries index table on bottom. #}
+   the clinician-entries index table on bottom.
+
+   The identity card has no `<header>` — the toolbar H1 above already
+   carries `target_user.username`, so an in-card header would just
+   restate it. The Clinicians card keeps its header because the
+   `<strong>Clinicians</strong>` is a section label, not a duplicate
+   of any heading above. #}
 {% block content %}
 <article class="entity-card">
-  <header class="entity-header">
-    <strong>{{ target_user.username }}</strong>
-  </header>
-
   {# Private rows (email, active, verified) are gated by
      `can_view_private`, computed in handle_get_user_detail as
      `is_self OR is_admin(viewer)`. The handler also omits these
