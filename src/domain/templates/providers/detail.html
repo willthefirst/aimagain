@@ -69,15 +69,14 @@
    `affiliation.org.name` directly — they read `aff.org_name`. #}
 {% block content %}
 {%- set view = provider_card_view(provider) -%}
-<article class="entity-card">
-  <header class="entity-header">
-    <strong>{{ view.practice_name }}</strong>
-    {%- if view.npi %}
-    {# title-case-ignore: NPI is an industry abbreviation (National Provider Identifier) #}
-    <small>NPI {{ view.npi }}</small>
-    {%- endif %}
-  </header>
-</article>
+{# Identity card (practice_name + NPI) collapses to a single `<p>` —
+   the toolbar H1 above already carries `view.practice_name`, so an
+   in-card header would just restate it. NPI is the only non-duplicate
+   piece, so it survives as a one-line subtitle when present. #}
+{%- if view.npi %}
+{# title-case-ignore: NPI is an industry abbreviation (National Provider Identifier) #}
+<p><small>NPI {{ view.npi }}</small></p>
+{%- endif %}
 
 {# Stacked affiliation cards — one per row in `provider.affiliations`.
    Reads as "At <Org A>: ... · At <Org B>: ...". Each card links its

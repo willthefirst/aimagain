@@ -17,9 +17,10 @@
    the previous template emitted the raw UUID as the link text, which
    read as a bare hex number in the UI.
 
-   The name does NOT appear as a `<dt>Name</dt>` row in the facts list
-   because the header `<strong>` already carries it — duplicating the
-   primary identifier inside the body was filed as #594.
+   The card has no `<header>` block — the toolbar H1 above already
+   carries `organization.name`, and the type label is already a
+   `<dt>Type</dt>` row in the facts list, so an in-card header would
+   only restate both.
 
    Root organizations (no `parent_org_id`) omit the parent row entirely
    rather than rendering placeholder text — matching the optional-field
@@ -29,11 +30,6 @@
    empty-state conventions (em-dash + parenthetical). #}
 {% block content %}
 <article class="entity-card">
-  <header class="entity-header">
-    <strong>{{ organization.name }}</strong>
-    <small>{{ ORGANIZATION_TYPES_LABELS[organization.type] }}</small>
-  </header>
-
   <section class="entity-facts">
     <dl>
       <div><dt>Type</dt><dd>{{ ORGANIZATION_TYPES_LABELS[organization.type] }}</dd></div>

@@ -14,16 +14,13 @@
 {# Program detail uses the `.entity-card` chrome shared with
    posts/detail.html and providers/detail.html. Description renders as
    `.entity-description` lead prose above the facts dl when present
-   (matches posts/detail.html's optional description block). #}
+   (matches posts/detail.html's optional description block).
+
+   The card has no `<header>` block — the toolbar H1 above already
+   carries `program.name`, and `state_preference` is already a
+   `<dt>State served</dt>` row in the facts list. #}
 {% block content %}
 <article class="entity-card">
-  <header class="entity-header">
-    <strong>{{ program.name }}</strong>
-    {%- if program.state_preference %}
-    <small>{{ program.state_preference }}</small>
-    {%- endif %}
-  </header>
-
   {%- if program.description %}
   <p class="entity-description">{{ program.description }}</p>
   {%- endif %}
