@@ -293,12 +293,14 @@ def test_in_cell_action_menu_lays_out_inline() -> None:
     ), "`td > menu` must use flex layout so `<li>` commands sit inline (#580)"
 
 
-def test_primary_nav_shows_admin_links_only_for_admins() -> None:
-    """Regression for #590 — `/organizations`, `/programs`, `/users` are
-    admin tools, not surfaces for ordinary viewers. Render the chrome
-    twice: once as an admin (the three links appear), once as a
-    non-admin authenticated user (the links don't render).
-    Referrals/Openings/Directory render for any authed user."""
+def test_primary_nav_excludes_non_journey_links_for_all_viewers() -> None:
+    """The primary nav promotes only the two journey surfaces
+    (`/referrals`, `/openings`). Non-journey URL families —
+    `/intakes`, `/clinicians` (Directory), and the admin trio
+    `/organizations` / `/programs` / `/users` — stay live and
+    reachable by URL/bookmark but are intentionally absent from the
+    chrome. Render twice (admin and non-admin) to pin that the
+    `is_admin` branch doesn't reintroduce them either."""
     env = _make_env()
     _add_child(
         env,
@@ -310,41 +312,32 @@ def test_primary_nav_shows_admin_links_only_for_admins() -> None:
         """,
     )
 
-    admin_html = env.get_template("stub.html").render(
-        request=_request_stub(),
-        is_authenticated=True,
-        is_admin=True,
-        is_development=False,
-    )
-    nonadmin_html = env.get_template("stub.html").render(
-        request=_request_stub(),
-        is_authenticated=True,
-        is_admin=False,
-        is_development=False,
-    )
-
-    admin_tree = HTMLParser(admin_html)
-    admin_links = {
-        a.attributes.get("href") for a in admin_tree.css('nav[aria-label="Primary"] a')
-    }
-    assert "/organizations" in admin_links, "admin nav must include Organizations link"
-    assert "/programs" in admin_links, "admin nav must include Programs link"
-    assert "/users" in admin_links, "admin nav must include Users link"
-
-    nonadmin_tree = HTMLParser(nonadmin_html)
-    nonadmin_links = {
-        a.attributes.get("href")
-        for a in nonadmin_tree.css('nav[aria-label="Primary"] a')
-    }
-    assert (
-        "/organizations" not in nonadmin_links
-    ), "non-admin viewer must not see Organizations link"
-    assert (
-        "/programs" not in nonadmin_links
-    ), "non-admin viewer must not see Programs link"
-    assert "/users" not in nonadmin_links, "non-admin viewer must not see Users link"
-    # Referrals/Openings/Directory still present for the authed non-admin.
-    assert "/clinicians" in nonadmin_links
+    for is_admin_flag in (True, False):
+        html = env.get_template("stub.html").render(
+            request=_request_stub(),
+            is_authenticated=True,
+            is_admin=is_admin_flag,
+            is_development=False,
+        )
+        tree = HTMLParser(html)
+        nav_links = {
+            a.attributes.get("href") for a in tree.css('nav[aria-label="Primary"] a')
+        }
+        # Both journey tabs are present.
+        assert "/referrals" in nav_links
+        assert "/openings" in nav_links
+        # Non-journey families are NOT in the primary nav (regardless of
+        # admin flag).
+        for absent in (
+            "/intakes",
+            "/clinicians",
+            "/organizations",
+            "/programs",
+            "/users",
+        ):
+            assert (
+                absent not in nav_links
+            ), f"{absent} must not appear in primary nav (is_admin={is_admin_flag})"
 
 
 def test_form_edit_view_renders_breadcrumb_and_edit_heading() -> None:
@@ -835,18 +828,6 @@ def test_login_link_color_is_consistent_across_auth_pages() -> None:
 # --- Primary nav: section active-state + Login shortcut --------------
 
 
-def test_primary_nav_directory_active_on_clinicians_list() -> None:
-    """`/clinicians` is the canonical Directory URL — its tab is active."""
-    assert _active_tab_labels(_render_chrome("/clinicians")) == ["Directory"]
-
-
-def test_primary_nav_directory_active_on_clinician_detail() -> None:
-    """Subpaths under `/clinicians` (detail, edit) keep Directory lit so
-    the chrome stays consistent through the full clinician drill-down."""
-    assert _active_tab_labels(_render_chrome("/clinicians/42")) == ["Directory"]
-    assert _active_tab_labels(_render_chrome("/clinicians/42/form")) == ["Directory"]
-
-
 def test_primary_nav_referrals_active_on_referrals_list() -> None:
     """`/referrals` is the canonical Referrals URL — its tab is active."""
     assert _active_tab_labels(_render_chrome("/referrals")) == ["Referrals"]
@@ -870,24 +851,14 @@ def test_primary_nav_openings_active_on_openings_subpath() -> None:
     assert _active_tab_labels(_render_chrome("/openings/42/form")) == ["Openings"]
 
 
-def test_primary_nav_intakes_active_on_intakes_list() -> None:
-    """`/intakes` is the canonical Intakes URL."""
-    assert _active_tab_labels(_render_chrome("/intakes")) == ["Intakes"]
-
-
-def test_primary_nav_intakes_active_on_intakes_subpath() -> None:
-    assert _active_tab_labels(_render_chrome("/intakes/42")) == ["Intakes"]
-
-
-def test_primary_nav_no_post_tab_when_outside_post_families() -> None:
-    """The three post URL families are mutually exclusive — when none
-    of them owns the request path, none of `Referrals`/`Openings`/
-    `Intakes` is active. (`/clinicians` lights Directory, which is
-    asserted separately above.)"""
-    labels = _active_tab_labels(_render_chrome("/clinicians"))
-    assert "Referrals" not in labels
-    assert "Openings" not in labels
-    assert "Intakes" not in labels
+def test_primary_nav_no_tab_active_on_non_journey_paths() -> None:
+    """Neither Referrals nor Openings is active on URL families that
+    aren't chrome-promoted (`/clinicians`, `/intakes`, `/organizations`,
+    `/programs`, `/users`). The journey-1 bias intentionally leaves the
+    primary nav inert on these still-reachable-by-URL surfaces."""
+    for path in ("/clinicians", "/intakes", "/organizations", "/users"):
+        labels = _active_tab_labels(_render_chrome(path))
+        assert labels == [], f"{path} should not light any nav tab, got {labels}"
 
 
 def test_primary_nav_renders_login_link_off_auth_flow() -> None:
