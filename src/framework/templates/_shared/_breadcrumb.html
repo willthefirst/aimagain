@@ -47,7 +47,7 @@ breadcrumbs are ordered) loses Pico's auto-styling.
 {%- set _back = _linkable[-1] if _linkable else items[0] -%}
 <nav aria-label="breadcrumb">
   <a class="breadcrumb-back"{% if _back[1] %} href="{{ _back[1] }}"{% endif %}>
-    <i class="icon-arrow-left" aria-hidden="true"></i>{{ _back[0] }}
+    <i class="icon-arrow-left" aria-hidden="true"></i><span class="breadcrumb-back-label">{{ _back[0] }}</span>
   </a>
   <ul>
     {%- for label, href in items %}

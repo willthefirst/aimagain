@@ -347,13 +347,30 @@
          macro's full `<ul>` chain is hidden and the inline
          `<a class="breadcrumb-back">` is shown: a Lucide arrow-left
          glyph plus the deepest clickable parent's label. On desktop
-         the `<a>` is hidden and the chain renders normally. Two
-         rules, no JS — the macro emits both elements unconditionally
-         and CSS does the swapping. */
-      .breadcrumb-back { display: none; }
+         the `<a>` is hidden and the chain renders normally. The
+         macro emits both elements unconditionally; CSS does the
+         swapping (no JS).
+
+         Pico's default `<a>` underline ran across both the icon and
+         the label, and the icon's `vertical-align: -0.15em` made it
+         sit below the underline so the chevron read as visually
+         detached from the label. Strip the underline on the link as
+         a whole, scope the underline to the label `<span>` on hover/
+         focus, and use a flex `gap` for the chevron-to-label spacing
+         (overriding the icon's universal `margin-inline-end`). */
+      .breadcrumb-back { display: none; text-decoration: none; }
       @media (max-width: 540px) {
         nav[aria-label="breadcrumb"] > ul { display: none; }
-        .breadcrumb-back { display: inline-flex; align-items: center; }
+        .breadcrumb-back {
+          display: inline-flex;
+          align-items: center;
+          gap: 0.25rem;
+        }
+        .breadcrumb-back > i { margin-inline-end: 0; }
+        .breadcrumb-back:hover .breadcrumb-back-label,
+        .breadcrumb-back:focus .breadcrumb-back-label {
+          text-decoration: underline;
+        }
       }
       /* Brand collapse on mobile. The two-word "Bedlam Connect" wraps
          to two lines on narrow viewports once the primary nav fills the
