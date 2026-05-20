@@ -47,7 +47,9 @@ async def login_as_seed_user(
     user_manager: BaseUserManager[User, object] = Depends(get_user_manager),
 ) -> Response:
     """Issue a session cookie for the configured seed user and 302 to
-    ``/posts``."""
+    ``/`` — root then decides where to land (see ``read_root`` in
+    ``src/main.py``), so this handler doesn't bake in a specific
+    resource path."""
     if settings.ENVIRONMENT != "development":
         raise HTTPException(status_code=404)
 
@@ -65,10 +67,13 @@ async def login_as_seed_user(
     # `auth_backend.login(strategy, user)` builds a Response with the
     # cookie set by the transport (CookieTransport in our config). We
     # then swap the status + Location header so the agent / browser
-    # lands on `/posts` carrying the freshly-set cookie.
+    # lands on `/` (which redirects onward) carrying the freshly-set
+    # cookie. Routing the landing through `/` keeps the
+    # "where does an authenticated session land?" decision in one
+    # place — `src/main.py:read_root` — instead of duplicating it here.
     response = await auth_backend.login(get_strategy(), user)
     response.status_code = 302
-    response.headers["Location"] = "/posts"
+    response.headers["Location"] = "/"
     return response
 
 

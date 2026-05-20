@@ -13,8 +13,10 @@ Two layers of guarding:
 The happy-path test goes through the test client's already-mounted
 ``app`` (which runs with ``ENVIRONMENT="development"`` via
 ``.env.test``) and pins the contract a Playwright agent or a manual
-bookmark relies on: 302 + ``Location: /posts`` + ``Set-Cookie:
-fastapiusersauth=...``.
+bookmark relies on: 302 + ``Location: /`` + ``Set-Cookie:
+fastapiusersauth=...``. The handler redirects to ``/`` so the root
+handler (``src/main.py:read_root``) owns the choice of landing page;
+this route only proves the cookie was issued.
 """
 
 import pytest
@@ -73,8 +75,8 @@ async def test_dev_login_issues_session_cookie_and_redirects(
 ):
     """Hitting the route with a seed user in the DB issues the same
     `fastapiusersauth` cookie a production login would, and 302s to
-    `/posts`. This is the contract a Playwright MCP agent's
-    first-tool-call relies on."""
+    `/` (root then forwards to the actual landing page). This is the
+    contract a Playwright MCP agent's first-tool-call relies on."""
     # Seed the DEV_LOGIN_EMAIL user. Use the standard fastapi-users
     # user-manager dependency so the password is hashed correctly.
     seed_email = "dev-login-seed@example.com"
@@ -84,7 +86,7 @@ async def test_dev_login_issues_session_cookie_and_redirects(
 
     response = await test_client.get("/dev/login-as-seed-user", follow_redirects=False)
     assert response.status_code == 302
-    assert response.headers["Location"] == "/posts"
+    assert response.headers["Location"] == "/"
     set_cookie = response.headers.get("Set-Cookie", "")
     assert "fastapiusersauth=" in set_cookie, (
         "expected the session cookie to be set on the response — "
