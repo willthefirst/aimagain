@@ -1,4 +1,5 @@
 {% extends "views/list.html" %}
+{%- from "_shared/_card.html" import card -%}
 
 {% block resource_label %}Organizations{% endblock %}
 
@@ -8,26 +9,23 @@
 
 {% block content %}
 {% if organizations %}
-<div class="overflow-auto">
-  <table id="organizations-table">
-    <thead>
-      <tr>
-        <th>Name</th>
-        <th>Type</th>
-        <th>Parent</th>
-      </tr>
-    </thead>
-    <tbody>
-      {%- for org in organizations %}
-      <tr>
-        <td><a href="{{ entity_url('organization', id=org.id) }}">{{ org.name }}</a></td>
-        <td>{{ ORGANIZATION_TYPES_LABELS[org.type] }}</td>
-        <td>{% if org.parent_org_id %}<a href="{{ entity_url('organization', id=org.parent_org_id) }}">Parent</a>{% else %}—{% endif %}</td>
-      </tr>
-      {%- endfor %}
-    </tbody>
-  </table>
-</div>
+<section id="organizations-list">
+  {%- for org in organizations %}
+  {% call card(
+       id=org.id,
+       headline_url=entity_url('organization', id=org.id),
+       headline=org.name) -%}
+  <section class="entity-facts">
+    <dl>
+      <div><dt>Type</dt><dd>{{ ORGANIZATION_TYPES_LABELS[org.type] }}</dd></div>
+      {%- if org.parent_org_id %}
+      <div><dt>Parent</dt><dd><a href="{{ entity_url('organization', id=org.parent_org_id) }}">View parent</a></dd></div>
+      {%- endif %}
+    </dl>
+  </section>
+  {%- endcall %}
+  {%- endfor %}
+</section>
 {% else %}
 <p>No organizations found.</p>
 {% endif %}

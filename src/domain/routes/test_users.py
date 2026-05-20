@@ -183,7 +183,7 @@ async def test_list_users_multiple_users(
     assert "text/html" in response.headers["content-type"]
 
     tree = HTMLParser(response.text)
-    user_list_items = tree.css("#user-list tbody tr")
+    user_list_items = tree.css("#user-list article.entity-card")
     assert len(user_list_items) == 2, "Expected two users in the list"
 
     usernames_found = {item.text() for item in user_list_items}
@@ -483,7 +483,7 @@ async def test_detail_lists_owned_providers(
     assert response.status_code == 200
     tree = HTMLParser(response.text)
     assert tree.css_first("#user-detail-clinicians-empty") is None
-    rows = tree.css("#user-detail-clinicians tbody tr")
+    rows = tree.css("#user-detail-clinicians article.entity-card")
     assert len(rows) == 2
     # After #642 PR 3 the Practice cell anchors to the owning Org per
     # affiliation (each Provider here has its own auto-built Org via
@@ -851,7 +851,7 @@ async def test_get_my_providers_empty_state(
     assert response.status_code == 200
     assert response.headers["content-type"].startswith("text/html")
     tree = HTMLParser(response.text)
-    assert tree.css_first("#user-clinicians") is None
+    assert tree.css_first("#user-clinicians-list") is None
     empty = tree.css_first("#user-clinicians-empty")
     assert empty is not None
     assert "have not created" in empty.text()
@@ -921,7 +921,7 @@ async def test_get_user_providers_self(
     response = await authenticated_client.get(f"/users/{logged_in_user.id}/clinicians")
     assert response.status_code == 200
     tree = HTMLParser(response.text)
-    assert len(tree.css("#user-clinicians tbody tr")) == 1
+    assert len(tree.css("#user-clinicians-list article.entity-card")) == 1
 
 
 async def test_get_user_providers_admin_can_view_other(
@@ -942,7 +942,7 @@ async def test_get_user_providers_admin_can_view_other(
     response = await authenticated_client.get(f"/users/{target.id}/clinicians")
     assert response.status_code == 200
     tree = HTMLParser(response.text)
-    assert len(tree.css("#user-clinicians tbody tr")) == 1
+    assert len(tree.css("#user-clinicians-list article.entity-card")) == 1
 
 
 async def test_get_user_providers_non_admin_forbidden_for_other(

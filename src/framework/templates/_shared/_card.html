@@ -1,0 +1,65 @@
+{# Generic list-item card.
+
+Every list view renders its items as cards (not tables). The canonical
+example is `posts/openings/list.html` rendering through
+`posts/_shared/_item.html`; this primitive is the shared scaffold every
+list — post and non-post — composes.
+
+Layout:
+
+  ┌──────────────────────────────────────────────┐
+  │ <header>                                     │
+  │   <h3><a>{headline}</a></h3>                 │
+  │   <small class="meta">{subtitle…}</small>    │
+  │                                              │
+  │ {caller body — facts, sub-sections, etc.}    │
+  │                                              │
+  │ <footer> (optional — emit inside caller)     │
+  └──────────────────────────────────────────────┘
+
+The card uses Pico's `<article>` defaults for chrome (background,
+border, rounded corners, tinted header/footer bands) plus
+`class="entity-card"` for the domain-wide convention. The body and
+optional footer are caller-provided via `{% call %}` — no separate
+"with footer" macro variant.
+
+Args
+----
+id            row id; emitted as `data-row-id` for tests.
+headline_url  href for the heading anchor.
+headline      heading text (escaped by Jinja).
+subtitle      optional pre-rendered HTML for the `<small class="meta">`
+              line — pass `<span>`s when you want the `.meta` CSS rule
+              to join them with " · " separators. Pass plain text when
+              a single string is enough.
+data_kind     optional `data-kind` attribute (the post family carries
+              `clinician_opening` / `program_intake` / `referral` so
+              detail-card CSS can branch).
+
+Usage
+-----
+  {% call card(
+       id=org.id,
+       headline_url=entity_url('organization', id=org.id),
+       headline=org.name) %}
+    <section class="entity-facts">
+      <dl>
+        <div><dt>Type</dt><dd>{{ ORGANIZATION_TYPES_LABELS[org.type] }}</dd></div>
+      </dl>
+    </section>
+  {% endcall %}
+
+For a card that needs a footer, emit `<footer>...</footer>` inside the
+caller body — Pico will tint it automatically.
+#}
+{% macro card(id, headline_url, headline, subtitle=None, data_kind=None) -%}
+<article class="entity-card" data-row-id="{{ id }}"{% if data_kind %} data-kind="{{ data_kind }}"{% endif %}>
+  <header>
+    <h3><a href="{{ headline_url }}">{{ headline }}</a></h3>
+    {%- if subtitle %}
+    <small class="meta">{{ subtitle }}</small>
+    {%- endif %}
+  </header>
+  {{ caller() }}
+</article>
+{%- endmacro %}

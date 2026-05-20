@@ -46,27 +46,28 @@ list and detail share the same visual vocabulary.
 ``"opening"``, or ``"intake"``. Each family's `list.html` passes its
 own name so the card's headline anchor resolves to the correct URL
 family (e.g. `/referrals/{id}` for referrals' list). #}
+{%- from "_shared/_card.html" import card -%}
 {%- from "posts/_shared/_modality_chips.html" import modality_chips -%}
 {%- from "posts/_shared/_facts_block.html" import facts_block -%}
 
 {% macro post_item(post, entity_name) -%}
 {%- set view = post_card_view(post) -%}
-<article class="entity-card" data-row-id="{{ post.id }}" data-kind="{{ post.kind }}">
-  <header>
-    <h3><a href="{{ entity_url(entity_name, id=post.id) }}">{{ view.headline }}{% if view.header_state %}, {{ view.header_state }}{% endif %}</a></h3>
-    <small class="meta">
-      <span>{{ post.created_at | format_post_date }}</span>{{ modality_chips(view.in_person, view.virtual) }}
-    </small>
-  </header>
-  {{ facts_block(view) }}
-
-  {#- Footer carries just the Email CTA — Pico-styled `role="button"
-      class="secondary outline"` with the label "Email". The raw
-      address lives only in the `href`. `target="_blank" rel="noopener
-      noreferrer"` is harmless on `mailto:` URLs and matches the
-      pattern used for the PA `website` link on the detail page. -#}
-  <footer>
-    <a href="mailto:{{ post.owner.email }}" target="_blank" rel="noopener noreferrer" role="button" class="secondary outline">Email</a>
-  </footer>
-</article>
+{%- set headline_text = view.headline ~ (", " ~ view.header_state if view.header_state else "") -%}
+{%- set subtitle %}<span>{{ post.created_at | format_post_date }}</span>{{ modality_chips(view.in_person, view.virtual) }}{% endset %}
+{% call card(
+     id=post.id,
+     headline_url=entity_url(entity_name, id=post.id),
+     headline=headline_text,
+     subtitle=subtitle,
+     data_kind=post.kind) -%}
+{{ facts_block(view) }}
+{#- Footer carries just the Email CTA — Pico-styled `role="button"
+    class="secondary outline"` with the label "Email". The raw
+    address lives only in the `href`. `target="_blank" rel="noopener
+    noreferrer"` is harmless on `mailto:` URLs and matches the pattern
+    used for the PA `website` link on the detail page. -#}
+<footer>
+  <a href="mailto:{{ post.owner.email }}" target="_blank" rel="noopener noreferrer" role="button" class="secondary outline">Email</a>
+</footer>
+{%- endcall %}
 {%- endmacro %}

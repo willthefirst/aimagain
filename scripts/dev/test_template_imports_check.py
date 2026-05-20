@@ -60,7 +60,7 @@ def test_two_template_roots_resolve_owning_resource(tmp_path: Path) -> None:
     domain_page = _write(
         domain_root / "providers" / "list.html",
         '{% extends "views/list.html" %}\n'
-        '{% from "_shared/index_table.html" import index_table %}',
+        '{% from "_shared/_card.html" import card %}',
     )
 
     violations = find_violations(

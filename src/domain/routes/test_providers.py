@@ -438,11 +438,11 @@ async def test_list_providers_renders_html(
     assert response.status_code == 200
     assert response.headers["content-type"].startswith("text/html")
     tree = HTMLParser(response.text)
-    rows = tree.css("#clinicians-table tbody tr")
+    rows = tree.css("#clinicians-list article.entity-card")
     assert len(rows) == 1
     assert rows[0].attributes.get("data-row-id") == str(provider_id)
     # Org name renders as a link to the owning Organization.
-    practice_cell = rows[0].css_first('td[data-label="Practice"]')
+    practice_cell = rows[0].css_first('div[data-fact="practice"] dd')
     assert practice_cell is not None
     org_anchor = practice_cell.css_first("a[href^='/organizations/']")
     assert org_anchor is not None
@@ -501,13 +501,13 @@ async def test_list_providers_row_shows_all_affiliations(
 
     assert response.status_code == 200
     tree = HTMLParser(response.text)
-    rows = tree.css(f'tr[data-row-id="{provider_id}"]')
+    rows = tree.css(f'article[data-row-id="{provider_id}"]')
     assert (
         len(rows) == 1
     ), "expected a single row per Provider (not one per affiliation)"
-    practice_cell = rows[0].css_first('td[data-label="Practice"]')
-    location_cell = rows[0].css_first('td[data-label="Location"]')
-    insurance_cell = rows[0].css_first('td[data-label="Insurance"]')
+    practice_cell = rows[0].css_first('div[data-fact="practice"] dd')
+    location_cell = rows[0].css_first('div[data-fact="location"] dd')
+    insurance_cell = rows[0].css_first('div[data-fact="insurance"] dd')
     assert practice_cell is not None
     assert location_cell is not None
     assert insurance_cell is not None
@@ -580,7 +580,7 @@ async def test_list_providers_row_dedupes_identical_locations(
     assert response.status_code == 200
     tree = HTMLParser(response.text)
     location_cell = tree.css_first(
-        f'tr[data-row-id="{provider_id}"] td[data-label="Location"]'
+        f'article[data-row-id="{provider_id}"] div[data-fact="location"] dd'
     )
     assert location_cell is not None
     location_text = location_cell.text(strip=True)
@@ -591,7 +591,7 @@ async def test_list_providers_row_dedupes_identical_locations(
     # Both org chips still render (org_id dedup is intentionally
     # off — two affiliations at different Orgs both get a link).
     practice_cell = tree.css_first(
-        f'tr[data-row-id="{provider_id}"] td[data-label="Practice"]'
+        f'article[data-row-id="{provider_id}"] div[data-fact="practice"] dd'
     )
     assert practice_cell is not None
     assert len(practice_cell.css("a[href^='/organizations/']")) == 2
@@ -639,7 +639,7 @@ async def test_list_providers_shows_licensure_states(
     assert response.status_code == 200
     tree = HTMLParser(response.text)
     licensed_in_cell = tree.css_first(
-        f'tr[data-row-id="{provider_id}"] td[data-label="Licensed in"]'
+        f'article[data-row-id="{provider_id}"] div[data-fact="licensed_in"] dd'
     )
     assert licensed_in_cell is not None
     assert licensed_in_cell.text(strip=True) == "CA, CT"
@@ -678,7 +678,7 @@ async def test_list_providers_renders_empty_state(
     assert response.status_code == 200
     assert "No clinicians found" in response.text
     tree = HTMLParser(response.text)
-    assert tree.css_first("#clinicians-table") is None
+    assert tree.css_first("#clinicians-list") is None
     # Filter link goes to the dedicated search page.
     link = tree.css_first("a.toolbar-filter-link")
     assert link is not None
@@ -736,12 +736,12 @@ async def test_list_providers_filters_by_license_type(
 
     assert response.status_code == 200
     tree = HTMLParser(response.text)
-    rows = tree.css("#clinicians-table tbody tr")
+    rows = tree.css("#clinicians-list article.entity-card")
     assert len(rows) == 1
     # After #642 PR 3 the row scopes by `data-row-id` (the Provider id);
     # the row's Practice cell anchors out to Orgs, not to the provider.
-    assert tree.css_first(f'tr[data-row-id="{provider_a}"]') is not None
-    assert tree.css_first(f'tr[data-row-id="{provider_b}"]') is None
+    assert tree.css_first(f'article[data-row-id="{provider_a}"]') is not None
+    assert tree.css_first(f'article[data-row-id="{provider_b}"]') is None
     # The toolbar's filter link summarizes the active filter inline.
     link = tree.css_first("a.toolbar-filter-link")
     assert link is not None
@@ -784,7 +784,7 @@ async def test_list_providers_treats_empty_filter_values_as_absent(
 
     assert response.status_code == 200
     tree = HTMLParser(response.text)
-    rows = tree.css("#clinicians-table tbody tr")
+    rows = tree.css("#clinicians-list article.entity-card")
     assert len(rows) == 1, "Empty filter values should not exclude rows"
 
 
@@ -1509,7 +1509,7 @@ async def test_list_paginates_when_over_per_page(
     response = await authenticated_client.get("/clinicians")
     assert response.status_code == 200
     tree = HTMLParser(response.text)
-    rows = tree.css("#clinicians-table tbody tr")
+    rows = tree.css("#clinicians-list article.entity-card")
     assert len(rows) == 2
     pagination = tree.css_first('nav[aria-label="Pagination"]')
     assert pagination is not None
@@ -1519,7 +1519,7 @@ async def test_list_paginates_when_over_per_page(
     response2 = await authenticated_client.get("/clinicians?page=2")
     assert response2.status_code == 200
     tree2 = HTMLParser(response2.text)
-    rows2 = tree2.css("#clinicians-table tbody tr")
+    rows2 = tree2.css("#clinicians-list article.entity-card")
     assert len(rows2) == 1
     pagination2 = tree2.css_first('nav[aria-label="Pagination"]')
     assert pagination2 is not None

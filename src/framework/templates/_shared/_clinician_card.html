@@ -1,0 +1,106 @@
+{# Shared clinician card — used by every list of clinician directory
+   entries (the underlying Python model class is still `Provider`;
+   only the user-facing surface flipped in #642 PR 4).
+
+   Lives in `src/framework/templates/_shared/` rather than under a
+   per-cluster dir because four templates across three clusters render
+   the same card:
+
+     - `/clinicians`                  (providers/list.html)
+     - `/users/me/favorites`          (favorites/list.html)
+     - `/users/{id}/clinicians`       (users/providers_list.html)
+     - `/users/{id}` embedded preview (users/detail.html)
+
+   Cross-cluster template imports aren't permitted (see
+   ../README.md "Layering rule"), so the shared shape goes here.
+
+   Headline: the clinician's "{first_name} {last_name}" when both are
+   set; falls back to whichever is set, or to the first affiliation's
+   org name, or to a literal "Clinician" when nothing else is known.
+   The headline anchors to the clinician detail page so a click
+   navigates into the directory entry — practice / location chips in
+   the body link out to Orgs separately.
+
+   Body — after #642 PR 3, each fact reflects **every** affiliation
+   the Provider holds, not just a primary one:
+
+     - Practice (linked Org chips, one per affiliation; duplicates by
+       org-id are kept because two affiliations at the same Org may be
+       different locations).
+     - Location ("City, ST" chips, deduped on identical strings).
+     - Licensed in (issuing-state code list).
+     - Insurance (rendered via
+       `src.domain.logic.providers.view._insurance_summary`).
+#}
+{%- from "_shared/_card.html" import card -%}
+
+{% macro clinician_card(provider) -%}
+{%- set view = provider_card_view(provider) -%}
+{%- set affiliations = provider.affiliations | list -%}
+{%- set issuing_states = provider.licensures | map(attribute='issuing_state') | unique | sort | list -%}
+{# Dedupe identical "City, ST" strings (e.g. two affiliations both in
+   Brooklyn, NY shouldn't render "Brooklyn, NY · Brooklyn, NY"). Org
+   chips intentionally don't dedupe — two affiliations at the same
+   Org may be different physical locations and both deserve a link. #}
+{%- set locations = [] -%}
+{%- for aff in affiliations -%}
+  {%- set loc -%}
+    {%- if aff.location_city or aff.location_state -%}
+      {{ aff.location_city }}{% if aff.location_city and aff.location_state %}, {% endif %}{{ aff.location_state }}
+    {%- endif -%}
+  {%- endset -%}
+  {%- set loc = loc | trim -%}
+  {%- if loc and loc not in locations -%}
+    {%- set _ = locations.append(loc) -%}
+  {%- endif -%}
+{%- endfor -%}
+{%- set first = provider.first_name -%}
+{%- set last = provider.last_name -%}
+{%- set name -%}
+  {%- if first and last %}{{ first }} {{ last }}
+  {%- elif first %}{{ first }}
+  {%- elif last %}{{ last }}
+  {%- elif affiliations %}{{ affiliations[0].org.name }}
+  {%- else %}Clinician
+  {%- endif %}
+{%- endset -%}
+{% call card(
+     id=provider.id,
+     headline_url=entity_url('clinician', id=provider.id),
+     headline=name | trim) -%}
+{# `data-fact` on each row's wrapping `<div>` is the stable test
+   selector — display labels in `<dt>` are presentation strings and may
+   change, but the data-fact keys form the contract tests rely on. #}
+<section class="entity-facts">
+  <dl>
+    <div data-fact="practice">
+      <dt>Practice</dt>
+      <dd class="meta">
+        {%- if affiliations -%}
+          {%- for aff in affiliations -%}
+            <a href="{{ entity_url('organization', id=aff.org_id) }}">{{ aff.org.name }}</a>
+          {%- endfor -%}
+        {%- else -%}
+          &mdash;
+        {%- endif -%}
+      </dd>
+    </div>
+    <div data-fact="location">
+      <dt>Location</dt>
+      <dd class="meta">
+        {%- if locations -%}
+          {%- for loc in locations -%}<span>{{ loc }}</span>{%- endfor -%}
+        {%- else -%}
+          &mdash;
+        {%- endif -%}
+      </dd>
+    </div>
+    <div data-fact="licensed_in">
+      <dt>Licensed in</dt>
+      <dd>{% if issuing_states %}{{ issuing_states | join(', ') }}{% else %}&mdash;{% endif %}</dd>
+    </div>
+    <div data-fact="insurance"><dt>Insurance</dt><dd>{{ view.insurance_summary }}</dd></div>
+  </dl>
+</section>
+{%- endcall %}
+{%- endmacro %}
