@@ -30,7 +30,7 @@ Audit-log historical rows reference the old kind strings in their JSON
 the current name. New audit writes use the new names.
 
 Revision ID: 9e1f7b3c4a2d
-Revises: 7c3c296c9429
+Revises: 3a9d52f17b04
 Create Date: 2026-05-20 00:00:00.000000
 
 """
@@ -41,7 +41,7 @@ from alembic import op
 
 # revision identifiers, used by Alembic.
 revision: str = "9e1f7b3c4a2d"
-down_revision: Union[str, None] = "7c3c296c9429"
+down_revision: Union[str, None] = "3a9d52f17b04"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
