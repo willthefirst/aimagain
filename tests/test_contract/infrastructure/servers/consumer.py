@@ -244,9 +244,12 @@ def _setup_provider_edit_form_stub(app: FastAPI) -> None:
             # `orgs` context var to render options.
             org_id=org_id,
             org=org,
-            # `npi` is an empty optional text input on the stub (#525);
-            # it serializes as `npi=` in the encoded body right after
-            # `location_zip`.
+            # `first_name`, `last_name`, and `npi` are empty optional
+            # text inputs on the stub. They live in the "Clinician"
+            # fieldset which renders first, so the form serializes them
+            # ahead of `org_id` in the encoded body.
+            first_name=None,
+            last_name=None,
             npi=None,
             location_city="Brooklyn",
             location_state="NY",
