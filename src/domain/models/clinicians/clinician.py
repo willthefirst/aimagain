@@ -58,6 +58,15 @@ class Clinician(BaseModel):
     # before the field is curated; tighten once the data is clean.
     npi = Column(Text, nullable=True)
 
+    # Legal first / last name. Both nullable because existing rows
+    # predate the columns (backfill is operator-driven, same posture as
+    # `npi`). The verification pipeline reads through here for the
+    # NPPES + OIG name match — without these, every check routes to
+    # human review because the username fallback in `_clinician_names`
+    # scores far below threshold (see `handlers.py:_clinician_names`).
+    first_name = Column(Text, nullable=True)
+    last_name = Column(Text, nullable=True)
+
     # Back-populates `Provider.clinician`. 1:many in the schema so PR 2
     # can attach more `Provider` rows (which become `Affiliation`s) to
     # one clinician without a relationship-cardinality migration. In
