@@ -24,13 +24,14 @@ async def test_base_template_renders_primary_nav_when_authenticated(
     authenticated_client: AsyncClient,
     logged_in_user: User,
 ):
-    """Authenticated pages render the primary nav with section
-    shortcuts (Referrals / Openings / Intakes / Directory) on the left
-    and on the right an adaptive primary CTA (Create-clinician for
-    first-time users without a provider profile, Create-opening for
-    returning users) plus the `/users/me` profile icon. Other section
-    links (Users / Favorites) are reachable from within their pages
-    rather than from the top-level chrome."""
+    """Authenticated pages render the primary nav with the two Journey
+    surfaces on the left (Referrals = "find new clients", Openings =
+    "refer out a client") and on the right an adaptive primary CTA
+    (Create-clinician for first-time users without a provider profile,
+    Create-opening for returning users) plus the `/users/me` profile
+    icon. Other URL families — `/intakes`, `/clinicians`,
+    `/organizations`, `/programs`, `/users` — stay live and reachable
+    by URL/bookmark, but are no longer chrome-promoted."""
     response = await authenticated_client.get("/users")
 
     assert response.status_code == 200
@@ -44,12 +45,9 @@ async def test_base_template_renders_primary_nav_when_authenticated(
     section_hrefs = [a.attributes.get("href") for a in section_items]
     # Brand link is `<li><strong><a>` so the `> li > a` direct-child
     # selector picks up only the section shortcuts in render order.
-    # Each post-kind family is its own top-level URL (#628).
     assert section_hrefs == [
         "/referrals",
         "/openings",
-        "/intakes",
-        "/clinicians",
     ]
 
 
@@ -57,10 +55,8 @@ async def test_primary_nav_highlights_active_section(
     authenticated_client: AsyncClient,
     logged_in_user: User,
 ):
-    """Each post kind has its own URL family; the matching tab lights
-    on the family's list page (and any subpath) — same path-prefix
-    rule Directory uses. The old `?kind=` query-param disambiguation
-    is gone along with the shared `/posts` route (#628)."""
+    """The two journey tabs (Referrals / Openings) light on their own
+    list page and subpaths; the other tab does not."""
     referrals = await authenticated_client.get("/referrals")
     tree = HTMLParser(referrals.text)
     assert (
@@ -74,15 +70,6 @@ async def test_primary_nav_highlights_active_section(
             "aria-current"
         )
         is None
-    )
-
-    directory = await authenticated_client.get("/clinicians")
-    tree = HTMLParser(directory.text)
-    assert (
-        tree.css_first(
-            'nav[aria-label="Primary"] a[href="/clinicians"]'
-        ).attributes.get("aria-current")
-        == "page"
     )
 
 
