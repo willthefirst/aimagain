@@ -14,7 +14,7 @@
    creation). #}
 {% block actions %}
 {% if is_authenticated %}
-<li><a href="{{ entity_form_url('clinician') }}" role="button">Create clinician</a></li>
+<li><a href="{{ entity_form_url('clinician') }}" role="button">{{ entity_create_label('clinician') }}</a></li>
 {% endif %}
 {% endblock %}
 

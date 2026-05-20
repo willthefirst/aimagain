@@ -14,26 +14,30 @@ styles that didn't fit the "pick a kind to post" intent).
 {% extends "views/form_new.html" %}
 
 {% block resource_label %}Openings{% endblock %}
-{% block current_label %}New{% endblock %}
 
 {% block content %}
-{# Each `<h2>` line carries a `title-case-ignore` marker — the
-   linter's concatenated-text heuristic flags the heading+tagline as
-   mid-text-capital ("Heading An individual…") even though each
-   element is correct sentence case in isolation, and resolves the
-   violation against the first leaf text-node (the `<h2>`). The
-   marker scope is the same line as the violation, so it sits on the
-   `<h2>`, not the parent `<a>`. #}
+{# Each option's `<h2>` label funnels through `entity_create_label` so
+   the text on the picker matches the H1 the user lands on after
+   clicking (e.g. "Create clinician opening"). Same helper the
+   kind-specific form page reads from — see
+   `src/framework/rendering/labels.py`.
+
+   `title-case-ignore` markers: the linter's concatenated-text heuristic
+   flags the heading+tagline as mid-text-capital ("Heading An individual…")
+   even though each element is correct sentence case in isolation, and
+   resolves the violation against the first leaf text-node (the `<h2>`).
+   The marker scope is the same line as the violation, so it sits on
+   the `<h2>`, not the parent `<a>`. #}
 <a href="{{ entity_form_url('opening') }}?kind=clinician_opening">
   <hgroup>
-    <h2>Post a clinician opening</h2> <!-- title-case-ignore -->
+    <h2>{{ entity_create_label('opening', kind='clinician_opening') }}</h2> <!-- title-case-ignore -->
     <p>An individual clinician with availability on their caseload.</p>
   </hgroup>
 </a>
 
 <a href="{{ entity_form_url('opening') }}?kind=program_intake">
   <hgroup>
-    <h2>Post a program intake</h2> <!-- title-case-ignore -->
+    <h2>{{ entity_create_label('opening', kind='program_intake') }}</h2> <!-- title-case-ignore -->
     <p>An organization's program announcing open intake slots.</p>
   </hgroup>
 </a>

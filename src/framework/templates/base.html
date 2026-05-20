@@ -588,7 +588,7 @@
              `has_provider_profile` is a chrome scalar in
              `src.framework.http.responses.base_context`. #}
           {% if not has_provider_profile %}
-          <li><a role="button" href="{{ entity_form_url('clinician') }}">Create clinician</a></li>
+          <li><a role="button" href="{{ entity_form_url('clinician') }}">{{ entity_create_label('clinician') }}</a></li>
           {% endif %}
           <li>
             <a href="{{ entity_url('user', id='me') }}" aria-label="Profile"{% if _on_profile %} aria-current="page"{% endif %}>

@@ -76,7 +76,8 @@ Args:
 {% macro page_toolbar(
   heading,
   active_filters=(),
-  search_url=none
+  search_url=none,
+  filter_label="Filters"
 ) -%}
 {# `caller` is truthy whenever the macro was invoked via `{% call %}`,
    even if the caller body trims to empty (e.g. the list view always
@@ -97,7 +98,7 @@ Args:
     {%- if search_url %}
     <a href="{{ search_url }}" class="toolbar-filter-link">
       {%- if not active_filters -%}
-      Filters
+      {{ filter_label }}
       {%- else -%}
         {%- set shown = active_filters[:_ACTIVE_FILTER_INLINE_LIMIT] -%}
         {%- set hidden = active_filters | length - shown | length -%}

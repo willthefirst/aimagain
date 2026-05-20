@@ -42,6 +42,6 @@
     {{ radio_bool_field("accepting_referrals", "Accepting referrals?", current=true, required=false) }}
   </fieldset>
 
-  {{ actions("Create program", cancel_url=entity_url('program')) }}
+  {{ actions(entity_create_label('program'), cancel_url=entity_url('program')) }}
 </form>
 {% endblock %}

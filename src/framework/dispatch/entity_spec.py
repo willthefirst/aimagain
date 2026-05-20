@@ -182,6 +182,21 @@ class EntitySpec:
 
     # Model + ownership --------------------------------------------------
     model: type
+    # Human-facing singular for chrome strings — the noun that completes
+    # "Create <X>" / "Edit <X>" on the form pages and every CTA that
+    # opens them. Lowercase, no leading article; e.g. ``"organization"``,
+    # ``"clinician"``, ``"opening"``. Defaults to ``name`` (most specs:
+    # the URL singular doubles as the display noun); set explicitly when
+    # the URL identifier diverges from the user-visible noun (e.g.
+    # if a spec ever needed `name="thing_v2"` while showing "Thing" in
+    # chrome, set this).
+    #
+    # `entity_create_label(name, kind=None)` reads this to build the
+    # single canonical string the form-page H1 *and* every "Create X"
+    # button render from — see `src/framework/templates/views/form_new.html`
+    # and `src/framework/rendering/labels.py`. The pin test
+    # `test_form_chrome_labels` asserts the structural equivalence.
+    singular_label: str | None = None
     owner_attr: str | None = "owner_id"
 
     # Parent (owned subentity link) --------------------------------------
@@ -514,6 +529,12 @@ class EntitySpec:
     )
 
     def __post_init__(self) -> None:
+        # Default `singular_label` to `name`. Specs only set the field
+        # explicitly when the URL singular and the user-visible noun
+        # diverge (none today; declared on the field so future
+        # divergences have a place to land without touching templates).
+        if self.singular_label is None:
+            object.__setattr__(self, "singular_label", self.name)
         # Mirror `ResourceSpec.__post_init__` — declaring private fields
         # without a predicate would silently leak them.
         if self.private_fields and self.private_field_predicate is None:

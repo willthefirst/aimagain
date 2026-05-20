@@ -76,7 +76,7 @@
      a user sees on the profile preview, without an extra click. #}
   {% if is_self %}
   <footer class="entity-footer">
-    <a href="{{ entity_form_url('clinician') }}" role="button">Create clinician</a>
+    <a href="{{ entity_form_url('clinician') }}" role="button">{{ entity_create_label('clinician') }}</a>
   </footer>
   {% endif %}
 </article>

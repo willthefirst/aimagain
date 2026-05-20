@@ -45,10 +45,16 @@ def _make_env() -> Environment:
     # Jinja globals registered in production by
     # `src.framework.rendering.templating`. Mirror them here so the
     # chrome renders without needing a full app boot.
+    from src.framework.rendering.labels import (
+        entity_create_label,
+        entity_filter_label,
+    )
     from src.framework.rendering.route_urls import entity_form_url, entity_url
 
     env.globals["entity_url"] = entity_url
     env.globals["entity_form_url"] = entity_form_url
+    env.globals["entity_create_label"] = entity_create_label
+    env.globals["entity_filter_label"] = entity_filter_label
     return env
 
 
@@ -185,7 +191,12 @@ def test_detail_view_renders_two_segment_breadcrumb_and_actions() -> None:
     assert '<li><a id="edit" href="/providers/1/form">Edit</a></li>' in html
 
 
-def test_form_new_view_appends_new_segment() -> None:
+def test_form_new_view_renders_create_heading_from_context() -> None:
+    """``views/form_new.html`` reads ``create_heading`` from the
+    handler-supplied context and renders it as the toolbar `<h1>`.
+    The handler computes it via `create_label_for(spec, kind=...)`,
+    the same helper every "Create X" CTA reads from, so the page
+    title can't drift from the button that opened it."""
     env = _make_env()
     _add_child(
         env,
@@ -202,10 +213,11 @@ def test_form_new_view_appends_new_segment() -> None:
         request=_request_stub(),
         is_authenticated=False,
         is_development=False,
+        create_heading="Create clinician",
     )
 
     assert 'href="/providers"' in html and ">Providers</a>" in html
-    assert ">New</li>" in html or ">New<" in html
+    assert "<h1>Create clinician</h1>" in html
     assert '<form id="x"></form>' in html
 
 
