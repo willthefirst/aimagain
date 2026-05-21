@@ -25,11 +25,16 @@ def create_test_user(
     username: Optional[str] = None,
     email: Optional[str] = None,
     hashed_password: Optional[str] = None,
-    is_active: bool = True,  # Added fastapi-users default
-    is_superuser: bool = False,  # Added fastapi-users default
-    is_verified: bool = True,  # Added fastapi-users default
+    is_active: bool = True,
+    is_superuser: bool = False,
+    # `is_verified` is an ORM column required by fastapi-users — it is NOT
+    # the same as the API response field (which was removed from `UserRead`
+    # in #696). Passing `is_verified=True` here sets the DB column only;
+    # it does not affect the JSON response shape. Default True so tests
+    # don't need to worry about the verification state.
+    is_verified: bool = True,
 ) -> User:
-    """Creates a User instance with default values for testing."""
+    """Creates a User ORM instance with default values for testing."""
     unique_suffix = uuid.uuid4()
     return User(
         id=id or unique_suffix,
