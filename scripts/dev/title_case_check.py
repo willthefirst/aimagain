@@ -5,7 +5,7 @@ import argparse
 import re
 import sys
 from pathlib import Path
-from typing import Dict, List, Union
+from typing import Dict, List, Optional, Union
 
 try:
     import pathspec
@@ -285,6 +285,30 @@ class TitleCaseChecker:
                 return True
         return False
 
+    def is_violation_suppressed(
+        self, content: str, line_num: int, lines: Optional[List[str]] = None
+    ) -> bool:
+        """Return True if line `line_num` (1-indexed) or its immediately
+        preceding line carries an ignore marker.
+
+        The preceding-line check is the lint equivalent of
+        `# eslint-disable-next-line` — it lets templates put the marker on
+        its own line so brand-name copy reads cleanly:
+
+            {# title-case-ignore: brand name #}
+            <h2>Bedlam Connect</h2>
+
+        Only the *immediately* preceding line is consulted (no blank-line
+        skipping) so a far-away comment can never attribute itself to an
+        unrelated violation. See #749 for the motivating friction."""
+        if lines is None:
+            lines = content.split("\n")
+        if 1 <= line_num <= len(lines) and self.should_ignore_line(lines[line_num - 1]):
+            return True
+        if line_num >= 2 and self.should_ignore_line(lines[line_num - 2]):
+            return True
+        return False
+
     def should_ignore_file(self, file_path: Path) -> bool:
         """Check if entire file should be ignored based on .titleignore file or gitignore."""
         # Skip known binary extensions silently — these are never text content
@@ -516,7 +540,7 @@ class TitleCaseChecker:
             if in_fenced_code_block:
                 continue
 
-            if self.should_ignore_line(line):
+            if self.is_violation_suppressed(content, line_num, lines):
                 continue
 
             for pattern, pattern_type in patterns:
@@ -746,12 +770,13 @@ class TitleCaseChecker:
         line_num = self._locate_in_source(locator_candidates, content, line_starts)
 
         # Honour the per-line escape hatch even in parsed mode: if the
-        # source line carries a ``title-case-ignore`` marker, suppress.
+        # source line — or the immediately preceding line, see #749 —
+        # carries a ``title-case-ignore`` marker, suppress.
         try:
             line_text = content.split("\n")[line_num - 1]
         except IndexError:
             line_text = ""
-        if self.should_ignore_line(line_text):
+        if self.is_violation_suppressed(content, line_num):
             return
 
         violations.append(
@@ -899,7 +924,10 @@ class TitleCaseChecker:
             return 0 if fixed_count == total_violations else 1
         else:
             print("💡 Run with --fix to automatically correct these violations")
-            print("💡 Add 'title-case-ignore' comment to ignore specific lines")
+            print(
+                "💡 Add 'title-case-ignore' on the violating line OR the line "
+                "immediately above it"
+            )
             print("💡 Create .titleignore file to ignore specific files/patterns")
             return 1
 
@@ -916,7 +944,10 @@ Examples:
     python scripts/dev/title_case_check.py README.md src/     # Check specific files/dirs
 
 Exception handling:
-  - Add 'title-case-ignore' in a comment to ignore specific lines
+  - Add 'title-case-ignore' in a comment on the violating line OR the
+    line immediately above it (e.g. `{# title-case-ignore: brand #}`
+    on its own line above an `<h2>` works the same as `<h2>...</h2>
+    {# title-case-ignore #}` inline).
   - Create .titleignore file with glob patterns to ignore files
   - Use --check-only to report without fixing
   - Use --no-gitignore to disable automatic gitignore support
