@@ -32,7 +32,7 @@ verbatim.
 
 from typing import Annotated, Any, Literal
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, model_serializer, model_validator
 
 from src.domain.models.enums import US_STATES
 from src.framework.rendering.form_fields import HtmlPattern
@@ -189,3 +189,37 @@ def flatten_location_on_dump(model: BaseModel, data: dict[str, Any]) -> dict[str
         if sub in nested:
             data[f"location_{sub}"] = nested[sub]
     return data
+
+
+class FlatLocationSchema(BaseModel):
+    """Mixin for schemas that embed `Location` (or `LocationPartial`) and
+    need to keep `(location_city, location_state, location_zip)` flat on
+    the wire while modeling them as a single `location` value object in
+    Python.
+
+    Composes `gather_flat_location` (pre-validate) and
+    `flatten_location_on_dump` (serialize) so each embedding schema
+    inherits this mixin alongside its usual base
+    (`ReadProjection`, `WirePayload`, `PartialUpdate`) instead of
+    re-declaring the same two decorators per class.
+
+    Example:
+
+        class FooCreate(FlatLocationSchema, WirePayload):
+            location: Location
+            ...
+
+    Don't use this mixin on the polymorphic Post schemas — those compose
+    the gather hook with `_flatten_post_to_dict` and need to keep their
+    bespoke `@model_validator(mode="before")` to control the
+    composition order.
+    """
+
+    @model_validator(mode="before")
+    @classmethod
+    def _gather_flat_location(cls, data: Any) -> Any:
+        return gather_flat_location(data)
+
+    @model_serializer(mode="wrap")
+    def _flatten_location_on_dump(self, handler):
+        return flatten_location_on_dump(self, handler(self))
