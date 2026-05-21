@@ -315,6 +315,11 @@ def _setup_organization_create_form_stub(app: FastAPI) -> None:
                 "current_user": current_user,
                 "ORGANIZATION_TYPES": ORGANIZATION_TYPES,
                 "ORGANIZATION_TYPES_LABELS": ORGANIZATION_TYPES_LABELS,
+                # The `?type=` picker bypasses this stub's no-db path;
+                # when `?type=` is set the form branch renders
+                # `parent_org_options`. Empty list = no parent choices,
+                # which is the correct stub default (no db).
+                "parent_org_options": [],
             },
             request=request,
         )

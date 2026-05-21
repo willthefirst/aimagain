@@ -26,23 +26,20 @@ async def test_base_template_renders_primary_nav_when_authenticated(
 ):
     """Authenticated pages render the primary nav with the two Journey
     surfaces on the left (Referrals = "find new clients", Openings =
-    "refer out a client") and on the right an adaptive primary CTA
-    (Create-clinician for first-time users without a provider profile,
-    Create-opening for returning users) plus the `/users/me` profile
-    icon. Other URL families — `/intakes`, `/clinicians`,
+    "refer out a client") and on the right the `/users/me` profile
+    dropdown. Other URL families — `/intakes`, `/clinicians`,
     `/organizations`, `/programs`, `/users` — stay live and reachable
-    by URL/bookmark, but are no longer chrome-promoted."""
+    by URL/bookmark, but are no longer chrome-promoted.
+
+    The "Create clinician" chrome CTA was removed in #697 — the
+    /users/me onboarding checklist is the discoverable entry point."""
     response = await authenticated_client.get("/users")
 
     assert response.status_code == 200
     tree = HTMLParser(response.text)
-    # CTA link is a direct `> li > a`; profile link is nested inside the
-    # sign-out dropdown so use a descendant selector for it (#702).
-    cta_items = tree.css("#primary-nav > li > a")
-    cta_hrefs = {a.attributes.get("href") for a in cta_items}
-    # First-time user (no `Provider` row yet) — the CTA points at
-    # `/clinicians/form` so they can unblock posting.
-    assert "/clinicians/form" in cta_hrefs
+    # "Create clinician" button no longer lives in the nav (#697).
+    cta_items = tree.css("#primary-nav > li > a[href='/clinicians/form']")
+    assert len(cta_items) == 0, "Create-clinician CTA should be removed from nav (#697)"
     # Profile link lives inside the dropdown — descendant selector.
     assert tree.css_first('#primary-nav a[href="/users/me"]') is not None
     section_items = tree.css('nav[aria-label="Primary"] > ul:first-of-type > li > a')

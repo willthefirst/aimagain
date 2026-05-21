@@ -652,18 +652,11 @@
         </ul>
         <ul id="primary-nav">
           {% if is_authenticated %}
-          {# Onboarding-only chrome CTA — first-time users (no provider
-             profile yet) see "Create clinician", which takes them to
-             `/clinicians/form` so they can unblock posting. Returning
-             users with a profile see no CTA in the nav: the page-level
-             "Create opening" / "Create referral" buttons on the
-             respective list views are the right surface for those
-             actions (one CTA per page, not duplicated in chrome).
-             `has_provider_profile` is a chrome scalar in
-             `src.framework.http.responses.base_context`. #}
-          {% if not has_provider_profile %}
-          <li><a role="button" href="{{ entity_form_url('clinician') }}">{{ entity_create_label('clinician') }}</a></li>
-          {% endif %}
+          {# "Create clinician" chrome CTA removed in #697: the rebuilt
+             /users/me onboarding home carries that CTA in the checklist,
+             so duplicating it in the nav adds clutter without orientation.
+             `has_provider_profile` is still set in base_context but is no
+             longer read here. #}
           <li>
             {# title-case-ignore — Profile dropdown: Pico `<details role="list">` gives us a
                disclosure widget with no JS. Contains two items — Profile

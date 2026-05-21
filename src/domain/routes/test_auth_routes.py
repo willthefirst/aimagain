@@ -368,3 +368,26 @@ async def test_failed_register_writes_no_audit_row(
         )
         rows = result.scalars().all()
         assert rows == []
+
+
+async def test_root_anonymous_returns_landing_page(test_client: AsyncClient):
+    """Anonymous GET / returns the marketing landing page (200 HTML),
+    not a redirect to the login wall (#692)."""
+    response = await test_client.get("/", follow_redirects=False)
+    assert response.status_code == 200
+    assert "text/html" in response.headers["content-type"]
+    # Pin the headline copy so it can't drift without breaking a test.
+    assert "Connect clinicians with the right clients" in response.text
+    # Both CTAs must be present so anonymous visitors can self-serve.
+    assert "/auth/register" in response.text
+    assert "/auth/login" in response.text
+
+
+async def test_root_authenticated_redirects_to_referrals(
+    authenticated_client: AsyncClient,
+):
+    """Authenticated GET / still redirects to /referrals — the
+    "find new clients" home (#692)."""
+    response = await authenticated_client.get("/", follow_redirects=False)
+    assert response.status_code == 302
+    assert response.headers["location"] == "/referrals"
