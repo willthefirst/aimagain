@@ -456,6 +456,57 @@ def test_genuinely_miscased_acronym_neighbour_still_flags(tmp_path):
     assert "ZIP Code Lookup" in originals
 
 
+def test_brand_phrase_bedlam_connect_passes_anywhere(tmp_path):
+    """Multi-word brand phrases (``BRAND_PHRASES``) are preserved verbatim
+    wherever they appear in prose — sentence-case lowercases every word
+    after the first ("Bedlam Connect" → "Bedlam connect"), so a post-pass
+    restores the canonical casing. Brand-name copy no longer needs
+    per-line ``title-case-ignore`` markers (#728)."""
+    file = _write_html(
+        tmp_path,
+        """
+        <html><body>
+        <title>Bedlam Connect</title>
+        <p>Sign in to your Bedlam Connect account.</p>
+        <p>Bedlam Connect helps clinicians share openings.</p>
+        </body></html>
+        """,
+    )
+    assert _check(file) == []
+
+
+def test_brand_mark_bedlam_alone_passes(tmp_path):
+    """The standalone brand mark (``<span>Bedlam</span>``) lives in
+    ``ALWAYS_CAPITALIZE`` so it stays capitalized in any position. The
+    base template emits both forms inside a single ``<a>`` so the deep
+    text is "Bedlam Connect Bedlam"; both halves must clear the linter."""
+    file = _write_html(
+        tmp_path,
+        """
+        <html><body>
+        <a href="/">
+          <span>Bedlam Connect</span>
+          <span>Bedlam</span>
+        </a>
+        </body></html>
+        """,
+    )
+    assert _check(file) == []
+
+
+def test_brand_phrase_does_not_creep_into_unrelated_prose(tmp_path):
+    """The brand-phrase post-pass only restores casing when the phrase
+    actually appears in the source — it must not over-capitalize random
+    occurrences of either word."""
+    file = _write_html(
+        tmp_path,
+        "<html><body><p>Connect with your peers.</p></body></html>",
+    )
+    # "Connect" alone is not a brand phrase and stays sentence-case
+    # ("Connect with your peers." is already correct at position 0).
+    assert _check(file) == []
+
+
 def test_main_exits_with_error_when_selectolax_missing(monkeypatch, capsys):
     """If selectolax isn't importable, the CLI must hard-fail rather than
     silently skip every HTML/Jinja file. Regression for #198 — the old
