@@ -16,6 +16,8 @@ CLAUDE.md and other docs that want to mention a command link to `dev --help` rat
 - `dev/` — one file per `dev <command>` implementation, each with a colocated `test_*.py`.
 - `dev/title_case_check.py` / `dev/template_imports_check.py` / `dev/python_cluster_imports_check.py` — lint checks invoked by `dev lint`.
 - `runtime/` — container-entrypoint scripts: `start.sh` (production CMD: runs migrations, starts uvicorn) and `start-dev.sh` (dev: adds LiveReload + hot reload).
+- `check_doc_test_coupling.py` — Claude Code `Stop` hook; reminds the agent when `src/` code changed without touching colocated README/tests. Wired via [`.claude/settings.json`](../.claude/settings.json).
+- `session_start_branch_check.py` — Claude Code `SessionStart` hook; prints the real branch, dirty state, and stash list at session start, and warns loudly when the agent lands on `main`/`master` in the shared working tree. Wired via [`.claude/settings.json`](../.claude/settings.json).
 - `test_dev_cli.py` — tests for `dev_cli.py` itself.
 
 Deployment-specific scripts live in `deployment/scripts/` (see [`deployment/README.md`](../deployment/README.md)).
