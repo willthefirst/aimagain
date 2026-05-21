@@ -536,28 +536,28 @@ async def test_failed_register_writes_no_audit_row(
 
 async def test_root_anonymous_returns_landing_page(test_client: AsyncClient):
     """Anonymous GET / returns the marketing landing page (200 HTML),
-    not a redirect to the login wall (#692). The H1 + audience-section
-    headings are pinned so the page-shape (brand-led hero → "how it
-    works" → footer, mirroring bedlamconnect.com) can't drift without
-    breaking a test."""
+    not a redirect to the login wall (#692). The H1 + tagline +
+    description copy are taken verbatim from the parent marketing
+    site at https://www.bedlamconnect.com/ — pinning them so a
+    well-meaning copy edit doesn't quietly drift the public-facing
+    page out of sync with the brand."""
     response = await test_client.get("/", follow_redirects=False)
     assert response.status_code == 200
     assert "text/html" in response.headers["content-type"]
-    # Brand-led H1 (matches the parent marketing site).
+    # Verbatim copy from bedlamconnect.com.
     assert "Welcome to Bedlam Connect" in response.text
-    # "How it works" anchor + the two audience-keyed cards must be
-    # present so the "Learn more" CTA has somewhere to land.
-    assert 'id="how-it-works"' in response.text
-    assert "For clinicians" in response.text
-    assert "For referrers" in response.text
-    # All three CTAs must be present so anonymous visitors can
-    # self-serve. "Sign in" / "Sign up" verbs match the parent
-    # marketing site and the rest of the auth flow (#693).
+    assert "Connecting providers, helping patients." in response.text
+    assert (
+        "Post referrals, find referrals, and maintain a network of "
+        "professional contacts." in response.text
+    )
+    # Both CTAs must be present so anonymous visitors can self-serve.
+    # "Sign in" / "Sign up" verbs match the parent marketing site and
+    # the rest of the auth flow (#693).
     assert "/auth/register" in response.text
     assert "/auth/login" in response.text
     assert "Sign in" in response.text
     assert "Sign up" in response.text
-    assert "Learn more" in response.text
 
 
 async def test_root_authenticated_redirects_to_referrals(

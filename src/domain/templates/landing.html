@@ -1,46 +1,54 @@
 {% extends "base.html" %}
+{% block head %}
+{# Landing-only layout. Scoped to `body:has(.landing-hero)` so these
+   rules don't leak to any other page — every other template extends
+   `base.html` without rendering a `.landing-hero`. On tablet+ the
+   page is exactly one viewport tall: header at top (natural row),
+   hero vertically centered, footer pinned to the bottom. On phones
+   the natural document flow is preferred (the dvh trick reads as
+   awkward at narrow widths where the hero already fills the screen). #}
+<style>
+  @media (min-width: 768px) {
+    body:has(.landing-hero) {
+      min-height: 100dvh;
+      display: grid;
+      grid-template-rows: auto 1fr;
+    }
+    body:has(.landing-hero) main.container {
+      display: grid;
+      grid-template-rows: 1fr auto;
+      gap: 2rem;
+      padding-block: 2rem;
+    }
+    .landing-hero { align-self: center; }
+  }
+  /* CTA cluster — Pico styles `<a role="button">` as block-level
+     100%-wide; inside a `.grid` utility we want them sitting in
+     their cells, not stretching the row. */
+  .landing-hero .grid > [role="button"] { margin: 0; }
+</style>
+{% endblock %}
 {% block content %}
-{# Public landing (anonymous `/`) — the structure mirrors the parent
-   marketing site at https://www.bedlamconnect.com/: a hero with
-   brand-led `<hgroup>` (H1 + tagline `<p>`), a one-line value
-   description, a three-CTA cluster (sign in / sign up / learn more),
-   then a "how it works" section with two `<article>` cards keyed by
-   role. The whole tree is plain semantic HTML — Pico styles
-   `<hgroup>`, `<article>`, `<footer>`, and `<a role="button">` out of
-   the box, so no per-page CSS is needed. #}
-<section>
+{# Public landing (anonymous `/`) — structure mirrors the parent
+   marketing site at https://www.bedlamconnect.com/: a brand-led
+   `<hgroup>` hero (H1 + tagline), a one-line value description, a
+   two-CTA cluster, and a page-level `<footer>`. Pico styles
+   `<hgroup>`, `<footer>`, `<a role="button">`, and `.grid` out of
+   the box; the page-level `<style>` above only handles the
+   vertical-center / footer-pinned viewport fit. #}
+<section class="landing-hero">
   <hgroup>
     <h1>Welcome to Bedlam Connect</h1>
-    <p>Connecting clinicians, helping clients find care.</p>
+    <p>Connecting providers, helping patients.</p>
   </hgroup>
-  <p>Post openings, share referrals, and maintain a network of trusted clinicians — all in one place.</p>
-  {# title-case-ignore: button labels below ("Sign in" / "Sign up" /
-     "Learn more") are intentionally sentence-case verb phrases, not
-     title-case headings. #}
-  <p>
+  <p>Post referrals, find referrals, and maintain a network of professional contacts.</p>
+  {# title-case-ignore: button labels below ("Sign in" / "Sign up")
+     are intentionally sentence-case verb phrases, not title-case
+     headings. #}
+  <div class="grid">
     <a href="/auth/login" role="button">Sign in</a>
     <a href="/auth/register" role="button" class="secondary">Sign up</a>
-    <a href="#how-it-works" role="button" class="outline">Learn more</a>
-  </p>
-</section>
-
-<section id="how-it-works">
-  <hgroup>
-    <h2>How it works</h2>
-    <p>Two surfaces, one network.</p>
-  </hgroup>
-  <article>
-    <hgroup>
-      <h3>For clinicians</h3>
-      <p>Post your availability, connect with referrers, and manage incoming referrals — all in one place.</p>
-    </hgroup>
-  </article>
-  <article>
-    <hgroup>
-      <h3>For referrers</h3>
-      <p>Find clinicians with open capacity, check availability, and send referrals directly.</p>
-    </hgroup>
-  </article>
+  </div>
 </section>
 
 <footer>
