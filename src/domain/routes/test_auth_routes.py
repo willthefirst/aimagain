@@ -152,9 +152,12 @@ async def test_get_register_page(test_client: AsyncClient):
     response = await test_client.get("/auth/register")
     assert response.status_code == 200
     assert "text/html" in response.headers["content-type"]
-    # Page-title text is no longer wrapped in an `<h1>` (per app-wide
-    # H1 removal); the form's submit button still says "Register".
-    assert "Register" in response.text
+    # Page H1 plus the canonical "Create account" submit button are
+    # both load-bearing — pin the H1 here so the page-title copy
+    # doesn't drift to a generic "Sign up" / "Register" string. The
+    # rest of the auth-flow pages follow the same shape.
+    assert "Create an account" in response.text
+    assert "Create account" in response.text
     # Card wrapper — `.auth-page` caps the form at 28rem and centers it
     # so it doesn't stretch to the `<main class="container">` width on
     # tablet/desktop (#584). The `.auth-page` rule lives in `base.html`.
@@ -165,7 +168,10 @@ async def test_get_login_page(test_client: AsyncClient):
     response = await test_client.get("/auth/login")
     assert response.status_code == 200
     assert "text/html" in response.headers["content-type"]
-    assert "Login" in response.text
+    # H1 + submit button (both "Log in" — verb form, no longer the
+    # noun "Login"). See `test_get_register_page` for the H1 pin
+    # rationale.
+    assert "Log in" in response.text
     # See `test_get_register_page` for `.auth-page` rationale (#584).
     assert '<article class="auth-page">' in response.text
 
@@ -188,7 +194,11 @@ async def test_get_reset_password_page(test_client: AsyncClient):
     response = await test_client.get(f"/auth/reset-password/{reset_token}")
     assert response.status_code == 200
     assert "text/html" in response.headers["content-type"]
-    assert "Reset password" in response.text
+    # H1 + submit button. Reset is now "Save password" (the user is
+    # picking a new password, not resetting one); the H1 sets the
+    # "you're about to" frame.
+    assert "Set a new password" in response.text
+    assert "Save password" in response.text
     assert (
         f'value="{reset_token}"' in response.text
         or f'data-token="{reset_token}"' in response.text

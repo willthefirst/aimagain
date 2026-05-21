@@ -7,7 +7,7 @@
 
 {% block content %}
 {% if not current_user.programs %}
-<p>You need a program before posting an intake. <a href="{{ entity_form_url('program') }}">Create a program</a>, then return here.</p>
+<p>Create a program first — every intake is tied to one. <a href="{{ entity_form_url('program') }}">Create a program.</a></p>
 {% else %}
 {{ intake_form("post", entity_url('opening'), entity_create_label('opening', kind='program_intake'), schema=intake_create_schema, current_user=current_user, cancel_url=entity_url('opening')) }}
 {% endif %}
