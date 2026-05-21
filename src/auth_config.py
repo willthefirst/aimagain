@@ -20,7 +20,32 @@ class UserManager(UUIDIDMixin, BaseUserManager[User, uuid.UUID]):
     verification_token_secret = settings.SECRET
 
     async def on_after_register(self, user: User, request: Optional[Request] = None):
-        print(f"User {user.id} has registered.")
+        """Trigger the verify-email flow on new-account creation.
+
+        In development, the user is auto-verified — local dev creates
+        throw-away accounts and shouldn't have to click an email link
+        just to skip the nag banner (also lets Playwright/MCP automation
+        register users without intercepting the verify email). In any
+        other environment, call `self.request_verify(user, request)`
+        which generates a token and triggers `on_after_request_verify`
+        to send the email.
+
+        Wrapped in try/except because email delivery failures must not
+        block registration — the user is already created at this point;
+        they can re-request the verify link from the nag banner.
+        """
+        if settings.ENVIRONMENT == "development":
+            await self.user_db.update(user, {"is_verified": True})
+            return
+
+        try:
+            await self.request_verify(user, request)
+        except Exception:
+            # `request_verify` raises on already-verified or inactive
+            # users — neither possible right after register, but the
+            # broader catch covers transport failures too. The user can
+            # retry via the nag banner's re-send form.
+            pass
 
     async def on_after_forgot_password(
         self, user: User, token: str, request: Optional[Request] = None
@@ -38,7 +63,18 @@ class UserManager(UUIDIDMixin, BaseUserManager[User, uuid.UUID]):
     async def on_after_request_verify(
         self, user: User, token: str, request: Optional[Request] = None
     ):
-        print(f"Verification requested for user {user.id}. Verification token: {token}")
+        """Send the verify-your-email message.
+
+        Called by fastapi-users when:
+          - `on_after_register` triggers `self.request_verify` (the
+            new-account flow), or
+          - the user POSTs `/auth/request-verify-token` (re-send from
+            the nag banner).
+
+        Lazy-imported for the same reason as the reset hook below."""
+        from src.domain.logic.auth.emails import send_verification_email
+
+        await send_verification_email(user, token)
 
     async def on_after_login(
         self,

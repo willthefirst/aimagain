@@ -25,19 +25,42 @@ def test_base_context_anonymous():
         "current_username": None,
         "current_user_id": None,
         "has_provider_profile": False,
+        # Anonymous users don't get the verify nag — default True so
+        # the banner stays silent.
+        "current_user_is_verified": True,
     }
 
 
 def test_base_context_regular_user():
     user_id = uuid.uuid4()
-    user = SimpleNamespace(id=user_id, username="alice", is_superuser=False)
+    user = SimpleNamespace(
+        id=user_id, username="alice", is_superuser=False, is_verified=True
+    )
     assert base_context(user) == {
         "is_authenticated": True,
         "is_admin": False,
         "current_username": "alice",
         "current_user_id": user_id,
         "has_provider_profile": False,
+        "current_user_is_verified": True,
     }
+
+
+def test_base_context_unverified_user_surfaces_for_nag_banner():
+    """A user with `is_verified=False` is what triggers the nag
+    banner in `_verify_banner.html`. Pin the scalar's exact shape."""
+    user = SimpleNamespace(
+        id=uuid.uuid4(), username="alice", is_superuser=False, is_verified=False
+    )
+    assert base_context(user)["current_user_is_verified"] is False
+
+
+def test_base_context_user_without_is_verified_attr_defaults_true():
+    """`Actor` doesn't declare `is_verified`; test stubs lacking the
+    attribute must not accidentally raise the banner. Default True
+    keeps the nag opt-in (only real `is_verified=False` rows show)."""
+    user = SimpleNamespace(id=uuid.uuid4(), username="alice", is_superuser=False)
+    assert base_context(user)["current_user_is_verified"] is True
 
 
 def test_base_context_admin():

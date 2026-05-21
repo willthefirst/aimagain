@@ -1,0 +1,12 @@
+Verify your email
+
+Hi {{ username }},
+
+Thanks for signing up for Bedlam Connect. Use the link below to
+confirm this email address:
+
+{{ verify_url }}
+
+If you didn't create an account with us, you can ignore this email.
+
+— Bedlam Connect

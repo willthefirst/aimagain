@@ -1,6 +1,11 @@
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Depends, Request
 from fastapi.responses import Response
+from fastapi_users import exceptions as fa_users_exceptions
+from fastapi_users import models
+from fastapi_users.manager import BaseUserManager
 
+from src.auth_config import current_active_user, get_user_manager
+from src.domain.models import User
 from src.framework import APIResponse, BaseRouter
 
 # Standardized router initialization
@@ -71,6 +76,77 @@ async def get_reset_password_page(request: Request, token: str):
     return APIResponse.html_response(
         template_name="auth/reset_password.html",
         context={"token": token},
+        request=request,
+    )
+
+
+@router.get("/verify", name="auth_pages:verify")
+async def get_verify_page(
+    request: Request,
+    user_manager: BaseUserManager[models.UP, models.ID] = Depends(get_user_manager),
+):
+    """Consume the verify token from the email link.
+
+    The email contains `GET /auth/verify?token=...`. Calling
+    `user_manager.verify(token)` server-side keeps the user out of any
+    HTMX/JS ceremony — the click comes from an email client, which may
+    not run JS at all. Renders one of three states:
+
+      - `status="success"`: token consumed, account verified.
+      - `status="already_verified"`: token valid but `is_verified`
+        already True. Treated as success in the UI; explicit branch so
+        a future "the link doesn't seem to work" copy can differentiate.
+      - `status="error"`: token missing / expired / malformed. The page
+        offers a "resend" link back to the nag banner (`/users/me`).
+    """
+    token = request.query_params.get("token", "")
+    if not token:
+        status = "error"
+    else:
+        try:
+            await user_manager.verify(token, request)
+            status = "success"
+        except fa_users_exceptions.UserAlreadyVerified:
+            status = "already_verified"
+        except (
+            fa_users_exceptions.InvalidVerifyToken,
+            fa_users_exceptions.UserNotExists,
+        ):
+            status = "error"
+    return APIResponse.html_response(
+        template_name="auth/verify.html",
+        context={"status": status},
+        request=request,
+    )
+
+
+@router.post("/resend-verify", name="auth_pages:resend_verify")
+async def post_resend_verify(
+    request: Request,
+    current_user: User = Depends(current_active_user),
+    user_manager: BaseUserManager[models.UP, models.ID] = Depends(get_user_manager),
+):
+    """Re-send the verify email for the currently-authed user.
+
+    Sits in front of fastapi-users' `POST /auth/request-verify-token`
+    so the nag banner doesn't need to expose the user's email in HTML
+    (and doesn't need a JSON-encoding HTMX form). Reads the user from
+    the session cookie; calls `request_verify` which triggers
+    `on_after_request_verify` → `send_verification_email`.
+
+    Returns the banner partial back to HTMX (`outerHTML` swap) so the
+    nag is replaced with a confirmation message inline.
+    """
+    try:
+        await user_manager.request_verify(current_user, request)
+    except fa_users_exceptions.UserAlreadyVerified:
+        # Edge case: user verified in another tab between page load
+        # and the resend click. Render the same confirmation —
+        # nothing to do from the user's POV.
+        pass
+    return APIResponse.html_response(
+        template_name="_shared/_verify_banner_sent.html",
+        context={},
         request=request,
     )
 
