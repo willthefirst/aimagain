@@ -44,6 +44,27 @@ async def test_register(
         assert created_user.email == email_to_test
 
 
+async def test_register_via_htmx_sets_cookie_and_redirects(test_client: AsyncClient):
+    """HTMX register should auto-login (cookie) and redirect, not return JSON."""
+    payload = {
+        "email": "htmx@example.com",
+        "username": "htmxuser",
+        "password": "Password123!",
+    }
+    response = await test_client.post(
+        "/auth/register",
+        json=payload,
+        headers={"HX-Request": "true", "Content-Type": "application/json"},
+    )
+    assert response.status_code == 200
+    assert response.headers.get("HX-Redirect") == "/users/me"
+    # A session cookie must be set so the redirect lands authenticated.
+    assert (
+        "fastapiusersauth" in response.cookies
+        or "set-cookie" in str(response.headers).lower()
+    )
+
+
 async def test_register_duplicate_email(test_client: AsyncClient, logged_in_user: User):
     register_data = {
         "email": logged_in_user.email,
