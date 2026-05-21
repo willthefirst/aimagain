@@ -14,6 +14,21 @@
    viewer is an admin looking at someone else. #}
 {% if is_self %}
 <li><a href="{{ entity_url('user_favorite') }}" role="button" class="outline">Favorites</a></li>
+{# Sign out — self-only. fastapi-users' POST /auth/jwt/logout returns
+   204 (cookie deleted, no body); the `hx-on::after-request` shim
+   redirects the browser to `/` on success since the library doesn't
+   ship a `?next=` for logout the way login does. Don't move this
+   above the admin block — Sign out reads as the last action in the
+   self view, and the admin actions only render for admins viewing
+   someone else. #}
+<li>
+  <button type="button"
+          class="secondary outline"
+          hx-post="/auth/jwt/logout"
+          hx-on::after-request="if(event.detail.successful){window.location='/'}">
+    Sign out
+  </button>
+</li>
 {% endif %}
 {% include "users/_admin_actions.html" %}
 {% endblock %}

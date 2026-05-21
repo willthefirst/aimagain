@@ -597,6 +597,65 @@ async def test_detail_omits_inline_create_provider_for_other_user(
     assert _inline_create_provider_link(tree) is None
 
 
+# --- Sign out -----------------------------------------------------------
+
+
+def _signout_button(tree: HTMLParser):
+    """Find the Sign out button in the toolbar action menu — keyed off
+    `hx-post="/auth/jwt/logout"` rather than text because the button
+    label is the only visible signal of the action and the test should
+    pin the wire contract (the htmx POST target), not the copy."""
+    for button in tree.css("button[hx-post]"):
+        if button.attributes.get("hx-post") == "/auth/jwt/logout":
+            return button
+    return None
+
+
+async def test_detail_shows_signout_for_self(
+    authenticated_client: AsyncClient,
+    logged_in_user: User,
+):
+    """`/users/me` exposes a Sign out button in the toolbar action menu
+    so a user can end their session from somewhere visible (was
+    previously only reachable by knowing the POST /auth/jwt/logout
+    endpoint exists). Pin the htmx POST target + the after-request
+    redirect hook so the button's wire behavior stays in lockstep."""
+    response = await authenticated_client.get("/users/me")
+    assert response.status_code == 200
+    tree = HTMLParser(response.text)
+    button = _signout_button(tree)
+    assert button is not None, "self profile is missing the Sign out button"
+    on_after = button.attributes.get("hx-on::after-request") or ""
+    assert "window.location" in on_after, (
+        "Sign out button must redirect after the 204 logout response — "
+        "fastapi-users' logout returns 204 with no body, so the htmx "
+        "swap alone leaves the browser on /users/me."
+    )
+
+
+async def test_detail_omits_signout_for_other_user(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user: User,
+):
+    """Viewing another user's profile (including as admin) does NOT
+    surface the Sign out button — that affordance is self-only.
+    Otherwise an admin could accidentally sign out the user they're
+    auditing, which is both confusing and would do nothing useful (the
+    admin's own session would also end since cookies are per-browser).
+    """
+    await promote_to_admin(db_test_session_manager, logged_in_user.email)
+    target = create_test_user(username=f"target-{uuid.uuid4()}")
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            session.add(target)
+
+    response = await authenticated_client.get(f"/users/{target.id}")
+    assert response.status_code == 200
+    tree = HTMLParser(response.text)
+    assert _signout_button(tree) is None
+
+
 # --- Chrome: font preload (icon-flicker fix) ----------------------------
 
 
