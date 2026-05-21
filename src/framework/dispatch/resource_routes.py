@@ -1160,7 +1160,7 @@ def mount_entity(
     entity: Any,  # `EntitySpec` — imported lazily to avoid a cycle
     *,
     handlers: dict[str, Callable[..., Awaitable[Any]]] | None = None,
-    owned_subentities: tuple[Any, ...] = (),
+    owned_subentities: tuple[Any, ...] | None = None,
 ) -> None:
     """Spec-driven dispatcher for an entity's full route surface.
 
@@ -1225,6 +1225,14 @@ def mount_entity(
     spec = entity.to_resource_spec()
     if handlers is None:
         handlers = {}
+    # Default to the spec's `children` tuple — every subentity that
+    # declared `parent=<this>` at construction time is already in
+    # `entity.children` (see `EntitySpec.__post_init__`), so route
+    # files don't need to list them twice. Callers can still pass
+    # an explicit tuple (e.g. `()` to mount only the parent, or a
+    # subset for staged rollouts).
+    if owned_subentities is None:
+        owned_subentities = entity.children
 
     # The path/handler pairing is the only check that can't live in
     # `EntitySpec.__post_init__` — `handlers` arrive at the mount call,
