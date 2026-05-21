@@ -65,10 +65,28 @@ async def _assert_provider_payload_org_ownership(
     requesting_user: User,
     organization_repo: OrganizationRepository,
 ) -> None:
-    """`PROVIDER_ENTITY.payload_authz_path` target — thin wrapper around
-    the framework's generic FK-ownership assertion. Keeps the dotted-
-    path on the spec stable while the rule lives in one framework spot.
+    """`PROVIDER_ENTITY.payload_authz_path` target.
+
+    Solo-practice path (#699): when ``payload.solo_practice`` is True,
+    auto-create a solo-practice Organization named after the clinician
+    and patch ``payload.org_id`` so the framework's model constructor
+    gets a real FK. Skips the ownership check since we just created it.
+
+    Normal path: delegate to the framework's generic FK-ownership guard.
     """
+    if getattr(payload, "solo_practice", False):
+        first = (getattr(payload, "first_name", None) or "").strip()
+        last = (getattr(payload, "last_name", None) or "").strip()
+        name_parts = [p for p in (first, last) if p]
+        org_name = " ".join(name_parts) if name_parts else requesting_user.username
+        auto_org = Organization(
+            name=org_name,
+            type="solo_practice",
+            owner_id=requesting_user.id,
+        )
+        created_org = await organization_repo.create(auto_org)
+        payload.org_id = created_org.id
+        return
     await assert_fk_ownership(
         payload=payload,
         attr="org_id",

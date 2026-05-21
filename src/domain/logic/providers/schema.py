@@ -37,7 +37,7 @@ import uuid
 from datetime import date, datetime
 from typing import Annotated, Literal
 
-from pydantic import AfterValidator, BeforeValidator
+from pydantic import AfterValidator, BeforeValidator, Field, model_validator
 
 from src.domain.logic.value_objects.location import (
     FlatLocationSchema,
@@ -255,12 +255,21 @@ class ProviderCreate(FlatLocationSchema, WirePayload):
     the flat shape.
     """
 
-    # The practice's display name lives on the linked Organization
-    # (`org.name`). Provider create accepts an existing Org's id; users
-    # who need a new Org create it via `POST /organizations` first and
-    # come back to this form. The dropdown is rendered by the form
-    # template from an `orgs` context var the form_new handler injects.
-    org_id: uuid.UUID
+    # `solo_practice=True` lets a new user skip the separate Org-create
+    # step: the create handler auto-creates a solo-practice Org and
+    # patches `org_id` before persisting the Provider (#699). Excluded
+    # from model_dump() so the field never leaks into the ORM constructor.
+    solo_practice: bool = Field(default=False, exclude=True)
+    # Required when `solo_practice=False`; the handler fills it in for
+    # the solo path. The `@model_validator` below enforces the invariant.
+    org_id: uuid.UUID | None = None
+
+    @model_validator(mode="after")
+    def _require_org_or_solo(self) -> "ProviderCreate":
+        if not self.solo_practice and self.org_id is None:
+            raise ValueError("org_id is required unless solo_practice is True")
+        return self
+
     # Optional on create; backfill is operator-driven. Empty input
     # normalizes to `None` so an unfilled form field doesn't 422.
     npi: NpiText = None
