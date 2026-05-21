@@ -1,0 +1,55 @@
+# Framework: email transport
+
+One async function (`send_email`) dispatched to one of three backends
+behind it. Callers don't know the provider.
+
+## Backend dispatch
+
+`settings.EMAIL_BACKEND` selects the transport at call time:
+
+- `console` (default) — prints subject + recipient + plain-text body to
+  stderr. Used in dev so verify/reset links land in the terminal,
+  clickable, with zero external dependencies.
+- `file` — writes a timestamped `.eml`-shaped file under `./.mail/`
+  (gitignored). Useful when you want to inspect the HTML version of
+  the email a render produced.
+- `resend` — calls the Resend HTTP API. Production. Requires
+  `RESEND_API_KEY` to be set and `EMAIL_FROM` to live on a
+  DKIM/SPF-verified domain.
+
+The `console` default means a fresh checkout never sends real mail by
+accident — flipping to `resend` requires both an env-var change and a
+valid API key.
+
+## Public surface
+
+```python
+from src.framework.email import send_email
+
+await send_email(
+    to="user@example.com",
+    subject="Verify your email",
+    html="<p>…</p>",
+    text="…",
+)
+```
+
+Both `html` and `text` parts are required — text/plain is what keeps
+the spam score down at deliverability-strict providers. Callers
+render both from the same template pair (see
+`src/domain/templates/emails/`).
+
+## Why provider-shaped
+
+`send_email` is the only public function. Backends live behind it.
+Swapping Resend for Postmark / SES / anything else is a single
+`_send_resend` rewrite in [`sender.py`](sender.py), not a
+touch-every-caller refactor. This is why callers never `import resend`
+directly.
+
+## Errors
+
+Errors propagate. fastapi-users hooks (the primary callers) don't
+expose a retry surface — and adding one would be the wrong layer. If a
+provider call fails, the user sees a generic error; they can
+re-request the email via the standard re-send route.

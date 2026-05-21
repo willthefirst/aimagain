@@ -56,6 +56,10 @@ coverage.xml
 .pytest_cache/
 
 
+# Local dev mail dump — `EMAIL_BACKEND=file` writes .eml-shaped files
+# here for HTML inspection. See `src/framework/email/README.md`.
+.mail/
+
 # Environments
 .env
 .env.development
