@@ -40,8 +40,10 @@ PROVIDER_PATCH_API_PATH = f"/clinicians/{STUB_PROVIDER_ID}"
 PROVIDER_EDIT_FORM_PAGE_PATH = f"/clinicians/{STUB_PROVIDER_ID}/form"
 
 # Organization create form pact.
+# `?type=clinic` bypasses the type-picker added in #704 and lands
+# directly on the create form with the Type dropdown pre-selected.
 ORGANIZATION_CREATE_API_PATH = "/organizations"
-ORGANIZATION_CREATE_FORM_PAGE_PATH = "/organizations/form"
+ORGANIZATION_CREATE_FORM_PAGE_PATH = "/organizations/form?type=clinic"
 
 # Program create form pact. Programs attach to an existing Organization
 # via the form's `org_id` dropdown; the consumer stub seeds one Org
