@@ -94,7 +94,7 @@ Public auth-flow pages (`/auth/login`, `/auth/register`, …) opt out — they a
 
 Inline / subresource actions inside the page body (per-row delete buttons on `provider/form_edit.html`'s licensure list, inline-add-form submits) are **not** primary resource actions and stay where they are — they act on a single subentity, not on the page's resource.
 
-Edit forms keep a bottom `<a class="secondary outline">Cancel</a>` pointing at the resource's detail page — a deliberate "abandon this edit" affordance.
+Edit forms keep a bottom `<a class="secondary outline">Cancel</a>` pointing at the resource's detail page — a deliberate "abandon this edit" affordance. The Cancel link carries a `data-cancel-btn` attribute; the `actions` macro injects a tiny inline script that marks the form dirty on the first `input` event and shows a `confirm("Discard changes?")` dialog on Cancel click when the form is dirty. Untouched forms navigate immediately. The script is only emitted in form layout (`wrapper="form"`) — toolbar Cancel links (detail-page Edit/Delete clusters) are not guarded because they never sit adjacent to an editable form.
 
 ## Partial convention
 
