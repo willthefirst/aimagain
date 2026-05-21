@@ -9,7 +9,7 @@ toolbar row itself usually has no right-side actions.
 Layout per page:
 
     <breadcrumb: link to collection › link back to detail>
-    <h1: "Edit <current_label>">
+    <h1: "Edit <noun>" — sourced from context.edit_heading>
     <hr>
     <form>
 
@@ -19,9 +19,13 @@ Child contract:
     resource_label — short string label for the collection segment of
                      the breadcrumb (e.g. "Providers").
     current_label  — short string label for the resource being edited
-                     (e.g. `{{ provider.org.name }}`). Used in the
-                     toolbar `<h1>` as "Edit <current_label>" and as
-                     the link text for the second breadcrumb segment.
+                     (e.g. `{{ provider.org.name }}` or a referral's
+                     identity line). Used only as the link text for
+                     the second breadcrumb segment — NOT in the H1.
+                     The H1 reads `edit_heading` (sourced from
+                     `entity_edit_label(spec.name, kind=...)` via the
+                     form handler) so it reads "Edit clinician
+                     opening" instead of "Edit <row identity>".
     content        — the `<form>` body. By convention forms keep a
                      `<a class="secondary outline">Cancel</a>` linking
                      to `resource_detail_url` so abandoning an edit is
@@ -32,6 +36,12 @@ Child contract:
     resource_url        — URL the collection segment links to.
     resource_detail_url — URL the current-item breadcrumb segment
                           links to (e.g. `"/clinicians/" ~ provider.id`).
+    edit_heading        — full H1 string (e.g. "Edit clinician
+                          opening"). Set by `handle_get_edit_form` via
+                          `edit_label_for(spec, kind=...)` — same
+                          funnel `create_heading` uses on the create
+                          page so the H1 and any "Edit X" button text
+                          can't drift.
 
   Optional blocks:
     breadcrumb          — full breadcrumb override for nested-edit pages.
@@ -50,8 +60,7 @@ Child contract:
 {% endblock %}
 
 {% block toolbar %}
-{%- set current = self.current_label() | trim -%}
-{% call page_toolbar(heading="Edit " ~ current) %}{% endcall %}
+{% call page_toolbar(heading=edit_heading) %}{% endcall %}
 {% endblock %}
 
 {# `entity-form-page` — see `views/form_new.html`. #}

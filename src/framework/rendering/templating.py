@@ -6,7 +6,11 @@ from jinja2 import Environment, FileSystemLoader, select_autoescape
 
 from src.framework.config import settings
 from src.framework.rendering.form_fields import field_spec
-from src.framework.rendering.labels import entity_create_label, entity_filter_label
+from src.framework.rendering.labels import (
+    entity_create_label,
+    entity_edit_label,
+    entity_filter_label,
+)
 from src.framework.rendering.route_urls import entity_form_url, entity_url
 
 auto_reload = settings.ENVIRONMENT == "development"
@@ -58,6 +62,9 @@ _env.globals["entity_form_url"] = entity_form_url
 # "Create X" strings across CTAs and form-page H1s. See
 # `src/framework/rendering/labels.py`.
 _env.globals["entity_create_label"] = entity_create_label
+# `entity_edit_label(name, kind=None)` — the create-label twin for the
+# edit-page H1 and any "Edit X" button text. See `labels.py`.
+_env.globals["entity_edit_label"] = entity_edit_label
 _env.globals["entity_filter_label"] = entity_filter_label
 _env.filters["format_post_date"] = format_post_date
 

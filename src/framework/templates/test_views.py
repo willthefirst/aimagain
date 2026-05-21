@@ -270,10 +270,13 @@ def test_primary_nav_excludes_non_journey_links_for_all_viewers() -> None:
 
 def test_form_edit_view_renders_breadcrumb_and_edit_heading() -> None:
     """``views/form_edit.html`` renders a two-segment breadcrumb
-    (collection link › detail link) and an `<h1>"Edit <current>"`
-    in the toolbar. The current item is not repeated as a non-link
-    crumb — the H1 carries it, so every visible crumb stays an
-    actionable link (GOV.UK pattern)."""
+    (collection link › detail link, the latter carrying the row's
+    identity as `current_label`) above an `<h1>"Edit <noun>"` sourced
+    from `edit_heading`. The H1 reads the resource noun ("clinician",
+    "clinician opening", "client referral") rather than the row's
+    identity — that lives on the breadcrumb's middle segment, where
+    "back to <row>" is the natural verb. Mirrors the create-page
+    contract where `create_heading` sources the H1."""
     env = _make_env()
     _add_child(
         env,
@@ -292,6 +295,7 @@ def test_form_edit_view_renders_breadcrumb_and_edit_heading() -> None:
         request=_request_stub(),
         is_authenticated=False,
         is_development=False,
+        edit_heading="Edit clinician",
     )
 
     tree = HTMLParser(html)
@@ -300,10 +304,12 @@ def test_form_edit_view_renders_breadcrumb_and_edit_heading() -> None:
         "/providers",
         "/providers/42",
     ], "form-edit breadcrumb must be exactly two link segments"
-    # H1 in the toolbar reads "Edit <current>".
+    # Middle crumb's link text is the row's identity (current_label).
+    assert crumbs[1].css_first("a").text(strip=True) == "Sunrise Therapy"
+    # H1 in the toolbar reads `edit_heading`, NOT "Edit <current_label>".
     h1 = tree.css_first("div.toolbar h1")
     assert h1 is not None
-    assert h1.text(strip=True) == "Edit Sunrise Therapy"
+    assert h1.text(strip=True) == "Edit clinician"
 
 
 def test_actions_buttons_fill_row_width_on_desktop() -> None:
