@@ -632,17 +632,25 @@ async def handle_get_edit_form(
     # kind-locked faces is the same value `_assert_kind_lock` just
     # checked; subset-supertype faces use the row's stored kind).
     from src.framework.rendering.labels import edit_label_for
+    from src.framework.rendering.route_urls import url_for_spec
 
     edit_kind: str | None = None
     if spec.discriminator is not None:
         edit_kind = getattr(target, spec.discriminator.column)
 
+    # `resource_url` / `resource_detail_url` are derivable from the
+    # spec + the loaded target — every form-edit template used to set
+    # them via two `{% set %}` lines. Inject from the handler so child
+    # templates skip the boilerplate; same funnel `edit_heading` uses
+    # for the H1.
     context: dict[str, Any] = {
         "request": request,
         spec.name: target,
         "entity_name": spec.name,
         "current_user": requesting_user,
         "edit_heading": edit_label_for(spec, kind=edit_kind),
+        "resource_url": url_for_spec(spec),
+        "resource_detail_url": url_for_spec(spec, id=target.id),
     }
     # Spec-declared constants (enum labels, schema classes the form
     # references, etc.) — same merge precedence as detail/list.
@@ -718,12 +726,18 @@ async def handle_get_new_form(
     # the structural pin (the other half is the Jinja global on the
     # CTAs); pinned by `tests/test_form_chrome_labels.py`.
     from src.framework.rendering.labels import create_label_for
+    from src.framework.rendering.route_urls import url_for_spec
 
+    # `resource_url` is derivable from `spec.name` — every form-new
+    # template used to set it via a `{% set %}` line. Inject from the
+    # handler so child templates skip the boilerplate; same funnel
+    # `create_heading` uses for the H1.
     context: dict[str, Any] = {
         "request": request,
         "entity_name": spec.name,
         "current_user": requesting_user,
         "create_heading": create_label_for(spec, kind=kind),
+        "resource_url": url_for_spec(spec),
     }
     if spec.static_context:
         context.update(spec.static_context)
@@ -806,6 +820,8 @@ async def handle_detail(
         raise NotFoundError(detail=f"{spec.name.capitalize()} not found")
     _assert_kind_lock(spec, target)
 
+    from src.framework.rendering.route_urls import url_for_spec
+
     context: dict[str, Any] = {
         "request": request,
         spec.name: target,
@@ -816,6 +832,10 @@ async def handle_detail(
         # context.
         "entity_name": spec.name,
         "current_user": requesting_user,
+        # Detail templates' breadcrumb back-link to the collection
+        # used to set `resource_url` via a `{% set %}` line; inject
+        # here so child templates skip the boilerplate.
+        "resource_url": url_for_spec(spec),
     }
     if spec.can_write is not None:
         context["can_edit"] = spec.can_write(target, requesting_user)

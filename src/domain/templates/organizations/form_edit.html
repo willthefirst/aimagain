@@ -2,8 +2,6 @@
 {%- from "_shared/form_fields.html" import entity_select_field, select_field, text_field -%}
 {%- from "_shared/actions.html" import actions -%}
 
-{% set resource_url = entity_url('organization') %}
-{% set resource_detail_url = entity_url('organization', id=organization.id) %}
 
 {% block resource_label %}Organizations{% endblock %}
 {% block current_label %}{{ organization.name }}{% endblock %}
@@ -35,13 +33,13 @@
          "Parent organization",
          parent_org_options,
          current=organization.parent_org_id,
-         blank_label="(root — no parent)",
+         blank_label="(no parent)",
          required=false,
-         help='Leave as "(root — no parent)" for a top-level organization.',
+         help="Set one only if this is part of a larger network.",
     ) }}
   </fieldset>
   {{ actions(
-      "Save organization",
+      "Save changes",
       cancel_url=entity_url('organization', id=organization.id),
       delete_url=entity_url('organization', id=organization.id),
       delete_confirm="Delete this organization?",

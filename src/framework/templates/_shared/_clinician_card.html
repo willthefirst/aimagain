@@ -37,6 +37,7 @@
        `src.domain.logic.providers.view._insurance_summary`).
 #}
 {%- from "_shared/_card.html" import card -%}
+{%- from "_shared/sections.html" import fact -%}
 
 {% macro clinician_card(provider) -%}
 {%- set view = provider_card_view(provider) -%}
@@ -71,38 +72,34 @@
      id=provider.id,
      headline_url=entity_url('clinician', id=provider.id),
      headline=name | trim) -%}
-{# `data-fact` on each row's wrapping `<div>` is the stable test
-   selector — display labels in `<dt>` are presentation strings and may
-   change, but the data-fact keys form the contract tests rely on. #}
+{# Each row goes through the shared `fact(key, label, ...)` macro
+   from `_shared/sections.html` so the `data-fact` attribute and the
+   `<div>/<dt>/<dd>` shape stay in lockstep with every other card and
+   detail page. `dd_class="meta"` activates the `.meta` CSS rule
+   (adjacent chip siblings render with " · " separators) on the
+   Practice and Location rows. #}
 <section class="entity-facts">
   <dl>
-    <div data-fact="practice">
-      <dt>Practice</dt>
-      <dd class="meta">
-        {%- if affiliations -%}
-          {%- for aff in affiliations -%}
-            <a href="{{ entity_url('organization', id=aff.org_id) }}">{{ aff.org.name }}</a>
-          {%- endfor -%}
-        {%- else -%}
-          &mdash;
-        {%- endif -%}
-      </dd>
-    </div>
-    <div data-fact="location">
-      <dt>Location</dt>
-      <dd class="meta">
-        {%- if locations -%}
-          {%- for loc in locations -%}<span>{{ loc }}</span>{%- endfor -%}
-        {%- else -%}
-          &mdash;
-        {%- endif -%}
-      </dd>
-    </div>
-    <div data-fact="licensed_in">
-      <dt>Licensed in</dt>
-      <dd>{% if issuing_states %}{{ issuing_states | join(', ') }}{% else %}&mdash;{% endif %}</dd>
-    </div>
-    <div data-fact="insurance"><dt>Insurance</dt><dd>{{ view.insurance_summary }}</dd></div>
+    {%- call fact('practice', 'Practice', dd_class='meta') -%}
+      {%- if affiliations -%}
+        {%- for aff in affiliations -%}
+          <a href="{{ entity_url('organization', id=aff.org_id) }}">{{ aff.org.name }}</a>
+        {%- endfor -%}
+      {%- else -%}
+        &mdash;
+      {%- endif -%}
+    {%- endcall %}
+    {%- call fact('location', 'Location', dd_class='meta') -%}
+      {%- if locations -%}
+        {%- for loc in locations -%}<span>{{ loc }}</span>{%- endfor -%}
+      {%- else -%}
+        &mdash;
+      {%- endif -%}
+    {%- endcall %}
+    {%- call fact('licensed_in', 'Licensed in') -%}
+      {% if issuing_states %}{{ issuing_states | join(', ') }}{% else %}&mdash;{% endif %}
+    {%- endcall %}
+    {{ fact('insurance', 'Insurance', view.insurance_summary) }}
   </dl>
 </section>
 {%- endcall %}

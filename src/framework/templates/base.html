@@ -222,6 +222,17 @@
         border: 0;
       }
       .form-field-label { font-weight: 600; }
+      /* "(optional)" indicator rendered by every form-field macro when
+         `required=False`. Reads as muted secondary text next to the
+         label so it's visually clear the field can be left blank
+         without competing with the label itself. Replaces the previous
+         per-form `help="Optional."` pattern (single source of truth in
+         `_field_label` — see `_shared/form_fields.html`). */
+      .form-field-optional {
+        font-weight: 400;
+        color: var(--pico-muted-color);
+        margin-inline-start: 0.25em;
+      }
       .entity-form-page form .form-field > input,
       .entity-form-page form .form-field > select,
       .entity-form-page form .form-field > textarea,

@@ -19,6 +19,7 @@ when `current_user.providers` is empty, so this macro always renders
 with at least one provider available.
 #}
 {%- from "_shared/form_fields.html" import entity_select_field, text_field, textarea_field, select_field, time_grid_field, multi_select_field, field_for -%}
+{%- from "_shared/form_copy.html" import modality_help, schedule_notes_help, select_all_help -%}
 {%- from "_shared/actions.html" import actions -%}
 {%- macro opening_form(hx_method, action, submit_label, post=None, schema=None, current_user=None, cancel_url=None) -%}
 {%- set d = post.opening_detail if post else None -%}
@@ -39,7 +40,7 @@ with at least one provider available.
      the (provider, affiliation) pair is unambiguous (file an issue
      once a clinician actually adds a second affiliation). #}
   <label for="provider_id">
-    At which of your practices?
+    Which practice?
     <select id="provider_id" name="provider_id" required>
       {%- if not d %}
       <option value="" disabled selected>--</option>
@@ -62,8 +63,8 @@ with at least one provider available.
 
   <fieldset>
     <legend>Availability</legend>
-    {{ time_grid_field("desired_times", "Desired times", current=d.desired_times if d else None, help="Optional.") }}
-    {{ field_for(schema, "schedule_text", "Schedule notes", current=d.schedule_text if d else None, help="e.g. start date, cohort dates, fixed program hours.") }}
+    {{ time_grid_field("desired_times", "Desired times", current=d.desired_times if d else None) }}
+    {{ field_for(schema, "schedule_text", "Schedule notes", current=d.schedule_text if d else None, help=schedule_notes_help()) }}
   </fieldset>
 
   <fieldset>
@@ -72,9 +73,8 @@ with at least one provider available.
       {{ multi_select_field("services", "Services", REFERRAL_SERVICES, labels=REFERRAL_SERVICE_LABELS, current=d.services if d else None) }}
       {{ multi_select_field("settings", "Treatment settings", TREATMENT_SETTINGS, labels=TREATMENT_SETTINGS_LABELS, current=d.settings if d else None) }}
     </div>
-    <small>Both lists optional.</small>
-    {{ text_field("treatment_modality", "Treatment modality", current=d.treatment_modality if d else None, required=false, help="Optional. e.g. DBT, EMDR.") }}
-    {{ field_for(schema, "age_groups", "Age groups", current=d.age_groups if d else None, help="Select all that apply.") }}
+    {{ text_field("treatment_modality", "Treatment modality", current=d.treatment_modality if d else None, required=false, help=modality_help()) }}
+    {{ field_for(schema, "age_groups", "Age groups", current=d.age_groups if d else None, help=select_all_help()) }}
     <div class="grid">
       {{ field_for(schema, "languages", "Languages spoken", current=d.languages if d else None) }}
       {{ multi_select_field("genders", "Genders served", GENDERS, labels=GENDER_LABELS, current=d.genders if d else None) }}

@@ -262,8 +262,8 @@ async def test_form_new_renders_parent_org_select_with_root_option(
     logged_in_user: User,
 ):
     """Pins the new picker structure from issue #581: a ``<select
-    name="parent_org_id">`` with a "(root — no parent)" default option
-    plus one ``<option>`` per Org visible to the requesting user.
+    name="parent_org_id">`` with a "(no parent)" default option plus
+    one ``<option>`` per Org visible to the requesting user.
     """
     mine_a = await _seed_org(
         db_test_session_manager, owner_id=logged_in_user.id, name="Mine A"
@@ -278,15 +278,15 @@ async def test_form_new_renders_parent_org_select_with_root_option(
     select = tree.css_first('select[name="parent_org_id"]')
     assert select is not None, "parent-org picker should be a <select>"
     options = select.css("option")
-    # Root option + one option per visible Org. selectolax surfaces
-    # `value=""` as ``None`` in the attribute dict, so we test the root
-    # option by position + the absence of a value.
+    # Blank-option + one option per visible Org. selectolax surfaces
+    # `value=""` as ``None`` in the attribute dict, so we test the
+    # blank option by position + the absence of a value.
     assert len(options) == 3
     assert options[0].attributes.get("value") is None
     assert "selected" in options[0].attributes
-    assert "root" in options[0].text().lower()
+    assert "no parent" in options[0].text().lower()
     values = {opt.attributes.get("value") for opt in options}
-    # `None` is the root option's value (empty-string attribute).
+    # `None` is the blank option's value (empty-string attribute).
     assert values == {None, str(mine_a), str(mine_b)}
     # Free-text input from the prior UI is gone.
     assert tree.css_first('input[name="parent_org_id"]') is None
@@ -382,7 +382,7 @@ async def test_form_edit_preselects_root_for_top_level_org(
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user: User,
 ):
-    """A root org (no parent) edits with the "(root — no parent)" option
+    """A root org (no parent) edits with the "(no parent)" option
     pre-selected."""
     create_resp = await authenticated_client.post(
         "/organizations", data=_org_payload(name="Top-Level")
@@ -394,10 +394,10 @@ async def test_form_edit_preselects_root_for_top_level_org(
     tree = HTMLParser(response.text)
     selected = tree.css_first('select[name="parent_org_id"] option[selected]')
     assert selected is not None
-    # `value=""` is rendered as the root option; selectolax surfaces an
+    # `value=""` is rendered as the blank option; selectolax surfaces an
     # empty-string attribute as ``None``.
     assert selected.attributes.get("value") is None
-    assert "root" in selected.text().lower()
+    assert "no parent" in selected.text().lower()
 
 
 async def test_delete_removes_org(

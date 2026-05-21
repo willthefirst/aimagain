@@ -29,27 +29,9 @@ from typing import Any
 
 from src.domain.logic.organizations.repository import OrganizationRepository
 from src.domain.models import Organization, User
+from src.framework.authz import list_visible_to
 
 logger = logging.getLogger(__name__)
-
-
-async def _orgs_visible_to(
-    org_repo: OrganizationRepository, user: User
-) -> list[Organization]:
-    """Return the Organizations a user may pick as a parent.
-
-    Owners see only the Orgs they own; superusers see every Org.
-    Mirrors ``_orgs_visible_to`` on the Provider and Program sides —
-    Org ownership is the boundary for who may pick an Org in form
-    pickers.
-    """
-    if user.is_superuser:
-        return list(
-            await org_repo.list_default(
-                Organization, order_by=Organization.created_at.desc()
-            )
-        )
-    return list(await org_repo.list_for_user(user.id))
 
 
 async def organization_form_extras(
@@ -71,7 +53,7 @@ async def organization_form_extras(
       template pre-selects the row's current ``parent_org_id`` if it
       still appears in the options.
     """
-    orgs = await _orgs_visible_to(organization_repo, requesting_user)
+    orgs = await list_visible_to(organization_repo, requesting_user, Organization)
     if target is not None:
         orgs = [o for o in orgs if o.id != target.id]
     return {"parent_org_options": orgs}

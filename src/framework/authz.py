@@ -85,3 +85,63 @@ def assert_owner_or_admin(
     """
     if not is_owner_or_admin(obj, user, owner_attr=owner_attr):
         raise ForbiddenError(detail=f"Only the owner or an admin can {action}")
+
+
+async def list_visible_to(repo, user: "Actor", model, *, owner_attr: str = "owner_id"):
+    """Return the rows of `model` a user may pick from in a form picker.
+
+    Owners see only the rows they own; superusers see every row. Drives
+    every "your X" form-extras dropdown (Provider's Org picker,
+    Program's Org picker, Organization's parent-Org picker, post-kind
+    Provider/Program pickers) so the same boundary lives in one place.
+
+    Calls `repo.list_for_user(user.id)` for the owner path and
+    `repo.list_default(model, order_by=...)` for the superuser path
+    — both already exist on `BaseRepository` subclasses today. The
+    `owner_attr` kwarg is plumbed through for future entities whose
+    owner-FK isn't literally `owner_id`.
+    """
+    if user.is_superuser:
+        return list(await repo.list_default(model, order_by=model.created_at.desc()))
+    return list(await repo.list_for_user(user.id))
+
+
+async def assert_fk_ownership(
+    *,
+    payload,
+    attr: str,
+    requesting_user: "Actor",
+    parent_repo,
+    parent_model,
+    parent_noun: str,
+    child_noun: str,
+) -> None:
+    """Reject a create/update payload whose `attr` FK points at a parent
+    row the requesting user doesn't own (superusers bypass).
+
+    Generic form of the per-entity `_assert_X_payload_org_ownership`
+    helpers — every call shape was identical except the noun in the
+    error messages, so the noun is a kwarg now.
+
+    - 404 when the parent doesn't exist (no info leak about other
+      users' parent ids).
+    - 403 when it exists but belongs to someone else.
+    - PATCH payloads where `attr` is `None` (the PATCH didn't touch
+      the FK) are a no-op.
+
+    Used by every entity whose Create/Update payload carries an FK to
+    another user-owned entity (Provider→Org, Program→Org, post→
+    Provider/Program, etc.).
+    """
+    fk_id = getattr(payload, attr, None)
+    if fk_id is None:
+        return
+    parent = await parent_repo._get_by_id(parent_model, fk_id)
+    if parent is None:
+        from src.framework.http.exceptions import NotFoundError
+
+        raise NotFoundError(detail=f"{parent_noun} {fk_id} not found")
+    if not requesting_user.is_superuser and parent.owner_id != requesting_user.id:
+        raise ForbiddenError(
+            detail=f"You may only attach a {child_noun} to a {parent_noun} you own"
+        )

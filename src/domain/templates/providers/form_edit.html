@@ -1,5 +1,6 @@
 {% extends "views/form_edit.html" %}
 {%- from "_shared/form_fields.html" import entity_select_field, text_field, select_field, radio_bool_field, multi_select_field -%}
+{%- from "_shared/form_copy.html" import cost_help, npi_help, org_picker_help -%}
 {%- from "_shared/forms.html" import inline_add_form -%}
 {%- from "_shared/actions.html" import actions -%}
 {%- from "providers/_credential_row.html" import credential_row -%}
@@ -11,8 +12,6 @@
    vocabulary — the underlying model class is still `Provider`. #}
 {% set provider = clinician %}
 
-{% set resource_url = entity_url('clinician') %}
-{% set resource_detail_url = entity_url('clinician', id=provider.id) %}
 
 {% block resource_label %}Clinicians{% endblock %}
 {# Same H1-fallback shape as the detail page — name when set, primary
@@ -36,17 +35,11 @@
         {{ text_field("first_name", "First name", current=provider.first_name, required=false, maxlength=120) }}
         {{ text_field("last_name", "Last name", current=provider.last_name, required=false, maxlength=120) }}
       </div>
-      {{ text_field("npi", "NPI", current=provider.npi, required=false, pattern="\\d{10}", maxlength=10, help="10-digit National Provider Identifier. Optional.") }}
+      {{ text_field("npi", "NPI", current=provider.npi, required=false, pattern="\\d{10}", maxlength=10, help=npi_help()) }}
     </fieldset>
     <fieldset>
       <legend>Practice location</legend>
-      {{ entity_select_field(
-           "org_id",
-           "Organization",
-           orgs,
-           current=provider.org_id,
-           help='Don\'t see your organization? <a href="' ~ entity_form_url('organization') ~ '">Create one first</a>.',
-      ) }}
+      {{ entity_select_field("org_id", "Organization", orgs, current=provider.org_id, help=org_picker_help()) }}
       <div class="grid">
         {{ text_field("location_city", "City", current=provider.location_city, maxlength=120) }}
         {{ select_field("location_state", "State", US_STATES, current=provider.location_state) }}
@@ -63,18 +56,18 @@
     {# Insurance & payment. Empty carrier list = no in-network. #}
     <fieldset>
       <legend>Insurance &amp; payment</legend>
-      {{ multi_select_field("in_network_carriers", "In-network carriers", INSURANCE_CARRIERS, labels=INSURANCE_CARRIER_LABELS, current=provider.in_network_carriers, help="Leave empty for none.") }}
+      {{ multi_select_field("in_network_carriers", "In-network carriers", INSURANCE_CARRIERS, labels=INSURANCE_CARRIER_LABELS, current=provider.in_network_carriers) }}
       <div class="grid">
         {{ radio_bool_field("accepts_out_of_network", "Accepts out-of-network?", current=provider.accepts_out_of_network, required=false) }}
         {{ radio_bool_field("sliding_scale", "Sliding scale?", current=provider.sliding_scale, required=false) }}
       </div>
-      {{ text_field("cost", "Cost", current=provider.cost, required=false, help="Free text. Optional.") }}
+      {{ text_field("cost", "Cost", current=provider.cost, required=false, help=cost_help()) }}
     </fieldset>
     {# Practice-details form keeps its own action cluster; credentials
        are managed via the inline add/remove forms below. Delete for
        the Provider itself lives on the detail page's toolbar (see
        `providers/detail.html`). #}
-    {{ actions("Save practice details", cancel_url=entity_url('clinician', id=provider.id)) }}
+    {{ actions("Save changes", cancel_url=entity_url('clinician', id=provider.id)) }}
   </form>
 </section>
 
@@ -164,7 +157,7 @@
     {{ select_field("license_type", "License type", LICENSE_TYPES, labels=LICENSE_TYPES_LABELS, placeholder=true) }}
     {{ text_field("license_number", "License number", maxlength=120) }}
     {{ select_field("issuing_state", "Issuing state", US_STATES, placeholder=true) }}
-    {{ text_field("expiration_date", "Expiration date (YYYY-MM-DD)", required=false, pattern="\\d{4}-\\d{2}-\\d{2}", maxlength=10) }}
+    {{ text_field("expiration_date", "Expiration date", required=false, type="date") }}
   {% endcall %}
 </section>
 
@@ -188,7 +181,7 @@
   {% call inline_add_form(entity_url('clinician', id=provider.id) ~ "/educations", "Add education", "Add education") %}
     {{ select_field("education_type", "Education type", EDUCATION_TYPES, labels=EDUCATION_TYPES_LABELS, placeholder=true) }}
     {{ text_field("institution", "Institution", maxlength=200) }}
-    {{ text_field("month_completed", "Month completed (YYYY-MM)", required=false, pattern="\\d{4}-\\d{2}", maxlength=7) }}
+    {{ text_field("month_completed", "Month completed", required=false, type="month") }}
   {% endcall %}
 </section>
 
@@ -212,7 +205,7 @@
   {% call inline_add_form(entity_url('clinician', id=provider.id) ~ "/certifications", "Add certification", "Add certification") %}
     {{ select_field("certification_type", "Certification type", CERTIFICATION_TYPES, labels=CERTIFICATION_TYPES_LABELS, placeholder=true) }}
     {{ text_field("certifying_body", "Certifying body", maxlength=200) }}
-    {{ text_field("expiration_date", "Expiration date (YYYY-MM-DD)", required=false, pattern="\\d{4}-\\d{2}-\\d{2}", maxlength=10) }}
+    {{ text_field("expiration_date", "Expiration date", required=false, type="date") }}
   {% endcall %}
 </section>
 

@@ -1,5 +1,6 @@
 {% extends "views/list.html" %}
 {%- from "_shared/_card.html" import card -%}
+{%- from "_shared/sections.html" import fact -%}
 
 {% block resource_label %}Organizations{% endblock %}
 
@@ -17,9 +18,9 @@
        headline=org.name) -%}
   <section class="entity-facts">
     <dl>
-      <div><dt>Type</dt><dd>{{ ORGANIZATION_TYPES_LABELS[org.type] }}</dd></div>
+      {{ fact('type', 'Type', ORGANIZATION_TYPES_LABELS[org.type]) }}
       {%- if org.parent_org_id %}
-      <div><dt>Parent</dt><dd><a href="{{ entity_url('organization', id=org.parent_org_id) }}">View parent</a></dd></div>
+      {%- call fact('parent', 'Parent') %}<a href="{{ entity_url('organization', id=org.parent_org_id) }}">View parent</a>{% endcall %}
       {%- endif %}
     </dl>
   </section>
