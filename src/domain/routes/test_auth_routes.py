@@ -162,6 +162,11 @@ async def test_get_register_page(test_client: AsyncClient):
     # so it doesn't stretch to the `<main class="container">` width on
     # tablet/desktop (#584). The `.auth-page` rule lives in `base.html`.
     assert '<article class="auth-page">' in response.text
+    # Subtitle must use plain language a first-time visitor can parse —
+    # no bare model-jargon list ("openings, referrals, and intakes")
+    # before any value framing (#694).
+    assert "openings, referrals, and intakes" not in response.text
+    assert "clinician profile" in response.text
 
 
 async def test_get_login_page(test_client: AsyncClient):
