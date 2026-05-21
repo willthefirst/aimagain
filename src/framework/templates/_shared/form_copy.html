@@ -23,9 +23,9 @@
 
 {# The Org-picker help — every create/edit form that takes a parent-Org
    or owning-Org FK renders this so the "I can't find my Org" path is
-   one click away. The link target is the Organization create form. #}
+   one click away. The link target is the Organization type picker (#704). #}
 {%- macro org_picker_help() -%}
-Don't see your organization? <a href="{{ entity_form_url('organization') }}">Create one first.</a>
+Don't see your organization? <a href="{{ entity_form_url('organization') }}">Create one.</a>
 {%- endmacro %}
 
 {# Treatment-modality help — referrals, clinician openings, and program
