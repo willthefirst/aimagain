@@ -322,10 +322,10 @@ async def test_detail_hides_private_fields_from_strangers(
     logged_in_user: User,
 ):
     """A non-admin viewer looking at *someone else's* profile must not
-    see email, is_active, or is_verified — those are private to the
-    user themselves and admins. The handler's projection omits the
-    fields entirely from context, so even the values can't leak via
-    a forgotten template guard."""
+    see email or is_active — those are private to the user themselves
+    and admins. (`is_verified` was dropped in #696.) The handler's
+    projection omits the fields entirely from context, so even the
+    values can't leak via a forgotten template guard."""
     target_email = f"private-{uuid.uuid4()}@example.com"
     target = create_test_user(
         username=f"target-{uuid.uuid4()}",
@@ -352,9 +352,9 @@ async def test_detail_shows_email_but_hides_admin_fields_for_self(
     logged_in_user: User,
 ):
     """The user viewing their own profile (via /users/me or
-    /users/<own-id>) sees their email but NOT the Active or Verified
-    rows — those are admin signals (#597). Admins viewing someone
-    else still see all three (see
+    /users/<own-id>) sees their email but NOT the Active row — that is
+    an admin signal (#597). The Verified row was removed entirely (#696).
+    Admins viewing someone else still see email and Active (see
     ``test_detail_shows_private_fields_to_admin``)."""
     response = await authenticated_client.get("/users/me")
 

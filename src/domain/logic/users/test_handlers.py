@@ -1,12 +1,13 @@
 """Tests for user orchestration handlers.
 
 The user-detail projection is a security claim — `target_view` must omit
-`email`, `is_active`, `is_verified` from any viewer who isn't the user
-themselves or an admin. The auto-injected `target_user` projection on
-`handle_detail` carries this guarantee from `USER_ENTITY.public_fields`
-/ `private_fields` / `private_field_predicate`; the extras callable
-just adds the owned-providers list. These tests pin the dict shape so
-the security invariant holds independent of any template.
+`email` and `is_active` from any viewer who isn't the user themselves or
+an admin. (`is_verified` was dropped from `UserRead` in #696 — the app
+has no email-verification flow.) The auto-injected `target_user` projection
+on `handle_detail` carries this guarantee from `USER_ENTITY.public_fields`
+/ `private_fields` / `private_field_predicate`; the extras callable just
+adds the owned-providers list. These tests pin the dict shape so the
+security invariant holds independent of any template.
 
 Self-target guards (delete + activation) are spec-declared and
 framework-enforced — pinned in `src/logic/test__generic.py`.
@@ -70,7 +71,6 @@ async def test_get_user_detail_excludes_private_fields_from_stranger(
     assert set(target_view.keys()) == {"id", "username"}
     assert "email" not in target_view
     assert "is_active" not in target_view
-    assert "is_verified" not in target_view
     assert context["can_view_private"] is False
 
 
@@ -94,7 +94,6 @@ async def test_get_user_detail_includes_private_fields_for_self(
     target_view = context["target_user"]
     assert "email" in target_view
     assert "is_active" in target_view
-    assert "is_verified" in target_view
     assert context["can_view_private"] is True
 
 
@@ -119,7 +118,6 @@ async def test_get_user_detail_includes_private_fields_for_admin(
     target_view = context["target_user"]
     assert "email" in target_view
     assert "is_active" in target_view
-    assert "is_verified" in target_view
     assert context["can_view_private"] is True
 
 

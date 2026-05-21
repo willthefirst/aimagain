@@ -9,7 +9,6 @@ from src.auth_config import auth_backend, fastapi_users
 from src.db import check_database_health
 from src.domain import routes  # noqa: F401  # populates entity_registry
 from src.domain import template_globals  # noqa: F401  # populates Jinja env globals
-from src.domain.logic.users.schema import UserRead
 from src.domain.routes import auth_pages, auth_routes, dev_auth, verifications
 from src.framework.config import settings
 from src.framework.dispatch.registry import entity_registry
@@ -109,11 +108,6 @@ app.include_router(
 
 app.include_router(
     fastapi_users.get_reset_password_router(),
-    prefix="/auth",
-    tags=["auth"],
-)
-app.include_router(
-    fastapi_users.get_verify_router(UserRead),
     prefix="/auth",
     tags=["auth"],
 )

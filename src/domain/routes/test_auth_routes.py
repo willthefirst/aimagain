@@ -35,7 +35,7 @@ async def test_register(
     assert user_info["email"] == email_to_test
     assert user_info["is_active"] is True
     assert user_info["is_superuser"] is False
-    assert user_info["is_verified"] is False
+    assert "is_verified" not in user_info
 
     async with db_test_session_manager() as session:
         user_db = SQLAlchemyUserDatabase(session, User)

@@ -46,25 +46,25 @@
    of any heading above. #}
 {% block content %}
 <article class="entity-card">
-  {# Private rows (email, active, verified) are gated by
-     `can_view_private`, computed in handle_get_user_detail as
-     `is_self OR is_admin(viewer)`. The handler also omits these
-     fields from the `target_user` projection for non-authorized
-     viewers, so a forgotten guard here cannot re-leak.
+  {# Private rows (email, active) are gated by `can_view_private`,
+     computed in handle_get_user_detail as `is_self OR is_admin(viewer)`.
+     The handler also omits these fields from the `target_user` projection
+     for non-authorized viewers, so a forgotten guard here cannot re-leak.
 
-     The Active and Verified rows are admin signals — they make
-     sense to an admin auditing someone else's account, not to the
-     user themselves (#597). Hide them on the self-view; an admin
-     viewing another user still sees both. Email stays for self
-     since users routinely glance at it to confirm which account
-     they're signed in as. #}
+     The Active row is an admin signal — it makes sense to an admin
+     auditing someone else's account, not to the user themselves (#597).
+     Hide it on the self-view; an admin viewing another user still sees it.
+     Email stays for self since users routinely glance at it to confirm
+     which account they're signed in as.
+
+     The Verified row was removed: the app has no email-verification flow,
+     so `is_verified=false` was misleading. Dropped with the field (#696). #}
   {% if can_view_private %}
   <section class="entity-facts">
     <dl>
       {{ fact('email', 'Email', target_user.email) }}
       {% if not is_self %}
       {{ fact('active', 'Active', "Yes" if target_user.is_active else "No") }}
-      {{ fact('verified', 'Verified', "Yes" if target_user.is_verified else "No") }}
       {% endif %}
     </dl>
   </section>

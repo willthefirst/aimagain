@@ -31,10 +31,12 @@ def test_auth_deps_is_admin_for_write():
 
 
 def test_private_fields_match_security_invariant():
-    """The fields gated by the projection are exactly these three.
-    Changing this tuple is a security-visible change — handler tests
-    pin the runtime behavior."""
-    assert USER_ENTITY.private_fields == ("email", "is_active", "is_verified")
+    """The fields gated by the projection are exactly these two.
+    `is_verified` was removed (#696): the app has no email-verification
+    flow, so the field was dropped from `UserRead` and is no longer in
+    the projection. Changing this tuple is a security-visible change —
+    handler tests pin the runtime behavior."""
+    assert USER_ENTITY.private_fields == ("email", "is_active")
 
 
 def test_private_field_predicate_is_self_or_admin():

@@ -1,13 +1,17 @@
 from typing import Literal
 
 from fastapi_users import schemas
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, Field
 
 from src.framework.schema_validators import ReadProjection
 
 
 class UserRead(schemas.BaseUser):
     username: str
+    # The app has no email-verification flow — `is_verified=false` in API
+    # responses is misleading (implies a contract that doesn't exist). Exclude
+    # the inherited field from serialization; the DB column is unchanged (#696).
+    is_verified: bool = Field(default=False, exclude=True)
 
 
 class UserCreate(schemas.BaseUserCreate):
