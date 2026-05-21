@@ -47,9 +47,13 @@ Select all that apply.
 
 {# NPI help — the clinician create/edit forms both render this on the
    `npi` field. The field validation (10 ASCII digits) lives in the
-   schema; the help text just describes what NPI stands for. #}
+   schema; this copy leads with the *why* (NPPES verification cross-
+   check) rather than the *what* (definition) so a reader knows what
+   they're trading for the 30 seconds of data entry. Without NPI the
+   verification pipeline flags `nppes_skipped` and routes the listing
+   to manual review (see `domain/logic/verifications/handlers.py`). #}
 {%- macro npi_help() -%}
-10-digit National Provider Identifier.
+Adding your NPI lets us cross-check your identity against the federal NPPES registry. Leave blank to skip.
 {%- endmacro %}
 
 {# Cost-field help — clinician create/edit forms both expose `cost`
