@@ -54,7 +54,7 @@ Every label, legend, help string, button, and intro paragraph in `src/domain/tem
 
 ### Help text (`help=`)
 
-- **Full sentence, period at the end.** `10-digit National Provider Identifier.` not `10-digit National Provider Identifier`.
+- **Full sentence, period at the end.** `Adding your NPI lets us cross-check your identity against NPPES.` not `Adding your NPI lets us cross-check your identity against NPPES`.
 - **Specific.** Explain *what the value is for*, not that the field exists. `For example: DBT, EMDR, IFS.` beats `Free text.`.
 - **Never write `help="Optional."`.** The `(optional)` indicator on the label is the single canonical signal — see below.
 - If the same help string appears in two or more forms, move it to [`../../framework/templates/_shared/form_copy.html`](../../framework/templates/_shared/form_copy.html) and import it.
@@ -65,10 +65,10 @@ Pass `required=False` to any form-field macro. The macro renders a muted `(optio
 
 ```jinja
 {# OK — `(optional)` is rendered automatically #}
-{{ text_field("npi", "NPI", required=False, help="10-digit National Provider Identifier.") }}
+{{ text_field("npi", "NPI", required=False, help="Adding your NPI lets us cross-check your identity against NPPES.") }}
 
 {# Bad — duplicates the (optional) indicator with prose #}
-{{ text_field("npi", "NPI", required=False, help="Optional. 10-digit NPI.") }}
+{{ text_field("npi", "NPI", required=False, help="Optional. Adding your NPI lets us cross-check your identity against NPPES.") }}
 ```
 
 Fieldset-level "everything below is optional" lines (the previous `<small>Both lists optional.</small>` pattern) are gone — every field carries its own indicator now.
