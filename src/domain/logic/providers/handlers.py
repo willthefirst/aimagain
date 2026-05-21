@@ -43,6 +43,7 @@ from src.domain.models import (
     Provider,
     User,
 )
+from src.framework.authz import assert_fk_ownership, list_visible_to
 from src.framework.dispatch.pagination import (
     DEFAULT_PAGE_SIZE,
     base_query,
@@ -58,56 +59,25 @@ logger = logging.getLogger(__name__)
 # --- Provider handlers ----------------------------------------------------
 
 
-async def _orgs_visible_to(
-    org_repo: OrganizationRepository, user: User
-) -> list[Organization]:
-    """Return the Organizations a user may attach their Provider to.
-
-    Owners see only the Orgs they own; superusers see every Org. Drives
-    the Provider create/edit form's Org-picker dropdown and pairs with
-    the wire-level ownership check in
-    :func:`_assert_provider_payload_org_ownership` (#524 retro: Org
-    ownership is the boundary for who may attach Providers — mirrors
-    ``Organization.write_authz``)."""
-    if user.is_superuser:
-        return list(
-            await org_repo.list_default(
-                Organization, order_by=Organization.created_at.desc()
-            )
-        )
-    return list(await org_repo.list_for_user(user.id))
-
-
 async def _assert_provider_payload_org_ownership(
     *,
     payload: BaseModel,
     requesting_user: User,
     organization_repo: OrganizationRepository,
 ) -> None:
-    """`PROVIDER_ENTITY.payload_authz_path` target — reject a Provider
-    create/update whose ``org_id`` points at an Org the requesting user
-    doesn't own (superusers bypass).
-
-    404 when the Org doesn't exist (no info leak about other users' Org
-    ids); 403 when it exists but belongs to someone else. Same shape as
-    ``OWNER_OR_ADMIN`` on the Org row itself — attaching a Provider is
-    "writing the Org's Provider list," so the same boundary applies.
-
-    The framework invokes this from both `handle_create` and
-    `handle_update`. PATCH payloads where ``org_id`` is None (i.e. the
-    PATCH doesn't touch the FK) are a no-op — only flow through the
-    ownership check when the payload is actually trying to set a new
-    Org."""
-    org_id = getattr(payload, "org_id", None)
-    if org_id is None:
-        return
-    org = await organization_repo._get_by_id(Organization, org_id)
-    if org is None:
-        raise NotFoundError(detail=f"Organization {org_id} not found")
-    if not requesting_user.is_superuser and org.owner_id != requesting_user.id:
-        raise ForbiddenError(
-            detail="You may only attach a Provider to an Organization you own"
-        )
+    """`PROVIDER_ENTITY.payload_authz_path` target — thin wrapper around
+    the framework's generic FK-ownership assertion. Keeps the dotted-
+    path on the spec stable while the rule lives in one framework spot.
+    """
+    await assert_fk_ownership(
+        payload=payload,
+        attr="org_id",
+        requesting_user=requesting_user,
+        parent_repo=organization_repo,
+        parent_model=Organization,
+        parent_noun="Organization",
+        child_noun="Provider",
+    )
 
 
 async def provider_form_extras(
@@ -129,7 +99,7 @@ async def provider_form_extras(
     current ``org_id`` via the standard `selected` attribute.
     """
     return {
-        "orgs": await _orgs_visible_to(organization_repo, requesting_user),
+        "orgs": await list_visible_to(organization_repo, requesting_user, Organization),
     }
 
 
