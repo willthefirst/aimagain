@@ -118,9 +118,13 @@
       {{ select_field("location_state", "State", US_STATES, placeholder=true) }}
       {{ text_field("location_zip", "ZIP", pattern="\\d{5}", maxlength=5) }}
     </div>
+    {# Inline "add affiliation" form pre-selects "yes" for both
+       arms — same rationale as the clinician create form's session-
+       availability fieldset (most common posture; users for whom
+       this is wrong can flip it). #}
     <div class="grid">
-      {{ select_field("in_person_sessions", "In-person sessions", LOCATION_AVAILABILITY_OPTIONS, labels=LOCATION_AVAILABILITY_LABELS, placeholder=true) }}
-      {{ select_field("virtual_sessions", "Virtual sessions", LOCATION_AVAILABILITY_OPTIONS, labels=LOCATION_AVAILABILITY_LABELS, placeholder=true) }}
+      {{ select_field("in_person_sessions", "In-person sessions", LOCATION_AVAILABILITY_OPTIONS, labels=LOCATION_AVAILABILITY_LABELS, current="yes") }}
+      {{ select_field("virtual_sessions", "Virtual sessions", LOCATION_AVAILABILITY_OPTIONS, labels=LOCATION_AVAILABILITY_LABELS, current="yes") }}
     </div>
     {{ multi_select_field("in_network_carriers", "In-network carriers", INSURANCE_CARRIERS, labels=INSURANCE_CARRIER_LABELS) }}
     <div class="grid">
