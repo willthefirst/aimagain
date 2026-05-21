@@ -127,6 +127,20 @@ async def test_logout_success(authenticated_client: AsyncClient):
     assert me_response_after.text == user_email_html
 
 
+async def test_authenticated_page_has_sign_out_affordance(
+    authenticated_client: AsyncClient,
+):
+    """Any authenticated page must expose the sign-out endpoint in the
+    header chrome so the user can end their session within 2 clicks.
+    The logout form targets POST /auth/jwt/logout — assert it is present
+    on the profile page (a representative authenticated response)."""
+    response = await authenticated_client.get(
+        "/users/me", headers={"Accept": "text/html"}
+    )
+    assert response.status_code == 200
+    assert 'action="/auth/sign-out"' in response.text
+
+
 async def test_forgot_password_request(test_client: AsyncClient, logged_in_user: User):
     response = await test_client.post(
         "/auth/forgot-password", json={"email": logged_in_user.email}
@@ -204,6 +218,19 @@ async def test_get_login_page(test_client: AsyncClient):
     assert "Sign in to your Bedlam Connect account" in response.text
     # See `test_get_register_page` for `.auth-page` rationale (#584).
     assert '<article class="auth-page">' in response.text
+    # Default subtitle must not assume a returning user (#693).
+    assert "Welcome back" not in response.text
+    # Default subtitle must not contain bare jargon without context (#693).
+    assert "referrals" not in response.text
+    assert "Sign in to your Bedlam Connect account" in response.text
+
+
+async def test_get_login_page_post_register_banner(test_client: AsyncClient):
+    """?registered=1 shows a confirmation banner instead of the default subtitle."""
+    response = await test_client.get("/auth/login?registered=1")
+    assert response.status_code == 200
+    assert "Account created" in response.text
+    assert "Sign in to your Bedlam Connect account." not in response.text
 
 
 async def test_get_login_page_just_registered(test_client: AsyncClient):
