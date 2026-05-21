@@ -172,8 +172,22 @@ async def test_get_login_page(test_client: AsyncClient):
     # noun "Login"). See `test_get_register_page` for the H1 pin
     # rationale.
     assert "Log in" in response.text
+    # Default subtitle must not assume a returning user (#693).
+    assert "Welcome back" not in response.text
+    assert "referrals" not in response.text
+    assert "Sign in to your Bedlam Connect account" in response.text
     # See `test_get_register_page` for `.auth-page` rationale (#584).
     assert '<article class="auth-page">' in response.text
+
+
+async def test_get_login_page_just_registered(test_client: AsyncClient):
+    """GET /auth/login?registered=1 shows the post-registration banner (#693)."""
+    response = await test_client.get("/auth/login?registered=1")
+    assert response.status_code == 200
+    assert "text/html" in response.headers["content-type"]
+    assert "Account created" in response.text
+    # Default subtitle is replaced by the contextual message.
+    assert "Sign in to your Bedlam Connect account" not in response.text
 
 
 async def test_get_forgot_password_page(test_client: AsyncClient):
