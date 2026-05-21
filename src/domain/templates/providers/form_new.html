@@ -6,17 +6,19 @@
 
 {% block resource_label %}Clinicians{% endblock %}
 
+{% block head %}
+<style>
+  {# Solo-practice toggle (#699): checkbox hides the org picker via CSS.
+     When checked, the .org-picker-group is hidden and the note shown.
+     When unchecked, the picker is visible and the note hidden. #}
+  #solo-practice-check:checked ~ .org-picker-group { display: none; }
+  #solo-practice-check:not(:checked) ~ .org-picker-solo-note { display: none; }
+</style>
+{% endblock %}
+
 {% block content %}
 <p>Start with the basics. You can add licensures, education, and certifications after the clinician is created.</p>
 
-{# `org_id` is the FK to the directory entry's Organization (the
-   practice's display name lives on `org.name`). The dropdown lists
-   every Org in the directory; any user may attach their clinician
-   entry to any Org. To create a new Organization, visit the create
-   form first; the org-picker help (`org_picker_help` in
-   `_shared/form_copy.html`) links there. The underlying model class
-   is still `Provider` — only the user-facing surface flipped in #642
-   PR 4. #}
 <form hx-post="{{ entity_url('clinician') }}">
   {# Person-level fields (name, NPI) — these live on the linked
      `Clinician` row and follow the person across affiliations. Kept in
@@ -33,24 +35,20 @@
 
   <fieldset>
     <legend>Practice</legend>
-    {# Solo-practice toggle (#699): when checked, the create handler
-       auto-creates a solo-practice Org from the clinician's name so
-       the user doesn't have to visit /organizations/form first. The
-       inline script hides/shows the Org picker and marks it
-       required/not-required to match. #}
-    <label class="form-field" for="solo_practice">
-      <span class="form-field-label">Solo practice?</span>
-      <input type="checkbox" id="solo_practice" name="solo_practice" value="true"
-             onchange="
-               var orgRow = document.getElementById('org-row');
-               var orgSel = orgRow.querySelector('select');
-               orgRow.hidden = this.checked;
-               orgSel.required = !this.checked;
-             " />
+    {# Solo-practice toggle (#699). When checked, the org picker is
+       hidden by CSS and the form submits solo_practice=true with no
+       org_id. The create handler auto-creates a solo-practice Org
+       named after the clinician. Users who already have an Org (or
+       want to join a group) leave this unchecked and pick normally. #}
+    <label style="display:flex;align-items:center;gap:0.5rem;margin-bottom:var(--pico-spacing);">
+      <input type="checkbox" name="solo_practice" value="true" id="solo-practice-check"
+             aria-controls="org-picker-group" style="margin:0;flex:0 0 auto;" />
+      I'm a solo practitioner — create my organization automatically
     </label>
-    <div id="org-row">
-    {{ entity_select_field("org_id", "Organization", orgs, help=org_picker_help()) }}
+    <div class="org-picker-group" id="org-picker-group">
+      {{ entity_select_field("org_id", "Organization", orgs, required=false, help=org_picker_help()) }}
     </div>
+    <p class="org-picker-solo-note"><small>A solo-practice organization will be created using your name.</small></p>
     <div class="grid">
       {{ field_for(schema, "location_city", "City") }}
       {{ field_for(schema, "location_state", "State") }}
@@ -66,8 +64,8 @@
     </div>
   </fieldset>
 
-  {# Insurance & payment. `in_network_carriers` is a multi-select — an
-     empty selection means "no in-network". `accepts_out_of_network` is
+  {# Insurance & payment. in_network_carriers is a multi-select — an
+     empty selection means "no in-network". accepts_out_of_network is
      independent. No cross-field invariant. #}
   <fieldset>
     <legend>Insurance &amp; payment</legend>

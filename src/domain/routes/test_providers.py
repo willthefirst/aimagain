@@ -1376,6 +1376,11 @@ async def test_get_provider_form_renders(
     carrier_select = tree.css_first('select[name="in_network_carriers"][multiple]')
     assert carrier_select is not None
     assert len(carrier_select.css("option")) == 11
+    # Solo-practice toggle is present (#699): checkbox lets users skip
+    # the separate /organizations/form step.
+    solo_check = tree.css_first('input[type="checkbox"][name="solo_practice"]')
+    assert solo_check is not None
+    assert solo_check.attributes.get("value") == "true"
 
 
 async def test_get_provider_form_scopes_org_dropdown_to_user(
