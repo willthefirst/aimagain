@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block content %}
+<section>
+  <hgroup>
+    <h1>Connect clinicians with the right clients</h1>
+    <p>Bedlam Connect helps mental health providers share available openings and receive referrals from their network.</p> <!-- title-case-ignore: "Bedlam Connect" is a brand name -->
+  </hgroup>
+  <p>
+    <a href="/auth/register" role="button">Create an account</a>
+    &nbsp;
+    <a href="/auth/login" role="button" class="outline">Log in</a> <!-- title-case-ignore: "Log in" is a verb phrase, not a title -->
+  </p>
+  <section>
+    <h2>For clinicians</h2>
+    <p>Post your availability, connect with referrers, and manage incoming referrals — all in one place.</p>
+    <h2>For referrers</h2>
+    <p>Find clinicians with open capacity, check availability, and send referrals directly.</p>
+  </section>
+</section>
+{% endblock %}
