@@ -1,5 +1,32 @@
 {# Section-shape macros shared across CRUD detail/edit pages. #}
 
+{# Render one fact-row inside an `<section class="entity-facts">
+   <dl>` block. Each row is wrapped in a `<div>` (so the parent
+   grid treats the `<dt>`/`<dd>` pair as one logical row — see the
+   `dl > div { display: contents; }` rule in `base.html`).
+
+   `data-fact="<key>"` lives on the wrapping `<div>` and is the
+   stable test selector — `<dt>` text is presentation prose and
+   may shift; the key is the contract.
+
+   Two call styles:
+
+     - Simple value:
+         {{ fact('type', 'Type', org.type_label) }}
+
+     - Rich value (link, multi-element, etc.):
+         {% call fact('parent', 'Parent') -%}
+           <a href="…">View parent</a>
+         {%- endcall %}
+
+   When invoked via `{% call %}`, the caller body fills the `<dd>`
+   and the `value` argument is ignored. Without `{% call %}`, the
+   `value` argument fills the `<dd>` (escaped by Jinja by default).
+#}
+{% macro fact(key, label, value="", dd_class=None) -%}
+<div data-fact="{{ key }}"><dt>{{ label }}</dt><dd{% if dd_class %} class="{{ dd_class }}"{% endif %}>{{ caller() if caller else value }}</dd></div>
+{%- endmacro %}
+
 {# Render a `<ul>` of items or an empty-state `<p>`. The caller passes
 the per-item `<li>` body via `{% call(item) %}…{% endcall %}`. The macro
 owns the if/else split — callers own the row markup and the surrounding

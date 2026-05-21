@@ -1,5 +1,6 @@
 {% extends "views/detail.html" %}
 {%- from "_shared/actions.html" import actions -%}
+{%- from "_shared/sections.html" import fact -%}
 
 
 {% block resource_label %}Programs{% endblock %}
@@ -31,17 +32,17 @@
 
   <section class="entity-facts">
     <dl>
-      <div><dt>Organization</dt><dd><a href="{{ entity_url('organization', id=program.org_id) }}">{{ program.organization.name }}</a></dd></div>
+      {%- call fact('organization', 'Organization') %}<a href="{{ entity_url('organization', id=program.org_id) }}">{{ program.organization.name }}</a>{% endcall %}
       {%- if program.state_preference %}
-      <div><dt>State served</dt><dd>{{ program.state_preference }}</dd></div>
+      {{ fact('state_served', 'State served', program.state_preference) }}
       {%- endif %}
       {%- if program.start_date %}
-      <div><dt>Start date</dt><dd>{{ program.start_date }}</dd></div>
+      {{ fact('start_date', 'Start date', program.start_date) }}
       {%- endif %}
       {%- if program.end_date %}
-      <div><dt>End date</dt><dd>{{ program.end_date }}</dd></div>
+      {{ fact('end_date', 'End date', program.end_date) }}
       {%- endif %}
-      <div><dt>Accepting referrals</dt><dd>{{ "Yes" if program.accepting_referrals else "No" }}</dd></div>
+      {{ fact('accepting_referrals', 'Accepting referrals', "Yes" if program.accepting_referrals else "No") }}
     </dl>
   </section>
 </article>
