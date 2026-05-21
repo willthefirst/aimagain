@@ -15,8 +15,12 @@
    ../README.md "Layering rule"), so the shared shape goes here.
 
    Headline: the clinician's "{first_name} {last_name}" when both are
-   set; falls back to whichever is set, or to the first affiliation's
-   org name, or to a literal "Clinician" when nothing else is known.
+   set; falls back to whichever is set, or to "Unnamed clinician"
+   when neither is. The card represents a *person*, so the headline
+   must be a person identifier — never the org name (the Practice row
+   below already carries that, and using the org name as the headline
+   collapses the User → Clinician → Org hierarchy into one
+   indistinguishable string).
    The headline anchors to the clinician detail page so a click
    navigates into the directory entry — practice / location chips in
    the body link out to Orgs separately.
@@ -60,8 +64,7 @@
   {%- if first and last %}{{ first }} {{ last }}
   {%- elif first %}{{ first }}
   {%- elif last %}{{ last }}
-  {%- elif affiliations %}{{ affiliations[0].org.name }}
-  {%- else %}Clinician
+  {%- else %}Unnamed clinician
   {%- endif %}
 {%- endset -%}
 {% call card(
