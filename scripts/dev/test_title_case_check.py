@@ -369,6 +369,55 @@ def test_inline_title_case_ignore_marker_suppresses(tmp_path):
     assert _check(file) == []
 
 
+def test_title_case_ignore_on_preceding_line_suppresses_in_html(tmp_path):
+    """``{# title-case-ignore #}`` on the line *immediately above* the
+    violation also suppresses it. This is the natural Jinja-comment
+    placement and saves the agent from putting the marker inline; see
+    #749 for the trial-and-error friction that drove this."""
+    file = _write_html(
+        tmp_path,
+        """
+        <html><body>
+        {# title-case-ignore: brand name #}
+        <h1>Bedlam Connect</h1>
+        </body></html>
+        """,
+    )
+    assert _check(file) == []
+
+
+def test_title_case_ignore_on_preceding_line_suppresses_in_markdown(tmp_path):
+    """Same preceding-line behaviour for Markdown headings — a
+    ``<!-- title-case-ignore -->`` HTML comment above the heading
+    suppresses it."""
+    file = _write_md(
+        tmp_path,
+        """
+        <!-- title-case-ignore: brand name -->
+        # Bedlam Connect Is Here
+        """,
+    )
+    assert _check(file) == []
+
+
+def test_title_case_ignore_two_lines_above_does_not_suppress(tmp_path):
+    """Only the *immediately* preceding line is consulted. A marker two
+    lines above (with a content line in between) does not retroactively
+    suppress an unrelated violation downstream — that would let a single
+    stale marker silence unrelated lint."""
+    file = _write_md(
+        tmp_path,
+        """
+        <!-- title-case-ignore: this was for the line below -->
+        # Sentence case heading
+        # Another Bad Heading
+        """,
+    )
+    violations = _check(file)
+    assert len(violations) == 1
+    assert "Another Bad Heading" in violations[0]["original"]
+
+
 def test_titleignore_file_skips_whole_file(tmp_path):
     """A ``.titleignore`` listing a file pattern excludes that file even
     when it has clear violations."""
