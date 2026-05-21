@@ -996,6 +996,143 @@ class MergeCommands:
         return 4
 
 
+class ClaimCommands:
+    """`dev claim <issue>` / `dev unclaimed-issues` / `dev claimed-issues`
+    — assignee-based atomic claiming.
+
+    The `in-progress` label is read-modify-write with no compare. Two
+    agents reading the issue list at the same time both see no label,
+    both add it, both proceed — duplicate work. GitHub assignees are
+    atomic at the API level: `gh issue edit --add-assignee` either wins
+    or the user is already assigned. This subcommand uses that
+    primitive and surfaces lost races as a non-zero exit code so the
+    agent's automation can pick a different issue. See #742 / #750.
+
+    Exit codes:
+      0 — won the claim (issue is now assigned to the user).
+      1 — already claimed by someone else.
+      2 — network or other failure.
+    """
+
+    def __init__(self, runner: CLIRunner) -> None:
+        self.runner = runner
+
+    def _gh_json(self, args: List[str]) -> Optional[dict]:
+        result = subprocess.run(
+            ["gh", *args],
+            capture_output=True,
+            text=True,
+            check=False,
+            cwd=self.runner.project_root,
+        )
+        if result.returncode != 0:
+            return None
+        try:
+            import json
+
+            return json.loads(result.stdout or "{}")
+        except ValueError:
+            return None
+
+    def _current_user(self) -> Optional[str]:
+        data = self._gh_json(["api", "user", "--jq", "{login}"])
+        if not data:
+            return None
+        return data.get("login")
+
+    def claim(self, issue: int, assignee: Optional[str] = None) -> int:
+        who = assignee or self._current_user()
+        if not who:
+            print(
+                "❌ Could not resolve a GitHub user to claim with. "
+                "Pass --assignee <user> or run `gh auth login`."
+            )
+            return 2
+
+        existing = self._gh_json(
+            ["issue", "view", str(issue), "--json", "assignees,state,title,url"]
+        )
+        if not existing:
+            print(f"❌ Could not fetch issue #{issue}.")
+            return 2
+        if (existing.get("state") or "").lower() != "open":
+            print(f"❌ Issue #{issue} is not open (state: {existing.get('state')}).")
+            return 2
+
+        prior = [a.get("login") for a in (existing.get("assignees") or [])]
+        if prior and who not in prior:
+            print(f"❌ Issue #{issue} is already claimed by: {', '.join(prior)}")
+            print(f"    Title: {existing.get('title', '')}")
+            return 1
+
+        # Attempt the claim. `gh issue edit --add-assignee` is atomic
+        # — if a second agent had assigned themselves between our view
+        # and our edit, the edit still succeeds (assignee is additive)
+        # so we re-read and confirm we won the race.
+        rc = self.runner.run_command(
+            ["gh", "issue", "edit", str(issue), "--add-assignee", who]
+        )
+        if rc != 0:
+            return 2
+
+        post = self._gh_json(["issue", "view", str(issue), "--json", "assignees"])
+        post_assignees = [a.get("login") for a in (post or {}).get("assignees") or []]
+        if who not in post_assignees:
+            print(f"❌ Claim of #{issue} did not stick — assignment was reverted.")
+            return 2
+        if post_assignees and post_assignees != [who]:
+            # Someone else also assigned themselves. Decide by lexical
+            # order to give both agents a deterministic loser without
+            # extra round-trips.
+            winner = sorted(post_assignees)[0]
+            if winner != who:
+                print(
+                    f"❌ Lost race on #{issue} — co-assignees: "
+                    f"{', '.join(sorted(post_assignees))}. Winner by "
+                    f"deterministic tiebreak: {winner}. Unassigning."
+                )
+                self.runner.run_command(
+                    ["gh", "issue", "edit", str(issue), "--remove-assignee", who]
+                )
+                return 1
+
+        print(f"✅ Claimed issue #{issue} for @{who}.")
+        return 0
+
+    def list_unclaimed(self, limit: int = 30) -> int:
+        return self.runner.run_command(
+            [
+                "gh",
+                "issue",
+                "list",
+                "--search",
+                "no:assignee state:open",
+                "--limit",
+                str(limit),
+            ]
+        )
+
+    def list_claimed(self, assignee: Optional[str] = None, limit: int = 30) -> int:
+        who = assignee or self._current_user()
+        if not who:
+            print(
+                "❌ Could not resolve a user. Pass --assignee <user> or "
+                "run `gh auth login`."
+            )
+            return 2
+        return self.runner.run_command(
+            [
+                "gh",
+                "issue",
+                "list",
+                "--search",
+                f"assignee:{who} state:open",
+                "--limit",
+                str(limit),
+            ]
+        )
+
+
 class SetupCommands:
     def __init__(self, runner: CLIRunner):
         self.runner = runner
@@ -1053,6 +1190,7 @@ class DevCLI:
         self.worktree_cmd = WorktreeCommands(self.runner)
         self.push_cmd = PushCommands(self.runner)
         self.merge_cmd = MergeCommands(self.runner)
+        self.claim_cmd = ClaimCommands(self.runner)
 
     def create_parser(self) -> argparse.ArgumentParser:
         """Create the argument parser with all commands."""
@@ -1092,6 +1230,7 @@ Examples:
         self._add_worktree_parser(subparsers)
         self._add_push_parser(subparsers)
         self._add_merge_parser(subparsers)
+        self._add_claim_parser(subparsers)
 
         return parser
 
@@ -1464,6 +1603,46 @@ Examples:
         )
         parser.set_defaults(
             func=lambda args: self.merge_cmd.merge(args.pr, args.method, args.timeout)
+        )
+
+    def _add_claim_parser(self, subparsers):
+        claim = subparsers.add_parser(
+            "claim",
+            help="Atomically claim an issue via GitHub assignee",
+            description=(
+                "Assigns the issue to the current user (or --assignee) using "
+                "`gh issue edit --add-assignee`. Exits 0 on a successful "
+                "claim, 1 if already claimed by someone else, 2 on error. "
+                "Use as a precondition before opening a PR to avoid the "
+                "label-claim race (#742 / #750)."
+            ),
+        )
+        claim.add_argument("issue", type=int, help="Issue number to claim")
+        claim.add_argument(
+            "--assignee",
+            help="GitHub login to claim as (defaults to authenticated user)",
+        )
+        claim.set_defaults(
+            func=lambda args: self.claim_cmd.claim(args.issue, args.assignee)
+        )
+
+        unclaimed = subparsers.add_parser(
+            "unclaimed-issues",
+            help="List open issues with no assignee",
+        )
+        unclaimed.add_argument("--limit", type=int, default=30)
+        unclaimed.set_defaults(
+            func=lambda args: self.claim_cmd.list_unclaimed(args.limit)
+        )
+
+        claimed = subparsers.add_parser(
+            "claimed-issues",
+            help="List open issues assigned to me (or --assignee)",
+        )
+        claimed.add_argument("--assignee")
+        claimed.add_argument("--limit", type=int, default=30)
+        claimed.set_defaults(
+            func=lambda args: self.claim_cmd.list_claimed(args.assignee, args.limit)
         )
 
     def run(self) -> int:
