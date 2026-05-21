@@ -1,11 +1,9 @@
 """Tests for user orchestration handlers.
 
 The user-detail projection is a security claim — `target_view` must omit
-`email`, `is_active`, `is_verified` from any viewer who isn't the user
-themselves or an admin. The auto-injected `target_user` projection on
-`handle_detail` carries this guarantee from `USER_ENTITY.public_fields`
-/ `private_fields` / `private_field_predicate`; the extras callable
-just adds the owned-providers list. These tests pin the dict shape so
+`email` and `is_active` from any viewer who isn't the user themselves or
+an admin. `is_verified` was removed from the response entirely in #696
+(no verification flow; always False). These tests pin the dict shape so
 the security invariant holds independent of any template.
 
 Self-target guards (delete + activation) are spec-declared and
@@ -94,7 +92,7 @@ async def test_get_user_detail_includes_private_fields_for_self(
     target_view = context["target_user"]
     assert "email" in target_view
     assert "is_active" in target_view
-    assert "is_verified" in target_view
+    assert "is_verified" not in target_view  # removed from response in #696
     assert context["can_view_private"] is True
 
 
@@ -119,7 +117,7 @@ async def test_get_user_detail_includes_private_fields_for_admin(
     target_view = context["target_user"]
     assert "email" in target_view
     assert "is_active" in target_view
-    assert "is_verified" in target_view
+    assert "is_verified" not in target_view  # removed from response in #696
     assert context["can_view_private"] is True
 
 
