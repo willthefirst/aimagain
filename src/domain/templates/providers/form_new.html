@@ -1,6 +1,6 @@
 {% extends "views/form_new.html" %}
 {%- from "_shared/form_fields.html" import entity_select_field, field_for, radio_bool_field, text_field -%}
-{%- from "_shared/form_copy.html" import org_picker_help -%}
+{%- from "_shared/form_copy.html" import cost_help, npi_help, org_picker_help -%}
 {%- from "_shared/actions.html" import actions -%}
 
 
@@ -28,7 +28,7 @@
       {{ field_for(schema, "first_name", "First name") }}
       {{ field_for(schema, "last_name", "Last name") }}
     </div>
-    {{ field_for(schema, "npi", "NPI", required=false, help="10-digit National Provider Identifier.") }}
+    {{ field_for(schema, "npi", "NPI", required=false, help=npi_help()) }}
   </fieldset>
 
   <fieldset>
@@ -59,7 +59,7 @@
       {{ radio_bool_field("accepts_out_of_network", "Accepts out-of-network?", required=false) }}
       {{ radio_bool_field("sliding_scale", "Sliding scale?", required=false) }}
     </div>
-    {{ text_field("cost", "Cost", required=false, help="Free text — for example, &quot;$200/session&quot; or &quot;sliding 80–200&quot;.") }}
+    {{ text_field("cost", "Cost", required=false, help=cost_help()) }}
   </fieldset>
 
   {{ actions(entity_create_label('clinician'), cancel_url=entity_url('clinician')) }}

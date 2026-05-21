@@ -1,6 +1,6 @@
 {% extends "views/form_edit.html" %}
 {%- from "_shared/form_fields.html" import entity_select_field, text_field, select_field, radio_bool_field, multi_select_field -%}
-{%- from "_shared/form_copy.html" import org_picker_help -%}
+{%- from "_shared/form_copy.html" import cost_help, npi_help, org_picker_help -%}
 {%- from "_shared/forms.html" import inline_add_form -%}
 {%- from "_shared/actions.html" import actions -%}
 {%- from "providers/_credential_row.html" import credential_row -%}
@@ -35,7 +35,7 @@
         {{ text_field("first_name", "First name", current=provider.first_name, required=false, maxlength=120) }}
         {{ text_field("last_name", "Last name", current=provider.last_name, required=false, maxlength=120) }}
       </div>
-      {{ text_field("npi", "NPI", current=provider.npi, required=false, pattern="\\d{10}", maxlength=10, help="10-digit National Provider Identifier.") }}
+      {{ text_field("npi", "NPI", current=provider.npi, required=false, pattern="\\d{10}", maxlength=10, help=npi_help()) }}
     </fieldset>
     <fieldset>
       <legend>Practice location</legend>
@@ -61,7 +61,7 @@
         {{ radio_bool_field("accepts_out_of_network", "Accepts out-of-network?", current=provider.accepts_out_of_network, required=false) }}
         {{ radio_bool_field("sliding_scale", "Sliding scale?", current=provider.sliding_scale, required=false) }}
       </div>
-      {{ text_field("cost", "Cost", current=provider.cost, required=false, help="Free text — for example, &quot;$200/session&quot; or &quot;sliding 80–200&quot;.") }}
+      {{ text_field("cost", "Cost", current=provider.cost, required=false, help=cost_help()) }}
     </fieldset>
     {# Practice-details form keeps its own action cluster; credentials
        are managed via the inline add/remove forms below. Delete for

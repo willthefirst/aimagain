@@ -44,3 +44,26 @@ For example: DBT, EMDR, IFS.
 {%- macro select_all_help() -%}
 Select all that apply.
 {%- endmacro %}
+
+{# NPI help — the clinician create/edit forms both render this on the
+   `npi` field. The field validation (10 ASCII digits) lives in the
+   schema; the help text just describes what NPI stands for. #}
+{%- macro npi_help() -%}
+10-digit National Provider Identifier.
+{%- endmacro %}
+
+{# Cost-field help — clinician create/edit forms both expose `cost`
+   as a free-text field (no controlled vocabulary; practices price
+   sessions in idiosyncratic ways). The hint shows the two most
+   common shapes. Quotes pre-escaped because the macro output is
+   passed through `|safe` in `_help_small`. #}
+{%- macro cost_help() -%}
+Free text — for example, &quot;$200/session&quot; or &quot;sliding 80–200&quot;.
+{%- endmacro %}
+
+{# Schedule-notes help — clinician openings and program intakes both
+   carry a free-text `schedule_text` field for cohort dates / fixed
+   program hours. Same examples on both forms. #}
+{%- macro schedule_notes_help() -%}
+For example: start date, cohort dates, fixed program hours.
+{%- endmacro %}
