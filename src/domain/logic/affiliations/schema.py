@@ -20,15 +20,14 @@ declares no separate snapshot class.
 
 import uuid
 from datetime import datetime
-from typing import Annotated, Any, Literal
+from typing import Annotated, Literal
 
-from pydantic import BeforeValidator, model_serializer, model_validator
+from pydantic import BeforeValidator
 
 from src.domain.logic.value_objects.location import (
+    FlatLocationSchema,
     Location,
     LocationPartial,
-    flatten_location_on_dump,
-    gather_flat_location,
 )
 from src.domain.models.enums import (
     INSURANCE_CARRIERS,
@@ -58,7 +57,7 @@ InNetworkCarriersField = Annotated[
 ]
 
 
-class AffiliationRead(ReadProjection):
+class AffiliationRead(FlatLocationSchema, ReadProjection):
     """Read shape for one Affiliation row — what the framework's
     create/update routes return and what the audit snapshot mirrors.
 
@@ -82,17 +81,8 @@ class AffiliationRead(ReadProjection):
     sliding_scale: bool
     cost: str | None = None
 
-    @model_validator(mode="before")
-    @classmethod
-    def _gather_flat_location(cls, data: Any) -> Any:
-        return gather_flat_location(data)
 
-    @model_serializer(mode="wrap")
-    def _flatten_location(self, handler):
-        return flatten_location_on_dump(self, handler(self))
-
-
-class AffiliationCreate(WirePayload):
+class AffiliationCreate(FlatLocationSchema, WirePayload):
     """Create payload for a new Affiliation row.
 
     `provider_id` is bound from the URL by the framework's sub-resource
@@ -113,17 +103,8 @@ class AffiliationCreate(WirePayload):
     sliding_scale: bool = False
     cost: StrippedOptionalText = None
 
-    @model_validator(mode="before")
-    @classmethod
-    def _gather_flat_location(cls, data: Any) -> Any:
-        return gather_flat_location(data)
 
-    @model_serializer(mode="wrap")
-    def _flatten_location(self, handler):
-        return flatten_location_on_dump(self, handler(self))
-
-
-class AffiliationUpdate(PartialUpdate):
+class AffiliationUpdate(FlatLocationSchema, PartialUpdate):
     """Partial update of an Affiliation's per-role fields."""
 
     org_id: uuid.UUID | None = None
@@ -134,12 +115,3 @@ class AffiliationUpdate(PartialUpdate):
     in_network_carriers: InNetworkCarriersField | None = None
     sliding_scale: bool | None = None
     cost: StrippedOptionalText = None
-
-    @model_validator(mode="before")
-    @classmethod
-    def _gather_flat_location(cls, data: Any) -> Any:
-        return gather_flat_location(data)
-
-    @model_serializer(mode="wrap")
-    def _flatten_location(self, handler):
-        return flatten_location_on_dump(self, handler(self))

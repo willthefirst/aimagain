@@ -35,7 +35,7 @@ display label).
 
 import uuid
 from datetime import datetime
-from typing import Annotated, Any, Literal, Union
+from typing import Annotated, Literal, Union
 
 from pydantic import (
     BeforeValidator,
@@ -46,6 +46,7 @@ from pydantic import (
 )
 
 from src.domain.logic.value_objects.location import (
+    FlatLocationSchema,
     Location,
     LocationPartial,
     flatten_location_on_dump,
@@ -284,7 +285,7 @@ post_read_adapter: TypeAdapter = TypeAdapter(PostRead)
 # bleed is rejected by the discriminated union one level up.
 
 
-class ReferralCreate(WirePayload):
+class ReferralCreate(FlatLocationSchema, WirePayload):
     """Create payload for `kind='referral'`. Field set follows the
     client-referral intake form.
 
@@ -321,15 +322,6 @@ class ReferralCreate(WirePayload):
     # decision.
     network_preference: Literal[*NETWORK_PREFERENCES]
     insurance_carrier: OptionalInsuranceCarrier = None
-
-    @model_validator(mode="before")
-    @classmethod
-    def _gather_flat_location_cr_create(cls, data: Any) -> Any:
-        return gather_flat_location(data)
-
-    @model_serializer(mode="wrap")
-    def _flatten_location(self, handler):
-        return flatten_location_on_dump(self, handler(self))
 
 
 class ClinicianOpeningCreate(WirePayload):
@@ -425,7 +417,7 @@ openings_create_adapter: TypeAdapter = TypeAdapter(OpeningsCreate)
 # Create and Update.
 
 
-class ReferralUpdate(PartialUpdate):
+class ReferralUpdate(FlatLocationSchema, PartialUpdate):
     # `kind` is the discriminator, always required on the wire; the
     # `PartialUpdate` "at least one field" rule excludes it via
     # `at_least_one_field_exclude`.
@@ -455,15 +447,6 @@ class ReferralUpdate(PartialUpdate):
     # repo's "None means leave unchanged" semantic for optional fields).
     network_preference: Literal[*NETWORK_PREFERENCES] | None = None
     insurance_carrier: OptionalInsuranceCarrier = None
-
-    @model_validator(mode="before")
-    @classmethod
-    def _gather_flat_location_cr_update(cls, data: Any) -> Any:
-        return gather_flat_location(data)
-
-    @model_serializer(mode="wrap")
-    def _flatten_location(self, handler):
-        return flatten_location_on_dump(self, handler(self))
 
 
 class ClinicianOpeningUpdate(PartialUpdate):
