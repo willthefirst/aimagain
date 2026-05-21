@@ -27,7 +27,12 @@ def create_test_user(
     hashed_password: Optional[str] = None,
     is_active: bool = True,  # Added fastapi-users default
     is_superuser: bool = False,  # Added fastapi-users default
-    is_verified: bool = True,  # Added fastapi-users default
+    # `is_verified` is a fastapi-users ORM column on the `User` model.
+    # It was excluded from `UserRead` in PR #724 (#696) — it is NOT an
+    # API response field. Setting it True in tests bypasses any future
+    # email-verification gate; that's intentional for unit tests that
+    # don't exercise the verification flow itself.
+    is_verified: bool = True,
 ) -> User:
     """Creates a User instance with default values for testing."""
     unique_suffix = uuid.uuid4()
