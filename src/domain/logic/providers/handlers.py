@@ -38,6 +38,7 @@ from src.domain.logic.favorites.repository import UserFavoriteRepository
 from src.domain.logic.organizations.repository import OrganizationRepository
 from src.domain.logic.providers.repository import ProviderRepository
 from src.domain.logic.users.repository import UserRepository
+from src.domain.logic.verifications.repository import VerificationRepository
 from src.domain.models import (
     Organization,
     Provider,
@@ -126,23 +127,25 @@ async def provider_detail_extras(
     target: Provider,
     requesting_user: User | None,
     user_favorite_repo: UserFavoriteRepository,
+    verification_repo: VerificationRepository,
     **_: Any,
 ) -> dict[str, Any]:
     """Per-viewer detail extras for `make_detail_handler(PROVIDER_ENTITY)`.
 
-    `is_favorited` is a property of the (viewer, provider) pair, not of
-    the provider — it lives in context, not on the model. Anonymous
-    viewers (`requesting_user is None` for a hypothetical public detail)
-    get `False` without a DB round-trip; today `PROVIDER_ENTITY.read_user_dep`
-    forces auth, but the None-check keeps the helper safe if that ever
-    changes.
+    `is_favorited` is a property of the (viewer, provider) pair; anonymous
+    viewers get `False`. `verification_status` is the outcome of the most
+    recent nightly run (`verified` / `needs_review` / `failed`) or `None`
+    when no run has happened yet (#707).
     """
+    latest = await verification_repo.latest_for_provider(target.id)
+    verification_status = latest.status if latest else None
     if requesting_user is None:
-        return {"is_favorited": False}
+        return {"is_favorited": False, "verification_status": verification_status}
     return {
         "is_favorited": await user_favorite_repo.is_favorited(
             user_id=requesting_user.id, provider_id=target.id
-        )
+        ),
+        "verification_status": verification_status,
     }
 
 
