@@ -61,6 +61,19 @@ def test_compose_env_respects_user_override(monkeypatch):
     assert env["COMPOSE_PROJECT_NAME"] == "user-pick"
 
 
+def test_is_compose_cmd_recognises_docker_compose_invocations():
+    runner = _make_runner_at(Path("/x"))
+    assert runner._is_compose_cmd(["docker", "compose", "-f", "x.yml", "up"])
+    assert runner._is_compose_cmd(["docker-compose", "up"])
+    # Not compose:
+    assert not runner._is_compose_cmd(["pytest", "-v"])
+    assert not runner._is_compose_cmd(["alembic", "upgrade", "head"])
+    assert not runner._is_compose_cmd(["docker", "build", "."])
+    assert not runner._is_compose_cmd(["docker", "ps"])
+    assert not runner._is_compose_cmd(["git", "status"])
+    assert not runner._is_compose_cmd([])
+
+
 def test_slugifies_uppercase_and_punctuation():
     runner = _make_runner_at(Path("/tmp/MY Project Dir!"))
     name = runner.compose_project_name

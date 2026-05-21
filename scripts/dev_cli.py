@@ -68,6 +68,17 @@ class CLIRunner:
             env.update(extra)
         return env
 
+    def _is_compose_cmd(self, cmd: List[str]) -> bool:
+        # Recognize `docker compose` and `docker-compose` invocations
+        # — those are the only ones that consult COMPOSE_PROJECT_NAME.
+        # Everything else (alembic, pytest, gh, git, python, …) runs
+        # with the inherited parent env so its behaviour is unchanged.
+        if not cmd:
+            return False
+        if cmd[0] == "docker-compose":
+            return True
+        return cmd[0] == "docker" and len(cmd) > 1 and cmd[1] == "compose"
+
     def run_command(self, cmd: List[str], cwd: Optional[Path] = None) -> int:
         if cwd is None:
             cwd = self.project_root
@@ -75,8 +86,9 @@ class CLIRunner:
         print(f"🚀 Running: {' '.join(cmd)}")
         print(f"📁 Working directory: {cwd}")
 
+        env = self._compose_env() if self._is_compose_cmd(cmd) else None
         try:
-            result = subprocess.run(cmd, cwd=cwd, env=self._compose_env(), check=False)
+            result = subprocess.run(cmd, cwd=cwd, env=env, check=False)
             return result.returncode
         except KeyboardInterrupt:
             print("\n⚠️ Interrupted by user")
