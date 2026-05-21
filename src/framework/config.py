@@ -20,6 +20,18 @@ class Settings(BaseSettings):
     # extra config.
     DEV_LOGIN_EMAIL: str = "admin@example.com"
 
+    # Transactional email — see `src/framework/email/README.md` for the
+    # backend dispatch rule. `console` is the safe default: no real
+    # mail sent without an explicit env-var flip. `EMAIL_FROM` is read
+    # by every backend (including `console`, which prints it). The
+    # `APP_BASE_URL` is needed to build absolute links in emails
+    # (verify, password reset) — relative paths don't work outside the
+    # request scope.
+    EMAIL_BACKEND: str = "console"
+    EMAIL_FROM: str = "no-reply@bedlamconnect.com"
+    APP_BASE_URL: str = "http://localhost:8000"
+    RESEND_API_KEY: str | None = None
+
     model_config = ConfigDict(env_file=".env", env_file_encoding="utf-8")
 
     @classmethod
