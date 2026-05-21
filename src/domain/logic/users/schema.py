@@ -1,13 +1,20 @@
 from typing import Literal
 
 from fastapi_users import schemas
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, Field
 
 from src.framework.schema_validators import ReadProjection
 
 
 class UserRead(schemas.BaseUser):
     username: str
+    # `is_verified` is inherited from fastapi_users.BaseUser but the app
+    # has no verification flow — every account is permanently `False`.
+    # Exclude it from the JSON response so we stop advertising a contract
+    # we don't honour (#696). The DB column stays; fastapi-users requires
+    # it on the ORM model. Remove this override if a verification flow is
+    # ever shipped (Option A from #696).
+    is_verified: bool = Field(default=False, exclude=True)
 
 
 class UserCreate(schemas.BaseUserCreate):
