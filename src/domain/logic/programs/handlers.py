@@ -30,29 +30,10 @@ from src.domain.models import (
     Program,
     User,
 )
-from src.framework.http.exceptions import ForbiddenError, NotFoundError
+from src.framework.authz import assert_fk_ownership, list_visible_to
+from src.framework.http.exceptions import ForbiddenError, NotFoundError  # noqa: F401
 
 logger = logging.getLogger(__name__)
-
-
-async def _orgs_visible_to(
-    org_repo: OrganizationRepository, user: User
-) -> list[Organization]:
-    """Return the Organizations a user may attach their Program to.
-
-    Owners see only the Orgs they own; superusers see every Org. Drives
-    the Program create/edit form's Org-picker dropdown and pairs with
-    the wire-level ownership check in
-    :func:`_assert_program_payload_org_ownership`. Mirrors
-    ``_orgs_visible_to`` on the Provider side — Org ownership is the
-    boundary for who may attach owned children (Providers, Programs)."""
-    if user.is_superuser:
-        return list(
-            await org_repo.list_default(
-                Organization, order_by=Organization.created_at.desc()
-            )
-        )
-    return list(await org_repo.list_for_user(user.id))
 
 
 async def _assert_program_payload_org_ownership(
@@ -61,27 +42,19 @@ async def _assert_program_payload_org_ownership(
     requesting_user: User,
     organization_repo: OrganizationRepository,
 ) -> None:
-    """`PROGRAM_ENTITY.payload_authz_path` target — reject a Program
-    create/update whose ``org_id`` points at an Org the requesting
-    user doesn't own (superusers bypass).
-
-    404 when the Org doesn't exist (no info leak about other users' Org
-    ids); 403 when it exists but belongs to someone else. PATCH
-    payloads where ``org_id`` is None (i.e. the PATCH doesn't touch
-    the FK) are a no-op — only flow through the ownership check when
-    the payload is actually trying to set a new Org. Same shape as
-    :func:`src.domain.logic.providers.handlers._assert_provider_payload_org_ownership`.
+    """`PROGRAM_ENTITY.payload_authz_path` target — thin wrapper around
+    the framework's generic FK-ownership assertion. Keeps the dotted-
+    path on the spec stable while the rule lives in one framework spot.
     """
-    org_id = getattr(payload, "org_id", None)
-    if org_id is None:
-        return
-    org = await organization_repo._get_by_id(Organization, org_id)
-    if org is None:
-        raise NotFoundError(detail=f"Organization {org_id} not found")
-    if not requesting_user.is_superuser and org.owner_id != requesting_user.id:
-        raise ForbiddenError(
-            detail="You may only attach a Program to an Organization you own"
-        )
+    await assert_fk_ownership(
+        payload=payload,
+        attr="org_id",
+        requesting_user=requesting_user,
+        parent_repo=organization_repo,
+        parent_model=Organization,
+        parent_noun="Organization",
+        child_noun="Program",
+    )
 
 
 async def program_form_extras(
@@ -108,7 +81,7 @@ async def program_form_extras(
     re-point at any other Org they own; they just can't pretend the
     current attachment doesn't exist.
     """
-    orgs = await _orgs_visible_to(organization_repo, requesting_user)
+    orgs = await list_visible_to(organization_repo, requesting_user, Organization)
     if target is not None:
         org_ids = {o.id for o in orgs}
         if target.org_id not in org_ids:
