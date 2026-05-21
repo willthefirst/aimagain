@@ -2,6 +2,7 @@
 """Development CLI."""
 
 import argparse
+import os
 import re
 import subprocess
 import sys
@@ -42,6 +43,30 @@ def _resolve_project_root() -> Path:
 class CLIRunner:
     def __init__(self):
         self.project_root = _resolve_project_root()
+        # Per-worktree `docker compose` project name (see #748). Each
+        # worktree gets its own container stack — containers, volumes,
+        # network — so two worktrees can run the dev container in
+        # parallel and `dev seed` from a worktree targets the worktree's
+        # own volume instead of leaking into the main checkout. The user
+        # can still override by exporting COMPOSE_PROJECT_NAME themselves;
+        # we only set it when nothing else has.
+        self.compose_project_name = self._derive_compose_project_name()
+
+    def _derive_compose_project_name(self) -> str:
+        # docker-compose project names must be lowercase alnum + `-`/`_`,
+        # so slugify the project-root directory name. `bedlam-` prefix
+        # keeps the namespace human-grep-able across docker installs that
+        # also host other compose projects.
+        raw = self.project_root.name.lower()
+        slug = re.sub(r"[^a-z0-9_-]+", "-", raw).strip("-") or "bedlam"
+        return f"bedlam-{slug}" if not slug.startswith("bedlam") else slug
+
+    def _compose_env(self, extra: Optional[dict] = None) -> dict:
+        env = os.environ.copy()
+        env.setdefault("COMPOSE_PROJECT_NAME", self.compose_project_name)
+        if extra:
+            env.update(extra)
+        return env
 
     def run_command(self, cmd: List[str], cwd: Optional[Path] = None) -> int:
         if cwd is None:
@@ -51,7 +76,7 @@ class CLIRunner:
         print(f"📁 Working directory: {cwd}")
 
         try:
-            result = subprocess.run(cmd, cwd=cwd, check=False)
+            result = subprocess.run(cmd, cwd=cwd, env=self._compose_env(), check=False)
             return result.returncode
         except KeyboardInterrupt:
             print("\n⚠️ Interrupted by user")
@@ -74,6 +99,7 @@ class CLIRunner:
             capture_output=True,
             text=True,
             cwd=self.project_root,
+            env=self._compose_env(),
         )
         return bool(result.stdout.strip())
 
