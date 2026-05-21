@@ -32,8 +32,12 @@ async def get_login_page(request: Request):
     """
     # Extract the 'next' parameter from query string for redirect after login
     next_url = request.query_params.get("next", "")
+    # Show a contextual message when arriving from the registration flow
+    just_registered = request.query_params.get("registered") == "1"
     return APIResponse.html_response(
-        template_name="auth/login.html", context={"next_url": next_url}, request=request
+        template_name="auth/login.html",
+        context={"next_url": next_url, "just_registered": just_registered},
+        request=request,
     )
 
 
