@@ -656,25 +656,23 @@
              `has_provider_profile` is still set in base_context but is no
              longer read here. #}
           <li>
-            {# title-case-ignore — Profile dropdown: Pico `<details role="list">` gives us a
-               disclosure widget with no JS. Contains two items — Profile
-               (links to /users/me) and Sign out (POSTs to /auth/sign-out
-               which clears the fastapiusersauth cookie and returns
-               HX-Redirect → /auth/login). #}
-            <details role="list"{% if _on_profile %} aria-current="page"{% endif %}>
-              <summary aria-haspopup="listbox" aria-label="Profile menu" style="list-style:none;cursor:pointer;">
+            {# Profile dropdown — canonical Pico v2 nav-dropdown pattern
+               (https://picocss.com/docs/nav#dropdowns): `<details
+               class="dropdown">` / `<summary>` / `<ul dir="rtl">` /
+               `<li><a>`. `dir="rtl"` right-aligns the panel so it doesn't
+               overflow the viewport edge. Sign-out uses `hx-post` on the
+               `<a>` because the route returns `HX-Redirect`; HTMX handles
+               the full-page navigation to `/auth/login`. #}
+            <details class="dropdown"{% if _on_profile %} aria-current="page"{% endif %}>
+              <summary aria-label="Profile menu">
                 {# Lucide `user` icon, inlined. `currentColor` inherits
-                   the summary color so Pico's aria-current treatment
-                   propagates to the icon automatically. #}
+                   the summary's link color, including Pico's
+                   aria-current treatment. #}
                 <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
               </summary>
-              <ul role="listbox">
+              <ul dir="rtl">
                 <li><a href="{{ entity_url('user', id='me') }}">Profile</a></li>
-                <li>
-                  <form method="post" action="/auth/sign-out" hx-post="/auth/sign-out" style="margin:0;">
-                    <button type="submit" style="width:100%;text-align:left;background:none;border:none;padding:0;cursor:pointer;color:inherit;">Sign out</button>
-                  </form>
-                </li>
+                <li><a href="#" hx-post="/auth/sign-out">Sign out</a></li>
               </ul>
             </details>
           </li>

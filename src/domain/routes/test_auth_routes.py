@@ -134,13 +134,14 @@ async def test_authenticated_page_has_sign_out_affordance(
 ):
     """Any authenticated page must expose the sign-out endpoint in the
     header chrome so the user can end their session within 2 clicks.
-    The logout form targets POST /auth/jwt/logout — assert it is present
-    on the profile page (a representative authenticated response)."""
+    The header dropdown uses `<a hx-post="/auth/sign-out">` (Pico v2
+    nav-dropdown pattern) — assert the target is present on the profile
+    page (a representative authenticated response)."""
     response = await authenticated_client.get(
         "/users/me", headers={"Accept": "text/html"}
     )
     assert response.status_code == 200
-    assert 'action="/auth/sign-out"' in response.text
+    assert 'hx-post="/auth/sign-out"' in response.text
 
 
 async def test_forgot_password_request(test_client: AsyncClient, logged_in_user: User):
