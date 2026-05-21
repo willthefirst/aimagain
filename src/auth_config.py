@@ -25,7 +25,15 @@ class UserManager(UUIDIDMixin, BaseUserManager[User, uuid.UUID]):
     async def on_after_forgot_password(
         self, user: User, token: str, request: Optional[Request] = None
     ):
-        print(f"User {user.id} has forgot their password. Reset token: {token}")
+        """Send the password-reset email.
+
+        Lazy-imported so the framework layer can be exercised in
+        isolation without loading domain modules. Domain wrapper owns
+        link construction + template rendering — single home for the
+        URL shape (`src/domain/logic/auth/emails.py`)."""
+        from src.domain.logic.auth.emails import send_password_reset_email
+
+        await send_password_reset_email(user, token)
 
     async def on_after_request_verify(
         self, user: User, token: str, request: Optional[Request] = None
