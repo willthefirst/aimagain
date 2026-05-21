@@ -857,6 +857,145 @@ class PushCommands:
         return answer in {"y", "yes"}
 
 
+class MergeCommands:
+    """`dev merge [<pr-number>]` — auto-rebase-then-merge loop.
+
+    `gh pr merge --auto` only merges once the PR is up-to-date with the
+    base. When main is moving (multi-PR sessions), PRs land in BEHIND
+    with all checks green and stay there until someone runs
+    `gh pr update-branch --rebase`. The retros named this the single
+    biggest cycle-time tax. This command closes the loop: poll status,
+    rebase when behind + green, merge when clean + green, exit non-zero
+    on a real check failure. See #747.
+    """
+
+    POLL_SECONDS = 30
+    DEFAULT_TIMEOUT_SECONDS = 30 * 60
+
+    def __init__(self, runner: CLIRunner) -> None:
+        self.runner = runner
+
+    def _resolve_pr_number(self, explicit: Optional[int]) -> Optional[int]:
+        if explicit is not None:
+            return explicit
+        result = subprocess.run(
+            ["gh", "pr", "view", "--json", "number"],
+            capture_output=True,
+            text=True,
+            check=False,
+            cwd=self.runner.project_root,
+        )
+        if result.returncode != 0:
+            return None
+        try:
+            import json
+
+            data = json.loads(result.stdout or "{}")
+            number = data.get("number")
+            return int(number) if number is not None else None
+        except (ValueError, KeyError):
+            return None
+
+    def _pr_status(self, pr: int) -> dict:
+        result = subprocess.run(
+            [
+                "gh",
+                "pr",
+                "view",
+                str(pr),
+                "--json",
+                "mergeStateStatus,mergeable,statusCheckRollup,state",
+            ],
+            capture_output=True,
+            text=True,
+            check=False,
+            cwd=self.runner.project_root,
+        )
+        if result.returncode != 0:
+            return {}
+        try:
+            import json
+
+            return json.loads(result.stdout or "{}")
+        except ValueError:
+            return {}
+
+    def _checks_failing(self, status: dict) -> List[str]:
+        rollup = status.get("statusCheckRollup") or []
+        failed: List[str] = []
+        for check in rollup:
+            conclusion = (check.get("conclusion") or "").upper()
+            if conclusion in {"FAILURE", "CANCELLED", "TIMED_OUT", "ACTION_REQUIRED"}:
+                name = check.get("name") or check.get("context") or "<unknown>"
+                failed.append(name)
+        return failed
+
+    def _checks_done(self, status: dict) -> bool:
+        rollup = status.get("statusCheckRollup") or []
+        if not rollup:
+            return True  # no required checks
+        return all(
+            (check.get("status") or "").upper() == "COMPLETED" for check in rollup
+        )
+
+    def _update_branch(self, pr: int) -> int:
+        return self.runner.run_command(
+            ["gh", "pr", "update-branch", "--rebase", str(pr)]
+        )
+
+    def _merge(self, pr: int, method: str) -> int:
+        return self.runner.run_command(["gh", "pr", "merge", f"--{method}", str(pr)])
+
+    def merge(
+        self,
+        pr: Optional[int] = None,
+        method: str = "rebase",
+        timeout_seconds: int = DEFAULT_TIMEOUT_SECONDS,
+    ) -> int:
+        import time
+
+        number = self._resolve_pr_number(pr)
+        if number is None:
+            print(
+                "❌ Could not determine PR number — pass one explicitly "
+                "(`dev merge 123`) or run from a branch with an open PR."
+            )
+            return 1
+
+        print(f"🔄 Driving PR #{number} to merge (method: {method})")
+        deadline = time.monotonic() + timeout_seconds
+        last_state: Optional[str] = None
+        while time.monotonic() < deadline:
+            status = self._pr_status(number)
+            if not status:
+                print("⚠ Could not fetch PR status — retrying.")
+                time.sleep(self.POLL_SECONDS)
+                continue
+            if (status.get("state") or "").upper() == "MERGED":
+                print(f"✅ PR #{number} is merged.")
+                return 0
+            state = (status.get("mergeStateStatus") or "").upper()
+            failing = self._checks_failing(status)
+            if failing:
+                print(f"❌ PR #{number} has failing checks: {', '.join(failing)}")
+                return 3
+            if state != last_state:
+                print(f"  state: {state}")
+                last_state = state
+            if state == "CLEAN" and self._checks_done(status):
+                rc = self._merge(number, method)
+                if rc == 0:
+                    print(f"✅ PR #{number} merge submitted.")
+                return rc
+            if state == "BEHIND" and self._checks_done(status):
+                print("  branch is behind main — rebasing…")
+                self._update_branch(number)
+                # Loop continues; CI will rerun, state will transition.
+            time.sleep(self.POLL_SECONDS)
+        print(f"⏰ Timed out after {timeout_seconds}s waiting on PR #{number}.")
+        return 4
+
+
 class SetupCommands:
     def __init__(self, runner: CLIRunner):
         self.runner = runner
@@ -913,6 +1052,7 @@ class DevCLI:
         self.playwright_cmd = PlaywrightCommands(self.runner)
         self.worktree_cmd = WorktreeCommands(self.runner)
         self.push_cmd = PushCommands(self.runner)
+        self.merge_cmd = MergeCommands(self.runner)
 
     def create_parser(self) -> argparse.ArgumentParser:
         """Create the argument parser with all commands."""
@@ -951,6 +1091,7 @@ Examples:
         self._add_playwright_setup_parser(subparsers)
         self._add_worktree_parser(subparsers)
         self._add_push_parser(subparsers)
+        self._add_merge_parser(subparsers)
 
         return parser
 
@@ -1287,6 +1428,43 @@ Examples:
             help="Forward --force-with-lease to git push.",
         )
         parser.set_defaults(func=lambda args: self.push_cmd.push(args.force, args.yes))
+
+    def _add_merge_parser(self, subparsers):
+        parser = subparsers.add_parser(
+            "merge",
+            help="Drive a PR to merge, auto-rebasing whenever it falls behind",
+            description=(
+                "Polls `gh pr view` and, when the PR is BEHIND with green "
+                "checks, runs `gh pr update-branch --rebase` automatically. "
+                "When the PR is CLEAN with green checks, merges. Closes the "
+                "stall where `gh pr merge --auto` waits forever because the "
+                "branch never gets rebased. See #747."
+            ),
+        )
+        parser.add_argument(
+            "pr",
+            type=int,
+            nargs="?",
+            help="PR number. Defaults to the PR for the current branch.",
+        )
+        parser.add_argument(
+            "--method",
+            choices=["rebase", "merge", "squash"],
+            default="rebase",
+            help="Merge method to use when ready (default: rebase).",
+        )
+        parser.add_argument(
+            "--timeout",
+            type=int,
+            default=MergeCommands.DEFAULT_TIMEOUT_SECONDS,
+            help=(
+                "Give up after this many seconds (default: "
+                f"{MergeCommands.DEFAULT_TIMEOUT_SECONDS})."
+            ),
+        )
+        parser.set_defaults(
+            func=lambda args: self.merge_cmd.merge(args.pr, args.method, args.timeout)
+        )
 
     def run(self) -> int:
         """Run the CLI application."""
