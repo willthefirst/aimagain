@@ -673,7 +673,10 @@
               <ul role="listbox">
                 <li><a href="{{ entity_url('user', id='me') }}">Profile</a></li>
                 <li>
-                  <form method="post" action="/auth/sign-out" hx-post="/auth/sign-out" style="margin:0;">
+                  {# data-form="sign-out" distinguishes this chrome form from
+                     page-specific resource forms so tests can scope selectors
+                     like `form:not([data-form="sign-out"])` (#730). #}
+                  <form method="post" action="/auth/sign-out" hx-post="/auth/sign-out" data-form="sign-out" style="margin:0;">
                     <button type="submit" style="width:100%;text-align:left;background:none;border:none;padding:0;cursor:pointer;color:inherit;">Sign out</button>
                   </form>
                 </li>

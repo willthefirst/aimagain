@@ -125,6 +125,11 @@ class TitleCaseChecker:
         "JavaScript",
         "TypeScript",
         "Pact",  # Contract testing framework
+        # Brand / product names — never lowercased regardless of position.
+        # Add the product name parts here so per-template ignore comments
+        # aren't needed on every page that displays the brand (#728).
+        "Bedlam",  # "Bedlam Connect" app name — first word
+        "Connect",  # "Bedlam Connect" app name — second word
         # General-domain acronyms
         "CRUD",
         "TDD",
