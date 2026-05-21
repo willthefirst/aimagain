@@ -1,22 +1,49 @@
 {% extends "base.html" %}
 {% block content %}
+{# Public landing (anonymous `/`) — the structure mirrors the parent
+   marketing site at https://www.bedlamconnect.com/: a hero with
+   brand-led `<hgroup>` (H1 + tagline `<p>`), a one-line value
+   description, a three-CTA cluster (sign in / sign up / learn more),
+   then a "how it works" section with two `<article>` cards keyed by
+   role. The whole tree is plain semantic HTML — Pico styles
+   `<hgroup>`, `<article>`, `<footer>`, and `<a role="button">` out of
+   the box, so no per-page CSS is needed. #}
 <section>
   <hgroup>
-    <h1>Connect clinicians with the right clients</h1>
-    <p>Bedlam Connect helps mental health providers share available openings and receive referrals from their network.</p>
+    <h1>Welcome to Bedlam Connect</h1>
+    <p>Connecting clinicians, helping clients find care.</p>
   </hgroup>
-  {# title-case-ignore: button labels below ("Create an account" / "Log in") are
-     intentionally sentence-case verb phrases, not title-case headings. #}
+  <p>Post openings, share referrals, and maintain a network of trusted clinicians — all in one place.</p>
+  {# title-case-ignore: button labels below ("Sign in" / "Sign up" /
+     "Learn more") are intentionally sentence-case verb phrases, not
+     title-case headings. #}
   <p>
-    <a href="/auth/register" role="button">Create an account</a>
-    &nbsp;
-    <a href="/auth/login" role="button" class="outline">Log in</a>
+    <a href="/auth/login" role="button">Sign in</a>
+    <a href="/auth/register" role="button" class="secondary">Sign up</a>
+    <a href="#how-it-works" role="button" class="outline">Learn more</a>
   </p>
-  <section>
-    <h2>For clinicians</h2>
-    <p>Post your availability, connect with referrers, and manage incoming referrals — all in one place.</p>
-    <h2>For referrers</h2>
-    <p>Find clinicians with open capacity, check availability, and send referrals directly.</p>
-  </section>
 </section>
+
+<section id="how-it-works">
+  <hgroup>
+    <h2>How it works</h2>
+    <p>Two surfaces, one network.</p>
+  </hgroup>
+  <article>
+    <hgroup>
+      <h3>For clinicians</h3>
+      <p>Post your availability, connect with referrers, and manage incoming referrals — all in one place.</p>
+    </hgroup>
+  </article>
+  <article>
+    <hgroup>
+      <h3>For referrers</h3>
+      <p>Find clinicians with open capacity, check availability, and send referrals directly.</p>
+    </hgroup>
+  </article>
+</section>
+
+<footer>
+  <small>&copy; 2026 Bedlam Health &middot; <a href="mailto:support@bedlamhealth.com">support@bedlamhealth.com</a></small>
+</footer>
 {% endblock %}
