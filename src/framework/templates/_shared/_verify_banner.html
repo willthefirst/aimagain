@@ -1,0 +1,27 @@
+{# Nag banner — "verify your email" reminder shown on every page
+   when the authed user is `is_verified=False`. Reads
+   `current_user_is_verified` from `base_context()` (defaults True for
+   anonymous + missing-attr stubs so the banner is silent unless
+   explicitly opted-in).
+
+   Re-send is a one-click HTMX POST to `/auth/resend-verify` (custom
+   page route, not fastapi-users' `/auth/request-verify-token`).
+   The custom route reads the user from the session so the email
+   doesn't have to live in the HTML. Response is the
+   `_verify_banner_sent.html` partial which swaps the banner in
+   place via `hx-swap="outerHTML"`. #}
+{%- if is_authenticated and not current_user_is_verified -%}
+<aside class="verify-banner" role="status" id="verify-banner">
+  <strong>Verify your email.</strong>
+  Check your inbox for a link to confirm your account.
+  <form
+    method="post"
+    action="/auth/resend-verify"
+    hx-post="/auth/resend-verify"
+    hx-target="#verify-banner"
+    hx-swap="outerHTML"
+    class="verify-banner-form">
+    <button type="submit" class="secondary verify-banner-button">Resend verification email</button>
+  </form>
+</aside>
+{%- endif -%}

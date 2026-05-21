@@ -12,7 +12,10 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from src.domain.logic.auth.emails import send_password_reset_email
+from src.domain.logic.auth.emails import (
+    send_password_reset_email,
+    send_verification_email,
+)
 
 
 @pytest.mark.asyncio
@@ -108,3 +111,44 @@ async def test_send_password_reset_email_renders_both_parts(monkeypatch):
     kwargs = send_email_mock.call_args.kwargs
     assert kwargs["html"].strip().startswith("<")
     assert "<" not in kwargs["text"]  # plain text only
+
+
+# --- send_verification_email -------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_send_verification_email_builds_query_param_link(monkeypatch):
+    """Verify link is `GET /auth/verify?token=...` — query string,
+    not path param (different from reset). The landing page route in
+    `auth_pages.py:get_verify_page` reads the token via
+    `request.query_params`."""
+    monkeypatch.setattr(
+        "src.domain.logic.auth.emails.settings.APP_BASE_URL",
+        "https://app.example.com",
+    )
+    send_email_mock = AsyncMock()
+    monkeypatch.setattr("src.domain.logic.auth.emails.send_email", send_email_mock)
+
+    user = SimpleNamespace(email="alice@example.com", username="alice")
+    await send_verification_email(user, token="verify-tok")
+
+    kwargs = send_email_mock.call_args.kwargs
+    expected = "https://app.example.com/auth/verify?token=verify-tok"
+    assert expected in kwargs["text"]
+    assert expected in kwargs["html"]
+    assert kwargs["subject"] == "Verify your Bedlam Connect email"
+    assert kwargs["to"] == "alice@example.com"
+
+
+@pytest.mark.asyncio
+async def test_send_verification_email_renders_both_parts(monkeypatch):
+    send_email_mock = AsyncMock()
+    monkeypatch.setattr("src.domain.logic.auth.emails.send_email", send_email_mock)
+
+    user = SimpleNamespace(email="alice@example.com", username="alice")
+    await send_verification_email(user, token="t")
+
+    kwargs = send_email_mock.call_args.kwargs
+    assert kwargs["html"].strip().startswith("<")
+    assert "<" not in kwargs["text"]
+    assert "alice" in kwargs["text"]

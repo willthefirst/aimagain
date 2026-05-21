@@ -1,20 +1,21 @@
 from typing import Literal
 
 from fastapi_users import schemas
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr
 
 from src.framework.schema_validators import ReadProjection
 
 
 class UserRead(schemas.BaseUser):
     username: str
-    # `is_verified` is inherited from fastapi_users.BaseUser but the app
-    # has no verification flow — every account is permanently `False`.
-    # Exclude it from the JSON response so we stop advertising a contract
-    # we don't honour (#696). The DB column stays; fastapi-users requires
-    # it on the ORM model. Remove this override if a verification flow is
-    # ever shipped (Option A from #696).
-    is_verified: bool = Field(default=False, exclude=True)
+    # `is_verified` is inherited from `fastapi_users.schemas.BaseUser`
+    # and serialized on the wire — the chrome's "verify your email"
+    # nag banner reads it. The earlier `exclude=True` override (#696)
+    # has been removed now that the verification flow ships
+    # (PR 3 of the email-verify rollout). The field is `False` for
+    # newly-registered prod users until they click the link in their
+    # verify email; dev users are auto-verified in
+    # `UserManager.on_after_register`.
 
 
 class UserCreate(schemas.BaseUserCreate):
