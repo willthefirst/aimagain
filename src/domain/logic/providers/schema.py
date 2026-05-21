@@ -35,15 +35,14 @@ universes aligned with the source tuples.
 import re
 import uuid
 from datetime import date, datetime
-from typing import Annotated, Any, Literal
+from typing import Annotated, Literal
 
-from pydantic import AfterValidator, BeforeValidator, model_serializer, model_validator
+from pydantic import AfterValidator, BeforeValidator
 
 from src.domain.logic.value_objects.location import (
+    FlatLocationSchema,
     Location,
     LocationPartial,
-    flatten_location_on_dump,
-    gather_flat_location,
 )
 from src.domain.models.enums import (
     CERTIFICATION_TYPES,
@@ -201,7 +200,7 @@ class ProviderCertificationUpdate(PartialUpdate):
 # --- Provider ----------------------------------------------------
 
 
-class ProviderRead(ReadProjection):
+class ProviderRead(FlatLocationSchema, ReadProjection):
     id: uuid.UUID
     owner_id: uuid.UUID
     created_at: datetime
@@ -240,17 +239,8 @@ class ProviderRead(ReadProjection):
     educations: list[ProviderEducationRead] = []
     certifications: list[ProviderCertificationRead] = []
 
-    @model_validator(mode="before")
-    @classmethod
-    def _gather_flat_location(cls, data: Any) -> Any:
-        return gather_flat_location(data)
 
-    @model_serializer(mode="wrap")
-    def _flatten_location(self, handler):
-        return flatten_location_on_dump(self, handler(self))
-
-
-class ProviderCreate(WirePayload):
+class ProviderCreate(FlatLocationSchema, WirePayload):
     """Create payload for a provider's directory provider. `owner_id` is
     set by the route from the authenticated user, not accepted on the
     wire.
@@ -295,17 +285,8 @@ class ProviderCreate(WirePayload):
     educations: list[ProviderEducationCreate] = []
     certifications: list[ProviderCertificationCreate] = []
 
-    @model_validator(mode="before")
-    @classmethod
-    def _gather_flat_location(cls, data: Any) -> Any:
-        return gather_flat_location(data)
 
-    @model_serializer(mode="wrap")
-    def _flatten_location(self, handler):
-        return flatten_location_on_dump(self, handler(self))
-
-
-class ProviderUpdate(PartialUpdate):
+class ProviderUpdate(FlatLocationSchema, PartialUpdate):
     """Partial update of practice/availability fields only. Sub-entity
     lists (licensures, educations, certifications) are managed via
     their own endpoints, so this schema does not accept them.
@@ -338,12 +319,3 @@ class ProviderUpdate(PartialUpdate):
     in_network_carriers: InNetworkCarriersField | None = None
     sliding_scale: bool | None = None
     cost: StrippedOptionalText = None
-
-    @model_validator(mode="before")
-    @classmethod
-    def _gather_flat_location(cls, data: Any) -> Any:
-        return gather_flat_location(data)
-
-    @model_serializer(mode="wrap")
-    def _flatten_location(self, handler):
-        return flatten_location_on_dump(self, handler(self))
