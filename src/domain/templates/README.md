@@ -42,6 +42,68 @@ The services list is the first row of `_facts_block`'s `<dl>` rather than its ow
 
 The auth-flow pages (`auth/login.html`, `auth/register.html`, `auth/forgot_password.html`, `auth/reset_password.html`) each render a single `<article class="auth-page">` card. The `.auth-page` rule in [`../../framework/templates/base.html`](../../framework/templates/base.html) caps the card at 28rem and centers it horizontally — without the class the card stretches to the full `<main class="container">` width on tablet/desktop.
 
+## Copy style guide
+
+Every label, legend, help string, button, and intro paragraph in `src/domain/templates/` follows the rules below. The audience is mental-health clinicians — copy reads as concise plain English, not clinical jargon. Pinned by [`test_copy_conventions.py`](test_copy_conventions.py); a violation surfaces as a test failure, not a code review note.
+
+### Labels and legends
+
+- **Sentence case.** `First name`, `In-network carriers`, `Treatment settings` — not `First Name` or `Treatment Settings`. Acronyms keep their canonical case (`NPI`, `ZIP`, `DBT`).
+- **No trailing punctuation** unless the label is genuinely a question. `Sliding scale?` yes; `Last name.` no.
+- **No app-internal abbreviations.** `Organization`, never `Org`. Domain acronyms every clinician already says aloud (`NPI`, `ZIP`) stay.
+
+### Help text (`help=`)
+
+- **Full sentence, period at the end.** `10-digit National Provider Identifier.` not `10-digit National Provider Identifier`.
+- **Specific.** Explain *what the value is for*, not that the field exists. `For example: DBT, EMDR, IFS.` beats `Free text.`.
+- **Never write `help="Optional."`.** The `(optional)` indicator on the label is the single canonical signal — see below.
+- If the same help string appears in two or more forms, move it to [`../../framework/templates/_shared/form_copy.html`](../../framework/templates/_shared/form_copy.html) and import it.
+
+### Optional fields
+
+Pass `required=False` to any form-field macro. The macro renders a muted `(optional)` after the label automatically (see `_field_label` in [`../../framework/templates/_shared/form_fields.html`](../../framework/templates/_shared/form_fields.html)).
+
+```jinja
+{# OK — `(optional)` is rendered automatically #}
+{{ text_field("npi", "NPI", required=False, help="10-digit National Provider Identifier.") }}
+
+{# Bad — duplicates the (optional) indicator with prose #}
+{{ text_field("npi", "NPI", required=False, help="Optional. 10-digit NPI.") }}
+```
+
+Fieldset-level "everything below is optional" lines (the previous `<small>Both lists optional.</small>` pattern) are gone — every field carries its own indicator now.
+
+### Buttons
+
+- **Verb-noun, sentence case.** `Create program`, `Post referral`, `Save changes`, `Send reset link`.
+- **Create / edit submit pattern.** Create forms use `entity_create_label(spec.name, kind=...)` so the submit button text matches the H1 (`Create clinician opening` everywhere). Edit forms use `Save changes` — every edit form, no exceptions. The structural pin lives in `entity_create_label` (see [`../../framework/templates/README.md` § "Create / filter labels"](../../framework/templates/README.md)).
+
+### Vocabulary
+
+One word per concept, no synonyms. Replace any of the variants below in any new copy:
+
+| Concept                    | Word                | Don't use                                |
+| -------------------------- | ------------------- | ---------------------------------------- |
+| Person who treats          | clinician           | provider, practitioner, therapist        |
+| Person treated             | client              | patient                                  |
+| Practice / employer entity | organization        | practice, clinic, group, agency          |
+| Delivery format            | in-person / virtual | telehealth, remote, online               |
+| The post type announcing availability for individual clinicians | opening | listing, slot, position |
+| The post type announcing program-level intake | intake | enrollment, admission window |
+| The post type seeking placement for a client | referral | seeker post, lead |
+
+The model class `Provider` and the audit string `provider` are historical and kept on the Python side; user-facing copy says `clinician`. See `src/domain/specs/provider.py` for the rename rationale.
+
+### Shared microcopy
+
+Strings repeated across forms live in [`../../framework/templates/_shared/form_copy.html`](../../framework/templates/_shared/form_copy.html). Today:
+
+- `org_picker_help()` — the "Can't find your organization?" hint for every Org-FK picker.
+- `modality_help()` — the `e.g. DBT, EMDR, IFS` example for the treatment-modality free-text field.
+- `select_all_help()` — the `Select all that apply.` hint for multi-choice demographics.
+
+If a new string would otherwise live in two forms, add it here.
+
 ## Tests
 
-Exercised indirectly via route tests under [`../routes/`](../routes/). Selector and fixture conventions live in [`../../../tests/README.md`](../../../tests/README.md).
+Exercised indirectly via route tests under [`../routes/`](../routes/), plus [`test_copy_conventions.py`](test_copy_conventions.py) (this directory) which scans every template for forbidden patterns (literal `Optional.` help strings, `Org` abbreviation, etc.). Selector and fixture conventions live in [`../../../tests/README.md`](../../../tests/README.md).

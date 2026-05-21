@@ -35,13 +35,13 @@
          "Parent organization",
          parent_org_options,
          current=organization.parent_org_id,
-         blank_label="(root — no parent)",
+         blank_label="(no parent)",
          required=false,
-         help='Leave as "(root — no parent)" for a top-level organization.',
+         help="Set one only if this is part of a larger network.",
     ) }}
   </fieldset>
   {{ actions(
-      "Save organization",
+      "Save changes",
       cancel_url=entity_url('organization', id=organization.id),
       delete_url=entity_url('organization', id=organization.id),
       delete_confirm="Delete this organization?",

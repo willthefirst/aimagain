@@ -2,6 +2,8 @@
 {% block content %}
 <article class="auth-page">
   <header>
+    <h1>Log in</h1>
+    <p>Welcome back. Log in to post or browse referrals.</p>
   </header>
   <!-- FastAPI Users JWT login endpoint expects 'username' (which is email) and 'password' as form data. -->
   <form
@@ -9,22 +11,22 @@
     action="/auth/jwt/login{% if next_url %}?next={{ next_url }}{% endif %}">
     <label for="username">
       Email
-      <input type="email" id="username" name="username" />
+      <input type="email" id="username" name="username" required />
     </label>
     <label for="password">
       Password
-      <input type="password" id="password" name="password" />
+      <input type="password" id="password" name="password" required />
     </label>
-    <button type="submit">Login</button>
+    <button type="submit">Log in</button>
   </form>
   <footer>
     <p>
       Forgot your password?
-      <a href="/auth/forgot-password">Reset here</a>
+      <a href="/auth/forgot-password">Reset it.</a>
     </p>
     <p>
-      Need an account?
-      <a href="/auth/register">Register here</a>
+      New here?
+      <a href="/auth/register">Create an account.</a>
     </p>
   </footer>
 </article>

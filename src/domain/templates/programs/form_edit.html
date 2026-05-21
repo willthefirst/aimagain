@@ -1,5 +1,6 @@
 {% extends "views/form_edit.html" %}
 {%- from "_shared/form_fields.html" import entity_select_field, radio_bool_field, select_field, text_field -%}
+{%- from "_shared/form_copy.html" import org_picker_help -%}
 {%- from "_shared/actions.html" import actions -%}
 
 {% set resource_url = entity_url('program') %}
@@ -17,31 +18,24 @@
 <form hx-patch="{{ entity_url('program', id=program.id) }}">
   <fieldset>
     <legend>Identity</legend>
-    {{ entity_select_field(
-         "org_id",
-         "Organization",
-         organizations,
-         current=program.org_id,
-         help='Don\'t see your organization? <a href="' ~ entity_form_url('organization') ~ '">Create one first</a>.',
-    ) }}
+    {{ entity_select_field("org_id", "Organization", organizations, current=program.org_id, help=org_picker_help()) }}
     {{ text_field("name", "Name", current=program.name) }}
-    {{ text_field("description", "Description", current=program.description, required=false, help="Optional.") }}
+    {{ text_field("description", "Description", current=program.description, required=false) }}
   </fieldset>
   <fieldset>
-    <legend>State &amp; dates</legend>
+    <legend>Where and when</legend>
     {{ select_field("state_preference", "State served", US_STATES, current=program.state_preference, required=false, placeholder=true) }}
     <div class="grid">
       {{ text_field("start_date", "Start date", current=program.start_date, required=false, type="date") }}
       {{ text_field("end_date", "End date", current=program.end_date, required=false, type="date") }}
     </div>
-    <small>All three above are optional.</small>
   </fieldset>
   <fieldset>
     <legend>Intake</legend>
     {{ radio_bool_field("accepting_referrals", "Accepting referrals?", current=program.accepting_referrals, required=false) }}
   </fieldset>
   {{ actions(
-      "Save program",
+      "Save changes",
       cancel_url=entity_url('program', id=program.id),
       delete_url=entity_url('program', id=program.id),
       delete_confirm="Delete this program?",

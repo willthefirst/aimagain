@@ -1,0 +1,46 @@
+{# Shared form microcopy — single source of truth for any help string
+   the app would otherwise re-type in two or more forms.
+
+   The audit at the top of this PR found three duplications:
+
+     - "Don't see your organization? <a>Create one first</a>." — used by
+       the clinician, program, and organization create/edit forms.
+     - "e.g. DBT, EMDR." — used by the referral, clinician-opening,
+       and program-intake forms for the treatment-modality field.
+     - "Select all that apply." — used by every multi-choice
+       demographics field.
+
+   Each lives here as a single macro so a copy change is a one-place
+   edit. Importing pattern:
+
+     {%- from "_shared/form_copy.html" import org_picker_help, modality_help -%}
+     {{ entity_select_field("org_id", "Organization", orgs, help=org_picker_help()) }}
+
+   The macro is invoked (not just referenced) so Jinja renders it to a
+   string before the host macro reads `help=`. `|safe` plumbing inside
+   `_help_small` keeps any inline `<a>` from being escaped.
+#}
+
+{# The Org-picker help — every create/edit form that takes a parent-Org
+   or owning-Org FK renders this so the "I can't find my Org" path is
+   one click away. The link target is the Organization create form. #}
+{%- macro org_picker_help() -%}
+Don't see your organization? <a href="{{ entity_form_url('organization') }}">Create one first.</a>
+{%- endmacro %}
+
+{# Treatment-modality help — referrals, clinician openings, and program
+   intakes all expose a single free-text "treatment modality" field
+   alongside the structured services/settings multi-selects. The
+   abbreviation expansion lives here once so a future style change
+   (full-name examples, link to a glossary, etc.) is one edit. #}
+{%- macro modality_help() -%}
+For example: DBT, EMDR, IFS.
+{%- endmacro %}
+
+{# Multi-choice demographics fields (Age groups, Languages, Genders
+   served) — each opens with the same explanatory line. Centralized so
+   adding a new multi-choice field on a future form picks up the
+   convention. #}
+{%- macro select_all_help() -%}
+Select all that apply.
+{%- endmacro %}

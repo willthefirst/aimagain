@@ -1,5 +1,6 @@
 {% extends "views/form_new.html" %}
 {%- from "_shared/form_fields.html" import entity_select_field, field_for, radio_bool_field, text_field -%}
+{%- from "_shared/form_copy.html" import org_picker_help -%}
 {%- from "_shared/actions.html" import actions -%}
 
 {% set resource_url = entity_url('clinician') %}
@@ -7,16 +8,16 @@
 {% block resource_label %}Clinicians{% endblock %}
 
 {% block content %}
-<p>Practice details only. Add licensures, education, and certifications after creating the clinician entry.</p>
+<p>Start with the basics. You can add licensures, education, and certifications after the clinician is created.</p>
 
 {# `org_id` is the FK to the directory entry's Organization (the
    practice's display name lives on `org.name`). The dropdown lists
    every Org in the directory; any user may attach their clinician
-   entry to any Org. To create a new Organization, visit the create form
-   (use `entity_form_url('organization')`) first; this form doesn't
-   bundle inline-create into the clinician create page. The underlying
-   model class is still `Provider` — only the user-facing surface
-   flipped in #642 PR 4. #}
+   entry to any Org. To create a new Organization, visit the create
+   form first; the org-picker help (`org_picker_help` in
+   `_shared/form_copy.html`) links there. The underlying model class
+   is still `Provider` — only the user-facing surface flipped in #642
+   PR 4. #}
 <form hx-post="{{ entity_url('clinician') }}">
   {# Person-level fields (name, NPI) — these live on the linked
      `Clinician` row and follow the person across affiliations. Kept in
@@ -28,17 +29,12 @@
       {{ field_for(schema, "first_name", "First name") }}
       {{ field_for(schema, "last_name", "Last name") }}
     </div>
-    {{ field_for(schema, "npi", "NPI", help="10-digit National Provider Identifier. Optional.") }}
+    {{ field_for(schema, "npi", "NPI", required=false, help="10-digit National Provider Identifier.") }}
   </fieldset>
 
   <fieldset>
     <legend>Practice</legend>
-    {{ entity_select_field(
-         "org_id",
-         "Organization",
-         orgs,
-         help='Don\'t see your organization? <a href="' ~ entity_form_url('organization') ~ '">Create one first</a>.',
-    ) }}
+    {{ entity_select_field("org_id", "Organization", orgs, help=org_picker_help()) }}
     <div class="grid">
       {{ field_for(schema, "location_city", "City") }}
       {{ field_for(schema, "location_state", "State") }}
@@ -59,12 +55,12 @@
      independent. No cross-field invariant. #}
   <fieldset>
     <legend>Insurance &amp; payment</legend>
-    {{ field_for(schema, "in_network_carriers", "In-network carriers", help="Leave empty for none.") }}
+    {{ field_for(schema, "in_network_carriers", "In-network carriers") }}
     <div class="grid">
       {{ radio_bool_field("accepts_out_of_network", "Accepts out-of-network?", required=false) }}
       {{ radio_bool_field("sliding_scale", "Sliding scale?", required=false) }}
     </div>
-    {{ text_field("cost", "Cost", required=false, help="Free text. Optional.") }}
+    {{ text_field("cost", "Cost", required=false, help="Free text — for example, &quot;$200/session&quot; or &quot;sliding 80–200&quot;.") }}
   </fieldset>
 
   {{ actions(entity_create_label('clinician'), cancel_url=entity_url('clinician')) }}
