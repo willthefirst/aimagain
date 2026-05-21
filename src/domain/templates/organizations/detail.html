@@ -1,7 +1,6 @@
 {% extends "views/detail.html" %}
 {%- from "_shared/actions.html" import actions -%}
 
-{% set resource_url = entity_url('organization') %}
 
 {% block resource_label %}Organizations{% endblock %}
 {% block current_label %}{{ organization.name }}{% endblock %}

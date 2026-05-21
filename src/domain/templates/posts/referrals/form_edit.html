@@ -1,8 +1,6 @@
 {% extends "views/form_edit.html" %}
 {% from "posts/referrals/_form.html" import referral_form %}
 
-{% set resource_url = entity_url('referral') %}
-{% set resource_detail_url = entity_url('referral', id=referral.id) %}
 {# `view.headline` is the referral's identity line (age + gender combo).
    Reusing it here pins the breadcrumb / H1 to the specific referral
    the user is editing. #}

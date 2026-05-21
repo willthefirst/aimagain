@@ -12,8 +12,6 @@
    vocabulary — the underlying model class is still `Provider`. #}
 {% set provider = clinician %}
 
-{% set resource_url = entity_url('clinician') %}
-{% set resource_detail_url = entity_url('clinician', id=provider.id) %}
 
 {% block resource_label %}Clinicians{% endblock %}
 {# Same H1-fallback shape as the detail page — name when set, primary

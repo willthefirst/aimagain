@@ -1,7 +1,6 @@
 {% extends "views/detail.html" %}
 {%- from "_shared/_clinician_card.html" import clinician_card -%}
 
-{% set resource_url = entity_url('user') %}
 
 {% block resource_label %}Users{% endblock %}
 {% block current_label %}{{ target_user.username }}{% endblock %}

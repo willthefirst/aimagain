@@ -62,6 +62,22 @@ def _prefix(spec: "EntitySpec") -> str:
     )
 
 
+def url_for_spec(spec: "EntitySpec", *, id: Any = None) -> str:
+    """Spec-direct form of `entity_url` — same path resolution, no
+    registry lookup.
+
+    Used by `handle_detail` / `handle_get_new_form` / `handle_get_edit_form`
+    to inject `resource_url` / `resource_detail_url` into template
+    context. Routing through the spec directly lets handler tests with
+    synthetic (unregistered) specs round-trip without registering them
+    with `entity_registry` first.
+    """
+    prefix = _prefix(spec)
+    if id is None:
+        return prefix
+    return f"{prefix}/{id}"
+
+
 def entity_url(name: str, *, id: Any = None, subresource: str | None = None) -> str:
     """Parent-resource URL for the entity ``name``.
 
