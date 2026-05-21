@@ -256,15 +256,31 @@ async def _seed_org(
     return org.id
 
 
-async def test_form_new_renders_parent_org_select_with_root_option(
+async def test_form_new_renders_type_picker_without_type_param(
+    authenticated_client: AsyncClient,
+):
+    """`GET /organizations/form` (no `?type=`) shows the org-type picker
+    (#704) — a list of option links, not the create form. Each link points
+    at the same URL with `?type=<value>` so the user chooses the org type
+    before filling out the form."""
+    response = await authenticated_client.get("/organizations/form")
+    assert response.status_code == 200
+    tree = HTMLParser(response.text)
+    # Picker renders option links, not a form.
+    assert tree.css_first("main form") is None
+    picker_links = tree.css("main a[href*='?type=']")
+    hrefs = {a.attributes.get("href") for a in picker_links}
+    assert any("solo_practice" in h for h in hrefs), "solo_practice option missing"
+    assert any("group_practice" in h for h in hrefs), "group_practice option missing"
+
+
+async def test_form_new_renders_create_form_with_type_param(
     authenticated_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user: User,
 ):
-    """Pins the new picker structure from issue #581: a ``<select
-    name="parent_org_id">`` with a "(no parent)" default option plus
-    one ``<option>`` per Org visible to the requesting user.
-    """
+    """With `?type=group_practice`, the org create form renders (skipping the
+    picker) with a hidden type input and the parent-org select (#704 / #581)."""
     mine_a = await _seed_org(
         db_test_session_manager, owner_id=logged_in_user.id, name="Mine A"
     )
@@ -272,21 +288,21 @@ async def test_form_new_renders_parent_org_select_with_root_option(
         db_test_session_manager, owner_id=logged_in_user.id, name="Mine B"
     )
 
-    response = await authenticated_client.get("/organizations/form")
+    response = await authenticated_client.get("/organizations/form?type=group_practice")
     assert response.status_code == 200
     tree = HTMLParser(response.text)
+    # Type is pre-filled via hidden input; no dropdown.
+    assert tree.css_first('input[name="type"][value="group_practice"]') is not None
+    assert tree.css_first('select[name="type"]') is None
     select = tree.css_first('select[name="parent_org_id"]')
     assert select is not None, "parent-org picker should be a <select>"
     options = select.css("option")
-    # Blank-option + one option per visible Org. selectolax surfaces
-    # `value=""` as ``None`` in the attribute dict, so we test the
-    # blank option by position + the absence of a value.
+    # Blank-option + one option per visible Org.
     assert len(options) == 3
     assert options[0].attributes.get("value") is None
     assert "selected" in options[0].attributes
     assert "no parent" in options[0].text().lower()
     values = {opt.attributes.get("value") for opt in options}
-    # `None` is the blank option's value (empty-string attribute).
     assert values == {None, str(mine_a), str(mine_b)}
     # Free-text input from the prior UI is gone.
     assert tree.css_first('input[name="parent_org_id"]') is None
@@ -297,8 +313,9 @@ async def test_form_new_scopes_to_owned_orgs(
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user: User,
 ):
-    """Non-superusers see only Orgs they own in the picker — same scope
-    as the Program/Provider form pickers (see ``_orgs_visible_to``)."""
+    """Non-superusers see only Orgs they own in the parent picker — same
+    scope as the Program/Provider form pickers (see ``_orgs_visible_to``).
+    Use `?type=group_practice` to bypass the type picker (#704)."""
     mine = await _seed_org(
         db_test_session_manager, owner_id=logged_in_user.id, name="Mine"
     )
@@ -310,7 +327,7 @@ async def test_form_new_scopes_to_owned_orgs(
         db_test_session_manager, owner_id=other.id, name="Other's"
     )
 
-    response = await authenticated_client.get("/organizations/form")
+    response = await authenticated_client.get("/organizations/form?type=group_practice")
     assert response.status_code == 200
     tree = HTMLParser(response.text)
     values = {

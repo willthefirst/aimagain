@@ -6,39 +6,26 @@ framework's `handle_get_new_form` falls through to
 canonical entry point is the "Create opening" CTA on
 `posts/openings/list.html`; this picker is where that CTA lands.
 
-Each option is an `<a>` wrapping an `<hgroup>` — the heading + tagline
-read as content the user picks from, not as a navigation menu (the
-previous `<nav><ul>` layout encouraged Pico to apply horizontal-nav
-styles that didn't fit the "pick a kind to post" intent).
+Uses the shared `kind_picker` macro from `_shared/kind_picker.html`.
+Deep-linking with `?kind=<value>` bypasses this picker — the framework
+handler routes directly to the kind-specific form template.
 #}
 {% extends "views/form_new.html" %}
+{%- from "_shared/kind_picker.html" import kind_picker -%}
 
 {% block resource_label %}Openings{% endblock %}
 
 {% block content %}
-{# Each option's `<h2>` label funnels through `entity_create_label` so
-   the text on the picker matches the H1 the user lands on after
-   clicking (e.g. "Create clinician opening"). Same helper the
-   kind-specific form page reads from — see
-   `src/framework/rendering/labels.py`.
-
-   `title-case-ignore` markers: the linter's concatenated-text heuristic
-   flags the heading+tagline as mid-text-capital ("Heading An individual…")
-   even though each element is correct sentence case in isolation, and
-   resolves the violation against the first leaf text-node (the `<h2>`).
-   The marker scope is the same line as the violation, so it sits on
-   the `<h2>`, not the parent `<a>`. #}
-<a href="{{ entity_form_url('opening') }}?kind=clinician_opening">
-  <hgroup>
-    <h2>{{ entity_create_label('opening', kind='clinician_opening') }}</h2> <!-- title-case-ignore -->
-    <p>An individual clinician with availability on their caseload.</p>
-  </hgroup>
-</a>
-
-<a href="{{ entity_form_url('opening') }}?kind=program_intake">
-  <hgroup>
-    <h2>{{ entity_create_label('opening', kind='program_intake') }}</h2> <!-- title-case-ignore -->
-    <p>An organization's program announcing open intake slots.</p>
-  </hgroup>
-</a>
+{{ kind_picker([
+  {
+    "href": entity_form_url("opening") ~ "?kind=clinician_opening",
+    "heading": entity_create_label("opening", kind="clinician_opening"),
+    "description": "An individual clinician with availability on their caseload."
+  },
+  {
+    "href": entity_form_url("opening") ~ "?kind=program_intake",
+    "heading": entity_create_label("opening", kind="program_intake"),
+    "description": "An organization's program announcing open intake slots."
+  }
+]) }}
 {% endblock %}

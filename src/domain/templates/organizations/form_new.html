@@ -1,18 +1,58 @@
 {% extends "views/form_new.html" %}
-{%- from "_shared/form_fields.html" import entity_select_field, select_field, text_field -%}
+{%- from "_shared/form_fields.html" import entity_select_field, text_field -%}
 {%- from "_shared/actions.html" import actions -%}
+{%- from "_shared/kind_picker.html" import kind_picker -%}
 
 
 {% block resource_label %}Organizations{% endblock %}
 
 {% block content %}
+{# Org-type picker (#704). When `?type=` is absent the user sees a
+   "choose your path" picker that explains each org type in plain
+   language. Once a type is chosen, the URL carries `?type=<value>`
+   and the actual create form renders with the type pre-filled as a
+   hidden input (no dropdown needed). Deep-linking with `?type=` skips
+   the picker. Mirrors the /openings/form picker pattern. #}
+{%- set org_type = request.query_params.get("type", "") -%}
+
+{% if not org_type %}
+{{ kind_picker([
+  {
+    "href": entity_form_url("organization") ~ "?type=solo_practice",
+    "heading": "Solo practice",
+    "description": "Just me — a single clinician operating independently."
+  },
+  {
+    "href": entity_form_url("organization") ~ "?type=group_practice",
+    "heading": "Group practice",
+    "description": "Two or more clinicians sharing a name and practice."
+  },
+  {
+    "href": entity_form_url("organization") ~ "?type=clinic",
+    "heading": "Clinic",
+    "description": "Outpatient, IOP, PHP, inpatient, or similar program-based setting."
+  },
+  {
+    "href": entity_form_url("organization") ~ "?type=health_system",
+    "heading": "Health system",
+    "description": "A hospital system, network, or multi-site health organization."
+  },
+  {
+    "href": entity_form_url("organization") ~ "?type=other",
+    "heading": "Other",
+    "description": "None of the above — give it a name and carry on."
+  }
+]) }}
+
+{% else %}
 <form hx-post="{{ entity_url('organization') }}">
   <fieldset>
     <legend>Organization</legend>
-    <div class="grid">
-      {{ text_field("name", "Name", maxlength=200) }}
-      {{ select_field("type", "Type", ORGANIZATION_TYPES, labels=ORGANIZATION_TYPES_LABELS, placeholder=true) }}
-    </div>
+    {# Type is already chosen via the picker; pass it as a hidden input
+       so the form body is simpler. The label shows what was selected. #}
+    <input type="hidden" name="type" value="{{ org_type }}" />
+    <p><small>Type: <strong>{{ ORGANIZATION_TYPES_LABELS.get(org_type, org_type) }}</strong> — <a href="{{ entity_form_url('organization') }}">Change</a></small></p>
+    {{ text_field("name", "Name", maxlength=200) }}
     {# Parent-Org picker — replaces the free-text UUID input from #581.
        `parent_org_options` is populated by `organization_form_extras`
        (see `ORGANIZATION_ENTITY.form_extras_path`). Empty value =
@@ -30,4 +70,5 @@
 
   {{ actions(entity_create_label('organization'), cancel_url=entity_url('organization')) }}
 </form>
+{% endif %}
 {% endblock %}

@@ -1,0 +1,31 @@
+{# `kind_picker(options)` — reusable "choose your path" picker.
+
+   Renders a set of large clickable option cards, each pointing at a URL
+   that carries the chosen kind/type as a query parameter. Mirrors the
+   pattern used by /openings/form to let users pick between clinician
+   opening and program intake before the kind-specific form loads.
+
+   `options` is a list of dicts with three keys:
+     href        — target URL (e.g. "?type=solo_practice")
+     heading     — short option title (e.g. "Solo practice")
+     description — one-sentence description of the choice
+
+   Usage (from a form_new.html template):
+
+     {%- from "_shared/kind_picker.html" import kind_picker -%}
+     ...
+     {{ kind_picker([
+       {"href": "?type=solo_practice",  "heading": "Solo practice",  "description": "..."},
+       {"href": "?type=group_practice", "heading": "Group practice", "description": "..."},
+     ]) }}
+#}
+{% macro kind_picker(options) %}
+{%- for opt in options -%}
+<a href="{{ opt.href }}">
+  <hgroup>
+    <h2>{{ opt.heading }}</h2> <!-- title-case-ignore -->
+    <p>{{ opt.description }}</p>
+  </hgroup>
+</a>
+{% endfor -%}
+{% endmacro %}
