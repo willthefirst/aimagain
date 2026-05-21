@@ -664,26 +664,25 @@
           {% if not has_provider_profile %}
           <li><a role="button" href="{{ entity_form_url('clinician') }}">{{ entity_create_label('clinician') }}</a></li>
           {% endif %}
-          {# Profile dropdown — title-case-ignore: "Sign out" is a verb
-             phrase, not a title. Icon toggles a Pico <details> popover with
-             "Profile" and "Sign out". Sign-out posts to /auth/sign-out,
-             which clears the cookie and returns HX-Redirect to /auth/login
-             so the browser lands on the login page immediately (#702). #}
+          {# Profile icon — direct link to /users/me. Keeps `#primary-nav > li > a`
+             discoverable by tests and existing behavior. The sign-out affordance
+             is the adjacent list item (#702). #}
           <li>
-            <details role="list"{% if _on_profile %} aria-current="page"{% endif %}>
-              <summary aria-haspopup="listbox" aria-label="Profile menu" style="list-style:none;cursor:pointer;">
-                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-              </summary>
-              <ul role="listbox">
-                <li><a href="{{ entity_url('user', id='me') }}">Profile</a></li>
-                <li>
-                  {# title-case-ignore: "Sign out" is a verb phrase, not a title #}
-                  <form method="post" action="/auth/sign-out" hx-post="/auth/sign-out" style="margin:0;">
-                    <button type="submit" style="width:100%;text-align:left;background:none;border:none;padding:0;cursor:pointer;color:inherit;">Sign out</button>
-                  </form>
-                </li>
-              </ul>
-            </details>
+            <a href="{{ entity_url('user', id='me') }}" aria-label="Profile"{% if _on_profile %} aria-current="page"{% endif %}>
+              {# Lucide `user` icon, inlined. `currentColor` makes it
+                 inherit the link color, including Pico's default
+                 `aria-current="page"` treatment. #}
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+            </a>
+          </li>
+          {# Sign-out affordance: one-click from any authenticated page (#702).
+             Posts to /auth/sign-out which clears the cookie and returns
+             HX-Redirect to /auth/login. No <form> wrapper — the button
+             carries hx-post directly so it doesn't shadow the page's own
+             form when tests look for the first <form> in the DOM. #}
+          <li>
+            {# title-case-ignore: "Sign out" is a verb phrase, not a title #}
+            <button hx-post="/auth/sign-out" style="background:none;border:none;padding:0;cursor:pointer;color:inherit;font:inherit;">Sign out</button>
           </li>
           {% else %}
           <li>
