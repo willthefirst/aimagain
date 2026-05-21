@@ -520,6 +520,59 @@ async def test_detail_shows_inline_create_provider_for_self(
     assert action.attributes.get("href") == "/clinicians/form"
 
 
+async def test_users_me_shows_onboarding_create_clinician_cta_when_no_profile(
+    authenticated_client: AsyncClient,
+    logged_in_user: User,
+):
+    """`GET /users/me` for a user with no clinician profile shows a
+    'Create your clinician profile' CTA in the onboarding checklist.
+    The checklist is self-only — other users' profiles (/users/{id})
+    are unaffected."""
+    response = await authenticated_client.get("/users/me")
+    assert response.status_code == 200
+    tree = HTMLParser(response.text)
+    # The onboarding "Getting started" card must be present.
+    headings = [
+        el.text(strip=True)
+        for el in tree.css("article.entity-card header.entity-header strong")
+    ]
+    assert (
+        "Getting started" in headings
+    ), "/users/me is missing the 'Getting started' onboarding card"
+    # The create-clinician CTA must link to the clinician form.
+    cta = tree.css_first(
+        "article.entity-card a[href='/clinicians/form'][role='button']"
+    )
+    assert (
+        cta is not None
+    ), "onboarding card is missing 'Create your clinician profile' CTA"
+    assert "Create your clinician profile" in cta.text()
+
+
+async def test_users_me_onboarding_not_shown_for_other_users(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user: User,
+):
+    """The 'Getting started' onboarding card must NOT appear on
+    other users' profile pages — it is self-only."""
+    target = create_test_user(username=f"target-{uuid.uuid4()}")
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            session.add(target)
+
+    response = await authenticated_client.get(f"/users/{target.id}")
+    assert response.status_code == 200
+    tree = HTMLParser(response.text)
+    headings = [
+        el.text(strip=True)
+        for el in tree.css("article.entity-card header.entity-header strong")
+    ]
+    assert (
+        "Getting started" not in headings
+    ), "onboarding card unexpectedly shown on another user's profile"
+
+
 async def test_detail_omits_inline_create_provider_for_other_user(
     authenticated_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],
