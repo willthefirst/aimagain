@@ -1,6 +1,7 @@
 {% extends "views/detail.html" %}
 {%- from "_shared/actions.html" import actions -%}
 {%- from "_shared/sections.html" import fact -%}
+{%- from "providers/_credential_list.html" import credential_list -%}
 {%- from "providers/_credential_row.html" import credential_row -%}
 
 {# The framework binds `context[spec.name] = target`; after #642 PR 4 the
@@ -127,50 +128,32 @@
 <article class="entity-card">
   <section>
     <h4>Licensures</h4>
-    {% if view.licensures %}
-    <div class="credential-list">
-      {%- for lic in view.licensures %}
+    {% call(lic) credential_list(view.licensures, "No licensures listed.") %}
       {{ credential_row(
           LICENSE_TYPES_LABELS[lic.license_type],
           ["#" ~ lic.license_number, lic.issuing_state, ("Expires " ~ lic.expiration_date) if lic.expiration_date else None],
       ) }}
-      {%- endfor %}
-    </div>
-    {% else %}
-    <p><small>No licensures listed.</small></p>
-    {% endif %}
+    {% endcall %}
   </section>
 
   <section>
     <h4>Education</h4>
-    {% if view.educations %}
-    <div class="credential-list">
-      {%- for edu in view.educations %}
+    {% call(edu) credential_list(view.educations, "No education entries listed.") %}
       {{ credential_row(
           EDUCATION_TYPES_LABELS[edu.education_type],
           [edu.institution, edu.month_completed],
       ) }}
-      {%- endfor %}
-    </div>
-    {% else %}
-    <p><small>No education entries listed.</small></p>
-    {% endif %}
+    {% endcall %}
   </section>
 
   <section>
     <h4>Certifications</h4>
-    {% if view.certifications %}
-    <div class="credential-list">
-      {%- for cert in view.certifications %}
+    {% call(cert) credential_list(view.certifications, "No certifications listed.") %}
       {{ credential_row(
           CERTIFICATION_TYPES_LABELS[cert.certification_type],
           [cert.certifying_body, ("Expires " ~ cert.expiration_date) if cert.expiration_date else None],
       ) }}
-      {%- endfor %}
-    </div>
-    {% else %}
-    <p><small>No certifications listed.</small></p>
-    {% endif %}
+    {% endcall %}
   </section>
 </article>
 {% endblock %}
