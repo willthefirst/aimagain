@@ -12,6 +12,7 @@ from src.domain.models import (
     ProviderEducation,
     ProviderLicensure,
     User,
+    Verification,
 )
 from src.framework.audit.repository import AuditRepository
 from tests.helpers import (
@@ -316,6 +317,41 @@ async def test_get_provider_renders_detail_page(
     # `<strong>` only. The facts list relabels its row "Organization"
     # so the same string is not repeated under a "Practice name" `<dt>`.
     assert "<dt>Practice name</dt>" not in response.text
+
+
+async def test_get_provider_detail_shows_verification_badge(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user: User,
+):
+    """`GET /clinicians/{id}` shows the verification badge when a
+    verification row exists (#707)."""
+    provider_id = await _seed_provider_for(
+        db_test_session_manager, user_id=logged_in_user.id, practice_name="Verified"
+    )
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            session.add(Verification(provider_id=provider_id, status="verified"))
+
+    response = await authenticated_client.get(f"/clinicians/{provider_id}")
+    assert response.status_code == 200
+    assert "Verified" in response.text
+    assert "icon-shield-check" in response.text
+
+
+async def test_get_provider_detail_shows_no_badge_without_verification(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user: User,
+):
+    """No verification run → no badge rendered (#707)."""
+    provider_id = await _seed_provider_for(
+        db_test_session_manager, user_id=logged_in_user.id, practice_name="Unverified"
+    )
+    response = await authenticated_client.get(f"/clinicians/{provider_id}")
+    assert response.status_code == 200
+    assert "icon-shield-check" not in response.text
+    assert "icon-shield-x" not in response.text
 
 
 async def test_get_provider_detail_renders_stacked_affiliation_cards(

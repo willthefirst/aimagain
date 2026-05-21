@@ -37,6 +37,7 @@ from src.domain.logic.providers.schema import (
     ProviderRead,
     ProviderUpdate,
 )
+from src.domain.logic.verifications.repository import VerificationRepository
 from src.domain.models import Provider
 from src.domain.models.enums import (
     CERTIFICATION_TYPES,
@@ -129,7 +130,10 @@ PROVIDER_ENTITY: Final[EntitySpec] = EntitySpec(
     ),
     # Per-viewer detail extras live on the spec — see `EntitySpec`.
     detail_extras_path="src.domain.logic.providers.handlers.provider_detail_extras",
-    detail_extras_repos=(("user_favorite_repo", UserFavoriteRepository),),
+    detail_extras_repos=(
+        ("user_favorite_repo", UserFavoriteRepository),
+        ("verification_repo", VerificationRepository),
+    ),
     # The create/edit form's Org-picker dropdown is scoped per-viewer to
     # the user's owned Organizations. The framework invokes the extras
     # callable on both the create path (target=None) and the edit path
