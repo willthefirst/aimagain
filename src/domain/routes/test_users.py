@@ -26,21 +26,22 @@ async def test_base_template_renders_primary_nav_when_authenticated(
 ):
     """Authenticated pages render the primary nav with the two Journey
     surfaces on the left (Referrals = "find new clients", Openings =
-    "refer out a client") and on the right an adaptive primary CTA
-    (Create-clinician for first-time users without a provider profile,
-    Create-opening for returning users) plus the `/users/me` profile
-    icon. Other URL families — `/intakes`, `/clinicians`,
+    "refer out a client") and on the right only the `/users/me` profile
+    icon. No "Create clinician" CTA appears in the header chrome —
+    onboarding cues live on `/users/me` and list-page empty states
+    (#697). Other URL families — `/intakes`, `/clinicians`,
     `/organizations`, `/programs`, `/users` — stay live and reachable
-    by URL/bookmark, but are no longer chrome-promoted."""
+    by URL/bookmark, but are not chrome-promoted."""
     response = await authenticated_client.get("/users")
 
     assert response.status_code == 200
     tree = HTMLParser(response.text)
     profile_items = tree.css("#primary-nav > li > a")
     profile_hrefs = {a.attributes.get("href") for a in profile_items}
-    # First-time user (no `Provider` row yet) — the CTA points at
-    # `/clinicians/form` so they can unblock posting.
-    assert profile_hrefs == {"/clinicians/form", "/users/me"}
+    # Only the profile icon link — no "Create clinician" CTA in header.
+    assert profile_hrefs == {"/users/me"}
+    # The header must NOT contain a Create clinician link (#697).
+    assert "/clinicians/form" not in profile_hrefs
     section_items = tree.css('nav[aria-label="Primary"] > ul:first-of-type > li > a')
     section_hrefs = [a.attributes.get("href") for a in section_items]
     # Brand link is `<li><strong><a>` so the `> li > a` direct-child

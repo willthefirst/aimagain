@@ -28,8 +28,8 @@ def base_context(user: Actor | None) -> dict:
     `src/domain/models/users/user.py`). It defaults to `False` when the
     attribute is missing — Actor is a structural Protocol that doesn't
     declare `providers`, so test stubs without the attribute read as
-    "first-time user" (no provider profile yet) and the chrome shows
-    the profile-setup CTA accordingly.
+    "first-time user" (no provider profile yet). Templates use this
+    scalar to conditionally show provider-related affordances.
     """
     return {
         "is_authenticated": user is not None,

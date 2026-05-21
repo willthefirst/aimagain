@@ -49,8 +49,8 @@ def test_base_context_admin():
 
 def test_base_context_user_with_provider_profile():
     """A user whose `providers` relationship is non-empty reads as
-    `has_provider_profile=True` — the chrome uses this to swap the
-    primary CTA from "Set up your profile" to "+ Post availability"."""
+    `has_provider_profile=True` — templates can use this scalar to
+    conditionally show or hide provider-related affordances."""
     user = SimpleNamespace(
         id=uuid.uuid4(),
         username="alice",
