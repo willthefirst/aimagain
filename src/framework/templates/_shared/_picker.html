@@ -1,0 +1,26 @@
+{# _picker(options) — renders a "choose your path" card grid.
+
+Adopted from the `/openings/form` picker pattern (issue #704). Use this
+macro anywhere a multi-option entry point needs to funnel the user to a
+kind- or type-specific sub-form before showing fields.
+
+Each option is a dict with keys:
+  href:        URL to navigate to on click
+  heading:     short label (e.g. "Solo practice")
+  description: one-line tagline
+
+The `<h2>` carries `<!-- title-case-ignore -->` because the linter's
+concatenated-text heuristic flags the heading + tagline as a
+mid-text-capital violation even though each element is correct sentence
+case in isolation. Scope is the same line as the violation.
+#}
+{%- macro picker(options) -%}
+{%- for opt in options %}
+<a href="{{ opt.href }}">
+  <hgroup>
+    <h2>{{ opt.heading }}</h2> <!-- title-case-ignore -->
+    <p>{{ opt.description }}</p>
+  </hgroup>
+</a>
+{%- endfor %}
+{%- endmacro %}

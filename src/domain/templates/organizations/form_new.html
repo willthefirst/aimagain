@@ -1,17 +1,54 @@
+{# Create-organization entry point.
+
+When no `?type=` query param is present the user sees a type-picker — one
+card per organization type, each linking to the same URL with `?type=<value>`
+appended.  Clicking a card (or following a deep link with `?type=` already
+set) skips the picker and renders the full create form with that type
+pre-selected in the Type dropdown.
+
+This mirrors the `/openings/form` picker pattern (issue #704).
+#}
 {% extends "views/form_new.html" %}
 {%- from "_shared/form_fields.html" import entity_select_field, select_field, text_field -%}
 {%- from "_shared/actions.html" import actions -%}
+{%- from "_shared/_picker.html" import picker -%}
 
 
 {% block resource_label %}Organizations{% endblock %}
 
 {% block content %}
+{%- set selected_type = request.query_params.get('type', '') -%}
+{% if not selected_type %}
+{# Type picker: shown when no ?type= param is present.  Each card links
+   to the same URL with ?type=<value> so the form renders with the Type
+   field pre-filled.  Deep links (?type=solo_practice) skip the picker
+   and land directly on the form. #}
+{{ picker([
+  {"href": entity_form_url('organization') + "?type=solo_practice",
+   "heading": "Solo practice",
+   "description": "Just you — a single clinician running their own practice."},
+  {"href": entity_form_url('organization') + "?type=group_practice",
+   "heading": "Group practice",
+   "description": "Multiple clinicians under one roof or brand."},
+  {"href": entity_form_url('organization') + "?type=clinic",
+   "heading": "Clinic, IOP, or inpatient program",
+   "description": "A facility offering structured or intensive programming."},
+  {"href": entity_form_url('organization') + "?type=health_system",
+   "heading": "Health system",
+   "description": "A network of clinics or hospitals."},
+  {"href": entity_form_url('organization') + "?type=other",
+   "heading": "Other",
+   "description": "Doesn't fit the above."},
+]) }}
+{% else %}
+{# Form: shown when ?type= is set (either via picker click or deep link).
+   The Type dropdown is pre-selected to the value from the query param. #}
 <form hx-post="{{ entity_url('organization') }}">
   <fieldset>
     <legend>Organization</legend>
     <div class="grid">
       {{ text_field("name", "Name", maxlength=200) }}
-      {{ select_field("type", "Type", ORGANIZATION_TYPES, labels=ORGANIZATION_TYPES_LABELS, placeholder=true) }}
+      {{ select_field("type", "Type", ORGANIZATION_TYPES, labels=ORGANIZATION_TYPES_LABELS, current=selected_type) }}
     </div>
     {# Parent-Org picker — replaces the free-text UUID input from #581.
        `parent_org_options` is populated by `organization_form_extras`
@@ -30,4 +67,5 @@
 
   {{ actions(entity_create_label('organization'), cancel_url=entity_url('organization')) }}
 </form>
+{% endif %}
 {% endblock %}

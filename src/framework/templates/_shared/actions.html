@@ -103,7 +103,7 @@ Examples:
 {%- endif %}
 {%- if cancel_url %}
 {%- if is_toolbar %}<li>{% endif -%}
-<a href="{{ cancel_url }}" role="button" class="secondary outline">Cancel</a>
+<a href="{{ cancel_url }}" role="button" class="secondary outline" data-cancel-btn>Cancel</a>
 {%- if is_toolbar %}</li>{% endif %}
 {%- endif %}
 {%- if delete_url and delete_confirm %}
@@ -111,7 +111,18 @@ Examples:
 <button type="button" class="secondary outline{% if not is_toolbar %} form-actions-destructive{% endif %}" hx-delete="{{ delete_url }}" hx-confirm="{{ delete_confirm }}">{{ delete_label }}</button>
 {%- if is_toolbar %}</li>{% endif %}
 {%- endif %}
-{%- if not is_toolbar %}</div>{% endif -%}
+{%- if not is_toolbar %}</div>
+{%- if cancel_url %}<script>
+(function(){
+  var form=document.querySelector('form');
+  if(!form)return;
+  form.addEventListener('input',function(){form.dataset.dirty='1';});
+  var btn=document.querySelector('[data-cancel-btn]');
+  if(btn)btn.addEventListener('click',function(e){
+    if(form.dataset.dirty&&!confirm('Discard changes?'))e.preventDefault();
+  });
+})();
+</script>{% endif %}{% endif -%}
 {%- endmacro %}
 
 {# Confirm-then-delete button. Renders an `hx-delete` button with an
