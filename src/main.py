@@ -2,7 +2,7 @@ import logging
 from contextlib import asynccontextmanager
 from datetime import datetime
 
-from fastapi import FastAPI, HTTPException, Request, status
+from fastapi import Depends, FastAPI, HTTPException, Request, status
 from fastapi.responses import JSONResponse, RedirectResponse
 
 from src.auth_config import auth_backend, fastapi_users
@@ -14,6 +14,7 @@ from src.domain.routes import auth_pages, auth_routes, dev_auth, verifications
 from src.framework.config import settings
 from src.framework.dispatch.registry import entity_registry
 from src.framework.http.middleware import StripEmptyQueryParamsMiddleware
+from src.framework.http.responses import APIResponse
 from src.jobs.scheduler import make_scheduler, register_jobs
 
 logging.basicConfig(level=logging.INFO)
@@ -86,15 +87,22 @@ async def unauthorized_exception_handler(request: Request, exc: HTTPException):
     return JSONResponse(status_code=exc.status_code, content={"detail": exc.detail})
 
 
+_optional_current_user = fastapi_users.current_user(optional=True)
+
+
 @app.get("/")
-def read_root():
-    # Home biases to the "find new clients" journey: `/referrals` is the
-    # list of clients other clinicians are looking to place — the surface
-    # a working clinician scans to fill their caseload. The mirror
-    # journey ("refer out") still has a top-level nav tab to `/openings`.
-    # Anonymous visitors landing on `/` redirect here; auth gating
-    # happens at the route, not at root.
-    return RedirectResponse(url="/referrals", status_code=302)
+async def read_root(request: Request, user=Depends(_optional_current_user)):
+    # Authenticated users land on `/referrals` — the "find new clients"
+    # home (see `src/auth_config.py:on_after_login` for the same bias).
+    # Anonymous visitors see the public landing page instead of being
+    # redirected to the login wall.
+    if user is not None:
+        return RedirectResponse(url="/referrals", status_code=302)
+    return APIResponse.html_response(
+        template_name="landing.html",
+        context={},
+        request=request,
+    )
 
 
 app.include_router(
