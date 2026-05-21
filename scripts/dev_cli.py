@@ -540,6 +540,172 @@ class PlaywrightCommands:
         return 0
 
 
+class WorktreeCommands:
+    """`dev worktree {add,list,gc}` — issue-named worktrees plus GC of
+    merged ones.
+
+    Background: multi-agent sessions share `/home/user/bedlam-connect`,
+    so the project's convention is one git worktree per task under
+    `.claude/worktrees/`. The harness's `EnterWorktree` tool used to
+    name them by agent UUID, which made `ls .claude/worktrees/` unreadable
+    and let stale worktrees accumulate after their branch merged. See
+    #744 for the friction this addresses."""
+
+    WORKTREES_DIR = ".claude/worktrees"
+
+    def __init__(self, runner: CLIRunner) -> None:
+        self.runner = runner
+
+    def _slugify(self, text: str) -> str:
+        # ASCII slug: lowercase, hyphen-separated, no leading/trailing dashes.
+        # Limited to alnum + hyphen so it's always a valid directory and
+        # branch name.
+        out = []
+        prev_dash = False
+        for ch in text.lower():
+            if ch.isalnum():
+                out.append(ch)
+                prev_dash = False
+            elif not prev_dash:
+                out.append("-")
+                prev_dash = True
+        return "".join(out).strip("-")
+
+    def _worktrees_root(self) -> Path:
+        return self.runner.project_root / self.WORKTREES_DIR
+
+    def _run_git(self, args: List[str]) -> "subprocess.CompletedProcess":
+        return subprocess.run(
+            ["git", *args],
+            capture_output=True,
+            text=True,
+            check=False,
+            cwd=self.runner.project_root,
+        )
+
+    def add(self, name: str, base: str = "origin/main") -> int:
+        # Refuse to create a worktree whose name looks like an opaque UUID
+        # — the whole point is human-readable, issue-shaped names.
+        if self._looks_like_uuid(name):
+            print(
+                f"❌ Refusing to create worktree with opaque name '{name}'. "
+                "Use an issue-shaped name like `issue-707-verification-badge` "
+                "or `707` (which expands to `issue-707`)."
+            )
+            return 2
+
+        slug = self._slugify(name)
+        if slug.isdigit():
+            slug = f"issue-{slug}"
+        path = self._worktrees_root() / slug
+        if path.exists():
+            print(f"❌ Worktree path already exists: {path}")
+            return 1
+
+        branch = f"fix/{slug}" if not slug.startswith("issue-") else f"fix/{slug[6:]}"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        print(f"📂 Creating worktree at {path} on branch {branch} (base: {base})")
+        result = self._run_git(["worktree", "add", str(path), "-b", branch, base])
+        if result.returncode != 0:
+            print(result.stderr.rstrip())
+            return result.returncode
+        print(f"✅ Worktree ready: {path}")
+        print(f"   Branch: {branch}")
+        return 0
+
+    def _looks_like_uuid(self, name: str) -> bool:
+        # Heuristic: 6+ consecutive hex chars and no human-meaningful
+        # words. Catches `a3f9c2`-style agent IDs without rejecting
+        # `issue-707-...`. Worktrees that already include `issue-` or any
+        # alpha-rich slug are fine.
+        if "issue-" in name or "fix-" in name:
+            return False
+        hex_chars = sum(1 for c in name if c in "0123456789abcdefABCDEF")
+        return hex_chars >= 6 and hex_chars / max(len(name), 1) > 0.6
+
+    def list_(self) -> int:
+        result = self._run_git(["worktree", "list", "--porcelain"])
+        if result.returncode != 0:
+            print(result.stderr.rstrip())
+            return result.returncode
+        print(result.stdout.rstrip())
+        return 0
+
+    def gc(self, assume_yes: bool = False) -> int:
+        # Remove worktrees whose branches are fully merged into
+        # origin/main (or whose branches no longer exist).
+        # `git branch --merged` prefixes the current branch with `*` and
+        # worktree-checked-out branches with `+`. Strip both, then drop
+        # any entry that points at a remote ref (`origin/main` etc.) so
+        # GC only ever considers local branches we created.
+        merged_branches: set = set()
+        for raw in self._run_git(
+            ["branch", "--merged", "origin/main"]
+        ).stdout.splitlines():
+            cleaned = raw.strip().lstrip("*+").strip()
+            if (
+                not cleaned
+                or "/" in cleaned.split()[0]
+                and cleaned.startswith("origin/")
+            ):
+                continue
+            merged_branches.add(cleaned)
+
+        candidates: List[tuple] = []
+        for entry in self._parse_worktree_list():
+            path = entry.get("worktree")
+            branch = entry.get("branch", "")
+            if path is None:
+                continue
+            # Refuse to GC the main checkout no matter what.
+            if Path(path).resolve() == self.runner.project_root.resolve():
+                continue
+            if self.WORKTREES_DIR not in path:
+                continue
+            short = branch.removeprefix("refs/heads/")
+            if short in merged_branches or not short:
+                candidates.append((path, short))
+
+        if not candidates:
+            print("✅ No merged worktrees to remove.")
+            return 0
+
+        print("The following worktrees will be removed (their branches are merged):")
+        for path, branch in candidates:
+            print(f"  {path}  ({branch or '<no branch>'})")
+
+        if not assume_yes:
+            print("Pass --yes to confirm.")
+            return 0
+
+        for path, branch in candidates:
+            print(f"🧹 Removing {path}")
+            rm = self._run_git(["worktree", "remove", "--force", path])
+            if rm.returncode != 0:
+                print(rm.stderr.rstrip())
+                continue
+            if branch:
+                self._run_git(["branch", "-D", branch])
+        print("✅ GC complete.")
+        return 0
+
+    def _parse_worktree_list(self) -> List[dict]:
+        result = self._run_git(["worktree", "list", "--porcelain"])
+        entries: List[dict] = []
+        current: dict = {}
+        for raw in result.stdout.splitlines():
+            if not raw.strip():
+                if current:
+                    entries.append(current)
+                    current = {}
+                continue
+            key, _, value = raw.partition(" ")
+            current[key] = value
+        if current:
+            entries.append(current)
+        return entries
+
+
 class SetupCommands:
     def __init__(self, runner: CLIRunner):
         self.runner = runner
@@ -594,6 +760,7 @@ class DevCLI:
         self.promote_admin_cmd = PromoteAdminCommands(self.runner)
         self.migrate_cmd = MigrateCommands(self.runner)
         self.playwright_cmd = PlaywrightCommands(self.runner)
+        self.worktree_cmd = WorktreeCommands(self.runner)
 
     def create_parser(self) -> argparse.ArgumentParser:
         """Create the argument parser with all commands."""
@@ -630,6 +797,7 @@ Examples:
         self._add_promote_admin_parser(subparsers)
         self._add_migrate_parser(subparsers)
         self._add_playwright_setup_parser(subparsers)
+        self._add_worktree_parser(subparsers)
 
         return parser
 
@@ -884,6 +1052,56 @@ Examples:
             help="Override scratch DB path (default /tmp/bedlam-migrate-roundtrip.db)",
         )
         rt.set_defaults(func=lambda args: self.migrate_cmd.roundtrip(args.scratch))
+
+        def _print_help(_args):
+            parser.print_help()
+            return 1
+
+        parser.set_defaults(func=_print_help)
+
+    def _add_worktree_parser(self, subparsers):
+        parser = subparsers.add_parser(
+            "worktree",
+            help="Manage per-task git worktrees under .claude/worktrees/",
+            description=(
+                "Multi-agent sessions share one working tree; the project's "
+                "convention is one git worktree per task. `dev worktree add "
+                "<N>` creates `.claude/worktrees/issue-<N>-<slug>` off a "
+                "fresh origin/main and refuses opaque UUID names. `dev "
+                "worktree gc` removes worktrees whose branches are merged. "
+                "See #744."
+            ),
+        )
+        sub = parser.add_subparsers(dest="worktree_command")
+
+        add = sub.add_parser("add", help="Create a worktree for an issue")
+        add.add_argument(
+            "name",
+            help=(
+                "Issue number (e.g. 707) or descriptive name "
+                "(e.g. issue-707-verification-badge)"
+            ),
+        )
+        add.add_argument(
+            "--base",
+            default="origin/main",
+            help="Base ref for the new branch (default: origin/main)",
+        )
+        add.set_defaults(func=lambda args: self.worktree_cmd.add(args.name, args.base))
+
+        ls = sub.add_parser("list", help="List all worktrees")
+        ls.set_defaults(func=lambda args: self.worktree_cmd.list_())
+
+        gc = sub.add_parser(
+            "gc",
+            help="Remove worktrees whose branches are merged into origin/main",
+        )
+        gc.add_argument(
+            "--yes",
+            action="store_true",
+            help="Confirm removal (without this, gc only previews)",
+        )
+        gc.set_defaults(func=lambda args: self.worktree_cmd.gc(args.yes))
 
         def _print_help(_args):
             parser.print_help()
