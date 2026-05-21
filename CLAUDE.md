@@ -17,6 +17,8 @@ If a relevant README or test file doesn't exist yet, **create it as part of the 
 
 A Stop hook checks the diff at end-of-turn and surfaces a reminder when source files change without their README/test. The hook is a soft prompt, not a hard block — but ignoring it should be a deliberate decision (e.g. typo fix, log message tweak), not an oversight.
 
+A SessionStart hook prints the real current branch, dirty state, and stash list at session start — and warns loudly if you've landed on `main`/`master` in the shared working tree. Multi-agent sessions in this repo share one working directory; trust the hook's output over any harness-provided "current branch" line. See [`scripts/README.md`](scripts/README.md) for both hooks.
+
 **Contract tests are not run by default.** `tests/test_contract` is excluded from the default `dev test` collection (see [`tests/test_contract/README.md`](tests/test_contract/README.md)). If you change templates, route response shapes, or anything mock data factories in `tests/test_contract` assume, also run `dev test contract` before pushing — otherwise CI is the first place the breakage surfaces.
 
 ## One source of truth — link, don't copy
