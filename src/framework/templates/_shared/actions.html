@@ -103,7 +103,12 @@ Examples:
 {%- endif %}
 {%- if cancel_url %}
 {%- if is_toolbar %}<li>{% endif -%}
-<a href="{{ cancel_url }}" role="button" class="secondary outline">Cancel</a>
+{#- `data-cancel-link` is the hook the dirty-form confirm script in
+    `base.html` reads. If the click's nearest `<form>` ancestor has
+    `data-dirty="1"` (the script marks it on the first `input` event),
+    Cancel prompts "Discard changes?" before navigating. Untouched
+    forms skip the prompt — same instant-navigate behavior. -#}
+<a href="{{ cancel_url }}" role="button" class="secondary outline" data-cancel-link>Cancel</a>
 {%- if is_toolbar %}</li>{% endif %}
 {%- endif %}
 {%- if delete_url and delete_confirm %}

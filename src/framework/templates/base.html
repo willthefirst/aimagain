@@ -584,6 +584,28 @@
        `dist/ext/json-enc.js` is the htmx-1 build and logs a "v1 extension
        with htmx 2" console warning. Use the htmx-2 package instead. #}
     <script src="https://unpkg.com/htmx-ext-json-enc@2.0.2/json-enc.js"></script>
+    {# Dirty-form Cancel confirm — `_shared/actions.html` marks the
+       Cancel link with `data-cancel-link`. Any `input` event inside a
+       `<form>` marks the form `data-dirty="1"`; clicking Cancel on a
+       dirty form prompts before navigating. Untouched forms skip the
+       prompt. Document-scoped listeners survive HTMX swaps (no
+       per-mount rebinding needed). #}
+    <script>
+      document.addEventListener("input", (e) => {
+        const form = e.target.closest("form");
+        if (form) form.dataset.dirty = "1";
+      });
+      document.addEventListener("click", (e) => {
+        const cancel = e.target.closest("a[data-cancel-link]");
+        if (!cancel) return;
+        const form = cancel.closest("form");
+        if (form && form.dataset.dirty === "1") {
+          if (!confirm("Discard changes?")) {
+            e.preventDefault();
+          }
+        }
+      });
+    </script>
     {% block head %}{% endblock %} {% if is_development %}
     <!-- LiveReload script for development hot reloading -->
     <script>

@@ -408,6 +408,66 @@ def test_actions_macro_supports_cancel_only_for_page_level_clusters() -> None:
     assert cancel.attributes.get("href") == "/widgets/1"
 
 
+def test_cancel_link_carries_dirty_form_confirm_hook() -> None:
+    """Cancel links from the `actions` macro must carry
+    `data-cancel-link` — the hook the dirty-form confirm script in
+    `base.html` reads. The script marks forms as `data-dirty="1"` on
+    any `input` event and prompts "Discard changes?" when Cancel is
+    clicked on a dirty form. Without the attribute the prompt never
+    fires and users silently lose in-progress work (#703)."""
+    env = _make_env()
+    _add_child(
+        env,
+        "stub.html",
+        """
+        {% from "_shared/actions.html" import actions %}
+        <form>
+          {{ actions("Save", cancel_url="/widgets/1") }}
+        </form>
+        """,
+    )
+    html = env.get_template("stub.html").render()
+    tree = HTMLParser(html)
+    cancel = tree.css_first("a[role='button']")
+    assert cancel is not None
+    assert "data-cancel-link" in cancel.attributes, (
+        "Cancel link must carry data-cancel-link so the dirty-form "
+        "confirm script in base.html can intercept the click"
+    )
+
+
+def test_base_html_loads_dirty_form_confirm_script() -> None:
+    """The dirty-form confirm script lives in `base.html` so every
+    page that uses the `actions` macro's Cancel link gets the prompt
+    automatically. Pinned by string presence; the live behavior is
+    exercised in browsers (and could move to a Playwright contract
+    test if confirm-dialog interception becomes load-bearing). #703."""
+    env = _make_env()
+    _add_child(
+        env,
+        "stub.html",
+        """
+        {% extends "views/list.html" %}
+        {% block resource_label %}Stub{% endblock %}
+        {% block content %}body{% endblock %}
+        """,
+    )
+    html = env.get_template("stub.html").render(
+        request=_request_stub(),
+        is_authenticated=False,
+        is_development=False,
+    )
+    # The form-dirty event listener.
+    assert (
+        'form.dataset.dirty = "1"' in html
+    ), "missing dirty-form input listener in base.html"
+    # The cancel-link interception.
+    assert (
+        "a[data-cancel-link]" in html
+    ), "missing cancel-link click interception in base.html"
+    assert '"Discard changes?"' in html, "missing confirm prompt text in base.html"
+
+
 def test_no_template_uses_danger_class() -> None:
     """The custom `.danger` button class was removed when its Pico-token
     overrides weren't taking effect. Guard against re-introducing
