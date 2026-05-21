@@ -33,7 +33,24 @@
 
   <fieldset>
     <legend>Practice</legend>
+    {# Solo-practice toggle (#699): when checked, the create handler
+       auto-creates a solo-practice Org from the clinician's name so
+       the user doesn't have to visit /organizations/form first. The
+       inline script hides/shows the Org picker and marks it
+       required/not-required to match. #}
+    <label class="form-field" for="solo_practice">
+      <span class="form-field-label">Solo practice?</span>
+      <input type="checkbox" id="solo_practice" name="solo_practice" value="true"
+             onchange="
+               var orgRow = document.getElementById('org-row');
+               var orgSel = orgRow.querySelector('select');
+               orgRow.hidden = this.checked;
+               orgSel.required = !this.checked;
+             " />
+    </label>
+    <div id="org-row">
     {{ entity_select_field("org_id", "Organization", orgs, help=org_picker_help()) }}
+    </div>
     <div class="grid">
       {{ field_for(schema, "location_city", "City") }}
       {{ field_for(schema, "location_state", "State") }}

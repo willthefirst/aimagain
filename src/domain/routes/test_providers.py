@@ -239,6 +239,47 @@ async def test_create_provider_allows_superuser_to_attach_to_any_org(
     assert response.status_code == 201
 
 
+async def test_create_provider_solo_practice_auto_creates_org(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user: User,
+):
+    """POST /clinicians with solo_practice=true auto-creates a solo-practice
+    Org named after the clinician — no separate /organizations/form step (#699)."""
+    from src.domain.models import Organization
+
+    response = await authenticated_client.post(
+        "/clinicians",
+        data={
+            "first_name": "Jane",
+            "last_name": "Smith",
+            "solo_practice": "true",
+            "location_city": "Austin",
+            "location_state": "TX",
+            "location_zip": "78701",
+            "in_person_sessions": "yes",
+            "virtual_sessions": "yes",
+        },
+    )
+    assert response.status_code == 201
+    new_id = uuid.UUID(response.json()["id"])
+
+    async with db_test_session_manager() as session:
+        result = await session.execute(select(Provider).filter(Provider.id == new_id))
+        persisted = result.scalars().first()
+        assert persisted is not None
+        assert persisted.org_id is not None
+
+        org_result = await session.execute(
+            select(Organization).filter(Organization.id == persisted.org_id)
+        )
+        auto_org = org_result.scalars().first()
+        assert auto_org is not None
+        assert auto_org.name == "Jane Smith"
+        assert auto_org.type == "solo_practice"
+        assert auto_org.owner_id == logged_in_user.id
+
+
 # --- Provider reads -------------------------------------------------------
 
 

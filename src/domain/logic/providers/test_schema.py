@@ -371,6 +371,33 @@ def test_provider_create_defaults_credential_lists_to_empty():
     assert p.certifications == []
 
 
+# --- Solo practice path (#699) ------------------------------------------
+
+
+def test_provider_create_requires_org_id_without_solo_practice():
+    """Without solo_practice=True, org_id is mandatory."""
+    with pytest.raises(ValidationError):
+        kwargs = _provider_create_kwargs()
+        del kwargs["org_id"]
+        ProviderCreate(**kwargs)
+
+
+def test_provider_create_allows_missing_org_id_when_solo_practice():
+    """solo_practice=True makes org_id optional at schema level."""
+    kwargs = _provider_create_kwargs()
+    del kwargs["org_id"]
+    p = ProviderCreate(**kwargs, solo_practice=True)
+    assert p.solo_practice is True
+    assert p.org_id is None
+
+
+def test_provider_create_solo_practice_excluded_from_model_dump():
+    """solo_practice must not appear in model_dump() since it's handler-only."""
+    p = ProviderCreate(**_provider_create_kwargs(), solo_practice=True)
+    dumped = p.model_dump()
+    assert "solo_practice" not in dumped
+
+
 # --- Read from nested dict ----------------------------------------------
 
 
