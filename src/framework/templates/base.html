@@ -652,18 +652,11 @@
         </ul>
         <ul id="primary-nav">
           {% if is_authenticated %}
-          {# Onboarding-only chrome CTA — first-time users (no provider
-             profile yet) see "Create clinician", which takes them to
-             `/clinicians/form` so they can unblock posting. Returning
-             users with a profile see no CTA in the nav: the page-level
-             "Create opening" / "Create referral" buttons on the
-             respective list views are the right surface for those
-             actions (one CTA per page, not duplicated in chrome).
-             `has_provider_profile` is a chrome scalar in
-             `src.framework.http.responses.base_context`. #}
-          {% if not has_provider_profile %}
-          <li><a role="button" href="{{ entity_form_url('clinician') }}">{{ entity_create_label('clinician') }}</a></li>
-          {% endif %}
+          {# No chrome-level CTA — onboarding nudges belong in dedicated
+             surfaces (`/users/me`, the `/openings` empty state, etc.),
+             not in chrome that follows the user across every page (see
+             issue #697). The right-side slot carries only the profile
+             link for authed users. #}
           <li>
             <a href="{{ entity_url('user', id='me') }}" aria-label="Profile"{% if _on_profile %} aria-current="page"{% endif %}>
               {# Lucide `user` icon, inlined. `currentColor` makes it
