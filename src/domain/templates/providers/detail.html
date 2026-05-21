@@ -22,7 +22,15 @@
    while the name backfill is in progress. #}
 {% block current_label %}{% if provider.first_name and provider.last_name %}{{ provider.first_name }} {{ provider.last_name }}{% else %}{{ provider.org.name }}{% endif %}{% endblock %}
 {# title-case-ignore: NPI is an industry abbreviation (National Provider Identifier) #}
-{% block subtitle %}{% if view.npi %}<span>NPI {{ view.npi }}</span>{% endif %}{% endblock %}
+{% block subtitle %}{% if view.npi %}<span>NPI {{ view.npi }}</span>{% endif %}
+{%- if verification_status == "verified" %}
+<small><i class="icon-shield-check"></i>Verified</small>
+{%- elif verification_status == "needs_review" %}
+<small><i class="icon-shield-alert"></i>Needs review</small>
+{%- elif verification_status == "failed" %}
+<small><i class="icon-shield-x"></i>Verification failed</small>
+{%- endif %}
+{% endblock %}
 
 {% block actions %}
 {# Primary resource actions (Favorite toggle, Edit, Delete) live in

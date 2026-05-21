@@ -28,6 +28,7 @@ from src.domain.logic.providers.schema import (
     ProviderLicensureCreate,
 )
 from src.domain.logic.users.repository import UserRepository
+from src.domain.logic.verifications.repository import VerificationRepository
 from src.domain.models import (
     Provider,
     ProviderLicensure,
@@ -244,7 +245,10 @@ async def test_get_provider_detail_returns_context(
             repo=ProviderRepository(session),
             requesting_user=user,
             extras=provider_detail_extras,
-            extra_kwargs={"user_favorite_repo": UserFavoriteRepository(session)},
+            extra_kwargs={
+                "user_favorite_repo": UserFavoriteRepository(session),
+                "verification_repo": VerificationRepository(session),
+            },
         )
         # Framework binds `context[spec.name] = target`; the spec name
         # flipped to "clinician" in #642 PR 4. The underlying row is
@@ -259,6 +263,8 @@ async def test_get_provider_detail_returns_context(
         # `is_favorited` is a per-viewer derived field; the owner here
         # has not favorited their own provider.
         assert context["is_favorited"] is False
+        # No verification run yet → None (#707).
+        assert context["verification_status"] is None
 
 
 async def test_get_provider_detail_404_for_unknown_id(
@@ -274,7 +280,10 @@ async def test_get_provider_detail_404_for_unknown_id(
                 repo=ProviderRepository(session),
                 requesting_user=user,
                 extras=provider_detail_extras,
-                extra_kwargs={"user_favorite_repo": UserFavoriteRepository(session)},
+                extra_kwargs={
+                    "user_favorite_repo": UserFavoriteRepository(session),
+                    "verification_repo": VerificationRepository(session),
+                },
             )
 
 
@@ -299,7 +308,10 @@ async def test_get_provider_detail_is_favorited_true_when_self_favorited(
             repo=ProviderRepository(session),
             requesting_user=user,
             extras=provider_detail_extras,
-            extra_kwargs={"user_favorite_repo": UserFavoriteRepository(session)},
+            extra_kwargs={
+                "user_favorite_repo": UserFavoriteRepository(session),
+                "verification_repo": VerificationRepository(session),
+            },
         )
         assert context["is_favorited"] is True
 
@@ -322,7 +334,10 @@ async def test_get_provider_detail_is_favorited_false_for_anonymous_viewer(
             repo=ProviderRepository(session),
             requesting_user=None,
             extras=provider_detail_extras,
-            extra_kwargs={"user_favorite_repo": UserFavoriteRepository(session)},
+            extra_kwargs={
+                "user_favorite_repo": UserFavoriteRepository(session),
+                "verification_repo": VerificationRepository(session),
+            },
         )
         assert context["is_favorited"] is False
 
