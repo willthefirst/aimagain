@@ -3,8 +3,6 @@
 {%- from "_shared/form_copy.html" import org_picker_help -%}
 {%- from "_shared/actions.html" import actions -%}
 
-{% set resource_url = entity_url('program') %}
-{% set resource_detail_url = entity_url('program', id=program.id) %}
 
 {% block resource_label %}Programs{% endblock %}
 {% block current_label %}{{ program.name }}{% endblock %}

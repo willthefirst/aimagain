@@ -1,8 +1,6 @@
 {% extends "views/form_edit.html" %}
 {% from "posts/openings/_form_clinician_opening.html" import opening_form %}
 
-{% set resource_url = entity_url('opening') %}
-{% set resource_detail_url = entity_url('opening', id=opening.id) %}
 {# `view.headline` is the same identity string the detail page's H1
    renders ("Will's Org, NY" for an opening). Reusing it here pins the
    edit-page breadcrumb / H1 to the *specific* post being edited

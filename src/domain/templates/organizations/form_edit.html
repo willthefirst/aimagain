@@ -2,8 +2,6 @@
 {%- from "_shared/form_fields.html" import entity_select_field, select_field, text_field -%}
 {%- from "_shared/actions.html" import actions -%}
 
-{% set resource_url = entity_url('organization') %}
-{% set resource_detail_url = entity_url('organization', id=organization.id) %}
 
 {% block resource_label %}Organizations{% endblock %}
 {% block current_label %}{{ organization.name }}{% endblock %}

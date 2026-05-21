@@ -1,8 +1,6 @@
 {% extends "views/form_edit.html" %}
 {% from "posts/openings/_form_program_intake.html" import intake_form %}
 
-{% set resource_url = entity_url('opening') %}
-{% set resource_detail_url = entity_url('opening', id=opening.id) %}
 {# `view.headline` for an intake is the program name — same identity
    the detail page renders. See `edit_clinician_opening.html` for the
    `post_card_view` rationale. #}
