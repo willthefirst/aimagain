@@ -5,7 +5,7 @@ from fastapi_users import models
 from fastapi_users.manager import BaseUserManager
 from fastapi_users.router.common import ErrorCode, ErrorModel
 
-from src.auth_config import get_user_manager
+from src.auth_config import auth_backend, get_strategy, get_user_manager
 from src.domain.logic.auth.handlers import handle_registration
 from src.domain.logic.users.schema import UserCreate, UserRead
 from src.framework import BaseRouter
@@ -73,10 +73,19 @@ async def register_request_handler(
     audit_repo: AuditRepository = Depends(get_audit_repository),
 ):
     logger.debug(f"Handling registration for email: {request_data.email}")
-    result = await handle_registration(
+    created_user = await handle_registration(
         request_data=request_data,
         request=request,
         user_manager=user_manager,
         audit_repo=audit_repo,
     )
-    return result
+
+    if request.headers.get("HX-Request") == "true":
+        # HTMX submit: auto-login and redirect instead of returning raw JSON.
+        # Mirrors the pattern in src/domain/routes/dev_auth.py.
+        login_response = await auth_backend.login(get_strategy(), created_user)
+        login_response.status_code = 200
+        login_response.headers["HX-Redirect"] = "/users/me"
+        return login_response
+
+    return created_user
