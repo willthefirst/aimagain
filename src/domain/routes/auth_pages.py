@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Request
+from fastapi.responses import Response
 
 from src.framework import APIResponse, BaseRouter
 
@@ -30,10 +31,13 @@ async def get_login_page(request: Request):
     Returns:
         TemplateResponse: The rendered HTML page.
     """
-    # Extract the 'next' parameter from query string for redirect after login
     next_url = request.query_params.get("next", "")
+    # Show a contextual message when arriving from the registration flow
+    just_registered = request.query_params.get("registered") == "1"
     return APIResponse.html_response(
-        template_name="auth/login.html", context={"next_url": next_url}, request=request
+        template_name="auth/login.html",
+        context={"next_url": next_url, "just_registered": just_registered},
+        request=request,
     )
 
 
@@ -69,3 +73,17 @@ async def get_reset_password_page(request: Request, token: str):
         context={"token": token},
         request=request,
     )
+
+
+@router.post("/sign-out", name="auth_pages:sign_out")
+async def post_sign_out(request: Request):
+    """Clear the session cookie and redirect to the login page (#702).
+
+    Deletes the `fastapiusersauth` cookie (CookieTransport default name)
+    and sends `HX-Redirect` so HTMX does a full navigation — the chrome
+    immediately reflects the anonymous state without a stale header.
+    """
+    response = Response(status_code=200)
+    response.delete_cookie("fastapiusersauth")
+    response.headers["HX-Redirect"] = "/auth/login"
+    return response

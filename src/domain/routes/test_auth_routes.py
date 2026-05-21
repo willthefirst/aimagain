@@ -44,6 +44,27 @@ async def test_register(
         assert created_user.email == email_to_test
 
 
+async def test_register_via_htmx_sets_cookie_and_redirects(test_client: AsyncClient):
+    """HTMX register should auto-login (cookie) and redirect, not return JSON."""
+    payload = {
+        "email": "htmx@example.com",
+        "username": "htmxuser",
+        "password": "Password123!",
+    }
+    response = await test_client.post(
+        "/auth/register",
+        json=payload,
+        headers={"HX-Request": "true", "Content-Type": "application/json"},
+    )
+    assert response.status_code == 200
+    assert response.headers.get("HX-Redirect") == "/users/me"
+    # A session cookie must be set so the redirect lands authenticated.
+    assert (
+        "fastapiusersauth" in response.cookies
+        or "set-cookie" in str(response.headers).lower()
+    )
+
+
 async def test_register_duplicate_email(test_client: AsyncClient, logged_in_user: User):
     register_data = {
         "email": logged_in_user.email,
@@ -106,6 +127,20 @@ async def test_logout_success(authenticated_client: AsyncClient):
     assert me_response_after.text == user_email_html
 
 
+async def test_authenticated_page_has_sign_out_affordance(
+    authenticated_client: AsyncClient,
+):
+    """Any authenticated page must expose the sign-out endpoint in the
+    header chrome so the user can end their session within 2 clicks.
+    The logout form targets POST /auth/jwt/logout — assert it is present
+    on the profile page (a representative authenticated response)."""
+    response = await authenticated_client.get(
+        "/users/me", headers={"Accept": "text/html"}
+    )
+    assert response.status_code == 200
+    assert 'action="/auth/sign-out"' in response.text
+
+
 async def test_forgot_password_request(test_client: AsyncClient, logged_in_user: User):
     response = await test_client.post(
         "/auth/forgot-password", json={"email": logged_in_user.email}
@@ -162,6 +197,11 @@ async def test_get_register_page(test_client: AsyncClient):
     # so it doesn't stretch to the `<main class="container">` width on
     # tablet/desktop (#584). The `.auth-page` rule lives in `base.html`.
     assert '<article class="auth-page">' in response.text
+    # Subtitle must use plain language a first-time visitor can parse —
+    # no bare model-jargon list ("openings, referrals, and intakes")
+    # before any value framing (#694).
+    assert "openings, referrals, and intakes" not in response.text
+    assert "clinician profile" in response.text
 
 
 async def test_get_login_page(test_client: AsyncClient):
@@ -172,8 +212,35 @@ async def test_get_login_page(test_client: AsyncClient):
     # noun "Login"). See `test_get_register_page` for the H1 pin
     # rationale.
     assert "Log in" in response.text
+    # Default subtitle must not assume a returning user (#693).
+    assert "Welcome back" not in response.text
+    assert "referrals" not in response.text
+    assert "Sign in to your Bedlam Connect account" in response.text
     # See `test_get_register_page` for `.auth-page` rationale (#584).
     assert '<article class="auth-page">' in response.text
+    # Default subtitle must not assume a returning user (#693).
+    assert "Welcome back" not in response.text
+    # Default subtitle must not contain bare jargon without context (#693).
+    assert "referrals" not in response.text
+    assert "Sign in to your Bedlam Connect account" in response.text
+
+
+async def test_get_login_page_post_register_banner(test_client: AsyncClient):
+    """?registered=1 shows a confirmation banner instead of the default subtitle."""
+    response = await test_client.get("/auth/login?registered=1")
+    assert response.status_code == 200
+    assert "Account created" in response.text
+    assert "Sign in to your Bedlam Connect account." not in response.text
+
+
+async def test_get_login_page_just_registered(test_client: AsyncClient):
+    """GET /auth/login?registered=1 shows the post-registration banner (#693)."""
+    response = await test_client.get("/auth/login?registered=1")
+    assert response.status_code == 200
+    assert "text/html" in response.headers["content-type"]
+    assert "Account created" in response.text
+    # Default subtitle is replaced by the contextual message.
+    assert "Sign in to your Bedlam Connect account" not in response.text
 
 
 async def test_get_forgot_password_page(test_client: AsyncClient):

@@ -36,11 +36,15 @@ async def test_base_template_renders_primary_nav_when_authenticated(
 
     assert response.status_code == 200
     tree = HTMLParser(response.text)
-    profile_items = tree.css("#primary-nav > li > a")
-    profile_hrefs = {a.attributes.get("href") for a in profile_items}
+    # CTA link is a direct `> li > a`; profile link is nested inside the
+    # sign-out dropdown so use a descendant selector for it (#702).
+    cta_items = tree.css("#primary-nav > li > a")
+    cta_hrefs = {a.attributes.get("href") for a in cta_items}
     # First-time user (no `Provider` row yet) — the CTA points at
     # `/clinicians/form` so they can unblock posting.
-    assert profile_hrefs == {"/clinicians/form", "/users/me"}
+    assert "/clinicians/form" in cta_hrefs
+    # Profile link lives inside the dropdown — descendant selector.
+    assert tree.css_first('#primary-nav a[href="/users/me"]') is not None
     section_items = tree.css('nav[aria-label="Primary"] > ul:first-of-type > li > a')
     section_hrefs = [a.attributes.get("href") for a in section_items]
     # Brand link is `<li><strong><a>` so the `> li > a` direct-child
@@ -642,8 +646,12 @@ async def test_primary_nav_marks_profile_active_on_users_me_subpaths(
     response = await authenticated_client.get("/users/me/favorites")
     assert response.status_code == 200
     tree = HTMLParser(response.text)
-    profile_link = tree.css_first('#primary-nav a[href="/users/me"]')
-    assert profile_link.attributes.get("aria-current") == "page"
+    # With the sign-out dropdown (#702), `aria-current` lives on the
+    # enclosing `<details>` element, not the inner profile link.
+    details = tree.css_first('#primary-nav details[aria-current="page"]')
+    assert (
+        details is not None
+    ), "expected details to carry aria-current=page on /users/me subpaths"
 
 
 # --- Activation endpoint -------------------------------------------------
