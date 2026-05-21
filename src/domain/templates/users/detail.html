@@ -56,6 +56,32 @@
   {% endif %}
 </article>
 
+{# Onboarding checklist — visible only to the user viewing their own
+   profile. Shows status-based CTAs: create a clinician profile first,
+   then post an opening. Other users' profiles (/users/{id}) are
+   unchanged — they keep the Clinicians card below without this section. #}
+{% if is_self %}
+<article class="entity-card">
+  <header class="entity-header">
+    <strong>Getting started</strong>
+  </header>
+  <ul>
+    <li>
+      {% if providers %}
+      &#10003; <a href="{{ entity_url('clinician', id=providers[0].id) }}">Your clinician profile</a>
+      {% else %}
+      <a href="{{ entity_form_url('clinician') }}" role="button">Create your clinician profile</a>
+      {% endif %}
+    </li>
+    {% if providers %}
+    <li>
+      <a href="{{ entity_form_url('opening') }}" role="button" class="outline">Post an opening</a>
+    </li>
+    {% endif %}
+  </ul>
+</article>
+{% endif %}
+
 <article class="entity-card">
   <header class="entity-header">
     <strong>Clinicians</strong>
