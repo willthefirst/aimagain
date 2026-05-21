@@ -44,8 +44,8 @@
   <fieldset>
     <legend>Session availability</legend>
     <div class="grid">
-      {{ field_for(schema, "in_person_sessions", "In-person sessions") }}
-      {{ field_for(schema, "virtual_sessions", "Virtual sessions") }}
+      {{ field_for(schema, "in_person_sessions", "In-person sessions", current="yes") }}
+      {{ field_for(schema, "virtual_sessions", "Virtual sessions", current="yes") }}
     </div>
   </fieldset>
 

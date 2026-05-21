@@ -267,9 +267,10 @@ async def test_get_provider_renders_detail_page(
     tree = HTMLParser(response.text)
     # Licensure section renders the seeded row.
     assert "L-99999" in response.text
-    # Owner sees an Edit link, no edit forms (read-only).
+    # Owner sees an Edit link, no edit forms (read-only) in the page body.
+    # (The header contains the sign-out form — limit to main content only.)
     assert tree.css_first(f'a[href="/clinicians/{provider_id}/form"]') is not None
-    assert tree.css_first("form") is None
+    assert tree.css_first("main form") is None
     # Regression for #594 — the practice name lives in the header
     # `<strong>` only. The facts list relabels its row "Organization"
     # so the same string is not repeated under a "Practice name" `<dt>`.
@@ -1279,7 +1280,9 @@ async def test_get_provider_form_renders(
     response = await authenticated_client.get("/clinicians/form")
     assert response.status_code == 200
     tree = HTMLParser(response.text)
-    form = tree.css_first("form")
+    # The sign-out nav dropdown adds a <form> in the header; target the
+    # main-content form specifically.
+    form = tree.css_first("main form")
     assert form is not None
     assert form.attributes.get("hx-post") == "/clinicians"
     # Org-picker dropdown — replaces the old free-text practice_name input.
@@ -1302,13 +1305,24 @@ async def test_get_provider_form_renders(
     assert state_select is not None
     state_options = state_select.css("option")
     assert len(state_options) == 52  # 51 + placeholder
-    # Availability selects with three real options + placeholder.
+    # Availability selects default to "yes" on create (#701); no placeholder.
     in_person = tree.css_first('select[name="in_person_sessions"]')
     virtual = tree.css_first('select[name="virtual_sessions"]')
     assert in_person is not None
     assert virtual is not None
-    assert len(in_person.css("option")) == 4
-    assert len(virtual.css("option")) == 4
+    assert len(in_person.css("option")) == 3
+    assert len(virtual.css("option")) == 3
+    # Both session-availability dropdowns default to "yes" (#701).
+    in_person_selected = in_person.css_first("option[selected]")
+    virtual_selected = virtual.css_first("option[selected]")
+    assert (
+        in_person_selected is not None
+    ), "in_person_sessions should have a pre-selected option"
+    assert in_person_selected.attributes.get("value") == "yes"
+    assert (
+        virtual_selected is not None
+    ), "virtual_sessions should have a pre-selected option"
+    assert virtual_selected.attributes.get("value") == "yes"
     # Insurance & payment fieldset. The carrier multi-select speaks for
     # the in-network signal (empty = no in-network); only OON and
     # sliding-scale render as bool radios.
