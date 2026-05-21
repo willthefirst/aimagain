@@ -310,7 +310,9 @@ async def test_get_provider_renders_detail_page(
     # Licensure section renders the seeded row.
     assert "L-99999" in response.text
     # Owner sees an Edit link, no edit forms (read-only) in the page body.
-    # (The header contains the sign-out form — limit to main content only.)
+    # (The header dropdown link is not a form — scoping to main is still
+    #  the right approach for future-proofing, but the original reason no
+    #  longer applies.)
     assert tree.css_first(f'a[href="/clinicians/{provider_id}/form"]') is not None
     assert tree.css_first("main form") is None
     # Regression for #594 — the practice name lives in the header
@@ -1357,8 +1359,8 @@ async def test_get_provider_form_renders(
     response = await authenticated_client.get("/clinicians/form")
     assert response.status_code == 200
     tree = HTMLParser(response.text)
-    # The sign-out nav dropdown adds a <form> in the header; target the
-    # main-content form specifically.
+    # The header uses a link (`<a hx-post>`), not a form; targeting
+    # `main form` is still the right scope for the clinician create form.
     form = tree.css_first("main form")
     assert form is not None
     assert form.attributes.get("hx-post") == "/clinicians"
