@@ -6,6 +6,8 @@ This directory holds the project's developer CLI plus a handful of standalone sc
 
 `dev_cli.py` is the source of truth for `dev <command>`. It's installed as a console script via `pip install -e .` and auto-detects the current project root by walking up to `pyproject.toml`, so it operates on the worktree you're sitting in.
 
+Each worktree also runs under its own `docker compose` project name (derived from the project-root directory), so `dev up` / `dev seed` / `dev logs` in a worktree never collide with the main checkout. Export `COMPOSE_PROJECT_NAME` to override.
+
 Run `dev --help` for the command list and `dev <command> --help` for per-command details. Help strings are co-located with the argparse definitions in [`dev_cli.py`](dev_cli.py), so they cannot drift from the implementation.
 
 CLAUDE.md and other docs that want to mention a command link to `dev --help` rather than restating it.
