@@ -48,6 +48,7 @@ Reads from `view` (the `post_card_view` dict). Display-label dicts
 `REFERRAL_SERVICE_ICONS`, `TREATMENT_SETTINGS_LABELS`,
 `TREATMENT_SETTINGS_ICONS`) are Jinja globals. #}
 {%- from "_shared/icon_list.html" import icon_list -%}
+{%- from "_shared/sections.html" import fact -%}
 {% macro facts_block(view, expanded=False) -%}
 <section class="entity-facts">
   <dl>
@@ -70,49 +71,41 @@ Reads from `view` (the `post_card_view` dict). Display-label dicts
     {%- for s in view.settings -%}
       {%- set _ = _items.append({"icon": TREATMENT_SETTINGS_ICONS[s], "label": TREATMENT_SETTINGS_LABELS[s]}) -%}
     {%- endfor -%}
-    <div class="entity-services"><dt>{{ view.kind_verb }}</dt><dd>{{ icon_list(_items) }}</dd></div>
+    {%- call fact('services', view.kind_verb) %}{{ icon_list(_items) }}{% endcall %}
     {%- endif %}
     {%- if view.location_chunk and not expanded %}
     {#- Compact mode: "City, ST". Both referral and opening kinds
         populate `location_chunk` so the row renders identically on
         both cards. Expanded mode replaces this with the labeled
         "Address" row below (full street address). -#}
-    <div><dt>Location</dt><dd>
-      {%- if view.location_chunk.city -%}{{ view.location_chunk.city }}, {% endif -%}{{ view.location_chunk.state }}
-    </dd></div>
+    {%- call fact('location', 'Location') %}{% if view.location_chunk.city %}{{ view.location_chunk.city }}, {% endif %}{{ view.location_chunk.state }}{% endcall %}
     {%- endif %}
     {%- if view.ages and view.kind != "referral" %}
     {#- `opening` and `intake` describe a cohort the
         practice/program accepts — labeled `Ages` (plural). Referral
         skips this row because its age lives in the headline; the
         `expanded` block below repeats it for the detail page. -#}
-    <div><dt>Ages</dt><dd>
-      {%- set ages = [] -%}
-      {%- for g in view.ages -%}{%- set _ = ages.append(CLIENT_AGE_GROUP_LABELS[g]) -%}{%- endfor -%}
-      {{ ages | join(", ") }}
-    </dd></div>
+    {%- set ages = [] -%}
+    {%- for g in view.ages -%}{%- set _ = ages.append(CLIENT_AGE_GROUP_LABELS[g]) -%}{%- endfor -%}
+    {{ fact('ages', 'Ages', ages | join(", ")) }}
     {%- endif %}
     {%- if view.genders and (expanded or view.kind != "referral") %}
     {#- Compact mode hides CR gender (it's in the headline). Expanded
         mode shows it for every kind that has one. -#}
-    <div><dt>{% if view.kind == "referral" %}Gender{% else %}Genders{% endif %}</dt><dd>
-      {%- set gs = [] -%}
-      {%- for g in view.genders -%}{%- set _ = gs.append(GENDER_LABELS[g]) -%}{%- endfor -%}
-      {{ gs | join(", ") }}
-    </dd></div>
+    {%- set gs = [] -%}
+    {%- for g in view.genders -%}{%- set _ = gs.append(GENDER_LABELS[g]) -%}{%- endfor -%}
+    {{ fact('genders', 'Gender' if view.kind == 'referral' else 'Genders', gs | join(", ")) }}
     {%- endif %}
     {%- if view.languages and (expanded or not (view.languages | length == 1 and view.languages[0] == "en")) %}
-    <div><dt>Languages</dt><dd>
-      {%- set langs = [] -%}
-      {%- for l in view.languages -%}{%- set _ = langs.append(LANGUAGE_LABELS[l]) -%}{%- endfor -%}
-      {{ langs | join(", ") }}
-    </dd></div>
+    {%- set langs = [] -%}
+    {%- for l in view.languages -%}{%- set _ = langs.append(LANGUAGE_LABELS[l]) -%}{%- endfor -%}
+    {{ fact('languages', 'Languages', langs | join(", ")) }}
     {%- endif %}
     {%- if view.insurance_posture %}
-    <div><dt>Insurance</dt><dd>{{ INSURANCE_POSTURE_LABELS[view.insurance_posture] }}</dd></div>
+    {{ fact('insurance', 'Insurance', INSURANCE_POSTURE_LABELS[view.insurance_posture]) }}
     {%- endif %}
     {%- if view.treatment_modality %}
-    <div><dt>Modality</dt><dd>{{ view.treatment_modality }}</dd></div>
+    {{ fact('modality', 'Modality', view.treatment_modality) }}
     {%- endif %}
 
     {#- Detail-only rows below. The expanded set surfaces fields the
@@ -125,51 +118,47 @@ Reads from `view` (the `post_card_view` dict). Display-label dicts
           this. The detail page is detail-y enough to repeat it as a
           labeled row (singular `Age` — a referral describes one
           seeker). -#}
-      <div><dt>Age</dt><dd>
-        {%- set ages = [] -%}
-        {%- for g in view.ages -%}{%- set _ = ages.append(CLIENT_AGE_GROUP_LABELS[g]) -%}{%- endfor -%}
-        {{ ages | join(", ") }}
-      </dd></div>
+      {%- set ages = [] -%}
+      {%- for g in view.ages -%}{%- set _ = ages.append(CLIENT_AGE_GROUP_LABELS[g]) -%}{%- endfor -%}
+      {{ fact('age', 'Age', ages | join(", ")) }}
       {%- endif %}
       {%- if view.practice_link %}
-      <div><dt>Practice</dt><dd><a href="{{ entity_url('clinician', id=view.practice_link.id) }}">{{ view.practice_link.name }}</a></dd></div>
+      {%- call fact('practice', 'Practice') %}<a href="{{ entity_url('clinician', id=view.practice_link.id) }}">{{ view.practice_link.name }}</a>{% endcall %}
       {%- endif %}
       {%- if view.program_link %}
-      <div><dt>Program</dt><dd><a href="{{ entity_url('program', id=view.program_link.id) }}">{{ view.program_link.name }}</a></dd></div>
+      {%- call fact('program', 'Program') %}<a href="{{ entity_url('program', id=view.program_link.id) }}">{{ view.program_link.name }}</a>{% endcall %}
       {%- endif %}
       {%- if view.organization_link %}
-      <div><dt>Organization</dt><dd><a href="{{ entity_url('organization', id=view.organization_link.id) }}">{{ view.organization_link.name }}</a></dd></div>
+      {%- call fact('organization', 'Organization') %}<a href="{{ entity_url('organization', id=view.organization_link.id) }}">{{ view.organization_link.name }}</a>{% endcall %}
       {%- endif %}
       {%- if view.full_address %}
-      <div><dt>Address</dt><dd>{{ view.full_address }}</dd></div>
+      {{ fact('address', 'Address', view.full_address) }}
       {%- endif %}
       {%- if view.in_person is not none %}
-      <div><dt>In-person sessions</dt><dd>{{ LOCATION_AVAILABILITY_LABELS[view.in_person] }}</dd></div>
+      {{ fact('in_person_sessions', 'In-person sessions', LOCATION_AVAILABILITY_LABELS[view.in_person]) }}
       {%- endif %}
       {%- if view.virtual is not none %}
-      <div><dt>Virtual sessions</dt><dd>{{ LOCATION_AVAILABILITY_LABELS[view.virtual] }}</dd></div>
+      {{ fact('virtual_sessions', 'Virtual sessions', LOCATION_AVAILABILITY_LABELS[view.virtual]) }}
       {%- endif %}
       {%- if view.desired_times %}
-      <div><dt>Desired times</dt><dd>
-        {%- set times = [] -%}
-        {%- for slot in view.desired_times -%}{%- set _ = times.append(DESIRED_TIME_SLOT_LABELS[slot]) -%}{%- endfor -%}
-        {{ times | join(", ") }}
-      </dd></div>
+      {%- set times = [] -%}
+      {%- for slot in view.desired_times -%}{%- set _ = times.append(DESIRED_TIME_SLOT_LABELS[slot]) -%}{%- endfor -%}
+      {{ fact('desired_times', 'Desired times', times | join(", ")) }}
       {%- endif %}
       {%- if view.schedule_text %}
-      <div><dt>Schedule notes</dt><dd>{{ view.schedule_text }}</dd></div>
+      {{ fact('schedule_notes', 'Schedule notes', view.schedule_text) }}
       {%- endif %}
       {%- if view.network_preference %}
-      <div><dt>Network preference</dt><dd>{{ NETWORK_PREFERENCE_LABELS[view.network_preference] }}</dd></div>
+      {{ fact('network_preference', 'Network preference', NETWORK_PREFERENCE_LABELS[view.network_preference]) }}
       {%- endif %}
       {%- if view.insurance_carrier and view.network_preference and view.network_preference != "no_preference" %}
-      <div><dt>Insurance carrier</dt><dd>{{ INSURANCE_CARRIER_LABELS[view.insurance_carrier] }}</dd></div>
+      {{ fact('insurance_carrier', 'Insurance carrier', INSURANCE_CARRIER_LABELS[view.insurance_carrier]) }}
       {%- endif %}
       {%- if view.sliding_scale %}
-      <div><dt>Sliding scale</dt><dd>Yes</dd></div>
+      {{ fact('sliding_scale', 'Sliding scale', 'Yes') }}
       {%- endif %}
       {%- if view.cost %}
-      <div><dt>Cost</dt><dd>{{ view.cost }}</dd></div>
+      {{ fact('cost', 'Cost', view.cost) }}
       {%- endif %}
     {%- endif %}
   </dl>

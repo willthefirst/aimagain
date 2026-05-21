@@ -1,5 +1,6 @@
 {% extends "views/detail.html" %}
 {%- from "_shared/actions.html" import actions -%}
+{%- from "_shared/sections.html" import fact -%}
 {%- from "providers/_credential_row.html" import credential_row -%}
 
 {# The framework binds `context[spec.name] = target`; after #642 PR 4 the
@@ -104,14 +105,14 @@
   <section class="entity-facts">
     <dl>
       {%- if aff.full_address %}
-      <div><dt>Address</dt><dd>{{ aff.full_address }}</dd></div>
+      {{ fact('address', 'Address', aff.full_address) }}
       {%- endif %}
-      <div><dt>In-person sessions</dt><dd>{{ aff.in_person_label }}</dd></div>
-      <div><dt>Virtual sessions</dt><dd>{{ aff.virtual_label }}</dd></div>
-      <div><dt>Insurance</dt><dd>{{ aff.insurance_summary }}</dd></div>
-      <div><dt>Sliding scale</dt><dd>{{ aff.sliding_scale_label }}</dd></div>
+      {{ fact('in_person_sessions', 'In-person sessions', aff.in_person_label) }}
+      {{ fact('virtual_sessions', 'Virtual sessions', aff.virtual_label) }}
+      {{ fact('insurance', 'Insurance', aff.insurance_summary) }}
+      {{ fact('sliding_scale', 'Sliding scale', aff.sliding_scale_label) }}
       {%- if aff.cost %}
-      <div><dt>Cost</dt><dd>{{ aff.cost }}</dd></div>
+      {{ fact('cost', 'Cost', aff.cost) }}
       {%- endif %}
     </dl>
   </section>

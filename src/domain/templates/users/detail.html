@@ -1,5 +1,6 @@
 {% extends "views/detail.html" %}
 {%- from "_shared/_clinician_card.html" import clinician_card -%}
+{%- from "_shared/sections.html" import fact -%}
 
 
 {% block resource_label %}Users{% endblock %}
@@ -45,10 +46,10 @@
   {% if can_view_private %}
   <section class="entity-facts">
     <dl>
-      <div><dt>Email</dt><dd>{{ target_user.email }}</dd></div>
+      {{ fact('email', 'Email', target_user.email) }}
       {% if not is_self %}
-      <div><dt>Active</dt><dd>{{ "Yes" if target_user.is_active else "No" }}</dd></div>
-      <div><dt>Verified</dt><dd>{{ "Yes" if target_user.is_verified else "No" }}</dd></div>
+      {{ fact('active', 'Active', "Yes" if target_user.is_active else "No") }}
+      {{ fact('verified', 'Verified', "Yes" if target_user.is_verified else "No") }}
       {% endif %}
     </dl>
   </section>
