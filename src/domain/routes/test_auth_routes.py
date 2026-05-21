@@ -44,25 +44,41 @@ async def test_register(
         assert created_user.email == email_to_test
 
 
-async def test_register_via_htmx_sets_cookie_and_redirects(test_client: AsyncClient):
-    """HTMX register should auto-login (cookie) and redirect, not return JSON."""
-    payload = {
-        "email": "htmx@example.com",
-        "username": "htmxuser",
-        "password": "Password123!",
+async def test_register_htmx_auto_logs_in_and_redirects(test_client: AsyncClient):
+    """HTMX form submission auto-logs in and returns HX-Redirect (#695).
+
+    Non-HTMX clients keep the 201 JSON response; HTMX clients (HX-Request
+    header present) get a 200 with a session cookie and HX-Redirect header
+    so the browser navigates to /users/me without ever seeing raw JSON.
+    """
+    register_data = {
+        "email": "htmx-reg@example.com",
+        "password": "password123",
+        "username": "htmxreguser",
     }
     response = await test_client.post(
         "/auth/register",
-        json=payload,
-        headers={"HX-Request": "true", "Content-Type": "application/json"},
+        json=register_data,
+        headers={"HX-Request": "true"},
     )
     assert response.status_code == 200
     assert response.headers.get("HX-Redirect") == "/users/me"
-    # A session cookie must be set so the redirect lands authenticated.
-    assert (
-        "fastapiusersauth" in response.cookies
-        or "set-cookie" in str(response.headers).lower()
-    )
+    assert "fastapiusersauth" in response.headers.get("set-cookie", "")
+
+
+async def test_sign_out_clears_cookie_and_redirects(authenticated_client: AsyncClient):
+    """/auth/sign-out clears the session cookie and returns HX-Redirect (#702).
+
+    Must return 200 (not 302) so HTMX processes the headers, set Max-Age=0
+    on `fastapiusersauth` to expire the cookie, and include HX-Redirect to
+    /auth/login so the browser lands on the login page.
+    """
+    response = await authenticated_client.post("/auth/sign-out")
+    assert response.status_code == 200
+    assert response.headers.get("HX-Redirect") == "/auth/login"
+    set_cookie = response.headers.get("set-cookie", "")
+    assert "fastapiusersauth" in set_cookie
+    assert "max-age=0" in set_cookie.lower() or "expires=" in set_cookie.lower()
 
 
 async def test_register_duplicate_email(test_client: AsyncClient, logged_in_user: User):

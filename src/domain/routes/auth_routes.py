@@ -80,9 +80,9 @@ async def register_request_handler(
         audit_repo=audit_repo,
     )
 
+    # HTMX form submissions get auto-logged-in and redirected so the
+    # browser never sees raw JSON (#695). API clients keep the 201 JSON.
     if request.headers.get("HX-Request") == "true":
-        # HTMX submit: auto-login and redirect instead of returning raw JSON.
-        # Mirrors the pattern in src/domain/routes/dev_auth.py.
         login_response = await auth_backend.login(get_strategy(), created_user)
         login_response.status_code = 200
         login_response.headers["HX-Redirect"] = "/users/me"
