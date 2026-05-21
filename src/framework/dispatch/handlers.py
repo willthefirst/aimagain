@@ -625,11 +625,24 @@ async def handle_get_edit_form(
     if spec.write_authz is not None:
         spec.write_authz(target, requesting_user, action=f"edit this {spec.name}")
 
+    # `edit_heading` mirrors `create_heading` in `handle_get_new_form`:
+    # one funnel for the H1 string so the page H1 can't drift from the
+    # CTA that opened it. For polymorphic specs the kind is derived
+    # from the loaded target row (the spec's `discriminator_value` for
+    # kind-locked faces is the same value `_assert_kind_lock` just
+    # checked; subset-supertype faces use the row's stored kind).
+    from src.framework.rendering.labels import edit_label_for
+
+    edit_kind: str | None = None
+    if spec.discriminator is not None:
+        edit_kind = getattr(target, spec.discriminator.column)
+
     context: dict[str, Any] = {
         "request": request,
         spec.name: target,
         "entity_name": spec.name,
         "current_user": requesting_user,
+        "edit_heading": edit_label_for(spec, kind=edit_kind),
     }
     # Spec-declared constants (enum labels, schema classes the form
     # references, etc.) — same merge precedence as detail/list.

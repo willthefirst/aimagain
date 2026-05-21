@@ -17,7 +17,9 @@ import pytest
 
 from src.framework.rendering.labels import (
     create_label_for,
+    edit_label_for,
     entity_create_label,
+    entity_edit_label,
     entity_filter_label,
     filter_label_for,
 )
@@ -61,6 +63,36 @@ def test_create_label_kind_locked_face_uses_bound_kind_label():
     assert create_label_for(REFERRAL_ENTITY) == "Create client referral"
 
 
+def test_edit_label_uses_singular_label_for_non_polymorphic_spec():
+    from src.domain.specs.organization import ORGANIZATION_ENTITY
+
+    assert edit_label_for(ORGANIZATION_ENTITY) == "Edit organization"
+
+
+def test_edit_label_uses_per_kind_list_label_when_kind_supplied():
+    """The edit page for a subset-supertype face's row reads the
+    row's stored kind off the loaded target — `handle_get_edit_form`
+    derives this and passes it as `kind=`. Same per-kind noun the
+    create page uses for the matching form."""
+    from src.domain.specs.posts.opening import OPENING_ENTITY
+
+    assert edit_label_for(OPENING_ENTITY, kind="clinician_opening") == (
+        "Edit clinician opening"
+    )
+    assert edit_label_for(OPENING_ENTITY, kind="program_intake") == (
+        "Edit program intake"
+    )
+
+
+def test_edit_label_kind_locked_face_uses_bound_kind_label():
+    """Kind-locked leaf face (`/referrals`): the bound discriminator
+    wins, so the edit-page H1 reads "Edit client referral" regardless
+    of the row's identity string."""
+    from src.domain.specs.posts.referral import REFERRAL_ENTITY
+
+    assert edit_label_for(REFERRAL_ENTITY) == "Edit client referral"
+
+
 def test_filter_label_uses_url_collection():
     from src.domain.specs.provider import PROVIDER_ENTITY
 
@@ -83,6 +115,17 @@ def test_every_registry_spec_resolves_via_entity_create_label():
         # The noun half is non-empty — guards against a spec landing
         # with `singular_label=""` (would render "Create ").
         assert len(label) > len("Create ")
+
+
+def test_every_registry_spec_resolves_via_entity_edit_label():
+    """Mirror of the create-label round-trip — every registered spec
+    produces a sensible "Edit <noun>" string."""
+    from src.framework.dispatch.registry import entity_registry
+
+    for spec in entity_registry.specs():
+        label = entity_edit_label(spec.name)
+        assert label.startswith("Edit ")
+        assert len(label) > len("Edit ")
 
 
 def test_every_searchable_spec_resolves_via_entity_filter_label():

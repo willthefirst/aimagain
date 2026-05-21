@@ -64,6 +64,21 @@ def entity_create_label(name: str, *, kind: str | None = None) -> str:
     return create_label_for(spec, kind=kind)
 
 
+def entity_edit_label(name: str, *, kind: str | None = None) -> str:
+    """Return the canonical "Edit <noun>" string for an entity.
+
+    Mirrors `entity_create_label`'s resolution rule — same per-kind
+    `list_label` lookup so the edit page's H1 reads "Edit clinician
+    opening" / "Edit program intake" / "Edit client referral" / "Edit
+    organization" rather than the row's identity string ("Edit Adult
+    male (25-64)" was the friction this funnel fixes). The row
+    identity stays on the breadcrumb's middle segment via the
+    template's `current_label` block.
+    """
+    spec = _spec_by_name(name)
+    return edit_label_for(spec, kind=kind)
+
+
 def entity_filter_label(name: str) -> str:
     """Return the canonical "Filter <plural>" string for an entity.
 
@@ -85,6 +100,16 @@ def create_label_for(spec: "EntitySpec", *, kind: str | None = None) -> str:
     registered). See `entity_create_label` for the rule.
     """
     return f"Create {_noun_for(spec, kind=kind)}"
+
+
+def edit_label_for(spec: "EntitySpec", *, kind: str | None = None) -> str:
+    """Spec-direct form of `entity_edit_label` — same resolution rule.
+
+    Used by `handle_get_edit_form` which already holds the spec and
+    derives `kind` from the loaded target row when the spec is
+    polymorphic. See `entity_edit_label` for the rule.
+    """
+    return f"Edit {_noun_for(spec, kind=kind)}"
 
 
 def filter_label_for(spec: "EntitySpec") -> str:
