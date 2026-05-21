@@ -25,6 +25,11 @@ class _RecordingRunner:
 
     def __init__(self) -> None:
         self.last_cmd: Optional[List[str]] = None
+        # `_dirty_files` in TestCommands shells out to `git status` against
+        # this directory. Tests that don't care about fmt-mutation surfacing
+        # rely on the lookup returning an empty set silently — pointing at
+        # /tmp does that without contaminating the repo.
+        self.project_root = Path("/tmp")
 
     def run_command(self, cmd: List[str], cwd: Optional[Path] = None) -> int:
         self.last_cmd = cmd
@@ -130,3 +135,51 @@ def test_run_tests_stops_when_fmt_fails_and_does_not_invoke_lint_or_pytest():
     assert quality.calls == ["fmt"]
     assert runner.last_cmd is None
     assert rc == 1
+
+
+# --- #745: surface fmt-step mutations -----------------------------------
+
+
+def test_run_tests_warns_when_fmt_modifies_a_previously_clean_file(capsys):
+    """When `dev fmt` rewrites a file that was clean before, surface the
+    path explicitly. Agents had been hitting "Edit failed: file modified
+    since read" with no visible cause; the cause is fmt, and naming it
+    saves the diagnose-from-scratch round trip. See #745."""
+    runner, quality = _quality_aware_runner()
+    cmd = TestCommands(runner, quality)
+    # Simulate fmt rewriting one file mid-step.
+    dirty_states = iter([set(), {"src/templates/login.html"}])
+    cmd._dirty_files = lambda: next(dirty_states)
+    rc = cmd.run_tests()
+    out = capsys.readouterr().out
+    assert "src/templates/login.html" in out
+    assert "rewrote 1 file" in out
+    assert "re-read" in out
+    assert rc == 0
+
+
+def test_run_tests_does_not_warn_when_fmt_changes_nothing(capsys):
+    """If fmt is a no-op, no warning — silence is fine, the case we care
+    about is the surprise mutation."""
+    runner, quality = _quality_aware_runner()
+    cmd = TestCommands(runner, quality)
+    cmd._dirty_files = lambda: set()
+    cmd.run_tests()
+    out = capsys.readouterr().out
+    assert "rewrote" not in out
+
+
+def test_run_tests_does_not_warn_for_files_dirty_before_fmt(capsys):
+    """Files the agent had already edited are dirty BEFORE fmt — that's
+    not a fmt mutation, just the agent's own in-flight work. Only
+    newly-dirty paths get surfaced."""
+    runner, quality = _quality_aware_runner()
+    cmd = TestCommands(runner, quality)
+    pre = {"src/foo.py"}
+    dirty_states = iter([pre, pre | {"src/templates/login.html"}])
+    cmd._dirty_files = lambda: next(dirty_states)
+    cmd.run_tests()
+    out = capsys.readouterr().out
+    assert "src/templates/login.html" in out
+    assert "src/foo.py" not in out
+    assert "rewrote 1 file" in out

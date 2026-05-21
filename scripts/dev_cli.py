@@ -217,6 +217,7 @@ class TestCommands:
         # lint surprise. `--skip-lint` is the escape hatch for the
         # "I know my code's dirty, I'm debugging a failing test" case.
         if not skip_lint:
+            pre_fmt_dirty = self._dirty_files()
             fmt_rc = self.quality.fmt()
             if fmt_rc != 0:
                 print(
@@ -225,6 +226,7 @@ class TestCommands:
                     "to bypass the pre-step."
                 )
                 return fmt_rc
+            self._warn_on_fmt_mutations(pre_fmt_dirty)
             lint_rc = self.quality.lint()
             if lint_rc != 0:
                 print(
@@ -249,6 +251,44 @@ class TestCommands:
             cmd.extend(self.PATH_ALIASES.get(p, p) for p in paths)
 
         return self.runner.run_command(cmd)
+
+    def _dirty_files(self) -> set:
+        # Snapshot `git status --porcelain` as a set of paths. Used by the
+        # fmt-mutation surfacing below: if a file is dirty AFTER fmt but
+        # was clean BEFORE, fmt rewrote it — and if the agent has an
+        # in-flight Edit on that file, the next Edit will fail with a
+        # generic "modified since read" error. We surface what fmt
+        # actually touched so the cause is obvious. See #745.
+        try:
+            out = subprocess.run(
+                ["git", "status", "--porcelain"],
+                capture_output=True,
+                text=True,
+                check=False,
+                cwd=self.runner.project_root,
+            )
+        except FileNotFoundError:
+            return set()
+        return {line[3:] for line in out.stdout.splitlines() if line[3:]}
+
+    def _warn_on_fmt_mutations(self, pre_fmt_dirty: set) -> None:
+        post_fmt_dirty = self._dirty_files()
+        newly_dirty = sorted(post_fmt_dirty - pre_fmt_dirty)
+        if not newly_dirty:
+            return
+        print("")
+        print(
+            f"⚠  `dev fmt` rewrote {len(newly_dirty)} file(s) "
+            f"while preparing to run tests:"
+        )
+        for path in newly_dirty:
+            print(f"     {path}")
+        print(
+            "   If you have in-flight edits to these files, re-read them "
+            "before editing further."
+        )
+        print("   Pass --skip-lint to bypass the auto-fmt step.")
+        print("")
 
 
 class QualityCommands:
