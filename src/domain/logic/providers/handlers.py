@@ -38,6 +38,7 @@ from src.domain.logic.favorites.repository import UserFavoriteRepository
 from src.domain.logic.organizations.repository import OrganizationRepository
 from src.domain.logic.providers.repository import ProviderRepository
 from src.domain.logic.users.repository import UserRepository
+from src.domain.logic.verifications.repository import VerificationRepository
 from src.domain.models import (
     Organization,
     Provider,
@@ -108,6 +109,7 @@ async def provider_detail_extras(
     target: Provider,
     requesting_user: User | None,
     user_favorite_repo: UserFavoriteRepository,
+    verification_repo: VerificationRepository,
     **_: Any,
 ) -> dict[str, Any]:
     """Per-viewer detail extras for `make_detail_handler(PROVIDER_ENTITY)`.
@@ -118,13 +120,27 @@ async def provider_detail_extras(
     get `False` without a DB round-trip; today `PROVIDER_ENTITY.read_user_dep`
     forces auth, but the None-check keeps the helper safe if that ever
     changes.
+
+    `verification_status` is a property of the provider (not the viewer),
+    but it lives in context so the template doesn't need a DB-aware
+    helper. The value is the latest `Verification.status` (one of
+    `"verified" / "needs_review" / "failed"`) or `None` when the
+    pipeline (see `domain/logic/verifications/handlers.py`) has not yet
+    run for this provider — the template renders "Pending" for `None`
+    so the badge always shows something (#707 stage 2).
     """
+    latest = await verification_repo.latest_for_provider(target.id)
+    verification_status = latest.status if latest is not None else None
     if requesting_user is None:
-        return {"is_favorited": False}
+        return {
+            "is_favorited": False,
+            "verification_status": verification_status,
+        }
     return {
         "is_favorited": await user_favorite_repo.is_favorited(
             user_id=requesting_user.id, provider_id=target.id
-        )
+        ),
+        "verification_status": verification_status,
     }
 
 

@@ -276,6 +276,63 @@ async def test_get_provider_renders_detail_page(
     assert "<dt>Practice name</dt>" not in response.text
 
 
+async def test_get_provider_detail_shows_pending_verification_badge_when_no_row(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user: User,
+):
+    """A provider with no `Verification` row yet renders the UI-only
+    "Pending" badge (`data-status="pending"`). Pins the contract that
+    the badge always shows something, even before the nightly pipeline
+    has touched the row (#707 stage 2)."""
+    provider_id = await _seed_provider_for(
+        db_test_session_manager, user_id=logged_in_user.id
+    )
+    response = await authenticated_client.get(f"/clinicians/{provider_id}")
+    assert response.status_code == 200
+    tree = HTMLParser(response.text)
+    badge = tree.css_first('[data-testid="verification-badge"]')
+    assert badge is not None, "verification badge should always render on detail"
+    assert badge.attributes.get("data-status") == "pending"
+    assert "Pending" in badge.text()
+
+
+async def test_get_provider_detail_shows_verified_badge_for_verified_row(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user: User,
+):
+    """A provider with a `verified` `Verification` row renders the
+    "Verified" badge (`data-status="verified"`). Pins that the
+    template reads `verification_status` from the detail context the
+    handler now forwards (#707 stage 2)."""
+    from src.domain.models import Verification
+
+    provider_id = await _seed_provider_for(
+        db_test_session_manager, user_id=logged_in_user.id
+    )
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            session.add(
+                Verification(
+                    provider_id=provider_id,
+                    status="verified",
+                    flags=[],
+                    nppes_result={"NPI": "1234567890"},
+                    oig_match=False,
+                    name_match_score=1.0,
+                )
+            )
+
+    response = await authenticated_client.get(f"/clinicians/{provider_id}")
+    assert response.status_code == 200
+    tree = HTMLParser(response.text)
+    badge = tree.css_first('[data-testid="verification-badge"]')
+    assert badge is not None
+    assert badge.attributes.get("data-status") == "verified"
+    assert "Verified" in badge.text()
+
+
 async def test_get_provider_detail_renders_stacked_affiliation_cards(
     authenticated_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],

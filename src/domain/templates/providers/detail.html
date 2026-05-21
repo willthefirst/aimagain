@@ -22,7 +22,19 @@
    while the name backfill is in progress. #}
 {% block current_label %}{% if provider.first_name and provider.last_name %}{{ provider.first_name }} {{ provider.last_name }}{% else %}{{ provider.org.name }}{% endif %}{% endblock %}
 {# title-case-ignore: NPI is an industry abbreviation (National Provider Identifier) #}
-{% block subtitle %}{% if view.npi %}<span>NPI {{ view.npi }}</span>{% endif %}{% endblock %}
+{# Verification status (#707 stage 2) — three nightly-pipeline states
+   (`verified` / `needs_review` / `failed`) plus a fourth UI-only
+   "Pending" rendered when no Verification row exists yet. The
+   `verification_status` context value comes from
+   `provider_detail_extras`; templates do not query the repo directly.
+   `data-status` lets CSS color the pill without parsing the label. #}
+{%- set _status_labels = {
+    "verified": "Verified",
+    "needs_review": "Needs review",
+    "failed": "Verification failed",
+} -%}
+{%- set _status_key = verification_status or "pending" -%}
+{% block subtitle %}<span class="verification-badge" data-testid="verification-badge" data-status="{{ _status_key }}">{{ _status_labels.get(verification_status, "Pending verification") }}</span>{% if view.npi %} · <span>NPI {{ view.npi }}</span>{% endif %}{% endblock %}
 
 {% block actions %}
 {# Primary resource actions (Favorite toggle, Edit, Delete) live in
