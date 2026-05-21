@@ -2,6 +2,7 @@
 """Development CLI."""
 
 import argparse
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -706,6 +707,156 @@ class WorktreeCommands:
         return entries
 
 
+class PushCommands:
+    """`dev push` — `git push -u` with a pre-flight duplicate-PR check.
+
+    Multi-agent retros (#746) reported the same loss-of-30-minutes pattern:
+    claim an issue, build the fix, open a PR, then discover at rebase time
+    that another agent had already merged the same fix. The label-based
+    claim primitive doesn't gate work-in-progress between agents.
+
+    This wrapper parses the current branch for an issue number and, if
+    found, asks GitHub whether a PR for that issue already exists or
+    whether a merge commit mentioning it is already on origin/main.
+    The user is prompted before push so a real overlap can be reviewed
+    and cancelled, but `--yes` (or `--force`) bypasses the prompt for
+    the no-issue-number case.
+    """
+
+    # Branch-name patterns that carry an issue number. The capture group
+    # is the issue number itself. Order matters — most-specific first.
+    _BRANCH_PATTERNS = [
+        re.compile(r"(?:^|/)fix[-/](\d+)(?:[-/]|$)"),
+        re.compile(r"(?:^|/)issue[-/](\d+)(?:[-/]|$)"),
+        re.compile(r"(?:^|/)claude/[^/]*-(\d+)-"),
+    ]
+
+    def __init__(self, runner: CLIRunner) -> None:
+        self.runner = runner
+
+    def _current_branch(self) -> Optional[str]:
+        result = subprocess.run(
+            ["git", "branch", "--show-current"],
+            capture_output=True,
+            text=True,
+            check=False,
+            cwd=self.runner.project_root,
+        )
+        return result.stdout.strip() or None
+
+    def _issue_number_from_branch(self, branch: str) -> Optional[int]:
+        for pat in self._BRANCH_PATTERNS:
+            m = pat.search(branch)
+            if m:
+                return int(m.group(1))
+        return None
+
+    def _gh_existing_prs(self, issue: int) -> List[dict]:
+        # Best-effort: if `gh` isn't installed or the call fails, return
+        # [] so push isn't blocked by tooling absence.
+        result = subprocess.run(
+            [
+                "gh",
+                "pr",
+                "list",
+                "--search",
+                f"#{issue} in:title,body",
+                "--state",
+                "all",
+                "--json",
+                "number,state,title,url",
+                "--limit",
+                "10",
+            ],
+            capture_output=True,
+            text=True,
+            check=False,
+            cwd=self.runner.project_root,
+        )
+        if result.returncode != 0:
+            return []
+        try:
+            import json
+
+            data = json.loads(result.stdout or "[]")
+        except (ValueError, json.JSONDecodeError):
+            return []
+        return data if isinstance(data, list) else []
+
+    def _grep_main_log(self, issue: int) -> List[str]:
+        result = subprocess.run(
+            [
+                "git",
+                "log",
+                "--grep",
+                f"#{issue}",
+                "origin/main",
+                "--oneline",
+                "-5",
+            ],
+            capture_output=True,
+            text=True,
+            check=False,
+            cwd=self.runner.project_root,
+        )
+        if result.returncode != 0:
+            return []
+        return [ln for ln in result.stdout.splitlines() if ln.strip()]
+
+    def push(
+        self,
+        force: bool = False,
+        yes: bool = False,
+        extra_args: Optional[List[str]] = None,
+    ) -> int:
+        branch = self._current_branch()
+        if not branch:
+            print("❌ Could not resolve current branch.")
+            return 1
+
+        issue = self._issue_number_from_branch(branch)
+        if issue is not None and not yes:
+            overlaps = self._collect_overlaps(issue)
+            if overlaps and not self._confirm_push(branch, issue, overlaps):
+                return 2
+
+        cmd = ["git", "push", "-u", "origin", branch]
+        if force:
+            cmd.append("--force-with-lease")
+        if extra_args:
+            cmd.extend(extra_args)
+        return self.runner.run_command(cmd)
+
+    def _collect_overlaps(self, issue: int) -> dict:
+        return {
+            "prs": self._gh_existing_prs(issue),
+            "commits": self._grep_main_log(issue),
+        }
+
+    def _confirm_push(self, branch: str, issue: int, overlaps: dict) -> bool:
+        prs = overlaps.get("prs") or []
+        commits = overlaps.get("commits") or []
+        if not prs and not commits:
+            return True
+        print(f"⚠  Issue #{issue} may already be addressed elsewhere:")
+        for pr in prs:
+            number = pr.get("number")
+            state = (pr.get("state") or "?").upper()
+            title = pr.get("title", "")
+            print(f"    PR #{number} ({state}): {title}")
+        for line in commits:
+            print(f"    commit on main: {line}")
+        print(
+            "Push anyway? Re-run with --yes to skip this prompt, or "
+            "Ctrl-C / answer 'n' to abort."
+        )
+        try:
+            answer = input(f"Push branch '{branch}'? [y/N] ").strip().lower()
+        except EOFError:
+            answer = "n"
+        return answer in {"y", "yes"}
+
+
 class SetupCommands:
     def __init__(self, runner: CLIRunner):
         self.runner = runner
@@ -761,6 +912,7 @@ class DevCLI:
         self.migrate_cmd = MigrateCommands(self.runner)
         self.playwright_cmd = PlaywrightCommands(self.runner)
         self.worktree_cmd = WorktreeCommands(self.runner)
+        self.push_cmd = PushCommands(self.runner)
 
     def create_parser(self) -> argparse.ArgumentParser:
         """Create the argument parser with all commands."""
@@ -798,6 +950,7 @@ Examples:
         self._add_migrate_parser(subparsers)
         self._add_playwright_setup_parser(subparsers)
         self._add_worktree_parser(subparsers)
+        self._add_push_parser(subparsers)
 
         return parser
 
@@ -1108,6 +1261,32 @@ Examples:
             return 1
 
         parser.set_defaults(func=_print_help)
+
+    def _add_push_parser(self, subparsers):
+        parser = subparsers.add_parser(
+            "push",
+            help="`git push -u` with a pre-flight duplicate-PR check",
+            description=(
+                "Wraps `git push -u origin <current-branch>`. If the branch "
+                "name carries an issue number (e.g. `fix/697-foo`, "
+                "`claude/fix-697-foo`), first checks whether a PR for that "
+                "issue already exists and whether origin/main already has a "
+                "merge commit mentioning it. If so, prompts before pushing. "
+                "Use --yes to skip the prompt non-interactively. See #746."
+            ),
+        )
+        parser.add_argument(
+            "--yes",
+            "-y",
+            action="store_true",
+            help="Skip the duplicate-PR prompt and push regardless.",
+        )
+        parser.add_argument(
+            "--force",
+            action="store_true",
+            help="Forward --force-with-lease to git push.",
+        )
+        parser.set_defaults(func=lambda args: self.push_cmd.push(args.force, args.yes))
 
     def run(self) -> int:
         """Run the CLI application."""
