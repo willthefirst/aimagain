@@ -1,4 +1,4 @@
-# Bedlam CONNECT
+# Bedlam Connect
 
 FastAPI + server-side rendering + HTMX, with JWT cookie auth via fastapi-users. Python 3.11+; SQLite locally, Postgres in production; Docker-based dev and deploy.
 

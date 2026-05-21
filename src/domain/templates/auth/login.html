@@ -3,7 +3,7 @@
 <article class="auth-page">
   <header>
     <h1>Log in</h1>
-    {% if just_registered %}<p>Account created — log in to continue.</p>{% else %}<p>Sign in to your Bedlam Connect account.</p>{% endif %} <!-- title-case-ignore: "Bedlam Connect" is a brand name -->
+    {% if just_registered %}<p>Account created — log in to continue.</p>{% else %}<p>Sign in to your Bedlam Connect account.</p>{% endif %}
   </header>
   <!-- FastAPI Users JWT login endpoint expects 'username' (which is email) and 'password' as form data. -->
   <form

@@ -137,6 +137,11 @@ class TitleCaseChecker:
         "PII",  # Personally identifiable information
         "DBT",  # Dialectical behavior therapy
         "EMDR",  # Eye movement desensitization and reprocessing
+        # Brand mark — the short form rendered on narrow viewports.
+        # Multi-word brand phrases (e.g. "Bedlam Connect") live in
+        # ``BRAND_PHRASES`` below; this entry covers the standalone
+        # ``<span class="brand-mark">Bedlam</span>`` shape.
+        "Bedlam",
         # Language names — surface in form labels ("non-English", "Spanish")
         # and standard sentence-case rules would lowercase them.
         "English",
@@ -155,6 +160,15 @@ class TitleCaseChecker:
         "Russian",
         "Italian",
         "Portuguese",
+    }
+
+    # Multi-word brand phrases preserved verbatim (case-sensitive) when
+    # they appear in source. Sentence-case conversion would lowercase the
+    # second word ("Bedlam Connect" → "Bedlam connect"); the post-pass
+    # in ``_convert_single_sentence`` restores the canonical casing. The
+    # single-word brand mark ("Bedlam") lives in ``ALWAYS_CAPITALIZE``.
+    BRAND_PHRASES = {
+        "Bedlam Connect",
     }
 
     # HTTP methods are ambiguous: they overlap with common English words
@@ -404,6 +418,17 @@ class TitleCaseChecker:
                     result_words.append(word.replace(clean_word, clean_word.lower()))
 
         sentence_case = emoji_prefix + " ".join(result_words)
+
+        # Restore multi-word brand phrases. Sentence-case lowercases every
+        # word after the first ("Bedlam Connect" → "Bedlam connect");
+        # this pass swaps any case-insensitive match back to the canonical
+        # form so brand-name copy doesn't need per-line `title-case-ignore`
+        # markers (#728).
+        for brand in self.BRAND_PHRASES:
+            if re.search(re.escape(brand), original_clean, re.IGNORECASE):
+                sentence_case = re.sub(
+                    re.escape(brand), brand, sentence_case, flags=re.IGNORECASE
+                )
 
         if "<" in text and ">" in text:
             return text.replace(original_clean, sentence_case)
