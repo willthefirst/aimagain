@@ -1,9 +1,9 @@
 """Tests for `dev merge` in scripts/dev_cli.py.
 
-The merge loop is mostly about state-machine behaviour: given a sequence
-of PR statuses, what does it do next? The shell-out boundary (gh, time)
-is stubbed at the method level so we can drive the loop deterministically
-without sleeping.
+With the merge queue enabled, `dev merge` enables auto-merge via
+`gh pr merge --auto` and then polls until the queue lands the PR or a
+check fails. The shell-out boundary (gh, time) is stubbed so we can
+drive the loop deterministically without sleeping.
 """
 
 from __future__ import annotations
@@ -27,7 +27,7 @@ class _RecordingRunner:
 def _merge_cmd(statuses: list) -> MergeCommands:
     runner = _RecordingRunner()
     cmd = MergeCommands(runner)
-    cmd.POLL_SECONDS = 0  # don't sleep in tests
+    cmd.POLL_SECONDS = 0
     iterator = iter(statuses)
     cmd._pr_status = lambda pr: next(iterator)
     cmd._resolve_pr_number = lambda explicit: explicit if explicit else 999
@@ -44,29 +44,32 @@ def _green(state: str) -> dict:
     }
 
 
-def test_merges_when_clean_and_checks_green():
-    cmd = _merge_cmd([_green("CLEAN")])
+def _merged() -> dict:
+    return {"state": "MERGED", "mergeStateStatus": "CLEAN"}
+
+
+def test_enables_auto_merge_and_waits_for_queue_to_land():
+    # initial check (clean) → enable auto-merge → poll once and see MERGED.
+    cmd = _merge_cmd([_green("CLEAN"), _merged()])
     rc = cmd.merge(pr=123)
     assert rc == 0
-    assert ["gh", "pr", "merge", "--rebase", "123"] in cmd.runner.commands
+    assert ["gh", "pr", "merge", "123", "--auto", "--squash"] in cmd.runner.commands
 
 
-def test_rebases_then_merges_when_behind_then_clean():
-    cmd = _merge_cmd([_green("BEHIND"), _green("CLEAN")])
-    rc = cmd.merge(pr=123)
-    assert rc == 0
-    # Should have called update-branch once, then merged.
-    assert ["gh", "pr", "update-branch", "--rebase", "123"] in cmd.runner.commands
-    assert ["gh", "pr", "merge", "--rebase", "123"] in cmd.runner.commands
-    # And the rebase came first.
-    rebase_idx = cmd.runner.commands.index(
-        ["gh", "pr", "update-branch", "--rebase", "123"]
-    )
-    merge_idx = cmd.runner.commands.index(["gh", "pr", "merge", "--rebase", "123"])
-    assert rebase_idx < merge_idx
+def test_default_method_is_squash():
+    cmd = _merge_cmd([_green("CLEAN"), _merged()])
+    cmd.merge(pr=123)
+    # Squash is the queue-configured method; default must match.
+    assert ["gh", "pr", "merge", "123", "--auto", "--squash"] in cmd.runner.commands
 
 
-def test_aborts_on_failing_checks():
+def test_method_flag_is_forwarded():
+    cmd = _merge_cmd([_green("CLEAN"), _merged()])
+    cmd.merge(pr=123, method="rebase")
+    assert ["gh", "pr", "merge", "123", "--auto", "--rebase"] in cmd.runner.commands
+
+
+def test_aborts_on_failing_checks_before_enabling_auto_merge():
     failing = {
         "state": "OPEN",
         "mergeStateStatus": "BLOCKED",
@@ -77,23 +80,32 @@ def test_aborts_on_failing_checks():
     cmd = _merge_cmd([failing])
     rc = cmd.merge(pr=123)
     assert rc == 3
-    # Did NOT attempt merge or update-branch.
-    assert all("merge" not in c[2] for c in cmd.runner.commands if len(c) >= 3)
-    assert not any("update-branch" in c for c in cmd.runner.commands)
-
-
-def test_recognises_already_merged_pr():
-    cmd = _merge_cmd([{"state": "MERGED", "mergeStateStatus": "CLEAN"}])
-    rc = cmd.merge(pr=123)
-    assert rc == 0
-    # No further action — PR is already merged.
+    # Did NOT attempt to enable auto-merge — would have burned a queue slot.
     assert cmd.runner.commands == []
 
 
-def test_method_flag_is_forwarded_to_gh_pr_merge():
-    cmd = _merge_cmd([_green("CLEAN")])
-    cmd.merge(pr=123, method="merge")
-    assert ["gh", "pr", "merge", "--merge", "123"] in cmd.runner.commands
+def test_detects_failure_while_waiting_in_queue():
+    failing = {
+        "state": "OPEN",
+        "mergeStateStatus": "BLOCKED",
+        "statusCheckRollup": [
+            {"name": "tests", "status": "COMPLETED", "conclusion": "FAILURE"}
+        ],
+    }
+    # initial clean, auto-merge submitted, then a queued CI run fails.
+    cmd = _merge_cmd([_green("CLEAN"), failing])
+    rc = cmd.merge(pr=123)
+    assert rc == 3
+    # Auto-merge was attempted before the failure showed up.
+    assert ["gh", "pr", "merge", "123", "--auto", "--squash"] in cmd.runner.commands
+
+
+def test_recognises_already_merged_pr():
+    cmd = _merge_cmd([_merged()])
+    rc = cmd.merge(pr=123)
+    assert rc == 0
+    # No auto-merge call — PR is already merged.
+    assert cmd.runner.commands == []
 
 
 def test_fails_fast_when_no_pr_number_resolvable(capsys):
