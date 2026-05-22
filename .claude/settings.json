@@ -21,6 +21,24 @@
           }
         ]
       }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write|NotebookEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$CLAUDE_PROJECT_DIR/scripts/preflight_worktree_check.py"
+          }
+        ]
+      }
+    ]
+  },
+  "permissions": {
+    "allow": [
+      "Bash(dev worktree add *)",
+      "Bash(dev worktree list)",
+      "Bash(dev worktree gc *)"
     ]
   },
   "mcpServers": {
