@@ -4,6 +4,8 @@ Pact-based contract tests verify that the **shape of the conversation** between 
 
 The current set of contract pairs lives in [`manifest.py`](manifest.py)'s `CONTRACT_PAIRS` — that's the registry. Per [`src/domain/routes/RESOURCE_GRAMMAR.md`](../../src/domain/routes/RESOURCE_GRAMMAR.md), every resource exposing an HTML form (or htmx-driven action partial) MUST have a contract pair; add new pairs there using the conventions below.
 
+The rule is enforced by [`scripts/dev/contract_form_coverage_check.py`](../../scripts/dev/contract_form_coverage_check.py), which runs in `dev lint` and as a pre-commit hook. It walks every `<form>` in `src/{domain,framework}/templates/` and asserts the submit URL appears in either `CONTRACT_PAIRS[*].endpoints` or that script's `FORMS_WITHOUT_PAIRS` allowlist. A new literal-URL form without a pair fails CI loudly — see the failure-message template in the script for the exact escape hatches.
+
 ## Why this directory exists outside the colocated convention
 
 The rest of the repo's tests live next to their source ([`tests/README.md`](../README.md)). Contract tests can't, because each test inherently spans **two** layers:

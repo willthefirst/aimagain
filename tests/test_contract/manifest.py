@@ -30,6 +30,13 @@ class ContractPair:
     `provider_state` (optional) is the state string the consumer test's
     `pact.given(...)` uses; surfaced here so `KNOWN_PROVIDER_STATES`
     is derived rather than hand-maintained.
+    `endpoints` is the static-analysis source of truth: the
+    `("METHOD /path", ...)` tuples this pair covers. Read by
+    `scripts/dev/contract_form_coverage_check.py` to verify every
+    literal-URL form template has a corresponding pair. Forms whose
+    submit URL is dynamic (macro-driven `hx-{{ method }}="{{ action }}"`)
+    are skipped by the lint — they route through the entity dispatch
+    layer that the existing entity-form pairs already cover.
     `pytest_marks` is the tuple of pytest marks applied to the
     parametrized provider verification (e.g. `pytest.mark.provider`,
     `pytest.mark.posts`).
@@ -41,6 +48,7 @@ class ContractPair:
     handler_mocks_factory: Optional[Callable[[], dict]] = None
     consumer_setup_fn: Optional[Callable] = None
     provider_state: Optional[str] = None
+    endpoints: tuple = ()
     pytest_marks: tuple = ()
 
 
@@ -52,6 +60,10 @@ CONTRACT_PAIRS: list[ContractPair] = [
         handler_mocks_factory=MockDataFactory.create_registration_dependency_config,
         consumer_setup_fn=None,  # uses real auth_pages router
         provider_state="User test.user@example.com does not exist",
+        # Literal URL — `register.html` does `hx-post="/auth/register"`.
+        # Picked up by `scripts/dev/contract_form_coverage_check.py` so
+        # the form's URL never drifts away from a paired endpoint.
+        endpoints=("POST /auth/register",),
         pytest_marks=(pytest.mark.provider, pytest.mark.auth),
     ),
     ContractPair(

@@ -61,3 +61,15 @@ repos:
         language: python
         files: ^src/(models|schemas|repositories|logic)/.*\.py$
         pass_filenames: true
+
+      - id: contract-form-coverage-check
+        name: Check contract-form coverage
+        entry: python scripts/dev/contract_form_coverage_check.py
+        language: python
+        # Fires on changes to form templates OR the manifest — either a
+        # new uncovered form, or a manifest edit that removes coverage,
+        # is what we want to catch. The script itself walks the whole
+        # template tree on each invocation; the file filter is just
+        # the trigger.
+        files: ^(src/(framework|domain)/templates/.*\.(html|jinja|jinja2)|tests/test_contract/manifest\.py|scripts/dev/contract_form_coverage_check\.py)$
+        pass_filenames: false
