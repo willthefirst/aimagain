@@ -2460,8 +2460,8 @@ async def test_handle_list_threads_filter_values_into_repo_call():
         filter_values={"kind": "beta"},
     )
     # `offset` + `limit` come from the pagination layer (`page=1`,
-    # `per_page=DEFAULT_PAGE_SIZE=25`, asked-for-rows=`per_page + 1`).
-    assert captured == {"kind": "beta", "offset": 0, "limit": 26}
+    # `per_page=DEFAULT_PAGE_SIZE=15`, asked-for-rows=`per_page + 1`).
+    assert captured == {"kind": "beta", "offset": 0, "limit": 16}
 
 
 async def test_handle_list_extras_merges_into_context():
@@ -2858,9 +2858,9 @@ async def test_handle_list_passes_exclude_self_when_spec_opts_in():
         filter_values={},
     )
 
-    # `offset` + `limit` come from the pagination layer (page 1 of 25).
-    assert captured[0] == {"exclude_self": viewer, "offset": 0, "limit": 26}
-    assert captured[1] == {"offset": 0, "limit": 26}
+    # `offset` + `limit` come from the pagination layer (page 1 of 15).
+    assert captured[0] == {"exclude_self": viewer, "offset": 0, "limit": 16}
+    assert captured[1] == {"offset": 0, "limit": 16}
 
 
 @pytest.mark.asyncio
@@ -2885,8 +2885,8 @@ async def test_handle_list_omits_exclude_self_when_spec_opts_out():
         filter_values={"kind": "alpha"},
     )
 
-    # `offset` + `limit` come from the pagination layer (page 1 of 25).
-    assert captured[0] == {"kind": "alpha", "offset": 0, "limit": 26}
+    # `offset` + `limit` come from the pagination layer (page 1 of 15).
+    assert captured[0] == {"kind": "alpha", "offset": 0, "limit": 16}
     assert "exclude_self" not in captured[0]
 
 
@@ -2926,8 +2926,8 @@ async def test_handle_list_falls_back_to_list_default_when_no_bespoke_method():
 
     assert captured["model"] is _FixtureRow
     assert captured["order_by"] == "ORDER_BY_SENTINEL"
-    # `offset` + `limit` come from the pagination layer (page 1 of 25).
-    assert captured["kwargs"] == {"offset": 0, "limit": 26}
+    # `offset` + `limit` come from the pagination layer (page 1 of 15).
+    assert captured["kwargs"] == {"offset": 0, "limit": 16}
 
 
 @pytest.mark.asyncio

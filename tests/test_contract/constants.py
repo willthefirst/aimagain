@@ -9,6 +9,17 @@ TEST_USERNAME = "testuser"
 
 # API paths
 REGISTER_API_PATH = "/auth/register"
+FORGOT_PASSWORD_API_PATH = "/auth/forgot-password"
+RESET_PASSWORD_API_PATH = "/auth/reset-password"
+
+# Reset-password token surface. The token is a JWT produced by
+# `BaseUserManager.forgot_password` in production; for contract testing
+# we only care that the consumer's hidden input round-trips a token
+# string the route's body schema accepts (it's a plain `str`, no JWT
+# validation at the parsing layer — that's deferred to `reset_password`,
+# which the provider verification mocks out).
+TEST_RESET_PASSWORD_TOKEN = "test-reset-password-token"
+TEST_NEW_PASSWORD = "newpassword456"
 
 # Stable target-user id used by the admin-actions stub + activation pact.
 # Matches `STUB_TARGET_USER_ID` in `infrastructure/servers/consumer.py`.
@@ -54,6 +65,12 @@ STUB_PROGRAM_FORM_ORG_ID = uuid.UUID("77777777-7777-7777-7777-777777777777")
 
 # Provider states
 PROVIDER_STATE_USER_DOES_NOT_EXIST = f"User {TEST_EMAIL} does not exist"
+PROVIDER_STATE_USER_CAN_REQUEST_PASSWORD_RESET = (
+    f"User {TEST_EMAIL} can request a password reset"
+)
+PROVIDER_STATE_RESET_PASSWORD_TOKEN_IS_VALID = (
+    "Reset password token is valid for an active user"
+)
 PROVIDER_STATE_USER_EXISTS_AND_ACTIVE = f"User {TARGET_USER_ID} exists and is active"
 PROVIDER_STATE_POST_EXISTS_AND_OWNED = (
     f"Post {STUB_POST_ID} exists and is owned by the requester"
@@ -67,6 +84,8 @@ PROVIDER_STATE_USER_CAN_CREATE_PROGRAM = "User can create a program"
 
 # Consumer / provider Pact identifiers
 CONSUMER_NAME_REGISTRATION = "registration-form"
+CONSUMER_NAME_FORGOT_PASSWORD = "forgot-password-form"
+CONSUMER_NAME_RESET_PASSWORD = "reset-password-form"
 PROVIDER_NAME_AUTH = "auth-api"
 
 CONSUMER_NAME_USER_ADMIN_ACTIONS = "user-admin-actions"
@@ -96,3 +115,5 @@ PACT_PORT_PROVIDER_CREATE = 1239
 PACT_PORT_PROVIDER_EDIT = 1240
 PACT_PORT_ORGANIZATION_CREATE = 1241
 PACT_PORT_PROGRAM_CREATE = 1242
+PACT_PORT_FORGOT_PASSWORD = 1243
+PACT_PORT_RESET_PASSWORD = 1244
