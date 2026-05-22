@@ -288,11 +288,11 @@ async def test_get_user_detail_renders_breadcrumb_and_heading(
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user: User,
 ):
-    """User detail uses the consolidated chrome: a one-segment
-    breadcrumb that links back to `/users` and a toolbar `<h1>` that
-    carries the current user's name. The current item is NOT
-    repeated as a non-link crumb — every visible breadcrumb item is
-    an actionable link (GOV.UK pattern)."""
+    """User detail uses the consolidated chrome: a back affordance that
+    links to `/users` (the deepest clickable parent) and a toolbar
+    `<h1>` that carries the current user's name. The current item is
+    NOT repeated in the breadcrumb — every visible breadcrumb element
+    is an actionable link (GOV.UK pattern)."""
     target_username = f"target-{uuid.uuid4()}"
     target = create_test_user(username=target_username)
     async with db_test_session_manager() as session:
@@ -302,11 +302,11 @@ async def test_get_user_detail_renders_breadcrumb_and_heading(
     response = await authenticated_client.get(f"/users/{target.id}")
     assert response.status_code == 200
     tree = HTMLParser(response.text)
-    items = tree.css('nav[aria-label="breadcrumb"] ul > li')
-    assert [li.text(strip=True) for li in items] == ["Users"]
-    parent = items[0].css_first("a")
-    assert parent is not None
-    assert parent.attributes.get("href") == "/users"
+    back = tree.css_first('nav[aria-label="breadcrumb"] a.breadcrumb-back')
+    assert back is not None
+    assert back.attributes.get("href") == "/users"
+    label = back.css_first("span.breadcrumb-back-label")
+    assert label is not None and label.text(strip=True) == "Users"
     # Current item lives in the toolbar <h1>, not the breadcrumb.
     h1 = tree.css_first("div.toolbar h1")
     assert h1 is not None
