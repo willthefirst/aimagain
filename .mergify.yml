@@ -19,4 +19,4 @@ queue_rules:
       - check-success = docker-health-check
     merge_method: squash
     batch_size: 3
-    batch_max_wait_time: 2 minutes
+    batch_max_wait_time: 1 minute
