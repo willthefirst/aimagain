@@ -1,3 +1,10 @@
+commands_restrictions:
+  queue:
+    conditions:
+      - or:
+        - sender-permission >= write
+        - sender = github-actions[bot]
+
 queue_rules:
   - name: default
     queue_conditions:
@@ -13,12 +20,3 @@ queue_rules:
     merge_method: squash
     batch_size: 3
     batch_max_wait_time: 2 minutes
-
-pull_request_rules:
-  - name: add to merge queue on open
-    conditions:
-      - base = main
-      - -draft
-    actions:
-      queue:
-        name: default
