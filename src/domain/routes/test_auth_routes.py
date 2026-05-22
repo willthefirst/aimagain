@@ -288,10 +288,17 @@ async def test_get_forgot_password_page(test_client: AsyncClient):
     # H1 was removed app-wide; the page no longer carries the literal
     # "Forgot password" text. The submit button and body copy still
     # identify the page.
-    assert "/auth/forgot-password" in response.text
     assert "Send reset link" in response.text
     # See `test_get_register_page` for `.auth-page` rationale (#584).
     assert '<article class="auth-page">' in response.text
+    # The form MUST submit as JSON — fastapi-users' `/auth/forgot-password`
+    # expects `{"email": "..."}`. A plain `<form method="post">` would
+    # send `application/x-www-form-urlencoded` and the endpoint would
+    # 422 with "email field required" in production. Pin both the
+    # htmx submit attribute and the json-enc extension so the next
+    # rewrite can't silently regress to form-encoding.
+    assert 'hx-post="/auth/forgot-password"' in response.text
+    assert 'hx-ext="json-enc"' in response.text
 
 
 async def test_get_reset_password_page(test_client: AsyncClient):
@@ -308,6 +315,11 @@ async def test_get_reset_password_page(test_client: AsyncClient):
         f'value="{reset_token}"' in response.text
         or f'data-token="{reset_token}"' in response.text
     )
+    # Same JSON-submit contract as `test_get_forgot_password_page`:
+    # the endpoint expects `{"token": "...", "password": "..."}` and
+    # form-encoding would 422.
+    assert 'hx-post="/auth/reset-password"' in response.text
+    assert 'hx-ext="json-enc"' in response.text
     # See `test_get_register_page` for `.auth-page` rationale (#584).
     assert '<article class="auth-page">' in response.text
 
