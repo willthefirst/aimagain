@@ -27,14 +27,16 @@ Deployment-specific scripts live in `deployment/scripts/` (see [`deployment/READ
 
 ## Merging PRs
 
-PRs land via [Mergify](https://mergify.com) on `main`. Mergify is a GitHub App that watches for PRs with green CI, queues them, runs speculative CI on the rebased merge commit (up to 3 PRs batched together), and squash-merges when green.
+PRs land via [Mergify](https://mergify.com) on `main`. The full flow requires no manual steps beyond `dev push`:
 
 **Flow:**
 
 1. `dev push` opens (or updates) a PR off your worktree branch.
-2. CI runs on the PR head (`pull_request` event). When all four checks go green, Mergify automatically adds the PR to the queue — no manual step needed.
-3. Mergify rebases the PR onto current `main` (batching up to 3 queued PRs together), runs CI on that speculative commit, and squash-merges when green.
-4. `dev merge [<pr>]` watches and reports until Mergify lands it or a check fails. It issues no `gh` commands — Mergify does the work.
+2. Mergify immediately registers the PR for the queue (triggered on PR open, not on CI completion).
+3. CI runs on the PR head (`pull_request` event). Mergify watches the `queue_conditions` and waits for all four checks to go green.
+4. Once CI is green, Mergify admits the PR to the active queue — batching with any other waiting PRs (up to 3).
+5. Mergify creates a speculative branch combining the batch rebased onto current `main`, runs CI on that branch, and squash-merges when green.
+6. `dev merge [<pr>]` is optional — use it to watch and get notified when the PR lands or a check fails.
 
 **Queue config:**
 
@@ -42,7 +44,7 @@ Config lives in [`.mergify.yml`](../.mergify.yml) at the repo root. Key knobs:
 
 - `merge_method: squash` — matches `required_linear_history: true` on the branch rule.
 - `batch_size: 3` — up to 3 PRs share one speculative CI run. Raise if throughput increases.
-- `batch_max_wait_time: 5 minutes` — a lone PR in the queue won't wait more than 5 min for siblings before merging solo.
+- `batch_max_wait_time: 2 minutes` — a lone PR in the queue won't wait more than 2 min for siblings before merging solo.
 
 **Recovery:**
 
