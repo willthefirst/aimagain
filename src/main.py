@@ -66,20 +66,20 @@ async def lifespan(app: FastAPI):
 
     # APScheduler runs inside the app process so jobs share the real
     # async_session_maker and audit repository (see src/jobs/README.md).
-    # DISABLE_SCHEDULER=1 keeps the scheduler idle under pytest while
-    # still letting tests inspect register_jobs(make_scheduler()).
-    scheduler = make_scheduler()
-    register_jobs(scheduler)
-    scheduler_running = False
-    if os.getenv("DISABLE_SCHEDULER") != "1":
+    # DISABLE_SCHEDULER=1 skips the subsystem entirely (dev + pytest); job
+    # registration is exercised by src/jobs/test_scheduler.py instead.
+    if os.getenv("DISABLE_SCHEDULER") == "1":
+        scheduler = None
+    else:
+        scheduler = make_scheduler()
+        register_jobs(scheduler)
         scheduler.start()
-        scheduler_running = True
         logger.info("APScheduler started")
 
     try:
         yield
     finally:
-        if scheduler_running:
+        if scheduler is not None:
             scheduler.shutdown(wait=False)
 
 
