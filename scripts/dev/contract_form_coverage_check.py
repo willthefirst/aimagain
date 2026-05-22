@@ -72,16 +72,6 @@ FORMS_WITHOUT_PAIRS: dict[str, str] = {
         "Empty-body endpoint that reads the user from the session and "
         "re-mints a verify token. Nothing to pin beyond the path."
     ),
-    "POST /auth/forgot-password": (
-        "TODO(#771): write a Pact pair (consumer-side fills the form "
-        "in Playwright, provider verifies the JSON shape). The form "
-        "was fixed in PR #770 to emit JSON; the pair pins it structurally."
-    ),
-    "POST /auth/reset-password": (
-        "TODO(#771): write a Pact pair (consumer-side fills the "
-        "token+password fields, provider verifies the JSON shape). "
-        "Same situation as `/auth/forgot-password` above."
-    ),
 }
 
 
