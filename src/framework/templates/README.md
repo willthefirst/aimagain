@@ -32,15 +32,15 @@ A template under `<resource>/` in either root may only `{% extends %}` / `{% inc
 
 Each view-type template wires the same three-strip chrome (nav + breadcrumb + toolbar + content) from `base.html` with the breadcrumb and toolbar shape that matches the verb. A child template extending one of these declares only what's unique: a label, a URL, the body markup, and an optional action cluster.
 
-| View type     | Breadcrumb shape                          | Toolbar                                    | Child must declare                                       |
+| View type     | Breadcrumb back target                    | Toolbar                                    | Child must declare                                       |
 | ------------- | ----------------------------------------- | ------------------------------------------ | -------------------------------------------------------- |
-| `list.html`   | `Resource`                                | optional filter widget + actions cluster   | `resource_label`, `content`. Optional: `actions`, `filters`/`filter_action`/`filter_values` (context). |
-| `detail.html` | `Resource › <current>`                    | optional actions cluster                   | `resource_label`, `current_label`, `content`, `resource_url` (context). Optional: `actions`. |
-| `form_new.html` | `Resource`                              | none — form's submit button is the action  | `resource_label`, `content`, `resource_url` (context). H1 = `create_heading`, sourced from `entity_create_label(spec.name, kind=...)` via the form handler — children don't override the H1. |
-| `form_edit.html` | `Resource › <current> › Edit`          | none — form's Save/Cancel buttons are the actions | `resource_label`, `current_label`, `content`, `resource_url`, `resource_detail_url` (context). `current_label` is the **specific resource being edited** (e.g. `{{ organization.name }}`, `{{ view.headline }}`) — not a generic kind noun. |
-| `search.html` | `Resource`                                | none — form's submit button is the action  | `resource_label` (context). H1 = `filter_heading`, sourced from `entity_filter_label(spec.name)` via the search handler. |
+| `list.html`   | _(none — list pages omit the breadcrumb)_ | optional filter widget + actions cluster   | `resource_label`, `content`. Optional: `actions`, `filters`/`filter_action`/`filter_values` (context). |
+| `detail.html` | `← Resource`                              | optional actions cluster                   | `resource_label`, `current_label`, `content`, `resource_url` (context). Optional: `actions`. |
+| `form_new.html` | `← Resource`                            | none — form's submit button is the action  | `resource_label`, `content`, `resource_url` (context). H1 = `create_heading`, sourced from `entity_create_label(spec.name, kind=...)` via the form handler — children don't override the H1. |
+| `form_edit.html` | `← <current>`                          | none — form's Save/Cancel buttons are the actions | `resource_label`, `current_label`, `content`, `resource_url`, `resource_detail_url` (context). `current_label` is the **specific resource being edited** (e.g. `{{ organization.name }}`, `{{ view.headline }}`) — not a generic kind noun. |
+| `search.html` | `← Resource`                              | none — form's submit button is the action  | `resource_label` (context). H1 = `filter_heading`, sourced from `entity_filter_label(spec.name)` via the search handler. |
 
-Every view-type template also exposes its `breadcrumb` block for full override, so subresource lists with multi-segment chains (e.g. `Users › <username> › Providers` on `/users/{id}/providers`) keep the chrome by overriding one block while still inheriting the toolbar/content shape.
+The breadcrumb is always a single back affordance — a left chevron + the deepest clickable parent's label — at every viewport. The macro picks the back target by walking the chain backward to the last item with a non-`None` href, so a child template can override `{% block breadcrumb %}` with a multi-item chain (e.g. `[("Users", …), (username, /users/<id>), ("Clinicians", None)]` on `/users/{id}/clinicians`) to shift the back link one level up the tree without changing the visible shape.
 
 ### Create / filter labels — single source of truth
 

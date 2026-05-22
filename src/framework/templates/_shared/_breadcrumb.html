@@ -1,24 +1,17 @@
 {# Breadcrumb zone bar primitive.
    title-case-ignore: the literal ARIA value `breadcrumb` is Pico's hook.
 
-Renders the page's location chain as Pico's native breadcrumb nav
-above the page toolbar — see the `breadcrumb` block slot wired in
-[`../base.html`](../base.html). Pico styles the markup automatically
-(horizontal inline list, `›` separator via CSS on `li + li::before`)
-so no classes are added to the `<ul>`; the divider character is set
-globally in `base.html` via `--pico-nav-breadcrumb-divider`.
+Renders the page's location as a single "back" affordance — a
+Lucide arrow-left chevron plus the deepest clickable parent's
+label. Sits in the `breadcrumb` block slot wired in
+[`../base.html`](../base.html). No band chrome (background, border,
+padding); just inline text with an icon.
 
 Each item is a `(label, href)` tuple. The last item's `href` is
-typically `None` — it renders as plain text (the current page) and
-carries `aria-current="page"` for screen readers.
-
-On narrow viewports (≤540px) the full chain collapses to a single
-back affordance: a Lucide arrow-left chevron plus the deepest
-clickable parent's label (the last item with a non-None href). The
-`<ul>` chain is hidden and the `<a class="breadcrumb-back">` is
-shown — see the `@media` block in `base.html`. Both elements are
-emitted unconditionally; CSS does the swapping so no JS branches on
-viewport.
+typically `None` (the current page); the back target is the
+deepest item with a non-None `href` — for two-level chains
+(collection → current) that's the collection link, for nested
+chains (collection → row → edit) that's the row link.
 
 When every item has `href=None` (theoretical edge case — a page
 with no parent), the back affordance falls back to the first
@@ -29,33 +22,21 @@ item's label as plain text so the markup stays valid.
         ("Post", "/posts/" ~ post.id),
         ("Edit", None),
     ]) }}
-
-Pico's docs at https://picocss.com/docs/nav#breadcrumb require an
-inner `<ul>` specifically — the built-in style hooks off the nav's
-descendant `ul`. Picking `<ol>` (semantically tempting, since
-breadcrumbs are ordered) loses Pico's auto-styling.
 #}
 
 {# title-case-ignore: literal aria-label value `breadcrumb` is the Pico hook #}
 {% macro breadcrumb(items) -%}
 {%- if items %}
-{# Deepest clickable parent — the back target on mobile. Walk from the
-   end backward; the current page (last item) typically has `href=None`
-   so its parent is at index -2. For single-item crumbs (detail pages)
-   the only item carries the href. #}
+{# Deepest clickable parent — the back target. Walk from the end
+   backward; the current page (last item) typically has `href=None`
+   so its parent is at index -2. For single-item crumbs (detail
+   pages) the only item carries the href. #}
 {%- set _linkable = items | selectattr(1) | list -%}
 {%- set _back = _linkable[-1] if _linkable else items[0] -%}
 <nav aria-label="breadcrumb">
   <a class="breadcrumb-back"{% if _back[1] %} href="{{ _back[1] }}"{% endif %}>
     <i class="icon-arrow-left" aria-hidden="true"></i><span class="breadcrumb-back-label">{{ _back[0] }}</span>
   </a>
-  <ul>
-    {%- for label, href in items %}
-    <li{% if loop.last %} aria-current="page"{% endif %}>
-      {%- if href %}<a href="{{ href }}">{{ label }}</a>{% else %}{{ label }}{% endif -%}
-    </li>
-    {%- endfor %}
-  </ul>
 </nav>
 {%- endif %}
 {%- endmacro %}

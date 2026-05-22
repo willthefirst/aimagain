@@ -155,13 +155,15 @@ def test_list_view_renders_actions_block_in_toolbar_right() -> None:
     assert '<li><a id="create" href="/posts/form">Create</a></li>' in html
 
 
-def test_detail_view_renders_two_segment_breadcrumb_and_actions() -> None:
-    """``views/detail.html`` builds `[(resource_label, resource_url),
-    (current_label, None)]` and renders actions inside the shared
-    two-zone toolbar — empty left zone (no search link), and a
-    `<menu class="toolbar-right">` carrying the `<li>` commands. Pins
-    the "detail actions land at the same right edge as list-page
-    actions" rule (no per-view-type toolbar shape)."""
+def test_detail_view_renders_back_affordance_and_actions() -> None:
+    """``views/detail.html`` builds `[(resource_label, resource_url)]`
+    and the breadcrumb macro renders it as a single back affordance —
+    `<a class="breadcrumb-back" href="/providers">…Providers</a>`.
+    Actions land inside the shared two-zone toolbar — empty left zone
+    (no search link), and a `<menu class="toolbar-right">` carrying
+    the `<li>` commands. Pins the "detail actions land at the same
+    right edge as list-page actions" rule (no per-view-type toolbar
+    shape)."""
     env = _make_env()
     _add_child(
         env,
@@ -182,7 +184,11 @@ def test_detail_view_renders_two_segment_breadcrumb_and_actions() -> None:
         is_development=False,
     )
 
-    assert 'href="/providers"' in html and ">Providers</a>" in html
+    tree = HTMLParser(html)
+    back = tree.css_first('nav[aria-label="breadcrumb"] a.breadcrumb-back')
+    assert back is not None and back.attributes.get("href") == "/providers"
+    label = back.css_first("span.breadcrumb-back-label")
+    assert label is not None and label.text(strip=True) == "Providers"
     assert "Sunrise Therapy" in html
     assert '<div class="toolbar">' in html
     assert '<menu class="toolbar-right">' in html
@@ -216,7 +222,11 @@ def test_form_new_view_renders_create_heading_from_context() -> None:
         create_heading="Create clinician",
     )
 
-    assert 'href="/providers"' in html and ">Providers</a>" in html
+    tree = HTMLParser(html)
+    back = tree.css_first('nav[aria-label="breadcrumb"] a.breadcrumb-back')
+    assert back is not None and back.attributes.get("href") == "/providers"
+    label = back.css_first("span.breadcrumb-back-label")
+    assert label is not None and label.text(strip=True) == "Providers"
     assert "<h1>Create clinician</h1>" in html
     assert '<form id="x"></form>' in html
 
@@ -269,14 +279,14 @@ def test_primary_nav_excludes_non_journey_links_for_all_viewers() -> None:
 
 
 def test_form_edit_view_renders_breadcrumb_and_edit_heading() -> None:
-    """``views/form_edit.html`` renders a two-segment breadcrumb
-    (collection link › detail link, the latter carrying the row's
-    identity as `current_label`) above an `<h1>"Edit <noun>"` sourced
-    from `edit_heading`. The H1 reads the resource noun ("clinician",
-    "clinician opening", "client referral") rather than the row's
-    identity — that lives on the breadcrumb's middle segment, where
-    "back to <row>" is the natural verb. Mirrors the create-page
-    contract where `create_heading` sources the H1."""
+    """``views/form_edit.html`` renders a single-link back affordance
+    pointing at the row's detail page (the deepest clickable parent of
+    an edit view) above an `<h1>"Edit <noun>"` sourced from
+    `edit_heading`. The back link's label is the row's identity
+    (`current_label`) — "back to Sunrise Therapy" is the natural verb.
+    The H1 reads the resource noun ("clinician", "clinician opening",
+    "client referral") rather than the row's identity, mirroring the
+    create-page contract where `create_heading` sources the H1."""
     env = _make_env()
     _add_child(
         env,
@@ -299,13 +309,13 @@ def test_form_edit_view_renders_breadcrumb_and_edit_heading() -> None:
     )
 
     tree = HTMLParser(html)
-    crumbs = tree.css('nav[aria-label="breadcrumb"] li')
-    assert [li.css_first("a").attributes.get("href") for li in crumbs] == [
-        "/providers",
-        "/providers/42",
-    ], "form-edit breadcrumb must be exactly two link segments"
-    # Middle crumb's link text is the row's identity (current_label).
-    assert crumbs[1].css_first("a").text(strip=True) == "Sunrise Therapy"
+    back = tree.css_first('nav[aria-label="breadcrumb"] a.breadcrumb-back')
+    assert back is not None, "form-edit must render a back affordance"
+    assert (
+        back.attributes.get("href") == "/providers/42"
+    ), "back link points at the deepest clickable parent (the row's detail page)"
+    label = back.css_first("span.breadcrumb-back-label")
+    assert label is not None and label.text(strip=True) == "Sunrise Therapy"
     # H1 in the toolbar reads `edit_heading`, NOT "Edit <current_label>".
     h1 = tree.css_first("div.toolbar h1")
     assert h1 is not None

@@ -341,24 +341,12 @@
         padding-inline: 0.5rem;
         font-size: 0.875rem;
       }
-      /* Breadcrumb. Inline text only — no band chrome (background,
-         border, padding). Pico already styles `nav[aria-label="breadcrumb"]
-         ul` as an inline list with a separator via `li + li::before`;
-         we just set the divider character via the Pico-exposed
-         `--pico-nav-breadcrumb-divider`. The breadcrumb sits as a thin
-         line above the toolbar row that carries the `<h1>`, so the
-         chrome between the global nav and the content is one band
-         instead of two. */
-      nav[aria-label="breadcrumb"] {
-        --pico-nav-breadcrumb-divider: '›';
-      }
-      /* Mobile back affordance. On narrow viewports the breadcrumb
-         macro's full `<ul>` chain is hidden and the inline
-         `<a class="breadcrumb-back">` is shown: a Lucide arrow-left
-         glyph plus the deepest clickable parent's label. On desktop
-         the `<a>` is hidden and the chain renders normally. The
-         macro emits both elements unconditionally; CSS does the
-         swapping (no JS).
+      /* Breadcrumb back affordance. The macro emits a single
+         `<a class="breadcrumb-back">` — a Lucide arrow-left glyph plus
+         the deepest clickable parent's label — at every viewport
+         width. The breadcrumb sits as a thin line above the toolbar
+         row that carries the `<h1>`, so the chrome between the
+         global nav and the content is one band instead of two.
 
          Pico's default `<a>` underline ran across both the icon and
          the label, and the icon's `vertical-align: -0.15em` made it
@@ -367,19 +355,16 @@
          a whole, scope the underline to the label `<span>` on hover/
          focus, and use a flex `gap` for the chevron-to-label spacing
          (overriding the icon's universal `margin-inline-end`). */
-      .breadcrumb-back { display: none; text-decoration: none; }
-      @media (max-width: 540px) {
-        nav[aria-label="breadcrumb"] > ul { display: none; }
-        .breadcrumb-back {
-          display: inline-flex;
-          align-items: center;
-          gap: 0.25rem;
-        }
-        .breadcrumb-back > i { margin-inline-end: 0; }
-        .breadcrumb-back:hover .breadcrumb-back-label,
-        .breadcrumb-back:focus .breadcrumb-back-label {
-          text-decoration: underline;
-        }
+      .breadcrumb-back {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.25rem;
+        text-decoration: none;
+      }
+      .breadcrumb-back > i { margin-inline-end: 0; }
+      .breadcrumb-back:hover .breadcrumb-back-label,
+      .breadcrumb-back:focus .breadcrumb-back-label {
+        text-decoration: underline;
       }
       /* Brand collapse on mobile. The two-word "Bedlam Connect" wraps
          to two lines on narrow viewports once the primary nav fills the
