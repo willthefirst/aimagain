@@ -359,6 +359,10 @@ class QualityCommands:
                 "🔗 Checking template route literals...",
                 [sys.executable, "scripts/dev/template_route_check.py"],
             ),
+            (
+                "🤝 Checking contract-form coverage...",
+                [sys.executable, "scripts/dev/contract_form_coverage_check.py"],
+            ),
         ]
 
         exit_code = 0
