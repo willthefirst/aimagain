@@ -27,7 +27,7 @@ Deployment-specific scripts live in `deployment/scripts/` (see [`deployment/READ
 
 ## Merging PRs
 
-PRs land via [Mergify](https://mergify.com) on `main`. Mergify is a GitHub App that watches for PRs with green CI, queues them, runs speculative CI on the rebased merge commit, and squash-merges when green.
+PRs land via [Mergify](https://mergify.com) on `main`. Mergify is a GitHub App that watches for PRs with green CI, queues them, runs speculative CI on the rebased merge commit (up to 3 PRs batched together), and squash-merges when green.
 
 **Flow:**
 
