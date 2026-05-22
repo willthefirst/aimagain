@@ -234,7 +234,7 @@ async def test_get_register_page(test_client: AsyncClient):
     # Card wrapper — `.auth-page` caps the form at 28rem and centers it
     # so it doesn't stretch to the `<main class="container">` width on
     # tablet/desktop (#584). The `.auth-page` rule lives in `base.html`.
-    assert '<article class="auth-page">' in response.text
+    assert '<section class="auth-page">' in response.text
     # Subtitle must use plain language a first-time visitor can parse —
     # no bare model-jargon list ("openings, referrals, and intakes")
     # before any value framing (#694).
@@ -255,7 +255,7 @@ async def test_get_login_page(test_client: AsyncClient):
     assert "referrals" not in response.text
     assert "Sign in to your Bedlam Connect account" in response.text
     # See `test_get_register_page` for `.auth-page` rationale (#584).
-    assert '<article class="auth-page">' in response.text
+    assert '<section class="auth-page">' in response.text
     # Default subtitle must not assume a returning user (#693).
     assert "Welcome back" not in response.text
     # Default subtitle must not contain bare jargon without context (#693).
@@ -290,7 +290,7 @@ async def test_get_forgot_password_page(test_client: AsyncClient):
     # identify the page.
     assert "Send reset link" in response.text
     # See `test_get_register_page` for `.auth-page` rationale (#584).
-    assert '<article class="auth-page">' in response.text
+    assert '<section class="auth-page">' in response.text
     # The form MUST submit as JSON — fastapi-users' `/auth/forgot-password`
     # expects `{"email": "..."}`. A plain `<form method="post">` would
     # send `application/x-www-form-urlencoded` and the endpoint would
@@ -321,7 +321,7 @@ async def test_get_reset_password_page(test_client: AsyncClient):
     assert 'hx-post="/auth/reset-password"' in response.text
     assert 'hx-ext="json-enc"' in response.text
     # See `test_get_register_page` for `.auth-page` rationale (#584).
-    assert '<article class="auth-page">' in response.text
+    assert '<section class="auth-page">' in response.text
 
 
 async def test_get_verify_page_without_token_returns_error(test_client: AsyncClient):

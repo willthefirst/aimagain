@@ -40,7 +40,7 @@ The cross-resource import lint ([`scripts/dev/template_imports_check.py`](../../
 
 The services list is the first row of `_facts_block`'s `<dl>` rather than its own partial (see #628).
 
-The auth-flow pages (`auth/login.html`, `auth/register.html`, `auth/forgot_password.html`, `auth/reset_password.html`) each render a single `<article class="auth-page">` card. The `.auth-page` rule in [`../../framework/templates/base.html`](../../framework/templates/base.html) caps the card at 28rem and centers it horizontally — without the class the card stretches to the full `<main class="container">` width on tablet/desktop.
+The auth-flow pages (`auth/login.html`, `auth/register.html`, `auth/forgot_password.html`, `auth/reset_password.html`) each render a single `<section class="auth-page">` card. The shared card-chrome rules in [`../../framework/templates/base.html`](../../framework/templates/base.html) apply Pico's article framing (background, border, padding, header/footer bands) to the class, and the `.auth-page` rule caps the card at 28rem centered horizontally. `<article>` is reserved for items inside a list of items (post-list cards, the per-affiliation loop in `providers/detail.html`); single-form pages use `<section>`.
 
 ## Copy style guide
 

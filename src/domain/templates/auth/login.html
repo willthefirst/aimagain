@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% block content %}
-<article class="auth-page">
+<section class="auth-page">
   <header>
     <h1>Log in</h1>
     {% if just_registered %}<p>Account created — log in to continue.</p>{% else %}<p>Sign in to your Bedlam Connect account.</p>{% endif %}
@@ -29,5 +29,5 @@
       <a href="/auth/register">Create an account.</a>
     </p>
   </footer>
-</article>
+</section>
 {% endblock %}

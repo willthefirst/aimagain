@@ -34,7 +34,7 @@
    already conveyed by absence; a "— (root)" placeholder mixed two
    empty-state conventions (em-dash + parenthetical). #}
 {% block content %}
-<article class="entity-card">
+<section class="entity-card">
   <section class="entity-facts">
     <dl>
       {{ fact('type', 'Type', ORGANIZATION_TYPES_LABELS[organization.type]) }}
@@ -45,5 +45,5 @@
       {%- endif %}
     </dl>
   </section>
-</article>
+</section>
 {% endblock %}

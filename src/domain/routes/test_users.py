@@ -409,9 +409,9 @@ async def test_detail_admin_actions_render_inside_toolbar(
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user: User,
 ):
-    """Admin actions render inside the page toolbar (not the `<article>`
-    body). This pins the "primary resource actions live in the toolbar"
-    rule documented in `src/framework/templates/README.md`."""
+    """Admin actions render inside the page toolbar (not the
+    `.entity-card` body). This pins the "primary resource actions live
+    in the toolbar" rule documented in `src/framework/templates/README.md`."""
     await promote_to_admin(db_test_session_manager, logged_in_user.email)
     target = create_test_user(username=f"target-{uuid.uuid4()}")
     async with db_test_session_manager() as session:
@@ -422,8 +422,44 @@ async def test_detail_admin_actions_render_inside_toolbar(
     tree = HTMLParser(response.text)
     activation_selector = f"button[hx-put='/users/{target.id}/activation']"
     assert tree.css_first(f".toolbar {activation_selector}") is not None
-    # Sanity: not duplicated inside <article>.
-    assert tree.css_first(f"article {activation_selector}") is None
+    # Sanity: not duplicated inside the detail-page card body.
+    assert tree.css_first(f".entity-card {activation_selector}") is None
+
+
+async def test_self_detail_renders_favorites_link_in_body_not_toolbar(
+    authenticated_client: AsyncClient,
+):
+    """Favorites is navigation, not an Action — the toolbar is reserved
+    for Actions (Sign out, admin Deactivate/Delete). The link to the
+    viewer's favorites list lives in the detail-page body."""
+    response = await authenticated_client.get("/users/me")
+    assert response.status_code == 200
+    tree = HTMLParser(response.text)
+    favorites_selector = "a[href='/users/me/favorites']"
+    assert tree.css_first(f".toolbar {favorites_selector}") is None, (
+        "Favorites link must not appear in the toolbar — toolbar is for " "Actions only"
+    )
+    assert (
+        tree.css_first(f"main {favorites_selector}") is not None
+    ), "Favorites link must appear in the page body for the self viewer"
+
+
+async def test_other_user_detail_hides_favorites_link(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user: User,
+):
+    """Viewing someone else's profile must not expose their private
+    favorites list — the Favorites body section is self-only."""
+    target = create_test_user(username=f"target-{uuid.uuid4()}")
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            session.add(target)
+
+    response = await authenticated_client.get(f"/users/{target.id}")
+    assert response.status_code == 200
+    tree = HTMLParser(response.text)
+    assert tree.css_first("a[href='/users/me/favorites']") is None
 
 
 async def test_detail_hides_admin_actions_for_non_admin(
@@ -532,17 +568,19 @@ async def test_users_me_shows_onboarding_create_clinician_cta_when_no_profile(
     response = await authenticated_client.get("/users/me")
     assert response.status_code == 200
     tree = HTMLParser(response.text)
-    # The onboarding "Getting started" card must be present.
+    # The onboarding "Getting started" card must be present. Detail-page
+    # cards are `<section class="entity-card">` (article is reserved for
+    # list items); list-item cards inside still use `article` (no overlap).
     headings = [
         el.text(strip=True)
-        for el in tree.css("article.entity-card header.entity-header strong")
+        for el in tree.css("section.entity-card header.entity-header strong")
     ]
     assert (
         "Getting started" in headings
     ), "/users/me is missing the 'Getting started' onboarding card"
     # The create-clinician CTA must link to the clinician form.
     cta = tree.css_first(
-        "article.entity-card a[href='/clinicians/form'][role='button']"
+        "section.entity-card a[href='/clinicians/form'][role='button']"
     )
     assert (
         cta is not None
@@ -567,7 +605,7 @@ async def test_users_me_onboarding_not_shown_for_other_users(
     tree = HTMLParser(response.text)
     headings = [
         el.text(strip=True)
-        for el in tree.css("article.entity-card header.entity-header strong")
+        for el in tree.css("section.entity-card header.entity-header strong")
     ]
     assert (
         "Getting started" not in headings

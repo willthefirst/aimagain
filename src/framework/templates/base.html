@@ -65,15 +65,49 @@
         --pico-font-size-h3: 1.125rem;
         --pico-font-size-h4: 1rem;
       }
-      /* Entity cards (`<article class="entity-card">`) intentionally
-         carry no custom CSS — they rely on Pico's default `<article>`
-         framing (background, border, padding, rounded corners) plus
-         semantic HTML inside (`<header>`, `<h3>`, `<small>`, `<dl>`,
-         etc.) so the chrome stays framework-portable. The
-         `entity-card` / `entity-header` / `entity-facts` / etc.
-         class names are kept on the markup as DOM hooks (tests query
-         them and they may pick up styles if Pico ever needs to be
-         supplemented), but no rule below targets them. */
+      /* Card chrome. Replicates Pico's default `<article>` framing
+         (background, border, padding, rounded corners, tinted header/
+         footer bands) on a class so the wrapping element doesn't have
+         to be `<article>`. `<article>` is reserved for items inside a
+         possible list of items (post-list cards, the per-affiliation
+         loop in `providers/detail.html`); single-item containers —
+         the detail-page wrapper, the auth-page form card — use
+         `<section>` and pick up chrome via these rules. The Pico
+         article element rule still applies to the list-card form;
+         the values are identical, so list cards see no change. */
+      .entity-card,
+      .auth-page {
+        margin-bottom: var(--pico-block-spacing-vertical);
+        padding: var(--pico-block-spacing-vertical) var(--pico-block-spacing-horizontal);
+        border-radius: var(--pico-border-radius);
+        background: var(--pico-card-background-color);
+        box-shadow: var(--pico-card-box-shadow);
+      }
+      .entity-card > header,
+      .entity-card > footer,
+      .auth-page > header,
+      .auth-page > footer {
+        margin-right: calc(var(--pico-block-spacing-horizontal) * -1);
+        margin-left: calc(var(--pico-block-spacing-horizontal) * -1);
+        padding: calc(var(--pico-block-spacing-vertical) * 0.66) var(--pico-block-spacing-horizontal);
+        background-color: var(--pico-card-sectioning-background-color);
+      }
+      .entity-card > header,
+      .auth-page > header {
+        margin-top: calc(var(--pico-block-spacing-vertical) * -1);
+        margin-bottom: var(--pico-block-spacing-vertical);
+        border-bottom: var(--pico-border-width) solid var(--pico-card-border-color);
+        border-top-right-radius: var(--pico-border-radius);
+        border-top-left-radius: var(--pico-border-radius);
+      }
+      .entity-card > footer,
+      .auth-page > footer {
+        margin-top: var(--pico-block-spacing-vertical);
+        margin-bottom: calc(var(--pico-block-spacing-vertical) * -1);
+        border-top: var(--pico-border-width) solid var(--pico-card-border-color);
+        border-bottom-right-radius: var(--pico-border-radius);
+        border-bottom-left-radius: var(--pico-border-radius);
+      }
       /* Lucide icons — single source of truth for sizing AND
          spacing. `color: inherit` lets each icon pick up the
          surrounding text color (so an icon inside a `<small>` or a
@@ -512,9 +546,9 @@
         }
       }
       /* Credential rows (provider licensures / education / certifications)
-         render as flat rows inside an outer `<section>` (edit) or
-         `<article>` (detail), so a card-on-card pattern would read as
-         visual noise. The row's vocabulary is just a stacked
+         render as flat rows inside an outer `<section>` (edit or
+         detail), so a card-on-card pattern would read as visual
+         noise. The row's vocabulary is just a stacked
          `<strong>` + muted `<small>` on the left, optional Delete on
          the right, with a hairline divider between entries. */
       .credential-list {
@@ -545,11 +579,12 @@
       /* Auth-page form card — `/auth/login`, `/auth/register`,
          `/auth/forgot-password`, `/auth/reset-password/<token>`. Each
          page extends `base.html` directly (not the entity-form grammar)
-         and renders a single `<article class="auth-page">` card. The
-         article sits inside the `<main class="container">` which Pico
-         already centers and caps; without the rules below the card
-         itself still stretches to the container's full width (~720px
-         on tablet, ~1300px on desktop, #584). Cap at 28rem (~448px) —
+         and renders a single `<section class="auth-page">` card; chrome
+         comes from the shared card-chrome rules above. The section sits
+         inside the `<main class="container">` which Pico already
+         centers and caps; without the rules below the card itself
+         still stretches to the container's full width (~720px on
+         tablet, ~1300px on desktop, #584). Cap at 28rem (~448px) —
          narrower than `--form-max-width` since the auth forms are
          visually dense (2–3 short fields) and a tighter card reads as
          a clear focal point on landing. Centered via `margin-inline:
