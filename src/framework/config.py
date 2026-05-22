@@ -32,6 +32,11 @@ class Settings(BaseSettings):
     APP_BASE_URL: str = "http://localhost:8000"
     RESEND_API_KEY: str | None = None
 
+    # Error tracking. Empty string disables Sentry entirely — app starts
+    # normally without it. Set in production via the `.env` file on the
+    # droplet or as a CI/CD secret.
+    SENTRY_DSN: str = ""
+
     model_config = ConfigDict(env_file=".env", env_file_encoding="utf-8")
 
     @classmethod

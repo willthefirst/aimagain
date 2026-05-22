@@ -565,33 +565,6 @@
         max-width: 28rem;
         margin-inline: auto;
       }
-      /* Verify-email nag banner. Renders on every authenticated
-         page when `is_verified=False` (see `_verify_banner.html`).
-         The colors are inline because they're the only place this
-         palette appears — Pico's default `<aside>` styling is too
-         understated for a heads-up. */
-      .verify-banner {
-        background: #fff8e1;
-        border-left: 4px solid #f5a623;
-        padding: 0.5rem 1rem;
-        margin-block-end: 1rem;
-        border-radius: 4px;
-      }
-      .verify-banner-sent {
-        background: #e8f5e9;
-        border-left-color: #43a047;
-      }
-      .verify-banner-form {
-        display: inline;
-        margin: 0;
-      }
-      .verify-banner-button {
-        display: inline;
-        width: auto;
-        padding: 0.25rem 0.5rem;
-        font-size: 0.875rem;
-        margin: 0 0 0 0.5rem;
-      }
     </style>
     <script
       src="https://unpkg.com/htmx.org@2.0.4"
@@ -611,6 +584,16 @@
         script.async = true
         document.head.appendChild(script)
       })()
+    </script>
+    {% endif %} {% if not is_development and sentry_dsn %}
+    <script
+      src="https://browser.sentry-cdn.com/8.55.0/bundle.min.js"
+      crossorigin="anonymous"></script>
+    <script>
+      Sentry.init({
+        dsn: "{{ sentry_dsn }}",
+        environment: "{{ environment }}",
+      })
     </script>
     {% endif %}
   </head>
