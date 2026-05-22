@@ -8,6 +8,7 @@ silently disappear from the agent's first impression.
 from __future__ import annotations
 
 import subprocess
+import sys
 from pathlib import Path
 
 HOOK = Path(__file__).resolve().parent / "session_start_branch_check.py"
@@ -60,7 +61,7 @@ def test_prints_branch_and_clean_state_on_feature_branch(tmp_path: Path) -> None
     _git(repo, "checkout", "-b", "fix/123-foo")
 
     result = subprocess.run(
-        ["python", str(copy)], capture_output=True, text=True, cwd=repo
+        [sys.executable, str(copy)], capture_output=True, text=True, cwd=repo
     )
     assert result.returncode == 0
     assert "branch: fix/123-foo" in result.stderr
@@ -73,7 +74,7 @@ def test_warns_loudly_on_main_branch(tmp_path: Path) -> None:
     copy = _install_hook(repo)
 
     result = subprocess.run(
-        ["python", str(copy)], capture_output=True, text=True, cwd=repo
+        [sys.executable, str(copy)], capture_output=True, text=True, cwd=repo
     )
     assert result.returncode == 0
     assert "branch: main" in result.stderr
@@ -93,7 +94,7 @@ def test_surfaces_dirty_state_and_stashes(tmp_path: Path) -> None:
     (repo / "c.txt").write_text("c")
 
     result = subprocess.run(
-        ["python", str(copy)], capture_output=True, text=True, cwd=repo
+        [sys.executable, str(copy)], capture_output=True, text=True, cwd=repo
     )
     assert result.returncode == 0
     assert "file(s) modified" in result.stderr
