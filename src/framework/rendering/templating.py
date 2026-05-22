@@ -89,4 +89,6 @@ def get_template_context():
     return {
         "is_development": settings.ENVIRONMENT == "development",
         "livereload_port": "35729",
+        "sentry_dsn": settings.SENTRY_DSN,
+        "environment": settings.ENVIRONMENT,
     }

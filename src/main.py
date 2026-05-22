@@ -2,8 +2,12 @@ import logging
 from contextlib import asynccontextmanager
 from datetime import datetime
 
+import sentry_sdk
 from fastapi import Depends, FastAPI, HTTPException, Request, status
 from fastapi.responses import JSONResponse, RedirectResponse
+from sentry_sdk.integrations.fastapi import FastApiIntegration
+from sentry_sdk.integrations.sqlalchemy import SqlalchemyIntegration
+from starlette.middleware.base import BaseHTTPMiddleware
 
 from src.auth_config import auth_backend, fastapi_users
 from src.db import check_database_health
@@ -16,6 +20,21 @@ from src.framework.dispatch.registry import entity_registry
 from src.framework.http.middleware import StripEmptyQueryParamsMiddleware
 from src.framework.http.responses import APIResponse
 from src.jobs.scheduler import make_scheduler, register_jobs
+
+if settings.SENTRY_DSN:
+    sentry_sdk.init(
+        dsn=settings.SENTRY_DSN,
+        environment=settings.ENVIRONMENT,
+        send_default_pii=True,
+        enable_logs=True,
+        traces_sample_rate=1.0,
+        profile_session_sample_rate=1.0,
+        profile_lifecycle="trace",
+        integrations=[
+            FastApiIntegration(transaction_style="endpoint"),
+            SqlalchemyIntegration(),
+        ],
+    )
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -71,6 +90,25 @@ app = FastAPI(title="Bedlam Connect", lifespan=lifespan)
 # as omitting the param. See `src/framework/http/middleware.py` for the
 # full convention rationale.
 app.add_middleware(StripEmptyQueryParamsMiddleware)
+
+if settings.SENTRY_DSN:
+
+    class _SentryUserMiddleware(BaseHTTPMiddleware):
+        """Tags the Sentry scope with the authenticated user after each request.
+
+        Uses `request.state.user` set by the auth dependency during route
+        handling. Runs after `call_next` so the user attribute is populated;
+        covers performance traces and non-error events on the same scope.
+        """
+
+        async def dispatch(self, request: Request, call_next):
+            response = await call_next(request)
+            user = getattr(request.state, "user", None)
+            if user is not None:
+                sentry_sdk.set_user({"id": str(user.id), "email": user.email})
+            return response
+
+    app.add_middleware(_SentryUserMiddleware)
 
 
 @app.exception_handler(HTTPException)

@@ -36,6 +36,9 @@ app = [
     # `EMAIL_BACKEND=resend`; the console/file backends don't load it.
     # See `src/framework/email/README.md`.
     "resend",
+    # Error tracking. Disabled when `SENTRY_DSN` is unset (empty string).
+    # See `src/main.py` for init and `src/framework/config.py` for the setting.
+    "sentry-sdk[fastapi]",
 ]
 
 dev = [
