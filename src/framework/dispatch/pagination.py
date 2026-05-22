@@ -22,7 +22,7 @@ from urllib.parse import parse_qsl, urlencode
 
 from starlette.requests import Request
 
-DEFAULT_PAGE_SIZE = 25
+DEFAULT_PAGE_SIZE = 15
 
 T = TypeVar("T")
 

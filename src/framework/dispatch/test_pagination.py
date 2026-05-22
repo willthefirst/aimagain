@@ -58,7 +58,7 @@ def test_offset_for_first_page_is_zero() -> None:
 
 
 def test_offset_for_third_page_with_default_size() -> None:
-    assert offset_for(3, DEFAULT_PAGE_SIZE) == 50
+    assert offset_for(3, DEFAULT_PAGE_SIZE) == 30
 
 
 def test_paginate_full_page_with_overflow_signals_has_next() -> None:
