@@ -229,11 +229,13 @@
          label so it's visually clear the field can be left blank
          without competing with the label itself. Replaces the previous
          per-form `help="Optional."` pattern (single source of truth in
-         `_field_label` — see `_shared/form_fields.html`). */
+         `_field_label` — see `_shared/form_fields.html`). The
+         label-to-"(optional)" gap is owned here — `_field_label` emits
+         no literal whitespace between the two. */
       .form-field-optional {
         font-weight: 400;
         color: var(--pico-muted-color);
-        margin-inline-start: 0.25em;
+        margin-inline-start: 0.5em;
       }
       .entity-form-page form .form-field > input,
       .entity-form-page form .form-field > select,

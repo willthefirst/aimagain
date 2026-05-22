@@ -78,10 +78,14 @@ Composite-label cases (e.g. "<Program> · <Org>") pre-build a list of
    here so the "(optional)" marker is the *only* way an optional field is
    communicated visually — there is no `help="Optional."` pattern anymore
    (the per-field marker beats a help line both visually and in terms of
-   discoverability). Pinned by ``src/domain/templates/test_copy_conventions.py``.
+   discoverability). The gap between the label and "(optional)" is owned
+   by `.form-field-optional { margin-inline-start }` in `base.html` — do
+   not introduce literal whitespace here (spacing belongs in CSS, not
+   markup). Pinned by ``src/domain/templates/test_copy_conventions.py``
+   (copy) and ``test_form_fields.py`` (no literal-space markup).
 #}
 {% macro _field_label(label, required) -%}
-{{ label }}{% if not required %} <small class="form-field-optional">(optional)</small>{% endif %}
+{{ label }}{% if not required %}<small class="form-field-optional">(optional)</small>{% endif %}
 {%- endmacro %}
 
 {# ---- text-like inputs --------------------------------------------- #}
