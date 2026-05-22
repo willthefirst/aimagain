@@ -231,9 +231,10 @@ async def test_get_register_page(test_client: AsyncClient):
     # rest of the auth-flow pages follow the same shape.
     assert "Create an account" in response.text
     assert "Create account" in response.text
-    # Card wrapper — `.auth-page` caps the form at 28rem and centers it
+    # Form wrapper — `.auth-page` caps the form at 28rem and centers it
     # so it doesn't stretch to the `<main class="container">` width on
-    # tablet/desktop (#584). The `.auth-page` rule lives in `base.html`.
+    # tablet/desktop (#584). No card chrome: deliberately not styled as
+    # a card. The `.auth-page` rule lives in `base.html`.
     assert '<section class="auth-page">' in response.text
     # Subtitle must use plain language a first-time visitor can parse —
     # no bare model-jargon list ("openings, referrals, and intakes")
@@ -322,6 +323,43 @@ async def test_get_reset_password_page(test_client: AsyncClient):
     assert 'hx-ext="json-enc"' in response.text
     # See `test_get_register_page` for `.auth-page` rationale (#584).
     assert '<section class="auth-page">' in response.text
+
+
+async def test_card_chrome_only_applies_to_article_list_items(
+    test_client: AsyncClient,
+):
+    """Card chrome (background, border, padding, header/footer bands)
+    is reserved for list-item cards — `<article class="entity-card">`
+    rendered via `_shared/_card.html` — which pick it up automatically
+    from Pico's default `<article>` element styling. Single-item
+    wrappers (`<section class="entity-card">` detail pages,
+    `<section class="auth-page">` auth pages) carry the class as a DOM
+    hook only, contributing no styling.
+
+    Pin the rule by asserting the inline `<style>` block in the
+    rendered page contains no `.entity-card` rule whose body has card-
+    chrome properties (background, box-shadow, border-radius, padding).
+    If someone re-adds chrome to `.entity-card`, the regex match fires
+    and this test fails."""
+    import re
+
+    response = await test_client.get("/auth/login")
+    assert response.status_code == 200
+    # Find any `.entity-card` rule (matches `.entity-card { ... }` or
+    # `.entity-card > header { ... }`); assert none of them carry
+    # chrome properties. A bare `.entity-card,` in a combined selector
+    # (e.g. `.entity-card, .auth-page { background: ... }`) would also
+    # match. The auth-page max-width rule isn't on entity-card so it
+    # doesn't fire this.
+    chrome_props = ("background:", "box-shadow:", "border-radius:", "padding:")
+    for match in re.finditer(r"\.entity-card[^{]*\{([^}]*)\}", response.text):
+        body = match.group(1)
+        offenders = [p for p in chrome_props if p in body]
+        assert not offenders, (
+            f".entity-card rule has chrome properties {offenders}: "
+            f"`{match.group(0).strip()}` — chrome belongs only on the "
+            "Pico `<article>` element default, not on the class."
+        )
 
 
 async def test_get_verify_page_without_token_returns_error(test_client: AsyncClient):

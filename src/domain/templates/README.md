@@ -40,7 +40,7 @@ The cross-resource import lint ([`scripts/dev/template_imports_check.py`](../../
 
 The services list is the first row of `_facts_block`'s `<dl>` rather than its own partial (see #628).
 
-The auth-flow pages (`auth/login.html`, `auth/register.html`, `auth/forgot_password.html`, `auth/reset_password.html`) each render a single `<section class="auth-page">` card. The shared card-chrome rules in [`../../framework/templates/base.html`](../../framework/templates/base.html) apply Pico's article framing (background, border, padding, header/footer bands) to the class, and the `.auth-page` rule caps the card at 28rem centered horizontally. `<article>` is reserved for items inside a list of items (post-list cards, the per-affiliation loop in `providers/detail.html`); single-form pages use `<section>`.
+The auth-flow pages (`auth/login.html`, `auth/register.html`, `auth/forgot_password.html`, `auth/reset_password.html`, `auth/verify.html`) each render a single `<section class="auth-page">`. The `.auth-page` rule in [`../../framework/templates/base.html`](../../framework/templates/base.html) caps the form at 28rem and centers it; **no card chrome** is applied. Card chrome (background, border, padding, header/footer bands) is reserved for list-item cards — `<article class="entity-card">` rendered through `_shared/_card.html` — which get the chrome from Pico's default `<article>` element styling. Detail-page wrappers (`<section class="entity-card">`) and auth-page wrappers (`<section class="auth-page">`) carry the class as a DOM hook but contribute no styling; the wrapping `<main class="container">` already centers and caps page content.
 
 ## Copy style guide
 
