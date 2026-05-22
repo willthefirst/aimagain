@@ -900,12 +900,12 @@ class PushCommands:
 
 
 class MergeCommands:
-    """`dev merge [<pr-number>]` — hand off to GitHub Merge Queue.
+    """`dev merge [<pr-number>]` — watch a PR until Mergify lands it.
 
-    With the merge queue enabled on `main`, the queue handles rebase and
-    CI-in-merge_group itself. This command's job is to enable auto-merge
-    (`gh pr merge --auto`), then watch the PR until the queue lands it
-    or a check fails. See scripts/README.md#merging-prs.
+    Mergify auto-queues PRs whose CI is green (see .mergify.yml), runs
+    speculative CI on the rebased commit, and squash-merges when green.
+    This command's job is to watch and report until that happens, or
+    exit non-zero when a check fails. See scripts/README.md#merging-prs.
     """
 
     POLL_SECONDS = 30
@@ -969,15 +969,9 @@ class MergeCommands:
                 failed.append(name)
         return failed
 
-    def _enable_auto_merge(self, pr: int, method: str) -> int:
-        return self.runner.run_command(
-            ["gh", "pr", "merge", str(pr), "--auto", f"--{method}"]
-        )
-
     def merge(
         self,
         pr: Optional[int] = None,
-        method: str = "squash",
         timeout_seconds: int = DEFAULT_TIMEOUT_SECONDS,
     ) -> int:
         import time
@@ -990,20 +984,7 @@ class MergeCommands:
             )
             return 1
 
-        print(f"🔄 Handing PR #{number} to merge queue (method: {method})")
-        # Short-circuit on already-failing checks so we don't burn a queue slot.
-        initial = self._pr_status(number)
-        if (initial.get("state") or "").upper() == "MERGED":
-            print(f"✅ PR #{number} is already merged.")
-            return 0
-        failing = self._checks_failing(initial)
-        if failing:
-            print(f"❌ PR #{number} has failing checks: {', '.join(failing)}")
-            return 3
-        rc = self._enable_auto_merge(number, method)
-        if rc != 0:
-            return rc
-
+        print(f"⏳ Watching PR #{number} — Mergify will queue it when CI is green.")
         deadline = time.monotonic() + timeout_seconds
         last_state: Optional[str] = None
         while time.monotonic() < deadline:
@@ -1603,11 +1584,11 @@ Examples:
     def _add_merge_parser(self, subparsers):
         parser = subparsers.add_parser(
             "merge",
-            help="Hand a PR to the merge queue and watch it land",
+            help="Watch a PR until Mergify queues and lands it",
             description=(
-                "Enables auto-merge via `gh pr merge --auto`, then polls the "
-                "PR until the queue lands it or a check fails. The queue does "
-                "the rebase-onto-main and CI-in-merge_group itself. See "
+                "Polls the PR until Mergify squash-merges it or a check fails. "
+                "Mergify auto-queues PRs whose CI is green (see .mergify.yml); "
+                "this command just watches and reports. See "
                 "scripts/README.md#merging-prs."
             ),
         )
@@ -1616,12 +1597,6 @@ Examples:
             type=int,
             nargs="?",
             help="PR number. Defaults to the PR for the current branch.",
-        )
-        parser.add_argument(
-            "--method",
-            choices=["rebase", "merge", "squash"],
-            default="squash",
-            help="Merge method (default: squash, matches branch-protection queue config).",
         )
         parser.add_argument(
             "--timeout",
@@ -1633,7 +1608,7 @@ Examples:
             ),
         )
         parser.set_defaults(
-            func=lambda args: self.merge_cmd.merge(args.pr, args.method, args.timeout)
+            func=lambda args: self.merge_cmd.merge(args.pr, args.timeout)
         )
 
     def _add_claim_parser(self, subparsers):

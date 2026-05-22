@@ -28,38 +28,28 @@ Deployment-specific scripts live in `deployment/scripts/` (see [`deployment/READ
 <!-- title-case-ignore: PRs is an acronym -->
 ## Merging PRs
 
-PRs land via [GitHub Merge Queue](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/configuring-pull-request-merges/managing-a-merge-queue) on `main`. The flow is:
+PRs land via [Mergify](https://mergify.com) on `main`. Mergify is a GitHub App that watches for PRs with green CI, queues them, runs speculative CI on the rebased merge commit, and squash-merges when green.
+
+**Flow:**
 
 1. `dev push` opens (or updates) a PR off your worktree branch.
-2. `dev merge [<pr>]` enables auto-merge via `gh pr merge --auto --squash`, then polls until the queue lands the PR or a required check fails.
-3. The queue rebases the PR onto current `main` itself, runs CI in `merge_group` context against the speculative merge commit, and merges when green. No manual `gh pr update-branch --rebase`.
+2. CI runs on the PR head (`pull_request` event). When all four checks go green, Mergify automatically adds the PR to the queue — no manual step needed.
+3. Mergify rebases the PR onto current `main` (batching up to 3 queued PRs together), runs CI on that speculative commit, and squash-merges when green.
+4. `dev merge [<pr>]` watches and reports until Mergify lands it or a check fails. It issues no `gh` commands — Mergify does the work.
 
-**When CI runs in each context:**
+**Queue config:**
 
-- `pull_request` event — runs against the PR head, on every push. Required checks for the PR-ready state.
-- `merge_group` event — runs against the queue's speculative merge commit (PR rebased onto current `main`). Same four required checks (`tests`, `contract-tests`, `linting`, `docker-health-check`); see [`.github/workflows/ci.yml`](../.github/workflows/ci.yml).
+Config lives in [`.mergify.yml`](../.mergify.yml) at the repo root. Key knobs:
 
-The required-check names are identical across both contexts, so branch protection is satisfied by either.
-
-**Queue config and tuning:**
-
-The queue config lives on the `main` branch protection rule, not in this repo. Inspect with:
-
-```bash
-gh api /repos/willthefirst/bedlam-connect/branches/main/protection/required_merge_queue
-```
-
-Knobs worth knowing:
-
-- `merge_method=squash` — matches `required_linear_history: true` on the branch rule.
-- `max_entries_to_build` — how many PRs the queue speculatively rebases and tests in parallel. Start small (3); raise once CI is stable.
-- `min_entries_to_merge_wait_minutes` — how long the queue waits for siblings before merging a lone entry. Set low for solo work, higher to amortize CI across batches.
+- `merge_method: squash` — matches `required_linear_history: true` on the branch rule.
+- `batch_size: 3` — up to 3 PRs share one speculative CI run. Raise if throughput increases.
+- `batch_max_wait_time: 5 minutes` — a lone PR in the queue won't wait more than 5 min for siblings before merging solo.
 
 **Recovery:**
 
-- See what's queued: `gh api /repos/willthefirst/bedlam-connect/actions/runs?event=merge_group --jq '.workflow_runs[] | {id, status, head_branch}'`.
-- Pull a PR out of the queue: `gh pr merge --disable-auto <pr>`. Re-queue with `dev merge <pr>` when ready.
-- If the queue is jammed (stuck PR with no clear failure), GitHub UI → Settings → Branches → `main` → "Merge queue" exposes the queue dashboard.
+- See what's queued: Mergify dashboard at [app.mergify.com](https://app.mergify.com) or the "Mergify" check on any PR.
+- Pull a PR out of the queue: comment `@mergifyio dequeue` on the PR. Re-add by pushing a new commit (re-triggering CI) or commenting `@mergifyio queue`.
+- If Mergify is dequeuing PRs unexpectedly, check the "Checks" tab on the speculative merge commit Mergify created — that's where the failing CI run lives.
 
 ## Tests
 
