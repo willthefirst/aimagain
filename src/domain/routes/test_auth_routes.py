@@ -35,15 +35,50 @@ async def test_register(
     assert user_info["email"] == email_to_test
     assert user_info["is_active"] is True
     assert user_info["is_superuser"] is False
-    # `is_verified` removed from the response in #696 — no verification
-    # flow exists; the field was always False and misleading.
-    assert "is_verified" not in user_info
+    # `is_verified` restored to the response with the verification
+    # rollout (reversing #696). Tests run with `ENVIRONMENT=development`
+    # (see `.env.test`), so the dev-mode auto-verify guardrail in
+    # `UserManager.on_after_register` fires — the user is `True`
+    # without anyone clicking a verify link. In production this would
+    # be `False` until the user clicks the link in their verify email;
+    # the prod path is exercised by `test_register_prod_mode_leaves_user_unverified`.
+    assert user_info["is_verified"] is True
 
     async with db_test_session_manager() as session:
         user_db = SQLAlchemyUserDatabase(session, User)
         created_user = await user_db.get_by_email(email_to_test)
         assert created_user is not None
         assert created_user.email == email_to_test
+
+
+async def test_register_prod_mode_leaves_user_unverified(
+    test_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    monkeypatch,
+):
+    """Pin the production-mode path: `on_after_register` calls
+    `self.request_verify` (which sends the verify email) and does NOT
+    auto-flip `is_verified`. The user starts at `False` until they
+    click the link in the email.
+
+    Tests run with `ENVIRONMENT=development` by default — this test
+    monkey-patches that and stubs the send call so the assertion
+    isolates the hook's branching, not the email transport."""
+    from unittest.mock import AsyncMock
+
+    monkeypatch.setattr("src.auth_config.settings.ENVIRONMENT", "production")
+    monkeypatch.setattr(
+        "src.domain.logic.auth.emails.send_email", AsyncMock(return_value=None)
+    )
+
+    register_data = {
+        "email": "prod-mode-user@example.com",
+        "password": "password123",
+        "username": "prodmodeuser",
+    }
+    response = await test_client.post("/auth/register", json=register_data)
+    assert response.status_code == 201
+    assert response.json()["is_verified"] is False
 
 
 async def test_register_via_htmx_sets_cookie_and_redirects(test_client: AsyncClient):
@@ -253,10 +288,17 @@ async def test_get_forgot_password_page(test_client: AsyncClient):
     # H1 was removed app-wide; the page no longer carries the literal
     # "Forgot password" text. The submit button and body copy still
     # identify the page.
-    assert "/auth/forgot-password" in response.text
     assert "Send reset link" in response.text
     # See `test_get_register_page` for `.auth-page` rationale (#584).
     assert '<article class="auth-page">' in response.text
+    # The form MUST submit as JSON — fastapi-users' `/auth/forgot-password`
+    # expects `{"email": "..."}`. A plain `<form method="post">` would
+    # send `application/x-www-form-urlencoded` and the endpoint would
+    # 422 with "email field required" in production. Pin both the
+    # htmx submit attribute and the json-enc extension so the next
+    # rewrite can't silently regress to form-encoding.
+    assert 'hx-post="/auth/forgot-password"' in response.text
+    assert 'hx-ext="json-enc"' in response.text
 
 
 async def test_get_reset_password_page(test_client: AsyncClient):
@@ -273,8 +315,129 @@ async def test_get_reset_password_page(test_client: AsyncClient):
         f'value="{reset_token}"' in response.text
         or f'data-token="{reset_token}"' in response.text
     )
+    # Same JSON-submit contract as `test_get_forgot_password_page`:
+    # the endpoint expects `{"token": "...", "password": "..."}` and
+    # form-encoding would 422.
+    assert 'hx-post="/auth/reset-password"' in response.text
+    assert 'hx-ext="json-enc"' in response.text
     # See `test_get_register_page` for `.auth-page` rationale (#584).
     assert '<article class="auth-page">' in response.text
+
+
+async def test_get_verify_page_without_token_returns_error(test_client: AsyncClient):
+    """Missing `?token=` query param → error state. Page still
+    renders 200 (this is the email-link landing, not an API endpoint
+    — the user shouldn't see a JSON 422)."""
+    response = await test_client.get("/auth/verify")
+    assert response.status_code == 200
+    assert "text/html" in response.headers["content-type"]
+    assert "didn't work" in response.text.lower() or "error" in response.text.lower()
+
+
+async def test_get_verify_page_with_invalid_token_returns_error(
+    test_client: AsyncClient,
+):
+    """An obviously-bad token (not a valid JWT) renders the error
+    state, never raises a 500. The page route swallows
+    `InvalidVerifyToken` and routes to the error template."""
+    response = await test_client.get("/auth/verify?token=not.a.real.jwt")
+    assert response.status_code == 200
+    assert "didn't work" in response.text.lower() or "error" in response.text.lower()
+
+
+async def test_get_verify_page_with_valid_token_verifies_user(
+    test_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user: User,
+):
+    """A valid verification token flips `is_verified` to True and the
+    landing page renders the success state."""
+    from src.auth_config import get_user_manager
+    from src.db import get_user_db
+
+    # Mint a real verify token by calling `request_verify` through the
+    # manager — same path the email-link generation uses.
+    async with db_test_session_manager() as session:
+        user_db_gen = get_user_db(session)
+        user_db = await anext(user_db_gen)
+        manager_gen = get_user_manager(user_db)
+        manager = await anext(manager_gen)
+        # Pull a fresh user row from this session so the manager can
+        # operate on it without touching a closed session.
+        from sqlalchemy import select
+
+        fresh_user = (
+            await session.execute(select(User).where(User.id == logged_in_user.id))
+        ).scalar_one()
+        # Mark unverified so the verify call has work to do (the dev
+        # auto-verify pathway leaves users at True; reset to False here).
+        await user_db.update(fresh_user, {"is_verified": False})
+        # Mint the token via the manager. fastapi-users doesn't expose
+        # a `make_verify_token` helper but `request_verify` produces
+        # one and triggers `on_after_request_verify` — we capture the
+        # token from there.
+
+        captured: dict = {}
+
+        async def capture_send(user, token):
+            captured["token"] = token
+
+        from src.domain.logic.auth import emails as emails_module
+
+        original = emails_module.send_verification_email
+        emails_module.send_verification_email = capture_send
+        try:
+            await manager.request_verify(fresh_user)
+        finally:
+            emails_module.send_verification_email = original
+
+    token = captured["token"]
+
+    response = await test_client.get(f"/auth/verify?token={token}")
+    assert response.status_code == 200
+    assert "verified" in response.text.lower()
+
+    # Confirm the DB column actually flipped.
+    async with db_test_session_manager() as session:
+        from sqlalchemy import select
+
+        user = (
+            await session.execute(select(User).where(User.id == logged_in_user.id))
+        ).scalar_one()
+        assert user.is_verified is True
+
+
+async def test_post_resend_verify_unauthenticated_returns_401(test_client: AsyncClient):
+    """`POST /auth/resend-verify` reads the user from the session — no
+    cookie means no resend. Returns 401 (handled by the middleware
+    that turns 401 into a redirect for HTML, but the API client here
+    isn't sending the HTMX header so it stays 401)."""
+    response = await test_client.post("/auth/resend-verify")
+    assert response.status_code == 401
+
+
+async def test_post_resend_verify_authenticated_returns_sent_banner(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user: User,
+    monkeypatch,
+):
+    """Authed user can re-request the verify email. Response is the
+    `_verify_banner_sent.html` partial (HTMX swaps it over the
+    original banner via `outerHTML`)."""
+    # Stub the actual send so the test doesn't print to stderr.
+    from unittest.mock import AsyncMock
+
+    monkeypatch.setattr(
+        "src.domain.logic.auth.emails.send_email", AsyncMock(return_value=None)
+    )
+
+    response = await authenticated_client.post("/auth/resend-verify")
+    assert response.status_code == 200
+    assert "Verification email sent" in response.text
+    # The partial keeps the original id so a future HTMX target=
+    # `#verify-banner` swap on the same page still works.
+    assert 'id="verify-banner"' in response.text
 
 
 async def test_unauthorized_redirect_for_browser_requests(test_client: AsyncClient):
