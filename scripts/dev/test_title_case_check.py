@@ -556,6 +556,182 @@ def test_brand_phrase_does_not_creep_into_unrelated_prose(tmp_path):
     assert _check(file) == []
 
 
+def test_prose_text_skips_nested_lintable_subtrees(tmp_path):
+    """A structural wrapper like ``<a><hgroup><h2>...</h2><p>...</p></hgroup></a>``
+    must not be linted on its rolled-up deep text. ``<h2>`` and ``<p>`` are
+    themselves linted units; including their text in the outer ``<a>``'s
+    judgement creates the picker-pattern false positive that previously
+    required ``<!-- title-case-ignore -->`` markers on every card."""
+    file = _write_html(
+        tmp_path,
+        """
+        <html><body>
+        <a href="/x">
+          <hgroup>
+            <h2>Solo practice</h2>
+            <p>An individual clinician with availability.</p>
+          </hgroup>
+        </a>
+        </body></html>
+        """,
+    )
+    assert _check(file) == []
+
+
+def test_prose_text_still_flags_inner_heading_violation(tmp_path):
+    """The wrapper-skip must not hide real violations in nested lintable
+    children — each child is judged on its own."""
+    file = _write_html(
+        tmp_path,
+        """
+        <html><body>
+        <a href="/x">
+          <hgroup>
+            <h2>Solo Practice</h2>
+            <p>An individual clinician.</p>
+          </hgroup>
+        </a>
+        </body></html>
+        """,
+    )
+    originals = {v["original"] for v in _check(file)}
+    assert "Solo Practice" in originals
+
+
+def test_nested_li_dropdown_rollup_does_not_false_positive(tmp_path):
+    """A dropdown nav (outer ``<li>`` wrapping ``<details>``/``<summary>``/
+    inner ``<li><a>``) used to roll up to ``"Profile Sign out"`` on the
+    outer ``<li>`` and require a ``title-case-ignore`` marker. The inner
+    ``<a>`` tags are independent lintable units, so the outer wrapper
+    should now be empty for lint purposes."""
+    file = _write_html(
+        tmp_path,
+        """
+        <html><body>
+        <ul>
+          <li>
+            <details>
+              <summary aria-label="Profile menu">Profile</summary>
+              <ul>
+                <li><a href="/profile">Profile</a></li>
+                <li><a href="#" hx-post="/auth/sign-out">Sign out</a></li>
+              </ul>
+            </details>
+          </li>
+        </ul>
+        </body></html>
+        """,
+    )
+    assert _check(file) == []
+
+
+def test_inline_emphasis_still_treated_as_one_prose_unit(tmp_path):
+    """Non-lintable inline elements (``<em>``, ``<span>``) are still
+    descended into so ``<p>Some <em>bad</em> text</p>`` is judged as one
+    sentence — the wrapper-skip rule only fires on tags that are themselves
+    lintable."""
+    file = _write_html(
+        tmp_path,
+        """
+        <html><body>
+        <p>Welcome to <em>the</em> service.</p>
+        </body></html>
+        """,
+    )
+    assert _check(file) == []
+
+
+def test_aria_hook_value_breadcrumb_is_not_linted(tmp_path):
+    """``aria-label="breadcrumb"`` is a reserved ARIA landmark hook, not
+    prose — sentence-casing to ``"Breadcrumb"`` would defeat the screen
+    reader convention."""
+    file = _write_html(
+        tmp_path,
+        """
+        <html><body>
+        <nav aria-label="breadcrumb"><a href="/x">Posts</a></nav>
+        </body></html>
+        """,
+    )
+    assert _check(file) == []
+
+
+def test_aria_label_with_real_prose_still_linted(tmp_path):
+    """The hook allowlist is narrow — generic ``aria-label`` values that
+    aren't reserved landmark words remain prose."""
+    file = _write_html(
+        tmp_path,
+        """
+        <html><body>
+        <button aria-label="Close The Dialog">x</button>
+        </body></html>
+        """,
+    )
+    originals = {v["original"] for v in _check(file)}
+    assert "Close The Dialog" in originals
+
+
+def test_leading_symbol_yields_to_first_alpha_word(tmp_path):
+    """A leading non-alphanumeric token (``«``, ``»``, bullet glyphs)
+    doesn't have case and shouldn't consume the sentence-leading slot.
+    The pagination macro emits ``« Prev`` / ``Next »`` — both should
+    pass without per-line ignore markers."""
+    file = _write_html(
+        tmp_path,
+        """
+        <html><body>
+        <a href="/?page=1">&laquo; Prev</a>
+        <a href="/?page=3">Next &raquo;</a>
+        </body></html>
+        """,
+    )
+    assert _check(file) == []
+
+
+def test_leading_symbol_does_not_hide_miscased_first_word(tmp_path):
+    """The symbol-yields rule still expects the first alpha word to start
+    the sentence — ``« back to home`` is wrong and must be flagged."""
+    file = _write_html(
+        tmp_path,
+        """
+        <html><body>
+        <a href="/">&laquo; back to home</a>
+        </body></html>
+        """,
+    )
+    violations = _check(file)
+    assert violations, "leading symbol must not silently capitalize the next word"
+
+
+def test_numbered_prefix_still_consumes_first_slot(tmp_path):
+    """A digit-led token like ``1.`` has a word character, so it does
+    consume the first-word slot — preserving the existing
+    ``1. ssh to droplet`` behaviour. This separates "no case at all"
+    (symbols) from "case fixed by source" (numbers)."""
+    file = _write_md(tmp_path, "### 1. ssh to droplet\n")
+    assert _check(file) == []
+
+
+def test_domain_acronyms_iop_npi_mcp_pass(tmp_path):
+    """``IOP`` (intensive outpatient program), ``NPI`` (National Provider
+    Identifier), and ``MCP`` (Model Context Protocol) appear in template
+    prose and dev docs — promoting them to ``ALWAYS_CAPITALIZE`` replaces
+    one-off ``title-case-ignore`` markers."""
+    file = _write_html(
+        tmp_path,
+        """
+        <html><body>
+        <p>For example a cohort, IOP, or day program.</p>
+        <p>NPI 1234567890.</p>
+        </body></html>
+        """,
+    )
+    assert _check(file) == []
+
+    md = _write_md(tmp_path, "### Playwright MCP for design review\n")
+    assert _check(md) == []
+
+
 def test_main_exits_with_error_when_selectolax_missing(monkeypatch, capsys):
     """If selectolax isn't importable, the CLI must hard-fail rather than
     silently skip every HTML/Jinja file. Regression for #198 — the old

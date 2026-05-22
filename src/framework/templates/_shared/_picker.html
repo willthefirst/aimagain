@@ -8,17 +8,12 @@ Each option is a dict with keys:
   href:        URL to navigate to on click
   heading:     short label (e.g. "Solo practice")
   description: one-line tagline
-
-The `<h2>` carries `<!-- title-case-ignore -->` because the linter's
-concatenated-text heuristic flags the heading + tagline as a
-mid-text-capital violation even though each element is correct sentence
-case in isolation. Scope is the same line as the violation.
 #}
 {%- macro picker(options) -%}
 {%- for opt in options %}
 <a href="{{ opt.href }}">
   <hgroup>
-    <h2>{{ opt.heading }}</h2> <!-- title-case-ignore -->
+    <h2>{{ opt.heading }}</h2>
     <p>{{ opt.description }}</p>
   </hgroup>
 </a>

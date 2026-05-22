@@ -21,7 +21,6 @@
    clinician practices at, so the org-as-H1 fallback only matters
    while the name backfill is in progress. #}
 {% block current_label %}{% if provider.first_name and provider.last_name %}{{ provider.first_name }} {{ provider.last_name }}{% else %}{{ provider.org.name }}{% endif %}{% endblock %}
-{# title-case-ignore: NPI is an industry abbreviation (National Provider Identifier) #}
 {% block subtitle %}{% if view.npi %}<span>NPI {{ view.npi }}</span>{% endif %}
 {%- if verification_status == "verified" %}
 <small><i class="icon-shield-check"></i>Verified</small>
