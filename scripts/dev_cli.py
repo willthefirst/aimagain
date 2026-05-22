@@ -902,10 +902,10 @@ class PushCommands:
 class MergeCommands:
     """`dev merge [<pr-number>]` — watch a PR until Mergify lands it.
 
-    Mergify auto-queues PRs whose CI is green (see .mergify.yml), runs
-    speculative CI on the rebased commit, and squash-merges when green.
-    This command's job is to watch and report until that happens, or
-    exit non-zero when a check fails. See scripts/README.md#merging-prs.
+    Mergify queues PRs automatically when they open (see .mergify.yml),
+    waits for CI to go green, runs speculative CI on the rebased batch,
+    and squash-merges. This command watches and reports that process,
+    exiting non-zero if a check fails. See scripts/README.md#merging-prs.
     """
 
     POLL_SECONDS = 30

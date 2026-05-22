@@ -12,16 +12,13 @@ queue_rules:
       - check-success = docker-health-check
     merge_method: squash
     batch_size: 3
-    batch_max_wait_time: 5 minutes
+    batch_max_wait_time: 2 minutes
 
 pull_request_rules:
-  - name: add to merge queue when CI is green
+  - name: add to merge queue on open
     conditions:
       - base = main
-      - check-success = tests
-      - check-success = contract-tests
-      - check-success = linting
-      - check-success = docker-health-check
+      - -draft
     actions:
       queue:
         name: default
