@@ -179,6 +179,6 @@ jobs:
     if: success() && github.event_name == 'pull_request'
     steps:
       - name: Add to Mergify queue
-        run: gh pr comment ${{ github.event.pull_request.number }} --body "@mergifyio queue"
+        run: gh pr comment ${{ github.event.pull_request.number }} --repo ${{ github.repository }} --body "@mergifyio queue"
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
