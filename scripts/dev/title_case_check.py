@@ -141,6 +141,16 @@ class TitleCaseChecker:
         "LLMs",
         "AI",
         "MVP",
+        "PR",
+        "PRs",
+        "API",
+        "APIs",
+        "URL",
+        "URLs",
+        "ID",
+        "IDs",
+        "UUID",
+        "UUIDs",
         # App-domain acronyms (intake forms, public-facing copy)
         "ZIP",  # Postal code field
         "PII",  # Personally identifiable information
