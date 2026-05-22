@@ -3,6 +3,7 @@ name: CI - Test and lnt
 on:
   pull_request:
     branches: [main]
+  merge_group:
   workflow_dispatch: # Allow manual runs
 
 env:
