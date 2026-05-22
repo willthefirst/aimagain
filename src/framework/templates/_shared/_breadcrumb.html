@@ -1,5 +1,4 @@
 {# Breadcrumb zone bar primitive.
-   title-case-ignore: the literal ARIA value `breadcrumb` is Pico's hook.
 
 Renders the page's location as a single "back" affordance — a
 Lucide arrow-left chevron plus the deepest clickable parent's
@@ -24,7 +23,6 @@ item's label as plain text so the markup stays valid.
     ]) }}
 #}
 
-{# title-case-ignore: literal aria-label value `breadcrumb` is the Pico hook #}
 {% macro breadcrumb(items) -%}
 {%- if items %}
 {# Deepest clickable parent — the back target. Walk from the end

@@ -71,6 +71,15 @@ class TitleCaseChecker:
     # CSS/JS). The walker never descends into these.
     NEVER_DESCEND_TAGS = {"script", "style", "code", "pre", "kbd"}
 
+    # Reserved ARIA landmark/role hook values — document-structure
+    # vocabulary, not user-facing prose. They appear in ``aria-label`` so
+    # assistive tech announces a familiar region name; sentence-casing
+    # them ("Breadcrumb") would defeat the hook.
+    ARIA_HOOK_VALUES = {
+        "breadcrumb",
+        "pagination",
+    }
+
     FILE_EXTENSIONS = {
         ".md": "markdown",
         ".markdown": "markdown",
@@ -137,6 +146,9 @@ class TitleCaseChecker:
         "PII",  # Personally identifiable information
         "DBT",  # Dialectical behavior therapy
         "EMDR",  # Eye movement desensitization and reprocessing
+        "IOP",  # Intensive outpatient program
+        "NPI",  # National Provider Identifier
+        "MCP",  # Model Context Protocol (referenced in dev docs)
         # Brand mark — the short form rendered on narrow viewports.
         # Multi-word brand phrases (e.g. "Bedlam Connect") live in
         # ``BRAND_PHRASES`` below; this entry covers the standalone
@@ -404,13 +416,21 @@ class TitleCaseChecker:
         if not words:
             return text
 
+        # Pure-symbol prefixes (``«``, ``»``, bullets) don't have case and
+        # shouldn't consume the sentence-leading slot — the first *word with
+        # alphanumeric content* is what the sentence starts on. A digit-led
+        # token like ``1.`` does have a word character and does consume the
+        # slot, preserving the existing "1. ssh to droplet" behaviour.
+        sentence_started = False
         result_words = []
-        for i, word in enumerate(words):
+        for word in words:
             # Backtick-wrapped code spans (`.env`, `BaseRepository`) are
             # identifiers, not prose — preserve verbatim, including for the
             # first-word rule that would otherwise mangle "`.env` vs `.env.test`".
             if "`" in word:
                 result_words.append(word)
+                if re.search(r"\w", word):
+                    sentence_started = True
                 continue
 
             clean_word = re.sub(r"[^\w]", "", word)
@@ -420,26 +440,28 @@ class TitleCaseChecker:
             is_http_method = clean_word.upper() in self.HTTP_METHODS
             if is_http_method and clean_word.isupper():
                 result_words.append(word)
+                if clean_word:
+                    sentence_started = True
                 continue
 
-            if i == 0:
+            if not sentence_started and clean_word:
                 if not is_http_method and clean_word.upper() in capitalize_map:
                     proper_case = capitalize_map[clean_word.upper()]
                     result_words.append(word.replace(clean_word, proper_case))
                 else:
-                    if clean_word:
-                        new_word = word.replace(
-                            clean_word, clean_word[0].upper() + clean_word[1:].lower()
-                        )
-                        result_words.append(new_word)
-                    else:
-                        result_words.append(word)
+                    new_word = word.replace(
+                        clean_word, clean_word[0].upper() + clean_word[1:].lower()
+                    )
+                    result_words.append(new_word)
+                sentence_started = True
             else:
                 if not is_http_method and clean_word.upper() in capitalize_map:
                     proper_case = capitalize_map[clean_word.upper()]
                     result_words.append(word.replace(clean_word, proper_case))
-                else:
+                elif clean_word:
                     result_words.append(word.replace(clean_word, clean_word.lower()))
+                else:
+                    result_words.append(word)
 
         sentence_case = emoji_prefix + " ".join(result_words)
 
@@ -685,6 +707,13 @@ class TitleCaseChecker:
                     continue
                 if not attr_value:
                     continue
+                if (
+                    attr_name in ("aria-label", "aria-description")
+                    and attr_value.strip().lower() in self.ARIA_HOOK_VALUES
+                ):
+                    # Reserved ARIA landmark hook (e.g. ``aria-label="breadcrumb"``)
+                    # — not prose.
+                    continue
                 self._maybe_record(
                     text=attr_value,
                     header_level=f"@{attr_name}",
@@ -695,19 +724,19 @@ class TitleCaseChecker:
                     locator_candidates=[attr_value],
                 )
 
-        # Lint the deep text content of recognised content elements. We use
-        # deep text so that ``<p>Some <em>bad</em> phrase</p>`` is judged as
-        # one prose unit; nested lintable elements (``<a>`` inside ``<p>``)
-        # are also linted independently when the walker reaches them.
+        # Lint the prose text of recognised content elements. ``_prose_text``
+        # treats other ``LINTABLE_TEXT_TAGS`` as boundaries — those subtrees
+        # are linted as independent units when the walker reaches them, so
+        # including their text in the outer rollup double-counts and creates
+        # false positives (e.g. ``<a><hgroup><h2>X</h2><p>Y</p></hgroup></a>``
+        # used to flag the joined ``"X Y"`` even when X and Y were each
+        # correct in isolation).
         if tag in self.LINTABLE_TEXT_TAGS:
-            try:
-                deep_text = node.text(deep=True)
-            except Exception:
-                deep_text = None
-            if deep_text:
-                normalized = " ".join(deep_text.split())
+            prose = self._prose_text(node)
+            if prose:
+                normalized = " ".join(prose.split())
                 if normalized:
-                    locator_candidates = [normalized, deep_text]
+                    locator_candidates = [normalized, prose]
                     leaf = self._first_leaf_text(node)
                     if leaf:
                         locator_candidates.append(leaf)
@@ -724,6 +753,32 @@ class TitleCaseChecker:
         # Descend.
         for child in node.iter(include_text=False):
             self._walk(child, file_path, content, line_starts, violations)
+
+    def _prose_text(self, node) -> str:
+        """Concatenated text inside ``node``, stopping at any nested element
+        that's itself in ``LINTABLE_TEXT_TAGS``.
+
+        Those subtrees are linted as independent prose units when the walker
+        reaches them; including their text in the outer rollup creates
+        false positives on structural wrappers like
+        ``<a><hgroup><h2>...</h2><p>...</p></hgroup></a>``. Inline emphasis
+        elements that aren't lintable (e.g. ``<em>``, ``<span>``) are still
+        descended into so ``<p>Some <em>bad</em> text</p>`` is judged as
+        one prose unit.
+        """
+        fragments: List[str] = []
+        for child in node.iter(include_text=True):
+            if child.tag == "-text":
+                fragments.append(child.text() or "")
+            elif child.tag in self.NEVER_DESCEND_TAGS:
+                continue
+            elif child.tag in self.LINTABLE_TEXT_TAGS:
+                continue
+            else:
+                inner = self._prose_text(child)
+                if inner:
+                    fragments.append(inner)
+        return "".join(fragments)
 
     def _first_leaf_text(self, node) -> str:
         """Return the first non-empty text-node descendant's content.
