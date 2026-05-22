@@ -25,7 +25,6 @@ CLAUDE.md and other docs that want to mention a command link to `dev --help` rat
 
 Deployment-specific scripts live in `deployment/scripts/` (see [`deployment/README.md`](../deployment/README.md)).
 
-<!-- title-case-ignore: PRs is an acronym -->
 ## Merging PRs
 
 PRs land via [Mergify](https://mergify.com) on `main`. Mergify is a GitHub App that watches for PRs with green CI, queues them, runs speculative CI on the rebased merge commit, and squash-merges when green.
