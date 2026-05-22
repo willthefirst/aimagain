@@ -66,6 +66,33 @@ CONTRACT_PAIRS: list[ContractPair] = [
         endpoints=("POST /auth/register",),
         pytest_marks=(pytest.mark.provider, pytest.mark.auth),
     ),
+    # `forgot-password-form` and `reset-password-form` differ from the
+    # other auth-api pair: fastapi-users' `get_reset_password_router()`
+    # routes call `BaseUserManager.{get_by_email,forgot_password,
+    # reset_password}` directly — there is no local handler to patch.
+    # The provider verification therefore mocks methods on our concrete
+    # `src.auth_config.UserManager` (see the corresponding
+    # `MockDataFactory.create_*_dependency_config` entries).
+    ContractPair(
+        consumer_name="forgot-password-form",
+        provider_name="auth-api",
+        pact_port=1243,
+        handler_mocks_factory=MockDataFactory.create_forgot_password_dependency_config,
+        consumer_setup_fn=None,  # uses real auth_pages router
+        provider_state="User test.user@example.com can request a password reset",
+        endpoints=("POST /auth/forgot-password",),
+        pytest_marks=(pytest.mark.provider, pytest.mark.auth),
+    ),
+    ContractPair(
+        consumer_name="reset-password-form",
+        provider_name="auth-api",
+        pact_port=1244,
+        handler_mocks_factory=MockDataFactory.create_reset_password_dependency_config,
+        consumer_setup_fn=None,  # uses real auth_pages router
+        provider_state="Reset password token is valid for an active user",
+        endpoints=("POST /auth/reset-password",),
+        pytest_marks=(pytest.mark.provider, pytest.mark.auth),
+    ),
     ContractPair(
         consumer_name="user-admin-actions",
         provider_name="users-api",

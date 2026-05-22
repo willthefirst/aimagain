@@ -217,6 +217,51 @@ class MockDataFactory:
         }
 
     @classmethod
+    def create_forgot_password_dependency_config(cls) -> Dict[str, Any]:
+        """Mocks for `POST /auth/forgot-password`.
+
+        Unlike the local-handler pairs above, fastapi-users' bundled
+        `get_reset_password_router()` calls `BaseUserManager.get_by_email`
+        and then `BaseUserManager.forgot_password` directly — there is
+        no local wrapper to patch. Mock both methods on our concrete
+        `UserManager` subclass so the route returns 202 without
+        touching the (empty) test database or attempting to send an
+        email.
+
+        `get_by_email` returns a Post-shaped `SimpleNamespace` standing
+        in for a User row; `forgot_password` is a no-op AsyncMock. The
+        route discards both return values, so the stub shape is
+        irrelevant beyond "not None / no exception."
+        """
+        stub_user = SimpleNamespace(
+            id=UUID("00000000-0000-0000-0000-000000000007"),
+            email=cls.TEST_EMAIL,
+            is_active=True,
+            is_verified=True,
+        )
+        return {
+            "src.auth_config.UserManager.get_by_email": {
+                "return_value_config": stub_user
+            },
+            "src.auth_config.UserManager.forgot_password": {
+                "return_value_config": None
+            },
+        }
+
+    @classmethod
+    def create_reset_password_dependency_config(cls) -> Dict[str, Any]:
+        """Mock for `POST /auth/reset-password`.
+
+        Same rationale as `create_forgot_password_dependency_config` —
+        fastapi-users' router calls `BaseUserManager.reset_password`
+        directly, no local handler in between. The mock returns None;
+        the route discards the return value and emits 200 on success.
+        """
+        return {
+            "src.auth_config.UserManager.reset_password": {"return_value_config": None},
+        }
+
+    @classmethod
     def create_user_activation_dependency_config(
         cls, user_read: UserRead = None
     ) -> Dict[str, Any]:
