@@ -33,7 +33,7 @@ The `JOB_RUN_STARTED` action is bespoke (no spec home) — see [`../framework/au
 
 ## Disabling the scheduler
 
-Set `DISABLE_SCHEDULER=1` to skip `scheduler.start()` in [`../main.py`](../main.py). `register_jobs` still runs so the job table is introspectable; the scheduler simply never fires. The test environment sets this in `.env.test`.
+Set `DISABLE_SCHEDULER=1` to skip the subsystem entirely in [`../main.py`](../main.py) — no `make_scheduler()`, no `register_jobs`, no `.start()`. Registration is still pinned by [`test_scheduler.py`](test_scheduler.py), so a registration-time bug fails fast in CI rather than at dev startup. The test environment sets this in `.env.test`; `docker-compose.dev.yml` sets it for `dev up`.
 
 ## APScheduler vs system cron
 
