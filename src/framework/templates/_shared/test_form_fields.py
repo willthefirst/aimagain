@@ -282,6 +282,40 @@ def test_entity_select_field_preselects_current() -> None:
     assert selected.attributes.get("value") == "2"
 
 
+# --- optional indicator ---------------------------------------------------
+
+
+def test_optional_marker_has_no_literal_space_before_small() -> None:
+    """Spacing between the label text and the `(optional)` marker is
+    owned by `.form-field-optional { margin-inline-start }` in
+    `base.html` — the macro must not emit a literal space character
+    before `<small class="form-field-optional">`. Whitespace-as-spacing
+    in markup is the anti-pattern this test pins against regression.
+    """
+    html = _render(_make_env(), '{{ text_field("zip", "ZIP", required=false) }}')
+    # The label text and the `<small>` must be flush in the rendered
+    # source — no run of one-or-more whitespace chars between them.
+    assert "ZIP<small" in html, (
+        "Expected label text flush against `<small>` (CSS owns the "
+        f"gap). Rendered HTML: {html!r}"
+    )
+
+
+def test_optional_marker_renders_inside_form_field_label_span() -> None:
+    """Sanity-check the structural contract while we're here: when
+    `required=false`, the `<small class="form-field-optional">` lives
+    inside the `<span class="form-field-label">` next to the label
+    text. This is what lets the CSS rule key off `.form-field-optional`
+    without any additional selector specificity."""
+    html = _render(_make_env(), '{{ text_field("zip", "ZIP", required=false) }}')
+    tree = HTMLParser(html)
+    span = tree.css_first("span.form-field-label")
+    assert span is not None
+    small = span.css_first("small.form-field-optional")
+    assert small is not None
+    assert small.text().strip() == "(optional)"
+
+
 # --- radio_bool_field -----------------------------------------------------
 
 
