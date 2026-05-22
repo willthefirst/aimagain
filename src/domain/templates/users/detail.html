@@ -7,13 +7,9 @@
 {% block current_label %}{{ target_user.username }}{% endblock %}
 
 {% block actions %}
-{# Favorites moved into the toolbar action menu (was buried in a
-   `<p><a>` inside content). Self-only — viewing someone else's
-   profile shouldn't expose their private favorites list. The admin
-   actions partial appends Deactivate / Delete after this when the
-   viewer is an admin looking at someone else. #}
+{# Toolbar is reserved for Actions (Sign out, admin Deactivate/Delete).
+   Favorites is navigation and lives in the body content below. #}
 {% if is_self %}
-<li><a href="{{ entity_url('user_favorite') }}" role="button" class="outline">Favorites</a></li>
 {# Sign out — self-only. fastapi-users' POST /auth/jwt/logout returns
    204 (cookie deleted, no body); the `hx-on::after-request` shim
    redirects the browser to `/` on success since the library doesn't
@@ -45,7 +41,7 @@
    `<strong>Clinicians</strong>` is a section label, not a duplicate
    of any heading above. #}
 {% block content %}
-<article class="entity-card">
+<section class="entity-card">
   {# Private rows (email, active) are gated by `can_view_private`,
      computed in handle_get_user_detail as `is_self OR is_admin(viewer)`.
      The handler also omits these fields from the `target_user`
@@ -70,14 +66,29 @@
     </dl>
   </section>
   {% endif %}
-</article>
+</section>
+
+{# Favorites — self-only navigation to the viewer's private favorites
+   list. Lives in the body, not the toolbar: toolbar is reserved for
+   Actions (Sign out, admin Deactivate/Delete), and viewing someone
+   else's profile must not expose their private favorites. #}
+{% if is_self %}
+<section class="entity-card">
+  <header class="entity-header">
+    <strong>Favorites</strong>
+  </header>
+  <footer class="entity-footer">
+    <a href="{{ entity_url('user_favorite') }}" role="button" class="outline">View favorites</a>
+  </footer>
+</section>
+{% endif %}
 
 {# Onboarding checklist — visible only to the user viewing their own
    profile. Shows status-based CTAs: create a clinician profile first,
    then post an opening. Other users' profiles (/users/{id}) are
    unchanged — they keep the Clinicians card below without this section. #}
 {% if is_self %}
-<article class="entity-card">
+<section class="entity-card">
   <header class="entity-header">
     <strong>Getting started</strong>
   </header>
@@ -95,10 +106,10 @@
     </li>
     {% endif %}
   </ul>
-</article>
+</section>
 {% endif %}
 
-<article class="entity-card">
+<section class="entity-card">
   <header class="entity-header">
     <strong>Clinicians</strong>
   </header>
@@ -121,5 +132,5 @@
     <a href="{{ entity_form_url('clinician') }}" role="button">{{ entity_create_label('clinician') }}</a>
   </footer>
   {% endif %}
-</article>
+</section>
 {% endblock %}

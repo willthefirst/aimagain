@@ -25,7 +25,7 @@
    carries `program.name`, and `state_preference` is already a
    `<dt>State served</dt>` row in the facts list. #}
 {% block content %}
-<article class="entity-card">
+<section class="entity-card">
   {%- if program.description %}
   <p class="entity-description">{{ program.description }}</p>
   {%- endif %}
@@ -45,5 +45,5 @@
       {{ fact('accepting_referrals', 'Accepting referrals', "Yes" if program.accepting_referrals else "No") }}
     </dl>
   </section>
-</article>
+</section>
 {% endblock %}

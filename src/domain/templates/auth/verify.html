@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% block content %}
-<article class="auth-page">
+<section class="auth-page">
   <header>
     {% if status == "success" %}
     <h1>Email verified</h1>
@@ -18,5 +18,5 @@
       <a href="{{ entity_url('user', id='me') }}" role="button">Go to your profile</a>
     </p>
   </footer>
-</article>
+</section>
 {% endblock %}

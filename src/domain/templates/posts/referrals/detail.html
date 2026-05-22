@@ -25,7 +25,7 @@
    card. Per-kind branching lives in `post_card_view` (one place);
    every visual element in the card reads from `view`. #}
 {% block content %}
-<article class="entity-card" data-kind="{{ referral.kind }}">
+<section class="entity-card" data-kind="{{ referral.kind }}">
   {%- if view.description %}
   <p>{{ view.description }}</p>
   {%- endif %}
@@ -39,5 +39,5 @@
   <footer>
     <a href="mailto:{{ referral.owner.email }}" target="_blank" rel="noopener noreferrer" role="button" class="secondary outline">Email</a>
   </footer>
-</article>
+</section>
 {% endblock %}

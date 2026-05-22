@@ -133,7 +133,7 @@
    so they render once below the stacked affiliation cards. The
    list-per-section grammar is the same the old single-card layout
    used; only the parent card changed. #}
-<article class="entity-card">
+<section class="entity-card">
   <section>
     <h4>Licensures</h4>
     {% call(lic) credential_list(view.licensures, "No licensures listed.") %}
@@ -163,5 +163,5 @@
       ) }}
     {% endcall %}
   </section>
-</article>
+</section>
 {% endblock %}

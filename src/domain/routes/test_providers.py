@@ -895,8 +895,8 @@ async def test_provider_detail_favorite_toggle_lives_in_toolbar(
     logged_in_user: User,
 ):
     """The favorite/unfavorite button is a primary resource action and
-    renders inside the toolbar, not in `<footer>` or `<article>`. Pins
-    the chrome rule in `src/framework/templates/README.md`."""
+    renders inside the toolbar, not in `<footer>` or any `.entity-card`
+    body. Pins the chrome rule in `src/framework/templates/README.md`."""
     other = create_test_user(username=f"other-{uuid.uuid4()}")
     async with db_test_session_manager() as session:
         async with session.begin():
@@ -908,8 +908,8 @@ async def test_provider_detail_favorite_toggle_lives_in_toolbar(
     tree = HTMLParser(response.text)
     favorite_selector = f'button[hx-post="/users/me/favorites/{provider_id}"]'
     assert tree.css_first(f".toolbar {favorite_selector}") is not None
-    # The favorite button is not duplicated inside <article>.
-    assert tree.css_first(f"article {favorite_selector}") is None
+    # The favorite button is not duplicated inside any detail-card body.
+    assert tree.css_first(f".entity-card {favorite_selector}") is None
 
 
 async def test_provider_form_new_renders_form_actions_cluster(
