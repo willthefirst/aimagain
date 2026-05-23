@@ -31,13 +31,7 @@ class ProviderRepository(BaseRepository):
         """Lists every provider owned by the given user, newest first.
         `offset`/`limit` come from the pagination layer (the bespoke
         `handle_list_user_providers` handler computes them)."""
-        return await self._list(
-            select(Provider)
-            .filter(Provider.owner_id == user_id)
-            .order_by(Provider.created_at.desc()),
-            offset=offset,
-            limit=limit,
-        )
+        return await self.list_owned_by(Provider, user_id, offset=offset, limit=limit)
 
     async def list_for_verification(self) -> Sequence[Provider]:
         """Return providers eligible for the nightly verification job

@@ -3,7 +3,6 @@
 from types import SimpleNamespace
 
 from src.domain.logic.providers.view import (
-    _full_address,
     _insurance_summary,
     affiliation_card_view,
     provider_card_view,
@@ -74,24 +73,10 @@ def _stub_provider(**overrides):
     return SimpleNamespace(**defaults)
 
 
-# --- _full_address -----------------------------------------------------
-
-
-def test_full_address_composes_all_three_parts():
-    assert _full_address("Brooklyn", "NY", "11201") == "Brooklyn, NY 11201"
-
-
-def test_full_address_handles_missing_zip():
-    assert _full_address("Brooklyn", "NY", None) == "Brooklyn, NY"
-
-
-def test_full_address_handles_missing_city():
-    assert _full_address(None, "NY", "11201") == "NY 11201"
-
-
-def test_full_address_returns_none_when_all_empty():
-    assert _full_address(None, None, None) is None
-    assert _full_address("", "", "") is None
+# Address composition lives in `src/framework/rendering/address.py`;
+# its full unit-test matrix is `src/framework/rendering/test_address.py`.
+# `provider_card_view`'s integration with that helper is exercised by
+# the card-view tests below.
 
 
 # --- _insurance_summary ------------------------------------------------

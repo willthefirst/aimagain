@@ -12,23 +12,7 @@ Exposed as a Jinja global via `src/domain/template_globals.py`.
 
 from typing import Any
 
-
-def _full_address(
-    city: str | None, state: str | None, zip_code: str | None
-) -> str | None:
-    """Compose ``"City, ST ZIP"`` from the three location columns.
-
-    Returns ``None`` when every part is empty so templates can ``{% if
-    view.full_address %}`` rather than render a blank row. Mirrors
-    :func:`src.domain.logic.posts.view._full_address` — kept separate
-    because the providers logic module should not import from the posts
-    logic module (cross-cluster boundary)."""
-    if not any((city, state, zip_code)):
-        return None
-    head = ", ".join(p for p in (city, state) if p)
-    if zip_code:
-        return f"{head} {zip_code}" if head else zip_code
-    return head or None
+from src.framework.rendering.address import full_address
 
 
 def _role_attr(provider, attr, default=None):
@@ -179,7 +163,7 @@ def affiliation_card_view(affiliation, org=None) -> dict[str, Any]:
         "org_id": org_id,
         "org_name": (getattr(org, "name", None) if org else None),
         "org_url": (f"/organizations/{org_id}" if org_id is not None else None),
-        "full_address": _full_address(
+        "full_address": full_address(
             getattr(affiliation, "location_city", None),
             getattr(affiliation, "location_state", None),
             getattr(affiliation, "location_zip", None),
@@ -264,7 +248,7 @@ def provider_card_view(provider) -> dict[str, Any]:
     return {
         "practice_name": (getattr(org, "name", None) if org else None),
         "practice_url": (f"/organizations/{org_id}" if org_id is not None else None),
-        "full_address": _full_address(
+        "full_address": full_address(
             _role_attr(provider, "location_city"),
             _role_attr(provider, "location_state"),
             _role_attr(provider, "location_zip"),

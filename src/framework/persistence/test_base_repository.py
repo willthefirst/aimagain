@@ -268,3 +268,103 @@ async def test_list_default_none_exclude_self_returns_everyone(
         rows = await repo.list_default(User, order_by=User.username)
 
     assert len(rows) == 2
+
+
+# --- list_owned_by --------------------------------------------------------
+
+
+async def test_list_owned_by_returns_only_rows_owned_by_user(
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+):
+    """`list_owned_by` filters by `owner_id` — rows owned by a
+    different user are excluded."""
+    owner = await _seed_users(db_test_session_manager, ["owner"])
+    other = await _seed_users(db_test_session_manager, ["other"])
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            session.add(make_provider_with_org(owner_id=owner[0].id))
+            session.add(make_provider_with_org(owner_id=other[0].id))
+
+    async with db_test_session_manager() as session:
+        repo = BaseRepository(session)
+        rows = await repo.list_owned_by(Provider, owner[0].id)
+
+    assert len(rows) == 1
+    assert rows[0].owner_id == owner[0].id
+
+
+async def test_list_owned_by_orders_newest_first(
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+):
+    """`list_owned_by` orders by `created_at` descending. Set
+    `created_at` explicitly to force a deterministic ordering — SQLite's
+    server-default `CURRENT_TIMESTAMP` is second-precision and rows
+    inserted in the same second would tie."""
+    from datetime import datetime, timedelta, timezone
+
+    owner = await _seed_users(db_test_session_manager, ["owner"])
+    earlier = datetime.now(timezone.utc)
+    later = earlier + timedelta(seconds=1)
+
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            session.add(
+                make_provider_with_org(
+                    owner_id=owner[0].id,
+                    practice_name="First",
+                    created_at=earlier,
+                )
+            )
+            session.add(
+                make_provider_with_org(
+                    owner_id=owner[0].id,
+                    practice_name="Second",
+                    created_at=later,
+                )
+            )
+
+    async with db_test_session_manager() as session:
+        repo = BaseRepository(session)
+        rows = await repo.list_owned_by(Provider, owner[0].id)
+
+    assert [p.org.name for p in rows] == ["Second", "First"]
+
+
+async def test_list_owned_by_honors_offset_and_limit(
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+):
+    """`offset` and `limit` flow through to `_list`."""
+    from datetime import datetime, timedelta, timezone
+
+    owner = await _seed_users(db_test_session_manager, ["owner"])
+    base = datetime.now(timezone.utc)
+
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            for i, name in enumerate(["A", "B", "C", "D"]):
+                session.add(
+                    make_provider_with_org(
+                        owner_id=owner[0].id,
+                        practice_name=name,
+                        created_at=base + timedelta(seconds=i),
+                    )
+                )
+
+    async with db_test_session_manager() as session:
+        repo = BaseRepository(session)
+        rows = await repo.list_owned_by(Provider, owner[0].id, offset=1, limit=2)
+
+    # Newest first: D, C, B, A — offset=1 limit=2 → C, B.
+    assert [p.org.name for p in rows] == ["C", "B"]
+
+
+async def test_list_owned_by_empty_when_user_owns_nothing(
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+):
+    owner = await _seed_users(db_test_session_manager, ["owner"])
+
+    async with db_test_session_manager() as session:
+        repo = BaseRepository(session)
+        rows = await repo.list_owned_by(Provider, owner[0].id)
+
+    assert list(rows) == []

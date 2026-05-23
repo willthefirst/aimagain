@@ -16,8 +16,6 @@ read the tree but won't widen the writer surface.
 import uuid
 from typing import Any, Sequence
 
-from sqlalchemy import select
-
 from src.domain.models import Organization
 from src.framework.http.exceptions import NotFoundError
 from src.framework.persistence.base_repository import BaseRepository
@@ -31,12 +29,7 @@ class OrganizationRepository(BaseRepository):
         can only attach Providers to Orgs they own (#524 retro: Org
         ownership is the boundary for who may attach Providers, mirroring
         ``Organization.write_authz``)."""
-        stmt = (
-            select(Organization)
-            .filter(Organization.owner_id == user_id)
-            .order_by(Organization.created_at.desc())
-        )
-        return await self._list(stmt)
+        return await self.list_owned_by(Organization, user_id)
 
     async def _resolve_root_id(
         self, parent_org_id: uuid.UUID | None

@@ -46,6 +46,7 @@ All three helpers are exposed as Jinja globals by
 from typing import Any
 
 from src.domain.models.enums import CLIENT_AGE_GROUPS_BY_KEY
+from src.framework.rendering.address import full_address
 
 # Gender values that don't fit a "<age> <gender>" phrase. `gender_diverse`
 # is the umbrella token (genderqueer / agender / two-spirit / etc.) —
@@ -119,20 +120,6 @@ def _location_chunk(
     if not any((city, state, zip_code)):
         return None
     return {"city": city, "state": state, "zip": zip_code}
-
-
-def _full_address(
-    city: str | None, state: str | None, zip_code: str | None
-) -> str | None:
-    """Compose ``"City, ST ZIP"`` for the detail page's expanded address
-    row. Returns ``None`` when no parts are present so templates omit
-    the row entirely."""
-    if not any((city, state, zip_code)):
-        return None
-    head = ", ".join(p for p in (city, state) if p)
-    if zip_code:
-        return f"{head} {zip_code}" if head else zip_code
-    return head or None
 
 
 def _referral_or_none(website: str | None, instructions: str | None) -> dict | None:
@@ -277,7 +264,7 @@ def post_card_view(post) -> dict[str, Any]:
             ),
             description=getattr(d, "description", None),
             desired_times=list(getattr(d, "desired_times", None) or []),
-            full_address=_full_address(
+            full_address=full_address(
                 getattr(d, "location_city", None),
                 getattr(d, "location_state", None),
                 getattr(d, "location_zip", None),
@@ -334,7 +321,7 @@ def post_card_view(post) -> dict[str, Any]:
                 else None
             ),
             full_address=(
-                _full_address(
+                full_address(
                     getattr(p, "location_city", None),
                     getattr(p, "location_state", None),
                     getattr(p, "location_zip", None),
