@@ -419,6 +419,15 @@ class QualityCommands:
                 "🔤 Sorting imports with isort...",
                 ["isort", "src", "tests", "scripts", "alembic", "conftest.py"],
             ),
+            (
+                "🧩 Formatting templates with djlint...",
+                [
+                    "djlint",
+                    "src/framework/templates",
+                    "src/domain/templates",
+                    "--reformat",
+                ],
+            ),
         ]
 
         exit_code = 0
