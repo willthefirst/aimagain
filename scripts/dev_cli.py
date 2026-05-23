@@ -371,6 +371,15 @@ class QualityCommands:
                 ["isort", "--check-only", "."],
             ),
             (
+                "🧩 Checking template formatting with djlint...",
+                [
+                    "djlint",
+                    "src/framework/templates",
+                    "src/domain/templates",
+                    "--check",
+                ],
+            ),
+            (
                 "🏷️ Checking title case...",
                 [sys.executable, "scripts/dev/title_case_check.py", "--check-only"],
             ),
