@@ -575,17 +575,33 @@
         document.head.appendChild(script)
       })()
     </script>
-    {% endif %} {% if not is_development and sentry_dsn %}
+    {% endif %} {% if not is_development and observability_frontend %} {#
+      Browser SDK init. Dict shape and `provider` key come from
+      `src/framework/observability/<provider>_backend.py:frontend_context`.
+      Add a new `{% elif %}` branch here when adding a provider. #}
+    {% if observability_frontend.provider == "sentry" %} {% set _replay_enabled
+    = (observability_frontend.replays_session_sample_rate or 0) > 0 or
+    (observability_frontend.replays_on_error_sample_rate or 0) > 0 %}
     <script
-      src="https://browser.sentry-cdn.com/8.55.0/bundle.min.js"
+      src="https://browser.sentry-cdn.com/8.55.0/{% if _replay_enabled %}bundle.tracing.replay.min.js{% else %}bundle.tracing.min.js{% endif %}"
       crossorigin="anonymous"></script>
     <script>
       Sentry.init({
-        dsn: "{{ sentry_dsn }}",
-        environment: "{{ environment }}",
+        dsn: "{{ observability_frontend.dsn }}",
+        environment: "{{ observability_frontend.environment }}",
+        {% if observability_frontend.release %}release: "{{ observability_frontend.release }}",{% endif %}
+        tracesSampleRate: {{ observability_frontend.traces_sample_rate }},
+        integrations: [
+          Sentry.browserTracingIntegration(),
+          {% if _replay_enabled %}Sentry.replayIntegration(),{% endif %}
+        ],
+        {% if _replay_enabled %}
+        replaysSessionSampleRate: {{ observability_frontend.replays_session_sample_rate }},
+        replaysOnErrorSampleRate: {{ observability_frontend.replays_on_error_sample_rate }},
+        {% endif %}
       })
     </script>
-    {% endif %}
+    {% endif %} {% endif %}
   </head>
   <body>
     {# Primary nav renders on every screen so the chrome stays
