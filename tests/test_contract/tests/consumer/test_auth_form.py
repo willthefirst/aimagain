@@ -11,7 +11,6 @@ from tests.test_contract.constants import (
     REGISTER_API_PATH,
     TEST_EMAIL,
     TEST_PASSWORD,
-    TEST_USERNAME,
 )
 from tests.test_contract.tests.shared.helpers import (
     setup_pact,
@@ -36,10 +35,11 @@ async def test_consumer_registration_form_interaction(
     full_mock_url = f"{mock_server_uri}{REGISTER_API_PATH}"
 
     expected_request_headers = {"Content-Type": "application/json"}
+    # Signup form collects email + password only; the provider fills
+    # `username` from `email` server-side in `handle_registration`.
     expected_request_body = {
         "email": Like(TEST_EMAIL),
         "password": Like(TEST_PASSWORD),
-        "username": Like(TEST_USERNAME),
     }
 
     (
@@ -67,7 +67,6 @@ async def test_consumer_registration_form_interaction(
         await page.wait_for_selector("#email")
         await page.locator("#email").fill(TEST_EMAIL)
         await page.locator("#password").fill(TEST_PASSWORD)
-        await page.locator("#username").fill(TEST_USERNAME)
         await page.locator("button[type='submit']").click()
         await page.wait_for_timeout(NETWORK_TIMEOUT_MS)
 
