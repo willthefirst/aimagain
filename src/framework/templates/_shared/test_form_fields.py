@@ -121,6 +121,54 @@ def test_text_field_invalid_true_sets_aria_invalid_true() -> None:
     assert "aria-invalid" not in HTMLParser(html_none).css_first("input").attributes
 
 
+def test_text_field_error_sets_aria_invalid_and_replaces_helper_with_error_text() -> (
+    None
+):
+    """`error="..."` follows Pico's canonical invalid-form pattern:
+    the input gets `aria-invalid="true"` and `aria-describedby` points
+    at the `<name>-helper` small, but the small carries the error
+    message instead of the helper text — one small per field, one id
+    in both states. Pico's `[aria-invalid="true"] ~ small` rule colors
+    it red automatically."""
+    html = _render(
+        _make_env(),
+        '{{ text_field("age_groups", "Age groups", error="Pick at least one.") }}',
+    )
+    tree = HTMLParser(html)
+    inp = tree.css_first("input")
+    assert inp.attributes.get("aria-invalid") == "true"
+    assert inp.attributes.get("aria-describedby") == "age_groups-helper"
+    small = tree.css_first("small#age_groups-helper")
+    assert small is not None
+    assert "Pick at least one." in small.text()
+
+
+def test_text_field_error_wins_over_help_text() -> None:
+    """When both `help=` and `error=` are set, the visible small is the
+    actionable error — helper text is suppressed for that render so the
+    user sees the failure, not the hint. The id stays `<name>-helper`
+    either way."""
+    html = _render(
+        _make_env(),
+        '{{ text_field("zip", "ZIP", help="5 digits.", error="Required.") }}',
+    )
+    tree = HTMLParser(html)
+    small = tree.css_first("small#zip-helper")
+    assert small is not None
+    assert "Required." in small.text()
+    assert "5 digits." not in small.text()
+
+
+def test_text_field_no_error_no_help_omits_describedby_and_small() -> None:
+    """Default state: no `aria-describedby`, no small. Pinned so a
+    future regression that always emits `<name>-helper` is caught."""
+    html = _render(_make_env(), '{{ text_field("x", "X") }}')
+    tree = HTMLParser(html)
+    inp = tree.css_first("input")
+    assert "aria-describedby" not in inp.attributes
+    assert tree.css_first("small") is None
+
+
 def test_text_field_type_parameter_overrides_default() -> None:
     """`type=` defaults to `text` and threads through (`date`, `url`,
     etc.). Pico styles all standard HTML5 input types out of the box."""
@@ -206,6 +254,25 @@ def test_multi_select_field_with_help_links_each_via_aria() -> None:
     sel = tree.css_first('select[name="tags"][multiple]')
     assert sel.attributes.get("aria-describedby") == "tags-helper"
     assert tree.css_first("small#tags-helper") is not None
+
+
+def test_multi_select_field_error_sets_aria_invalid_and_carries_message() -> None:
+    """Same Pico-canonical error pattern on `<select multiple>` as on
+    text fields — the age_groups multi-select is the first form-error
+    callsite in the codebase (see `OPENING_ENTITY` /
+    `_form_clinician_opening.html`)."""
+    html = _render(
+        _make_env(),
+        '{{ multi_select_field("age_groups", "Age groups", ("a", "b"),'
+        ' error="Select at least one age group.") }}',
+    )
+    tree = HTMLParser(html)
+    sel = tree.css_first('select[name="age_groups"]')
+    assert sel.attributes.get("aria-invalid") == "true"
+    assert sel.attributes.get("aria-describedby") == "age_groups-helper"
+    small = tree.css_first("small#age_groups-helper")
+    assert small is not None
+    assert "Select at least one age group." in small.text()
 
 
 # --- entity_select_field --------------------------------------------------
