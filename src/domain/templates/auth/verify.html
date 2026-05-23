@@ -1,22 +1,24 @@
 {% extends "base.html" %}
 {% block content %}
-<section class="auth-page">
-  <header>
-    {% if status == "success" %}
-    <h1>Email verified</h1>
-    <p>Thanks — your email is confirmed. The nag banner will go away on your next page load.</p>
-    {% elif status == "already_verified" %}
-    <h1>Already verified</h1>
-    <p>This email was already confirmed. Nothing more to do.</p>
-    {% else %}
-    <h1>Verification link didn't work</h1>
-    <p>The link may have expired, been used already, or been mis-copied. Sign in and use the resend link in the banner at the top of the page.</p>
-    {% endif %}
-  </header>
-  <footer>
-    <p>
-      <a href="{{ entity_url('user', id='me') }}" role="button">Go to your profile</a>
-    </p>
-  </footer>
-</section>
+  <section class="auth-page">
+    <header>
+      {% if status == "success" %}
+        <h1>Email verified</h1>
+        <p>Thanks — your email is confirmed. The nag banner will go away on your next page load.</p>
+      {% elif status == "already_verified" %}
+        <h1>Already verified</h1>
+        <p>This email was already confirmed. Nothing more to do.</p>
+      {% else %}
+        <h1>Verification link didn't work</h1>
+        <p>
+          The link may have expired, been used already, or been mis-copied. Sign in and use the resend link in the banner at the top of the page.
+        </p>
+      {% endif %}
+    </header>
+    <footer>
+      <p>
+        <a href="{{ entity_url('user', id='me') }}" role="button">Go to your profile</a>
+      </p>
+    </footer>
+  </section>
 {% endblock %}

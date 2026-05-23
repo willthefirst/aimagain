@@ -21,10 +21,9 @@
 #}
 {%- from "_shared/actions.html" import actions -%}
 {% if can_edit %}
-{{ actions(
-    wrapper="toolbar",
-    edit_url=entity_form_url(entity_name, id=post.id),
-    delete_url=entity_url(entity_name, id=post.id),
-    delete_confirm="Permanently delete this " ~ entity_name ~ "? This cannot be undone.",
-) }}
+  {{ actions(wrapper="toolbar",
+    edit_url=entity_form_url(entity_name, id=post.id) ,
+  delete_url=entity_url(entity_name, id=post.id),
+  delete_confirm="Permanently delete this " ~ entity_name ~ "? This cannot be undone.",
+  ) }}
 {% endif %}

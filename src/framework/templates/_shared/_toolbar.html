@@ -53,10 +53,7 @@ Cap on how many filter chips appear inline before collapsing to
 
         {% call page_toolbar(heading="Edit Will's Org") %}{% endcall %}
 #}
-
 {% set _ACTIVE_FILTER_INLINE_LIMIT = 2 %}
-
-
 {# Render the toolbar.
 
 Args:
@@ -78,44 +75,44 @@ Args:
   active_filters=(),
   search_url=none,
   filter_label="Filters"
-) -%}
-{# `caller` is truthy whenever the macro was invoked via `{% call %}`,
+  ) -%}
+  {# `caller` is truthy whenever the macro was invoked via `{% call %}`,
    even if the caller body trims to empty (e.g. the list view always
    wraps with `{% call %}` and passes `{{ actions_body }}` which may
    be blank). Render once and check the trimmed string so empty
    bodies don't emit a stray `<menu>` or a separator. #}
-{%- set actions_html = caller() if caller else "" -%}
-{%- set has_actions = actions_html | trim -%}
-<div class="toolbar">
-
-  <h1>{{ heading }}</h1>
-
-  {%- if search_url or has_actions %}
-  {# Filter + menu live in one grid cell so the actions cluster
+  {%- set actions_html = caller() if caller else "" -%}
+  {%- set has_actions = actions_html | trim -%}
+  <div class="toolbar">
+    <h1>{{ heading }}</h1>
+    {%- if search_url or has_actions %}
+      {# Filter + menu live in one grid cell so the actions cluster
      reflows as a single unit (atomic wrap). See `.toolbar`'s grid
      in `base.html`. #}
-  <div class="toolbar-actions">
-    {%- if search_url %}
-    <a href="{{ search_url }}" class="toolbar-filter-link">
-      {%- if not active_filters -%}
-      {{ filter_label }}
-      {%- else -%}
-        {%- set shown = active_filters[:_ACTIVE_FILTER_INLINE_LIMIT] -%}
-        {%- set hidden = active_filters | length - shown | length -%}
-        {%- for tag in shown -%}{{ tag.label }}{%- if not loop.last %}, {% endif -%}{%- endfor -%}
-        {%- if hidden > 0 %}, +{{ hidden }} more filter{% if hidden != 1 %}s{% endif %}{%- endif -%}
-      {%- endif -%}
-    </a>
-    {%- endif %}
-
-    {%- if has_actions %}
-    <menu class="toolbar-right">
-      {{ actions_html }}
-    </menu>
-    {%- endif %}
-  </div>
+      <div class="toolbar-actions">
+        {%- if search_url %}
+          <a href="{{ search_url }}" class="toolbar-filter-link">
+            {%- if not active_filters -%}
+              {{ filter_label }}
+            {%- else -%}
+              {%- set shown = active_filters[:_ACTIVE_FILTER_INLINE_LIMIT] -%}
+              {%- set hidden = active_filters | length - shown | length -%}
+              {%- for tag in shown -%}{{ tag.label }}{%- if not loop.last %},
+              {% endif -%}
+            {%- endfor -%}
+            {%- if hidden > 0 %}, +{{ hidden }} more filter
+              {% if hidden != 1 %}s{% endif %}
+            {%- endif -%}
+          {%- endif -%}
+        </a>
+      {%- endif %}
+      {%- if has_actions %}
+        <menu class="toolbar-right">
+          {{ actions_html }}
+        </menu>
+      {%- endif %}
+    </div>
   {%- endif %}
-
 </div>
 <hr />
 {%- endmacro %}

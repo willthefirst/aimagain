@@ -2,22 +2,25 @@
 {%- from "posts/_shared/_modality_chips.html" import modality_chips -%}
 {%- from "posts/_shared/_facts_block.html" import facts_block -%}
 {%- from "posts/_shared/_how_to_refer.html" import how_to_refer -%}
-
 {%- set view = post_card_view(referral) -%}
-
 {% block resource_label %}Referrals{% endblock %}
 {# The toolbar H1 carries the full identity string (`headline` plus
    the optional `header_state` — e.g. "Will's Org, NY"); the
    `subtitle` block below carries date + modality meta as `<span>`
    items joined by the `.meta` rule's CSS-driven middot. The
    entity-card body therefore needs no `<header>`. #}
-{% block current_label %}{{ view.headline or 'Referrals'|truncate(40) }}{% if view.header_state %}, {{ view.header_state }}{% endif %}{% endblock %}
-{% block subtitle %}<span>{{ referral.created_at | format_post_date }}</span>{{ modality_chips(view.in_person, view.virtual) }}{% endblock %}
-
-{% block actions %}
-{% with post=referral %}{% include "posts/_shared/_owner_actions.html" %}{% endwith %}
+{% block current_label %}
+  {{ view.headline or 'Referrals'|truncate(40) }}
+  {% if view.header_state %}, {{ view.header_state }}{% endif %}
 {% endblock %}
-
+{% block subtitle %}
+  <span>{{ referral.created_at | format_post_date }}</span>{{ modality_chips(view.in_person, view.virtual) }}
+{% endblock %}
+{% block actions %}
+  {% with post=referral %}
+    {% include "posts/_shared/_owner_actions.html" %}
+  {% endwith %}
+{% endblock %}
 {# Detail-page layout: same `.entity-card` shape the list cards use,
    with detail-only sections (description, expanded facts,
    how-to-refer, footer) stacked vertically. The services row is the
@@ -25,19 +28,16 @@
    card. Per-kind branching lives in `post_card_view` (one place);
    every visual element in the card reads from `view`. #}
 {% block content %}
-<section class="entity-card" data-kind="{{ referral.kind }}">
-  {%- if view.description %}
-  <p>{{ view.description }}</p>
-  {%- endif %}
-
-  {{ facts_block(view, expanded=True) }}
-
-  {%- if view.referral %}
-  {{ how_to_refer(view) }}
-  {%- endif %}
-
-  <footer>
-    <a href="mailto:{{ referral.owner.email }}" target="_blank" rel="noopener noreferrer" role="button" class="secondary outline">Email</a>
-  </footer>
-</section>
+  <section class="entity-card" data-kind="{{ referral.kind }}">
+    {%- if view.description %}<p>{{ view.description }}</p>{%- endif %}
+    {{ facts_block(view, expanded=True) }}
+    {%- if view.referral %}{{ how_to_refer(view) }}{%- endif %}
+    <footer>
+      <a href="mailto:{{ referral.owner.email }}"
+         target="_blank"
+         rel="noopener noreferrer"
+         role="button"
+         class="secondary outline">Email</a>
+    </footer>
+  </section>
 {% endblock %}

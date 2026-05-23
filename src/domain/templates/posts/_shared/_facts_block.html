@@ -50,117 +50,113 @@ Reads from `view` (the `post_card_view` dict). Display-label dicts
 {%- from "_shared/icon_list.html" import icon_list -%}
 {%- from "_shared/sections.html" import fact -%}
 {% macro facts_block(view, expanded=False) -%}
-<section class="entity-facts">
-  <dl>
-    {%- if view.services or view.settings %}
-    {#- Services / settings row. Verb (`Seeking` / `Providing`) is the
+  <section class="entity-facts">
+    <dl>
+      {%- if view.services or view.settings %}
+        {#- Services / settings row. Verb (`Seeking` / `Providing`) is the
         label; the value is an `icon_list` of services and settings.
         Priority sort puts `psychotherapy` and `medication_management`
         first since those are the two services scanners most often look
         for; the rest follow in `REFERRAL_SERVICES` declaration order.
         PA + program `settings` render after services in the same
         list. -#}
-    {%- set _priority = ["psychotherapy", "medication_management"] -%}
-    {%- set _items = [] -%}
-    {%- for s in _priority if s in view.services -%}
-      {%- set _ = _items.append({"icon": REFERRAL_SERVICE_ICONS[s], "label": REFERRAL_SERVICE_LABELS[s]}) -%}
-    {%- endfor -%}
-    {%- for s in view.services if s not in _priority -%}
-      {%- set _ = _items.append({"icon": REFERRAL_SERVICE_ICONS[s], "label": REFERRAL_SERVICE_LABELS[s]}) -%}
-    {%- endfor -%}
-    {%- for s in view.settings -%}
-      {%- set _ = _items.append({"icon": TREATMENT_SETTINGS_ICONS[s], "label": TREATMENT_SETTINGS_LABELS[s]}) -%}
-    {%- endfor -%}
-    {%- call fact('services', view.kind_verb) %}{{ icon_list(_items) }}{% endcall %}
-    {%- endif %}
-    {%- if view.location_chunk and not expanded %}
-    {#- Compact mode: "City, ST". Both referral and opening kinds
+        {%- set _priority = ["psychotherapy", "medication_management"] -%}
+        {%- set _items = [] -%}
+        {%- for s in _priority if s in view.services -%}
+          {%- set _ = _items.append({"icon": REFERRAL_SERVICE_ICONS[s], "label": REFERRAL_SERVICE_LABELS[s]}) -%}
+        {%- endfor -%}
+        {%- for s in view.services if s not in _priority -%}
+          {%- set _ = _items.append({"icon": REFERRAL_SERVICE_ICONS[s], "label": REFERRAL_SERVICE_LABELS[s]}) -%}
+        {%- endfor -%}
+        {%- for s in view.settings -%}
+          {%- set _ = _items.append({"icon": TREATMENT_SETTINGS_ICONS[s], "label": TREATMENT_SETTINGS_LABELS[s]}) -%}
+        {%- endfor -%}
+        {%- call fact('services', view.kind_verb) %}{{ icon_list(_items) }}
+        {% endcall %}
+      {%- endif %}
+      {%- if view.location_chunk and not expanded %}
+        {#- Compact mode: "City, ST". Both referral and opening kinds
         populate `location_chunk` so the row renders identically on
         both cards. Expanded mode replaces this with the labeled
         "Address" row below (full street address). -#}
-    {%- call fact('location', 'Location') %}{% if view.location_chunk.city %}{{ view.location_chunk.city }}, {% endif %}{{ view.location_chunk.state }}{% endcall %}
-    {%- endif %}
-    {%- if view.ages and view.kind != "referral" %}
-    {#- `opening` and `intake` describe a cohort the
+        {%- call fact('location', 'Location') %}
+          {% if view.location_chunk.city %}{{ view.location_chunk.city }},{% endif %}
+          {{ view.location_chunk.state }}
+        {% endcall %}
+      {%- endif %}
+      {%- if view.ages and view.kind != "referral" %}
+        {#- `opening` and `intake` describe a cohort the
         practice/program accepts — labeled `Ages` (plural). Referral
         skips this row because its age lives in the headline; the
         `expanded` block below repeats it for the detail page. -#}
-    {%- set ages = [] -%}
-    {%- for g in view.ages -%}{%- set _ = ages.append(CLIENT_AGE_GROUP_LABELS[g]) -%}{%- endfor -%}
-    {{ fact('ages', 'Ages', ages | join(", ")) }}
-    {%- endif %}
-    {%- if view.genders and (expanded or view.kind != "referral") %}
-    {#- Compact mode hides CR gender (it's in the headline). Expanded
+        {%- set ages = [] -%}
+        {%- for g in view.ages -%}{%- set _ = ages.append(CLIENT_AGE_GROUP_LABELS[g]) -%}{%- endfor -%}
+          {{ fact('ages', 'Ages', ages | join(", ") ) }}
+        {%- endif %}
+        {%- if view.genders and (expanded or view.kind != "referral") %}
+          {#- Compact mode hides CR gender (it's in the headline). Expanded
         mode shows it for every kind that has one. -#}
-    {%- set gs = [] -%}
-    {%- for g in view.genders -%}{%- set _ = gs.append(GENDER_LABELS[g]) -%}{%- endfor -%}
-    {{ fact('genders', 'Gender' if view.kind == 'referral' else 'Genders', gs | join(", ")) }}
-    {%- endif %}
-    {%- if view.languages and (expanded or not (view.languages | length == 1 and view.languages[0] == "en")) %}
-    {%- set langs = [] -%}
-    {%- for l in view.languages -%}{%- set _ = langs.append(LANGUAGE_LABELS[l]) -%}{%- endfor -%}
-    {{ fact('languages', 'Languages', langs | join(", ")) }}
-    {%- endif %}
-    {%- if view.insurance_posture %}
-    {{ fact('insurance', 'Insurance', INSURANCE_POSTURE_LABELS[view.insurance_posture]) }}
-    {%- endif %}
-    {%- if view.treatment_modality %}
-    {{ fact('modality', 'Modality', view.treatment_modality) }}
-    {%- endif %}
-
-    {#- Detail-only rows below. The expanded set surfaces fields the
+          {%- set gs = [] -%}
+          {%- for g in view.genders -%}{%- set _ = gs.append(GENDER_LABELS[g]) -%}{%- endfor -%}
+            {{ fact('genders', 'Gender' if view.kind == 'referral' else 'Genders', gs | join(", ") ) }}
+          {%- endif %}
+          {%- if view.languages and (expanded or not (view.languages | length == 1 and view.languages[0] == "en")) %}
+            {%- set langs = [] -%}
+            {%- for l in view.languages -%}{%- set _ = langs.append(LANGUAGE_LABELS[l]) -%}{%- endfor -%}
+              {{ fact('languages', 'Languages', langs | join(", ") ) }}
+            {%- endif %}
+            {%- if view.insurance_posture %}
+              {{ fact('insurance', 'Insurance', INSURANCE_POSTURE_LABELS[view.insurance_posture]) }}
+            {%- endif %}
+            {%- if view.treatment_modality %}{{ fact('modality', 'Modality', view.treatment_modality) }}{%- endif %}
+            {#- Detail-only rows below. The expanded set surfaces fields the
         compact card omits — practice/program identity, full address,
         scheduling, and per-kind insurance details. -#}
-    {%- if expanded %}
-      {%- if view.ages and view.kind == "referral" %}
-      {#- Referral expanded-only Age row: the headline already carries
+            {%- if expanded %}
+              {%- if view.ages and view.kind == "referral" %}
+                {#- Referral expanded-only Age row: the headline already carries
           the age + gender combo, so the compact list-card body skips
           this. The detail page is detail-y enough to repeat it as a
           labeled row (singular `Age` — a referral describes one
           seeker). -#}
-      {%- set ages = [] -%}
-      {%- for g in view.ages -%}{%- set _ = ages.append(CLIENT_AGE_GROUP_LABELS[g]) -%}{%- endfor -%}
-      {{ fact('age', 'Age', ages | join(", ")) }}
-      {%- endif %}
-      {%- if view.practice_link %}
-      {%- call fact('practice', 'Practice') %}<a href="{{ entity_url('clinician', id=view.practice_link.id) }}">{{ view.practice_link.name }}</a>{% endcall %}
-      {%- endif %}
-      {%- if view.program_link %}
-      {%- call fact('program', 'Program') %}<a href="{{ entity_url('program', id=view.program_link.id) }}">{{ view.program_link.name }}</a>{% endcall %}
-      {%- endif %}
-      {%- if view.organization_link %}
-      {%- call fact('organization', 'Organization') %}<a href="{{ entity_url('organization', id=view.organization_link.id) }}">{{ view.organization_link.name }}</a>{% endcall %}
-      {%- endif %}
-      {%- if view.full_address %}
-      {{ fact('address', 'Address', view.full_address) }}
-      {%- endif %}
-      {%- if view.in_person is not none %}
-      {{ fact('in_person_sessions', 'In-person sessions', LOCATION_AVAILABILITY_LABELS[view.in_person]) }}
-      {%- endif %}
-      {%- if view.virtual is not none %}
-      {{ fact('virtual_sessions', 'Virtual sessions', LOCATION_AVAILABILITY_LABELS[view.virtual]) }}
-      {%- endif %}
-      {%- if view.desired_times %}
-      {%- set times = [] -%}
-      {%- for slot in view.desired_times -%}{%- set _ = times.append(DESIRED_TIME_SLOT_LABELS[slot]) -%}{%- endfor -%}
-      {{ fact('desired_times', 'Desired times', times | join(", ")) }}
-      {%- endif %}
-      {%- if view.schedule_text %}
-      {{ fact('schedule_notes', 'Schedule notes', view.schedule_text) }}
-      {%- endif %}
-      {%- if view.network_preference %}
-      {{ fact('network_preference', 'Network preference', NETWORK_PREFERENCE_LABELS[view.network_preference]) }}
-      {%- endif %}
-      {%- if view.insurance_carrier and view.network_preference and view.network_preference != "no_preference" %}
-      {{ fact('insurance_carrier', 'Insurance carrier', INSURANCE_CARRIER_LABELS[view.insurance_carrier]) }}
-      {%- endif %}
-      {%- if view.sliding_scale %}
-      {{ fact('sliding_scale', 'Sliding scale', 'Yes') }}
-      {%- endif %}
-      {%- if view.cost %}
-      {{ fact('cost', 'Cost', view.cost) }}
-      {%- endif %}
-    {%- endif %}
-  </dl>
-</section>
-{%- endmacro %}
+                {%- set ages = [] -%}
+                {%- for g in view.ages -%}{%- set _ = ages.append(CLIENT_AGE_GROUP_LABELS[g]) -%}{%- endfor -%}
+                  {{ fact('age', 'Age', ages | join(", ") ) }}
+                {%- endif %}
+                {%- if view.practice_link %}
+                  {%- call fact('practice', 'Practice') %}<a href="{{ entity_url('clinician', id=view.practice_link.id) }}">{{ view.practice_link.name }}</a>
+                {% endcall %}
+              {%- endif %}
+              {%- if view.program_link %}
+                {%- call fact('program', 'Program') %}<a href="{{ entity_url('program', id=view.program_link.id) }}">{{ view.program_link.name }}</a>
+              {% endcall %}
+            {%- endif %}
+            {%- if view.organization_link %}
+              {%- call fact('organization', 'Organization') %}<a href="{{ entity_url('organization', id=view.organization_link.id) }}">{{ view.organization_link.name }}</a>
+            {% endcall %}
+          {%- endif %}
+          {%- if view.full_address %}{{ fact('address', 'Address', view.full_address) }}{%- endif %}
+          {%- if view.in_person is not none %}
+            {{ fact('in_person_sessions', 'In-person sessions', LOCATION_AVAILABILITY_LABELS[view.in_person]) }}
+          {%- endif %}
+          {%- if view.virtual is not none %}
+            {{ fact('virtual_sessions', 'Virtual sessions', LOCATION_AVAILABILITY_LABELS[view.virtual]) }}
+          {%- endif %}
+          {%- if view.desired_times %}
+            {%- set times = [] -%}
+            {%- for slot in view.desired_times -%}{%- set _ = times.append(DESIRED_TIME_SLOT_LABELS[slot]) -%}{%- endfor -%}
+              {{ fact('desired_times', 'Desired times', times | join(", ") ) }}
+            {%- endif %}
+            {%- if view.schedule_text %}{{ fact('schedule_notes', 'Schedule notes', view.schedule_text) }}{%- endif %}
+            {%- if view.network_preference %}
+              {{ fact('network_preference', 'Network preference', NETWORK_PREFERENCE_LABELS[view.network_preference]) }}
+            {%- endif %}
+            {%- if view.insurance_carrier and view.network_preference and view.network_preference != "no_preference" %}
+              {{ fact('insurance_carrier', 'Insurance carrier', INSURANCE_CARRIER_LABELS[view.insurance_carrier]) }}
+            {%- endif %}
+            {%- if view.sliding_scale %}{{ fact('sliding_scale', 'Sliding scale', 'Yes') }}{%- endif %}
+            {%- if view.cost %}{{ fact('cost', 'Cost', view.cost) }}{%- endif %}
+          {%- endif %}
+        </dl>
+      </section>
+    {%- endmacro %}

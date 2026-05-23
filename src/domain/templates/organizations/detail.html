@@ -1,21 +1,16 @@
 {% extends "views/detail.html" %}
 {%- from "_shared/actions.html" import actions -%}
 {%- from "_shared/sections.html" import fact -%}
-
-
 {% block resource_label %}Organizations{% endblock %}
 {% block current_label %}{{ organization.name }}{% endblock %}
-
 {% block actions %}
-{% if can_edit %}
-{{ actions(
-    wrapper="toolbar",
-    edit_url=entity_form_url('organization', id=organization.id),
+  {% if can_edit %}
+    {{ actions(wrapper="toolbar",
+        edit_url=entity_form_url('organization', id=organization.id) ,
     edit_label="Edit organization",
-) }}
-{% endif %}
+    ) }}
+  {% endif %}
 {% endblock %}
-
 {# Organization detail uses the `.entity-card` chrome shared with
    posts/detail.html and providers/detail.html. The parent-organization
    row resolves the parent's *name* via the `parent` relationship —
@@ -34,16 +29,16 @@
    already conveyed by absence; a "— (root)" placeholder mixed two
    empty-state conventions (em-dash + parenthetical). #}
 {% block content %}
-<section class="entity-card">
-  <section class="entity-facts">
-    <dl>
-      {{ fact('type', 'Type', ORGANIZATION_TYPES_LABELS[organization.type]) }}
-      {%- if organization.parent_org_id %}
-      {%- call fact('parent', 'Parent organization') %}
-        <a href="{{ entity_url('organization', id=organization.parent_org_id) }}">{{ organization.parent.name if organization.parent else organization.parent_org_id }}</a>
-      {%- endcall %}
-      {%- endif %}
-    </dl>
+  <section class="entity-card">
+    <section class="entity-facts">
+      <dl>
+        {{ fact('type', 'Type', ORGANIZATION_TYPES_LABELS[organization.type]) }}
+        {%- if organization.parent_org_id %}
+          {%- call fact('parent', 'Parent organization') %}
+            <a href="{{ entity_url('organization', id=organization.parent_org_id) }}">{{ organization.parent.name if organization.parent else organization.parent_org_id }}</a>
+          {%- endcall %}
+        {%- endif %}
+      </dl>
+    </section>
   </section>
-</section>
 {% endblock %}

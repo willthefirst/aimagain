@@ -1,34 +1,28 @@
 {% extends "views/detail.html" %}
 {%- from "_shared/_clinician_card.html" import clinician_card -%}
 {%- from "_shared/sections.html" import fact -%}
-
-
 {% block resource_label %}Users{% endblock %}
 {% block current_label %}{{ target_user.username }}{% endblock %}
-
 {% block actions %}
-{# Toolbar is reserved for Actions (Sign out, admin Deactivate/Delete).
+  {# Toolbar is reserved for Actions (Sign out, admin Deactivate/Delete).
    Favorites is navigation and lives in the body content below. #}
-{% if is_self %}
-{# Sign out — self-only. fastapi-users' POST /auth/jwt/logout returns
+  {% if is_self %}
+    {# Sign out — self-only. fastapi-users' POST /auth/jwt/logout returns
    204 (cookie deleted, no body); the `hx-on::after-request` shim
    redirects the browser to `/` on success since the library doesn't
    ship a `?next=` for logout the way login does. Don't move this
    above the admin block — Sign out reads as the last action in the
    self view, and the admin actions only render for admins viewing
    someone else. #}
-<li>
-  <button type="button"
-          class="secondary outline"
-          hx-post="/auth/jwt/logout"
-          hx-on::after-request="if(event.detail.successful){window.location='/'}">
-    Sign out
-  </button>
-</li>
-{% endif %}
-{% include "users/_admin_actions.html" %}
+    <li>
+      <button type="button"
+              class="secondary outline"
+              hx-post="/auth/jwt/logout"
+              hx-on::after-request="if(event.detail.successful){window.location='/'}">Sign out</button>
+    </li>
+  {% endif %}
+  {% include "users/_admin_actions.html" %}
 {% endblock %}
-
 {# User detail uses the `.entity-card` chrome shared with the other
    detail pages. The Clinicians section is a separate card below the
    main user card — embedded card-in-card would read as visual noise,
@@ -41,8 +35,8 @@
    `<strong>Clinicians</strong>` is a section label, not a duplicate
    of any heading above. #}
 {% block content %}
-<section class="entity-card">
-  {# Private rows (email, active) are gated by `can_view_private`,
+  <section class="entity-card">
+    {# Private rows (email, active) are gated by `can_view_private`,
      computed in handle_get_user_detail as `is_self OR is_admin(viewer)`.
      The handler also omits these fields from the `target_user`
      projection for non-authorized viewers, so a forgotten guard here
@@ -56,81 +50,76 @@
 
      `is_verified` removed in #696 — no verification flow exists and
      every account is permanently False; showing it was misleading. #}
-  {% if can_view_private %}
-  <section class="entity-facts">
-    <dl>
-      {{ fact('email', 'Email', target_user.email) }}
-      {% if not is_self %}
-      {{ fact('active', 'Active', "Yes" if target_user.is_active else "No") }}
-      {% endif %}
-    </dl>
+    {% if can_view_private %}
+      <section class="entity-facts">
+        <dl>
+          {{ fact('email', 'Email', target_user.email) }}
+          {% if not is_self %}{{ fact('active', 'Active', "Yes" if target_user.is_active else "No") }}{% endif %}
+        </dl>
+      </section>
+    {% endif %}
   </section>
-  {% endif %}
-</section>
-
-{# Favorites — self-only navigation to the viewer's private favorites
+  {# Favorites — self-only navigation to the viewer's private favorites
    list. Lives in the body, not the toolbar: toolbar is reserved for
    Actions (Sign out, admin Deactivate/Delete), and viewing someone
    else's profile must not expose their private favorites. #}
-{% if is_self %}
-<section class="entity-card">
-  <header class="entity-header">
-    <strong>Favorites</strong>
-  </header>
-  <footer class="entity-footer">
-    <a href="{{ entity_url('user_favorite') }}" role="button" class="outline">View favorites</a>
-  </footer>
-</section>
-{% endif %}
-
-{# Onboarding checklist — visible only to the user viewing their own
+  {% if is_self %}
+    <section class="entity-card">
+      <header class="entity-header">
+        <strong>Favorites</strong>
+      </header>
+      <footer class="entity-footer">
+        <a href="{{ entity_url('user_favorite') }}"
+           role="button"
+           class="outline">View favorites</a>
+      </footer>
+    </section>
+  {% endif %}
+  {# Onboarding checklist — visible only to the user viewing their own
    profile. Shows status-based CTAs: create a clinician profile first,
    then post an opening. Other users' profiles (/users/{id}) are
    unchanged — they keep the Clinicians card below without this section. #}
-{% if is_self %}
-<section class="entity-card">
-  <header class="entity-header">
-    <strong>Getting started</strong>
-  </header>
-  <ul>
-    <li>
-      {% if providers %}
-      &#10003; <a href="{{ entity_url('clinician', id=providers[0].id) }}">Your clinician profile</a>
-      {% else %}
-      <a href="{{ entity_form_url('clinician') }}" role="button">Create your clinician profile</a>
-      {% endif %}
-    </li>
-    {% if providers %}
-    <li>
-      <a href="{{ entity_form_url('opening') }}" role="button" class="outline">Post an opening</a>
-    </li>
-    {% endif %}
-  </ul>
-</section>
-{% endif %}
-
-<section class="entity-card">
-  <header class="entity-header">
-    <strong>Clinicians</strong>
-  </header>
-  {% if providers %}
-  <section id="user-detail-clinicians">
-    {%- for provider in providers %}
-    {{ clinician_card(provider) }}
-    {%- endfor %}
-  </section>
-  {% else %}
-  <p id="user-detail-clinicians-empty">No clinician entries yet.</p>
+  {% if is_self %}
+    <section class="entity-card">
+      <header class="entity-header">
+        <strong>Getting started</strong>
+      </header>
+      <ul>
+        <li>
+          {% if providers %}
+            &#10003; <a href="{{ entity_url('clinician', id=providers[0].id) }}">Your clinician profile</a>
+          {% else %}
+            <a href="{{ entity_form_url('clinician') }}" role="button">Create your clinician profile</a>
+          {% endif %}
+        </li>
+        {% if providers %}
+          <li>
+            <a href="{{ entity_form_url('opening') }}" role="button" class="outline">Post an opening</a>
+          </li>
+        {% endif %}
+      </ul>
+    </section>
   {% endif %}
-  {# Self-only Create CTA — the profile is the natural discovery
+  <section class="entity-card">
+    <header class="entity-header">
+      <strong>Clinicians</strong>
+    </header>
+    {% if providers %}
+      <section id="user-detail-clinicians">
+        {%- for provider in providers %}{{ clinician_card(provider) }}{%- endfor %}
+      </section>
+    {% else %}
+      <p id="user-detail-clinicians-empty">No clinician entries yet.</p>
+    {% endif %}
+    {# Self-only Create CTA — the profile is the natural discovery
      point for "make my own clinician entry". The dedicated
      `/users/me/clinicians` page carries the same action in its
      toolbar (added in 3b59933f); this inline button is the version
      a user sees on the profile preview, without an extra click. #}
-  {% if is_self %}
-  <footer class="entity-footer">
-    <a href="{{ entity_form_url('clinician') }}" role="button">{{ entity_create_label('clinician') }}</a>
-  </footer>
-  {% endif %}
-</section>
+    {% if is_self %}
+      <footer class="entity-footer">
+        <a href="{{ entity_form_url('clinician') }}" role="button">{{ entity_create_label("clinician") }}</a>
+      </footer>
+    {% endif %}
+  </section>
 {% endblock %}

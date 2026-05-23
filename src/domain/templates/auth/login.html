@@ -1,37 +1,40 @@
 {% extends "base.html" %}
 {% block content %}
-{# Login form sits in a `<section class="auth-page">` — the rule in
+  {# Login form sits in a `<section class="auth-page">` — the rule in
    `base.html` caps the section at 28rem and centers it horizontally
    via `margin-inline: auto`, matching every other auth page
    (register, forgot-password, reset-password, verify). #}
-<section class="auth-page">
-  <header>
-    <h1>Log in</h1>
-    {% if just_registered %}<p>Account created — log in to continue.</p>{% else %}<p>Sign in to your Bedlam Connect account.</p>{% endif %}
-  </header>
-  <!-- FastAPI Users JWT login endpoint expects 'username' (which is email) and 'password' as form data. -->
-  <form
-    method="post"
-    action="/auth/jwt/login{% if next_url %}?next={{ next_url }}{% endif %}">
-    <label for="username">
-      Email
-      <input type="email" id="username" name="username" required />
-    </label>
-    <label for="password">
-      Password
-      <input type="password" id="password" name="password" required />
-    </label>
-    <button type="submit">Log in</button>
-  </form>
-  <footer>
-    <p>
-      Forgot your password?
-      <a href="/auth/forgot-password">Reset it.</a>
-    </p>
-    <p>
-      New here?
-      <a href="/auth/register">Create an account.</a>
-    </p>
-  </footer>
-</section>
+  <section class="auth-page">
+    <header>
+      <h1>Log in</h1>
+      {% if just_registered %}
+        <p>Account created — log in to continue.</p>
+      {% else %}
+        <p>Sign in to your Bedlam Connect account.</p>
+      {% endif %}
+    </header>
+    <!-- FastAPI Users JWT login endpoint expects 'username' (which is email) and 'password' as form data. -->
+    <form method="post"
+          action="/auth/jwt/login{% if next_url %}?next={{ next_url }}{% endif %}">
+      <label for="username">
+        Email
+        <input type="email" id="username" name="username" required />
+      </label>
+      <label for="password">
+        Password
+        <input type="password" id="password" name="password" required />
+      </label>
+      <button type="submit">Log in</button>
+    </form>
+    <footer>
+      <p>
+        Forgot your password?
+        <a href="/auth/forgot-password">Reset it.</a>
+      </p>
+      <p>
+        New here?
+        <a href="/auth/register">Create an account.</a>
+      </p>
+    </footer>
+  </section>
 {% endblock %}
