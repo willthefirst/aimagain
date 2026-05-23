@@ -371,6 +371,15 @@ class QualityCommands:
                 ["isort", "--check-only", "."],
             ),
             (
+                "🧩 Checking template formatting with djlint...",
+                [
+                    "djlint",
+                    "src/framework/templates",
+                    "src/domain/templates",
+                    "--check",
+                ],
+            ),
+            (
                 "🏷️ Checking title case...",
                 [sys.executable, "scripts/dev/title_case_check.py", "--check-only"],
             ),
@@ -413,15 +422,38 @@ class QualityCommands:
     def fmt(self) -> int:
         print("🎨 Applying formatters...")
 
+        # djlint is non-idempotent on `{% block %}/{% endblock %}` indent —
+        # the first pass leaves `{% endblock %}` at column 0; a second pass
+        # bumps it to column 2 (or vice versa). Running it twice converges
+        # in practice. Without this, `dev lint`'s `djlint --check` flags
+        # drift on the very output `dev fmt` just produced.
+        djlint_cmd = [
+            "djlint",
+            "src/framework/templates",
+            "src/domain/templates",
+            "--reformat",
+        ]
         steps = [
             ("📝 Formatting code with black...", ["black", "."]),
-            ("🔤 Sorting imports with isort...", ["isort", "."]),
+            (
+                "🔤 Sorting imports with isort...",
+                ["isort", "src", "tests", "scripts", "alembic", "conftest.py"],
+            ),
+            ("🧩 Formatting templates with djlint (pass 1/2)...", djlint_cmd),
+            ("🧩 Formatting templates with djlint (pass 2/2)...", djlint_cmd),
         ]
 
         exit_code = 0
         for description, cmd in steps:
             print(description)
             result = self.runner.run_command(cmd)
+            # `djlint --reformat` exits 1 when it rewrites files — same
+            # signal as `git diff --exit-code`. Black and isort instead
+            # exit 0 in that case, so treating any non-zero as failure
+            # would make every template-touching `dev fmt` run report
+            # failure. Special-case djlint so the step is success-on-fix.
+            if cmd[0] == "djlint" and "--reformat" in cmd and result == 1:
+                result = 0
             if result != 0:
                 exit_code = result
 

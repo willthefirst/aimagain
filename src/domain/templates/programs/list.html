@@ -1,45 +1,45 @@
 {% extends "views/list.html" %}
 {%- from "_shared/_card.html" import card -%}
 {%- from "_shared/sections.html" import fact -%}
-
 {% block resource_label %}Programs{% endblock %}
-
 {% block actions %}
-<li><a href="{{ entity_form_url('program') }}" role="button">{{ entity_create_label('program') }}</a></li>
+  <li>
+    <a href="{{ entity_form_url('program') }}" role="button">{{ entity_create_label("program") }}</a>
+  </li>
 {% endblock %}
-
 {% block content %}
-{% if programs %}
-<section id="programs-list">
-  {%- for program in programs %}
-  {%- set subtitle %}
-  <span>{{ "Accepting referrals" if program.accepting_referrals else "Not accepting referrals" }}</span>
-  {%- if program.state_preference %}<span>{{ program.state_preference }}</span>{%- endif %}
-  {%- endset %}
-  {% call card(
-       id=program.id,
-       headline_url=entity_url('program', id=program.id),
-       headline=program.name,
-       subtitle=subtitle) -%}
-  <section class="entity-facts">
-    <dl>
-      {%- call fact('organization', 'Organization') %}<a href="{{ entity_url('organization', id=program.org_id) }}">{{ program.organization.name }}</a>{% endcall %}
-    </dl>
+  {% if programs %}
+    <section id="programs-list">
+      {%- for program in programs %}
+        {%- set subtitle %}
+          <span>{{ "Accepting referrals" if program.accepting_referrals else "Not accepting referrals" }}</span>
+          {%- if program.state_preference %}<span>{{ program.state_preference }}</span>{%- endif %}
+        {%- endset %}
+        {% call card(
+          id=program.id,
+          headline_url=entity_url('program', id=program.id),
+          headline=program.name,
+          subtitle=subtitle) -%}
+          <section class="entity-facts">
+            <dl>
+              {%- call fact('organization', 'Organization') %}<a href="{{ entity_url('organization', id=program.org_id) }}">{{ program.organization.name }}</a>
+            {% endcall %}
+          </dl>
+        </section>
+      {%- endcall %}
+    {%- endfor %}
   </section>
-  {%- endcall %}
-  {%- endfor %}
-</section>
 {% else %}
-{# Empty state owns its own CTA so the next action is in the eye-line of
+  {# Empty state owns its own CTA so the next action is in the eye-line of
    the user, not buried in the toolbar above. The toolbar's "Create
    program" still renders (this branch fires only when the list itself
    is empty) — the inline button is a second affordance, not a
    replacement. #}
-<div id="programs-empty-state">
-  <p>No programs yet.</p>
-  <p>
-    <a href="{{ entity_form_url('program') }}" role="button">{{ entity_create_label('program') }}</a>
-  </p>
-</div>
+  <div id="programs-empty-state">
+    <p>No programs yet.</p>
+    <p>
+      <a href="{{ entity_form_url('program') }}" role="button">{{ entity_create_label("program") }}</a>
+    </p>
+  </div>
 {% endif %}
 {% endblock %}

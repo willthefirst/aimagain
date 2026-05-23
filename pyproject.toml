@@ -61,6 +61,7 @@ lint = [
     "black==26.3.1",
     "isort==6.0.1",
     "autoflake",
+    "djlint==1.36.4",
     "pre-commit",
     "pathspec",
 ]
@@ -86,6 +87,10 @@ target-version = ['py311']
 [tool.isort]
 profile = "black"
 line_length = 88
+
+[tool.djlint]
+profile = "jinja"
+indent = 2
 
 [tool.pytest.ini_options]
 pythonpath = ["."]

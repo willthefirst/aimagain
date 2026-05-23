@@ -1,14 +1,11 @@
 {% extends "views/form_edit.html" %}
 {% from "posts/referrals/_form.html" import referral_form %}
-
 {# `view.headline` is the referral's identity line (age + gender combo).
    Reusing it here pins the breadcrumb / H1 to the specific referral
    the user is editing. #}
 {% set view = post_card_view(referral) %}
-
 {% block resource_label %}Referrals{% endblock %}
 {% block current_label %}{{ view.headline or 'Referral' }}{% endblock %}
-
 {% block content %}
-{{ referral_form("patch", entity_url('referral', id=referral.id), "Save changes", post=referral, schema=referral_create_schema, cancel_url=entity_url('referral', id=referral.id)) }}
+  {{ referral_form("patch", entity_url('referral', id=referral.id) , "Save changes", post=referral, schema=referral_create_schema, cancel_url=entity_url('referral', id=referral.id)) }}
 {% endblock %}

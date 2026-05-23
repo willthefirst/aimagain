@@ -11,16 +11,15 @@
    `_verify_banner_sent.html` partial which swaps the banner in
    place via `hx-swap="outerHTML"`. #}
 {%- if is_authenticated and not current_user_is_verified -%}
-<aside role="status" id="verify-banner">
-  <strong>Verify your email.</strong>
-  Check your inbox for a link to confirm your account.
-  <form
-    method="post"
-    action="/auth/resend-verify"
-    hx-post="/auth/resend-verify"
-    hx-target="#verify-banner"
-    hx-swap="outerHTML">
-    <button type="submit" class="secondary">Resend verification email</button>
-  </form>
-</aside>
+  <aside role="status" id="verify-banner">
+    <strong>Verify your email.</strong>
+    Check your inbox for a link to confirm your account.
+    <form method="post"
+          action="/auth/resend-verify"
+          hx-post="/auth/resend-verify"
+          hx-target="#verify-banner"
+          hx-swap="outerHTML">
+      <button type="submit" class="secondary">Resend verification email</button>
+    </form>
+  </aside>
 {%- endif -%}

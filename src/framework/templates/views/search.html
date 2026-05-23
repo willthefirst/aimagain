@@ -27,95 +27,99 @@ the spec.
 {% extends "base.html" %}
 {%- from "_shared/_breadcrumb.html" import breadcrumb -%}
 {%- from "_shared/_toolbar.html" import page_toolbar -%}
-
 {% block breadcrumb %}
-{%- set label %}{% block resource_label %}{% endblock %}{% endset -%}
-{{ breadcrumb([(label | trim, list_action)]) }}
+  {%- set label %}
+    {% block resource_label %}{% endblock %}
+  {% endset -%}
+  {{ breadcrumb([(label | trim, list_action) ]) }}
 {% endblock %}
-
 {% block toolbar %}
-{# `filter_heading` is sourced from `entity_filter_label(spec.name)` in
+  {# `filter_heading` is sourced from `entity_filter_label(spec.name)` in
    the search handler (see `mount_search` in
    `framework/dispatch/resource_routes.py`). Same helper feeds the
    list-page toolbar's filter link, so the button text and the page
    title can't drift. #}
-{% call page_toolbar(heading=filter_heading) %}{% endcall %}
+  {% call page_toolbar(heading=filter_heading) %}
+  {% endcall %}
 {% endblock %}
-
 {% block content %}
-
-<form method="get" action="{{ list_action }}" class="search-form">
-
-  {%- for f in declared_filters %}
-  {{ _search_field(f, filter_values.get(f.name)) }}
-  {%- endfor %}
-
-  <menu>
-    <li><button type="submit">Apply</button></li>
-    {# Use the outline variant so Clear matches the rest of the
+  <form method="get" action="{{ list_action }}" class="search-form">
+    {%- for f in declared_filters %}{{ _search_field(f, filter_values.get(f.name) ) }}{%- endfor %}
+      <menu>
+        <li>
+          <button type="submit">Apply</button>
+        </li>
+        {# Use the outline variant so Clear matches the rest of the
        app's secondary-action vocabulary (Cancel, Filters, Edit,
        Unfavorite) — Pico's filled `.secondary` was a third button
        style with no other callers (#599). #}
-    <li><a href="{{ list_action }}" role="button" class="secondary outline">Clear</a></li>
-  </menu>
-
-</form>
-{% endblock %}
-
-
-{% macro _search_field(f, value) -%}
-{%- if f.kind == "text" -%}
-<label>
-  {{ f.display_label }}
-  <input
-    type="search"
-    name="{{ f.name }}"
-    value="{{ value or '' }}"
-    {%- if f.placeholder %} placeholder="{{ f.placeholder }}"{% endif %} />
-</label>
-{%- elif f.kind == "choice" -%}
-{%- if f.multi -%}
-{%- set selected = value or [] -%}
-{# Long choice sets (US states, license-type lists) get a multi-column
+        <li>
+          <a href="{{ list_action }}" role="button" class="secondary outline">Clear</a>
+        </li>
+      </menu>
+    </form>
+  {% endblock %}
+  {% macro _search_field(f, value) -%}
+    {%- if f.kind == "text" -%}
+      <label>
+        {{ f.display_label }}
+        <input type="search"
+               name="{{ f.name }}"
+               value="{{ value or '' }}"
+               {% if f.placeholder %}placeholder="{{ f.placeholder }}"{% endif %} />
+      </label>
+    {%- elif f.kind == "choice" -%}
+      {%- if f.multi -%}
+        {%- set selected = value or [] -%}
+        {# Long choice sets (US states, license-type lists) get a multi-column
    grid on desktop so the form doesn't become absurdly tall. The
    threshold (>12) keeps short multi-selects — Age groups, Languages —
    as a single column where each option already reads cleanly. #}
-{%- set grid_class = " search-checkbox-grid" if f.choices|length > 12 else "" -%}
-<fieldset class="search-checkbox-fieldset{{ grid_class }}">
-  <legend>{{ f.display_label }}</legend>
-  {%- for v, l in f.choices %}
-  <label>
-    <input type="checkbox" name="{{ f.name }}" value="{{ v }}"{% if v in selected %} checked{% endif %} />
-    {{ l }}
-  </label>
-  {%- endfor %}
-</fieldset>
-{%- elif f.radio -%}
-<fieldset class="toggle-radio">
-  <legend>{{ f.display_label }}</legend>
-  <div role="group">
-    <label>
-      <input type="radio" name="{{ f.name }}" value=""{% if not value %} checked{% endif %} />
-      Any
-    </label>
-    {%- for v, l in f.choices %}
-    <label>
-      <input type="radio" name="{{ f.name }}" value="{{ v }}"{% if value == v %} checked{% endif %} />
-      {{ l }}
-    </label>
-    {%- endfor %}
-  </div>
-</fieldset>
-{%- else -%}
-<label>
-  {{ f.display_label }}
-  <select name="{{ f.name }}">
-    <option value=""{% if not value %} selected{% endif %}>Any</option>
-    {%- for v, l in f.choices %}
-    <option value="{{ v }}"{% if value == v %} selected{% endif %}>{{ l }}</option>
-    {%- endfor %}
-  </select>
-</label>
-{%- endif -%}
-{%- endif -%}
-{%- endmacro %}
+        {%- set grid_class = " search-checkbox-grid" if f.choices|length > 12 else "" -%}
+        <fieldset class="search-checkbox-fieldset{{ grid_class }}">
+          <legend>{{ f.display_label }}</legend>
+          {%- for v, l in f.choices %}
+            <label>
+              <input type="checkbox"
+                     name="{{ f.name }}"
+                     value="{{ v }}"
+                     {% if v in selected %}checked{% endif %} />
+              {{ l }}
+            </label>
+          {%- endfor %}
+        </fieldset>
+      {%- elif f.radio -%}
+        <fieldset class="toggle-radio">
+          <legend>{{ f.display_label }}</legend>
+          <div role="group">
+            <label>
+              <input type="radio"
+                     name="{{ f.name }}"
+                     value=""
+                     {% if not value %}checked{% endif %} />
+              Any
+            </label>
+            {%- for v, l in f.choices %}
+              <label>
+                <input type="radio"
+                       name="{{ f.name }}"
+                       value="{{ v }}"
+                       {% if value == v %}checked{% endif %} />
+                {{ l }}
+              </label>
+            {%- endfor %}
+          </div>
+        </fieldset>
+      {%- else -%}
+        <label>
+          {{ f.display_label }}
+          <select name="{{ f.name }}">
+            <option value=""{% if not value %} selected{% endif %}>Any</option>
+            {%- for v, l in f.choices %}
+              <option value="{{ v }}"{% if value == v %} selected{% endif %}>{{ l }}</option>
+            {%- endfor %}
+          </select>
+        </label>
+      {%- endif -%}
+    {%- endif -%}
+  {%- endmacro %}

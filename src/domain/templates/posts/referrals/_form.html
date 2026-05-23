@@ -21,40 +21,35 @@ which FastAPI/Pydantic parses as a list.
 {%- from "_shared/form_copy.html" import modality_help, select_all_help -%}
 {%- from "_shared/actions.html" import actions -%}
 {%- macro referral_form(hx_method, action, submit_label, post=None, schema=None, cancel_url=None) -%}
-{%- set d = post.referral_detail if post else None -%}
-<form hx-{{ hx_method }}="{{ action }}">
-  <input type="hidden" name="kind" value="referral" />
-
-  <fieldset>
-    <legend>Client location</legend>
-    <div class="grid">
-      {{ text_field("location_city", "City", current=d.location_city if d else None) }}
-      {{ select_field("location_state", "State", US_STATES, current=d.location_state if d else None, placeholder=true) }}
-      {{ text_field("location_zip", "ZIP", current=d.location_zip if d else None, pattern="\\d{5}", maxlength=5) }}
-    </div>
-    <div class="grid">
-      {{ select_field("location_in_person", "In-person sessions", LOCATION_AVAILABILITY_OPTIONS, labels=LOCATION_AVAILABILITY_LABELS, current=d.location_in_person if d else None, placeholder=true) }}
-      {{ select_field("location_virtual", "Virtual sessions", LOCATION_AVAILABILITY_OPTIONS, labels=LOCATION_AVAILABILITY_LABELS, current=d.location_virtual if d else None, placeholder=true) }}
-    </div>
-    {{ time_grid_field("desired_times", "Desired times", current=d.desired_times if d else None) }}
-  </fieldset>
-
-  <fieldset>
-    <legend>Client demographics</legend>
-    {{ field_for(schema, "age_groups", "Age groups", current=d.age_groups if d else None, help=select_all_help()) }}
-    {{ field_for(schema, "languages", "Languages spoken", current=d.languages if d else None) }}
-    {{ select_field("gender", "Gender", GENDERS, labels=GENDER_LABELS, current=d.gender if d else None) }}
-  </fieldset>
-
-  {{ textarea_field("description", "About the client", current=d.description if d else None, help="Anything else a clinician needs to know. Please don't include identifying details.") }}
-
-  <fieldset>
-    <legend>Services</legend>
-    {{ multi_select_field("services", "Services", REFERRAL_SERVICES, labels=REFERRAL_SERVICE_LABELS, current=d.services if d else None) }}
-    {{ text_field("treatment_modality", "Treatment modality", current=d.treatment_modality if d else None, required=false, help=modality_help()) }}
-  </fieldset>
-
-  {# Insurance: two controls. `network_preference` is the referrer's
+  {%- set d = post.referral_detail if post else None -%}
+  <form hx-{{ hx_method }}="{{ action }}">
+    <input type="hidden" name="kind" value="referral" />
+    <fieldset>
+      <legend>Client location</legend>
+      <div class="grid">
+        {{ text_field("location_city", "City", current=d.location_city if d else None) }}
+        {{ select_field("location_state", "State", US_STATES, current=d.location_state if d else None, placeholder=true) }}
+        {{ text_field("location_zip", "ZIP", current=d.location_zip if d else None, pattern="\\d{5}", maxlength=5) }}
+      </div>
+      <div class="grid">
+        {{ select_field("location_in_person", "In-person sessions", LOCATION_AVAILABILITY_OPTIONS, labels=LOCATION_AVAILABILITY_LABELS, current=d.location_in_person if d else None, placeholder=true) }}
+        {{ select_field("location_virtual", "Virtual sessions", LOCATION_AVAILABILITY_OPTIONS, labels=LOCATION_AVAILABILITY_LABELS, current=d.location_virtual if d else None, placeholder=true) }}
+      </div>
+      {{ time_grid_field("desired_times", "Desired times", current=d.desired_times if d else None) }}
+    </fieldset>
+    <fieldset>
+      <legend>Client demographics</legend>
+      {{ field_for(schema, "age_groups", "Age groups", current=d.age_groups if d else None, help=select_all_help() ) }}
+      {{ field_for(schema, "languages", "Languages spoken", current=d.languages if d else None) }}
+      {{ select_field("gender", "Gender", GENDERS, labels=GENDER_LABELS, current=d.gender if d else None) }}
+    </fieldset>
+    {{ textarea_field("description", "About the client", current=d.description if d else None, help="Anything else a clinician needs to know. Please don't include identifying details.") }}
+    <fieldset>
+      <legend>Services</legend>
+      {{ multi_select_field("services", "Services", REFERRAL_SERVICES, labels=REFERRAL_SERVICE_LABELS, current=d.services if d else None) }}
+      {{ text_field("treatment_modality", "Treatment modality", current=d.treatment_modality if d else None, required=false, help=modality_help() ) }}
+    </fieldset>
+    {# Insurance: two controls. `network_preference` is the referrer's
      posture (always set); `insurance_carrier` is the client's carrier
      (optional — null when network_preference='no_preference'). The
      carrier <div> is hidden whenever no_preference is selected; a tiny
@@ -62,19 +57,19 @@ which FastAPI/Pydantic parses as a list.
      ReferralCreate schema accepts a null carrier with any
      network_preference, so the hidden control just leaves the field
      unset rather than enforcing the invariant on the wire. #}
-  <fieldset>
-    <legend>Insurance</legend>
-    <div class="grid">
-      {{ select_field("network_preference", "Network preference", NETWORK_PREFERENCES, labels=NETWORK_PREFERENCE_LABELS, current=d.network_preference if d else None, placeholder=true) }}
-      <div data-cr-carrier{% if d and d.network_preference == "no_preference" %} hidden{% endif %}>
-        {{ select_field("insurance_carrier", "Insurance carrier", INSURANCE_CARRIERS, labels=INSURANCE_CARRIER_LABELS, current=d.insurance_carrier if d else None, placeholder=true, required=false) }}
+    <fieldset>
+      <legend>Insurance</legend>
+      <div class="grid">
+        {{ select_field("network_preference", "Network preference", NETWORK_PREFERENCES, labels=NETWORK_PREFERENCE_LABELS, current=d.network_preference if d else None, placeholder=true) }}
+        <div data-cr-carrier
+             {% if d and d.network_preference == "no_preference" %}hidden{% endif %}>
+          {{ select_field("insurance_carrier", "Insurance carrier", INSURANCE_CARRIERS, labels=INSURANCE_CARRIER_LABELS, current=d.insurance_carrier if d else None, placeholder=true, required=false) }}
+        </div>
       </div>
-    </div>
-  </fieldset>
-
-  {{ actions(submit_label, cancel_url=cancel_url) }}
-</form>
-<script>
+    </fieldset>
+    {{ actions(submit_label, cancel_url=cancel_url) }}
+  </form>
+  <script>
   // Hide the insurance_carrier control when the referrer has no
   // preference — the field is meaningless in that branch.
   (function () {
@@ -91,5 +86,5 @@ which FastAPI/Pydantic parses as a list.
     sel.addEventListener('change', sync);
     sync();
   })();
-</script>
+  </script>
 {%- endmacro -%}

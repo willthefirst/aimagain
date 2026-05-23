@@ -1,5 +1,4 @@
 {# Section-shape macros shared across CRUD detail/edit pages. #}
-
 {# Render one fact-row inside an `<section class="entity-facts">
    <dl>` block. Each row is wrapped in a `<div>` (so the parent
    grid treats the `<dt>`/`<dd>` pair as one logical row — see the
@@ -24,9 +23,13 @@
    `value` argument fills the `<dd>` (escaped by Jinja by default).
 #}
 {% macro fact(key, label, value="", dd_class=None) -%}
-<div data-fact="{{ key }}"><dt>{{ label }}</dt><dd{% if dd_class %} class="{{ dd_class }}"{% endif %}>{{ caller() if caller else value }}</dd></div>
+  <div data-fact="{{ key }}">
+    <dt>{{ label }}</dt>
+    <dd {% if dd_class %}class="{{ dd_class }}"{% endif %}>
+      {{ caller() if caller else value }}
+    </dd>
+  </div>
 {%- endmacro %}
-
 {# Render a `<ul>` of items or an empty-state `<p>`. The caller passes
 the per-item `<li>` body via `{% call(item) %}…{% endcall %}`. The macro
 owns the if/else split — callers own the row markup and the surrounding
@@ -39,13 +42,11 @@ Example:
   {% endcall %}
 #}
 {% macro list_or_empty(items, empty_message) -%}
-{% if items %}
-<ul>
-  {%- for item in items %}
-  {{ caller(item) }}
-  {%- endfor %}
-</ul>
-{% else %}
-<p>{{ empty_message }}</p>
-{% endif %}
-{%- endmacro %}
+  {% if items %}
+    <ul>
+      {%- for item in items %}{{ caller(item) }}{%- endfor %}
+      </ul>
+    {% else %}
+      <p>{{ empty_message }}</p>
+    {% endif %}
+  {%- endmacro %}

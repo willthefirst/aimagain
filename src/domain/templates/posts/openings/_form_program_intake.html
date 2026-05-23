@@ -22,50 +22,46 @@ with at least one Program available.
 {%- from "_shared/form_copy.html" import modality_help, schedule_notes_help, select_all_help -%}
 {%- from "_shared/actions.html" import actions -%}
 {%- macro intake_form(hx_method, action, submit_label, post=None, schema=None, current_user=None, cancel_url=None) -%}
-{%- set d = post.intake_detail if post else None -%}
-<form hx-{{ hx_method }}="{{ action }}">
-  <input type="hidden" name="kind" value="program_intake" />
-
-  <label for="program_id">
-    Which program?
-    <select id="program_id" name="program_id" required>
-      {%- if not d %}
-      <option value="" disabled selected>--</option>
-      {%- endif %}
-      {%- for p in current_user.programs %}
-      <option value="{{ p.id }}"{% if d and d.program_id == p.id %} selected{% endif %}>{{ p.name }} &middot; {{ p.organization.name }}</option>
-      {%- endfor %}
-    </select>
-  </label>
-
-  {# About: free-text core fields — description / referral / website. #}
-  <fieldset>
-    <legend>About</legend>
-    {{ field_for(schema, "description", "Description", current=d.description if d else None) }}
-    {{ field_for(schema, "referral_instructions", "Referral instructions", current=d.referral_instructions if d else None) }}
-    {{ field_for(schema, "website", "Website", current=d.website if d else None) }}
-  </fieldset>
-
-  <fieldset>
-    <legend>Availability</legend>
-    {{ time_grid_field("desired_times", "Desired times", current=d.desired_times if d else None) }}
-    {{ field_for(schema, "schedule_text", "Schedule notes", current=d.schedule_text if d else None, help=schedule_notes_help()) }}
-  </fieldset>
-
-  <fieldset>
-    <legend>Featured services</legend>
-    <div class="grid">
-      {{ multi_select_field("services", "Services", REFERRAL_SERVICES, labels=REFERRAL_SERVICE_LABELS, current=d.services if d else None) }}
-      {{ multi_select_field("settings", "Treatment settings", TREATMENT_SETTINGS, labels=TREATMENT_SETTINGS_LABELS, current=d.settings if d else None) }}
-    </div>
-    {{ text_field("treatment_modality", "Treatment modality", current=d.treatment_modality if d else None, required=false, help=modality_help()) }}
-    {{ field_for(schema, "age_groups", "Age groups", current=d.age_groups if d else None, help=select_all_help()) }}
-    <div class="grid">
-      {{ field_for(schema, "languages", "Languages spoken", current=d.languages if d else None) }}
-      {{ multi_select_field("genders", "Genders served", GENDERS, labels=GENDER_LABELS, current=d.genders if d else None) }}
-    </div>
-  </fieldset>
-
-  {{ actions(submit_label, cancel_url=cancel_url) }}
-</form>
+  {%- set d = post.intake_detail if post else None -%}
+  <form hx-{{ hx_method }}="{{ action }}">
+    <input type="hidden" name="kind" value="program_intake" />
+    <label for="program_id">
+      Which program?
+      <select id="program_id" name="program_id" required>
+        {%- if not d %}<option value="" disabled selected>--</option>{%- endif %}
+        {%- for p in current_user.programs %}
+          <option value="{{ p.id }}"
+                  {% if d and d.program_id == p.id %}selected{% endif %}>
+            {{ p.name }} &middot; {{ p.organization.name }}
+          </option>
+        {%- endfor %}
+      </select>
+    </label>
+    {# About: free-text core fields — description / referral / website. #}
+    <fieldset>
+      <legend>About</legend>
+      {{ field_for(schema, "description", "Description", current=d.description if d else None) }}
+      {{ field_for(schema, "referral_instructions", "Referral instructions", current=d.referral_instructions if d else None) }}
+      {{ field_for(schema, "website", "Website", current=d.website if d else None) }}
+    </fieldset>
+    <fieldset>
+      <legend>Availability</legend>
+      {{ time_grid_field("desired_times", "Desired times", current=d.desired_times if d else None) }}
+      {{ field_for(schema, "schedule_text", "Schedule notes", current=d.schedule_text if d else None, help=schedule_notes_help() ) }}
+    </fieldset>
+    <fieldset>
+      <legend>Featured services</legend>
+      <div class="grid">
+        {{ multi_select_field("services", "Services", REFERRAL_SERVICES, labels=REFERRAL_SERVICE_LABELS, current=d.services if d else None) }}
+        {{ multi_select_field("settings", "Treatment settings", TREATMENT_SETTINGS, labels=TREATMENT_SETTINGS_LABELS, current=d.settings if d else None) }}
+      </div>
+      {{ text_field("treatment_modality", "Treatment modality", current=d.treatment_modality if d else None, required=false, help=modality_help() ) }}
+      {{ field_for(schema, "age_groups", "Age groups", current=d.age_groups if d else None, help=select_all_help() ) }}
+      <div class="grid">
+        {{ field_for(schema, "languages", "Languages spoken", current=d.languages if d else None) }}
+        {{ multi_select_field("genders", "Genders served", GENDERS, labels=GENDER_LABELS, current=d.genders if d else None) }}
+      </div>
+    </fieldset>
+    {{ actions(submit_label, cancel_url=cancel_url) }}
+  </form>
 {%- endmacro -%}
