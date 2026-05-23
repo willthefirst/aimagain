@@ -249,6 +249,8 @@ class TestCommands:
         keywords: Optional[str] = None,
         paths: Optional[List[str]] = None,
         skip_lint: bool = False,
+        affected: bool = False,
+        base: str = "origin/main",
     ) -> int:
         # Inner-loop guard (#648). Default sequence: auto-fmt → lint →
         # pytest. Lint failures stop before pytest so the agent fixes
@@ -275,6 +277,29 @@ class TestCommands:
                 )
                 return lint_rc
 
+        # `--affected` resolves changed-files-vs-base into a pytest path
+        # list using the colocated-test convention. Falls back to the
+        # full suite on blast-radius hits and exits 0 without invoking
+        # pytest when nothing test-relevant changed (e.g. README-only
+        # PRs). See `scripts/affected_tests.py` for the contract.
+        affected_paths: Optional[List[str]] = None
+        if affected:
+            if paths:
+                print("❌ `--affected` is mutually exclusive with explicit paths.")
+                return 2
+            from scripts.affected_tests import (
+                changed_files,
+                select_affected_tests,
+            )
+
+            files = changed_files(base, self.runner.project_root)
+            selection = select_affected_tests(files, self.runner.project_root)
+            print(f"📍 Affected selector: {selection.reason}")
+            if not selection.full_suite and not selection.paths:
+                print("✅ No affected tests; skipping pytest.")
+                return 0
+            affected_paths = selection.pytest_args()
+
         print("🧪 Running tests...")
 
         cmd = ["pytest"]
@@ -286,7 +311,9 @@ class TestCommands:
             cmd.extend(["-m", markers])
         if keywords:
             cmd.extend(["-k", keywords])
-        if paths:
+        if affected_paths is not None:
+            cmd.extend(affected_paths)
+        elif paths:
             cmd.extend(self.PATH_ALIASES.get(p, p) for p in paths)
 
         return self.runner.run_command(cmd)
@@ -1325,6 +1352,22 @@ Examples:
             ),
         )
         parser.add_argument(
+            "--affected",
+            action="store_true",
+            help=(
+                "Run only test files relevant to files changed in this "
+                "branch vs --base. Mutually exclusive with explicit paths. "
+                "Falls back to the full suite when a blast-radius file "
+                "(pyproject.toml, alembic/, src/framework/config.py, ...) "
+                "changed. See `scripts/affected_tests.py`."
+            ),
+        )
+        parser.add_argument(
+            "--base",
+            default="origin/main",
+            help="Base ref for --affected diff (default: origin/main).",
+        )
+        parser.add_argument(
             "paths",
             nargs="*",
             help="One or more test paths or files (forwarded to pytest)",
@@ -1337,6 +1380,8 @@ Examples:
                 args.keywords,
                 args.paths,
                 args.skip_lint,
+                args.affected,
+                args.base,
             )
         )
 

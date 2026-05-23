@@ -183,3 +183,80 @@ def test_run_tests_does_not_warn_for_files_dirty_before_fmt(capsys):
     assert "src/templates/login.html" in out
     assert "src/foo.py" not in out
     assert "rewrote 1 file" in out
+
+
+# --- --affected wiring --------------------------------------------------
+
+
+def test_run_tests_affected_with_explicit_paths_is_rejected():
+    """`--affected` derives the path list from the diff; combining it
+    with explicit paths is almost always a usage mistake. Exit 2
+    (argparse convention for usage errors) so a CI invocation that
+    accidentally drifts surfaces immediately."""
+    runner, quality = _quality_aware_runner()
+    rc = TestCommands(runner, quality).run_tests(
+        affected=True, paths=["tests/foo.py"], skip_lint=True
+    )
+    assert rc == 2
+    assert runner.last_cmd is None
+
+
+def test_run_tests_affected_forwards_selected_paths_to_pytest(monkeypatch):
+    """The selector decides which test files matter; the CLI passes
+    that decision through to pytest verbatim. Mock the selector so we
+    test the wiring, not the colocated-test heuristic (which
+    `test_affected_tests.py` already pins)."""
+    import scripts.affected_tests as mod
+
+    monkeypatch.setattr(mod, "changed_files", lambda base, root: ["x.py"])
+    monkeypatch.setattr(
+        mod,
+        "select_affected_tests",
+        lambda files, root: mod.AffectedSelection(
+            paths=("src/a/test_x.py",), full_suite=False, reason="stub"
+        ),
+    )
+    runner, quality = _quality_aware_runner()
+    rc = TestCommands(runner, quality).run_tests(affected=True, skip_lint=True)
+    assert rc == 0
+    assert runner.last_cmd == ["pytest", "src/a/test_x.py"]
+
+
+def test_run_tests_affected_full_suite_runs_pytest_with_no_paths(monkeypatch):
+    """Blast-radius → `pytest` with no path args, which collects
+    everything via the configured `addopts`. Critical that the CLI
+    doesn't pass an empty path list as a literal argument."""
+    import scripts.affected_tests as mod
+
+    monkeypatch.setattr(mod, "changed_files", lambda base, root: ["pyproject.toml"])
+    monkeypatch.setattr(
+        mod,
+        "select_affected_tests",
+        lambda files, root: mod.AffectedSelection(
+            paths=(), full_suite=True, reason="stub blast radius"
+        ),
+    )
+    runner, quality = _quality_aware_runner()
+    rc = TestCommands(runner, quality).run_tests(affected=True, skip_lint=True)
+    assert rc == 0
+    assert runner.last_cmd == ["pytest"]
+
+
+def test_run_tests_affected_empty_selection_skips_pytest(monkeypatch):
+    """README-only PR: no source touched, no tests selected. The CLI
+    exits 0 *without* invoking pytest — that's the entire point of
+    the selector in the CI tier (don't spin up the runner for nothing)."""
+    import scripts.affected_tests as mod
+
+    monkeypatch.setattr(mod, "changed_files", lambda base, root: ["README.md"])
+    monkeypatch.setattr(
+        mod,
+        "select_affected_tests",
+        lambda files, root: mod.AffectedSelection(
+            paths=(), full_suite=False, reason="docs only"
+        ),
+    )
+    runner, quality = _quality_aware_runner()
+    rc = TestCommands(runner, quality).run_tests(affected=True, skip_lint=True)
+    assert rc == 0
+    assert runner.last_cmd is None
