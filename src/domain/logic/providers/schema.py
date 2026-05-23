@@ -59,6 +59,7 @@ from src.framework.schema_validators import (
     StrippedOptionalText,
     StrippedText,
     WirePayload,
+    scalar_to_list,
 )
 
 _NPI_RE = re.compile(r"^[0-9]{10}$")
@@ -91,21 +92,10 @@ NpiText = Annotated[
 ]
 
 
-def _scalar_to_list(v):
-    """Wrap a single string in a one-element list. HTML form posts collapse
-    a 1-checkbox-checked group to a scalar (htmx's `json-enc` only emits an
-    array when the same name appears 2+ times); this normalizes that
-    1-element case before the `Literal[*TUPLE]` member check fires. Mirrors
-    the helper in `src/domain/logic/posts/schema.py`."""
-    if isinstance(v, str):
-        return [v]
-    return v
-
-
 # `in_network_carriers` is a multi-checkbox group; scalar→singleton coercion
 # matches the pattern shared with PA/CR multi-select fields.
 InNetworkCarriersField = Annotated[
-    list[Literal[*INSURANCE_CARRIERS]], BeforeValidator(_scalar_to_list)
+    list[Literal[*INSURANCE_CARRIERS]], BeforeValidator(scalar_to_list)
 ]
 
 

@@ -1,0 +1,12 @@
+name: DB setup
+description: Run alembic migrations against the CI sqlite database.
+
+# Shared by `tests` and `contract-tests`. Kept separate from
+# `python-setup` because `linting` doesn't need a database.
+
+runs:
+  using: composite
+  steps:
+    - name: Create test database
+      shell: bash
+      run: alembic -c config/alembic.ini upgrade head

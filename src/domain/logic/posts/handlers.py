@@ -32,9 +32,20 @@ from pydantic import BaseModel
 from src.domain.logic.programs.repository import ProgramRepository
 from src.domain.logic.providers.repository import ProviderRepository
 from src.domain.models import Program, Provider, User
-from src.framework.http.exceptions import ForbiddenError, NotFoundError
+from src.framework.authz import assert_fk_ownership
 
 logger = logging.getLogger(__name__)
+
+# Per-kind mapping for the FK-ownership check. Each entry says: when the
+# payload's `kind` matches, validate that the named attribute points at a
+# row of `model` (loaded via `repo`) that the requesting user owns.
+# `referral` is intentionally absent — it has no target FK; the dispatch
+# below no-ops for any kind not in this map.
+_KIND_FK_TARGETS: tuple[tuple[str, str, str, type], ...] = (
+    # (kind, attr, parent_noun, parent_model)
+    ("clinician_opening", "provider_id", "Provider", Provider),
+    ("program_intake", "program_id", "Program", Program),
+)
 
 
 async def _assert_post_payload_target_ownership(
@@ -48,45 +59,36 @@ async def _assert_post_payload_target_ownership(
     create/update whose per-kind FK points at a row the requesting user
     doesn't own (superusers bypass).
 
-    Dispatches on ``payload.kind``:
+    Dispatches on ``payload.kind`` via :data:`_KIND_FK_TARGETS`:
 
     * ``clinician_opening`` — checks ``payload.provider_id`` against
       ``Provider.owner_id``.
     * ``program_intake`` — checks ``payload.program_id`` against
       ``Program.owner_id``.
-    * ``referral`` — no target FK; no-op.
+    * ``referral`` (and any future kind without a target FK) — no-op.
 
     404 when the target row doesn't exist (no info leak about other
     users' ids); 403 when it exists but belongs to someone else. PATCH
     payloads where the FK field is None (the PATCH doesn't touch the
     FK) are a no-op — only flow through the ownership check when the
-    payload is actually trying to set a new target.
+    payload is actually trying to set a new target. Both branches share
+    the generic :func:`~src.framework.authz.assert_fk_ownership` helper.
 
     See module docstring for why the dispatcher lives here rather than
     on :class:`PostKindSpec` per-kind."""
     kind = getattr(payload, "kind", None)
-    if kind == "clinician_opening":
-        provider_id = getattr(payload, "provider_id", None)
-        if provider_id is None:
-            return
-        provider = await provider_repo._get_by_id(Provider, provider_id)
-        if provider is None:
-            raise NotFoundError(detail=f"Provider {provider_id} not found")
-        if not requesting_user.is_superuser and provider.owner_id != requesting_user.id:
-            raise ForbiddenError(
-                detail="You may only post availability for a Provider you own"
-            )
-        return
-    if kind == "program_intake":
-        program_id = getattr(payload, "program_id", None)
-        if program_id is None:
-            return
-        program = await program_repo._get_by_id(Program, program_id)
-        if program is None:
-            raise NotFoundError(detail=f"Program {program_id} not found")
-        if not requesting_user.is_superuser and program.owner_id != requesting_user.id:
-            raise ForbiddenError(
-                detail="You may only post availability for a Program you own"
-            )
+    repos = {"provider_id": provider_repo, "program_id": program_repo}
+    for target_kind, attr, parent_noun, parent_model in _KIND_FK_TARGETS:
+        if kind != target_kind:
+            continue
+        await assert_fk_ownership(
+            payload=payload,
+            attr=attr,
+            requesting_user=requesting_user,
+            parent_repo=repos[attr],
+            parent_model=parent_model,
+            parent_noun=parent_noun,
+            child_noun="post",
+        )
         return
     # referral and any future kind without a target FK: no-op.

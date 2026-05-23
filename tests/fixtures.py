@@ -5,7 +5,7 @@ from asyncstdlib import anext
 from fastapi import Depends, FastAPI
 from fastapi_users.db import SQLAlchemyUserDatabase
 from httpx import ASGITransport, AsyncClient
-from sqlalchemy import event
+from sqlalchemy import delete, event
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from src.db import get_db_session, get_user_db
@@ -31,17 +31,46 @@ def _enable_sqlite_foreign_keys(dbapi_connection, connection_record):
     cursor.close()
 
 
+@pytest.fixture(scope="session", autouse=True)
+async def _db_schema() -> AsyncGenerator[None, None]:
+    """Create the schema once per pytest session — every
+    `db_test_session_manager` consumer shares it. Per-test isolation is
+    provided by the function-scoped fixture's teardown, which deletes all
+    rows.
+
+    Was function-scoped (drop_all + create_all per test, ~18ms each);
+    the cost compounded across ~360 DB-touching tests. Moving schema
+    setup to session scope plus switching teardown from `drop_all` to
+    delete-all cuts the per-test fixture cost from ~18ms to ~3ms."""
+    async with test_engine.begin() as conn:
+        await conn.run_sync(metadata.create_all)
+    yield
+    async with test_engine.begin() as conn:
+        await conn.run_sync(metadata.drop_all)
+
+
 @pytest.fixture(scope="function")
 async def db_test_session_manager() -> (
     AsyncGenerator[async_sessionmaker[AsyncSession], None]
 ):
-    async with test_engine.begin() as conn:
-        await conn.run_sync(metadata.create_all)
+    """Yield the sessionmaker; on teardown, delete all rows so the next
+    test sees an empty DB. The schema itself is owned by the
+    session-scoped `_db_schema` fixture so we pay the DDL cost once,
+    not per test.
 
+    SQLite-specific: `sqlite_sequence` keeps the max-used `INTEGER PRIMARY
+    KEY AUTOINCREMENT` across deletes, so a test that asserts a specific
+    autoincrement id (e.g. `assert created.id == 1`) would break here.
+    We don't use `AUTOINCREMENT` — every primary key is a UUID — so this
+    is a non-issue today. If we ever add an autoincrement column, also
+    delete from `sqlite_sequence` in teardown."""
     yield async_test_sessionmaker
-
-    async with test_engine.begin() as conn:
-        await conn.run_sync(metadata.drop_all)
+    async with async_test_sessionmaker() as session:
+        # Reverse FK order so child rows go first and we don't trip FK
+        # enforcement (enabled by `_enable_sqlite_foreign_keys` above).
+        for table in reversed(metadata.sorted_tables):
+            await session.execute(delete(table))
+        await session.commit()
 
 
 async def override_get_db_session() -> AsyncGenerator[AsyncSession, None]:

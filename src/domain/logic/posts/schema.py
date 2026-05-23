@@ -71,6 +71,7 @@ from src.framework.schema_validators import (
     StrippedOptionalText,
     StrippedText,
     WirePayload,
+    scalar_to_list,
 )
 
 # `description` and `referral_instructions` on `opening` are
@@ -84,19 +85,6 @@ TextareaOptional = Annotated[StrippedOptionalText, HtmlTextarea()]
 # `<input type=url>`. Schema-side validation stays the same; browser
 # gates submission on URL syntax client-side.
 UrlOptional = Annotated[StrippedOptionalText, HtmlUrl()]
-
-
-def _scalar_to_list(v):
-    """Wrap a single string in a one-element list. HTML form posts collapse
-    a 1-checkbox-checked group to a scalar (htmx's `json-enc` only emits
-    an array when the same name appears 2+ times); this normalizes that
-    1-element case before the `Literal[*TUPLE]` member check fires. The
-    0-element case is handled by the field default `[]`; the 2+ case
-    already arrives as a list. Reused by every multi-checkbox field
-    (`desired_times`, `services`, and the upcoming `settings`)."""
-    if isinstance(v, str):
-        return [v]
-    return v
 
 
 def _empty_to_none(v):
@@ -119,12 +107,12 @@ OptionalInsuranceCarrier = Annotated[
 
 # Annotated aliases for the multi-checkbox fields. The `BeforeValidator`
 # runs first and normalizes a scalar string to a single-element list
-# (see `_scalar_to_list`); `Literal[*TUPLE]` then validates each member.
+# (see `scalar_to_list` in `framework/schema_validators.py`); `Literal[*TUPLE]` then validates each member.
 DesiredTimesField = Annotated[
-    list[Literal[*DESIRED_TIME_SLOTS]], BeforeValidator(_scalar_to_list)
+    list[Literal[*DESIRED_TIME_SLOTS]], BeforeValidator(scalar_to_list)
 ]
 ServicesField = Annotated[
-    list[Literal[*REFERRAL_SERVICES]], BeforeValidator(_scalar_to_list)
+    list[Literal[*REFERRAL_SERVICES]], BeforeValidator(scalar_to_list)
 ]
 # `opening.services` is required-min-1 on the wire; layer
 # the constraint over the shared alias so the scalar-coercion still runs
@@ -133,18 +121,18 @@ ServicesField = Annotated[
 # (Update — `None` means "leave unchanged"; an empty list 422s).
 RequiredServicesField = Annotated[ServicesField, Field(min_length=1)]
 SettingsField = Annotated[
-    list[Literal[*TREATMENT_SETTINGS]], BeforeValidator(_scalar_to_list)
+    list[Literal[*TREATMENT_SETTINGS]], BeforeValidator(scalar_to_list)
 ]
 # `opening.settings` is required-min-1 on the wire; same
 # pattern as services.
 RequiredSettingsField = Annotated[SettingsField, Field(min_length=1)]
-LanguagesField = Annotated[list[Literal[*LANGUAGES]], BeforeValidator(_scalar_to_list)]
+LanguagesField = Annotated[list[Literal[*LANGUAGES]], BeforeValidator(scalar_to_list)]
 # `opening.languages` is required-min-1 on the wire — every
 # practice speaks at least one language, and the unfilterable "no
 # languages" state is meaningless. Mirrors services / settings.
 RequiredLanguagesField = Annotated[LanguagesField, Field(min_length=1)]
 AgeGroupsField = Annotated[
-    list[Literal[*CLIENT_AGE_GROUPS]], BeforeValidator(_scalar_to_list)
+    list[Literal[*CLIENT_AGE_GROUPS]], BeforeValidator(scalar_to_list)
 ]
 # `opening.age_groups` is required-min-1 on the wire — every
 # practice serves at least one age bucket.
@@ -152,7 +140,7 @@ RequiredAgeGroupsField = Annotated[AgeGroupsField, Field(min_length=1)]
 # `opening.genders` is a multi-checkbox on the wire, same
 # normalization shape as services/settings/age_groups. Empty list is
 # allowed — "no restriction stated" / serves any gender.
-GendersField = Annotated[list[Literal[*GENDERS]], BeforeValidator(_scalar_to_list)]
+GendersField = Annotated[list[Literal[*GENDERS]], BeforeValidator(scalar_to_list)]
 
 
 # --- Shared flatten helper ----------------------------------------------
