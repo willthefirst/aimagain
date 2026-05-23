@@ -13,6 +13,7 @@ from fastapi_users.db import SQLAlchemyUserDatabase
 from src.db import get_user_db
 from src.domain.models import User
 from src.framework.config import settings
+from src.framework.observability import observability
 
 
 class UserManager(UUIDIDMixin, BaseUserManager[User, uuid.UUID]):
@@ -120,5 +121,30 @@ auth_backend = AuthenticationBackend(
 
 fastapi_users = FastAPIUsers[User, uuid.UUID](get_user_manager, [auth_backend])
 
-current_active_user = fastapi_users.current_user(active=True)
-current_admin_user = fastapi_users.current_user(active=True, superuser=True)
+# Raw fastapi-users deps. We wrap them below so every successful resolve
+# tags the observability scope — see `src/framework/observability/` for
+# why we tag here (inside the request) rather than in middleware (which
+# runs after `call_next` and so misses exceptions raised in the handler).
+_current_active_user = fastapi_users.current_user(active=True)
+_current_admin_user = fastapi_users.current_user(active=True, superuser=True)
+_current_optional_user = fastapi_users.current_user(optional=True)
+
+
+async def current_active_user(user: User = Depends(_current_active_user)) -> User:
+    observability.set_user(str(user.id), user.email)
+    return user
+
+
+async def current_admin_user(user: User = Depends(_current_admin_user)) -> User:
+    observability.set_user(str(user.id), user.email)
+    return user
+
+
+async def current_optional_user(
+    user: Optional[User] = Depends(_current_optional_user),
+) -> Optional[User]:
+    """Anonymous-allowed variant. Tags the scope only when a user is
+    present so anonymous traffic doesn't carry stale identities."""
+    if user is not None:
+        observability.set_user(str(user.id), user.email)
+    return user

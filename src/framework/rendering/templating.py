@@ -5,6 +5,7 @@ from fastapi.templating import Jinja2Templates
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
 from src.framework.config import settings
+from src.framework.observability import observability
 from src.framework.rendering.form_fields import field_spec
 from src.framework.rendering.labels import (
     entity_create_label,
@@ -85,10 +86,16 @@ templates = Jinja2Templates(env=_env)
 
 # Add global template variables for development features
 def get_template_context():
-    """Get global template context with environment information."""
+    """Get global template context.
+
+    `observability_frontend` is the provider-agnostic dict consumed by
+    `base.html` to render the browser SDK init block — `None` when no
+    provider is configured (no script tag rendered). See
+    `src/framework/observability/` for the contract and how to add a new
+    provider.
+    """
     return {
         "is_development": settings.ENVIRONMENT == "development",
         "livereload_port": "35729",
-        "sentry_dsn": settings.SENTRY_DSN,
-        "environment": settings.ENVIRONMENT,
+        "observability_frontend": observability.frontend_context(),
     }
