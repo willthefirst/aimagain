@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import textwrap
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 from jinja2 import ChoiceLoader, DictLoader, Environment, FileSystemLoader
@@ -336,6 +337,199 @@ def test_radio_bool_field_with_help_emits_small_inside_fieldset() -> None:
     for r in radios:
         assert r.attributes.get("aria-describedby") == "ok-helper"
     assert fs.css_first("small#ok-helper") is not None
+
+
+# --- error-state contract (pattern, parametrized over every macro) -------
+#
+# Each input macro exposed by `form_fields.html` must render the same
+# Pico-canonical error pattern when `error=` is set:
+#
+#   1. the control (`<input>`/`<select>`/`<textarea>`) carries
+#      `aria-invalid="true"` (so Pico colors it red),
+#   2. it points `aria-describedby="<name>-helper"` at the small,
+#   3. the `<small id="<name>-helper">` slot holds the error message
+#      (replacing any helper text — one small per field, single id in
+#      both valid/invalid states).
+#
+# These are the *contract* tests — one parametrized run pins the
+# pattern across every input macro, so adding a new input macro to
+# `form_fields.html` only needs one new entry below. Per-form
+# implementations (e.g. the clinician_opening age_groups callsite) are
+# smoke-tested at the route layer; they don't re-verify the pattern
+# this owns.
+
+
+def _render_macro(macro_call: str) -> "HTMLParser":
+    """Render an inline macro call against the form-fields macro file
+    and return a parsed HTML tree. Stub `entities` global lets the
+    `entity_select_field` parametrize entry render without extra fixtures."""
+    env = _make_env()
+    env.globals["entities"] = [_Stub("1", "Alpha")]
+    template = (
+        '{%- from "_shared/form_fields.html" import text_field, textarea_field,'
+        " url_field, select_field, multi_select_field, entity_select_field,"
+        " field_for -%}\n"
+        f"{macro_call}"
+    )
+    return HTMLParser(env.from_string(template).render())
+
+
+# (macro_call, control_selector) — `control_selector` is the css
+# selector for the focusable element the `aria-invalid`/`aria-describedby`
+# attrs land on (one of `<input>`, `<select>`, `<textarea>`). Each macro
+# gets one row; field_for has a row per dispatch kind (covered by the
+# field_for test below).
+_INPUT_MACROS = [
+    ("text_field", '{{ text_field("x", "X", error="bad") }}', "input"),
+    ("textarea_field", '{{ textarea_field("x", "X", error="bad") }}', "textarea"),
+    ("url_field", '{{ url_field("x", "X", error="bad") }}', "input"),
+    (
+        "select_field",
+        '{{ select_field("x", "X", ("a", "b"), error="bad") }}',
+        "select",
+    ),
+    (
+        "multi_select_field",
+        '{{ multi_select_field("x", "X", ("a", "b"), error="bad") }}',
+        "select",
+    ),
+    (
+        "entity_select_field",
+        '{{ entity_select_field("x", "X", entities, error="bad") }}',
+        "select",
+    ),
+]
+
+
+@pytest.mark.parametrize(
+    "macro_name,macro_call,control_selector",
+    _INPUT_MACROS,
+    ids=[m[0] for m in _INPUT_MACROS],
+)
+def test_input_macro_with_error_emits_pico_canonical_invalid_pattern(
+    macro_name: str, macro_call: str, control_selector: str
+) -> None:
+    """All input macros emit the same `aria-invalid="true"` +
+    `aria-describedby="<name>-helper"` + `<small id="<name>-helper">`
+    structure when `error=` is set."""
+    tree = _render_macro(macro_call)
+    control = tree.css_first(control_selector)
+    assert control is not None, f"{macro_name}: missing {control_selector!r}"
+    assert (
+        control.attributes.get("aria-invalid") == "true"
+    ), f"{macro_name}: aria-invalid should be 'true' when error= is set"
+    assert (
+        control.attributes.get("aria-describedby") == "x-helper"
+    ), f"{macro_name}: aria-describedby must point at the helper slot"
+    small = tree.css_first("small#x-helper")
+    assert small is not None, f"{macro_name}: missing <small id='x-helper'>"
+    assert (
+        "bad" in small.text()
+    ), f"{macro_name}: error message did not land in the helper slot"
+
+
+@pytest.mark.parametrize(
+    "macro_name,macro_call,control_selector",
+    _INPUT_MACROS,
+    ids=[m[0] for m in _INPUT_MACROS],
+)
+def test_input_macro_error_wins_over_help_text(
+    macro_name: str, macro_call: str, control_selector: str
+) -> None:
+    """When both `help=` and `error=` are set, the small carries the
+    error — helper text is suppressed for that render. Same single-id
+    slot in both states."""
+    with_both = macro_call.replace(', error="bad"', ', help="hint", error="bad"')
+    tree = _render_macro(with_both)
+    small = tree.css_first("small#x-helper")
+    assert small is not None
+    assert "bad" in small.text(), f"{macro_name}: error must replace helper"
+    assert (
+        "hint" not in small.text()
+    ), f"{macro_name}: helper text must not co-render with error"
+
+
+@pytest.mark.parametrize(
+    "macro_name,macro_call,control_selector",
+    _INPUT_MACROS,
+    ids=[m[0] for m in _INPUT_MACROS],
+)
+def test_input_macro_no_error_no_help_omits_describedby_and_small(
+    macro_name: str, macro_call: str, control_selector: str
+) -> None:
+    """Default state: no `aria-describedby`, no small. Pins the
+    "absent unless asked" half of the contract so a regression that
+    always emits `<name>-helper` is caught for every macro."""
+    bare = macro_call.replace(', error="bad"', "")
+    tree = _render_macro(bare)
+    control = tree.css_first(control_selector)
+    assert (
+        "aria-describedby" not in control.attributes
+    ), f"{macro_name}: aria-describedby must be absent without help/error"
+    # `<small id="x-helper">` is the helper/error slot; the macros also
+    # emit a sibling `<small class="form-field-optional">(optional)</small>`
+    # inside the label when `required=False` (so multi_select_field +
+    # any other defaulted-optional field carries one). Only the helper
+    # slot must be absent.
+    assert (
+        tree.css_first("small#x-helper") is None
+    ), f"{macro_name}: <small id='x-helper'> must be absent without help/error"
+
+
+# `field_for` is the schema-driven dispatcher; it must thread `error=`
+# through to every kind it routes to. One row per `spec.kind` branch in
+# the macro. Uses a minimal stub schema so we don't have to import a
+# real Pydantic model — the test asserts the dispatch contract, not
+# the upstream schema-introspection logic (which has its own tests).
+_FIELD_FOR_KINDS = [
+    ("text", {"kind": "text", "required": True, "pattern": None, "maxlength": None}),
+    ("textarea", {"kind": "textarea", "required": True}),
+    ("url", {"kind": "url", "required": True}),
+    (
+        "select",
+        {"kind": "select", "required": True, "choices": ("a", "b"), "labels": None},
+    ),
+    (
+        "multi_select",
+        {
+            "kind": "multi_select",
+            "required": False,
+            "choices": ("a", "b"),
+            "labels": None,
+        },
+    ),
+]
+
+
+@pytest.mark.parametrize(
+    "kind,spec_dict", _FIELD_FOR_KINDS, ids=[k[0] for k in _FIELD_FOR_KINDS]
+)
+def test_field_for_threads_error_through_every_dispatched_kind(
+    kind: str, spec_dict: dict
+) -> None:
+    """`field_for(..., error=...)` must pass `error=` to whichever
+    underlying macro it dispatches to. One row per `spec.kind`
+    branch — adding a new kind to the dispatcher must add a row here."""
+    env = _make_env()
+
+    def fake_field_spec(_schema, _name):
+        return SimpleNamespace(**spec_dict)
+
+    env.globals["field_spec"] = fake_field_spec
+    tree = HTMLParser(
+        env.from_string(
+            '{%- from "_shared/form_fields.html" import field_for -%}'
+            '{{ field_for(None, "x", "X", error="bad") }}'
+        ).render()
+    )
+    # Whichever macro field_for picked, the error must land in the
+    # `<small id="x-helper">` slot and the control must carry
+    # `aria-invalid="true"` — same contract as direct macro calls.
+    small = tree.css_first("small#x-helper")
+    assert small is not None, f"kind={kind}: small not emitted"
+    assert "bad" in small.text(), f"kind={kind}: error did not thread through"
+    invalid_controls = tree.css('[aria-invalid="true"]')
+    assert invalid_controls, f"kind={kind}: no control carries aria-invalid=true"
 
 
 # --- repository-level guard ------------------------------------------------

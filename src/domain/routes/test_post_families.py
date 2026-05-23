@@ -38,6 +38,7 @@ from tests.helpers import (
     make_program,
     make_provider_with_org,
     make_referral_detail,
+    opening_payload,
     promote_to_admin,
 )
 
@@ -407,3 +408,45 @@ async def test_admin_can_patch_anyone(
     # important assertion is "not 403". A 400 / 422 on body shape is
     # acceptable; a 403 would be the regression we want to catch.
     assert response.status_code != 403
+
+
+# --- Form-error re-render (form_error_render opt-in) ---------------------
+
+
+async def test_clinician_opening_create_form_error_render_is_wired(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user,
+):
+    """Integration smoke for the `OPENING_ENTITY.form_error_render`
+    opt-in. Asserts only that the wiring is hooked up end-to-end —
+    HX-Request POST with invalid `age_groups` returns 200 + HTML and
+    the response mentions the failing field somewhere.
+
+    Structural contracts live in their owning layers, not here:
+
+      - HX-Request vs not, 200 vs 422, `form_errors` dict shape,
+        kind-prefix stripping → `src/framework/dispatch/mounts/test_create.py`.
+      - Pico-canonical `aria-invalid` + helper-slot rendering →
+        `src/framework/templates/_shared/test_form_fields.py`.
+
+    Adding a second entity that opts into `form_error_render` only
+    needs a copy of this smoke for that entity's form — neither layer
+    above re-runs per entity.
+    """
+    provider = make_provider_with_org(owner_id=logged_in_user.id)
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            session.add(provider)
+
+    payload = opening_payload(provider_id=str(provider.id))
+    payload["age_groups"] = []
+
+    response = await authenticated_client.post(
+        "/openings",
+        data=payload,
+        headers={"HX-Request": "true"},
+    )
+    assert response.status_code == 200, response.text
+    assert response.headers["content-type"].startswith("text/html")
+    assert "age_groups" in response.text

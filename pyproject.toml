@@ -80,13 +80,26 @@ all = [
 dev = "scripts.dev_cli:main"
 
 # Tool configurations
+#
+# Each formatter excludes `.claude/` regardless of how it's invoked
+# (`black .`, `isort .`, pre-commit, `dev lint`). The directory hosts
+# per-task git worktrees (see `scripts/dev/preflight_worktree_check.py`)
+# whose Python trees would otherwise multiply every project-root walk
+# by the number of in-flight worktrees — `isort --check-only .` hung
+# in `dev lint` until this exclusion landed.
 [tool.black]
 line-length = 88
 target-version = ['py311']
+extend-exclude = '''
+/(
+    \.claude
+)/
+'''
 
 [tool.isort]
 profile = "black"
 line_length = 88
+extend_skip = [".claude"]
 
 [tool.djlint]
 profile = "jinja"

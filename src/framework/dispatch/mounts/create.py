@@ -2,7 +2,7 @@
 
 from typing import Any, Awaitable, Callable
 
-from fastapi import Request, status
+from fastapi import HTTPException, Request, status
 
 from src.framework.dispatch.mounts._common import (
     call_handler_with,
@@ -12,8 +12,8 @@ from src.framework.dispatch.mounts._common import (
 )
 from src.framework.dispatch.mounts._spec import ResourceSpec
 from src.framework.dispatch.mounts._synth import SynthOptions, synthesize_route_fn
-from src.framework.http.forms import parse_and_validate_form
-from src.framework.http.responses import created_response
+from src.framework.http.forms import parse_form_to_payload, validate_or_422
+from src.framework.http.responses import APIResponse, created_response
 
 
 def mount_create(
@@ -58,7 +58,27 @@ def mount_create(
 
     async def response_builder(*, handler, handler_kwarg_names, kwargs):
         request: Request = kwargs["request"]
-        kwargs["payload"] = await parse_and_validate_form(request, create_adapter)
+        # Parse + validate split so the raw payload survives validation
+        # failure: when `spec.form_error_render` opts in, an HX-Request
+        # client gets the form template re-rendered with the typed values
+        # still in place rather than a JSON 422 with nowhere to land.
+        payload_dict = await parse_form_to_payload(request)
+        try:
+            kwargs["payload"] = validate_or_422(create_adapter, payload_dict)
+        except HTTPException as exc:
+            if (
+                exc.status_code == 422
+                and spec.form_error_render
+                and request.headers.get("HX-Request") == "true"
+            ):
+                return await _render_form_with_errors(
+                    spec=spec,
+                    request=request,
+                    requesting_user=kwargs.get("requesting_user"),
+                    payload_dict=payload_dict,
+                    errors=exc.detail,
+                )
+            raise
         created = await call_handler_with(handler, handler_kwarg_names, kwargs)
         path_kwargs = {name: kwargs[name] for name in parent_id_names}
         # Default Location is the canonical resource URL — for a top-level
@@ -89,3 +109,113 @@ def mount_create(
         response_builder=response_builder,
     )
     router.post(path, status_code=status.HTTP_201_CREATED)(route_fn)
+
+
+def build_form_errors_dict(errors: Any, *, kind: str | None = None) -> dict[str, str]:
+    """Collapse a 422 detail list into a `{field_name: first_message}` dict.
+
+    Input shape matches `validate_or_422`'s output:
+    `[{loc: tuple, msg: str, type: str}, ...]`. For discriminated-union
+    adapters Pydantic prefixes `loc` with the kind discriminator (e.g.
+    `("clinician_opening", "age_groups")`); when `kind` is supplied and
+    matches the first `loc` segment, the prefix is stripped so the dict
+    keys land at the field name the form macros look up.
+
+    The first message wins per field — repeated nested errors on the
+    same field don't clobber render order. Malformed entries (no `loc`,
+    no `msg`, prefix-only locs) are skipped silently rather than raising,
+    so a future Pydantic shape change degrades to "no inline error"
+    instead of 500.
+    """
+    out: dict[str, str] = {}
+    if not isinstance(errors, list):
+        return out
+    for err in errors:
+        if not isinstance(err, dict):
+            continue
+        loc = err.get("loc")
+        msg = err.get("msg")
+        if not loc or not msg:
+            continue
+        loc_seq = list(loc) if isinstance(loc, (tuple, list)) else [loc]
+        if kind is not None and loc_seq and loc_seq[0] == kind:
+            loc_seq = loc_seq[1:]
+        if not loc_seq:
+            continue
+        field = loc_seq[0]
+        out.setdefault(str(field), str(msg))
+    return out
+
+
+async def _render_form_with_errors(
+    *,
+    spec: ResourceSpec,
+    request: Request,
+    requesting_user: Any,
+    payload_dict: dict,
+    errors: Any,
+) -> Any:
+    """Re-render the spec's form_new template with field-level errors.
+
+    Called by `mount_create` on a 422 from `validate_or_422` when the
+    spec has opted in via `form_error_render=True` and the request is
+    an HX-Request. The form template receives:
+
+      - `form_errors`: a `{field_name: first_error_message}` dict built
+        from the 422 detail list. Discriminated-union locs (`("<kind>",
+        "<field>")`) are stripped of the kind prefix so the dict keys
+        match the form field names; the macro layer reads
+        `error=errors.get(name)` and auto-emits `aria-invalid="true"`
+        + the inline message.
+      - `form_values`: the raw submitted payload dict, so controls
+        prefill from what the user typed instead of resetting.
+
+    The originating `EntitySpec` (carried as `spec.entity_spec` by
+    `to_resource_spec()`) drives the kind-aware template lookup via
+    `handle_get_new_form` — same template-resolution path the form_new
+    GET handler uses, so the re-render is structurally indistinguishable
+    from a fresh GET aside from the injected `form_errors`/`form_values`.
+
+    Returns a 200-OK HTML response; the form's
+    `hx-target="this" hx-swap="outerHTML"` swaps it in place. Status is
+    200 (not 422) because the default HTMX response-handling table only
+    swaps 2xx — non-HTMX clients and the JSON-422 contract are
+    untouched (this branch is gated on `HX-Request: true`).
+    """
+    from src.framework.dispatch.handlers import handle_get_new_form
+
+    entity_spec = spec.entity_spec
+    if entity_spec is None:
+        # `form_error_render=True` without a back-reference to the
+        # EntitySpec means a synthetic ResourceSpec opted in but didn't
+        # populate `entity_spec`. Bail to the original 422 rather than
+        # 500 on a template lookup.
+        raise HTTPException(status_code=422, detail=errors)
+
+    kind = payload_dict.get("kind") if entity_spec.discriminator is not None else None
+    # `handle_get_new_form` builds the same context the form_new GET
+    # handler would assemble — current_user, schema, create_heading,
+    # resource_url, and (for subset-supertype/whole-supertype) the
+    # kind-specific template_name. Reusing it keeps the re-render
+    # context identical to a fresh GET so child templates can't drift.
+    context = await handle_get_new_form(
+        spec=entity_spec,
+        request=request,
+        requesting_user=requesting_user,
+        kind=kind,
+    )
+    context["form_errors"] = build_form_errors_dict(errors, kind=kind)
+    context["form_values"] = payload_dict
+    template_name = context.pop("template_name", None) or entity_spec.templates.form_new
+    if template_name is None:
+        # Defensive: a spec that opted into `form_error_render` without
+        # a resolvable form_new template would silently 500 — better to
+        # fall through to the original 422 so the caller sees the
+        # validation failure rather than a template error.
+        raise HTTPException(status_code=422, detail=errors)
+    return APIResponse.html_response(
+        template_name=template_name,
+        context=context,
+        request=request,
+        current_user=requesting_user,
+    )
