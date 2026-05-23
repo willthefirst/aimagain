@@ -8,8 +8,8 @@ itself usually has no right-side actions.
 
 Layout per page:
 
-    <breadcrumb: link to collection>
-    <h1: "Create <noun>" — sourced from context.create_heading>
+    <breadcrumb : link to collection>
+    <h1 : "Create <noun>" — sourced from context.create_heading>
     <hr>
     <form>
 
@@ -39,20 +39,20 @@ as a second crumb between collection and the H1).
 {% extends "base.html" %}
 {%- from "_shared/_breadcrumb.html" import breadcrumb -%}
 {%- from "_shared/_toolbar.html" import page_toolbar -%}
-
 {% block breadcrumb %}
-{%- set collection_label %}{% block resource_label %}{% endblock %}{% endset -%}
-{{ breadcrumb([(collection_label | trim, resource_url)]) }}
+  {%- set collection_label %}
+    {% block resource_label %}{% endblock %}
+  {% endset -%}
+  {{ breadcrumb([(collection_label | trim, resource_url) ]) }}
 {% endblock %}
-
 {% block toolbar %}
-{% call page_toolbar(heading=create_heading) %}{% endcall %}
+  {% call page_toolbar(heading=create_heading) %}
+  {% endcall %}
 {% endblock %}
-
 {# `entity-form-page` carries the shared visual contract for entity
    create/edit pages: caps the form width on large screens via
    `--form-max-width` and brackets the form-action cluster. See
    `src/framework/templates/README.md` § "Entity form pages". #}
 <div class="entity-form-page">
-{% block content %}{% endblock %}
+  {% block content %}{% endblock %}
 </div>

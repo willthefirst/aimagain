@@ -33,6 +33,17 @@ repos:
       - id: autoflake
         args: [--remove-all-unused-imports, --in-place]
 
+  - repo: https://github.com/djlint/djLint
+    # Keep in sync with the djlint version installed via pyproject.toml so
+    # pre-commit and `dev fmt`/`dev lint`/CI agree on template formatting.
+    # Same drift hazard as black/isort above (PR #73 flap).
+    rev: v1.36.4
+    hooks:
+      - id: djlint-reformat-jinja
+        files: ^src/(framework|domain)/templates/.*\.html$
+      - id: djlint-jinja
+        files: ^src/(framework|domain)/templates/.*\.html$
+
   - repo: local
     hooks:
       - id: title-case-check

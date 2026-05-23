@@ -46,26 +46,27 @@ Child contract:
 {% extends "base.html" %}
 {%- from "_shared/_toolbar.html" import page_toolbar -%}
 {%- from "_shared/pagination.html" import pagination -%}
-
 {% block toolbar %}
-{%- set label %}{% block resource_label %}{% endblock %}{% endset -%}
-{%- set actions_body %}{% block actions %}{% endblock %}{% endset -%}
-{%- set has_search = search_url is defined and search_url -%}
-{# `filter_heading` is `entity_filter_label(spec.name)` from `handle_list`
+  {%- set label %}
+    {% block resource_label %}{% endblock %}
+  {% endset -%}
+  {%- set actions_body %}
+    {% block actions %}{% endblock %}
+  {% endset -%}
+  {%- set has_search = search_url is defined and search_url -%}
+  {# `filter_heading` is `entity_filter_label(spec.name)` from `handle_list`
    (set only when `routes.search` is opted in). When absent, the toolbar
    macro falls back to its default ``"Filters"`` label. #}
-{% call page_toolbar(
-  heading=label | trim,
-  active_filters=active_filters|default([]),
-  search_url=search_url if has_search else none,
-  filter_label=filter_heading or "Filters"
-) %}{{ actions_body }}{% endcall %}
+  {% call page_toolbar(
+    heading=label | trim,
+    active_filters=active_filters|default([]),
+    search_url=search_url if has_search else none,
+    filter_label=filter_heading or "Filters"
+    ) %}
+    {{ actions_body }}
+  {% endcall %}
 {% endblock %}
-
 {% block content %}{% endblock %}
-
 {% block after_content %}
-{%- if page_meta is defined %}
-{{ pagination(page_meta, paginator_base_query|default("")) }}
-{%- endif %}
-{% endblock %}
+  {%- if page_meta is defined %}{{ pagination(page_meta, paginator_base_query|default("") ) }}{%- endif %}
+  {% endblock %}

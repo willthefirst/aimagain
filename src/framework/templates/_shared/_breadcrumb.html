@@ -22,19 +22,19 @@ item's label as plain text so the markup stays valid.
         ("Edit", None),
     ]) }}
 #}
-
 {% macro breadcrumb(items) -%}
-{%- if items %}
-{# Deepest clickable parent — the back target. Walk from the end
+  {%- if items %}
+    {# Deepest clickable parent — the back target. Walk from the end
    backward; the current page (last item) typically has `href=None`
    so its parent is at index -2. For single-item crumbs (detail
    pages) the only item carries the href. #}
-{%- set _linkable = items | selectattr(1) | list -%}
-{%- set _back = _linkable[-1] if _linkable else items[0] -%}
-<nav aria-label="breadcrumb">
-  <a class="breadcrumb-back"{% if _back[1] %} href="{{ _back[1] }}"{% endif %}>
-    <i class="icon-arrow-left" aria-hidden="true"></i><span class="breadcrumb-back-label">{{ _back[0] }}</span>
-  </a>
-</nav>
-{%- endif %}
+    {%- set _linkable = items | selectattr(1) | list -%}
+    {%- set _back = _linkable[-1] if _linkable else items[0] -%}
+    <nav aria-label="breadcrumb">
+      <a class="breadcrumb-back"
+         {% if _back[1] %}href="{{ _back[1] }}"{% endif %}>
+        <i class="icon-arrow-left" aria-hidden="true"></i><span class="breadcrumb-back-label">{{ _back[0] }}</span>
+      </a>
+    </nav>
+  {%- endif %}
 {%- endmacro %}

@@ -2,41 +2,33 @@
 {%- from "_shared/form_fields.html" import entity_select_field, field_for, radio_bool_field, text_field -%}
 {%- from "_shared/form_copy.html" import org_picker_help -%}
 {%- from "_shared/actions.html" import actions -%}
-
-
 {% block resource_label %}Programs{% endblock %}
-
 {% block content %}
-<p>A program is a treatment offering owned by an organization — for example a cohort, IOP, or day program.</p>
-
-
-{# `org_id` is the FK to the owning Organization. The dropdown is
+  <p>A program is a treatment offering owned by an organization — for example a cohort, IOP, or day program.</p>
+  {# `org_id` is the FK to the owning Organization. The dropdown is
    scoped per-viewer by `program_form_extras` (the spec's
    `form_extras_path`) — it lists only the Orgs the requesting user
    owns. Superusers see every Org. The "create one first" hint lives
    in `_shared/form_copy.html::org_picker_help`. #}
-<form hx-post="{{ entity_url('program') }}">
-  <fieldset>
-    <legend>Program</legend>
-    {{ entity_select_field("org_id", "Organization", organizations, help=org_picker_help()) }}
-    {{ field_for(schema, "name", "Name") }}
-    {{ field_for(schema, "description", "Description", required=false) }}
-  </fieldset>
-
-  <fieldset>
-    <legend>Where and when</legend>
-    {{ field_for(schema, "state_preference", "State served", required=false) }}
-    <div class="grid">
-      {{ text_field("start_date", "Start date", required=false, type="date") }}
-      {{ text_field("end_date", "End date", required=false, type="date") }}
-    </div>
-  </fieldset>
-
-  <fieldset>
-    <legend>Intake</legend>
-    {{ radio_bool_field("accepting_referrals", "Accepting referrals?", current=true, required=false) }}
-  </fieldset>
-
-  {{ actions(entity_create_label('program'), cancel_url=entity_url('program')) }}
-</form>
+  <form hx-post="{{ entity_url('program') }}">
+    <fieldset>
+      <legend>Program</legend>
+      {{ entity_select_field("org_id", "Organization", organizations, help=org_picker_help() ) }}
+      {{ field_for(schema, "name", "Name") }}
+      {{ field_for(schema, "description", "Description", required=false) }}
+    </fieldset>
+    <fieldset>
+      <legend>Where and when</legend>
+      {{ field_for(schema, "state_preference", "State served", required=false) }}
+      <div class="grid">
+        {{ text_field("start_date", "Start date", required=false, type="date") }}
+        {{ text_field("end_date", "End date", required=false, type="date") }}
+      </div>
+    </fieldset>
+    <fieldset>
+      <legend>Intake</legend>
+      {{ radio_bool_field("accepting_referrals", "Accepting referrals?", current=true, required=false) }}
+    </fieldset>
+    {{ actions(entity_create_label('program') , cancel_url=entity_url('program')) }}
+  </form>
 {% endblock %}
