@@ -363,6 +363,10 @@ class QualityCommands:
                 "🤝 Checking contract-form coverage...",
                 [sys.executable, "scripts/dev/contract_form_coverage_check.py"],
             ),
+            (
+                "🌱 Checking seed generator coverage...",
+                [sys.executable, "-m", "scripts.dev.seed.lint_coverage"],
+            ),
         ]
 
         exit_code = 0
@@ -428,7 +432,7 @@ class SeedCommands:
 
         print("🌱 Seeding fixture users...")
         seed_cmd = self.runner.wrap_for_compose(
-            self.SERVICE_NAME, ["python", "scripts/dev/seed.py"]
+            self.SERVICE_NAME, ["python", "-m", "scripts.dev.seed"]
         )
         return self.runner.run_command(seed_cmd)
 
