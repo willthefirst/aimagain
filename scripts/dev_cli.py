@@ -415,7 +415,10 @@ class QualityCommands:
 
         steps = [
             ("📝 Formatting code with black...", ["black", "."]),
-            ("🔤 Sorting imports with isort...", ["isort", "."]),
+            (
+                "🔤 Sorting imports with isort...",
+                ["isort", "src", "tests", "scripts", "alembic", "conftest.py"],
+            ),
         ]
 
         exit_code = 0
