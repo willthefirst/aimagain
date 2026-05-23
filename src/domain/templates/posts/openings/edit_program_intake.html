@@ -1,14 +1,14 @@
 {% extends "views/form_edit.html" %}
 {% from "posts/openings/_form_program_intake.html" import intake_form %}
-
 {# `view.headline` for an intake is the program name — same identity
    the detail page renders. See `edit_clinician_opening.html` for the
    `post_card_view` rationale. #}
 {% set view = post_card_view(opening) %}
-
 {% block resource_label %}Openings{% endblock %}
-{% block current_label %}{{ view.headline or 'Intake' }}{% if view.header_state %}, {{ view.header_state }}{% endif %}{% endblock %}
-
+{% block current_label %}
+  {{ view.headline or 'Intake' }}
+  {% if view.header_state %}, {{ view.header_state }}{% endif %}
+{% endblock %}
 {% block content %}
-{{ intake_form("patch", entity_url('opening', id=opening.id), "Save changes", post=opening, schema=intake_create_schema, current_user=current_user, cancel_url=entity_url('opening', id=opening.id)) }}
+  {{ intake_form("patch", entity_url('opening', id=opening.id) , "Save changes", post=opening, schema=intake_create_schema, current_user=current_user, cancel_url=entity_url('opening', id=opening.id)) }}
 {% endblock %}

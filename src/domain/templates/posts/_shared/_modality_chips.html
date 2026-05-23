@@ -16,10 +16,12 @@ Used by `posts/_item.html` (the list card) and `posts/detail.html`
 Both callers wrap the macro's output inside `<small class="meta">…
 <span>{{ date }}</span> {{ modality_chips(...) }}</small>`. #}
 {% macro modality_chips(in_person, virtual) -%}
-{%- if in_person == "please_contact" or virtual == "please_contact" -%}
-<span>Contact for format</span>
-{%- else -%}
-{%- if virtual == "yes" %}<span>Virtual</span>{% endif -%}
-{%- if in_person == "yes" %}<span>In-person</span>{% endif -%}
+  {%- if in_person == "please_contact" or virtual == "please_contact" -%}
+    <span>Contact for format</span>
+  {%- else -%}
+    {%- if virtual == "yes" %}<span>Virtual</span>
+  {% endif -%}
+  {%- if in_person == "yes" %}<span>In-person</span>
+{% endif -%}
 {%- endif -%}
 {%- endmacro %}

@@ -1,26 +1,26 @@
 {% extends "base.html" %}
 {% block content %}
-<section class="auth-page">
-  <header>
-    <h1>Create an account</h1>
-    <p>Create your clinician profile and start sharing available openings with referrers in your network.</p>
-  </header>
-  <form hx-post="/auth/register" hx-ext="json-enc">
-    <label for="email">
-      Email
-      <input type="email" id="email" name="email" required />
-    </label>
-    <label for="password">
-      Password
-      <input type="password" id="password" name="password" required />
-    </label>
-    <button type="submit">Create account</button>
-  </form>
-  <footer>
-    <p>
-      Already have an account?
-      <a href="/auth/login">Log in.</a>
-    </p>
-  </footer>
-</section>
+  <section class="auth-page">
+    <header>
+      <h1>Create an account</h1>
+      <p>Create your clinician profile and start sharing available openings with referrers in your network.</p>
+    </header>
+    <form hx-post="/auth/register" hx-ext="json-enc">
+      <label for="email">
+        Email
+        <input type="email" id="email" name="email" required />
+      </label>
+      <label for="password">
+        Password
+        <input type="password" id="password" name="password" required />
+      </label>
+      <button type="submit">Create account</button>
+    </form>
+    <footer>
+      <p>
+        Already have an account?
+        <a href="/auth/login">Log in.</a>
+      </p>
+    </footer>
+  </section>
 {% endblock %}

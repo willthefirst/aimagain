@@ -33,9 +33,11 @@ Example:
     ]) }}
 #}
 {% macro icon_list(items) -%}
-<ul class="glyph-list">
-  {%- for item in items %}
-  <li><i class="icon-{{ item.icon }}" aria-hidden="true"></i>{{ item.label }}</li>
-  {%- endfor %}
-</ul>
+  <ul class="glyph-list">
+    {%- for item in items %}
+      <li>
+        <i class="icon-{{ item.icon }}" aria-hidden="true"></i>{{ item.label }}
+      </li>
+    {%- endfor %}
+  </ul>
 {%- endmacro %}
