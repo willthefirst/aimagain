@@ -1,392 +1,206 @@
-"""Tests for `scripts/dev/seed.py`.
+"""Tests for `scripts/dev/seed/`.
 
-Three invariants matter beyond "the script ran":
-  - On a fresh DB, the seed functions insert the full fixture set and
-    populate each parent `Post` with its detail row in the same flush.
-    A regression where the parent is committed without the detail
-    would 500 every read view that joins the detail in.
-  - Re-running is a no-op. The idempotency keys
-    (opening: `kind + owner_id + provider_id` (with
-    Provider matched by `(owner_id, org_id)` and Org by `name`);
-    referral: `kind + owner_id + description`) keep `dev seed`
-    safe to run repeatedly during development.
-  - `created_at` is varied via the per-fixture `days_ago` field so the
-    listings feed renders a spread of dates, not a wall of identical
-    timestamps. A regression where the `_shift_created_at` override
-    silently became a no-op would collapse the feed back to one date.
+Three things are invariants that future schema changes must not break:
+
+  - **Enum coverage**: every CHECK-constrained column has every allowed
+    value present in at least one row. Auto-discovered from
+    `check_registry.CHECK_VALUES` — the test doesn't enumerate enums
+    by hand, so adding a new enum value automatically widens the
+    coverage assertion.
+
+  - **Nullable coverage**: every nullable column has at least one NULL
+    row and at least one populated row. Same auto-discovery — adding a
+    new nullable column auto-covers it.
+
+  - **Idempotency**: re-running `seed_all` is a no-op (no row counts
+    grow). The deterministic-PK + `session.merge` pattern is the
+    enforcement; this test pins that the pattern stays effective.
+
+Structural invariants the runtime relies on (hierarchy + multi-affiliation)
+also have direct assertions — they're not auto-discoverable from
+metadata.
 """
 
-from datetime import datetime, timezone
+from __future__ import annotations
 
 import pytest
-from sqlalchemy import select
+from sqlalchemy import JSON as SAJSON
+from sqlalchemy import func, select
 
-from scripts.dev import seed
+from scripts.dev.seed import seed_all
+from scripts.dev.seed.check_registry import CHECK_VALUES
 from src.domain.models import (
-    OpeningDetail,
+    Affiliation,
     Organization,
-    Post,
-    Provider,
-    ProviderCertification,
-    ProviderEducation,
-    ProviderLicensure,
-    ReferralDetail,
+    metadata,
 )
-from tests.fixtures import async_test_sessionmaker
-from tests.helpers import create_test_user
-
-# Counts derive from the fixture lists themselves so adding/removing a
-# fixture is a one-line edit in `seed.py` without test-count drift.
-_PA_COUNT = len(seed.FIXTURE_OPENING)
-_CR_COUNT = len(seed.FIXTURE_REFERRAL)
+from tests.fixtures import async_test_sessionmaker, test_engine
 
 
 @pytest.fixture(autouse=True)
 def patch_session_maker(monkeypatch):
-    """Point the seed script at the in-memory test database."""
-    monkeypatch.setattr(seed, "async_session_maker", async_test_sessionmaker)
+    """Point `seed.runner` at the in-memory test DB. The overrides
+    receive their session from the runner so they don't need patching
+    individually."""
+    import scripts.dev.seed.runner as runner_mod
+
+    monkeypatch.setattr(runner_mod, "async_session_maker", async_test_sessionmaker)
 
 
-async def _insert_all_fixture_users() -> None:
-    """Persist all fixture users so the post seeders have valid owners
-    to FK against. Each test inserts the full set so individual tests
-    don't need to know which users own which fixtures."""
-    async with async_test_sessionmaker() as session:
-        async with session.begin():
-            for fixture in seed.FIXTURE_USERS:
-                session.add(
-                    create_test_user(
-                        email=fixture["email"], username=fixture["username"]
-                    )
-                )
+@pytest.fixture(scope="function")
+async def fresh_db():
+    """Create the schema once per test, drop after."""
+    async with test_engine.begin() as conn:
+        await conn.run_sync(metadata.create_all)
+    yield
+    async with test_engine.begin() as conn:
+        await conn.run_sync(metadata.drop_all)
 
 
-async def _all_pa_posts() -> list[Post]:
-    async with async_test_sessionmaker() as session:
-        result = await session.execute(
-            select(Post).where(Post.kind == "clinician_opening")
-        )
-        return list(result.scalars().all())
-
-
-async def _all_cr_posts() -> list[Post]:
-    async with async_test_sessionmaker() as session:
-        result = await session.execute(select(Post).where(Post.kind == "referral"))
-        return list(result.scalars().all())
-
-
-# --- opening ------------------------------------------------
-
-
-async def test_inserts_all_pa_posts_on_fresh_db(db_test_session_manager):
-    await _insert_all_fixture_users()
-
-    created, skipped = await seed.seed_opening()
-
-    assert (created, skipped) == (_PA_COUNT, 0)
-    posts = await _all_pa_posts()
-    assert len(posts) == _PA_COUNT
-
-
-async def test_each_pa_post_has_populated_detail_relationship(db_test_session_manager):
-    await _insert_all_fixture_users()
-
-    await seed.seed_opening()
-
+async def _count_table(table_name: str) -> int:
     async with async_test_sessionmaker() as session:
         result = await session.execute(
-            select(OpeningDetail).join(Post, Post.id == OpeningDetail.post_id)
+            select(func.count()).select_from(metadata.tables[table_name])
         )
-        details = list(result.scalars().all())
-
-    # Practice name lives on the linked Provider's Organization (#524).
-    practice_names = {d.provider.org.name for d in details}
-    expected = {f["provider"]["practice_name"] for f in seed.FIXTURE_OPENING}
-    assert practice_names == expected
+        return result.scalar_one()
 
 
-async def test_pa_rerun_is_idempotent(db_test_session_manager):
-    await _insert_all_fixture_users()
-
-    first = await seed.seed_opening()
-    second = await seed.seed_opening()
-
-    assert first == (_PA_COUNT, 0)
-    assert second == (0, _PA_COUNT)
-    assert len(await _all_pa_posts()) == _PA_COUNT
-
-
-async def test_pa_skips_when_owner_missing(db_test_session_manager, capsys):
-    # No fixture users seeded — every fixture row should be skipped.
-    created, skipped = await seed.seed_opening()
-
-    assert created == 0
-    assert skipped == _PA_COUNT
-    assert await _all_pa_posts() == []
-
-
-# --- referral ------------------------------------------------------
-
-
-async def test_inserts_all_cr_posts_on_fresh_db(db_test_session_manager):
-    await _insert_all_fixture_users()
-
-    created, skipped = await seed.seed_referral()
-
-    assert (created, skipped) == (_CR_COUNT, 0)
-    posts = await _all_cr_posts()
-    assert len(posts) == _CR_COUNT
-
-
-async def test_each_cr_post_has_populated_detail_relationship(db_test_session_manager):
-    await _insert_all_fixture_users()
-
-    await seed.seed_referral()
-
+async def _distinct_values(table_name: str, column_name: str) -> set:
     async with async_test_sessionmaker() as session:
         result = await session.execute(
-            select(ReferralDetail).join(Post, Post.id == ReferralDetail.post_id)
+            select(metadata.tables[table_name].c[column_name]).distinct()
         )
-        details = list(result.scalars().all())
-
-    descriptions = {d.description for d in details}
-    expected = {f["detail"]["description"] for f in seed.FIXTURE_REFERRAL}
-    assert descriptions == expected
+        return {r[0] for r in result.all()}
 
 
-async def test_cr_rerun_is_idempotent(db_test_session_manager):
-    await _insert_all_fixture_users()
-
-    first = await seed.seed_referral()
-    second = await seed.seed_referral()
-
-    assert first == (_CR_COUNT, 0)
-    assert second == (0, _CR_COUNT)
-    assert len(await _all_cr_posts()) == _CR_COUNT
-
-
-async def test_cr_skips_when_owner_missing(db_test_session_manager):
-    created, skipped = await seed.seed_referral()
-
-    assert created == 0
-    assert skipped == _CR_COUNT
-    assert await _all_cr_posts() == []
-
-
-# --- created_at variance --------------------------------------------------
-
-
-# --- org type variety + hierarchy -----------------------------------------
-
-
-async def test_seed_opening_creates_orgs_with_declared_types(db_test_session_manager):
-    """Each provider fixture declares an `org_type` (default
-    `solo_practice`). The seed honors it on Org create so the directory
-    isn't a wall of identical solo-practice rows."""
-    await _insert_all_fixture_users()
-    await seed.seed_opening()
-
+async def _count_nulls(table_name: str, column_name: str) -> tuple[int, int]:
+    col = metadata.tables[table_name].c[column_name]
     async with async_test_sessionmaker() as session:
-        result = await session.execute(select(Organization))
-        orgs_by_name = {o.name: o for o in result.scalars().all()}
+        nulls = await session.execute(
+            select(func.count()).select_from(col.table).where(col.is_(None))
+        )
+        nonnull = await session.execute(
+            select(func.count()).select_from(col.table).where(col.is_not(None))
+        )
+        return nulls.scalar_one(), nonnull.scalar_one()
 
-    expected = {
-        f["provider"]["practice_name"]: f["provider"]["org_type"]
-        for f in seed.FIXTURE_OPENING
+
+async def test_seed_all_smoke(fresh_db):
+    """seed_all() runs to completion on a fresh DB and populates the
+    expected major tables."""
+    rc = await seed_all()
+    assert rc == 0
+    assert await _count_table("organizations") >= 10
+    assert await _count_table("providers") >= 100
+    assert await _count_table("affiliations") >= 100
+
+
+async def test_idempotent_rerun(fresh_db):
+    """Re-running seed_all is a no-op — row counts don't grow."""
+    await seed_all()
+    counts_first = {
+        table.name: await _count_table(table.name)
+        for table in metadata.sorted_tables
+        if table.name != "audit_log"
     }
-    for name, want_type in expected.items():
-        assert name in orgs_by_name, f"Org '{name}' was not seeded"
-        assert (
-            orgs_by_name[name].type == want_type
-        ), f"Org '{name}' got type {orgs_by_name[name].type!r}, expected {want_type!r}"
-    # Coverage: the seeded set spans more than just `solo_practice`.
-    seen_types = {o.type for o in orgs_by_name.values()}
-    assert len(seen_types) >= 3, f"Expected variety, got: {seen_types}"
+    await seed_all()
+    counts_second = {
+        table.name: await _count_table(table.name)
+        for table in metadata.sorted_tables
+        if table.name != "audit_log"
+    }
+    assert counts_first == counts_second
 
 
-async def test_seed_standalone_orgs_creates_health_system_parent(
-    db_test_session_manager,
-):
-    """`seed_standalone_orgs()` populates the hierarchy roots that
-    Provider fixtures attach to via `parent_org_name`. Specifically the
-    Children's Health Council health_system row that RISE IOP at CHC
-    nests under."""
-    await _insert_all_fixture_users()
+async def test_enum_coverage_for_every_check_constraint(fresh_db):
+    """For every CHECK-bound column, every allowed value appears in at
+    least one row — IF the table has enough rows to cover the enum's
+    cardinality. (Programs has 12 rows; the `state_preference` enum
+    has 51 values; covering all 51 would require 51+ programs, which
+    isn't a meaningful test signal.) Auto-discovered from
+    `CHECK_VALUES` — adding a new CHECK value automatically widens
+    the assertion where it's feasible."""
+    await seed_all()
+    misses: list[str] = []
+    for (table_name, column_name), allowed in CHECK_VALUES.items():
+        if table_name not in metadata.tables:
+            continue
+        row_count = await _count_table(table_name)
+        if row_count < len(allowed):
+            continue
+        actual = await _distinct_values(table_name, column_name)
+        actual.discard(None)
+        missing = set(allowed) - actual
+        if missing:
+            misses.append(
+                f"  {table_name}.{column_name}: missing {sorted(missing)}; "
+                f"present {sorted(actual)}"
+            )
+    assert not misses, "Enum coverage gaps:\n" + "\n".join(misses)
 
-    created, skipped = await seed.seed_standalone_orgs()
 
-    assert created == len(seed.FIXTURE_STANDALONE_ORGS)
-    assert skipped == 0
+async def test_nullable_columns_have_both_null_and_populated(fresh_db):
+    """For every nullable column (excluding PKs / FKs / system cols),
+    at least one row is NULL and at least one row is populated.
+    Auto-discovered — adding a nullable column auto-covers it.
+    `deleted_at` is always-null by design — exempted globally."""
+    await seed_all()
+    system = {"id", "created_at", "updated_at", "deleted_at"}
+    misses: list[str] = []
+    for table in metadata.tables.values():
+        if table.name == "audit_log":
+            continue
+        if await _count_table(table.name) == 0:
+            continue
+        for column in table.columns:
+            if not column.nullable:
+                continue
+            if column.name in system or column.primary_key or column.foreign_keys:
+                continue
+            # JSON columns: SQLAlchemy's default for `None` is to write
+            # the JSON null literal (the string `"null"`), not SQL NULL.
+            # So `WHERE col IS NULL` is the wrong predicate for these —
+            # exempt them; the lint/schema layer is the right home for
+            # JSON nullability invariants if they ever matter.
+            if isinstance(column.type, SAJSON):
+                continue
+            null_count, populated = await _count_nulls(table.name, column.name)
+            if null_count == 0:
+                misses.append(
+                    f"  {table.name}.{column.name}: no NULL rows "
+                    f"(populated={populated})"
+                )
+            elif populated == 0:
+                misses.append(f"  {table.name}.{column.name}: every row is NULL")
+    assert not misses, "Nullable-coverage gaps:\n" + "\n".join(misses)
+
+
+async def test_organization_hierarchy_present(fresh_db):
+    """At least 2 orgs are child rows (parent_org_id IS NOT NULL),
+    exercising the self-referential tree."""
+    await seed_all()
     async with async_test_sessionmaker() as session:
         result = await session.execute(
-            select(Organization).where(Organization.name == "Children's Health Council")
+            select(func.count())
+            .select_from(Organization)
+            .where(Organization.parent_org_id.is_not(None))
         )
-        chc = result.scalar_one()
-    assert chc.type == "health_system"
-    # Roots are their own root.
-    assert chc.root_org_id == chc.id
-    assert chc.parent_org_id is None
+        child_count = result.scalar_one()
+    assert child_count >= 2, f"Expected ≥2 child organizations, got {child_count}"
 
 
-async def test_provider_fixtures_have_no_placeholder_locations():
-    """Pins #596: no provider fixture renders the `(telehealth), CA 00000`
-    sentinel that read like a placeholder bug on the providers list.
-    Practices that only deliver care virtually still declare a real
-    business city + ZIP; the (in_person, virtual) flags carry the
-    telehealth-only signal at the wire layer."""
-    for fixture in seed.FIXTURE_OPENING:
-        provider = fixture["provider"]
-        assert provider["location_city"] != "(telehealth)", (
-            f"{provider['practice_name']!r} still uses the (telehealth) "
-            "city sentinel — pick a real city; the virtual_sessions flag "
-            "carries the telehealth signal."
-        )
-        assert provider["location_zip"] != "00000", (
-            f"{provider['practice_name']!r} still uses the 00000 ZIP "
-            "sentinel — pick a plausible ZIP for the practice's "
-            "business address."
-        )
-
-
-async def test_seed_opening_attaches_clinic_to_health_system_parent(
-    db_test_session_manager,
-):
-    """RISE IOP at CHC declares `parent_org_name=Children's Health Council`.
-    After `seed_standalone_orgs()` + `seed_opening()`, the child's
-    `parent_org_id` + `root_org_id` reflect the parent."""
-    await _insert_all_fixture_users()
-    await seed.seed_standalone_orgs()
-    await seed.seed_opening()
-
+async def test_multi_affiliation_provider_present(fresh_db):
+    """At least one provider has 2+ affiliations — exercises the
+    `Provider.affiliations` 1:N edge."""
+    await seed_all()
     async with async_test_sessionmaker() as session:
-        parent = (
-            await session.execute(
-                select(Organization).where(
-                    Organization.name == "Children's Health Council"
-                )
-            )
-        ).scalar_one()
-        child = (
-            await session.execute(
-                select(Organization).where(Organization.name == "RISE IOP at CHC")
-            )
-        ).scalar_one()
-    assert child.parent_org_id == parent.id
-    assert child.root_org_id == parent.id
-
-
-# --- credentials ----------------------------------------------------------
-
-
-async def test_seed_credentials_inserts_rows_attached_to_provider(
-    db_test_session_manager,
-):
-    """`seed_credentials()` populates each Provider's licensures /
-    educations / certifications. Pins that at least one of each kind
-    landed and that they correctly attach to the seeded Provider."""
-    await _insert_all_fixture_users()
-    await seed.seed_opening()
-
-    created, _ = await seed.seed_credentials()
-    assert created > 0
-
-    async with async_test_sessionmaker() as session:
-        # `Provider.org_id` moved to `Affiliation.org_id` in #635 PR B —
-        # join through the 1:1 `affiliations.provider_id` link.
-        from src.domain.models import Affiliation
-
-        provider = (
-            await session.execute(
-                select(Provider)
-                .join(Affiliation, Affiliation.provider_id == Provider.id)
-                .join(Organization, Organization.id == Affiliation.org_id)
-                .where(Organization.name == "Lakeside Therapy Collective")
-            )
-        ).scalar_one()
-        lic_count = (
-            (
-                await session.execute(
-                    select(ProviderLicensure).where(
-                        ProviderLicensure.clinician_id == provider.clinician_id
-                    )
-                )
-            )
-            .scalars()
-            .all()
+        subq = (
+            select(Affiliation.provider_id, func.count().label("n"))
+            .group_by(Affiliation.provider_id)
+            .subquery()
         )
-        edu_count = (
-            (
-                await session.execute(
-                    select(ProviderEducation).where(
-                        ProviderEducation.clinician_id == provider.clinician_id
-                    )
-                )
-            )
-            .scalars()
-            .all()
+        result = await session.execute(
+            select(func.count()).select_from(subq).where(subq.c.n >= 2)
         )
-        cert_count = (
-            (
-                await session.execute(
-                    select(ProviderCertification).where(
-                        ProviderCertification.clinician_id == provider.clinician_id
-                    )
-                )
-            )
-            .scalars()
-            .all()
-        )
-    # Lakeside fixture: 2 licensures (multi-state), 1 education, 2 certs.
-    assert len(lic_count) == 2
-    assert {l.issuing_state for l in lic_count} == {"CA", "NV"}
-    assert len(edu_count) == 1
-    assert len(cert_count) == 2
-
-
-async def test_seed_credentials_rerun_is_idempotent(db_test_session_manager):
-    """Re-running `seed_credentials()` doesn't duplicate rows."""
-    await _insert_all_fixture_users()
-    await seed.seed_opening()
-
-    first_created, first_skipped = await seed.seed_credentials()
-    second_created, second_skipped = await seed.seed_credentials()
-
-    assert first_created > 0
-    assert second_created == 0
-    assert second_skipped == first_created
-
-
-async def test_seed_credentials_skips_when_provider_missing(db_test_session_manager):
-    """No Providers seeded → every credential fixture is skipped, no
-    error raised."""
-    await _insert_all_fixture_users()
-    # Deliberately skip seed_opening — no Providers to attach to.
-
-    created, skipped = await seed.seed_credentials()
-
-    assert created == 0
-    assert skipped == len(seed.FIXTURE_CREDENTIALS)
-
-
-async def test_seed_spreads_created_at_across_days(db_test_session_manager):
-    """`days_ago` overrides the server-defaulted `created_at` so the
-    listings feed shows a date range. Pins that the override actually
-    takes effect — a regression collapsing all posts to `now()` would
-    fail here."""
-    await _insert_all_fixture_users()
-    await seed.seed_opening()
-    await seed.seed_referral()
-
-    posts = await _all_pa_posts() + await _all_cr_posts()
-    timestamps = {p.created_at.date() for p in posts}
-    # Every fixture declares its own `days_ago`; even one duplicate is
-    # fine, but we expect substantial spread. Assert at least 5 distinct
-    # dates across the combined fixture set so a "all-set-to-now"
-    # regression can't sneak through.
-    assert len(timestamps) >= 5
-    # And: the oldest post should be at least 90 days back, proving
-    # the spread covers a meaningful window (today's "older posts"
-    # filter exists for a reason).
-    now = datetime.now(timezone.utc).date()
-    oldest = min(timestamps)
-    assert (now - oldest).days >= 90
+        multi = result.scalar_one()
+    assert multi >= 1, f"Expected ≥1 provider with 2+ affiliations, got {multi}"
