@@ -26,7 +26,6 @@ async def test_register(
     register_data = {
         "email": email_to_test,
         "password": password_to_test,
-        "username": "testreguser",
     }
     response = await test_client.post("/auth/register", json=register_data)
     assert response.status_code == 201
@@ -35,6 +34,10 @@ async def test_register(
     assert user_info["email"] == email_to_test
     assert user_info["is_active"] is True
     assert user_info["is_superuser"] is False
+    # Signup form no longer collects a username; `handle_registration`
+    # fills the (UNIQUE, NOT NULL) column from `email` so existing
+    # downstream consumers (display, audit snapshot, emails) keep working.
+    assert user_info["username"] == email_to_test
     # `is_verified` restored to the response with the verification
     # rollout (reversing #696). Tests run with `ENVIRONMENT=development`
     # (see `.env.test`), so the dev-mode auto-verify guardrail in
@@ -74,7 +77,6 @@ async def test_register_prod_mode_leaves_user_unverified(
     register_data = {
         "email": "prod-mode-user@example.com",
         "password": "password123",
-        "username": "prodmodeuser",
     }
     response = await test_client.post("/auth/register", json=register_data)
     assert response.status_code == 201
@@ -85,7 +87,6 @@ async def test_register_via_htmx_sets_cookie_and_redirects(test_client: AsyncCli
     """HTMX register should auto-login (cookie) and redirect, not return JSON."""
     payload = {
         "email": "htmx@example.com",
-        "username": "htmxuser",
         "password": "Password123!",
     }
     response = await test_client.post(
@@ -106,7 +107,6 @@ async def test_register_duplicate_email(test_client: AsyncClient, logged_in_user
     register_data = {
         "email": logged_in_user.email,
         "password": "newpassword",
-        "username": "anotheruser",
     }
     response = await test_client.post("/auth/register", json=register_data)
     assert response.status_code == 400
@@ -241,6 +241,10 @@ async def test_get_register_page(test_client: AsyncClient):
     # before any value framing (#694).
     assert "openings, referrals, and intakes" not in response.text
     assert "clinician profile" in response.text
+    # Signup form collects email + password only — username is filled
+    # server-side from email in `handle_registration`. Pin the absence
+    # so the field doesn't sneak back in.
+    assert 'name="username"' not in response.text
 
 
 async def test_get_login_page(test_client: AsyncClient):
