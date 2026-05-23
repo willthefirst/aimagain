@@ -1,4 +1,15 @@
-name: CI - Test and lint
+name: CI - PR tier (lite)
+
+# Two-tier CI plan:
+#  - This workflow runs on every `pull_request` push. Lite by design:
+#    `linting` + `tests-affected`. Purpose is author feedback.
+#  - `ci-queue.yml` runs on push to Mergify's `mergify/merge-queue/**`
+#    branches and is the real correctness gate (full suite, contract
+#    tests, docker health check).
+#
+# Mergify's `queue_conditions` gates queue admission on the PR-tier
+# checks; `merge_conditions` gates the actual merge on the queue-tier
+# checks. See `.mergify.yml`.
 
 on:
   pull_request:
@@ -6,8 +17,6 @@ on:
   workflow_dispatch: # Allow manual runs
 
 env:
-  REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.repository }}
   PYTHON_VERSION: '3.11'
   DATABASE_URL: sqlite+aiosqlite:///./test.db
   # Padded to >=32 chars; PyJWT warns on shorter HMAC keys for SHA256.
@@ -16,63 +25,6 @@ env:
   ACCESS_TOKEN_EXPIRE_MINUTES: 60
 
 jobs:
-  tests:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: ./.github/actions/python-setup
-      - uses: ./.github/actions/db-setup
-
-      - name: Show database setup help on failure
-        if: failure()
-        run: |
-          echo "❌ Database setup failed!"
-          echo "💡 To reproduce this locally, run: alembic -c config/alembic.ini upgrade head"
-          echo "   Or use the development CLI: dev migrate up"
-
-      - name: Run tests
-        run: dev test --tb short -v
-
-      - name: Show test failure help
-        if: failure()
-        run: |
-          echo "❌ Tests failed!"
-          echo "💡 To reproduce this locally, run: dev test --tb short -v"
-          echo "   This runs the full default test suite (excludes contract tests; those run in the contract-tests job)."
-
-  contract-tests:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: ./.github/actions/python-setup
-
-      - name: Cache Playwright browsers
-        uses: actions/cache@v4
-        with:
-          path: ~/.cache/ms-playwright
-          key: ${{ runner.os }}-playwright-${{ hashFiles('pyproject.toml') }}
-          restore-keys: |
-            ${{ runner.os }}-playwright-
-
-      - name: Install Playwright browsers
-        run: playwright install --with-deps chromium
-
-      - uses: ./.github/actions/db-setup
-
-      - name: Run contract tests
-        run: dev test tests/test_contract --tb short -v
-
-      - name: Show contract test failure help
-        if: failure()
-        run: |
-          echo "❌ Contract tests failed!"
-          echo "💡 To reproduce this locally:"
-          echo "     pip install -e .[full]"
-          echo "     playwright install chromium"
-          echo "     dev test tests/test_contract --tb short -v"
-          echo "   Contract tests are excluded from default 'dev test' runs;"
-          echo "   they must be invoked with the explicit path above."
-
   linting:
     runs-on: ubuntu-latest
     steps:
@@ -87,59 +39,47 @@ jobs:
         run: |
           echo "❌ Linting checks failed!"
           echo "💡 To reproduce this locally, run: dev lint"
-          echo "   This runs black, isort, and title case checks"
           echo "   To fix formatting issues, you can run:"
           echo "     black .           # Fix code formatting"
           echo "     isort .           # Fix import ordering"
 
-  docker-health-check:
+  tests-affected:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      # `fetch-depth: 0` is required so `git diff origin/main...HEAD`
+      # works inside `dev test --affected` — the default shallow clone
+      # only has `HEAD`, no merge-base computable.
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: ./.github/actions/python-setup
+      - uses: ./.github/actions/db-setup
 
-      - name: Build Docker image for testing
-        run: |
-          docker build -f ./deployment/docker/Dockerfile -t test-image .
+      - name: Run affected tests
+        # `--skip-lint` because the `linting` job above already runs
+        # the lint suite; running it again here would just double the
+        # walltime. The selector escalates to the full default suite
+        # when a blast-radius file changed — see
+        # `scripts/affected_tests.py` for the list.
+        run: dev test --affected --base origin/main --skip-lint --tb short -v
 
-      - name: Create test data directory
-        run: |
-          mkdir -p ./test-data
-
-      - name: Start application with docker-compose
-        run: |
-          docker compose -f deployment/docker/docker-compose.test.yml up -d
-        env:
-          SECRET: ${{ env.SECRET }}
-          ACCESS_TOKEN_EXPIRE_MINUTES: ${{ env.ACCESS_TOKEN_EXPIRE_MINUTES }}
-          DATABASE_URL: ${{ env.DATABASE_URL }}
-          ALGORITHM: ${{ env.ALGORITHM }}
-
-      - name: Wait for application to be healthy
-        run: |
-          timeout 60 bash -c 'until docker compose -f deployment/docker/docker-compose.test.yml ps | grep -q healthy; do echo "Waiting for health check..."; sleep 2; done'
-
-      - name: Test application endpoints
-        run: |
-          # Test the health endpoint
-          curl -f http://localhost:8000/health || exit 1
-          # Test the docs endpoint
-          curl -f http://localhost:8000/docs/ || exit 1
-
-      - name: Show container logs on failure
+      - name: Show test failure help
         if: failure()
         run: |
-          docker compose -f deployment/docker/docker-compose.test.yml logs
-
-      - name: Cleanup
-        if: always()
-        run: |
-          docker compose -f deployment/docker/docker-compose.test.yml down
-          docker rmi test-image || true
+          echo "❌ Affected tests failed!"
+          echo "💡 To reproduce locally:"
+          echo "     dev test --affected --base origin/main --skip-lint --tb short -v"
+          echo "   To see which files the selector picked up:"
+          echo "     git diff --name-only origin/main...HEAD"
+          echo "   Then map each path to its colocated test_*.py per"
+          echo "   scripts/affected_tests.py."
+          echo ""
+          echo "ℹ️  The full suite + contract tests + docker health check"
+          echo "    run again in the merge-queue tier — see ci-queue.yml."
 
   queue:
     runs-on: ubuntu-latest
-    needs: [tests, contract-tests, linting, docker-health-check]
+    needs: [linting, tests-affected]
     if: success() && github.event_name == 'pull_request'
     permissions:
       pull-requests: write

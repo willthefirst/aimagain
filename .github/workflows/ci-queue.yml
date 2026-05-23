@@ -1,0 +1,103 @@
+name: CI - queue tier (full)
+
+# Triggered on push to Mergify's queue branches. Runs the full suite,
+# contract tests, and the docker health check — the real correctness
+# gate before a PR merges to main. `.mergify.yml`'s `merge_conditions`
+# block merging until these checks succeed on the queue branch.
+#
+# Mergify rebases queued PRs onto a synthetic `mergify/merge-queue/<base>/...`
+# branch and pushes it; that push fires this workflow. Batched queues
+# (we use `batch_size: 3`) push one branch per batch — this workflow
+# proves the batch's combined diff is still green before any of the
+# PRs in the batch merge.
+#
+# Job names match the ones the previous single-tier `ci.yml` used so
+# branch-protection "required checks" entries keep working without a
+# repo-settings change.
+
+on:
+  push:
+    branches:
+      # Mergify's queue branch naming. Adjust if Mergify config changes.
+      - 'mergify/merge-queue/**'
+      - 'mergify/batches/**'
+  workflow_dispatch: # Allow manual runs against any ref (debugging).
+
+env:
+  PYTHON_VERSION: '3.11'
+  DATABASE_URL: sqlite+aiosqlite:///./test.db
+  SECRET: test-secret-key-for-ci-only-padded-to-32-bytes
+  ALGORITHM: HS256
+  ACCESS_TOKEN_EXPIRE_MINUTES: 60
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/python-setup
+      - uses: ./.github/actions/db-setup
+
+      - name: Run tests
+        run: dev test --tb short -v
+
+  contract-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/python-setup
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ hashFiles('pyproject.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-playwright-
+
+      - name: Install Playwright browsers
+        run: playwright install --with-deps chromium
+
+      - uses: ./.github/actions/db-setup
+
+      - name: Run contract tests
+        run: dev test tests/test_contract --tb short -v
+
+  docker-health-check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Build Docker image for testing
+        run: docker build -f ./deployment/docker/Dockerfile -t test-image .
+
+      - name: Create test data directory
+        run: mkdir -p ./test-data
+
+      - name: Start application with docker-compose
+        run: docker compose -f deployment/docker/docker-compose.test.yml up -d
+        env:
+          SECRET: ${{ env.SECRET }}
+          ACCESS_TOKEN_EXPIRE_MINUTES: ${{ env.ACCESS_TOKEN_EXPIRE_MINUTES }}
+          DATABASE_URL: ${{ env.DATABASE_URL }}
+          ALGORITHM: ${{ env.ALGORITHM }}
+
+      - name: Wait for application to be healthy
+        run: |
+          timeout 60 bash -c 'until docker compose -f deployment/docker/docker-compose.test.yml ps | grep -q healthy; do echo "Waiting for health check..."; sleep 2; done'
+
+      - name: Test application endpoints
+        run: |
+          curl -f http://localhost:8000/health || exit 1
+          curl -f http://localhost:8000/docs/ || exit 1
+
+      - name: Show container logs on failure
+        if: failure()
+        run: docker compose -f deployment/docker/docker-compose.test.yml logs
+
+      - name: Cleanup
+        if: always()
+        run: |
+          docker compose -f deployment/docker/docker-compose.test.yml down
+          docker rmi test-image || true

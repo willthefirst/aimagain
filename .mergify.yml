@@ -7,15 +7,17 @@ commands_restrictions:
 
 queue_rules:
   - name: default
+    # Two-tier CI: `queue_conditions` gate queue admission on the lite
+    # PR-tier checks (linting + tests-affected from `ci.yml`).
+    # `merge_conditions` gate the actual merge on the full queue-tier
+    # checks run by `ci-queue.yml` against the rebased queue branch.
+    # See the workflow files for what each check actually does.
     queue_conditions:
-      - check-success = tests
-      - check-success = contract-tests
       - check-success = linting
-      - check-success = docker-health-check
+      - check-success = tests-affected
     merge_conditions:
       - check-success = tests
       - check-success = contract-tests
-      - check-success = linting
       - check-success = docker-health-check
     merge_method: squash
     batch_size: 3
