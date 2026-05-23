@@ -1,6 +1,8 @@
 {# Form-skeleton macros for HTMX-driven CRUD forms. #}
+
 {# Single-fieldset add form. Wraps caller-supplied field markup in
-`<form><fieldset><legend>…</legend>{{ caller() }}</fieldset><button type="submit">…</button></form>`. Used by sub-resource sections that
+`<form><fieldset><legend>…</legend>{{ caller() }}</fieldset><button
+type="submit">…</button></form>`. Used by sub-resource sections that
 have the same shape (legend + flat field list + submit button), e.g. the
 licensure / education / certification add forms in providers/form_edit.html.
 
@@ -16,14 +18,15 @@ Example:
   {% endcall %}
 #}
 {% macro inline_add_form(action, legend, submit_label, method="post") -%}
-  <form hx-{{ method }}="{{ action }}">
-    <fieldset>
-      <legend>{{ legend }}</legend>
-      {{ caller() }}
-    </fieldset>
-    <button type="submit">{{ submit_label }}</button>
-  </form>
+<form hx-{{ method }}="{{ action }}">
+  <fieldset>
+    <legend>{{ legend }}</legend>
+    {{ caller() }}
+  </fieldset>
+  <button type="submit">{{ submit_label }}</button>
+</form>
 {%- endmacro %}
+
 {# The Save / Cancel / Delete cluster at the bottom of every entity
 create/edit form lives in `_shared/actions.html::actions` (renamed from
 the former `form_actions`). Import from there. #}

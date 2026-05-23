@@ -1,36 +1,39 @@
 {% extends "views/list.html" %}
 {%- from "_shared/_clinician_card.html" import clinician_card -%}
 {%- from "_shared/_breadcrumb.html" import breadcrumb -%}
+
 {# Subresource list — three-segment breadcrumb instead of the default
    single-segment `resource_label`. The view-type template lets a child
    override `{% block breadcrumb %}` directly when the shape doesn't
    fit. #}
 {% block breadcrumb %}
-  {{ breadcrumb([
-    ("Users", entity_url('user') ),
+{{ breadcrumb([
+  ("Users", entity_url('user')),
   (target_user.username, entity_url('user', id=target_user.id)),
   ("Clinicians", none),
-  ]) }}
+]) }}
 {% endblock %}
+
 {% block actions %}
-  {% if is_self %}
-    <li>
-      <a href="{{ entity_form_url('clinician') }}" role="button">{{ entity_create_label("clinician") }}</a>
-    </li>
-  {% endif %}
+{% if is_self %}
+<li><a href="{{ entity_form_url('clinician') }}" role="button">{{ entity_create_label('clinician') }}</a></li>
+{% endif %}
 {% endblock %}
+
 {% block content %}
-  {% if providers %}
-    <section id="user-clinicians-list">
-      {%- for provider in providers %}{{ clinician_card(provider) }}{%- endfor %}
-      </section>
-    {% else %}
-      <p id="user-clinicians-empty">
-        {% if is_self %}
-          You have not created any clinician entries yet.
-        {% else %}
-          This user has no clinician entries yet.
-        {% endif %}
-      </p>
-    {% endif %}
-  {% endblock %}
+{% if providers %}
+<section id="user-clinicians-list">
+  {%- for provider in providers %}
+  {{ clinician_card(provider) }}
+  {%- endfor %}
+</section>
+{% else %}
+<p id="user-clinicians-empty">
+  {% if is_self %}
+  You have not created any clinician entries yet.
+  {% else %}
+  This user has no clinician entries yet.
+  {% endif %}
+</p>
+{% endif %}
+{% endblock %}

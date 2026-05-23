@@ -1,6 +1,9 @@
 {% extends "views/form_new.html" %}
 {% from "posts/referrals/_form.html" import referral_form %}
+
+
 {% block resource_label %}Referrals{% endblock %}
+
 {% block content %}
-  {{ referral_form("post", entity_url('referral') , entity_create_label('referral'), schema=referral_create_schema, cancel_url=entity_url('referral')) }}
+{{ referral_form("post", entity_url('referral'), entity_create_label('referral'), schema=referral_create_schema, cancel_url=entity_url('referral')) }}
 {% endblock %}

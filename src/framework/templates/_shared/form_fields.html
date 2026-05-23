@@ -59,15 +59,21 @@ Composite-label cases (e.g. "<Program> · <Org>") pre-build a list of
 `(id, label)` tuples and pass that via `options=...` instead.
 
 #}
+
 {# ---- helpers (internal) ------------------------------------------- #}
+
 {# Renders the input-attribute fragment shared by every text-like macro.
    Builds `aria-describedby` only when `help` is set, and emits
    `aria-invalid` only when `invalid is not none`. Macros call this
    inline rather than via macro-call to avoid double-whitespace in the
-emitted attribute string. #}
+   emitted attribute string. #}
+
 {% macro _help_small(name, help) -%}
-  {%- if help %}<small id="{{ name }}-helper">{{ help|safe }}</small>{%- endif %}
+{%- if help %}
+    <small id="{{ name }}-helper">{{ help|safe }}</small>
+    {%- endif %}
 {%- endmacro %}
+
 {# Field label + optional indicator. Every macro funnels its label through
    here so the "(optional)" marker is the *only* way an optional field is
    communicated visually — there is no `help="Optional."` pattern anymore
@@ -79,60 +85,64 @@ emitted attribute string. #}
    (copy) and ``test_form_fields.py`` (no literal-space markup).
 #}
 {% macro _field_label(label, required) -%}
-  {{ label }}
-  {% if not required %}<small class="form-field-optional">(optional)</small>{% endif %}
+{{ label }}{% if not required %}<small class="form-field-optional">(optional)</small>{% endif %}
 {%- endmacro %}
+
 {# ---- text-like inputs --------------------------------------------- #}
+
 {% macro text_field(name, label, current=None, required=True, pattern=None, maxlength=None, help=None, invalid=None, type="text", autocomplete=None) -%}
-  <label class="form-field" for="{{ name }}">
-    <span class="form-field-label">{{ _field_label(label, required) }}</span>
-    <input type="{{ type }}"
-           id="{{ name }}"
-           name="{{ name }}"
-           {%- if current is not none %}value="{{ current }}"{% endif %}
-           {%- if pattern %}pattern="{{ pattern }}"{% endif %}
-           {%- if maxlength %}maxlength="{{ maxlength }}"{% endif %}
-           {%- if autocomplete %}autocomplete="{{ autocomplete }}"{% endif %}
-           {%- if required %}required{% endif %}
-           {%- if help %}aria-describedby="{{ name }}-helper"{% endif %}
-           {%- if invalid is not none %}aria-invalid="{{ 'true' if invalid else 'false' }}"{% endif %} />
-    {{- _help_small(name, help) }}
-  </label>
+<label class="form-field" for="{{ name }}">
+  <span class="form-field-label">{{ _field_label(label, required) }}</span>
+  <input type="{{ type }}" id="{{ name }}" name="{{ name }}"
+    {%- if current is not none %} value="{{ current }}"{% endif %}
+    {%- if pattern %} pattern="{{ pattern }}"{% endif %}
+    {%- if maxlength %} maxlength="{{ maxlength }}"{% endif %}
+    {%- if autocomplete %} autocomplete="{{ autocomplete }}"{% endif %}
+    {%- if required %} required{% endif %}
+    {%- if help %} aria-describedby="{{ name }}-helper"{% endif %}
+    {%- if invalid is not none %} aria-invalid="{{ 'true' if invalid else 'false' }}"{% endif %} />
+  {{- _help_small(name, help) }}
+</label>
 {%- endmacro %}
+
 {% macro textarea_field(name, label, current=None, required=True, help=None, invalid=None) -%}
-  <label class="form-field" for="{{ name }}">
-    <span class="form-field-label">{{ _field_label(label, required) }}</span>
-    <textarea id="{{ name }}"
-              name="{{ name }}"
-              {%- if required %} required{% endif %}
-              {%- if help %} aria-describedby="{{ name }}-helper"{% endif %}
-              {%- if invalid is not none %} aria-invalid="{{ 'true' if invalid else 'false' }}"{% endif %}>{{ current or "" }}</textarea>
-    {{- _help_small(name, help) }}
-  </label>
+<label class="form-field" for="{{ name }}">
+  <span class="form-field-label">{{ _field_label(label, required) }}</span>
+  <textarea id="{{ name }}" name="{{ name }}"
+    {%- if required %} required{% endif %}
+    {%- if help %} aria-describedby="{{ name }}-helper"{% endif %}
+    {%- if invalid is not none %} aria-invalid="{{ 'true' if invalid else 'false' }}"{% endif %}>{{ current or "" }}</textarea>
+  {{- _help_small(name, help) }}
+</label>
 {%- endmacro %}
+
 {# `url_field` is `text_field(type="url")` with a more readable callsite.
    Browsers validate the URL on submit; the Pydantic schema's
    `HttpUrl`/`HtmlUrl` re-validates server-side. #}
 {% macro url_field(name, label, current=None, required=True, help=None, invalid=None) -%}
-  {{ text_field(name, label, current=current, required=required, help=help, invalid=invalid, type="url") }}
+{{ text_field(name, label, current=current, required=required, help=help, invalid=invalid, type="url") }}
 {%- endmacro %}
+
 {# ---- selects ------------------------------------------------------- #}
+
 {% macro select_field(name, label, options, labels=None, current=None, required=True, placeholder=False, help=None, invalid=None) -%}
-  <label class="form-field" for="{{ name }}">
-    <span class="form-field-label">{{ _field_label(label, required) }}</span>
-    <select id="{{ name }}"
-            name="{{ name }}"
-            {%- if required %}required{% endif %}
-            {%- if help %}aria-describedby="{{ name }}-helper"{% endif %}
-            {%- if invalid is not none %}aria-invalid="{{ 'true' if invalid else 'false' }}"{% endif %}>
-      {%- if placeholder and not current %}<option value="" disabled selected>--</option>{%- endif %}
-      {%- for v in options %}
-        <option value="{{ v }}"{% if current == v %} selected{% endif %}>{{ labels[v] if labels else v }}</option>
-      {%- endfor %}
-    </select>
-    {{- _help_small(name, help) }}
-  </label>
+<label class="form-field" for="{{ name }}">
+  <span class="form-field-label">{{ _field_label(label, required) }}</span>
+  <select id="{{ name }}" name="{{ name }}"
+    {%- if required %} required{% endif %}
+    {%- if help %} aria-describedby="{{ name }}-helper"{% endif %}
+    {%- if invalid is not none %} aria-invalid="{{ 'true' if invalid else 'false' }}"{% endif %}>
+    {%- if placeholder and not current %}
+    <option value="" disabled selected>--</option>
+    {%- endif %}
+    {%- for v in options %}
+    <option value="{{ v }}"{% if current == v %} selected{% endif %}>{{ labels[v] if labels else v }}</option>
+    {%- endfor %}
+  </select>
+  {{- _help_small(name, help) }}
+</label>
 {%- endmacro %}
+
 {# `<select multiple>` driven by a controlled-vocabulary tuple. One
    option per value; selected ones get `selected`. Multi selections
    serialize as repeated `name=v` pairs under
@@ -147,22 +157,20 @@ emitted attribute string. #}
    carriers, no featured services). Callers can pass `required=True`
    to force at least one selection. #}
 {% macro multi_select_field(name, label, options, labels=None, current=None, required=False, help=None, invalid=None) -%}
-  {%- set selected = current or [] -%}
-  <label class="form-field" for="{{ name }}">
-    <span class="form-field-label">{{ _field_label(label, required) }}</span>
-    <select id="{{ name }}"
-            name="{{ name }}"
-            multiple
-            size="{{ [options|length, 8]|min }}"
-            {%- if help %}aria-describedby="{{ name }}-helper"{% endif %}
-            {%- if invalid is not none %}aria-invalid="{{ 'true' if invalid else 'false' }}"{% endif %}>
-      {%- for v in options %}
-        <option value="{{ v }}"{% if v in selected %} selected{% endif %}>{{ labels[v] if labels else v }}</option>
-      {%- endfor %}
-    </select>
-    {{- _help_small(name, help) }}
-  </label>
+{%- set selected = current or [] -%}
+<label class="form-field" for="{{ name }}">
+  <span class="form-field-label">{{ _field_label(label, required) }}</span>
+  <select id="{{ name }}" name="{{ name }}" multiple size="{{ [options|length, 8]|min }}"
+    {%- if help %} aria-describedby="{{ name }}-helper"{% endif %}
+    {%- if invalid is not none %} aria-invalid="{{ 'true' if invalid else 'false' }}"{% endif %}>
+    {%- for v in options %}
+    <option value="{{ v }}"{% if v in selected %} selected{% endif %}>{{ labels[v] if labels else v }}</option>
+    {%- endfor %}
+  </select>
+  {{- _help_small(name, help) }}
+</label>
 {%- endmacro %}
+
 {# `<select>` populated from a list of entity rows — the canonical
    foreign-key picker (`org_id` on Provider/Program forms, `parent_org_id`
    on Org forms, etc). Replaces hand-rolled per-template `<select>`s.
@@ -183,80 +191,75 @@ emitted attribute string. #}
    sides — the option `value` attribute is stringified by the browser
    anyway, so callers don't need to coerce. #}
 {% macro entity_select_field(name, label, entities, current=None, required=True, blank_label=None, help=None, invalid=None, value_attr="id", label_attr="name") -%}
-  {%- set current_s = current|string if current is not none else "" -%}
-  <label class="form-field" for="{{ name }}">
-    <span class="form-field-label">{{ _field_label(label, required) }}</span>
-    <select id="{{ name }}"
-            name="{{ name }}"
-            {%- if required %}required{% endif %}
-            {%- if help %}aria-describedby="{{ name }}-helper"{% endif %}
-            {%- if invalid is not none %}aria-invalid="{{ 'true' if invalid else 'false' }}"{% endif %}>
-      {%- if blank_label is not none %}
-        <option value=""{% if current_s == "" %} selected{% endif %}>{{ blank_label }}</option>
-      {%- elif required and not current %}
-        <option value="" disabled selected>--</option>
-      {%- endif %}
-      {%- for e in entities %}
-        {%- set ev = e[value_attr] if e is mapping else e|attr(value_attr) -%}
-        {%- set el = e[label_attr] if e is mapping else e|attr(label_attr) -%}
-        <option value="{{ ev }}"{% if current_s == ev|string %} selected{% endif %}>{{ el }}</option>
-      {%- endfor %}
-    </select>
-    {{- _help_small(name, help) }}
-  </label>
+{%- set current_s = current|string if current is not none else "" -%}
+<label class="form-field" for="{{ name }}">
+  <span class="form-field-label">{{ _field_label(label, required) }}</span>
+  <select id="{{ name }}" name="{{ name }}"
+    {%- if required %} required{% endif %}
+    {%- if help %} aria-describedby="{{ name }}-helper"{% endif %}
+    {%- if invalid is not none %} aria-invalid="{{ 'true' if invalid else 'false' }}"{% endif %}>
+    {%- if blank_label is not none %}
+    <option value=""{% if current_s == "" %} selected{% endif %}>{{ blank_label }}</option>
+    {%- elif required and not current %}
+    <option value="" disabled selected>--</option>
+    {%- endif %}
+    {%- for e in entities %}
+    {%- set ev = e[value_attr] if e is mapping else e|attr(value_attr) -%}
+    {%- set el = e[label_attr] if e is mapping else e|attr(label_attr) -%}
+    <option value="{{ ev }}"{% if current_s == ev|string %} selected{% endif %}>{{ el }}</option>
+    {%- endfor %}
+  </select>
+  {{- _help_small(name, help) }}
+</label>
 {%- endmacro %}
+
 {# ---- radio groups ------------------------------------------------- #}
+
 {# Yes / No radio pair. `<fieldset>` + `<legend>` is the accessible
    substitute for `<label>` when one logical question owns multiple
    inputs. Each radio carries `aria-describedby` so screen readers
    announce the helper text on either selection. #}
 {% macro radio_bool_field(name, label, current=None, required=True, help=None) -%}
-  <fieldset class="form-field">
-    <legend class="form-field-label">{{ _field_label(label, required) }}</legend>
-    <div class="form-field-control">
-      <label class="form-field-inline">
-        <input type="radio"
-               name="{{ name }}"
-               value="true"
-               {%- if current is sameas true %}checked{% endif %}
-               {%- if required %}required{% endif %}
-               {%- if help %}aria-describedby="{{ name }}-helper"{% endif %} />
-        Yes
-      </label>
-      <label class="form-field-inline">
-        <input type="radio"
-               name="{{ name }}"
-               value="false"
-               {%- if current is sameas false %}checked{% endif %}
-               {%- if required %}required{% endif %}
-               {%- if help %}aria-describedby="{{ name }}-helper"{% endif %} />
-        No
-      </label>
-      {{- _help_small(name, help) }}
-    </div>
-  </fieldset>
+<fieldset class="form-field">
+  <legend class="form-field-label">{{ _field_label(label, required) }}</legend>
+  <div class="form-field-control">
+    <label class="form-field-inline"><input type="radio" name="{{ name }}" value="true"
+      {%- if current is sameas true %} checked{% endif %}
+      {%- if required %} required{% endif %}
+      {%- if help %} aria-describedby="{{ name }}-helper"{% endif %} />Yes</label>
+    <label class="form-field-inline"><input type="radio" name="{{ name }}" value="false"
+      {%- if current is sameas false %} checked{% endif %}
+      {%- if required %} required{% endif %}
+      {%- if help %} aria-describedby="{{ name }}-helper"{% endif %} />No</label>
+    {{- _help_small(name, help) }}
+  </div>
+</fieldset>
 {%- endmacro %}
+
 {# ---- schema-driven dispatch --------------------------------------- #}
+
 {# Reads `field_spec(schema, name)` and delegates to the right inner
    macro. `current`, `required`, `help`, `invalid` pass through. Pass
    `required=false` to override the schema-derived default (e.g. an
    optional filter on a field that's required for create). #}
 {% macro field_for(schema, name, label, current=None, required=None, help=None, invalid=None) -%}
-  {%- set spec = field_spec(schema, name) -%}
-  {%- set is_required = spec.required if required is none else required -%}
-  {%- if spec.kind == "select" -%}
-    {{ select_field(name, label, spec.choices, labels=spec.labels, current=current, required=is_required, placeholder=true, help=help, invalid=invalid) }}
-  {%- elif spec.kind == "multi_select" -%}
-    {{ multi_select_field(name, label, spec.choices, labels=spec.labels, current=current, help=help, invalid=invalid) }}
-  {%- elif spec.kind == "textarea" -%}
-    {{ textarea_field(name, label, current=current, required=is_required, help=help, invalid=invalid) }}
-  {%- elif spec.kind == "url" -%}
-    {{ url_field(name, label, current=current, required=is_required, help=help, invalid=invalid) }}
-  {%- elif spec.kind == "text" -%}
-    {{ text_field(name, label, current=current, required=is_required, pattern=spec.pattern, maxlength=spec.maxlength, help=help, invalid=invalid) }}
-  {%- endif -%}
+{%- set spec = field_spec(schema, name) -%}
+{%- set is_required = spec.required if required is none else required -%}
+{%- if spec.kind == "select" -%}
+{{ select_field(name, label, spec.choices, labels=spec.labels, current=current, required=is_required, placeholder=true, help=help, invalid=invalid) }}
+{%- elif spec.kind == "multi_select" -%}
+{{ multi_select_field(name, label, spec.choices, labels=spec.labels, current=current, help=help, invalid=invalid) }}
+{%- elif spec.kind == "textarea" -%}
+{{ textarea_field(name, label, current=current, required=is_required, help=help, invalid=invalid) }}
+{%- elif spec.kind == "url" -%}
+{{ url_field(name, label, current=current, required=is_required, help=help, invalid=invalid) }}
+{%- elif spec.kind == "text" -%}
+{{ text_field(name, label, current=current, required=is_required, pattern=spec.pattern, maxlength=spec.maxlength, help=help, invalid=invalid) }}
+{%- endif -%}
 {%- endmacro %}
+
 {# ---- specialized widgets ------------------------------------------ #}
+
 {# Day × time-of-day checkbox grid. One checkbox per (day, part) pair;
    all share the same `name` so the json-enc-arrays extension serializes
    them as a single JSON array of `<day>_<part>` tokens. `current` is an
@@ -269,34 +272,32 @@ emitted attribute string. #}
    that need a non-empty selection can pass `required=True` (no caller
    today). #}
 {% macro time_grid_field(name, label, current=None, required=False, help=None) -%}
-  {%- set selected = current or [] -%}
-  <fieldset class="form-field">
-    <legend class="form-field-label">{{ _field_label(label, required) }}</legend>
-    <table>
-      <thead>
-        <tr>
-          <th></th>
-          {%- for part in DESIRED_TIME_PARTS %}<th scope="col">{{ DESIRED_TIME_PART_LABELS[part] }}</th>{%- endfor %}
-        </tr>
-      </thead>
-      <tbody>
-        {%- for day in DESIRED_TIME_DAYS %}
-          <tr>
-            <th scope="row">{{ DESIRED_TIME_DAY_SHORT_LABELS[day] }}</th>
-            {%- for part in DESIRED_TIME_PARTS %}
-              {%- set token = day ~ "_" ~ part -%}
-              <td>
-                <input type="checkbox"
-                       name="{{ name }}"
-                       value="{{ token }}"
-                       {% if token in selected %}checked{% endif %}
-                       aria-label="{{ DESIRED_TIME_DAY_LABELS[day] }} {{ DESIRED_TIME_PART_LABELS[part] }}" />
-              </td>
-            {%- endfor %}
-          </tr>
+{%- set selected = current or [] -%}
+<fieldset class="form-field">
+  <legend class="form-field-label">{{ _field_label(label, required) }}</legend>
+  <table>
+    <thead>
+      <tr>
+        <th></th>
+        {%- for part in DESIRED_TIME_PARTS %}
+        <th scope="col">{{ DESIRED_TIME_PART_LABELS[part] }}</th>
         {%- endfor %}
-      </tbody>
-    </table>
-    {{- _help_small(name, help) }}
-  </fieldset>
+      </tr>
+    </thead>
+    <tbody>
+      {%- for day in DESIRED_TIME_DAYS %}
+      <tr>
+        <th scope="row">{{ DESIRED_TIME_DAY_SHORT_LABELS[day] }}</th>
+        {%- for part in DESIRED_TIME_PARTS %}
+        {%- set token = day ~ "_" ~ part -%}
+        <td>
+          <input type="checkbox" name="{{ name }}" value="{{ token }}"{% if token in selected %} checked{% endif %} aria-label="{{ DESIRED_TIME_DAY_LABELS[day] }} {{ DESIRED_TIME_PART_LABELS[part] }}" />
+        </td>
+        {%- endfor %}
+      </tr>
+      {%- endfor %}
+    </tbody>
+  </table>
+  {{- _help_small(name, help) }}
+</fieldset>
 {%- endmacro %}

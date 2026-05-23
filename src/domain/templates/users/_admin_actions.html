@@ -23,28 +23,26 @@
 #}
 {%- from "_shared/actions.html" import confirm_delete_button -%}
 {% if can_admin_actions %}
-  {% if target_user.is_active %}
-    <li>
-      <button type="button"
-              class="secondary outline"
-              hx-put="{{ entity_url('user', id=target_user.id, subresource='activation') }}"
-              hx-ext="json-enc"
-              hx-vals='{"state": "deactivated"}'
-              hx-confirm="Deactivate {{ target_user.username }}? They will be unable to log in until reactivated.">
-        Deactivate
-      </button>
-    </li>
-  {% else %}
-    <li>
-      <button type="button"
-              class="secondary outline"
-              hx-put="{{ entity_url('user', id=target_user.id, subresource='activation') }}"
-              hx-ext="json-enc"
-              hx-vals='{"state": "active"}'
-              hx-confirm="Reactivate {{ target_user.username }}?">Reactivate</button>
-    </li>
-  {% endif %}
-  <li>
-    {{ confirm_delete_button(entity_url('user', id=target_user.id) , "Permanently delete " ~ target_user.username ~ "? This cannot be undone.") }}
-  </li>
+{% if target_user.is_active %}
+<li><button
+  type="button"
+  class="secondary outline"
+  hx-put="{{ entity_url('user', id=target_user.id, subresource='activation') }}"
+  hx-ext="json-enc"
+  hx-vals='{"state": "deactivated"}'
+  hx-confirm="Deactivate {{ target_user.username }}? They will be unable to log in until reactivated.">
+  Deactivate
+</button></li>
+{% else %}
+<li><button
+  type="button"
+  class="secondary outline"
+  hx-put="{{ entity_url('user', id=target_user.id, subresource='activation') }}"
+  hx-ext="json-enc"
+  hx-vals='{"state": "active"}'
+  hx-confirm="Reactivate {{ target_user.username }}?">
+  Reactivate
+</button></li>
+{% endif %}
+<li>{{ confirm_delete_button(entity_url('user', id=target_user.id), "Permanently delete " ~ target_user.username ~ "? This cannot be undone.") }}</li>
 {% endif %}

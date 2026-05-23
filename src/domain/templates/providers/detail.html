@@ -3,38 +3,36 @@
 {%- from "_shared/sections.html" import fact -%}
 {%- from "providers/_credential_list.html" import credential_list -%}
 {%- from "providers/_credential_row.html" import credential_row -%}
+
 {# The framework binds `context[spec.name] = target`; after #642 PR 4 the
    entity name is "clinician" so the row arrives as `clinician`. Alias it
    to `provider` here so the rest of the template (and the
    `provider_card_view` helper signature) keeps the Python-side
    vocabulary — the underlying model class is still `Provider`. #}
 {% set provider = clinician %}
+
+
 {%- set view = provider_card_view(provider) -%}
+
 {% block resource_label %}Clinicians{% endblock %}
 {# H1 is the clinician's name when set; falls back to the primary
    affiliation's organization name for legacy rows without name data.
    The stacked affiliation cards below already list every org the
    clinician practices at, so the org-as-H1 fallback only matters
    while the name backfill is in progress. #}
-{% block current_label %}
-  {% if provider.first_name and provider.last_name %}
-    {{ provider.first_name }} {{ provider.last_name }}
-  {% else %}
-    {{ provider.org.name }}
-  {% endif %}
+{% block current_label %}{% if provider.first_name and provider.last_name %}{{ provider.first_name }} {{ provider.last_name }}{% else %}{{ provider.org.name }}{% endif %}{% endblock %}
+{% block subtitle %}{% if view.npi %}<span>NPI {{ view.npi }}</span>{% endif %}
+{%- if verification_status == "verified" %}
+<small><i class="icon-shield-check"></i>Verified</small>
+{%- elif verification_status == "needs_review" %}
+<small><i class="icon-shield-alert"></i>Needs review</small>
+{%- elif verification_status == "failed" %}
+<small><i class="icon-shield-x"></i>Verification failed</small>
+{%- endif %}
 {% endblock %}
-{% block subtitle %}
-  {% if view.npi %}<span>NPI {{ view.npi }}</span>{% endif %}
-  {%- if verification_status == "verified" %}
-    <small><i class="icon-shield-check"></i>Verified</small>
-  {%- elif verification_status == "needs_review" %}
-    <small><i class="icon-shield-alert"></i>Needs review</small>
-  {%- elif verification_status == "failed" %}
-    <small><i class="icon-shield-x"></i>Verification failed</small>
-  {%- endif %}
-{% endblock %}
+
 {% block actions %}
-  {# Primary resource actions (Favorite toggle, Edit, Delete) live in
+{# Primary resource actions (Favorite toggle, Edit, Delete) live in
    the toolbar — see the "every page's toolbar is the home for
    resource actions" rule in
    [`../../../framework/templates/README.md`](../../../framework/templates/README.md).
@@ -43,31 +41,33 @@
    authorization predicates inline. Each action is a `<li>` because
    the toolbar's right zone is a `<menu class="toolbar-right">` of
    commands. #}
-  {% if is_authenticated %}
-    {% if is_favorited %}
-      <li>
-        <button type="button"
-                class="secondary outline"
-                hx-delete="{{ entity_url('user_favorite', id=provider.id) }}"
-                hx-confirm="Remove this clinician from your favorites?">Unfavorite</button>
-      </li>
-    {% else %}
-      <li>
-        <button type="button"
-                class="outline"
-                hx-post="{{ entity_url('user_favorite', id=provider.id) }}">Favorite</button>
-      </li>
-    {% endif %}
+{% if is_authenticated %}
+  {% if is_favorited %}
+  <li><button type="button"
+          class="secondary outline"
+          hx-delete="{{ entity_url('user_favorite', id=provider.id) }}"
+          hx-confirm="Remove this clinician from your favorites?">
+    Unfavorite
+  </button></li>
+  {% else %}
+  <li><button type="button"
+          class="outline"
+          hx-post="{{ entity_url('user_favorite', id=provider.id) }}">
+    Favorite
+  </button></li>
   {% endif %}
-  {% if can_edit %}
-    {{ actions(wrapper="toolbar",
-        edit_url=entity_form_url('clinician', id=provider.id) ,
+{% endif %}
+{% if can_edit %}
+{{ actions(
+    wrapper="toolbar",
+    edit_url=entity_form_url('clinician', id=provider.id),
     edit_label="Edit clinician",
     delete_url=entity_url('clinician', id=provider.id),
     delete_confirm="Permanently delete this clinician? Credentials attached to them will be removed too. This cannot be undone.",
-    ) }}
-  {% endif %}
+) }}
+{% endif %}
 {% endblock %}
+
 {# Provider detail uses the same `.entity-card` chrome the posts/detail
    page does. After #642 PR 2 the page is **stacked sections**:
 
@@ -90,7 +90,7 @@
    availability display labels. Templates never reach for
    `affiliation.org.name` directly — they read `aff.org_name`. #}
 {% block content %}
-  {# Identity card collapsed: the toolbar H1 carries `view.practice_name`
+{# Identity card collapsed: the toolbar H1 carries `view.practice_name`
    and the `subtitle` block above carries NPI. The page starts straight
    into the affiliation cards.
 
@@ -101,54 +101,66 @@
    row still works. The directory listing (`list.html`) is unchanged
    — it continues to read `view.practice_name` / the flat per-role
    keys off the primary affiliation; #642 PR 3 rolls it up. #}
-  {% for aff in view.affiliations %}
-    <article class="entity-card"
-             data-testid="affiliation-card"
-             data-affiliation-org-id="{{ aff.org_id }}">
-      <header class="entity-header">
-        <strong>At <a href="{{ aff.org_url }}">{{ aff.org_name }}</a></strong>
-        {%- if aff.full_address %}<small>{{ aff.full_address }}</small>{%- endif %}
-      </header>
-      <section class="entity-facts">
-        <dl>
-          {%- if aff.full_address %}{{ fact('address', 'Address', aff.full_address) }}{%- endif %}
-            {{ fact('in_person_sessions', 'In-person sessions', aff.in_person_label) }}
-            {{ fact('virtual_sessions', 'Virtual sessions', aff.virtual_label) }}
-            {{ fact('insurance', 'Insurance', aff.insurance_summary) }}
-            {{ fact('sliding_scale', 'Sliding scale', aff.sliding_scale_label) }}
-            {%- if aff.cost %}{{ fact('cost', 'Cost', aff.cost) }}{%- endif %}
-            </dl>
-          </section>
-        </article>
-      {% endfor %}
-      {# Credentials are clinician-level (FK to `clinicians.id` after #635
+{% for aff in view.affiliations %}
+<article class="entity-card" data-testid="affiliation-card" data-affiliation-org-id="{{ aff.org_id }}">
+  <header class="entity-header">
+    <strong>At <a href="{{ aff.org_url }}">{{ aff.org_name }}</a></strong>
+    {%- if aff.full_address %}
+    <small>{{ aff.full_address }}</small>
+    {%- endif %}
+  </header>
+
+  <section class="entity-facts">
+    <dl>
+      {%- if aff.full_address %}
+      {{ fact('address', 'Address', aff.full_address) }}
+      {%- endif %}
+      {{ fact('in_person_sessions', 'In-person sessions', aff.in_person_label) }}
+      {{ fact('virtual_sessions', 'Virtual sessions', aff.virtual_label) }}
+      {{ fact('insurance', 'Insurance', aff.insurance_summary) }}
+      {{ fact('sliding_scale', 'Sliding scale', aff.sliding_scale_label) }}
+      {%- if aff.cost %}
+      {{ fact('cost', 'Cost', aff.cost) }}
+      {%- endif %}
+    </dl>
+  </section>
+</article>
+{% endfor %}
+
+{# Credentials are clinician-level (FK to `clinicians.id` after #635
    PR A) — they belong to the person, not to any single affiliation,
    so they render once below the stacked affiliation cards. The
    list-per-section grammar is the same the old single-card layout
    used; only the parent card changed. #}
-      <section class="entity-card">
-        <section>
-          <h4>Licensures</h4>
-          {% call(lic) credential_list(view.licensures, "No licensures listed.") %}
-            {{ credential_row(LICENSE_TYPES_LABELS[lic.license_type],
-                        ["#" ~ lic.license_number, lic.issuing_state, ("Expires " ~ lic.expiration_date) if lic.expiration_date else None],
-            ) }}
-          {% endcall %}
-        </section>
-        <section>
-          <h4>Education</h4>
-          {% call(edu) credential_list(view.educations, "No education entries listed.") %}
-            {{ credential_row(EDUCATION_TYPES_LABELS[edu.education_type],
-                        [edu.institution, edu.month_completed],) }}
-          {% endcall %}
-        </section>
-        <section>
-          <h4>Certifications</h4>
-          {% call(cert) credential_list(view.certifications, "No certifications listed.") %}
-            {{ credential_row(CERTIFICATION_TYPES_LABELS[cert.certification_type],
-                        [cert.certifying_body, ("Expires " ~ cert.expiration_date) if cert.expiration_date else None],
-            ) }}
-          {% endcall %}
-        </section>
-      </section>
-    {% endblock %}
+<section class="entity-card">
+  <section>
+    <h4>Licensures</h4>
+    {% call(lic) credential_list(view.licensures, "No licensures listed.") %}
+      {{ credential_row(
+          LICENSE_TYPES_LABELS[lic.license_type],
+          ["#" ~ lic.license_number, lic.issuing_state, ("Expires " ~ lic.expiration_date) if lic.expiration_date else None],
+      ) }}
+    {% endcall %}
+  </section>
+
+  <section>
+    <h4>Education</h4>
+    {% call(edu) credential_list(view.educations, "No education entries listed.") %}
+      {{ credential_row(
+          EDUCATION_TYPES_LABELS[edu.education_type],
+          [edu.institution, edu.month_completed],
+      ) }}
+    {% endcall %}
+  </section>
+
+  <section>
+    <h4>Certifications</h4>
+    {% call(cert) credential_list(view.certifications, "No certifications listed.") %}
+      {{ credential_row(
+          CERTIFICATION_TYPES_LABELS[cert.certification_type],
+          [cert.certifying_body, ("Expires " ~ cert.expiration_date) if cert.expiration_date else None],
+      ) }}
+    {% endcall %}
+  </section>
+</section>
+{% endblock %}

@@ -10,10 +10,10 @@ link.
 
 Layout per page:
 
-    <breadcrumb : link to collection>
-    <h1 : current item>    <actions ...>
+    <breadcrumb: link to collection>
+    <h1: current item>    <actions...>
     <hr>
-    <subtitle : optional one-line meta>
+    <subtitle: optional one-line meta>
     <content>
 
 Child contract:
@@ -54,29 +54,18 @@ Child contract:
 {% extends "base.html" %}
 {%- from "_shared/_toolbar.html" import page_toolbar -%}
 {%- from "_shared/_breadcrumb.html" import breadcrumb -%}
+
 {% block breadcrumb %}
-  {%- set collection_label %}
-    {% block resource_label %}{% endblock %}
-  {% endset -%}
-  {{ breadcrumb([(collection_label | trim, resource_url) ]) }}
+{%- set collection_label %}{% block resource_label %}{% endblock %}{% endset -%}
+{{ breadcrumb([(collection_label | trim, resource_url)]) }}
 {% endblock %}
+
 {% block toolbar %}
-  {%- set current %}
-    {% block current_label %}{% endblock %}
-  {% endset -%}
-  {%- set actions_body %}
-    {% block actions %}{% endblock %}
-  {% endset -%}
-  {% call page_toolbar(heading=current | trim) %}
-    {{ actions_body }}
-  {% endcall %}
-  {%- set sub %}
-    {% block subtitle %}{% endblock %}
-  {% endset -%}
-  {%- if sub | trim %}
-    <p>
-      <small class="meta">{{ sub | trim | safe }}</small>
-    </p>
-  {% endif %}
+{%- set current %}{% block current_label %}{% endblock %}{% endset -%}
+{%- set actions_body %}{% block actions %}{% endblock %}{% endset -%}
+{% call page_toolbar(heading=current | trim) %}{{ actions_body }}{% endcall %}
+{%- set sub %}{% block subtitle %}{% endblock %}{% endset -%}
+{%- if sub | trim %}<p><small class="meta">{{ sub | trim | safe }}</small></p>{% endif %}
 {% endblock %}
+
 {% block content %}{% endblock %}

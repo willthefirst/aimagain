@@ -1,20 +1,23 @@
 {% extends "views/form_edit.html" %}
 {%- from "_shared/form_fields.html" import entity_select_field, select_field, text_field -%}
 {%- from "_shared/actions.html" import actions -%}
+
+
 {% block resource_label %}Organizations{% endblock %}
 {% block current_label %}{{ organization.name }}{% endblock %}
+
 {% block content %}
-  <form hx-patch="{{ entity_url('organization', id=organization.id) }}">
-    <fieldset>
-      <legend>Identity</legend>
-      <div class="grid">
-        {{ text_field("name", "Name", current=organization.name, maxlength=200) }}
-        {{ select_field("type", "Type", ORGANIZATION_TYPES, labels=ORGANIZATION_TYPES_LABELS, current=organization.type) }}
-      </div>
-    </fieldset>
-    <fieldset>
-      <legend>Hierarchy</legend>
-      {# `root_org_id` is server-managed — see
+<form hx-patch="{{ entity_url('organization', id=organization.id) }}">
+  <fieldset>
+    <legend>Identity</legend>
+    <div class="grid">
+      {{ text_field("name", "Name", current=organization.name, maxlength=200) }}
+      {{ select_field("type", "Type", ORGANIZATION_TYPES, labels=ORGANIZATION_TYPES_LABELS, current=organization.type) }}
+    </div>
+  </fieldset>
+  <fieldset>
+    <legend>Hierarchy</legend>
+    {# `root_org_id` is server-managed — see
        src/domain/models/organizations/README.md. The form exposes
        `parent_org_id` only; the repository recomputes `root_org_id`
        when a reparent happens.
@@ -25,18 +28,21 @@
        `ORGANIZATION_ENTITY.form_extras_path`) and excludes the row
        being edited so the picker can't pin a self-loop. Empty value
        = root organization (no parent). #}
-      {{ entity_select_field("parent_org_id",
-            "Parent organization",
-            parent_org_options,
-            current=organization.parent_org_id,
-            blank_label="(no parent)",
-            required=false,
-            help="Set one only if this is part of a larger network.",) }}
-    </fieldset>
-    {{ actions("Save changes",
-        cancel_url=entity_url('organization', id=organization.id) ,
-    delete_url=entity_url('organization', id=organization.id),
-    delete_confirm="Delete this organization?",
+    {{ entity_select_field(
+         "parent_org_id",
+         "Parent organization",
+         parent_org_options,
+         current=organization.parent_org_id,
+         blank_label="(no parent)",
+         required=false,
+         help="Set one only if this is part of a larger network.",
     ) }}
-  </form>
+  </fieldset>
+  {{ actions(
+      "Save changes",
+      cancel_url=entity_url('organization', id=organization.id),
+      delete_url=entity_url('organization', id=organization.id),
+      delete_confirm="Delete this organization?",
+  ) }}
+</form>
 {% endblock %}

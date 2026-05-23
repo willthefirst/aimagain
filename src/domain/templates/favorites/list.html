@@ -1,14 +1,18 @@
 {% extends "views/list.html" %}
 {%- from "_shared/_clinician_card.html" import clinician_card -%}
+
 {% block resource_label %}Favorites{% endblock %}
+
 {% block content %}
-  {% if providers %}
-    <section id="favorites-list">
-      {%- for provider in providers %}{{ clinician_card(provider) }}{%- endfor %}
-      </section>
-    {% else %}
-      <p id="favorites-empty">
-        No favorites yet. <a href="{{ entity_url('clinician') }}">Browse clinicians</a> to add some.
-      </p>
-    {% endif %}
-  {% endblock %}
+{% if providers %}
+<section id="favorites-list">
+  {%- for provider in providers %}
+  {{ clinician_card(provider) }}
+  {%- endfor %}
+</section>
+{% else %}
+<p id="favorites-empty">
+  No favorites yet. <a href="{{ entity_url('clinician') }}">Browse clinicians</a> to add some.
+</p>
+{% endif %}
+{% endblock %}

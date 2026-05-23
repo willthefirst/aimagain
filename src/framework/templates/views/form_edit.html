@@ -8,8 +8,8 @@ toolbar row itself usually has no right-side actions.
 
 Layout per page:
 
-    <breadcrumb : link to collection › link back to detail>
-    <h1 : "Edit <noun>" — sourced from context.edit_heading>
+    <breadcrumb: link to collection › link back to detail>
+    <h1: "Edit <noun>" — sourced from context.edit_heading>
     <hr>
     <form>
 
@@ -49,23 +49,21 @@ Child contract:
 {% extends "base.html" %}
 {%- from "_shared/_breadcrumb.html" import breadcrumb -%}
 {%- from "_shared/_toolbar.html" import page_toolbar -%}
+
 {% block breadcrumb %}
-  {%- set collection_label %}
-    {% block resource_label %}{% endblock %}
-  {% endset -%}
-  {%- set current %}
-    {% block current_label %}{% endblock %}
-  {% endset -%}
-  {{ breadcrumb([
-    (collection_label | trim, resource_url) ,
+{%- set collection_label %}{% block resource_label %}{% endblock %}{% endset -%}
+{%- set current %}{% block current_label %}{% endblock %}{% endset -%}
+{{ breadcrumb([
+  (collection_label | trim, resource_url),
   (current | trim, resource_detail_url),
-  ]) }}
+]) }}
 {% endblock %}
+
 {% block toolbar %}
-  {% call page_toolbar(heading=edit_heading) %}
-  {% endcall %}
+{% call page_toolbar(heading=edit_heading) %}{% endcall %}
 {% endblock %}
+
 {# `entity-form-page` — see `views/form_new.html`. #}
 <div class="entity-form-page">
-  {% block content %}{% endblock %}
+{% block content %}{% endblock %}
 </div>

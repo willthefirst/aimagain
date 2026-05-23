@@ -1,33 +1,33 @@
 {% extends "views/list.html" %}
 {%- from "_shared/_card.html" import card -%}
 {%- from "_shared/sections.html" import fact -%}
+
 {% block resource_label %}Organizations{% endblock %}
+
 {% block actions %}
-  <li>
-    <a href="{{ entity_form_url('organization') }}" role="button">{{ entity_create_label("organization") }}</a>
-  </li>
+<li><a href="{{ entity_form_url('organization') }}" role="button">{{ entity_create_label('organization') }}</a></li>
 {% endblock %}
+
 {% block content %}
-  {% if organizations %}
-    <section id="organizations-list">
-      {%- for org in organizations %}
-        {% call card(
-          id=org.id,
-          headline_url=entity_url('organization', id=org.id),
-          headline=org.name) -%}
-          <section class="entity-facts">
-            <dl>
-              {{ fact('type', 'Type', ORGANIZATION_TYPES_LABELS[org.type]) }}
-              {%- if org.parent_org_id %}
-                {%- call fact('parent', 'Parent') %}<a href="{{ entity_url('organization', id=org.parent_org_id) }}">View parent</a>
-              {% endcall %}
-            {%- endif %}
-          </dl>
-        </section>
-      {%- endcall %}
-    {%- endfor %}
+{% if organizations %}
+<section id="organizations-list">
+  {%- for org in organizations %}
+  {% call card(
+       id=org.id,
+       headline_url=entity_url('organization', id=org.id),
+       headline=org.name) -%}
+  <section class="entity-facts">
+    <dl>
+      {{ fact('type', 'Type', ORGANIZATION_TYPES_LABELS[org.type]) }}
+      {%- if org.parent_org_id %}
+      {%- call fact('parent', 'Parent') %}<a href="{{ entity_url('organization', id=org.parent_org_id) }}">View parent</a>{% endcall %}
+      {%- endif %}
+    </dl>
   </section>
+  {%- endcall %}
+  {%- endfor %}
+</section>
 {% else %}
-  <p>No organizations found.</p>
+<p>No organizations found.</p>
 {% endif %}
 {% endblock %}

@@ -1,23 +1,22 @@
 {% extends "views/list.html" %}
 {%- from "posts/_shared/_item.html" import post_item with context -%}
+
 {% block resource_label %}Referrals{% endblock %}
+
 {% block actions %}
-  <li>
-    <a href="{{ entity_form_url('referral') }}" role="button">{{ entity_create_label("referral") }}</a>
-  </li>
+<li><a href="{{ entity_form_url('referral') }}" role="button">{{ entity_create_label('referral') }}</a></li>
 {% endblock %}
+
 {% block content %}
-  {% if referrals %}
-    <section id="referrals-list">
-      {%- for post in referrals %}{{ post_item(post, entity_name) }}{%- endfor %}
-      </section>
-    {% else %}
-      <p>
-        {% if active_filter_count %}
-          No referrals match these filters.
-        {% else %}
-          No referrals found.
-        {% endif %}
-      </p>
-    {% endif %}
-  {% endblock %}
+{% if referrals %}
+<section id="referrals-list">
+  {%- for post in referrals %}
+  {{ post_item(post, entity_name) }}
+  {%- endfor %}
+</section>
+{% else %}
+<p>
+  {% if active_filter_count %}No referrals match these filters.{% else %}No referrals found.{% endif %}
+</p>
+{% endif %}
+{% endblock %}

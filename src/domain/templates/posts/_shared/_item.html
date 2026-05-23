@@ -4,7 +4,8 @@ Each post renders as a Pico `<article>` (default Pico styles give the
 card chrome — background, border, padding, rounded corners). The
 `<article>` is the natural HTML element for a self-contained piece of
 syndicated content; `<ul><li>` wrapping isn't needed once cards have
-their own framing. The list container in `list.html` is a `<section id="posts-list">` of `<article>` children.
+their own framing. The list container in `list.html` is a `<section
+id="posts-list">` of `<article>` children.
 
 Layout per card:
 
@@ -48,29 +49,25 @@ family (e.g. `/referrals/{id}` for referrals' list). #}
 {%- from "_shared/_card.html" import card -%}
 {%- from "posts/_shared/_modality_chips.html" import modality_chips -%}
 {%- from "posts/_shared/_facts_block.html" import facts_block -%}
+
 {% macro post_item(post, entity_name) -%}
-  {%- set view = post_card_view(post) -%}
-  {%- set headline_text = view.headline ~ (", " ~ view.header_state if view.header_state else "") -%}
-  {%- set subtitle %}<span>{{ post.created_at | format_post_date }}</span>{{ modality_chips(view.in_person, view.virtual) }}
-{% endset %}
+{%- set view = post_card_view(post) -%}
+{%- set headline_text = view.headline ~ (", " ~ view.header_state if view.header_state else "") -%}
+{%- set subtitle %}<span>{{ post.created_at | format_post_date }}</span>{{ modality_chips(view.in_person, view.virtual) }}{% endset %}
 {% call card(
-  id=post.id,
-  headline_url=entity_url(entity_name, id=post.id),
-  headline=headline_text,
-  subtitle=subtitle,
-  data_kind=post.kind) -%}
-  {{ facts_block(view) }}
-  {#- Footer carries just the Email CTA — Pico-styled `role="button"
+     id=post.id,
+     headline_url=entity_url(entity_name, id=post.id),
+     headline=headline_text,
+     subtitle=subtitle,
+     data_kind=post.kind) -%}
+{{ facts_block(view) }}
+{#- Footer carries just the Email CTA — Pico-styled `role="button"
     class="secondary outline"` with the label "Email". The raw
     address lives only in the `href`. `target="_blank" rel="noopener
     noreferrer"` is harmless on `mailto:` URLs and matches the pattern
     used for the PA `website` link on the detail page. -#}
-  <footer>
-    <a href="mailto:{{ post.owner.email }}"
-       target="_blank"
-       rel="noopener noreferrer"
-       role="button"
-       class="secondary outline">Email</a>
-  </footer>
+<footer>
+  <a href="mailto:{{ post.owner.email }}" target="_blank" rel="noopener noreferrer" role="button" class="secondary outline">Email</a>
+</footer>
 {%- endcall %}
 {%- endmacro %}

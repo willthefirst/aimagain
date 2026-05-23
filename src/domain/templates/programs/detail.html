@@ -1,16 +1,21 @@
 {% extends "views/detail.html" %}
 {%- from "_shared/actions.html" import actions -%}
 {%- from "_shared/sections.html" import fact -%}
+
+
 {% block resource_label %}Programs{% endblock %}
 {% block current_label %}{{ program.name }}{% endblock %}
+
 {% block actions %}
-  {% if can_edit %}
-    {{ actions(wrapper="toolbar",
-        edit_url=entity_form_url('program', id=program.id) ,
+{% if can_edit %}
+{{ actions(
+    wrapper="toolbar",
+    edit_url=entity_form_url('program', id=program.id),
     edit_label="Edit program",
-    ) }}
-  {% endif %}
+) }}
+{% endif %}
 {% endblock %}
+
 {# Program detail uses the `.entity-card` chrome shared with
    posts/detail.html and providers/detail.html. Description renders as
    `.entity-description` lead prose above the facts dl when present
@@ -20,17 +25,25 @@
    carries `program.name`, and `state_preference` is already a
    `<dt>State served</dt>` row in the facts list. #}
 {% block content %}
-  <section class="entity-card">
-    {%- if program.description %}<p class="entity-description">{{ program.description }}</p>{%- endif %}
-    <section class="entity-facts">
-      <dl>
-        {%- call fact('organization', 'Organization') %}<a href="{{ entity_url('organization', id=program.org_id) }}">{{ program.organization.name }}</a>
-      {% endcall %}
-      {%- if program.state_preference %}{{ fact('state_served', 'State served', program.state_preference) }}{%- endif %}
-        {%- if program.start_date %}{{ fact('start_date', 'Start date', program.start_date) }}{%- endif %}
-          {%- if program.end_date %}{{ fact('end_date', 'End date', program.end_date) }}{%- endif %}
-            {{ fact('accepting_referrals', 'Accepting referrals', "Yes" if program.accepting_referrals else "No") }}
-          </dl>
-        </section>
-      </section>
-    {% endblock %}
+<section class="entity-card">
+  {%- if program.description %}
+  <p class="entity-description">{{ program.description }}</p>
+  {%- endif %}
+
+  <section class="entity-facts">
+    <dl>
+      {%- call fact('organization', 'Organization') %}<a href="{{ entity_url('organization', id=program.org_id) }}">{{ program.organization.name }}</a>{% endcall %}
+      {%- if program.state_preference %}
+      {{ fact('state_served', 'State served', program.state_preference) }}
+      {%- endif %}
+      {%- if program.start_date %}
+      {{ fact('start_date', 'Start date', program.start_date) }}
+      {%- endif %}
+      {%- if program.end_date %}
+      {{ fact('end_date', 'End date', program.end_date) }}
+      {%- endif %}
+      {{ fact('accepting_referrals', 'Accepting referrals', "Yes" if program.accepting_referrals else "No") }}
+    </dl>
+  </section>
+</section>
+{% endblock %}

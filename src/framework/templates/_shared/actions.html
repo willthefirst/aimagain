@@ -37,6 +37,7 @@ the Edit / Delete cluster in a detail-page toolbar. `confirm_delete_button`
 remains for inline sub-resource list rows that need a bare Delete
 button outside any cluster.
 #}
+
 {# Unified action cluster. One macro covers two layouts:
 
   - **`wrapper="form"` (default)** — wraps the buttons in
@@ -79,54 +80,39 @@ Examples:
         )
 #}
 {% macro actions(
-  submit_label=None,
-  cancel_url=None,
-  edit_url=None,
-  edit_label="Edit",
-  delete_url=None,
-  delete_confirm=None,
-  delete_label="Delete",
-  wrapper="form"
-  ) -%}
-  {%- set is_toolbar = wrapper == "toolbar" -%}
-  {%- if not is_toolbar %}<div class="form-actions">{% endif %}
-    {%- if submit_label %}
-      {%- if is_toolbar %}
-        <li>
-        {% endif -%}
-        <button type="submit">{{ submit_label }}</button>
-        {%- if is_toolbar %}</li>{% endif %}
-    {%- endif %}
-    {%- if edit_url %}
-      {%- if is_toolbar %}
-        <li>
-        {% endif -%}
-        <a href="{{ edit_url }}" role="button" class="outline">{{ edit_label }}</a>
-        {%- if is_toolbar %}</li>{% endif %}
-    {%- endif %}
-    {%- if cancel_url %}
-      {%- if is_toolbar %}
-        <li>
-        {% endif -%}
-        <a href="{{ cancel_url }}"
-           role="button"
-           class="secondary outline"
-           data-cancel-btn>Cancel</a>
-        {%- if is_toolbar %}</li>{% endif %}
-    {%- endif %}
-    {%- if delete_url and delete_confirm %}
-      {%- if is_toolbar %}
-        <li>
-        {% endif -%}
-        <button type="button"
-                class="secondary outline{% if not is_toolbar %} form-actions-destructive{% endif %}"
-                hx-delete="{{ delete_url }}"
-                hx-confirm="{{ delete_confirm }}">{{ delete_label }}</button>
-        {%- if is_toolbar %}</li>{% endif %}
-    {%- endif %}
-    {%- if not is_toolbar %}
-    </div>
-    {%- if cancel_url %}<script>
+    submit_label=None,
+    cancel_url=None,
+    edit_url=None,
+    edit_label="Edit",
+    delete_url=None,
+    delete_confirm=None,
+    delete_label="Delete",
+    wrapper="form"
+) -%}
+{%- set is_toolbar = wrapper == "toolbar" -%}
+{%- if not is_toolbar %}<div class="form-actions">{% endif %}
+{%- if submit_label %}
+{%- if is_toolbar %}<li>{% endif -%}
+<button type="submit">{{ submit_label }}</button>
+{%- if is_toolbar %}</li>{% endif %}
+{%- endif %}
+{%- if edit_url %}
+{%- if is_toolbar %}<li>{% endif -%}
+<a href="{{ edit_url }}" role="button" class="outline">{{ edit_label }}</a>
+{%- if is_toolbar %}</li>{% endif %}
+{%- endif %}
+{%- if cancel_url %}
+{%- if is_toolbar %}<li>{% endif -%}
+<a href="{{ cancel_url }}" role="button" class="secondary outline" data-cancel-btn>Cancel</a>
+{%- if is_toolbar %}</li>{% endif %}
+{%- endif %}
+{%- if delete_url and delete_confirm %}
+{%- if is_toolbar %}<li>{% endif -%}
+<button type="button" class="secondary outline{% if not is_toolbar %} form-actions-destructive{% endif %}" hx-delete="{{ delete_url }}" hx-confirm="{{ delete_confirm }}">{{ delete_label }}</button>
+{%- if is_toolbar %}</li>{% endif %}
+{%- endif %}
+{%- if not is_toolbar %}</div>
+{%- if cancel_url %}<script>
 (function(){
   var form=document.querySelector('form');
   if(!form)return;
@@ -136,10 +122,9 @@ Examples:
     if(form.dataset.dirty&&!confirm('Discard changes?'))e.preventDefault();
   });
 })();
-    </script>
-  {% endif %}
-{% endif -%}
+</script>{% endif %}{% endif -%}
 {%- endmacro %}
+
 {# Confirm-then-delete button. Renders an `hx-delete` button with an
 `hx-confirm` dialog. Used by inline sub-resource list rows (e.g.
 providers/form_edit.html licensure delete) where a single Delete sits
@@ -150,8 +135,5 @@ Renders as neutral outline (matches Cancel) until a destructive color
 treatment that survives Pico's cascade is added back. The `hx-confirm`
 dialog is what keeps misfires unlikely. #}
 {% macro confirm_delete_button(url, confirm_message, label="Delete") -%}
-  <button type="button"
-          class="secondary outline"
-          hx-delete="{{ url }}"
-          hx-confirm="{{ confirm_message }}">{{ label }}</button>
+<button type="button" class="secondary outline" hx-delete="{{ url }}" hx-confirm="{{ confirm_message }}">{{ label }}</button>
 {%- endmacro %}

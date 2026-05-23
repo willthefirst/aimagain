@@ -1,16 +1,16 @@
 {% extends "views/form_edit.html" %}
 {% from "posts/openings/_form_clinician_opening.html" import opening_form %}
+
 {# `view.headline` is the same identity string the detail page's H1
    renders ("Will's Org, NY" for an opening). Reusing it here pins the
    edit-page breadcrumb / H1 to the *specific* post being edited
    instead of the generic kind noun. The `post_card_view` helper is a
    Jinja global registered in `src/domain/template_globals.py`. #}
 {% set view = post_card_view(opening) %}
+
 {% block resource_label %}Openings{% endblock %}
-{% block current_label %}
-  {{ view.headline or 'Opening' }}
-  {% if view.header_state %}, {{ view.header_state }}{% endif %}
-{% endblock %}
+{% block current_label %}{{ view.headline or 'Opening' }}{% if view.header_state %}, {{ view.header_state }}{% endif %}{% endblock %}
+
 {% block content %}
-  {{ opening_form("patch", entity_url('opening', id=opening.id) , "Save changes", post=opening, schema=opening_create_schema, current_user=current_user, cancel_url=entity_url('opening', id=opening.id)) }}
+{{ opening_form("patch", entity_url('opening', id=opening.id), "Save changes", post=opening, schema=opening_create_schema, current_user=current_user, cancel_url=entity_url('opening', id=opening.id)) }}
 {% endblock %}

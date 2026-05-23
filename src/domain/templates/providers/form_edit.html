@@ -5,76 +5,75 @@
 {%- from "_shared/actions.html" import actions -%}
 {%- from "providers/_credential_list.html" import credential_list -%}
 {%- from "providers/_credential_row.html" import credential_row -%}
+
 {# The framework binds `context[spec.name] = target`; after #642 PR 4 the
    entity name is "clinician" so the row arrives as `clinician`. Alias it
    to `provider` here so the rest of the template (and the
    `provider_card_view` helper signature) keeps the Python-side
    vocabulary — the underlying model class is still `Provider`. #}
 {% set provider = clinician %}
+
+
 {% block resource_label %}Clinicians{% endblock %}
 {# Same H1-fallback shape as the detail page — name when set, primary
    affiliation's org name otherwise. #}
-{% block current_label %}
-  {% if provider.first_name and provider.last_name %}
-    {{ provider.first_name }} {{ provider.last_name }}
-  {% else %}
-    {{ provider.org.name }}
-  {% endif %}
-{% endblock %}
+{% block current_label %}{% if provider.first_name and provider.last_name %}{{ provider.first_name }} {{ provider.last_name }}{% else %}{{ provider.org.name }}{% endif %}{% endblock %}
+
 {% block content %}
-  <section>
-    <h2>Practice</h2>
-    {# `org_id` PATCH reassigns the Provider to a different Organization;
+<section>
+  <h2>Practice</h2>
+  {# `org_id` PATCH reassigns the Provider to a different Organization;
      `org.name` itself changes by editing the Organization (not via this
      form). To use a new Organization, create one via
      `entity_form_url('organization')` first. #}
-    <form hx-patch="{{ entity_url('clinician', id=provider.id) }}">
-      {# Person-level fields (name, NPI) — these live on the linked
+  <form hx-patch="{{ entity_url('clinician', id=provider.id) }}">
+    {# Person-level fields (name, NPI) — these live on the linked
        `Clinician` row, so they follow the person across affiliations.
        Practice/location lives below. #}
-      <fieldset>
-        <legend>Clinician</legend>
-        <div class="grid">
-          {{ text_field("first_name", "First name", current=provider.first_name, required=false, maxlength=120) }}
-          {{ text_field("last_name", "Last name", current=provider.last_name, required=false, maxlength=120) }}
-        </div>
-        {{ text_field("npi", "NPI", current=provider.npi, required=false, pattern="\\d{10}", maxlength=10, help=npi_help() ) }}
-      </fieldset>
-      <fieldset>
-        <legend>Practice location</legend>
-        {{ entity_select_field("org_id", "Organization", orgs, current=provider.org_id, help=org_picker_help() ) }}
-        <div class="grid">
-          {{ text_field("location_city", "City", current=provider.location_city, maxlength=120) }}
-          {{ select_field("location_state", "State", US_STATES, current=provider.location_state) }}
-          {{ text_field("location_zip", "ZIP", current=provider.location_zip, pattern="\\d{5}", maxlength=5) }}
-        </div>
-      </fieldset>
-      <fieldset>
-        <legend>Session availability</legend>
-        <div class="grid">
-          {{ select_field("in_person_sessions", "In-person sessions", LOCATION_AVAILABILITY_OPTIONS, labels=LOCATION_AVAILABILITY_LABELS, current=provider.in_person_sessions) }}
-          {{ select_field("virtual_sessions", "Virtual sessions", LOCATION_AVAILABILITY_OPTIONS, labels=LOCATION_AVAILABILITY_LABELS, current=provider.virtual_sessions) }}
-        </div>
-      </fieldset>
-      {# Insurance & payment. Empty carrier list = no in-network. #}
-      <fieldset>
-        <legend>Insurance &amp; payment</legend>
-        {{ multi_select_field("in_network_carriers", "In-network carriers", INSURANCE_CARRIERS, labels=INSURANCE_CARRIER_LABELS, current=provider.in_network_carriers) }}
-        <div class="grid">
-          {{ radio_bool_field("accepts_out_of_network", "Accepts out-of-network?", current=provider.accepts_out_of_network, required=false) }}
-          {{ radio_bool_field("sliding_scale", "Sliding scale?", current=provider.sliding_scale, required=false) }}
-        </div>
-        {{ text_field("cost", "Cost", current=provider.cost, required=false, help=cost_help() ) }}
-      </fieldset>
-      {# Practice-details form keeps its own action cluster; credentials
+    <fieldset>
+      <legend>Clinician</legend>
+      <div class="grid">
+        {{ text_field("first_name", "First name", current=provider.first_name, required=false, maxlength=120) }}
+        {{ text_field("last_name", "Last name", current=provider.last_name, required=false, maxlength=120) }}
+      </div>
+      {{ text_field("npi", "NPI", current=provider.npi, required=false, pattern="\\d{10}", maxlength=10, help=npi_help()) }}
+    </fieldset>
+    <fieldset>
+      <legend>Practice location</legend>
+      {{ entity_select_field("org_id", "Organization", orgs, current=provider.org_id, help=org_picker_help()) }}
+      <div class="grid">
+        {{ text_field("location_city", "City", current=provider.location_city, maxlength=120) }}
+        {{ select_field("location_state", "State", US_STATES, current=provider.location_state) }}
+        {{ text_field("location_zip", "ZIP", current=provider.location_zip, pattern="\\d{5}", maxlength=5) }}
+      </div>
+    </fieldset>
+    <fieldset>
+      <legend>Session availability</legend>
+      <div class="grid">
+        {{ select_field("in_person_sessions", "In-person sessions", LOCATION_AVAILABILITY_OPTIONS, labels=LOCATION_AVAILABILITY_LABELS, current=provider.in_person_sessions) }}
+        {{ select_field("virtual_sessions", "Virtual sessions", LOCATION_AVAILABILITY_OPTIONS, labels=LOCATION_AVAILABILITY_LABELS, current=provider.virtual_sessions) }}
+      </div>
+    </fieldset>
+    {# Insurance & payment. Empty carrier list = no in-network. #}
+    <fieldset>
+      <legend>Insurance &amp; payment</legend>
+      {{ multi_select_field("in_network_carriers", "In-network carriers", INSURANCE_CARRIERS, labels=INSURANCE_CARRIER_LABELS, current=provider.in_network_carriers) }}
+      <div class="grid">
+        {{ radio_bool_field("accepts_out_of_network", "Accepts out-of-network?", current=provider.accepts_out_of_network, required=false) }}
+        {{ radio_bool_field("sliding_scale", "Sliding scale?", current=provider.sliding_scale, required=false) }}
+      </div>
+      {{ text_field("cost", "Cost", current=provider.cost, required=false, help=cost_help()) }}
+    </fieldset>
+    {# Practice-details form keeps its own action cluster; credentials
        are managed via the inline add/remove forms below. Delete for
        the Provider itself lives on the detail page's toolbar (see
        `providers/detail.html`). #}
-      {{ actions("Save changes", cancel_url=entity_url('clinician', id=provider.id) ) }}
-    </form>
-  </section>
-  <section>
-    {# Affiliations — clinician's practice-role rows. After #642 PR 1 a
+    {{ actions("Save changes", cancel_url=entity_url('clinician', id=provider.id)) }}
+  </form>
+</section>
+
+<section>
+  {# Affiliations — clinician's practice-role rows. After #642 PR 1 a
      Provider may hold multiple Affiliations; each row is independently
      add/delete-able via /providers/{id}/affiliations[/{aff_id}]. The
      "Practice" form above edits the primary affiliation (oldest by
@@ -83,104 +82,118 @@
      (#642) collapses the directory listing to one row per Clinician
      with stacked affiliations; PR 2 (#642) rewrites the detail page
      to render the same stacked sections. #}
-    <h2>Affiliations</h2>
-    {% call(aff) credential_list(provider.affiliations, "No affiliations yet.") %}
-      {%- set meta_parts = [
-            aff.location_city,
-            aff.location_state,
-            aff.location_zip,
-            ("In-person: " ~ LOCATION_AVAILABILITY_LABELS[aff.in_person_sessions]) if aff.in_person_sessions else None,
-            ("Virtual: " ~ LOCATION_AVAILABILITY_LABELS[aff.virtual_sessions]) if aff.virtual_sessions else None,
-            ("In-network: " ~ (aff.in_network_carriers | map('lower') | map('capitalize') | join(', '))) if aff.in_network_carriers else None,
-            "Out-of-network OK" if aff.accepts_out_of_network else None,
-            "Sliding scale" if aff.sliding_scale else None,
-            aff.cost,
-            ] -%}
-      {{ credential_row(aff.org.name,
-            meta_parts,
-            delete_url=entity_url('clinician', id=provider.id) ~ "/affiliations/" ~ aff.id|string,
-      delete_confirm="Remove this affiliation?",
-      ) }}
-    {% endcall %}
-    {% call inline_add_form(entity_url('clinician', id=provider.id) ~ "/affiliations", "Add affiliation", "Add affiliation") %}
-      <label for="aff_org_id">
-        Organization
-        <select id="aff_org_id" name="org_id" required>
-          <option value="" disabled selected>--</option>
-          {%- for o in orgs %}<option value="{{ o.id }}">{{ o.name }}</option>{%- endfor %}
-        </select>
-      </label>
-      <div class="grid">
-        {{ text_field("location_city", "City", maxlength=120) }}
-        {{ select_field("location_state", "State", US_STATES, placeholder=true) }}
-        {{ text_field("location_zip", "ZIP", pattern="\\d{5}", maxlength=5) }}
-      </div>
-      {# Inline "add affiliation" form pre-selects "yes" for both
+  <h2>Affiliations</h2>
+  {% call(aff) credential_list(provider.affiliations, "No affiliations yet.") %}
+    {%- set meta_parts = [
+        aff.location_city,
+        aff.location_state,
+        aff.location_zip,
+        ("In-person: " ~ LOCATION_AVAILABILITY_LABELS[aff.in_person_sessions]) if aff.in_person_sessions else None,
+        ("Virtual: " ~ LOCATION_AVAILABILITY_LABELS[aff.virtual_sessions]) if aff.virtual_sessions else None,
+        ("In-network: " ~ (aff.in_network_carriers | map('lower') | map('capitalize') | join(', '))) if aff.in_network_carriers else None,
+        "Out-of-network OK" if aff.accepts_out_of_network else None,
+        "Sliding scale" if aff.sliding_scale else None,
+        aff.cost,
+    ] -%}
+    {{ credential_row(
+        aff.org.name,
+        meta_parts,
+        delete_url=entity_url('clinician', id=provider.id) ~ "/affiliations/" ~ aff.id|string,
+        delete_confirm="Remove this affiliation?",
+    ) }}
+  {% endcall %}
+
+  {% call inline_add_form(entity_url('clinician', id=provider.id) ~ "/affiliations", "Add affiliation", "Add affiliation") %}
+    <label for="aff_org_id">
+      Organization
+      <select id="aff_org_id" name="org_id" required>
+        <option value="" disabled selected>--</option>
+        {%- for o in orgs %}
+        <option value="{{ o.id }}">{{ o.name }}</option>
+        {%- endfor %}
+      </select>
+    </label>
+    <div class="grid">
+      {{ text_field("location_city", "City", maxlength=120) }}
+      {{ select_field("location_state", "State", US_STATES, placeholder=true) }}
+      {{ text_field("location_zip", "ZIP", pattern="\\d{5}", maxlength=5) }}
+    </div>
+    {# Inline "add affiliation" form pre-selects "yes" for both
        arms — same rationale as the clinician create form's session-
        availability fieldset (most common posture; users for whom
        this is wrong can flip it). #}
-      <div class="grid">
-        {{ select_field("in_person_sessions", "In-person sessions", LOCATION_AVAILABILITY_OPTIONS, labels=LOCATION_AVAILABILITY_LABELS, current="yes") }}
-        {{ select_field("virtual_sessions", "Virtual sessions", LOCATION_AVAILABILITY_OPTIONS, labels=LOCATION_AVAILABILITY_LABELS, current="yes") }}
-      </div>
-      {{ multi_select_field("in_network_carriers", "In-network carriers", INSURANCE_CARRIERS, labels=INSURANCE_CARRIER_LABELS) }}
-      <div class="grid">
-        {{ radio_bool_field("accepts_out_of_network", "Accepts out-of-network?", current=true, required=false) }}
-        {{ radio_bool_field("sliding_scale", "Sliding scale?", current=false, required=false) }}
-      </div>
-      {{ text_field("cost", "Cost", required=false) }}
-    {% endcall %}
-  </section>
-  <section>
-    <h2>Licensures</h2>
-    {% call(lic) credential_list(provider.licensures, "No licensures yet.") %}
-      {{ credential_row(LICENSE_TYPES_LABELS[lic.license_type],
-            ["#" ~ lic.license_number, lic.issuing_state, ("Expires " ~ lic.expiration_date) if lic.expiration_date else None],
-      delete_url=entity_url('clinician', id=provider.id) ~ "/licensures/" ~ lic.id|string,
-      delete_confirm="Remove this licensure?",
-      ) }}
-    {% endcall %}
-    {% call inline_add_form(entity_url('clinician', id=provider.id) ~ "/licensures", "Add licensure", "Add licensure") %}
-      {{ select_field("license_type", "License type", LICENSE_TYPES, labels=LICENSE_TYPES_LABELS, placeholder=true) }}
-      {{ text_field("license_number", "License number", maxlength=120) }}
-      {{ select_field("issuing_state", "Issuing state", US_STATES, placeholder=true) }}
-      {{ text_field("expiration_date", "Expiration date", required=false, type="date") }}
-    {% endcall %}
-  </section>
-  <section>
-    <h2>Education</h2>
-    {% call(edu) credential_list(provider.educations, "No education entries yet.") %}
-      {{ credential_row(EDUCATION_TYPES_LABELS[edu.education_type],
-            [edu.institution, edu.month_completed],
-            delete_url=entity_url('clinician', id=provider.id) ~ "/educations/" ~ edu.id|string,
-      delete_confirm="Remove this education entry?",
-      ) }}
-    {% endcall %}
-    {% call inline_add_form(entity_url('clinician', id=provider.id) ~ "/educations", "Add education", "Add education") %}
-      {{ select_field("education_type", "Education type", EDUCATION_TYPES, labels=EDUCATION_TYPES_LABELS, placeholder=true) }}
-      {{ text_field("institution", "Institution", maxlength=200) }}
-      {{ text_field("month_completed", "Month completed", required=false, type="month") }}
-    {% endcall %}
-  </section>
-  <section>
-    <h2>Certifications</h2>
-    {% call(cert) credential_list(provider.certifications, "No certifications yet.") %}
-      {{ credential_row(CERTIFICATION_TYPES_LABELS[cert.certification_type],
-            [cert.certifying_body, ("Expires " ~ cert.expiration_date) if cert.expiration_date else None],
-      delete_url=entity_url('clinician', id=provider.id) ~ "/certifications/" ~ cert.id|string,
-      delete_confirm="Remove this certification?",
-      ) }}
-    {% endcall %}
-    {% call inline_add_form(entity_url('clinician', id=provider.id) ~ "/certifications", "Add certification", "Add certification") %}
-      {{ select_field("certification_type", "Certification type", CERTIFICATION_TYPES, labels=CERTIFICATION_TYPES_LABELS, placeholder=true) }}
-      {{ text_field("certifying_body", "Certifying body", maxlength=200) }}
-      {{ text_field("expiration_date", "Expiration date", required=false, type="date") }}
-    {% endcall %}
-  </section>
-  {# Page-level Cancel — the credentials sections above use inline-add /
+    <div class="grid">
+      {{ select_field("in_person_sessions", "In-person sessions", LOCATION_AVAILABILITY_OPTIONS, labels=LOCATION_AVAILABILITY_LABELS, current="yes") }}
+      {{ select_field("virtual_sessions", "Virtual sessions", LOCATION_AVAILABILITY_OPTIONS, labels=LOCATION_AVAILABILITY_LABELS, current="yes") }}
+    </div>
+    {{ multi_select_field("in_network_carriers", "In-network carriers", INSURANCE_CARRIERS, labels=INSURANCE_CARRIER_LABELS) }}
+    <div class="grid">
+      {{ radio_bool_field("accepts_out_of_network", "Accepts out-of-network?", current=true, required=false) }}
+      {{ radio_bool_field("sliding_scale", "Sliding scale?", current=false, required=false) }}
+    </div>
+    {{ text_field("cost", "Cost", required=false) }}
+  {% endcall %}
+</section>
+
+<section>
+  <h2>Licensures</h2>
+  {% call(lic) credential_list(provider.licensures, "No licensures yet.") %}
+    {{ credential_row(
+        LICENSE_TYPES_LABELS[lic.license_type],
+        ["#" ~ lic.license_number, lic.issuing_state, ("Expires " ~ lic.expiration_date) if lic.expiration_date else None],
+        delete_url=entity_url('clinician', id=provider.id) ~ "/licensures/" ~ lic.id|string,
+        delete_confirm="Remove this licensure?",
+    ) }}
+  {% endcall %}
+
+  {% call inline_add_form(entity_url('clinician', id=provider.id) ~ "/licensures", "Add licensure", "Add licensure") %}
+    {{ select_field("license_type", "License type", LICENSE_TYPES, labels=LICENSE_TYPES_LABELS, placeholder=true) }}
+    {{ text_field("license_number", "License number", maxlength=120) }}
+    {{ select_field("issuing_state", "Issuing state", US_STATES, placeholder=true) }}
+    {{ text_field("expiration_date", "Expiration date", required=false, type="date") }}
+  {% endcall %}
+</section>
+
+<section>
+  <h2>Education</h2>
+  {% call(edu) credential_list(provider.educations, "No education entries yet.") %}
+    {{ credential_row(
+        EDUCATION_TYPES_LABELS[edu.education_type],
+        [edu.institution, edu.month_completed],
+        delete_url=entity_url('clinician', id=provider.id) ~ "/educations/" ~ edu.id|string,
+        delete_confirm="Remove this education entry?",
+    ) }}
+  {% endcall %}
+
+  {% call inline_add_form(entity_url('clinician', id=provider.id) ~ "/educations", "Add education", "Add education") %}
+    {{ select_field("education_type", "Education type", EDUCATION_TYPES, labels=EDUCATION_TYPES_LABELS, placeholder=true) }}
+    {{ text_field("institution", "Institution", maxlength=200) }}
+    {{ text_field("month_completed", "Month completed", required=false, type="month") }}
+  {% endcall %}
+</section>
+
+<section>
+  <h2>Certifications</h2>
+  {% call(cert) credential_list(provider.certifications, "No certifications yet.") %}
+    {{ credential_row(
+        CERTIFICATION_TYPES_LABELS[cert.certification_type],
+        [cert.certifying_body, ("Expires " ~ cert.expiration_date) if cert.expiration_date else None],
+        delete_url=entity_url('clinician', id=provider.id) ~ "/certifications/" ~ cert.id|string,
+        delete_confirm="Remove this certification?",
+    ) }}
+  {% endcall %}
+
+  {% call inline_add_form(entity_url('clinician', id=provider.id) ~ "/certifications", "Add certification", "Add certification") %}
+    {{ select_field("certification_type", "Certification type", CERTIFICATION_TYPES, labels=CERTIFICATION_TYPES_LABELS, placeholder=true) }}
+    {{ text_field("certifying_body", "Certifying body", maxlength=200) }}
+    {{ text_field("expiration_date", "Expiration date", required=false, type="date") }}
+  {% endcall %}
+</section>
+
+{# Page-level Cancel — the credentials sections above use inline-add /
    per-row delete forms that don't share submit/cancel state with the
    Practice form. Routing through `actions` (with no
    `submit_label`) keeps the visual width consistent with the rest of
    the form-action clusters on the page. #}
-  {{ actions(cancel_url=entity_url('clinician', id=provider.id) ) }}
+{{ actions(cancel_url=entity_url('clinician', id=provider.id)) }}
 {% endblock %}

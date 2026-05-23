@@ -5,8 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="color-scheme" content="light dark" />
     <title>Bedlam Connect</title>
-    <link rel="stylesheet"
-          href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css" />
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css" />
     {# Lucide icon font. Pinned to a recent release rather than `@latest`
        so the icon glyphs don't shift under us between deploys; bump the
        version deliberately. The CSS defines `<i class="icon-<name>">`
@@ -30,13 +31,15 @@
        Browsers match preloads to actual requests by exact URL, so the
        two URLs MUST share the same query string. Bump the timestamp
        here in lockstep with any version bump above. #}
-    <link rel="preload"
-          as="font"
-          type="font/woff2"
-          crossorigin
-          href="https://unpkg.com/lucide-static@0.471.0/font/lucide.woff2?t=1736516416702" />
-    <link rel="stylesheet"
-          href="https://unpkg.com/lucide-static@0.471.0/font/lucide.css" />
+    <link
+      rel="preload"
+      as="font"
+      type="font/woff2"
+      crossorigin
+      href="https://unpkg.com/lucide-static@0.471.0/font/lucide.woff2?t=1736516416702" />
+    <link
+      rel="stylesheet"
+      href="https://unpkg.com/lucide-static@0.471.0/font/lucide.css" />
     {# Density overrides. Pico's defaults are generous (~1rem spacing, 1.5
        line-height, large H1). These tokens tighten the scale globally so
        templates stay vanilla Pico semantics without per-page overrides.
@@ -568,17 +571,17 @@
         grid-template-rows: auto 1fr auto;
       }
     </style>
-    <script src="https://unpkg.com/htmx.org@2.0.4"
-            integrity="sha384-HGfztofotfshcF7+8n44JQL2oJmowVChPTg48S+jvZoztPfvwD79OC/LTtG6dMp+"
-            crossorigin="anonymous"></script>
+    <script
+      src="https://unpkg.com/htmx.org@2.0.4"
+      integrity="sha384-HGfztofotfshcF7+8n44JQL2oJmowVChPTg48S+jvZoztPfvwD79OC/LTtG6dMp+"
+      crossorigin="anonymous"></script>
     {# htmx 2 ships extensions as separate npm packages — the in-tree
        `dist/ext/json-enc.js` is the htmx-1 build and logs a "v1 extension
        with htmx 2" console warning. Use the htmx-2 package instead. #}
     <script src="https://unpkg.com/htmx-ext-json-enc@2.0.2/json-enc.js"></script>
-    {% block head %}{% endblock %}
-    {% if is_development %}
-      <!-- LiveReload script for development hot reloading -->
-      <script>
+    {% block head %}{% endblock %} {% if is_development %}
+    <!-- LiveReload script for development hot reloading -->
+    <script>
       ;(function () {
         var script = document.createElement('script')
         script.src =
@@ -586,19 +589,18 @@
         script.async = true
         document.head.appendChild(script)
       })()
-      </script>
-    {% endif %}
-    {% if not is_development and observability_frontend %}
-      {#
+    </script>
+    {% endif %} {% if not is_development and observability_frontend %} {#
       Browser SDK init. Dict shape and `provider` key come from
       `src/framework/observability/<provider>_backend.py:frontend_context`.
       Add a new `{% elif %}` branch here when adding a provider. #}
-      {% if observability_frontend.provider == "sentry" %}
-        {% set _replay_enabled = (observability_frontend.replays_session_sample_rate or 0) > 0 or
-                (observability_frontend.replays_on_error_sample_rate or 0) > 0 %}
-        <script src="https://browser.sentry-cdn.com/8.55.0/{% if _replay_enabled %}bundle.tracing.replay.min.js{% else %}bundle.tracing.min.js{% endif %}"
-                crossorigin="anonymous"></script>
-        <script>
+    {% if observability_frontend.provider == "sentry" %} {% set _replay_enabled
+    = (observability_frontend.replays_session_sample_rate or 0) > 0 or
+    (observability_frontend.replays_on_error_sample_rate or 0) > 0 %}
+    <script
+      src="https://browser.sentry-cdn.com/8.55.0/{% if _replay_enabled %}bundle.tracing.replay.min.js{% else %}bundle.tracing.min.js{% endif %}"
+      crossorigin="anonymous"></script>
+    <script>
       Sentry.init({
         dsn: "{{ observability_frontend.dsn }}",
         environment: "{{ observability_frontend.environment }}",
@@ -613,9 +615,8 @@
         replaysOnErrorSampleRate: {{ observability_frontend.replays_on_error_sample_rate }},
         {% endif %}
       })
-        </script>
-      {% endif %}
-    {% endif %}
+    </script>
+    {% endif %} {% endif %}
   </head>
   <body>
     {# Primary nav renders on every screen so the chrome stays
@@ -646,32 +647,19 @@
     <header class="container">
       <nav aria-label="Primary">
         <ul id="primary-nav">
-          <li>
-            <a href="/"><strong>Bedlam Connect</strong></a>
-          </li>
+          <li><a href="/"><strong>Bedlam Connect</strong></a></li>
           {% if is_authenticated %}
-            {# Flat nav: brand on the left, four links pushed right via
+          {# Flat nav: brand on the left, four links pushed right via
              `margin-left: auto` on the first item. Sign-out uses
              `hx-post` because the route returns `HX-Redirect`; HTMX
              handles the full-page navigation to `/auth/login`.
              Overflow on narrow viewports is a known follow-up — for
              now the row may wrap or scroll horizontally on small
              screens. #}
-            <li style="margin-left: auto;">
-              <a href="{{ entity_url('referral') }}"
-                 {% if _on_referrals %}aria-current="page"{% endif %}>Referrals</a>
-            </li>
-            <li>
-              <a href="{{ entity_url('opening') }}"
-                 {% if _on_openings %}aria-current="page"{% endif %}>Openings</a>
-            </li>
-            <li>
-              <a href="{{ entity_url('user', id='me') }}"
-                 {% if _on_profile %}aria-current="page"{% endif %}>Profile</a>
-            </li>
-            <li>
-              <a href="#" hx-post="/auth/sign-out">Sign out</a>
-            </li>
+          <li style="margin-left: auto;"><a href="{{ entity_url('referral') }}"{% if _on_referrals %} aria-current="page"{% endif %}>Referrals</a></li>
+          <li><a href="{{ entity_url('opening') }}"{% if _on_openings %} aria-current="page"{% endif %}>Openings</a></li>
+          <li><a href="{{ entity_url('user', id='me') }}"{% if _on_profile %} aria-current="page"{% endif %}>Profile</a></li>
+          <li><a href="#" hx-post="/auth/sign-out">Sign out</a></li>
           {% endif %}
           {# Anonymous visitors get only the brand link; the chrome
              carries no Login shortcut. Visitors enter the auth flow
@@ -714,7 +702,7 @@
        redefining `{% raw %}{% block footer %}{% endraw %}`. #}
     <footer class="container">
       {% block footer %}
-        <small>&copy; 2026 Bedlam Health &middot; <a href="mailto:support@bedlamhealth.com">support@bedlamhealth.com</a></small>
+      <small>&copy; 2026 Bedlam Health &middot; <a href="mailto:support@bedlamhealth.com">support@bedlamhealth.com</a></small>
       {% endblock %}
     </footer>
   </body>

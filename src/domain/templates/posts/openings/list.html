@@ -1,23 +1,22 @@
 {% extends "views/list.html" %}
 {%- from "posts/_shared/_item.html" import post_item with context -%}
+
 {% block resource_label %}Openings{% endblock %}
+
 {% block actions %}
-  <li>
-    <a href="{{ entity_form_url('opening') }}" role="button">{{ entity_create_label("opening") }}</a>
-  </li>
+<li><a href="{{ entity_form_url('opening') }}" role="button">{{ entity_create_label('opening') }}</a></li>
 {% endblock %}
+
 {% block content %}
-  {% if openings %}
-    <section id="openings-list">
-      {%- for post in openings %}{{ post_item(post, entity_name) }}{%- endfor %}
-      </section>
-    {% else %}
-      <p>
-        {% if active_filter_count %}
-          No openings match these filters.
-        {% else %}
-          No openings found.
-        {% endif %}
-      </p>
-    {% endif %}
-  {% endblock %}
+{% if openings %}
+<section id="openings-list">
+  {%- for post in openings %}
+  {{ post_item(post, entity_name) }}
+  {%- endfor %}
+</section>
+{% else %}
+<p>
+  {% if active_filter_count %}No openings match these filters.{% else %}No openings found.{% endif %}
+</p>
+{% endif %}
+{% endblock %}
