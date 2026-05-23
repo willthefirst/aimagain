@@ -371,18 +371,6 @@
       .breadcrumb-back:focus .breadcrumb-back-label {
         text-decoration: underline;
       }
-      /* Brand collapse on mobile. The two-word "Bedlam Connect" wraps
-         to two lines on narrow viewports once the primary nav fills the
-         row (see screenshot in #647-followup). The header markup emits
-         two spans — `.brand-full` (default) and `.brand-mark` (the
-         short form) — and the media query swaps them. No JS, two
-         rules. Threshold matches the breadcrumb back affordance above
-         so both kick in at the same width. */
-      .brand-mark { display: none; }
-      @media (max-width: 540px) {
-        .brand-full { display: none; }
-        .brand-mark { display: inline; }
-      }
       /* Entity create/edit forms — cap form width on large screens so
          short fields don't stretch across the whole container, and
          standardize the Save/Cancel/Delete action cluster. The wrapper
@@ -602,24 +590,14 @@
   <body>
     {# Primary nav renders on every screen so the chrome stays
        consistent between authenticated app pages and the public auth
-       flow. The right-side slot (`#primary-nav`) adapts: authed users
-       see the profile icon (with `aria-current="page"` while on
-       `/users/me`); anonymous visitors see a Login link. The brand
-       link goes to `/`, which redirects authed users to `/referrals`
-       (the "find new clients" journey home — see
+       flow. Authed users get the four inline links (Referrals,
+       Openings, Profile, Sign out); anonymous visitors get only the
+       brand. The brand link goes to `/`, which redirects authed users
+       to `/referrals` (the "find new clients" journey home — see
        `src/main.py:read_root` for the bias rationale) and unauthed
-       users to the login page — safe on either side of the auth gate.
-
-       Self-reference suppression: when an anonymous visitor is already
-       on an auth-flow page (`/auth/login`, `/auth/register`,
-       `/auth/forgot-password`, `/auth/reset-password`), the right-side
-       Login shortcut renders as a non-link `<span>` so the chrome
-       doesn't offer a click target that points where the user already
-       is. The `<span>` keeps `aria-current="page"` for assistive tech.
-    #}
+       users to the login page — safe on either side of the auth gate. #}
     {%- set _profile_path = entity_url('user', id='me') -%}
     {%- set _on_profile = is_authenticated and (request.url.path == _profile_path or request.url.path.startswith(_profile_path + '/')) -%}
-    {%- set _on_auth_flow = request.url.path == '/auth/login' or request.url.path == '/auth/register' or request.url.path == '/auth/forgot-password' or request.url.path.startswith('/auth/reset-password') -%}
     {# Section shortcuts. After the journey-led nav refactor the
        primary nav promotes only the two surfaces a clinician scans:
        `/referrals` (clients others are placing — "find new clients")
@@ -637,64 +615,24 @@
     {%- set _on_openings = is_authenticated and (request.url.path == _openings_path or request.url.path.startswith(_openings_path + '/')) -%}
     <header class="container">
       <nav aria-label="Primary">
-        <ul>
-          {# Brand wraps the full label and a short "mark" form; only
-             one is visible at a time. CSS in the `<style>` block
-             above swaps them at ≤540px so the brand stays on one
-             line as the primary nav fills the row. #}
-          <li><strong><a href="/">
-            <span class="brand-full">Bedlam Connect</span>
-            <span class="brand-mark">Bedlam</span>
-          </a></strong></li>
-          {% if is_authenticated %}
-          <li><a href="{{ entity_url('referral') }}"{% if _on_referrals %} aria-current="page"{% endif %}>Referrals</a></li>
-          <li><a href="{{ entity_url('opening') }}"{% if _on_openings %} aria-current="page"{% endif %}>Openings</a></li>
-          {% endif %}
-        </ul>
         <ul id="primary-nav">
+          <li><strong><a href="/">Bedlam Connect</a></strong></li>
           {% if is_authenticated %}
-          {# "Create clinician" chrome CTA removed in #697: the rebuilt
-             /users/me onboarding home carries that CTA in the checklist,
-             so duplicating it in the nav adds clutter without orientation.
-             `has_provider_profile` is still set in base_context but is no
-             longer read here. #}
-          <li>
-            {# Profile dropdown — canonical Pico v2 nav-dropdown pattern
-               (https://picocss.com/docs/nav#dropdowns): `<details
-               class="dropdown">` / `<summary>` / `<ul dir="rtl">` /
-               `<li><a>`. `dir="rtl"` right-aligns the panel so it doesn't
-               overflow the viewport edge. Sign-out uses `hx-post` on the
-               `<a>` because the route returns `HX-Redirect`; HTMX handles
-               the full-page navigation to `/auth/login`. #}
-            <details class="dropdown"{% if _on_profile %} aria-current="page"{% endif %}>
-              <summary aria-label="Profile menu">
-                {# Lucide `user` icon, inlined. `currentColor` inherits
-                   the summary's link color, including Pico's
-                   aria-current treatment. #}
-                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-              </summary>
-              <ul dir="rtl">
-                <li><a href="{{ entity_url('user', id='me') }}">Profile</a></li>
-                <li><a href="#" hx-post="/auth/sign-out">Sign out</a></li>
-              </ul>
-            </details>
-          </li>
-          {% else %}
-          <li>
-            {# When the visitor is already on the auth flow (login /
-               register / forgot-password) we render Login as a
-               non-clickable `<span>` instead of a self-referential
-               link (#591). The `<span>` keeps `aria-current="page"`
-               so assistive tech still hears it as the current section;
-               Pico styles the indicator using its default current-page
-               treatment. #}
-            {% if _on_auth_flow %}
-            <span aria-current="page">Login</span>
-            {% else %}
-            <a href="/auth/login">Login</a>
-            {% endif %}
-          </li>
+          {# Flat nav: brand on the left, four links pushed right via
+             `margin-left: auto` on the first item. Sign-out uses
+             `hx-post` because the route returns `HX-Redirect`; HTMX
+             handles the full-page navigation to `/auth/login`.
+             Overflow on narrow viewports is a known follow-up — for
+             now the row may wrap or scroll horizontally on small
+             screens. #}
+          <li style="margin-left: auto;"><a href="{{ entity_url('referral') }}"{% if _on_referrals %} aria-current="page"{% endif %}>Referrals</a></li>
+          <li><a href="{{ entity_url('opening') }}"{% if _on_openings %} aria-current="page"{% endif %}>Openings</a></li>
+          <li><a href="{{ entity_url('user', id='me') }}"{% if _on_profile %} aria-current="page"{% endif %}>Profile</a></li>
+          <li><a href="#" hx-post="/auth/sign-out">Sign out</a></li>
           {% endif %}
+          {# Anonymous visitors get only the brand link; the chrome
+             carries no Login shortcut. Visitors enter the auth flow
+             from the landing page CTA. #}
         </ul>
       </nav>
     </header>
@@ -724,5 +662,11 @@
          content). #}
       {% block after_content %}{% endblock %}
     </main>
+    {# Page footer slot — outside `<main>` so the footer is the
+       document's `<footer>` (semantic site-level role) rather than a
+       child of the main content. Wrapped in Pico's `.container` so
+       footer content picks up the same max-width centering as the
+       header/main bands. Empty on pages that don't fill the block. #}
+    <footer class="container">{% block footer %}{% endblock %}</footer>
   </body>
 </html>

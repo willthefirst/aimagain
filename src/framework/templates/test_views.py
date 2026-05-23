@@ -713,33 +713,14 @@ def test_primary_nav_no_tab_active_on_non_journey_paths() -> None:
         assert labels == [], f"{path} should not light any nav tab, got {labels}"
 
 
-def test_primary_nav_renders_login_link_off_auth_flow() -> None:
-    """When an anonymous visitor is *not* on an auth-flow page, the
-    top-right Login shortcut renders as a clickable `<a
-    href="/auth/login">` — the default chrome state."""
-    html = _render_base_for_path("/")
-    tree = HTMLParser(html)
-    link = tree.css_first('#primary-nav a[href="/auth/login"]')
-    assert link is not None
-    # No `<span aria-current="page">` on a non-auth path.
-    assert tree.css_first('#primary-nav span[aria-current="page"]') is None
-    # No `class="contrast"` anywhere in the nav — Pico styles the
-    # link with its default chrome treatment and the active-section
-    # cue with its default `aria-current="page"` treatment, no custom
-    # contrast utility needed (#592 + nav-pico-defaults cleanup).
-    classes = (link.attributes.get("class") or "").split()
-    assert (
-        "contrast" not in classes
-    ), f"Login link must not use `class='contrast'`: got {classes!r}"
-
-
-def test_primary_nav_suppresses_login_link_on_auth_flow_paths() -> None:
-    """Issue #591: on `/auth/login`, `/auth/register`,
-    `/auth/forgot-password`, and any `/auth/reset-password/...` path,
-    the top-right Login shortcut renders as a non-link
-    `<span aria-current="page">Login</span>` so the chrome doesn't
-    offer a self-referential click target."""
+def test_primary_nav_omits_login_link_for_anonymous_visitors() -> None:
+    """Anonymous visitors see only the brand in the chrome — no Login
+    shortcut, no self-referential indicator. Visitors enter the auth
+    flow from the landing page CTA. Pin the no-link contract across
+    every anonymous-accessible URL family so a regression doesn't
+    silently re-introduce the link."""
     for path in (
+        "/",
         "/auth/login",
         "/auth/register",
         "/auth/forgot-password",
@@ -750,6 +731,6 @@ def test_primary_nav_suppresses_login_link_on_auth_flow_paths() -> None:
         assert (
             tree.css_first('#primary-nav a[href="/auth/login"]') is None
         ), f"expected no /auth/login link on {path}"
-        indicator = tree.css_first('#primary-nav span[aria-current="page"]')
-        assert indicator is not None, f"expected Login indicator on {path}"
-        assert indicator.text().strip() == "Login"
+        assert (
+            tree.css_first('#primary-nav span[aria-current="page"]') is None
+        ), f"expected no Login indicator on {path}"

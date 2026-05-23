@@ -24,10 +24,11 @@ async def test_base_template_renders_primary_nav_when_authenticated(
     authenticated_client: AsyncClient,
     logged_in_user: User,
 ):
-    """Authenticated pages render the primary nav with the two Journey
-    surfaces on the left (Referrals = "find new clients", Openings =
-    "refer out a client") and on the right the `/users/me` profile
-    dropdown. Other URL families — `/intakes`, `/clinicians`,
+    """Authenticated pages render the primary nav as a single `<ul>`
+    with the brand on the left and four inline links pushed to the
+    right via `margin-left: auto` on the first link: Referrals (= "find
+    new clients"), Openings (= "refer out a client"), Profile, and
+    Sign out. Other URL families — `/intakes`, `/clinicians`,
     `/organizations`, `/programs`, `/users` — stay live and reachable
     by URL/bookmark, but are no longer chrome-promoted.
 
@@ -40,15 +41,19 @@ async def test_base_template_renders_primary_nav_when_authenticated(
     # "Create clinician" button no longer lives in the nav (#697).
     cta_items = tree.css("#primary-nav > li > a[href='/clinicians/form']")
     assert len(cta_items) == 0, "Create-clinician CTA should be removed from nav (#697)"
-    # Profile link lives inside the dropdown — descendant selector.
+    # Profile link is one of the four inline nav links.
     assert tree.css_first('#primary-nav a[href="/users/me"]') is not None
-    section_items = tree.css('nav[aria-label="Primary"] > ul:first-of-type > li > a')
-    section_hrefs = [a.attributes.get("href") for a in section_items]
-    # Brand link is `<li><strong><a>` so the `> li > a` direct-child
-    # selector picks up only the section shortcuts in render order.
-    assert section_hrefs == [
+    # All four authed-chrome destinations render in this exact order
+    # inside #primary-nav. Sign-out is the `#` placeholder href on the
+    # `<a hx-post>` that drives the HTMX POST.
+    nav_items = tree.css("#primary-nav > li > a")
+    nav_hrefs = [a.attributes.get("href") for a in nav_items]
+    assert nav_hrefs == [
+        "/",
         "/referrals",
         "/openings",
+        "/users/me",
+        "#",
     ]
 
 
@@ -79,71 +84,28 @@ async def test_base_template_renders_primary_nav_for_anonymous_visitors(
 ):
     """The primary nav renders on every screen — public auth-flow pages
     included — so the chrome stays consistent across the auth gate.
-    Anonymous visitors get the brand link plus a Login shortcut on the
-    right (no `/users/me` link, which would 401). The `{% if
-    is_authenticated %}` branch lives inside `#primary-nav` so the
-    nav scaffold is always present and only its right-side item swaps.
+    Anonymous visitors see only the brand link; the chrome carries no
+    Login shortcut and no profile link (which would 401). Visitors
+    enter the auth flow from the landing page CTA.
 
-    On `/auth/login` itself the Login shortcut is rendered as a
-    non-link `<span aria-current="page">` so the chrome doesn't offer a
-    self-referential click target (see issue #591); that branch is
-    pinned in ``test_primary_nav_suppresses_self_referential_login_link``
-    below.
-    """
-    # Every anonymous-accessible page in production is under
-    # `/auth/...`, and the issue-#591 suppression covers all of them,
-    # so there is no end-to-end path that exercises the clickable-`<a>`
-    # branch — that branch is pinned by the isolation-level unit test
-    # in ``src/framework/templates/test_views.py``.
+    The cross-path no-link contract is pinned at the isolation level
+    in `test_primary_nav_omits_login_link_for_anonymous_visitors`
+    (`src/framework/templates/test_views.py`); this end-to-end test
+    just confirms a representative anonymous response renders the
+    expected shape."""
     response = await test_client.get("/auth/login")
 
     assert response.status_code == 200
     tree = HTMLParser(response.text)
     nav = tree.css_first('nav[aria-label="Primary"]')
     assert nav is not None
-    # Brand link is present on the left.
+    # Brand link is present.
     brand = nav.css_first('a[href="/"]')
     assert brand is not None
-    # Right-side slot has the Login indicator (rendered as a non-link
-    # span on auth-flow pages); no profile link.
-    profile_link = tree.css_first('#primary-nav a[href="/users/me"]')
-    assert profile_link is None
-    # No clickable `<a href="/auth/login">` on the login page itself.
+    # No profile link, no Login link, no Login indicator.
+    assert tree.css_first('#primary-nav a[href="/users/me"]') is None
     assert tree.css_first('#primary-nav a[href="/auth/login"]') is None
-    # The Login indicator is a `<span aria-current="page">`.
-    login_indicator = tree.css_first('#primary-nav span[aria-current="page"]')
-    assert login_indicator is not None
-    assert login_indicator.text().strip() == "Login"
-
-
-@pytest.mark.parametrize(
-    "path",
-    [
-        "/auth/login",
-        "/auth/register",
-        "/auth/forgot-password",
-    ],
-)
-async def test_primary_nav_suppresses_self_referential_login_link(
-    test_client: AsyncClient,
-    path: str,
-):
-    """On every anonymous-accessible auth-flow page the top-right
-    Login shortcut must not link to `/auth/login` — clicking a header
-    link that points where you already are (or to a sibling auth page
-    that has the same chrome) is the bug filed in issue #591. The
-    suppression covers `/auth/login`, `/auth/register`, and
-    `/auth/forgot-password` so the chrome reads consistently across
-    the public auth flow."""
-    response = await test_client.get(path)
-    assert response.status_code == 200
-    tree = HTMLParser(response.text)
-    assert tree.css_first('#primary-nav a[href="/auth/login"]') is None
-    login_indicator = tree.css_first('#primary-nav span[aria-current="page"]')
-    assert (
-        login_indicator is not None
-    ), f"expected #primary-nav to carry a non-link Login indicator on {path}"
-    assert login_indicator.text().strip() == "Login"
+    assert tree.css_first('#primary-nav span[aria-current="page"]') is None
 
 
 # --- Listing -------------------------------------------------------------
@@ -734,18 +696,18 @@ async def test_base_template_preloads_lucide_icon_font(
 async def test_primary_nav_marks_profile_active_on_users_me_subpaths(
     authenticated_client: AsyncClient,
 ):
-    """The profile icon links to `/users/me` and shows `aria-current`
-    on any `/users/me/*` path — `/users/me/favorites` is the canonical
-    case but the rule covers every nested profile sub-route."""
+    """The Profile link in the primary nav points at `/users/me` and
+    carries `aria-current="page"` on any `/users/me/*` path —
+    `/users/me/favorites` is the canonical case but the rule covers
+    every nested profile sub-route."""
     response = await authenticated_client.get("/users/me/favorites")
     assert response.status_code == 200
     tree = HTMLParser(response.text)
-    # With the sign-out dropdown (#702), `aria-current` lives on the
-    # enclosing `<details>` element, not the inner profile link.
-    details = tree.css_first('#primary-nav details[aria-current="page"]')
+    profile_link = tree.css_first('#primary-nav a[href="/users/me"]')
     assert (
-        details is not None
-    ), "expected details to carry aria-current=page on /users/me subpaths"
+        profile_link is not None
+        and profile_link.attributes.get("aria-current") == "page"
+    ), "expected Profile link to carry aria-current=page on /users/me subpaths"
 
 
 # --- Activation endpoint -------------------------------------------------
