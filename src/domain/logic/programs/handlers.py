@@ -85,7 +85,9 @@ async def program_form_extras(
     if target is not None:
         org_ids = {o.id for o in orgs}
         if target.org_id not in org_ids:
-            attached = await organization_repo._get_by_id(Organization, target.org_id)
+            attached = await organization_repo.get_by_model_id(
+                Organization, target.org_id
+            )
             if attached is not None:
                 orgs = [*orgs, attached]
     return {"organizations": orgs}
