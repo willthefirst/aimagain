@@ -37,9 +37,27 @@ test_no_orphan_small_siblings_in_form_templates`.
 
 `invalid` is a tri-state — `None` (default, no aria), `True` (sets
 `aria-invalid="true"`, Pico colors the field + small red), `False`
-(`aria-invalid="false"`, Pico colors green). Currently unused at
-callsites but plumbed through so an error-rendering pass can land
-without touching every macro again.
+(`aria-invalid="false"`, Pico colors green). Callsites typically set
+this implicitly via the `error=` parameter below.
+
+## Inline error text (`error=None`)
+
+`error` is a string. When set, the macro follows Pico's canonical
+invalid-form pattern (https://picocss.com/docs/forms/input):
+
+  - the `<small id="<name>-helper">` slot carries the error text
+    instead of the helper text (one small per field, single id),
+  - the input keeps `aria-describedby="<name>-helper"` so screen
+    readers announce the error,
+  - the input auto-sets `aria-invalid="true"` — Pico colors both the
+    input and the sibling `<small>` red via its
+    `[aria-invalid="true"] ~ small` rule (callers don't pass
+    `invalid=` redundantly alongside `error=`).
+
+If both `help=` and `error=` are set, the error wins — the helper text
+is suppressed for that render so the visible message is the actionable
+one. Used by the form-error-rerender path on validation failure — see
+the `form_error_render` opt-in on `EntitySpec` and `mount_create`.
 
 ## Schema dispatch (`field_for`)
 
@@ -65,8 +83,16 @@ Composite-label cases (e.g. "<Program> · <Org>") pre-build a list of
    `aria-invalid` only when `invalid is not none`. Macros call this
    inline rather than via macro-call to avoid double-whitespace in the
 emitted attribute string. #}
-{% macro _help_small(name, help) -%}
-  {%- if help %}<small id="{{ name }}-helper">{{ help|safe }}</small>{%- endif %}
+{# Pico's canonical "one small per field" slot: when `error` is set the
+   small carries the error text; otherwise (and when `help` is set) it
+   carries the helper text. The id stays `<name>-helper` either way so
+   the input's `aria-describedby="<name>-helper"` stays valid in both
+   states without re-wiring. Pico's `[aria-invalid="true"] ~ small`
+   selector colors the small red automatically when the input has
+   `aria-invalid="true"`. #}
+{% macro _help_small(name, help, error=None) -%}
+  {%- if error %}<small id="{{ name }}-helper">{{ error }}</small>
+  {%- elif help %}<small id="{{ name }}-helper">{{ help|safe }}</small>{%- endif %}
 {%- endmacro %}
 {# Field label + optional indicator. Every macro funnels its label through
    here so the "(optional)" marker is the *only* way an optional field is
@@ -82,7 +108,8 @@ emitted attribute string. #}
   {{ label }}{%- if not required -%}<small class="form-field-optional">(optional)</small>{%- endif -%}
 {%- endmacro %}
 {# ---- text-like inputs --------------------------------------------- #}
-{% macro text_field(name, label, current=None, required=True, pattern=None, maxlength=None, help=None, invalid=None, type="text", autocomplete=None) -%}
+{% macro text_field(name, label, current=None, required=True, pattern=None, maxlength=None, help=None, invalid=None, error=None, type="text", autocomplete=None) -%}
+  {%- set aria_invalid = true if error else invalid -%}
   <label class="form-field" for="{{ name }}">
     <span class="form-field-label">{{ _field_label(label, required) }}</span>
     <input type="{{ type }}"
@@ -93,43 +120,45 @@ emitted attribute string. #}
            {% if maxlength %}maxlength="{{ maxlength }}"{% endif %}
            {% if autocomplete %}autocomplete="{{ autocomplete }}"{% endif %}
            {% if required %}required{% endif %}
-           {% if help %}aria-describedby="{{ name }}-helper"{% endif %}
-           {% if invalid is not none %}aria-invalid="{{ 'true' if invalid else 'false' }}"{% endif %} />
-    {{- _help_small(name, help) }}
+           {% if help or error %}aria-describedby="{{ name }}-helper"{% endif %}
+           {% if aria_invalid is not none %}aria-invalid="{{ 'true' if aria_invalid else 'false' }}"{% endif %} />
+    {{- _help_small(name, help, error) }}
   </label>
 {%- endmacro %}
-{% macro textarea_field(name, label, current=None, required=True, help=None, invalid=None) -%}
+{% macro textarea_field(name, label, current=None, required=True, help=None, invalid=None, error=None) -%}
+  {%- set aria_invalid = true if error else invalid -%}
   <label class="form-field" for="{{ name }}">
     <span class="form-field-label">{{ _field_label(label, required) }}</span>
     <textarea id="{{ name }}"
               name="{{ name }}"
               {% if required %}required{% endif %}
-              {% if help %}aria-describedby="{{ name }}-helper"{% endif %}
-              {% if invalid is not none %}aria-invalid="{{ 'true' if invalid else 'false' }}"{% endif %}>{{ current or "" }}</textarea>
-    {{- _help_small(name, help) }}
+              {% if help or error %}aria-describedby="{{ name }}-helper"{% endif %}
+              {% if aria_invalid is not none %}aria-invalid="{{ 'true' if aria_invalid else 'false' }}"{% endif %}>{{ current or "" }}</textarea>
+    {{- _help_small(name, help, error) }}
   </label>
 {%- endmacro %}
 {# `url_field` is `text_field(type="url")` with a more readable callsite.
    Browsers validate the URL on submit; the Pydantic schema's
    `HttpUrl`/`HtmlUrl` re-validates server-side. #}
-{% macro url_field(name, label, current=None, required=True, help=None, invalid=None) -%}
-  {{ text_field(name, label, current=current, required=required, help=help, invalid=invalid, type="url") }}
+{% macro url_field(name, label, current=None, required=True, help=None, invalid=None, error=None) -%}
+  {{ text_field(name, label, current=current, required=required, help=help, invalid=invalid, error=error, type="url") }}
 {%- endmacro %}
 {# ---- selects ------------------------------------------------------- #}
-{% macro select_field(name, label, options, labels=None, current=None, required=True, placeholder=False, help=None, invalid=None) -%}
+{% macro select_field(name, label, options, labels=None, current=None, required=True, placeholder=False, help=None, invalid=None, error=None) -%}
+  {%- set aria_invalid = true if error else invalid -%}
   <label class="form-field" for="{{ name }}">
     <span class="form-field-label">{{ _field_label(label, required) }}</span>
     <select id="{{ name }}"
             name="{{ name }}"
             {% if required %}required{% endif %}
-            {% if help %}aria-describedby="{{ name }}-helper"{% endif %}
-            {% if invalid is not none %}aria-invalid="{{ 'true' if invalid else 'false' }}"{% endif %}>
+            {% if help or error %}aria-describedby="{{ name }}-helper"{% endif %}
+            {% if aria_invalid is not none %}aria-invalid="{{ 'true' if aria_invalid else 'false' }}"{% endif %}>
       {%- if placeholder and not current %}<option value="" disabled selected>--</option>{%- endif %}
       {%- for v in options %}
         <option value="{{ v }}"{% if current == v %} selected{% endif %}>{{ labels[v] if labels else v }}</option>
       {%- endfor %}
     </select>
-    {{- _help_small(name, help) }}
+    {{- _help_small(name, help, error) }}
   </label>
 {%- endmacro %}
 {# `<select multiple>` driven by a controlled-vocabulary tuple. One
@@ -145,21 +174,22 @@ emitted attribute string. #}
    semantic is "any subset, including the empty set" (no in-network
    carriers, no featured services). Callers can pass `required=True`
    to force at least one selection. #}
-{% macro multi_select_field(name, label, options, labels=None, current=None, required=False, help=None, invalid=None) -%}
+{% macro multi_select_field(name, label, options, labels=None, current=None, required=False, help=None, invalid=None, error=None) -%}
   {%- set selected = current or [] -%}
+  {%- set aria_invalid = true if error else invalid -%}
   <label class="form-field" for="{{ name }}">
     <span class="form-field-label">{{ _field_label(label, required) }}</span>
     <select id="{{ name }}"
             name="{{ name }}"
             multiple
             size="{{ [options|length, 8]|min }}"
-            {% if help %}aria-describedby="{{ name }}-helper"{% endif %}
-            {% if invalid is not none %}aria-invalid="{{ 'true' if invalid else 'false' }}"{% endif %}>
+            {% if help or error %}aria-describedby="{{ name }}-helper"{% endif %}
+            {% if aria_invalid is not none %}aria-invalid="{{ 'true' if aria_invalid else 'false' }}"{% endif %}>
       {%- for v in options %}
         <option value="{{ v }}"{% if v in selected %} selected{% endif %}>{{ labels[v] if labels else v }}</option>
       {%- endfor %}
     </select>
-    {{- _help_small(name, help) }}
+    {{- _help_small(name, help, error) }}
   </label>
 {%- endmacro %}
 {# `<select>` populated from a list of entity rows — the canonical
@@ -181,15 +211,16 @@ emitted attribute string. #}
    value on edit). String/UUID equality is handled by stringifying both
    sides — the option `value` attribute is stringified by the browser
    anyway, so callers don't need to coerce. #}
-{% macro entity_select_field(name, label, entities, current=None, required=True, blank_label=None, help=None, invalid=None, value_attr="id", label_attr="name") -%}
+{% macro entity_select_field(name, label, entities, current=None, required=True, blank_label=None, help=None, invalid=None, error=None, value_attr="id", label_attr="name") -%}
   {%- set current_s = current|string if current is not none else "" -%}
+  {%- set aria_invalid = true if error else invalid -%}
   <label class="form-field" for="{{ name }}">
     <span class="form-field-label">{{ _field_label(label, required) }}</span>
     <select id="{{ name }}"
             name="{{ name }}"
             {% if required %}required{% endif %}
-            {% if help %}aria-describedby="{{ name }}-helper"{% endif %}
-            {% if invalid is not none %}aria-invalid="{{ 'true' if invalid else 'false' }}"{% endif %}>
+            {% if help or error %}aria-describedby="{{ name }}-helper"{% endif %}
+            {% if aria_invalid is not none %}aria-invalid="{{ 'true' if aria_invalid else 'false' }}"{% endif %}>
       {%- if blank_label is not none %}
         <option value=""{% if current_s == "" %} selected{% endif %}>{{ blank_label }}</option>
       {%- elif required and not current %}
@@ -201,7 +232,7 @@ emitted attribute string. #}
         <option value="{{ ev }}"{% if current_s == ev|string %} selected{% endif %}>{{ el }}</option>
       {%- endfor %}
     </select>
-    {{- _help_small(name, help) }}
+    {{- _help_small(name, help, error) }}
   </label>
 {%- endmacro %}
 {# ---- radio groups ------------------------------------------------- #}
@@ -240,19 +271,19 @@ emitted attribute string. #}
    macro. `current`, `required`, `help`, `invalid` pass through. Pass
    `required=false` to override the schema-derived default (e.g. an
    optional filter on a field that's required for create). #}
-{% macro field_for(schema, name, label, current=None, required=None, help=None, invalid=None) -%}
+{% macro field_for(schema, name, label, current=None, required=None, help=None, invalid=None, error=None) -%}
   {%- set spec = field_spec(schema, name) -%}
   {%- set is_required = spec.required if required is none else required -%}
   {%- if spec.kind == "select" -%}
-    {{ select_field(name, label, spec.choices, labels=spec.labels, current=current, required=is_required, placeholder=true, help=help, invalid=invalid) }}
+    {{ select_field(name, label, spec.choices, labels=spec.labels, current=current, required=is_required, placeholder=true, help=help, invalid=invalid, error=error) }}
   {%- elif spec.kind == "multi_select" -%}
-    {{ multi_select_field(name, label, spec.choices, labels=spec.labels, current=current, help=help, invalid=invalid) }}
+    {{ multi_select_field(name, label, spec.choices, labels=spec.labels, current=current, help=help, invalid=invalid, error=error) }}
   {%- elif spec.kind == "textarea" -%}
-    {{ textarea_field(name, label, current=current, required=is_required, help=help, invalid=invalid) }}
+    {{ textarea_field(name, label, current=current, required=is_required, help=help, invalid=invalid, error=error) }}
   {%- elif spec.kind == "url" -%}
-    {{ url_field(name, label, current=current, required=is_required, help=help, invalid=invalid) }}
+    {{ url_field(name, label, current=current, required=is_required, help=help, invalid=invalid, error=error) }}
   {%- elif spec.kind == "text" -%}
-    {{ text_field(name, label, current=current, required=is_required, pattern=spec.pattern, maxlength=spec.maxlength, help=help, invalid=invalid) }}
+    {{ text_field(name, label, current=current, required=is_required, pattern=spec.pattern, maxlength=spec.maxlength, help=help, invalid=invalid, error=error) }}
   {%- endif -%}
 {%- endmacro %}
 {# ---- specialized widgets ------------------------------------------ #}

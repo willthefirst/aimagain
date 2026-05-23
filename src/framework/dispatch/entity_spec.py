@@ -412,6 +412,28 @@ class EntitySpec:
     # Templates ----------------------------------------------------------
     templates: Templates = field(default_factory=Templates)
 
+    # Form-error re-render opt-in ---------------------------------------
+    # When True, the framework's `mount_create` catches 422 validation
+    # errors from `parse_and_validate_form` on HX-Request POSTs and
+    # re-renders the spec's form_new template with `form_errors` (dict
+    # of field-name → first error message) and `form_values` (the raw
+    # submitted payload) injected into the context. Default False keeps
+    # the existing JSON-422 contract for entities that haven't migrated
+    # their form templates to consume `form_errors`/`form_values`.
+    #
+    # Forms that opt in must:
+    #   - render `_shared/form_fields.html` macros with `error=` wired
+    #     to `errors.get(field_name)` (the macro auto-sets
+    #     `aria-invalid="true"` and emits inline error text);
+    #   - prefill controls from `values.get(field_name, <fallback>)` so
+    #     the user's typed values survive the re-render;
+    #   - set `hx-target="this" hx-swap="outerHTML"` on the `<form>` so
+    #     the returned partial replaces the form in place.
+    #
+    # Today only OPENING_ENTITY's `clinician_opening` create form opts
+    # in (see `src/domain/specs/posts/_base.py`).
+    form_error_render: bool = False
+
     # Route-prefix override --------------------------------------------
     # Default route prefix is ``f"/{url_collection}"`` (e.g. ``/users``).
     # Favorites is the only entity whose URL doesn't fit the convention
@@ -989,6 +1011,8 @@ class EntitySpec:
             private_fields=self.private_fields,
             private_field_predicate=self.private_field_predicate,
             parent=parent_rs,
+            form_error_render=self.form_error_render,
+            entity_spec=self,
         )
 
     def state_axis(self, name: str) -> StateAxis:

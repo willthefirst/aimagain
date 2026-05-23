@@ -123,6 +123,7 @@ def _post_face(
     kinds: tuple[str, ...] | None = None,
     create_adapter: type,
     update_adapter: type,
+    form_error_render: bool = False,
 ) -> EntitySpec:
     """Construct a post face — kind-locked leaf or subset-supertype.
 
@@ -215,4 +216,5 @@ def _post_face(
         discriminator=POST_KINDS,
         discriminator_value=kind,
         discriminator_values=kinds,
+        form_error_render=form_error_render,
     )

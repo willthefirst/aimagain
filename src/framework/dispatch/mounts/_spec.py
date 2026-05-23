@@ -135,6 +135,23 @@ class ResourceSpec:
 
     parent: "ResourceSpec | None" = None
 
+    # Form-error re-render opt-in. When True, `mount_create` catches the
+    # 422 from `parse_and_validate_form` on HX-Request POSTs and
+    # re-renders the spec's form_new template with field-level errors
+    # and the raw submitted values, instead of letting the JSON 422
+    # bubble up. Mirrors the same-named field on `EntitySpec`; copied
+    # over in `EntitySpec.to_resource_spec()`. See `EntitySpec.form_error_render`
+    # for the full contract.
+    form_error_render: bool = False
+    # Back-reference to the originating `EntitySpec`, populated by
+    # `EntitySpec.to_resource_spec()`. `mount_create`'s
+    # `_render_form_with_errors` reads this to reach the discriminator
+    # registry + the polymorphic template-dispatch logic in
+    # `handle_get_new_form`. `None` for synthetic ResourceSpecs built
+    # outside the `EntitySpec` path (e.g. test specs). Typed `Any` to
+    # avoid the circular import EntitySpec→ResourceSpec→EntitySpec.
+    entity_spec: Any = None
+
     def __post_init__(self) -> None:
         # Field-level visibility metadata: `private_fields` names the
         # attributes gated by `private_field_predicate(actor, target)`.

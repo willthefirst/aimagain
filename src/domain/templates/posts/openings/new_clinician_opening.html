@@ -7,6 +7,6 @@
       Set up your clinician profile first — every opening is tied to one. <a href="{{ entity_form_url('clinician') }}">Create your clinician profile.</a>
     </p>
   {% else %}
-    {{ opening_form("post", entity_url('opening') , entity_create_label('opening', kind='clinician_opening'), schema=opening_create_schema, current_user=current_user, cancel_url=entity_url('opening')) }}
+    {{ opening_form("post", entity_url('opening') , entity_create_label('opening', kind='clinician_opening'), schema=opening_create_schema, current_user=current_user, cancel_url=entity_url('opening'), errors=form_errors|default({}), values=form_values|default({})) }}
   {% endif %}
 {% endblock %}

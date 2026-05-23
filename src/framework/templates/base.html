@@ -243,6 +243,17 @@
         margin: 0;
         color: var(--pico-muted-color);
       }
+      /* Error state: when an input/select/textarea inside a `.form-field`
+         row carries `aria-invalid="true"` (set by the macros' `error=`
+         param), the sibling `<small id="<name>-helper">` carries the
+         error text instead of the helper text (Pico's canonical
+         one-small-per-field pattern). The selector mirrors the muted
+         rule above's specificity and adds an attribute selector so it
+         wins; Pico's own `~ small` rule for invalid forms is overridden
+         by the rule above, so we restate it here at matching depth. */
+      .entity-form-page form .form-field > [aria-invalid="true"] ~ small {
+        color: var(--pico-del-color);
+      }
       /* Inline form-fields nested inside a Pico `.grid` utility (a
          responsive 2-up row) fall back to a self-contained grid since
          their parent (the `.grid` div) isn't the subgrid source. */

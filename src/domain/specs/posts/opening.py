@@ -19,10 +19,17 @@ from src.framework.dispatch.entity_spec import EntitySpec
 
 from ._base import _post_face
 
+# `form_error_render=True` opts this face into the HX-Request
+# re-render-on-validation-failure path (see `EntitySpec.form_error_render`
+# and `mount_create`). First-pass scope: the clinician_opening form's
+# `age_groups` field surfaces an inline error instead of silently
+# 422-ing. The form templates in `domain/templates/posts/openings/` are
+# wired to consume `form_errors` and `form_values` from the context.
 OPENING_ENTITY: Final[EntitySpec] = _post_face(
     name="opening",
     url_collection="openings",
     kinds=("clinician_opening", "program_intake"),
     create_adapter=openings_create_adapter,
     update_adapter=openings_update_adapter,
+    form_error_render=True,
 )
