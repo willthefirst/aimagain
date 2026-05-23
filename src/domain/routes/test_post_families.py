@@ -413,21 +413,26 @@ async def test_admin_can_patch_anyone(
 # --- Form-error re-render (form_error_render opt-in) ---------------------
 
 
-async def test_clinician_opening_create_rerenders_form_with_age_groups_error_on_htmx(
+async def test_clinician_opening_create_form_error_render_is_wired(
     authenticated_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user,
 ):
-    """`POST /openings` (`kind=clinician_opening`) on an HX-Request with
-    an empty `age_groups` returns the form re-rendered with an inline
-    error on the `age_groups` `<select>` — not a JSON 422. This is the
-    first callsite of the `form_error_render` opt-in on `EntitySpec`
-    (see `OPENING_ENTITY` and `mount_create`'s `_render_form_with_errors`).
+    """Integration smoke for the `OPENING_ENTITY.form_error_render`
+    opt-in. Asserts only that the wiring is hooked up end-to-end —
+    HX-Request POST with invalid `age_groups` returns 200 + HTML and
+    the response mentions the failing field somewhere.
 
-    The user owns one Provider so the form template's
-    `current_user.providers` gate passes; the wire-valid `opening_payload`
-    is sent with `age_groups=[]` to trip the schema's `min_length=1`
-    constraint without dragging in unrelated validation noise.
+    Structural contracts live in their owning layers, not here:
+
+      - HX-Request vs not, 200 vs 422, `form_errors` dict shape,
+        kind-prefix stripping → `src/framework/dispatch/mounts/test_create.py`.
+      - Pico-canonical `aria-invalid` + helper-slot rendering →
+        `src/framework/templates/_shared/test_form_fields.py`.
+
+    Adding a second entity that opts into `form_error_render` only
+    needs a copy of this smoke for that entity's form — neither layer
+    above re-runs per entity.
     """
     provider = make_provider_with_org(owner_id=logged_in_user.id)
     async with db_test_session_manager() as session:
@@ -442,55 +447,6 @@ async def test_clinician_opening_create_rerenders_form_with_age_groups_error_on_
         data=payload,
         headers={"HX-Request": "true"},
     )
-    # Status is 200 (not 422 or 201) so HTMX swaps the response body
-    # via the form's `hx-target="this" hx-swap="outerHTML"`. The JSON
-    # 422 contract is preserved for non-HTMX clients (a separate test
-    # below pins that branch).
     assert response.status_code == 200, response.text
     assert response.headers["content-type"].startswith("text/html")
-
-    tree = HTMLParser(response.text)
-    age_select = tree.css_first('select[name="age_groups"]')
-    assert age_select is not None, "age_groups select missing from re-rendered form"
-    assert (
-        age_select.attributes.get("aria-invalid") == "true"
-    ), "age_groups select must carry aria-invalid='true' so Pico colors it red"
-    # Pico's canonical one-small-per-field slot: the helper id stays
-    # `<name>-helper` whether the small carries help text or the error
-    # message. With `error=` set, the small contains the error message.
-    error_small = tree.css_first("small#age_groups-helper")
-    assert error_small is not None, "age_groups error small missing"
-    # The small carries whatever Pydantic emits for the failure mode —
-    # `httpx` drops empty-list form keys so the wire payload omits
-    # `age_groups` entirely and Pydantic returns "Field required"; if a
-    # client submits a single empty value `min_length=1` fires with
-    # "at least 1 item". We only assert *some* message survives the
-    # `loc`-stripping + dict-collapse path, not its exact wording.
-    assert error_small.text().strip(), "age_groups error small is empty"
-
-
-async def test_clinician_opening_create_returns_json_422_without_htmx(
-    authenticated_client: AsyncClient,
-    db_test_session_manager: async_sessionmaker[AsyncSession],
-    logged_in_user,
-):
-    """The same POST without `HX-Request` falls through to the existing
-    JSON 422 contract — `form_error_render` is HTMX-only by design so
-    non-HTMX API clients keep their machine-readable error list."""
-    provider = make_provider_with_org(owner_id=logged_in_user.id)
-    async with db_test_session_manager() as session:
-        async with session.begin():
-            session.add(provider)
-
-    payload = opening_payload(provider_id=str(provider.id))
-    payload["age_groups"] = []
-
-    response = await authenticated_client.post("/openings", data=payload)
-    assert response.status_code == 422
-    body = response.json()
-    # The discriminated-union adapter prefixes `loc` with the kind for
-    # nested errors; `age_groups` lives under `clinician_opening`. We
-    # only assert the JSON-422 contract preserves the field name
-    # somewhere in `loc`, not the exact tuple shape.
-    locs = [tuple(err["loc"]) for err in body["detail"]]
-    assert any("age_groups" in loc for loc in locs), body
+    assert "age_groups" in response.text

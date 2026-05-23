@@ -111,6 +111,42 @@ def mount_create(
     router.post(path, status_code=status.HTTP_201_CREATED)(route_fn)
 
 
+def build_form_errors_dict(errors: Any, *, kind: str | None = None) -> dict[str, str]:
+    """Collapse a 422 detail list into a `{field_name: first_message}` dict.
+
+    Input shape matches `validate_or_422`'s output:
+    `[{loc: tuple, msg: str, type: str}, ...]`. For discriminated-union
+    adapters Pydantic prefixes `loc` with the kind discriminator (e.g.
+    `("clinician_opening", "age_groups")`); when `kind` is supplied and
+    matches the first `loc` segment, the prefix is stripped so the dict
+    keys land at the field name the form macros look up.
+
+    The first message wins per field — repeated nested errors on the
+    same field don't clobber render order. Malformed entries (no `loc`,
+    no `msg`, prefix-only locs) are skipped silently rather than raising,
+    so a future Pydantic shape change degrades to "no inline error"
+    instead of 500.
+    """
+    out: dict[str, str] = {}
+    if not isinstance(errors, list):
+        return out
+    for err in errors:
+        if not isinstance(err, dict):
+            continue
+        loc = err.get("loc")
+        msg = err.get("msg")
+        if not loc or not msg:
+            continue
+        loc_seq = list(loc) if isinstance(loc, (tuple, list)) else [loc]
+        if kind is not None and loc_seq and loc_seq[0] == kind:
+            loc_seq = loc_seq[1:]
+        if not loc_seq:
+            continue
+        field = loc_seq[0]
+        out.setdefault(str(field), str(msg))
+    return out
+
+
 async def _render_form_with_errors(
     *,
     spec: ResourceSpec,
@@ -168,28 +204,7 @@ async def _render_form_with_errors(
         requesting_user=requesting_user,
         kind=kind,
     )
-    # `form_errors` is a per-field dict for the macro `error=` param.
-    # The detail list is `[{loc: tuple, msg: str, type: str}, ...]`.
-    # For discriminated-union adapters Pydantic prefixes `loc` with the
-    # kind (e.g. `("clinician_opening", "age_groups")`), so strip a
-    # leading segment that matches the submitted kind before reducing
-    # to the field name. Keep the first message per field so repeated
-    # nested errors on the same field don't clobber render order.
-    form_errors: dict[str, str] = {}
-    if isinstance(errors, list):
-        for err in errors:
-            loc = err.get("loc") if isinstance(err, dict) else None
-            msg = err.get("msg") if isinstance(err, dict) else None
-            if not loc or not msg:
-                continue
-            loc_seq = list(loc) if isinstance(loc, (tuple, list)) else [loc]
-            if kind is not None and loc_seq and loc_seq[0] == kind:
-                loc_seq = loc_seq[1:]
-            if not loc_seq:
-                continue
-            field = loc_seq[0]
-            form_errors.setdefault(str(field), str(msg))
-    context["form_errors"] = form_errors
+    context["form_errors"] = build_form_errors_dict(errors, kind=kind)
     context["form_values"] = payload_dict
     template_name = context.pop("template_name", None) or entity_spec.templates.form_new
     if template_name is None:
