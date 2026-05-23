@@ -510,7 +510,7 @@ async def test_unauthorized_redirect_follows_to_login_page(test_client: AsyncCli
     )
     assert response.status_code == 200
     assert "text/html" in response.headers["content-type"]
-    assert "Login" in response.text
+    assert "Log in" in response.text
 
 
 async def test_register_writes_audit_row(
