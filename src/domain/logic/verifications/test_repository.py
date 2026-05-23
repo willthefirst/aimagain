@@ -7,7 +7,7 @@ tested in A4; here we only exercise the persistence shape and the
 ordering / pagination contract.
 """
 
-import asyncio
+from datetime import datetime, timedelta, timezone
 
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
@@ -57,18 +57,27 @@ async def test_latest_for_provider_returns_most_recent(
     db_test_session_manager: async_sessionmaker[AsyncSession],
 ):
     """`latest_for_provider` orders by `created_at` desc and returns
-    the top row. SQLite's `CURRENT_TIMESTAMP` is second-precision, so
-    we sleep ≥1.0s between inserts to force a different timestamp —
-    same pattern as `test_list_favorited_providers_newest_first`."""
+    the top row. SQLite's server-default `CURRENT_TIMESTAMP` is
+    second-precision, so two inserts in the same second tie on
+    ordering. Pass `created_at` explicitly on the model constructor
+    to force a deterministic ordering without burning real wall-clock
+    on `asyncio.sleep(1.0+)`."""
     provider = await _seed_provider(db_test_session_manager)
+    earlier = datetime.now(timezone.utc)
+    later = earlier + timedelta(seconds=1)
 
     async with db_test_session_manager() as session:
         async with session.begin():
-            session.add(Verification(provider_id=provider.id, status="failed"))
-    await asyncio.sleep(1.1)
-    async with db_test_session_manager() as session:
-        async with session.begin():
-            session.add(Verification(provider_id=provider.id, status="verified"))
+            session.add(
+                Verification(
+                    provider_id=provider.id, status="failed", created_at=earlier
+                )
+            )
+            session.add(
+                Verification(
+                    provider_id=provider.id, status="verified", created_at=later
+                )
+            )
 
     async with db_test_session_manager() as session:
         repo = VerificationRepository(session)
@@ -89,16 +98,23 @@ async def test_latest_for_provider_returns_none_when_no_history(
 async def test_list_for_provider_orders_newest_first(
     db_test_session_manager: async_sessionmaker[AsyncSession],
 ):
-    """SQLite second-precision `created_at` — sleep ≥1.0s between
-    inserts to force a distinct timestamp."""
+    """Same SQLite-tie problem as `test_latest_for_provider_returns_most_recent`
+    — pass `created_at` explicitly to avoid a second-precision tie."""
     provider = await _seed_provider(db_test_session_manager)
+    earlier = datetime.now(timezone.utc)
+    later = earlier + timedelta(seconds=1)
     async with db_test_session_manager() as session:
         async with session.begin():
-            session.add(Verification(provider_id=provider.id, status="failed"))
-    await asyncio.sleep(1.1)
-    async with db_test_session_manager() as session:
-        async with session.begin():
-            session.add(Verification(provider_id=provider.id, status="verified"))
+            session.add(
+                Verification(
+                    provider_id=provider.id, status="failed", created_at=earlier
+                )
+            )
+            session.add(
+                Verification(
+                    provider_id=provider.id, status="verified", created_at=later
+                )
+            )
 
     async with db_test_session_manager() as session:
         repo = VerificationRepository(session)
@@ -110,16 +126,22 @@ async def test_list_for_provider_honors_limit_and_offset(
     db_test_session_manager: async_sessionmaker[AsyncSession],
 ):
     """Two-row pagination sanity: offset=1 limit=1 returns the second
-    row from the newest-first listing. Only two distinct timestamps
-    needed → one sleep call, not three."""
+    row from the newest-first listing."""
     provider = await _seed_provider(db_test_session_manager)
+    earlier = datetime.now(timezone.utc)
+    later = earlier + timedelta(seconds=1)
     async with db_test_session_manager() as session:
         async with session.begin():
-            session.add(Verification(provider_id=provider.id, status="failed"))
-    await asyncio.sleep(1.1)
-    async with db_test_session_manager() as session:
-        async with session.begin():
-            session.add(Verification(provider_id=provider.id, status="verified"))
+            session.add(
+                Verification(
+                    provider_id=provider.id, status="failed", created_at=earlier
+                )
+            )
+            session.add(
+                Verification(
+                    provider_id=provider.id, status="verified", created_at=later
+                )
+            )
 
     async with db_test_session_manager() as session:
         repo = VerificationRepository(session)
