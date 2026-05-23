@@ -35,6 +35,8 @@ async def handle_registration(
     user activation/delete) get true atomicity via shared transactions; this
     is the one exception.
     """
+    if request_data.username is None:
+        request_data.username = request_data.email
     created_user = await user_manager.create(request_data, safe=True, request=request)
     await record_audit(
         audit_repo,

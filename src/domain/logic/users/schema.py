@@ -19,7 +19,11 @@ class UserRead(schemas.BaseUser):
 
 
 class UserCreate(schemas.BaseUserCreate):
-    username: str
+    # Optional on the wire: the signup form no longer collects a username.
+    # `handle_registration` fills it from `email` before persisting so the
+    # `users.username` column (UNIQUE, NOT NULL) and `UserAuditSnapshot`
+    # shape remain unchanged.
+    username: str | None = None
 
 
 class UserUpdate(schemas.BaseUserUpdate):
