@@ -1,0 +1,25 @@
+name: Python setup
+description: Set up Python 3.11 with pip cache and install project deps.
+
+# Shared by every CI job that needs the Python toolchain (`tests`,
+# `contract-tests`, `linting`). One file means a deps bump or a Python
+# version bump touches one place, not three.
+
+runs:
+  using: composite
+  steps:
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+        # `cache: pip` keys off the deps file we point at below. A
+        # warm cache cuts cold-start of `pip install -e .[full]` from
+        # ~45s to ~5s on hub runners.
+        cache: pip
+        cache-dependency-path: pyproject.toml
+
+    - name: Install dependencies
+      shell: bash
+      run: |
+        python -m pip install --upgrade pip
+        pip install -e .[full]
