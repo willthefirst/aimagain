@@ -190,6 +190,35 @@ class BaseRepository:
         stmt = stmt.order_by(order_by)
         return await self._list(stmt, offset=offset, limit=limit)
 
+    async def list_owned_by(
+        self,
+        model: type[M],
+        user_id: UUID,
+        *,
+        owner_attr: str = "owner_id",
+        offset: int = 0,
+        limit: int | None = None,
+    ) -> Sequence[M]:
+        """Framework helper for the "rows owned by a user, newest first"
+        listing shape — `select(model).filter(<owner_attr> == user_id)
+        .order_by(model.created_at.desc())`. Per-entity
+        `list_for_user`-style methods delegate here so the query
+        construction lives in one place; the per-entity wrapper keeps
+        the domain-named entry point and its docstring describing
+        *why* the listing exists.
+
+        `owner_attr` defaults to ``"owner_id"`` (the column every
+        owned entity uses today). Threaded as a kwarg so a future
+        renamed-FK entity can opt in without altering this method or
+        its callers.
+        """
+        stmt = (
+            select(model)
+            .filter(getattr(model, owner_attr) == user_id)
+            .order_by(model.created_at.desc())
+        )
+        return await self._list(stmt, offset=offset, limit=limit)
+
     async def create_polymorphic(
         self, parent: Any, detail: Any, *, detail_relationship: str
     ) -> Any:
