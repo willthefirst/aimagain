@@ -555,6 +555,21 @@
         max-width: 28rem;
         margin-inline: auto;
       }
+      /* Page footer (`<footer class="container">` in base.html — sibling
+         of `<header>` and `<main>`). Centered chrome line, present on
+         every page via the default `{% raw %}{% block footer %}{% endraw %}` body. */
+      footer.container { text-align: center; }
+      /* Sticky-footer layout. The body is a three-row grid
+         (`<header>` / `<main>` / `<footer>`) sized to the viewport, so
+         short pages pin the footer at the bottom instead of leaving it
+         floating mid-screen. The landing page reuses this row scaffold
+         to vertically center its hero (see `landing.html`); regular
+         content pages just benefit from the pinned footer. */
+      body {
+        min-height: 100dvh;
+        display: grid;
+        grid-template-rows: auto 1fr auto;
+      }
     </style>
     <script
       src="https://unpkg.com/htmx.org@2.0.4"
@@ -682,7 +697,13 @@
        document's `<footer>` (semantic site-level role) rather than a
        child of the main content. Wrapped in Pico's `.container` so
        footer content picks up the same max-width centering as the
-       header/main bands. Empty on pages that don't fill the block. #}
-    <footer class="container">{% block footer %}{% endblock %}</footer>
+       header/main bands. The default body is a site-wide copyright /
+       contact line shown on every page; pages can override by
+       redefining `{% raw %}{% block footer %}{% endraw %}`. #}
+    <footer class="container">
+      {% block footer %}
+      <small>&copy; 2026 Bedlam Health &middot; <a href="mailto:support@bedlamhealth.com">support@bedlamhealth.com</a></small>
+      {% endblock %}
+    </footer>
   </body>
 </html>

@@ -600,6 +600,17 @@ async def test_root_anonymous_returns_landing_page(test_client: AsyncClient):
     assert "/auth/login" in response.text
     assert "Sign in" in response.text
     assert "Sign up" in response.text
+    # CTA buttons live in `.cta-cluster`, NOT Pico's `.grid` — `.grid`
+    # would stretch them to the full hero width on tablet+. The
+    # `.cta-cluster` CSS in `landing.html` overrides Pico's
+    # `<a role="button">` full-width default at ≥768px so the buttons
+    # render at natural width, but keeps the full-width treatment on
+    # phones where stacked tappable bars read better.
+    assert "cta-cluster" in response.text
+    # The footer slot is shared across every page (default block in
+    # `base.html`), so the brand/contact line is present on the
+    # landing page too.
+    assert "support@bedlamhealth.com" in response.text
 
 
 async def test_root_authenticated_redirects_to_referrals(
