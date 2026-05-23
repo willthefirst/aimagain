@@ -3,21 +3,23 @@
 {# Landing-only layout. Scoped to `body:has(.landing-hero)` so these
    rules don't leak to any other page — every other template extends
    `base.html` without rendering a `.landing-hero`. On tablet+ the
-   page is exactly one viewport tall: header at top (natural row),
-   hero vertically centered, footer pinned to the bottom. On phones
+   page is exactly one viewport tall: header at top, hero vertically
+   centered in the main row, footer pinned to the bottom. On phones
    the natural document flow is preferred (the dvh trick reads as
-   awkward at narrow widths where the hero already fills the screen). #}
+   awkward at narrow widths where the hero already fills the screen).
+
+   The `<footer>` is rendered by `base.html` *outside* `<main>` (via
+   the `{% raw %}{% block footer %}{% endraw %}` slot), so the body grid carries three rows
+   (header, main, footer) and the main row alone holds the hero. #}
 <style>
   @media (min-width: 768px) {
     body:has(.landing-hero) {
       min-height: 100dvh;
       display: grid;
-      grid-template-rows: auto 1fr;
+      grid-template-rows: auto 1fr auto;
     }
     body:has(.landing-hero) main.container {
       display: grid;
-      grid-template-rows: 1fr auto;
-      gap: 2rem;
       padding-block: 2rem;
     }
     .landing-hero { align-self: center; }
@@ -32,10 +34,11 @@
 {# Public landing (anonymous `/`) — structure mirrors the parent
    marketing site at https://www.bedlamconnect.com/: a brand-led
    `<hgroup>` hero (H1 + tagline), a one-line value description, a
-   two-CTA cluster, and a page-level `<footer>`. Pico styles
-   `<hgroup>`, `<footer>`, `<a role="button">`, and `.grid` out of
-   the box; the page-level `<style>` above only handles the
-   vertical-center / footer-pinned viewport fit. #}
+   two-CTA cluster. The page-level `<footer>` is emitted into the
+   shared footer slot below (rendered outside `<main>` by `base.html`).
+   Pico styles `<hgroup>`, `<footer>`, `<a role="button">`, and
+   `.grid` out of the box; the page-level `<style>` above only
+   handles the vertical-center / footer-pinned viewport fit. #}
 <section class="landing-hero">
   <hgroup>
     <h1>Welcome to Bedlam Connect</h1>
@@ -47,8 +50,7 @@
     <a href="/auth/register" role="button" class="secondary">Sign up</a>
   </div>
 </section>
-
-<footer>
-  <small>&copy; 2026 Bedlam Health &middot; <a href="mailto:support@bedlamhealth.com">support@bedlamhealth.com</a></small>
-</footer>
+{% endblock %}
+{% block footer %}
+<small>&copy; 2026 Bedlam Health &middot; <a href="mailto:support@bedlamhealth.com">support@bedlamhealth.com</a></small>
 {% endblock %}

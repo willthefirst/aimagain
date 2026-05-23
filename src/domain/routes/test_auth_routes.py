@@ -169,9 +169,9 @@ async def test_authenticated_page_has_sign_out_affordance(
 ):
     """Any authenticated page must expose the sign-out endpoint in the
     header chrome so the user can end their session within 2 clicks.
-    The header dropdown uses `<a hx-post="/auth/sign-out">` (Pico v2
-    nav-dropdown pattern) — assert the target is present on the profile
-    page (a representative authenticated response)."""
+    Sign-out is a plain `<a hx-post="/auth/sign-out">` in the primary
+    nav row; the route returns `HX-Redirect` and HTMX handles the
+    full-page navigation to `/auth/login`."""
     response = await authenticated_client.get(
         "/users/me", headers={"Accept": "text/html"}
     )
@@ -510,7 +510,7 @@ async def test_unauthorized_redirect_follows_to_login_page(test_client: AsyncCli
     )
     assert response.status_code == 200
     assert "text/html" in response.headers["content-type"]
-    assert "Login" in response.text
+    assert "Log in" in response.text
 
 
 async def test_register_writes_audit_row(
