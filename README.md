@@ -11,7 +11,7 @@ dev up                    # starts the dev server at http://localhost:8000
 dev test                  # runs the test suite
 ```
 
-`dev --help` lists every command. See [`scripts/README.md`](scripts/README.md) for what's there.
+`dev --help` lists every command. See [`scripts/README.md`](scripts/README.md) for what's there, including `dev merge <PR#>` for shepherding a PR through Mergify's queue.
 
 ### Dev auto-login
 
