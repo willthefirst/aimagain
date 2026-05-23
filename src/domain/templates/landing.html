@@ -1,33 +1,31 @@
 {% extends "base.html" %}
 {% block head %}
-{# Landing-only layout. Scoped to `body:has(.landing-hero)` so these
-   rules don't leak to any other page — every other template extends
-   `base.html` without rendering a `.landing-hero`. On tablet+ the
-   page is exactly one viewport tall: header at top, hero vertically
-   centered in the main row, footer pinned to the bottom. On phones
-   the natural document flow is preferred (the dvh trick reads as
-   awkward at narrow widths where the hero already fills the screen).
-
-   The `<footer>` is rendered by `base.html` *outside* `<main>` (via
-   the `{% raw %}{% block footer %}{% endraw %}` slot), so the body grid carries three rows
-   (header, main, footer) and the main row alone holds the hero. #}
+{# Landing-only layout. The sticky-footer body grid (auto 1fr auto)
+   lives in `base.html` and already grows the `<main>` row to fill the
+   viewport. This block adds the landing-specific extras: vertically
+   center the hero within `<main>` and switch the CTA cluster to a
+   natural-width inline row, both at tablet+. Mobile relies on Pico
+   defaults — `<a role="button">` is block-level full-width, which is
+   exactly what we want for stacked tappable bars. Scoped to
+   `body:has(.landing-hero)` and `.landing-hero` so the rules don't
+   leak to any other page. #}
 <style>
   @media (min-width: 768px) {
-    body:has(.landing-hero) {
-      min-height: 100dvh;
-      display: grid;
-      grid-template-rows: auto 1fr auto;
-    }
     body:has(.landing-hero) main.container {
       display: grid;
       padding-block: 2rem;
     }
     .landing-hero { align-self: center; }
+    .landing-hero .cta-cluster {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.75rem;
+    }
+    .landing-hero .cta-cluster > [role="button"] {
+      width: auto;
+      margin: 0;
+    }
   }
-  /* CTA cluster — Pico styles `<a role="button">` as block-level
-     100%-wide; inside a `.grid` utility we want them sitting in
-     their cells, not stretching the row. */
-  .landing-hero .grid > [role="button"] { margin: 0; }
 </style>
 {% endblock %}
 {% block content %}
@@ -45,12 +43,9 @@
     <p>Connecting providers, helping patients.</p>
   </hgroup>
   <p>Post referrals, find referrals, and maintain a network of professional contacts.</p>
-  <div class="grid">
+  <div class="cta-cluster">
     <a href="/auth/login" role="button">Sign in</a>
     <a href="/auth/register" role="button" class="secondary">Sign up</a>
   </div>
 </section>
-{% endblock %}
-{% block footer %}
-<small>&copy; 2026 Bedlam Health &middot; <a href="mailto:support@bedlamhealth.com">support@bedlamhealth.com</a></small>
 {% endblock %}
