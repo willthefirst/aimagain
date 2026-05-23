@@ -9,6 +9,7 @@ The framework groups its code by concern:
 - **[`audit/`](audit/README.md)** — the audit framework. `AuditLog` model, `AuditRepository`, the `record_audit` / `record_audit_for` helpers, the `mutate(...)` context manager, the `AuditedResource` / `EdgeAudit` bindings.
 - **[`http/`](http/README.md)** — cross-cutting HTTP plumbing. `APIException` subclasses, response helpers, form parsing, decorators, ASGI middleware.
 - **[`rendering/`](rendering/README.md)** — Jinja + form rendering. Templating env, view projections, the schema-driven form-field markers.
+- **[`observability/`](observability/README.md)** — provider-agnostic error tracking + tracing. `ObservabilityBackend` Protocol with Sentry + Noop implementations; the only place a provider SDK is imported.
 
 Plus three flat-at-root single-file modules used by everything:
 

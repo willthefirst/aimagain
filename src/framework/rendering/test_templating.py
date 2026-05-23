@@ -44,24 +44,25 @@ def test_livereload_loaded_in_development():
         assert context["is_development"] is True
 
 
-def test_sentry_dsn_and_environment_exposed_in_template_context():
-    """Both `sentry_dsn` and `environment` must appear in the template
-    context so `base.html` can conditionally load the browser SDK and
-    tag events with the correct environment."""
-    with patch("src.framework.rendering.templating.settings") as mock_settings:
-        mock_settings.ENVIRONMENT = "production"
-        mock_settings.SENTRY_DSN = "https://abc@sentry.io/1"
+def test_observability_frontend_exposed_in_template_context():
+    """`observability_frontend` is the dict `base.html` reads to render
+    the browser SDK init block. The framework asks the abstraction for
+    it; provider-specific shape is the backend's concern."""
+    sentinel = {"provider": "sentry", "dsn": "https://abc@sentry.io/1"}
+    with patch(
+        "src.framework.rendering.templating.observability"
+    ) as mock_observability:
+        mock_observability.frontend_context.return_value = sentinel
         context = get_template_context()
-        assert context["sentry_dsn"] == "https://abc@sentry.io/1"
-        assert context["environment"] == "production"
+    assert context["observability_frontend"] is sentinel
 
 
-def test_sentry_dsn_empty_string_when_unset():
-    """An unset `SENTRY_DSN` (empty string) is forwarded as-is so the
-    `{% if sentry_dsn %}` guard in `base.html` evaluates to falsy and
-    the browser SDK is not loaded."""
-    with patch("src.framework.rendering.templating.settings") as mock_settings:
-        mock_settings.ENVIRONMENT = "production"
-        mock_settings.SENTRY_DSN = ""
+def test_observability_frontend_none_when_disabled():
+    """`None` from the backend → `None` in the context. `base.html`
+    treats `None` as "skip the browser SDK script tag entirely"."""
+    with patch(
+        "src.framework.rendering.templating.observability"
+    ) as mock_observability:
+        mock_observability.frontend_context.return_value = None
         context = get_template_context()
-        assert context["sentry_dsn"] == ""
+    assert context["observability_frontend"] is None

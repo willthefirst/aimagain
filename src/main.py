@@ -2,14 +2,10 @@ import logging
 from contextlib import asynccontextmanager
 from datetime import datetime
 
-import sentry_sdk
 from fastapi import Depends, FastAPI, HTTPException, Request, status
 from fastapi.responses import JSONResponse, RedirectResponse
-from sentry_sdk.integrations.fastapi import FastApiIntegration
-from sentry_sdk.integrations.sqlalchemy import SqlalchemyIntegration
-from starlette.middleware.base import BaseHTTPMiddleware
 
-from src.auth_config import auth_backend, fastapi_users
+from src.auth_config import auth_backend, current_optional_user, fastapi_users
 from src.db import check_database_health
 from src.domain import routes  # noqa: F401  # populates entity_registry
 from src.domain import template_globals  # noqa: F401  # populates Jinja env globals
@@ -19,22 +15,8 @@ from src.framework.config import settings
 from src.framework.dispatch.registry import entity_registry
 from src.framework.http.middleware import StripEmptyQueryParamsMiddleware
 from src.framework.http.responses import APIResponse
+from src.framework.observability import observability
 from src.jobs.scheduler import make_scheduler, register_jobs
-
-if settings.SENTRY_DSN:
-    sentry_sdk.init(
-        dsn=settings.SENTRY_DSN,
-        environment=settings.ENVIRONMENT,
-        send_default_pii=True,
-        enable_logs=True,
-        traces_sample_rate=1.0,
-        profile_session_sample_rate=1.0,
-        profile_lifecycle="trace",
-        integrations=[
-            FastApiIntegration(transaction_style="endpoint"),
-            SqlalchemyIntegration(),
-        ],
-    )
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -85,30 +67,16 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="Bedlam Connect", lifespan=lifespan)
 
+# Initialize the error tracking / tracing provider. No-op when no DSN
+# is configured — see `src/framework/observability/` for the contract
+# and how to swap providers.
+observability.init_app(app)
+
 # Strip empty query-string pairs at request entry so HTML-form
 # submissions ("Apply" with no filter selected → `?x=`) behave the same
 # as omitting the param. See `src/framework/http/middleware.py` for the
 # full convention rationale.
 app.add_middleware(StripEmptyQueryParamsMiddleware)
-
-if settings.SENTRY_DSN:
-
-    class _SentryUserMiddleware(BaseHTTPMiddleware):
-        """Tags the Sentry scope with the authenticated user after each request.
-
-        Uses `request.state.user` set by the auth dependency during route
-        handling. Runs after `call_next` so the user attribute is populated;
-        covers performance traces and non-error events on the same scope.
-        """
-
-        async def dispatch(self, request: Request, call_next):
-            response = await call_next(request)
-            user = getattr(request.state, "user", None)
-            if user is not None:
-                sentry_sdk.set_user({"id": str(user.id), "email": user.email})
-            return response
-
-    app.add_middleware(_SentryUserMiddleware)
 
 
 @app.exception_handler(HTTPException)
@@ -125,11 +93,8 @@ async def unauthorized_exception_handler(request: Request, exc: HTTPException):
     return JSONResponse(status_code=exc.status_code, content={"detail": exc.detail})
 
 
-_optional_current_user = fastapi_users.current_user(optional=True)
-
-
 @app.get("/")
-async def read_root(request: Request, user=Depends(_optional_current_user)):
+async def read_root(request: Request, user=Depends(current_optional_user)):
     # Authenticated users land on `/referrals` — the "find new clients"
     # home (see `src/auth_config.py:on_after_login` for the same bias).
     # Anonymous visitors see the public landing page instead of being

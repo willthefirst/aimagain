@@ -32,10 +32,24 @@ class Settings(BaseSettings):
     APP_BASE_URL: str = "http://localhost:8000"
     RESEND_API_KEY: str | None = None
 
-    # Error tracking. Empty string disables Sentry entirely — app starts
-    # normally without it. Set in production via the `.env` file on the
-    # droplet or as a CI/CD secret.
+    # Error tracking + tracing. Read by `src/framework/observability/`,
+    # which picks a backend (Sentry or Noop) based on `SENTRY_DSN`. Set
+    # in production via the `.env` file on the droplet or as a CI/CD
+    # secret. Empty DSN → the app runs with no provider at all.
     SENTRY_DSN: str = ""
+    # Sample rates default to 10% so a traffic spike doesn't tank the
+    # Sentry quota. Override per-environment if you need fuller traces.
+    SENTRY_TRACES_SAMPLE_RATE: float = 0.1
+    SENTRY_PROFILES_SAMPLE_RATE: float = 0.1
+    # Session Replay is opt-in (paid feature, larger payload). `0.0`
+    # disables; bump the on-error rate to e.g. `1.0` to record replays
+    # only when something throws.
+    SENTRY_REPLAY_SAMPLE_RATE: float = 0.0
+    SENTRY_REPLAY_ON_ERROR_SAMPLE_RATE: float = 0.0
+    # Release tag (typically the deploy's git SHA) used by both the
+    # backend SDK and the browser SDK. Provider-agnostic name so a
+    # future swap doesn't churn the deploy pipeline. Empty → no tag.
+    APP_RELEASE: str = ""
 
     model_config = ConfigDict(env_file=".env", env_file_encoding="utf-8")
 
