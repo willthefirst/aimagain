@@ -10,14 +10,14 @@
   {% if referrals %}
     <section id="referrals-list">
       {%- for post in referrals %}{{ post_item(post, entity_name) }}{%- endfor %}
-    </section>
-  {% else %}
-    <p>
-      {% if active_filter_count %}
-        No referrals match these filters.
-      {% else %}
-        No referrals found.
-      {% endif %}
-    </p>
-  {% endif %}
-{% endblock %}
+      </section>
+    {% else %}
+      <p>
+        {% if active_filter_count %}
+          No referrals match these filters.
+        {% else %}
+          No referrals found.
+        {% endif %}
+      </p>
+    {% endif %}
+  {% endblock %}

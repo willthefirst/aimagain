@@ -20,8 +20,8 @@ user-facing surface flipped). #}
   {% if clinicians %}
     <section id="clinicians-list">
       {%- for provider in clinicians %}{{ clinician_card(provider) }}{%- endfor %}
-    </section>
-  {% else %}
-    <p>No clinicians found.</p>
-  {% endif %}
-{% endblock %}
+      </section>
+    {% else %}
+      <p>No clinicians found.</p>
+    {% endif %}
+  {% endblock %}

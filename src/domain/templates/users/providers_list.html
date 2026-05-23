@@ -23,14 +23,14 @@
   {% if providers %}
     <section id="user-clinicians-list">
       {%- for provider in providers %}{{ clinician_card(provider) }}{%- endfor %}
-    </section>
-  {% else %}
-    <p id="user-clinicians-empty">
-      {% if is_self %}
-        You have not created any clinician entries yet.
-      {% else %}
-        This user has no clinician entries yet.
-      {% endif %}
-    </p>
-  {% endif %}
-{% endblock %}
+      </section>
+    {% else %}
+      <p id="user-clinicians-empty">
+        {% if is_self %}
+          You have not created any clinician entries yet.
+        {% else %}
+          This user has no clinician entries yet.
+        {% endif %}
+      </p>
+    {% endif %}
+  {% endblock %}

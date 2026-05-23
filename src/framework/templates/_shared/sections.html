@@ -45,8 +45,8 @@ Example:
   {% if items %}
     <ul>
       {%- for item in items %}{{ caller(item) }}{%- endfor %}
-    </ul>
-  {% else %}
-    <p>{{ empty_message }}</p>
-  {% endif %}
-{%- endmacro %}
+      </ul>
+    {% else %}
+      <p>{{ empty_message }}</p>
+    {% endif %}
+  {%- endmacro %}

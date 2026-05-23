@@ -5,10 +5,10 @@
   {% if providers %}
     <section id="favorites-list">
       {%- for provider in providers %}{{ clinician_card(provider) }}{%- endfor %}
-    </section>
-  {% else %}
-    <p id="favorites-empty">
-      No favorites yet. <a href="{{ entity_url('clinician') }}">Browse clinicians</a> to add some.
-    </p>
-  {% endif %}
-{% endblock %}
+      </section>
+    {% else %}
+      <p id="favorites-empty">
+        No favorites yet. <a href="{{ entity_url('clinician') }}">Browse clinicians</a> to add some.
+      </p>
+    {% endif %}
+  {% endblock %}

@@ -69,4 +69,4 @@ Child contract:
 {% block content %}{% endblock %}
 {% block after_content %}
   {%- if page_meta is defined %}{{ pagination(page_meta, paginator_base_query|default("") ) }}{%- endif %}
-{% endblock %}
+  {% endblock %}

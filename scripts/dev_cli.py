@@ -422,21 +422,25 @@ class QualityCommands:
     def fmt(self) -> int:
         print("🎨 Applying formatters...")
 
+        # djlint is non-idempotent on `{% block %}/{% endblock %}` indent —
+        # the first pass leaves `{% endblock %}` at column 0; a second pass
+        # bumps it to column 2 (or vice versa). Running it twice converges
+        # in practice. Without this, `dev lint`'s `djlint --check` flags
+        # drift on the very output `dev fmt` just produced.
+        djlint_cmd = [
+            "djlint",
+            "src/framework/templates",
+            "src/domain/templates",
+            "--reformat",
+        ]
         steps = [
             ("📝 Formatting code with black...", ["black", "."]),
             (
                 "🔤 Sorting imports with isort...",
                 ["isort", "src", "tests", "scripts", "alembic", "conftest.py"],
             ),
-            (
-                "🧩 Formatting templates with djlint...",
-                [
-                    "djlint",
-                    "src/framework/templates",
-                    "src/domain/templates",
-                    "--reformat",
-                ],
-            ),
+            ("🧩 Formatting templates with djlint (pass 1/2)...", djlint_cmd),
+            ("🧩 Formatting templates with djlint (pass 2/2)...", djlint_cmd),
         ]
 
         exit_code = 0

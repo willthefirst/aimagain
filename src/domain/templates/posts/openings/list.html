@@ -10,14 +10,14 @@
   {% if openings %}
     <section id="openings-list">
       {%- for post in openings %}{{ post_item(post, entity_name) }}{%- endfor %}
-    </section>
-  {% else %}
-    <p>
-      {% if active_filter_count %}
-        No openings match these filters.
-      {% else %}
-        No openings found.
-      {% endif %}
-    </p>
-  {% endif %}
-{% endblock %}
+      </section>
+    {% else %}
+      <p>
+        {% if active_filter_count %}
+          No openings match these filters.
+        {% else %}
+          No openings found.
+        {% endif %}
+      </p>
+    {% endif %}
+  {% endblock %}

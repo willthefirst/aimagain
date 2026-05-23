@@ -32,12 +32,12 @@
     {%- if view.description %}<p>{{ view.description }}</p>{%- endif %}
     {{ facts_block(view, expanded=True) }}
     {%- if view.referral %}{{ how_to_refer(view) }}{%- endif %}
-    <footer>
-      <a href="mailto:{{ opening.owner.email }}"
-         target="_blank"
-         rel="noopener noreferrer"
-         role="button"
-         class="secondary outline">Email</a>
-    </footer>
-  </section>
-{% endblock %}
+      <footer>
+        <a href="mailto:{{ opening.owner.email }}"
+           target="_blank"
+           rel="noopener noreferrer"
+           role="button"
+           class="secondary outline">Email</a>
+      </footer>
+    </section>
+  {% endblock %}

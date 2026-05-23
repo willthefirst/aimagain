@@ -112,43 +112,43 @@
       <section class="entity-facts">
         <dl>
           {%- if aff.full_address %}{{ fact('address', 'Address', aff.full_address) }}{%- endif %}
-          {{ fact('in_person_sessions', 'In-person sessions', aff.in_person_label) }}
-          {{ fact('virtual_sessions', 'Virtual sessions', aff.virtual_label) }}
-          {{ fact('insurance', 'Insurance', aff.insurance_summary) }}
-          {{ fact('sliding_scale', 'Sliding scale', aff.sliding_scale_label) }}
-          {%- if aff.cost %}{{ fact('cost', 'Cost', aff.cost) }}{%- endif %}
-        </dl>
-      </section>
-    </article>
-  {% endfor %}
-  {# Credentials are clinician-level (FK to `clinicians.id` after #635
+            {{ fact('in_person_sessions', 'In-person sessions', aff.in_person_label) }}
+            {{ fact('virtual_sessions', 'Virtual sessions', aff.virtual_label) }}
+            {{ fact('insurance', 'Insurance', aff.insurance_summary) }}
+            {{ fact('sliding_scale', 'Sliding scale', aff.sliding_scale_label) }}
+            {%- if aff.cost %}{{ fact('cost', 'Cost', aff.cost) }}{%- endif %}
+            </dl>
+          </section>
+        </article>
+      {% endfor %}
+      {# Credentials are clinician-level (FK to `clinicians.id` after #635
    PR A) — they belong to the person, not to any single affiliation,
    so they render once below the stacked affiliation cards. The
    list-per-section grammar is the same the old single-card layout
    used; only the parent card changed. #}
-  <section class="entity-card">
-    <section>
-      <h4>Licensures</h4>
-      {% call(lic) credential_list(view.licensures, "No licensures listed.") %}
-        {{ credential_row(LICENSE_TYPES_LABELS[lic.license_type],
-                ["#" ~ lic.license_number, lic.issuing_state, ("Expires " ~ lic.expiration_date) if lic.expiration_date else None],
-        ) }}
-      {% endcall %}
-    </section>
-    <section>
-      <h4>Education</h4>
-      {% call(edu) credential_list(view.educations, "No education entries listed.") %}
-        {{ credential_row(EDUCATION_TYPES_LABELS[edu.education_type],
-                [edu.institution, edu.month_completed],) }}
-      {% endcall %}
-    </section>
-    <section>
-      <h4>Certifications</h4>
-      {% call(cert) credential_list(view.certifications, "No certifications listed.") %}
-        {{ credential_row(CERTIFICATION_TYPES_LABELS[cert.certification_type],
-                [cert.certifying_body, ("Expires " ~ cert.expiration_date) if cert.expiration_date else None],
-        ) }}
-      {% endcall %}
-    </section>
-  </section>
-{% endblock %}
+      <section class="entity-card">
+        <section>
+          <h4>Licensures</h4>
+          {% call(lic) credential_list(view.licensures, "No licensures listed.") %}
+            {{ credential_row(LICENSE_TYPES_LABELS[lic.license_type],
+                        ["#" ~ lic.license_number, lic.issuing_state, ("Expires " ~ lic.expiration_date) if lic.expiration_date else None],
+            ) }}
+          {% endcall %}
+        </section>
+        <section>
+          <h4>Education</h4>
+          {% call(edu) credential_list(view.educations, "No education entries listed.") %}
+            {{ credential_row(EDUCATION_TYPES_LABELS[edu.education_type],
+                        [edu.institution, edu.month_completed],) }}
+          {% endcall %}
+        </section>
+        <section>
+          <h4>Certifications</h4>
+          {% call(cert) credential_list(view.certifications, "No certifications listed.") %}
+            {{ credential_row(CERTIFICATION_TYPES_LABELS[cert.certification_type],
+                        [cert.certifying_body, ("Expires " ~ cert.expiration_date) if cert.expiration_date else None],
+            ) }}
+          {% endcall %}
+        </section>
+      </section>
+    {% endblock %}
