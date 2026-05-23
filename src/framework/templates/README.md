@@ -67,8 +67,14 @@ Every page extending `base.html` lands the same three-strip chrome above its con
 │ toolbar / action bar         [filters left]    [actions ▶] │  ← `{% block toolbar %}`
 ├───────────────────────────────────────────────────────────┤
 │ page content                                              │  ← `{% block content %}`
+├───────────────────────────────────────────────────────────┤
+│ <footer> site chrome           &copy; … · support@ …      │  ← `{% block footer %}` (default body in `base.html`)
 └───────────────────────────────────────────────────────────┘
 ```
+
+**Body layout.** `<header>`, `<main>`, and `<footer>` are direct siblings of `<body>`, and `<body>` is a three-row CSS grid (`grid-template-rows: auto 1fr auto`) sized to `min-height: 100dvh`. Short pages pin the footer to the viewport bottom instead of leaving it floating; tall pages flow normally and push the footer below. The landing page reuses this scaffold to vertically center its hero inside the `<main>` row (see [`../../domain/templates/landing.html`](../../domain/templates/landing.html)).
+
+**Site footer** (`{% block footer %}`) renders on every page from the default body in `base.html` — a centered `<small>` with the copyright line and a `mailto:` to support. Pages can override the block to swap or extend the line; today none do.
 
 **Primary nav** lives in `base.html` and renders on every screen (authed *and* anonymous) as a single `<ul id="primary-nav">`. The brand sits on the left; when authed, four inline links push to the right via `margin-left: auto` on the first link: Referrals (`/referrals`), Openings (`/openings`), Profile (`/users/me`), and Sign out (an `<a hx-post="/auth/sign-out">` — the route returns `HX-Redirect`). Anonymous visitors see only the brand; the chrome carries no Login shortcut (visitors enter the auth flow from the landing page CTA). Active state is matched against `request.url.path`. Pages don't extend it.
 
