@@ -62,6 +62,30 @@ def _strip_optional(v: str | None) -> str | None:
     return v or None
 
 
+def scalar_to_list(v):
+    """Wrap a single string in a one-element list.
+
+    HTML form posts collapse a 1-checkbox-checked group to a scalar
+    (htmx's `json-enc` only emits an array when the same name appears
+    2+ times); this `BeforeValidator` normalizes that 1-element case
+    before the `Literal[*TUPLE]` member check fires. The 0-element
+    case is handled by the field default `[]`; the 2+ case already
+    arrives as a list.
+
+    Used by every multi-checkbox field across domain schemas
+    (posts, providers, affiliations, ...). Each schema layers its own
+    `Literal[*TUPLE]` over the shared coercion:
+
+        MyField = Annotated[
+            list[Literal[*MY_TUPLE]],
+            BeforeValidator(scalar_to_list),
+        ]
+    """
+    if isinstance(v, str):
+        return [v]
+    return v
+
+
 # --- Annotated field types ----------------------------------------------
 #
 # Attach the cleaning rule to the field's type, not to a per-class

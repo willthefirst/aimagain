@@ -14,7 +14,7 @@ from types import SimpleNamespace
 from typing import Annotated, ClassVar, Literal
 
 import pytest
-from pydantic import BaseModel, ValidationError
+from pydantic import BaseModel, BeforeValidator, ValidationError
 
 from src.framework.schema_validators import (
     PartialUpdate,
@@ -22,6 +22,7 @@ from src.framework.schema_validators import (
     StrippedOptionalText,
     StrippedText,
     WirePayload,
+    scalar_to_list,
 )
 
 
@@ -242,3 +243,41 @@ def test_coercion_applies_through_partial_update():
     instance = _Update(fk="", name="")
     assert instance.fk is None
     assert instance.name == ""
+
+
+def test_scalar_to_list_wraps_lone_string_in_list():
+    """An HTML form with one checkbox checked posts a scalar; the
+    coercion lifts it to a one-element list before `Literal` member
+    validation runs."""
+
+    class _Checkboxes(WirePayload):
+        choices: Annotated[
+            list[Literal["a", "b", "c"]], BeforeValidator(scalar_to_list)
+        ] = []
+
+    assert _Checkboxes(choices="a").choices == ["a"]
+
+
+def test_scalar_to_list_passes_lists_through_unchanged():
+    """2+ checkboxes arrive as a list already; the coercion is a no-op."""
+
+    class _Checkboxes(WirePayload):
+        choices: Annotated[
+            list[Literal["a", "b", "c"]], BeforeValidator(scalar_to_list)
+        ] = []
+
+    assert _Checkboxes(choices=["a", "b"]).choices == ["a", "b"]
+
+
+def test_scalar_to_list_rejects_invalid_member_after_lifting():
+    """Coercion runs before the `Literal[...]` member check, so an
+    invalid scalar still 422s — the helper doesn't bypass validation,
+    it just normalizes the wire shape."""
+
+    class _Checkboxes(WirePayload):
+        choices: Annotated[
+            list[Literal["a", "b", "c"]], BeforeValidator(scalar_to_list)
+        ] = []
+
+    with pytest.raises(ValidationError):
+        _Checkboxes(choices="z")

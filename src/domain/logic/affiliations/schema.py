@@ -38,22 +38,11 @@ from src.framework.schema_validators import (
     ReadProjection,
     StrippedOptionalText,
     WirePayload,
+    scalar_to_list,
 )
 
-
-def _scalar_to_list(v):
-    """Wrap a single string in a one-element list. HTML form posts
-    collapse a 1-checkbox-checked group to a scalar (htmx's `json-enc`
-    only emits an array when the same name appears 2+ times); this
-    normalizes that 1-element case before the `Literal[*TUPLE]` member
-    check fires. Mirrors the helper in `providers/schema.py`."""
-    if isinstance(v, str):
-        return [v]
-    return v
-
-
 InNetworkCarriersField = Annotated[
-    list[Literal[*INSURANCE_CARRIERS]], BeforeValidator(_scalar_to_list)
+    list[Literal[*INSURANCE_CARRIERS]], BeforeValidator(scalar_to_list)
 ]
 
 

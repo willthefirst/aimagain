@@ -136,7 +136,7 @@ async def assert_fk_ownership(
     fk_id = getattr(payload, attr, None)
     if fk_id is None:
         return
-    parent = await parent_repo._get_by_id(parent_model, fk_id)
+    parent = await parent_repo.get_by_model_id(parent_model, fk_id)
     if parent is None:
         from src.framework.http.exceptions import NotFoundError
 
