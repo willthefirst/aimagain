@@ -443,6 +443,13 @@ class QualityCommands:
         for description, cmd in steps:
             print(description)
             result = self.runner.run_command(cmd)
+            # `djlint --reformat` exits 1 when it rewrites files — same
+            # signal as `git diff --exit-code`. Black and isort instead
+            # exit 0 in that case, so treating any non-zero as failure
+            # would make every template-touching `dev fmt` run report
+            # failure. Special-case djlint so the step is success-on-fix.
+            if cmd[0] == "djlint" and "--reformat" in cmd and result == 1:
+                result = 0
             if result != 0:
                 exit_code = result
 
