@@ -19,6 +19,14 @@ Three things are invariants that future schema changes must not break:
 Structural invariants the runtime relies on (hierarchy + multi-affiliation)
 also have direct assertions — they're not auto-discoverable from
 metadata.
+
+Fixture scope: the schema-create + `seed_all()` runs ONCE per module
+(`seeded_db`). Every test in this file is a read-only assertion on the
+shared seeded DB except `test_idempotent_rerun`, which re-runs
+`seed_all` and asserts row counts haven't grown — re-seeding is a
+no-op by contract, so it doesn't perturb the shared state for
+subsequent tests. Running seed_all() once instead of per-test cuts
+this module from ~38s to ~6s.
 """
 
 from __future__ import annotations
@@ -37,24 +45,30 @@ from src.domain.models import (
 from tests.fixtures import async_test_sessionmaker, test_engine
 
 
-@pytest.fixture(autouse=True)
-def patch_session_maker(monkeypatch):
-    """Point `seed.runner` at the in-memory test DB. The overrides
-    receive their session from the runner so they don't need patching
-    individually."""
+@pytest.fixture(scope="module")
+async def seeded_db():
+    """Create the schema and run `seed_all()` once per module. All
+    tests in this file are read-only assertions on the shared seeded
+    DB except `test_idempotent_rerun`, which exercises re-seeding (a
+    no-op by contract).
+
+    Uses `pytest.MonkeyPatch()` directly because the default
+    `monkeypatch` fixture is function-scoped; the seed runner's
+    `async_session_maker` reference must stay pointed at the test
+    sessionmaker for the whole module's seed + assertion run."""
+    mp = pytest.MonkeyPatch()
     import scripts.dev.seed.runner as runner_mod
 
-    monkeypatch.setattr(runner_mod, "async_session_maker", async_test_sessionmaker)
-
-
-@pytest.fixture(scope="function")
-async def fresh_db():
-    """Create the schema once per test, drop after."""
+    mp.setattr(runner_mod, "async_session_maker", async_test_sessionmaker)
     async with test_engine.begin() as conn:
+        await conn.run_sync(metadata.drop_all)
         await conn.run_sync(metadata.create_all)
+    rc = await seed_all()
+    assert rc == 0, f"seed_all() failed during module setup (rc={rc})"
     yield
     async with test_engine.begin() as conn:
         await conn.run_sync(metadata.drop_all)
+    mp.undo()
 
 
 async def _count_table(table_name: str) -> int:
@@ -85,19 +99,19 @@ async def _count_nulls(table_name: str, column_name: str) -> tuple[int, int]:
         return nulls.scalar_one(), nonnull.scalar_one()
 
 
-async def test_seed_all_smoke(fresh_db):
-    """seed_all() runs to completion on a fresh DB and populates the
-    expected major tables."""
-    rc = await seed_all()
-    assert rc == 0
+async def test_seed_all_smoke(seeded_db):
+    """The shared module seed populated the expected major tables."""
     assert await _count_table("organizations") >= 10
     assert await _count_table("providers") >= 100
     assert await _count_table("affiliations") >= 100
 
 
-async def test_idempotent_rerun(fresh_db):
-    """Re-running seed_all is a no-op — row counts don't grow."""
-    await seed_all()
+async def test_idempotent_rerun(seeded_db):
+    """Re-running seed_all is a no-op — row counts don't grow. The
+    module fixture has already seeded once; this test runs a second
+    seed_all and asserts the row counts before/after are equal. The
+    no-op property is what lets the shared `seeded_db` fixture work
+    safely across tests in this module."""
     counts_first = {
         table.name: await _count_table(table.name)
         for table in metadata.sorted_tables
@@ -112,7 +126,7 @@ async def test_idempotent_rerun(fresh_db):
     assert counts_first == counts_second
 
 
-async def test_enum_coverage_for_every_check_constraint(fresh_db):
+async def test_enum_coverage_for_every_check_constraint(seeded_db):
     """For every CHECK-bound column, every allowed value appears in at
     least one row — IF the table has enough rows to cover the enum's
     cardinality. (Programs has 12 rows; the `state_preference` enum
@@ -120,7 +134,6 @@ async def test_enum_coverage_for_every_check_constraint(fresh_db):
     isn't a meaningful test signal.) Auto-discovered from
     `CHECK_VALUES` — adding a new CHECK value automatically widens
     the assertion where it's feasible."""
-    await seed_all()
     misses: list[str] = []
     for (table_name, column_name), allowed in CHECK_VALUES.items():
         if table_name not in metadata.tables:
@@ -139,12 +152,11 @@ async def test_enum_coverage_for_every_check_constraint(fresh_db):
     assert not misses, "Enum coverage gaps:\n" + "\n".join(misses)
 
 
-async def test_nullable_columns_have_both_null_and_populated(fresh_db):
+async def test_nullable_columns_have_both_null_and_populated(seeded_db):
     """For every nullable column (excluding PKs / FKs / system cols),
     at least one row is NULL and at least one row is populated.
     Auto-discovered — adding a nullable column auto-covers it.
     `deleted_at` is always-null by design — exempted globally."""
-    await seed_all()
     system = {"id", "created_at", "updated_at", "deleted_at"}
     misses: list[str] = []
     for table in metadata.tables.values():
@@ -175,10 +187,9 @@ async def test_nullable_columns_have_both_null_and_populated(fresh_db):
     assert not misses, "Nullable-coverage gaps:\n" + "\n".join(misses)
 
 
-async def test_organization_hierarchy_present(fresh_db):
+async def test_organization_hierarchy_present(seeded_db):
     """At least 2 orgs are child rows (parent_org_id IS NOT NULL),
     exercising the self-referential tree."""
-    await seed_all()
     async with async_test_sessionmaker() as session:
         result = await session.execute(
             select(func.count())
@@ -189,10 +200,9 @@ async def test_organization_hierarchy_present(fresh_db):
     assert child_count >= 2, f"Expected ≥2 child organizations, got {child_count}"
 
 
-async def test_multi_affiliation_provider_present(fresh_db):
+async def test_multi_affiliation_provider_present(seeded_db):
     """At least one provider has 2+ affiliations — exercises the
     `Provider.affiliations` 1:N edge."""
-    await seed_all()
     async with async_test_sessionmaker() as session:
         subq = (
             select(Affiliation.provider_id, func.count().label("n"))

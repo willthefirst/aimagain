@@ -7,8 +7,8 @@ test file pins the listing's newest-first ordering and the `is_favorited`
 truth table.
 """
 
-import asyncio
 import uuid
+from datetime import datetime, timedelta, timezone
 
 import pytest
 from sqlalchemy import select
@@ -137,23 +137,27 @@ async def test_delete_favorite_removes_edge(
 async def test_list_favorited_providers_newest_first(
     db_test_session_manager: async_sessionmaker[AsyncSession],
 ):
-    """Ordering is by `UserFavorite.created_at DESC`. We add two edges
-    with a short sleep between to force a different timestamp on SQLite."""
+    """Ordering is by `UserFavorite.created_at DESC`. SQLite's
+    server-default `CURRENT_TIMESTAMP` is second-precision, so two
+    inserts in the same second tie on ordering. The test bypasses
+    `add_favorite` (which doesn't accept `created_at`) and inserts
+    `UserFavorite` rows directly with explicit timestamps to force a
+    deterministic ordering without `asyncio.sleep`. The repo
+    listing's `created_at DESC` is what's under test, not the writer."""
     user = await _seed_user(db_test_session_manager)
     first = await _seed_provider(db_test_session_manager, practice_name="First")
     second = await _seed_provider(db_test_session_manager, practice_name="Second")
+    earlier = datetime.now(timezone.utc)
+    later = earlier + timedelta(seconds=1)
 
     async with db_test_session_manager() as session:
-        repo = UserFavoriteRepository(session)
-        await repo.add_favorite(user_id=user.id, provider_id=first.id)
-        await session.commit()
-
-    await asyncio.sleep(1.1)
-
-    async with db_test_session_manager() as session:
-        repo = UserFavoriteRepository(session)
-        await repo.add_favorite(user_id=user.id, provider_id=second.id)
-        await session.commit()
+        async with session.begin():
+            session.add(
+                UserFavorite(user_id=user.id, provider_id=first.id, created_at=earlier)
+            )
+            session.add(
+                UserFavorite(user_id=user.id, provider_id=second.id, created_at=later)
+            )
 
     async with db_test_session_manager() as session:
         repo = UserFavoriteRepository(session)
