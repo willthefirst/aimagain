@@ -144,15 +144,22 @@ def test_template_imports_macros_with_context(
     method: str, path: str, config: FormErrorConfig
 ):
     """The form-error rerender contract requires the template to import
-    both `form_fields` macros AND `form_banner` macro `with context` —
-    without it, the macros silently no-op on the auto-resolution from
-    `form_errors` / `form_values` / `form_banner_text`. The framework
-    populates those keys but the template fails to read them; the user
-    sees nothing.
+    both `form_fields` macros AND a banner source `with context` —
+    without `with context`, the macros silently no-op on the
+    auto-resolution from `form_errors` / `form_values` /
+    `form_banner_text`. The framework populates those keys but the
+    template fails to read them; the user sees nothing.
 
-    This test catches that silent regression. Pinning here (not in a
-    runtime smoke that hits the route + asserts response body) means
-    even handlers we haven't exercised yet are checked.
+    Two ways to satisfy the banner half:
+      1. Import `form_banner` directly from `_shared/form_banner.html`
+         and place `{{ form_banner() }}` manually. Pre-PR-#8 style.
+      2. Import `form_with_errors` from `_shared/form_meta.html` and
+         use `{% call form_with_errors(...) %}` — the wrapper macro
+         imports `form_banner` itself. Post-PR-#8 style.
+
+    Either is accepted. The wrapper-macro path is preferred for new
+    templates because it also bakes in the four hx-* attributes,
+    but migrating every existing template at once is out of scope.
     """
     src = _find_template(config.template).read_text(encoding="utf-8")
     # Allow either order; the `with context` clause must appear on each
@@ -162,15 +169,19 @@ def test_template_imports_macros_with_context(
         r'from\s+["\']_shared/form_fields\.html["\'][^}\n]*with context',
         src,
     )
-    banner_import = re.search(
+    direct_banner_import = re.search(
         r'from\s+["\']_shared/form_banner\.html["\'][^}\n]*with context',
+        src,
+    )
+    wrapper_import = re.search(
+        r'from\s+["\']_shared/form_meta\.html["\'][^}\n]*with context',
         src,
     )
     missing = []
     if not fields_import:
         missing.append("form_fields with context")
-    if not banner_import:
-        missing.append("form_banner with context")
+    if not direct_banner_import and not wrapper_import:
+        missing.append("banner source (form_banner or form_with_errors) with context")
     assert not missing, (
         f"Template {config.template!r} (route {method} {path}) is missing "
         f"required imports: {missing}. Without `with context`, the form-"

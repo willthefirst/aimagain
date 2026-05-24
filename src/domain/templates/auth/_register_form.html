@@ -8,32 +8,22 @@
       footer link to login) wraps it.
    2. Standalone by `register_request_handler`'s error-rerender path
       (see `src/domain/routes/auth_routes.py` → `form_rerender`) when
-      registration fails (duplicate email, invalid password). HTMX's
-      `outerHTML` swap replaces just the `<form>` in place; rendering
-      the full page here would nest the entire page chrome inside the
-      form slot.
+      registration fails (duplicate email, invalid password). The
+      `response-targets` htmx extension swaps the 4xx body into the
+      `<form>` slot in place.
 
-   `with context` is required so the form_fields / form_banner macros
-   auto-resolve from `form_errors` / `form_values` / `form_banner_text`
-   (see the docstring at the top of `_shared/form_fields.html`). #}
+   `with context` is required on the form_fields import so the macros
+   auto-resolve `form_errors` / `form_values` from the render context
+   (see the docstring at the top of `_shared/form_fields.html`). The
+   `form_with_errors` wrapper imports `form_banner` itself.
+
+   `form_with_errors` bakes in the four hx-* attributes the form-error
+   rerender path needs (`hx-target`, `hx-swap`, `hx-target-4xx`,
+   `hx-swap-4xx`) plus the `{{ form_banner() }}` placement. `json_enc=true`
+   matches `UserCreate`'s JSON body contract on POST /auth/register. #}
 {%- from "_shared/form_fields.html" import text_field with context -%}
-{%- from "_shared/form_banner.html" import form_banner with context -%}
-{# `hx-ext="json-enc"` matches `UserCreate`'s JSON body contract on
-   `POST /auth/register`. `hx-target="this" hx-swap="outerHTML"` lets
-   the error-rerender path swap the form fragment in place. #}
-{# `hx-target-4xx="this" hx-swap-4xx="outerHTML"` activates the
-   `response-targets` htmx extension (loaded in `base.html`) so a 4xx
-   response — 409 for duplicate email, 422 for invalid password —
-   swaps the form fragment in place. Without these attributes, htmx's
-   default response handler would ignore the body on a 4xx and the
-   user would see nothing change. #}
-<form hx-post="/auth/register"
-      hx-ext="json-enc"
-      hx-target="this"
-      hx-swap="outerHTML"
-      hx-target-4xx="this"
-      hx-swap-4xx="outerHTML">
-  {{ form_banner() }}
+{%- from "_shared/form_meta.html" import form_with_errors with context -%}
+{% call form_with_errors(action="/auth/register", method="post", json_enc=True) %}
   {# Email is preserved on re-render via `form_values["email"]` so the
      user only retypes the password. Password is intentionally not
      echoed back — never echo a password into form HTML. #}
@@ -43,4 +33,4 @@
     type="password",
     autocomplete="new-password") }}
   <button type="submit">Create account</button>
-</form>
+{% endcall %}
