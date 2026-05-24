@@ -450,19 +450,25 @@ async def test_clinician_opening_create_form_error_render_is_wired(
     )
     assert response.status_code == 200, response.text
     assert response.headers["content-type"].startswith("text/html")
-    # Single integration-level assertion: the age_groups select carries
-    # `aria-invalid="true"` in the re-rendered HTML. This is the signal
-    # that proves *both* halves of the wiring landed — the spec opt-in
-    # (form_error_render=True) and the macros' context auto-resolution
-    # (templates importing `with context`). Without `with context` the
-    # form still renders and "age_groups" still appears as the label,
-    # so checking only the field name would silently pass on a broken
-    # auto-resolution wiring. Macro-shape assertions stay at the macro
-    # layer; this is the minimum end-to-end signal.
+    # Auto-resolution signal: aria-invalid="true" lands on the
+    # age_groups select. Proves the spec opt-in + macro
+    # auto-resolution wiring (`with context` on the import) both
+    # landed end-to-end.
     assert 'name="age_groups"' in response.text
     age_block_start = response.text.index('name="age_groups"')
     age_block = response.text[max(0, age_block_start - 200) : age_block_start + 200]
     assert 'aria-invalid="true"' in age_block, age_block
+    # Fragment-only response: the re-render returns just the `<form>`,
+    # not the full `new_clinician_opening.html` page (which extends
+    # base.html). HTMX's `hx-target="this" hx-swap="outerHTML"` would
+    # otherwise nest the entire page chrome inside the form slot —
+    # the visible bug that motivated the `_<name>_fragment.html`
+    # convention in `mount_create._fragment_template_name`. Pinned
+    # here so a missing fragment file (which silently falls back to
+    # the full page) is caught.
+    assert "<!DOCTYPE" not in response.text
+    assert "<html" not in response.text
+    assert "Bedlam Connect" not in response.text
 
 
 async def test_referral_create_form_error_render_is_wired(
@@ -490,16 +496,12 @@ async def test_referral_create_form_error_render_is_wired(
     )
     assert response.status_code == 200, response.text
     assert response.headers["content-type"].startswith("text/html")
-    # Single integration-level assertion: the age_groups select carries
-    # `aria-invalid="true"` in the re-rendered HTML. This is the signal
-    # that proves *both* halves of the wiring landed — the spec opt-in
-    # (form_error_render=True) and the macros' context auto-resolution
-    # (templates importing `with context`). Without `with context` the
-    # form still renders and "age_groups" still appears as the label,
-    # so checking only the field name would silently pass on a broken
-    # auto-resolution wiring. Macro-shape assertions stay at the macro
-    # layer; this is the minimum end-to-end signal.
+    # Same shape as the openings smoke: aria-invalid signal +
+    # fragment-only response.
     assert 'name="age_groups"' in response.text
     age_block_start = response.text.index('name="age_groups"')
     age_block = response.text[max(0, age_block_start - 200) : age_block_start + 200]
     assert 'aria-invalid="true"' in age_block, age_block
+    assert "<!DOCTYPE" not in response.text
+    assert "<html" not in response.text
+    assert "Bedlam Connect" not in response.text

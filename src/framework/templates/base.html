@@ -254,6 +254,23 @@
       .entity-form-page form .form-field > [aria-invalid="true"] ~ small {
         color: var(--pico-del-color);
       }
+      /* Form-level error banner rendered above the fields by the
+         `form_banner()` macro in `_shared/form_banner.html`. Used for
+         errors that don't pin to a single input — auth/login's
+         "Invalid email or password" is the canonical case. Styled with
+         the same del-color the per-field errors use (single visual
+         vocabulary for "this didn't work") plus a left border that
+         reads as a callout without the heavyweight chrome of a Pico
+         <article>. Not nested under `.entity-form-page` because the
+         auth pages live under `.auth-page`, not the entity-form
+         chrome — the banner needs to render in both. */
+      .form-banner {
+        margin-block-end: 1rem;
+        padding: 0.75rem 1rem;
+        border-inline-start: 0.25rem solid var(--pico-del-color);
+        background: color-mix(in srgb, var(--pico-del-color) 8%, transparent);
+        color: var(--pico-del-color);
+      }
       /* Inline form-fields nested inside a Pico `.grid` utility (a
          responsive 2-up row) fall back to a self-contained grid since
          their parent (the `.grid` div) isn't the subgrid source. */

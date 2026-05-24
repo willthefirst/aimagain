@@ -1,0 +1,39 @@
+{# Login form fragment — just the `<form>` and its contents, no page
+   chrome.
+
+   Rendered in two contexts:
+
+   1. As part of `auth/login.html` (the full GET page) via
+      `{% include "auth/_login_form.html" %}`. The chrome (header,
+      footer links) wraps it.
+   2. Standalone by `post_login`'s error-rerender path (see
+      `src/domain/routes/auth_pages.py` → `form_rerender`) — HTMX's
+      `outerHTML` swap replaces just the `<form>` in place; rendering
+      the full page here would nest the entire page chrome inside
+      the form slot.
+
+   `with context` is required so the form_fields / form_banner macros
+   auto-resolve from `form_errors` / `form_values` / `form_banner_text`
+   (see the docstring at the top of `_shared/form_fields.html`). #}
+{%- from "_shared/form_fields.html" import text_field with context -%}
+{%- from "_shared/form_banner.html" import form_banner with context -%}
+{# Posts to `/auth/login` (this app's wrapper) — see
+   `src/domain/routes/auth_pages.py::post_login` for why we wrap
+   `/auth/jwt/login`. `hx-target="this" hx-swap="outerHTML"` lets
+   the error-rerender path swap the form fragment in place. #}
+<form hx-post="/auth/login{% if next_url %}?next={{ next_url }}{% endif %}"
+      hx-target="this"
+      hx-swap="outerHTML">
+  {{ form_banner() }}
+  {# `name="username"` is what `OAuth2PasswordRequestForm` expects; we
+     relabel the visible "Email" while keeping the OAuth-form contract
+     on the wire. The form-error rerender prefills the field via
+     `form_values["username"]` so the user only retypes the password —
+     password is intentionally not echoed back. #}
+  {{ text_field("username", "Email", type="email", autocomplete="email") }}
+  {{ text_field("password",
+    "Password",
+    type="password",
+    autocomplete="current-password") }}
+  <button type="submit">Log in</button>
+</form>

@@ -1,0 +1,24 @@
+{# `clinician_opening` create-form fragment — just the `<form>`, no
+   page chrome.
+
+   Rendered standalone by mount_create's `_render_form_with_errors` on
+   a validation-failure re-render (path-convention derived from the
+   full template `new_clinician_opening.html` by inserting `_` prefix
+   and `_fragment` suffix; see `src/framework/dispatch/mounts/create.py`).
+
+   The full GET page lives at `new_clinician_opening.html` and renders
+   this same `opening_form` macro inside the page chrome — different
+   entry point, identical inner output, so the re-render is
+   structurally indistinguishable from a fresh GET aside from the
+   error/values context injection.
+
+   `with context` is required so the form_fields macros inside the
+   form body auto-resolve `error=` / `current=` from `form_errors` /
+   `form_values` (see the docstring at the top of `_shared/form_fields.html`). #}
+{%- from "posts/openings/_form_clinician_opening.html" import opening_form with context -%}
+{{ opening_form("post",
+entity_url('opening') ,
+entity_create_label('opening', kind='clinician_opening'),
+schema=opening_create_schema,
+current_user=current_user,
+cancel_url=entity_url('opening')) }}
