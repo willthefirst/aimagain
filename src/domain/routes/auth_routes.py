@@ -79,8 +79,13 @@ register_responses = {
     # exception via `handlers={...}` on this decorator; the explicit
     # entry wins over the registry. Non-HTMX clients still get the
     # JSON 400 contract via `handle_route_errors`.
+    # `prefill_fields` is omitted → auto-detect from the submitted
+    # `UserCreate` body. The framework reads the Pydantic schema fields
+    # (`email`, `password`, `username`) and prefills the non-sensitive
+    # ones — `password` is dropped by `SENSITIVE_FIELD_NAMES`'s
+    # substring rule. Adding a new visible field to `UserCreate` (e.g.
+    # `display_name`) will prefill automatically; no per-route opt-in.
     template="auth/_register_form.html",
-    prefill_fields=("email",),
     catches=(
         fa_users_exceptions.UserAlreadyExists,
         fa_users_exceptions.InvalidPasswordException,
