@@ -292,7 +292,21 @@ def test_prefill_field_names_appear_in_template(
     """Same shape as the field-error pin: a `prefill_fields=("emial",)`
     typo would silently fail (the rerender would lose what the user
     typed and they'd have to retype the email). The pin catches it
-    at test time."""
+    at test time.
+
+    Routes using auto-detect (`prefill_fields=None`, the default
+    after PR #7) are skipped — the discovered names depend on the
+    actual request-body schema at runtime, so there's no static
+    list to pin against. Auto-detect is verified at the route layer
+    by the existing rerender smokes (which still assert that
+    `value="..."` shows up in the response HTML).
+    """
+    if config.prefill_fields is None:
+        pytest.skip(
+            "Route uses auto-detect prefill (PR #7) — discovered names "
+            "depend on request-body shape at runtime; verified by route "
+            'smokes that assert `value="..."` is present in the rerender.'
+        )
     if not config.prefill_fields:
         pytest.skip("Route declares no prefill fields.")
     src = _find_template(config.template).read_text(encoding="utf-8")

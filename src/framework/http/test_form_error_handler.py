@@ -322,6 +322,132 @@ async def test_require_htmx_false_rerenders_for_non_htmx_calls(monkeypatch):
     assert captured["form_banner"] == "b"
 
 
+async def test_auto_prefill_collects_all_non_sensitive_pydantic_fields(monkeypatch):
+    """`prefill_fields=None` (the post-PR-#7 default) auto-detects
+    from the submitted Pydantic body. Every non-sensitive declared
+    field is prefilled; password-like fields are dropped by the
+    denylist."""
+    captured: dict = {}
+    monkeypatch.setattr(
+        "src.framework.http.form_error_handler.form_rerender",
+        lambda **kw: captured.update(kw) or "ok",
+    )
+
+    class _Body(BaseModel):
+        email: str
+        display_name: str
+        password: str
+        token: str
+        new_password: str
+
+    @form_error_handler(
+        template="x.html",
+        handlers={CustomError: lambda e: FormError()},
+        # `prefill_fields` omitted — auto-detect path.
+    )
+    async def handler(request: Request, request_data: _Body):
+        raise CustomError()
+
+    await handler(
+        request=_request(),
+        request_data=_Body(
+            email="u@x.io",
+            display_name="Pat",
+            password="secret",
+            token="ABC",
+            new_password="also-secret",
+        ),
+    )
+    # Visible fields land; sensitive ones are dropped.
+    assert captured["values"] == {
+        "email": "u@x.io",
+        "display_name": "Pat",
+    }
+    assert "password" not in captured["values"]
+    assert "new_password" not in captured["values"]
+    assert "token" not in captured["values"]
+
+
+async def test_explicit_prefill_still_drops_sensitive_fields(monkeypatch):
+    """Defense in depth: a route that explicitly passes
+    `prefill_fields=("password",)` still gets the password dropped.
+    The denylist applies to both modes — there is no path that
+    lets a password round-trip into HTML."""
+    captured: dict = {}
+    monkeypatch.setattr(
+        "src.framework.http.form_error_handler.form_rerender",
+        lambda **kw: captured.update(kw) or "ok",
+    )
+
+    @form_error_handler(
+        template="x.html",
+        prefill_fields=("email", "password"),  # password in the allowlist
+        handlers={CustomError: lambda e: FormError()},
+    )
+    async def handler(request: Request, request_data: _Body):
+        raise CustomError()
+
+    await handler(
+        request=_request(),
+        request_data=_Body(email="u@x.io", password="secret"),
+    )
+    assert captured["values"] == {"email": "u@x.io"}
+    assert "password" not in captured["values"]
+
+
+async def test_auto_prefill_handles_plain_attribute_objects(monkeypatch):
+    """OAuth2PasswordRequestForm-style classes (plain Python objects
+    with attributes set in `__init__`) are discovered via `__dict__`.
+    `username` lands; `password` is dropped."""
+    captured: dict = {}
+    monkeypatch.setattr(
+        "src.framework.http.form_error_handler.form_rerender",
+        lambda **kw: captured.update(kw) or "ok",
+    )
+
+    class OAuthLike:
+        def __init__(self, username: str, password: str, scope: str = ""):
+            self.username = username
+            self.password = password
+            self.scope = scope
+
+    @form_error_handler(
+        template="x.html",
+        handlers={CustomError: lambda e: FormError()},
+    )
+    async def handler(request: Request, credentials: OAuthLike):
+        raise CustomError()
+
+    await handler(
+        request=_request(),
+        credentials=OAuthLike("u@x.io", "secret", scope="read"),
+    )
+    assert captured["values"] == {"username": "u@x.io", "scope": "read"}
+    assert "password" not in captured["values"]
+
+
+async def test_auto_prefill_returns_empty_when_no_form_data_in_kwargs(monkeypatch):
+    """A route with no body — just framework deps — auto-detects
+    nothing and the rerender lands with empty `values`. The macros
+    fall back to whatever `current=` the template passed (typically
+    nothing)."""
+    captured: dict = {}
+    monkeypatch.setattr(
+        "src.framework.http.form_error_handler.form_rerender",
+        lambda **kw: captured.update(kw) or "ok",
+    )
+
+    @form_error_handler(
+        template="x.html",
+        handlers={CustomError: lambda e: FormError()},
+    )
+    async def handler(request: Request):
+        raise CustomError()
+
+    await handler(request=_request())
+    assert captured["values"] == {}
+
+
 async def test_catches_resolves_through_registry(monkeypatch):
     """`catches=(ExceptionType,)` pulls (status_code, field, message)
     from `FormErrorRegistry`. Equivalent to writing a `handlers=`

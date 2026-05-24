@@ -98,7 +98,12 @@ async def get_login_page(request: Request):
     # whether the username or the password was wrong — distinguishing
     # would let an attacker enumerate registered emails.
     template="auth/_login_form.html",
-    prefill_fields=("username",),
+    # `prefill_fields` omitted → auto-detect from the submitted
+    # `OAuth2PasswordRequestForm`. `username` is prefilled; `password`
+    # is dropped by the sensitive-field denylist. (`scope`,
+    # `client_id`, `client_secret` get prefilled too — harmless for
+    # this form, and matches what a non-magical reader of the
+    # OAuth2-form spec would expect.)
     catches=(_LoginBadCredentials,),
     context_builder=lambda kwargs: {
         "next_url": kwargs["request"].query_params.get("next", "")
