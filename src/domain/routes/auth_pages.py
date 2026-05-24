@@ -5,6 +5,7 @@ from fastapi_users import exceptions as fa_users_exceptions
 from fastapi_users import models
 from fastapi_users.authentication import Strategy
 from fastapi_users.manager import BaseUserManager
+from pydantic import BaseModel, EmailStr, ValidationError
 
 from src.auth_config import auth_backend, current_active_user, get_user_manager
 from src.domain.models import User
@@ -179,6 +180,130 @@ async def get_forgot_password_page(request: Request):
     return APIResponse.html_response(
         template_name="auth/forgot_password.html", context={}, request=request
     )
+
+
+class _ForgotPasswordRequest(BaseModel):
+    """Request body for the HTMX-friendly forgot-password wrapper.
+
+    Matches the JSON shape fastapi-users' built-in `POST
+    /auth/forgot-password` expects (`{"email": "..."}`). `EmailStr`
+    handles malformed-email validation so the wrapper can raise a
+    `RequestValidationError` and let the decorator render the inline
+    error on the email input.
+    """
+
+    email: EmailStr
+
+
+class _MalformedForgotPasswordBody(Exception):
+    """Sentinel raised when the JSON body fails `_ForgotPasswordRequest`
+    validation inside the route body (not via FastAPI auto-validation —
+    that fires before the decorator can catch it).
+
+    Carries the Pydantic-style errors list so the registered handler
+    can build a `{field: msg}` dict via `build_form_errors_dict`.
+    """
+
+    def __init__(self, errors: list[dict]):
+        self.errors = errors
+
+
+def _render_validation_errors(exc: _MalformedForgotPasswordBody) -> "FormError":
+    """Convert collected validation errors to a `FormError`.
+
+    Reuses `build_form_errors_dict` (the same helper `mount_create`
+    uses on a Pydantic 422 path) so the loc-to-field mapping is
+    shared.
+    """
+    from src.framework.dispatch.mounts.create import build_form_errors_dict
+    from src.framework.http.form_error_handler import FormError
+
+    return FormError(
+        field_errors=build_form_errors_dict(exc.errors),
+        status_code=422,
+    )
+
+
+@router.post("/forgot-password", name="auth_pages:post_forgot_password")
+@form_error_handler(
+    # Browser-only flow — programmatic clients hit this same path; the
+    # wrapper returns 202 for non-HTMX preserving the documented JSON
+    # contract (pinned by `test_forgot_password_request*`).
+    # `require_htmx=False` so a bare POST with a malformed body also
+    # lands on the rerender path.
+    #
+    # We use a route-private sentinel (`_MalformedForgotPasswordBody`)
+    # instead of FastAPI's `RequestValidationError` because the latter
+    # is raised by FastAPI's framework machinery *before* the route
+    # function runs — outside the decorator's try/except. The route
+    # body parses the request manually and raises the sentinel inside
+    # the decorated function so the decorator catches it.
+    template="auth/_forgot_password_form.html",
+    handlers={_MalformedForgotPasswordBody: _render_validation_errors},
+    require_htmx=False,
+)
+async def post_forgot_password(
+    request: Request,
+    user_manager: BaseUserManager[models.UP, models.ID] = Depends(get_user_manager),
+):
+    """HTMX-friendly forgot-password wrapper. Same JSON wire shape as
+    fastapi-users' built-in but returns rendered HTML for HTMX clients.
+
+    Replaces fastapi-users' router-mounted route at this path
+    (registration order in `src/main.py` puts auth_pages first so this
+    wrapper wins). Replicates the original behavior:
+
+      - Look up user by email; if found, call
+        `user_manager.forgot_password(user, request)` which mints a
+        token and triggers `on_after_forgot_password` → send-reset-
+        email. Swallow `UserNotExists` and `UserInactive` silently to
+        avoid revealing which emails are registered.
+      - Return 202 (no body) for non-HTMX clients so the existing
+        JSON contract is preserved.
+      - For HTMX clients, render the form fragment with a success
+        banner ("If an account ..."). Same banner copy whether the
+        email exists or not — anti-enumeration.
+
+    Body parsing is manual (not a FastAPI `body:` param) because the
+    framework's auto-validation raises `RequestValidationError`
+    *before* the route runs — too early for the decorator to catch.
+    Parsing inside the body lets the decorator render the inline
+    error on the email field.
+    """
+    try:
+        raw = await request.json()
+    except Exception:
+        raise _MalformedForgotPasswordBody(
+            [{"loc": ("email",), "msg": "Body must be JSON.", "type": "value_error"}]
+        )
+    try:
+        body = _ForgotPasswordRequest.model_validate(raw)
+    except ValidationError as e:
+        raise _MalformedForgotPasswordBody(e.errors())
+
+    try:
+        user = await user_manager.get_by_email(body.email)
+        await user_manager.forgot_password(user, request)
+    except (fa_users_exceptions.UserNotExists, fa_users_exceptions.UserInactive):
+        # Anti-enumeration — same response either way.
+        pass
+
+    if request.headers.get("HX-Request") == "true":
+        return APIResponse.html_response(
+            template_name="auth/_forgot_password_form.html",
+            context={
+                "form_banner_text": (
+                    "If an account with that email exists, "
+                    "you'll receive a reset link shortly."
+                ),
+                "form_errors": {},
+                "form_values": {"email": body.email},
+                "submitted": True,
+            },
+            request=request,
+        )
+    # Non-HTMX clients keep the documented JSON 202 contract.
+    return Response(status_code=202)
 
 
 @router.get("/reset-password/{token}", name="auth_pages:reset_password")

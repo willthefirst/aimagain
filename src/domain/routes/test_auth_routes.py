@@ -369,6 +369,63 @@ async def test_forgot_password_request_nonexistent_user(test_client: AsyncClient
     assert response.status_code == 202
 
 
+async def test_forgot_password_htmx_success_renders_banner(
+    test_client: AsyncClient, logged_in_user: User
+):
+    """HTMX submit with a valid email → 200 + form fragment with the
+    canonical "if an account ... exists" banner. The banner copy is
+    the same for nonexistent emails (next test) — anti-enumeration
+    contract preserved end-to-end."""
+    response = await test_client.post(
+        "/auth/forgot-password",
+        json={"email": logged_in_user.email},
+        headers={"HX-Request": "true", "Content-Type": "application/json"},
+    )
+    assert response.status_code == 200
+    body = response.text
+    assert 'class="form-banner"' in body
+    assert "If an account with that email exists" in body
+    # Email is prefilled so the user sees what they submitted.
+    assert f'value="{logged_in_user.email}"' in body
+    # Fragment-only; no page chrome.
+    assert "<!DOCTYPE" not in body
+    assert "<html" not in body
+
+
+async def test_forgot_password_htmx_nonexistent_email_renders_same_banner(
+    test_client: AsyncClient,
+):
+    """Nonexistent email → same 200 + same banner copy as the success
+    case above. Anti-enumeration — an attacker can't tell from the
+    response which emails are registered."""
+    response = await test_client.post(
+        "/auth/forgot-password",
+        json={"email": "nobody@example.com"},
+        headers={"HX-Request": "true", "Content-Type": "application/json"},
+    )
+    assert response.status_code == 200
+    assert "If an account with that email exists" in response.text
+
+
+async def test_forgot_password_htmx_malformed_email_renders_field_error(
+    test_client: AsyncClient,
+):
+    """Malformed email body → 422 + form fragment with an inline error
+    on the `email` input. The `response-targets` extension swaps the
+    body on the 4xx so the user actually sees the error (vs the
+    pre-wrapper behavior of a silent JSON 422)."""
+    response = await test_client.post(
+        "/auth/forgot-password",
+        json={"email": "not-an-email"},
+        headers={"HX-Request": "true", "Content-Type": "application/json"},
+    )
+    assert response.status_code == 422, response.text
+    body = response.text
+    email_at = body.index('name="email"')
+    window = body[max(0, email_at - 200) : email_at + 200]
+    assert 'aria-invalid="true"' in window, window
+
+
 async def test_reset_password(test_client: AsyncClient, logged_in_user: User):
     request_response = await test_client.post(
         "/auth/forgot-password", json={"email": logged_in_user.email}
