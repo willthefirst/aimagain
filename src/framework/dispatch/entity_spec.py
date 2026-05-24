@@ -417,21 +417,27 @@ class EntitySpec:
     # errors from `parse_and_validate_form` on HX-Request POSTs and
     # re-renders the spec's form_new template with `form_errors` (dict
     # of field-name → first error message) and `form_values` (the raw
-    # submitted payload) injected into the context. Default False keeps
-    # the existing JSON-422 contract for entities that haven't migrated
-    # their form templates to consume `form_errors`/`form_values`.
+    # submitted payload) injected into the render context. Default
+    # False preserves the JSON-422 contract for entities that haven't
+    # opted in.
     #
-    # Forms that opt in must:
-    #   - render `_shared/form_fields.html` macros with `error=` wired
-    #     to `errors.get(field_name)` (the macro auto-sets
-    #     `aria-invalid="true"` and emits inline error text);
-    #   - prefill controls from `values.get(field_name, <fallback>)` so
-    #     the user's typed values survive the re-render;
-    #   - set `hx-target="this" hx-swap="outerHTML"` on the `<form>` so
-    #     the returned partial replaces the form in place.
+    # Opted-in forms get the user-visible "inline error under each
+    # invalid field, prefilled values" UX declaratively — the form
+    # template only has to:
     #
-    # Today only OPENING_ENTITY's `clinician_opening` create form opts
-    # in (see `src/domain/specs/posts/_base.py`).
+    #   1. import the `_shared/form_fields.html` macros **`with context`**
+    #      (so each macro can auto-resolve `error=` from
+    #      `form_errors.get(name)` and `current=` from
+    #      `form_values.get(name, current)` — see the docstring at the
+    #      top of `_shared/form_fields.html`),
+    #   2. set `hx-target="this" hx-swap="outerHTML"` on the `<form>`
+    #      so the re-rendered partial replaces the form in place.
+    #
+    # No per-field error/value threading at the callsite — every
+    # `field_for(...)` or direct input-macro call self-resolves from
+    # the render context. Explicit caller args (`error=`/`current=`)
+    # still win, so a form can override the auto-resolution where
+    # needed.
     form_error_render: bool = False
 
     # Route-prefix override --------------------------------------------

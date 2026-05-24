@@ -40,6 +40,7 @@ from tests.helpers import (
     make_referral_detail,
     opening_payload,
     promote_to_admin,
+    referral_payload,
 )
 
 pytestmark = pytest.mark.asyncio
@@ -449,4 +450,56 @@ async def test_clinician_opening_create_form_error_render_is_wired(
     )
     assert response.status_code == 200, response.text
     assert response.headers["content-type"].startswith("text/html")
-    assert "age_groups" in response.text
+    # Single integration-level assertion: the age_groups select carries
+    # `aria-invalid="true"` in the re-rendered HTML. This is the signal
+    # that proves *both* halves of the wiring landed — the spec opt-in
+    # (form_error_render=True) and the macros' context auto-resolution
+    # (templates importing `with context`). Without `with context` the
+    # form still renders and "age_groups" still appears as the label,
+    # so checking only the field name would silently pass on a broken
+    # auto-resolution wiring. Macro-shape assertions stay at the macro
+    # layer; this is the minimum end-to-end signal.
+    assert 'name="age_groups"' in response.text
+    age_block_start = response.text.index('name="age_groups"')
+    age_block = response.text[max(0, age_block_start - 200) : age_block_start + 200]
+    assert 'aria-invalid="true"' in age_block, age_block
+
+
+async def test_referral_create_form_error_render_is_wired(
+    authenticated_client: AsyncClient,
+    logged_in_user,
+):
+    """Integration smoke for the `REFERRAL_ENTITY.form_error_render`
+    opt-in — same shape as the clinician_opening smoke above, exercised
+    against the referral form to confirm the declarative pattern
+    generalizes. The referral form's `_form.html` imports
+    `_shared/form_fields.html` macros `with context`, so the per-field
+    `error=`/`current=` are auto-resolved from `form_errors`/`form_values`
+    without any template-side threading.
+
+    No provider setup required (referrals don't link to a Provider on
+    creation). The empty `age_groups` trips `RequiredAgeGroupsField`'s
+    `min_length=1` constraint on `ReferralCreate`.
+    """
+    payload = referral_payload(age_groups=[])
+
+    response = await authenticated_client.post(
+        "/referrals",
+        data=payload,
+        headers={"HX-Request": "true"},
+    )
+    assert response.status_code == 200, response.text
+    assert response.headers["content-type"].startswith("text/html")
+    # Single integration-level assertion: the age_groups select carries
+    # `aria-invalid="true"` in the re-rendered HTML. This is the signal
+    # that proves *both* halves of the wiring landed — the spec opt-in
+    # (form_error_render=True) and the macros' context auto-resolution
+    # (templates importing `with context`). Without `with context` the
+    # form still renders and "age_groups" still appears as the label,
+    # so checking only the field name would silently pass on a broken
+    # auto-resolution wiring. Macro-shape assertions stay at the macro
+    # layer; this is the minimum end-to-end signal.
+    assert 'name="age_groups"' in response.text
+    age_block_start = response.text.index('name="age_groups"')
+    age_block = response.text[max(0, age_block_start - 200) : age_block_start + 200]
+    assert 'aria-invalid="true"' in age_block, age_block
