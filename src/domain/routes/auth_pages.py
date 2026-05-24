@@ -9,7 +9,24 @@ from fastapi_users.manager import BaseUserManager
 from src.auth_config import auth_backend, current_active_user, get_user_manager
 from src.domain.models import User
 from src.framework import APIResponse, BaseRouter
-from src.framework.http.form_rerender import form_rerender
+from src.framework.http.form_error_handler import FormError, form_error_handler
+
+
+class _LoginBadCredentials(Exception):
+    """Sentinel raised by `post_login` when authenticate returns None
+    or the user is inactive.
+
+    Caught by the route's `@form_error_handler` to re-render the login
+    form fragment with a single "Invalid email or password." banner.
+    Deliberately does NOT distinguish between "no such user" and "wrong
+    password" — exposing the difference would let an attacker
+    enumerate registered emails. The banner copy is the same in either
+    case, pinned by `test_post_login_wrapper_nonexistent_user_uses_same_banner`.
+
+    Kept module-private (underscore prefix) — this is the wire between
+    the route body and its decorator, not a domain concept.
+    """
+
 
 # Standardized router initialization
 auth_pages_api_router = APIRouter(prefix="/auth")
@@ -50,6 +67,28 @@ async def get_login_page(request: Request):
 
 
 @router.post("/login", name="auth_pages:post_login")
+@form_error_handler(
+    # Login is browser-only — programmatic clients use `/auth/jwt/login`
+    # (which keeps its JSON 400 contract). `require_htmx=False` makes
+    # the rerender path fire on every client of *this* route, matching
+    # the behavior the route had before the decorator extraction
+    # (pinned by `test_post_login_wrapper_nonexistent_user_uses_same_banner`,
+    # which posts without an `HX-Request` header and expects the
+    # banner in the response).
+    #
+    # Banner-only, no field error: deliberately doesn't tell the user
+    # whether the username or the password was wrong — distinguishing
+    # would let an attacker enumerate registered emails.
+    template="auth/_login_form.html",
+    prefill_fields=("username",),
+    handlers={
+        _LoginBadCredentials: lambda e: FormError(banner="Invalid email or password."),
+    },
+    context_builder=lambda kwargs: {
+        "next_url": kwargs["request"].query_params.get("next", "")
+    },
+    require_htmx=False,
+)
 async def post_login(
     request: Request,
     credentials: OAuth2PasswordRequestForm = Depends(),
@@ -62,10 +101,11 @@ async def post_login(
     on bad credentials, which HTMX has nowhere to land — the user sees
     nothing. This route exists to surface the failure inline:
 
-      - bad credentials / inactive user → re-render `auth/login.html`
-        with `form_banner="Invalid email or password."` (no per-field
-        error because we deliberately don't tell the user which half
-        is wrong — that would be an enumeration vector).
+      - bad credentials / inactive user → raise `_LoginBadCredentials`;
+        the `@form_error_handler` decorator catches it and re-renders
+        the form fragment with the banner (`form_values["username"]`
+        prefills the email so the user only retypes the password;
+        password is intentionally never echoed back into HTML).
       - success → mint the cookie exactly as fastapi-users' login
         does (delegate to `auth_backend.login`) and add `HX-Redirect`
         pointing at `?next=` (or `/` if absent) so HTMX navigates
@@ -83,22 +123,7 @@ async def post_login(
     next_url = request.query_params.get("next", "") or "/"
     user = await user_manager.authenticate(credentials)
     if user is None or not user.is_active:
-        # `form_values["username"]` lets the macro auto-prefill the
-        # email input on re-render so the user only has to retype the
-        # password. Password is *not* echoed back — never echo a
-        # password into form HTML.
-        # Render *just the form fragment* (`auth/_login_form.html`), not
-        # the full `auth/login.html` page. HTMX's `hx-target="this"
-        # hx-swap="outerHTML"` on the form replaces the form element
-        # with the response body — feeding it the full page here would
-        # nest the entire page chrome inside the form slot.
-        return form_rerender(
-            request=request,
-            template_name="auth/_login_form.html",
-            context={"next_url": request.query_params.get("next", "")},
-            form_banner="Invalid email or password.",
-            values={"username": credentials.username},
-        )
+        raise _LoginBadCredentials()
     response = await auth_backend.login(strategy, user)
     # `UserManager.on_after_login` mutates the response into a 302 +
     # `Location` (see `src/auth_config.py`) — that's the right shape
