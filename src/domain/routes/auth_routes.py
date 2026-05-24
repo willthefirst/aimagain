@@ -82,11 +82,20 @@ register_responses = {
     template="auth/_register_form.html",
     prefill_fields=("email",),
     handlers={
+        # 409 Conflict — RFC 9110 §15.5.10. "The request could not be
+        # completed due to a conflict with the current state of the
+        # target resource"; a duplicate email is the textbook case.
         fa_users_exceptions.UserAlreadyExists: lambda e: FormError(
-            field_errors={"email": "An account with this email already exists."}
+            field_errors={"email": "An account with this email already exists."},
+            status_code=409,
         ),
+        # 422 Unprocessable Content — the request was syntactically
+        # valid (Pydantic parsed it) but the password didn't pass
+        # policy. Matches the existing convention for validation
+        # failures on entity creation.
         fa_users_exceptions.InvalidPasswordException: lambda e: FormError(
-            field_errors={"password": e.reason}
+            field_errors={"password": e.reason},
+            status_code=422,
         ),
     },
 )
