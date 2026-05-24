@@ -59,6 +59,7 @@ class APIResponse:
         request: Any,
         *,
         current_user: Actor | None = None,
+        status_code: int = 200,
     ) -> Any:
         """
         Helper for HTML responses using templates.
@@ -72,6 +73,11 @@ class APIResponse:
         authenticated `current_user` and are not callable-overridable, so
         a handler can't accidentally pass `is_admin=True` for a non-admin
         viewer.
+
+        `status_code` defaults to 200 (the common success path). Form-
+        error rerenders pass 4xx (409 duplicate, 401 bad creds, 422
+        validation) and the htmx response-targets extension still swaps
+        the body in place — see `form_rerender` callers.
         """
         from src.framework.rendering.templating import get_template_context, templates
 
@@ -81,7 +87,9 @@ class APIResponse:
             **base_context(current_user),
         }
 
-        return templates.TemplateResponse(request, template_name, merged_context)
+        return templates.TemplateResponse(
+            request, template_name, merged_context, status_code=status_code
+        )
 
 
 def created_response(

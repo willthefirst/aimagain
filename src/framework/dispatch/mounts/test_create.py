@@ -165,15 +165,16 @@ def _stub_renderer_returning(html: str) -> Any:
     assert on the context that landed."""
     calls: list[dict] = []
 
-    def stub(template_name, context, request, *, current_user=None):
+    def stub(template_name, context, request, *, current_user=None, status_code=200):
         calls.append(
             {
                 "template_name": template_name,
                 "context": context,
                 "current_user": current_user,
+                "status_code": status_code,
             }
         )
-        return Response(content=html, media_type="text/html", status_code=200)
+        return Response(content=html, media_type="text/html", status_code=status_code)
 
     stub.calls = calls  # type: ignore[attr-defined]
     return stub
@@ -196,7 +197,16 @@ def _fake_entity_spec(
 
 def test_mount_create_with_hx_request_and_form_error_render_invokes_renderer() -> None:
     """The headline path: HX-Request + opted-in spec + validation
-    failure → renderer is called (returns 200), no 422 surfaces."""
+    failure → renderer is called and the response carries a 422
+    status code (RFC 9110 §15.5.21 "Unprocessable Content"). The
+    htmx `response-targets` extension swaps the body on the matching
+    `hx-target-4xx` declaration in the form fragment.
+
+    Pre-`response-targets` adoption this asserted 200 (the trade-off
+    htmx forced when its default response handler only swapped on
+    2xx). Now that the extension is wired in `base.html`, the
+    rerender returns a semantically-correct 422 and the swap still
+    fires."""
     app = _build_app(form_error_render=True, entity_spec=_fake_entity_spec())
     renderer = _stub_renderer_returning("<form>rendered</form>")
     with (
@@ -214,7 +224,7 @@ def test_mount_create_with_hx_request_and_form_error_render_invokes_renderer() -
         # the rerender branch.
         resp = client.post("/widgets", data={}, headers={"HX-Request": "true"})
 
-    assert resp.status_code == 200
+    assert resp.status_code == 422
     assert resp.headers["content-type"].startswith("text/html")
     assert resp.text == "<form>rendered</form>"
     assert len(renderer.calls) == 1

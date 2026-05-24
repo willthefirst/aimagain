@@ -29,15 +29,16 @@ def _stub_renderer():
     test can assert on the template_name + context that landed."""
     calls: list[dict] = []
 
-    def stub(template_name, context, request, *, current_user=None):
+    def stub(template_name, context, request, *, current_user=None, status_code=200):
         calls.append(
             {
                 "template_name": template_name,
                 "context": context,
                 "current_user": current_user,
+                "status_code": status_code,
             }
         )
-        return Response(content="ok", media_type="text/html", status_code=200)
+        return Response(content="ok", media_type="text/html", status_code=status_code)
 
     stub.calls = calls  # type: ignore[attr-defined]
     return stub
@@ -131,11 +132,15 @@ def test_form_rerender_caller_context_cannot_override_framework_keys():
     assert ctx["form_banner_text"] == "fresh banner"
 
 
-def test_form_rerender_returns_200_html_response():
-    """Status code is 200 (not 4xx) because HTMX's default
-    response-handling table only swaps on 2xx. The non-HTMX / JSON
-    contract is the caller's responsibility — `form_rerender` is the
-    HTMX-side branch."""
+def test_form_rerender_returns_422_html_response_by_default():
+    """Default status is 422 (Unprocessable Content) — the generic
+    "request was syntactically valid but failed validation" code.
+    Callers pass `status_code=` to specialize (409 duplicate, 401
+    bad creds). htmx's default response handler only swaps on 2xx
+    so opted-in form fragments declare `hx-target-4xx="this"` to
+    activate the `response-targets` extension; without that
+    declaration the 4xx body is dropped (matching htmx's documented
+    error behavior)."""
     renderer = _stub_renderer()
     with patch(
         "src.framework.http.form_rerender.APIResponse.html_response", new=renderer
@@ -143,8 +148,27 @@ def test_form_rerender_returns_200_html_response():
         resp = form_rerender(
             request=SimpleNamespace(), template_name="x.html", context={}
         )
-    assert resp.status_code == 200
+    assert resp.status_code == 422
     assert resp.media_type == "text/html"
+
+
+def test_form_rerender_passes_status_code_through_to_renderer():
+    """An explicit `status_code=` lands at the renderer. Pins that
+    the per-handler status-code overrides from `form_error_handler`
+    (409 for `UserAlreadyExists`, 401 for `_LoginBadCredentials`,
+    etc.) actually reach the wire."""
+    renderer = _stub_renderer()
+    with patch(
+        "src.framework.http.form_rerender.APIResponse.html_response", new=renderer
+    ):
+        resp = form_rerender(
+            request=SimpleNamespace(),
+            template_name="x.html",
+            context={},
+            status_code=409,
+        )
+    assert resp.status_code == 409
+    assert renderer.calls[0]["status_code"] == 409
 
 
 def test_form_rerender_passes_current_user_through_to_renderer():

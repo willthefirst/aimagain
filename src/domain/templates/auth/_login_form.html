@@ -21,9 +21,17 @@
    `src/domain/routes/auth_pages.py::post_login` for why we wrap
    `/auth/jwt/login`. `hx-target="this" hx-swap="outerHTML"` lets
    the error-rerender path swap the form fragment in place. #}
+{# `hx-target-4xx="this" hx-swap-4xx="outerHTML"` activates the
+   `response-targets` htmx extension (loaded in `base.html`) so a 4xx
+   response — 401 for bad credentials — swaps the form fragment in
+   place. Without these attributes, htmx's default response handler
+   would ignore the body on a 4xx and the user would see nothing
+   change. #}
 <form hx-post="/auth/login{% if next_url %}?next={{ next_url }}{% endif %}"
       hx-target="this"
-      hx-swap="outerHTML">
+      hx-swap="outerHTML"
+      hx-target-4xx="this"
+      hx-swap-4xx="outerHTML">
   {{ form_banner() }}
   {# `name="username"` is what `OAuth2PasswordRequestForm` expects; we
      relabel the visible "Email" while keeping the OAuth-form contract

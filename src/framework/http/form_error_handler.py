@@ -69,10 +69,19 @@ class FormError:
     auto-resolution, banner via `_shared/form_banner.html`'s
     `form_banner()` macro). Both empty is a no-op rerender — usually
     a sign the handler should have re-raised instead.
+
+    `status_code` is the HTTP status code the rerender lands at.
+    Default 422 (generic validation failure — RFC 9110 §15.5.21
+    "Unprocessable Content"). Override per handler when the failure
+    has a more specific code: 409 for "already exists", 401 for bad
+    credentials. The htmx `response-targets` extension (loaded
+    globally in `base.html`) swaps the response into the form on a
+    matching `hx-target-<code>` declaration.
     """
 
     field_errors: Mapping[str, str] = field(default_factory=dict)
     banner: str | None = None
+    status_code: int = 422
 
 
 # A handler is a pure function from the exception (and the route's
@@ -154,6 +163,7 @@ def form_error_handler(
                     field_errors=dict(form_error.field_errors),
                     form_banner=form_error.banner,
                     values=values,
+                    status_code=form_error.status_code,
                 )
 
         # Stash the decorator's config on the wrapper so the contract-

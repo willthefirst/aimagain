@@ -448,7 +448,11 @@ async def test_clinician_opening_create_form_error_render_is_wired(
         data=payload,
         headers={"HX-Request": "true"},
     )
-    assert response.status_code == 200, response.text
+    # 422 Unprocessable Content — RFC 9110 §15.5.21. The body was
+    # syntactically valid (Pydantic parsed it) but failed validation.
+    # The form fragment declares `hx-target-4xx="this"` so the htmx
+    # `response-targets` extension still swaps the body in place.
+    assert response.status_code == 422, response.text
     assert response.headers["content-type"].startswith("text/html")
     # Auto-resolution signal: aria-invalid="true" lands on the
     # age_groups select. Proves the spec opt-in + macro
@@ -494,7 +498,9 @@ async def test_referral_create_form_error_render_is_wired(
         data=payload,
         headers={"HX-Request": "true"},
     )
-    assert response.status_code == 200, response.text
+    # 422 Unprocessable Content — same justification as the openings
+    # smoke; the response-targets extension still drives the swap.
+    assert response.status_code == 422, response.text
     assert response.headers["content-type"].startswith("text/html")
     # Same shape as the openings smoke: aria-invalid signal +
     # fragment-only response.
