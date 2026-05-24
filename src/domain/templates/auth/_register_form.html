@@ -1,0 +1,38 @@
+{# Register form fragment — just the `<form>` and its contents, no page
+   chrome.
+
+   Rendered in two contexts:
+
+   1. As part of `auth/register.html` (the full GET page) via
+      `{% include "auth/_register_form.html" %}`. The chrome (header,
+      footer link to login) wraps it.
+   2. Standalone by `register_request_handler`'s error-rerender path
+      (see `src/domain/routes/auth_routes.py` → `form_rerender`) when
+      registration fails (duplicate email, invalid password). HTMX's
+      `outerHTML` swap replaces just the `<form>` in place; rendering
+      the full page here would nest the entire page chrome inside the
+      form slot.
+
+   `with context` is required so the form_fields / form_banner macros
+   auto-resolve from `form_errors` / `form_values` / `form_banner_text`
+   (see the docstring at the top of `_shared/form_fields.html`). #}
+{%- from "_shared/form_fields.html" import text_field with context -%}
+{%- from "_shared/form_banner.html" import form_banner with context -%}
+{# `hx-ext="json-enc"` matches `UserCreate`'s JSON body contract on
+   `POST /auth/register`. `hx-target="this" hx-swap="outerHTML"` lets
+   the error-rerender path swap the form fragment in place. #}
+<form hx-post="/auth/register"
+      hx-ext="json-enc"
+      hx-target="this"
+      hx-swap="outerHTML">
+  {{ form_banner() }}
+  {# Email is preserved on re-render via `form_values["email"]` so the
+     user only retypes the password. Password is intentionally not
+     echoed back — never echo a password into form HTML. #}
+  {{ text_field("email", "Email", type="email", autocomplete="email") }}
+  {{ text_field("password",
+    "Password",
+    type="password",
+    autocomplete="new-password") }}
+  <button type="submit">Create account</button>
+</form>

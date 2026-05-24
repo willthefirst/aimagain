@@ -5,17 +5,13 @@
       <h1>Create an account</h1>
       <p>Create your clinician profile and start sharing available openings with referrers in your network.</p>
     </header>
-    <form hx-post="/auth/register" hx-ext="json-enc">
-      <label for="email">
-        Email
-        <input type="email" id="email" name="email" required />
-      </label>
-      <label for="password">
-        Password
-        <input type="password" id="password" name="password" required />
-      </label>
-      <button type="submit">Create account</button>
-    </form>
+    {# The form lives in `_register_form.html` so the error-rerender
+       path can re-render *just the form fragment* (`hx-target="this"
+       hx-swap="outerHTML"` would otherwise nest the entire page
+       chrome inside the form slot). See the partial's docstring +
+       `register_request_handler`'s `form_rerender` call for the
+       wiring. #}
+    {% include "auth/_register_form.html" %}
     <footer>
       <p>
         Already have an account?
