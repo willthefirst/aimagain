@@ -105,6 +105,35 @@ async def test_create_program_happy_path(
     assert rows[0].actor_id == logged_in_user.id
 
 
+async def test_create_program_form_error_render_is_wired(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user: User,
+):
+    """Integration smoke for `PROGRAM_ENTITY.form_error_render`.
+
+    HX-Request POST with an empty `name` trips the schema's
+    min-length → 422 + HTML fragment with the inline error on the
+    `name` input. Same shape as the organizations smoke; rationale
+    in `test_post_families.py::test_clinician_opening_create_form_error_render_is_wired`.
+    """
+    org_id = await _seed_org(db_test_session_manager, owner_id=logged_in_user.id)
+    response = await authenticated_client.post(
+        "/programs",
+        data=_program_payload(org_id=org_id, name=""),
+        headers={"HX-Request": "true"},
+    )
+    assert response.status_code == 422, response.text
+    assert response.headers["content-type"].startswith("text/html")
+    body = response.text
+    name_at = body.index('name="name"')
+    name_window = body[max(0, name_at - 200) : name_at + 200]
+    assert 'aria-invalid="true"' in name_window, name_window
+    assert "<!DOCTYPE" not in body
+    assert "<html" not in body
+    assert "Bedlam Connect" not in body
+
+
 async def test_create_program_with_blank_optional_form_fields_succeeds(
     authenticated_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],
