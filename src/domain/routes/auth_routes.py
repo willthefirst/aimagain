@@ -11,6 +11,7 @@ from src.domain.logic.auth.handlers import handle_registration
 from src.domain.logic.users.schema import UserCreate, UserRead
 from src.framework import BaseRouter
 from src.framework.audit.repository import AuditRepository
+from src.framework.http.form_error_handler import FormError, form_error_handler
 from src.framework.http.form_rerender import form_rerender
 from src.framework.persistence.dependencies import get_audit_repository
 
@@ -67,6 +68,28 @@ register_responses = {
     tags=["auth"],
     name="auth:register",
     responses=register_responses,
+)
+@form_error_handler(
+    # `form_error_handler` is applied *between* `BaseRouter`'s
+    # `handle_route_errors` wrap and the function body. On a registered
+    # exception + `HX-Request: true` it short-circuits with a 200 +
+    # form fragment via `form_rerender`. Anything else (non-HTMX call,
+    # unregistered exception) re-raises so `handle_route_errors`
+    # translates it into the documented JSON 4xx — preserving the
+    # contract pinned by `test_register_duplicate_email`.
+    #
+    # Email is the only field we prefill — password is intentionally
+    # never echoed back into HTML.
+    template="auth/_register_form.html",
+    prefill_fields=("email",),
+    handlers={
+        fa_users_exceptions.UserAlreadyExists: lambda e: FormError(
+            field_errors={"email": "An account with this email already exists."}
+        ),
+        fa_users_exceptions.InvalidPasswordException: lambda e: FormError(
+            field_errors={"password": e.reason}
+        ),
+    },
 )
 async def register_request_handler(
     request_data: UserCreate,
