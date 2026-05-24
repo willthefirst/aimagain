@@ -218,6 +218,20 @@ def _install_builtin_registrations() -> None:
         # "Password should be at least 8 chars", etc.
         message_from=lambda e: getattr(e, "reason", "Invalid password."),
     )
+    register_form_error(
+        fa_users_exceptions.InvalidResetPasswordToken,
+        # 410 Gone fits the failure mode end users see — "your link
+        # doesn't work anymore" (RFC 9110 §15.5.11). A malformed/forged
+        # token semantically maps closer to 400, but 410 is the
+        # canonical "this URL used to work" code and the user-facing
+        # copy treats both cases the same.
+        status_code=410,
+        banner=True,
+        message=(
+            "This reset link is invalid or has expired. "
+            "Request a new one from the forgot-password page."
+        ),
+    )
 
 
 _install_builtin_registrations()
