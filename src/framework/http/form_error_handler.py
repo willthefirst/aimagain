@@ -92,6 +92,52 @@ FormErrorHandler = Callable[[Exception], FormError]
 FormErrorHandlerWithKwargs = Callable[[Exception, Mapping[str, Any]], FormError]
 
 
+# Form field names that must never be echoed back into rerendered
+# HTML. The auto-prefill path (when `prefill_fields=None`) iterates
+# over the submitted body and skips any field whose name lands in
+# this set, OR whose name contains "password" / "passwd" (covers
+# `password`, `password_confirm`, `new_password`, `current_password`,
+# any future variant).
+#
+# Inverting the prefill contract — from allowlist (per-route opt-in)
+# to denylist (framework default + per-route opt-out) — means new
+# visible fields prefill automatically and a security review can
+# audit *one* list instead of N per-route lists. Adding a new sensitive
+# field name to this set covers every route in the codebase.
+SENSITIVE_FIELD_NAMES: frozenset[str] = frozenset(
+    {
+        "token",
+        "secret",
+        "api_key",
+        "otp",
+        "otp_code",
+        "csrf",
+        "csrf_token",
+        "verification_code",
+    }
+)
+
+
+def _is_sensitive_field(name: str) -> bool:
+    """Return True if `name` should never round-trip into rerendered HTML.
+
+    Two rules:
+      1. exact-match against `SENSITIVE_FIELD_NAMES` for the names that
+         don't share a substring with anything else
+         (`token`, `secret`, `csrf`, etc).
+      2. substring match for `password`/`passwd` (covers every variant
+         a route could plausibly name without forcing every name into
+         the set above).
+
+    Case-insensitive on the substring check because callers occasionally
+    use camelCase / Title Case for legacy schema reasons.
+    """
+    if name in SENSITIVE_FIELD_NAMES:
+        return True
+    lower = name.lower()
+    return "password" in lower or "passwd" in lower
+
+
 def form_error_handler(
     *,
     template: str,
@@ -99,7 +145,7 @@ def form_error_handler(
         Mapping[type[Exception], FormErrorHandler | FormErrorHandlerWithKwargs] | None
     ) = None,
     catches: Sequence[type[Exception]] = (),
-    prefill_fields: Sequence[str] = (),
+    prefill_fields: Sequence[str] | None = None,
     context_builder: Callable[[Mapping[str, Any]], dict[str, Any]] | None = None,
     require_htmx: bool = True,
 ):
@@ -126,12 +172,22 @@ def form_error_handler(
         exception type at module-import-time + listing it under
         `catches` is the lowest-boilerplate path for cross-cutting
         errors (fastapi-users auth exceptions, future domain types).
-      prefill_fields: names of fields to copy into `form_values` so the
-        rerender keeps what the user typed. Reads from the route's
-        kwargs: if a value is a Pydantic model the attribute is
-        looked up; if it's a dict, the key is looked up; otherwise
-        the kwarg with that name is used directly. Password-like
-        fields should be omitted — never echo a password.
+      prefill_fields: which fields to copy into `form_values` so the
+        rerender keeps what the user typed. Three modes:
+          - **`None` (default)** — auto-detect from the submitted body.
+            Iterates over the route's kwargs, finds the form-data
+            container (Pydantic model, OAuth2 form, plain dict),
+            and prefills every field whose name is *not* in
+            `SENSITIVE_FIELD_NAMES` and doesn't contain `password`.
+            Inverts the contract from allowlist to denylist so new
+            visible fields prefill automatically; security review
+            audits one list instead of N per-route lists.
+          - **explicit tuple** — `("email", "name")`-style allowlist,
+            for routes that want to be conservative (only prefill the
+            named fields). Pre-PR-#7 behavior. Names still pass through
+            the sensitive-field check so an accidental
+            `prefill_fields=("password",)` still drops the password.
+          - **`()` (empty tuple)** — no prefill at all.
       context_builder: optional callable from route kwargs to extra
         render context (e.g. `next_url` for the login form). Same shape
         as the existing `context=` param on `form_rerender`.
@@ -202,7 +258,14 @@ def form_error_handler(
             template=template,
             handlers=explicit_handlers,
             catches=catches_set,
-            prefill_fields=tuple(prefill_fields),
+            # `prefill_fields=None` means "auto-detect at request time"
+            # — there's no static list to stash. The contract pin
+            # treats that as "skip the prefill check" because the
+            # discovered names depend on the actual request body
+            # shape, not the decorator config.
+            prefill_fields=(
+                tuple(prefill_fields) if prefill_fields is not None else None
+            ),
             require_htmx=require_htmx,
         )
         return wrapper
@@ -220,7 +283,12 @@ class FormErrorConfig:
     template: str
     handlers: Mapping[type[Exception], Any]
     catches: tuple[type[Exception], ...]
-    prefill_fields: tuple[str, ...]
+    # `None` means the route uses auto-detection — no static list of
+    # field names to introspect. The contract pin handles this branch
+    # by skipping the prefill-names-in-template check (the names
+    # depend on the request-body schema, which the lint already
+    # walks indirectly via the Pydantic schema attached to the route).
+    prefill_fields: tuple[str, ...] | None
     require_htmx: bool
 
 
@@ -319,31 +387,129 @@ def _extract_request(kwargs: Mapping[str, Any]) -> Request | None:
 
 
 def _collect_prefill(
-    kwargs: Mapping[str, Any], fields: Sequence[str]
+    kwargs: Mapping[str, Any], fields: Sequence[str] | None
 ) -> dict[str, Any]:
     """Build the `{name: value}` dict the rerender uses for prefill.
 
-    Search order per field:
-      1. Any kwarg whose value is a Pydantic model (or any object
-         exposing the field as an attribute).
-      2. Any kwarg whose value is a dict containing the field.
-      3. The kwarg with the exact name.
+    Two modes:
+      - **`fields=None`** — auto-detect. Walks the route's kwargs, finds
+        every form-data container, enumerates its declared field names,
+        and prefills the non-sensitive ones. See `_discover_field_names`
+        for the discovery rules.
+      - **explicit tuple** — allowlist (pre-PR-#7 contract). Each name
+        is looked up in the route's kwargs and collected.
 
-    First non-None hit wins. Missing fields are silently omitted so the
-    rerender macro falls back to whatever explicit `current=` the
-    template passed (typically also nothing).
+    Sensitive fields (per `_is_sensitive_field`) are dropped in BOTH
+    modes — an explicit `prefill_fields=("password",)` still doesn't
+    echo the password. Defense in depth.
+
+    Missing fields are silently omitted so the rerender macro falls
+    back to whatever explicit `current=` the template passed.
     """
     out: dict[str, Any] = {}
-    for name in fields:
+    names = _discover_field_names(kwargs) if fields is None else tuple(fields)
+    for name in names:
+        if _is_sensitive_field(name):
+            continue
         for v in kwargs.values():
+            # Skip framework deps in the lookup pass too — Request
+            # has a `scope` attribute that would otherwise shadow a
+            # form-field of the same name on an OAuth2-style body.
+            if _is_framework_dep(v):
+                continue
             value = _lookup_field(v, name)
             if value is not None:
                 out[name] = value
                 break
         else:
-            if name in kwargs and kwargs[name] is not None:
+            if (
+                name in kwargs
+                and kwargs[name] is not None
+                and not _is_framework_dep(kwargs[name])
+            ):
                 out[name] = kwargs[name]
     return out
+
+
+def _discover_field_names(kwargs: Mapping[str, Any]) -> tuple[str, ...]:
+    """Find every plausible form-field name across the route's kwargs.
+
+    Discovery order — first container that yields names wins:
+      1. Pydantic v2 model (``model_fields`` class attr) — declared
+         schema fields; the most reliable signal.
+      2. Pydantic v1 model (``__fields__``) — same idea, older API.
+      3. Plain object with form-like attributes (e.g.
+         ``OAuth2PasswordRequestForm``) — ``vars(obj)`` keys minus
+         dunders. Less precise but covers the FastAPI-security case.
+      4. dict — keys directly (raw form payload).
+
+    The first hit wins so a route with both a Pydantic body AND a
+    framework-injected OAuth2 form (rare) doesn't double-collect.
+    Returns a tuple so the order is deterministic.
+
+    The route's framework deps (Request, Session, repos, managers) are
+    skipped because they expose nothing matching the form-field shape
+    — Request has ``headers`` and ``method``, neither of which lands
+    in a Pydantic schema or a dataclass-like ``__dict__``.
+    """
+    for v in kwargs.values():
+        if _is_framework_dep(v):
+            continue
+        # Pydantic v2 — `model_fields` is on the class, not the
+        # instance. Cheap to read.
+        cls = type(v)
+        model_fields = getattr(cls, "model_fields", None)
+        if isinstance(model_fields, dict) and model_fields:
+            return tuple(model_fields.keys())
+        # Pydantic v1.
+        legacy_fields = getattr(v, "__fields__", None)
+        if isinstance(legacy_fields, dict) and legacy_fields:
+            return tuple(legacy_fields.keys())
+    # Second pass: plain attribute objects and dicts. We do this in a
+    # second pass so a Pydantic body always wins over a plain object
+    # (the schema declares the canonical field set).
+    for v in kwargs.values():
+        if _is_framework_dep(v):
+            continue
+        if isinstance(v, dict):
+            return tuple(v.keys())
+        # Plain attribute-bearing object (OAuth2PasswordRequestForm
+        # sets `username`, `password`, `scope`, etc. on `self`).
+        # Filter dunders + callables so we don't pull
+        # `headers`/`method`/etc from framework objects.
+        attrs = getattr(v, "__dict__", None)
+        if attrs:
+            candidate = tuple(
+                k
+                for k, val in attrs.items()
+                if not k.startswith("_") and not callable(val)
+            )
+            if candidate:
+                return candidate
+    return ()
+
+
+def _is_framework_dep(v: Any) -> bool:
+    """True if `v` is a FastAPI framework dependency that doesn't
+    carry form data — Request, BackgroundTasks, Response, etc.
+
+    These objects have rich `__dict__` / attributes that would
+    otherwise pass the plain-attribute fallback's filter (Request
+    has `scope`, `method`, etc.). Explicitly skipping them avoids
+    auto-prefill picking up `scope=<the scope dict>` as a form field.
+
+    Matched by class name to avoid importing every FastAPI internal
+    at import time. Misses a custom-named subclass; the sensitive-
+    field denylist still catches the obvious leaks downstream.
+    """
+    cls_name = type(v).__name__
+    return cls_name in {
+        "Request",
+        "Response",
+        "BackgroundTasks",
+        "HTTPConnection",
+        "WebSocket",
+    }
 
 
 def _lookup_field(container: Any, name: str) -> Any:
