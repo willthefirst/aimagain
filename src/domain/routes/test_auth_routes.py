@@ -150,6 +150,131 @@ async def test_login_failure_nonexistent_user(test_client: AsyncClient):
     assert response.status_code == 400
 
 
+# --- POST /auth/login (HTMX wrapper) -------------------------------------
+#
+# `/auth/jwt/login` is fastapi-users' built-in (JSON 400 on failure —
+# what the tests above pin). `/auth/login` is the form-handler wrapper
+# this app adds for the browser flow: bad credentials re-render the
+# login template inline with `form_banner="Invalid email or password."`
+# so the user actually sees the failure (HTMX has nowhere to land a
+# JSON 400). Success path mints the cookie via the same
+# `auth_backend.login` the fastapi-users route uses, then adds
+# `HX-Redirect` so HTMX navigates after the 204.
+
+
+async def test_post_login_wrapper_htmx_success_sets_cookie_and_hx_redirect(
+    test_client: AsyncClient, logged_in_user: User
+):
+    """HTMX-flagged POST + valid credentials → 204 + `Set-Cookie:
+    fastapiusersauth=...` + `HX-Redirect` (default `/referrals` per
+    `UserManager.on_after_login`). The wrapper converts the
+    underlying 302+Location into 204+HX-Redirect for HTMX so the
+    browser doesn't auto-follow before HTMX honors the navigation."""
+    response = await test_client.post(
+        "/auth/login",
+        data={"username": logged_in_user.email, "password": "password123"},
+        headers={"HX-Request": "true"},
+    )
+    assert response.status_code == 204
+    assert "fastapiusersauth=" in response.headers.get("Set-Cookie", "")
+    # `Location` is popped (auto-follow guard for HTMX); HX-Redirect
+    # takes over. `on_after_login` defaults to `/referrals` when no
+    # `?next=` is set.
+    assert "Location" not in response.headers
+    assert response.headers.get("HX-Redirect") == "/referrals"
+
+
+async def test_post_login_wrapper_non_htmx_success_returns_302_redirect(
+    test_client: AsyncClient, logged_in_user: User
+):
+    """Without `HX-Request`, the wrapper preserves fastapi-users'
+    original contract: 302 + `Location` (powered by
+    `UserManager.on_after_login`). Lets contract tests + programmatic
+    clients keep using the same shape."""
+    response = await test_client.post(
+        "/auth/login",
+        data={"username": logged_in_user.email, "password": "password123"},
+    )
+    assert response.status_code == 302
+    assert response.headers.get("Location") == "/referrals"
+    assert "fastapiusersauth=" in response.headers.get("Set-Cookie", "")
+
+
+async def test_post_login_wrapper_respects_next_query_param(
+    test_client: AsyncClient, logged_in_user: User
+):
+    """`?next=/users/me` flows through to `HX-Redirect: /users/me` —
+    matches how the GET login page passes `next` along, so the
+    post-login landing is whatever the browser was trying to reach
+    when redirected to login. (`next` validation lives in
+    `UserManager.on_after_login` — same checks the JWT route uses.)"""
+    response = await test_client.post(
+        "/auth/login?next=/users/me",
+        data={"username": logged_in_user.email, "password": "password123"},
+        headers={"HX-Request": "true"},
+    )
+    assert response.status_code == 204
+    assert response.headers.get("HX-Redirect") == "/users/me"
+
+
+async def test_post_login_wrapper_bad_password_rerenders_form_with_banner(
+    test_client: AsyncClient, logged_in_user: User
+):
+    """Wrong password → 200 + HTML carrying the form_banner alert and
+    the email prefilled into the username input via `form_values`.
+    Password is *not* echoed back (never echo a password into form
+    HTML). This is the user-visible signal that the wrapper actually
+    routes through `form_rerender` — the framework contract (key
+    names, status code) is pinned in `test_form_rerender.py`."""
+    response = await test_client.post(
+        "/auth/login",
+        data={"username": logged_in_user.email, "password": "wrongpassword"},
+    )
+    assert response.status_code == 200
+    assert response.headers["content-type"].startswith("text/html")
+    body = response.text
+    # Banner with the canonical bad-creds copy lands in the response.
+    assert 'class="form-banner"' in body
+    assert "Invalid email or password" in body
+    # Email is preserved so the user only retypes the password.
+    assert f'value="{logged_in_user.email}"' in body
+    # Password is NOT echoed — defense against a password ending up in
+    # a re-rendered form's HTML (which could land in a browser back-
+    # forward cache, a screenshot, server logs, etc.).
+    assert "wrongpassword" not in body
+    # Fragment-only response: the re-render returns just the `<form>`,
+    # not the full `auth/login.html` page. HTMX swaps the form
+    # element in place via `hx-target="this" hx-swap="outerHTML"`;
+    # feeding it the full page here would nest the entire page chrome
+    # (header, h1 "Log in", footer with reset/register links) inside
+    # the form slot — visually broken (#bug surfaced post-#834).
+    assert "<!DOCTYPE" not in body
+    assert "<html" not in body
+    assert "Bedlam Connect" not in body
+    assert "<h1>Log in</h1>" not in body
+    assert "Forgot your password?" not in body
+
+
+async def test_post_login_wrapper_nonexistent_user_uses_same_banner(
+    test_client: AsyncClient,
+):
+    """A non-existent user gets the same "Invalid email or password"
+    banner as a real user with a wrong password — the wrapper
+    deliberately does not distinguish the two cases so an attacker
+    can't enumerate which emails are registered."""
+    response = await test_client.post(
+        "/auth/login",
+        data={
+            "username": "nobody@example.com",
+            "password": "anything",
+        },
+    )
+    assert response.status_code == 200
+    assert "Invalid email or password" in response.text
+    # Still preserves what the user typed so they can correct it.
+    assert 'value="nobody@example.com"' in response.text
+
+
 async def test_logout_success(authenticated_client: AsyncClient):
     me_response_before = await authenticated_client.get("/users/me")
     assert me_response_before.status_code == 200

@@ -1,0 +1,35 @@
+{# Form-level error banner.
+
+   Renders a single `<div role="alert">` above the form fields when the
+   render context carries a non-empty `form_banner_text` string (or the
+   caller passes `message=` explicitly). Use for errors that don't pin
+   to a single field — e.g. "Invalid email or password" on login,
+   "This account is locked" on a future admin gate.
+
+   For per-field errors, use the `error=` param on the form-field
+   macros in `form_fields.html` (or rely on their auto-resolution from
+   `form_errors`); banner is the complement, not a replacement.
+
+   Templates that opt into the auto-resolution from render context
+   must import this macro `with context`:
+
+     {%- from "_shared/form_banner.html" import form_banner with context -%}
+
+   then drop `{{ form_banner() }}` once at the top of the form. Callers
+   can also pass `message="..."` to override the context lookup (same
+   override-wins semantics as the form_fields macros' `error=`).
+
+   The context key is `form_banner_text` (not `form_banner`) to avoid
+   shadowing the macro's own name when imported with context — Jinja
+   resolves `form_banner` inside the macro body to the macro callable,
+   so a context var named the same would be invisible.
+
+   Framework side: `src/framework/http/form_rerender.py` populates the
+   `form_banner_text` context key. Without `with context`, the macro
+   silently reads as "no banner" — caught by the route-layer smoke
+   that asserts the banner text appears in the response when expected.
+#}
+{% macro form_banner(message=None) -%}
+  {%- set message = message if message is not none else form_banner_text|default(none, true) -%}
+  {%- if message %}<div class="form-banner" role="alert">{{ message }}</div>{%- endif %}
+{%- endmacro %}
