@@ -21,10 +21,18 @@
 {# `hx-ext="json-enc"` matches `UserCreate`'s JSON body contract on
    `POST /auth/register`. `hx-target="this" hx-swap="outerHTML"` lets
    the error-rerender path swap the form fragment in place. #}
+{# `hx-target-4xx="this" hx-swap-4xx="outerHTML"` activates the
+   `response-targets` htmx extension (loaded in `base.html`) so a 4xx
+   response — 409 for duplicate email, 422 for invalid password —
+   swaps the form fragment in place. Without these attributes, htmx's
+   default response handler would ignore the body on a 4xx and the
+   user would see nothing change. #}
 <form hx-post="/auth/register"
       hx-ext="json-enc"
       hx-target="this"
-      hx-swap="outerHTML">
+      hx-swap="outerHTML"
+      hx-target-4xx="this"
+      hx-swap-4xx="outerHTML">
   {{ form_banner() }}
   {# Email is preserved on re-render via `form_values["email"]` so the
      user only retypes the password. Password is intentionally not

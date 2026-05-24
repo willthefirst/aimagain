@@ -32,11 +32,15 @@ with at least one provider available.
   {%- set d = post.opening_detail if post else None -%}
   {# `hx-target="this" hx-swap="outerHTML"` is required for the
      error-rerender path to swap the form in place; the success path is
-     unaffected because `mount_create` emits `HX-Redirect`. The pair is
-     bundled into `_hx_attrs` because `hx-{{ hx_method }}` is a
-     templated attribute *name* and djlint mis-wraps the form tag when
-     the line exceeds its budget. #}
-  {%- set _hx_attrs = "hx-target=\"this\" hx-swap=\"outerHTML\"" -%}
+     unaffected because `mount_create` emits `HX-Redirect`. The
+     `hx-target-4xx`/`hx-swap-4xx` pair activates the `response-targets`
+     extension (loaded in `base.html`) so a 422 validation-error
+     response — the proper code from `mount_create` — still swaps the
+     form fragment in place (htmx's default response handler ignores
+     bodies on 4xx). The pair is bundled into `_hx_attrs` because
+     `hx-{{ hx_method }}` is a templated attribute *name* and djlint
+     mis-wraps the form tag when the line exceeds its budget. #}
+  {%- set _hx_attrs = "hx-target=\"this\" hx-swap=\"outerHTML\" hx-target-4xx=\"this\" hx-swap-4xx=\"outerHTML\"" -%}
   <form hx-{{ hx_method }}="{{ action }}" {{ _hx_attrs|safe }}>
     <input type="hidden" name="kind" value="clinician_opening" />
     {# Practice picker. After #642 PR 1 a Provider may carry multiple

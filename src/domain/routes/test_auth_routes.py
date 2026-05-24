@@ -129,7 +129,11 @@ async def test_register_htmx_duplicate_email_rerenders_form_with_field_error(
         json={"email": logged_in_user.email, "password": "newpassword"},
         headers={"HX-Request": "true", "Content-Type": "application/json"},
     )
-    assert response.status_code == 200
+    # 409 Conflict — RFC 9110 §15.5.10. Duplicate email is a textbook
+    # conflict with current resource state. The form fragment declares
+    # `hx-target-4xx="this"` so the htmx `response-targets` extension
+    # still swaps the body in place.
+    assert response.status_code == 409
     assert response.headers["content-type"].startswith("text/html")
     body = response.text
     # Per-field error sits in the email input's `<small>` slot via the
@@ -268,7 +272,11 @@ async def test_post_login_wrapper_bad_password_rerenders_form_with_banner(
         "/auth/login",
         data={"username": logged_in_user.email, "password": "wrongpassword"},
     )
-    assert response.status_code == 200
+    # 401 Unauthorized — RFC 9110 §15.5.2. The htmx `response-targets`
+    # extension swaps on the matching `hx-target-4xx` declaration in
+    # the form fragment, so the rerendered HTML still lands in the
+    # form slot (htmx's default response handler ignores 4xx bodies).
+    assert response.status_code == 401
     assert response.headers["content-type"].startswith("text/html")
     body = response.text
     # Banner with the canonical bad-creds copy lands in the response.
@@ -307,7 +315,11 @@ async def test_post_login_wrapper_nonexistent_user_uses_same_banner(
             "password": "anything",
         },
     )
-    assert response.status_code == 200
+    # 401 Unauthorized — same code as the wrong-password branch above.
+    # Same code AND same banner copy: this is the anti-enumeration
+    # contract (an attacker can't distinguish "no such user" from
+    # "wrong password" via status code OR body).
+    assert response.status_code == 401
     assert "Invalid email or password" in response.text
     # Still preserves what the user typed so they can correct it.
     assert 'value="nobody@example.com"' in response.text

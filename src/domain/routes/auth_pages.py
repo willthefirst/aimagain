@@ -82,7 +82,16 @@ async def get_login_page(request: Request):
     template="auth/_login_form.html",
     prefill_fields=("username",),
     handlers={
-        _LoginBadCredentials: lambda e: FormError(banner="Invalid email or password."),
+        # 401 Unauthorized — bad credentials. Same status code
+        # `/auth/jwt/login` returns (well, the JWT route returns 400
+        # for "bad credentials", but the semantically-correct code is
+        # 401 per RFC 9110 §15.5.2 — "the request lacks valid
+        # authentication credentials"). This wrapper is browser-only,
+        # so the wire shape doesn't need to match the legacy route.
+        _LoginBadCredentials: lambda e: FormError(
+            banner="Invalid email or password.",
+            status_code=401,
+        ),
     },
     context_builder=lambda kwargs: {
         "next_url": kwargs["request"].query_params.get("next", "")

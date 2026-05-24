@@ -603,6 +603,20 @@
        `dist/ext/json-enc.js` is the htmx-1 build and logs a "v1 extension
        with htmx 2" console warning. Use the htmx-2 package instead. #}
     <script src="https://unpkg.com/htmx-ext-json-enc@2.0.2/json-enc.js"></script>
+    {# `response-targets` extension lets a form swap the response into a
+       target on a 4xx response (htmx's default response handler only
+       swaps on 2xx). With it, form-error rerenders can return *proper*
+       HTTP status codes — 409 for "user already exists", 401 for bad
+       credentials, 422 for validation failure — instead of paying the
+       semantic tax of 200-on-error.
+
+       Wired globally so any form can add `hx-target-4xx="this"` (or a
+       more specific `hx-target-409="this"`) and the swap fires. The
+       extension is opt-in per element — adding it here doesn't change
+       behavior for forms that don't declare a 4xx target.
+
+       https://htmx.org/extensions/response-targets/ #}
+    <script src="https://unpkg.com/htmx-ext-response-targets@2.0.4/response-targets.js"></script>
     {% block head %}{% endblock %}
     {% if is_development %}
       <!-- LiveReload script for development hot reloading -->
@@ -645,7 +659,13 @@
       {% endif %}
     {% endif %}
   </head>
-  <body>
+  {# `hx-ext="response-targets"` enables 4xx response swaps for any
+     descendant form. The extension is loaded in <head>; this attribute
+     activates it. Per-form opt-in still required via `hx-target-4xx`
+     (or the more specific `hx-target-409`, etc) — adding the ext here
+     doesn't change behavior for forms that don't declare a 4xx target.
+     See https://htmx.org/extensions/response-targets/ #}
+  <body hx-ext="response-targets">
     {# Primary nav renders on every screen so the chrome stays
        consistent between authenticated app pages and the public auth
        flow. Authed users get the four inline links (Referrals,

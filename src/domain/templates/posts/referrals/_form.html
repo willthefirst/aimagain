@@ -31,8 +31,12 @@ which FastAPI/Pydantic parses as a list.
   {# `hx-target="this" hx-swap="outerHTML"` for the error-rerender path;
      bundled into `_hx_attrs` because `hx-{{ hx_method }}` is a
      templated attribute *name* and djlint mis-wraps when the line
-     exceeds its budget. #}
-  {%- set _hx_attrs = "hx-target=\"this\" hx-swap=\"outerHTML\"" -%}
+     exceeds its budget. `hx-target-4xx`/`hx-swap-4xx` activate the
+     `response-targets` extension (loaded in `base.html`) so a 422
+     validation-error response — the status `mount_create` returns
+     on a Pydantic failure once the rerender path lands the proper
+     code — still swaps the form fragment in place. #}
+  {%- set _hx_attrs = "hx-target=\"this\" hx-swap=\"outerHTML\" hx-target-4xx=\"this\" hx-swap-4xx=\"outerHTML\"" -%}
   <form hx-{{ hx_method }}="{{ action }}" {{ _hx_attrs|safe }}>
     <input type="hidden" name="kind" value="referral" />
     <fieldset>

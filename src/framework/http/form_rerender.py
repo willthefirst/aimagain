@@ -6,25 +6,31 @@ Generic over the *source* of the error. Today's callers:
 
   - `mount_create`'s `_render_form_with_errors` (Pydantic 422 on a
     form-encoded create POST — `field_errors` populated, no banner).
-  - `auth_pages.post_login` (fastapi-users `LOGIN_BAD_CREDENTIALS` — no
-    per-field error, single form-level `banner`).
+  - `auth_pages.post_login` (bad credentials — no per-field error,
+    single form-level `banner`).
+  - `auth_routes.register_request_handler` (duplicate email /
+    invalid password — per-field).
 
 The framework contract is "inject the three context keys
 (`form_errors`, `form_values`, `form_banner`) and render the template
-as 200 + HTML." The macro layer in `_shared/form_fields.html` does
-auto-resolution from those keys when the template imports macros
+as <status_code> + HTML." The macro layer in `_shared/form_fields.html`
+does auto-resolution from those keys when the template imports macros
 `with context` (see the macros' top-of-file docstring); the banner is
 read by `_shared/form_banner.html`'s `form_banner()` macro. Pages
 opting in must:
 
   1. import the form-fields macros `with context`,
   2. drop a `{{ form_banner() }}` call at the top of the form,
-  3. set `hx-target="this" hx-swap="outerHTML"` on the `<form>`.
+  3. set `hx-target="this" hx-swap="outerHTML"` on the `<form>`,
+  4. set `hx-target-4xx="this" hx-swap-4xx="outerHTML"` so the
+     `response-targets` extension (loaded globally in base.html)
+     swaps form-error rerenders that come back with a 4xx status.
 
-Status code is 200 (not 4xx) because HTMX's default response-handling
-table only swaps on 2xx. Branches that hit this helper are gated on
-`HX-Request: true` at the call site — non-HTMX clients keep whatever
-JSON / 4xx contract the route documented.
+`status_code` defaults to 422 for the entity-create Pydantic path
+and is set per-handler by `form_error_handler` callers. The htmx
+default response handler only swaps on 2xx; the `response-targets`
+extension reads `hx-target-4xx` (or the more specific
+`hx-target-409` / `hx-target-422` / etc) and swaps on 4xx anyway.
 """
 
 from __future__ import annotations
@@ -45,6 +51,7 @@ def form_rerender(
     form_banner: str | None = None,
     values: dict | None = None,
     current_user: Any = None,
+    status_code: int = 422,
 ) -> Response:
     """Render `template_name` with form-error context injected.
 
@@ -68,8 +75,14 @@ def form_rerender(
         macros auto-resolve via `form_values.get(name, current)`.
       current_user: the authenticated user (or None) so the chrome
         layer can render identity widgets correctly.
+      status_code: HTTP status code for the rerender. Default 422
+        (generic validation failure). Callers should set a more
+        specific code when the failure has one: 409 for "already
+        exists" (RFC 9110 §15.5.10), 401 for bad credentials. The
+        htmx `response-targets` extension swaps on the matching
+        `hx-target-<code>` (or `hx-target-4xx` as the catch-all).
 
-    Returns: 200 + HTML Response.
+    Returns: <status_code> + HTML Response.
     """
     merged: dict = {**(context or {})}
     merged["form_errors"] = field_errors or {}
@@ -83,4 +96,5 @@ def form_rerender(
         context=merged,
         request=request,
         current_user=current_user,
+        status_code=status_code,
     )

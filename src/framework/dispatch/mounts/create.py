@@ -220,6 +220,12 @@ async def _render_form_with_errors(
     # `<dir>/_<name>_fragment.html`. If the fragment doesn't exist the
     # render falls back to the full template (visibly-broken nesting,
     # surfaced by the per-form route smoke's no-chrome assertion).
+    #
+    # `status_code=422` because the body was syntactically parseable
+    # but failed validation — RFC 9110 §15.5.21. Form fragments
+    # declare `hx-target-4xx="this"` so the `response-targets` htmx
+    # extension swaps on the 422 (the default response handler only
+    # swaps on 2xx).
     fragment_name = _fragment_template_name(template_name)
     return form_rerender(
         request=request,
@@ -228,6 +234,7 @@ async def _render_form_with_errors(
         field_errors=build_form_errors_dict(errors, kind=kind),
         values=payload_dict,
         current_user=requesting_user,
+        status_code=422,
     )
 
 
