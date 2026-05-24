@@ -50,6 +50,11 @@ PROGRAM_ENTITY: Final[EntitySpec] = EntitySpec(
     list_order_by=Program.created_at.desc(),
     create_redirect=_program_form_redirect,
     update_redirect=_program_form_redirect,
+    # Opt into the HX-Request re-render-on-validation-failure path —
+    # see `EntitySpec.form_error_render`. On a Pydantic 422 the
+    # framework re-renders `programs/_form_new_fragment.html` with
+    # `form_errors` / `form_values` injected.
+    form_error_render=True,
     # The create/edit form's Org-picker is scoped per-viewer to the user's
     # owned Organizations. The framework invokes the extras callable on
     # both the create path (target=None) and the edit path (target=<row>)

@@ -1,0 +1,43 @@
+{# Program create-form fragment — just the `<form>` element, no page
+   chrome.
+
+   Rendered in two contexts:
+
+   1. Included by `programs/form_new.html` (the full GET page).
+   2. Standalone by `mount_create._render_form_with_errors` on a
+      validation-failure re-render. The path-derivation convention
+      (`<dir>/_<name>_fragment.html`) requires this file's name.
+
+   `with context` lets the form-field macros auto-resolve `error=` /
+   `current=` from the `form_errors` / `form_values` injected into
+   the render context by `mount_create` on a 422. #}
+{%- from "_shared/form_fields.html" import entity_select_field, field_for, radio_bool_field, text_field with context -%}
+{%- from "_shared/form_meta.html" import form_with_errors with context -%}
+{%- from "_shared/form_copy.html" import org_picker_help -%}
+{%- from "_shared/actions.html" import actions -%}
+{# `org_id` is the FK to the owning Organization. The dropdown is
+   scoped per-viewer by `program_form_extras` (the spec's
+   `form_extras_path`) — it lists only the Orgs the requesting user
+   owns. Superusers see every Org. The "create one first" hint lives
+   in `_shared/form_copy.html::org_picker_help`. #}
+{% call form_with_errors(action=entity_url('program'), method="post") %}
+  <fieldset>
+    <legend>Program</legend>
+    {{ entity_select_field("org_id", "Organization", organizations, help=org_picker_help() ) }}
+    {{ field_for(schema, "name", "Name") }}
+    {{ field_for(schema, "description", "Description", required=false) }}
+  </fieldset>
+  <fieldset>
+    <legend>Where and when</legend>
+    {{ field_for(schema, "state_preference", "State served", required=false) }}
+    <div class="grid">
+      {{ text_field("start_date", "Start date", required=false, type="date") }}
+      {{ text_field("end_date", "End date", required=false, type="date") }}
+    </div>
+  </fieldset>
+  <fieldset>
+    <legend>Intake</legend>
+    {{ radio_bool_field("accepting_referrals", "Accepting referrals?", current=true, required=false) }}
+  </fieldset>
+  {{ actions(entity_create_label('program') , cancel_url=entity_url('program')) }}
+{% endcall %}

@@ -70,6 +70,42 @@ async def test_create_organization_happy_path(
     assert rows[0].action == "create_organization"
 
 
+async def test_create_organization_form_error_render_is_wired(
+    authenticated_client: AsyncClient,
+):
+    """Integration smoke for `ORGANIZATION_ENTITY.form_error_render`.
+
+    HX-Request POST with an empty `name` trips the schema's
+    min-length constraint → 422 + HTML fragment with the inline
+    error landed on the `name` input via macro auto-resolution.
+
+    Structural contracts (HX-Request gating, fragment-only response,
+    422 status from PR #5) live in `test_post_families.py` /
+    `test_create.py` — duplicating them here would be alphabet
+    instead of grammar. This smoke just asserts the wiring is on
+    end-to-end for this entity (the spec opt-in, the form's
+    `with context` imports, the fragment file's existence).
+    """
+    response = await authenticated_client.post(
+        "/organizations",
+        data={"name": "", "type": "health_system"},
+        headers={"HX-Request": "true"},
+    )
+    assert response.status_code == 422, response.text
+    assert response.headers["content-type"].startswith("text/html")
+    body = response.text
+    # `aria-invalid="true"` on the name input proves the macro layer
+    # picked up `form_errors["name"]` from the rerender context.
+    assert 'name="name"' in body
+    name_at = body.index('name="name"')
+    name_window = body[max(0, name_at - 200) : name_at + 200]
+    assert 'aria-invalid="true"' in name_window, name_window
+    # Fragment-only response — no page chrome leakage.
+    assert "<!DOCTYPE" not in body
+    assert "<html" not in body
+    assert "Bedlam Connect" not in body
+
+
 async def test_create_organization_with_parent_inherits_root(
     authenticated_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],

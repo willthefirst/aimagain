@@ -52,6 +52,13 @@ ORGANIZATION_ENTITY: Final[EntitySpec] = EntitySpec(
     list_order_by=Organization.created_at.desc(),
     create_redirect=_organization_form_redirect,
     update_redirect=_organization_form_redirect,
+    # Opt into the HX-Request re-render-on-validation-failure path —
+    # see `EntitySpec.form_error_render`. On a Pydantic 422 the
+    # framework re-renders `organizations/_form_new_fragment.html`
+    # with `form_errors` / `form_values` injected; the form-field
+    # macros auto-resolve from those keys (the form template imports
+    # them `with context`).
+    form_error_render=True,
     # The create/edit form's parent-Org picker is scoped per-viewer to
     # the user's owned Organizations (superusers see all). Replaces the
     # free-text UUID input — see issue #581. The framework invokes the

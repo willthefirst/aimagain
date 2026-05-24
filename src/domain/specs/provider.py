@@ -113,6 +113,11 @@ PROVIDER_ENTITY: Final[EntitySpec] = EntitySpec(
     ),
     create_redirect=_provider_form_redirect,
     update_redirect=_provider_form_redirect,
+    # Opt into the HX-Request re-render-on-validation-failure path —
+    # see `EntitySpec.form_error_render`. On a Pydantic 422 the
+    # framework re-renders `providers/_form_new_fragment.html`
+    # with `form_errors` / `form_values` injected.
+    form_error_render=True,
     # Template paths are pinned explicitly because the directory cluster
     # is still `templates/providers/` (the Python model file lives at
     # `models/providers/provider.py` and the brief kept that filename
