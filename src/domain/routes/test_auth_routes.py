@@ -112,6 +112,44 @@ async def test_register_duplicate_email(test_client: AsyncClient, logged_in_user
     assert response.status_code == 400
 
 
+async def test_register_htmx_duplicate_email_rerenders_form_with_field_error(
+    test_client: AsyncClient, logged_in_user: User
+):
+    """HTMX register + duplicate email → 200 + HTML form fragment with
+    a per-field error on the email input and the email prefilled via
+    `form_values`. Password is *not* echoed back (never echo a
+    password into form HTML). Mirrors the login bad-creds re-render
+    path — same `form_rerender` plumbing on the framework side.
+
+    Non-HTMX clients still get the JSON 400 contract (pinned by
+    `test_register_duplicate_email` above) — the rerender branch is
+    gated on `HX-Request: true`."""
+    response = await test_client.post(
+        "/auth/register",
+        json={"email": logged_in_user.email, "password": "newpassword"},
+        headers={"HX-Request": "true", "Content-Type": "application/json"},
+    )
+    assert response.status_code == 200
+    assert response.headers["content-type"].startswith("text/html")
+    body = response.text
+    # Per-field error sits in the email input's `<small>` slot via the
+    # form-fields macro's `error=` auto-resolution.
+    assert "An account with this email already exists." in body
+    # Email is preserved so the user doesn't have to retype it.
+    assert f'value="{logged_in_user.email}"' in body
+    # Password is NOT echoed — same defense as the login re-render.
+    assert "newpassword" not in body
+    # Fragment-only response: the re-render returns just the `<form>`,
+    # not the full `auth/register.html` page. HTMX swaps the form
+    # element in place via `hx-target="this" hx-swap="outerHTML"`;
+    # feeding it the full page here would nest the entire page chrome
+    # inside the form slot.
+    assert "<!DOCTYPE" not in body
+    assert "<html" not in body
+    assert "Bedlam Connect" not in body
+    assert "<h1>Create an account</h1>" not in body
+
+
 async def test_login_success(test_client: AsyncClient, logged_in_user: User):
     login_data = {
         "username": logged_in_user.email,
