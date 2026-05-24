@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Body, Depends, Request
 from fastapi.responses import Response
 from fastapi.security import OAuth2PasswordRequestForm
 from fastapi_users import exceptions as fa_users_exceptions
@@ -304,6 +304,127 @@ async def post_forgot_password(
         )
     # Non-HTMX clients keep the documented JSON 202 contract.
     return Response(status_code=202)
+
+
+class _ResetPasswordRequest(BaseModel):
+    """Request body for the HTMX-friendly reset-password wrapper.
+
+    Matches fastapi-users' built-in shape (`{"token": "...",
+    "password": "..."}`). Validation is wired through the same
+    sentinel-exception pattern as `post_forgot_password` so the
+    decorator can render inline errors — FastAPI's auto-validation
+    would raise too early in the request lifecycle.
+    """
+
+    token: str
+    password: str
+
+
+class _MalformedResetPasswordBody(Exception):
+    """Sentinel raised when the JSON body fails validation inside the
+    reset-password route body. See `_MalformedForgotPasswordBody` for
+    why we use a custom sentinel instead of `RequestValidationError`.
+    """
+
+    def __init__(self, errors: list[dict]):
+        self.errors = errors
+
+
+def _render_reset_password_validation_errors(
+    exc: _MalformedResetPasswordBody,
+) -> "FormError":
+    """Convert collected validation errors to a `FormError`. Same
+    plumbing as `_render_validation_errors` for forgot-password —
+    `build_form_errors_dict` does the loc-to-field mapping."""
+    from src.framework.dispatch.mounts.create import build_form_errors_dict
+    from src.framework.http.form_error_handler import FormError
+
+    return FormError(
+        field_errors=build_form_errors_dict(exc.errors),
+        status_code=422,
+    )
+
+
+@router.post("/reset-password", name="auth_pages:post_reset_password")
+@form_error_handler(
+    # Browser-only — the form posts via `hx-ext="json-enc"`.
+    # Programmatic clients hit the same path; for non-HTMX successful
+    # resets we still return 200 with no body (matching fastapi-users'
+    # original contract).
+    #
+    # `InvalidResetPasswordToken` and `InvalidPasswordException` are
+    # both registered in `FormErrorRegistry` so `catches=` resolves
+    # them. The token-invalid case is a banner (no single input pin);
+    # the password-policy case lands on the `password` input.
+    #
+    # `_MalformedResetPasswordBody` covers Pydantic body-shape failures
+    # (missing token, empty password) and goes through `handlers=`
+    # because it carries multi-field errors.
+    #
+    # `body: dict = Body(...)` (below) lets FastAPI bind the raw JSON
+    # payload without auto-validation, so the parsed body lands in
+    # the route's kwargs. The decorator's auto-prefill (PR #847) then
+    # discovers the `token` field and round-trips it into the hidden
+    # input on rerender — password is dropped by the sensitive-field
+    # denylist.
+    template="auth/_reset_password_form.html",
+    catches=(
+        fa_users_exceptions.InvalidResetPasswordToken,
+        fa_users_exceptions.InvalidPasswordException,
+    ),
+    handlers={_MalformedResetPasswordBody: _render_reset_password_validation_errors},
+    require_htmx=False,
+)
+async def post_reset_password(
+    request: Request,
+    body: dict = Body(...),
+    user_manager: BaseUserManager[models.UP, models.ID] = Depends(get_user_manager),
+):
+    """HTMX-friendly reset-password wrapper. Same JSON wire shape as
+    fastapi-users' built-in but returns rendered HTML for HTMX clients
+    on every failure mode.
+
+    Failure modes:
+      - Malformed body → `_MalformedResetPasswordBody` → 422 + per-field
+        errors (`token`/`password` whichever failed).
+      - Invalid / expired token → `InvalidResetPasswordToken` → 410 +
+        banner ("This reset link is invalid or has expired.").
+      - Password policy → `InvalidPasswordException` → 422 + inline
+        error on `password` input via the registry.
+
+    On success: 200 with a confirmation banner. Browsers can then
+    follow the "Log in" link in the page footer; programmatic clients
+    get the same 200 with empty body that fastapi-users emits.
+
+    `body: dict = Body(...)` accepts the raw JSON without Pydantic
+    validation (which would raise `RequestValidationError` outside
+    the decorator's reach). Validation happens manually below; the
+    raw dict in kwargs is what the auto-prefill path uses to keep
+    the `token` field across a rerender (password is dropped by the
+    sensitive-field denylist).
+    """
+    try:
+        parsed = _ResetPasswordRequest.model_validate(body)
+    except ValidationError as e:
+        raise _MalformedResetPasswordBody(e.errors())
+
+    await user_manager.reset_password(parsed.token, parsed.password, request)
+
+    if request.headers.get("HX-Request") == "true":
+        return APIResponse.html_response(
+            template_name="auth/_reset_password_form.html",
+            context={
+                "token": parsed.token,
+                "form_banner_text": (
+                    "Password updated. You can now log in with your new password."
+                ),
+                "form_errors": {},
+                "form_values": {},
+                "reset_complete": True,
+            },
+            request=request,
+        )
+    return Response(status_code=200)
 
 
 @router.get("/reset-password/{token}", name="auth_pages:reset_password")

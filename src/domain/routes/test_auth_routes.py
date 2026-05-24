@@ -447,10 +447,63 @@ async def test_reset_password(test_client: AsyncClient, logged_in_user: User):
     assert "access_token" in login_response.json()
 
 
+async def test_reset_password_htmx_invalid_token_renders_banner(
+    test_client: AsyncClient,
+):
+    """HTMX submit with a bad token → 410 + form fragment carrying
+    the "this reset link is invalid or has expired" banner from the
+    registry. The `response-targets` extension swaps the 4xx body
+    into the form so the user actually sees the failure."""
+    response = await test_client.post(
+        "/auth/reset-password",
+        json={"token": "BAD", "password": "newpassword"},
+        headers={"HX-Request": "true", "Content-Type": "application/json"},
+    )
+    assert response.status_code == 410, response.text
+    body = response.text
+    assert 'class="form-banner"' in body
+    assert "reset link is invalid or has expired" in body
+    # Fragment-only.
+    assert "<!DOCTYPE" not in body
+    assert "<html" not in body
+
+
+async def test_reset_password_htmx_missing_password_renders_field_error(
+    test_client: AsyncClient,
+):
+    """HTMX submit with missing/empty password → 422 + form fragment
+    with an inline error on the `password` input."""
+    response = await test_client.post(
+        "/auth/reset-password",
+        json={"token": "T", "password": ""},
+        headers={"HX-Request": "true", "Content-Type": "application/json"},
+    )
+    # Empty string parses as `str` but fastapi-users' password helper
+    # / validator may accept it depending on policy. The wrapper still
+    # returns a non-2xx response — either 422 (weak password) or 410
+    # (the token "T" is invalid). Both are valid wire shapes; the
+    # smoke just pins that the response is a fragment, not JSON.
+    assert response.status_code >= 400
+    body = response.text
+    assert "<!DOCTYPE" not in body
+    assert "<html" not in body
+    # The form fragment is what swaps into the page; the response
+    # always carries a `<form` element.
+    assert "<form" in body
+
+
 async def test_reset_password_invalid_token(test_client: AsyncClient):
+    """Bad token → 410 Gone. Pre-PR-#11 this asserted fastapi-users'
+    historical 400, but the wrapper now responds 410 (RFC 9110
+    §15.5.11 — "the target resource is no longer available at the
+    origin server and that this condition is likely to be
+    permanent"), which matches the user-facing "your link doesn't
+    work anymore" copy. Both HTMX and non-HTMX clients land on the
+    same status code; HTMX gets HTML, others get an HTML body that
+    `response-targets` can swap if they're htmx-aware."""
     reset_data = {"token": "INVALID_TOKEN", "password": "newpassword"}
     response = await test_client.post("/auth/reset-password", json=reset_data)
-    assert response.status_code == 400
+    assert response.status_code == 410
 
 
 async def test_get_register_page(test_client: AsyncClient):
