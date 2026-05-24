@@ -95,7 +95,10 @@ FormErrorHandlerWithKwargs = Callable[[Exception, Mapping[str, Any]], FormError]
 def form_error_handler(
     *,
     template: str,
-    handlers: Mapping[type[Exception], FormErrorHandler | FormErrorHandlerWithKwargs],
+    handlers: (
+        Mapping[type[Exception], FormErrorHandler | FormErrorHandlerWithKwargs] | None
+    ) = None,
+    catches: Sequence[type[Exception]] = (),
     prefill_fields: Sequence[str] = (),
     context_builder: Callable[[Mapping[str, Any]], dict[str, Any]] | None = None,
     require_htmx: bool = True,
@@ -111,7 +114,18 @@ def form_error_handler(
         A two-arg callable receives the route's kwargs dict so it can
         read other submitted fields (e.g. for cross-field rules); the
         single-arg form is enough when the exception itself carries
-        the error message.
+        the error message. Use `handlers` when the route needs
+        custom copy / cross-field logic; use `catches` (below) when
+        the registry's default rules are good enough.
+      catches: tuple of exception types whose rendering rules live in
+        `FormErrorRegistry`. The decorator looks each up at request
+        time and builds the equivalent `FormError`. Catches and
+        handlers can be combined — `handlers` wins on conflict, so a
+        route can opt into the registry for most exceptions and
+        override one with a route-specific message. Registering an
+        exception type at module-import-time + listing it under
+        `catches` is the lowest-boilerplate path for cross-cutting
+        errors (fastapi-users auth exceptions, future domain types).
       prefill_fields: names of fields to copy into `form_values` so the
         rerender keeps what the user typed. Reads from the route's
         kwargs: if a value is a Pydantic model the attribute is
@@ -132,14 +146,25 @@ def form_error_handler(
         about whether HTMX is required *for matched* exceptions.
     """
 
+    # Merge `catches=` (registry-backed) and `handlers=` (explicit).
+    # Explicit handlers win, so a route can opt into the registry for
+    # most exceptions and override one with route-specific copy.
+    # Registry lookup happens lazily (per-request) so domain layers
+    # that register at import-time after this decorator runs still
+    # work.
+    explicit_handlers = dict(handlers or {})
+    catches_set = tuple(catches)
+
     def decorator(fn):
         @wraps(fn)
         async def wrapper(*args, **kwargs):
             try:
                 return await fn(*args, **kwargs)
             except Exception as exc:
-                handler = _match_handler(handlers, exc)
-                if handler is None:
+                form_error = _resolve_form_error(
+                    exc, explicit_handlers, catches_set, kwargs
+                )
+                if form_error is None:
                     raise
                 request = _extract_request(kwargs)
                 if request is None:
@@ -153,7 +178,6 @@ def form_error_handler(
                     # and fall through to the rerender path on every
                     # client.
                     raise
-                form_error = _call_handler(handler, exc, kwargs)
                 values = _collect_prefill(kwargs, prefill_fields)
                 context = context_builder(kwargs) if context_builder else None
                 return form_rerender(
@@ -176,7 +200,8 @@ def form_error_handler(
         # framework-internal contract; route code should never read it.
         wrapper.__form_error_config__ = FormErrorConfig(
             template=template,
-            handlers=dict(handlers),
+            handlers=explicit_handlers,
+            catches=catches_set,
             prefill_fields=tuple(prefill_fields),
             require_htmx=require_htmx,
         )
@@ -194,8 +219,56 @@ class FormErrorConfig:
 
     template: str
     handlers: Mapping[type[Exception], Any]
+    catches: tuple[type[Exception], ...]
     prefill_fields: tuple[str, ...]
     require_htmx: bool
+
+
+def _resolve_form_error(
+    exc: Exception,
+    explicit_handlers: Mapping[type[Exception], Any],
+    catches: tuple[type[Exception], ...],
+    kwargs: Mapping[str, Any],
+) -> FormError | None:
+    """Resolution order on a raised exception:
+
+      1. **Explicit `handlers=`** — first matching key (isinstance,
+         insertion order). Lets a route override the registry default
+         with route-specific copy.
+      2. **Registry-backed `catches=`** — first listed type matching
+         (isinstance, order). Pulls (status, field/banner, message)
+         from `FormErrorRegistry`.
+      3. **Miss** — return None; the decorator re-raises so
+         `handle_route_errors` takes over.
+
+    The two-pass split (explicit first, registry second) matches the
+    way callers think about it: \"here's how I render this normally
+    *unless* I've explicitly written a handler for it.\"
+    """
+    handler = _match_handler(explicit_handlers, exc)
+    if handler is not None:
+        return _call_handler(handler, exc, kwargs)
+    # Lazy import to avoid a circular dependency — the registry
+    # module imports `FormError` from this module at import time.
+    from src.framework.http.form_error_registry import render_with_registry
+
+    for exc_type in catches:
+        if isinstance(exc, exc_type):
+            resolved = render_with_registry(exc)
+            if resolved is not None:
+                return resolved
+            # Registered in `catches=` but missing from the registry —
+            # treat as a config bug. Fail loudly so the missing
+            # registration is obvious; this can only happen if a route
+            # lists an unregistered exception type.
+            raise RuntimeError(
+                f"@form_error_handler: exception {type(exc).__name__} is "
+                f"listed in `catches=` but not registered in "
+                f"`FormErrorRegistry`. Add a "
+                f"`register_form_error({type(exc).__name__}, ...)` call "
+                f"at import time, or move this handler into `handlers=`."
+            )
+    return None
 
 
 def _match_handler(
