@@ -322,6 +322,103 @@ async def test_require_htmx_false_rerenders_for_non_htmx_calls(monkeypatch):
     assert captured["form_banner"] == "b"
 
 
+async def test_catches_resolves_through_registry(monkeypatch):
+    """`catches=(ExceptionType,)` pulls (status_code, field, message)
+    from `FormErrorRegistry`. Equivalent to writing a `handlers=`
+    entry by hand, but doesn't require a route-level lambda."""
+    captured: dict = {}
+    monkeypatch.setattr(
+        "src.framework.http.form_error_handler.form_rerender",
+        lambda **kw: captured.update(kw) or "ok",
+    )
+
+    from src.framework.http.form_error_registry import (
+        _clear_for_testing,
+        register_form_error,
+    )
+
+    class _CatchMe(Exception):
+        pass
+
+    register_form_error(
+        _CatchMe, status_code=409, field="email", message="dup via registry"
+    )
+    try:
+
+        @form_error_handler(
+            template="x.html",
+            catches=(_CatchMe,),
+        )
+        async def handler(request: Request):
+            raise _CatchMe()
+
+        result = await handler(request=_request())
+        assert result == "ok"
+        assert captured["field_errors"] == {"email": "dup via registry"}
+        assert captured["status_code"] == 409
+    finally:
+        _clear_for_testing()
+
+
+async def test_explicit_handler_wins_over_catches(monkeypatch):
+    """When both `handlers=` and `catches=` would match the same
+    exception, the explicit handler wins. Lets a route opt into the
+    registry generally and override copy for one error type."""
+    captured: dict = {}
+    monkeypatch.setattr(
+        "src.framework.http.form_error_handler.form_rerender",
+        lambda **kw: captured.update(kw) or "ok",
+    )
+
+    from src.framework.http.form_error_registry import (
+        _clear_for_testing,
+        register_form_error,
+    )
+
+    class _CatchMe(Exception):
+        pass
+
+    register_form_error(_CatchMe, status_code=409, field="email", message="registry")
+    try:
+
+        @form_error_handler(
+            template="x.html",
+            catches=(_CatchMe,),
+            handlers={
+                _CatchMe: lambda e: FormError(
+                    field_errors={"email": "route override"},
+                    status_code=400,
+                ),
+            },
+        )
+        async def handler(request: Request):
+            raise _CatchMe()
+
+        await handler(request=_request())
+        assert captured["field_errors"] == {"email": "route override"}
+        assert captured["status_code"] == 400
+    finally:
+        _clear_for_testing()
+
+
+async def test_catches_unregistered_exception_raises_config_error():
+    """Listing an exception under `catches=` that isn't registered
+    in `FormErrorRegistry` is a config bug — fail loudly so the gap
+    is obvious. Alternative is silently re-raising, which would look
+    like "the decorator isn't catching my exception" and waste
+    diagnosis time."""
+
+    class _NotRegistered(Exception):
+        pass
+
+    @form_error_handler(template="x.html", catches=(_NotRegistered,))
+    async def handler(request: Request):
+        raise _NotRegistered()
+
+    with pytest.raises(RuntimeError, match="not registered"):
+        await handler(request=_request())
+
+
 async def test_context_builder_threads_through(monkeypatch):
     """`context_builder` receives the route's kwargs and returns a dict
     that becomes the rerender's render context. Used for things like

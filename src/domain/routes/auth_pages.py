@@ -9,15 +9,19 @@ from fastapi_users.manager import BaseUserManager
 from src.auth_config import auth_backend, current_active_user, get_user_manager
 from src.domain.models import User
 from src.framework import APIResponse, BaseRouter
-from src.framework.http.form_error_handler import FormError, form_error_handler
+from src.framework.http.form_error_handler import form_error_handler
+from src.framework.http.form_error_registry import register_form_error
 
 
 class _LoginBadCredentials(Exception):
     """Sentinel raised by `post_login` when authenticate returns None
     or the user is inactive.
 
-    Caught by the route's `@form_error_handler` to re-render the login
-    form fragment with a single "Invalid email or password." banner.
+    Caught by the route's `@form_error_handler` → `catches=` lookup
+    which resolves through `FormErrorRegistry` (registration below) —
+    re-renders the login form fragment with the canonical
+    "Invalid email or password." banner.
+
     Deliberately does NOT distinguish between "no such user" and "wrong
     password" — exposing the difference would let an attacker
     enumerate registered emails. The banner copy is the same in either
@@ -26,6 +30,20 @@ class _LoginBadCredentials(Exception):
     Kept module-private (underscore prefix) — this is the wire between
     the route body and its decorator, not a domain concept.
     """
+
+
+# Register `_LoginBadCredentials` next to its definition (the
+# "register-where-you-define" pattern). Tying the registration to the
+# import of this module means the route's `catches=` lookup always
+# finds it without a global-side-effect-on-app-boot detour. Domain
+# layers that add their own typed exceptions should follow the same
+# pattern.
+register_form_error(
+    _LoginBadCredentials,
+    status_code=401,  # RFC 9110 §15.5.2 Unauthorized — bad credentials.
+    banner=True,
+    message="Invalid email or password.",
+)
 
 
 # Standardized router initialization
@@ -81,18 +99,7 @@ async def get_login_page(request: Request):
     # would let an attacker enumerate registered emails.
     template="auth/_login_form.html",
     prefill_fields=("username",),
-    handlers={
-        # 401 Unauthorized — bad credentials. Same status code
-        # `/auth/jwt/login` returns (well, the JWT route returns 400
-        # for "bad credentials", but the semantically-correct code is
-        # 401 per RFC 9110 §15.5.2 — "the request lacks valid
-        # authentication credentials"). This wrapper is browser-only,
-        # so the wire shape doesn't need to match the legacy route.
-        _LoginBadCredentials: lambda e: FormError(
-            banner="Invalid email or password.",
-            status_code=401,
-        ),
-    },
+    catches=(_LoginBadCredentials,),
     context_builder=lambda kwargs: {
         "next_url": kwargs["request"].query_params.get("next", "")
     },
