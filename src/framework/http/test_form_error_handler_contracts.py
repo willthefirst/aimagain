@@ -181,22 +181,22 @@ def test_template_imports_macros_with_context(
 
 
 def _handler_field_keys(config: FormErrorConfig) -> set[str]:
-    """Invoke every registered handler with a stub exception and a
-    stub kwargs dict to recover the set of `field_errors` keys it can
-    emit. Captures typos at config time — `{"emial": ...}` lands in
-    this set and fails the per-field-presence assertion below.
+    """Recover the set of `field_errors` keys this route can emit —
+    from both `handlers=` (explicit) and `catches=` (registry-backed).
 
-    Handlers that only emit `banner=` return an empty `field_errors`,
-    contributing nothing.
+    Captures typos at config time — `{"emial": ...}` lands in this
+    set and fails the per-field-presence assertion below. Same for a
+    registry registration with a typo'd `field=`.
 
     Trade-off: handlers that build `field_errors` keys *dynamically*
     from the exception's attributes (rare but possible) can't be
-    statically resolved this way. Today, all registered handlers
-    use literal dict keys — pinned by inspection of `auth_routes.py`
-    and `auth_pages.py`. If a dynamic handler shows up, this lint
-    will under-cover it but won't false-fail.
+    statically resolved this way. Today, all callsites use literal
+    dict keys; if a dynamic handler shows up, this lint will under-
+    cover it but won't false-fail.
     """
     keys: set[str] = set()
+
+    # Explicit handlers — invoke with a stub exception.
     for exc_type, handler in config.handlers.items():
         # Build a stub exception of the right type. fastapi-users
         # exceptions take varied __init__ args, so we go via __new__
@@ -227,6 +227,25 @@ def _handler_field_keys(config: FormErrorConfig) -> set[str]:
             continue
         if isinstance(form_error, FormError):
             keys.update(form_error.field_errors.keys())
+
+    # Registry-backed `catches=` — look each exception type up in the
+    # registry and collect its `field` (banner-only entries contribute
+    # nothing). Pinning here, not just at registration time, means a
+    # route can't list an exception under `catches=` whose registered
+    # field doesn't exist on the route's template — that mismatch
+    # would render the error to nowhere.
+    from src.framework.http.form_error_registry import lookup_form_error
+
+    for exc_type in config.catches:
+        try:
+            stub_exc = exc_type.__new__(exc_type)
+        except Exception:
+            continue
+        mapping = lookup_form_error(stub_exc)
+        if mapping is None or mapping.banner or mapping.field is None:
+            continue
+        keys.add(mapping.field)
+
     return keys
 
 

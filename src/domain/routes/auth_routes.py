@@ -11,7 +11,7 @@ from src.domain.logic.auth.handlers import handle_registration
 from src.domain.logic.users.schema import UserCreate, UserRead
 from src.framework import BaseRouter
 from src.framework.audit.repository import AuditRepository
-from src.framework.http.form_error_handler import FormError, form_error_handler
+from src.framework.http.form_error_handler import form_error_handler
 from src.framework.persistence.dependencies import get_audit_repository
 
 auth_api_router = APIRouter()
@@ -69,35 +69,22 @@ register_responses = {
     responses=register_responses,
 )
 @form_error_handler(
-    # `form_error_handler` is applied *between* `BaseRouter`'s
-    # `handle_route_errors` wrap and the function body. On a registered
-    # exception + `HX-Request: true` it short-circuits with a 200 +
-    # form fragment via `form_rerender`. Anything else (non-HTMX call,
-    # unregistered exception) re-raises so `handle_route_errors`
-    # translates it into the documented JSON 4xx — preserving the
-    # contract pinned by `test_register_duplicate_email`.
-    #
-    # Email is the only field we prefill — password is intentionally
-    # never echoed back into HTML.
+    # `catches=` pulls the rendering rules (status_code, field name,
+    # default message) from `FormErrorRegistry`. The two fastapi-users
+    # exceptions are registered at framework boot in
+    # `src/framework/http/form_error_registry.py`:
+    #   - UserAlreadyExists      → 409 + email + "An account ..."
+    #   - InvalidPasswordException → 422 + password + e.reason
+    # If a future route needs different copy, it can override per
+    # exception via `handlers={...}` on this decorator; the explicit
+    # entry wins over the registry. Non-HTMX clients still get the
+    # JSON 400 contract via `handle_route_errors`.
     template="auth/_register_form.html",
     prefill_fields=("email",),
-    handlers={
-        # 409 Conflict — RFC 9110 §15.5.10. "The request could not be
-        # completed due to a conflict with the current state of the
-        # target resource"; a duplicate email is the textbook case.
-        fa_users_exceptions.UserAlreadyExists: lambda e: FormError(
-            field_errors={"email": "An account with this email already exists."},
-            status_code=409,
-        ),
-        # 422 Unprocessable Content — the request was syntactically
-        # valid (Pydantic parsed it) but the password didn't pass
-        # policy. Matches the existing convention for validation
-        # failures on entity creation.
-        fa_users_exceptions.InvalidPasswordException: lambda e: FormError(
-            field_errors={"password": e.reason},
-            status_code=422,
-        ),
-    },
+    catches=(
+        fa_users_exceptions.UserAlreadyExists,
+        fa_users_exceptions.InvalidPasswordException,
+    ),
 )
 async def register_request_handler(
     request_data: UserCreate,
