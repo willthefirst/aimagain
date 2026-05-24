@@ -7,32 +7,23 @@
       `{% include "auth/_login_form.html" %}`. The chrome (header,
       footer links) wraps it.
    2. Standalone by `post_login`'s error-rerender path (see
-      `src/domain/routes/auth_pages.py` → `form_rerender`) — HTMX's
-      `outerHTML` swap replaces just the `<form>` in place; rendering
-      the full page here would nest the entire page chrome inside
-      the form slot.
+      `src/domain/routes/auth_pages.py`). The `response-targets`
+      htmx extension swaps the 4xx body into the `<form>` slot in
+      place.
 
-   `with context` is required so the form_fields / form_banner macros
-   auto-resolve from `form_errors` / `form_values` / `form_banner_text`
-   (see the docstring at the top of `_shared/form_fields.html`). #}
-{%- from "_shared/form_fields.html" import text_field with context -%}
-{%- from "_shared/form_banner.html" import form_banner with context -%}
-{# Posts to `/auth/login` (this app's wrapper) — see
+   `with context` is required on the form_fields import so the macros
+   auto-resolve `form_errors` / `form_values` from the render context
+   (see the docstring at the top of `_shared/form_fields.html`). The
+   `form_with_errors` wrapper imports `form_banner` itself.
+
+   `/auth/login` is this app's wrapper — see
    `src/domain/routes/auth_pages.py::post_login` for why we wrap
-   `/auth/jwt/login`. `hx-target="this" hx-swap="outerHTML"` lets
-   the error-rerender path swap the form fragment in place. #}
-{# `hx-target-4xx="this" hx-swap-4xx="outerHTML"` activates the
-   `response-targets` htmx extension (loaded in `base.html`) so a 4xx
-   response — 401 for bad credentials — swaps the form fragment in
-   place. Without these attributes, htmx's default response handler
-   would ignore the body on a 4xx and the user would see nothing
-   change. #}
-<form hx-post="/auth/login{% if next_url %}?next={{ next_url }}{% endif %}"
-      hx-target="this"
-      hx-swap="outerHTML"
-      hx-target-4xx="this"
-      hx-swap-4xx="outerHTML">
-  {{ form_banner() }}
+   `/auth/jwt/login`. The `?next=` query string passes the post-login
+   redirect target through. #}
+{%- from "_shared/form_fields.html" import text_field with context -%}
+{%- from "_shared/form_meta.html" import form_with_errors with context -%}
+{%- set _action = "/auth/login" ~ ("?next=" ~ next_url if next_url else "") -%}
+{% call form_with_errors(action=_action, method="post") %}
   {# `name="username"` is what `OAuth2PasswordRequestForm` expects; we
      relabel the visible "Email" while keeping the OAuth-form contract
      on the wire. The form-error rerender prefills the field via
@@ -44,4 +35,4 @@
     type="password",
     autocomplete="current-password") }}
   <button type="submit">Log in</button>
-</form>
+{% endcall %}

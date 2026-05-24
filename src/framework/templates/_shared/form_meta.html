@@ -1,0 +1,67 @@
+{# `form_with_errors` — wraps an opted-in form's `<form>` tag with the
+   four hx-* attributes the form-error rerender path requires, plus
+   the `form_banner()` placement. Templates supply the field inputs
+   inside a `{% call form_with_errors(...) %}` block.
+
+   Before this macro, every opted-in form template wrote nine lines
+   of mechanical wiring:
+
+       {%- from "_shared/form_banner.html" import form_banner with context -%}
+       <form hx-post="..." hx-target="this" hx-swap="outerHTML" hx-target-4xx="this" hx-swap-4xx="outerHTML">
+         {{ form_banner() }}
+         ...
+       </form>
+
+   With this macro, that collapses to:
+
+       {%- from "_shared/form_meta.html" import form_with_errors with context -%}
+       {% call form_with_errors(action="/auth/register", method="post", json_enc=true) %}
+         ...
+       {% endcall %}
+
+   The macro bakes in:
+
+     - `hx-{method}="<action>"`              — the submit URL.
+     - `hx-target="this" hx-swap="outerHTML"` — the success/error-2xx swap.
+     - `hx-target-4xx="this" hx-swap-4xx="outerHTML"` — activates
+       `response-targets` so 4xx rerenders swap too.
+     - `hx-ext="json-enc"` (when `json_enc=true`) — for endpoints
+       that take JSON bodies (`/auth/register`, `/auth/forgot-password`).
+     - `{{ form_banner() }}` — the form-level alert slot.
+
+   What the template still imports itself:
+
+     - `text_field`, `select_field`, etc. from `_shared/form_fields.html`
+       `with context` — Jinja macros that depend on caller-scoped
+       context can't be hoisted into a wrapper macro (the wrapper's
+       imports are scoped to the wrapper, not the caller).
+
+   The contract pin (`test_form_error_handler_contracts.py`) used to
+   check the four hx-* attributes individually; after this PR it can
+   simplify to "every opted-in template uses `form_with_errors`" once
+   every form has migrated. For now both rules coexist.
+
+   `with context` is required when importing this macro so the
+   `form_banner()` call inside it can read `form_banner_text` from
+   the render context.
+#}
+{%- from "_shared/form_banner.html" import form_banner with context -%}
+{% macro form_with_errors(action, method="post", json_enc=False, extra_attrs="") -%}
+  {# `hx-<method>=<action>` is built as a string and emitted with
+     `|safe` because djlint mangles a templated attribute *name*
+     (`hx-{{ method }}`) — it sees the dynamic name as a value and
+     line-wraps it. Same workaround as the entity forms in
+     `posts/referrals/_form.html` / `posts/openings/_form_clinician_opening.html`. #}
+  {%- set _hx_method_attr = 'hx-' ~ method ~ '="' ~ action ~ '"' -%}
+  {%- set _json_ext = 'hx-ext="json-enc"' if json_enc else '' -%}
+  <form {{ _hx_method_attr|safe }}
+        {{ _json_ext|safe }}
+        hx-target="this"
+        hx-swap="outerHTML"
+        hx-target-4xx="this"
+        hx-swap-4xx="outerHTML"
+        {{ extra_attrs|safe }}>
+    {{ form_banner() }}
+    {{ caller() }}
+  </form>
+{%- endmacro %}
