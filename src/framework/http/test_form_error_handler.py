@@ -266,6 +266,62 @@ async def test_handler_with_dict_kwarg_prefill(monkeypatch):
     assert captured["values"] == {"email": "from-dict@x.io"}
 
 
+async def test_prefill_reads_plain_attribute_object(monkeypatch):
+    """Some FastAPI deps aren't Pydantic — `OAuth2PasswordRequestForm`
+    is a plain class with `.username` / `.password` set in `__init__`.
+    The prefill helper falls back to `getattr` for plain objects
+    (guarded against callables so `Request.headers` doesn't spuriously
+    match). Pinned here so a future refactor of `_lookup_field` can't
+    silently regress the login prefill path."""
+    captured: dict = {}
+    monkeypatch.setattr(
+        "src.framework.http.form_error_handler.form_rerender",
+        lambda **kw: captured.update(kw) or "ok",
+    )
+
+    class OAuthLike:
+        def __init__(self, username: str, password: str):
+            self.username = username
+            self.password = password
+
+    @form_error_handler(
+        template="x.html",
+        prefill_fields=("username",),
+        handlers={CustomError: lambda e: FormError()},
+    )
+    async def handler(request: Request, credentials: OAuthLike):
+        raise CustomError()
+
+    await handler(request=_request(), credentials=OAuthLike("u@x.io", "secret"))
+    assert captured["values"] == {"username": "u@x.io"}
+
+
+async def test_require_htmx_false_rerenders_for_non_htmx_calls(monkeypatch):
+    """Browser-only routes (no JSON contract for programmatic clients)
+    pass `require_htmx=False`. A registered exception then renders the
+    form fragment regardless of the `HX-Request` header. The login
+    wrapper is the canonical case — programmatic clients use
+    `/auth/jwt/login` instead, so the wrapper has no JSON contract to
+    preserve."""
+    captured: dict = {}
+    monkeypatch.setattr(
+        "src.framework.http.form_error_handler.form_rerender",
+        lambda **kw: captured.update(kw) or "ok",
+    )
+
+    @form_error_handler(
+        template="x.html",
+        handlers={CustomError: lambda e: FormError(banner="b")},
+        require_htmx=False,
+    )
+    async def handler(request: Request):
+        raise CustomError()
+
+    result = await handler(request=_request(htmx=False))
+    assert result == "ok"
+    assert captured["form_banner"] == "b"
+
+
 async def test_context_builder_threads_through(monkeypatch):
     """`context_builder` receives the route's kwargs and returns a dict
     that becomes the rerender's render context. Used for things like

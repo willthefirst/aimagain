@@ -89,6 +89,7 @@ def form_error_handler(
     handlers: Mapping[type[Exception], FormErrorHandler | FormErrorHandlerWithKwargs],
     prefill_fields: Sequence[str] = (),
     context_builder: Callable[[Mapping[str, Any]], dict[str, Any]] | None = None,
+    require_htmx: bool = True,
 ):
     """Decorator factory. See module docstring.
 
@@ -111,6 +112,15 @@ def form_error_handler(
       context_builder: optional callable from route kwargs to extra
         render context (e.g. `next_url` for the login form). Same shape
         as the existing `context=` param on `form_rerender`.
+      require_htmx: gate the rerender on `HX-Request: true`. Default
+        True (the register / programmatic-client split: HTMX gets HTML,
+        programmatic clients keep their JSON-4xx contract). Set False
+        for routes that are *only* a browser form — there is no JSON
+        contract to preserve, so the rerender should fire on every
+        client (login wrapper `/auth/login`; programmatic auth clients
+        use `/auth/jwt/login` instead). Re-raise to `handle_route_errors`
+        still happens when `handlers` doesn't match — the gate is just
+        about whether HTMX is required *for matched* exceptions.
     """
 
     def decorator(fn):
@@ -123,10 +133,16 @@ def form_error_handler(
                 if handler is None:
                     raise
                 request = _extract_request(kwargs)
-                if request is None or request.headers.get("HX-Request") != "true":
-                    # No request, or non-HTMX caller — preserve the
-                    # original error so `handle_route_errors` turns it
-                    # into the documented JSON 4xx (or 500).
+                if request is None:
+                    raise
+                if require_htmx and request.headers.get("HX-Request") != "true":
+                    # Non-HTMX caller on a route that preserves a JSON
+                    # contract (e.g. `/auth/register` for programmatic
+                    # clients) — preserve the original error so
+                    # `handle_route_errors` turns it into the documented
+                    # JSON 4xx. Browser-only routes pass `require_htmx=False`
+                    # and fall through to the rerender path on every
+                    # client.
                     raise
                 form_error = _call_handler(handler, exc, kwargs)
                 values = _collect_prefill(kwargs, prefill_fields)
@@ -223,15 +239,30 @@ def _collect_prefill(
 def _lookup_field(container: Any, name: str) -> Any:
     """Pull `name` from `container` if it carries the field.
 
-    Returns None on miss (caller iterates). Treats Request and other
-    framework-injected objects as misses by ignoring AttributeError on
-    non-data attributes — `getattr(request, "email", None)` returning
-    `None` is fine for prefill purposes (Request doesn't have form
-    fields exposed as attrs).
+    Returns None on miss (caller iterates). Three accepted shapes:
+
+      1. **dict** — `container.get(name)` (typical for raw form payloads
+         that haven't been adapted into a model yet).
+      2. **Pydantic model** — `getattr(container, name, None)`. Detected
+         by `model_dump` (v2) or `__fields__` (v1/v2 both expose it).
+      3. **Plain object with the attribute** — used by FastAPI deps that
+         aren't Pydantic, e.g. `OAuth2PasswordRequestForm` (the login
+         credentials object has `.username` / `.password` set in
+         `__init__`). The callable-guard excludes methods, so `Request`
+         (`.headers`, `.method`, etc.) won't spuriously match unless
+         the caller actually asks for `prefill_fields=("headers",)`,
+         which is caller error.
+
+    The framework-injected objects (Request, repos, managers) generally
+    don't have form-field attributes, so they return None and the
+    caller's loop moves on.
     """
     if isinstance(container, dict):
         return container.get(name)
     if hasattr(container, "model_dump") or hasattr(container, "__fields__"):
         # Pydantic v1/v2 model — read as an attribute.
         return getattr(container, name, None)
-    return None
+    value = getattr(container, name, None)
+    if callable(value):
+        return None
+    return value
