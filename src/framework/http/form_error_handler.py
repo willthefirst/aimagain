@@ -156,9 +156,36 @@ def form_error_handler(
                     values=values,
                 )
 
+        # Stash the decorator's config on the wrapper so the contract-
+        # pinning lint (`test_form_error_handler_contracts.py`) can
+        # introspect every decorated route at app-startup time and
+        # verify the template + macros + field names line up. Without
+        # this, the lint would have to grep AST source to recover the
+        # config — which doesn't survive imports, dynamic registration,
+        # or factory-built routes. `__form_error_config__` is the
+        # framework-internal contract; route code should never read it.
+        wrapper.__form_error_config__ = FormErrorConfig(
+            template=template,
+            handlers=dict(handlers),
+            prefill_fields=tuple(prefill_fields),
+            require_htmx=require_htmx,
+        )
         return wrapper
 
     return decorator
+
+
+@dataclass(frozen=True)
+class FormErrorConfig:
+    """The decorator's resolved configuration, attached to the wrapped
+    function as `__form_error_config__` for contract-pinning lint use.
+    See the decorator definition for why this exists.
+    """
+
+    template: str
+    handlers: Mapping[type[Exception], Any]
+    prefill_fields: tuple[str, ...]
+    require_htmx: bool
 
 
 def _match_handler(
