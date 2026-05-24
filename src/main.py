@@ -118,6 +118,13 @@ app.include_router(
     tags=["auth"],
 )
 
+# `auth_pages` is included BEFORE `get_reset_password_router()` because
+# the latter mounts a `POST /auth/forgot-password` at the same path as
+# our HTMX-friendly wrapper. FastAPI matches in registration order, so
+# whichever router is included first wins. The fastapi-users routes
+# remain mounted (for any path the wrapper doesn't intercept) — see
+# `auth_pages.post_forgot_password` for why we wrap.
+app.include_router(auth_pages.auth_pages_api_router)
 app.include_router(
     fastapi_users.get_reset_password_router(),
     prefix="/auth",
@@ -128,7 +135,6 @@ app.include_router(
     prefix="/auth",
     tags=["auth"],
 )
-app.include_router(auth_pages.auth_pages_api_router)
 app.include_router(verifications.verifications_api_router)
 
 # Every entity route file calls `register_entity(SPEC)` at import time
