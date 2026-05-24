@@ -64,6 +64,15 @@ FORMS_WITHOUT_PAIRS: dict[str, str] = {
         "fastapi-users OAuth2 password flow is form-encoded by RFC 6749; "
         "no JSON contract to verify."
     ),
+    "POST /auth/login": (
+        "HTMX wrapper around `POST /auth/jwt/login` (see "
+        "`src/domain/routes/auth_pages.py::post_login`). Same request "
+        "body shape as the underlying fastapi-users route — no new "
+        "JSON contract surface to verify. Response shape (200 + HTML "
+        "fragment on failure, 204 + HX-Redirect on HTMX success, 302 "
+        "on non-HTMX success) is pinned by the route tests in "
+        "`src/domain/routes/test_auth_routes.py`."
+    ),
     "POST /auth/sign-out": (
         "Empty-body endpoint that clears the session cookie. Nothing "
         "to pin beyond the path itself."

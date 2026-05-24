@@ -1,12 +1,15 @@
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import Response
+from fastapi.security import OAuth2PasswordRequestForm
 from fastapi_users import exceptions as fa_users_exceptions
 from fastapi_users import models
+from fastapi_users.authentication import Strategy
 from fastapi_users.manager import BaseUserManager
 
-from src.auth_config import current_active_user, get_user_manager
+from src.auth_config import auth_backend, current_active_user, get_user_manager
 from src.domain.models import User
 from src.framework import APIResponse, BaseRouter
+from src.framework.http.form_rerender import form_rerender
 
 # Standardized router initialization
 auth_pages_api_router = APIRouter(prefix="/auth")
@@ -44,6 +47,78 @@ async def get_login_page(request: Request):
         context={"next_url": next_url, "just_registered": just_registered},
         request=request,
     )
+
+
+@router.post("/login", name="auth_pages:post_login")
+async def post_login(
+    request: Request,
+    credentials: OAuth2PasswordRequestForm = Depends(),
+    user_manager: BaseUserManager[models.UP, models.ID] = Depends(get_user_manager),
+    strategy: Strategy[models.UP, models.ID] = Depends(auth_backend.get_strategy),
+):
+    """HTMX-friendly login that wraps fastapi-users' `auth_backend.login`.
+
+    fastapi-users' built-in `/auth/jwt/login` handler returns a JSON 400
+    on bad credentials, which HTMX has nowhere to land — the user sees
+    nothing. This route exists to surface the failure inline:
+
+      - bad credentials / inactive user → re-render `auth/login.html`
+        with `form_banner="Invalid email or password."` (no per-field
+        error because we deliberately don't tell the user which half
+        is wrong — that would be an enumeration vector).
+      - success → mint the cookie exactly as fastapi-users' login
+        does (delegate to `auth_backend.login`) and add `HX-Redirect`
+        pointing at `?next=` (or `/` if absent) so HTMX navigates
+        instead of trying to swap a 204-no-body response.
+
+    The original `/auth/jwt/login` route stays mounted (third-party
+    OAuth flows, programmatic clients, contract tests) — this is
+    purely the form-handler addition for the browser flow.
+
+    Templates that opt into the form-error rerender pattern must
+    import their form-fields / form-banner macros `with context` so
+    the auto-resolution from `form_errors` / `form_banner_text` lands;
+    see `src/framework/http/form_rerender.py`.
+    """
+    next_url = request.query_params.get("next", "") or "/"
+    user = await user_manager.authenticate(credentials)
+    if user is None or not user.is_active:
+        # `form_values["username"]` lets the macro auto-prefill the
+        # email input on re-render so the user only has to retype the
+        # password. Password is *not* echoed back — never echo a
+        # password into form HTML.
+        # Render *just the form fragment* (`auth/_login_form.html`), not
+        # the full `auth/login.html` page. HTMX's `hx-target="this"
+        # hx-swap="outerHTML"` on the form replaces the form element
+        # with the response body — feeding it the full page here would
+        # nest the entire page chrome inside the form slot.
+        return form_rerender(
+            request=request,
+            template_name="auth/_login_form.html",
+            context={"next_url": request.query_params.get("next", "")},
+            form_banner="Invalid email or password.",
+            values={"username": credentials.username},
+        )
+    response = await auth_backend.login(strategy, user)
+    # `UserManager.on_after_login` mutates the response into a 302 +
+    # `Location` (see `src/auth_config.py`) — that's the right shape
+    # for plain browser POSTs. For HTMX, however, an auto-followed 302
+    # would land HTML from the redirect target into the form-swap
+    # slot, not the intended page navigation. The branch below
+    # converts to 204 + `HX-Redirect` for HTMX so HTMX honors the
+    # navigation explicitly. Non-HTMX clients (contract tests,
+    # third-party tools) keep the existing 302 contract.
+    await user_manager.on_after_login(user, request, response)
+    if request.headers.get("HX-Request") == "true":
+        # Starlette's `MutableHeaders` lacks `.pop`; use the explicit
+        # get-then-delete pattern so the underlying multi-value header
+        # collection stays consistent.
+        location = response.headers.get("Location", next_url)
+        if "Location" in response.headers:
+            del response.headers["Location"]
+        response.headers["HX-Redirect"] = location
+        response.status_code = 204
+    return response
 
 
 @router.get("/forgot-password", name="auth_pages:forgot_password")

@@ -201,7 +201,7 @@ def test_mount_create_with_hx_request_and_form_error_render_invokes_renderer() -
     renderer = _stub_renderer_returning("<form>rendered</form>")
     with (
         patch(
-            "src.framework.dispatch.mounts.create.APIResponse.html_response",
+            "src.framework.http.form_rerender.APIResponse.html_response",
             new=renderer,
         ),
         patch(
@@ -232,7 +232,7 @@ def test_mount_create_without_hx_request_falls_through_to_json_422() -> None:
     app = _build_app(form_error_render=True, entity_spec=_fake_entity_spec())
     renderer = _stub_renderer_returning("<form>should not be called</form>")
     with patch(
-        "src.framework.dispatch.mounts.create.APIResponse.html_response",
+        "src.framework.http.form_rerender.APIResponse.html_response",
         new=renderer,
     ):
         client = TestClient(app)
@@ -249,7 +249,7 @@ def test_mount_create_with_hx_request_but_no_opt_in_falls_through_to_json_422() 
     app = _build_app(form_error_render=False)
     renderer = _stub_renderer_returning("<form>should not be called</form>")
     with patch(
-        "src.framework.dispatch.mounts.create.APIResponse.html_response",
+        "src.framework.http.form_rerender.APIResponse.html_response",
         new=renderer,
     ):
         client = TestClient(app)

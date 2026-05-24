@@ -13,19 +13,12 @@
         <p>Sign in to your Bedlam Connect account.</p>
       {% endif %}
     </header>
-    <!-- FastAPI Users JWT login endpoint expects 'username' (which is email) and 'password' as form data. -->
-    <form method="post"
-          action="/auth/jwt/login{% if next_url %}?next={{ next_url }}{% endif %}">
-      <label for="username">
-        Email
-        <input type="email" id="username" name="username" required />
-      </label>
-      <label for="password">
-        Password
-        <input type="password" id="password" name="password" required />
-      </label>
-      <button type="submit">Log in</button>
-    </form>
+    {# The form lives in `_login_form.html` so the error-rerender path
+       can re-render *just the form fragment* (`hx-target="this"
+       hx-swap="outerHTML"` would otherwise nest the entire page
+       chrome inside the form slot). See the partial's docstring +
+       `post_login`'s `form_rerender` call for the wiring. #}
+    {% include "auth/_login_form.html" %}
     <footer>
       <p>
         Forgot your password?

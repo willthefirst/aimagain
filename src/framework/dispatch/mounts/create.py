@@ -12,8 +12,9 @@ from src.framework.dispatch.mounts._common import (
 )
 from src.framework.dispatch.mounts._spec import ResourceSpec
 from src.framework.dispatch.mounts._synth import SynthOptions, synthesize_route_fn
+from src.framework.http.form_rerender import form_rerender
 from src.framework.http.forms import parse_form_to_payload, validate_or_422
-from src.framework.http.responses import APIResponse, created_response
+from src.framework.http.responses import created_response
 
 
 def mount_create(
@@ -204,8 +205,6 @@ async def _render_form_with_errors(
         requesting_user=requesting_user,
         kind=kind,
     )
-    context["form_errors"] = build_form_errors_dict(errors, kind=kind)
-    context["form_values"] = payload_dict
     template_name = context.pop("template_name", None) or entity_spec.templates.form_new
     if template_name is None:
         # Defensive: a spec that opted into `form_error_render` without
@@ -213,9 +212,43 @@ async def _render_form_with_errors(
         # fall through to the original 422 so the caller sees the
         # validation failure rather than a template error.
         raise HTTPException(status_code=422, detail=errors)
-    return APIResponse.html_response(
-        template_name=template_name,
-        context=context,
+    # Render *just the form fragment*, not the full page. HTMX swaps
+    # the response into the form via `hx-target="this" hx-swap="outerHTML"`;
+    # feeding it a full page (with `<html>`, header chrome, etc.) would
+    # nest the entire page inside the form slot — visually broken.
+    # Convention: full template `<dir>/<name>.html` has a fragment at
+    # `<dir>/_<name>_fragment.html`. If the fragment doesn't exist the
+    # render falls back to the full template (visibly-broken nesting,
+    # surfaced by the per-form route smoke's no-chrome assertion).
+    fragment_name = _fragment_template_name(template_name)
+    return form_rerender(
         request=request,
+        template_name=fragment_name,
+        context=context,
+        field_errors=build_form_errors_dict(errors, kind=kind),
+        values=payload_dict,
         current_user=requesting_user,
     )
+
+
+def _fragment_template_name(full_path: str) -> str:
+    """Convert a full form-page template path to its fragment sibling.
+
+    `posts/openings/new_clinician_opening.html` →
+    `posts/openings/_new_clinician_opening_fragment.html`
+
+    The fragment is a thin Jinja template that calls the same form
+    macro the full page does, with no `extends` — so rendering it
+    produces just the `<form>` element, the right shape for an HTMX
+    `outerHTML` swap that replaces the form in place.
+
+    Failure mode if the fragment file doesn't exist: Jinja raises
+    `TemplateNotFound` on render. That's intentional — surfacing the
+    missing-fragment as a 500 makes the bug discoverable, vs. silently
+    nesting the chrome.
+    """
+    import os
+
+    dirname, basename = os.path.split(full_path)
+    name, ext = os.path.splitext(basename)
+    return os.path.join(dirname, f"_{name}_fragment{ext}")
