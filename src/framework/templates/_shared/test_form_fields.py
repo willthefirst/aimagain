@@ -532,6 +532,203 @@ def test_field_for_threads_error_through_every_dispatched_kind(
     assert invalid_controls, f"kind={kind}: no control carries aria-invalid=true"
 
 
+# --- auto-resolution from form_errors / form_values (declarative) --------
+#
+# The `form_error_render` pattern wires `form_errors` and `form_values`
+# into the render context; each input macro reads them when the caller
+# didn't override. Templates opt into this by importing the macros
+# `with context`. These tests pin the contract once across every input
+# macro so opting a new form in is "set `form_error_render=True` + add
+# `with context` to the import" — no per-field threading.
+
+
+def _render_macro_with_context(macro_call: str, **context: dict) -> "HTMLParser":
+    """Render an inline macro call WITH the calling template's context
+    threaded into the macros (`with context`). `context` kwargs become
+    render-context vars (e.g. `form_errors={"x": "bad"}`). Without
+    `with context`, the macros can't see render-context vars and
+    auto-resolution silently no-ops — pinned by the dedicated test
+    below."""
+    env = _make_env()
+    env.globals["entities"] = [_Stub("1", "Alpha")]
+    template = (
+        '{%- from "_shared/form_fields.html" import text_field, textarea_field,'
+        " url_field, select_field, multi_select_field, entity_select_field,"
+        " field_for with context -%}\n"
+        f"{macro_call}"
+    )
+    return HTMLParser(env.from_string(template).render(**context))
+
+
+_AUTO_RESOLVE_MACROS = [
+    ("text_field", '{{ text_field("x", "X") }}', "input"),
+    ("textarea_field", '{{ textarea_field("x", "X") }}', "textarea"),
+    ("url_field", '{{ url_field("x", "X") }}', "input"),
+    ("select_field", '{{ select_field("x", "X", ("a", "b")) }}', "select"),
+    (
+        "multi_select_field",
+        '{{ multi_select_field("x", "X", ("a", "b")) }}',
+        "select",
+    ),
+    (
+        "entity_select_field",
+        '{{ entity_select_field("x", "X", entities) }}',
+        "select",
+    ),
+]
+
+
+@pytest.mark.parametrize(
+    "macro_name,macro_call,control_selector",
+    _AUTO_RESOLVE_MACROS,
+    ids=[m[0] for m in _AUTO_RESOLVE_MACROS],
+)
+def test_input_macro_auto_resolves_error_from_form_errors_context(
+    macro_name: str, macro_call: str, control_selector: str
+) -> None:
+    """With `form_errors` in the render context (and `with context` on
+    the import), each input macro auto-resolves `error=` from
+    `form_errors.get(name)` — no explicit `error=` arg required. This
+    is the declarative pattern that makes opting a form in just
+    "set the flag + import with context"."""
+    tree = _render_macro_with_context(macro_call, form_errors={"x": "auto"})
+    control = tree.css_first(control_selector)
+    assert (
+        control.attributes.get("aria-invalid") == "true"
+    ), f"{macro_name}: auto-resolution must set aria-invalid='true'"
+    small = tree.css_first("small#x-helper")
+    assert (
+        small is not None and "auto" in small.text()
+    ), f"{macro_name}: auto-resolved error did not render in helper slot"
+
+
+@pytest.mark.parametrize(
+    "macro_name,macro_call,control_selector",
+    _AUTO_RESOLVE_MACROS,
+    ids=[m[0] for m in _AUTO_RESOLVE_MACROS],
+)
+def test_input_macro_caller_error_wins_over_form_errors_context(
+    macro_name: str, macro_call: str, control_selector: str
+) -> None:
+    """Explicit `error="..."` from the caller takes precedence over
+    `form_errors.get(name)`. Keeps the override hatch open for callers
+    that synthesize their own message (and prevents context leakage
+    from accidentally clobbering a deliberate caller intent)."""
+    with_explicit = macro_call.replace(") }}", ', error="caller-wins") }}')
+    tree = _render_macro_with_context(with_explicit, form_errors={"x": "from-context"})
+    small = tree.css_first("small#x-helper")
+    assert small is not None
+    assert (
+        "caller-wins" in small.text()
+    ), f"{macro_name}: explicit error= must override form_errors context"
+    assert "from-context" not in small.text()
+
+
+# (macro_name, macro_call, form_value, assertion_fn) — each row encodes
+# how a given macro's `current` materializes in the rendered DOM so the
+# auto-resolution test can pin "context value made it through" without
+# branching inside the test body. Text inputs land as `value=...`;
+# selects (single/entity) gain a `[selected]` option; multi_select takes
+# a list of tokens and selects each.
+def _input_value_check(value: str):
+    def check(tree: HTMLParser) -> tuple[bool, str]:
+        inp = tree.css_first("input")
+        actual = inp.attributes.get("value") if inp else None
+        return actual == value, f"expected value={value!r}, got {actual!r}"
+
+    return check
+
+
+def _select_selected_check(values: list[str]):
+    def check(tree: HTMLParser) -> tuple[bool, str]:
+        selected = [
+            opt.attributes.get("value")
+            for opt in tree.css('select[name="x"] option')
+            if "selected" in opt.attributes
+        ]
+        return selected == values, f"expected selected={values!r}, got {selected!r}"
+
+    return check
+
+
+_AUTO_RESOLVE_VALUE_CASES = [
+    ("text_field", '{{ text_field("x", "X") }}', "typed", _input_value_check("typed")),
+    (
+        "url_field",
+        '{{ url_field("x", "X") }}',
+        "https://e.com",
+        _input_value_check("https://e.com"),
+    ),
+    (
+        "select_field",
+        '{{ select_field("x", "X", ("a", "b")) }}',
+        "a",
+        _select_selected_check(["a"]),
+    ),
+    (
+        "multi_select_field",
+        '{{ multi_select_field("x", "X", ("a", "b")) }}',
+        ["a", "b"],
+        _select_selected_check(["a", "b"]),
+    ),
+    (
+        "entity_select_field",
+        '{{ entity_select_field("x", "X", entities) }}',
+        "1",
+        _select_selected_check(["1"]),
+    ),
+]
+
+
+@pytest.mark.parametrize(
+    "macro_name,macro_call,form_value,check",
+    _AUTO_RESOLVE_VALUE_CASES,
+    ids=[c[0] for c in _AUTO_RESOLVE_VALUE_CASES],
+)
+def test_input_macro_auto_resolves_current_from_form_values_context(
+    macro_name: str, macro_call: str, form_value, check
+) -> None:
+    """`form_values[name]` in the render context auto-prefills the
+    control's `current` so a validation-failure re-render preserves
+    what the user typed. The per-macro check encodes how that
+    prefill manifests in the DOM (value attribute vs [selected]
+    option(s))."""
+    tree = _render_macro_with_context(macro_call, form_values={"x": form_value})
+    ok, detail = check(tree)
+    assert ok, f"{macro_name}: {detail}"
+
+
+# textarea: `current` lands as the element's text content, not an attr.
+def test_textarea_field_auto_resolves_current_from_form_values_context() -> None:
+    tree = _render_macro_with_context(
+        '{{ textarea_field("x", "X") }}', form_values={"x": "typed body"}
+    )
+    ta = tree.css_first("textarea")
+    assert ta is not None
+    assert ta.text() == "typed body"
+
+
+def test_input_macros_no_with_context_silently_skip_auto_resolution() -> None:
+    """Sanity check on the "must import with context" requirement: a
+    template that imports the macros WITHOUT context can't see
+    `form_errors`/`form_values`, so auto-resolution is a no-op. The
+    macro still renders normally; the test is the safety net that
+    catches "I opted into form_error_render but forgot `with context`"
+    — the route smoke wouldn't otherwise distinguish this from a
+    correctly-wired form."""
+    env = _make_env()
+    template = (
+        '{%- from "_shared/form_fields.html" import text_field -%}'
+        '{{ text_field("x", "X") }}'
+    )
+    tree = HTMLParser(env.from_string(template).render(form_errors={"x": "bad"}))
+    inp = tree.css_first("input")
+    # No `with context` → form_errors invisible to the macro → no
+    # auto-resolution → no aria-invalid, no helper slot.
+    assert "aria-invalid" not in inp.attributes
+    assert tree.css_first("small#x-helper") is None
+
+
 # --- repository-level guard ------------------------------------------------
 
 

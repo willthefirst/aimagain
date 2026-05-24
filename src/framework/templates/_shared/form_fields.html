@@ -56,8 +56,40 @@ invalid-form pattern (https://picocss.com/docs/forms/input):
 
 If both `help=` and `error=` are set, the error wins — the helper text
 is suppressed for that render so the visible message is the actionable
-one. Used by the form-error-rerender path on validation failure — see
-the `form_error_render` opt-in on `EntitySpec` and `mount_create`.
+one.
+
+## Auto-resolution from `form_errors` / `form_values` (declarative)
+
+For forms wired into the `form_error_render` opt-in on `EntitySpec`,
+each input macro **auto-resolves** `error` from `form_errors.get(name)`
+and prefills `current` from `form_values.get(name, current)` — the
+template author calls `field_for(schema, "x", "X")` and the framework
+handles both error rendering and submitted-value prefill on re-render.
+
+Two requirements for auto-resolution to kick in:
+
+  1. **The template must import macros `with context`** so the macros
+     can see the render-context vars:
+
+         {%- from "_shared/form_fields.html"
+             import text_field, field_for, ... with context -%}
+
+     Without `with context`, the macros silently fall back to "no
+     auto-resolution" (caller's explicit `error=`/`current=` still
+     work). The smoke test on the route is the safety net.
+  2. **The framework injects `form_errors` and `form_values` into the
+     render context** — `mount_create`'s `_render_form_with_errors`
+     (see `src/framework/dispatch/mounts/create.py`) does this on a
+     validation-failure re-render. On a successful GET both are empty
+     and the macros behave exactly as if the caller hadn't asked for
+     auto-resolution.
+
+Explicit caller args **always win** — passing `error="..."` or
+`current=<x>` overrides the context lookup. This keeps existing
+non-opted-in templates working unchanged and lets opted-in templates
+override the auto-resolution for the rare case where the caller
+genuinely knows better (e.g. a synthesized error message that doesn't
+match a Pydantic field).
 
 ## Schema dispatch (`field_for`)
 
@@ -109,6 +141,10 @@ emitted attribute string. #}
 {%- endmacro %}
 {# ---- text-like inputs --------------------------------------------- #}
 {% macro text_field(name, label, current=None, required=True, pattern=None, maxlength=None, help=None, invalid=None, error=None, type="text", autocomplete=None) -%}
+  {%- set _form_errors = form_errors|default({}, true) -%}
+  {%- set _form_values = form_values|default({}, true) -%}
+  {%- set error = error if error is not none else _form_errors.get(name) -%}
+  {%- set current = _form_values[name] if name in _form_values else current -%}
   {%- set aria_invalid = true if error else invalid -%}
   <label class="form-field" for="{{ name }}">
     <span class="form-field-label">{{ _field_label(label, required) }}</span>
@@ -126,6 +162,10 @@ emitted attribute string. #}
   </label>
 {%- endmacro %}
 {% macro textarea_field(name, label, current=None, required=True, help=None, invalid=None, error=None) -%}
+  {%- set _form_errors = form_errors|default({}, true) -%}
+  {%- set _form_values = form_values|default({}, true) -%}
+  {%- set error = error if error is not none else _form_errors.get(name) -%}
+  {%- set current = _form_values[name] if name in _form_values else current -%}
   {%- set aria_invalid = true if error else invalid -%}
   <label class="form-field" for="{{ name }}">
     <span class="form-field-label">{{ _field_label(label, required) }}</span>
@@ -145,6 +185,10 @@ emitted attribute string. #}
 {%- endmacro %}
 {# ---- selects ------------------------------------------------------- #}
 {% macro select_field(name, label, options, labels=None, current=None, required=True, placeholder=False, help=None, invalid=None, error=None) -%}
+  {%- set _form_errors = form_errors|default({}, true) -%}
+  {%- set _form_values = form_values|default({}, true) -%}
+  {%- set error = error if error is not none else _form_errors.get(name) -%}
+  {%- set current = _form_values[name] if name in _form_values else current -%}
   {%- set aria_invalid = true if error else invalid -%}
   <label class="form-field" for="{{ name }}">
     <span class="form-field-label">{{ _field_label(label, required) }}</span>
@@ -175,6 +219,10 @@ emitted attribute string. #}
    carriers, no featured services). Callers can pass `required=True`
    to force at least one selection. #}
 {% macro multi_select_field(name, label, options, labels=None, current=None, required=False, help=None, invalid=None, error=None) -%}
+  {%- set _form_errors = form_errors|default({}, true) -%}
+  {%- set _form_values = form_values|default({}, true) -%}
+  {%- set error = error if error is not none else _form_errors.get(name) -%}
+  {%- set current = _form_values[name] if name in _form_values else current -%}
   {%- set selected = current or [] -%}
   {%- set aria_invalid = true if error else invalid -%}
   <label class="form-field" for="{{ name }}">
@@ -212,6 +260,10 @@ emitted attribute string. #}
    sides — the option `value` attribute is stringified by the browser
    anyway, so callers don't need to coerce. #}
 {% macro entity_select_field(name, label, entities, current=None, required=True, blank_label=None, help=None, invalid=None, error=None, value_attr="id", label_attr="name") -%}
+  {%- set _form_errors = form_errors|default({}, true) -%}
+  {%- set _form_values = form_values|default({}, true) -%}
+  {%- set error = error if error is not none else _form_errors.get(name) -%}
+  {%- set current = _form_values[name] if name in _form_values else current -%}
   {%- set current_s = current|string if current is not none else "" -%}
   {%- set aria_invalid = true if error else invalid -%}
   <label class="form-field" for="{{ name }}">
@@ -272,6 +324,10 @@ emitted attribute string. #}
    `required=false` to override the schema-derived default (e.g. an
    optional filter on a field that's required for create). #}
 {% macro field_for(schema, name, label, current=None, required=None, help=None, invalid=None, error=None) -%}
+  {%- set _form_errors = form_errors|default({}, true) -%}
+  {%- set _form_values = form_values|default({}, true) -%}
+  {%- set error = error if error is not none else _form_errors.get(name) -%}
+  {%- set current = _form_values[name] if name in _form_values else current -%}
   {%- set spec = field_spec(schema, name) -%}
   {%- set is_required = spec.required if required is none else required -%}
   {%- if spec.kind == "select" -%}

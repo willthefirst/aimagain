@@ -18,24 +18,24 @@ practice. The wrapper templates `posts/openings/new_clinician_opening.html` /
 when `current_user.providers` is empty, so this macro always renders
 with at least one provider available.
 #}
-{%- from "_shared/form_fields.html" import entity_select_field, text_field, textarea_field, select_field, time_grid_field, multi_select_field, field_for -%}
+{# `with context` lets the form_fields macros auto-resolve per-field
+   `error=`/`current=` from the `form_errors`/`form_values` injected into
+   the render context by `mount_create` on a validation-failure
+   re-render (see `OPENING_ENTITY.form_error_render` + the docstring at
+   the top of `_shared/form_fields.html`). No per-field error or value
+   threading is required at the callsite; explicit overrides still win
+   if a future caller needs them. #}
+{%- from "_shared/form_fields.html" import entity_select_field, text_field, textarea_field, select_field, time_grid_field, multi_select_field, field_for with context -%}
 {%- from "_shared/form_copy.html" import modality_help, schedule_notes_help, select_all_help -%}
 {%- from "_shared/actions.html" import actions -%}
-{%- macro opening_form(hx_method, action, submit_label, post=None, schema=None, current_user=None, cancel_url=None, errors=None, values=None) -%}
+{%- macro opening_form(hx_method, action, submit_label, post=None, schema=None, current_user=None, cancel_url=None) -%}
   {%- set d = post.opening_detail if post else None -%}
-  {%- set errors = errors or {} -%}
-  {%- set values = values or {} -%}
-  {# `values` overlays the per-field default when the form is re-rendered
-     after a validation failure (see `form_error_render` in OPENING_ENTITY's
-     spec and `mount_create`). On a normal GET both `errors` and `values`
-     are empty and fields prefill from `post` (edit) or nothing (create).
-     The form's `hx-target="this" hx-swap="outerHTML"` lets the
-     error-rerender path replace the whole `<form>` in place; the success
-     path is unaffected because `mount_create` emits `HX-Redirect`. #}
-  {# `hx-{{ hx_method }}` is a templated attribute *name*; djlint
-     mis-wraps the form tag when the line exceeds its budget, so the
-     extra hx-target / hx-swap pair is read from the `_hx_attrs` set
-     below instead of being inlined as raw attrs. #}
+  {# `hx-target="this" hx-swap="outerHTML"` is required for the
+     error-rerender path to swap the form in place; the success path is
+     unaffected because `mount_create` emits `HX-Redirect`. The pair is
+     bundled into `_hx_attrs` because `hx-{{ hx_method }}` is a
+     templated attribute *name* and djlint mis-wraps the form tag when
+     the line exceeds its budget. #}
   {%- set _hx_attrs = "hx-target=\"this\" hx-swap=\"outerHTML\"" -%}
   <form hx-{{ hx_method }}="{{ action }}" {{ _hx_attrs|safe }}>
     <input type="hidden" name="kind" value="clinician_opening" />
@@ -83,7 +83,7 @@ with at least one provider available.
         {{ multi_select_field("settings", "Treatment settings", TREATMENT_SETTINGS, labels=TREATMENT_SETTINGS_LABELS, current=d.settings if d else None) }}
       </div>
       {{ text_field("treatment_modality", "Treatment modality", current=d.treatment_modality if d else None, required=false, help=modality_help() ) }}
-      {{ field_for(schema, "age_groups", "Age groups", current=values.get("age_groups", d.age_groups if d else None) , error=errors.get("age_groups"), help=select_all_help() ) }}
+      {{ field_for(schema, "age_groups", "Age groups", current=d.age_groups if d else None, help=select_all_help() ) }}
       <div class="grid">
         {{ field_for(schema, "languages", "Languages spoken", current=d.languages if d else None) }}
         {{ multi_select_field("genders", "Genders served", GENDERS, labels=GENDER_LABELS, current=d.genders if d else None) }}
