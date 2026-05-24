@@ -145,6 +145,45 @@ async def test_create_provider_happy_path(
     assert rows[0].actor_id == logged_in_user.id
 
 
+async def test_create_provider_form_error_render_is_wired(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user: User,
+):
+    """Integration smoke for `PROVIDER_ENTITY.form_error_render`.
+
+    HX-Request POST with an invalid `in_person_sessions` value
+    (the field is a Literal over `LOCATION_AVAILABILITY_OPTIONS`)
+    → 422 + HTML fragment with the inline error landed on the
+    `in_person_sessions` input. Same shape as the organizations /
+    programs smokes.
+
+    `first_name` would have been a more obvious trip — but the
+    schema models it as `StrippedOptionalText = None` (matches the
+    rest of the provider model's tolerant defaults), so an empty
+    string passes. Pin the actual Literal field instead.
+    """
+    org_id = await _seed_org(
+        db_test_session_manager, owner_id=logged_in_user.id, name="Acme"
+    )
+    payload = provider_payload(org_id=str(org_id))
+    payload["in_person_sessions"] = "not-a-valid-option"
+    response = await authenticated_client.post(
+        "/clinicians",
+        data=payload,
+        headers={"HX-Request": "true"},
+    )
+    assert response.status_code == 422, response.text
+    assert response.headers["content-type"].startswith("text/html")
+    body = response.text
+    field_at = body.index('name="in_person_sessions"')
+    window = body[max(0, field_at - 200) : field_at + 200]
+    assert 'aria-invalid="true"' in window, window
+    assert "<!DOCTYPE" not in body
+    assert "<html" not in body
+    assert "Bedlam Connect" not in body
+
+
 async def test_create_provider_allows_multiple_per_user(
     authenticated_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],

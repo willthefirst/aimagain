@@ -7,10 +7,14 @@ set) skips the picker and renders the full create form with that type
 pre-selected in the Type dropdown.
 
 This mirrors the `/openings/form` picker pattern (issue #704).
+
+The actual form lives in `_form_new_fragment.html` so the framework's
+error-rerender path (`mount_create._render_form_with_errors`) can
+re-render just the form fragment on a Pydantic validation failure —
+the path-derivation convention (`<dir>/_<name>_fragment.html`) requires
+a sibling file with that exact name. The full page below includes it.
 #}
 {% extends "views/form_new.html" %}
-{%- from "_shared/form_fields.html" import entity_select_field, select_field, text_field -%}
-{%- from "_shared/actions.html" import actions -%}
 {%- from "_shared/_picker.html" import picker -%}
 {% block resource_label %}Organizations{% endblock %}
 {% block content %}
@@ -38,28 +42,6 @@ This mirrors the `/openings/form` picker pattern (issue #704).
     "description": "Doesn't fit the above."},
     ]) }}
   {% else %}
-    {# Form: shown when ?type= is set (either via picker click or deep link).
-   The Type dropdown is pre-selected to the value from the query param. #}
-    <form hx-post="{{ entity_url('organization') }}">
-      <fieldset>
-        <legend>Organization</legend>
-        <div class="grid">
-          {{ text_field("name", "Name", maxlength=200) }}
-          {{ select_field("type", "Type", ORGANIZATION_TYPES, labels=ORGANIZATION_TYPES_LABELS, current=selected_type) }}
-        </div>
-        {# Parent-Org picker — replaces the free-text UUID input from #581.
-       `parent_org_options` is populated by `organization_form_extras`
-       (see `ORGANIZATION_ENTITY.form_extras_path`). Empty value =
-       root organization; blank-string is coerced to None by the
-       schema's `OptionalUuid`. #}
-        {{ entity_select_field("parent_org_id",
-                "Parent organization",
-                parent_org_options,
-                blank_label="(no parent)",
-                required=false,
-                help="Most organizations have no parent. Set one only if this is part of a larger network.",) }}
-      </fieldset>
-      {{ actions(entity_create_label('organization') , cancel_url=entity_url('organization')) }}
-    </form>
+    {% include "organizations/_form_new_fragment.html" %}
   {% endif %}
 {% endblock %}
