@@ -14,8 +14,22 @@ it. The signal table:
 | `intent` | `user.onboarding_intent` |
 | `has_clinician` | `user.providers` non-empty (selectin-loaded) |
 | `clinician_verified` | onboarding clinician's latest `Verification.status == 'verified'` |
-| `has_opening` | onboarding clinician owns ≥1 `OpeningDetail` (T4+) |
+| `has_opening` | onboarding clinician owns ≥1 `clinician_opening` Post (T4) |
 | `has_reciprocity_profile` | clinician has non-empty specialties AND modality (T5+) |
+
+### Truth table (current)
+
+| intent | has_clinician | clinician_verified | has_opening | next URL |
+|---|---|---|---|---|
+| any | False | — | — | `/welcome/verify` |
+| any | True | False | — | `/welcome/verify` |
+| `have_openings` | True | True | False | `/welcome/first-opening` |
+| `have_openings` | True | True | True | `/welcome/done` |
+| `refer_now` | True | True | — | `/welcome/coming-soon` (T5) |
+| `building_network` | True | True | — | `/welcome/coming-soon` (T7) |
+| `invited` | True | True | — | `/welcome/coming-soon` (T7) |
+
+**Terminal rule**: Repeat visits to `/welcome/done` re-render the done page — the natural exit is the "Go to the board" CTA. No session flag is used (see `state_machine.py` comment).
 
 ### Onboarding clinician convention
 

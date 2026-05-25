@@ -5,6 +5,12 @@ Covers:
 - GET /welcome/verify renders with 200 and the step header
 - POST /welcome/verify happy path: creates Provider+Licensure, runs verification, redirects
 - POST /welcome/verify validation error: re-renders form with 422 inline errors
+- GET /welcome/first-opening renders when preconditions met
+- GET /welcome/first-opening redirects to /welcome when no clinician
+- POST /welcome/first-opening happy path: Opening created, redirects to /welcome/done
+- POST /welcome/first-opening validation error: re-renders form with errors
+- POST /welcome/first-opening skip-note: colleague_note is None
+- GET /welcome/done renders static peer cards
 - GET /welcome/coming-soon renders placeholder
 - Unauthenticated access redirects to login
 
@@ -19,7 +25,8 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from src.domain.logic.verifications import oig as oig_module
-from src.domain.models import Provider, User
+from src.domain.models import OpeningDetail, Provider, User
+from src.domain.models.posts.post import Post
 
 pytestmark = pytest.mark.asyncio
 
@@ -188,6 +195,221 @@ async def test_post_verify_invalid_body_returns_422_inline(
     assert response.status_code == 422
     # Form is re-rendered — heading still present
     assert b"Verify your license" in response.content
+
+
+# ---------------------------------------------------------------------------
+# GET /welcome/first-opening
+# ---------------------------------------------------------------------------
+
+
+async def _setup_verified_clinician(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user: User,
+) -> None:
+    """Create a verified clinician for the logged-in user by running the verify step."""
+    await _set_intent(db_test_session_manager, logged_in_user.email, "have_openings")
+    response = await authenticated_client.post(
+        "/welcome/verify",
+        json=_VALID_BODY,
+        headers={"Accept": "text/html"},
+        follow_redirects=False,
+    )
+    assert response.status_code == 302, f"Verify failed: {response.status_code}"
+
+
+async def test_get_first_opening_renders_when_clinician_verified(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user: User,
+):
+    """GET /welcome/first-opening renders the form when preconditions met."""
+    await _setup_verified_clinician(
+        authenticated_client, db_test_session_manager, logged_in_user
+    )
+    response = await authenticated_client.get(
+        "/welcome/first-opening",
+        headers={"Accept": "text/html"},
+    )
+    assert response.status_code == 200
+    assert b"Describe one opening" in response.content
+    assert b'data-testid="first-opening-type"' in response.content
+    assert b'data-testid="welcome-step-header"' in response.content
+
+
+async def test_get_first_opening_without_clinician_redirects_to_welcome(
+    authenticated_client: AsyncClient,
+):
+    """GET /welcome/first-opening with no clinician → redirect to /welcome."""
+    response = await authenticated_client.get(
+        "/welcome/first-opening",
+        headers={"Accept": "text/html"},
+        follow_redirects=False,
+    )
+    assert response.status_code == 302
+    assert response.headers["location"] == "/welcome"
+
+
+# ---------------------------------------------------------------------------
+# POST /welcome/first-opening
+# ---------------------------------------------------------------------------
+
+_FIRST_OPENING_BODY = {
+    "opening_type": "individual",
+    "specialties": ["Trauma/PTSD", "Anxiety"],
+    "availability_state": "taking_now",
+}
+
+
+async def test_post_first_opening_happy_path_creates_opening_and_redirects(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user: User,
+):
+    """Valid body → Opening created, 302 to /welcome/done."""
+    await _setup_verified_clinician(
+        authenticated_client, db_test_session_manager, logged_in_user
+    )
+
+    response = await authenticated_client.post(
+        "/welcome/first-opening",
+        json=_FIRST_OPENING_BODY,
+        headers={"Accept": "text/html"},
+        follow_redirects=False,
+    )
+    assert response.status_code == 302
+    assert response.headers["location"] == "/welcome/done"
+
+    # Verify a Post + OpeningDetail row was created
+    async with db_test_session_manager() as session:
+        result = await session.execute(
+            select(Post).filter(
+                Post.owner_id == logged_in_user.id,
+                Post.kind == "clinician_opening",
+            )
+        )
+        posts = result.scalars().all()
+    assert len(posts) == 1
+
+
+async def test_post_first_opening_sets_slot_fields(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user: User,
+):
+    """Slot fields written to OpeningDetail survive a read-back."""
+    await _setup_verified_clinician(
+        authenticated_client, db_test_session_manager, logged_in_user
+    )
+
+    body = {
+        **_FIRST_OPENING_BODY,
+        "colleague_note": "Looking for adults with anxiety.",
+    }
+    response = await authenticated_client.post(
+        "/welcome/first-opening",
+        json=body,
+        headers={"Accept": "text/html"},
+        follow_redirects=False,
+    )
+    assert response.status_code == 302
+
+    async with db_test_session_manager() as session:
+        result = await session.execute(
+            select(OpeningDetail)
+            .join(Post, Post.id == OpeningDetail.post_id)
+            .filter(
+                Post.owner_id == logged_in_user.id,
+                Post.kind == "clinician_opening",
+            )
+        )
+        detail = result.scalars().first()
+    assert detail is not None
+    assert detail.opening_type == "individual"
+    assert detail.availability_state == "taking_now"
+    assert detail.colleague_note == "Looking for adults with anxiety."
+
+
+async def test_post_first_opening_skip_note_clears_colleague_note(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user: User,
+):
+    """skip_note=1 in body clears colleague_note before validation."""
+    await _setup_verified_clinician(
+        authenticated_client, db_test_session_manager, logged_in_user
+    )
+
+    body = {
+        **_FIRST_OPENING_BODY,
+        "colleague_note": "This should be stripped",
+        "skip_note": "1",
+    }
+    response = await authenticated_client.post(
+        "/welcome/first-opening",
+        json=body,
+        headers={"Accept": "text/html"},
+        follow_redirects=False,
+    )
+    assert response.status_code == 302
+
+    async with db_test_session_manager() as session:
+        result = await session.execute(
+            select(OpeningDetail)
+            .join(Post, Post.id == OpeningDetail.post_id)
+            .filter(
+                Post.owner_id == logged_in_user.id,
+            )
+        )
+        detail = result.scalars().first()
+    assert detail is not None
+    assert detail.colleague_note is None
+
+
+async def test_post_first_opening_invalid_opening_type_returns_422(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user: User,
+):
+    """Bad opening_type → form re-rendered with 422 inline errors."""
+    await _setup_verified_clinician(
+        authenticated_client, db_test_session_manager, logged_in_user
+    )
+
+    bad_body = {**_FIRST_OPENING_BODY, "opening_type": "not_a_valid_type"}
+    response = await authenticated_client.post(
+        "/welcome/first-opening",
+        json=bad_body,
+        headers={"Accept": "text/html"},
+        follow_redirects=False,
+    )
+    assert response.status_code == 422
+    assert b"Describe one opening" in response.content
+
+
+# ---------------------------------------------------------------------------
+# GET /welcome/done
+# ---------------------------------------------------------------------------
+
+
+async def test_get_done_renders_200(authenticated_client: AsyncClient):
+    """GET /welcome/done always renders 200 with peer cards."""
+    response = await authenticated_client.get(
+        "/welcome/done",
+        headers={"Accept": "text/html"},
+    )
+    assert response.status_code == 200
+    assert b"You're on the board" in response.content
+    assert b'data-testid="likely-referral-sources"' in response.content
+
+
+async def test_get_done_anon_redirected(test_client: AsyncClient):
+    response = await test_client.get(
+        "/welcome/done",
+        headers={"Accept": "text/html"},
+        follow_redirects=False,
+    )
+    assert response.status_code in {302, 401}
 
 
 # ---------------------------------------------------------------------------

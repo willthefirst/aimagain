@@ -10,19 +10,20 @@ Templates for the `/welcome/*` bespoke router (`src/domain/routes/welcome.py`).
 
 Each step template extends `_layout.html` and fills `wizard_content`.
 
-## Steps (this ticket)
+## Steps
 
 | File | URL | Description |
 |---|---|---|
-| `verify.html` | `GET /welcome/verify` | License-verification form |
-| `coming_soon.html` | `GET /welcome/coming-soon` | Placeholder while downstream steps ship |
+| `verify.html` | `GET /welcome/verify` | License-verification form (Step 1 of 1 for all flows) |
+| `first_opening.html` | `GET /welcome/first-opening` | First opening form (Step 2 of 2 for `have_openings` flow) |
+| `done.html` | `GET /welcome/done` | Terminal "You're on the board" page (`have_openings` flow) |
+| `coming_soon.html` | `GET /welcome/coming-soon` | Placeholder while T5/T7 steps ship |
 
 ## Steps (downstream)
 
-T4/T5/T6/T7 add `first_opening.html`, `done.html`, `be_findable.html`,
-`refer.html`, `start_network.html`, `minimal_profile.html`. Each follows the
-same pattern: extend `_layout.html`, fill `wizard_content`, form via
-`form_with_errors` macro.
+T5/T6/T7 add `be_findable.html`, `refer.html`, `start_network.html`,
+`minimal_profile.html`. Each follows the same pattern: extend `_layout.html`,
+fill `wizard_content`, form via `form_with_errors` macro.
 
 ## Styling note
 
