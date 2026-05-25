@@ -66,6 +66,10 @@ register_template_globals(
     TREATMENT_SETTINGS_LABELS=enums.TREATMENT_SETTINGS_LABELS,
     GENDERS=enums.GENDERS,
     GENDER_LABELS=enums.GENDER_LABELS,
+    OPENING_TYPES=enums.OPENING_TYPES,
+    OPENING_TYPES_LABELS=enums.OPENING_TYPES_LABELS,
+    AVAILABILITY_STATES=enums.AVAILABILITY_STATES,
+    AVAILABILITY_STATES_LABELS=enums.AVAILABILITY_STATES_LABELS,
     # Lucide icon names per enum value — consumed by the listing-row
     # macro in `src/domain/templates/posts/_item.html`. Renaming a label
     # leaves these untouched; adding/renaming an *enum value* must touch
@@ -128,3 +132,5 @@ register_choice_labels(enums.GENDERS, enums.GENDER_LABELS)
 register_choice_labels(enums.LICENSE_TYPES, enums.LICENSE_TYPES_LABELS)
 register_choice_labels(enums.EDUCATION_TYPES, enums.EDUCATION_TYPES_LABELS)
 register_choice_labels(enums.CERTIFICATION_TYPES, enums.CERTIFICATION_TYPES_LABELS)
+register_choice_labels(enums.OPENING_TYPES, enums.OPENING_TYPES_LABELS)
+register_choice_labels(enums.AVAILABILITY_STATES, enums.AVAILABILITY_STATES_LABELS)
