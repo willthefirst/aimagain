@@ -1,0 +1,42 @@
+# Onboarding logic cluster
+
+Wizard state machine, service functions, and wire schemas for the `/welcome/*`
+bespoke router (`src/domain/routes/welcome.py`).
+
+## State machine
+
+`state_machine.py:next_step(user, *, db)` is the single source of truth for
+"where does this user go next?" Every wizard route that needs a redirect calls
+it. The signal table:
+
+| Signal | Source |
+|---|---|
+| `intent` | `user.onboarding_intent` |
+| `has_clinician` | `user.providers` non-empty (selectin-loaded) |
+| `clinician_verified` | onboarding clinician's latest `Verification.status == 'verified'` |
+| `has_opening` | onboarding clinician owns ≥1 `OpeningDetail` (T4+) |
+| `has_reciprocity_profile` | clinician has non-empty specialties AND modality (T5+) |
+
+### Onboarding clinician convention
+
+The wizard always operates on the **most-recently-created `Provider`** owned by
+the user: `onboarding_clinician(user) = max(user.providers, key=lambda p: p.created_at)`.
+Every downstream ticket uses this helper — never inline the definition.
+
+## Bespoke-shim pattern
+
+Every wizard write is a function in `services.py` that:
+1. Validates form data via a Pydantic schema in `schema.py`
+2. Delegates to existing domain repo primitives / handlers
+3. Owns the transaction (or delegates to the verification pipeline, which commits)
+4. Returns the primary created/updated model
+
+The route handler calls the service function, then redirects via `next_step()`.
+There is no `return_to` primitive — wizard redirects are always determined by
+the state machine.
+
+## No `return_to` primitive
+
+Wizard redirects are always state-machine-driven. There is no `?return_to=`
+query-string pass-through. If a non-onboarding use case emerges that needs a
+`return_to` primitive, design it then — don't add it speculatively here.
