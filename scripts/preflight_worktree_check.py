@@ -19,6 +19,14 @@ Worktree detection: ``git rev-parse --git-dir`` differs from
 sits under ``<main>/.git/worktrees/<name>`` while ``--git-common-dir`` returns
 the shared ``<main>/.git``). In the main checkout the two are equal.
 
+The check runs twice:
+
+  1. Against the payload ``cwd`` — the session's reported working directory.
+  2. Against the target ``file_path`` — needed because the harness ``cwd``
+     may still point at the main checkout even after ``EnterWorktree`` has
+     switched the session into a linked worktree. If the file being written
+     lives inside a worktree, that's sufficient evidence to allow it.
+
 Exits 2 with a stderr message on block (Claude Code surfaces stderr to the
 model so the next step is actionable). Exits 0 (allow) on every other path
 and on any internal failure — the hook must not wedge the session if git
@@ -62,6 +70,36 @@ def _in_worktree() -> bool:
     return git_abs != common_abs
 
 
+def _path_in_worktree(file_path: str) -> bool:
+    """True if file_path (or its nearest existing ancestor) is inside a linked worktree.
+
+    Used as a fallback when the harness ``cwd`` lags behind an ``EnterWorktree``
+    call — the payload cwd may still point at the main checkout while the target
+    file already lives in the worktree.
+    """
+    if not file_path:
+        return False
+    p = Path(file_path).resolve()
+    # Walk up to the nearest existing directory; the file itself may not exist yet.
+    while not p.exists():
+        parent = p.parent
+        if parent == p:
+            return False  # reached filesystem root without finding anything
+        p = parent
+    check_dir = p if p.is_dir() else p.parent
+    old_cwd = Path.cwd()
+    try:
+        os.chdir(check_dir)
+        return _in_worktree()
+    except OSError:
+        return False
+    finally:
+        try:
+            os.chdir(old_cwd)
+        except OSError:
+            pass
+
+
 def main() -> int:
     raw = sys.stdin.read()
     if not raw.strip():
@@ -75,6 +113,8 @@ def main() -> int:
     if tool_name not in GUARDED_TOOLS:
         return 0
 
+    file_path = payload.get("tool_input", {}).get("file_path", "")
+
     # Move to the cwd Claude Code reports — the hook process inherits its own
     # cwd from the harness, which is not necessarily the session's cwd.
     cwd = payload.get("cwd") or os.getcwd()
@@ -86,13 +126,17 @@ def main() -> int:
     if _in_worktree():
         return 0
 
+    # The harness cwd may not reflect an EnterWorktree switch — also check
+    # whether the target file itself lives inside a worktree.
+    if _path_in_worktree(file_path):
+        return 0
+
     branch = _git(["branch", "--show-current"])
     if branch not in {"main", "master"}:
         return 0
 
     # Pick a slug hint from the file being edited so the suggested command
     # is concrete. Fallback to "task" so the message stays valid.
-    file_path = payload.get("tool_input", {}).get("file_path", "")
     slug_hint = "task"
     if file_path:
         parts = [p for p in Path(file_path).parts if p not in {"/", ".", ".."}]
