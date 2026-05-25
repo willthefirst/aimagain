@@ -202,22 +202,6 @@ async def test_post_verify_invalid_body_returns_422_inline(
 # ---------------------------------------------------------------------------
 
 
-async def _setup_verified_clinician(
-    authenticated_client: AsyncClient,
-    db_test_session_manager: async_sessionmaker[AsyncSession],
-    logged_in_user: User,
-) -> None:
-    """Create a verified clinician for the logged-in user by running the verify step."""
-    await _set_intent(db_test_session_manager, logged_in_user.email, "have_openings")
-    response = await authenticated_client.post(
-        "/welcome/verify",
-        json=_VALID_BODY,
-        headers={"Accept": "text/html"},
-        follow_redirects=False,
-    )
-    assert response.status_code == 302, f"Verify failed: {response.status_code}"
-
-
 async def test_get_first_opening_renders_when_clinician_verified(
     authenticated_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],
@@ -225,7 +209,10 @@ async def test_get_first_opening_renders_when_clinician_verified(
 ):
     """GET /welcome/first-opening renders the form when preconditions met."""
     await _setup_verified_clinician(
-        authenticated_client, db_test_session_manager, logged_in_user
+        authenticated_client,
+        db_test_session_manager,
+        logged_in_user.email,
+        intent="have_openings",
     )
     response = await authenticated_client.get(
         "/welcome/first-opening",
@@ -268,7 +255,10 @@ async def test_post_first_opening_happy_path_creates_opening_and_redirects(
 ):
     """Valid body → Opening created, 302 to /welcome/done."""
     await _setup_verified_clinician(
-        authenticated_client, db_test_session_manager, logged_in_user
+        authenticated_client,
+        db_test_session_manager,
+        logged_in_user.email,
+        intent="have_openings",
     )
 
     response = await authenticated_client.post(
@@ -299,7 +289,10 @@ async def test_post_first_opening_sets_slot_fields(
 ):
     """Slot fields written to OpeningDetail survive a read-back."""
     await _setup_verified_clinician(
-        authenticated_client, db_test_session_manager, logged_in_user
+        authenticated_client,
+        db_test_session_manager,
+        logged_in_user.email,
+        intent="have_openings",
     )
 
     body = {
@@ -337,7 +330,10 @@ async def test_post_first_opening_skip_note_clears_colleague_note(
 ):
     """skip_note=1 in body clears colleague_note before validation."""
     await _setup_verified_clinician(
-        authenticated_client, db_test_session_manager, logged_in_user
+        authenticated_client,
+        db_test_session_manager,
+        logged_in_user.email,
+        intent="have_openings",
     )
 
     body = {
@@ -373,7 +369,10 @@ async def test_post_first_opening_invalid_opening_type_returns_422(
 ):
     """Bad opening_type → form re-rendered with 422 inline errors."""
     await _setup_verified_clinician(
-        authenticated_client, db_test_session_manager, logged_in_user
+        authenticated_client,
+        db_test_session_manager,
+        logged_in_user.email,
+        intent="have_openings",
     )
 
     bad_body = {**_FIRST_OPENING_BODY, "opening_type": "not_a_valid_type"}
