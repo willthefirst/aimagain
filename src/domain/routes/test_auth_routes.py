@@ -862,47 +862,42 @@ async def test_failed_register_writes_no_audit_row(
 
 
 async def test_root_anonymous_returns_landing_page(test_client: AsyncClient):
-    """Anonymous GET / returns the marketing landing page (200 HTML),
-    not a redirect to the login wall (#692). The H1 + tagline +
-    description copy are taken verbatim from the parent marketing
-    site at https://www.bedlamconnect.com/ — pinning them so a
-    well-meaning copy edit doesn't quietly drift the public-facing
-    page out of sync with the brand."""
+    """Anonymous GET / returns the onboarding intent picker (200 HTML),
+    not a redirect to the login wall (#692). The H1 and 4 intent cards
+    are the canonical landing-page contract — verified here so a copy
+    edit doesn't quietly drop a card or the page title."""
     response = await test_client.get("/", follow_redirects=False)
     assert response.status_code == 200
     assert "text/html" in response.headers["content-type"]
-    # Verbatim copy from bedlamconnect.com.
+    # Page H1 and picker subtitle.
     assert "Welcome to Bedlam Connect" in response.text
-    assert "Connecting providers, helping patients." in response.text
-    assert (
-        "Post referrals, find referrals, and maintain a network of "
-        "professional contacts." in response.text
-    )
-    # Both CTAs must be present so anonymous visitors can self-serve.
-    # "Sign in" / "Sign up" verbs match the parent marketing site and
-    # the rest of the auth flow (#693).
-    assert "/auth/register" in response.text
-    assert "/auth/login" in response.text
-    assert "Sign in" in response.text
-    assert "Sign up" in response.text
-    # CTA buttons live in `.cta-cluster`, NOT Pico's `.grid` — `.grid`
-    # would stretch them to the full hero width on tablet+. The
-    # `.cta-cluster` CSS in `landing.html` overrides Pico's
-    # `<a role="button">` full-width default at ≥768px so the buttons
-    # render at natural width, but keeps the full-width treatment on
-    # phones where stacked tappable bars read better.
-    assert "cta-cluster" in response.text
+    assert "What brings you here today?" in response.text
+    # All 4 intent cards must be present for anonymous visitors.
+    assert 'data-testid="intent-refer-now"' in response.text
+    assert 'data-testid="intent-have-openings"' in response.text
+    assert 'data-testid="intent-invited"' in response.text
+    assert 'data-testid="intent-building-network"' in response.text
+    # Anonymous path uses plain form POSTs to /onboarding-intent-pending.
+    assert "/onboarding-intent-pending" in response.text
     # The footer slot is shared across every page (default block in
     # `base.html`), so the brand/contact line is present on the
     # landing page too.
     assert "support@bedlamhealth.com" in response.text
 
 
-async def test_root_authenticated_redirects_to_referrals(
+async def test_root_authenticated_without_intent_shows_picker(
     authenticated_client: AsyncClient,
 ):
-    """Authenticated GET / still redirects to /referrals — the
-    "find new clients" home (#692)."""
+    """Authenticated GET / for a user with no onboarding_intent shows
+    the intent picker — they are asked to pick their reason for being here
+    before being routed to the app. The returner-skip rule only applies
+    once the user has set an intent AND has a verified clinician."""
     response = await authenticated_client.get("/", follow_redirects=False)
-    assert response.status_code == 302
-    assert response.headers["location"] == "/referrals"
+    assert response.status_code == 200
+    assert "text/html" in response.headers["content-type"]
+    assert "Welcome to Bedlam Connect" in response.text
+    # All 4 intent cards must be present for authed visitors without an intent.
+    assert 'data-testid="intent-refer-now"' in response.text
+    assert 'data-testid="intent-have-openings"' in response.text
+    assert 'data-testid="intent-invited"' in response.text
+    assert 'data-testid="intent-building-network"' in response.text
