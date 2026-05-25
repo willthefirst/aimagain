@@ -1,10 +1,30 @@
 {% extends "base.html" %}
+{%- from "posts/_shared/_row.html" import post_row with context -%}
 {% block title %}Home{% endblock %}
 {% block content %}
+  <p>Welcome back, {{ display_name }}.</p>
   <div style="display: flex; gap: 1rem; flex-wrap: wrap;">
     <a href="{{ entity_form_url('referral') }}"
        role="button"
        class="outline">+ Post a referral</a>
     <a href="{{ entity_form_url('opening') }}" role="button" class="outline">+ Post an opening</a>
   </div>
+  {% if my_posts %}
+    <section>
+      <header style="display: flex;
+                     justify-content: space-between;
+                     align-items: baseline">
+        <h2>My active posts</h2>
+        <a href="{{ entity_url('referral') }}">See all</a>
+      </header>
+      <table class="post-rows">
+        <tbody>
+          {%- for post in my_posts -%}
+            {%- set ename = "referral" if post.kind == "referral" else "opening" -%}
+            {{ post_row(post, ename) }}
+          {%- endfor -%}
+        </tbody>
+      </table>
+    </section>
+  {% endif %}
 {% endblock %}

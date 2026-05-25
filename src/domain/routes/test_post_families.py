@@ -266,7 +266,7 @@ async def test_list_only_includes_own_kind(
     response = await authenticated_client.get(f"/{collection}")
     assert response.status_code == 200
     tree = HTMLParser(response.text)
-    cards = tree.css(f"#{collection}-list > article")
+    cards = tree.css(f"#{collection}-list > tbody > tr")
     kinds = {c.attributes.get("data-kind") for c in cards}
     assert kinds == {kind}, f"/{collection} leaked a non-{kind} row: {kinds!r}"
 
@@ -299,7 +299,7 @@ async def test_list_kind_query_param_does_not_override_lock(
     response = await authenticated_client.get(f"/{collection}?kind={other_kind}")
     assert response.status_code == 200
     tree = HTMLParser(response.text)
-    cards = tree.css(f"#{collection}-list > article")
+    cards = tree.css(f"#{collection}-list > tbody > tr")
     kinds_in_page = {c.attributes.get("data-kind") for c in cards}
     # Foreign-kind row never leaks in; for the subset face this means
     # the wrong-kind value was clamped out of the intersection. The
@@ -337,7 +337,7 @@ async def test_openings_kind_filter_narrows_to_one_subkind(
     assert response.status_code == 200
     kinds_unfiltered = {
         c.attributes.get("data-kind")
-        for c in HTMLParser(response.text).css("#openings-list > article")
+        for c in HTMLParser(response.text).css("#openings-list > tbody > tr")
     }
     assert {"clinician_opening", "program_intake"} <= kinds_unfiltered
 
@@ -346,7 +346,7 @@ async def test_openings_kind_filter_narrows_to_one_subkind(
     assert response.status_code == 200
     kinds_filtered = {
         c.attributes.get("data-kind")
-        for c in HTMLParser(response.text).css("#openings-list > article")
+        for c in HTMLParser(response.text).css("#openings-list > tbody > tr")
     }
     assert kinds_filtered == {
         "clinician_opening"

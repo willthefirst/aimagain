@@ -45,7 +45,13 @@ All three helpers are exposed as Jinja globals by
 
 from typing import Any
 
-from src.domain.models.enums import CLIENT_AGE_GROUPS_BY_KEY
+from src.domain.models.enums import (
+    CLIENT_AGE_GROUP_LABELS_SINGULAR,
+    CLIENT_AGE_GROUPS_BY_KEY,
+    INSURANCE_CARRIER_LABELS,
+    REFERRAL_SERVICE_LABELS,
+    TREATMENT_SETTINGS_LABELS,
+)
 from src.framework.rendering.address import full_address
 
 # Gender values that don't fit a "<age> <gender>" phrase. `gender_diverse`
@@ -409,3 +415,77 @@ def referral_headline(detail) -> str:
     if gender_word:
         return f"{age.singular} {gender_word} ({age.range})"
     return f"{age.singular} ({age.range})"
+
+
+def post_row_summary(post) -> str:
+    """Build the compact mid-dot summary line for the row layout.
+
+    Used by the home-page "My active posts" widget and the list-page row
+    view. Returns a " · "-joined string of the post's key facts: the
+    free-text description plus the one or two most differentiating
+    metadata signals (insurance carrier + city for referrals; settings +
+    sliding-scale flag for openings).
+
+    Truncates description to 100 chars so rows stay single-line on typical
+    screens; metadata appended after the truncation so the separators
+    always appear regardless of description length.
+    """
+    kind = getattr(post, "kind", None)
+
+    if kind == "referral":
+        d = getattr(post, "referral_detail", None)
+        if d is None:
+            return "Referral"
+        parts: list[str] = []
+        desc = getattr(d, "description", None)
+        if desc:
+            parts.append(desc[:100])
+        else:
+            parts.append(referral_headline(d))
+        carrier = getattr(d, "insurance_carrier", None)
+        if carrier:
+            parts.append(INSURANCE_CARRIER_LABELS.get(carrier, carrier))
+        city = getattr(d, "location_city", None)
+        if city:
+            parts.append(city)
+        return " · ".join(parts)
+
+    if kind == "clinician_opening":
+        d = getattr(post, "opening_detail", None)
+        if d is None:
+            return "Opening"
+        p = getattr(d, "provider", None)
+        parts = []
+        desc = getattr(d, "description", None)
+        if desc:
+            parts.append(desc[:100])
+        else:
+            ages = list(getattr(d, "age_groups", None) or [])
+            services = list(getattr(d, "services", None) or [])
+            age_labels = [CLIENT_AGE_GROUP_LABELS_SINGULAR.get(a, a) for a in ages[:2]]
+            svc_labels = [REFERRAL_SERVICE_LABELS.get(s, s) for s in services[:2]]
+            combined = age_labels + svc_labels
+            if combined:
+                parts.append(", ".join(combined))
+        settings = list(getattr(d, "settings", None) or [])
+        if settings:
+            parts.append(TREATMENT_SETTINGS_LABELS.get(settings[0], settings[0]))
+        if p and getattr(p, "sliding_scale", None):
+            parts.append("sliding scale")
+        return " · ".join(parts) if parts else "Opening"
+
+    if kind == "program_intake":
+        d = getattr(post, "intake_detail", None)
+        if d is None:
+            return "Program"
+        prog = getattr(d, "program", None)
+        name = getattr(prog, "name", None) if prog else None
+        desc = getattr(d, "description", None)
+        parts = []
+        if name:
+            parts.append(name)
+        if desc:
+            parts.append(desc[:80])
+        return " · ".join(parts) if parts else "Program"
+
+    return ""

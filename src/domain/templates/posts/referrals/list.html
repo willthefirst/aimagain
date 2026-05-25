@@ -1,5 +1,5 @@
 {% extends "views/list.html" %}
-{%- from "posts/_shared/_item.html" import post_item with context -%}
+{%- from "posts/_shared/_row.html" import post_row with context -%}
 {% block resource_label %}Referrals{% endblock %}
 {% block actions %}
   <li>
@@ -8,9 +8,11 @@
 {% endblock %}
 {% block content %}
   {% if referrals %}
-    <section id="referrals-list">
-      {%- for post in referrals %}{{ post_item(post, entity_name) }}{%- endfor %}
-      </section>
+    <table id="referrals-list" class="post-rows">
+      <tbody>
+        {%- for post in referrals %}{{ post_row(post, entity_name) }}{%- endfor %}
+        </tbody>
+      </table>
     {% else %}
       <p>
         {% if active_filter_count %}
