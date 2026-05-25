@@ -1,0 +1,76 @@
+{% extends "welcome/_layout.html" %}
+{%- from "_shared/form_fields.html" import text_field with context -%}
+{%- from "_shared/form_meta.html" import form_with_errors with context -%}
+{% block wizard_content %}
+  {% if clinician %}<span class="bc-verified" data-testid="verified-badge">&#10003; Verified</span>{% endif %}
+  {% if user and user.onboarding_intent == 'building_network' %}
+    <p class="step-info" data-testid="step-info">Step 3 of 3</p>
+    <hgroup>
+      <h1 data-testid="minimal-profile-heading">Add your first opening</h1>
+      <p>Add your first opening so clinicians know you exist. You can add more later.</p>
+    </hgroup>
+  {% else %}
+    <p class="step-info" data-testid="step-info">Step 2 of 2</p>
+    <hgroup>
+      <h1 data-testid="minimal-profile-heading">Three things to get you started</h1>
+      <p>So clinicians looking to refer can find and refer to you.</p>
+    </hgroup>
+  {% endif %}
+  {% call form_with_errors(action="/welcome/minimal-profile", method="post", json_enc=true) %}
+    <fieldset data-testid="minimal-profile-specialties">
+      <legend>Specialties</legend>
+      {% for specialty in specialties %}
+        <label>
+          <input type="checkbox"
+                 name="specialties"
+                 value="{{ specialty }}"
+                 {% if specialty in selected_specialties %}checked{% endif %}
+                 data-testid="specialty-{{ specialty|lower|replace('/', '-') |replace(' ', '-') }}">
+          {{ specialty }}
+        </label>
+      {% endfor %}
+    </fieldset>
+    <fieldset data-testid="minimal-profile-availability">
+      <legend>Availability</legend>
+      {% for state in availability_states %}
+        <label>
+          <input type="radio"
+                 name="availability_state"
+                 value="{{ state }}"
+                 required
+                 data-testid="availability-{{ state }}">
+          {% if state == 'taking_now' %}
+            Taking referrals now
+          {% elif state == 'short_wait' %}
+            Short wait &mdash; 1 to 3 weeks
+          {% elif state == 'waitlist' %}
+            Waitlist only right now
+          {% elif state == 'not_taking' %}
+            Not taking new clients
+          {% else %}
+            {{ state }}
+          {% endif %}
+        </label>
+      {% endfor %}
+    </fieldset>
+    <fieldset data-testid="minimal-profile-opening-type">
+      <legend>Opening type</legend>
+      {% for ot in opening_types %}
+        <label>
+          <input type="radio"
+                 name="opening_type"
+                 value="{{ ot }}"
+                 required
+                 data-testid="opening-type-{{ ot }}">
+          {{ ot|replace('_', ' ') |title }}
+        </label>
+      {% endfor %}
+    </fieldset>
+    <button type="submit" data-testid="minimal-profile-submit">Go live &#x2192;</button>
+    <button type="submit"
+            name="skip"
+            value="1"
+            class="secondary outline"
+            data-testid="minimal-profile-skip">Skip for now</button>
+  {% endcall %}
+{% endblock %}

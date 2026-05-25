@@ -136,6 +136,26 @@ def _make_unverified_result():
     return v
 
 
+def _make_db(verification, has_opening: bool = False):
+    """Build a mock AsyncSession that returns a verification result on first
+    execute (for the Verification query) and an OpeningDetail result on the
+    second execute (for the _has_opening query).
+
+    `has_opening` controls whether the second execute returns a row or None.
+    """
+    verification_result = MagicMock()
+    verification_result.scalars.return_value.first.return_value = verification
+
+    opening_result = MagicMock()
+    opening_result.scalars.return_value.first.return_value = (
+        MagicMock() if has_opening else None
+    )
+
+    mock_db = AsyncMock()
+    mock_db.execute.side_effect = [verification_result, opening_result]
+    return mock_db
+
+
 @pytest.mark.parametrize(
     "intent,has_clinician,clinician_verified,has_opening,has_profile,expected",
     [
@@ -160,9 +180,12 @@ def _make_unverified_result():
         ("have_openings", True, True, False, False, "/welcome/first-opening"),
         # have_openings, verified, has opening → done
         ("have_openings", True, True, True, False, "/welcome/done"),
-        # building_network / invited: stub (T7 replaces)
-        ("building_network", True, True, False, False, _NOT_YET_BUILT),
-        ("invited", True, True, False, False, _NOT_YET_BUILT),
+        # building_network / invited: verified, no opening → minimal-profile (T7)
+        ("building_network", True, True, False, False, "/welcome/minimal-profile"),
+        ("invited", True, True, False, False, "/welcome/minimal-profile"),
+        # building_network / invited: verified, has opening → done (T7)
+        ("building_network", True, True, True, False, "/welcome/done"),
+        ("invited", True, True, True, False, "/welcome/done"),
     ],
 )
 async def test_next_step_truth_table(
@@ -189,20 +212,21 @@ async def test_next_step_truth_table(
     # verification, and (for have_openings+verified) once for openings.
     fake_post = MagicMock() if has_opening else None
 
-    call_count = 0
+    # For intents that don't reach _has_opening, we only need one execute call.
+    # Use the multi-call mock only when both queries will run.
+    reaches_has_opening = (
+        has_clinician
+        and clinician_verified
+        and intent in ("building_network", "invited", "have_openings")
+    )
 
-    def _side_effect(stmt):
-        nonlocal call_count
-        call_count += 1
-        result = MagicMock()
-        if call_count == 1:
-            result.scalars.return_value.first.return_value = fake_verification
-        else:
-            result.scalars.return_value.first.return_value = fake_post
-        return result
-
-    mock_db = AsyncMock()
-    mock_db.execute.side_effect = _side_effect
+    if reaches_has_opening:
+        mock_db = _make_db(fake_verification, has_opening=has_opening)
+    else:
+        mock_result = MagicMock()
+        mock_result.scalars.return_value.first.return_value = fake_verification
+        mock_db = AsyncMock()
+        mock_db.execute.return_value = mock_result
 
     result = await next_step(user, db=mock_db)
     assert result == expected

@@ -14,6 +14,12 @@ Covers:
 - GET /welcome/coming-soon renders placeholder
 - GET /welcome/refer/{opening_id}: renders with opening context, 404 on missing opening
 - POST /welcome/refer/{opening_id}: happy path creates Referral, validation error rerenders
+- GET /welcome/start-network renders specialty picker
+- POST /welcome/start-network saves session + redirects to /welcome/verify
+- GET /welcome/minimal-profile renders form
+- POST /welcome/minimal-profile happy path: creates Opening + redirects to done
+- POST /welcome/minimal-profile skip: creates minimal Opening anyway
+- GET /welcome/done renders building_network / invited variant
 - Unauthenticated access redirects to login
 
 NPPES is stubbed via `BEDLAM_VERIFY_DEV_FALLBACK=1`; OIG uses the local LEIE fixture.
@@ -393,8 +399,12 @@ async def test_post_first_opening_invalid_opening_type_returns_422(
 # ---------------------------------------------------------------------------
 
 
-async def test_get_done_renders_200(authenticated_client: AsyncClient):
-    """GET /welcome/done always renders 200 with peer cards."""
+async def test_get_done_renders_200(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+):
+    """GET /welcome/done renders 200 with peer cards for have_openings intent."""
+    await _set_intent(db_test_session_manager, "testuser@example.com", "have_openings")
     response = await authenticated_client.get(
         "/welcome/done",
         headers={"Accept": "text/html"},
@@ -428,7 +438,7 @@ async def test_get_coming_soon_renders_200(authenticated_client: AsyncClient):
 
 
 # ---------------------------------------------------------------------------
-# Helpers — setup a verified clinician (reused for be-findable tests)
+# Helpers — setup a verified clinician (reused across test groups)
 # ---------------------------------------------------------------------------
 
 
@@ -668,3 +678,264 @@ async def test_post_refer_validation_error_rerenders(
     assert response.status_code == 422
     # Form is re-rendered — heading still present
     assert b"Refer a client" in response.content
+
+
+# ---------------------------------------------------------------------------
+# GET /welcome/start-network
+# ---------------------------------------------------------------------------
+
+
+async def test_get_start_network_renders(authenticated_client: AsyncClient):
+    """GET /welcome/start-network renders the specialty picker."""
+    response = await authenticated_client.get(
+        "/welcome/start-network",
+        headers={"Accept": "text/html"},
+    )
+    assert response.status_code == 200
+    assert b"start-network-heading" in response.content
+    assert b"start-network-specialties" in response.content
+    assert b"start-network-submit" in response.content
+
+
+# ---------------------------------------------------------------------------
+# POST /welcome/start-network
+# ---------------------------------------------------------------------------
+
+
+async def test_post_start_network_saves_session_and_redirects(
+    authenticated_client: AsyncClient,
+):
+    """POST /welcome/start-network saves specialties to session and redirects to verify."""
+    response = await authenticated_client.post(
+        "/welcome/start-network",
+        json={"specialties": ["Anxiety", "EMDR"]},
+        headers={"Accept": "text/html"},
+        follow_redirects=False,
+    )
+    assert response.status_code == 302
+    assert response.headers["location"] == "/welcome/verify"
+
+
+async def test_post_start_network_empty_specialties_redirects(
+    authenticated_client: AsyncClient,
+):
+    """POST /welcome/start-network with no specialties selected still redirects."""
+    response = await authenticated_client.post(
+        "/welcome/start-network",
+        json={},
+        headers={"Accept": "text/html"},
+        follow_redirects=False,
+    )
+    assert response.status_code == 302
+    assert response.headers["location"] == "/welcome/verify"
+
+
+# ---------------------------------------------------------------------------
+# Helpers for minimal-profile + done tests (need a verified clinician)
+# ---------------------------------------------------------------------------
+
+
+async def _create_verified_clinician(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    intent: str,
+    logged_in_user: User,
+) -> None:
+    """Set intent + POST verify to create a verified clinician."""
+    await _set_intent(db_test_session_manager, logged_in_user.email, intent)
+    await authenticated_client.post(
+        "/welcome/verify",
+        json=_VALID_BODY,
+        headers={"Accept": "text/html"},
+        follow_redirects=False,
+    )
+
+
+# ---------------------------------------------------------------------------
+# GET /welcome/minimal-profile
+# ---------------------------------------------------------------------------
+
+
+async def test_get_minimal_profile_renders(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user: User,
+):
+    """GET /welcome/minimal-profile renders the form for a verified clinician."""
+    await _create_verified_clinician(
+        authenticated_client,
+        db_test_session_manager,
+        "building_network",
+        logged_in_user,
+    )
+    response = await authenticated_client.get(
+        "/welcome/minimal-profile",
+        headers={"Accept": "text/html"},
+    )
+    assert response.status_code == 200
+    assert b"minimal-profile-heading" in response.content
+    assert b"minimal-profile-specialties" in response.content
+    assert b"minimal-profile-availability" in response.content
+    assert b"minimal-profile-opening-type" in response.content
+    assert b"minimal-profile-submit" in response.content
+    assert b"minimal-profile-skip" in response.content
+
+
+async def test_get_minimal_profile_no_clinician_redirects_to_welcome(
+    authenticated_client: AsyncClient,
+):
+    """GET /welcome/minimal-profile without a clinician redirects to /welcome."""
+    response = await authenticated_client.get(
+        "/welcome/minimal-profile",
+        headers={"Accept": "text/html"},
+        follow_redirects=False,
+    )
+    assert response.status_code == 302
+    assert response.headers["location"] == "/welcome"
+
+
+# ---------------------------------------------------------------------------
+# POST /welcome/minimal-profile
+# ---------------------------------------------------------------------------
+
+
+async def test_post_minimal_profile_happy_path_redirects_to_done(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user: User,
+):
+    """Valid POST creates an Opening and redirects to /welcome/done."""
+    await _create_verified_clinician(
+        authenticated_client,
+        db_test_session_manager,
+        "building_network",
+        logged_in_user,
+    )
+
+    response = await authenticated_client.post(
+        "/welcome/minimal-profile",
+        json={
+            "specialties": ["Anxiety"],
+            "availability_state": "taking_now",
+            "opening_type": "individual",
+        },
+        headers={"Accept": "text/html"},
+        follow_redirects=False,
+    )
+    assert response.status_code == 302
+    assert response.headers["location"] == "/welcome/done"
+
+    # OpeningDetail row created
+    async with db_test_session_manager() as session:
+        result = await session.execute(
+            select(Provider).filter(Provider.owner_id == logged_in_user.id)
+        )
+        provider = result.scalars().first()
+        assert provider is not None
+
+        result2 = await session.execute(
+            select(OpeningDetail).filter(OpeningDetail.provider_id == provider.id)
+        )
+        detail = result2.scalars().first()
+        assert detail is not None
+        assert detail.availability_state == "taking_now"
+        assert detail.opening_type == "individual"
+
+
+async def test_post_minimal_profile_skip_creates_opening(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user: User,
+):
+    """Skip button creates a minimal Opening with defaults and redirects to done."""
+    await _create_verified_clinician(
+        authenticated_client, db_test_session_manager, "invited", logged_in_user
+    )
+
+    response = await authenticated_client.post(
+        "/welcome/minimal-profile",
+        json={"skip": "1"},
+        headers={"Accept": "text/html"},
+        follow_redirects=False,
+    )
+    assert response.status_code == 302
+    assert response.headers["location"] == "/welcome/done"
+
+    # An OpeningDetail was still created
+    async with db_test_session_manager() as session:
+        result = await session.execute(
+            select(Provider).filter(Provider.owner_id == logged_in_user.id)
+        )
+        provider = result.scalars().first()
+        assert provider is not None
+
+        result2 = await session.execute(
+            select(OpeningDetail).filter(OpeningDetail.provider_id == provider.id)
+        )
+        detail = result2.scalars().first()
+        assert detail is not None
+
+
+async def test_post_minimal_profile_invalid_body_returns_422(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user: User,
+):
+    """Invalid body (bad availability_state) re-renders form with 422."""
+    await _create_verified_clinician(
+        authenticated_client,
+        db_test_session_manager,
+        "building_network",
+        logged_in_user,
+    )
+
+    response = await authenticated_client.post(
+        "/welcome/minimal-profile",
+        json={
+            "availability_state": "not_a_real_state",
+            "opening_type": "individual",
+        },
+        headers={"Accept": "text/html"},
+        follow_redirects=False,
+    )
+    assert response.status_code == 422
+    assert b"minimal-profile-heading" in response.content
+
+
+# ---------------------------------------------------------------------------
+# GET /welcome/done — building_network / invited variants
+# ---------------------------------------------------------------------------
+
+
+async def test_get_done_renders_building_network_variant(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user: User,
+):
+    """GET /welcome/done renders the building_network variant."""
+    await _set_intent(db_test_session_manager, logged_in_user.email, "building_network")
+
+    response = await authenticated_client.get(
+        "/welcome/done",
+        headers={"Accept": "text/html"},
+    )
+    assert response.status_code == 200
+    assert b"done-heading" in response.content
+    assert b"suggested-clinicians-to-follow" in response.content
+
+
+async def test_get_done_renders_invited_variant(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user: User,
+):
+    """GET /welcome/done renders the invited variant (same as building_network)."""
+    await _set_intent(db_test_session_manager, logged_in_user.email, "invited")
+
+    response = await authenticated_client.get(
+        "/welcome/done",
+        headers={"Accept": "text/html"},
+    )
+    assert response.status_code == 200
+    assert b"done-heading" in response.content
+    assert b"suggested-clinicians-to-follow" in response.content

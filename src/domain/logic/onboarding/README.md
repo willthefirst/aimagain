@@ -14,7 +14,7 @@ it. The signal table:
 | `intent` | `user.onboarding_intent` |
 | `has_clinician` | `user.providers` non-empty (selectin-loaded) |
 | `clinician_verified` | onboarding clinician's latest `Verification.status == 'verified'` |
-| `has_opening` | onboarding clinician owns ≥1 `clinician_opening` Post (T4) |
+| `has_opening` | onboarding clinician owns ≥1 `OpeningDetail` — checked via `_has_opening()` |
 | `has_reciprocity_profile` | clinician has non-empty specialties AND modality (T5+) |
 
 ### Truth table (current)
@@ -27,8 +27,10 @@ it. The signal table:
 | `refer_now` | True | True | — | True | `/openings` (terminal) |
 | `have_openings` | True | True | False | — | `/welcome/first-opening` |
 | `have_openings` | True | True | True | — | `/welcome/done` |
-| `building_network` | True | True | — | — | `/welcome/coming-soon` (T7) |
-| `invited` | True | True | — | — | `/welcome/coming-soon` (T7) |
+| `building_network` | True | True | False | — | `/welcome/minimal-profile` (T7) |
+| `building_network` | True | True | True | — | `/welcome/done` (T7) |
+| `invited` | True | True | False | — | `/welcome/minimal-profile` (T7) |
+| `invited` | True | True | True | — | `/welcome/done` (T7) |
 
 **Terminal rule**: Repeat visits to `/welcome/done` re-render the done page — the natural exit is the "Go to the board" CTA. No session flag is used (see `state_machine.py` comment).
 
@@ -37,6 +39,16 @@ it. The signal table:
 (`in_person_sessions == "yes"` OR `virtual_sessions == "yes"`). AND not OR
 because neither alone is sufficient to be findable. Implemented synchronously
 — Provider loads Affiliations via `lazy="selectin"`.
+
+The `building_network` flow also has a `GET /welcome/start-network` step (C1b) that
+captures specialty selections into the session before routing through verify. It is
+reached directly via the landing page link, not via `next_step()`.
+
+## Session keys
+
+`start_network_specialties` — set by `POST /welcome/start-network`, consumed and cleared
+by `POST /welcome/minimal-profile`. Persists across the verify step so the user's
+specialty selections survive the redirect chain.
 
 ### Onboarding clinician convention
 

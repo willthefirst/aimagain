@@ -397,9 +397,9 @@ class Provider(BaseModel):
     @property
     def specialties(self) -> list:
         aff = self.primary_affiliation
-        if aff is None or aff.specialties is None:
-            return []
-        return aff.specialties
+        return (
+            aff.specialties if aff is not None and aff.specialties is not None else []
+        )
 
     @specialties.setter
     def specialties(self, value) -> None:

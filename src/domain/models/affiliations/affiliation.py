@@ -92,6 +92,9 @@ class Affiliation(LocationMixin, BaseModel):
     # of this module.
     in_person_sessions = Column(Text, nullable=False)
     virtual_sessions = Column(Text, nullable=False)
+    specialties = Column(
+        JSON, nullable=False, server_default=text("'[]'"), default=list
+    )
     accepts_out_of_network = Column(
         Boolean, nullable=False, server_default=text("1"), default=True
     )

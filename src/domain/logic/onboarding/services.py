@@ -14,6 +14,7 @@ No `return_to` primitive — redirects are always determined by `next_step()`.
 """
 
 import uuid
+from datetime import datetime, timezone
 
 import httpx
 from fastapi import HTTPException
@@ -22,6 +23,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.domain.logic.onboarding.schema import (
     BeFindableForm,
     FirstOpeningForm,
+    MinimalProfileForm,
     ReferralFromWizardForm,
     VerifyForm,
 )
@@ -238,6 +240,51 @@ async def create_referral_from_wizard(
         location_zip="",
     )
     kind_spec = POST_KIND_BY_DETAIL_MODEL[ReferralDetail]
+    repo = BaseRepository(db)
+    created = await repo.create_polymorphic(
+        post, detail, detail_relationship=kind_spec.detail_relationship
+    )
+    await db.commit()
+    return created
+
+
+async def complete_minimal_profile(
+    form_data: MinimalProfileForm,
+    user: User,
+    *,
+    db: AsyncSession,
+    session_specialties: list[str] | None = None,
+) -> Post:
+    """PATCH clinician specialties + create first Opening — atomic.
+
+    If form_data.specialties is empty but session_specialties were set in
+    start-network, merge them. The whole operation commits atomically — if
+    OpeningDetail creation fails, the clinician PATCH rolls back too.
+
+    Returns the created Post (with opening_detail attached).
+    """
+    clinician = onboarding_clinician(user)
+    if clinician is None:
+        raise HTTPException(status_code=400, detail="No onboarding clinician found.")
+
+    # Merge specialties: form submission takes precedence over session
+    specialties = form_data.specialties or session_specialties or []
+
+    # PATCH clinician's primary affiliation specialties
+    aff = clinician.primary_affiliation
+    if aff is not None:
+        aff.specialties = specialties
+
+    # Create first Opening
+    post = Post(kind="clinician_opening", owner_id=user.id)
+    detail = OpeningDetail(
+        provider_id=clinician.id,
+        specialties=specialties,
+        availability_state=form_data.availability_state,
+        opening_type=form_data.opening_type,
+        last_confirmed_at=datetime.now(timezone.utc),
+    )
+    kind_spec = POST_KIND_BY_DETAIL_MODEL[OpeningDetail]
     repo = BaseRepository(db)
     created = await repo.create_polymorphic(
         post, detail, detail_relationship=kind_spec.detail_relationship

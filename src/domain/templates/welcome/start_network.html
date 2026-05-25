@@ -1,0 +1,35 @@
+{% extends "welcome/_layout.html" %}
+{%- from "_shared/form_fields.html" import text_field with context -%}
+{%- from "_shared/form_meta.html" import form_with_errors with context -%}
+{% block wizard_content %}
+  <hgroup>
+    <h1 data-testid="start-network-heading">Build your referral network from the start.</h1>
+    <p>New to private practice or the area? Find clinicians whose specialties complement yours — and let them find you.</p>
+  </hgroup>
+  <p>
+    <small>Licensed clinicians only &middot; not a directory &middot; not for clients</small>
+  </p>
+  {% call form_with_errors(action="/welcome/start-network", method="post", json_enc=true) %}
+    <fieldset data-testid="start-network-specialties">
+      <legend>What do you specialize in?</legend>
+      {% for specialty in specialties %}
+        <label>
+          <input type="checkbox"
+                 name="specialties"
+                 value="{{ specialty }}"
+                 {% if specialty in selected_specialties %}checked{% endif %}
+                 data-testid="specialty-{{ specialty|lower|replace('/', '-') |replace(' ', '-') }}">
+          {{ specialty }}
+        </label>
+      {% endfor %}
+    </fieldset>
+    <section data-testid="complementary-specialties-hint">
+      <p>Clinicians who often refer across specialties:</p>
+      <span>OCD specialists</span>
+      <span>Couples therapists</span>
+      <span>Perinatal providers</span>
+      <span>Grief counselors</span>
+    </section>
+    <button type="submit" data-testid="start-network-submit">Continue &#x2192;</button>
+  {% endcall %}
+{% endblock %}

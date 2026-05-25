@@ -117,11 +117,26 @@ async def next_step(user: User, *, db: AsyncSession) -> str:
         return "/welcome/done"
 
     if intent == "building_network":
-        # T7 will replace this stub with /welcome/start-network
-        return _NOT_YET_BUILT
+        # C1b → C2 (verify, shared) → C3 (minimal-profile) → C4 (done)
+        # After verify, the next step depends on whether a first Opening exists.
+        has_opening = await _has_opening(clinician, db)
+        if not has_opening:
+            return "/welcome/minimal-profile"
+        return "/welcome/done"
 
     if intent == "invited":
-        # T7 will replace this stub with /welcome/minimal-profile
-        return _NOT_YET_BUILT
+        # Invited users skip start-network — verify → minimal-profile → done
+        has_opening = await _has_opening(clinician, db)
+        if not has_opening:
+            return "/welcome/minimal-profile"
+        return "/welcome/done"
 
     return "/"
+
+
+async def _has_opening(clinician: Provider, db: AsyncSession) -> bool:
+    """Return True if `clinician` owns at least one OpeningDetail post."""
+    result = await db.execute(
+        select(OpeningDetail).filter(OpeningDetail.provider_id == clinician.id).limit(1)
+    )
+    return result.scalars().first() is not None

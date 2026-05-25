@@ -21,10 +21,12 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from src.domain.logic.onboarding.schema import (
     BeFindableForm,
     FirstOpeningForm,
+    MinimalProfileForm,
     ReferralFromWizardForm,
     VerifyForm,
 )
 from src.domain.logic.onboarding.services import (
+    complete_minimal_profile,
     create_first_opening,
     create_referral_from_wizard,
     update_clinician_for_findability,
@@ -419,3 +421,183 @@ async def test_create_referral_inactive_opening_raises_404(
             await create_referral_from_wizard(form_data, user, db=session)
 
     assert exc_info.value.status_code == 404
+
+
+# ---------------------------------------------------------------------------
+# complete_minimal_profile tests
+# ---------------------------------------------------------------------------
+
+_MINIMAL_PROFILE_FORM = MinimalProfileForm(
+    specialties=["Anxiety", "EMDR"],
+    availability_state="taking_now",
+    opening_type="individual",
+)
+
+
+async def _seed_verified_clinician(
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+) -> tuple:
+    """Seed a user + verified clinician (Provider + Verification). Returns (user, provider)."""
+    user = await _seed_user(db_test_session_manager)
+
+    async with db_test_session_manager() as session:
+        provider = await verify_and_create_clinician(_VALID_FORM, user, db=session)
+
+    # Reload user so providers relationship is fresh
+    async with db_test_session_manager() as session:
+        result = await session.execute(
+            select(Provider).filter(Provider.id == provider.id)
+        )
+        provider_fresh = result.scalars().first()
+
+    return user, provider_fresh
+
+
+async def test_complete_minimal_profile_happy_path(
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+):
+    """complete_minimal_profile creates an OpeningDetail and patches affiliation.specialties."""
+    user, provider = await _seed_verified_clinician(db_test_session_manager)
+
+    async with db_test_session_manager() as session:
+        # Reload user with providers eager-loaded
+        from sqlalchemy.orm import selectinload
+
+        result = await session.execute(
+            select(Provider).filter(Provider.id == provider.id)
+        )
+        p = result.scalars().first()
+        # Need user with providers loaded for the service
+        from src.domain.models import User as UserModel
+
+        u_result = await session.execute(
+            select(UserModel)
+            .filter(UserModel.id == user.id)
+            .options(selectinload(UserModel.providers))
+        )
+        u = u_result.scalars().first()
+
+        created_post = await complete_minimal_profile(
+            _MINIMAL_PROFILE_FORM, u, db=session, session_specialties=["Trauma/PTSD"]
+        )
+
+    assert created_post is not None
+    assert created_post.id is not None
+    assert created_post.kind == "clinician_opening"
+
+    # Opening row exists with correct fields
+    async with db_test_session_manager() as session:
+        result = await session.execute(
+            select(OpeningDetail).filter(OpeningDetail.provider_id == provider.id)
+        )
+        detail = result.scalars().first()
+        assert detail is not None
+        assert detail.availability_state == "taking_now"
+        assert detail.opening_type == "individual"
+        # Form specialties take precedence over session_specialties
+        assert "Anxiety" in detail.specialties
+        assert "EMDR" in detail.specialties
+
+        # Affiliation specialties patched
+        result2 = await session.execute(
+            select(Provider).filter(Provider.id == provider.id)
+        )
+        p2 = result2.scalars().first()
+        assert "Anxiety" in p2.specialties
+        assert "EMDR" in p2.specialties
+
+
+async def test_complete_minimal_profile_uses_session_specialties_when_form_empty(
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+):
+    """When form specialties are empty, session_specialties are used instead."""
+    user, provider = await _seed_verified_clinician(db_test_session_manager)
+
+    form_no_specialties = MinimalProfileForm(
+        specialties=[],
+        availability_state="short_wait",
+        opening_type="couples",
+    )
+
+    async with db_test_session_manager() as session:
+        from sqlalchemy.orm import selectinload
+
+        from src.domain.models import User as UserModel
+
+        u_result = await session.execute(
+            select(UserModel)
+            .filter(UserModel.id == user.id)
+            .options(selectinload(UserModel.providers))
+        )
+        u = u_result.scalars().first()
+
+        await complete_minimal_profile(
+            form_no_specialties, u, db=session, session_specialties=["Grief", "OCD/ERP"]
+        )
+
+    async with db_test_session_manager() as session:
+        result = await session.execute(
+            select(OpeningDetail).filter(OpeningDetail.provider_id == provider.id)
+        )
+        detail = result.scalars().first()
+        assert detail is not None
+        assert "Grief" in detail.specialties
+        assert "OCD/ERP" in detail.specialties
+
+
+async def test_complete_minimal_profile_atomicity(
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+):
+    """If BaseRepository.create_polymorphic raises, the affiliation patch rolls back."""
+    user, provider = await _seed_verified_clinician(db_test_session_manager)
+
+    from src.framework.persistence import base_repository as repo_mod
+
+    # Record the original specialties value
+    async with db_test_session_manager() as session:
+        result = await session.execute(
+            select(Provider).filter(Provider.id == provider.id)
+        )
+        p_before = result.scalars().first()
+        original_specialties = list(p_before.specialties)
+
+    with patch.object(
+        repo_mod.BaseRepository,
+        "create_polymorphic",
+        new_callable=AsyncMock,
+        side_effect=RuntimeError("db exploded"),
+    ):
+        with pytest.raises(RuntimeError, match="db exploded"):
+            async with db_test_session_manager() as session:
+                from sqlalchemy.orm import selectinload
+
+                from src.domain.models import User as UserModel
+
+                u_result = await session.execute(
+                    select(UserModel)
+                    .filter(UserModel.id == user.id)
+                    .options(selectinload(UserModel.providers))
+                )
+                u = u_result.scalars().first()
+
+                await complete_minimal_profile(
+                    _MINIMAL_PROFILE_FORM,
+                    u,
+                    db=session,
+                    session_specialties=[],
+                )
+
+    # Specialties should be unchanged (rollback happened)
+    async with db_test_session_manager() as session:
+        result = await session.execute(
+            select(Provider).filter(Provider.id == provider.id)
+        )
+        p_after = result.scalars().first()
+        assert p_after.specialties == original_specialties
+
+    # No OpeningDetail created
+    async with db_test_session_manager() as session:
+        result = await session.execute(
+            select(OpeningDetail).filter(OpeningDetail.provider_id == provider.id)
+        )
+        assert result.scalars().first() is None

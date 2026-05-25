@@ -23,10 +23,13 @@ from src.db import get_db_session
 from src.domain.logic.onboarding.schema import (
     BeFindableForm,
     FirstOpeningForm,
+    MinimalProfileForm,
     ReferralFromWizardForm,
+    StartNetworkForm,
     VerifyForm,
 )
 from src.domain.logic.onboarding.services import (
+    complete_minimal_profile,
     create_first_opening,
     create_referral_from_wizard,
     update_clinician_for_findability,
@@ -49,6 +52,22 @@ from src.framework.http.responses import APIResponse
 welcome_api_router = APIRouter(tags=["Welcome Wizard"])
 router = BaseRouter(router=welcome_api_router, default_tags=["Welcome Wizard"])
 
+# Hardcoded specialty vocabulary — same list rendered on all three
+# specialty-picker surfaces (start-network + minimal-profile for C, and
+# the first-opening form for B).
+_SPECIALTIES = [
+    "Trauma/PTSD",
+    "EMDR",
+    "Anxiety",
+    "OCD/ERP",
+    "Depression",
+    "Grief",
+    "Couples",
+    "Adolescents",
+    "ADHD",
+    "Perinatal",
+]
+
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -60,15 +79,6 @@ class _MalformedVerifyBody(Exception):
 
     def __init__(self, errors: list[dict]):
         self.errors = errors
-
-
-def _render_verify_errors(exc: _MalformedVerifyBody) -> FormError:
-    from src.framework.dispatch.mounts.create import build_form_errors_dict
-
-    return FormError(
-        field_errors=build_form_errors_dict(exc.errors),
-        status_code=422,
-    )
 
 
 class _MalformedFirstOpeningBody(Exception):
@@ -85,6 +95,29 @@ class _MalformedBeFindableBody(Exception):
         self.errors = errors
 
 
+class _MalformedStartNetworkBody(Exception):
+    """Validation failed on POST /welcome/start-network body."""
+
+    def __init__(self, errors: list[dict]):
+        self.errors = errors
+
+
+class _MalformedMinimalProfileBody(Exception):
+    """Validation failed on POST /welcome/minimal-profile body."""
+
+    def __init__(self, errors: list[dict]):
+        self.errors = errors
+
+
+def _render_verify_errors(exc: _MalformedVerifyBody) -> FormError:
+    from src.framework.dispatch.mounts.create import build_form_errors_dict
+
+    return FormError(
+        field_errors=build_form_errors_dict(exc.errors),
+        status_code=422,
+    )
+
+
 def _render_first_opening_errors(exc: _MalformedFirstOpeningBody) -> FormError:
     from src.framework.dispatch.mounts.create import build_form_errors_dict
 
@@ -95,6 +128,24 @@ def _render_first_opening_errors(exc: _MalformedFirstOpeningBody) -> FormError:
 
 
 def _render_be_findable_errors(exc: _MalformedBeFindableBody) -> FormError:
+    from src.framework.dispatch.mounts.create import build_form_errors_dict
+
+    return FormError(
+        field_errors=build_form_errors_dict(exc.errors),
+        status_code=422,
+    )
+
+
+def _render_start_network_errors(exc: _MalformedStartNetworkBody) -> FormError:
+    from src.framework.dispatch.mounts.create import build_form_errors_dict
+
+    return FormError(
+        field_errors=build_form_errors_dict(exc.errors),
+        status_code=422,
+    )
+
+
+def _render_minimal_profile_errors(exc: _MalformedMinimalProfileBody) -> FormError:
     from src.framework.dispatch.mounts.create import build_form_errors_dict
 
     return FormError(
@@ -277,7 +328,7 @@ async def post_first_opening(
 
 
 # ---------------------------------------------------------------------------
-# Done page (B4)
+# Done page (B4 / C4 — all flows that complete with an Opening)
 # ---------------------------------------------------------------------------
 
 
@@ -285,9 +336,8 @@ async def post_first_opening(
 async def get_done(
     request: Request,
     requesting_user: User = Depends(current_active_user),
-    db: AsyncSession = Depends(get_db_session),
 ):
-    """Terminal step of the have_openings wizard flow.
+    """Final wizard page — rendered after the clinician's first Opening is live.
 
     Always 200 — no redirect on re-visit. The natural exit is the
     'Go to the board' CTA (→ /openings). See state_machine.py for
@@ -306,19 +356,6 @@ async def get_done(
 
 _BE_FINDABLE_STEP_INFO = "Step 2 of 2"
 _BE_FINDABLE_TEMPLATE = "welcome/be_findable.html"
-
-_SPECIALTIES = [
-    "Trauma/PTSD",
-    "EMDR",
-    "Anxiety",
-    "OCD/ERP",
-    "Depression",
-    "Grief",
-    "Couples",
-    "Adolescents",
-    "ADHD",
-    "Perinatal",
-]
 
 
 def _be_findable_context(clinician=None) -> dict:
@@ -389,7 +426,7 @@ async def post_be_findable(
 
 
 # ---------------------------------------------------------------------------
-# Coming-soon stub (placeholder for T7 steps)
+# Coming-soon stub (placeholder for steps not yet built)
 # ---------------------------------------------------------------------------
 
 
@@ -399,8 +436,8 @@ async def get_coming_soon(
     requesting_user: User = Depends(current_active_user),
 ):
     """Placeholder rendered for verified users while downstream steps are not
-    yet built. T4/T5/T7 will replace the real pages; this page disappears
-    from the state machine once all stubs are filled in."""
+    yet built. This page disappears from the state machine once all stubs
+    are filled in."""
     return APIResponse.html_response(
         template_name="welcome/coming_soon.html",
         context={},
@@ -508,3 +545,145 @@ async def post_refer(
 
     await create_referral_from_wizard(form_data, requesting_user, db=db)
     return _redirect(request, "/openings")
+
+
+# ---------------------------------------------------------------------------
+# Start-network step (C1b — building_network flow only)
+# ---------------------------------------------------------------------------
+
+_START_NETWORK_TEMPLATE = "welcome/start_network.html"
+
+
+@router.get("/welcome/start-network", name="welcome:get_start_network")
+async def get_start_network(
+    request: Request,
+    requesting_user: User = Depends(current_active_user),
+):
+    """Render the specialty-picker card for the building_network flow."""
+    session_specialties = request.session.get("start_network_specialties", [])
+    return APIResponse.html_response(
+        template_name=_START_NETWORK_TEMPLATE,
+        context={
+            "specialties": _SPECIALTIES,
+            "selected_specialties": session_specialties,
+            "step_info": "Step 1 of 3",
+        },
+        request=request,
+    )
+
+
+@router.post("/welcome/start-network", name="welcome:post_start_network")
+@form_error_handler(
+    template=_START_NETWORK_TEMPLATE,
+    handlers={_MalformedStartNetworkBody: _render_start_network_errors},
+    context_builder=lambda kwargs: {
+        "specialties": _SPECIALTIES,
+        "selected_specialties": [],
+        "step_info": "Step 1 of 3",
+    },
+    require_htmx=False,
+)
+async def post_start_network(
+    request: Request,
+    body: dict = Body(...),
+    requesting_user: User = Depends(current_active_user),
+):
+    """Save specialty selections to the session, redirect to /welcome/verify."""
+    try:
+        form_data = StartNetworkForm.model_validate(body)
+    except ValidationError as e:
+        raise _MalformedStartNetworkBody(e.errors())
+
+    request.session["start_network_specialties"] = form_data.specialties
+    return _redirect(request, "/welcome/verify")
+
+
+# ---------------------------------------------------------------------------
+# Minimal-profile step (C3 — building_network + invited flows)
+# ---------------------------------------------------------------------------
+
+_MINIMAL_PROFILE_TEMPLATE = "welcome/minimal_profile.html"
+
+
+def _minimal_profile_context(clinician, user, session_specialties):
+    return {
+        "specialties": _SPECIALTIES,
+        "selected_specialties": session_specialties,
+        "clinician": clinician,
+        "availability_states": AVAILABILITY_STATES,
+        "opening_types": OPENING_TYPES,
+        "user": user,
+    }
+
+
+@router.get("/welcome/minimal-profile", name="welcome:get_minimal_profile")
+async def get_minimal_profile(
+    request: Request,
+    requesting_user: User = Depends(current_active_user),
+    db: AsyncSession = Depends(get_db_session),
+):
+    """Render the minimal-profile form (specialties, availability, opening type)."""
+    clinician = onboarding_clinician(requesting_user)
+    if clinician is None:
+        return _redirect(request, "/welcome")
+    session_specialties = request.session.get("start_network_specialties", [])
+    return APIResponse.html_response(
+        template_name=_MINIMAL_PROFILE_TEMPLATE,
+        context=_minimal_profile_context(
+            clinician, requesting_user, session_specialties
+        ),
+        request=request,
+    )
+
+
+@router.post("/welcome/minimal-profile", name="welcome:post_minimal_profile")
+@form_error_handler(
+    template=_MINIMAL_PROFILE_TEMPLATE,
+    handlers={_MalformedMinimalProfileBody: _render_minimal_profile_errors},
+    context_builder=lambda kwargs: _minimal_profile_context(
+        onboarding_clinician(kwargs.get("requesting_user")),
+        kwargs.get("requesting_user"),
+        [],
+    ),
+    require_htmx=False,
+)
+async def post_minimal_profile(
+    request: Request,
+    body: dict = Body(...),
+    requesting_user: User = Depends(current_active_user),
+    db: AsyncSession = Depends(get_db_session),
+):
+    """Validate MinimalProfileForm, create first Opening, redirect via next_step.
+
+    Skip path: when body contains `skip=1`, bypass validation and create a
+    minimal Opening using the first valid enum values as defaults. Specialties
+    from the session are still applied on skip.
+    """
+    session_specialties = request.session.pop("start_network_specialties", [])
+
+    if body.get("skip"):
+        # Ghost-submit: create a minimal Opening with default values so the
+        # clinician is on the board. Specialties from start-network are applied.
+        skip_form = MinimalProfileForm(
+            specialties=session_specialties,
+            availability_state=AVAILABILITY_STATES[0],
+            opening_type=OPENING_TYPES[0],
+        )
+        await complete_minimal_profile(
+            skip_form, requesting_user, db=db, session_specialties=session_specialties
+        )
+    else:
+        try:
+            form_data = MinimalProfileForm.model_validate(body)
+        except ValidationError as e:
+            # Restore session key so the user can re-submit without losing selections
+            request.session["start_network_specialties"] = session_specialties
+            raise _MalformedMinimalProfileBody(e.errors())
+
+        await complete_minimal_profile(
+            form_data, requesting_user, db=db, session_specialties=session_specialties
+        )
+
+    await db.refresh(requesting_user)
+    next_url = await next_step(requesting_user, db=db)
+    return _redirect(request, next_url)

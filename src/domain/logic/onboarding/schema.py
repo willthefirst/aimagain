@@ -11,12 +11,20 @@ from src.domain.logic.posts.schema import (
     PopulationTagsField,
     SpecialtiesField,
 )
-from src.domain.models.enums import LANGUAGES, LICENSE_TYPES, US_STATES
+from src.domain.models.enums import (
+    AVAILABILITY_STATES,
+    LANGUAGES,
+    LICENSE_TYPES,
+    OPENING_TYPES,
+    US_STATES,
+)
 from src.framework.schema_validators import StrippedOptionalText, scalar_to_list
 
 _LICENSE_TYPES = Literal[tuple(LICENSE_TYPES)]  # type: ignore[valid-type]
 _US_STATES = Literal[tuple(US_STATES)]  # type: ignore[valid-type]
 _LANGUAGES = Literal[tuple(LANGUAGES)]  # type: ignore[valid-type]
+_AVAILABILITY_STATES_TYPE = Literal[tuple(AVAILABILITY_STATES)]  # type: ignore[valid-type]
+_OPENING_TYPES_TYPE = Literal[tuple(OPENING_TYPES)]  # type: ignore[valid-type]
 
 _SpecialtiesList = Annotated[list[str], BeforeValidator(scalar_to_list)]
 
@@ -113,3 +121,30 @@ class ReferralFromWizardForm(BaseModel):
                     "Please remove client name / contact info — describe the clinical picture only."
                 )
         return v
+
+
+class StartNetworkForm(BaseModel):
+    """Wire schema for POST /welcome/start-network (C1b).
+
+    Captures the clinician's specialty selections from the network-start
+    picker. Specialties are saved to the session and merged into the
+    MinimalProfileForm at the next step. All fields are optional — skipping
+    the picker is valid.
+    """
+
+    specialties: _SpecialtiesList = []
+
+
+class MinimalProfileForm(BaseModel):
+    """Wire schema for POST /welcome/minimal-profile (C3).
+
+    Captures specialties, availability state, and opening type to create
+    the clinician's first Opening atomically with the affiliation specialty
+    PATCH. `availability_state` and `opening_type` are required on the
+    wire (the skip path sets them to defaults in the route handler before
+    calling the service).
+    """
+
+    specialties: _SpecialtiesList = []
+    availability_state: _AVAILABILITY_STATES_TYPE
+    opening_type: _OPENING_TYPES_TYPE

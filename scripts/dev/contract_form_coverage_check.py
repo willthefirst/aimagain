@@ -87,6 +87,14 @@ FORMS_WITHOUT_PAIRS: dict[str, str] = {
         "No JSON body; the only contract is the redirect, which is pinned "
         "by the route tests in `src/test_main.py`."
     ),
+    "POST /welcome/start-network": (
+        "Dynamic URL form via form_with_errors macro; shape pinned by "
+        "route tests in `src/domain/routes/test_welcome.py`."
+    ),
+    "POST /welcome/minimal-profile": (
+        "Dynamic URL form via form_with_errors macro; shape pinned by "
+        "route tests in `src/domain/routes/test_welcome.py`."
+    ),
 }
 
 

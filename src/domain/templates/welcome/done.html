@@ -1,45 +1,84 @@
 {% extends "welcome/_layout.html" %}
 {% block wizard_content %}
-  <span aria-hidden="true" style="font-size:3rem;">✓</span>
+  <span aria-hidden="true" style="font-size:3rem;">&#10003;</span>
   <hgroup>
-    <h1>You're on the board.</h1>
+    <h1 data-testid="done-heading">You're on the board.</h1>
     {% if user and user.onboarding_intent == 'have_openings' %}
       <p>
         Clinicians searching for your specialties can find you now. You'll only hear from us when someone actually reaches out.
       </p>
+    {% elif user and user.onboarding_intent in ('building_network', 'invited') %}
+      <p>Your profile is live. You're findable to clinicians looking to refer.</p>
     {% else %}
       <p>You're set up. Browse the board whenever you're ready.</p>
     {% endif %}
   </hgroup>
-  <section data-testid="likely-referral-sources">
-    <h2>Clinicians likely to refer to you</h2>
-    <article>
-      <header>
+  {% if user and user.onboarding_intent == 'have_openings' %}
+    <section data-testid="likely-referral-sources">
+      <h2>Clinicians likely to refer to you</h2>
+      <article>
+        <header>
+          {# title-case-ignore #}
+          <strong>Sarah Kim, LCSW</strong>
+        </header>
         {# title-case-ignore #}
-        <strong>Sarah Kim, LCSW</strong>
-      </header>
-      {# title-case-ignore #}
-      <p>Anxiety/OCD — OCD clients often need trauma work after symptom stabilization.</p>
-    </article>
-    <article>
-      <header>
+        <p>Anxiety/OCD — OCD clients often need trauma work after symptom stabilization.</p>
+      </article>
+      <article>
+        <header>
+          {# title-case-ignore #}
+          <strong>Marcus Webb, LPC</strong>
+        </header>
         {# title-case-ignore #}
-        <strong>Marcus Webb, LPC</strong>
-      </header>
-      {# title-case-ignore #}
-      <p>Grief/loss — clients in complicated grief often benefit from deeper trauma processing.</p>
-    </article>
-    <article>
-      <header>
+        <p>Grief/loss — clients in complicated grief often benefit from deeper trauma processing.</p>
+      </article>
+      <article>
+        <header>
+          {# title-case-ignore #}
+          <strong>Priya Nair, LMFT</strong>
+        </header>
         {# title-case-ignore #}
-        <strong>Priya Nair, LMFT</strong>
-      </header>
-      {# title-case-ignore #}
-      <p>Couples — partners frequently need individual trauma work alongside couples therapy.</p>
-    </article>
-  </section>
-  <p>
-    <a href="{{ entity_form_url('opening') }}" class="secondary">Want to add another opening? Takes 30 seconds.</a>
-  </p>
+        <p>Couples — partners frequently need individual trauma work alongside couples therapy.</p>
+      </article>
+    </section>
+    <p>
+      <a href="{{ entity_form_url('opening') }}" class="secondary">Want to add another opening? Takes 30 seconds.</a>
+    </p>
+  {% elif user and user.onboarding_intent in ('building_network', 'invited') %}
+    <section data-testid="suggested-clinicians-to-follow">
+      <h2>Clinicians you might connect with</h2>
+      <article>
+        <header>
+          {# title-case-ignore #}
+          <strong>Jordan Lee, LMFT</strong>
+          <small>Couples · Family · Adults</small>
+        </header>
+        {# title-case-ignore #}
+        <p>San Francisco, CA · Taking referrals now</p>
+        <button disabled title="Coming soon" data-testid="follow-btn-1">Follow</button>
+      </article>
+      <article>
+        <header>
+          {# title-case-ignore #}
+          <strong>Aisha Okafor, LPC</strong>
+          <small>Anxiety · OCD/ERP · Adults</small>
+        </header>
+        {# title-case-ignore #}
+        <p>Oakland, CA · Short wait</p>
+        <button disabled title="Coming soon" data-testid="follow-btn-2">Follow</button>
+      </article>
+      <article>
+        <header>
+          {# title-case-ignore #}
+          <strong>Ray Gutierrez, LCSW</strong>
+          <small>Grief · Depression · Adolescents</small>
+        </header>
+        {# title-case-ignore #}
+        <p>Berkeley, CA · Taking referrals now</p>
+        <button disabled title="Coming soon" data-testid="follow-btn-3">Follow</button>
+      </article>
+    </section>
+    <p>Or invite a clinician you already know — they'll join with your trust attached.</p>
+  {% endif %}
   <a href="{{ entity_url('opening') }}" role="button">Go to the board</a>
 {% endblock %}
