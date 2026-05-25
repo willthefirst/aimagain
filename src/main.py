@@ -1,6 +1,6 @@
 import logging
 from contextlib import asynccontextmanager
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 
 from fastapi import Depends, FastAPI, HTTPException, Request, status
 from fastapi.responses import JSONResponse, RedirectResponse
@@ -113,9 +113,35 @@ async def read_home(
     else:
         display_name = _user.username
     my_posts = await post_repo.list_owned_by(Post, _user.id, limit=5)
+
+    since = datetime.now(tz=timezone.utc) - timedelta(days=7)
+    network_posts = await post_repo.list_recent_for_network(
+        since=since,
+        exclude_owner_id=_user.id,
+        limit=5,
+    )
+
+    network_filter_chips = []
+    if p and p.primary_affiliation:
+        aff = p.primary_affiliation
+        if aff.location_city:
+            network_filter_chips.append(aff.location_city)
+        if aff.in_network_carriers:
+            from src.domain.models.enums import INSURANCE_CARRIER_LABELS
+
+            carrier_labels = [
+                INSURANCE_CARRIER_LABELS.get(c, c) for c in aff.in_network_carriers
+            ]
+            network_filter_chips.extend(carrier_labels)
+
     return APIResponse.html_response(
         template_name="home.html",
-        context={"display_name": display_name, "my_posts": my_posts},
+        context={
+            "display_name": display_name,
+            "my_posts": my_posts,
+            "network_posts": network_posts,
+            "network_filter_chips": network_filter_chips,
+        },
         request=request,
         current_user=_user,
     )
