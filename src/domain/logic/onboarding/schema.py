@@ -1,6 +1,6 @@
 from typing import Annotated, Literal
 
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, BeforeValidator, EmailStr, Field
 
 from src.domain.logic.posts.schema import (
     OptionalAvailabilityState,
@@ -10,11 +10,13 @@ from src.domain.logic.posts.schema import (
     SpecialtiesField,
 )
 from src.domain.models.enums import LANGUAGES, LICENSE_TYPES, US_STATES
-from src.framework.schema_validators import StrippedOptionalText
+from src.framework.schema_validators import StrippedOptionalText, scalar_to_list
 
 _LICENSE_TYPES = Literal[tuple(LICENSE_TYPES)]  # type: ignore[valid-type]
 _US_STATES = Literal[tuple(US_STATES)]  # type: ignore[valid-type]
 _LANGUAGES = Literal[tuple(LANGUAGES)]  # type: ignore[valid-type]
+
+_SpecialtiesList = Annotated[list[str], BeforeValidator(scalar_to_list)]
 
 
 class VerifyForm(BaseModel):
@@ -51,3 +53,19 @@ class FirstOpeningForm(BaseModel):
     payment_types: PaymentTypesField = []
     availability_state: OptionalAvailabilityState = None
     colleague_note: Annotated[StrippedOptionalText, Field(max_length=280)] = None
+
+
+class BeFindableForm(BaseModel):
+    """Wire schema for POST /welcome/be-findable.
+
+    Collects the clinician's practice specialties and session modality so they
+    appear in referral searches. All fields optional — the wizard encourages
+    completion but never blocks on it (empty submission = no-op write).
+
+    `in_person` / `virtual` are booleans that map to Affiliation's
+    `in_person_sessions` / `virtual_sessions` TEXT columns ("yes" / "no").
+    """
+
+    specialties: _SpecialtiesList = []
+    in_person: bool = False
+    virtual: bool = False

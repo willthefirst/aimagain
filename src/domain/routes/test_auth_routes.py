@@ -940,3 +940,50 @@ async def test_root_b1_preview_absent_for_other_intents(
     response = await authenticated_client.get("/", follow_redirects=False)
     assert response.status_code == 200
     assert 'data-testid="b1-preview"' not in response.text
+
+
+async def test_root_refer_now_unverified_shows_a1_preview(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+):
+    """refer_now user without a verified clinician sees the A1 search preview."""
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            from sqlalchemy import select
+
+            from src.domain.models import User
+
+            result = await session.execute(
+                select(User).filter(User.email == "testuser@example.com")
+            )
+            user = result.scalars().first()
+            user.onboarding_intent = "refer_now"
+
+    response = await authenticated_client.get("/", follow_redirects=False)
+    assert response.status_code == 200
+    assert 'data-testid="a1-search-preview"' in response.text
+    assert 'data-testid="a1-card-1"' in response.text
+    assert 'data-testid="a1-card-2"' in response.text
+    assert 'data-testid="a1-verify-cta"' in response.text
+
+
+async def test_root_non_refer_now_user_no_a1_preview(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+):
+    """have_openings user does not see the A1 preview."""
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            from sqlalchemy import select
+
+            from src.domain.models import User
+
+            result = await session.execute(
+                select(User).filter(User.email == "testuser@example.com")
+            )
+            user = result.scalars().first()
+            user.onboarding_intent = "have_openings"
+
+    response = await authenticated_client.get("/", follow_redirects=False)
+    assert response.status_code == 200
+    assert 'data-testid="a1-search-preview"' not in response.text

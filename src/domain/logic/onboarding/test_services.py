@@ -15,9 +15,14 @@ import pytest
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from src.domain.logic.onboarding.schema import FirstOpeningForm, VerifyForm
+from src.domain.logic.onboarding.schema import (
+    BeFindableForm,
+    FirstOpeningForm,
+    VerifyForm,
+)
 from src.domain.logic.onboarding.services import (
     create_first_opening,
+    update_clinician_for_findability,
     verify_and_create_clinician,
 )
 from src.domain.logic.verifications import oig as oig_module
@@ -237,3 +242,69 @@ async def test_atomicity_on_pipeline_raise(
             .all()
         )
         assert providers == []
+
+
+# ---------------------------------------------------------------------------
+# update_clinician_for_findability
+# ---------------------------------------------------------------------------
+
+
+async def test_update_clinician_for_findability_happy_path(
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+):
+    """Updating specialties + modality persists to the primary affiliation."""
+    user = await _seed_user(db_test_session_manager)
+
+    # First create a verified clinician via the verify step
+    async with db_test_session_manager() as session:
+        provider = await verify_and_create_clinician(_VALID_FORM, user, db=session)
+
+    # Reload user with providers
+    from src.domain.models import User as UserModel
+
+    async with db_test_session_manager() as session:
+        user = await session.get(UserModel, user.id)
+
+        form = BeFindableForm(
+            specialties=["Trauma/PTSD", "EMDR"],
+            in_person=True,
+            virtual=False,
+        )
+        await update_clinician_for_findability(form, user, db=session)
+
+    # Verify the affiliation was updated
+
+    async with db_test_session_manager() as session:
+        p = await session.get(Provider, provider.id)
+        await session.refresh(p, ["affiliations"])
+        aff = p.primary_affiliation
+        assert aff is not None
+        assert set(aff.specialties) == {"Trauma/PTSD", "EMDR"}
+        assert aff.in_person_sessions == "yes"
+        assert aff.virtual_sessions == "no"
+
+
+async def test_update_clinician_for_findability_empty_submission(
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+):
+    """Empty submission (skip-for-now) is accepted without error."""
+    user = await _seed_user(db_test_session_manager)
+
+    async with db_test_session_manager() as session:
+        provider = await verify_and_create_clinician(_VALID_FORM, user, db=session)
+
+    from src.domain.models import User as UserModel
+
+    async with db_test_session_manager() as session:
+        user = await session.get(UserModel, user.id)
+
+        form = BeFindableForm(specialties=[], in_person=False, virtual=False)
+        await update_clinician_for_findability(form, user, db=session)
+
+    async with db_test_session_manager() as session:
+        p = await session.get(Provider, provider.id)
+        await session.refresh(p, ["affiliations"])
+        aff = p.primary_affiliation
+        assert aff.specialties == []
+        assert aff.in_person_sessions == "no"
+        assert aff.virtual_sessions == "no"

@@ -18,9 +18,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.auth_config import current_active_user
 from src.db import get_db_session
-from src.domain.logic.onboarding.schema import FirstOpeningForm, VerifyForm
+from src.domain.logic.onboarding.schema import (
+    BeFindableForm,
+    FirstOpeningForm,
+    VerifyForm,
+)
 from src.domain.logic.onboarding.services import (
     create_first_opening,
+    update_clinician_for_findability,
     verify_and_create_clinician,
 )
 from src.domain.logic.onboarding.state_machine import next_step, onboarding_clinician
@@ -69,7 +74,23 @@ class _MalformedFirstOpeningBody(Exception):
         self.errors = errors
 
 
+class _MalformedBeFindableBody(Exception):
+    """Validation failed on POST /welcome/be-findable body."""
+
+    def __init__(self, errors: list[dict]):
+        self.errors = errors
+
+
 def _render_first_opening_errors(exc: _MalformedFirstOpeningBody) -> FormError:
+    from src.framework.dispatch.mounts.create import build_form_errors_dict
+
+    return FormError(
+        field_errors=build_form_errors_dict(exc.errors),
+        status_code=422,
+    )
+
+
+def _render_be_findable_errors(exc: _MalformedBeFindableBody) -> FormError:
     from src.framework.dispatch.mounts.create import build_form_errors_dict
 
     return FormError(
@@ -276,7 +297,95 @@ async def get_done(
 
 
 # ---------------------------------------------------------------------------
-# Coming-soon stub (placeholder for T5/T7 steps)
+# Be-findable step (A3) — refer_now flow, Step 2 of 2
+# ---------------------------------------------------------------------------
+
+_BE_FINDABLE_STEP_INFO = "Step 2 of 2"
+_BE_FINDABLE_TEMPLATE = "welcome/be_findable.html"
+
+_SPECIALTIES = [
+    "Trauma/PTSD",
+    "EMDR",
+    "Anxiety",
+    "OCD/ERP",
+    "Depression",
+    "Grief",
+    "Couples",
+    "Adolescents",
+    "ADHD",
+    "Perinatal",
+]
+
+
+def _be_findable_context(clinician=None) -> dict:
+    return {
+        "step_info": _BE_FINDABLE_STEP_INFO,
+        "specialties_choices": _SPECIALTIES,
+        "clinician": clinician,
+    }
+
+
+@router.get("/welcome/be-findable", name="welcome:get_be_findable")
+async def get_be_findable(
+    request: Request,
+    requesting_user: User = Depends(current_active_user),
+    db: AsyncSession = Depends(get_db_session),
+):
+    """Render the be-findable form (Step 2 of 2 for refer_now flow).
+
+    Redirects to /welcome if preconditions aren't met (no verified clinician).
+    """
+    clinician = onboarding_clinician(requesting_user)
+    if clinician is None:
+        return _redirect(request, "/welcome")
+
+    return APIResponse.html_response(
+        template_name=_BE_FINDABLE_TEMPLATE,
+        context=_be_findable_context(clinician=clinician),
+        request=request,
+    )
+
+
+@router.post("/welcome/be-findable", name="welcome:post_be_findable")
+@form_error_handler(
+    template=_BE_FINDABLE_TEMPLATE,
+    handlers={_MalformedBeFindableBody: _render_be_findable_errors},
+    context_builder=lambda kwargs: _be_findable_context(),
+    require_htmx=False,
+)
+async def post_be_findable(
+    request: Request,
+    body: dict = Body(...),
+    requesting_user: User = Depends(current_active_user),
+    db: AsyncSession = Depends(get_db_session),
+):
+    """Validate BeFindableForm, update clinician specialties + modality, redirect.
+
+    Uses `body: dict = Body(...)` (raw JSON via hx-ext="json-enc") so the
+    decorator catches `_MalformedBeFindableBody` before FastAPI's
+    auto-validation fires outside the decorator's reach.
+
+    Empty submission (skip-for-now with neither box checked, no specialties)
+    is accepted — `update_clinician_for_findability` treats it as a no-op
+    write that still commits, leaving `has_reciprocity_profile` False and
+    routing back here on next visit. The user exits by selecting at least
+    one specialty AND one modality, or by navigating directly to /openings.
+    """
+    try:
+        form_data = BeFindableForm.model_validate(body)
+    except ValidationError as e:
+        raise _MalformedBeFindableBody(e.errors())
+
+    await update_clinician_for_findability(form_data, requesting_user, db=db)
+
+    await db.refresh(requesting_user)
+
+    next_url = await next_step(requesting_user, db=db)
+    return _redirect(request, next_url)
+
+
+# ---------------------------------------------------------------------------
+# Coming-soon stub (placeholder for T7 steps)
 # ---------------------------------------------------------------------------
 
 
