@@ -901,3 +901,42 @@ async def test_root_authenticated_without_intent_shows_picker(
     assert 'data-testid="intent-have-openings"' in response.text
     assert 'data-testid="intent-invited"' in response.text
     assert 'data-testid="intent-building-network"' in response.text
+
+
+async def test_root_b1_preview_shown_for_have_openings_without_providers(
+    authenticated_client: AsyncClient,
+    logged_in_user: User,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+):
+    """B1 preview renders only when intent=have_openings and no providers yet."""
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            await session.execute(
+                User.__table__.update()
+                .where(User.__table__.c.id == logged_in_user.id)
+                .values(onboarding_intent="have_openings")
+            )
+
+    response = await authenticated_client.get("/", follow_redirects=False)
+    assert response.status_code == 200
+    assert 'data-testid="b1-preview"' in response.text
+    assert "what your profile could look like" in response.text
+
+
+async def test_root_b1_preview_absent_for_other_intents(
+    authenticated_client: AsyncClient,
+    logged_in_user: User,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+):
+    """B1 preview is not shown for intents other than have_openings."""
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            await session.execute(
+                User.__table__.update()
+                .where(User.__table__.c.id == logged_in_user.id)
+                .values(onboarding_intent="refer_now")
+            )
+
+    response = await authenticated_client.get("/", follow_redirects=False)
+    assert response.status_code == 200
+    assert 'data-testid="b1-preview"' not in response.text

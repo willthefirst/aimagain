@@ -93,6 +93,16 @@ with at least one provider available.
         {{ multi_select_field("genders", "Genders served", GENDERS, labels=GENDER_LABELS, current=d.genders if d else None) }}
       </div>
     </fieldset>
+    <fieldset>
+      <legend>Slot details</legend>
+      {{ select_field("opening_type", "Session type", OPENING_TYPES, labels=OPENING_TYPES_LABELS, current=d.opening_type if d else None, required=false) }}
+      {{ select_field("availability_state", "Availability", AVAILABILITY_STATES, labels=AVAILABILITY_STATES_LABELS, current=d.availability_state if d else None, required=false) }}
+      <div class="grid">
+        {{ text_field("fee_low", "Fee low ($)", current=d.fee_low|string if d and d.fee_low is not none else None, required=false) }}
+        {{ text_field("fee_high", "Fee high ($)", current=d.fee_high|string if d and d.fee_high is not none else None, required=false) }}
+      </div>
+      {{ field_for(schema, "colleague_note", "Note for clinicians", current=d.colleague_note if d else None) }}
+    </fieldset>
     {{ actions(submit_label, cancel_url=cancel_url) }}
   </form>
 {%- endmacro -%}

@@ -4,10 +4,11 @@ from datetime import datetime
 
 from fastapi import Depends, FastAPI, Form, HTTPException, Request, status
 from fastapi.responses import JSONResponse, RedirectResponse
+from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.middleware.sessions import SessionMiddleware
 
 from src.auth_config import auth_backend, current_optional_user, fastapi_users
-from src.db import check_database_health
+from src.db import check_database_health, get_db_session
 from src.domain import routes  # noqa: F401  # populates entity_registry
 from src.domain import template_globals  # noqa: F401  # populates Jinja env globals
 from src.domain.logic.users.schema import UserRead
@@ -106,7 +107,11 @@ async def unauthorized_exception_handler(request: Request, exc: HTTPException):
 
 
 @app.get("/")
-async def read_root(request: Request, user=Depends(current_optional_user)):
+async def read_root(
+    request: Request,
+    user=Depends(current_optional_user),
+    db: AsyncSession = Depends(get_db_session),
+):
     """Public landing — intent picker for new visitors.
 
     Returner skip rule: authed users who have already set an intent AND
@@ -117,20 +122,17 @@ async def read_root(request: Request, user=Depends(current_optional_user)):
     after picking.
     """
     if user is not None and user.onboarding_intent is not None:
-        # Lazy import to keep the module import graph clean.
-        from src.db import async_session_maker
         from src.domain.logic.providers.repository import ProviderRepository
         from src.domain.logic.verifications.repository import VerificationRepository
 
-        async with async_session_maker() as _session:
-            provider_repo = ProviderRepository(_session)
-            providers = await provider_repo.list_for_user(user.id)
-            if providers:
-                verif_repo = VerificationRepository(_session)
-                for provider in providers:
-                    latest = await verif_repo.latest_for_provider(provider.id)
-                    if latest and latest.status == "verified":
-                        return RedirectResponse(url="/openings", status_code=302)
+        provider_repo = ProviderRepository(db)
+        providers = await provider_repo.list_for_user(user.id)
+        if providers:
+            verif_repo = VerificationRepository(db)
+            for provider in providers:
+                latest = await verif_repo.latest_for_provider(provider.id)
+                if latest and latest.status == "verified":
+                    return RedirectResponse(url="/openings", status_code=302)
 
     return APIResponse.html_response(
         template_name="landing.html",
