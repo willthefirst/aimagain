@@ -19,17 +19,24 @@ it. The signal table:
 
 ### Truth table (current)
 
-| intent | has_clinician | clinician_verified | has_opening | next URL |
-|---|---|---|---|---|
-| any | False | — | — | `/welcome/verify` |
-| any | True | False | — | `/welcome/verify` |
-| `have_openings` | True | True | False | `/welcome/first-opening` |
-| `have_openings` | True | True | True | `/welcome/done` |
-| `refer_now` | True | True | — | `/welcome/coming-soon` (T5) |
-| `building_network` | True | True | — | `/welcome/coming-soon` (T7) |
-| `invited` | True | True | — | `/welcome/coming-soon` (T7) |
+| intent | has_clinician | clinician_verified | has_opening | has_reciprocity_profile | next URL |
+|---|---|---|---|---|---|
+| any | False | — | — | — | `/welcome/verify` |
+| any | True | False | — | — | `/welcome/verify` |
+| `refer_now` | True | True | — | False | `/welcome/be-findable` |
+| `refer_now` | True | True | — | True | `/openings` (terminal) |
+| `have_openings` | True | True | False | — | `/welcome/first-opening` |
+| `have_openings` | True | True | True | — | `/welcome/done` |
+| `building_network` | True | True | — | — | `/welcome/coming-soon` (T7) |
+| `invited` | True | True | — | — | `/welcome/coming-soon` (T7) |
 
 **Terminal rule**: Repeat visits to `/welcome/done` re-render the done page — the natural exit is the "Go to the board" CTA. No session flag is used (see `state_machine.py` comment).
+
+`has_reciprocity_profile(clinician)` returns True when the clinician's
+`primary_affiliation` has non-empty `specialties` AND at least one modality
+(`in_person_sessions == "yes"` OR `virtual_sessions == "yes"`). AND not OR
+because neither alone is sufficient to be findable. Implemented synchronously
+— Provider loads Affiliations via `lazy="selectin"`.
 
 ### Onboarding clinician convention
 
