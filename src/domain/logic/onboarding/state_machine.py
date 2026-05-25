@@ -21,7 +21,7 @@ by the user. See `onboarding_clinician()`.
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.domain.models import Provider, User, Verification
+from src.domain.models import OpeningDetail, Post, Provider, User, Verification
 
 # Stub URL for steps not yet implemented — returns a minimal placeholder page
 # until the downstream ticket ships the real page.
@@ -75,8 +75,23 @@ async def next_step(user: User, *, db: AsyncSession) -> str:
         return _NOT_YET_BUILT
 
     if intent == "have_openings":
-        # T4 will replace this stub with /welcome/first-opening
-        return _NOT_YET_BUILT
+        has_opening_result = await db.execute(
+            select(Post)
+            .join(OpeningDetail, OpeningDetail.post_id == Post.id)
+            .filter(
+                Post.kind == "clinician_opening",
+                OpeningDetail.provider_id == clinician.id,
+            )
+            .limit(1)
+        )
+        has_opening = has_opening_result.scalars().first() is not None
+        if not has_opening:
+            return "/welcome/first-opening"
+        # Terminal: user has completed the wizard. Navigating back to /welcome
+        # shows the done page again rather than redirecting to /openings, so
+        # the done page is idempotent — clicking "Go to the board" is the
+        # natural exit. A session flag would add complexity for minimal gain.
+        return "/welcome/done"
 
     if intent == "building_network":
         # T7 will replace this stub with /welcome/start-network

@@ -1,7 +1,7 @@
 """Parametrized truth-table tests for the onboarding state machine.
 
-Each row covers one (intent, has_clinician, clinician_verified) combination
-from the documented signal table in state_machine.py.
+Each row covers one (intent, has_clinician, clinician_verified, has_opening)
+combination from the documented signal table in state_machine.py.
 """
 
 import uuid
@@ -59,30 +59,33 @@ _NOT_YET_BUILT = "/welcome/coming-soon"
 
 
 @pytest.mark.parametrize(
-    "intent,has_clinician,clinician_verified,expected",
+    "intent,has_clinician,clinician_verified,has_opening,expected",
     [
         # No intent → landing
-        (None, False, False, "/"),
-        (None, True, True, "/"),
+        (None, False, False, False, "/"),
+        (None, True, True, False, "/"),
         # No clinician → verify
-        ("refer_now", False, False, "/welcome/verify"),
-        ("have_openings", False, False, "/welcome/verify"),
-        ("building_network", False, False, "/welcome/verify"),
-        ("invited", False, False, "/welcome/verify"),
+        ("refer_now", False, False, False, "/welcome/verify"),
+        ("have_openings", False, False, False, "/welcome/verify"),
+        ("building_network", False, False, False, "/welcome/verify"),
+        ("invited", False, False, False, "/welcome/verify"),
         # Clinician exists but not verified → verify
-        ("refer_now", True, False, "/welcome/verify"),
-        ("have_openings", True, False, "/welcome/verify"),
-        ("building_network", True, False, "/welcome/verify"),
-        ("invited", True, False, "/welcome/verify"),
-        # Clinician exists and verified → intent-specific stub (T4/T5/T7 replace)
-        ("refer_now", True, True, _NOT_YET_BUILT),
-        ("have_openings", True, True, _NOT_YET_BUILT),
-        ("building_network", True, True, _NOT_YET_BUILT),
-        ("invited", True, True, _NOT_YET_BUILT),
+        ("refer_now", True, False, False, "/welcome/verify"),
+        ("have_openings", True, False, False, "/welcome/verify"),
+        ("building_network", True, False, False, "/welcome/verify"),
+        ("invited", True, False, False, "/welcome/verify"),
+        # Clinician verified, other intents → stub (T5/T7 will replace)
+        ("refer_now", True, True, False, _NOT_YET_BUILT),
+        ("building_network", True, True, False, _NOT_YET_BUILT),
+        ("invited", True, True, False, _NOT_YET_BUILT),
+        # have_openings, verified, no opening yet → first-opening step
+        ("have_openings", True, True, False, "/welcome/first-opening"),
+        # have_openings, verified, has opening → done
+        ("have_openings", True, True, True, "/welcome/done"),
     ],
 )
 async def test_next_step_truth_table(
-    intent, has_clinician, clinician_verified, expected
+    intent, has_clinician, clinician_verified, has_opening, expected
 ):
     provider = _make_provider()
     user = MagicMock()
@@ -99,11 +102,25 @@ async def test_next_step_truth_table(
     else:
         fake_verification = None
 
-    # Mock db.execute so scalars().first() returns the fake verification.
-    mock_result = MagicMock()
-    mock_result.scalars.return_value.first.return_value = fake_verification
+    # Mock db.execute to return the fake verification first, then simulate
+    # the has_opening query. The state machine calls execute once for
+    # verification, and (for have_openings+verified) once for openings.
+    fake_post = MagicMock() if has_opening else None
+
+    call_count = 0
+
+    def _side_effect(stmt):
+        nonlocal call_count
+        call_count += 1
+        result = MagicMock()
+        if call_count == 1:
+            result.scalars.return_value.first.return_value = fake_verification
+        else:
+            result.scalars.return_value.first.return_value = fake_post
+        return result
+
     mock_db = AsyncMock()
-    mock_db.execute.return_value = mock_result
+    mock_db.execute.side_effect = _side_effect
 
     result = await next_step(user, db=mock_db)
     assert result == expected
