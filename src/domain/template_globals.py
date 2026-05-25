@@ -23,6 +23,7 @@ from src.domain.logic.posts.schema import (
 from src.domain.logic.posts.view import (
     insurance_posture_for_post,
     post_card_view,
+    post_feed_headline,
     post_row_summary,
     referral_headline,
 )
@@ -107,6 +108,9 @@ register_template_globals(
     # `post_row_summary(post)` — compact mid-dot summary line for the row
     # layout used by the home-page widget and list-page compact view.
     post_row_summary=post_row_summary,
+    # `post_feed_headline(post)` — two-part "<identity> — <focus>" headline
+    # for the feed-row component in home and browse list views.
+    post_feed_headline=post_feed_headline,
     # `provider_card_view(provider)` is the unified view-model
     # `providers/detail.html` reads from — see its docstring in
     # `src.domain.logic.providers.view`.
