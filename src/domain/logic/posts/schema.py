@@ -54,7 +54,6 @@ from src.domain.logic.value_objects.location import (
 )
 from src.domain.models import POST_KINDS
 from src.domain.models.enums import (
-    AVAILABILITY_STATES,
     CLIENT_AGE_GROUPS,
     DESIRED_TIME_SLOTS,
     GENDERS,
@@ -62,7 +61,6 @@ from src.domain.models.enums import (
     LANGUAGES,
     LOCATION_AVAILABILITY_OPTIONS,
     NETWORK_PREFERENCES,
-    OPENING_TYPES,
     REFERRAL_SERVICES,
     TREATMENT_SETTINGS,
 )
@@ -144,18 +142,6 @@ RequiredAgeGroupsField = Annotated[AgeGroupsField, Field(min_length=1)]
 # allowed — "no restriction stated" / serves any gender.
 GendersField = Annotated[list[Literal[*GENDERS]], BeforeValidator(scalar_to_list)]
 
-OptionalOpeningType = Annotated[
-    Literal[*OPENING_TYPES] | None, BeforeValidator(_empty_to_none)
-]
-OptionalAvailabilityState = Annotated[
-    Literal[*AVAILABILITY_STATES] | None, BeforeValidator(_empty_to_none)
-]
-# Free-form JSON arrays — vocabulary enforced on the wire by the
-# application layer if/when a canonical taxonomy is defined.
-SpecialtiesField = Annotated[list[str], BeforeValidator(scalar_to_list)]
-PopulationTagsField = Annotated[list[str], BeforeValidator(scalar_to_list)]
-PaymentTypesField = Annotated[list[str], BeforeValidator(scalar_to_list)]
-
 
 # --- Shared flatten helper ----------------------------------------------
 
@@ -223,10 +209,6 @@ class ReferralRead(_PostReadBase):
     # See :class:`ReferralCreate` for the carrier/preference split.
     network_preference: Literal[*NETWORK_PREFERENCES]
     insurance_carrier: OptionalInsuranceCarrier = None
-    # Set when this referral was created via the wizard's
-    # ``/welcome/refer/{opening_id}`` step. ``None`` for referrals
-    # submitted through the full ``/referrals`` form.
-    target_opening_id: uuid.UUID | None = None
 
     # Flat-on-dump: keep ``location_city`` / ``location_state`` /
     # ``location_zip`` at the top level of JSON responses. The parent's
@@ -254,17 +236,6 @@ class ClinicianOpeningRead(_PostReadBase):
     age_groups: AgeGroupsField = []
     languages: LanguagesField = []
     genders: GendersField = []
-    # Slot-shape fields (T3)
-    opening_type: OptionalOpeningType = None
-    specialties: SpecialtiesField = []
-    population_tags: PopulationTagsField = []
-    fee_low: int | None = None
-    fee_high: int | None = None
-    payment_types: PaymentTypesField = []
-    availability_state: OptionalAvailabilityState = None
-    colleague_note: str | None = None
-    note_expires_at: datetime | None = None
-    last_confirmed_at: datetime | None = None
 
 
 class ProgramIntakeRead(_PostReadBase):
@@ -372,16 +343,6 @@ class ClinicianOpeningCreate(WirePayload):
     # Genders this practice serves. Optional; empty = "no restriction
     # stated" / serves any. Multi-checkbox on the wire.
     genders: GendersField = []
-    # Slot-shape fields (T3) — all optional on create so wizard pages
-    # can submit a subset and come back to fill in the rest.
-    opening_type: OptionalOpeningType = None
-    specialties: SpecialtiesField = []
-    population_tags: PopulationTagsField = []
-    fee_low: int | None = None
-    fee_high: int | None = None
-    payment_types: PaymentTypesField = []
-    availability_state: OptionalAvailabilityState = None
-    colleague_note: Annotated[StrippedOptionalText, Field(max_length=280)] = None
 
 
 class ProgramIntakeCreate(WirePayload):
@@ -502,15 +463,6 @@ class ClinicianOpeningUpdate(PartialUpdate):
     # `None` = leave unchanged; `[]` is allowed (clear the list to
     # "no restriction stated").
     genders: GendersField | None = None
-    # Slot-shape fields (T3) — `None` = leave unchanged.
-    opening_type: OptionalOpeningType = None
-    specialties: SpecialtiesField | None = None
-    population_tags: PopulationTagsField | None = None
-    fee_low: int | None = None
-    fee_high: int | None = None
-    payment_types: PaymentTypesField | None = None
-    availability_state: OptionalAvailabilityState = None
-    colleague_note: Annotated[StrippedOptionalText, Field(max_length=280)] = None
 
 
 class ProgramIntakeUpdate(PartialUpdate):
@@ -578,8 +530,6 @@ class ReferralAuditSnapshot(_PostAuditSnapshotBase):
     treatment_modality: str | None = None
     network_preference: Literal[*NETWORK_PREFERENCES]
     insurance_carrier: OptionalInsuranceCarrier = None
-    # Mirrors :class:`ReferralRead.target_opening_id`.
-    target_opening_id: uuid.UUID | None = None
 
     # Flat-on-dump — see :class:`ReferralRead`.
     @model_serializer(mode="wrap")
@@ -603,17 +553,6 @@ class ClinicianOpeningAuditSnapshot(_PostAuditSnapshotBase):
     age_groups: AgeGroupsField = []
     languages: LanguagesField = []
     genders: GendersField = []
-    # Slot-shape fields (T3)
-    opening_type: OptionalOpeningType = None
-    specialties: SpecialtiesField = []
-    population_tags: PopulationTagsField = []
-    fee_low: int | None = None
-    fee_high: int | None = None
-    payment_types: PaymentTypesField = []
-    availability_state: OptionalAvailabilityState = None
-    colleague_note: str | None = None
-    note_expires_at: datetime | None = None
-    last_confirmed_at: datetime | None = None
 
 
 class ProgramIntakeAuditSnapshot(_PostAuditSnapshotBase):

@@ -487,55 +487,6 @@ VERIFICATION_STATUSES: Final[tuple[str, ...]] = (
     "needs_review",
     "failed",
 )
-
-# Why a user joined Bedlam Connect. Captured on the landing page before
-# or during registration; drives the onboarding wizard in T2+. Nullable
-# on `User` — existing users and users who skip the picker have NULL.
-# The four values are exhaustive for the current onboarding design;
-# adding a fifth means extending this tuple plus the landing template
-# and the schema Literal type in `src/domain/logic/users/schema.py`.
-ONBOARDING_INTENTS: Final[tuple[str, ...]] = (
-    "refer_now",
-    "have_openings",
-    "invited",
-    "building_network",
-)
-# Opening-type vocabulary — what session format this opening is for.
-# CHECK-constrained on `opening_details.opening_type`.
-OPENING_TYPES: Final[tuple[str, ...]] = (
-    "individual",
-    "couples",
-    "family",
-    "adolescent",
-    "group",
-    "supervision",
-    "consultation",
-)
-OPENING_TYPES_LABELS: Final[dict[str, str]] = {
-    "individual": "Individual",
-    "couples": "Couples",
-    "family": "Family",
-    "adolescent": "Adolescent",
-    "group": "Group",
-    "supervision": "Supervision",
-    "consultation": "Consultation",
-}
-
-# Availability state vocabulary — the clinician's current intake posture.
-# CHECK-constrained on `opening_details.availability_state`.
-AVAILABILITY_STATES: Final[tuple[str, ...]] = (
-    "taking_now",
-    "short_wait",
-    "waitlist",
-    "not_taking",
-)
-AVAILABILITY_STATES_LABELS: Final[dict[str, str]] = {
-    "taking_now": "Taking now",
-    "short_wait": "Short wait",
-    "waitlist": "Waitlist",
-    "not_taking": "Not taking",
-}
-
 CERTIFICATION_TYPES_LABELS: Final[dict[str, str]] = {
     "emdr": "EMDR",
     "dbt": "DBT Certification",

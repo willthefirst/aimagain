@@ -1,5 +1,4 @@
 import uuid
-from functools import partial
 
 from fastapi_users.db import SQLAlchemyBaseUserTable
 from sqlalchemy import Column, Text
@@ -7,15 +6,9 @@ from sqlalchemy.orm import relationship
 
 from src.framework.persistence.base_model import BaseModel
 
-from ..enums import ONBOARDING_INTENTS, named_check_in
-
-_TABLE = "users"
-_ck = partial(named_check_in, _TABLE)
-
 
 class User(SQLAlchemyBaseUserTable[uuid.UUID], BaseModel):
-    __tablename__ = _TABLE
-    __table_args__ = (_ck("onboarding_intent", ONBOARDING_INTENTS),)
+    __tablename__ = "users"
 
     username = Column(
         Text,
@@ -23,12 +16,6 @@ class User(SQLAlchemyBaseUserTable[uuid.UUID], BaseModel):
         nullable=False,
         default=lambda: f"user_{uuid.uuid4()}",
     )
-
-    # Why the user joined Bedlam Connect — captured on the landing page
-    # before or during registration. Drives the onboarding wizard in T2+.
-    # NULL for users who joined before the field existed or skipped the
-    # intent picker. Values in `ONBOARDING_INTENTS`.
-    onboarding_intent = Column(Text, nullable=True)
 
     # Reverse of `Provider.owner_id`. The PA create form reads this off
     # `current_user` to populate the provider dropdown; `lazy="selectin"`

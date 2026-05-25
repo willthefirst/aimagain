@@ -4,49 +4,14 @@ from uuid import UUID
 
 from src.domain.logic.providers.repository import ProviderRepository
 from src.domain.logic.users.repository import UserRepository
-from src.domain.logic.users.schema import (
-    OnboardingIntentAuditSnapshot,
-    OnboardingIntentUpdate,
-    UserActivationUpdate,
-)
+from src.domain.logic.users.schema import UserActivationUpdate
 from src.domain.models import User
 from src.domain.specs.user import USER_ENTITY
-from src.framework.audit.core import AuditAction, make_snapshotter, record_audit
+from src.framework.audit.core import record_audit
 from src.framework.audit.repository import AuditRepository
 from src.framework.http.exceptions import NotFoundError
 
 logger = logging.getLogger(__name__)
-
-_snapshot_onboarding_intent = make_snapshotter(OnboardingIntentAuditSnapshot)
-
-
-async def handle_set_onboarding_intent(
-    payload: OnboardingIntentUpdate,
-    repo: UserRepository,
-    audit_repo: AuditRepository,
-    requesting_user: User,
-) -> User:
-    """Self-only: set the requesting user's onboarding intent.
-
-    Writes an audit row in the same transaction. The route is always
-    self-targeted (`/users/me/onboarding-intent`) so no separate
-    user_id lookup is needed — we operate directly on `requesting_user`.
-    """
-    before = _snapshot_onboarding_intent(requesting_user)
-    updated = await repo.patch(
-        requesting_user, onboarding_intent=payload.onboarding_intent
-    )
-    await record_audit(
-        audit_repo,
-        actor_id=requesting_user.id,
-        resource_type=USER_ENTITY.audit.type,
-        resource_id=updated.id,
-        action=AuditAction.UPDATE_USER_ONBOARDING_INTENT,
-        before=before,
-        after=_snapshot_onboarding_intent(updated),
-    )
-    await repo.session.commit()
-    return updated
 
 
 async def user_detail_extras(

@@ -5,14 +5,9 @@ from pydantic import BaseModel, EmailStr
 
 from src.framework.schema_validators import ReadProjection
 
-OnboardingIntentLiteral = Literal[
-    "refer_now", "have_openings", "invited", "building_network"
-]
-
 
 class UserRead(schemas.BaseUser):
     username: str
-    onboarding_intent: OnboardingIntentLiteral | None = None
     # `is_verified` is inherited from `fastapi_users.schemas.BaseUser`
     # and serialized on the wire — the chrome's "verify your email"
     # nag banner reads it. The earlier `exclude=True` override (#696)
@@ -33,9 +28,6 @@ class UserCreate(schemas.BaseUserCreate):
 
 class UserUpdate(schemas.BaseUserUpdate):
     username: str
-    # `onboarding_intent` is intentionally absent — it is a state axis
-    # managed via `PUT /users/me/onboarding-intent`, not a plain PATCH
-    # field (RESOURCE_GRAMMAR.md §"Worked example: /users").
 
 
 class UserActivationUpdate(BaseModel):
@@ -44,26 +36,12 @@ class UserActivationUpdate(BaseModel):
     state: Literal["active", "deactivated"]
 
 
-class OnboardingIntentUpdate(BaseModel):
-    """Body for `PUT /users/me/onboarding-intent` — sets the user's onboarding intent."""
-
-    onboarding_intent: OnboardingIntentLiteral
-
-
 class UserActivationAuditSnapshot(ReadProjection):
     """Audit `before`/`after` projection for the `/users/{id}/activation`
     state-axis subresource. Captures only the field this mutation can change.
     """
 
     is_active: bool
-
-
-class OnboardingIntentAuditSnapshot(ReadProjection):
-    """Audit `before`/`after` projection for the `/users/me/onboarding-intent`
-    field-cluster subresource. Captures only the field this mutation can change.
-    """
-
-    onboarding_intent: OnboardingIntentLiteral | None
 
 
 class UserAuditSnapshot(ReadProjection):

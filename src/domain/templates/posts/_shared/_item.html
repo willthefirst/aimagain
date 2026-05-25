@@ -60,23 +60,17 @@ family (e.g. `/referrals/{id}` for referrals' list). #}
   subtitle=subtitle,
   data_kind=post.kind) -%}
   {{ facts_block(view) }}
-  {#- Footer carries the Email CTA and, for opening cards, a Refer CTA.
-    Email: Pico-styled `role="button" class="secondary outline"`.
-    Refer: navigates to the wizard's send-referral step for this opening,
-    only rendered when entity_name == 'opening' so referral cards and
-    intake cards don't show it. -#}
+  {#- Footer carries just the Email CTA — Pico-styled `role="button"
+    class="secondary outline"` with the label "Email". The raw
+    address lives only in the `href`. `target="_blank" rel="noopener
+    noreferrer"` is harmless on `mailto:` URLs and matches the pattern
+    used for the PA `website` link on the detail page. -#}
   <footer>
     <a href="mailto:{{ post.owner.email }}"
        target="_blank"
        rel="noopener noreferrer"
        role="button"
        class="secondary outline">Email</a>
-    {% if entity_name == 'opening' %}
-      <a href="/welcome/refer/{{ post.id }}"
-         role="button"
-         class="outline"
-         data-testid="refer-cta">Refer</a>
-    {% endif %}
   </footer>
 {%- endcall %}
 {%- endmacro %}
