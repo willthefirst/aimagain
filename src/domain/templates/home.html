@@ -2,13 +2,12 @@
 {%- from "posts/_shared/_row.html" import post_row with context -%}
 {% block title %}Home{% endblock %}
 {% block content %}
-  <p>Welcome back, {{ display_name }}.</p>
-  <div style="display: flex; gap: 1rem; flex-wrap: wrap;">
+  <section style="display: flex; gap: 1rem; flex-wrap: wrap;">
     <a href="{{ entity_form_url('referral') }}"
        role="button"
        class="outline">+ Post a referral</a>
     <a href="{{ entity_form_url('opening') }}" role="button" class="outline">+ Post an opening</a>
-  </div>
+  </section>
   {% if my_posts %}
     <section>
       <header style="display: flex;
