@@ -1,3 +1,10 @@
 {% extends "base.html" %}
 {% block title %}Home{% endblock %}
-{% block content %}{% endblock %}
+{% block content %}
+  <div style="display: flex; gap: 1rem; flex-wrap: wrap;">
+    <a href="{{ entity_form_url('referral') }}"
+       role="button"
+       class="outline">+ Post a referral</a>
+    <a href="{{ entity_form_url('opening') }}" role="button" class="outline">+ Post an opening</a>
+  </div>
+{% endblock %}
