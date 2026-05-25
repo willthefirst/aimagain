@@ -12,7 +12,7 @@ from src.domain import routes  # noqa: F401  # populates entity_registry
 from src.domain import template_globals  # noqa: F401  # populates Jinja env globals
 from src.domain.logic.users.schema import UserRead
 from src.domain.models.enums import ONBOARDING_INTENTS
-from src.domain.routes import auth_pages, auth_routes, dev_auth, verifications, welcome
+from src.domain.routes import auth_pages, auth_routes, dev_auth, verifications
 from src.framework.config import settings
 from src.framework.dispatch.registry import entity_registry
 from src.framework.http.middleware import StripEmptyQueryParamsMiddleware
@@ -188,7 +188,6 @@ app.include_router(
     tags=["auth"],
 )
 app.include_router(verifications.verifications_api_router)
-app.include_router(welcome.welcome_api_router)
 
 # Every entity route file calls `register_entity(SPEC)` at import time
 # (see `src/framework/dispatch/registry.py`). The package import above

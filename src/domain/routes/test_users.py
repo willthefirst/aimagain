@@ -1120,8 +1120,7 @@ async def test_put_onboarding_intent_accepts_each_valid_value(
     db_test_session_manager: async_sessionmaker[AsyncSession],
 ):
     """Each of the 4 enum values is accepted and persisted.
-    The response is a 302 redirect to /welcome (dispatcher sends user to their next step).
-    """
+    The response is a 302 redirect to /openings."""
     for intent in ("refer_now", "have_openings", "invited", "building_network"):
         response = await authenticated_client.put(
             "/users/me/onboarding-intent",
@@ -1131,7 +1130,7 @@ async def test_put_onboarding_intent_accepts_each_valid_value(
         assert (
             response.status_code == 302
         ), f"intent={intent!r} got {response.status_code}"
-        assert response.headers["location"] == "/welcome"
+        assert response.headers["location"] == "/openings"
 
         async with db_test_session_manager() as session:
             result = await session.execute(

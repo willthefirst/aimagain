@@ -43,7 +43,7 @@ async def put_onboarding_intent(
 
     Self-only: always operates on the authenticated user. Writes an
     audit row with action `UPDATE_USER_ONBOARDING_INTENT`. On success,
-    redirects to `/welcome` (wizard dispatcher routes to the next step).
+    redirects to `/openings` (placeholder; T2 will change to `/welcome`).
 
     This is a field-cluster subresource (RESOURCE_GRAMMAR.md §2) — a
     single-value PUT because `onboarding_intent` has different rules
@@ -55,4 +55,4 @@ async def put_onboarding_intent(
         audit_repo=audit_repo,
         requesting_user=requesting_user,
     )
-    return RedirectResponse(url="/welcome", status_code=302)
+    return RedirectResponse(url="/openings", status_code=302)
