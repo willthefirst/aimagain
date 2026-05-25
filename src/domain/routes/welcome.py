@@ -11,7 +11,9 @@ This router is intentionally thin — all business logic lives in
 Modeled on `src/domain/routes/auth_pages.py`.
 """
 
-from fastapi import APIRouter, Body, Depends, Request
+import uuid
+
+from fastapi import APIRouter, Body, Depends, HTTPException, Request
 from fastapi.responses import RedirectResponse, Response
 from pydantic import ValidationError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -21,15 +23,17 @@ from src.db import get_db_session
 from src.domain.logic.onboarding.schema import (
     BeFindableForm,
     FirstOpeningForm,
+    ReferralFromWizardForm,
     VerifyForm,
 )
 from src.domain.logic.onboarding.services import (
     create_first_opening,
+    create_referral_from_wizard,
     update_clinician_for_findability,
     verify_and_create_clinician,
 )
 from src.domain.logic.onboarding.state_machine import next_step, onboarding_clinician
-from src.domain.models import User
+from src.domain.models import OpeningDetail, User
 from src.domain.models.enums import (
     AVAILABILITY_STATES,
     AVAILABILITY_STATES_LABELS,
@@ -402,3 +406,105 @@ async def get_coming_soon(
         context={},
         request=request,
     )
+
+
+# ---------------------------------------------------------------------------
+# Refer step — /welcome/refer/{opening_id}
+# ---------------------------------------------------------------------------
+
+_REFER_TEMPLATE = "welcome/refer.html"
+
+
+class _MalformedReferBody(Exception):
+    """Validation failed on POST /welcome/refer/{opening_id} body."""
+
+    def __init__(self, errors: list[dict]):
+        self.errors = errors
+
+
+def _render_refer_errors(exc: _MalformedReferBody) -> FormError:
+    from src.framework.dispatch.mounts.create import build_form_errors_dict
+
+    return FormError(
+        field_errors=build_form_errors_dict(exc.errors),
+        status_code=422,
+    )
+
+
+def _refer_context(opening_detail: OpeningDetail | None, refer_url: str) -> dict:
+    """Build template context for the refer step."""
+    clinician = None
+    if opening_detail is not None:
+        provider = opening_detail.provider
+        if provider is not None:
+            clinician = provider.clinician
+    return {
+        "opening_detail": opening_detail,
+        "clinician": clinician,
+        "refer_url": refer_url,
+    }
+
+
+@router.get("/welcome/refer/{opening_id}", name="welcome:get_refer")
+async def get_refer(
+    request: Request,
+    opening_id: uuid.UUID,
+    requesting_user: User = Depends(current_active_user),
+    db: AsyncSession = Depends(get_db_session),
+):
+    """Render the send-referral form for a specific clinician opening."""
+    opening_detail = await db.get(OpeningDetail, opening_id)
+    if opening_detail is None:
+        raise HTTPException(status_code=404, detail="Opening not found.")
+    refer_url = f"/welcome/refer/{opening_id}"
+    return APIResponse.html_response(
+        template_name=_REFER_TEMPLATE,
+        context=_refer_context(opening_detail, refer_url),
+        request=request,
+    )
+
+
+@router.post("/welcome/refer/{opening_id}", name="welcome:post_refer")
+@form_error_handler(
+    template=_REFER_TEMPLATE,
+    handlers={_MalformedReferBody: _render_refer_errors},
+    context_builder=lambda kwargs: _refer_context(
+        getattr(kwargs["request"].state, "_opening_detail", None),
+        getattr(kwargs["request"].state, "_refer_url", ""),
+    ),
+    require_htmx=False,
+)
+async def post_refer(
+    request: Request,
+    opening_id: uuid.UUID,
+    body: dict = Body(...),
+    requesting_user: User = Depends(current_active_user),
+    db: AsyncSession = Depends(get_db_session),
+):
+    """Validate ReferralFromWizardForm, create Referral post, redirect to /openings.
+
+    Uses `body: dict = Body(...)` (raw JSON via hx-ext="json-enc") so the
+    decorator can catch `_MalformedReferBody` before FastAPI's auto-validation
+    would raise outside the decorator's reach. The opening context is stashed
+    on `request.state` so `context_builder` can re-render the form with
+    opening info on validation errors.
+    """
+    opening_detail = await db.get(OpeningDetail, opening_id)
+    if opening_detail is None:
+        raise HTTPException(status_code=404, detail="Opening not found.")
+
+    # Stash on request.state so context_builder can access it for re-render.
+    request.state._opening_detail = opening_detail
+    request.state._refer_url = f"/welcome/refer/{opening_id}"
+
+    # Always use the URL path param as the authoritative opening_id —
+    # inject it into the body so Pydantic validates it round-trips cleanly.
+    body["target_opening_id"] = str(opening_id)
+
+    try:
+        form_data = ReferralFromWizardForm.model_validate(body)
+    except ValidationError as e:
+        raise _MalformedReferBody(e.errors())
+
+    await create_referral_from_wizard(form_data, requesting_user, db=db)
+    return _redirect(request, "/openings")
