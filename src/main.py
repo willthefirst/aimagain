@@ -2,18 +2,15 @@ import logging
 from contextlib import asynccontextmanager
 from datetime import datetime
 
-from fastapi import Depends, FastAPI, Form, HTTPException, Request, status
+from fastapi import Depends, FastAPI, HTTPException, Request, status
 from fastapi.responses import JSONResponse, RedirectResponse
-from sqlalchemy.ext.asyncio import AsyncSession
-from starlette.middleware.sessions import SessionMiddleware
 
 from src.auth_config import auth_backend, current_optional_user, fastapi_users
-from src.db import check_database_health, get_db_session
+from src.db import check_database_health
 from src.domain import routes  # noqa: F401  # populates entity_registry
 from src.domain import template_globals  # noqa: F401  # populates Jinja env globals
 from src.domain.logic.users.schema import UserRead
-from src.domain.models.enums import ONBOARDING_INTENTS
-from src.domain.routes import auth_pages, auth_routes, dev_auth, verifications, welcome
+from src.domain.routes import auth_pages, auth_routes, dev_auth, verifications
 from src.framework.config import settings
 from src.framework.dispatch.registry import entity_registry
 from src.framework.http.middleware import StripEmptyQueryParamsMiddleware
@@ -81,16 +78,6 @@ observability.init_app(app)
 # full convention rationale.
 app.add_middleware(StripEmptyQueryParamsMiddleware)
 
-# Session middleware for pre-auth state (e.g. onboarding intent captured
-# on the landing page before the user registers). Uses `SECRET` as the
-# session signing key — the same secret used for JWT and password-reset
-# tokens. `https_only` follows ENVIRONMENT so local dev works over http.
-app.add_middleware(
-    SessionMiddleware,
-    secret_key=settings.SECRET,
-    https_only=(settings.ENVIRONMENT != "development"),
-)
-
 
 @app.exception_handler(HTTPException)
 async def unauthorized_exception_handler(request: Request, exc: HTTPException):
@@ -107,65 +94,18 @@ async def unauthorized_exception_handler(request: Request, exc: HTTPException):
 
 
 @app.get("/")
-async def read_root(
-    request: Request,
-    user=Depends(current_optional_user),
-    db: AsyncSession = Depends(get_db_session),
-):
-    """Public landing — intent picker for new visitors.
-
-    Returner skip rule: authed users who have already set an intent AND
-    own at least one clinician with a `verified` Verification skip the
-    picker and land directly on `/openings`. All other authed users see
-    the intent picker so they can (re-)confirm their reason for being
-    here. Anonymous visitors see the picker and are routed to register
-    after picking.
-    """
-    user_has_verified_clinician = False
-
-    if user is not None and user.onboarding_intent is not None:
-        from src.domain.logic.providers.repository import ProviderRepository
-        from src.domain.logic.verifications.repository import VerificationRepository
-
-        provider_repo = ProviderRepository(db)
-        providers = await provider_repo.list_for_user(user.id)
-        if providers:
-            verif_repo = VerificationRepository(db)
-            for provider in providers:
-                latest = await verif_repo.latest_for_provider(provider.id)
-                if latest and latest.status == "verified":
-                    user_has_verified_clinician = True
-                    return RedirectResponse(url="/openings", status_code=302)
-
+async def read_root(request: Request, user=Depends(current_optional_user)):
+    # Authenticated users land on `/referrals` — the "find new clients"
+    # home (see `src/auth_config.py:on_after_login` for the same bias).
+    # Anonymous visitors see the public landing page instead of being
+    # redirected to the login wall.
+    if user is not None:
+        return RedirectResponse(url="/referrals", status_code=302)
     return APIResponse.html_response(
         template_name="landing.html",
-        context={
-            "user": user,
-            "user_has_verified_clinician": user_has_verified_clinician,
-        },
+        context={},
         request=request,
     )
-
-
-@app.post("/onboarding-intent-pending")
-async def set_pending_onboarding_intent(
-    request: Request,
-    intent: str = Form(...),
-):
-    """Pre-auth intent capture for the landing-page intent picker.
-
-    Writes the selected intent into the session and redirects the visitor
-    to `/auth/register`. On successful registration, `on_after_register`
-    in `auth_config.py` reads the session key and persists it to the new
-    user row, then clears the key.
-
-    Unknown intent values are silently ignored (the session key is not
-    set) so a browser replaying a stale form with a removed intent token
-    lands on register without crashing.
-    """
-    if intent in ONBOARDING_INTENTS:
-        request.session["onboarding_intent"] = intent
-    return RedirectResponse(url="/auth/register", status_code=302)
 
 
 app.include_router(
@@ -196,7 +136,6 @@ app.include_router(
     tags=["auth"],
 )
 app.include_router(verifications.verifications_api_router)
-app.include_router(welcome.welcome_api_router)
 
 # Every entity route file calls `register_entity(SPEC)` at import time
 # (see `src/framework/dispatch/registry.py`). The package import above

@@ -862,128 +862,47 @@ async def test_failed_register_writes_no_audit_row(
 
 
 async def test_root_anonymous_returns_landing_page(test_client: AsyncClient):
-    """Anonymous GET / returns the onboarding intent picker (200 HTML),
-    not a redirect to the login wall (#692). The H1 and 4 intent cards
-    are the canonical landing-page contract — verified here so a copy
-    edit doesn't quietly drop a card or the page title."""
+    """Anonymous GET / returns the marketing landing page (200 HTML),
+    not a redirect to the login wall (#692). The H1 + tagline +
+    description copy are taken verbatim from the parent marketing
+    site at https://www.bedlamconnect.com/ — pinning them so a
+    well-meaning copy edit doesn't quietly drift the public-facing
+    page out of sync with the brand."""
     response = await test_client.get("/", follow_redirects=False)
     assert response.status_code == 200
     assert "text/html" in response.headers["content-type"]
-    # Page H1 and picker subtitle.
+    # Verbatim copy from bedlamconnect.com.
     assert "Welcome to Bedlam Connect" in response.text
-    assert "What brings you here today?" in response.text
-    # All 4 intent cards must be present for anonymous visitors.
-    assert 'data-testid="intent-refer-now"' in response.text
-    assert 'data-testid="intent-have-openings"' in response.text
-    assert 'data-testid="intent-invited"' in response.text
-    assert 'data-testid="intent-building-network"' in response.text
-    # Anonymous path uses plain form POSTs to /onboarding-intent-pending.
-    assert "/onboarding-intent-pending" in response.text
+    assert "Connecting providers, helping patients." in response.text
+    assert (
+        "Post referrals, find referrals, and maintain a network of "
+        "professional contacts." in response.text
+    )
+    # Both CTAs must be present so anonymous visitors can self-serve.
+    # "Sign in" / "Sign up" verbs match the parent marketing site and
+    # the rest of the auth flow (#693).
+    assert "/auth/register" in response.text
+    assert "/auth/login" in response.text
+    assert "Sign in" in response.text
+    assert "Sign up" in response.text
+    # CTA buttons live in `.cta-cluster`, NOT Pico's `.grid` — `.grid`
+    # would stretch them to the full hero width on tablet+. The
+    # `.cta-cluster` CSS in `landing.html` overrides Pico's
+    # `<a role="button">` full-width default at ≥768px so the buttons
+    # render at natural width, but keeps the full-width treatment on
+    # phones where stacked tappable bars read better.
+    assert "cta-cluster" in response.text
     # The footer slot is shared across every page (default block in
     # `base.html`), so the brand/contact line is present on the
     # landing page too.
     assert "support@bedlamhealth.com" in response.text
 
 
-async def test_root_authenticated_without_intent_shows_picker(
+async def test_root_authenticated_redirects_to_referrals(
     authenticated_client: AsyncClient,
 ):
-    """Authenticated GET / for a user with no onboarding_intent shows
-    the intent picker — they are asked to pick their reason for being here
-    before being routed to the app. The returner-skip rule only applies
-    once the user has set an intent AND has a verified clinician."""
+    """Authenticated GET / still redirects to /referrals — the
+    "find new clients" home (#692)."""
     response = await authenticated_client.get("/", follow_redirects=False)
-    assert response.status_code == 200
-    assert "text/html" in response.headers["content-type"]
-    assert "Welcome to Bedlam Connect" in response.text
-    # All 4 intent cards must be present for authed visitors without an intent.
-    assert 'data-testid="intent-refer-now"' in response.text
-    assert 'data-testid="intent-have-openings"' in response.text
-    assert 'data-testid="intent-invited"' in response.text
-    assert 'data-testid="intent-building-network"' in response.text
-
-
-async def test_root_b1_preview_shown_for_have_openings_without_providers(
-    authenticated_client: AsyncClient,
-    logged_in_user: User,
-    db_test_session_manager: async_sessionmaker[AsyncSession],
-):
-    """B1 preview renders only when intent=have_openings and no providers yet."""
-    async with db_test_session_manager() as session:
-        async with session.begin():
-            await session.execute(
-                User.__table__.update()
-                .where(User.__table__.c.id == logged_in_user.id)
-                .values(onboarding_intent="have_openings")
-            )
-
-    response = await authenticated_client.get("/", follow_redirects=False)
-    assert response.status_code == 200
-    assert 'data-testid="b1-preview"' in response.text
-    assert "what your profile could look like" in response.text
-
-
-async def test_root_b1_preview_absent_for_other_intents(
-    authenticated_client: AsyncClient,
-    logged_in_user: User,
-    db_test_session_manager: async_sessionmaker[AsyncSession],
-):
-    """B1 preview is not shown for intents other than have_openings."""
-    async with db_test_session_manager() as session:
-        async with session.begin():
-            await session.execute(
-                User.__table__.update()
-                .where(User.__table__.c.id == logged_in_user.id)
-                .values(onboarding_intent="refer_now")
-            )
-
-    response = await authenticated_client.get("/", follow_redirects=False)
-    assert response.status_code == 200
-    assert 'data-testid="b1-preview"' not in response.text
-
-
-async def test_root_refer_now_unverified_shows_a1_preview(
-    authenticated_client: AsyncClient,
-    db_test_session_manager: async_sessionmaker[AsyncSession],
-):
-    """refer_now user without a verified clinician sees the A1 search preview."""
-    async with db_test_session_manager() as session:
-        async with session.begin():
-            from sqlalchemy import select
-
-            from src.domain.models import User
-
-            result = await session.execute(
-                select(User).filter(User.email == "testuser@example.com")
-            )
-            user = result.scalars().first()
-            user.onboarding_intent = "refer_now"
-
-    response = await authenticated_client.get("/", follow_redirects=False)
-    assert response.status_code == 200
-    assert 'data-testid="a1-search-preview"' in response.text
-    assert 'data-testid="a1-card-1"' in response.text
-    assert 'data-testid="a1-card-2"' in response.text
-    assert 'data-testid="a1-verify-cta"' in response.text
-
-
-async def test_root_non_refer_now_user_no_a1_preview(
-    authenticated_client: AsyncClient,
-    db_test_session_manager: async_sessionmaker[AsyncSession],
-):
-    """have_openings user does not see the A1 preview."""
-    async with db_test_session_manager() as session:
-        async with session.begin():
-            from sqlalchemy import select
-
-            from src.domain.models import User
-
-            result = await session.execute(
-                select(User).filter(User.email == "testuser@example.com")
-            )
-            user = result.scalars().first()
-            user.onboarding_intent = "have_openings"
-
-    response = await authenticated_client.get("/", follow_redirects=False)
-    assert response.status_code == 200
-    assert 'data-testid="a1-search-preview"' not in response.text
+    assert response.status_code == 302
+    assert response.headers["location"] == "/referrals"

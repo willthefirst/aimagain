@@ -76,10 +76,3 @@ class ReferralDetail(LocationMixin, Base):
         Text, nullable=False, server_default=text("'no_preference'")
     )
     insurance_carrier = Column(Text, nullable=True)
-
-    # Section 6 — wizard provenance. Set by `create_referral_from_wizard`
-    # when the referral is created from the /welcome/refer/{opening_id}
-    # wizard step; NULL for referrals created via the full /referrals form.
-    # FK deliberately omitted — OpeningDetail rows may be deleted without
-    # cascading to the referral history.
-    target_opening_id = Column(Uuid(as_uuid=True), nullable=True)

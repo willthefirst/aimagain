@@ -102,13 +102,6 @@ class Affiliation(LocationMixin, BaseModel):
         Boolean, nullable=False, server_default=text("0"), default=False
     )
     cost = Column(Text, nullable=True)
-    # Practice-area specialties — JSON list of strings (e.g. ["Trauma/PTSD",
-    # "EMDR"]). Populated by the T5 be-findable wizard step. Nullable so
-    # existing affiliations created before T5 (which set it via the migration
-    # default '[]') keep working without a forced re-submission.
-    specialties = Column(
-        JSON, nullable=False, server_default=text("'[]'"), default=list
-    )
 
 
 @event.listens_for(Affiliation.provider, "set")

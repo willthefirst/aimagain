@@ -661,29 +661,12 @@ PLACEHOLDER_OK: Final[frozenset[str]] = frozenset(
         # audit rows.
         "resource_type",
         "action",
-        # `colleague_note` is a short peer-facing text field (≤280 chars).
-        # Placeholder is acceptable for seed data; real copy is entered
-        # by the clinician in the wizard.
-        "colleague_note",
     }
 )
 
 # JSON-list columns → which enum to subset over. Most JSON columns
 # carry a vocabulary referenced from `enums.py`; the generator can't
 # infer the link from the column itself, so we declare it explicitly.
-_SPECIALTIES: Final[tuple[str, ...]] = (
-    "Trauma/PTSD",
-    "EMDR",
-    "Anxiety",
-    "OCD/ERP",
-    "Depression",
-    "Grief",
-    "Couples",
-    "Adolescents",
-    "ADHD",
-    "Perinatal",
-)
-
 JSON_LIST_SOURCE: Final[dict[str, tuple[str, ...]]] = {
     "age_groups": CLIENT_AGE_GROUPS,
     "languages": LANGUAGES,
@@ -692,24 +675,6 @@ JSON_LIST_SOURCE: Final[dict[str, tuple[str, ...]]] = {
     "desired_times": DESIRED_TIME_SLOTS,
     "genders": GENDERS,
     "in_network_carriers": INSURANCE_CARRIERS,
-    # Slot-shape fields. `specialties` uses canonical display labels (shared
-    # between OpeningDetail and Affiliation); `population_tags` and
-    # `payment_types` are free-form (no CHECK constraint).
-    "specialties": _SPECIALTIES,
-    "population_tags": (
-        "lgbtq",
-        "poc",
-        "veterans",
-        "first_responders",
-        "chronic_illness",
-        "neurodivergent",
-    ),
-    "payment_types": (
-        "sliding_scale",
-        "out_of_pocket",
-        "insurance",
-        "superbill",
-    ),
     "flags": (  # Verification.flags — free-form bag of strings
         "name_mismatch",
         "nppes_inactive",
