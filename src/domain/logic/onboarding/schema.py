@@ -45,7 +45,7 @@ class FirstOpeningForm(BaseModel):
     opening_type: OptionalOpeningType = None
     specialties: SpecialtiesField = []
     population_tags: PopulationTagsField = []
-    languages: Annotated[list[_LANGUAGES], Field(default_factory=list)] = []
+    languages: list[_LANGUAGES] = []
     fee_low: int | None = None
     fee_high: int | None = None
     payment_types: PaymentTypesField = []
