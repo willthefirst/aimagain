@@ -117,6 +117,7 @@ async def read_home(
         template_name="home.html",
         context={"display_name": display_name, "my_posts": my_posts},
         request=request,
+        current_user=_user,
     )
 
 
