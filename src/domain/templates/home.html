@@ -41,14 +41,12 @@
         <a href="{{ entity_url('referral') }}">Adjust filters</a>
         {# djlint:on #}
       </p>
-      <table class="post-rows">
-        <tbody>
-          {%- for post in network_posts -%}
-            {%- set ename = "referral" if post.kind == "referral" else "opening" -%}
-            {{ post_row(post, ename) }}
-          {%- endfor -%}
-        </tbody>
-      </table>
+      <div class="post-feed-list">
+        {%- for post in network_posts -%}
+          {%- set ename = "referral" if post.kind == "referral" else "opening" -%}
+          {{ post_feed_row(post, ename) }}
+        {%- endfor -%}
+      </div>
     </section>
   {% endif %}
 {% endblock %}
