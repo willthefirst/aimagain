@@ -1,8 +1,6 @@
-import re
-import uuid
 from typing import Annotated, Literal
 
-from pydantic import BaseModel, BeforeValidator, EmailStr, Field, field_validator
+from pydantic import BaseModel, BeforeValidator, EmailStr, Field
 
 from src.domain.logic.posts.schema import (
     OptionalAvailabilityState,
@@ -71,45 +69,3 @@ class BeFindableForm(BaseModel):
     specialties: _SpecialtiesList = []
     in_person: bool = False
     virtual: bool = False
-
-
-# ---------------------------------------------------------------------------
-# PII guard — patterns that indicate a client identifier slipped into a
-# clinical-context free-text field. The referral form prompts for "the
-# clinical picture only", so email / US phone / proper-name patterns are
-# red flags worth rejecting at the wire layer. False-positive rate is
-# acceptable for this use case: the form copy explains the rule upfront.
-# ---------------------------------------------------------------------------
-
-_PII_PATTERNS = [
-    re.compile(r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b"),  # email
-    re.compile(r"\b(?:\+?1[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}\b"),  # US phone
-    re.compile(r"\b[A-Z][a-z]+\s+[A-Z][a-z]+\b"),  # Proper Name Pattern
-]
-
-
-class ReferralFromWizardForm(BaseModel):
-    """Wire schema for POST /welcome/refer/{opening_id}.
-
-    Collects the minimal data needed to create a Referral post pointing at a
-    specific opening. PII guard on `clinical_context` rejects email addresses,
-    US phone numbers, and proper-name patterns — the field is for clinical
-    picture only, never client identifiers.
-    """
-
-    target_opening_id: uuid.UUID
-    clinical_context: str
-
-    @field_validator("clinical_context")
-    @classmethod
-    def no_pii(cls, v: str) -> str:
-        if not v.strip():
-            raise ValueError("Clinical context is required.")
-        if len(v) > 4000:
-            raise ValueError("Clinical context must be 4000 characters or fewer.")
-        for pat in _PII_PATTERNS:
-            if pat.search(v):
-                raise ValueError(
-                    "Please remove client name / contact info — describe the clinical picture only."
-                )
-        return v

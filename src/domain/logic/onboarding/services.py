@@ -16,13 +16,11 @@ No `return_to` primitive — redirects are always determined by `next_step()`.
 import uuid
 
 import httpx
-from fastapi import HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.domain.logic.onboarding.schema import (
     BeFindableForm,
     FirstOpeningForm,
-    ReferralFromWizardForm,
     VerifyForm,
 )
 from src.domain.logic.onboarding.state_machine import onboarding_clinician
@@ -35,7 +33,6 @@ from src.domain.models import (
     Post,
     Provider,
     ProviderLicensure,
-    ReferralDetail,
     User,
 )
 from src.domain.models.posts.post_kinds import POST_KIND_BY_DETAIL_MODEL
@@ -201,46 +198,3 @@ async def update_clinician_for_findability(
     aff.in_person_sessions = "yes" if form_data.in_person else "no"
     aff.virtual_sessions = "yes" if form_data.virtual else "no"
     await db.commit()
-
-
-async def create_referral_from_wizard(
-    form_data: ReferralFromWizardForm,
-    user: User,
-    *,
-    db: AsyncSession,
-) -> Post:
-    """Create a Referral Post pointing at a specific clinician opening.
-
-    Validates that the target opening exists (raises HTTP 404 if not), then
-    creates a `Post` + `ReferralDetail` pair via `create_polymorphic`. The
-    `description` field is populated from `form_data.clinical_context`;
-    location fields are set to placeholder values ("yes") to satisfy the NOT
-    NULL constraint — they will be refined if/when the referral form is
-    completed in full.
-
-    Commits the session after creating the rows.
-    """
-    # Validate the opening exists before creating the referral.
-    opening = await db.get(OpeningDetail, form_data.target_opening_id)
-    if opening is None:
-        raise HTTPException(status_code=404, detail="Opening not found.")
-
-    post = Post(kind="referral", owner_id=user.id)
-    detail = ReferralDetail(
-        target_opening_id=form_data.target_opening_id,
-        description=form_data.clinical_context,
-        location_in_person="yes",
-        location_virtual="yes",
-        # Location fields are NOT NULL — use empty-string placeholders.
-        # The referrer fills real values if they continue to the full form.
-        location_city="",
-        location_state="IL",  # placeholder; IL is a valid US_STATES value
-        location_zip="",
-    )
-    kind_spec = POST_KIND_BY_DETAIL_MODEL[ReferralDetail]
-    repo = BaseRepository(db)
-    created = await repo.create_polymorphic(
-        post, detail, detail_relationship=kind_spec.detail_relationship
-    )
-    await db.commit()
-    return created
