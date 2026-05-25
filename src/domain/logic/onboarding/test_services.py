@@ -15,13 +15,10 @@ import pytest
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from src.domain.logic.onboarding.schema import FirstOpeningForm, VerifyForm
-from src.domain.logic.onboarding.services import (
-    create_first_opening,
-    verify_and_create_clinician,
-)
+from src.domain.logic.onboarding.schema import VerifyForm
+from src.domain.logic.onboarding.services import verify_and_create_clinician
 from src.domain.logic.verifications import oig as oig_module
-from src.domain.models import OpeningDetail, Provider, ProviderLicensure, Verification
+from src.domain.models import Provider, ProviderLicensure, Verification
 from tests.helpers import create_test_user
 
 pytestmark = pytest.mark.asyncio
@@ -163,46 +160,6 @@ async def test_failed_verification_does_not_rollback_clinician(
         )
         assert verif is not None
         assert verif.status == "failed"
-
-
-async def test_create_first_opening_happy_path(
-    db_test_session_manager: async_sessionmaker[AsyncSession],
-):
-    """create_first_opening creates a Post + OpeningDetail with slot fields."""
-    user = await _seed_user(db_test_session_manager)
-
-    # Must have a verified clinician first (verify_and_create_clinician commits)
-    async with db_test_session_manager() as session:
-        provider = await verify_and_create_clinician(_VALID_FORM, user, db=session)
-
-    # Reload user to have providers eager-loaded (selectin) in a new session
-    async with db_test_session_manager() as session:
-        from src.domain.models import User as UserModel
-
-        fresh_user = await session.get(UserModel, user.id)
-        assert fresh_user is not None
-
-        form = FirstOpeningForm(
-            opening_type="individual",
-            specialties=["Trauma/PTSD", "Anxiety"],
-            availability_state="taking_now",
-            colleague_note="Taking adult clients now.",
-        )
-        created_post = await create_first_opening(form, fresh_user, db=session)
-
-    assert created_post.id is not None
-    assert created_post.kind == "clinician_opening"
-    assert created_post.owner_id == user.id
-
-    # Verify OpeningDetail has the slot fields
-    async with db_test_session_manager() as session:
-        detail = await session.get(OpeningDetail, created_post.id)
-        assert detail is not None
-        assert detail.provider_id == provider.id
-        assert detail.opening_type == "individual"
-        assert detail.availability_state == "taking_now"
-        assert detail.colleague_note == "Taking adult clients now."
-        assert "Trauma/PTSD" in detail.specialties
 
 
 async def test_atomicity_on_pipeline_raise(

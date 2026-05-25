@@ -18,22 +18,12 @@ import uuid
 import httpx
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.domain.logic.onboarding.schema import FirstOpeningForm, VerifyForm
-from src.domain.logic.onboarding.state_machine import onboarding_clinician
+from src.domain.logic.onboarding.schema import VerifyForm
 from src.domain.logic.providers.repository import ProviderRepository
 from src.domain.logic.verifications.handlers import run_provider_verification
 from src.domain.logic.verifications.repository import VerificationRepository
-from src.domain.models import (
-    OpeningDetail,
-    Organization,
-    Post,
-    Provider,
-    ProviderLicensure,
-    User,
-)
-from src.domain.models.posts.post_kinds import POST_KIND_BY_DETAIL_MODEL
+from src.domain.models import Organization, Provider, ProviderLicensure, User
 from src.framework.audit.repository import AuditRepository
-from src.framework.persistence.base_repository import BaseRepository
 
 _HTTP_TIMEOUT_SECONDS = 10.0
 
@@ -129,37 +119,3 @@ async def verify_and_create_clinician(
         )
 
     return provider
-
-
-async def create_first_opening(
-    form_data: FirstOpeningForm,
-    user: User,
-    *,
-    db: AsyncSession,
-) -> Post:
-    """Create the wizard's first clinician_opening Post for the user.
-
-    Delegates to `BaseRepository.create_polymorphic` — the same path the
-    canonical `/openings` create route uses. Returns the created Post.
-    """
-    clinician = onboarding_clinician(user)
-    post = Post(kind="clinician_opening", owner_id=user.id)
-    detail = OpeningDetail(
-        provider_id=clinician.id,
-        opening_type=form_data.opening_type,
-        specialties=form_data.specialties or [],
-        population_tags=form_data.population_tags or [],
-        languages=list(form_data.languages) if form_data.languages else [],
-        fee_low=form_data.fee_low,
-        fee_high=form_data.fee_high,
-        payment_types=form_data.payment_types or [],
-        availability_state=form_data.availability_state,
-        colleague_note=form_data.colleague_note,
-    )
-    kind_spec = POST_KIND_BY_DETAIL_MODEL[OpeningDetail]
-    repo = BaseRepository(db)
-    created = await repo.create_polymorphic(
-        post, detail, detail_relationship=kind_spec.detail_relationship
-    )
-    await db.commit()
-    return created
