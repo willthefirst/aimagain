@@ -131,3 +131,29 @@ def test_all_guarded_tools_are_blocked(tool: str, tmp_path: Path) -> None:
     }
     result = _run_hook(repo, payload)
     assert result.returncode == 2, result.stderr
+
+
+def test_allows_when_file_path_is_inside_worktree_even_if_cwd_is_main(
+    tmp_path: Path,
+) -> None:
+    """EnterWorktree switches the session into a linked worktree but the
+    harness payload ``cwd`` may still report the main checkout. The hook
+    must allow the write when the *target file* lives inside a worktree,
+    even when ``cwd`` would otherwise trigger a block.
+
+    This is the bug fixed by the _path_in_worktree fallback: previously,
+    Edit/Write calls after EnterWorktree were erroneously blocked because
+    the hook only checked cwd, not file_path."""
+    repo = _init_main_checkout(tmp_path / "repo")
+    worktree = tmp_path / "worktrees" / "feature"
+    _git(repo, "worktree", "add", "-b", "fix/feature-y", str(worktree))
+
+    # Payload simulates what the harness sends after EnterWorktree:
+    # cwd is still the main checkout, but file_path is inside the worktree.
+    payload = {
+        "tool_name": "Edit",
+        "tool_input": {"file_path": str(worktree / "src" / "foo.py")},
+        "cwd": str(repo),  # main checkout — the stale harness cwd
+    }
+    result = _run_hook(repo, payload)
+    assert result.returncode == 0, result.stderr
