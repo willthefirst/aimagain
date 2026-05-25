@@ -26,4 +26,31 @@
       </table>
     </section>
   {% endif %}
+  {% if network_posts %}
+    <section>
+      <header style="display: flex;
+                     justify-content: space-between;
+                     align-items: baseline">
+        <h2>Recent in the network</h2>
+        <a href="{{ entity_url('referral') }}">See all</a>
+      </header>
+      <p style="font-size: 0.875rem;
+                color: var(--pico-muted-color);
+                margin-bottom: 1rem">
+        {# djlint:off #}
+        Last 7 days, filtered to your saved searches and practice profile
+        {%- if network_filter_chips %} — {{ network_filter_chips | join(" · ") }}{% endif %}.
+        <a href="{{ entity_url('referral') }}">Adjust filters</a>
+        {# djlint:on #}
+      </p>
+      <table class="post-rows">
+        <tbody>
+          {%- for post in network_posts -%}
+            {%- set ename = "referral" if post.kind == "referral" else "opening" -%}
+            {{ post_row(post, ename) }}
+          {%- endfor -%}
+        </tbody>
+      </table>
+    </section>
+  {% endif %}
 {% endblock %}
