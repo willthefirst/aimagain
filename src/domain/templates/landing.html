@@ -1,117 +1,51 @@
 {% extends "base.html" %}
+{% block head %}
+  {# Landing-only layout. The sticky-footer body grid (auto 1fr auto)
+   lives in `base.html` and already grows the `<main>` row to fill the
+   viewport. This block adds the landing-specific extras: vertically
+   center the hero within `<main>` and switch the CTA cluster to a
+   natural-width inline row, both at tablet+. Mobile relies on Pico
+   defaults — `<a role="button">` is block-level full-width, which is
+   exactly what we want for stacked tappable bars. Scoped to
+   `body:has(.landing-hero)` and `.landing-hero` so the rules don't
+   leak to any other page. #}
+  <style>
+  @media (min-width: 768px) {
+    body:has(.landing-hero) main.container {
+      display: grid;
+      padding-block: 2rem;
+    }
+    .landing-hero { align-self: center; }
+    .landing-hero .cta-cluster {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.75rem;
+    }
+    .landing-hero .cta-cluster > [role="button"] {
+      width: auto;
+      margin: 0;
+    }
+  }
+  </style>
+{% endblock %}
 {% block content %}
-  {# Onboarding intent picker — 4 cards, one per intent value.
-   Click behaviour differs by auth state:
-   - Authenticated: HTMX PUT /users/me/onboarding-intent; on success
-     the server redirects to /openings (T2 will change to /welcome).
-   - Anonymous: plain HTML form POST to /onboarding-intent-pending,
-     which writes the intent to the session and redirects to /auth/register. #}
-  <section>
-    <hgroup>
-      <h1>Welcome to Bedlam Connect</h1>
-      <p>What brings you here today?</p>
-    </hgroup>
-    <div class="grid">
-      {% if user %}
-        {# Authenticated path: HTMX PUT on click; redirect handled by HX-Location response header. #}
-        <article data-testid="intent-refer-now">
-          <header>
-            <strong>I need to refer a client</strong>
-          </header>
-          <p>Find a clinician who can take your client now.</p>
-          <footer>
-            <button hx-put="{{ entity_url('user', id='me', subresource='onboarding-intent') }}"
-                    hx-vals='{"onboarding_intent": "refer_now"}'
-                    hx-ext="json-enc">Get started</button>
-          </footer>
-        </article>
-        <article data-testid="intent-have-openings">
-          <header>
-            <strong>I have openings</strong>
-          </header>
-          <p>List your availability so colleagues can refer to you.</p>
-          <footer>
-            <button hx-put="{{ entity_url('user', id='me', subresource='onboarding-intent') }}"
-                    hx-vals='{"onboarding_intent": "have_openings"}'
-                    hx-ext="json-enc">Get started</button>
-          </footer>
-        </article>
-        {# TODO(flow-c-invite): real invite-token handling is deferred to a post-epic ticket. #}
-        <article data-testid="intent-invited">
-          <header>
-            <strong>I was invited</strong>
-          </header>
-          <p>Join the network a another clinician introduced you to.</p>
-          <footer>
-            <button hx-put="{{ entity_url('user', id='me', subresource='onboarding-intent') }}"
-                    hx-vals='{"onboarding_intent": "invited"}'
-                    hx-ext="json-enc">Get started</button>
-          </footer>
-        </article>
-        <article data-testid="intent-building-network">
-          <header>
-            <strong>I&#39;m building my network</strong>
-          </header>
-          <p>Connect with other clinicians and grow your referral relationships.</p>
-          <footer>
-            <button hx-put="{{ entity_url('user', id='me', subresource='onboarding-intent') }}"
-                    hx-vals='{"onboarding_intent": "building_network"}'
-                    hx-ext="json-enc">Get started</button>
-          </footer>
-        </article>
-      {% else %}
-        {# Anonymous path: each card is a small form that POSTs the intent
-to /onboarding-intent-pending and follows a redirect to /auth/register. #}
-        <article data-testid="intent-refer-now">
-          <header>
-            <strong>I need to refer a client</strong>
-          </header>
-          <p>Find a clinician who can take your client now.</p>
-          <footer>
-            <form method="post" action="/onboarding-intent-pending">
-              <input type="hidden" name="intent" value="refer_now">
-              <button type="submit">Get started</button>
-            </form>
-          </footer>
-        </article>
-        <article data-testid="intent-have-openings">
-          <header>
-            <strong>I have openings</strong>
-          </header>
-          <p>List your availability so colleagues can refer to you.</p>
-          <footer>
-            <form method="post" action="/onboarding-intent-pending">
-              <input type="hidden" name="intent" value="have_openings">
-              <button type="submit">Get started</button>
-            </form>
-          </footer>
-        </article>
-        {# TODO(flow-c-invite): real invite-token handling is deferred to a post-epic ticket. #}
-        <article data-testid="intent-invited">
-          <header>
-            <strong>I was invited</strong>
-          </header>
-          <p>Join the network a another clinician introduced you to.</p>
-          <footer>
-            <form method="post" action="/onboarding-intent-pending">
-              <input type="hidden" name="intent" value="invited">
-              <button type="submit">Get started</button>
-            </form>
-          </footer>
-        </article>
-        <article data-testid="intent-building-network">
-          <header>
-            <strong>I&#39;m building my network</strong>
-          </header>
-          <p>Connect with other clinicians and grow your referral relationships.</p>
-          <footer>
-            <form method="post" action="/onboarding-intent-pending">
-              <input type="hidden" name="intent" value="building_network">
-              <button type="submit">Get started</button>
-            </form>
-          </footer>
-        </article>
-      {% endif %}
-    </div>
-  </section>
+  {# Public landing (anonymous `/`) — structure mirrors the parent
+   marketing site at https://www.bedlamconnect.com/: a brand-led
+   `<hgroup>` hero (H1 + tagline), a one-line value description, a
+   two-CTA cluster. The page-level `<footer>` is emitted into the
+   shared footer slot below (rendered outside `<main>` by `base.html`).
+   Pico styles `<hgroup>`, `<footer>`, `<a role="button">`, and
+   `.grid` out of the box; the page-level `<style>` above only
+   handles the vertical-center / footer-pinned viewport fit. #}
+<section class="landing-hero">
+<hgroup>
+<h1>Welcome to Bedlam Connect</h1>
+<p>Connecting providers, helping patients.</p>
+</hgroup>
+<p>Post referrals, find referrals, and maintain a network of professional contacts.</p>
+<div class="cta-cluster">
+<a href="/auth/login" role="button">Sign in</a>
+<a href="/auth/register" role="button" class="secondary">Sign up</a>
+</div>
+</section>
 {% endblock %}

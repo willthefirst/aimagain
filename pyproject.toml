@@ -32,8 +32,6 @@ app = [
     # (`src/domain/logic/verifications/nppes.py`). Runtime dep — must
     # ship in the production image, not just `[test]`.
     "httpx",
-    # Required by starlette.middleware.sessions.SessionMiddleware.
-    "itsdangerous",
     # Transactional email provider. Only imported when
     # `EMAIL_BACKEND=resend`; the console/file backends don't load it.
     # See `src/framework/email/README.md`.

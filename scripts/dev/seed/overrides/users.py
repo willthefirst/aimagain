@@ -9,23 +9,17 @@ Idempotency: matched by `email` (the stable deterministic
 `clinician_NNN@example.com` shape). First three slots are pinned to
 `admin@example.com` / `alice@example.com` / `bob@example.com` so
 login muscle memory survives.
-
-`onboarding_intent`: anchor users (first 3) are left NULL — they
-represent admin/ops accounts that joined before the field existed.
-Every clinician user cycles through the four valid intent values so
-the seed satisfies the enum-coverage and nullable-coverage lint checks.
 """
 
 from __future__ import annotations
 
 from fastapi_users.db import SQLAlchemyUserDatabase
-from sqlalchemy import select, update
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.auth_config import UserManager
 from src.domain.logic.users.schema import UserCreate
 from src.domain.models import User
-from src.domain.models.enums import ONBOARDING_INTENTS
 
 from .. import counts
 from ..generators import SeedPool
@@ -80,25 +74,5 @@ async def generate_users(
             safe=False,
         )
         out.append(user)
-
     await session.commit()
-
-    # Assign `onboarding_intent` to every clinician user (indexes ≥ 3),
-    # cycling through all four valid values. Anchor users (admin / alice /
-    # bob) stay NULL — they represent accounts from before the field existed.
-    # This satisfies both lint checks: all four enum values are present, and
-    # at least one NULL row exists alongside populated rows.
-    clinician_users = out[len(_ANCHOR_USERS) :]
-    if clinician_users:
-        intents = list(ONBOARDING_INTENTS)
-        for i, user in enumerate(clinician_users):
-            intent = intents[i % len(intents)]
-            await session.execute(
-                update(User).where(User.id == user.id).values(onboarding_intent=intent)
-            )
-        await session.commit()
-        # Refresh so callers see the updated field.
-        for user in clinician_users:
-            await session.refresh(user)
-
     return out
