@@ -10,8 +10,41 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from fastapi import FastAPI
+from httpx import AsyncClient
+from selectolax.parser import HTMLParser
 
 from src.main import lifespan
+
+pytestmark = pytest.mark.asyncio
+
+
+# --- GET /home -----------------------------------------------------------
+
+
+async def test_home_page_requires_auth(test_client: AsyncClient):
+    """Unauthenticated browser requests to /home redirect to the login page.
+    The 401→302 rewrite fires only when Accept: text/html is present
+    (see `unauthorized_exception_handler` in main.py)."""
+    response = await test_client.get(
+        "/home",
+        headers={"Accept": "text/html"},
+        follow_redirects=False,
+    )
+    assert response.status_code == 302
+    assert "/auth/login" in response.headers["location"]
+
+
+async def test_home_page_shows_post_buttons(authenticated_client: AsyncClient):
+    """The home page renders both action buttons linking to the correct
+    create-form URLs."""
+    response = await authenticated_client.get("/home")
+    assert response.status_code == 200
+    tree = HTMLParser(response.text)
+    assert tree.css_first('a[href="/referrals/form"]') is not None
+    assert tree.css_first('a[href="/openings/form"]') is not None
+
+
+# --- lifespan -----------------------------------------------------------
 
 
 @pytest.mark.asyncio
