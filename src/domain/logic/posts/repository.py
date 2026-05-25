@@ -1,4 +1,5 @@
 from collections.abc import Sequence
+from datetime import datetime
 
 from sqlalchemy import or_, select
 
@@ -61,6 +62,8 @@ class PostRepository(BaseRepository):
         city: str | None = None,
         age_group: list[str] | None = None,
         language: list[str] | None = None,
+        since: datetime | None = None,
+        exclude_owner_id: int | None = None,
         offset: int = 0,
         limit: int | None = None,
     ) -> Sequence[Post]:
@@ -134,6 +137,10 @@ class PostRepository(BaseRepository):
             stmt = stmt.filter(_json_array_contains_any(age_group, "age_groups"))
         if language:
             stmt = stmt.filter(_json_array_contains_any(language, "languages"))
+        if since is not None:
+            stmt = stmt.filter(Post.created_at >= since)
+        if exclude_owner_id is not None:
+            stmt = stmt.filter(Post.owner_id != exclude_owner_id)
 
         stmt = stmt.order_by(Post.created_at.desc())
         return await self._list(stmt, offset=offset, limit=limit)
@@ -152,6 +159,9 @@ class PostRepository(BaseRepository):
         return await self.list_posts(**kwargs)
 
     async def list_intakes(self, **kwargs) -> Sequence[Post]:
+        return await self.list_posts(**kwargs)
+
+    async def list_recent_for_network(self, **kwargs) -> Sequence[Post]:
         return await self.list_posts(**kwargs)
 
 
