@@ -19,7 +19,7 @@ A Stop hook checks the diff at end-of-turn and surfaces a reminder when source f
 
 A SessionStart hook prints the real current branch, dirty state, and stash list at session start — and warns loudly if you've landed on `main`/`master` in the shared working tree. Multi-agent sessions in this repo share one working directory; trust the hook's output over any harness-provided "current branch" line. A PreToolUse hook then enforces the rule: `Edit`/`Write`/`NotebookEdit` are refused on the main checkout when you're on `main`/`master`, so new work has to start on a worktree (`dev worktree add <slug>`). Feature branches on the main checkout are still allowed (for in-flight sessions); worktrees always are. See [`scripts/README.md`](scripts/README.md) for all three hooks.
 
-PRs land via Mergify on `main` — use `dev merge` to watch a PR until Mergify queues and merges it. See [`scripts/README.md#merging-prs`](scripts/README.md) for the flow, queue config, and recovery.
+PRs land via Mergify on `main`. Before pushing, run `git town sync` to rebase onto the latest `main` — this keeps the branch current when it enters CI. Once it's in the Mergify queue, Mergify handles any further rebasing speculatively. Use `dev merge` to watch a PR until it lands. See [`scripts/README.md#merging-prs`](scripts/README.md) for the full flow, queue config, and recovery.
 
 **Contract tests are not run by default.** `tests/test_contract` is excluded from the default `dev test` collection (see [`tests/test_contract/README.md`](tests/test_contract/README.md)). If you change templates, route response shapes, or anything mock data factories in `tests/test_contract` assume, also run `dev test contract` before pushing — otherwise CI is the first place the breakage surfaces.
 
