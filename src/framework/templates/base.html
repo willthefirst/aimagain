@@ -595,6 +595,26 @@
         display: grid;
         grid-template-rows: auto 1fr auto;
       }
+      /* Compact post-rows table — kind badge column and meta columns.
+         Pico's table defaults supply row dividers and cell padding;
+         these two rules handle only what Pico can't infer semantically:
+         the uppercase small-caps badge treatment on the first cell and
+         the muted-text/nowrap treatment on the trailing meta cells. */
+      table.post-rows td:first-child {
+        font-size: 0.7rem;
+        font-weight: 600;
+        letter-spacing: 0.05em;
+        text-transform: uppercase;
+        color: var(--pico-muted-color);
+        white-space: nowrap;
+        width: 5rem;
+      }
+      table.post-rows td:last-child,
+      table.post-rows td:nth-last-child(2) {
+        color: var(--pico-muted-color);
+        font-size: 0.875rem;
+        white-space: nowrap;
+      }
     </style>
     <script src="https://unpkg.com/htmx.org@2.0.4"
             integrity="sha384-HGfztofotfshcF7+8n44JQL2oJmowVChPTg48S+jvZoztPfvwD79OC/LTtG6dMp+"
