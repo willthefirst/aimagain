@@ -25,10 +25,10 @@ async def test_base_template_renders_primary_nav_when_authenticated(
     logged_in_user: User,
 ):
     """Authenticated pages render the primary nav as a single `<ul>`
-    with the brand on the left and four inline links pushed to the
-    right via `margin-left: auto` on the first link: Referrals (= "find
-    new clients"), Openings (= "refer out a client"), Profile, and
-    Sign out. Other URL families — `/intakes`, `/clinicians`,
+    with the brand on the left and five inline links pushed to the
+    right via `margin-left: auto` on the first link: Home, Referrals
+    (= "find new clients"), Openings (= "refer out a client"), Profile,
+    and Sign out. Other URL families — `/intakes`, `/clinicians`,
     `/organizations`, `/programs`, `/users` — stay live and reachable
     by URL/bookmark, but are no longer chrome-promoted.
 
@@ -41,15 +41,16 @@ async def test_base_template_renders_primary_nav_when_authenticated(
     # "Create clinician" button no longer lives in the nav (#697).
     cta_items = tree.css("#primary-nav > li > a[href='/clinicians/form']")
     assert len(cta_items) == 0, "Create-clinician CTA should be removed from nav (#697)"
-    # Profile link is one of the four inline nav links.
+    # Profile link is one of the five inline nav links.
     assert tree.css_first('#primary-nav a[href="/users/me"]') is not None
-    # All four authed-chrome destinations render in this exact order
+    # All five authed-chrome destinations render in this exact order
     # inside #primary-nav. Sign-out is the `#` placeholder href on the
     # `<a hx-post>` that drives the HTMX POST.
     nav_items = tree.css("#primary-nav > li > a")
     nav_hrefs = [a.attributes.get("href") for a in nav_items]
     assert nav_hrefs == [
         "/",
+        "/home",
         "/referrals",
         "/openings",
         "/users/me",
