@@ -7,6 +7,7 @@ import pytest
 from src.domain.logic.posts.view import (
     insurance_posture_for_post,
     post_card_view,
+    post_feed_headline,
     post_row_summary,
     referral_headline,
 )
@@ -678,3 +679,112 @@ def test_row_summary_program_name_and_description():
 def test_row_summary_unknown_kind_returns_empty_string():
     post = SimpleNamespace(kind="mystery")
     assert post_row_summary(post) == ""
+
+
+# --- post_feed_headline -------------------------------------------------
+
+
+def test_feed_headline_referral_with_services():
+    """Demographics form the left half; up to 2 service labels the right half."""
+    post = SimpleNamespace(
+        kind="referral",
+        referral_detail=SimpleNamespace(
+            age_groups=["adults_25_64"],
+            gender="female",
+            services=["psychotherapy", "medication_management"],
+        ),
+    )
+    assert (
+        post_feed_headline(post)
+        == "Adult female (25–64) — Psychotherapy, Medication management"
+    )
+
+
+def test_feed_headline_referral_no_services_returns_demographics_only():
+    post = SimpleNamespace(
+        kind="referral",
+        referral_detail=SimpleNamespace(
+            age_groups=["adolescents_14_18"],
+            gender="male",
+            services=[],
+        ),
+    )
+    assert post_feed_headline(post) == "Adolescent male (14–18)"
+
+
+def test_feed_headline_referral_caps_services_at_two():
+    post = SimpleNamespace(
+        kind="referral",
+        referral_detail=SimpleNamespace(
+            age_groups=["adults_25_64"],
+            gender="non_binary",
+            services=["evaluation", "psychotherapy", "case_management"],
+        ),
+    )
+    headline = post_feed_headline(post)
+    # Only first two services should appear; third is dropped.
+    assert "Evaluation, Psychotherapy" in headline
+    assert "Case management" not in headline
+
+
+def test_feed_headline_referral_missing_detail_returns_fallback():
+    post = SimpleNamespace(kind="referral", referral_detail=None)
+    assert post_feed_headline(post) == "Referral"
+
+
+def test_feed_headline_opening_with_services():
+    """Practice name forms the left half; service labels the right half."""
+    post = _make_pa_post()
+    headline = post_feed_headline(post)
+    assert headline.startswith("Acme Counseling — ")
+    assert "Psychotherapy" in headline
+
+
+def test_feed_headline_opening_falls_back_to_settings_when_no_services():
+    """When an opening carries no services, settings labels are used for the focus."""
+    post = _make_pa_post(services=[], settings=["outpatient", "iop"])
+    headline = post_feed_headline(post)
+    assert "Outpatient" in headline
+    assert "IOP" in headline
+
+
+def test_feed_headline_opening_practice_name_only_when_no_focus():
+    """Practice name alone is returned when both services and settings are empty."""
+    post = _make_pa_post(services=[], settings=[])
+    assert post_feed_headline(post) == "Acme Counseling"
+
+
+def test_feed_headline_opening_missing_detail_returns_fallback():
+    post = SimpleNamespace(kind="clinician_opening", opening_detail=None)
+    assert post_feed_headline(post) == "Opening"
+
+
+def test_feed_headline_opening_missing_provider_returns_fallback():
+    post = SimpleNamespace(
+        kind="clinician_opening",
+        opening_detail=SimpleNamespace(
+            provider=None,
+            services=["psychotherapy"],
+            settings=[],
+        ),
+    )
+    # Practice name cannot be derived; headline falls back to "Opening — <service>".
+    headline = post_feed_headline(post)
+    assert "Psychotherapy" in headline
+
+
+def test_feed_headline_program_with_services():
+    post = _make_program_post()
+    headline = post_feed_headline(post)
+    assert headline.startswith("RISE IOP — ")
+    assert "Psychotherapy" in headline
+
+
+def test_feed_headline_program_no_services_returns_name_only():
+    post = _make_program_post(services=[])
+    assert post_feed_headline(post) == "RISE IOP"
+
+
+def test_feed_headline_unknown_kind_returns_empty_string():
+    post = SimpleNamespace(kind="mystery")
+    assert post_feed_headline(post) == ""

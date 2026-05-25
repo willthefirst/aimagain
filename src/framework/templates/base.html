@@ -615,6 +615,92 @@
         font-size: 0.875rem;
         white-space: nowrap;
       }
+      /* ── Feed rows ────────────────────────────────────────────────
+         Two-line clickable rows for the home and browse list views.
+         Each `.post-feed-row` is an `<a>` element; `.post-feed-list`
+         is the parent container that provides the outer border and
+         dividers between rows. Pico supplies typography, color tokens,
+         and base link styles — these rules cover only the bespoke
+         two-line layout, the type-tag pill, the metadata strip with
+         middot dividers, and the narrow-screen adjustments. */
+      .post-feed-list {
+        border: 1px solid var(--pico-muted-border-color);
+        border-radius: var(--pico-border-radius);
+        overflow: hidden;
+      }
+      .post-feed-row {
+        display: block;
+        padding: 0.75rem 1rem;
+        border-top: 1px solid var(--pico-muted-border-color);
+        text-decoration: none;
+        color: inherit;
+      }
+      .post-feed-list .post-feed-row:first-child { border-top: none; }
+      .post-feed-row:hover { background: var(--pico-secondary-background); }
+      .post-feed-row--viewed { opacity: 0.6; }
+      .post-feed-row--interest { opacity: 1; }
+      /* Headline row (line 1) */
+      .post-feed-headline { display: flex; align-items: center; gap: 8px; }
+      .post-feed-headline-text { flex: 1; min-width: 0; }
+      .post-feed-ts { flex-shrink: 0; color: var(--pico-muted-color); }
+      .post-feed-ts--meta { display: none; }
+      /* Type-tag pill */
+      .post-feed-type-tag {
+        font-size: 0.625rem;
+        font-weight: 600;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        padding: 0.15em 0.5em;
+        border-radius: 2em;
+        white-space: nowrap;
+        flex-shrink: 0;
+      }
+      .post-feed-type-tag--referral {
+        color: var(--pico-muted-color);
+        background: color-mix(in srgb, var(--pico-muted-color) 8%, transparent);
+      }
+      .post-feed-type-tag--opening {
+        color: var(--pico-primary);
+        background: color-mix(in srgb, var(--pico-primary) 10%, transparent);
+      }
+      /* State indicators */
+      .post-feed-state-urgent {
+        font-size: 0.65rem;
+        font-weight: 600;
+        letter-spacing: 0.05em;
+        text-transform: uppercase;
+        padding: 0.15em 0.5em;
+        border-radius: 2em;
+        border: 1px solid var(--pico-mark-background-color);
+        color: var(--pico-muted-color);
+        white-space: nowrap;
+        flex-shrink: 0;
+      }
+      .post-feed-state-interest { color: var(--pico-primary); flex-shrink: 0; }
+      /* Metadata strip (line 2) */
+      .post-feed-meta {
+        display: flex;
+        flex-wrap: wrap;
+        margin-top: 0.2rem;
+        font-size: 0.875rem;
+        color: var(--pico-muted-color);
+      }
+      .post-feed-meta-item + .post-feed-meta-item::before {
+        content: "·";
+        margin: 0 0.4em;
+      }
+      .post-feed-meta-poster { margin-left: auto; }
+      .post-feed-meta-insurance--match { color: var(--pico-ins-color); }
+      /* Empty state */
+      .post-feed-empty { text-align: center; padding: 2rem 1rem; color: var(--pico-muted-color); }
+      /* Narrow screens */
+      @media (max-width: 640px) {
+        .post-feed-row { padding: 0.6rem 0.75rem; }
+        .post-feed-ts--headline { display: none; }
+        .post-feed-ts--meta { display: inline; }
+        .post-feed-meta-item + .post-feed-meta-item::before { display: none; }
+        .post-feed-meta-poster { margin-left: 0; }
+      }
     </style>
     <script src="https://unpkg.com/htmx.org@2.0.4"
             integrity="sha384-HGfztofotfshcF7+8n44JQL2oJmowVChPTg48S+jvZoztPfvwD79OC/LTtG6dMp+"

@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{%- from "posts/_shared/_row.html" import post_row with context -%}
+{%- from "posts/_shared/_feed_row.html" import post_feed_row, post_feed_empty with context -%}
 {% block title %}Home{% endblock %}
 {% block content %}
   <section style="display: flex; gap: 1rem; flex-wrap: wrap;">
@@ -16,14 +16,12 @@
         <h2>My active posts</h2>
         <a href="{{ entity_url('referral') }}">See all</a>
       </header>
-      <table class="post-rows">
-        <tbody>
-          {%- for post in my_posts -%}
-            {%- set ename = "referral" if post.kind == "referral" else "opening" -%}
-            {{ post_row(post, ename) }}
-          {%- endfor -%}
-        </tbody>
-      </table>
+      <div class="post-feed-list">
+        {%- for post in my_posts -%}
+          {%- set ename = "referral" if post.kind == "referral" else "opening" -%}
+          {{ post_feed_row(post, ename, show_poster=False) }}
+        {%- endfor -%}
+      </div>
     </section>
   {% endif %}
   {% if network_posts %}
@@ -43,14 +41,12 @@
         <a href="{{ entity_url('referral') }}">Adjust filters</a>
         {# djlint:on #}
       </p>
-      <table class="post-rows">
-        <tbody>
-          {%- for post in network_posts -%}
-            {%- set ename = "referral" if post.kind == "referral" else "opening" -%}
-            {{ post_row(post, ename) }}
-          {%- endfor -%}
-        </tbody>
-      </table>
+      <div class="post-feed-list">
+        {%- for post in network_posts -%}
+          {%- set ename = "referral" if post.kind == "referral" else "opening" -%}
+          {{ post_feed_row(post, ename) }}
+        {%- endfor -%}
+      </div>
     </section>
   {% endif %}
 {% endblock %}

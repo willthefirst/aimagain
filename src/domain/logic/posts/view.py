@@ -39,7 +39,12 @@ kind are ``None`` (or empty lists); templates render via
 lookup is the template's job (it's the same label dict pattern as
 elsewhere).
 
-All three helpers are exposed as Jinja globals by
+`post_feed_headline(post)` builds the two-part headline for the
+feed-row component used in the home and browse list views. Format is
+``"<identity> — <clinical focus>"``: demographics + services for
+referrals, practice name + services/settings for openings.
+
+All helpers are exposed as Jinja globals by
 `src/framework/rendering/templating.py`.
 """
 
@@ -487,5 +492,67 @@ def post_row_summary(post) -> str:
         if desc:
             parts.append(desc[:80])
         return " · ".join(parts) if parts else "Program"
+
+    return ""
+
+
+def post_feed_headline(post) -> str:
+    """Build the two-part feed-row headline for any post kind.
+
+    Referrals: ``"<demographics> — <services>"``, e.g.
+    ``"Adult female (25–64) — Psychotherapy, Medication management"``.
+    When the referral carries no services the demographics alone are returned.
+
+    Openings: ``"<practice name> — <clinical focus>"``, e.g.
+    ``"Acme Counseling — Psychotherapy, Outpatient"``. Clinical focus
+    comes from the opening's services list; settings are used as a
+    fallback when services are absent. Falls back to practice name alone
+    when neither is set.
+
+    Program intakes follow the same ``"<name> — <services>"`` pattern.
+    """
+    kind = getattr(post, "kind", None)
+
+    if kind == "referral":
+        d = getattr(post, "referral_detail", None)
+        if d is None:
+            return "Referral"
+        demo = referral_headline(d)
+        services = list(getattr(d, "services", None) or [])
+        if services:
+            labels = [REFERRAL_SERVICE_LABELS.get(s, s) for s in services[:2]]
+            return f"{demo} — {', '.join(labels)}"
+        return demo
+
+    if kind == "clinician_opening":
+        d = getattr(post, "opening_detail", None)
+        if d is None:
+            return "Opening"
+        p = getattr(d, "provider", None)
+        practice = (
+            p.org.name
+            if p and getattr(p, "org", None) and getattr(p.org, "name", None)
+            else "Opening"
+        )
+        services = list(getattr(d, "services", None) or [])
+        focus_parts = [REFERRAL_SERVICE_LABELS.get(s, s) for s in services[:2]]
+        if not focus_parts:
+            settings = list(getattr(d, "settings", None) or [])
+            focus_parts = [TREATMENT_SETTINGS_LABELS.get(s, s) for s in settings[:2]]
+        if focus_parts:
+            return f"{practice} — {', '.join(focus_parts)}"
+        return practice
+
+    if kind == "program_intake":
+        d = getattr(post, "intake_detail", None)
+        if d is None:
+            return "Program"
+        prog = getattr(d, "program", None)
+        name = (getattr(prog, "name", None) if prog else None) or "Program"
+        services = list(getattr(d, "services", None) or [])
+        focus_parts = [REFERRAL_SERVICE_LABELS.get(s, s) for s in services[:2]]
+        if focus_parts:
+            return f"{name} — {', '.join(focus_parts)}"
+        return name
 
     return ""
