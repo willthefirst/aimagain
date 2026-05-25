@@ -1,0 +1,22 @@
+{% extends "welcome/_layout.html" %}
+{%- from "_shared/form_fields.html" import text_field, select_field with context -%}
+{%- from "_shared/form_meta.html" import form_with_errors with context -%}
+{% block wizard_content %}
+  <hgroup>
+    <h1 data-testid="verify-license-heading">Verify your license</h1>
+    <p>This keeps the board trustworthy for everyone.</p>
+  </hgroup>
+  <blockquote>
+    <small>Your license number is used only for verification — never shown on your profile.</small>
+  </blockquote>
+  {% call form_with_errors(action="/welcome/verify", method="post", json_enc=true) %}
+    {{ text_field("first_name", "First name", autocomplete="given-name") }}
+    {{ text_field("last_name", "Last name", autocomplete="family-name") }}
+    {{ text_field("work_email", "Work email", type="email", autocomplete="email") }}
+    {{ select_field("license_type", "License type", options=license_types, labels=license_types_labels, placeholder=True) }}
+    {{ text_field('license_number', 'License number') }}
+    {{ select_field("issuing_state", "Issuing state", options=us_states, placeholder=True) }}
+    <small>Checked against state board databases. Usually instant.</small>
+    <button type="submit" data-testid="verify-submit">Verify →</button>
+  {% endcall %}
+{% endblock %}
