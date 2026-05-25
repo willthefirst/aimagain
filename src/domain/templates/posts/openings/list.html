@@ -1,5 +1,5 @@
 {% extends "views/list.html" %}
-{%- from "posts/_shared/_row.html" import post_row with context -%}
+{%- from "posts/_shared/_feed_row.html" import post_feed_row, post_feed_empty with context -%}
 {% block resource_label %}Openings{% endblock %}
 {% block actions %}
   <li>
@@ -8,18 +8,12 @@
 {% endblock %}
 {% block content %}
   {% if openings %}
-    <table id="openings-list" class="post-rows">
-      <tbody>
-        {%- for post in openings %}{{ post_row(post, entity_name) }}{%- endfor %}
-        </tbody>
-      </table>
+    <div id="openings-list" class="post-feed-list">
+      {%- for post in openings %}{{ post_feed_row(post, entity_name) }}{%- endfor %}
+      </div>
     {% else %}
-      <p>
-        {% if active_filter_count %}
-          No openings match these filters.
-        {% else %}
-          No openings found.
-        {% endif %}
-      </p>
+      {{ post_feed_empty("No openings match these filters." if active_filter_count else "No openings found.",
+            link_href=entity_url(entity_name) if active_filter_count else None
+      ) }}
     {% endif %}
   {% endblock %}
