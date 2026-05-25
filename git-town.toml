@@ -1,0 +1,9 @@
+[branches]
+main = "main"
+
+[hosting]
+dev-remote = "origin"
+
+[sync]
+feature-strategy = "rebase"
+perennial-strategy = "rebase"
