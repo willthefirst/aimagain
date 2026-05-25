@@ -1,14 +1,5 @@
 {% extends "base.html" %}
 {% block content %}
-  {# B1 preview: authed users with intent=have_openings who haven't
-     verified yet see an illustrative "this is what you'll look like"
-     card. The check uses `user.providers` as the proxy for
-     "not yet verified" — a clinician who has completed verification
-     lands on /openings (see main.py read_root skip-rule) and never
-     reaches this page. #}
-  {% if user and user.onboarding_intent == 'have_openings' and not user.providers %}
-    {% include "landing/_b1_preview.html" %}
-  {% endif %}
   {# Onboarding intent picker — 4 cards, one per intent value.
    Click behaviour differs by auth state:
    - Authenticated: HTMX PUT /users/me/onboarding-intent; on success

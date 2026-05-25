@@ -636,104 +636,12 @@ def test_post_update_opening_rejects_unknown_field():
         )
 
 
-# --- T3 slot-field schema tests -----------------------------------------
-
-
-def test_opening_create_slot_fields_optional():
-    """All T3 slot fields are optional on create; absent → defaults."""
-    p = post_create_adapter.validate_python(opening_payload())
-    assert p.opening_type is None
-    assert p.specialties == []
-    assert p.population_tags == []
-    assert p.fee_low is None
-    assert p.fee_high is None
-    assert p.payment_types == []
-    assert p.availability_state is None
-    assert p.colleague_note is None
-
-
-def test_opening_create_slot_fields_accepted():
-    """Valid T3 slot fields round-trip through ClinicianOpeningCreate."""
-    p = post_create_adapter.validate_python(
-        opening_payload(
-            opening_type="individual",
-            availability_state="taking_now",
-            fee_low=100,
-            fee_high=200,
-            specialties=["trauma"],
-            population_tags=["lgbtq"],
-            payment_types=["sliding_scale"],
-            colleague_note="Taking adults now.",
-        )
-    )
-    assert isinstance(p, ClinicianOpeningCreate)
-    assert p.opening_type == "individual"
-    assert p.availability_state == "taking_now"
-    assert p.fee_low == 100
-    assert p.fee_high == 200
-    assert p.specialties == ["trauma"]
-    assert p.payment_types == ["sliding_scale"]
-    assert p.colleague_note == "Taking adults now."
-
-
-def test_opening_create_colleague_note_max_length():
-    """colleague_note longer than 280 chars is rejected."""
-    with pytest.raises(ValidationError):
-        post_create_adapter.validate_python(opening_payload(colleague_note="x" * 281))
-
-
-def test_opening_create_colleague_note_at_max_length():
-    """colleague_note exactly 280 chars is accepted."""
-    p = post_create_adapter.validate_python(opening_payload(colleague_note="x" * 280))
-    assert len(p.colleague_note) == 280
-
-
-def test_opening_create_rejects_invalid_opening_type():
-    """An unrecognised opening_type is a 422."""
-    with pytest.raises(ValidationError):
-        post_create_adapter.validate_python(opening_payload(opening_type="not_a_type"))
-
-
-def test_opening_create_rejects_invalid_availability_state():
-    """An unrecognised availability_state is a 422."""
-    with pytest.raises(ValidationError):
-        post_create_adapter.validate_python(opening_payload(availability_state="open"))
-
-
-def test_opening_create_empty_string_opening_type_becomes_none():
-    """An empty-string opening_type coerces to None (HTML <select> no-pick)."""
-    p = post_create_adapter.validate_python(opening_payload(opening_type=""))
-    assert p.opening_type is None
-
-
-def test_opening_update_slot_fields_accepted():
-    """T3 slot fields are patchable."""
-    p = post_update_adapter.validate_python(
-        {"kind": "clinician_opening", "opening_type": "couples"}
-    )
-    assert isinstance(p, ClinicianOpeningUpdate)
-    assert p.opening_type == "couples"
-
-
 def test_audit_snapshot_for_opening_post():
     """Snapshotting a `kind='clinician_opening'` post flattens through
     `opening_detail`."""
     owner_id = uuid.uuid4()
     detail_attrs = opening_payload()
     detail_attrs.pop("kind")
-    # Add T3 slot fields (server-managed / optional; not in wire payload).
-    detail_attrs.update(
-        opening_type=None,
-        specialties=[],
-        population_tags=[],
-        fee_low=None,
-        fee_high=None,
-        payment_types=[],
-        availability_state=None,
-        colleague_note=None,
-        note_expires_at=None,
-        last_confirmed_at=None,
-    )
     post = SimpleNamespace(
         kind="clinician_opening",
         owner_id=owner_id,
