@@ -9,7 +9,9 @@ from pydantic import BaseModel, EmailStr, ValidationError
 
 from src.auth_config import auth_backend, current_active_user, get_user_manager
 from src.domain.models import User
+from src.domain.routes.dev_auth import DEV_SEED_USERS
 from src.framework import APIResponse, BaseRouter
+from src.framework.config import settings
 from src.framework.http.form_error_handler import form_error_handler
 from src.framework.http.form_error_registry import register_form_error
 
@@ -78,9 +80,14 @@ async def get_login_page(request: Request):
     next_url = request.query_params.get("next", "")
     # Show a contextual message when arriving from the registration flow
     just_registered = request.query_params.get("registered") == "1"
+    dev_users = DEV_SEED_USERS if settings.ENVIRONMENT == "development" else None
     return APIResponse.html_response(
         template_name="auth/login.html",
-        context={"next_url": next_url, "just_registered": just_registered},
+        context={
+            "next_url": next_url,
+            "just_registered": just_registered,
+            "dev_users": dev_users,
+        },
         request=request,
     )
 
