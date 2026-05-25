@@ -12,11 +12,14 @@ Covers:
 - POST /welcome/first-opening skip-note: colleague_note is None
 - GET /welcome/done renders static peer cards
 - GET /welcome/coming-soon renders placeholder
+- GET /welcome/refer/{opening_id}: renders with opening context, 404 on missing opening
+- POST /welcome/refer/{opening_id}: happy path creates Referral, validation error rerenders
 - Unauthenticated access redirects to login
 
 NPPES is stubbed via `BEDLAM_VERIFY_DEV_FALLBACK=1`; OIG uses the local LEIE fixture.
 """
 
+import uuid
 from pathlib import Path
 
 import pytest
@@ -25,8 +28,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from src.domain.logic.verifications import oig as oig_module
-from src.domain.models import OpeningDetail, Provider, User
-from src.domain.models.posts.post import Post
+from src.domain.models import OpeningDetail, Post, Provider, ReferralDetail, User
 
 pytestmark = pytest.mark.asyncio
 
@@ -543,3 +545,127 @@ async def test_post_be_findable_empty_submission_accepted(
     assert response.status_code == 302
     # No profile → state machine routes back to be-findable
     assert response.headers["location"] == "/welcome/be-findable"
+
+
+# ---------------------------------------------------------------------------
+# Helpers for refer step tests
+# ---------------------------------------------------------------------------
+
+
+async def _seed_opening_for_refer(
+    session_maker: async_sessionmaker[AsyncSession],
+    owner: User,
+) -> OpeningDetail:
+    """Create a Post + Provider + OpeningDetail and return the OpeningDetail."""
+    from tests.helpers import make_opening_detail, make_provider_with_org
+
+    provider = make_provider_with_org(owner_id=owner.id)
+    async with session_maker() as session:
+        async with session.begin():
+            session.add(provider)
+    # Fetch the committed provider
+    async with session_maker() as session:
+        async with session.begin():
+            p = await session.get(Provider, provider.id)
+            opening_post = Post(kind="clinician_opening", owner_id=owner.id)
+            session.add(opening_post)
+            await session.flush()
+            opening_detail = make_opening_detail(provider_id=p.id)
+            opening_detail.post_id = opening_post.id
+            session.add(opening_detail)
+    async with session_maker() as session:
+        od = await session.get(OpeningDetail, opening_post.id)
+        return od
+
+
+# ---------------------------------------------------------------------------
+# GET /welcome/refer/{opening_id}
+# ---------------------------------------------------------------------------
+
+
+async def test_get_refer_renders_with_opening_context(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user: User,
+):
+    """GET /welcome/refer/{opening_id} returns 200 with refer form."""
+    opening = await _seed_opening_for_refer(db_test_session_manager, logged_in_user)
+
+    response = await authenticated_client.get(
+        f"/welcome/refer/{opening.post_id}",
+        headers={"Accept": "text/html"},
+    )
+    assert response.status_code == 200
+    assert b"Refer a client" in response.content
+    assert b'data-testid="refer-heading"' in response.content
+    assert b'data-testid="refer-clinical-context"' in response.content
+
+
+async def test_get_refer_404_when_opening_not_found(
+    authenticated_client: AsyncClient,
+):
+    """GET /welcome/refer/{missing_id} returns 404."""
+    missing_id = uuid.uuid4()
+    response = await authenticated_client.get(
+        f"/welcome/refer/{missing_id}",
+        headers={"Accept": "text/html"},
+    )
+    assert response.status_code == 404
+
+
+# ---------------------------------------------------------------------------
+# POST /welcome/refer/{opening_id}
+# ---------------------------------------------------------------------------
+
+
+async def test_post_refer_happy_path_creates_referral(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user: User,
+):
+    """Valid body → Referral Post + ReferralDetail created, 302 to /openings."""
+    opening = await _seed_opening_for_refer(db_test_session_manager, logged_in_user)
+
+    response = await authenticated_client.post(
+        f"/welcome/refer/{opening.post_id}",
+        json={"clinical_context": "Client needs anxiety support. CBT was tried."},
+        headers={"Accept": "text/html"},
+        follow_redirects=False,
+    )
+    assert response.status_code == 302
+    assert response.headers["location"] == "/openings"
+
+    # Referral row created
+    async with db_test_session_manager() as session:
+        result = await session.execute(
+            select(Post).filter(
+                Post.owner_id == logged_in_user.id,
+                Post.kind == "referral",
+            )
+        )
+        referral_posts = result.scalars().all()
+    assert len(referral_posts) == 1
+
+    async with db_test_session_manager() as session:
+        rd = await session.get(ReferralDetail, referral_posts[0].id)
+    assert rd is not None
+    assert rd.target_opening_id == opening.post_id
+
+
+async def test_post_refer_validation_error_rerenders(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user: User,
+):
+    """Empty clinical_context → 422, form re-rendered."""
+    opening = await _seed_opening_for_refer(db_test_session_manager, logged_in_user)
+
+    response = await authenticated_client.post(
+        f"/welcome/refer/{opening.post_id}",
+        json={"clinical_context": ""},
+        headers={"Accept": "text/html"},
+        follow_redirects=False,
+    )
+    assert response.status_code == 422
+    # Form is re-rendered — heading still present
+    assert b"Refer a client" in response.content

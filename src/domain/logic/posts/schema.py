@@ -223,6 +223,10 @@ class ReferralRead(_PostReadBase):
     # See :class:`ReferralCreate` for the carrier/preference split.
     network_preference: Literal[*NETWORK_PREFERENCES]
     insurance_carrier: OptionalInsuranceCarrier = None
+    # Set when this referral was created via the wizard's
+    # ``/welcome/refer/{opening_id}`` step. ``None`` for referrals
+    # submitted through the full ``/referrals`` form.
+    target_opening_id: uuid.UUID | None = None
 
     # Flat-on-dump: keep ``location_city`` / ``location_state`` /
     # ``location_zip`` at the top level of JSON responses. The parent's
@@ -574,6 +578,8 @@ class ReferralAuditSnapshot(_PostAuditSnapshotBase):
     treatment_modality: str | None = None
     network_preference: Literal[*NETWORK_PREFERENCES]
     insurance_carrier: OptionalInsuranceCarrier = None
+    # Mirrors :class:`ReferralRead.target_opening_id`.
+    target_opening_id: uuid.UUID | None = None
 
     # Flat-on-dump — see :class:`ReferralRead`.
     @model_serializer(mode="wrap")
