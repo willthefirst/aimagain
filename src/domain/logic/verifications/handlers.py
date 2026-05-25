@@ -17,6 +17,7 @@ should leave this alone.
 """
 
 import logging
+import os
 from uuid import UUID
 
 import httpx
@@ -113,7 +114,14 @@ async def run_provider_verification(
     first_name, last_name = _clinician_names(provider, owner)
 
     extra_flags: list[str] = []
-    if provider.npi:
+    if os.getenv("BEDLAM_VERIFY_DEV_FALLBACK") == "1":
+        # Dev/test shortcut: synthesize an NPPES hit matching the provider's
+        # own names so scoring yields `verified` without hitting the public
+        # CMS registry. Never set in production.
+        nppes_result = NppesResult(
+            found=True, first_name=first_name, last_name=last_name, raw=None
+        )
+    elif provider.npi:
         nppes_result = await nppes_lookup(provider.npi, http=http)
     else:
         nppes_result = _SKIPPED_NPPES

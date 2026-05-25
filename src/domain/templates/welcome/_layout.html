@@ -1,0 +1,7 @@
+{% extends "base.html" %}
+{% block content %}
+  <section>
+    {% if step_info %}<p data-testid="welcome-step-header">{{ step_info }}</p>{% endif %}
+    {% block wizard_content %}{% endblock %}
+  </section>
+{% endblock %}

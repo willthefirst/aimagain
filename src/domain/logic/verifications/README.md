@@ -11,10 +11,11 @@ Persistence + pure-function primitives for the provider verification pipeline. T
 - `scoring.py` — `score_verification(...)` table-driven rules over `(NppesResult, OigResult, provider name)` → `Score(status, flags, name_match_score)`. No I/O.
 - `handlers.py` — `run_provider_verification(...)` orchestrator + `handle_create_provider_verification(...)` admin-only retrigger. Composes the primitives with persistence + audit + an `httpx.AsyncClient`. The bespoke route lives at [`../../routes/verifications.py`](../../routes/verifications.py) and is wired into `src/main.py` next to the other hand-rolled routers.
 
-The orchestrator has two callers:
+The orchestrator has three callers:
 
 1. **`handle_create_provider_verification`** in this file (admin retrigger; `actor_id=requesting_user.id`).
 2. **`run_nightly_verification`** in [`../../../jobs/nightly_verification.py`](../../../jobs/nightly_verification.py) (daily APScheduler job; `actor_id=None`).
+3. **`verify_and_create_clinician`** in [`../../logic/onboarding/services.py`](../onboarding/services.py) (self-service wizard path; `actor_id=user.id`).
 
 (`__init__.py` is intentionally empty — these are imported directly via `src.domain.logic.verifications.nppes`/`.oig`/`.scoring`/`.repository`/`.schema`/`.handlers`.)
 
@@ -43,6 +44,10 @@ The orchestrator writes one `Verification` row plus one matching audit row in a 
 ### Why `record_audit_for` + explicit commit (not `mutate`)
 
 The `mutate(...)` context manager is a snapshot-before / mutate / record_audit / commit ritual built around a pre-existing target — it snapshots `before` from the row that's already in the DB. Verification rows are *created* each run, so there's no pre-existing target. `record_audit_for` plus an explicit commit matches the favorites cluster's edge-add/remove pattern (`src/domain/logic/favorites/handlers.py`), which has the same shape (no pre-existing target on add).
+
+### Dev/test fallback (`BEDLAM_VERIFY_DEV_FALLBACK`)
+
+Set `BEDLAM_VERIFY_DEV_FALLBACK=1` to skip the real NPPES network call and synthesize an NPPES hit that matches the provider's own names (name-similarity = 1.0 → `verified`). Only for local dev and integration tests; never set in production. The OIG check still runs (using the configured CSV path).
 
 ### Name fields gap (followup tracking)
 
