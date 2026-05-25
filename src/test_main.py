@@ -44,6 +44,20 @@ async def test_home_page_shows_post_buttons(authenticated_client: AsyncClient):
     assert tree.css_first('a[href="/openings/form"]') is not None
 
 
+async def test_home_page_shows_primary_nav(authenticated_client: AsyncClient):
+    """The home page passes current_user so is_authenticated=True and the
+    primary nav links (Home, Referrals, Openings, Profile, Sign out) render."""
+    response = await authenticated_client.get("/home")
+    assert response.status_code == 200
+    tree = HTMLParser(response.text)
+    nav = tree.css_first('nav[aria-label="Primary"]')
+    assert nav is not None
+    links = {a.attributes.get("href") for a in nav.css("a")}
+    assert "/home" in links
+    assert "/referrals" in links
+    assert "/openings" in links
+
+
 # --- lifespan -----------------------------------------------------------
 
 
