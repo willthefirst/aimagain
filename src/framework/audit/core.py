@@ -39,6 +39,7 @@ class AuditAction(str, Enum):
     UPDATE_POST = "update_post"
     DELETE_POST = "delete_post"
     SET_USER_ACTIVATION = "set_user_activation"
+    UPDATE_USER_ONBOARDING_INTENT = "update_user_onboarding_intent"
     CREATE_USER = "create_user"
     UPDATE_USER = "update_user"
     DELETE_USER = "delete_user"

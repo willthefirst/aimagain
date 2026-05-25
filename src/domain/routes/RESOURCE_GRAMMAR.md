@@ -205,6 +205,7 @@ DELETE /users/{id}                hard delete                                   
 | `role` | `PUT /users/{id}/role` | Field cluster | Admin-only. Audited. |
 | `verification` | `PUT /users/{id}/verification` | State axis | Set by the email-verify token handler; not directly callable by clients. |
 | `activation` | `PUT /users/{id}/activation` | State axis | Admin to deactivate/reactivate; self may set self → `deactivated`. |
+| `onboarding-intent` | `PUT /users/me/onboarding-intent` | Field cluster | Self-only. Dedicated endpoint because the field has its own audit action (`update_user_onboarding_intent`) and different rules than ordinary PATCH fields. `/me` alias only — no `/{id}` variant. |
 
 ### Form pages (HTML)
 

@@ -81,6 +81,12 @@ FORMS_WITHOUT_PAIRS: dict[str, str] = {
         "Empty-body endpoint that reads the user from the session and "
         "re-mints a verify token. Nothing to pin beyond the path."
     ),
+    "POST /onboarding-intent-pending": (
+        "Pre-auth intent capture: accepts a single `intent` form field, "
+        "writes it to the session, and redirects to /auth/register. "
+        "No JSON body; the only contract is the redirect, which is pinned "
+        "by the route tests in `src/test_main.py`."
+    ),
 }
 
 

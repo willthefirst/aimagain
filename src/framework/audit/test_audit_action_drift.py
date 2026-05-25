@@ -38,6 +38,15 @@ _BESPOKE: frozenset[str] = frozenset(
         "CREATE_VERIFICATION",
         "UPDATE_VERIFICATION",
         "DELETE_VERIFICATION",
+        # `UPDATE_USER_ONBOARDING_INTENT` is fired by
+        # `PUT /users/me/onboarding-intent` (field-cluster subresource,
+        # self-only). It has its own dedicated audit action rather than
+        # reusing `UPDATE_USER` because `onboarding_intent` has separate
+        # rules and its own before/after snapshot shape
+        # (`OnboardingIntentAuditSnapshot`). There is no EntitySpec
+        # subresource declaration for it — the route is a plain FastAPI
+        # handler added directly to the users router.
+        "UPDATE_USER_ONBOARDING_INTENT",
     }
 )
 
