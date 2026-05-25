@@ -1,8 +1,9 @@
 """Tests for `src/framework/rendering/templating.py`."""
 
+from datetime import date, datetime, timedelta
 from unittest.mock import patch
 
-from .templating import _env, get_template_context, register_template_globals
+from .templating import _env, days_ago, get_template_context, register_template_globals
 
 
 def test_register_template_globals_updates_env():
@@ -66,3 +67,44 @@ def test_observability_frontend_none_when_disabled():
         mock_observability.frontend_context.return_value = None
         context = get_template_context()
     assert context["observability_frontend"] is None
+
+
+# --- days_ago ------------------------------------------------------------
+
+
+def test_days_ago_today():
+    assert days_ago(date.today()) == "today"
+
+
+def test_days_ago_yesterday():
+    assert days_ago(date.today() - timedelta(days=1)) == "1d ago"
+
+
+def test_days_ago_a_few_days():
+    assert days_ago(date.today() - timedelta(days=4)) == "4d ago"
+
+
+def test_days_ago_under_30():
+    assert days_ago(date.today() - timedelta(days=29)) == "29d ago"
+
+
+def test_days_ago_months():
+    assert days_ago(date.today() - timedelta(days=60)) == "2mo ago"
+
+
+def test_days_ago_over_a_year():
+    assert days_ago(date.today() - timedelta(days=400)) == "1y ago"
+
+
+def test_days_ago_accepts_datetime():
+    dt = datetime.combine(date.today() - timedelta(days=5), datetime.min.time())
+    assert days_ago(dt) == "5d ago"
+
+
+def test_days_ago_none_returns_empty_string():
+    assert days_ago(None) == ""
+
+
+def test_days_ago_filter_registered():
+    """The filter must be registered in the Jinja env for templates to use it."""
+    assert "days_ago" in _env.filters

@@ -7,6 +7,7 @@ import pytest
 from src.domain.logic.posts.view import (
     insurance_posture_for_post,
     post_card_view,
+    post_row_summary,
     referral_headline,
 )
 
@@ -537,3 +538,143 @@ def test_view_returns_dict_for_jinja_attribute_access():
     v = post_card_view(_make_cr_post())
     assert isinstance(v, dict)
     assert v["kind"] == "referral"
+
+
+# --- post_row_summary ---------------------------------------------------
+
+
+def test_row_summary_referral_description_carrier_city():
+    """Primary path: description + carrier label + city joined with ' · '."""
+    post = SimpleNamespace(
+        kind="referral",
+        referral_detail=SimpleNamespace(
+            description="Complex PTSD, seeking weekly EMDR",
+            insurance_carrier="aetna",
+            location_city="Berkeley",
+            age_groups=["adults_25_64"],
+            gender="female",
+        ),
+    )
+    assert (
+        post_row_summary(post) == "Complex PTSD, seeking weekly EMDR · Aetna · Berkeley"
+    )
+
+
+def test_row_summary_referral_no_carrier_no_city():
+    """When carrier and city are absent only the description is returned."""
+    post = SimpleNamespace(
+        kind="referral",
+        referral_detail=SimpleNamespace(
+            description="Needs a therapist",
+            insurance_carrier=None,
+            location_city=None,
+            age_groups=["adults_25_64"],
+            gender="male",
+        ),
+    )
+    assert post_row_summary(post) == "Needs a therapist"
+
+
+def test_row_summary_referral_no_description_falls_back_to_headline():
+    """When description is absent the age+gender headline is used."""
+    post = SimpleNamespace(
+        kind="referral",
+        referral_detail=SimpleNamespace(
+            description=None,
+            insurance_carrier=None,
+            location_city=None,
+            age_groups=["adults_25_64"],
+            gender="male",
+        ),
+    )
+    assert post_row_summary(post) == "Adult male (25–64)"
+
+
+def test_row_summary_referral_truncates_long_description():
+    """Descriptions longer than 100 chars are truncated so rows stay readable."""
+    long_desc = "x" * 150
+    post = SimpleNamespace(
+        kind="referral",
+        referral_detail=SimpleNamespace(
+            description=long_desc,
+            insurance_carrier=None,
+            location_city=None,
+            age_groups=["adults_25_64"],
+            gender=None,
+        ),
+    )
+    summary = post_row_summary(post)
+    assert len(summary) == 100
+    assert summary == "x" * 100
+
+
+def test_row_summary_referral_missing_detail():
+    post = SimpleNamespace(kind="referral", referral_detail=None)
+    assert post_row_summary(post) == "Referral"
+
+
+def test_row_summary_opening_with_description_and_settings():
+    """Opening with description + first settings label + sliding scale."""
+    post = SimpleNamespace(
+        kind="clinician_opening",
+        opening_detail=SimpleNamespace(
+            description="2 slots open",
+            settings=["outpatient"],
+            age_groups=[],
+            services=[],
+            provider=SimpleNamespace(sliding_scale=True),
+        ),
+    )
+    assert post_row_summary(post) == "2 slots open · Outpatient · sliding scale"
+
+
+def test_row_summary_opening_no_description_builds_from_fields():
+    """When opening has no description, age + service labels are used."""
+    post = SimpleNamespace(
+        kind="clinician_opening",
+        opening_detail=SimpleNamespace(
+            description=None,
+            settings=[],
+            age_groups=["adults_25_64"],
+            services=["psychotherapy"],
+            provider=SimpleNamespace(sliding_scale=False),
+        ),
+    )
+    summary = post_row_summary(post)
+    assert "Adult (25–64)" in summary
+    assert "Psychotherapy" in summary
+
+
+def test_row_summary_opening_no_sliding_scale():
+    post = SimpleNamespace(
+        kind="clinician_opening",
+        opening_detail=SimpleNamespace(
+            description="Accepting new clients",
+            settings=[],
+            age_groups=[],
+            services=[],
+            provider=SimpleNamespace(sliding_scale=False),
+        ),
+    )
+    assert post_row_summary(post) == "Accepting new clients"
+
+
+def test_row_summary_opening_missing_detail():
+    post = SimpleNamespace(kind="clinician_opening", opening_detail=None)
+    assert post_row_summary(post) == "Opening"
+
+
+def test_row_summary_program_name_and_description():
+    post = SimpleNamespace(
+        kind="program_intake",
+        intake_detail=SimpleNamespace(
+            program=SimpleNamespace(name="RISE IOP"),
+            description="Cohort starts June 1",
+        ),
+    )
+    assert post_row_summary(post) == "RISE IOP · Cohort starts June 1"
+
+
+def test_row_summary_unknown_kind_returns_empty_string():
+    post = SimpleNamespace(kind="mystery")
+    assert post_row_summary(post) == ""

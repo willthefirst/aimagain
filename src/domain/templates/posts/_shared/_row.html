@@ -1,0 +1,32 @@
+{# Compact row macro — emits a single <tr> for use inside
+   `<table class="post-rows"><tbody>…</tbody></table>`.
+
+Layout per row (four <td> cells):
+  1. Kind badge  — "REFERRAL" / "OPENING" / "INTAKE"; uppercase small
+                   text via `table.post-rows td:first-child` in base.html.
+  2. Summary     — mid-dot compact text linked to the detail page;
+                   Pico makes the link underline on hover for free.
+  3. Interest    — "No interest yet" (muted via td:nth-last-child(2)).
+                   No interest model yet — always renders this placeholder.
+  4. Age         — compact relative age via the `days_ago` filter;
+                   muted via td:last-child in base.html.
+
+`entity_name` is the URL family ("referral", "opening", "intake"). #}
+{% macro post_row(post, entity_name) -%}
+  {%- set summary = post_row_summary(post) -%}
+  {%- if post.kind == "referral" -%}
+    {%- set kind_label = "referral" -%}
+  {%- elif post.kind == "clinician_opening" -%}
+    {%- set kind_label = "opening" -%}
+  {%- else -%}
+    {%- set kind_label = "intake" -%}
+  {%- endif -%}
+  <tr data-kind="{{ post.kind }}">
+    <td>{{ kind_label }}</td>
+    <td>
+      <a href="{{ entity_url(entity_name, id=post.id) }}">{{ summary }}</a>
+    </td>
+    <td>No interest yet</td>
+    <td>{{ post.created_at | days_ago }}</td>
+  </tr>
+{%- endmacro %}

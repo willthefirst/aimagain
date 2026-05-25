@@ -14,7 +14,9 @@ from src.auth_config import (
 from src.db import check_database_health
 from src.domain import routes  # noqa: F401  # populates entity_registry
 from src.domain import template_globals  # noqa: F401  # populates Jinja env globals
+from src.domain.logic.posts.repository import get_post_repository
 from src.domain.logic.users.schema import UserRead
+from src.domain.models.posts.post import Post
 from src.domain.routes import auth_pages, auth_routes, dev_auth, verifications
 from src.framework.config import settings
 from src.framework.dispatch.registry import entity_registry
@@ -99,10 +101,21 @@ async def unauthorized_exception_handler(request: Request, exc: HTTPException):
 
 
 @app.get("/home")
-async def read_home(request: Request, _user=Depends(current_active_user)):
+async def read_home(
+    request: Request,
+    _user=Depends(current_active_user),
+    post_repo=Depends(get_post_repository),
+):
+    providers = getattr(_user, "providers", [])
+    p = providers[0] if providers else None
+    if p and (p.first_name or p.last_name):
+        display_name = " ".join(filter(None, [p.first_name, p.last_name]))
+    else:
+        display_name = _user.username
+    my_posts = await post_repo.list_owned_by(Post, _user.id, limit=5)
     return APIResponse.html_response(
         template_name="home.html",
-        context={},
+        context={"display_name": display_name, "my_posts": my_posts},
         request=request,
     )
 

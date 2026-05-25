@@ -17,6 +17,29 @@ from src.framework.rendering.route_urls import entity_form_url, entity_url
 auto_reload = settings.ENVIRONMENT == "development"
 
 
+def days_ago(value: datetime | date | None) -> str:
+    """Compact relative age — '4d ago', '2mo ago', '1y ago', 'today'.
+
+    Used by the home-page 'My active posts' widget and any compact row
+    view that needs a terse timestamp rather than an absolute date.
+    """
+    if value is None:
+        return ""
+    d = value.date() if isinstance(value, datetime) else value
+    delta = date.today() - d
+    days = delta.days
+    if days <= 0:
+        return "today"
+    if days == 1:
+        return "1d ago"
+    if days < 30:
+        return f"{days}d ago"
+    months = days // 30
+    if months < 12:
+        return f"{months}mo ago"
+    return f"{days // 365}y ago"
+
+
 def format_post_date(value: datetime | date | None) -> str:
     """Craigslist-style short date — `May 15` for current-year posts,
     `May 15, 2025` for older. Used by the posts list/detail templates so
@@ -68,6 +91,7 @@ _env.globals["entity_create_label"] = entity_create_label
 _env.globals["entity_edit_label"] = entity_edit_label
 _env.globals["entity_filter_label"] = entity_filter_label
 _env.filters["format_post_date"] = format_post_date
+_env.filters["days_ago"] = days_ago
 
 
 def register_template_globals(**kwargs: Any) -> None:
