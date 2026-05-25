@@ -424,3 +424,122 @@ async def test_get_coming_soon_renders_200(authenticated_client: AsyncClient):
     )
     assert response.status_code == 200
     assert b"coming soon" in response.content.lower()
+
+
+# ---------------------------------------------------------------------------
+# Helpers — setup a verified clinician (reused for be-findable tests)
+# ---------------------------------------------------------------------------
+
+
+async def _setup_verified_clinician(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    user_email: str,
+    intent: str = "refer_now",
+) -> None:
+    await _set_intent(db_test_session_manager, user_email, intent)
+    resp = await authenticated_client.post(
+        "/welcome/verify",
+        json=_VALID_BODY,
+        headers={"Accept": "text/html"},
+        follow_redirects=False,
+    )
+    assert resp.status_code == 302
+
+
+# ---------------------------------------------------------------------------
+# GET /welcome/be-findable
+# ---------------------------------------------------------------------------
+
+
+async def test_get_be_findable_renders_when_clinician_exists(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user: User,
+):
+    await _setup_verified_clinician(
+        authenticated_client, db_test_session_manager, logged_in_user.email
+    )
+    response = await authenticated_client.get(
+        "/welcome/be-findable",
+        headers={"Accept": "text/html"},
+    )
+    assert response.status_code == 200
+    assert b"Be findable" in response.content
+    assert b'data-testid="be-findable-specialties"' in response.content
+    assert b'data-testid="be-findable-modality"' in response.content
+
+
+async def test_get_be_findable_without_clinician_redirects_to_welcome(
+    authenticated_client: AsyncClient,
+):
+    response = await authenticated_client.get(
+        "/welcome/be-findable",
+        headers={"Accept": "text/html"},
+        follow_redirects=False,
+    )
+    assert response.status_code == 302
+    assert response.headers["location"] == "/welcome"
+
+
+async def test_get_be_findable_anon_redirected(test_client: AsyncClient):
+    response = await test_client.get(
+        "/welcome/be-findable",
+        headers={"Accept": "text/html"},
+        follow_redirects=False,
+    )
+    assert response.status_code in {302, 401}
+
+
+# ---------------------------------------------------------------------------
+# POST /welcome/be-findable
+# ---------------------------------------------------------------------------
+
+
+_BE_FINDABLE_BODY = {
+    "specialties": ["Trauma/PTSD", "EMDR"],
+    "in_person": True,
+    "virtual": False,
+}
+
+
+async def test_post_be_findable_happy_path_updates_clinician_and_redirects(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user: User,
+):
+    """Valid body → specialties + modality updated, 302 to /openings."""
+    await _setup_verified_clinician(
+        authenticated_client, db_test_session_manager, logged_in_user.email
+    )
+
+    response = await authenticated_client.post(
+        "/welcome/be-findable",
+        json=_BE_FINDABLE_BODY,
+        headers={"Accept": "text/html"},
+        follow_redirects=False,
+    )
+    assert response.status_code == 302
+    # has_reciprocity_profile → True → terminal /openings
+    assert response.headers["location"] == "/openings"
+
+
+async def test_post_be_findable_empty_submission_accepted(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user: User,
+):
+    """Empty submission (skip) is accepted; state machine sends back to /welcome/be-findable."""
+    await _setup_verified_clinician(
+        authenticated_client, db_test_session_manager, logged_in_user.email
+    )
+
+    response = await authenticated_client.post(
+        "/welcome/be-findable",
+        json={"specialties": [], "in_person": False, "virtual": False},
+        headers={"Accept": "text/html"},
+        follow_redirects=False,
+    )
+    assert response.status_code == 302
+    # No profile → state machine routes back to be-findable
+    assert response.headers["location"] == "/welcome/be-findable"

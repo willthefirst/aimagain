@@ -395,6 +395,18 @@ class Provider(BaseModel):
             self.primary_affiliation.cost = value
 
     @property
+    def specialties(self) -> list:
+        aff = self.primary_affiliation
+        if aff is None or aff.specialties is None:
+            return []
+        return aff.specialties
+
+    @specialties.setter
+    def specialties(self, value) -> None:
+        if self.primary_affiliation is not None:
+            self.primary_affiliation.specialties = value
+
+    @property
     def licensures(self):
         """Person-level credential list — proxies through
         `provider.clinician.licensures` after the FK move (#635 PR A).

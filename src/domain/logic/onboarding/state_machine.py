@@ -28,6 +28,27 @@ from src.domain.models import OpeningDetail, Post, Provider, User, Verification
 _NOT_YET_BUILT = "/welcome/coming-soon"
 
 
+def has_reciprocity_profile(clinician: Provider) -> bool:
+    """True when the clinician has BOTH non-empty specialties AND at least one
+    modality set to "yes".
+
+    AND (not OR) because a profile with only specialties — or only modality —
+    is too thin to be usefully findable: specialties without modality can't
+    tell a referring clinician how to reach this person, and modality without
+    specialties can't tell them what this clinician treats.
+
+    Called synchronously inside `next_step` because Provider loads its
+    Affiliations via `lazy="selectin"`, so `primary_affiliation` is already
+    populated when `next_step` receives the user's loaded `providers` list.
+    """
+    aff = clinician.primary_affiliation
+    if aff is None:
+        return False
+    has_specialties = bool(aff.specialties)
+    has_modality = aff.in_person_sessions == "yes" or aff.virtual_sessions == "yes"
+    return has_specialties and has_modality
+
+
 def onboarding_clinician(user: User) -> Provider | None:
     """Return the most-recently-created Provider owned by `user`, or None.
 
@@ -71,8 +92,10 @@ async def next_step(user: User, *, db: AsyncSession) -> str:
     intent = user.onboarding_intent
 
     if intent == "refer_now":
-        # T5 will replace this stub with /welcome/be-findable
-        return _NOT_YET_BUILT
+        if not has_reciprocity_profile(clinician):
+            return "/welcome/be-findable"
+        # Terminal — exit the wizard to the canonical openings board.
+        return "/openings"
 
     if intent == "have_openings":
         has_opening_result = await db.execute(
