@@ -1,0 +1,29 @@
+{% extends "welcome/_layout.html" %}
+{%- from "_shared/form_fields.html" import text_field with context -%}
+{%- from "_shared/form_meta.html" import form_with_errors with context -%}
+{% block wizard_content %}
+  <hgroup>
+    <h1 data-testid="refer-heading">Refer a client</h1>
+    {% if opening_detail and clinician %}
+      <p data-testid="refer-clinician-name">{{ clinician.first_name }} {{ clinician.last_name }}</p>
+    {% endif %}
+  </hgroup>
+  {% call form_with_errors(action=refer_url, method="post", json_enc=true) %}
+    <input type="hidden"
+           name="target_opening_id"
+           value="{{ opening_detail.post_id if opening_detail else '' }}">
+    <label for="clinical_context">Clinical picture</label>
+    <textarea id="clinical_context"
+              name="clinical_context"
+              required
+              placeholder="What does this client need? Why are you referring out? What has worked so far? No client name — just the clinical picture."
+              data-testid="refer-clinical-context"
+              rows="6"></textarea>
+    {% if clinician %}
+      <small>{{ clinician.first_name }} {{ clinician.last_name }} sees this before deciding whether to accept. Be specific — it makes for a better match.</small>
+    {% else %}
+      <small>This clinician sees this before deciding whether to accept. Be specific — it makes for a better match.</small>
+    {% endif %}
+    <button type="submit" data-testid="refer-submit">Send referral →</button>
+  {% endcall %}
+{% endblock %}

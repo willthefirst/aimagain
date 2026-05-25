@@ -347,6 +347,11 @@ def test_audit_snapshot_for_referral_post():
     owner_id = uuid.uuid4()
     detail_attrs = referral_payload()
     detail_attrs.pop("kind")
+    # `target_opening_id` is a model column (added in T6 migration c9f7e3b2a1d8)
+    # and therefore appears in `spec.detail_fields`. Supply it explicitly on the
+    # SimpleNamespace so `_flatten_post_to_dict` can read it; NULL on referrals
+    # created through the full form (only set by the wizard).
+    detail_attrs.setdefault("target_opening_id", None)
     post = SimpleNamespace(
         kind="referral",
         owner_id=owner_id,
