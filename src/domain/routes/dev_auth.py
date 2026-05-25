@@ -1,34 +1,32 @@
-"""Dev-only auto-login route.
+"""Dev-only auto-login routes.
 
-Visiting ``GET /dev/login-as-seed-user`` issues the same session
-cookie a production login would (via ``auth_backend.login`` with the
-JWT strategy from :mod:`src.auth_config`) for the user named by
-``settings.DEV_LOGIN_EMAIL``, then 302s to ``/posts``. Useful in two
-places:
+Two routes, both only mounted when ``settings.ENVIRONMENT == "development"``:
 
-  * Manual development — bookmark the URL. One click after starting
-    the dev server and you're authenticated; no form to fill.
-  * Playwright MCP agent — first tool call of a session navigates here,
-    then every subsequent navigate happens with the auth cookie set.
+``GET /dev/login-as-seed-user``
+    Logs in as the server-configured ``DEV_LOGIN_EMAIL`` (defaults to
+    ``admin@example.com``). No user input accepted — useful as a
+    bookmark or first Playwright MCP call.
 
-Security guards (defense in depth — both must pass):
+``GET /dev/login-as?email=<addr>``
+    Logs in as any user by email. The email comes from a query param
+    (selected from the quick-sign-in dropdown on the login page) rather
+    than from server config. Still dev-only — the route 404s outside
+    ``ENVIRONMENT=development`` — so it can't be used in production.
 
-  1. The route is only mounted on the FastAPI app when
-     ``settings.ENVIRONMENT == "development"`` — see
-     :func:`mount_dev_routes`. In production the route doesn't exist
-     and 404s without ever reaching this module.
-  2. The handler additionally raises 404 if ``settings.ENVIRONMENT``
-     somehow drifts out of "development" at request time. Belt-and-
-     suspenders against a future code path that toggles the env flag
-     after app boot.
+Security guards (defense in depth — both must pass for each route):
 
-The route never accepts user input — the seed-user identifier comes
-from the server-side ``DEV_LOGIN_EMAIL`` setting, not from query
-params — so it can't be tricked into authenticating as an arbitrary
-user. The seed user must already exist in the database; otherwise the
-handler 404s.
+  1. The router is only mounted when ``settings.ENVIRONMENT ==
+     "development"`` — see :func:`mount_dev_routes`. In production
+     neither route exists and both 404 without reaching this module.
+  2. Each handler raises 404 at request time if ``settings.ENVIRONMENT``
+     has somehow drifted. Belt-and-suspenders against a future code path
+     that toggles the env flag after app boot.
 
-Tested in `test_dev_auth.py` (the colocated route test).
+``DEV_SEED_USERS`` is the canonical list surfaced in the login-page
+dropdown. It mirrors the anchor rows in
+``scripts/dev/seed/overrides/users.py``.
+
+Tested in ``test_dev_auth.py`` (colocated route tests).
 """
 
 from fastapi import APIRouter, Depends, FastAPI, HTTPException
@@ -41,40 +39,64 @@ from src.framework.config import settings
 
 router = APIRouter(tags=["dev"])
 
+# Mirrors the anchor rows in scripts/dev/seed/overrides/users.py.
+# Shown in the login-page quick-sign-in dropdown when ENVIRONMENT=development.
+DEV_SEED_USERS: list[dict[str, str]] = [
+    {"email": "admin@example.com", "label": "admin (superuser)"},
+    {"email": "alice@example.com", "label": "alice"},
+    {"email": "bob@example.com", "label": "bob"},
+]
 
-@router.get("/dev/login-as-seed-user")
-async def login_as_seed_user(
-    user_manager: BaseUserManager[User, object] = Depends(get_user_manager),
+
+async def _login_response(
+    email: str, user_manager: BaseUserManager[User, object]
 ) -> Response:
-    """Issue a session cookie for the configured seed user and 302 to
-    ``/`` — root then decides where to land (see ``read_root`` in
-    ``src/main.py``), so this handler doesn't bake in a specific
-    resource path."""
-    if settings.ENVIRONMENT != "development":
-        raise HTTPException(status_code=404)
-
+    """Fetch user by email and return a 302 response with the session cookie set."""
     try:
-        user = await user_manager.get_by_email(settings.DEV_LOGIN_EMAIL)
+        user = await user_manager.get_by_email(email)
     except Exception as exc:  # fastapi-users raises UserNotExists
         raise HTTPException(
             status_code=404,
             detail=(
-                f"Seed user not found: {settings.DEV_LOGIN_EMAIL}. "
+                f"Seed user not found: {email}. "
                 "Run `dev seed` to populate the dev database."
             ),
         ) from exc
 
     # `auth_backend.login(strategy, user)` builds a Response with the
-    # cookie set by the transport (CookieTransport in our config). We
-    # then swap the status + Location header so the agent / browser
-    # lands on `/` (which redirects onward) carrying the freshly-set
-    # cookie. Routing the landing through `/` keeps the
-    # "where does an authenticated session land?" decision in one
-    # place — `src/main.py:read_root` — instead of duplicating it here.
+    # cookie set by CookieTransport. Swap status + Location so the browser
+    # lands on `/` carrying the freshly-set cookie; root decides the actual
+    # landing page (see `src/main.py:read_root`).
     response = await auth_backend.login(get_strategy(), user)
     response.status_code = 302
     response.headers["Location"] = "/"
     return response
+
+
+@router.get("/dev/login-as-seed-user")
+async def login_as_seed_user(
+    user_manager: BaseUserManager[User, object] = Depends(get_user_manager),
+) -> Response:
+    """Issue a session cookie for the configured seed user and 302 to ``/``."""
+    if settings.ENVIRONMENT != "development":
+        raise HTTPException(status_code=404)
+    return await _login_response(settings.DEV_LOGIN_EMAIL, user_manager)
+
+
+@router.get("/dev/login-as")
+async def login_as(
+    email: str,
+    user_manager: BaseUserManager[User, object] = Depends(get_user_manager),
+) -> Response:
+    """Issue a session cookie for any user by email and 302 to ``/``.
+
+    The email comes from the quick-sign-in dropdown on the login page.
+    Only reachable in ``ENVIRONMENT=development`` — the route is not
+    mounted in production.
+    """
+    if settings.ENVIRONMENT != "development":
+        raise HTTPException(status_code=404)
+    return await _login_response(email, user_manager)
 
 
 def mount_dev_routes(app: FastAPI, *, environment: str) -> None:

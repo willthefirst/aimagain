@@ -19,6 +19,21 @@
        chrome inside the form slot). See the partial's docstring +
        `post_login`'s `form_rerender` call for the wiring. #}
     {% include "auth/_login_form.html" %}
+    {% if dev_users %}
+      {# Dev-only: quick sign-in as a seeded user without entering credentials.
+         Only rendered when ENVIRONMENT=development and /dev/login-as is mounted.
+         Never shown in production. #}
+      <details>
+        <summary>Dev: quick sign-in</summary>
+        <form method="get" action="/dev/login-as">
+          <label for="dev-user-select">Sign in as</label>
+          <select id="dev-user-select" name="email">
+            {% for u in dev_users %}<option value="{{ u.email }}">{{ u.label }} — {{ u.email }}</option>{% endfor %}
+          </select>
+          <button type="submit">Go</button>
+        </form>
+      </details>
+    {% endif %}
     <footer>
       <p>
         Forgot your password?
