@@ -1,7 +1,7 @@
 """affiliation.specialties — JSON list for be-findable wizard step
 
 Revision ID: a1b9c2d3e4f5
-Revises: b5b6057986f2
+Revises: af760f747e18
 Create Date: 2026-05-24 19:00:00.000000
 
 """
@@ -13,7 +13,7 @@ import sqlalchemy as sa
 from alembic import op
 
 revision: str = "a1b9c2d3e4f5"
-down_revision: Union[str, None] = "b5b6057986f2"
+down_revision: Union[str, None] = "af760f747e18"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 

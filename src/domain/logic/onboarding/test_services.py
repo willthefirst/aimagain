@@ -15,7 +15,11 @@ import pytest
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from src.domain.logic.onboarding.schema import BeFindableForm, FirstOpeningForm, VerifyForm
+from src.domain.logic.onboarding.schema import (
+    BeFindableForm,
+    FirstOpeningForm,
+    VerifyForm,
+)
 from src.domain.logic.onboarding.services import (
     create_first_opening,
     update_clinician_for_findability,

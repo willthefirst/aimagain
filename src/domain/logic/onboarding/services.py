@@ -18,7 +18,11 @@ import uuid
 import httpx
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.domain.logic.onboarding.schema import BeFindableForm, FirstOpeningForm, VerifyForm
+from src.domain.logic.onboarding.schema import (
+    BeFindableForm,
+    FirstOpeningForm,
+    VerifyForm,
+)
 from src.domain.logic.onboarding.state_machine import onboarding_clinician
 from src.domain.logic.providers.repository import ProviderRepository
 from src.domain.logic.verifications.handlers import run_provider_verification

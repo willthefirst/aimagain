@@ -18,7 +18,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.auth_config import current_active_user
 from src.db import get_db_session
-from src.domain.logic.onboarding.schema import BeFindableForm, FirstOpeningForm, VerifyForm
+from src.domain.logic.onboarding.schema import (
+    BeFindableForm,
+    FirstOpeningForm,
+    VerifyForm,
+)
 from src.domain.logic.onboarding.services import (
     create_first_opening,
     update_clinician_for_findability,
