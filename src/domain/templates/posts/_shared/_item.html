@@ -71,13 +71,6 @@ family (e.g. `/referrals/{id}` for referrals' list). #}
        rel="noopener noreferrer"
        role="button"
        class="secondary outline">Email</a>
-    {% if entity_name == 'opening' %}
-      {# Refer CTA — links to /welcome/refer/{id} (T6). 404 until T6 ships. #}
-      <a href="/welcome/refer/{{ post.id }}"
-         role="button"
-         class="outline"
-         data-testid="refer-cta">Refer</a>
-    {% endif %}
   </footer>
 {%- endcall %}
 {%- endmacro %}

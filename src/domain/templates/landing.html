@@ -9,9 +9,6 @@
   {% if user and user.onboarding_intent == 'have_openings' and not user.providers %}
     {% include "landing/_b1_preview.html" %}
   {% endif %}
-  {% if user and user.onboarding_intent == 'refer_now' and not user_has_verified_clinician %}
-    {% include "landing/_a1_search_preview.html" %}
-  {% endif %}
   {# Onboarding intent picker — 4 cards, one per intent value.
    Click behaviour differs by auth state:
    - Authenticated: HTMX PUT /users/me/onboarding-intent; on success

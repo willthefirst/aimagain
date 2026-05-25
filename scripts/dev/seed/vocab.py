@@ -671,19 +671,6 @@ PLACEHOLDER_OK: Final[frozenset[str]] = frozenset(
 # JSON-list columns → which enum to subset over. Most JSON columns
 # carry a vocabulary referenced from `enums.py`; the generator can't
 # infer the link from the column itself, so we declare it explicitly.
-_SPECIALTIES: Final[tuple[str, ...]] = (
-    "Trauma/PTSD",
-    "EMDR",
-    "Anxiety",
-    "OCD/ERP",
-    "Depression",
-    "Grief",
-    "Couples",
-    "Adolescents",
-    "ADHD",
-    "Perinatal",
-)
-
 JSON_LIST_SOURCE: Final[dict[str, tuple[str, ...]]] = {
     "age_groups": CLIENT_AGE_GROUPS,
     "languages": LANGUAGES,
@@ -692,10 +679,20 @@ JSON_LIST_SOURCE: Final[dict[str, tuple[str, ...]]] = {
     "desired_times": DESIRED_TIME_SLOTS,
     "genders": GENDERS,
     "in_network_carriers": INSURANCE_CARRIERS,
-    # Slot-shape fields. `specialties` uses canonical display labels (shared
-    # between OpeningDetail and Affiliation); `population_tags` and
-    # `payment_types` are free-form (no CHECK constraint).
-    "specialties": _SPECIALTIES,
+    # T3 slot-shape fields. `specialties` and `population_tags` are
+    # free-form (no canonical enum yet); seed them from stable sample
+    # tuples. `payment_types` seeds from a small static list.
+    "specialties": (
+        "trauma",
+        "anxiety",
+        "depression",
+        "grief",
+        "ocd",
+        "emdr",
+        "dbt",
+        "cbt",
+        "relationships",
+    ),
     "population_tags": (
         "lgbtq",
         "poc",

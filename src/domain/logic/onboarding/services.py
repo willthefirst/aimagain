@@ -18,11 +18,7 @@ import uuid
 import httpx
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.domain.logic.onboarding.schema import (
-    BeFindableForm,
-    FirstOpeningForm,
-    VerifyForm,
-)
+from src.domain.logic.onboarding.schema import FirstOpeningForm, VerifyForm
 from src.domain.logic.onboarding.state_machine import onboarding_clinician
 from src.domain.logic.providers.repository import ProviderRepository
 from src.domain.logic.verifications.handlers import run_provider_verification
@@ -167,34 +163,3 @@ async def create_first_opening(
     )
     await db.commit()
     return created
-
-
-async def update_clinician_for_findability(
-    form_data: BeFindableForm,
-    user: User,
-    *,
-    db: AsyncSession,
-) -> None:
-    """Update the onboarding clinician's specialties and session modality.
-
-    Writes to the primary Affiliation of the onboarding clinician (the
-    most-recently-created Provider owned by `user`). Empty submission
-    (no specialties, neither modality box checked) is accepted as a
-    no-op write — the wizard allows "skip for now" by posting empty values.
-
-    `in_person_sessions` / `virtual_sessions` on Affiliation use the
-    string enum ("yes", "no", "please_contact"); we map booleans to
-    "yes"/"no" so the existing CHECK constraint stays satisfied.
-    """
-    clinician = onboarding_clinician(user)
-    if clinician is None:
-        return
-
-    aff = clinician.primary_affiliation
-    if aff is None:
-        return
-
-    aff.specialties = form_data.specialties
-    aff.in_person_sessions = "yes" if form_data.in_person else "no"
-    aff.virtual_sessions = "yes" if form_data.virtual else "no"
-    await db.commit()

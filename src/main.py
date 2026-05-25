@@ -121,8 +121,6 @@ async def read_root(
     here. Anonymous visitors see the picker and are routed to register
     after picking.
     """
-    user_has_verified_clinician = False
-
     if user is not None and user.onboarding_intent is not None:
         from src.domain.logic.providers.repository import ProviderRepository
         from src.domain.logic.verifications.repository import VerificationRepository
@@ -134,15 +132,11 @@ async def read_root(
             for provider in providers:
                 latest = await verif_repo.latest_for_provider(provider.id)
                 if latest and latest.status == "verified":
-                    user_has_verified_clinician = True
                     return RedirectResponse(url="/openings", status_code=302)
 
     return APIResponse.html_response(
         template_name="landing.html",
-        context={
-            "user": user,
-            "user_has_verified_clinician": user_has_verified_clinician,
-        },
+        context={"user": user},
         request=request,
     )
 

@@ -202,6 +202,22 @@ async def test_post_verify_invalid_body_returns_422_inline(
 # ---------------------------------------------------------------------------
 
 
+async def _setup_verified_clinician(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user: User,
+) -> None:
+    """Create a verified clinician for the logged-in user by running the verify step."""
+    await _set_intent(db_test_session_manager, logged_in_user.email, "have_openings")
+    response = await authenticated_client.post(
+        "/welcome/verify",
+        json=_VALID_BODY,
+        headers={"Accept": "text/html"},
+        follow_redirects=False,
+    )
+    assert response.status_code == 302, f"Verify failed: {response.status_code}"
+
+
 async def test_get_first_opening_renders_when_clinician_verified(
     authenticated_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],
@@ -209,10 +225,7 @@ async def test_get_first_opening_renders_when_clinician_verified(
 ):
     """GET /welcome/first-opening renders the form when preconditions met."""
     await _setup_verified_clinician(
-        authenticated_client,
-        db_test_session_manager,
-        logged_in_user.email,
-        intent="have_openings",
+        authenticated_client, db_test_session_manager, logged_in_user
     )
     response = await authenticated_client.get(
         "/welcome/first-opening",
@@ -255,10 +268,7 @@ async def test_post_first_opening_happy_path_creates_opening_and_redirects(
 ):
     """Valid body → Opening created, 302 to /welcome/done."""
     await _setup_verified_clinician(
-        authenticated_client,
-        db_test_session_manager,
-        logged_in_user.email,
-        intent="have_openings",
+        authenticated_client, db_test_session_manager, logged_in_user
     )
 
     response = await authenticated_client.post(
@@ -289,10 +299,7 @@ async def test_post_first_opening_sets_slot_fields(
 ):
     """Slot fields written to OpeningDetail survive a read-back."""
     await _setup_verified_clinician(
-        authenticated_client,
-        db_test_session_manager,
-        logged_in_user.email,
-        intent="have_openings",
+        authenticated_client, db_test_session_manager, logged_in_user
     )
 
     body = {
@@ -330,10 +337,7 @@ async def test_post_first_opening_skip_note_clears_colleague_note(
 ):
     """skip_note=1 in body clears colleague_note before validation."""
     await _setup_verified_clinician(
-        authenticated_client,
-        db_test_session_manager,
-        logged_in_user.email,
-        intent="have_openings",
+        authenticated_client, db_test_session_manager, logged_in_user
     )
 
     body = {
@@ -369,10 +373,7 @@ async def test_post_first_opening_invalid_opening_type_returns_422(
 ):
     """Bad opening_type → form re-rendered with 422 inline errors."""
     await _setup_verified_clinician(
-        authenticated_client,
-        db_test_session_manager,
-        logged_in_user.email,
-        intent="have_openings",
+        authenticated_client, db_test_session_manager, logged_in_user
     )
 
     bad_body = {**_FIRST_OPENING_BODY, "opening_type": "not_a_valid_type"}
@@ -423,122 +424,3 @@ async def test_get_coming_soon_renders_200(authenticated_client: AsyncClient):
     )
     assert response.status_code == 200
     assert b"coming soon" in response.content.lower()
-
-
-# ---------------------------------------------------------------------------
-# Helpers — setup a verified clinician (reused for be-findable tests)
-# ---------------------------------------------------------------------------
-
-
-async def _setup_verified_clinician(
-    authenticated_client: AsyncClient,
-    db_test_session_manager: async_sessionmaker[AsyncSession],
-    user_email: str,
-    intent: str = "refer_now",
-) -> None:
-    await _set_intent(db_test_session_manager, user_email, intent)
-    resp = await authenticated_client.post(
-        "/welcome/verify",
-        json=_VALID_BODY,
-        headers={"Accept": "text/html"},
-        follow_redirects=False,
-    )
-    assert resp.status_code == 302
-
-
-# ---------------------------------------------------------------------------
-# GET /welcome/be-findable
-# ---------------------------------------------------------------------------
-
-
-async def test_get_be_findable_renders_when_clinician_exists(
-    authenticated_client: AsyncClient,
-    db_test_session_manager: async_sessionmaker[AsyncSession],
-    logged_in_user: User,
-):
-    await _setup_verified_clinician(
-        authenticated_client, db_test_session_manager, logged_in_user.email
-    )
-    response = await authenticated_client.get(
-        "/welcome/be-findable",
-        headers={"Accept": "text/html"},
-    )
-    assert response.status_code == 200
-    assert b"Be findable" in response.content
-    assert b'data-testid="be-findable-specialties"' in response.content
-    assert b'data-testid="be-findable-modality"' in response.content
-
-
-async def test_get_be_findable_without_clinician_redirects_to_welcome(
-    authenticated_client: AsyncClient,
-):
-    response = await authenticated_client.get(
-        "/welcome/be-findable",
-        headers={"Accept": "text/html"},
-        follow_redirects=False,
-    )
-    assert response.status_code == 302
-    assert response.headers["location"] == "/welcome"
-
-
-async def test_get_be_findable_anon_redirected(test_client: AsyncClient):
-    response = await test_client.get(
-        "/welcome/be-findable",
-        headers={"Accept": "text/html"},
-        follow_redirects=False,
-    )
-    assert response.status_code in {302, 401}
-
-
-# ---------------------------------------------------------------------------
-# POST /welcome/be-findable
-# ---------------------------------------------------------------------------
-
-
-_BE_FINDABLE_BODY = {
-    "specialties": ["Trauma/PTSD", "EMDR"],
-    "in_person": True,
-    "virtual": False,
-}
-
-
-async def test_post_be_findable_happy_path_updates_clinician_and_redirects(
-    authenticated_client: AsyncClient,
-    db_test_session_manager: async_sessionmaker[AsyncSession],
-    logged_in_user: User,
-):
-    """Valid body → specialties + modality updated, 302 to /openings."""
-    await _setup_verified_clinician(
-        authenticated_client, db_test_session_manager, logged_in_user.email
-    )
-
-    response = await authenticated_client.post(
-        "/welcome/be-findable",
-        json=_BE_FINDABLE_BODY,
-        headers={"Accept": "text/html"},
-        follow_redirects=False,
-    )
-    assert response.status_code == 302
-    # has_reciprocity_profile → True → terminal /openings
-    assert response.headers["location"] == "/openings"
-
-
-async def test_post_be_findable_empty_submission_accepted(
-    authenticated_client: AsyncClient,
-    db_test_session_manager: async_sessionmaker[AsyncSession],
-    logged_in_user: User,
-):
-    """Empty submission (skip) is accepted; state machine sends back to /welcome/be-findable."""
-    await _setup_verified_clinician(
-        authenticated_client, db_test_session_manager, logged_in_user.email
-    )
-
-    response = await authenticated_client.post(
-        "/welcome/be-findable",
-        json={"specialties": [], "in_person": False, "virtual": False},
-        headers={"Accept": "text/html"},
-        follow_redirects=False,
-    )
-    assert response.status_code == 302
-    # No profile → state machine routes back to be-findable
-    assert response.headers["location"] == "/welcome/be-findable"
