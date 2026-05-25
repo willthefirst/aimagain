@@ -661,6 +661,10 @@ PLACEHOLDER_OK: Final[frozenset[str]] = frozenset(
         # audit rows.
         "resource_type",
         "action",
+        # `colleague_note` is a short peer-facing text field (≤280 chars).
+        # Placeholder is acceptable for seed data; real copy is entered
+        # by the clinician in the wizard.
+        "colleague_note",
     }
 )
 
@@ -675,6 +679,34 @@ JSON_LIST_SOURCE: Final[dict[str, tuple[str, ...]]] = {
     "desired_times": DESIRED_TIME_SLOTS,
     "genders": GENDERS,
     "in_network_carriers": INSURANCE_CARRIERS,
+    # T3 slot-shape fields. `specialties` and `population_tags` are
+    # free-form (no canonical enum yet); seed them from stable sample
+    # tuples. `payment_types` seeds from a small static list.
+    "specialties": (
+        "trauma",
+        "anxiety",
+        "depression",
+        "grief",
+        "ocd",
+        "emdr",
+        "dbt",
+        "cbt",
+        "relationships",
+    ),
+    "population_tags": (
+        "lgbtq",
+        "poc",
+        "veterans",
+        "first_responders",
+        "chronic_illness",
+        "neurodivergent",
+    ),
+    "payment_types": (
+        "sliding_scale",
+        "out_of_pocket",
+        "insurance",
+        "superbill",
+    ),
     "flags": (  # Verification.flags — free-form bag of strings
         "name_mismatch",
         "nppes_inactive",

@@ -1,7 +1,14 @@
-from sqlalchemy import JSON, Column, ForeignKey, Text, text
+from datetime import datetime, timezone
+
+from sqlalchemy import JSON, Column, DateTime, ForeignKey, Integer, Text, text
 from sqlalchemy.orm import relationship
 from sqlalchemy.types import Uuid
 
+from src.domain.models.enums import (
+    AVAILABILITY_STATES,
+    OPENING_TYPES,
+    named_check_in,
+)
 from src.framework.persistence.base_model import Base
 
 _TABLE = "opening_details"
@@ -17,6 +24,10 @@ class OpeningDetail(Base):
     """
 
     __tablename__ = _TABLE
+    __table_args__ = (
+        named_check_in(_TABLE, "opening_type", OPENING_TYPES),
+        named_check_in(_TABLE, "availability_state", AVAILABILITY_STATES),
+    )
 
     post_id = Column(
         Uuid(as_uuid=True),
@@ -56,6 +67,30 @@ class OpeningDetail(Base):
     # same shape as `services` / `settings` / `age_groups`). Empty list
     # is allowed both at rest and on the wire — "no restriction stated."
     genders = Column(JSON, nullable=False, server_default=text("'[]'"), default=list)
+
+    # Section 5 — slot shape (T3 fields)
+    opening_type = Column(Text, nullable=True)
+    specialties = Column(
+        JSON, nullable=False, server_default=text("'[]'"), default=list
+    )
+    population_tags = Column(
+        JSON, nullable=False, server_default=text("'[]'"), default=list
+    )
+    fee_low = Column(Integer, nullable=True)
+    fee_high = Column(Integer, nullable=True)
+    payment_types = Column(
+        JSON, nullable=False, server_default=text("'[]'"), default=list
+    )
+    availability_state = Column(Text, nullable=True)
+    # Peer-facing note (≤280 chars enforced in Pydantic, not at DB level).
+    colleague_note = Column(Text, nullable=True)
+    note_expires_at = Column(DateTime(timezone=True), nullable=True)
+    last_confirmed_at = Column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=text("(CURRENT_TIMESTAMP)"),
+        default=lambda: datetime.now(timezone.utc),
+    )
 
     # Section 6 — about (free-text core fields)
     description = Column(Text, nullable=True)
