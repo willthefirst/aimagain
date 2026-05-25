@@ -31,11 +31,11 @@ PRs land via [Mergify](https://mergify.com) on `main`. The full flow requires no
 
 **Flow:**
 
-1. `dev push` opens (or updates) a PR off your worktree branch.
-2. CI runs on the PR head (`pull_request` event) — four jobs in parallel.
-3. When all four pass, a fifth CI job (`queue`) automatically posts `@mergifyio queue` on the PR.
-4. Mergify admits the PR to the active queue, batching with any other waiting PRs (up to 3).
-5. Mergify creates a speculative branch combining the batch rebased onto current `main`, runs CI on that branch, and squash-merges when green.
+1. `git town sync` — rebase the branch onto the latest `main` before pushing. This ensures the branch is current when it enters CI; once the PR is in the Mergify queue, Mergify owns the rebase (see step 5).
+2. `dev push` opens (or updates) a PR off your worktree branch.
+3. CI runs on the PR head (`pull_request` event) — four jobs in parallel.
+4. When all four pass, a fifth CI job (`queue`) automatically posts `@mergifyio queue` on the PR.
+5. Mergify admits the PR to the active queue, batching with any other waiting PRs (up to 3). It creates a speculative branch rebased onto current `main` (absorbing any PRs that merged while yours was in CI), runs CI on that branch, and squash-merges when green. Conflicts that arise *after* the PR enters the queue are Mergify's problem, not yours.
 6. `dev merge [<pr>]` is optional — use it to block and get notified when the PR lands or a check fails.
 
 **Queue config:**
