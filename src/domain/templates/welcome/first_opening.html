@@ -1,0 +1,88 @@
+{% extends "welcome/_layout.html" %}
+{%- from "_shared/form_fields.html" import text_field, select_field with context -%}
+{%- from "_shared/form_meta.html" import form_with_errors with context -%}
+{% block wizard_content %}
+  <hgroup>
+    <h1>Describe one opening</h1>
+    <p>You can add as many as you need after you're live.</p>
+  </hgroup>
+  {% call form_with_errors(action="/welcome/first-opening", method="post", json_enc=true) %}
+    <fieldset data-testid="first-opening-type">
+      <legend>Session type</legend>
+      {% for t in opening_types %}
+        <label>
+          <input type="radio" name="opening_type" value="{{ t }}">
+          {{ opening_types_labels[t] }}
+        </label>
+      {% endfor %}
+    </fieldset>
+    <fieldset data-testid="first-opening-specialties">
+      <legend>Specialties</legend>
+      {% for label in ["Trauma/PTSD", "EMDR", "Anxiety", "OCD/ERP", "Depression", "Grief", "Couples", "Adolescents", "ADHD", "Perinatal"] %}
+        <label>
+          <input type="checkbox" name="specialties" value="{{ label }}">
+          {{ label }}
+        </label>
+      {% endfor %}
+    </fieldset>
+    <fieldset data-testid="first-opening-population-tags">
+      <legend>Who you work with</legend>
+      {% for label in ["Adults", "Adolescents", "Children", "Couples", "Older adults"] %}
+        <label>
+          <input type="checkbox" name="population_tags" value="{{ label }}">
+          {{ label }}
+        </label>
+      {% endfor %}
+    </fieldset>
+    <fieldset data-testid="first-opening-languages">
+      <legend>Languages (besides English)</legend>
+      {% for lang_value, lang_label in [("es", "Spanish"), ("zh", "Mandarin"), ("vi", "Vietnamese"), ("ar", "Arabic"), ("tl", "Tagalog"), ("pt", "Portuguese"), ("fr", "French"), ("yue", "Cantonese")] %}
+        <label>
+          <input type="checkbox" name="languages" value="{{ lang_value }}">
+          {{ lang_label }}
+        </label>
+      {% endfor %}
+    </fieldset>
+    <fieldset data-testid="first-opening-fee">
+      <legend>Fee range (optional)</legend>
+      <div class="grid">
+        <label>
+          Low ($)
+          <input type="number" name="fee_low" min="0" placeholder="e.g. 100">
+        </label>
+        <label>
+          High ($)
+          <input type="number" name="fee_high" min="0" placeholder="e.g. 200">
+        </label>
+      </div>
+    </fieldset>
+    <fieldset data-testid="first-opening-payment-types">
+      <legend>Payment</legend>
+      {% for pt_value, pt_label in [("sliding_scale", "Sliding scale"), ("superbill", "Superbill"), ("insurance_panels", "Insurance panels"), ("self_pay", "Self-pay only")] %}
+        <label>
+          <input type="checkbox" name="payment_types" value="{{ pt_value }}">
+          {{ pt_label }}
+        </label>
+      {% endfor %}
+    </fieldset>
+    <fieldset data-testid="first-opening-availability">
+      <legend>Availability</legend>
+      {% for state in availability_states %}
+        <label>
+          <input type="radio" name="availability_state" value="{{ state }}">
+          {{ availability_states_labels[state] }}
+        </label>
+      {% endfor %}
+    </fieldset>
+    <fieldset data-testid="first-opening-note">
+      <label for="colleague_note">Note for clinicians (optional)</label>
+      <textarea id="colleague_note"
+                name="colleague_note"
+                rows="3"
+                placeholder="What makes a good referral here? Write it like you'd say it to a clinician."></textarea>
+      <small>Disappears after 4 weeks unless renewed. Never shown to clients.</small>
+    </fieldset>
+    <button type="submit">Go live →</button>
+    <button type="submit" name="skip_note" value="1" class="secondary outline">Skip note</button>
+  {% endcall %}
+{% endblock %}
