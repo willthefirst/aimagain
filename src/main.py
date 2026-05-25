@@ -5,7 +5,12 @@ from datetime import datetime
 from fastapi import Depends, FastAPI, HTTPException, Request, status
 from fastapi.responses import JSONResponse, RedirectResponse
 
-from src.auth_config import auth_backend, current_optional_user, fastapi_users
+from src.auth_config import (
+    auth_backend,
+    current_active_user,
+    current_optional_user,
+    fastapi_users,
+)
 from src.db import check_database_health
 from src.domain import routes  # noqa: F401  # populates entity_registry
 from src.domain import template_globals  # noqa: F401  # populates Jinja env globals
@@ -91,6 +96,15 @@ async def unauthorized_exception_handler(request: Request, exc: HTTPException):
             )
 
     return JSONResponse(status_code=exc.status_code, content={"detail": exc.detail})
+
+
+@app.get("/home")
+async def read_home(request: Request, _user=Depends(current_active_user)):
+    return APIResponse.html_response(
+        template_name="home.html",
+        context={},
+        request=request,
+    )
 
 
 @app.get("/")
