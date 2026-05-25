@@ -21,7 +21,9 @@ class UserManager(UUIDIDMixin, BaseUserManager[User, uuid.UUID]):
     verification_token_secret = settings.SECRET
 
     async def on_after_register(self, user: User, request: Optional[Request] = None):
-        """Trigger the verify-email flow on new-account creation.
+        """Trigger the verify-email flow on new-account creation, and
+        transfer any pre-auth onboarding intent from the session to the
+        new user row.
 
         In development, the user is auto-verified — local dev creates
         throw-away accounts and shouldn't have to click an email link
@@ -35,6 +37,20 @@ class UserManager(UUIDIDMixin, BaseUserManager[User, uuid.UUID]):
         block registration — the user is already created at this point;
         they can re-request the verify link from the nag banner.
         """
+        # Transfer pre-auth onboarding intent from the session to the
+        # new user row. The session key is written by
+        # `POST /onboarding-intent-pending` when an anonymous visitor
+        # clicks a landing-page intent card. Clear it after transfer so
+        # a subsequent login by a different user doesn't inherit a stale
+        # intent.
+        if request is not None:
+            from src.domain.models.enums import ONBOARDING_INTENTS
+
+            session_intent = request.session.get("onboarding_intent")
+            if session_intent and session_intent in ONBOARDING_INTENTS:
+                await self.user_db.update(user, {"onboarding_intent": session_intent})
+                request.session.pop("onboarding_intent", None)
+
         if settings.ENVIRONMENT == "development":
             await self.user_db.update(user, {"is_verified": True})
             return
