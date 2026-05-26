@@ -37,6 +37,10 @@ class Settings(BaseSettings):
     # in production via the `.env` file on the droplet or as a CI/CD
     # secret. Empty DSN → the app runs with no provider at all.
     SENTRY_DSN: str = ""
+    # Separate DSN for the browser SDK — points at the frontend Sentry
+    # project so JS errors are triaged independently from backend errors.
+    # Empty → no browser SDK loaded. Set via `SENTRY_BROWSER_DSN` env var.
+    SENTRY_BROWSER_DSN: str = ""
     # Sample rates default to 10% so a traffic spike doesn't tank the
     # Sentry quota. Override per-environment if you need fuller traces.
     SENTRY_TRACES_SAMPLE_RATE: float = 0.1

@@ -732,6 +732,7 @@
         dsn: "{{ observability_frontend.dsn }}",
         environment: "{{ observability_frontend.environment }}",
         {% if observability_frontend.release %}release: "{{ observability_frontend.release }}",{% endif %}
+        sendDefaultPii: true,
         tracesSampleRate: {{ observability_frontend.traces_sample_rate }},
         integrations: [
           Sentry.browserTracingIntegration(),
