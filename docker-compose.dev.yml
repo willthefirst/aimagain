@@ -13,7 +13,6 @@ services:
       - SECRET=${SECRET}
       - DATABASE_URL=${DATABASE_URL:-sqlite+aiosqlite:///./data/bedlam-connect.db}
       - ACCESS_TOKEN_EXPIRE_MINUTES=${ACCESS_TOKEN_EXPIRE_MINUTES:-60}
-      - ENVIRONMENT=development # Enable template auto-reload
       - DISABLE_SCHEDULER=1
     volumes:
       - ./data:/app/data
