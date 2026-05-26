@@ -37,6 +37,9 @@ from .. import counts
 from ..generators import SeedPool, build_row
 from ..rng import SeededRandom, deterministic_uuid
 from ..vocab import (
+    intake_subject,
+    opening_subject,
+    referral_subject,
     render_intake_description,
     render_opening_description,
     render_referral_description,
@@ -70,6 +73,7 @@ async def generate_posts(
         detail = build_row(ReferralDetail, i, rng, pool)
         # FK + description: generic builder can't infer either.
         detail.post_id = post_id
+        detail.subject = None if rng.bool(0.2) else referral_subject(rng, i)
         detail.description = render_referral_description(rng, i)
         # Sidecar PK isn't an FK-pool target; just give it a stable
         # ID equal to its post_id (post_id is PK on detail).
@@ -87,6 +91,7 @@ async def generate_posts(
         detail = build_row(OpeningDetail, i, rng, pool)
         detail.post_id = post_id
         detail.provider_id = providers[i % len(providers)].id
+        detail.subject = None if rng.bool(0.2) else opening_subject(rng, i)
         # `description` is nullable — populate most rows for narrative,
         # leave a slice NULL so the empty-state card renders too.
         detail.description = (
@@ -107,6 +112,7 @@ async def generate_posts(
             detail = build_row(IntakeDetail, i, rng, pool)
             detail.post_id = post_id
             detail.program_id = programs[i % len(programs)].id
+            detail.subject = None if rng.bool(0.2) else intake_subject(rng, i)
             # `description` is nullable — same posture as OpeningDetail.
             detail.description = (
                 None if rng.bool(0.15) else render_intake_description(rng, i)

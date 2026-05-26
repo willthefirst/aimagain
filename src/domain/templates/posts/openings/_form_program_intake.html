@@ -25,6 +25,14 @@ with at least one Program available.
   {%- set d = post.intake_detail if post else None -%}
   <form hx-{{ hx_method }}="{{ action }}">
     <input type="hidden" name="kind" value="program_intake" />
+    <label for="subject">
+      Subject <small>(optional — leave blank to auto-generate)</small>
+      <input type="text"
+             name="subject"
+             id="subject"
+             maxlength="120"
+             value="{{ (form_values|default({}) ).get('subject') or (d.subject if d else '') or '' }}" />
+    </label>
     <label for="program_id">
       Which program?
       <select id="program_id" name="program_id" required>

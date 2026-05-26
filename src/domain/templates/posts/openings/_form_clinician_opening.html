@@ -43,6 +43,14 @@ with at least one provider available.
   {%- set _hx_attrs = "hx-target=\"this\" hx-swap=\"outerHTML\" hx-target-4xx=\"this\" hx-swap-4xx=\"outerHTML\"" -%}
   <form hx-{{ hx_method }}="{{ action }}" {{ _hx_attrs|safe }}>
     <input type="hidden" name="kind" value="clinician_opening" />
+    <label for="subject">
+      Subject <small>(optional — leave blank to auto-generate)</small>
+      <input type="text"
+             name="subject"
+             id="subject"
+             maxlength="120"
+             value="{{ (form_values|default({}) ).get('subject') or (d.subject if d else '') or '' }}" />
+    </label>
     {# Practice picker. After #642 PR 1 a Provider may carry multiple
      Affiliations (clinician × org practice-role rows); the dropdown
      labels each option by the affiliation's org name so a clinician

@@ -60,7 +60,8 @@ class ReferralDetail(LocationMixin, Base):
     # rows. CHECK constraint above pins the vocabulary to `GENDERS`.
     gender = Column(Text, nullable=False, server_default=text("'prefer_not_to_say'"))
 
-    # Section 3 — description
+    # Section 3 — subject / description
+    subject = Column(Text, nullable=True)
     description = Column(Text, nullable=False)
 
     # Section 4 — services

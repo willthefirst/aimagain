@@ -39,6 +39,14 @@ which FastAPI/Pydantic parses as a list.
   {%- set _hx_attrs = "hx-target=\"this\" hx-swap=\"outerHTML\" hx-target-4xx=\"this\" hx-swap-4xx=\"outerHTML\"" -%}
   <form hx-{{ hx_method }}="{{ action }}" {{ _hx_attrs|safe }}>
     <input type="hidden" name="kind" value="referral" />
+    <label for="subject">
+      Subject <small>(optional — leave blank to auto-generate)</small>
+      <input type="text"
+             name="subject"
+             id="subject"
+             maxlength="120"
+             value="{{ (form_values|default({}) ).get('subject') or (d.subject if d else '') or '' }}" />
+    </label>
     <fieldset>
       <legend>Client location</legend>
       <div class="grid">
