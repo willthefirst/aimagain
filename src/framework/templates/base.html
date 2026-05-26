@@ -616,34 +616,33 @@
         white-space: nowrap;
       }
       /* ── Feed rows ────────────────────────────────────────────────
-         Two-line clickable rows for the home and browse list views.
-         Container is a Pico <article> (border, border-radius, margin
-         from Pico); these rules add only the bespoke two-column layout,
-         type-tag pill, middot dividers, and responsive overrides. */
+         Each row is a vertical flex column: header line (pill + poster
+         + timestamp), then headline link, then meta strip. Container is
+         a Pico <article>; these rules add only the bespoke layout,
+         type-tag pill, and middot dividers. */
       .post-feed-list { padding: 0; overflow: hidden; }
       .post-feed-row {
-        display: grid;
-        grid-template-columns: auto 1fr auto;
-        align-items: center;
-        gap: 0.75rem;
-        padding: 0.75rem 1rem;
+        display: flex;
+        flex-direction: column;
+        gap: 0.3rem;
+        padding: 0.875rem 1rem;
         border-top: 1px solid var(--pico-muted-border-color);
       }
       .post-feed-list .post-feed-row:first-child { border-top: none; }
       .post-feed-row--interest { opacity: 1; }
-      .post-feed-body { flex: 1; }
-      /* Headline row (line 1) */
-      .post-feed-headline { display: flex; align-items: center; }
-      .post-feed-headline-text { flex: 1; }
-      /* Right column — timestamp stacked above poster name */
-      .post-feed-right {
+      /* Header line — pill · poster · timestamp */
+      .post-feed-header {
         display: flex;
-        flex-direction: column;
-        align-items: flex-end;
-        flex-shrink: 0;
-        gap: 0.15rem;
+        align-items: center;
+        gap: 0.5rem;
         color: var(--pico-muted-color);
       }
+      .post-feed-header > small + small::before {
+        content: "·";
+        margin-right: 0.4em;
+      }
+      /* Headline link */
+      .post-feed-headline-text { display: block; }
       /* Type-tag pill */
       .post-feed-type-tag {
         font-size: 0.625rem;
@@ -654,8 +653,6 @@
         border-radius: 2em;
         white-space: nowrap;
         flex-shrink: 0;
-        min-width: 5.5rem;
-        text-align: center;
       }
       .post-feed-type-tag--referral {
         color: var(--pico-muted-color);
@@ -665,25 +662,10 @@
         color: var(--pico-primary);
         background: color-mix(in srgb, var(--pico-primary) 10%, transparent);
       }
-      /* State indicators */
-      .post-feed-state-urgent {
-        font-size: 0.65rem;
-        font-weight: 600;
-        letter-spacing: 0.05em;
-        text-transform: uppercase;
-        padding: 0.15em 0.5em;
-        border-radius: 2em;
-        border: 1px solid var(--pico-mark-background-color);
-        color: var(--pico-muted-color);
-        white-space: nowrap;
-        flex-shrink: 0;
-      }
-      .post-feed-state-interest { color: var(--pico-primary); flex-shrink: 0; }
-      /* Metadata strip (line 2) */
+      /* Metadata strip */
       .post-feed-meta {
         display: flex;
         flex-wrap: wrap;
-        margin-top: 0.2rem;
         color: var(--pico-muted-color);
       }
       .post-feed-meta > span + span::before {
@@ -696,20 +678,9 @@
       .post-feed-headline-text:visited { color: var(--pico-muted-color); }
       /* Expressed-interest override */
       .post-feed-row--interest .post-feed-headline-text:visited { color: var(--pico-primary); }
-      /* Narrow screens — pill above headline, everything stacks */
+      /* Narrow screens */
       @media (max-width: 640px) {
-        .post-feed-row {
-          grid-template-columns: 1fr;
-          align-items: start;
-          padding: 0.6rem 0.75rem;
-          gap: 0.3rem;
-        }
-        .post-feed-type-tag { justify-self: start; }
-        .post-feed-right {
-          flex-direction: row;
-          justify-content: flex-start;
-          gap: 0.75rem;
-        }
+        .post-feed-row { padding: 0.75rem; }
       }
     </style>
     <script src="https://unpkg.com/htmx.org@2.0.4"

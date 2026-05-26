@@ -1,18 +1,15 @@
-{# Feed-row macro — renders a single two-line clickable row for the home
-   "Recent in the network" / "My active posts" sections and the browse
-   list views.  Both referrals and openings use this macro; per-kind
-   differences are handled with `{% if post.kind == "referral" %}` guards.
+{# Feed-row macro — renders a single clickable row for the home feed and
+   browse list views.
 
-Layout per row (three columns; only the headline text is a link):
+Layout per row:
 
-  ┌──────────────┬──────────────────────────────────┬─────────────┐
-  │  [TYPE TAG]  │ Headline text                    │  timestamp  │
-  │              │ City, ST · In-person · Aetna     │  E. Stone   │
-  └──────────────┴──────────────────────────────────┴─────────────┘
+  [OPENING]  E. Stone · 2h ago
+  Headline text that wraps freely across the full width
+  City, ST · In-person · Aetna
 
-Left column — fixed-width type-tag pill, vertically centred.
-Middle column (.post-feed-body) — two stacked rows: headline + meta strip.
-Right column (.post-feed-right) — timestamp above poster name, right-aligned.
+Header line — type-tag pill + poster name + timestamp, all inline.
+Headline — full-width link, wraps naturally.
+Meta strip — location, modality, insurance (muted, small).
 
 The macro reads view data via the `post_card_view(post)` global and the
 `post_feed_headline(post)` global.  Both are registered in
@@ -23,9 +20,9 @@ Parameters
                 program_intake).
   entity_name — URL family string ("referral", "opening", "intake");
                 passed unchanged to `entity_url()`.
-  show_poster — when False the poster-name metadata item is suppressed
-                (useful for "My active posts" where the viewer is the
-                poster).  Defaults to True.
+  show_poster — when False the poster-name item is suppressed (useful for
+                "My active posts" where the viewer is the poster).
+                Defaults to True.
 
 CSS lives in the `<style>` block of `src/framework/templates/base.html`
 under the "Feed rows" section. #}
@@ -35,13 +32,26 @@ under the "Feed rows" section. #}
 {%- set kind_class = "opening" if post.kind != "referral" else "referral" -%}
 {%- set kind_label = "Opening" if post.kind != "referral" else "Referral" -%}
 <div class="post-feed-row" data-kind="{{ post.kind }}">
+{# ── Header: pill · poster · timestamp ───────────────────────── #}
+<div class="post-feed-header">
 <span class="post-feed-type-tag post-feed-type-tag--{{ kind_class }}">{{ kind_label }}</span>
-<div class="post-feed-body">
-{# ── Line 1: Headline row ─────────────────────────────────────── #}
-<div class="post-feed-headline">
-<a href="{{ entity_url(entity_name, id=post.id) }}" class="post-feed-headline-text"><strong>{{ headline }}</strong></a>
+{%- if show_poster and post.owner -%}
+{%- set _fn = post.owner.first_name -%}
+{%- set _ln = post.owner.last_name -%}
+{%- set _poster_name -%}
+{%- if _fn and _ln %}{{ _fn[0] }}. {{ _ln }}
+{%- elif _fn %}{{ _fn }}
+{%- elif _ln %}{{ _ln }}
+{%- else %}{{ post.owner.email }}
+{%- endif %}
+{%- endset -%}
+<small>{{ _poster_name | trim }}</small>
+{%- endif -%}
+<small>{{ post.created_at | days_ago }}</small>
 </div>
-{# ── Line 2: Metadata strip ───────────────────────────────────── #}
+{# ── Headline ─────────────────────────────────────────────────── #}
+<a href="{{ entity_url(entity_name, id=post.id) }}" class="post-feed-headline-text"><strong>{{ headline }}</strong></a>
+{# ── Meta strip ───────────────────────────────────────────────── #}
 <div class="post-feed-meta">
 {# Item 1 ── Geography #}
 {%- if view.location_chunk -%}
@@ -97,23 +107,6 @@ under the "Feed rows" section. #}
 {%- elif view.sliding_scale -%}
 <span>Sliding scale</span>
 {%- endif -%}
-{%- endif -%}
-</div>
-</div>
-{# ── Right column: timestamp above poster name ────────────────── #}
-<div class="post-feed-right">
-<small>{{ post.created_at | days_ago }}</small>
-{%- if show_poster and post.owner -%}
-{%- set _fn = post.owner.first_name -%}
-{%- set _ln = post.owner.last_name -%}
-{%- set _poster_name -%}
-{%- if _fn and _ln %}{{ _fn[0] }}. {{ _ln }}
-{%- elif _fn %}{{ _fn }}
-{%- elif _ln %}{{ _ln }}
-{%- else %}{{ post.owner.email }}
-{%- endif %}
-{%- endset -%}
-<small class="post-feed-meta-poster">{{ _poster_name | trim }}</small>
 {%- endif -%}
 </div>
 </div>
