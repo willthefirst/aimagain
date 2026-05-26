@@ -74,10 +74,11 @@ def test_set_user_omits_email_when_none():
 
 
 def test_frontend_context_shape():
-    """The dict that lands in `base.html`. Keys checked exhaustively so
-    a rename here forces a template + test update."""
+    """The dict that lands in `base.html`. Uses `SENTRY_BROWSER_DSN` (the
+    frontend project), not `SENTRY_DSN` (backend). Keys checked exhaustively
+    so a rename here forces a template + test update."""
     with patch("src.framework.observability.sentry_backend.settings") as mock_settings:
-        mock_settings.SENTRY_DSN = "https://abc@sentry.io/1"
+        mock_settings.SENTRY_BROWSER_DSN = "https://xyz@sentry.io/2"
         mock_settings.ENVIRONMENT = "production"
         mock_settings.APP_RELEASE = "deadbeef"
         mock_settings.SENTRY_TRACES_SAMPLE_RATE = 0.1
@@ -88,10 +89,21 @@ def test_frontend_context_shape():
 
     assert ctx == {
         "provider": "sentry",
-        "dsn": "https://abc@sentry.io/1",
+        "dsn": "https://xyz@sentry.io/2",
         "environment": "production",
         "release": "deadbeef",
         "traces_sample_rate": 0.1,
         "replays_session_sample_rate": 0.0,
         "replays_on_error_sample_rate": 0.0,
     }
+
+
+def test_frontend_context_returns_none_when_browser_dsn_unset():
+    """No browser DSN → no browser SDK. Returns `None` so `base.html`'s
+    `{% if observability_frontend %}` guard suppresses the script tag."""
+    with patch("src.framework.observability.sentry_backend.settings") as mock_settings:
+        mock_settings.SENTRY_BROWSER_DSN = ""
+
+        ctx = SentryBackend().frontend_context()
+
+    assert ctx is None
