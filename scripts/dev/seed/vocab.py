@@ -434,6 +434,30 @@ MODALITIES_FREETEXT: Final[tuple[str, ...]] = (
     "Mindfulness-based",
     "Exposure and response prevention",
 )
+REFERRAL_SUBJECTS: Final[tuple[str, ...]] = (
+    "Child female (0–5) — Group therapy, Family therapy",
+    "Adult male seeking CBT, in-person only",
+    "Adolescent — trauma-informed care, Telehealth OK",
+    "Adult female — perinatal, EMDR preferred",
+    "Senior with depression, SF Bay Area",
+    "Adult — anxiety/OCD, sliding scale needed",
+    "Child (6–12) — ADHD, family involvement required",
+    "Young adult — first episode psychosis, Aetna",
+)
+OPENING_SUBJECTS: Final[tuple[str, ...]] = (
+    "3 slots — adults, relational/psychodynamic · $200/session",
+    "Accepting new clients for trauma work",
+    "2 openings — perinatal, EMDR, sliding scale",
+    "Adolescent caseload openings — DBT, Anthem in-network",
+    "Immediate availability — adults, CBT, Telehealth",
+    "Opening: older adults, grief/loss, in-person SF",
+)
+INTAKE_SUBJECTS: Final[tuple[str, ...]] = (
+    "Program intake — adolescents, DBT",
+    "IOP accepting referrals — adults, anxiety/depression",
+    "Residential: youth 12–17, trauma-informed",
+    "PHP cohort starting soon — adults, psychosis stabilization",
+)
 REFERRAL_TEMPLATES: Final[tuple[str, ...]] = (
     "Looking for a clinician for a {age_descriptor} with {condition}. "
     "{insurance_note}",
@@ -603,6 +627,13 @@ def _description_fallback(rng: SeededRandom, index: int) -> str:
     return render_opening_description(rng, index)
 
 
+def _subject_fallback(rng: SeededRandom, index: int) -> str:
+    """Generic subject fallback — uses opening subjects as the neutral
+    option. Per-kind overrides in `overrides/posts.py` replace this with
+    kind-appropriate vocabulary before it reaches the DB."""
+    return opening_subject(rng, index)
+
+
 def _name_fallback(rng: SeededRandom, index: int) -> str:
     """Late-binding wrapper around `practice_name` — same module-order
     rationale as `_description_fallback`."""
@@ -644,6 +675,7 @@ COLUMN_VOCAB: Final[dict[str, ColumnStrategy]] = {
     # populating a column.
     "name": _name_fallback,
     "description": _description_fallback,
+    "subject": _subject_fallback,
 }
 
 # Columns whose values the generator may auto-fill with
@@ -721,6 +753,18 @@ def render_intake_description(rng: SeededRandom, index: int) -> str:
     )
 
 
+def referral_subject(rng: SeededRandom, index: int) -> str:
+    return rng.round_robin(REFERRAL_SUBJECTS, index)
+
+
+def opening_subject(rng: SeededRandom, index: int) -> str:
+    return rng.round_robin(OPENING_SUBJECTS, index)
+
+
+def intake_subject(rng: SeededRandom, index: int) -> str:
+    return rng.round_robin(INTAKE_SUBJECTS, index)
+
+
 def practice_name(rng: SeededRandom, index: int) -> str:
     adj = rng.round_robin(PRACTICE_ADJECTIVES, index)
     nature = rng.round_robin(PRACTICE_NATURE, index // len(PRACTICE_ADJECTIVES))
@@ -756,6 +800,9 @@ __all__ = [
     "render_intake_description",
     "practice_name",
     "program_name",
+    "referral_subject",
+    "opening_subject",
+    "intake_subject",
     "US_STATES",
     "EDUCATION_TYPES",
     "LICENSE_TYPES",

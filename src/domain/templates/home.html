@@ -16,12 +16,12 @@
         <h2>My active posts</h2>
         <a href="{{ entity_url('referral') }}">See all</a>
       </header>
-      <div class="post-feed-list">
+      <article class="post-feed-list">
         {%- for post in my_posts -%}
           {%- set ename = "referral" if post.kind == "referral" else "opening" -%}
           {{ post_feed_row(post, ename, show_poster=False) }}
         {%- endfor -%}
-      </div>
+      </article>
     </section>
   {% endif %}
   {% if network_posts %}
@@ -41,12 +41,12 @@
         <a href="{{ entity_url('referral') }}">Adjust filters</a>
         {# djlint:on #}
       </p>
-      <div class="post-feed-list">
+      <article class="post-feed-list">
         {%- for post in network_posts -%}
           {%- set ename = "referral" if post.kind == "referral" else "opening" -%}
           {{ post_feed_row(post, ename) }}
         {%- endfor -%}
-      </div>
+      </article>
     </section>
   {% endif %}
 {% endblock %}

@@ -8,9 +8,9 @@
 {% endblock %}
 {% block content %}
   {% if openings %}
-    <div id="openings-list" class="post-feed-list">
+    <article id="openings-list" class="post-feed-list">
       {%- for post in openings %}{{ post_feed_row(post, entity_name) }}{%- endfor %}
-      </div>
+      </article>
     {% else %}
       {{ post_feed_empty("No openings match these filters." if active_filter_count else "No openings found.",
             link_href=entity_url(entity_name) if active_filter_count else None

@@ -3,17 +3,16 @@
    list views.  Both referrals and openings use this macro; per-kind
    differences are handled with `{% if post.kind == "referral" %}` guards.
 
-Layout per row (two stacked lines inside a single `<a>`):
+Layout per row (three columns; only the headline text is a link):
 
-  ┌────────────────────────────────────────────────────────────────┐
-  │ [TYPE TAG]  Headline text                [state] [timestamp]   │
-  │             City, ST · Outpatient · Aetna           poster     │
-  └────────────────────────────────────────────────────────────────┘
+  ┌──────────────┬──────────────────────────────────┬─────────────┐
+  │  [TYPE TAG]  │ Headline text                    │  timestamp  │
+  │              │ City, ST · In-person · Aetna     │  E. Stone   │
+  └──────────────┴──────────────────────────────────┴─────────────┘
 
-Line 1 — Headline row: type-tag pill · headline text · optional state
-  indicators · right-aligned timestamp (hidden on narrow screens).
-Line 2 — Metadata strip: 3–5 small items with middot dividers; poster
-  name pushed right with `margin-left: auto` (referrals only).
+Left column — fixed-width type-tag pill, vertically centred.
+Middle column (.post-feed-body) — two stacked rows: headline + meta strip.
+Right column (.post-feed-right) — timestamp above poster name, right-aligned.
 
 The macro reads view data via the `post_card_view(post)` global and the
 `post_feed_headline(post)` global.  Both are registered in
@@ -35,28 +34,38 @@ under the "Feed rows" section. #}
 {%- set headline = post_feed_headline(post) -%}
 {%- set kind_class = "opening" if post.kind != "referral" else "referral" -%}
 {%- set kind_label = "Opening" if post.kind != "referral" else "Referral" -%}
-<a href="{{ entity_url(entity_name, id=post.id) }}" class="post-feed-row" data-kind="{{ post.kind }}">
+<div class="post-feed-row" data-kind="{{ post.kind }}">
+<span class="post-feed-type-tag post-feed-type-tag--{{ kind_class }}">{{ kind_label }}</span>
+<div class="post-feed-body">
 {# ── Line 1: Headline row ─────────────────────────────────────── #}
 <div class="post-feed-headline">
-<span class="post-feed-type-tag post-feed-type-tag--{{ kind_class }}">{{ kind_label }}</span>
-<span class="post-feed-headline-text"><strong>{{ headline }}</strong></span>
-{# State indicators — rendered when applicable (currently stubbed;
-         time-sensitive and interest state require future model support). #}
-<small class="post-feed-ts post-feed-ts--headline">{{ post.created_at | days_ago }}</small>
+<a href="{{ entity_url(entity_name, id=post.id) }}" class="post-feed-headline-text"><strong>{{ headline }}</strong></a>
 </div>
 {# ── Line 2: Metadata strip ───────────────────────────────────── #}
 <div class="post-feed-meta">
-{# Item 1 ── Modality / level of care #}
+{# Item 1 ── Geography #}
+{%- if view.location_chunk -%}
+<span>
+<i class="icon-map-pin"></i>
+{%- if view.location_chunk.city -%}
+{{ view.location_chunk.city -}}
+{%- if view.location_chunk.state %}, {{ view.location_chunk.state }}{% endif %}
+{%- elif view.location_chunk.state -%}
+{{ view.location_chunk.state }}
+{%- endif -%}
+</span>
+{%- endif -%}
+{# Item 2 ── Modality / level of care #}
 {%- if post.kind == "referral" -%}
 {%- set _mod = [] -%}
 {%- if view.in_person == "yes" -%}{%- set _ = _mod.append("In-person") -%}{%- endif -%}
 {%- if view.virtual == "yes" -%}{%- set _ = _mod.append("Telehealth") -%}{%- endif -%}
 {%- if _mod -%}
-<span class="post-feed-meta-item">{{ _mod | join(" · ") }}</span>
+<span>{{ _mod | join(" · ") }}</span>
 {%- endif -%}
 {%- else -%}
 {%- if view.settings -%}
-<span class="post-feed-meta-item">
+<span>
 {%- for s in view.settings[:3] -%}
 {%- if not loop.first %} ·
 {% endif -%}
@@ -65,44 +74,16 @@ under the "Feed rows" section. #}
 </span>
 {%- endif -%}
 {%- endif -%}
-{# Item 2 ── Geography #}
-{%- if view.location_chunk -%}
-<span class="post-feed-meta-item">
-{%- if view.location_chunk.city -%}
-{{ view.location_chunk.city }}
-{% if view.location_chunk.state %}, {{ view.location_chunk.state }}{% endif %}
-{%- elif view.location_chunk.state -%}
-{{ view.location_chunk.state }}
-{%- endif -%}
-</span>
-{%- endif -%}
-{# Item 3 ── Clinical preferences / populations #}
-{%- if post.kind == "referral" -%}
-{%- if view.treatment_modality -%}
-<span class="post-feed-meta-item">{{ view.treatment_modality }}</span>
-{%- endif -%}
-{%- else -%}
-{%- if view.ages -%}
-<span class="post-feed-meta-item">
-{%- for a in view.ages[:2] -%}
-{%- if not loop.first %},
-{% endif -%}
-{{ CLIENT_AGE_GROUP_LABELS[a] }}
-{%- endfor -%}
-</span>
-{%- endif -%}
-{%- endif -%}
-{# Item 4 ── Insurance #}
+{# Item 3 ── Insurance #}
 {%- if post.kind == "referral" -%}
 {%- if view.insurance_carrier -%}
-<span class="post-feed-meta-item">{{ INSURANCE_CARRIER_LABELS[view.insurance_carrier] }}</span>
+<span>{{ INSURANCE_CARRIER_LABELS[view.insurance_carrier] }}</span>
 {%- elif view.network_preference == "no_preference" -%}
-<span class="post-feed-meta-item">No insurance req.</span>
+<span>No insurance req.</span>
 {%- endif -%}
 {%- else -%}
 {%- if view.in_network_carriers -%}
-<span class="post-feed-meta-item post-feed-meta-insurance--match">
-<i class="icon-check"></i>
+<span>
 {%- for c in view.in_network_carriers[:2] -%}
 {%- if not loop.first %},
 {% endif -%}
@@ -112,19 +93,30 @@ under the "Feed rows" section. #}
 {% endif -%}
 </span>
 {%- elif view.accepts_out_of_network -%}
-<span class="post-feed-meta-item">Out-of-network</span>
+<span>Out-of-network</span>
 {%- elif view.sliding_scale -%}
-<span class="post-feed-meta-item">Sliding scale</span>
+<span>Sliding scale</span>
 {%- endif -%}
 {%- endif -%}
-{# Item 5 ── Poster name (referrals only, right-aligned on wide screens) #}
-{%- if show_poster and post.kind == "referral" and post.owner -%}
-<span class="post-feed-meta-item post-feed-meta-poster">{{ post.owner.email }}</span>
-{%- endif -%}
-{# Timestamp in meta strip — visible only on narrow screens #}
-<small class="post-feed-meta-item post-feed-ts post-feed-ts--meta">{{ post.created_at | days_ago }}</small>
 </div>
-</a>
+</div>
+{# ── Right column: timestamp above poster name ────────────────── #}
+<div class="post-feed-right">
+<small>{{ post.created_at | days_ago }}</small>
+{%- if show_poster and post.owner -%}
+{%- set _fn = post.owner.first_name -%}
+{%- set _ln = post.owner.last_name -%}
+{%- set _poster_name -%}
+{%- if _fn and _ln %}{{ _fn[0] }}. {{ _ln }}
+{%- elif _fn %}{{ _fn }}
+{%- elif _ln %}{{ _ln }}
+{%- else %}{{ post.owner.email }}
+{%- endif %}
+{%- endset -%}
+<small class="post-feed-meta-poster">{{ _poster_name | trim }}</small>
+{%- endif -%}
+</div>
+</div>
 {%- endmacro %}
 {% macro post_feed_empty(message="No recent posts match your filters.", link_href=None, link_label="See all recent activity →") -%}
 <div class="post-feed-empty">

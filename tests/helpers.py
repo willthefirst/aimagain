@@ -56,6 +56,7 @@ def create_test_user(
 # spec-compliant defaults and let callers override per field.
 
 _REFERRAL_DEFAULTS: dict[str, Any] = {
+    "subject": None,
     "location_city": "Springfield",
     "location_state": "IL",
     "location_zip": "62701",
@@ -73,6 +74,7 @@ _REFERRAL_DEFAULTS: dict[str, Any] = {
 }
 
 _OPENING_DEFAULTS: dict[str, Any] = {
+    "subject": None,
     "description": None,
     "referral_instructions": None,
     "website": None,
@@ -128,6 +130,7 @@ def make_referral_detail(**overrides: Any) -> ReferralDetail:
 # below use the same defaults to keep round-trip tests aligned.
 
 _PROGRAM_AVAILABILITY_DEFAULTS: dict[str, Any] = {
+    "subject": None,
     "description": None,
     "referral_instructions": None,
     "website": None,

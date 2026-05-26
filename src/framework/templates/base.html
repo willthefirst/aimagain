@@ -92,7 +92,7 @@
          space (icon-only buttons, etc.) should override locally. */
       [class^="icon-"], [class*=" icon-"] {
         font-size: 1.1em;
-        vertical-align: -0.15em;
+        vertical-align: -0.05em;
         line-height: 1;
         color: inherit;
         margin-inline-end: 0.25em;
@@ -617,33 +617,32 @@
       }
       /* ── Feed rows ────────────────────────────────────────────────
          Two-line clickable rows for the home and browse list views.
-         Each `.post-feed-row` is an `<a>` element; `.post-feed-list`
-         is the parent container that provides the outer border and
-         dividers between rows. Pico supplies typography, color tokens,
-         and base link styles — these rules cover only the bespoke
-         two-line layout, the type-tag pill, the metadata strip with
-         middot dividers, and the narrow-screen adjustments. */
-      .post-feed-list {
-        border: 1px solid var(--pico-muted-border-color);
-        border-radius: var(--pico-border-radius);
-        overflow: hidden;
-      }
+         Container is a Pico <article> (border, border-radius, margin
+         from Pico); these rules add only the bespoke two-column layout,
+         type-tag pill, middot dividers, and responsive overrides. */
+      .post-feed-list { padding: 0; overflow: hidden; }
       .post-feed-row {
-        display: block;
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
         padding: 0.75rem 1rem;
         border-top: 1px solid var(--pico-muted-border-color);
-        text-decoration: none;
-        color: inherit;
       }
       .post-feed-list .post-feed-row:first-child { border-top: none; }
-      .post-feed-row:hover { background: var(--pico-secondary-background); }
-      .post-feed-row--viewed { opacity: 0.6; }
       .post-feed-row--interest { opacity: 1; }
+      .post-feed-body { flex: 1; min-width: 0; }
       /* Headline row (line 1) */
-      .post-feed-headline { display: flex; align-items: center; gap: 8px; }
+      .post-feed-headline { display: flex; align-items: center; }
       .post-feed-headline-text { flex: 1; min-width: 0; }
-      .post-feed-ts { flex-shrink: 0; color: var(--pico-muted-color); }
-      .post-feed-ts--meta { display: none; }
+      /* Right column — timestamp stacked above poster name */
+      .post-feed-right {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-end;
+        flex-shrink: 0;
+        gap: 0.15rem;
+        color: var(--pico-muted-color);
+      }
       /* Type-tag pill */
       .post-feed-type-tag {
         font-size: 0.625rem;
@@ -654,6 +653,8 @@
         border-radius: 2em;
         white-space: nowrap;
         flex-shrink: 0;
+        min-width: 5.5rem;
+        text-align: center;
       }
       .post-feed-type-tag--referral {
         color: var(--pico-muted-color);
@@ -682,24 +683,22 @@
         display: flex;
         flex-wrap: wrap;
         margin-top: 0.2rem;
-        font-size: 0.875rem;
         color: var(--pico-muted-color);
       }
-      .post-feed-meta-item + .post-feed-meta-item::before {
+      .post-feed-meta > span + span::before {
         content: "·";
         margin: 0 0.4em;
       }
-      .post-feed-meta-poster { margin-left: auto; }
-      .post-feed-meta-insurance--match { color: var(--pico-ins-color); }
       /* Empty state */
       .post-feed-empty { text-align: center; padding: 2rem 1rem; color: var(--pico-muted-color); }
+      /* Viewed state — browser :visited on the headline link */
+      .post-feed-headline-text:visited { color: var(--pico-muted-color); }
+      /* Expressed-interest override */
+      .post-feed-row--interest .post-feed-headline-text:visited { color: var(--pico-primary); }
       /* Narrow screens */
       @media (max-width: 640px) {
         .post-feed-row { padding: 0.6rem 0.75rem; }
-        .post-feed-ts--headline { display: none; }
-        .post-feed-ts--meta { display: inline; }
-        .post-feed-meta-item + .post-feed-meta-item::before { display: none; }
-        .post-feed-meta-poster { margin-left: 0; }
+        .post-feed-meta > span + span::before { display: none; }
       }
     </style>
     <script src="https://unpkg.com/htmx.org@2.0.4"
