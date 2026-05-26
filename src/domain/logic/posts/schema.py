@@ -203,6 +203,7 @@ class ReferralRead(_PostReadBase):
     age_groups: AgeGroupsField = []
     languages: LanguagesField = []
     gender: Literal[*GENDERS]
+    subject: str | None = None
     description: str
     services: ServicesField = []
     treatment_modality: str | None = None
@@ -220,6 +221,7 @@ class ReferralRead(_PostReadBase):
 
 class ClinicianOpeningRead(_PostReadBase):
     kind: Literal["clinician_opening"]
+    subject: str | None = None
     description: str | None = None
     referral_instructions: str | None = None
     website: str | None = None
@@ -240,6 +242,7 @@ class ClinicianOpeningRead(_PostReadBase):
 
 class ProgramIntakeRead(_PostReadBase):
     kind: Literal["program_intake"]
+    subject: str | None = None
     description: str | None = None
     referral_instructions: str | None = None
     website: str | None = None
@@ -297,6 +300,7 @@ class ReferralCreate(FlatLocationSchema, WirePayload):
     # include the field still validate; the form's <select> defaults
     # to the same value.
     gender: Literal[*GENDERS] = "prefer_not_to_say"
+    subject: StrippedOptionalText = None
     description: StrippedText
     services: ServicesField = []
     treatment_modality: StrippedOptionalText = None
@@ -317,6 +321,7 @@ class ClinicianOpeningCreate(WirePayload):
     the provider-availability intake form."""
 
     kind: Literal["clinician_opening"]
+    subject: StrippedOptionalText = None
     # Optional initially — graduates to required once seed posts confirm
     # the shape works.
     description: TextareaOptional = None
@@ -352,6 +357,7 @@ class ProgramIntakeCreate(WirePayload):
     not a specific clinician."""
 
     kind: Literal["program_intake"]
+    subject: StrippedOptionalText = None
     description: TextareaOptional = None
     referral_instructions: TextareaOptional = None
     website: UrlOptional = None
@@ -427,6 +433,7 @@ class ReferralUpdate(FlatLocationSchema, PartialUpdate):
     languages: RequiredLanguagesField | None = None
     # `None` = leave unchanged; any enum value sets it.
     gender: Literal[*GENDERS] | None = None
+    subject: StrippedOptionalText = None
     description: StrippedText | None = None
     services: ServicesField | None = None
     treatment_modality: StrippedOptionalText = None
@@ -441,6 +448,7 @@ class ClinicianOpeningUpdate(PartialUpdate):
     at_least_one_field_exclude = frozenset({"kind"})
 
     kind: Literal["clinician_opening"]
+    subject: StrippedOptionalText = None
     description: TextareaOptional = None
     referral_instructions: TextareaOptional = None
     website: UrlOptional = None
@@ -469,6 +477,7 @@ class ProgramIntakeUpdate(PartialUpdate):
     at_least_one_field_exclude = frozenset({"kind"})
 
     kind: Literal["program_intake"]
+    subject: StrippedOptionalText = None
     description: TextareaOptional = None
     referral_instructions: TextareaOptional = None
     website: UrlOptional = None
@@ -525,6 +534,7 @@ class ReferralAuditSnapshot(_PostAuditSnapshotBase):
     age_groups: AgeGroupsField = []
     languages: LanguagesField = []
     gender: Literal[*GENDERS]
+    subject: str | None = None
     description: str
     services: ServicesField = []
     treatment_modality: str | None = None
@@ -539,6 +549,7 @@ class ReferralAuditSnapshot(_PostAuditSnapshotBase):
 
 class ClinicianOpeningAuditSnapshot(_PostAuditSnapshotBase):
     kind: Literal["clinician_opening"]
+    subject: str | None = None
     description: str | None = None
     referral_instructions: str | None = None
     website: str | None = None
@@ -557,6 +568,7 @@ class ClinicianOpeningAuditSnapshot(_PostAuditSnapshotBase):
 
 class ProgramIntakeAuditSnapshot(_PostAuditSnapshotBase):
     kind: Literal["program_intake"]
+    subject: str | None = None
     description: str | None = None
     referral_instructions: str | None = None
     website: str | None = None

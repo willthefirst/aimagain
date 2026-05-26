@@ -65,6 +65,7 @@ class IntakeDetail(Base):
     genders = Column(JSON, nullable=False, server_default=text("'[]'"), default=list)
 
     # Section 6 — about (free-text core fields)
+    subject = Column(Text, nullable=True)
     description = Column(Text, nullable=True)
     referral_instructions = Column(Text, nullable=True)
     website = Column(Text, nullable=True)

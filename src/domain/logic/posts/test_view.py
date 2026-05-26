@@ -788,3 +788,49 @@ def test_feed_headline_program_no_services_returns_name_only():
 def test_feed_headline_unknown_kind_returns_empty_string():
     post = SimpleNamespace(kind="mystery")
     assert post_feed_headline(post) == ""
+
+
+# --- subject override ---------------------------------------------------
+
+
+def test_feed_headline_referral_subject_overrides_auto_generation():
+    """When subject is set on a referral, it is returned as-is."""
+    post = SimpleNamespace(
+        kind="referral",
+        referral_detail=SimpleNamespace(
+            subject="Child female (0–5) — Group therapy",
+            age_groups=["children_0_5"],
+            gender="female",
+            services=["group_therapy"],
+        ),
+    )
+    assert post_feed_headline(post) == "Child female (0–5) — Group therapy"
+
+
+def test_feed_headline_referral_none_subject_falls_back_to_auto():
+    """When subject is None, auto-generation runs normally."""
+    post = SimpleNamespace(
+        kind="referral",
+        referral_detail=SimpleNamespace(
+            subject=None,
+            age_groups=["adults_25_64"],
+            gender="female",
+            services=["psychotherapy"],
+        ),
+    )
+    assert post_feed_headline(post) == "Adult female (25–64) — Psychotherapy"
+
+
+def test_feed_headline_opening_subject_overrides_auto_generation():
+    """When subject is set on an opening, it is returned as-is."""
+    post = _make_pa_post()
+    post.opening_detail.subject = "3 slots — adults, relational/psychodynamic"
+    assert post_feed_headline(post) == "3 slots — adults, relational/psychodynamic"
+
+
+def test_feed_headline_opening_none_subject_falls_back_to_auto():
+    """When subject is None on an opening, practice name + services are used."""
+    post = _make_pa_post()
+    post.opening_detail.subject = None
+    headline = post_feed_headline(post)
+    assert headline.startswith("Acme Counseling — ")

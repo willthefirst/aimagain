@@ -517,6 +517,8 @@ def post_feed_headline(post) -> str:
         d = getattr(post, "referral_detail", None)
         if d is None:
             return "Referral"
+        if subject := getattr(d, "subject", None):
+            return subject
         demo = referral_headline(d)
         services = list(getattr(d, "services", None) or [])
         if services:
@@ -528,6 +530,8 @@ def post_feed_headline(post) -> str:
         d = getattr(post, "opening_detail", None)
         if d is None:
             return "Opening"
+        if subject := getattr(d, "subject", None):
+            return subject
         p = getattr(d, "provider", None)
         practice = (
             p.org.name
@@ -547,6 +551,8 @@ def post_feed_headline(post) -> str:
         d = getattr(post, "intake_detail", None)
         if d is None:
             return "Program"
+        if subject := getattr(d, "subject", None):
+            return subject
         prog = getattr(d, "program", None)
         name = (getattr(prog, "name", None) if prog else None) or "Program"
         services = list(getattr(d, "services", None) or [])

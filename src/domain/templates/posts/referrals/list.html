@@ -8,9 +8,9 @@
 {% endblock %}
 {% block content %}
   {% if referrals %}
-    <div id="referrals-list" class="post-feed-list">
+    <article id="referrals-list" class="post-feed-list">
       {%- for post in referrals %}{{ post_feed_row(post, entity_name) }}{%- endfor %}
-      </div>
+      </article>
     {% else %}
       {{ post_feed_empty("No referrals match these filters." if active_filter_count else "No referrals found.",
             link_href=entity_url(entity_name) if active_filter_count else None
