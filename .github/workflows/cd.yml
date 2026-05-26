@@ -74,6 +74,44 @@ jobs:
           # Clean up temporary key file
           rm -f /tmp/droplet_ssh_key
 
+      - name: Write production .env to droplet
+        uses: appleboy/ssh-action@v1.0.3
+        env:
+          APP_SECRET: ${{ secrets.APP_SECRET }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          APP_BASE_URL: ${{ secrets.APP_BASE_URL }}
+          SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
+          APP_RELEASE: ${{ github.sha }}
+        with:
+          host: ${{ secrets.DROPLET_HOST }}
+          username: ${{ secrets.DROPLET_USERNAME }}
+          key: ${{ secrets.DROPLET_SSH_KEY }}
+          envs: APP_SECRET,RESEND_API_KEY,APP_BASE_URL,SENTRY_DSN,APP_RELEASE
+          script: |
+            set -e
+            # Validate required secrets are present
+            for var in APP_SECRET RESEND_API_KEY APP_BASE_URL SENTRY_DSN; do
+              if [ -z "${!var}" ]; then
+                echo "❌ GitHub Secret '$var' is not set — aborting" >&2
+                exit 1
+              fi
+            done
+
+            mkdir -p /opt/bedlam-connect/config
+            {
+              printf 'SECRET=%s\n'                         "$APP_SECRET"
+              printf 'DATABASE_URL=%s\n'                   'sqlite+aiosqlite:///data/bedlam-connect.db'
+              printf 'ACCESS_TOKEN_EXPIRE_MINUTES=%s\n'    '60'
+              printf 'EMAIL_BACKEND=%s\n'                  'resend'
+              printf 'EMAIL_FROM=%s\n'                     'no-reply@bedlamconnect.com'
+              printf 'RESEND_API_KEY=%s\n'                 "$RESEND_API_KEY"
+              printf 'APP_BASE_URL=%s\n'                   "$APP_BASE_URL"
+              printf 'SENTRY_DSN=%s\n'                     "$SENTRY_DSN"
+              printf 'APP_RELEASE=%s\n'                    "$APP_RELEASE"
+            } > /opt/bedlam-connect/config/.env
+            chmod 600 /opt/bedlam-connect/config/.env
+            echo "✅ Production .env written to droplet"
+
       - name: Run deployment
         uses: appleboy/ssh-action@v1.0.3
         with:
