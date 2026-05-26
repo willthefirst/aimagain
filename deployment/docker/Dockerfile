@@ -36,6 +36,11 @@ RUN chmod +x /app/start.sh /app/start-dev.sh
 # === PRODUCTION STAGE ===
 FROM app-setup AS production
 
+# Safe default baked into the image — the compose file also sets this
+# explicitly, but belt-and-suspenders ensures the image itself can
+# never accidentally run as "development".
+ENV ENVIRONMENT=production
+
 # Install only production dependencies
 RUN pip install --no-cache-dir -e .[app]
 
