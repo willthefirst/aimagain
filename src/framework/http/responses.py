@@ -23,13 +23,12 @@ def base_context(user: Actor | None) -> dict:
     `is_admin` is computed via `src.framework.authz.is_admin` so the rule
     has a single home; templates never re-derive it.
 
-    `has_provider_profile` is duck-typed off the user's `providers`
+    `has_provider_profile` is duck-typed off the user's `clinicians`
     relationship (eagerly loaded on `User` via `lazy="selectin"`, see
     `src/domain/models/users/user.py`). It defaults to `False` when the
     attribute is missing — Actor is a structural Protocol that doesn't
-    declare `providers`, so test stubs without the attribute read as
-    "first-time user" (no provider profile yet) and the chrome shows
-    the profile-setup CTA accordingly.
+    declare `clinicians`, so test stubs without the attribute read as
+    "first-time user" and the chrome shows the profile-setup CTA accordingly.
 
     `current_user_is_verified` powers the "verify your email" nag
     banner in `base.html`. Anonymous visitors and test stubs without
@@ -44,7 +43,7 @@ def base_context(user: Actor | None) -> dict:
         "is_admin": is_admin(user),
         "current_username": user.username if user is not None else None,
         "current_user_id": user.id if user is not None else None,
-        "has_provider_profile": bool(getattr(user, "providers", None)),
+        "has_provider_profile": bool(getattr(user, "clinicians", None)),
         "current_user_is_verified": (
             True if user is None else bool(getattr(user, "is_verified", True))
         ),

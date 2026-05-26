@@ -15,27 +15,19 @@ from typing import Any
 from src.framework.rendering.address import full_address
 
 
-def _role_attr(provider, attr, default=None):
-    """Source a per-role attribute from `provider.primary_affiliation`.
+def _role_attr(clinician, attr, default=None):
+    """Source a per-role attribute from `clinician.primary_affiliation`.
 
-    Post-#635 PR B the per-role columns no longer live on `providers` —
-    affiliation is the single source of truth. After #642 PR 1 a
-    Provider may hold multiple Affiliations; the directory listing and
-    the post-opening dropdown read through the primary one (oldest by
-    `created_at`). The `Provider` ORM class surfaces `provider.location_city`
-    etc. as `@property` proxies over `primary_affiliation`, but
-    `provider_card_view` also accepts test stubs that set fields on a
-    `SimpleNamespace` without wiring an affiliation; for those, fall
-    through to the attribute on the provider directly (the property
-    proxies live on the real ORM class, not the stub).
+    Falls through to the attribute on the clinician directly for test stubs
+    that set fields on a `SimpleNamespace` without wiring an affiliation.
     """
-    affiliation = getattr(provider, "primary_affiliation", None)
+    affiliation = getattr(clinician, "primary_affiliation", None)
     if affiliation is not None:
         return getattr(affiliation, attr, default)
-    return getattr(provider, attr, default)
+    return getattr(clinician, attr, default)
 
 
-def _insurance_summary(provider) -> str:
+def _insurance_summary(clinician) -> str:
     """Compose a single-string insurance phrase that unions a Provider's
     insurance posture across **every** affiliation it holds.
 
@@ -70,7 +62,7 @@ def _insurance_summary(provider) -> str:
     """
     from src.domain.models.enums import INSURANCE_CARRIER_LABELS
 
-    affiliations = list(getattr(provider, "affiliations", None) or [])
+    affiliations = list(getattr(clinician, "affiliations", None) or [])
     if affiliations:
         carriers: list[str] = []
         seen: set[str] = set()
@@ -86,12 +78,11 @@ def _insurance_summary(provider) -> str:
             bool(getattr(aff, "sliding_scale", False)) for aff in affiliations
         )
     else:
-        # No affiliations on the row — fall through to the legacy
-        # single-record path so test stubs that set the columns on the
-        # provider stub (or via `primary_affiliation`) keep working.
-        carriers = list(_role_attr(provider, "in_network_carriers", []) or [])
-        accepts_oon = bool(_role_attr(provider, "accepts_out_of_network", False))
-        sliding = bool(_role_attr(provider, "sliding_scale", False))
+        # No affiliations — fall through to the clinician directly for
+        # test stubs that set the columns on a SimpleNamespace.
+        carriers = list(_role_attr(clinician, "in_network_carriers", []) or [])
+        accepts_oon = bool(_role_attr(clinician, "accepts_out_of_network", False))
+        sliding = bool(_role_attr(clinician, "sliding_scale", False))
 
     parts: list[str] = []
     if carriers:
@@ -182,7 +173,7 @@ def affiliation_card_view(affiliation, org=None) -> dict[str, Any]:
     }
 
 
-def provider_card_view(provider) -> dict[str, Any]:
+def provider_card_view(clinician) -> dict[str, Any]:
     """Normalize a `Provider` row into the flat shape
     ``providers/detail.html`` reads from.
 
@@ -227,47 +218,32 @@ def provider_card_view(provider) -> dict[str, Any]:
     """
     from src.domain.models.enums import LOCATION_AVAILABILITY_LABELS
 
-    org = getattr(provider, "org", None)
-    # Per-role attrs come from `provider.primary_affiliation` — the
-    # directory's source-of-truth for "what is this clinician's role
-    # at this org" after #635 PR B dropped the duplicated columns from
-    # `providers`. After #642 PR 1, a Provider may hold multiple
-    # Affiliations; the listing reads through the primary (oldest)
-    # one — PR 3 swaps the listing to one row per Clinician with
-    # stacked affiliations. PR 2 (this PR) adds the `affiliations`
-    # list below so the *detail* page renders one card per
-    # affiliation while the directory listing's read path stays
-    # unchanged.
-    # `npi` continues to come from `provider.clinician` (#629 PR 1).
-    # `_role_attr` still falls back to attributes on the `provider`
-    # object itself for `SimpleNamespace` test stubs that don't wire
-    # an affiliation.
-    clinician = getattr(provider, "clinician", None)
-    org_id = _role_attr(provider, "org_id")
-    affiliations = list(getattr(provider, "affiliations", None) or [])
+    org = getattr(clinician, "org", None)
+    org_id = _role_attr(clinician, "org_id")
+    affiliations = list(getattr(clinician, "affiliations", None) or [])
     return {
         "practice_name": (getattr(org, "name", None) if org else None),
         "practice_url": (f"/organizations/{org_id}" if org_id is not None else None),
         "full_address": full_address(
-            _role_attr(provider, "location_city"),
-            _role_attr(provider, "location_state"),
-            _role_attr(provider, "location_zip"),
+            _role_attr(clinician, "location_city"),
+            _role_attr(clinician, "location_state"),
+            _role_attr(clinician, "location_zip"),
         ),
         "in_person_label": LOCATION_AVAILABILITY_LABELS.get(
-            _role_attr(provider, "in_person_sessions") or ""
+            _role_attr(clinician, "in_person_sessions") or ""
         ),
         "virtual_label": LOCATION_AVAILABILITY_LABELS.get(
-            _role_attr(provider, "virtual_sessions") or ""
+            _role_attr(clinician, "virtual_sessions") or ""
         ),
-        "insurance_summary": _insurance_summary(provider),
+        "insurance_summary": _insurance_summary(clinician),
         "sliding_scale_label": (
-            "Yes" if _role_attr(provider, "sliding_scale", False) else "No"
+            "Yes" if _role_attr(clinician, "sliding_scale", False) else "No"
         ),
-        "cost": _role_attr(provider, "cost"),
-        "npi": getattr(clinician, "npi", None) if clinician is not None else None,
-        "licensures": list(getattr(provider, "licensures", None) or []),
-        "educations": list(getattr(provider, "educations", None) or []),
-        "certifications": list(getattr(provider, "certifications", None) or []),
+        "cost": _role_attr(clinician, "cost"),
+        "npi": getattr(clinician, "npi", None),
+        "licensures": list(getattr(clinician, "licensures", None) or []),
+        "educations": list(getattr(clinician, "educations", None) or []),
+        "certifications": list(getattr(clinician, "certifications", None) or []),
         "affiliations": [
             affiliation_card_view(aff, getattr(aff, "org", None))
             for aff in affiliations

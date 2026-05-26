@@ -13,7 +13,7 @@ through it.
 
 from pydantic import BaseModel, TypeAdapter
 
-from src.domain.logic.providers.repository import get_provider_repository
+from src.domain.logic.providers.repository import get_clinician_repository
 from src.domain.specs.provider import PROVIDER_ENTITY, _provider_form_redirect
 from src.framework.dispatch.entity_spec import (
     AUTHENTICATED,
@@ -53,14 +53,9 @@ def make_provider_credential_entity(
         id_param=id_param,
         model=model,
         parent=PROVIDER_ENTITY,
-        # Credentials FK to `clinicians.id` after #635 PR A — they URL-mount
-        # under `/clinicians/{clinician_id}/...` (URL family renamed in
-        # #642 PR 4; the model class stays `Provider`) but their persisted FK
-        # isn't `provider_id`. The framework's URL-vs-row consistency check
-        # loads the parent and compares
-        # `child.clinician_id == provider.clinician_id`.
-        child_parent_match_attr="clinician_id",
-        repo_dep=get_provider_repository,
+        # Default check: `child.clinician_id == URL.clinician_id`
+        # (derived from `spec.parent.name` = "clinician"). No override needed.
+        repo_dep=get_clinician_repository,
         auth_deps=AUTHENTICATED,
         auth_policy=OWNER_OR_ADMIN,
         audit_action_stem=audit_stem,

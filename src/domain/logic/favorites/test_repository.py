@@ -53,7 +53,7 @@ async def test_add_favorite_persists_edge(
 
     async with db_test_session_manager() as session:
         repo = UserFavoriteRepository(session)
-        edge = await repo.add_favorite(user_id=user.id, provider_id=provider.id)
+        edge = await repo.add_favorite(user_id=user.id, clinician_id=provider.id)
         await session.commit()
         edge_id = edge.id
 
@@ -69,7 +69,7 @@ async def test_add_favorite_persists_edge(
         )
         assert row is not None
         assert row.user_id == user.id
-        assert row.provider_id == provider.id
+        assert row.clinician_id == provider.id
 
 
 async def test_get_by_pair_returns_existing_edge(
@@ -80,15 +80,15 @@ async def test_get_by_pair_returns_existing_edge(
 
     async with db_test_session_manager() as session:
         repo = UserFavoriteRepository(session)
-        await repo.add_favorite(user_id=user.id, provider_id=provider.id)
+        await repo.add_favorite(user_id=user.id, clinician_id=provider.id)
         await session.commit()
 
     async with db_test_session_manager() as session:
         repo = UserFavoriteRepository(session)
-        edge = await repo.get_by_pair(user_id=user.id, provider_id=provider.id)
+        edge = await repo.get_by_pair(user_id=user.id, clinician_id=provider.id)
         assert edge is not None
         assert edge.user_id == user.id
-        assert edge.provider_id == provider.id
+        assert edge.clinician_id == provider.id
 
 
 async def test_get_by_pair_returns_none_when_absent(
@@ -99,7 +99,7 @@ async def test_get_by_pair_returns_none_when_absent(
 
     async with db_test_session_manager() as session:
         repo = UserFavoriteRepository(session)
-        edge = await repo.get_by_pair(user_id=user.id, provider_id=provider.id)
+        edge = await repo.get_by_pair(user_id=user.id, clinician_id=provider.id)
         assert edge is None
 
 
@@ -111,13 +111,13 @@ async def test_delete_favorite_removes_edge(
 
     async with db_test_session_manager() as session:
         repo = UserFavoriteRepository(session)
-        edge = await repo.add_favorite(user_id=user.id, provider_id=provider.id)
+        edge = await repo.add_favorite(user_id=user.id, clinician_id=provider.id)
         await session.commit()
         edge_id = edge.id
 
     async with db_test_session_manager() as session:
         repo = UserFavoriteRepository(session)
-        edge = await repo.get_by_pair(user_id=user.id, provider_id=provider.id)
+        edge = await repo.get_by_pair(user_id=user.id, clinician_id=provider.id)
         await repo.delete_favorite(edge)
         await session.commit()
 
@@ -134,7 +134,7 @@ async def test_delete_favorite_removes_edge(
         assert row is None
 
 
-async def test_list_favorited_providers_newest_first(
+async def test_list_favorited_clinicians_newest_first(
     db_test_session_manager: async_sessionmaker[AsyncSession],
 ):
     """Ordering is by `UserFavorite.created_at DESC`. SQLite's
@@ -153,26 +153,26 @@ async def test_list_favorited_providers_newest_first(
     async with db_test_session_manager() as session:
         async with session.begin():
             session.add(
-                UserFavorite(user_id=user.id, provider_id=first.id, created_at=earlier)
+                UserFavorite(user_id=user.id, clinician_id=first.id, created_at=earlier)
             )
             session.add(
-                UserFavorite(user_id=user.id, provider_id=second.id, created_at=later)
+                UserFavorite(user_id=user.id, clinician_id=second.id, created_at=later)
             )
 
     async with db_test_session_manager() as session:
         repo = UserFavoriteRepository(session)
-        providers = await repo.list_favorited_providers(user.id)
+        providers = await repo.list_favorited_clinicians(user.id)
         names = [p.org.name for p in providers]
         assert names == ["Second", "First"]
 
 
-async def test_list_favorited_providers_empty(
+async def test_list_favorited_clinicians_empty(
     db_test_session_manager: async_sessionmaker[AsyncSession],
 ):
     user = await _seed_user(db_test_session_manager)
     async with db_test_session_manager() as session:
         repo = UserFavoriteRepository(session)
-        providers = await repo.list_favorited_providers(user.id)
+        providers = await repo.list_favorited_clinicians(user.id)
         assert list(providers) == []
 
 
@@ -185,12 +185,12 @@ async def test_is_favorited_truth_table(
 
     async with db_test_session_manager() as session:
         repo = UserFavoriteRepository(session)
-        await repo.add_favorite(user_id=user.id, provider_id=favorited.id)
+        await repo.add_favorite(user_id=user.id, clinician_id=favorited.id)
         await session.commit()
 
     async with db_test_session_manager() as session:
         repo = UserFavoriteRepository(session)
-        assert await repo.is_favorited(user_id=user.id, provider_id=favorited.id)
+        assert await repo.is_favorited(user_id=user.id, clinician_id=favorited.id)
         assert not await repo.is_favorited(
-            user_id=user.id, provider_id=not_favorited.id
+            user_id=user.id, clinician_id=not_favorited.id
         )

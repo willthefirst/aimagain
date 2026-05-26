@@ -47,7 +47,7 @@ def test_relation_endpoints():
 def test_relation_join_shape():
     assert FAVORITE_ENTITY.relation.join_table == "user_favorites"
     assert FAVORITE_ENTITY.relation.from_attr == "user_id"
-    assert FAVORITE_ENTITY.relation.to_attr == "provider_id"
+    assert FAVORITE_ENTITY.relation.to_attr == "clinician_id"
 
 
 def test_relation_is_M2NRelation():

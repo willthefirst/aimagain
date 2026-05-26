@@ -31,14 +31,14 @@ from typing import Final
 
 from src.domain.logic.favorites.repository import UserFavoriteRepository
 from src.domain.logic.organizations.repository import OrganizationRepository
-from src.domain.logic.providers.repository import get_provider_repository
+from src.domain.logic.providers.repository import get_clinician_repository
 from src.domain.logic.providers.schema import (
     ProviderCreate,
     ProviderRead,
     ProviderUpdate,
 )
 from src.domain.logic.verifications.repository import VerificationRepository
-from src.domain.models import Provider
+from src.domain.models import Clinician
 from src.domain.models.enums import (
     CERTIFICATION_TYPES,
     CERTIFICATION_TYPES_LABELS,
@@ -75,10 +75,8 @@ PROVIDER_ENTITY: Final[EntitySpec] = EntitySpec(
     # still equals `spec.name` ("clinician") so *new* rows record the
     # post-rename resource type while the action enum reads as the old name.
     audit_action_stem="provider",
-    model=Provider,
-    # `owner_attr` defaults to "owner_id" — providers track their
-    # owning user via Provider.owner_id.
-    repo_dep=get_provider_repository,
+    model=Clinician,
+    repo_dep=get_clinician_repository,
     auth_deps=AUTHENTICATED,
     auth_policy=OWNER_OR_ADMIN,
     create_adapter=ProviderCreate,

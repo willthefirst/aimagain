@@ -26,7 +26,7 @@ from src.domain.logic.favorites.handlers import (
     handle_remove_favorite,
 )
 from src.domain.logic.favorites.repository import UserFavoriteRepository
-from src.domain.logic.providers.repository import ProviderRepository
+from src.domain.logic.providers.repository import ClinicianRepository
 from src.domain.models import User, UserFavorite
 from src.framework.audit.core import AuditAction
 from src.framework.audit.log import AuditLog
@@ -84,9 +84,9 @@ async def test_add_favorite_creates_edge_and_audits(
 
     async with db_test_session_manager() as session:
         edge = await handle_add_favorite(
-            provider_id=provider.id,
+            clinician_id=provider.id,
             repo=UserFavoriteRepository(session),
-            clinician_repo=ProviderRepository(session),
+            clinician_repo=ClinicianRepository(session),
             audit_repo=AuditRepository(session),
             requesting_user=user,
         )
@@ -122,9 +122,9 @@ async def test_add_favorite_is_idempotent_no_extra_audit(
 
     async with db_test_session_manager() as session:
         first = await handle_add_favorite(
-            provider_id=provider.id,
+            clinician_id=provider.id,
             repo=UserFavoriteRepository(session),
-            clinician_repo=ProviderRepository(session),
+            clinician_repo=ClinicianRepository(session),
             audit_repo=AuditRepository(session),
             requesting_user=user,
         )
@@ -132,9 +132,9 @@ async def test_add_favorite_is_idempotent_no_extra_audit(
 
     async with db_test_session_manager() as session:
         second = await handle_add_favorite(
-            provider_id=provider.id,
+            clinician_id=provider.id,
             repo=UserFavoriteRepository(session),
-            clinician_repo=ProviderRepository(session),
+            clinician_repo=ClinicianRepository(session),
             audit_repo=AuditRepository(session),
             requesting_user=user,
         )
@@ -173,9 +173,9 @@ async def test_add_favorite_provider_not_found(
     async with db_test_session_manager() as session:
         with pytest.raises(NotFoundError):
             await handle_add_favorite(
-                provider_id=uuid.uuid4(),
+                clinician_id=uuid.uuid4(),
                 repo=UserFavoriteRepository(session),
-                clinician_repo=ProviderRepository(session),
+                clinician_repo=ClinicianRepository(session),
                 audit_repo=AuditRepository(session),
                 requesting_user=user,
             )
@@ -189,9 +189,9 @@ async def test_remove_favorite_deletes_edge_and_audits(
 
     async with db_test_session_manager() as session:
         edge = await handle_add_favorite(
-            provider_id=provider.id,
+            clinician_id=provider.id,
             repo=UserFavoriteRepository(session),
-            clinician_repo=ProviderRepository(session),
+            clinician_repo=ClinicianRepository(session),
             audit_repo=AuditRepository(session),
             requesting_user=user,
         )
@@ -199,7 +199,7 @@ async def test_remove_favorite_deletes_edge_and_audits(
 
     async with db_test_session_manager() as session:
         await handle_remove_favorite(
-            provider_id=provider.id,
+            clinician_id=provider.id,
             repo=UserFavoriteRepository(session),
             audit_repo=AuditRepository(session),
             requesting_user=user,
@@ -242,7 +242,7 @@ async def test_remove_favorite_idempotent_no_audit_on_noop(
 
     async with db_test_session_manager() as session:
         await handle_remove_favorite(
-            provider_id=provider.id,
+            clinician_id=provider.id,
             repo=UserFavoriteRepository(session),
             audit_repo=AuditRepository(session),
             requesting_user=user,
@@ -275,16 +275,16 @@ async def test_list_my_favorites_returns_only_self_edges(
 
     async with db_test_session_manager() as session:
         await handle_add_favorite(
-            provider_id=mine.id,
+            clinician_id=mine.id,
             repo=UserFavoriteRepository(session),
-            clinician_repo=ProviderRepository(session),
+            clinician_repo=ClinicianRepository(session),
             audit_repo=AuditRepository(session),
             requesting_user=me,
         )
         await handle_add_favorite(
-            provider_id=theirs.id,
+            clinician_id=theirs.id,
             repo=UserFavoriteRepository(session),
-            clinician_repo=ProviderRepository(session),
+            clinician_repo=ClinicianRepository(session),
             audit_repo=AuditRepository(session),
             requesting_user=other,
         )

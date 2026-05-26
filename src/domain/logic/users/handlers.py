@@ -2,7 +2,7 @@ import logging
 from typing import Any
 from uuid import UUID
 
-from src.domain.logic.providers.repository import ProviderRepository
+from src.domain.logic.providers.repository import ClinicianRepository
 from src.domain.logic.users.repository import UserRepository
 from src.domain.logic.users.schema import UserActivationUpdate
 from src.domain.models import User
@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 async def user_detail_extras(
     *,
     target: User,
-    provider_repo: ProviderRepository,
+    provider_repo: ClinicianRepository,
     **_: Any,
 ) -> dict[str, Any]:
     """Per-viewer detail extras for `make_detail_handler(USER_ENTITY)`.

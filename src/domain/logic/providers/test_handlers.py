@@ -30,7 +30,7 @@ from src.domain.logic.providers.schema import (
 from src.domain.logic.users.repository import UserRepository
 from src.domain.logic.verifications.repository import VerificationRepository
 from src.domain.models import (
-    Provider,
+    Clinician,
     ProviderLicensure,
     User,
 )
@@ -97,7 +97,7 @@ async def _seed_provider(
             session.add(provider)
         await session.refresh(provider)
         provider_id = provider.id
-        clinician_id = provider.clinician_id
+        clinician_id = provider.id
 
     licensure_id: uuid.UUID | None = None
     education_id: uuid.UUID | None = None
@@ -209,13 +209,8 @@ async def test_list_providers_filters_by_license_type(
     # Add a non-matching licensure to provider_b
     async with db_test_session_manager() as session:
         async with session.begin():
-            clinician_b = (
-                await session.execute(
-                    select(Provider.clinician_id).where(Provider.id == provider_b)
-                )
-            ).scalar_one()
             session.add(
-                make_provider_licensure(clinician_id=clinician_b, license_type="lpc")
+                make_provider_licensure(clinician_id=provider_b, license_type="lpc")
             )
 
     async with db_test_session_manager() as session:
@@ -297,7 +292,7 @@ async def test_get_provider_detail_is_favorited_true_when_self_favorited(
 
     async with db_test_session_manager() as session:
         fav_repo = UserFavoriteRepository(session)
-        await fav_repo.add_favorite(user_id=user.id, provider_id=provider_id)
+        await fav_repo.add_favorite(user_id=user.id, clinician_id=provider_id)
         await session.commit()
 
     async with db_test_session_manager() as session:
@@ -542,7 +537,7 @@ async def test_create_provider_with_inline_children_captures_them_in_audit(
             (
                 await session.execute(
                     select(ProviderLicensure).filter(
-                        ProviderLicensure.clinician_id == created.clinician_id
+                        ProviderLicensure.clinician_id == created.id
                     )
                 )
             )
@@ -639,7 +634,7 @@ async def test_provider_form_extras_edit_path_passes_target(
 
     async with db_test_session_manager() as session:
         provider_repo = ProviderRepository(session)
-        provider = await provider_repo.get_by_model_id(Provider, provider_id)
+        provider = await provider_repo.get_by_model_id(Clinician, provider_id)
         org_repo = OrganizationRepository(session)
         result = await provider_form_extras(
             target=provider,

@@ -1,15 +1,15 @@
-"""UserFavorite override — M:N with `(user_id, provider_id)` unique.
+"""UserFavorite override — M:N with `(user_id, clinician_id)` unique.
 
 Generic generator would pick random pairs and could violate the
 UNIQUE constraint on collision. This override generates distinct
-pairs by indexing (user, provider) with co-prime strides.
+pairs by indexing (user, clinician) with co-prime strides.
 """
 
 from __future__ import annotations
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.domain.models import Provider, User, UserFavorite
+from src.domain.models import Clinician, User, UserFavorite
 
 from .. import counts
 from ..generators import SeedPool
@@ -22,17 +22,17 @@ async def generate_favorites(
     rng: SeededRandom, pool: SeedPool, session: AsyncSession
 ) -> list[UserFavorite]:
     users: list[User] = pool.all("users")
-    providers: list[Provider] = pool.all("providers")
+    clinicians: list[Clinician] = pool.all("clinicians")
     seen: set[tuple] = set()
     out: list[UserFavorite] = []
-    target = min(counts.FAVORITE_COUNT, len(users) * len(providers))
+    target = min(counts.FAVORITE_COUNT, len(users) * len(clinicians))
     i = 0
-    # Deterministic walk via (user_index, provider_index) with co-prime
+    # Deterministic walk via (user_index, clinician_index) with co-prime
     # strides keeps pairs distinct without rejection-sampling.
     while len(out) < target and i < target * 4:
         u = users[(i * 7) % len(users)]
-        p = providers[(i * 11) % len(providers)]
-        key = (u.id, p.id)
+        c = clinicians[(i * 11) % len(clinicians)]
+        key = (u.id, c.id)
         i += 1
         if key in seen:
             continue
@@ -40,7 +40,7 @@ async def generate_favorites(
         row = UserFavorite(
             id=deterministic_uuid("UserFavorite", len(out)),
             user_id=u.id,
-            provider_id=p.id,
+            clinician_id=c.id,
         )
         await session.merge(row)
         out.append(row)

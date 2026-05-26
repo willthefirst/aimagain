@@ -53,7 +53,7 @@ FAVORITE_ENTITY: Final[EntitySpec] = EntitySpec(
     name="user_favorite",
     url_collection="favorites",
     # The edge has a UUID PK on `UserFavorite.id`; the route file's
-    # URLs use `{provider_id}` (the to-side of the edge) instead. The
+    # URLs use `{clinician_id}` (the to-side of the edge) instead. The
     # spec declares the entity's PK name; URL grammar is the route
     # file's bespoke concern.
     id_param="favorite_id",
@@ -66,7 +66,7 @@ FAVORITE_ENTITY: Final[EntitySpec] = EntitySpec(
         to_entity=PROVIDER_ENTITY,
         join_table="user_favorites",
         from_attr="user_id",
-        to_attr="provider_id",
+        to_attr="clinician_id",
     ),
     # Favorites doesn't use any `mount_*` helper — the route file is
     # hand-rolled. All `RouteSet` flags stay False; phase 2 may

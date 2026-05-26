@@ -6,8 +6,8 @@ bespoke CRUD handlers; this hook plus the spec declaration is the
 entire wire-side authorization surface for posts.
 
 Why it dispatches on ``payload.kind``: two of the three kinds reference
-a cross-entity FK in the payload (``clinician_opening.provider_id``
-points at a Provider; ``program_intake.program_id`` points at a
+a cross-entity FK in the payload (``clinician_opening.clinician_id``
+points at a Clinician; ``program_intake.program_id`` points at a
 Program). Each needs the same "the requesting user must own the target
 row" check. The cleaner long-term shape is per-kind authz on
 :class:`PostKindSpec` (registry-per-kind ``payload_authz_path``); a
@@ -15,14 +15,6 @@ type-switching dispatcher is acceptable while the kind set is small.
 
 ``referral`` has no target FK and is intentionally skipped: a
 CR post describes a hypothetical client, not a row a third party owns.
-
-History: prior to #541 the post entity had **no** wire-side authz on
-its FK fields. ``opening.provider_id`` was nominally
-"verified at write time" (per the schema docstring) but no handler
-implemented the check — a wire-level attacker could post a PA
-referencing any Provider's id. This module closes that gap as a
-side-effect of generalizing for the new Program kind. See the PR body
-for the Step 0 investigation finding.
 """
 
 import logging
@@ -30,8 +22,8 @@ import logging
 from pydantic import BaseModel
 
 from src.domain.logic.programs.repository import ProgramRepository
-from src.domain.logic.providers.repository import ProviderRepository
-from src.domain.models import Program, Provider, User
+from src.domain.logic.providers.repository import ClinicianRepository
+from src.domain.models import Clinician, Program, User
 from src.framework.authz import assert_fk_ownership
 
 logger = logging.getLogger(__name__)
@@ -43,7 +35,7 @@ logger = logging.getLogger(__name__)
 # below no-ops for any kind not in this map.
 _KIND_FK_TARGETS: tuple[tuple[str, str, str, type], ...] = (
     # (kind, attr, parent_noun, parent_model)
-    ("clinician_opening", "provider_id", "Provider", Provider),
+    ("clinician_opening", "clinician_id", "Clinician", Clinician),
     ("program_intake", "program_id", "Program", Program),
 )
 
@@ -52,7 +44,7 @@ async def _assert_post_payload_target_ownership(
     *,
     payload: BaseModel,
     requesting_user: User,
-    provider_repo: ProviderRepository,
+    clinician_repo: ClinicianRepository,
     program_repo: ProgramRepository,
 ) -> None:
     """``POST_ENTITY.payload_authz_path`` target — reject a Post
@@ -61,8 +53,8 @@ async def _assert_post_payload_target_ownership(
 
     Dispatches on ``payload.kind`` via :data:`_KIND_FK_TARGETS`:
 
-    * ``clinician_opening`` — checks ``payload.provider_id`` against
-      ``Provider.owner_id``.
+    * ``clinician_opening`` — checks ``payload.clinician_id`` against
+      ``Clinician.owner_id``.
     * ``program_intake`` — checks ``payload.program_id`` against
       ``Program.owner_id``.
     * ``referral`` (and any future kind without a target FK) — no-op.
@@ -77,7 +69,7 @@ async def _assert_post_payload_target_ownership(
     See module docstring for why the dispatcher lives here rather than
     on :class:`PostKindSpec` per-kind."""
     kind = getattr(payload, "kind", None)
-    repos = {"provider_id": provider_repo, "program_id": program_repo}
+    repos = {"clinician_id": clinician_repo, "program_id": program_repo}
     for target_kind, attr, parent_noun, parent_model in _KIND_FK_TARGETS:
         if kind != target_kind:
             continue

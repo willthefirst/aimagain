@@ -19,7 +19,7 @@ A1 documented (`api/common -> api/routes`) is resolved.
 from typing import Final
 
 from src.auth_config import current_active_user
-from src.domain.logic.providers.repository import ProviderRepository
+from src.domain.logic.providers.repository import ClinicianRepository
 from src.domain.logic.users.repository import get_user_repository
 from src.domain.logic.users.schema import (
     UserActivationAuditSnapshot,
@@ -94,5 +94,5 @@ USER_ENTITY: Final[EntitySpec] = EntitySpec(
     # dotted-path trick the state-axis / subresource handlers use —
     # `specs/user.py` never statically imports `src.logic.users`.
     detail_extras_path="src.domain.logic.users.handlers.user_detail_extras",
-    detail_extras_repos=(("provider_repo", ProviderRepository),),
+    detail_extras_repos=(("provider_repo", ClinicianRepository),),
 )
