@@ -9,8 +9,6 @@ services:
       - /opt/bedlam-connect/data:/app/data
     env_file:
       - /opt/bedlam-connect/config/.env
-    environment:
-      - ENVIRONMENT=production
     healthcheck:
       test: ['CMD', 'curl', '-f', 'http://localhost:8000/health']
       interval: 30s
@@ -28,8 +26,6 @@ services:
       - /opt/bedlam-connect/data:/app/data
     env_file:
       - /opt/bedlam-connect/config/.env
-    environment:
-      - ENVIRONMENT=production
     healthcheck:
       test: ['CMD', 'curl', '-f', 'http://localhost:8000/health']
       interval: 30s
