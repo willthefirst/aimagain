@@ -40,10 +40,12 @@ class SentryBackend:
             payload["email"] = email
         sentry_sdk.set_user(payload)
 
-    def frontend_context(self) -> dict:
+    def frontend_context(self) -> dict | None:
+        if not settings.SENTRY_BROWSER_DSN:
+            return None
         return {
             "provider": "sentry",
-            "dsn": settings.SENTRY_DSN,
+            "dsn": settings.SENTRY_BROWSER_DSN,
             "environment": settings.ENVIRONMENT,
             "release": settings.APP_RELEASE,
             "traces_sample_rate": settings.SENTRY_TRACES_SAMPLE_RATE,

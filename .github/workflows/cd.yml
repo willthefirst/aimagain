@@ -82,16 +82,17 @@ jobs:
           RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
           APP_BASE_URL: ${{ secrets.APP_BASE_URL }}
           SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
+          SENTRY_BROWSER_DSN: ${{ secrets.SENTRY_BROWSER_DSN }}
           APP_RELEASE: ${{ github.sha }}
         with:
           host: ${{ secrets.DROPLET_HOST }}
           username: ${{ secrets.DROPLET_USERNAME }}
           key: ${{ secrets.DROPLET_SSH_KEY }}
-          envs: APP_SECRET,RESEND_API_KEY,APP_BASE_URL,SENTRY_DSN,APP_RELEASE
+          envs: APP_SECRET,RESEND_API_KEY,APP_BASE_URL,SENTRY_DSN,SENTRY_BROWSER_DSN,APP_RELEASE
           script: |
             set -e
             # Validate required secrets are present
-            for var in APP_SECRET RESEND_API_KEY APP_BASE_URL SENTRY_DSN; do
+            for var in APP_SECRET RESEND_API_KEY APP_BASE_URL SENTRY_DSN SENTRY_BROWSER_DSN; do
               if [ -z "${!var}" ]; then
                 echo "❌ GitHub Secret '$var' is not set — aborting" >&2
                 exit 1
@@ -108,6 +109,7 @@ jobs:
               printf 'RESEND_API_KEY=%s\n'                 "$RESEND_API_KEY"
               printf 'APP_BASE_URL=%s\n'                   "$APP_BASE_URL"
               printf 'SENTRY_DSN=%s\n'                     "$SENTRY_DSN"
+              printf 'SENTRY_BROWSER_DSN=%s\n'             "$SENTRY_BROWSER_DSN"
               printf 'APP_RELEASE=%s\n'                    "$APP_RELEASE"
             } > /opt/bedlam-connect/config/.env
             chmod 600 /opt/bedlam-connect/config/.env
