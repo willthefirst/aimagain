@@ -23,15 +23,15 @@ def _cr_post(network_preference: str, insurance_carrier: str | None = None):
     )
 
 
-def _pa_post(**provider_attrs):
-    provider_attrs.setdefault("in_network_carriers", [])
-    provider_attrs.setdefault("accepts_out_of_network", False)
-    provider_attrs.setdefault("sliding_scale", False)
-    provider_attrs.setdefault("cost", None)
+def _pa_post(**clinician_attrs):
+    clinician_attrs.setdefault("in_network_carriers", [])
+    clinician_attrs.setdefault("accepts_out_of_network", False)
+    clinician_attrs.setdefault("sliding_scale", False)
+    clinician_attrs.setdefault("cost", None)
     return SimpleNamespace(
         kind="clinician_opening",
         opening_detail=SimpleNamespace(
-            provider=SimpleNamespace(**provider_attrs),
+            clinician=SimpleNamespace(**clinician_attrs),
         ),
     )
 
@@ -55,7 +55,7 @@ def test_cr_posture_maps_each_network_preference(storage, expected):
 
 def test_pa_posture_prefers_in_network_when_set():
     """In-network is the highest-signal posture; show it even when the
-    provider also accepts out-of-network or offers sliding scale."""
+    clinician also accepts out-of-network or offers sliding scale."""
     post = _pa_post(
         in_network_carriers=["aetna"],
         accepts_out_of_network=True,
@@ -165,8 +165,8 @@ def _make_cr_post(**detail_overrides):
     )
 
 
-def _make_pa_post(*, provider_attrs=None, **detail_overrides):
-    """Realistic PA stub. Defaults populate provider + detail fields."""
+def _make_pa_post(*, clinician_attrs=None, **detail_overrides):
+    """Realistic PA stub. Defaults populate clinician + detail fields."""
     p = dict(
         id="prov-1",
         org=SimpleNamespace(id="org-1", name="Acme Counseling"),
@@ -180,8 +180,8 @@ def _make_pa_post(*, provider_attrs=None, **detail_overrides):
         sliding_scale=True,
         cost="$150/session",
     )
-    if provider_attrs:
-        p.update(provider_attrs)
+    if clinician_attrs:
+        p.update(clinician_attrs)
     d = dict(
         services=["psychotherapy"],
         settings=["individual"],
@@ -199,7 +199,7 @@ def _make_pa_post(*, provider_attrs=None, **detail_overrides):
     return SimpleNamespace(
         kind="clinician_opening",
         opening_detail=SimpleNamespace(
-            provider=SimpleNamespace(**p),
+            clinician=SimpleNamespace(**p),
             **d,
         ),
     )
@@ -324,8 +324,8 @@ def test_view_pa_basics():
     assert v["kind_verb"] == "Providing"
 
 
-def test_view_pa_headline_is_org_name_state_from_provider():
-    """PA's identity is the practice — `provider.org.name`. State
+def test_view_pa_headline_is_org_name_state_from_clinician():
+    """PA's identity is the practice — `clinician.org.name`. State
     surfaces via `location_chunk` (the demographics-column icon-only
     row), matching the CR treatment so referral + opening cards
     consistently locate their location in the same place. The header
@@ -336,14 +336,14 @@ def test_view_pa_headline_is_org_name_state_from_provider():
     assert v["location_chunk"] == {"city": "Brooklyn", "state": "NY", "zip": "11201"}
 
 
-def test_view_pa_in_person_virtual_come_from_provider():
+def test_view_pa_in_person_virtual_come_from_clinician():
     """PA's session availability lives on the linked Provider, not on
     the post's detail row. The view-model normalizes both kinds onto
     the same `in_person`/`virtual` keys so the card's modality chips
     read from one source."""
     v = post_card_view(
         _make_pa_post(
-            provider_attrs={"in_person_sessions": "no", "virtual_sessions": "yes"}
+            clinician_attrs={"in_person_sessions": "no", "virtual_sessions": "yes"}
         )
     )
     assert v["in_person"] == "no"
@@ -356,18 +356,18 @@ def test_view_pa_practice_link_carries_id_and_org_name():
 
 
 def test_view_pa_organization_link_carries_org_id_and_name():
-    """Opening's org link reads through `provider.org` so the detail
+    """Opening's org link reads through `clinician.org` so the detail
     page's `Organization` row is a one-click jump to the owning org."""
     v = post_card_view(_make_pa_post())
     assert v["organization_link"] == {"id": "org-1", "name": "Acme Counseling"}
 
 
-def test_view_pa_full_address_from_provider():
+def test_view_pa_full_address_from_clinician():
     v = post_card_view(_make_pa_post())
     assert v["full_address"] == "Brooklyn, NY 11201"
 
 
-def test_view_pa_insurance_fields_from_provider():
+def test_view_pa_insurance_fields_from_clinician():
     v = post_card_view(_make_pa_post())
     assert v["in_network_carriers"] == ["aetna"]
     assert v["accepts_out_of_network"] is False
@@ -394,7 +394,7 @@ def test_view_pa_referral_none_when_both_empty():
     assert v["referral"] is None
 
 
-def test_view_pa_location_chunk_pulled_from_provider():
+def test_view_pa_location_chunk_pulled_from_clinician():
     """PA's `location_chunk` reads city/state/zip from the linked
     Provider so the listing card renders the same "Location" row
     referral cards do. Detail page still gets the full address via
@@ -404,15 +404,15 @@ def test_view_pa_location_chunk_pulled_from_provider():
     assert v["full_address"] == "Brooklyn, NY 11201"
 
 
-def test_view_pa_no_location_chunk_when_provider_missing():
-    """Defensive — a PA stub without a `provider` relationship returns
+def test_view_pa_no_location_chunk_when_clinician_missing():
+    """Defensive — a PA stub without a `clinician` relationship returns
     `location_chunk=None` instead of crashing. Mirrors the same
-    defensive path the existing PA-missing-provider test covers for
-    other provider-derived fields."""
+    defensive path the existing PA-missing-clinician test covers for
+    other clinician-derived fields."""
     post = SimpleNamespace(
         kind="clinician_opening",
         opening_detail=SimpleNamespace(
-            provider=None,
+            clinician=None,
             services=[],
             settings=[],
             age_groups=[],
@@ -497,14 +497,14 @@ def test_view_cr_missing_detail_returns_base_skeleton():
     assert v["location_chunk"] is None
 
 
-def test_view_pa_missing_provider_returns_partial_view():
-    """PA's detail has a `provider` relationship that could be None
+def test_view_pa_missing_clinician_returns_partial_view():
+    """PA's detail has a `clinician` relationship that could be None
     in test stubs. View-model populates the detail-row fields it can
-    and leaves provider-derived fields at None."""
+    and leaves clinician-derived fields at None."""
     post = SimpleNamespace(
         kind="clinician_opening",
         opening_detail=SimpleNamespace(
-            provider=None,
+            clinician=None,
             services=["psychotherapy"],
             settings=[],
             age_groups=[],
@@ -525,7 +525,7 @@ def test_view_pa_missing_provider_returns_partial_view():
     assert v["practice_link"] is None
     assert v["organization_link"] is None
     assert v["sliding_scale"] is None
-    # Detail-row fields independent of the provider relationship still
+    # Detail-row fields independent of the clinician relationship still
     # populate so the card can render whatever it can.
     assert v["services"] == ["psychotherapy"]
     assert v["description"] == "x"
@@ -623,7 +623,7 @@ def test_row_summary_opening_with_description_and_settings():
             settings=["outpatient"],
             age_groups=[],
             services=[],
-            provider=SimpleNamespace(sliding_scale=True),
+            clinician=SimpleNamespace(sliding_scale=True),
         ),
     )
     assert post_row_summary(post) == "2 slots open · Outpatient · sliding scale"
@@ -638,7 +638,7 @@ def test_row_summary_opening_no_description_builds_from_fields():
             settings=[],
             age_groups=["adults_25_64"],
             services=["psychotherapy"],
-            provider=SimpleNamespace(sliding_scale=False),
+            clinician=SimpleNamespace(sliding_scale=False),
         ),
     )
     summary = post_row_summary(post)
@@ -654,7 +654,7 @@ def test_row_summary_opening_no_sliding_scale():
             settings=[],
             age_groups=[],
             services=[],
-            provider=SimpleNamespace(sliding_scale=False),
+            clinician=SimpleNamespace(sliding_scale=False),
         ),
     )
     assert post_row_summary(post) == "Accepting new clients"
@@ -759,11 +759,11 @@ def test_feed_headline_opening_missing_detail_returns_fallback():
     assert post_feed_headline(post) == "Opening"
 
 
-def test_feed_headline_opening_missing_provider_returns_fallback():
+def test_feed_headline_opening_missing_clinician_returns_fallback():
     post = SimpleNamespace(
         kind="clinician_opening",
         opening_detail=SimpleNamespace(
-            provider=None,
+            clinician=None,
             services=["psychotherapy"],
             settings=[],
         ),

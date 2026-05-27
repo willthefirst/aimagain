@@ -107,8 +107,8 @@ NETWORK_PREFERENCES: Final[tuple[str, ...]] = (
 
 # Carrier vocabulary for `Provider.in_network_carriers` and
 # `ReferralDetail.insurance_carrier`. Single-sourced so the
-# referral side (one carrier per patient) and the provider side (the
-# list of carriers the practice accepts) share tokens. On the provider
+# referral side (one carrier per patient) and the clinician side (the
+# list of carriers the practice accepts) share tokens. On the clinician
 # side an empty list means "no in-network"; nullable on the referral
 # side (null = self-pay / unknown / no carrier).
 INSURANCE_CARRIERS: Final[tuple[str, ...]] = (

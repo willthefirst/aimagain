@@ -18,10 +18,10 @@ from src.domain.logic.clinicians.schema import (
     ProviderLicensureUpdate,
 )
 from src.domain.models import ProviderLicensure
-from src.domain.specs._credential import make_provider_credential_entity
+from src.domain.specs._credential import make_clinician_credential_entity
 from src.framework.dispatch.entity_spec import EntitySpec
 
-LICENSURE_ENTITY: Final[EntitySpec] = make_provider_credential_entity(
+LICENSURE_ENTITY: Final[EntitySpec] = make_clinician_credential_entity(
     name="provider_licensure",
     url_collection="licensures",
     id_param="licensure_id",

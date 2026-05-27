@@ -1,11 +1,5 @@
 """`CLINICIAN_ENTITY`: single declaration of the clinician directory resource.
 
-`#642 PR 4` renamed the user-facing surface (URL family + entity name)
-from "provider" to "clinician". Enum names (`CREATE_PROVIDER` etc.) are
-pinned via `audit_action_stem="provider"` so historical audit rows keep
-their labels. See `src/domain/models/providers/README.md` for the
-model-vs-UI vocabulary gap.
-
 Read by:
   - `src/domain/routes/clinicians.py` — derives `CLINICIAN_SPEC` for the
     mount helpers and reads the list filters from `.filters`.
@@ -65,12 +59,6 @@ CLINICIAN_ENTITY: Final[EntitySpec] = EntitySpec(
     name="clinician",
     url_collection="clinicians",
     id_param="clinician_id",
-    # `audit_action_stem` pins the persisted enum names at `CREATE_PROVIDER`
-    # / `UPDATE_PROVIDER` / `DELETE_PROVIDER` so existing audit rows keep
-    # their historical labels — the rename is user-facing only. `audit.type`
-    # still equals `spec.name` ("clinician") so *new* rows record the
-    # post-rename resource type while the action enum reads as the old name.
-    audit_action_stem="provider",
     model=Clinician,
     repo_dep=get_clinician_repository,
     auth_deps=AUTHENTICATED,
@@ -140,7 +128,7 @@ CLINICIAN_ENTITY: Final[EntitySpec] = EntitySpec(
     # tuples behind the filter/select dropdowns. Tying them to the spec
     # (instead of Jinja globals) means a new credential-type tuple
     # doesn't need an edit in `core/templating.py`. The labels are
-    # provider-specific — posts and other entities don't read them —
+    # clinician-specific — posts and other entities don't read them —
     # so they belong here, not in shared template-global infrastructure.
     static_context={
         "LICENSE_TYPES": LICENSE_TYPES,

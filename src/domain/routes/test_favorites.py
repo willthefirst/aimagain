@@ -27,12 +27,12 @@ async def _seed_provider(
     practice_name: str = "Acme Health",
 ) -> uuid.UUID:
     owner = create_test_user(username=f"owner-{uuid.uuid4()}")
-    provider = make_provider_with_org(owner_id=owner.id, practice_name=practice_name)
+    clinician = make_provider_with_org(owner_id=owner.id, practice_name=practice_name)
     async with db_test_session_manager() as session:
         async with session.begin():
             session.add(owner)
-            session.add(provider)
-        return provider.id
+            session.add(clinician)
+        return clinician.id
 
 
 async def test_add_favorite_returns_201_first_time(
@@ -134,7 +134,7 @@ async def test_remove_favorite_idempotent_when_not_favorited(
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user: User,
 ):
-    """Unfavoriting a provider the user never favorited returns 204
+    """Unfavoriting a clinician the user never favorited returns 204
     and writes no audit row."""
     provider_id = await _seed_provider(db_test_session_manager)
     response = await authenticated_client.delete(f"/users/me/favorites/{provider_id}")

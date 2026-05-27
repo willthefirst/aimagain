@@ -90,7 +90,7 @@ def test_location_equality_via_round_trip():
 def test_location_state_literal_matches_us_states_tuple():
     """:class:`Location.state` is the post-#451 home for the
     location-state lockstep guardrail. The Literal values must match
-    ``US_STATES`` exactly — drift here would let provider /
+    ``US_STATES`` exactly — drift here would let clinician /
     client-referral schemas accept a state value the DB CHECK
     constraint would reject."""
     annotation = Location.model_fields["state"].annotation

@@ -50,7 +50,7 @@ def _insurance_summary(clinician) -> str:
       - ``"Self-pay only"``  (no carriers, no OON anywhere)
 
     Falls back to the legacy single-record path (``_role_attr``) when
-    ``provider.affiliations`` is empty/absent — covers ``SimpleNamespace``
+    ``clinician.affiliations`` is empty/absent — covers ``SimpleNamespace``
     test stubs that don't wire the 1:N relationship.
 
     Display-label lookup
@@ -101,10 +101,10 @@ def _insurance_summary(clinician) -> str:
 
 def _affiliation_insurance_summary(affiliation) -> str:
     """Same shape as :func:`_insurance_summary` but sourced directly
-    from an ``Affiliation`` (not a ``Provider``). The detail page's
+    from an ``Affiliation`` (not a ``Clinician``). The detail page's
     stacked-sections layout (#642 PR 2) renders one insurance line per
     affiliation, so we need a per-affiliation summarizer alongside the
-    per-provider one the directory listing still uses."""
+    per-clinician one the directory listing still uses."""
     from src.domain.models.enums import INSURANCE_CARRIER_LABELS
 
     carriers = list(getattr(affiliation, "in_network_carriers", None) or [])
@@ -122,10 +122,10 @@ def _affiliation_insurance_summary(affiliation) -> str:
 
 def affiliation_card_view(affiliation, org=None) -> dict[str, Any]:
     """Normalize a single ``Affiliation`` into the per-role dict shape
-    one stacked-section card on the provider detail page reads from
+    one stacked-section card on the clinician detail page reads from
     (#642 PR 2).
 
-    Mirrors the per-role keys ``provider_card_view`` exposes at the top
+    Mirrors the per-role keys ``clinician_card_view`` exposes at the top
     level (``full_address``, ``in_person_label``, ``virtual_label``,
     ``insurance_summary``, ``sliding_scale_label``, ``cost``) so the
     template's "one card per affiliation" loop reads the same flat

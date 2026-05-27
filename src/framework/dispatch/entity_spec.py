@@ -206,7 +206,7 @@ class EntitySpec:
     # child belonging to parent B. By default the check compares the
     # child's ``<parent.name>_id`` attribute to the URL's ``parent_id``.
     # Set this when the child's FK targets a *non-parent* table that the
-    # parent also references — e.g. provider credentials FK to
+    # parent also references — e.g. clinician credentials FK to
     # ``clinicians.id`` (#635 PR A) but URL-mount under ``/clinicians/...``.
     # When set, the framework loads the parent and compares
     # ``getattr(child, child_parent_match_attr) ==
@@ -215,10 +215,8 @@ class EntitySpec:
     child_parent_match_attr: str | None = None
     # Override for the convention "child holds ``<parent.name>_id``" when
     # the FK column name diverges from the parent's entity name — e.g.
-    # affiliations FK column is ``provider_id`` even though after #642 PR 4
-    # the parent entity's `name` is ``"clinician"`` (the Python model
-    # class kept the historical "provider" identifier; only the user-facing
-    # surface flipped). Read by the same default-path branch in
+    # affiliations FK column is ``clinician_id``; the parent entity's
+    # `name` is ``"clinician"``. Read by the same default-path branch in
     # ``handle_delete`` / ``handle_update`` ‑ a non-None value is used as
     # the attribute name on the child row, falling back to
     # ``f"{spec.parent.name}_id"`` when ``None``. Mutually orthogonal to

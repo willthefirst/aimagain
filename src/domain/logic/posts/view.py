@@ -16,7 +16,7 @@ kinds model the underlying data asymmetrically:
 `insurance_posture_for_post(post)` collapses both shapes to a value
 from `INSURANCE_POSTURES` (see `src/domain/models/enums.py`). The
 ordering of branches is the priority the row should show: if a
-provider accepts in-network plans, that's the posture, even if they
+clinician accepts in-network plans, that's the posture, even if they
 also offer sliding scale — the in-network signal is louder.
 
 `referral_headline(detail)` composes the CR card's headline
@@ -95,19 +95,19 @@ def insurance_posture_for_post(post) -> str | None:
         }.get(detail.network_preference)
     if kind == "clinician_opening":
         detail = getattr(post, "opening_detail", None)
-        provider = getattr(detail, "provider", None) if detail is not None else None
-        if provider is None:
+        clinician = getattr(detail, "clinician", None) if detail is not None else None
+        if clinician is None:
             return None
-        if provider.in_network_carriers:
+        if clinician.in_network_carriers:
             return "in_network"
-        if provider.accepts_out_of_network:
+        if clinician.accepts_out_of_network:
             return "out_of_network"
-        if provider.sliding_scale or provider.cost:
+        if clinician.sliding_scale or clinician.cost:
             return "self_pay"
         return "please_contact"
     if kind == "program_intake":
         # Program-availability has no insurance posture today — insurance
-        # is modeled on the Provider (who delivers care) and on the
+        # is modeled on the Clinician (who delivers care) and on the
         # Client-referral Post (the referral situation), not on the
         # Program (#537 docstring on `Program`). Return None so the
         # listing row omits the chunk entirely; the detail page does
@@ -201,7 +201,7 @@ def post_card_view(post) -> dict[str, Any]:
         program_link: ``{id, name}`` of program's linked Program;
             ``None`` for other kinds.
         organization_link: ``{id, name}`` of the post's owning
-            Organization (PA reads through ``provider.org``; program
+            Organization (PA reads through ``clinician.org``; program
             intake reads through ``program.organization``). ``None``
             for referral (CR has no org linkage in the model). The
             facts block renders this as a clickable link so any post
@@ -289,7 +289,7 @@ def post_card_view(post) -> dict[str, Any]:
         d = getattr(post, "opening_detail", None)
         if d is None:
             return base
-        p = getattr(d, "provider", None)
+        p = getattr(d, "clinician", None)
         base.update(
             headline=(p.org.name if p and getattr(p, "org", None) else None),
             # `header_state` stays None — opening's location lives in
@@ -459,7 +459,7 @@ def post_row_summary(post) -> str:
         d = getattr(post, "opening_detail", None)
         if d is None:
             return "Opening"
-        p = getattr(d, "provider", None)
+        p = getattr(d, "clinician", None)
         parts = []
         desc = getattr(d, "description", None)
         if desc:
@@ -532,7 +532,7 @@ def post_feed_headline(post) -> str:
             return "Opening"
         if subject := getattr(d, "subject", None):
             return subject
-        p = getattr(d, "provider", None)
+        p = getattr(d, "clinician", None)
         practice = (
             p.org.name
             if p and getattr(p, "org", None) and getattr(p.org, "name", None)
