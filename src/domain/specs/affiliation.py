@@ -3,11 +3,11 @@
 Owned subentity of Clinician. Routes nest under
 ``/clinicians/{clinician_id}/affiliations/{affiliation_id}``. The
 clinician edit page surfaces them as an inline list (same UX pattern
-as licensures — see `src/domain/specs/provider_licensure.py`); each row
+as licensures — see `src/domain/specs/clinician_licensure.py`); each row
 is independently created, updated, or deleted via the framework's
 sub-resource CRUD factories.
 
-Read by `src/domain/routes/providers.py` (registers the entity as an
+Read by `src/domain/routes/clinicians.py` (registers the entity as an
 owned subentity of `CLINICIAN_ENTITY` via `mount_entity`).
 
 A Clinician may hold multiple Affiliation rows; before that there was

@@ -525,10 +525,10 @@ def test_audit_snapshot_and_audit_mutually_exclusive():
 
 def test_audit_action_stem_overrides_name():
     """Credential entities' enum stems diverge from `name` (e.g.
-    `provider_licensure` → `CREATE_LICENSURE`). `audit_action_stem`
+    `clinician_licensure` → `CREATE_LICENSURE`). `audit_action_stem`
     feeds straight into `make_audited_resource`."""
     spec = _make_spec(
-        name="provider_licensure",
+        name="clinician_licensure",
         audit_snapshot=_DummyBody,
         audit_action_stem="licensure",
     )
@@ -753,10 +753,10 @@ def test_custom_authz_policy_can_be_declared():
 def test_redirects_to_edit_form_picks_id_from_named_kwarg():
     """Reads `kwargs[id_param]` so the same callable serves owned
     subentities whose URL kwargs include both parent + own ids."""
-    redirect = Redirects.to_edit_form("providers", "provider_id")
+    redirect = Redirects.to_edit_form("clinicians", "clinician_id")
     assert (
-        redirect(provider_id="abc-123", licensure_id="ignored")
-        == "/providers/abc-123/form"
+        redirect(clinician_id="abc-123", licensure_id="ignored")
+        == "/clinicians/abc-123/form"
     )
 
 
@@ -768,8 +768,8 @@ def test_redirects_to_detail_formats_canonical_path():
 def test_redirects_to_edit_form_missing_kwarg_raises_keyerror():
     """A misconfigured spec (wrong id_param) fails loudly at request
     time rather than silently producing a malformed URL."""
-    redirect = Redirects.to_edit_form("providers", "provider_id")
-    with pytest.raises(KeyError, match="provider_id"):
+    redirect = Redirects.to_edit_form("clinicians", "clinician_id")
+    with pytest.raises(KeyError, match="clinician_id"):
         redirect(some_other_id="abc")
 
 

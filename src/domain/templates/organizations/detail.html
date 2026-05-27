@@ -12,7 +12,7 @@
   {% endif %}
 {% endblock %}
 {# Organization detail uses the `.entity-card` chrome shared with
-   posts/detail.html and providers/detail.html. The parent-organization
+   posts/detail.html and clinicians/detail.html. The parent-organization
    row resolves the parent's *name* via the `parent` relationship —
    the previous template emitted the raw UUID as the link text, which
    read as a bare hex number in the UI.
@@ -25,7 +25,7 @@
    Root organizations (no `parent_org_id`) omit the parent row entirely
    rather than rendering placeholder text — matching the optional-field
    grammar used by posts/clinicians/programs detail templates (e.g.
-   `{% if view.cost %}` in providers/detail.html). The root status is
+   `{% if view.cost %}` in clinicians/detail.html). The root status is
    already conveyed by absence; a "— (root)" placeholder mixed two
    empty-state conventions (em-dash + parenthetical). #}
 {% block content %}

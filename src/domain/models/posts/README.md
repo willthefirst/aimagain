@@ -33,7 +33,7 @@ Before this extraction, `post.py`, `post_kinds.py`, and the two detail files liv
 - `post_kinds.py` imports from `referral_detail.py` and `opening_detail.py`.
 - The two detail files share a common table-CHECK pattern, both depend on the same `enums.py` vocabularies.
 
-Pulling them into `posts/` makes the boundary explicit: a reader landing here finds the entire posts data model in one place. Cross-domain shared modules (the controlled-vocabulary tuples in `../enums.py`, the `BaseModel` in [`src/framework/persistence/base_model.py`](../../../framework/persistence/base_model.py)) stay at the parent level because they're consumed by the providers cluster too.
+Pulling them into `posts/` makes the boundary explicit: a reader landing here finds the entire posts data model in one place. Cross-domain shared modules (the controlled-vocabulary tuples in `../enums.py`, the `BaseModel` in [`src/framework/persistence/base_model.py`](../../../framework/persistence/base_model.py)) stay at the parent level because they're consumed by the clinicians cluster too.
 
 ## Adding a new kind
 

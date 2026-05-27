@@ -3,8 +3,8 @@
 Read by:
   - `src/domain/routes/clinicians.py` — derives `CLINICIAN_SPEC` for the
     mount helpers and reads the list filters from `.filters`.
-  - `src/domain/specs/provider_licensure.py` /
-    `provider_education.py` / `provider_certification.py` — set
+  - `src/domain/specs/clinician_licensure.py` /
+    `clinician_education.py` / `clinician_certification.py` — set
     ``parent=CLINICIAN_ENTITY`` so the mount layer's parent-chain
     machinery builds nested paths like
     ``/clinicians/{clinician_id}/licensures/{licensure_id}``.
@@ -50,9 +50,6 @@ from src.framework.dispatch.filters import ChoiceFilter
 # by the three credential subentities (their parent is this clinician
 # directory entry).
 _clinician_form_redirect = Redirects.to_edit_form("clinicians", "clinician_id")
-
-# Backward-compat alias for credential specs that import the old name.
-_provider_form_redirect = _clinician_form_redirect
 
 
 CLINICIAN_ENTITY: Final[EntitySpec] = EntitySpec(

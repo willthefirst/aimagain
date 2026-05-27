@@ -4,7 +4,7 @@ The universal invariants (identity field shapes, audit-type-matches-name,
 templates default by convention, `to_resource_spec()` round-trips, etc.)
 live in `test_spec_conformance.py` parametrized across every spec. This
 file only pins what's unique to the user spec — the activation state
-axis, the providers related-list, the private-fields tuple, the
+axis, the clinicians related-list, the private-fields tuple, the
 `/users/me` singleton alias, and the per-viewer detail extras binding.
 """
 

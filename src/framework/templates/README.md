@@ -26,7 +26,7 @@ Names resolve by walking the list, so a domain page can `{% extends "views/list.
 
 ## Layering rule
 
-A template under `<resource>/` in either root may only `{% extends %}` / `{% include %}` / `{% from %}` / `{% import %}` from: a root-level file (`base.html`), its own directory, `_shared/`, or `views/`. Cross-cluster references (e.g. `posts/...` from `providers/...`) mean the partial is *de facto* shared and belongs in `_shared/`. Enforced by [`../../../scripts/dev/template_imports_check.py`](../../../scripts/dev/template_imports_check.py) (runs in `dev lint` and pre-commit).
+A template under `<resource>/` in either root may only `{% extends %}` / `{% include %}` / `{% from %}` / `{% import %}` from: a root-level file (`base.html`), its own directory, `_shared/`, or `views/`. Cross-cluster references (e.g. `posts/...` from `clinicians/...`) mean the partial is *de facto* shared and belongs in `_shared/`. Enforced by [`../../../scripts/dev/template_imports_check.py`](../../../scripts/dev/template_imports_check.py) (runs in `dev lint` and pre-commit).
 
 ## Generic view-type templates (`views/`)
 
@@ -50,7 +50,7 @@ The "Create X" noun resolves to: per-kind `list_label` from the discriminator re
 
 ### Why view-type templates
 
-Before this layer existed, every domain template manually rewired `{% block breadcrumb %}` and `{% block toolbar %}` from `_shared/` macros (`breadcrumb`, `page_toolbar`). That worked but offered no vocabulary — a reader had to scan 15 lines of imports and block overrides to confirm "this is the list view of providers." `views/list.html` puts that statement in line 1: `{% extends "views/list.html" %}`. The chrome wiring is a property of the view type, not a repeated incantation.
+Before this layer existed, every domain template manually rewired `{% block breadcrumb %}` and `{% block toolbar %}` from `_shared/` macros (`breadcrumb`, `page_toolbar`). That worked but offered no vocabulary — a reader had to scan 15 lines of imports and block overrides to confirm "this is the list view of clinicians." `views/list.html` puts that statement in line 1: `{% extends "views/list.html" %}`. The chrome wiring is a property of the view type, not a repeated incantation.
 
 The macros under `_shared/` are still the primitives — `views/*` compose them. A page that needs a chrome shape the view templates don't express (the `/auth/*` flow's centered single-card layout, the post feed's `<ul>` body) extends `base.html` directly or composes the macros by hand.
 

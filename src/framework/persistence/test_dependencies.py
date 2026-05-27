@@ -105,8 +105,8 @@ def test_generated_resolver_returns_an_instance():
     sentinel_session = object()
     user_repo = get_user_repository(session=sentinel_session)
     assert isinstance(user_repo, UserRepository)
-    provider_repo = get_clinician_repository(session=sentinel_session)
-    assert isinstance(provider_repo, ClinicianRepository)
+    clinician_repo = get_clinician_repository(session=sentinel_session)
+    assert isinstance(clinician_repo, ClinicianRepository)
 
 
 # --- make_repo_resolver -----------------------------------------------------

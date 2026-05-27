@@ -24,7 +24,7 @@ def test_base_context_anonymous():
         "is_admin": False,
         "current_username": None,
         "current_user_id": None,
-        "has_provider_profile": False,
+        "has_clinician_profile": False,
         # Anonymous users don't get the verify nag — default True so
         # the banner stays silent.
         "current_user_is_verified": True,
@@ -41,7 +41,7 @@ def test_base_context_regular_user():
         "is_admin": False,
         "current_username": "alice",
         "current_user_id": user_id,
-        "has_provider_profile": False,
+        "has_clinician_profile": False,
         "current_user_is_verified": True,
     }
 
@@ -70,9 +70,9 @@ def test_base_context_admin():
     assert ctx["is_authenticated"] is True
 
 
-def test_base_context_user_with_provider_profile():
+def test_base_context_user_with_clinician_profile():
     """A user whose `clinicians` relationship is non-empty reads as
-    `has_provider_profile=True` — the chrome uses this to swap the
+    `has_clinician_profile=True` — the chrome uses this to swap the
     primary CTA from "Set up your profile" to "+ Post availability"."""
     user = SimpleNamespace(
         id=uuid.uuid4(),
@@ -81,7 +81,7 @@ def test_base_context_user_with_provider_profile():
         clinicians=[SimpleNamespace(id=uuid.uuid4())],
     )
     ctx = base_context(user)
-    assert ctx["has_provider_profile"] is True
+    assert ctx["has_clinician_profile"] is True
 
 
 def test_base_context_user_without_clinicians_attr_defaults_false():
@@ -89,7 +89,7 @@ def test_base_context_user_without_clinicians_attr_defaults_false():
     defaults to `False` — same shape as a brand-new user who hasn't
     created a clinician profile yet."""
     user = SimpleNamespace(id=uuid.uuid4(), username="alice", is_superuser=False)
-    assert base_context(user)["has_provider_profile"] is False
+    assert base_context(user)["has_clinician_profile"] is False
 
 
 # --- existing helpers ----------------------------------------------------
@@ -108,11 +108,11 @@ def test_created_response_separate_location_and_hx_redirect():
     obj_id = uuid.uuid4()
     resp = created_response(
         id=obj_id,
-        location=f"/providers/{obj_id}",
-        hx_redirect=f"/providers/{obj_id}/form",
+        location=f"/clinicians/{obj_id}",
+        hx_redirect=f"/clinicians/{obj_id}/form",
     )
-    assert resp.headers["Location"] == f"/providers/{obj_id}"
-    assert resp.headers["HX-Redirect"] == f"/providers/{obj_id}/form"
+    assert resp.headers["Location"] == f"/clinicians/{obj_id}"
+    assert resp.headers["HX-Redirect"] == f"/clinicians/{obj_id}/form"
 
 
 def test_updated_response_with_body():

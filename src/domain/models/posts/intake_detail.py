@@ -38,7 +38,7 @@ class IntakeDetail(Base):
     # state preference, intake window, and owning Org all live on the
     # linked row — looked up via ``program.*`` in templates and read
     # projections. ``ondelete='CASCADE'`` mirrors
-    # ``OpeningDetail.provider_id``: deleting the Program
+    # ``OpeningDetail.clinician_id``: deleting the Program
     # tears down its announcements with it (a post about a deleted
     # Program is stale by construction).
     program_id = Column(

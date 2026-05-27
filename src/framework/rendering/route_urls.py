@@ -90,7 +90,7 @@ def entity_url(name: str, *, id: Any = None, subresource: str | None = None) -> 
     / field-cluster subresources from the grammar (e.g.
     ``/users/{id}/activation``, ``/posts/{id}/owner-actions``). Requires
     ``id`` — a subresource without a parent id doesn't fit the grammar.
-    Multi-segment subresources (``/providers/{id}/licensures/{lic_id}``)
+    Multi-segment subresources (``/clinicians/{id}/licensures/{lic_id}``)
     aren't covered by this helper; templates that need them keep the
     interpolation today, and the lint accepts them when they appear
     inside an ``entity_url(...)`` call's subresource value.
