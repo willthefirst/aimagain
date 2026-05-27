@@ -131,10 +131,3 @@ async def handle_list_user_clinicians(
         "page_meta": page_meta,
         "paginator_base_query": base_query(request),
     }
-
-
-# Aliases so specs that import old names keep working.
-provider_form_extras = clinician_form_extras
-provider_detail_extras = clinician_detail_extras
-handle_list_user_providers = handle_list_user_clinicians
-_assert_provider_payload_org_ownership = _assert_clinician_payload_org_ownership

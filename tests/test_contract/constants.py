@@ -41,14 +41,14 @@ POST_DETAIL_PAGE_PATH = f"/referrals/{STUB_POST_ID}"
 # names (`CONSUMER_NAME_PROVIDER_*`, `PROVIDER_NAME_PROVIDERS`) keep
 # their historical identity so the pact-broker history reads
 # continuously across the rename.
-PROVIDER_CREATE_API_PATH = "/clinicians"
-PROVIDER_CREATE_FORM_PAGE_PATH = "/clinicians/form"
+CLINICIAN_CREATE_API_PATH = "/clinicians"
+CLINICIAN_CREATE_FORM_PAGE_PATH = "/clinicians/form"
 
 # Clinician edit form pact: parent practice-fields PATCH only.
 # (Sub-resource pacts — licensures, educations, certifications — deferred.)
-STUB_PROVIDER_ID = uuid.UUID("44444444-4444-4444-4444-444444444444")
-PROVIDER_PATCH_API_PATH = f"/clinicians/{STUB_PROVIDER_ID}"
-PROVIDER_EDIT_FORM_PAGE_PATH = f"/clinicians/{STUB_PROVIDER_ID}/form"
+STUB_CLINICIAN_ID = uuid.UUID("44444444-4444-4444-4444-444444444444")
+CLINICIAN_PATCH_API_PATH = f"/clinicians/{STUB_CLINICIAN_ID}"
+CLINICIAN_EDIT_FORM_PAGE_PATH = f"/clinicians/{STUB_CLINICIAN_ID}/form"
 
 # Organization create form pact.
 # `?type=clinic` bypasses the type-picker added in #704 and lands
@@ -77,7 +77,7 @@ PROVIDER_STATE_POST_EXISTS_AND_OWNED = (
 )
 PROVIDER_STATE_USER_CAN_CREATE_PROVIDER = "User can create a provider"
 PROVIDER_STATE_PROVIDER_EXISTS_AND_OWNED = (
-    f"Provider {STUB_PROVIDER_ID} exists and is owned by the requester"
+    f"Provider {STUB_CLINICIAN_ID} exists and is owned by the requester"
 )
 PROVIDER_STATE_USER_CAN_CREATE_ORGANIZATION = "User can create an organization"
 PROVIDER_STATE_USER_CAN_CREATE_PROGRAM = "User can create a program"
@@ -94,8 +94,8 @@ PROVIDER_NAME_USERS = "users-api"
 CONSUMER_NAME_POST_OWNER_ACTIONS = "post-owner-actions"
 PROVIDER_NAME_POSTS = "posts-api"
 
-CONSUMER_NAME_PROVIDER_CREATE_FORM = "provider-create-form"
-CONSUMER_NAME_PROVIDER_EDIT_FORM = "provider-edit-form"
+CONSUMER_NAME_CLINICIAN_CREATE_FORM = "provider-create-form"
+CONSUMER_NAME_CLINICIAN_EDIT_FORM = "provider-edit-form"
 PROVIDER_NAME_PROVIDERS = "providers-api"
 
 CONSUMER_NAME_ORGANIZATION_CREATE_FORM = "organization-create-form"
@@ -111,8 +111,8 @@ NETWORK_TIMEOUT_MS = 500
 PACT_PORT_AUTH = 1234
 PACT_PORT_USER_ACTIVATION = 1235
 PACT_PORT_POST_DELETE = 1238
-PACT_PORT_PROVIDER_CREATE = 1239
-PACT_PORT_PROVIDER_EDIT = 1240
+PACT_PORT_CLINICIAN_CREATE = 1239
+PACT_PORT_CLINICIAN_EDIT = 1240
 PACT_PORT_ORGANIZATION_CREATE = 1241
 PACT_PORT_PROGRAM_CREATE = 1242
 PACT_PORT_FORGOT_PASSWORD = 1243

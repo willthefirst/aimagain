@@ -1,6 +1,6 @@
 # Verifications cluster
 
-One row per nightly verification attempt against a `Clinician`. Records the outcome the orchestrator (#528) computed: a `status` from `VERIFICATION_STATUSES`, free-form `flags`, the raw NPPES response, an `oig_match` boolean, and an optional NPPES-vs-provider `name_match_score`. Parent-layer conventions (BaseModel inheritance, FK coverage, migrations) live in [`../README.md`](../README.md).
+One row per nightly verification attempt against a `Clinician`. Records the outcome the orchestrator (#528) computed: a `status` from `VERIFICATION_STATUSES`, free-form `flags`, the raw NPPES response, an `oig_match` boolean, and an optional NPPES-vs-clinician `name_match_score`. Parent-layer conventions (BaseModel inheritance, FK coverage, migrations) live in [`../README.md`](../README.md).
 
 ## Append-only by convention
 

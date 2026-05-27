@@ -1,4 +1,4 @@
-"""Tests for the four `ProviderLicensure`/`ProviderEducation`/`ProviderCertification`
+"""Tests for the four `ClinicianLicensure`/`ClinicianEducation`/`ClinicianCertification`
 credential models and the `Clinician` root they attach to.
 
 Exercises the invariants the DB layer owns: that multiple `Clinician` rows
@@ -14,9 +14,9 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from src.domain.models import (
     Clinician,
-    ProviderCertification,
-    ProviderEducation,
-    ProviderLicensure,
+    ClinicianCertification,
+    ClinicianEducation,
+    ClinicianLicensure,
 )
 from tests.helpers import create_test_user, make_organization_row
 
@@ -101,20 +101,20 @@ async def test_delete_clinician_cascades_to_credentials(
             session.add(user)
             clinician = _make_clinician(user)
             clinician.licensures.append(
-                ProviderLicensure(
+                ClinicianLicensure(
                     license_type="lcsw",
                     license_number="LCSW-123",
                     issuing_state="IL",
                 )
             )
             clinician.educations.append(
-                ProviderEducation(
+                ClinicianEducation(
                     education_type="msw",
                     institution="State University",
                 )
             )
             clinician.certifications.append(
-                ProviderCertification(
+                ClinicianCertification(
                     certification_type="emdr",
                     certifying_body="EMDRIA",
                 )
@@ -128,7 +128,7 @@ async def test_delete_clinician_cascades_to_credentials(
             await session.delete(loaded)
 
     async with db_test_session_manager() as session:
-        for cls in (ProviderLicensure, ProviderEducation, ProviderCertification):
+        for cls in (ClinicianLicensure, ClinicianEducation, ClinicianCertification):
             rows = (
                 (
                     await session.execute(
@@ -225,7 +225,7 @@ async def test_invalid_license_type_violates_check_constraint(
         async with db_test_session_manager() as session:
             async with session.begin():
                 session.add(
-                    ProviderLicensure(
+                    ClinicianLicensure(
                         clinician_id=clinician_id,
                         license_type="not_a_real_license",
                         license_number="X-1",

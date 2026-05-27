@@ -2,11 +2,11 @@
 
 The person behind a directory entry — license-holder, name on NPPES, owner of credentials.
 
-`Clinician` was carved out of `providers` over the `Provider → Clinician + Affiliation` split (issues #629, #635, #642). The credential sub-tables (`provider_licensure.py`, `provider_education.py`, `provider_certification.py` — class names preserved) have their FK on `clinicians.id`; credentials are person-level (a license follows the person across affiliations). `Clinician` owns the credential relationships with `cascade="all, delete-orphan"`. See [`../affiliations/README.md`](../affiliations/README.md) for the practice-role side.
+`Clinician` was carved out of `providers` over the `Provider → Clinician + Affiliation` split (issues #629, #635, #642). The credential sub-tables (`provider_licensure.py`, `provider_education.py`, `provider_certification.py` — file/table names kept for DB compat; Python classes are now `ClinicianLicensure`, `ClinicianEducation`, `ClinicianCertification`) have their FK on `clinicians.id`; credentials are person-level (a license follows the person across affiliations). `Clinician` owns the credential relationships with `cascade="all, delete-orphan"`. See [`../affiliations/README.md`](../affiliations/README.md) for the practice-role side.
 
 ## Model-vs-UI vocabulary
 
-This `Clinician` class is the **directory entry**: the row that `/clinicians/...` URLs, templates, and audit logs (`resource_type="clinician"`) refer to. It owns NPI, credentials, and affiliations. The legacy `Provider` class that previously held the directory role has been dropped; `Clinician` is now the single model for both the person and the directory entry.
+This `Clinician` class is the **directory entry**: the row that `/clinicians/...` URLs, templates, and audit logs (`resource_type="clinician"`) refer to. It owns NPI, credentials, and affiliations.
 
 ## Files
 

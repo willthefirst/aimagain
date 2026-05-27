@@ -39,7 +39,7 @@ class ProgramRead(ReadProjection):
     # ``org_id`` is the FK to the owning Organization; ``org_name`` is
     # the Org's display name, sourced from
     # ``program.organization.name`` via ``from_attributes`` (same
-    # inline-field shape as ``ProviderRead`` post-#524).
+    # inline-field shape as ``ClinicianRead`` post-#524).
     org_id: uuid.UUID
     org_name: str
     name: str

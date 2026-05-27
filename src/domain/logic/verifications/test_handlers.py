@@ -1,6 +1,6 @@
 """Tests for the verification orchestrator.
 
-`run_provider_verification` is exercised with a mocked `httpx.AsyncClient`
+`run_clinician_verification` is exercised with a mocked `httpx.AsyncClient`
 (via `httpx.MockTransport`) and a controlled LEIE fixture pointed at
 via `LEIE_CSV_PATH`. The table-driven outcome test pins one assertion
 per status branch (`verified` / `needs_review` / `failed-via-NPPES` /
@@ -215,7 +215,7 @@ async def test_run_returns_failed_when_oig_npi_match(
     assert verification.oig_match is True
 
 
-async def test_run_skips_nppes_when_provider_has_no_npi(
+async def test_run_skips_nppes_when_clinician_has_no_npi(
     db_test_session_manager: async_sessionmaker[AsyncSession],
 ):
     """`clinician.npi is None` → NPPES is not called and the row flags

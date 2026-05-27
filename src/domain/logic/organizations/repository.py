@@ -26,8 +26,8 @@ class OrganizationRepository(BaseRepository):
     async def list_for_user(self, user_id: uuid.UUID) -> Sequence[Organization]:
         """Lists every Organization owned by ``user_id``, newest first.
         Drives the Clinician create/edit form's Org-picker dropdown — users
-        can only attach Providers to Orgs they own (#524 retro: Org
-        ownership is the boundary for who may attach Providers, mirroring
+        can only attach Clinicians to Orgs they own (#524 retro: Org
+        ownership is the boundary for who may attach Clinicians, mirroring
         ``Organization.write_authz``)."""
         return await self.list_owned_by(Organization, user_id)
 

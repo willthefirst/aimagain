@@ -71,7 +71,7 @@ class PostRepository(BaseRepository):
         # Joins are added only when a filter that needs them is active,
         # so a bare `/posts` request stays a single-table read.
         needs_detail_join = any((q, state, city, age_group, language))
-        needs_provider_join = bool(state or city)
+        needs_clinician_join = bool(state or city)
         needs_owner_join = bool(posted_by)
 
         if needs_owner_join:
@@ -84,7 +84,7 @@ class PostRepository(BaseRepository):
                 OpeningDetail,
                 OpeningDetail.post_id == Post.id,
             )
-        if needs_provider_join:
+        if needs_clinician_join:
             stmt = stmt.outerjoin(
                 Affiliation,
                 Affiliation.clinician_id == OpeningDetail.clinician_id,

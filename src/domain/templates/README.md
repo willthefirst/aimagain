@@ -1,6 +1,6 @@
 # Domain templates
 
-Per-entity Jinja templates. One cluster directory per resource (`providers/`, `users/`, `posts/`, `favorites/`, `auth/`); cluster-local partials are prefixed `_`.
+Per-entity Jinja templates. One cluster directory per resource (`clinicians/`, `users/`, `posts/`, `favorites/`, `auth/`); cluster-local partials are prefixed `_`.
 
 Chrome, shared macros, and the generic view-type templates live in [`../../framework/templates/`](../../framework/templates/) — see its README for the full contract, including the page-chrome strips, the layering rule, and the four view-type templates (`views/list.html`, `views/detail.html`, `views/form_new.html`, `views/form_edit.html`) that this directory's pages extend.
 
@@ -92,7 +92,7 @@ One word per concept, no synonyms. Replace any of the variants below in any new 
 | The post type announcing program-level intake | intake | enrollment, admission window |
 | The post type seeking placement for a client | referral | seeker post, lead |
 
-The schema classes `ProviderCreate` / `ProviderRead` / `ProviderUpdate` and the credential model classes `ProviderLicensure` / `ProviderEducation` / `ProviderCertification` are historical names preserved on the Python side; user-facing copy says `clinician`.
+
 
 ### Shared microcopy
 

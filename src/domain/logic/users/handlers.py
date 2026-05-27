@@ -17,19 +17,19 @@ logger = logging.getLogger(__name__)
 async def user_detail_extras(
     *,
     target: User,
-    provider_repo: ClinicianRepository,
+    clinician_repo: ClinicianRepository,
     **_: Any,
 ) -> dict[str, Any]:
     """Per-viewer detail extras for `make_detail_handler(USER_ENTITY)`.
 
-    Fetches the providers the target owns. Viewer-derived flags
+    Fetches the clinicians the target owns. Viewer-derived flags
     (`is_self`, `can_admin_actions`, `can_view_private`) and the
     `target_user` projection are framework-injected by `handle_detail`
     from `USER_ENTITY.public_fields` / `private_fields` /
     `private_field_predicate` — defense-in-depth (a forgotten template
     guard can re-leak; a missing dict key can't) is preserved.
     """
-    return {"clinicians": await provider_repo.list_for_user(target.id)}
+    return {"clinicians": await clinician_repo.list_for_user(target.id)}
 
 
 async def handle_set_user_activation(

@@ -39,7 +39,7 @@ def make_clinician_credential_entity(
     `audit_stem` is the `AuditAction` enum stem (e.g. `"licensure"` for
     the `CREATE_LICENSURE` / `UPDATE_LICENSURE` / `DELETE_LICENSURE`
     triple) — the credential enum stems diverge from the entity `name`
-    (which is `"provider_licensure"`) so the stem is passed explicitly
+    (which is `"clinician_licensure"`) so the stem is passed explicitly
     via the spec's `audit_action_stem`.
     `read_schema` is the response shape for `PATCH`; the spec
     constructor synthesizes `read_to_dict` from it and defaults

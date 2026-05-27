@@ -3,7 +3,7 @@
 A `Clinician` is a long-lived directory entry owned by a `User`
 (N:1 via `owner_id` — a user may own zero, one, or many clinicians). It
 holds three credential lists —
-`ProviderLicensure`, `ProviderEducation`, `ProviderCertification` —
+`ClinicianLicensure`, `ClinicianEducation`, `ClinicianCertification` —
 each managed via its own endpoints in later issues. The wire surface
 mirrors that shape: each entity has Read / Create / Update variants.
 
@@ -15,7 +15,7 @@ This module therefore declares no `*AuditSnapshot` symbols; posts and
 users genuinely diverge (kind-discriminated flatten / omitted id) and
 keep distinct classes — see those modules.
 
-`ProviderRead` embeds the sub-entity Read lists. `ProviderUpdate` does
+`ClinicianRead` embeds the sub-entity Read lists. `ClinicianUpdate` does
 **not** include nested lists — sub-entities are PATCHed via their own
 routes (added later), so a clinician-level PATCH only touches the
 practice/availability fields.
@@ -99,17 +99,15 @@ InNetworkCarriersField = Annotated[
 ]
 
 
-class _ProviderSubrowBase(ReadProjection):
+class _ClinicianSubrowBase(ReadProjection):
     """Common fields for every credential sub-row Read schema (licensure /
     education / certification). Subclasses add entity-specific fields.
     Also serves as the audit-snapshot shape (see module docstring).
 
-    Credentials FK to `clinicians.id` after #635 PR A — they're person-
-    level data shared across affiliations. The wire surface carries
-    `clinician_id` (the persisted FK); the URL still scopes mutations
-    through `/clinicians/{clinician_id}/...` so clients use the URL
-    for the clinician context (URL family renamed in #642 PR 4; the
-    model class stays `ProviderLicensure` / `ProviderEducation` / `ProviderCertification`).
+    Credentials FK to `clinicians.id` — they're person-level data shared
+    across affiliations. The wire surface carries `clinician_id` (the
+    persisted FK); the URL scopes mutations through
+    `/clinicians/{clinician_id}/...`.
     """
 
     id: uuid.UUID
@@ -118,40 +116,40 @@ class _ProviderSubrowBase(ReadProjection):
     updated_at: datetime
 
 
-# --- ProviderLicensure --------------------------------------------------
+# --- ClinicianLicensure -------------------------------------------------
 
 
-class ProviderLicensureRead(_ProviderSubrowBase):
+class ClinicianLicensureRead(_ClinicianSubrowBase):
     license_type: str
     license_number: str
     issuing_state: str
     expiration_date: date | None = None
 
 
-class ProviderLicensureCreate(WirePayload):
+class ClinicianLicensureCreate(WirePayload):
     license_type: Literal[*LICENSE_TYPES]
     license_number: StrippedText
     issuing_state: Literal[*US_STATES]
     expiration_date: date | None = None
 
 
-class ProviderLicensureUpdate(PartialUpdate):
+class ClinicianLicensureUpdate(PartialUpdate):
     license_type: Literal[*LICENSE_TYPES] | None = None
     license_number: StrippedText | None = None
     issuing_state: Literal[*US_STATES] | None = None
     expiration_date: date | None = None
 
 
-# --- ProviderEducation --------------------------------------------------
+# --- ClinicianEducation -------------------------------------------------
 
 
-class ProviderEducationRead(_ProviderSubrowBase):
+class ClinicianEducationRead(_ClinicianSubrowBase):
     education_type: str
     institution: str
     month_completed: str | None = None
 
 
-class ProviderEducationCreate(WirePayload):
+class ClinicianEducationCreate(WirePayload):
     education_type: Literal[*EDUCATION_TYPES]
     institution: StrippedText
     # `month_completed` is a "YYYY-MM" string per the model — month
@@ -160,28 +158,28 @@ class ProviderEducationCreate(WirePayload):
     month_completed: str | None = None
 
 
-class ProviderEducationUpdate(PartialUpdate):
+class ClinicianEducationUpdate(PartialUpdate):
     education_type: Literal[*EDUCATION_TYPES] | None = None
     institution: StrippedText | None = None
     month_completed: str | None = None
 
 
-# --- ProviderCertification ----------------------------------------------
+# --- ClinicianCertification ---------------------------------------------
 
 
-class ProviderCertificationRead(_ProviderSubrowBase):
+class ClinicianCertificationRead(_ClinicianSubrowBase):
     certification_type: str
     certifying_body: str
     expiration_date: date | None = None
 
 
-class ProviderCertificationCreate(WirePayload):
+class ClinicianCertificationCreate(WirePayload):
     certification_type: Literal[*CERTIFICATION_TYPES]
     certifying_body: StrippedText
     expiration_date: date | None = None
 
 
-class ProviderCertificationUpdate(PartialUpdate):
+class ClinicianCertificationUpdate(PartialUpdate):
     certification_type: Literal[*CERTIFICATION_TYPES] | None = None
     certifying_body: StrippedText | None = None
     expiration_date: date | None = None
@@ -190,7 +188,7 @@ class ProviderCertificationUpdate(PartialUpdate):
 # --- Clinician ----------------------------------------------------
 
 
-class ProviderRead(FlatLocationSchema, ReadProjection):
+class ClinicianRead(FlatLocationSchema, ReadProjection):
     id: uuid.UUID
     owner_id: uuid.UUID
     created_at: datetime
@@ -224,12 +222,12 @@ class ProviderRead(FlatLocationSchema, ReadProjection):
     in_network_carriers: list[str] = []
     sliding_scale: bool
     cost: str | None = None
-    licensures: list[ProviderLicensureRead] = []
-    educations: list[ProviderEducationRead] = []
-    certifications: list[ProviderCertificationRead] = []
+    licensures: list[ClinicianLicensureRead] = []
+    educations: list[ClinicianEducationRead] = []
+    certifications: list[ClinicianCertificationRead] = []
 
 
-class ProviderCreate(FlatLocationSchema, WirePayload):
+class ClinicianCreate(FlatLocationSchema, WirePayload):
     """Create payload for a clinician directory entry. `owner_id` is
     set by the route from the authenticated user, not accepted on the
     wire.
@@ -254,7 +252,7 @@ class ProviderCreate(FlatLocationSchema, WirePayload):
     org_id: uuid.UUID | None = None
 
     @model_validator(mode="after")
-    def _require_org_or_solo(self) -> "ProviderCreate":
+    def _require_org_or_solo(self) -> "ClinicianCreate":
         if not self.solo_practice and self.org_id is None:
             raise ValueError("org_id is required unless solo_practice is True")
         return self
@@ -279,17 +277,17 @@ class ProviderCreate(FlatLocationSchema, WirePayload):
     in_network_carriers: InNetworkCarriersField = []
     sliding_scale: bool = False
     cost: StrippedOptionalText = None
-    licensures: list[ProviderLicensureCreate] = []
-    educations: list[ProviderEducationCreate] = []
-    certifications: list[ProviderCertificationCreate] = []
+    licensures: list[ClinicianLicensureCreate] = []
+    educations: list[ClinicianEducationCreate] = []
+    certifications: list[ClinicianCertificationCreate] = []
 
 
-class ProviderUpdate(FlatLocationSchema, PartialUpdate):
+class ClinicianUpdate(FlatLocationSchema, PartialUpdate):
     """Partial update of practice/availability fields only. Sub-entity
     lists (licensures, educations, certifications) are managed via
     their own endpoints, so this schema does not accept them.
 
-    Like :class:`ProviderCreate`, the location triple is embedded as a
+    Like :class:`ClinicianCreate`, the location triple is embedded as a
     :class:`LocationPartial` value object — patches can touch one
     subfield independently (e.g. just ``location_city``) and the
     flatten-on-dump serializer keeps ``payload.model_dump(exclude_unset=True)``
@@ -302,7 +300,7 @@ class ProviderUpdate(FlatLocationSchema, PartialUpdate):
     # the Organization itself, not via this schema.
     org_id: uuid.UUID | None = None
     # Patch the NPI by writing a 10-digit string or empty (→ `None`,
-    # clearing the field). Same validator as :class:`ProviderCreate`.
+    # clearing the field). Same validator as :class:`ClinicianCreate`.
     npi: NpiText = None
     # Patch the linked Clinician's first / last name. Empty input
     # normalizes to `None` so submitting a blank field clears the

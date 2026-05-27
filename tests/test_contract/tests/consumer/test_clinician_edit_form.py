@@ -1,19 +1,19 @@
 """Consumer contract: editing the practice fields on the clinician edit form.
 
 Verifies that the practice-fields HTMX form rendered by
-`templates/providers/form_edit.html` (mounted via the
-`provider_edit_form` stub on the consumer server) issues a
+`templates/clinicians/form_edit.html` (mounted via the
+`clinician_edit_form` stub on the consumer server) issues a
 `PATCH /clinicians/{id}` form-encoded request with the practice fields
 the route expects. After #524 the practice's display name lives on
-``provider.org.name``, so the form's "what Organization?" knob is an
+``clinician.org.name``, so the form's "what Organization?" knob is an
 ``org_id`` `<select>`; the form still PATCHes ``location_*`` and
-session/insurance fields directly on the Provider.
+session/insurance fields directly on the Clinician.
 
-After #642 PR 1 a Provider may hold multiple Affiliations and the
+After #642 PR 1 a Clinician may hold multiple Affiliations and the
 edit page surfaces them as an inline list. The top-level
 `PATCH /clinicians/{id}` form is unchanged on the wire — the per-role
 fields it posts (`location_*`, sessions, insurance, `sliding_scale`,
-`cost`) are routed by Provider per-role property proxies to the primary
+`cost`) are routed by Clinician per-role property proxies to the primary
 (oldest) affiliation row. The affiliation sub-resource PATCH endpoint
 (`PATCH /clinicians/{id}/affiliations/{aff_id}`) exists in the framework
 but has no consumer UI today, so it is intentionally not contract-tested
@@ -29,12 +29,12 @@ from pact import Like
 from playwright.async_api import Page
 
 from tests.test_contract.constants import (
-    CONSUMER_NAME_PROVIDER_EDIT_FORM,
+    CLINICIAN_EDIT_FORM_PAGE_PATH,
+    CLINICIAN_PATCH_API_PATH,
+    CONSUMER_NAME_CLINICIAN_EDIT_FORM,
     NETWORK_TIMEOUT_MS,
-    PACT_PORT_PROVIDER_EDIT,
-    PROVIDER_EDIT_FORM_PAGE_PATH,
+    PACT_PORT_CLINICIAN_EDIT,
     PROVIDER_NAME_PROVIDERS,
-    PROVIDER_PATCH_API_PATH,
     PROVIDER_STATE_PROVIDER_EXISTS_AND_OWNED,
 )
 from tests.test_contract.tests.shared.helpers import (
@@ -45,28 +45,30 @@ from tests.test_contract.tests.shared.helpers import (
 
 @pytest.mark.parametrize(
     "origin_with_routes",
-    [{"provider_edit_form": True, "auth_pages": False}],
+    [{"clinician_edit_form": True, "auth_pages": False}],
     indirect=True,
 )
 @pytest.mark.asyncio(loop_scope="session")
-async def test_consumer_provider_edit_form_submits(origin_with_routes: str, page: Page):
+async def test_consumer_clinician_edit_form_submits(
+    origin_with_routes: str, page: Page
+):
     """Edit a single practice field on the stubbed edit page; assert the
     intercepted PATCH matches the contracted shape."""
     pact = setup_pact(
-        CONSUMER_NAME_PROVIDER_EDIT_FORM,
+        CONSUMER_NAME_CLINICIAN_EDIT_FORM,
         PROVIDER_NAME_PROVIDERS,
-        port=PACT_PORT_PROVIDER_EDIT,
+        port=PACT_PORT_CLINICIAN_EDIT,
     )
     mock_server_uri = pact.uri
-    edit_page_url = f"{origin_with_routes}{PROVIDER_EDIT_FORM_PAGE_PATH}"
-    full_mock_url = f"{mock_server_uri}{PROVIDER_PATCH_API_PATH}"
+    edit_page_url = f"{origin_with_routes}{CLINICIAN_EDIT_FORM_PAGE_PATH}"
+    full_mock_url = f"{mock_server_uri}{CLINICIAN_PATCH_API_PATH}"
 
     expected_request_headers = {
         "Content-Type": Like("application/x-www-form-urlencoded")
     }
     # The form posts every prefilled field; the test changes
     # `location_city` to confirm the PATCH wiring. Other fields keep
-    # their stub values. `org_id` is the Org the stub's Provider is
+    # their stub values. `org_id` is the Org the stub's Clinician is
     # already attached to (its `<option selected>` in the dropdown).
     # The stub's insurance posture is self-pay-only (empty carrier list,
     # OON off, no sliding scale). The form pre-checks the "No" radio for
@@ -97,7 +99,7 @@ async def test_consumer_provider_edit_form_submits(origin_with_routes: str, page
         .upon_receiving("a request to patch a provider profile via web form")
         .with_request(
             method="PATCH",
-            path=PROVIDER_PATCH_API_PATH,
+            path=CLINICIAN_PATCH_API_PATH,
             headers=expected_request_headers,
             body=expected_request_body,
         )
@@ -110,7 +112,7 @@ async def test_consumer_provider_edit_form_submits(origin_with_routes: str, page
 
     await setup_playwright_pact_interception(
         page=page,
-        api_path_to_intercept=PROVIDER_PATCH_API_PATH,
+        api_path_to_intercept=CLINICIAN_PATCH_API_PATH,
         mock_pact_url=full_mock_url,
         http_method="PATCH",
     )
@@ -119,7 +121,7 @@ async def test_consumer_provider_edit_form_submits(origin_with_routes: str, page
     # the same input names (`location_city`, etc.), so every locator on
     # this page must be scoped to the practice-fields form to avoid
     # strict-mode multi-match.
-    practice_form = page.locator(f'form[hx-patch="{PROVIDER_PATCH_API_PATH}"]')
+    practice_form = page.locator(f'form[hx-patch="{CLINICIAN_PATCH_API_PATH}"]')
 
     with pact:
         await page.goto(edit_page_url)
