@@ -56,8 +56,8 @@ def score_verification(
     *,
     nppes: NppesResult,
     oig: OigResult,
-    provider_first_name: str,
-    provider_last_name: str,
+    clinician_first_name: str,
+    clinician_last_name: str,
 ) -> Score:
     """Score a verification attempt from the primitives.
 
@@ -84,8 +84,8 @@ def score_verification(
     # the NPPES side counts as a mismatch — a record without a name we
     # can compare isn't a "verified" identity match.
     nppes_full = f"{nppes.first_name or ''} {nppes.last_name or ''}".strip()
-    provider_full = f"{provider_first_name} {provider_last_name}".strip()
-    similarity = _name_similarity(nppes_full, provider_full)
+    clinician_full = f"{clinician_first_name} {clinician_last_name}".strip()
+    similarity = _name_similarity(nppes_full, clinician_full)
 
     if similarity < _NAME_MATCH_THRESHOLD:
         return Score(

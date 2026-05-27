@@ -32,8 +32,8 @@ def test_score_oig_npi_match_returns_failed():
     score = score_verification(
         nppes=_nppes(True, "Alice", "Doe"),
         oig=_oig(True, "npi_match"),
-        provider_first_name="Alice",
-        provider_last_name="Doe",
+        clinician_first_name="Alice",
+        clinician_last_name="Doe",
     )
     assert score.status == "failed"
     assert score.flags == ["oig_excluded:npi_match"]
@@ -44,8 +44,8 @@ def test_score_oig_name_match_returns_failed():
     score = score_verification(
         nppes=_nppes(True, "Alice", "Doe"),
         oig=_oig(True, "name_match"),
-        provider_first_name="Alice",
-        provider_last_name="Doe",
+        clinician_first_name="Alice",
+        clinician_last_name="Doe",
     )
     assert score.status == "failed"
     assert score.flags == ["oig_excluded:name_match"]
@@ -58,8 +58,8 @@ def test_score_oig_match_with_unknown_reason_still_flags():
     score = score_verification(
         nppes=_nppes(True, "X", "Y"),
         oig=OigResult(match=True, reason=None),  # type: ignore[arg-type]
-        provider_first_name="X",
-        provider_last_name="Y",
+        clinician_first_name="X",
+        clinician_last_name="Y",
     )
     assert score.status == "failed"
     assert score.flags == ["oig_excluded:unknown"]
@@ -71,8 +71,8 @@ def test_score_oig_match_overrides_nppes_not_found():
     score = score_verification(
         nppes=_nppes(False),
         oig=_oig(True, "npi_match"),
-        provider_first_name="Alice",
-        provider_last_name="Doe",
+        clinician_first_name="Alice",
+        clinician_last_name="Doe",
     )
     assert score.status == "failed"
     assert score.flags == ["oig_excluded:npi_match"]
@@ -85,8 +85,8 @@ def test_score_nppes_not_found_returns_failed():
     score = score_verification(
         nppes=_nppes(False),
         oig=_oig(False),
-        provider_first_name="Alice",
-        provider_last_name="Doe",
+        clinician_first_name="Alice",
+        clinician_last_name="Doe",
     )
     assert score.status == "failed"
     assert score.flags == ["nppes_npi_not_found"]
@@ -100,8 +100,8 @@ def test_score_name_mismatch_returns_needs_review():
     score = score_verification(
         nppes=_nppes(True, "Alice", "Smith"),
         oig=_oig(False),
-        provider_first_name="Bartholomew",
-        provider_last_name="Jenkins",
+        clinician_first_name="Bartholomew",
+        clinician_last_name="Jenkins",
     )
     assert score.status == "needs_review"
     assert score.flags == ["nppes_name_mismatch"]
@@ -115,8 +115,8 @@ def test_score_empty_nppes_names_count_as_mismatch():
     score = score_verification(
         nppes=_nppes(True),  # no names
         oig=_oig(False),
-        provider_first_name="Alice",
-        provider_last_name="Doe",
+        clinician_first_name="Alice",
+        clinician_last_name="Doe",
     )
     assert score.status == "needs_review"
     assert score.flags == ["nppes_name_mismatch"]
@@ -130,8 +130,8 @@ def test_score_exact_name_match_returns_verified():
     score = score_verification(
         nppes=_nppes(True, "Alice", "Doe"),
         oig=_oig(False),
-        provider_first_name="Alice",
-        provider_last_name="Doe",
+        clinician_first_name="Alice",
+        clinician_last_name="Doe",
     )
     assert score.status == "verified"
     assert score.flags == []
@@ -144,8 +144,8 @@ def test_score_name_match_is_case_insensitive():
     score = score_verification(
         nppes=_nppes(True, "ALICE", "DOE"),
         oig=_oig(False),
-        provider_first_name="alice",
-        provider_last_name="doe",
+        clinician_first_name="alice",
+        clinician_last_name="doe",
     )
     assert score.status == "verified"
     assert score.name_match_score == pytest.approx(1.0)
@@ -157,8 +157,8 @@ def test_score_close_but_above_threshold_returns_verified():
     score = score_verification(
         nppes=_nppes(True, "Alice", "Doe"),
         oig=_oig(False),
-        provider_first_name="Allice",  # extra 'l' typo
-        provider_last_name="Doe",
+        clinician_first_name="Allice",  # extra 'l' typo
+        clinician_last_name="Doe",
     )
     assert score.status == "verified"
     assert score.name_match_score is not None

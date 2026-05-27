@@ -1,6 +1,6 @@
 """Per-spec hook callables for the `Program` entity.
 
-Two callables, mirroring :mod:`src.domain.logic.providers.handlers`:
+Two callables, mirroring :mod:`src.domain.logic.clinicians.handlers`:
 
 * :func:`program_form_extras` — driven by
   ``PROGRAM_ENTITY.form_extras_path``. Loads the requesting user's

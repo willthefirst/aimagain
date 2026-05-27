@@ -33,10 +33,10 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from src.domain.models import Clinician, Organization, Post, Program
 from tests.helpers import (
     create_test_user,
+    make_clinician_with_org,
     make_intake_detail,
     make_opening_detail,
     make_program,
-    make_provider_with_org,
     make_referral_detail,
     opening_payload,
     promote_to_admin,
@@ -59,7 +59,7 @@ def _opening_post(
     *, owner_id, practice_name: str = "Practice", clinician: Clinician | None = None
 ) -> Post:
     if clinician is None:
-        clinician = make_provider_with_org(
+        clinician = make_clinician_with_org(
             owner_id=owner_id, practice_name=practice_name
         )
     if clinician.id is None:
@@ -435,7 +435,7 @@ async def test_clinician_opening_create_form_error_render_is_wired(
     needs a copy of this smoke for that entity's form — neither layer
     above re-runs per entity.
     """
-    clinician = make_provider_with_org(owner_id=logged_in_user.id)
+    clinician = make_clinician_with_org(owner_id=logged_in_user.id)
     async with db_test_session_manager() as session:
         async with session.begin():
             session.add(clinician)

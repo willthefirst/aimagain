@@ -244,6 +244,3 @@ def clinician_card_view(clinician) -> dict[str, Any]:
             for aff in affiliations
         ],
     }
-
-
-provider_card_view = clinician_card_view  # backwards-compat alias

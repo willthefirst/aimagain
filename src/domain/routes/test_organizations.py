@@ -179,7 +179,7 @@ async def test_detail_root_org_omits_parent_organization_row(
     """Issue #595 — root organizations rendered `Parent organization: —
     (root)`, a mixed empty-state convention. Root orgs now omit the
     parent row entirely (matches the optional-field grammar used by
-    posts/providers/programs detail templates)."""
+    posts/clinicians/programs detail templates)."""
     create_resp = await authenticated_client.post(
         "/organizations", data=_org_payload(name="Root-Org")
     )

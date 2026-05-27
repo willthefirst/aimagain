@@ -20,12 +20,12 @@ from src.framework.dispatch.entity_spec import EntitySpec
 
 from .affiliation import AFFILIATION_ENTITY
 from .clinician import CLINICIAN_ENTITY
+from .clinician_certification import CERTIFICATION_ENTITY
+from .clinician_education import EDUCATION_ENTITY
+from .clinician_licensure import LICENSURE_ENTITY
 from .organization import ORGANIZATION_ENTITY
 from .posts import OPENING_ENTITY, REFERRAL_ENTITY
 from .program import PROGRAM_ENTITY
-from .provider_certification import CERTIFICATION_ENTITY
-from .provider_education import EDUCATION_ENTITY
-from .provider_licensure import LICENSURE_ENTITY
 from .user import USER_ENTITY
 from .user_favorite import FAVORITE_ENTITY
 

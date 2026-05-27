@@ -7,11 +7,11 @@ from typing import Any, Callable, Optional
 import pytest
 
 from .infrastructure.servers.consumer import (
+    _setup_clinician_create_form_stub,
+    _setup_clinician_edit_form_stub,
     _setup_organization_create_form_stub,
     _setup_post_owner_actions_stub,
     _setup_program_create_form_stub,
-    _setup_provider_create_form_stub,
-    _setup_provider_edit_form_stub,
     _setup_users_admin_actions_stub,
 )
 from .tests.shared.mock_data_factory import MockDataFactory
@@ -115,8 +115,8 @@ CONTRACT_PAIRS: list[ContractPair] = [
         consumer_name="provider-create-form",
         provider_name="providers-api",
         pact_port=1239,
-        handler_mocks_factory=MockDataFactory.create_provider_create_dependency_config,
-        consumer_setup_fn=_setup_provider_create_form_stub,
+        handler_mocks_factory=MockDataFactory.create_clinician_create_dependency_config,
+        consumer_setup_fn=_setup_clinician_create_form_stub,
         provider_state="User can create a provider",
         pytest_marks=(pytest.mark.provider, pytest.mark.providers),
     ),
@@ -134,8 +134,8 @@ CONTRACT_PAIRS: list[ContractPair] = [
         consumer_name="provider-edit-form",
         provider_name="providers-api",
         pact_port=1240,
-        handler_mocks_factory=MockDataFactory.create_provider_update_dependency_config,
-        consumer_setup_fn=_setup_provider_edit_form_stub,
+        handler_mocks_factory=MockDataFactory.create_clinician_update_dependency_config,
+        consumer_setup_fn=_setup_clinician_edit_form_stub,
         provider_state="Provider 44444444-4444-4444-4444-444444444444 exists and is owned by the requester",
         pytest_marks=(pytest.mark.provider, pytest.mark.providers),
     ),

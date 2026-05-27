@@ -69,7 +69,7 @@ def test_oig_check_name_match_strips_whitespace():
     assert result.match is True
 
 
-def test_oig_check_returns_no_match_for_unrelated_provider():
+def test_oig_check_returns_no_match_for_unrelated_clinician():
     result = oig_check(first_name="NORMA", last_name="LEGITIMATE", npi="9999999999")
     assert result == OigResult(match=False, reason=None)
 

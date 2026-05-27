@@ -39,7 +39,7 @@ from src.framework.rendering.form_fields import HtmlPattern
 from src.framework.schema_validators import StrippedText, ZipText
 
 # `maxlength=120` is the client-side hint inherited from the pre-#451
-# `ProviderCreate.location_city` annotation. ``HtmlPattern`` is a form-
+# `ClinicianCreate.location_city` annotation. ``HtmlPattern`` is a form-
 # rendering hint only (see :mod:`src.framework.rendering.form_fields`);
 # Pydantic doesn't apply it as a server-side length cap. Client-referral
 # forms don't read the hint (their template uses ``text_field`` directly

@@ -8,7 +8,7 @@ One callable today:
   create / edit form can render a parent-Org picker (replaces the
   free-text UUID input — see issue #581). Mirrors
   :mod:`src.domain.logic.programs.handlers` and
-  :mod:`src.domain.logic.providers.handlers`: owners see only their
+  :mod:`src.domain.logic.clinicians.handlers`: owners see only their
   own Orgs; superusers see every Org.
 
 Edit-path: the Org being edited is excluded from the picker options

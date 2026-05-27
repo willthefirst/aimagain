@@ -11,17 +11,11 @@ _TABLE = "provider_licensures"
 _ck = partial(named_check_in, _TABLE)
 
 
-class ProviderLicensure(BaseModel):
+class ClinicianLicensure(BaseModel):
     """One row per professional license held by a clinician. CASCADE on
     the parent FK keeps the credential list in lockstep with the
-    `Clinician`. Person-level data (a license follows the person across
-    affiliations) — the FK moved from `providers.id` to `clinicians.id`
-    in the #635 PR A cleanup that closed out the #629 split.
-
-    `Provider.licensures` survives as a `@property` proxy delegating
-    to `provider.clinician.licensures` so existing route handlers,
-    templates, and the framework's `repo.add_child(parent, "licensures",
-    licensure)` path continue to work unchanged.
+    `Clinician`. Person-level data — a license follows the person across
+    affiliations.
     """
 
     __tablename__ = _TABLE

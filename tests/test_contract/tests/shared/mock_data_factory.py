@@ -305,7 +305,7 @@ class MockDataFactory:
         }
 
     @classmethod
-    def create_provider_create_dependency_config(cls) -> Dict[str, Any]:
+    def create_clinician_create_dependency_config(cls) -> Dict[str, Any]:
         """Mock for the factory-built `_handle_create_clinician`.
 
         The route under test (`POST /clinicians`) reads `id` off
@@ -317,12 +317,12 @@ class MockDataFactory:
         target `_handle_create_clinician` (not the pre-rename
         `_handle_create_provider`).
         """
-        stub_provider = SimpleNamespace(
+        stub_clinician = SimpleNamespace(
             id=UUID("33333333-3333-3333-3333-333333333333"),
         )
         return {
             "src.domain.routes.clinicians._handle_create_clinician": {
-                "return_value_config": stub_provider
+                "return_value_config": stub_clinician
             }
         }
 
@@ -365,11 +365,11 @@ class MockDataFactory:
         }
 
     @classmethod
-    def create_provider_update_dependency_config(cls) -> Dict[str, Any]:
+    def create_clinician_update_dependency_config(cls) -> Dict[str, Any]:
         """Mock for `handle_update_clinician` (factory-built).
 
         The route under test (`PATCH /clinicians/{id}`) packs the
-        handler's return value through `ProviderRead.model_validate` —
+        handler's return value through `ClinicianRead.model_validate` —
         so the stub must expose every field that schema requires. The
         framework names the auto-bound update handler after `spec.name`;
         post-#642 PR 4 that's `clinician`, so the mock targets
@@ -378,13 +378,13 @@ class MockDataFactory:
         from datetime import datetime, timezone
 
         now = datetime.now(timezone.utc)
-        stub_provider = SimpleNamespace(
+        stub_clinician = SimpleNamespace(
             id=UUID("44444444-4444-4444-4444-444444444444"),
             owner_id=UUID("00000000-0000-0000-0000-000000000004"),
             created_at=now,
             updated_at=now,
             # `org_id` + `org_name` replace the former `practice_name`
-            # (#524). `ProviderRead.model_validate` reads `org_name` off
+            # (#524). `ClinicianRead.model_validate` reads `org_name` off
             # this stub via `from_attributes`.
             org_id=UUID("55555555-5555-5555-5555-555555555555"),
             org_name="Acme Counseling",
@@ -393,7 +393,7 @@ class MockDataFactory:
             location_zip="11201",
             in_person_sessions="yes",
             virtual_sessions="please_contact",
-            # Insurance posture on Provider: empty carrier list (no
+            # Insurance posture on Clinician: empty carrier list (no
             # in-network) + OON off keeps this stub deterministic.
             accepts_out_of_network=False,
             in_network_carriers=[],
@@ -403,14 +403,13 @@ class MockDataFactory:
             educations=[],
             certifications=[],
         )
-        # After B3 (#330) the per-entity `handle_update_provider` is gone;
-        # the route binds `make_update_handler(PROVIDER_ENTITY)` and
-        # assigns it to the module-level `_handle_update_<spec.name>`
-        # attr — `_handle_update_clinician` after #642 PR 4 — so contract
+        # After B3 (#330) the per-entity `handle_update_clinician` is
+        # bound by `make_update_handler(CLINICIAN_ENTITY)` and assigned
+        # to the module-level `_handle_update_clinician` attr so contract
         # patches retarget here. The mount layer's `_resolve_handler`
         # reads from `__module__`.
         return {
             "src.domain.routes.clinicians._handle_update_clinician": {
-                "return_value_config": stub_provider
+                "return_value_config": stub_clinician
             }
         }

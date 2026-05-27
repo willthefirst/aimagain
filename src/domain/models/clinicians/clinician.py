@@ -60,17 +60,17 @@ class Clinician(BaseModel):
     )
 
     licensures = relationship(
-        "ProviderLicensure",
+        "ClinicianLicensure",
         cascade="all, delete-orphan",
         lazy="selectin",
     )
     educations = relationship(
-        "ProviderEducation",
+        "ClinicianEducation",
         cascade="all, delete-orphan",
         lazy="selectin",
     )
     certifications = relationship(
-        "ProviderCertification",
+        "ClinicianCertification",
         cascade="all, delete-orphan",
         lazy="selectin",
     )

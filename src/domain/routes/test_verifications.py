@@ -1,4 +1,4 @@
-"""Route-level tests for `POST /clinicians/{provider_id}/verifications`.
+"""Route-level tests for `POST /clinicians/{clinician_id}/verifications`.
 
 Covers the wire shape: superuser-only authorization, 404 on missing
 clinician, 201 + `Location` header on the happy path, and a persisted
@@ -21,7 +21,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from src.domain.logic.verifications import oig as oig_module
 from src.domain.models import User, Verification
-from tests.helpers import create_test_user, make_provider_with_org, promote_to_admin
+from tests.helpers import create_test_user, make_clinician_with_org, promote_to_admin
 
 pytestmark = pytest.mark.asyncio
 
@@ -67,7 +67,7 @@ def _patch_external_apis(monkeypatch):
     oig_module._reset_cache_for_tests()
 
 
-async def _seed_provider(
+async def _seed_clinician(
     db_test_session_manager: async_sessionmaker[AsyncSession],
     *,
     npi: str | None = "1234567890",
@@ -76,7 +76,7 @@ async def _seed_provider(
     async with db_test_session_manager() as session:
         async with session.begin():
             session.add(owner)
-            clinician = make_provider_with_org(owner_id=owner.id, npi=npi)
+            clinician = make_clinician_with_org(owner_id=owner.id, npi=npi)
             session.add(clinician)
         return clinician.id
 
@@ -88,9 +88,9 @@ async def test_non_superuser_gets_403(
 ):
     """`current_admin_user` rejects non-superusers — fastapi-users
     returns 403 (not 401, since the user *is* authenticated)."""
-    provider_id = await _seed_provider(db_test_session_manager)
+    clinician_id = await _seed_clinician(db_test_session_manager)
     response = await authenticated_client.post(
-        f"/clinicians/{provider_id}/verifications"
+        f"/clinicians/{clinician_id}/verifications"
     )
     assert response.status_code == 403
 
@@ -103,10 +103,10 @@ async def test_admin_happy_path_returns_201_and_persists(
     """Promoted admin → orchestrator runs end-to-end → 201 with the new
     row's id + a `Location` header pointing at the per-verification URL."""
     await promote_to_admin(db_test_session_manager, logged_in_user.email)
-    provider_id = await _seed_provider(db_test_session_manager, npi="1234567890")
+    clinician_id = await _seed_clinician(db_test_session_manager, npi="1234567890")
 
     response = await authenticated_client.post(
-        f"/clinicians/{provider_id}/verifications"
+        f"/clinicians/{clinician_id}/verifications"
     )
     assert response.status_code == 201
     body = response.json()
@@ -114,7 +114,7 @@ async def test_admin_happy_path_returns_201_and_persists(
     assert body["status"] in {"verified", "needs_review", "failed"}
     assert (
         response.headers["Location"]
-        == f"/clinicians/{provider_id}/verifications/{verification_id}"
+        == f"/clinicians/{clinician_id}/verifications/{verification_id}"
     )
 
     async with db_test_session_manager() as session:
@@ -128,10 +128,10 @@ async def test_admin_happy_path_returns_201_and_persists(
             .first()
         )
         assert row is not None
-        assert row.clinician_id == provider_id
+        assert row.clinician_id == clinician_id
 
 
-async def test_admin_404_for_missing_provider(
+async def test_admin_404_for_missing_clinician(
     authenticated_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user: User,
@@ -150,6 +150,6 @@ async def test_anon_gets_401_or_redirect(
     pipeline. fastapi-users returns 401 for cookie-auth misses; the
     contract for this route is "anyone unauthorized doesn't get in"
     rather than a specific code, so accept 401 or 403."""
-    provider_id = await _seed_provider(db_test_session_manager)
-    response = await test_client.post(f"/clinicians/{provider_id}/verifications")
+    clinician_id = await _seed_clinician(db_test_session_manager)
+    response = await test_client.post(f"/clinicians/{clinician_id}/verifications")
     assert response.status_code in {401, 403}

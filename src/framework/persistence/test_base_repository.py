@@ -14,12 +14,12 @@ import pytest
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from src.domain.models import Clinician, ProviderLicensure, User
+from src.domain.models import Clinician, ClinicianLicensure, User
 from src.framework.persistence.base_repository import BaseRepository
 from tests.helpers import (
     create_test_user,
+    make_clinician_licensure,
     make_clinician_with_org,
-    make_provider_licensure,
 )
 
 pytestmark = pytest.mark.asyncio
@@ -187,14 +187,14 @@ async def test_count_respects_distinct_with_join(
     async with db_test_session_manager() as session:
         async with session.begin():
             session.add(
-                make_provider_licensure(
+                make_clinician_licensure(
                     clinician_id=clinician_id,
                     license_type="lcsw",
                     license_number="L-1",
                 )
             )
             session.add(
-                make_provider_licensure(
+                make_clinician_licensure(
                     clinician_id=clinician_id,
                     license_type="lcsw",
                     license_number="L-2",
@@ -203,8 +203,8 @@ async def test_count_respects_distinct_with_join(
 
     stmt = (
         select(Clinician)
-        .join(ProviderLicensure, ProviderLicensure.clinician_id == Clinician.id)
-        .filter(ProviderLicensure.license_type == "lcsw")
+        .join(ClinicianLicensure, ClinicianLicensure.clinician_id == Clinician.id)
+        .filter(ClinicianLicensure.license_type == "lcsw")
         .distinct()
     )
 

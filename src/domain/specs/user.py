@@ -94,5 +94,5 @@ USER_ENTITY: Final[EntitySpec] = EntitySpec(
     # dotted-path trick the state-axis / subresource handlers use —
     # `specs/user.py` never statically imports `src.logic.users`.
     detail_extras_path="src.domain.logic.users.handlers.user_detail_extras",
-    detail_extras_repos=(("provider_repo", ClinicianRepository),),
+    detail_extras_repos=(("clinician_repo", ClinicianRepository),),
 )
