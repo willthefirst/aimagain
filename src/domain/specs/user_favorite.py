@@ -8,7 +8,7 @@ characteristics no prior entity exercised:
      `EdgeAudit` captures the binding instead. The two are mutually
      exclusive on `EntitySpec`; favorites uses `edge_audit`.
   2. **Many-to-many shape.** The `user_favorites` join table links
-     `User` and `Provider`. `M2NRelation` captures the endpoints
+     `User` and `Clinician`. `M2NRelation` captures the endpoints
      + join-table shape.
 
 Phase 1 makes both declarations load-bearing: handlers in

@@ -17,9 +17,9 @@ Child contract:
 
   Required blocks:
     resource_label — short string label for the collection segment of
-                     the breadcrumb (e.g. "Providers").
+                     the breadcrumb (e.g. "Clinicians").
     current_label  — short string label for the resource being edited
-                     (e.g. `{{ provider.org.name }}` or a referral's
+                     (e.g. `{{ clinician.org.name }}` or a referral's
                      identity line). Used only as the link text for
                      the second breadcrumb segment — NOT in the H1.
                      The H1 reads `edit_heading` (sourced from
@@ -35,7 +35,7 @@ Child contract:
   Required context:
     resource_url        — URL the collection segment links to.
     resource_detail_url — URL the current-item breadcrumb segment
-                          links to (e.g. `"/clinicians/" ~ provider.id`).
+                          links to (e.g. `"/clinicians/" ~ clinician.id`).
     edit_heading        — full H1 string (e.g. "Edit clinician
                           opening"). Set by `handle_get_edit_form` via
                           `edit_label_for(spec, kind=...)` — same

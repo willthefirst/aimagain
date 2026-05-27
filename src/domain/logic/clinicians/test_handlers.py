@@ -131,7 +131,7 @@ async def _seed_org(
     owner_id: uuid.UUID,
     name: str = "Acme Health",
 ) -> uuid.UUID:
-    """Persist a root Organization and return its id. Provider create
+    """Persist a root Organization and return its id. Clinician create
     payloads require ``org_id`` on the wire (#524); tests seed an Org
     first and reference its id."""
     org = make_organization_row(owner_id=owner_id, name=name)
@@ -168,7 +168,7 @@ async def _audit_rows_for(
         return list(rows)
 
 
-# --- Provider reads -------------------------------------------------------
+# --- Clinician reads -------------------------------------------------------
 
 
 async def test_list_clinicians_returns_persisted_rows(
@@ -189,8 +189,7 @@ async def test_list_clinicians_returns_persisted_rows(
             filter_values={"license_type": None, "issuing_state": None},
         )
         # Framework binds `context[spec.url_collection] = items`; the
-        # collection flipped to "clinicians" in #642 PR 4. The list still
-        # holds `Provider` instances under the hood.
+        # collection key is "clinicians" (spec.name plural).
         assert len(context["clinicians"]) == 2
         assert context["selected_license_type"] is None
         assert context["selected_issuing_state"] is None
@@ -247,8 +246,7 @@ async def test_get_clinician_detail_returns_context(
             },
         )
         # Framework binds `context[spec.name] = target`; the spec name
-        # flipped to "clinician" in #642 PR 4. The underlying row is
-        # still a `Provider` instance.
+        # is "clinician".
         assert context["clinician"].id == clinician_id
         assert context["current_user"] is user
         assert "request" in context
@@ -454,7 +452,7 @@ async def test_list_user_clinicians_404_when_target_user_missing(
 # --- handle_create (clinician, via the generic framework) -----------------
 
 
-# Provider create goes through the framework's `handle_create`. The
+# Clinician create goes through the framework's `handle_create`. The
 # inline-children loop now lives in `_generic.py`, driven by
 # `CLINICIAN_ENTITY.children`.
 async def test_create_clinician_persists_row_and_writes_audit(
@@ -634,7 +632,7 @@ async def test_clinician_form_extras_superuser_sees_all_orgs(
 async def test_clinician_form_extras_edit_path_passes_target(
     db_test_session_manager: async_sessionmaker[AsyncSession],
 ):
-    """On the edit path the framework passes the loaded Provider as
+    """On the edit path the framework passes the loaded Clinician as
     `target`. The current implementation doesn't read it, but the
     callable must accept it without complaint — the contract is the
     same on both paths."""

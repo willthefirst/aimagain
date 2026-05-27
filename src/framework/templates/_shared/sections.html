@@ -37,7 +37,7 @@ owns the if/else split — callers own the row markup and the surrounding
 empty-state branch is repeated enough that it is).
 
 Example:
-  {% call(lic) list_or_empty(provider.licensures, "No licensures yet.") %}
+  {% call(lic) list_or_empty(clinician.licensures, "No licensures yet.") %}
   <li>… {{ lic.license_number }} …</li>
   {% endcall %}
 #}

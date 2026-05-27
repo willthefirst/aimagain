@@ -231,7 +231,7 @@ async def test_payload_authz_noop_when_org_id_absent(
 ):
     """PATCH payloads that don't set ``org_id`` skip the check entirely
     — only flow through ownership when the payload actually proposes a
-    new Org. (Mirrors the Provider analog.)"""
+    new Org. (Mirrors the Clinician analog.)"""
     user = await _seed_user(db_test_session_manager)
     payload = ProgramUpdate(name="Renamed")
     assert payload.org_id is None

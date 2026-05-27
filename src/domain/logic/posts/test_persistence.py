@@ -288,7 +288,7 @@ async def test_delete_post_cascades_referral_detail(
         assert detail_row is None
 
 
-# --- Provider availability kind ------------------------------------------
+# --- Clinician availability kind ------------------------------------------
 
 
 async def test_create_post_persists_parent_and_opening_detail(
@@ -418,7 +418,7 @@ async def test_update_post_writes_to_opening_detail(
     async with db_test_session_manager() as session:
         repo = BaseRepository(session)
         post = await repo.get_by_model_id(Post, post_id)
-        # Practice-name lives on Provider post-#448, so this round-trips a
+        # Practice-name lives on Clinician post-#448, so this round-trips a
         # remaining PA field (`description`) instead.
         await repo.patch(post.opening_detail, description="new description")
         await session.commit()

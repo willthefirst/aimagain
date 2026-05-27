@@ -11,7 +11,7 @@ def test_both_consumer_tables_carry_the_three_location_columns():
     that here.
 
     Consumers post-#635 PR B are ``Affiliation`` (carrying the per-
-    role attributes that used to live on ``Provider``) and
+    role attributes that used to live on ``Provider``/``Affiliation``) and
     ``ReferralDetail`` (the seeking side of a Post).
     """
     for cls in (Affiliation, ReferralDetail):

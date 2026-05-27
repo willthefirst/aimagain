@@ -382,7 +382,7 @@ def test_post_create_dispatches_opening():
     p = post_create_adapter.validate_python(opening_payload())
     assert isinstance(p, ClinicianOpeningCreate)
     assert p.kind == "clinician_opening"
-    # Insurance posture moved to Provider in #449; PA no longer carries
+    # Insurance posture moved to Clinician in #449; PA no longer carries
     # `sliding_scale` / `payment_situation` / `cost` on the wire.
 
 
@@ -445,7 +445,7 @@ def test_post_create_referral_accepts_all_network_preference_tokens(token):
 @pytest.mark.parametrize("token", INSURANCE_CARRIERS)
 def test_post_create_referral_accepts_all_insurance_carriers(token):
     """Every `INSURANCE_CARRIERS` token validates as a CR
-    `insurance_carrier` value (shared vocab with Provider)."""
+    `insurance_carrier` value (shared vocab with Clinician)."""
     p = post_create_adapter.validate_python(referral_payload(insurance_carrier=token))
     assert p.insurance_carrier == token
 
@@ -604,7 +604,7 @@ def test_post_update_opening_accepts_clinician_id_only():
 
 def test_post_update_opening_strips_whitespace():
     """`description` is a free-text PA field — whitespace stripping still
-    applies. (Practice-name stripping moved to Provider with #448.)"""
+    applies. (Practice-name stripping moved to Clinician with #448.)"""
     p = post_update_adapter.validate_python(
         {"kind": "clinician_opening", "description": "  Renamed  "}
     )
@@ -859,7 +859,7 @@ def test_post_create_opening_services_absent_defaults_empty():
 def test_post_create_opening_accepts_omitted_optional_fields():
     """`services` and `settings` are optional on PA Create (#433) — omitting
     them defaults to `[]`. (Practice/location/session fields moved to
-    Provider per #448 and are no longer wire fields on PA.)"""
+    Clinician per #448 and are no longer wire fields on PA.)"""
     payload = opening_payload()
     for field in ("services", "settings"):
         payload.pop(field, None)
