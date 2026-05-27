@@ -7,23 +7,18 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from src.domain.models import (
-    Provider,
-    ProviderCertification,
-    ProviderEducation,
-    ProviderLicensure,
+    Clinician,
     User,
     Verification,
 )
 from src.framework.audit.repository import AuditRepository
 from tests.helpers import (
+    clinician_payload,
     create_test_user,
+    make_clinician_with_org,
     make_organization_row,
-    make_provider_certification,
-    make_provider_education,
     make_provider_licensure,
-    make_provider_with_org,
     promote_to_admin,
-    provider_payload,
 )
 
 pytestmark = pytest.mark.asyncio
@@ -55,7 +50,7 @@ async def _seed_provider_for(
     **overrides,
 ) -> uuid.UUID:
     """Insert a provider owned by `user_id` and return its id."""
-    provider = make_provider_with_org(owner_id=user_id, **overrides)
+    provider = make_clinician_with_org(owner_id=user_id, **overrides)
     async with db_test_session_manager() as session:
         async with session.begin():
             session.add(provider)
@@ -65,24 +60,16 @@ async def _seed_provider_for(
 
 async def _clinician_id_for(
     db_test_session_manager: async_sessionmaker[AsyncSession],
-    provider_id: uuid.UUID,
+    clinician_id: uuid.UUID,
 ) -> uuid.UUID:
-    """Look up the `clinician_id` for a previously-seeded provider —
-    credential sub-tables FK to `clinicians.id` after #635 PR A, but
-    test fixtures still carry `provider_id` around. One small lookup
-    bridges the two."""
-    async with db_test_session_manager() as session:
-        return (
-            await session.execute(
-                select(Provider.clinician_id).where(Provider.id == provider_id)
-            )
-        ).scalar_one()
+    """Return the clinician_id — the id passed in IS the clinician_id."""
+    return clinician_id
 
 
 async def _seed_other_user_with_provider(
     db_test_session_manager: async_sessionmaker[AsyncSession],
 ) -> tuple[uuid.UUID, uuid.UUID]:
-    """Create a second user + their provider. Returns (user_id, provider_id)."""
+    """Create a second user + their clinician. Returns (user_id, clinician_id)."""
     other = create_test_user(username=f"other-{uuid.uuid4()}")
     async with db_test_session_manager() as session:
         async with session.begin():
@@ -104,7 +91,7 @@ async def _audit_rows_for(
         )
 
 
-# --- Provider create ------------------------------------------------------
+# --- Clinician create ------------------------------------------------------
 
 
 async def test_create_provider_happy_path(
@@ -119,7 +106,7 @@ async def test_create_provider_happy_path(
     )
     response = await authenticated_client.post(
         "/clinicians",
-        data=provider_payload(org_id=str(org_id)),
+        data=clinician_payload(org_id=str(org_id)),
     )
 
     assert response.status_code == 201
@@ -128,7 +115,7 @@ async def test_create_provider_happy_path(
     assert response.headers["HX-Redirect"] == f"/clinicians/{new_id}/form"
 
     async with db_test_session_manager() as session:
-        result = await session.execute(select(Provider).filter(Provider.id == new_id))
+        result = await session.execute(select(Clinician).filter(Clinician.id == new_id))
         persisted = result.scalars().first()
         assert persisted is not None
         assert persisted.owner_id == logged_in_user.id
@@ -166,7 +153,7 @@ async def test_create_provider_form_error_render_is_wired(
     org_id = await _seed_org(
         db_test_session_manager, owner_id=logged_in_user.id, name="Acme"
     )
-    payload = provider_payload(org_id=str(org_id))
+    payload = clinician_payload(org_id=str(org_id))
     payload["in_person_sessions"] = "not-a-valid-option"
     response = await authenticated_client.post(
         "/clinicians",
@@ -198,13 +185,13 @@ async def test_create_provider_allows_multiple_per_user(
         db_test_session_manager, owner_id=logged_in_user.id, name="Second"
     )
     first = await authenticated_client.post(
-        "/clinicians", data=provider_payload(org_id=str(org_first))
+        "/clinicians", data=clinician_payload(org_id=str(org_first))
     )
     assert first.status_code == 201
     first_id = uuid.UUID(first.json()["id"])
 
     second = await authenticated_client.post(
-        "/clinicians", data=provider_payload(org_id=str(org_second))
+        "/clinicians", data=clinician_payload(org_id=str(org_second))
     )
     assert second.status_code == 201
     second_id = uuid.UUID(second.json()["id"])
@@ -213,7 +200,7 @@ async def test_create_provider_allows_multiple_per_user(
 
     async with db_test_session_manager() as session:
         result = await session.execute(
-            select(Provider).filter(Provider.owner_id == logged_in_user.id)
+            select(Clinician).filter(Clinician.owner_id == logged_in_user.id)
         )
         owned = result.scalars().all()
         assert {p.id for p in owned} == {first_id, second_id}
@@ -225,7 +212,7 @@ async def test_create_provider_rejects_org_owned_by_another_user(
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user: User,
 ):
-    """Attaching a Provider is permissioned by Org ownership (#524). A
+    """Attaching a Clinician is permissioned by Org ownership (#524). A
     user POSTing with another user's `org_id` is forbidden — 403 keeps
     the boundary visible (the dropdown wouldn't have surfaced this Org
     in the first place; this guard catches curl callers)."""
@@ -238,7 +225,7 @@ async def test_create_provider_rejects_org_owned_by_another_user(
     )
 
     response = await authenticated_client.post(
-        "/clinicians", data=provider_payload(org_id=str(other_org_id))
+        "/clinicians", data=clinician_payload(org_id=str(other_org_id))
     )
     assert response.status_code == 403
 
@@ -252,7 +239,7 @@ async def test_create_provider_rejects_nonexistent_org(
     would otherwise produce."""
     bogus = uuid.uuid4()
     response = await authenticated_client.post(
-        "/clinicians", data=provider_payload(org_id=str(bogus))
+        "/clinicians", data=clinician_payload(org_id=str(bogus))
     )
     assert response.status_code == 404
 
@@ -274,7 +261,7 @@ async def test_create_provider_allows_superuser_to_attach_to_any_org(
     )
 
     response = await authenticated_client.post(
-        "/clinicians", data=provider_payload(org_id=str(other_org_id))
+        "/clinicians", data=clinician_payload(org_id=str(other_org_id))
     )
     assert response.status_code == 201
 
@@ -305,7 +292,7 @@ async def test_create_provider_solo_practice_auto_creates_org(
     new_id = uuid.UUID(response.json()["id"])
 
     async with db_test_session_manager() as session:
-        result = await session.execute(select(Provider).filter(Provider.id == new_id))
+        result = await session.execute(select(Clinician).filter(Clinician.id == new_id))
         persisted = result.scalars().first()
         assert persisted is not None
         assert persisted.org_id is not None
@@ -320,7 +307,7 @@ async def test_create_provider_solo_practice_auto_creates_org(
         assert auto_org.owner_id == logged_in_user.id
 
 
-# --- Provider reads -------------------------------------------------------
+# --- Clinician reads -------------------------------------------------------
 
 
 async def test_get_provider_renders_detail_page(
@@ -372,7 +359,7 @@ async def test_get_provider_detail_shows_verification_badge(
     )
     async with db_test_session_manager() as session:
         async with session.begin():
-            session.add(Verification(provider_id=provider_id, status="verified"))
+            session.add(Verification(clinician_id=provider_id, status="verified"))
 
     response = await authenticated_client.get(f"/clinicians/{provider_id}")
     assert response.status_code == 200
@@ -401,11 +388,11 @@ async def test_get_provider_detail_renders_stacked_affiliation_cards(
     logged_in_user: User,
 ):
     """`GET /clinicians/{id}` renders one stacked card per Affiliation
-    after #642 PR 2. Seed a Provider with two affiliations (the one
-    `Provider.__init__` builds from the create payload + a second one
+    after #642 PR 2. Seed a Clinician with two affiliations (the one
+    `Clinician.__init__` builds from the create payload + a second one
     appended) and assert both org names render and both
     `[data-testid="affiliation-card"]` blocks appear, in the order
-    `provider.affiliations` returns (oldest first by `created_at`).
+    `clinician.affiliations` returns (oldest first by `created_at`).
     """
     from src.domain.models import Affiliation
 
@@ -428,7 +415,6 @@ async def test_get_provider_detail_renders_stacked_affiliation_cards(
         async with session.begin():
             session.add(
                 Affiliation(
-                    provider_id=provider_id,
                     clinician_id=clinician_id,
                     org_id=second_org_id,
                     location_city="Queens",
@@ -527,7 +513,7 @@ async def test_get_provider_hides_delete_button_for_non_owner(
     assert _delete_provider_button(tree, provider_id) is None
 
 
-# --- Provider listing -----------------------------------------------------
+# --- Clinician listing -----------------------------------------------------
 
 
 async def test_list_providers_renders_html(
@@ -539,10 +525,10 @@ async def test_list_providers_renders_html(
 
     After #642 PR 3 the Practice cell no longer wraps in an
     `a[href="/clinicians/{id}"]` anchor — each org name is its own
-    link to the owning Organization. The Provider id still rides on
+    link to the owning Organization. The Clinician id still rides on
     the row via `data-row-id` so per-row chrome (and tests) can scope
     to it; the next-PR clinician name column will surface the
-    provider-detail link. The headline assertion here pins the org
+    clinician-detail link. The headline assertion here pins the org
     link shape and the row's `data-row-id`."""
     other = create_test_user(username=f"other-{uuid.uuid4()}")
     async with db_test_session_manager() as session:
@@ -573,8 +559,8 @@ async def test_list_providers_row_shows_all_affiliations(
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user: User,
 ):
-    """After #642 PR 3 each Provider row reflects **every** affiliation
-    it holds, not just the primary. Seed a Provider with two
+    """After #642 PR 3 each Clinician row reflects **every** affiliation
+    it holds, not just the primary. Seed a Clinician with two
     affiliations at different Orgs / cities and assert both org names
     and both city/state pairs render inside the single row's Practice
     and Location cells. The Insurance cell unions in-network carriers
@@ -601,7 +587,6 @@ async def test_list_providers_row_shows_all_affiliations(
         async with session.begin():
             session.add(
                 Affiliation(
-                    provider_id=provider_id,
                     clinician_id=clinician_id,
                     org_id=second_org_id,
                     location_city="Queens",
@@ -623,7 +608,7 @@ async def test_list_providers_row_shows_all_affiliations(
     rows = tree.css(f'article[data-row-id="{provider_id}"]')
     assert (
         len(rows) == 1
-    ), "expected a single row per Provider (not one per affiliation)"
+    ), "expected a single row per Clinician (not one per affiliation)"
     practice_cell = rows[0].css_first('div[data-fact="practice"] dd')
     location_cell = rows[0].css_first('div[data-fact="location"] dd')
     insurance_cell = rows[0].css_first('div[data-fact="insurance"] dd')
@@ -680,7 +665,6 @@ async def test_list_providers_row_dedupes_identical_locations(
         async with session.begin():
             session.add(
                 Affiliation(
-                    provider_id=provider_id,
                     clinician_id=clinician_id,
                     org_id=second_org_id,
                     location_city="Brooklyn",
@@ -857,8 +841,8 @@ async def test_list_providers_filters_by_license_type(
     tree = HTMLParser(response.text)
     rows = tree.css("#clinicians-list article.entity-card")
     assert len(rows) == 1
-    # After #642 PR 3 the row scopes by `data-row-id` (the Provider id);
-    # the row's Practice cell anchors out to Orgs, not to the provider.
+    # After #642 PR 3 the row scopes by `data-row-id` (the Clinician id);
+    # the row's Practice cell anchors out to Orgs, not to the clinician.
     assert tree.css_first(f'article[data-row-id="{provider_a}"]') is not None
     assert tree.css_first(f'article[data-row-id="{provider_b}"]') is None
     # The toolbar's filter link summarizes the active filter inline.
@@ -990,7 +974,7 @@ async def test_provider_form_edit_renders_cancel(
     assert cancel.text(strip=True) == "Cancel"
 
 
-# --- Provider update ------------------------------------------------------
+# --- Clinician update ------------------------------------------------------
 
 
 async def test_patch_provider_updates_fields(
@@ -998,7 +982,7 @@ async def test_patch_provider_updates_fields(
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user: User,
 ):
-    """PATCH /clinicians/{id} can reassign the Provider to a different Org
+    """PATCH /clinicians/{id} can reassign the Clinician to a different Org
     (``org_id``) or change other practice fields like location. Editing
     the practice's *name* now happens on the Organization itself (#524)."""
     provider_id = await _seed_provider_for(
@@ -1019,7 +1003,11 @@ async def test_patch_provider_updates_fields(
 
     async with db_test_session_manager() as session:
         refreshed = (
-            (await session.execute(select(Provider).filter(Provider.id == provider_id)))
+            (
+                await session.execute(
+                    select(Clinician).filter(Clinician.id == provider_id)
+                )
+            )
             .scalars()
             .first()
         )
@@ -1068,56 +1056,28 @@ async def test_patch_provider_rejects_reassign_to_unowned_org(
     assert response.status_code == 403
 
 
-# --- Provider delete ------------------------------------------------------
+# --- Clinician delete ------------------------------------------------------
 
 
-async def test_delete_provider_returns_204_and_leaves_credentials(
+async def test_delete_clinician_returns_204(
     authenticated_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user: User,
 ):
-    """After #635 PR A, credentials FK to `clinicians.id`. Deleting a
-    Provider returns 204 but leaves the person-level credentials attached
-    to the Clinician (which survives — Provider→Clinician is RESTRICT)."""
+    """Deleting a Clinician via DELETE /clinicians/{id} returns 204 and
+    removes the Clinician row (credentials cascade-delete with the Clinician
+    since credential FKs use ondelete='CASCADE')."""
     provider_id = await _seed_provider_for(
         db_test_session_manager, user_id=logged_in_user.id
     )
-    clinician_id = await _clinician_id_for(db_test_session_manager, provider_id)
-    async with db_test_session_manager() as session:
-        async with session.begin():
-            session.add(make_provider_licensure(clinician_id=clinician_id))
-            session.add(make_provider_education(clinician_id=clinician_id))
-            session.add(make_provider_certification(clinician_id=clinician_id))
 
     response = await authenticated_client.delete(f"/clinicians/{provider_id}")
     assert response.status_code == 204
 
     async with db_test_session_manager() as session:
         assert (
-            await session.execute(select(Provider).filter(Provider.id == provider_id))
+            await session.execute(select(Clinician).filter(Clinician.id == provider_id))
         ).scalars().first() is None
-        # Credentials stay attached to the Clinician.
-        assert (
-            await session.execute(
-                select(ProviderLicensure).filter(
-                    ProviderLicensure.clinician_id == clinician_id
-                )
-            )
-        ).scalars().first() is not None
-        assert (
-            await session.execute(
-                select(ProviderEducation).filter(
-                    ProviderEducation.clinician_id == clinician_id
-                )
-            )
-        ).scalars().first() is not None
-        assert (
-            await session.execute(
-                select(ProviderCertification).filter(
-                    ProviderCertification.clinician_id == clinician_id
-                )
-            )
-        ).scalars().first() is not None
 
 
 # --- Licensure sub-resource ---------------------------------------------
@@ -1185,9 +1145,8 @@ async def test_post_affiliation_creates_additional_row(
     logged_in_user: User,
 ):
     """`POST /clinicians/{id}/affiliations` adds a new Affiliation to
-    the Provider. After #642 PR 1 the UNIQUE on `affiliations.provider_id`
-    is gone, so the framework's generic create handler succeeds for
-    every row past the first one (which `Provider.__init__` already
+    the Clinician. The framework's generic create handler succeeds for
+    every row past the first one (which `Clinician.__init__` already
     built from the wire payload)."""
     from src.domain.models import Affiliation
 
@@ -1220,7 +1179,7 @@ async def test_post_affiliation_creates_additional_row(
         rows = (
             (
                 await session.execute(
-                    select(Affiliation).where(Affiliation.provider_id == provider_id)
+                    select(Affiliation).where(Affiliation.clinician_id == provider_id)
                 )
             )
             .scalars()
@@ -1245,13 +1204,13 @@ async def test_patch_affiliation_updates_fields(
     provider_id = await _seed_provider_for(
         db_test_session_manager, user_id=logged_in_user.id
     )
-    # The Provider's `__init__` already built one Affiliation — patch it.
+    # The Clinician's `__init__` already built one Affiliation — patch it.
     async with db_test_session_manager() as session:
         from src.domain.models import Affiliation
 
         aff_id = (
             await session.execute(
-                select(Affiliation.id).where(Affiliation.provider_id == provider_id)
+                select(Affiliation.id).where(Affiliation.clinician_id == provider_id)
             )
         ).scalar_one()
 
@@ -1272,9 +1231,9 @@ async def test_delete_affiliation_removes_row(
     logged_in_user: User,
 ):
     """`DELETE /clinicians/{id}/affiliations/{aff_id}` removes the row.
-    The Provider can be left with zero Affiliations — readers fall
+    The Clinician can be left with zero Affiliations — readers fall
     back to `None` via the property proxies. (PR 3's Clinician-row
-    rollup is the user-facing fix for empty-affiliations Providers.)"""
+    rollup is the user-facing fix for empty-affiliations Clinicians.)"""
     from src.domain.models import Affiliation
 
     provider_id = await _seed_provider_for(
@@ -1283,7 +1242,7 @@ async def test_delete_affiliation_removes_row(
     async with db_test_session_manager() as session:
         aff_id = (
             await session.execute(
-                select(Affiliation.id).where(Affiliation.provider_id == provider_id)
+                select(Affiliation.id).where(Affiliation.clinician_id == provider_id)
             )
         ).scalar_one()
 
@@ -1296,7 +1255,7 @@ async def test_delete_affiliation_removes_row(
         remaining = (
             (
                 await session.execute(
-                    select(Affiliation).where(Affiliation.provider_id == provider_id)
+                    select(Affiliation).where(Affiliation.clinician_id == provider_id)
                 )
             )
             .scalars()
@@ -1324,7 +1283,7 @@ async def test_delete_affiliation_returns_404_for_mismatched_provider(
         other_aff_id = (
             await session.execute(
                 select(Affiliation.id).where(
-                    Affiliation.provider_id == other_provider_id
+                    Affiliation.clinician_id == other_provider_id
                 )
             )
         ).scalar_one()
@@ -1342,8 +1301,8 @@ async def test_owner_edit_form_renders_affiliations_section(
 ):
     """The clinician edit page surfaces every Affiliation row in a
     dedicated "Affiliations" section with inline add and per-row
-    delete — #642 PR 1's UI. The Provider's initial Affiliation
-    (built by `Provider.__init__` from the create payload) appears
+    delete — #642 PR 1's UI. The Clinician's initial Affiliation
+    (built by `Clinician.__init__` from the create payload) appears
     prefilled."""
     provider_id = await _seed_provider_for(
         db_test_session_manager, user_id=logged_in_user.id
@@ -1369,7 +1328,7 @@ async def test_owner_edit_form_renders_affiliations_section(
     async with db_test_session_manager() as session:
         aff_id = (
             await session.execute(
-                select(Affiliation.id).where(Affiliation.provider_id == provider_id)
+                select(Affiliation.id).where(Affiliation.clinician_id == provider_id)
             )
         ).scalar_one()
     delete_button = tree.css_first(

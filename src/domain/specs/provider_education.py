@@ -6,7 +6,7 @@ factory (parent chain, subrow-CRUD-only routes, parent-form redirect).
 
 from typing import Final
 
-from src.domain.logic.providers.schema import (
+from src.domain.logic.clinicians.schema import (
     ProviderEducationCreate,
     ProviderEducationRead,
     ProviderEducationUpdate,

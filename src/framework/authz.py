@@ -37,7 +37,7 @@ def is_owner_or_admin(obj, user: Actor | None, *, owner_attr: str = "owner_id") 
     composition — `assert_owner_or_admin` delegates here — so a future
     rule change happens in exactly one place. Bound to
     `EntitySpec.can_write` for entities whose write rule is owner-or-admin
-    (posts, providers, provider credentials).
+    (posts, clinicians, provider credentials).
     """
     return is_owner(obj, user, owner_attr=owner_attr) or is_admin(user)
 

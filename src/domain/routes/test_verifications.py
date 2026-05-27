@@ -128,7 +128,7 @@ async def test_admin_happy_path_returns_201_and_persists(
             .first()
         )
         assert row is not None
-        assert row.provider_id == provider_id
+        assert row.clinician_id == provider_id
 
 
 async def test_admin_404_for_missing_provider(

@@ -3,61 +3,49 @@ from uuid import UUID
 
 from sqlalchemy import select
 
-from src.domain.models import Provider, UserFavorite
+from src.domain.models import Clinician, UserFavorite
 from src.framework.persistence.base_repository import BaseRepository
 from src.framework.persistence.dependencies import register_repository
 
 
 class UserFavoriteRepository(BaseRepository):
     async def get_by_pair(
-        self, *, user_id: UUID, provider_id: UUID
+        self, *, user_id: UUID, clinician_id: UUID
     ) -> UserFavorite | None:
-        """Return the edge for `(user_id, provider_id)` if it exists, else
-        `None`. Used to drive the idempotency of add/remove and the
-        per-viewer `is_favorited` flag on provider detail."""
         stmt = select(UserFavorite).filter(
             UserFavorite.user_id == user_id,
-            UserFavorite.provider_id == provider_id,
+            UserFavorite.clinician_id == clinician_id,
         )
         result = await self.session.execute(stmt)
         return result.scalars().first()
 
-    async def add_favorite(self, *, user_id: UUID, provider_id: UUID) -> UserFavorite:
-        """Persist a new edge. Caller is responsible for checking
-        idempotency via `get_by_pair` first — passing a duplicate pair
-        violates `uq_user_favorites_user_provider`."""
+    async def add_favorite(self, *, user_id: UUID, clinician_id: UUID) -> UserFavorite:
         return await self._persist_new(
-            UserFavorite(user_id=user_id, provider_id=provider_id)
+            UserFavorite(user_id=user_id, clinician_id=clinician_id)
         )
 
     async def delete_favorite(self, favorite: UserFavorite) -> None:
         await self._delete(favorite)
 
-    async def list_favorited_providers(
+    async def list_favorited_clinicians(
         self,
         user_id: UUID,
         *,
         offset: int = 0,
         limit: int | None = None,
-    ) -> Sequence[Provider]:
-        """Return the providers a user has favorited, newest-favoriting
-        first. Joined query (not two round-trips) so the listing page
-        renders in one shot. `offset`/`limit` come from the pagination
-        layer (the bespoke `handle_list_my_favorites` handler computes
-        them)."""
+    ) -> Sequence[Clinician]:
+        """Return the clinicians a user has favorited, newest-favoriting first."""
         stmt = (
-            select(Provider)
-            .join(UserFavorite, UserFavorite.provider_id == Provider.id)
+            select(Clinician)
+            .join(UserFavorite, UserFavorite.clinician_id == Clinician.id)
             .filter(UserFavorite.user_id == user_id)
             .order_by(UserFavorite.created_at.desc())
         )
         return await self._list(stmt, offset=offset, limit=limit)
 
-    async def is_favorited(self, *, user_id: UUID, provider_id: UUID) -> bool:
-        """True if this user has this provider favorited. Wrapper around
-        `get_by_pair` for callers that only need the boolean."""
+    async def is_favorited(self, *, user_id: UUID, clinician_id: UUID) -> bool:
         return (
-            await self.get_by_pair(user_id=user_id, provider_id=provider_id)
+            await self.get_by_pair(user_id=user_id, clinician_id=clinician_id)
         ) is not None
 
 

@@ -63,13 +63,13 @@ def test_pa_and_program_genders_default_to_empty_list():
 
 
 def test_uuid_columns_get_fresh_uuids():
-    """PA's `provider_id` and program's `program_id` are Uuid columns
+    """PA's `clinician_id` and program's `program_id` are Uuid columns
     — the stub generates a fresh UUID per call so two consecutive
     stubs don't share an id."""
     pa1 = make_post_stub("clinician_opening", owner_id=uuid.uuid4())
     pa2 = make_post_stub("clinician_opening", owner_id=uuid.uuid4())
-    pid1 = pa1.opening_detail.provider_id
-    pid2 = pa2.opening_detail.provider_id
+    pid1 = pa1.opening_detail.clinician_id
+    pid2 = pa2.opening_detail.clinician_id
     assert isinstance(pid1, uuid.UUID)
     assert isinstance(pid2, uuid.UUID)
     assert pid1 != pid2
@@ -111,14 +111,14 @@ def test_cr_enum_defaults_render_via_label_dict():
 
 def test_pa_has_no_enum_text_columns_on_detail_row():
     """PA's enum-typed fields (in_person_sessions, virtual_sessions,
-    in_network_carriers, ...) live on the linked Provider, not on the
+    in_network_carriers, ...) live on the linked Clinician, not on the
     detail row itself. The detail row has no CHECK-constrained Text
     columns, so the enum-defaults registry for PA is empty."""
     pa = make_post_stub("clinician_opening", owner_id=uuid.uuid4())
     # All fields on the detail row are list-typed JSON, Uuid, or
     # plain Text — none are enum-checked.
     assert isinstance(pa.opening_detail.services, list)
-    assert isinstance(pa.opening_detail.provider_id, uuid.UUID)
+    assert isinstance(pa.opening_detail.clinician_id, uuid.UUID)
     assert pa.opening_detail.description == "stub description"
 
 

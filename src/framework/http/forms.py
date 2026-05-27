@@ -32,7 +32,7 @@ def validate_or_422(adapter: TypeAdapter, payload_dict: dict):
     `ValidationError` to HTTP 422 with a JSON-serializable error list.
 
     The error shape — `[{"loc", "msg", "type"}, ...]` — matches what the
-    posts and provider routes have been emitting since their
+    posts and clinician routes have been emitting since their
     respective issues landed. HTMX form clients depend on the `loc`/`msg`
     pair to attach inline error text to the offending field.
     """

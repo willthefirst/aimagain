@@ -30,7 +30,7 @@ from httpx import AsyncClient
 from selectolax.parser import HTMLParser
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from src.domain.models import Organization, Post, Program, Provider
+from src.domain.models import Clinician, Organization, Post, Program
 from tests.helpers import (
     create_test_user,
     make_intake_detail,
@@ -56,17 +56,17 @@ def _referral_post(*, owner_id, description: str = "ref", **overrides) -> Post:
 
 
 def _opening_post(
-    *, owner_id, practice_name: str = "Practice", provider: Provider | None = None
+    *, owner_id, practice_name: str = "Practice", clinician: Clinician | None = None
 ) -> Post:
-    if provider is None:
-        provider = make_provider_with_org(
+    if clinician is None:
+        clinician = make_provider_with_org(
             owner_id=owner_id, practice_name=practice_name
         )
-    if provider.id is None:
-        provider.id = uuid.uuid4()
+    if clinician.id is None:
+        clinician.id = uuid.uuid4()
     post = Post(kind="clinician_opening", owner_id=owner_id)
-    detail = make_opening_detail(provider_id=provider.id)
-    detail.provider = provider
+    detail = make_opening_detail(clinician_id=clinician.id)
+    detail.clinician = clinician
     post.opening_detail = detail
     return post
 
@@ -435,12 +435,12 @@ async def test_clinician_opening_create_form_error_render_is_wired(
     needs a copy of this smoke for that entity's form — neither layer
     above re-runs per entity.
     """
-    provider = make_provider_with_org(owner_id=logged_in_user.id)
+    clinician = make_provider_with_org(owner_id=logged_in_user.id)
     async with db_test_session_manager() as session:
         async with session.begin():
-            session.add(provider)
+            session.add(clinician)
 
-    payload = opening_payload(provider_id=str(provider.id))
+    payload = opening_payload(clinician_id=str(clinician.id))
     payload["age_groups"] = []
 
     response = await authenticated_client.post(
@@ -487,7 +487,7 @@ async def test_referral_create_form_error_render_is_wired(
     `error=`/`current=` are auto-resolved from `form_errors`/`form_values`
     without any template-side threading.
 
-    No provider setup required (referrals don't link to a Provider on
+    No clinician setup required (referrals don't link to a Clinician on
     creation). The empty `age_groups` trips `RequiredAgeGroupsField`'s
     `min_length=1` constraint on `ReferralCreate`.
     """

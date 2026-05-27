@@ -1,14 +1,11 @@
-{# Shared clinician card — used by every list of clinician directory
-   entries (the underlying Python model class is still `Provider`;
-   only the user-facing surface flipped in #642 PR 4).
+{# Shared clinician card — used by every list of clinician directory entries.
 
-   Lives in `src/framework/templates/_shared/` rather than under a
-   per-cluster dir because four templates across three clusters render
-   the same card:
+   Lives in `src/framework/templates/_shared/` because four templates
+   across three clusters render the same card:
 
-     - `/clinicians`                  (providers/list.html)
+     - `/clinicians`                  (clinicians/list.html)
      - `/users/me/favorites`          (favorites/list.html)
-     - `/users/{id}/clinicians`       (users/providers_list.html)
+     - `/users/{id}/clinicians`       (users/clinicians_list.html)
      - `/users/{id}` embedded preview (users/detail.html)
 
    Cross-cluster template imports aren't permitted (see
@@ -16,36 +13,22 @@
 
    Headline: the clinician's "{first_name} {last_name}" when both are
    set; falls back to whichever is set, or to "Unnamed clinician"
-   when neither is. The card represents a *person*, so the headline
-   must be a person identifier — never the org name (the Practice row
-   below already carries that, and using the org name as the headline
-   collapses the User → Clinician → Org hierarchy into one
-   indistinguishable string).
-   The headline anchors to the clinician detail page so a click
-   navigates into the directory entry — practice / location chips in
-   the body link out to Orgs separately.
+   when neither is.
 
-   Body — after #642 PR 3, each fact reflects **every** affiliation
-   the Provider holds, not just a primary one:
-
-     - Practice (linked Org chips, one per affiliation; duplicates by
-       org-id are kept because two affiliations at the same Org may be
-       different locations).
+   Body — each fact reflects every affiliation the clinician holds:
+     - Practice (linked Org chips, one per affiliation).
      - Location ("City, ST" chips, deduped on identical strings).
      - Licensed in (issuing-state code list).
-     - Insurance (rendered via
-       `src.domain.logic.providers.view._insurance_summary`).
+     - Insurance (rendered via `clinician_card_view`).
 #}
 {%- from "_shared/_card.html" import card -%}
 {%- from "_shared/sections.html" import fact -%}
-{% macro clinician_card(provider) -%}
-  {%- set view = provider_card_view(provider) -%}
-  {%- set affiliations = provider.affiliations | list -%}
-  {%- set issuing_states = provider.licensures | map(attribute='issuing_state') | unique | sort | list -%}
-  {# Dedupe identical "City, ST" strings (e.g. two affiliations both in
-   Brooklyn, NY shouldn't render "Brooklyn, NY · Brooklyn, NY"). Org
-   chips intentionally don't dedupe — two affiliations at the same
-   Org may be different physical locations and both deserve a link. #}
+{% macro clinician_card(clinician) -%}
+  {%- set view = clinician_card_view(clinician) -%}
+  {%- set affiliations = clinician.affiliations | list -%}
+  {%- set issuing_states = clinician.licensures | map(attribute='issuing_state') | unique | sort | list -%}
+  {# Dedupe identical "City, ST" strings — two affiliations at the same
+   Org may be different locations and both deserve a link. #}
   {%- set locations = [] -%}
   {%- for aff in affiliations -%}
     {%- set loc -%}
@@ -60,8 +43,8 @@
       {%- set _ = locations.append(loc) -%}
     {%- endif -%}
   {%- endfor -%}
-  {%- set first = provider.first_name -%}
-  {%- set last = provider.last_name -%}
+  {%- set first = clinician.first_name -%}
+  {%- set last = clinician.last_name -%}
   {%- set name -%}
     {%- if first and last %}{{ first }} {{ last }}
     {%- elif first %}{{ first }}
@@ -70,15 +53,9 @@
     {%- endif %}
   {%- endset -%}
   {% call card(
-    id=provider.id,
-    headline_url=entity_url('clinician', id=provider.id),
+    id=clinician.id,
+    headline_url=entity_url('clinician', id=clinician.id),
     headline=name | trim) -%}
-    {# Each row goes through the shared `fact(key, label, ...)` macro
-   from `_shared/sections.html` so the `data-fact` attribute and the
-   `<div>/<dt>/<dd>` shape stay in lockstep with every other card and
-   detail page. `dd_class="meta"` activates the `.meta` CSS rule
-   (adjacent chip siblings render with " · " separators) on the
-   Practice and Location rows. #}
     <section class="entity-facts">
       <dl>
         {%- call fact('practice', 'Practice', dd_class='meta') -%}

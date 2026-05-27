@@ -7,11 +7,11 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 # Need ORM models
 from src.domain.models import (
+    Clinician,
     IntakeDetail,
     OpeningDetail,
     Organization,
     Program,
-    Provider,
     ProviderCertification,
     ProviderEducation,
     ProviderLicensure,
@@ -102,19 +102,19 @@ def referral_payload(**overrides: Any) -> dict[str, Any]:
     return {"kind": "referral", **_REFERRAL_DEFAULTS, **overrides}
 
 
-# Stub provider_id for schema-validation tests that never hit the DB.
-# Real round-trip tests pass an actual Provider's id via the kwarg.
-_STUB_PROVIDER_ID = uuid.UUID("00000000-0000-0000-0000-000000000001")
+# Stub clinician_id for schema-validation tests that never hit the DB.
+# Real round-trip tests pass an actual Clinician's id via the kwarg.
+_STUB_CLINICIAN_ID = uuid.UUID("00000000-0000-0000-0000-000000000001")
 
 
 def opening_payload(**overrides: Any) -> dict[str, Any]:
     """Build a wire-valid `kind='clinician_opening'` create/update payload.
-    Returns a fresh dict each call. `provider_id` defaults to a stub UUID
+    Returns a fresh dict each call. `clinician_id` defaults to a stub UUID
     that passes Pydantic validation but does *not* exist in the DB —
-    tests that actually persist must pass a real provider_id override."""
+    tests that actually persist must pass a real clinician_id override."""
     return {
         "kind": "clinician_opening",
-        "provider_id": str(_STUB_PROVIDER_ID),
+        "clinician_id": str(_STUB_CLINICIAN_ID),
         **_OPENING_DEFAULTS,
         **overrides,
     }
@@ -181,24 +181,26 @@ def make_program(
     return Program(owner_id=owner_id, org_id=org_id, name=name, **overrides)
 
 
-def make_opening_detail(*, provider_id: UUID, **overrides: Any) -> OpeningDetail:
+def make_opening_detail(*, clinician_id: UUID, **overrides: Any) -> OpeningDetail:
     """Build a `OpeningDetail` ORM row with spec-compliant
-    defaults. `provider_id` is a required kwarg — PA points at a Provider,
+    defaults. `clinician_id` is a required kwarg — PA points at a Clinician,
     and forgetting the FK should be a `TypeError` at construction rather
     than a NOT NULL violation at flush."""
-    return OpeningDetail(provider_id=provider_id, **{**_OPENING_DEFAULTS, **overrides})
+    return OpeningDetail(
+        clinician_id=clinician_id, **{**_OPENING_DEFAULTS, **overrides}
+    )
 
 
-# --- Provider + credential sub-table factories ---------------------------
+# --- Clinician + credential sub-table factories ---------------------------
 #
 # Defaults supply CHECK-constraint-valid values so tests that don't care
 # about credential specifics still produce inserts that pass DB-level
-# guards. The owning FK (`owner_id` for providers, `provider_id` for
+# guards. The owning FK (`owner_id` for clinicians, `clinician_id` for
 # sub-rows) is a required keyword-only parameter — making it required
 # turns "I forgot the FK" into a `TypeError` at the factory call site
 # instead of a `NOT NULL` violation at flush time.
 
-_PROVIDER_DEFAULTS: dict[str, Any] = {
+_CLINICIAN_DEFAULTS: dict[str, Any] = {
     "location_city": "Springfield",
     "location_state": "IL",
     "location_zip": "62701",
@@ -242,44 +244,47 @@ def _drop_none(d: dict[str, Any]) -> dict[str, Any]:
     return {k: v for k, v in d.items() if v is not None}
 
 
-def provider_payload(**overrides: Any) -> dict[str, Any]:
-    """Build a wire-valid `POST /providers` form-encoded payload.
+def clinician_payload(**overrides: Any) -> dict[str, Any]:
+    """Build a wire-valid `POST /clinicians` form-encoded payload.
     Returns a fresh flat dict each call. Sub-entity arrays are intentionally
     omitted — credentials are added via the dedicated sub-resource endpoints.
 
     ``org_id`` is required on the wire. Callers that hit a real DB must
     pass an existing Organization's id; pure schema-validation tests that
     don't persist can pass any UUID."""
-    return _drop_none({**_PROVIDER_DEFAULTS, **overrides})
+    return _drop_none({**_CLINICIAN_DEFAULTS, **overrides})
+
+
+# Backwards-compatible alias.
+provider_payload = clinician_payload
 
 
 def licensure_payload(**overrides: Any) -> dict[str, Any]:
-    """Build a wire-valid `POST /providers/{id}/licensures` payload."""
+    """Build a wire-valid `POST /clinicians/{id}/licensures` payload."""
     return _drop_none({**_PROVIDER_LICENSURE_DEFAULTS, **overrides})
 
 
 def education_payload(**overrides: Any) -> dict[str, Any]:
-    """Build a wire-valid `POST /providers/{id}/educations` payload."""
+    """Build a wire-valid `POST /clinicians/{id}/educations` payload."""
     return _drop_none({**_PROVIDER_EDUCATION_DEFAULTS, **overrides})
 
 
 def certification_payload(**overrides: Any) -> dict[str, Any]:
-    """Build a wire-valid `POST /providers/{id}/certifications` payload."""
+    """Build a wire-valid `POST /clinicians/{id}/certifications` payload."""
     return _drop_none({**_PROVIDER_CERTIFICATION_DEFAULTS, **overrides})
 
 
-def make_provider(*, owner_id: UUID, **overrides: Any) -> Provider:
-    """Build a `Provider` ORM row with CHECK-valid defaults.
+def make_provider(*, owner_id: UUID, **overrides: Any) -> Clinician:
+    """Build a `Clinician` ORM row with CHECK-valid defaults.
 
-    ``Provider.org_id`` is NOT NULL (#524 — the former ``practice_name``
-    mirror was dropped). Callers persisting the returned row must pass
-    ``org_id=<existing-org.id>`` in ``overrides`` (Org persisted
+    ``Clinician.org_id`` is NOT NULL. Callers persisting the returned row
+    must pass ``org_id=<existing-org.id>`` in ``overrides`` (Org persisted
     separately via ``make_organization_row`` + ``session.add``), or use
-    :func:`make_provider_with_org` which builds the Org + Provider in
+    :func:`make_clinician_with_org` which builds the Org + Clinician in
     one call. Bare ORM constructors without an ``org_id`` will trip the
     NOT NULL constraint at flush time.
     """
-    return Provider(owner_id=owner_id, **{**_PROVIDER_DEFAULTS, **overrides})
+    return Clinician(owner_id=owner_id, **{**_CLINICIAN_DEFAULTS, **overrides})
 
 
 def make_organization_row(
@@ -306,35 +311,38 @@ def make_organization_row(
     return obj
 
 
-def make_provider_with_org(
+def make_clinician_with_org(
     *,
     owner_id: UUID,
     practice_name: str = "Acme Health",
     org: Organization | None = None,
     **overrides: Any,
-) -> Provider:
-    """Build a Provider wired to an Organization. ``Organization.name``
+) -> Clinician:
+    """Build a Clinician wired to an Organization. ``Organization.name``
     is the practice's display name; tests that previously asserted on
-    ``provider.practice_name`` now read ``provider.org.name``.
+    ``provider.practice_name`` now read ``clinician.org.name``.
 
-    The Org is attached via ``provider.org = org`` rather than just
+    The Org is attached via ``clinician.org = org`` rather than just
     ``org_id`` so SQLAlchemy's default save-update cascade picks the
-    Org up when the Provider is added to a session — callers stay on
-    the single-add ``session.add(provider)`` shape.
+    Org up when the Clinician is added to a session — callers stay on
+    the single-add ``session.add(clinician)`` shape.
 
     ``practice_name`` here names the *Organization* — the kwarg is
     kept under that name for call-site stability. Pass ``org=<instance>``
-    when multiple Providers share an Org; the kwarg is ignored in that
+    when multiple Clinicians share an Org; the kwarg is ignored in that
     case (the existing Org's name wins)."""
     if org is None:
         org = make_organization_row(owner_id=owner_id, name=practice_name)
-    provider = make_provider(
+    clinician = make_provider(
         owner_id=owner_id,
         org_id=org.id,
         **{k: v for k, v in overrides.items() if k != "practice_name"},
     )
-    provider.org = org
-    return provider
+    clinician.org = org
+    return clinician
+
+
+make_provider_with_org = make_clinician_with_org  # backwards-compat alias
 
 
 def make_provider_licensure(
@@ -343,9 +351,7 @@ def make_provider_licensure(
     **overrides: Any,
 ) -> ProviderLicensure:
     """Build a `ProviderLicensure` ORM row with CHECK-valid defaults.
-    Credentials FK to `clinicians.id` after #635 PR A — pass
-    `clinician_id=provider.clinician_id` after the provider has been
-    flushed (or `provider.clinician.id` if the clinician is flushed)."""
+    Pass `clinician_id=clinician.id` after the clinician has been flushed."""
     return ProviderLicensure(
         clinician_id=clinician_id,
         **{**_PROVIDER_LICENSURE_DEFAULTS, **overrides},

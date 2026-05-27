@@ -1,19 +1,19 @@
 # Verifications logic cluster
 
-Persistence + pure-function primitives for the provider verification pipeline. The orchestrator (#528) composes them with an `httpx.AsyncClient` it owns.
+Persistence + pure-function primitives for the clinician verification pipeline. The orchestrator (#528) composes them with an `httpx.AsyncClient` it owns.
 
 ## Files
 
-- `repository.py` — `VerificationRepository`. Append-only persistence. `record(...)` writes a single attempt; `latest_for_provider(...)` / `list_for_provider(...)` drive the admin UI's per-provider history view. No `update` / `delete` methods by design (see the model README's "Append-only by convention" section).
+- `repository.py` — `VerificationRepository`. Append-only persistence. `record(...)` writes a single attempt; `latest_for_clinician(...)` / `list_for_clinician(...)` drive the admin UI's per-clinician history view. No `update` / `delete` methods by design (see the model README's "Append-only by convention" section).
 - `schema.py` — `VerificationRead`, `VerificationCreate`. Both are server-only: there is no public CRUD endpoint; the orchestrator (#528) and the admin readers compose them directly.
 - `nppes.py` — `nppes_lookup(npi, *, http)` against the public CMS registry. Errors / timeouts degrade to `NppesResult(found=False, raw=None)` plus a logged warning — never raises.
 - `oig.py` — `oig_check(*, first_name, last_name, npi)` against the OIG/LEIE exclusion list (loaded from a CSV on disk). Module-level cache by absolute path; missing CSV degrades to "no match" with a single startup warning.
-- `scoring.py` — `score_verification(...)` table-driven rules over `(NppesResult, OigResult, provider name)` → `Score(status, flags, name_match_score)`. No I/O.
-- `handlers.py` — `run_provider_verification(...)` orchestrator + `handle_create_provider_verification(...)` admin-only retrigger. Composes the primitives with persistence + audit + an `httpx.AsyncClient`. The bespoke route lives at [`../../routes/verifications.py`](../../routes/verifications.py) and is wired into `src/main.py` next to the other hand-rolled routers.
+- `scoring.py` — `score_verification(...)` table-driven rules over `(NppesResult, OigResult, clinician name)` → `Score(status, flags, name_match_score)`. No I/O.
+- `handlers.py` — `run_clinician_verification(...)` orchestrator + `handle_create_clinician_verification(...)` admin-only retrigger. Composes the primitives with persistence + audit + an `httpx.AsyncClient`. The bespoke route lives at [`../../routes/verifications.py`](../../routes/verifications.py) and is wired into `src/main.py` next to the other hand-rolled routers.
 
 The orchestrator has two callers:
 
-1. **`handle_create_provider_verification`** in this file (admin retrigger; `actor_id=requesting_user.id`).
+1. **`handle_create_clinician_verification`** in this file (admin retrigger; `actor_id=requesting_user.id`).
 2. **`run_nightly_verification`** in [`../../../jobs/nightly_verification.py`](../../../jobs/nightly_verification.py) (daily APScheduler job; `actor_id=None`).
 
 (`__init__.py` is intentionally empty — these are imported directly via `src.domain.logic.verifications.nppes`/`.oig`/`.scoring`/`.repository`/`.schema`/`.handlers`.)
@@ -46,8 +46,8 @@ The `mutate(...)` context manager is a snapshot-before / mutate / record_audit /
 
 ### Name fields gap (followup tracking)
 
-`run_provider_verification` reads provider names via `_provider_names(provider)`, which falls back to `user.username` in the first-name slot because the `User` model has no `first_name` / `last_name` columns today. The scoring layer's similarity check lands far below threshold against the NPPES first/last names, so every verification routes to `needs_review` until proper name fields are added. The safe default is on purpose: a human reviewer confirms identity rather than the pipeline auto-verifying against a name we never actually had. Adding `first_name` / `last_name` to `User` is a separate ticket.
+`run_clinician_verification` reads clinician names via `_clinician_names(clinician)`, which falls back to `user.username` in the first-name slot because the `User` model has no `first_name` / `last_name` columns today. The scoring layer's similarity check lands far below threshold against the NPPES first/last names, so every verification routes to `needs_review` until proper name fields are added. The safe default is on purpose: a human reviewer confirms identity rather than the pipeline auto-verifying against a name we never actually had.
 
-### Intake post-create hook
+### Post-create hook
 
-Triggering verification automatically after `POST /providers` succeeds was scoped out of this PR per #528 — the framework's CRUD handler doesn't have a `post_create_hook`, and adding one to the dispatcher is more scope than #528 should carry. Track as a follow-up issue.
+Triggering verification automatically after `POST /clinicians` succeeds was scoped out of this PR per #528 — the framework's CRUD handler doesn't have a `post_create_hook`. Track as a follow-up issue.

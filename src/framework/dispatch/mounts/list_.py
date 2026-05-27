@@ -34,7 +34,7 @@ def mount_list(
     ``spec.list_template`` with it.
 
     ``query_params`` is per-mount because filter shapes are usually
-    list-specific (e.g. provider list takes ``license_type`` and
+    list-specific (e.g. clinician list takes ``license_type`` and
     ``issuing_state``; users list takes none today). Each ``QueryParam``
     becomes a FastAPI ``Query(...)`` parameter on the route, with full
     OpenAPI doc support and 422-on-invalid validation.

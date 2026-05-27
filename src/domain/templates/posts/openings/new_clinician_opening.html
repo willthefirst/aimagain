@@ -7,7 +7,7 @@
 {% from "posts/openings/_form_clinician_opening.html" import opening_form with context %}
 {% block resource_label %}Openings{% endblock %}
 {% block content %}
-  {% if not current_user.providers %}
+  {% if not current_user.clinicians %}
     <p>
       Set up your clinician profile first — every opening is tied to one. <a href="{{ entity_form_url('clinician') }}">Create your clinician profile.</a>
     </p>

@@ -59,7 +59,7 @@ async def test_add_favorite_returns_201_first_time(
         )
         assert row is not None
         assert row.user_id == logged_in_user.id
-        assert row.provider_id == provider_id
+        assert row.clinician_id == provider_id
 
 
 async def test_add_favorite_idempotent_returns_200(
@@ -119,7 +119,7 @@ async def test_remove_favorite_returns_204(
                 await session.execute(
                     select(UserFavorite).filter(
                         UserFavorite.user_id == logged_in_user.id,
-                        UserFavorite.provider_id == provider_id,
+                        UserFavorite.clinician_id == provider_id,
                     )
                 )
             )

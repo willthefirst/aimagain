@@ -28,7 +28,6 @@ from .posts.post_kinds import (
 )
 from .posts.referral_detail import ReferralDetail
 from .programs.program import Program
-from .providers.provider import Provider
 from .providers.provider_certification import ProviderCertification
 from .providers.provider_education import ProviderEducation
 from .providers.provider_licensure import ProviderLicensure
@@ -58,7 +57,6 @@ __all__ = [
     "ProviderCertification",
     "ProviderEducation",
     "ProviderLicensure",
-    "Provider",
     "US_STATES",
     "User",
     "UserFavorite",

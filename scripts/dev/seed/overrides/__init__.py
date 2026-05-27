@@ -5,7 +5,7 @@ single-row-from-columns shapes. This package owns the cases that need
 something more:
 
   - Cross-row construction (Post + matching kind-detail).
-  - Constructor side effects (Provider auto-creates Clinician + Affiliation).
+  - Owner assignment and fan-out (Clinician + Affiliation).
   - Fan-out counts that depend on other rows (1-3 credentials per clinician).
   - Hierarchical structure (parent/child Organizations).
   - Special creation paths (User → fastapi-users password hashing).
@@ -47,11 +47,11 @@ def register(model: type[BaseModel]):
 
 # Import side effects: each module @register's against OVERRIDES.
 from . import (  # noqa: E402,F401
+    clinicians,
     credentials,
     favorites,
     organizations,
     posts,
-    providers,
     users,
     verifications,
 )

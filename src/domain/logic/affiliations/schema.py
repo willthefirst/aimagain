@@ -57,7 +57,6 @@ class AffiliationRead(FlatLocationSchema, ReadProjection):
     """
 
     id: uuid.UUID
-    provider_id: uuid.UUID
     clinician_id: uuid.UUID
     org_id: uuid.UUID
     created_at: datetime
@@ -74,13 +73,9 @@ class AffiliationRead(FlatLocationSchema, ReadProjection):
 class AffiliationCreate(FlatLocationSchema, WirePayload):
     """Create payload for a new Affiliation row.
 
-    `provider_id` is bound from the URL by the framework's sub-resource
-    create handler — not accepted on the wire. `clinician_id` is sourced
-    from the parent Provider (every affiliation shares its parent's
-    clinician); the create handler peels it off the parent row before
-    constructing the Affiliation, so this schema doesn't accept it
-    either. Only the per-role fields the user actually fills out come
-    in here.
+    `clinician_id` is bound from the URL by the framework's sub-resource
+    create handler — not accepted on the wire. Only the per-role fields
+    the user actually fills out come in here.
     """
 
     org_id: uuid.UUID

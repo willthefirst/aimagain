@@ -86,13 +86,13 @@
       </header>
       <ul>
         <li>
-          {% if providers %}
-            &#10003; <a href="{{ entity_url('clinician', id=providers[0].id) }}">Your clinician profile</a>
+          {% if clinicians %}
+            &#10003; <a href="{{ entity_url('clinician', id=clinicians[0].id) }}">Your clinician profile</a>
           {% else %}
             <a href="{{ entity_form_url('clinician') }}" role="button">Create your clinician profile</a>
           {% endif %}
         </li>
-        {% if providers %}
+        {% if clinicians %}
           <li>
             <a href="{{ entity_form_url('opening') }}" role="button" class="outline">Post an opening</a>
           </li>
@@ -104,9 +104,9 @@
     <header class="entity-header">
       <strong>Clinicians</strong>
     </header>
-    {% if providers %}
+    {% if clinicians %}
       <section id="user-detail-clinicians">
-        {%- for provider in providers %}{{ clinician_card(provider) }}{%- endfor %}
+        {%- for clinician in clinicians %}{{ clinician_card(clinician) }}{%- endfor %}
         </section>
       {% else %}
         <p id="user-detail-clinicians-empty">No clinician entries yet.</p>
