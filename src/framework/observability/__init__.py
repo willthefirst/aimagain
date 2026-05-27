@@ -27,10 +27,13 @@ from src.framework.observability.sentry_backend import SentryBackend
 def _select_backend() -> ObservabilityBackend:
     """Pick a backend from settings.
 
-    Empty DSN → `NoopBackend` so the app runs locally without any
-    provider credentials. Add new providers as additional branches.
+    Either DSN set → `SentryBackend`; `init_app` skips SDK init when
+    `SENTRY_DSN` is empty, `frontend_context` returns None when
+    `SENTRY_BROWSER_DSN` is empty — each side is independently optional.
+    Both empty → `NoopBackend` so the app runs locally with no provider.
+    Add new providers as additional branches.
     """
-    if settings.SENTRY_DSN:
+    if settings.SENTRY_DSN or settings.SENTRY_BROWSER_DSN:
         return SentryBackend()
     return NoopBackend()
 

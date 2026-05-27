@@ -19,16 +19,26 @@ def _import_factory():
     return _select_backend
 
 
-def test_select_backend_returns_sentry_when_dsn_set():
+def test_select_backend_returns_sentry_when_backend_dsn_set():
     with patch("src.framework.observability.settings") as mock_settings:
         mock_settings.SENTRY_DSN = "https://abc@sentry.io/1"
+        mock_settings.SENTRY_BROWSER_DSN = ""
         backend = _import_factory()()
     assert isinstance(backend, SentryBackend)
 
 
-def test_select_backend_returns_noop_when_dsn_empty():
+def test_select_backend_returns_sentry_when_browser_dsn_set():
     with patch("src.framework.observability.settings") as mock_settings:
         mock_settings.SENTRY_DSN = ""
+        mock_settings.SENTRY_BROWSER_DSN = "https://xyz@sentry.io/2"
+        backend = _import_factory()()
+    assert isinstance(backend, SentryBackend)
+
+
+def test_select_backend_returns_noop_when_both_dsns_empty():
+    with patch("src.framework.observability.settings") as mock_settings:
+        mock_settings.SENTRY_DSN = ""
+        mock_settings.SENTRY_BROWSER_DSN = ""
         backend = _import_factory()()
     assert isinstance(backend, NoopBackend)
 
