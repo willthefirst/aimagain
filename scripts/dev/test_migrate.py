@@ -166,6 +166,12 @@ def test_down_one_step_then_up(temp_db: Path):
 
 
 def test_down_multi_step(temp_db: Path):
+    # Seed a second no-op revision so there are at least 2 steps to
+    # downgrade through (the repo may have only 1 migration after a
+    # history collapse; the blank revision is cleaned up by the
+    # temp-directory fixture).
+    _upgrade()
+    _revision("scratch_step_for_multi_step_test")
     _upgrade()
     head = _db_version(temp_db)
 
