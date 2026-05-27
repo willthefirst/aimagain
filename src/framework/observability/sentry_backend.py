@@ -16,6 +16,8 @@ from src.framework.config import settings
 
 class SentryBackend:
     def init_app(self, app: FastAPI) -> None:
+        if not settings.SENTRY_DSN:
+            return
         # `release=None` (rather than empty string) tells Sentry "no
         # release tag" — important so events from un-tagged builds don't
         # cluster into a synthetic "" release.
