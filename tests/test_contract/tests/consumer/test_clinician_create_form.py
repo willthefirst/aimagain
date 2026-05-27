@@ -17,11 +17,11 @@ from playwright.async_api import Page
 from tests.test_contract.constants import (
     CLINICIAN_CREATE_API_PATH,
     CLINICIAN_CREATE_FORM_PAGE_PATH,
+    CLINICIAN_NAME_CLINICIANS,
+    CLINICIAN_STATE_USER_CAN_CREATE_CLINICIAN,
     CONSUMER_NAME_CLINICIAN_CREATE_FORM,
     NETWORK_TIMEOUT_MS,
     PACT_PORT_CLINICIAN_CREATE,
-    PROVIDER_NAME_PROVIDERS,
-    PROVIDER_STATE_USER_CAN_CREATE_PROVIDER,
 )
 from tests.test_contract.tests.shared.helpers import (
     setup_pact,
@@ -42,7 +42,7 @@ async def test_consumer_clinician_create_form_submits(
     request matches the contracted shape."""
     pact = setup_pact(
         CONSUMER_NAME_CLINICIAN_CREATE_FORM,
-        PROVIDER_NAME_PROVIDERS,
+        CLINICIAN_NAME_CLINICIANS,
         port=PACT_PORT_CLINICIAN_CREATE,
     )
     mock_server_uri = pact.uri
@@ -78,8 +78,8 @@ async def test_consumer_clinician_create_form_submits(
     )
 
     (
-        pact.given(PROVIDER_STATE_USER_CAN_CREATE_PROVIDER)
-        .upon_receiving("a request to create a provider profile via web form")
+        pact.given(CLINICIAN_STATE_USER_CAN_CREATE_CLINICIAN)
+        .upon_receiving("a request to create a clinician profile via web form")
         .with_request(
             method="POST",
             path=CLINICIAN_CREATE_API_PATH,

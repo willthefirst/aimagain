@@ -36,11 +36,7 @@ STUB_POST_ID = uuid.UUID("22222222-2222-2222-2222-222222222222")
 POST_DELETE_API_PATH = f"/referrals/{STUB_POST_ID}"
 POST_DETAIL_PAGE_PATH = f"/referrals/{STUB_POST_ID}"
 
-# Clinician (formerly "provider") create form pact. URL family flipped
-# from `/providers` to `/clinicians` in #642 PR 4; the Pact participant
-# names (`CONSUMER_NAME_PROVIDER_*`, `PROVIDER_NAME_PROVIDERS`) keep
-# their historical identity so the pact-broker history reads
-# continuously across the rename.
+# Clinician create form pact.
 CLINICIAN_CREATE_API_PATH = "/clinicians"
 CLINICIAN_CREATE_FORM_PAGE_PATH = "/clinicians/form"
 
@@ -75,9 +71,9 @@ PROVIDER_STATE_USER_EXISTS_AND_ACTIVE = f"User {TARGET_USER_ID} exists and is ac
 PROVIDER_STATE_POST_EXISTS_AND_OWNED = (
     f"Post {STUB_POST_ID} exists and is owned by the requester"
 )
-PROVIDER_STATE_USER_CAN_CREATE_PROVIDER = "User can create a provider"
-PROVIDER_STATE_PROVIDER_EXISTS_AND_OWNED = (
-    f"Provider {STUB_CLINICIAN_ID} exists and is owned by the requester"
+CLINICIAN_STATE_USER_CAN_CREATE_CLINICIAN = "User can create a clinician"
+CLINICIAN_STATE_CLINICIAN_EXISTS_AND_OWNED = (
+    f"Clinician {STUB_CLINICIAN_ID} exists and is owned by the requester"
 )
 PROVIDER_STATE_USER_CAN_CREATE_ORGANIZATION = "User can create an organization"
 PROVIDER_STATE_USER_CAN_CREATE_PROGRAM = "User can create a program"
@@ -94,9 +90,9 @@ PROVIDER_NAME_USERS = "users-api"
 CONSUMER_NAME_POST_OWNER_ACTIONS = "post-owner-actions"
 PROVIDER_NAME_POSTS = "posts-api"
 
-CONSUMER_NAME_CLINICIAN_CREATE_FORM = "provider-create-form"
-CONSUMER_NAME_CLINICIAN_EDIT_FORM = "provider-edit-form"
-PROVIDER_NAME_PROVIDERS = "providers-api"
+CONSUMER_NAME_CLINICIAN_CREATE_FORM = "clinician-create-form"
+CONSUMER_NAME_CLINICIAN_EDIT_FORM = "clinician-edit-form"
+CLINICIAN_NAME_CLINICIANS = "clinicians-api"
 
 CONSUMER_NAME_ORGANIZATION_CREATE_FORM = "organization-create-form"
 PROVIDER_NAME_ORGANIZATIONS = "organizations-api"
