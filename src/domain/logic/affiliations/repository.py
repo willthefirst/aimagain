@@ -18,7 +18,7 @@ from src.framework.persistence.dependencies import register_repository
 
 
 class AffiliationRepository(BaseRepository):
-    """Sub-resource of `Provider` — see module docstring."""
+    """Sub-resource of `Clinician` — see module docstring."""
 
 
 get_affiliation_repository = register_repository(AffiliationRepository)

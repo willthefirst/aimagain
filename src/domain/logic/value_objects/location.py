@@ -1,7 +1,7 @@
 """``Location`` wire value object: ``(city, state, zip)`` as a named triple.
 
 The DRY-at-the-Pydantic-layer counterpart to
-:class:`src.framework.persistence.mixins.LocationMixin`. Provider and
+:class:`src.framework.persistence.mixins.LocationMixin`. Clinician and
 client-referral wire schemas embed ``location: Location`` (required-state
 flavor) on Create/Read variants and ``location: LocationPartial`` on
 Update variants; helpers on those schemas keep the wire/JSON/audit
@@ -44,7 +44,7 @@ from src.framework.schema_validators import StrippedText, ZipText
 # Pydantic doesn't apply it as a server-side length cap. Client-referral
 # forms don't read the hint (their template uses ``text_field`` directly
 # instead of ``field_for``), so attaching it on the shared value object
-# only affects the provider form — which is the contract preserved here.
+# only affects the clinician form — which is the contract preserved here.
 _CityText = Annotated[StrippedText, HtmlPattern(maxlength=120)]
 _CityTextOptional = Annotated[StrippedText | None, HtmlPattern(maxlength=120)]
 
@@ -57,7 +57,7 @@ _LOCATION_SUBFIELDS: tuple[str, ...] = ("city", "state", "zip")
 class Location(BaseModel):
     """``(city, state, zip)`` triple — required-state flavor.
 
-    Used by Create and Read variants of the Provider and client-referral
+    Used by Create and Read variants of the Clinician and client-referral
     schemas. All three subfields are required and run through the shared
     cleaning rules (:class:`StrippedText` for city, ``Literal[*US_STATES]``
     for state, :class:`ZipText` for zip)."""

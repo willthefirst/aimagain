@@ -1,13 +1,13 @@
-"""Wire schemas for provider and its credential sub-entities.
+"""Wire schemas for the clinician entity and its credential sub-entities.
 
-A `Provider` is a long-lived directory entry owned by a `User`
-(N:1 via `owner_id` — a user may own zero, one, or many providers). It
+A `Clinician` is a long-lived directory entry owned by a `User`
+(N:1 via `owner_id` — a user may own zero, one, or many clinicians). It
 holds three credential lists —
 `ProviderLicensure`, `ProviderEducation`, `ProviderCertification` —
 each managed via its own endpoints in later issues. The wire surface
 mirrors that shape: each entity has Read / Create / Update variants.
 
-Audit snapshots for every provider entity are byte-identical to the
+Audit snapshots for every clinician entity are byte-identical to the
 matching `Read` schema, so each `EntitySpec` reads its audit shape
 through `read_schema` directly — `EntitySpec.__post_init__` defaults
 `audit_snapshot` to `read_schema` when the latter is a Pydantic class.
@@ -17,7 +17,7 @@ keep distinct classes — see those modules.
 
 `ProviderRead` embeds the sub-entity Read lists. `ProviderUpdate` does
 **not** include nested lists — sub-entities are PATCHed via their own
-routes (added later), so a provider-level PATCH only touches the
+routes (added later), so a clinician-level PATCH only touches the
 practice/availability fields.
 
 Controlled-vocabulary fields (state, license type, etc.) are typed as
@@ -84,7 +84,7 @@ def _validate_npi(v: str | None) -> str | None:
 # NPI is a National Provider Identifier — 10 ASCII digits. The HTML
 # `pattern` hint mirrors the validator so the form's `<input>` rejects
 # bad values client-side too. Local to this module because only the
-# provider entity has the column (rule-of-three).
+# clinician entity has the column (rule-of-three).
 NpiText = Annotated[
     str | None,
     AfterValidator(_validate_npi),
@@ -100,7 +100,7 @@ InNetworkCarriersField = Annotated[
 
 
 class _ProviderSubrowBase(ReadProjection):
-    """Common fields for every provider sub-row Read schema (licensure /
+    """Common fields for every credential sub-row Read schema (licensure /
     education / certification). Subclasses add entity-specific fields.
     Also serves as the audit-snapshot shape (see module docstring).
 
@@ -109,7 +109,7 @@ class _ProviderSubrowBase(ReadProjection):
     `clinician_id` (the persisted FK); the URL still scopes mutations
     through `/clinicians/{clinician_id}/...` so clients use the URL
     for the clinician context (URL family renamed in #642 PR 4; the
-    model class stays `Provider`).
+    model class stays `ProviderLicensure` / `ProviderEducation` / `ProviderCertification`).
     """
 
     id: uuid.UUID
@@ -187,7 +187,7 @@ class ProviderCertificationUpdate(PartialUpdate):
     expiration_date: date | None = None
 
 
-# --- Provider ----------------------------------------------------
+# --- Clinician ----------------------------------------------------
 
 
 class ProviderRead(FlatLocationSchema, ReadProjection):
@@ -196,18 +196,17 @@ class ProviderRead(FlatLocationSchema, ReadProjection):
     created_at: datetime
     updated_at: datetime
     # `org_name` is the practice's display name, sourced from
-    # ``provider.org.name`` via the model-validator below — every reader
+    # ``clinician.org.name`` via the model-validator below — every reader
     # (templates, audit snapshots, contract tests) reads `org_name` rather
     # than dereferencing the relationship inline.
     org_id: uuid.UUID
     org_name: str
     # National Provider Identifier; 10 ASCII digits or `None`. Used by the
-    # verification pipeline to look up the provider in NPPES. No UNIQUE
+    # verification pipeline to look up the clinician in NPPES. No UNIQUE
     # constraint at the DB layer yet.
     npi: str | None = None
     # Legal first / last name — surfaced via `from_attributes` through
-    # `Provider.first_name` / `last_name`, which proxy to the linked
-    # `Clinician` (the actual column owner). Optional on read because
+    # `Clinician.first_name` / `last_name`. Optional on read because
     # backfill is operator-driven.
     first_name: str | None = None
     last_name: str | None = None
@@ -231,7 +230,7 @@ class ProviderRead(FlatLocationSchema, ReadProjection):
 
 
 class ProviderCreate(FlatLocationSchema, WirePayload):
-    """Create payload for a provider's directory provider. `owner_id` is
+    """Create payload for a clinician directory entry. `owner_id` is
     set by the route from the authenticated user, not accepted on the
     wire.
 
@@ -247,7 +246,7 @@ class ProviderCreate(FlatLocationSchema, WirePayload):
 
     # `solo_practice=True` lets a new user skip the separate Org-create
     # step: the create handler auto-creates a solo-practice Org and
-    # patches `org_id` before persisting the Provider (#699). Excluded
+    # patches `org_id` before persisting the Clinician (#699). Excluded
     # from model_dump() so the field never leaks into the ORM constructor.
     solo_practice: bool = Field(default=False, exclude=True)
     # Required when `solo_practice=False`; the handler fills it in for
@@ -266,7 +265,7 @@ class ProviderCreate(FlatLocationSchema, WirePayload):
     # Legal first / last name — both optional, both normalize empty
     # string to `None` via `StrippedOptionalText` so an unfilled form
     # field doesn't persist `""`. Forwarded to the linked Clinician
-    # via `Provider.__init__`'s kwarg peeling.
+    # via `Clinician.__init__`'s kwarg peeling.
     first_name: StrippedOptionalText = None
     last_name: StrippedOptionalText = None
     location: Location
@@ -298,7 +297,7 @@ class ProviderUpdate(FlatLocationSchema, PartialUpdate):
     handler's ``repo.patch(target, **fields)`` call expects.
     """
 
-    # Patch the Provider's Organization by pointing `org_id` at a
+    # Patch the Clinician's Organization by pointing `org_id` at a
     # different row in `organizations`. `org.name` changes by editing
     # the Organization itself, not via this schema.
     org_id: uuid.UUID | None = None

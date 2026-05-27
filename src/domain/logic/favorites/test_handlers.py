@@ -62,29 +62,29 @@ async def _seed_user(
     return user
 
 
-async def _seed_provider(
+async def _seed_clinician(
     db_test_session_manager: async_sessionmaker[AsyncSession],
     *,
     practice_name: str = "Acme Health",
 ):
     owner = create_test_user(username=f"owner-{uuid.uuid4()}")
-    provider = make_clinician_with_org(owner_id=owner.id, practice_name=practice_name)
+    clinician = make_clinician_with_org(owner_id=owner.id, practice_name=practice_name)
     async with db_test_session_manager() as session:
         async with session.begin():
             session.add(owner)
-            session.add(provider)
-    return provider
+            session.add(clinician)
+    return clinician
 
 
 async def test_add_favorite_creates_edge_and_audits(
     db_test_session_manager: async_sessionmaker[AsyncSession],
 ):
     user = await _seed_user(db_test_session_manager)
-    provider = await _seed_provider(db_test_session_manager)
+    clinician = await _seed_clinician(db_test_session_manager)
 
     async with db_test_session_manager() as session:
         edge = await handle_add_favorite(
-            clinician_id=provider.id,
+            clinician_id=clinician.id,
             repo=UserFavoriteRepository(session),
             clinician_repo=ClinicianRepository(session),
             audit_repo=AuditRepository(session),
@@ -118,11 +118,11 @@ async def test_add_favorite_is_idempotent_no_extra_audit(
     """Re-favoriting returns the existing edge unchanged and does not
     write a second audit row."""
     user = await _seed_user(db_test_session_manager)
-    provider = await _seed_provider(db_test_session_manager)
+    clinician = await _seed_clinician(db_test_session_manager)
 
     async with db_test_session_manager() as session:
         first = await handle_add_favorite(
-            clinician_id=provider.id,
+            clinician_id=clinician.id,
             repo=UserFavoriteRepository(session),
             clinician_repo=ClinicianRepository(session),
             audit_repo=AuditRepository(session),
@@ -132,7 +132,7 @@ async def test_add_favorite_is_idempotent_no_extra_audit(
 
     async with db_test_session_manager() as session:
         second = await handle_add_favorite(
-            clinician_id=provider.id,
+            clinician_id=clinician.id,
             repo=UserFavoriteRepository(session),
             clinician_repo=ClinicianRepository(session),
             audit_repo=AuditRepository(session),
@@ -166,7 +166,7 @@ async def test_add_favorite_is_idempotent_no_extra_audit(
         assert len(edge_rows) == 1
 
 
-async def test_add_favorite_provider_not_found(
+async def test_add_favorite_clinician_not_found(
     db_test_session_manager: async_sessionmaker[AsyncSession],
 ):
     user = await _seed_user(db_test_session_manager)
@@ -185,11 +185,11 @@ async def test_remove_favorite_deletes_edge_and_audits(
     db_test_session_manager: async_sessionmaker[AsyncSession],
 ):
     user = await _seed_user(db_test_session_manager)
-    provider = await _seed_provider(db_test_session_manager)
+    clinician = await _seed_clinician(db_test_session_manager)
 
     async with db_test_session_manager() as session:
         edge = await handle_add_favorite(
-            clinician_id=provider.id,
+            clinician_id=clinician.id,
             repo=UserFavoriteRepository(session),
             clinician_repo=ClinicianRepository(session),
             audit_repo=AuditRepository(session),
@@ -199,7 +199,7 @@ async def test_remove_favorite_deletes_edge_and_audits(
 
     async with db_test_session_manager() as session:
         await handle_remove_favorite(
-            clinician_id=provider.id,
+            clinician_id=clinician.id,
             repo=UserFavoriteRepository(session),
             audit_repo=AuditRepository(session),
             requesting_user=user,
@@ -238,11 +238,11 @@ async def test_remove_favorite_idempotent_no_audit_on_noop(
 ):
     """Unfavoriting when no edge exists is a no-op — no audit row."""
     user = await _seed_user(db_test_session_manager)
-    provider = await _seed_provider(db_test_session_manager)
+    clinician = await _seed_clinician(db_test_session_manager)
 
     async with db_test_session_manager() as session:
         await handle_remove_favorite(
-            clinician_id=provider.id,
+            clinician_id=clinician.id,
             repo=UserFavoriteRepository(session),
             audit_repo=AuditRepository(session),
             requesting_user=user,
@@ -270,8 +270,8 @@ async def test_list_my_favorites_returns_only_self_edges(
     """Self-scoping: another user's favorites are not visible."""
     me = await _seed_user(db_test_session_manager)
     other = await _seed_user(db_test_session_manager)
-    mine = await _seed_provider(db_test_session_manager, practice_name="Mine")
-    theirs = await _seed_provider(db_test_session_manager, practice_name="Theirs")
+    mine = await _seed_clinician(db_test_session_manager, practice_name="Mine")
+    theirs = await _seed_clinician(db_test_session_manager, practice_name="Theirs")
 
     async with db_test_session_manager() as session:
         await handle_add_favorite(
