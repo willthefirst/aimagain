@@ -3,7 +3,7 @@ from uuid import UUID
 
 from sqlalchemy import select
 
-from src.domain.models import Clinician, ProviderLicensure
+from src.domain.models import Clinician, ClinicianLicensure
 from src.framework.persistence.base_repository import BaseRepository
 from src.framework.persistence.dependencies import register_repository
 
@@ -37,25 +37,21 @@ class ClinicianRepository(BaseRepository):
         limit: int | None = None,
     ) -> Sequence[Clinician]:
         """List directory entries newest first. Both filters are multi-select;
-        when set, joins through `provider_licensures` and distincts so a
+        when set, joins through `provider_licensures` (SQL table) and distincts so a
         clinician with multiple matching licensures appears once."""
         stmt = select(Clinician)
         if license_type or issuing_state:
             stmt = stmt.join(
-                ProviderLicensure,
-                ProviderLicensure.clinician_id == Clinician.id,
+                ClinicianLicensure,
+                ClinicianLicensure.clinician_id == Clinician.id,
             )
             if license_type:
-                stmt = stmt.filter(ProviderLicensure.license_type.in_(license_type))
+                stmt = stmt.filter(ClinicianLicensure.license_type.in_(license_type))
             if issuing_state:
-                stmt = stmt.filter(ProviderLicensure.issuing_state.in_(issuing_state))
+                stmt = stmt.filter(ClinicianLicensure.issuing_state.in_(issuing_state))
             stmt = stmt.distinct()
         stmt = stmt.order_by(Clinician.created_at.desc())
         return await self._list(stmt, offset=offset, limit=limit)
 
 
 get_clinician_repository = register_repository(ClinicianRepository)
-
-# Aliases for call sites not yet migrated to the new name.
-ProviderRepository = ClinicianRepository
-get_provider_repository = get_clinician_repository

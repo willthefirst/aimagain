@@ -8,13 +8,13 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 # Need ORM models
 from src.domain.models import (
     Clinician,
+    ClinicianCertification,
+    ClinicianEducation,
+    ClinicianLicensure,
     IntakeDetail,
     OpeningDetail,
     Organization,
     Program,
-    ProviderCertification,
-    ProviderEducation,
-    ProviderLicensure,
     ReferralDetail,
     User,
 )
@@ -215,20 +215,20 @@ _CLINICIAN_DEFAULTS: dict[str, Any] = {
     "cost": None,
 }
 
-_PROVIDER_LICENSURE_DEFAULTS: dict[str, Any] = {
+_CLINICIAN_LICENSURE_DEFAULTS: dict[str, Any] = {
     "license_type": "lcsw",
     "license_number": "L-12345",
     "issuing_state": "IL",
     "expiration_date": None,
 }
 
-_PROVIDER_EDUCATION_DEFAULTS: dict[str, Any] = {
+_CLINICIAN_EDUCATION_DEFAULTS: dict[str, Any] = {
     "education_type": "msw",
     "institution": "State University",
     "month_completed": None,
 }
 
-_PROVIDER_CERTIFICATION_DEFAULTS: dict[str, Any] = {
+_CLINICIAN_CERTIFICATION_DEFAULTS: dict[str, Any] = {
     "certification_type": "emdr",
     "certifying_body": "EMDRIA",
     "expiration_date": None,
@@ -255,26 +255,22 @@ def clinician_payload(**overrides: Any) -> dict[str, Any]:
     return _drop_none({**_CLINICIAN_DEFAULTS, **overrides})
 
 
-# Backwards-compatible alias.
-provider_payload = clinician_payload
-
-
 def licensure_payload(**overrides: Any) -> dict[str, Any]:
     """Build a wire-valid `POST /clinicians/{id}/licensures` payload."""
-    return _drop_none({**_PROVIDER_LICENSURE_DEFAULTS, **overrides})
+    return _drop_none({**_CLINICIAN_LICENSURE_DEFAULTS, **overrides})
 
 
 def education_payload(**overrides: Any) -> dict[str, Any]:
     """Build a wire-valid `POST /clinicians/{id}/educations` payload."""
-    return _drop_none({**_PROVIDER_EDUCATION_DEFAULTS, **overrides})
+    return _drop_none({**_CLINICIAN_EDUCATION_DEFAULTS, **overrides})
 
 
 def certification_payload(**overrides: Any) -> dict[str, Any]:
     """Build a wire-valid `POST /clinicians/{id}/certifications` payload."""
-    return _drop_none({**_PROVIDER_CERTIFICATION_DEFAULTS, **overrides})
+    return _drop_none({**_CLINICIAN_CERTIFICATION_DEFAULTS, **overrides})
 
 
-def make_provider(*, owner_id: UUID, **overrides: Any) -> Clinician:
+def make_clinician(*, owner_id: UUID, **overrides: Any) -> Clinician:
     """Build a `Clinician` ORM row with CHECK-valid defaults.
 
     ``Clinician.org_id`` is NOT NULL. Callers persisting the returned row
@@ -299,7 +295,7 @@ def make_organization_row(
     ``parent_org_id = NULL``).
 
     Assigns ``id`` eagerly so callers can pass ``org.id`` straight into
-    a sibling ``make_provider`` without an intermediate flush — mirrors
+    a sibling ``make_clinician`` without an intermediate flush — mirrors
     the eager assignment ``OrganizationRepository.create`` does."""
     obj = Organization(
         id=org_id or uuid.uuid4(),
@@ -319,8 +315,8 @@ def make_clinician_with_org(
     **overrides: Any,
 ) -> Clinician:
     """Build a Clinician wired to an Organization. ``Organization.name``
-    is the practice's display name; tests that previously asserted on
-    ``provider.practice_name`` now read ``clinician.org.name``.
+    is the practice's display name; tests assert on ``clinician.org.name``.
+
 
     The Org is attached via ``clinician.org = org`` rather than just
     ``org_id`` so SQLAlchemy's default save-update cascade picks the
@@ -333,7 +329,7 @@ def make_clinician_with_org(
     case (the existing Org's name wins)."""
     if org is None:
         org = make_organization_row(owner_id=owner_id, name=practice_name)
-    clinician = make_provider(
+    clinician = make_clinician(
         owner_id=owner_id,
         org_id=org.id,
         **{k: v for k, v in overrides.items() if k != "practice_name"},
@@ -342,45 +338,42 @@ def make_clinician_with_org(
     return clinician
 
 
-make_provider_with_org = make_clinician_with_org  # backwards-compat alias
-
-
-def make_provider_licensure(
+def make_clinician_licensure(
     *,
     clinician_id: UUID,
     **overrides: Any,
-) -> ProviderLicensure:
-    """Build a `ProviderLicensure` ORM row with CHECK-valid defaults.
+) -> ClinicianLicensure:
+    """Build a `ClinicianLicensure` ORM row with CHECK-valid defaults.
     Pass `clinician_id=clinician.id` after the clinician has been flushed."""
-    return ProviderLicensure(
+    return ClinicianLicensure(
         clinician_id=clinician_id,
-        **{**_PROVIDER_LICENSURE_DEFAULTS, **overrides},
+        **{**_CLINICIAN_LICENSURE_DEFAULTS, **overrides},
     )
 
 
-def make_provider_education(
+def make_clinician_education(
     *,
     clinician_id: UUID,
     **overrides: Any,
-) -> ProviderEducation:
-    """Build a `ProviderEducation` ORM row. See
-    :func:`make_provider_licensure` for the FK contract."""
-    return ProviderEducation(
+) -> ClinicianEducation:
+    """Build a `ClinicianEducation` ORM row. See
+    :func:`make_clinician_licensure` for the FK contract."""
+    return ClinicianEducation(
         clinician_id=clinician_id,
-        **{**_PROVIDER_EDUCATION_DEFAULTS, **overrides},
+        **{**_CLINICIAN_EDUCATION_DEFAULTS, **overrides},
     )
 
 
-def make_provider_certification(
+def make_clinician_certification(
     *,
     clinician_id: UUID,
     **overrides: Any,
-) -> ProviderCertification:
-    """Build a `ProviderCertification` ORM row. See
-    :func:`make_provider_licensure` for the FK contract."""
-    return ProviderCertification(
+) -> ClinicianCertification:
+    """Build a `ClinicianCertification` ORM row. See
+    :func:`make_clinician_licensure` for the FK contract."""
+    return ClinicianCertification(
         clinician_id=clinician_id,
-        **{**_PROVIDER_CERTIFICATION_DEFAULTS, **overrides},
+        **{**_CLINICIAN_CERTIFICATION_DEFAULTS, **overrides},
     )
 
 

@@ -77,8 +77,8 @@ async def run_clinician_verification(
     score: Score = score_verification(
         nppes=nppes_result,
         oig=oig_result,
-        provider_first_name=first_name,
-        provider_last_name=last_name,
+        clinician_first_name=first_name,
+        clinician_last_name=last_name,
     )
 
     verification = await verification_repo.record(
@@ -109,10 +109,6 @@ async def run_clinician_verification(
     return verification
 
 
-# Backward-compat alias used by the nightly job.
-run_provider_verification = run_clinician_verification
-
-
 async def handle_create_clinician_verification(
     clinician_id: UUID,
     verification_repo: VerificationRepository,
@@ -133,6 +129,3 @@ async def handle_create_clinician_verification(
             http=http,
             actor_id=requesting_user.id,
         )
-
-
-handle_create_provider_verification = handle_create_clinician_verification

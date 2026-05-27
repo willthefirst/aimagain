@@ -22,17 +22,17 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from src.domain.logic.clinicians.repository import ClinicianRepository
 from src.domain.models import (
     Clinician,
-    ProviderCertification,
-    ProviderEducation,
-    ProviderLicensure,
+    ClinicianCertification,
+    ClinicianEducation,
+    ClinicianLicensure,
     User,
 )
 from tests.helpers import (
     create_test_user,
+    make_clinician_certification,
+    make_clinician_education,
+    make_clinician_licensure,
     make_clinician_with_org,
-    make_provider_certification,
-    make_provider_education,
-    make_provider_licensure,
 )
 
 pytestmark = pytest.mark.asyncio
@@ -270,21 +270,21 @@ async def test_delete_clinician_cascades_to_credentials(
             session.add(clinician)
             await session.flush()
             session.add(
-                make_provider_licensure(
+                make_clinician_licensure(
                     clinician_id=clinician.id,
                     license_type="lcsw",
                     issuing_state="IL",
                 )
             )
             session.add(
-                make_provider_licensure(
+                make_clinician_licensure(
                     clinician_id=clinician.id,
                     license_type="lpc",
                     issuing_state="CA",
                 )
             )
-            session.add(make_provider_education(clinician_id=clinician.id))
-            session.add(make_provider_certification(clinician_id=clinician.id))
+            session.add(make_clinician_education(clinician_id=clinician.id))
+            session.add(make_clinician_certification(clinician_id=clinician.id))
             clinician_id = clinician.id
 
     async with db_test_session_manager() as session:
@@ -307,8 +307,8 @@ async def test_delete_clinician_cascades_to_credentials(
         licensure_rows = (
             (
                 await session.execute(
-                    select(ProviderLicensure).filter(
-                        ProviderLicensure.clinician_id == clinician_id
+                    select(ClinicianLicensure).filter(
+                        ClinicianLicensure.clinician_id == clinician_id
                     )
                 )
             )
@@ -318,8 +318,8 @@ async def test_delete_clinician_cascades_to_credentials(
         education_rows = (
             (
                 await session.execute(
-                    select(ProviderEducation).filter(
-                        ProviderEducation.clinician_id == clinician_id
+                    select(ClinicianEducation).filter(
+                        ClinicianEducation.clinician_id == clinician_id
                     )
                 )
             )
@@ -329,8 +329,8 @@ async def test_delete_clinician_cascades_to_credentials(
         certification_rows = (
             (
                 await session.execute(
-                    select(ProviderCertification).filter(
-                        ProviderCertification.clinician_id == clinician_id
+                    select(ClinicianCertification).filter(
+                        ClinicianCertification.clinician_id == clinician_id
                     )
                 )
             )
@@ -380,14 +380,14 @@ async def test_list_clinicians_filtered_by_license_type(
             session.add_all([clinician_a, clinician_b])
             await session.flush()
             session.add(
-                make_provider_licensure(
+                make_clinician_licensure(
                     clinician_id=clinician_a.id,
                     license_type="lcsw",
                     issuing_state="IL",
                 )
             )
             session.add(
-                make_provider_licensure(
+                make_clinician_licensure(
                     clinician_id=clinician_b.id,
                     license_type="lpc",
                     issuing_state="IL",
@@ -416,14 +416,14 @@ async def test_list_clinicians_filtered_by_issuing_state(
             session.add_all([clinician_a, clinician_b])
             await session.flush()
             session.add(
-                make_provider_licensure(
+                make_clinician_licensure(
                     clinician_id=clinician_a.id,
                     license_type="lcsw",
                     issuing_state="CA",
                 )
             )
             session.add(
-                make_provider_licensure(
+                make_clinician_licensure(
                     clinician_id=clinician_b.id,
                     license_type="lcsw",
                     issuing_state="IL",
@@ -458,7 +458,7 @@ async def test_list_clinicians_combined_filter_is_anded(
             await session.flush()
             # A: matches both filters
             session.add(
-                make_provider_licensure(
+                make_clinician_licensure(
                     clinician_id=clinician_a.id,
                     license_type="lcsw",
                     issuing_state="CA",
@@ -466,7 +466,7 @@ async def test_list_clinicians_combined_filter_is_anded(
             )
             # B: matches license_type only
             session.add(
-                make_provider_licensure(
+                make_clinician_licensure(
                     clinician_id=clinician_b.id,
                     license_type="lcsw",
                     issuing_state="IL",
@@ -474,7 +474,7 @@ async def test_list_clinicians_combined_filter_is_anded(
             )
             # C: matches issuing_state only
             session.add(
-                make_provider_licensure(
+                make_clinician_licensure(
                     clinician_id=clinician_c.id,
                     license_type="lpc",
                     issuing_state="CA",
@@ -533,7 +533,7 @@ async def test_list_clinicians_distinct_when_multiple_licensures_match(
             session.add(clinician_row)
             await session.flush()
             session.add(
-                make_provider_licensure(
+                make_clinician_licensure(
                     clinician_id=clinician_row.id,
                     license_type="lcsw",
                     issuing_state="IL",
@@ -541,7 +541,7 @@ async def test_list_clinicians_distinct_when_multiple_licensures_match(
                 )
             )
             session.add(
-                make_provider_licensure(
+                make_clinician_licensure(
                     clinician_id=clinician_row.id,
                     license_type="lcsw",
                     issuing_state="CA",
@@ -570,7 +570,7 @@ async def test_licensure_crud_round_trip(
         licensure = await repo.add_child(
             clinician,
             "licensures",
-            ProviderLicensure(
+            ClinicianLicensure(
                 license_type="lcsw",
                 license_number="L-1",
                 issuing_state="IL",
@@ -581,21 +581,21 @@ async def test_licensure_crud_round_trip(
 
     async with db_test_session_manager() as session:
         repo = ClinicianRepository(session)
-        found = await repo.get_by_model_id(ProviderLicensure, licensure_id)
+        found = await repo.get_by_model_id(ClinicianLicensure, licensure_id)
         assert found is not None
         await repo.patch(found, license_number="L-2")
         await session.commit()
 
     async with db_test_session_manager() as session:
         repo = ClinicianRepository(session)
-        found = await repo.get_by_model_id(ProviderLicensure, licensure_id)
+        found = await repo.get_by_model_id(ClinicianLicensure, licensure_id)
         assert found.license_number == "L-2"
         await repo.delete(found)
         await session.commit()
 
     async with db_test_session_manager() as session:
         repo = ClinicianRepository(session)
-        assert await repo.get_by_model_id(ProviderLicensure, licensure_id) is None
+        assert await repo.get_by_model_id(ClinicianLicensure, licensure_id) is None
 
 
 async def test_education_crud_round_trip(
@@ -610,7 +610,7 @@ async def test_education_crud_round_trip(
         education = await repo.add_child(
             clinician,
             "educations",
-            ProviderEducation(
+            ClinicianEducation(
                 education_type="msw",
                 institution="State U",
             ),
@@ -620,21 +620,21 @@ async def test_education_crud_round_trip(
 
     async with db_test_session_manager() as session:
         repo = ClinicianRepository(session)
-        found = await repo.get_by_model_id(ProviderEducation, education_id)
+        found = await repo.get_by_model_id(ClinicianEducation, education_id)
         assert found is not None
         await repo.patch(found, institution="State U Renamed")
         await session.commit()
 
     async with db_test_session_manager() as session:
         repo = ClinicianRepository(session)
-        found = await repo.get_by_model_id(ProviderEducation, education_id)
+        found = await repo.get_by_model_id(ClinicianEducation, education_id)
         assert found.institution == "State U Renamed"
         await repo.delete(found)
         await session.commit()
 
     async with db_test_session_manager() as session:
         repo = ClinicianRepository(session)
-        assert await repo.get_by_model_id(ProviderEducation, education_id) is None
+        assert await repo.get_by_model_id(ClinicianEducation, education_id) is None
 
 
 async def test_certification_crud_round_trip(
@@ -649,7 +649,7 @@ async def test_certification_crud_round_trip(
         cert = await repo.add_child(
             clinician,
             "certifications",
-            ProviderCertification(
+            ClinicianCertification(
                 certification_type="emdr",
                 certifying_body="EMDRIA",
             ),
@@ -659,18 +659,18 @@ async def test_certification_crud_round_trip(
 
     async with db_test_session_manager() as session:
         repo = ClinicianRepository(session)
-        found = await repo.get_by_model_id(ProviderCertification, cert_id)
+        found = await repo.get_by_model_id(ClinicianCertification, cert_id)
         assert found is not None
         await repo.patch(found, certifying_body="Updated Body")
         await session.commit()
 
     async with db_test_session_manager() as session:
         repo = ClinicianRepository(session)
-        found = await repo.get_by_model_id(ProviderCertification, cert_id)
+        found = await repo.get_by_model_id(ClinicianCertification, cert_id)
         assert found.certifying_body == "Updated Body"
         await repo.delete(found)
         await session.commit()
 
     async with db_test_session_manager() as session:
         repo = ClinicianRepository(session)
-        assert await repo.get_by_model_id(ProviderCertification, cert_id) is None
+        assert await repo.get_by_model_id(ClinicianCertification, cert_id) is None

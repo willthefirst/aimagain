@@ -15,9 +15,9 @@ from src.framework.audit.repository import AuditRepository
 from tests.helpers import (
     clinician_payload,
     create_test_user,
+    make_clinician_licensure,
     make_clinician_with_org,
     make_organization_row,
-    make_provider_licensure,
     promote_to_admin,
 )
 
@@ -321,7 +321,7 @@ async def test_get_clinician_renders_detail_page(
         db_test_session_manager, user_id=logged_in_user.id, practice_name="Mine"
     )
     clinician_id = await _clinician_id_for(db_test_session_manager, clinician_id)
-    licensure = make_provider_licensure(
+    licensure = make_clinician_licensure(
         clinician_id=clinician_id, license_type="lcsw", license_number="L-99999"
     )
     async with db_test_session_manager() as session:
@@ -723,14 +723,14 @@ async def test_list_clinicians_shows_licensure_states(
     async with db_test_session_manager() as session:
         async with session.begin():
             session.add(
-                make_provider_licensure(
+                make_clinician_licensure(
                     clinician_id=clinician_id,
                     license_type="lcsw",
                     issuing_state="CA",
                 )
             )
             session.add(
-                make_provider_licensure(
+                make_clinician_licensure(
                     clinician_id=clinician_id,
                     license_type="lpc",
                     issuing_state="CT",
@@ -829,10 +829,10 @@ async def test_list_clinicians_filters_by_license_type(
     async with db_test_session_manager() as session:
         async with session.begin():
             session.add(
-                make_provider_licensure(clinician_id=clinician_a, license_type="psyd")
+                make_clinician_licensure(clinician_id=clinician_a, license_type="psyd")
             )
             session.add(
-                make_provider_licensure(clinician_id=clinician_b, license_type="lcsw")
+                make_clinician_licensure(clinician_id=clinician_b, license_type="lcsw")
             )
 
     response = await authenticated_client.get("/clinicians?license_type=psyd")
@@ -1096,7 +1096,9 @@ async def test_patch_licensure_updates_fields(
         db_test_session_manager, user_id=logged_in_user.id
     )
     clinician_id = await _clinician_id_for(db_test_session_manager, clinician_id)
-    licensure = make_provider_licensure(clinician_id=clinician_id, license_number="L-1")
+    licensure = make_clinician_licensure(
+        clinician_id=clinician_id, license_number="L-1"
+    )
     async with db_test_session_manager() as session:
         async with session.begin():
             session.add(licensure)
@@ -1128,7 +1130,7 @@ async def test_patch_licensure_returns_404_for_mismatched_clinician(
     other_clinician_id = await _clinician_id_for(
         db_test_session_manager, other_clinician_id
     )
-    other_licensure = make_provider_licensure(clinician_id=other_clinician_id)
+    other_licensure = make_clinician_licensure(clinician_id=other_clinician_id)
     async with db_test_session_manager() as session:
         async with session.begin():
             session.add(other_licensure)
@@ -1464,7 +1466,7 @@ async def test_owner_can_open_edit_form(
         practice_name="Acme Counseling",
     )
     clinician_id = await _clinician_id_for(db_test_session_manager, clinician_id)
-    licensure = make_provider_licensure(
+    licensure = make_clinician_licensure(
         clinician_id=clinician_id, license_type="lcsw", license_number="L-12345"
     )
     async with db_test_session_manager() as session:
@@ -1513,7 +1515,7 @@ async def test_owner_edit_form_renders_credentials_as_rows(
         practice_name="Acme Counseling",
     )
     clinician_id = await _clinician_id_for(db_test_session_manager, clinician_id)
-    licensure = make_provider_licensure(
+    licensure = make_clinician_licensure(
         clinician_id=clinician_id,
         license_type="lcsw",
         license_number="L-12345",

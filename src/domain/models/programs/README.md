@@ -5,7 +5,7 @@ The SQLAlchemy model for the `programs` table. A :class:`Program` is a treatment
 The model file's own docstring documents the column-level grammar (ownership, `state_preference` independence from the parent Org, no insurance fields). This README captures only the cross-file ties that aren't visible from inside `program.py`:
 
 - **Reverse FKs** — :class:`Program` is referenced from:
-  - A Clinician's Org link lives on :class:`Affiliation.org_id`, not on the Program — Providers attach to Orgs (via their affiliation), not Programs (the Program is the intake door; the Clinician does the clinical work).
+  - A Clinician's Org link lives on :class:`Affiliation.org_id`, not on the Program — Clinicians attach to Orgs (via their affiliation), not Programs (the Program is the intake door; the Clinician does the clinical work).
   - :class:`IntakeDetail.program_id` (#541) — posts of kind `intake` announce a Program's intake openings. `program.intake_details` back-populates the relationship. Deleting a Program cascades through to its intake posts (a post about a deleted Program is stale by construction).
 
 - **Form / authz wiring** — Program edits go through the framework's factory-built `mount_entity`; the `payload_authz_path` declared on `PROGRAM_ENTITY` enforces "the user may only attach a Program to an Org they own" (#537). The intake post create flow has its own `payload_authz` check on `POST_ENTITY` (#541) enforcing "the user may only post Program-availability for a Program they own" — same shape, different entity boundary.

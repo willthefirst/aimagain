@@ -15,8 +15,8 @@ from fastapi import FastAPI, Request
 
 from src.auth_config import current_active_user, current_admin_user
 from src.domain import template_globals  # noqa: F401  # populates Jinja env globals
+from src.domain.logic.clinicians.schema import ClinicianCreate
 from src.domain.logic.programs.schema import ProgramCreate
-from src.domain.logic.providers.schema import ProviderCreate
 from src.domain.models.enums import (
     ORGANIZATION_TYPES,
     ORGANIZATION_TYPES_LABELS,
@@ -35,9 +35,9 @@ STUB_TARGET_USER_ID = uuid.UUID("11111111-1111-1111-1111-111111111111")
 # `tests/test_contract/constants.py`.
 STUB_POST_ID = uuid.UUID("22222222-2222-2222-2222-222222222222")
 
-# Stable UUID used by the provider-edit stub page; matches
-# `STUB_PROVIDER_ID` in `tests/test_contract/constants.py`.
-STUB_PROVIDER_ID = uuid.UUID("44444444-4444-4444-4444-444444444444")
+# Stable UUID used by the clinician-edit stub page; matches
+# `STUB_CLINICIAN_ID` in `tests/test_contract/constants.py`.
+STUB_CLINICIAN_ID = uuid.UUID("44444444-4444-4444-4444-444444444444")
 
 # Stable Org id seeded by the program-create stub page so the form's
 # `org_id` dropdown has a deterministic option to select; matches
@@ -58,8 +58,8 @@ class ConsumerServerConfig:
         auth_pages: bool = True,
         users_admin_actions: bool = False,
         posts_owner_actions: bool = False,
-        provider_create_form: bool = False,
-        provider_edit_form: bool = False,
+        clinician_create_form: bool = False,
+        clinician_edit_form: bool = False,
         organization_create_form: bool = False,
         program_create_form: bool = False,
         mock_auth: bool = True,
@@ -67,8 +67,8 @@ class ConsumerServerConfig:
         self.auth_pages = auth_pages
         self.users_admin_actions = users_admin_actions
         self.posts_owner_actions = posts_owner_actions
-        self.provider_create_form = provider_create_form
-        self.provider_edit_form = provider_edit_form
+        self.clinician_create_form = clinician_create_form
+        self.clinician_edit_form = clinician_edit_form
         self.organization_create_form = organization_create_form
         self.program_create_form = program_create_form
         self.mock_auth = mock_auth
@@ -178,8 +178,8 @@ def _setup_post_owner_actions_stub(app: FastAPI) -> None:
         )
 
 
-def _setup_provider_create_form_stub(app: FastAPI) -> None:
-    """Mount a stub page that renders the real `providers/form_new.html`
+def _setup_clinician_create_form_stub(app: FastAPI) -> None:
+    """Mount a stub page that renders the real `clinicians/form_new.html`
     template, so the create-form's HTMX submit is exercised without
     needing a database. The contract surface is the form's `POST
     /clinicians` request shape (URL family renamed in #642 PR 4);
@@ -192,10 +192,10 @@ def _setup_provider_create_form_stub(app: FastAPI) -> None:
             self.__dict__.update(kwargs)
 
     @app.get("/clinicians/form")
-    async def provider_create_form_stub_page(request: Request):
+    async def clinician_create_form_stub_page(request: Request):
         current_user = _StubAttrs(
             id=uuid.UUID("00000000-0000-0000-0000-000000000003"),
-            username="provider_user",
+            username="clinician_user",
             is_superuser=False,
         )
         # The Org-picker dropdown reads `orgs` from the template context
@@ -212,34 +212,32 @@ def _setup_provider_create_form_stub(app: FastAPI) -> None:
             # `spec.create_adapter`.
             context={
                 "current_user": current_user,
-                "schema": ProviderCreate,
+                "schema": ClinicianCreate,
                 "orgs": [org],
             },
             request=request,
         )
 
 
-def _setup_provider_edit_form_stub(app: FastAPI) -> None:
-    """Mount a stub page that renders the real `providers/form_edit.html`
-    template with a hardcoded provider, so the practice-fields PATCH form is
+def _setup_clinician_edit_form_stub(app: FastAPI) -> None:
+    """Mount a stub page that renders the real `clinicians/form_edit.html`
+    template with a hardcoded clinician, so the practice-fields PATCH form is
     exercised without needing a database. The contract surface is the form's
-    `PATCH /clinicians/{id}` request shape (URL family renamed in #642
-    PR 4; the path-param keeps its `provider_id` kwarg name because
-    the handler signature takes the Provider model id).
+    `PATCH /clinicians/{id}` request shape (URL family renamed in #642 PR 4).
     """
 
     class _StubAttrs:
         def __init__(self, **kwargs):
             self.__dict__.update(kwargs)
 
-    @app.get("/clinicians/{provider_id}/form")
-    async def provider_edit_form_stub_page(request: Request, provider_id: uuid.UUID):
+    @app.get("/clinicians/{clinician_id}/form")
+    async def clinician_edit_form_stub_page(request: Request, clinician_id: uuid.UUID):
         org_id = uuid.UUID("55555555-5555-5555-5555-555555555555")
         org = _StubAttrs(id=org_id, name="Acme Counseling")
-        provider = _StubAttrs(
-            id=provider_id,
+        clinician = _StubAttrs(
+            id=clinician_id,
             # `org_id` + `org.name` replaces the former `practice_name`
-            # column (#524). The form template reads `provider.org_id`
+            # column (#524). The form template reads `clinician.org_id`
             # for the dropdown's selected option and iterates the
             # `orgs` context var to render options.
             org_id=org_id,
@@ -273,16 +271,15 @@ def _setup_provider_edit_form_stub(app: FastAPI) -> None:
         )
         current_user = _StubAttrs(
             id=uuid.UUID("00000000-0000-0000-0000-000000000004"),
-            username="provider_user",
+            username="clinician_user",
             is_superuser=False,
         )
         return APIResponse.html_response(
             template_name="clinicians/form_edit.html",
             # The framework binds `context[spec.name] = target`; after
-            # #642 PR 4 the entity name is "clinician" (the template
-            # aliases it back to `provider` internally).
+            # #642 PR 4 the entity name is "clinician".
             context={
-                "clinician": provider,
+                "clinician": clinician,
                 "current_user": current_user,
                 "orgs": [org],
             },
@@ -363,10 +360,10 @@ def setup_consumer_app_routes(app: FastAPI, config: ConsumerServerConfig) -> Non
         _setup_users_admin_actions_stub(app)
     if config.posts_owner_actions:
         _setup_post_owner_actions_stub(app)
-    if config.provider_create_form:
-        _setup_provider_create_form_stub(app)
-    if config.provider_edit_form:
-        _setup_provider_edit_form_stub(app)
+    if config.clinician_create_form:
+        _setup_clinician_create_form_stub(app)
+    if config.clinician_edit_form:
+        _setup_clinician_edit_form_stub(app)
     if config.organization_create_form:
         _setup_organization_create_form_stub(app)
     if config.program_create_form:

@@ -11,11 +11,10 @@ _TABLE = "provider_certifications"
 _ck = partial(named_check_in, _TABLE)
 
 
-class ProviderCertification(BaseModel):
+class ClinicianCertification(BaseModel):
     """One row per professional certification held by a clinician.
     CASCADE on the parent FK keeps the credential list in lockstep
-    with the `Clinician`. Person-level data — the FK moved from
-    `providers.id` to `clinicians.id` in #635 PR A.
+    with the `Clinician`. Person-level data.
     """
 
     __tablename__ = _TABLE

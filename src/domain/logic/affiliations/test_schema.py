@@ -1,6 +1,6 @@
 """Schema tests for the Affiliation wire layer.
 
-The schemas mirror the per-role fields on `ProviderCreate`; these
+The schemas mirror the per-role fields on `ClinicianCreate`; these
 tests pin the wire contract (flat-location round-trip, Literal
 validation against the enum tuples, scalar→list coercion for the
 multi-checkbox carriers field).
@@ -83,7 +83,7 @@ def test_read_roundtrips_from_attribute_object():
 
     class _Fake:
         id = uuid.uuid4()
-        provider_id = uuid.uuid4()
+        clinician_id = uuid.uuid4()
         clinician_id = uuid.uuid4()
         org_id = uuid.uuid4()
         created_at = datetime(2025, 1, 1, tzinfo=timezone.utc)

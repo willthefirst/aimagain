@@ -18,9 +18,9 @@ from typing import Final
 
 from src.domain.logic.clinicians.repository import get_clinician_repository
 from src.domain.logic.clinicians.schema import (
-    ProviderCreate,
-    ProviderRead,
-    ProviderUpdate,
+    ClinicianCreate,
+    ClinicianRead,
+    ClinicianUpdate,
 )
 from src.domain.logic.favorites.repository import UserFavoriteRepository
 from src.domain.logic.organizations.repository import OrganizationRepository
@@ -63,9 +63,9 @@ CLINICIAN_ENTITY: Final[EntitySpec] = EntitySpec(
     repo_dep=get_clinician_repository,
     auth_deps=AUTHENTICATED,
     auth_policy=OWNER_OR_ADMIN,
-    create_adapter=ProviderCreate,
-    update_adapter=ProviderUpdate,
-    read_schema=ProviderRead,
+    create_adapter=ClinicianCreate,
+    update_adapter=ClinicianUpdate,
+    read_schema=ClinicianRead,
     routes=RouteSet(
         list=True,
         detail=True,

@@ -11,11 +11,10 @@ _TABLE = "provider_educations"
 _ck = partial(named_check_in, _TABLE)
 
 
-class ProviderEducation(BaseModel):
+class ClinicianEducation(BaseModel):
     """One row per educational credential held by a clinician. CASCADE
     on the parent FK keeps the credential list in lockstep with the
-    `Clinician`. Person-level data — the FK moved from `providers.id`
-    to `clinicians.id` in #635 PR A.
+    `Clinician`. Person-level data.
 
     `month_completed` is stored as a "YYYY-MM" string rather than a Date
     because the form captures month-precision only.

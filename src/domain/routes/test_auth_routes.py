@@ -873,7 +873,7 @@ async def test_root_anonymous_returns_landing_page(test_client: AsyncClient):
     assert "text/html" in response.headers["content-type"]
     # Verbatim copy from bedlamconnect.com.
     assert "Welcome to Bedlam Connect" in response.text
-    assert "Connecting providers, helping patients." in response.text
+    assert "Connecting clinicians, helping patients." in response.text
     assert (
         "Post referrals, find referrals, and maintain a network of "
         "professional contacts." in response.text

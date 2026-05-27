@@ -28,9 +28,9 @@ from .posts.post_kinds import (
 )
 from .posts.referral_detail import ReferralDetail
 from .programs.program import Program
-from .providers.provider_certification import ProviderCertification
-from .providers.provider_education import ProviderEducation
-from .providers.provider_licensure import ProviderLicensure
+from .providers.provider_certification import ClinicianCertification
+from .providers.provider_education import ClinicianEducation
+from .providers.provider_licensure import ClinicianLicensure
 from .users.user import User
 from .verifications.verification import Verification
 
@@ -54,9 +54,9 @@ __all__ = [
     "Program",
     "IntakeDetail",
     "OpeningDetail",
-    "ProviderCertification",
-    "ProviderEducation",
-    "ProviderLicensure",
+    "ClinicianCertification",
+    "ClinicianEducation",
+    "ClinicianLicensure",
     "US_STATES",
     "User",
     "UserFavorite",

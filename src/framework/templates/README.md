@@ -1,6 +1,6 @@
 # Framework templates: chrome + generic view types
 
-The framework's template root holds the domain-agnostic pieces: the site shell, the cross-resource macro library, and the generic view-type templates that domain pages extend. Nothing here knows what a "user" or "provider" is — it reads context vars and blocks from whichever domain template extends it.
+The framework's template root holds the domain-agnostic pieces: the site shell, the cross-resource macro library, and the generic view-type templates that domain pages extend. Nothing here knows what a "user" or "clinician" is — it reads context vars and blocks from whichever domain template extends it.
 
 ```
 src/framework/templates/
@@ -88,7 +88,7 @@ The active tab carries `aria-current="page"` plus `class="contrast"`, and `base.
 | Resource detail  | `/posts/{id}`                  | `Posts › Post`                        |
 | Resource new     | `/posts/form`                  | `Posts › New`                         |
 | Resource edit    | `/posts/{id}/form`             | `Posts › Post › Edit`                 |
-| Subresource list | `/users/{id}/providers`        | `Users › <username> › Providers`      |
+| Subresource list | `/users/{id}/clinicians`        | `Users › <username> › Clinicians`      |
 
 Every prior segment is a link (`<a href="…">`); the trailing segment is the current page (no `href`, gets `aria-current="page"`). Single-segment list breadcrumbs are still wrapped in the nav so the chrome strip is present and the strip height stays consistent across pages.
 
@@ -102,7 +102,7 @@ Edit forms keep a bottom `<a class="secondary outline">Cancel</a>` pointing at t
 
 ## Partial convention
 
-Files prefixed with `_` (e.g. `_breadcrumb.html`, `_toolbar.html`, `_provider_row.html`) are partials, `{% include %}`d from full pages — never rendered directly by routes. A partial documents its required context in a `{# ... #}` comment at the top and guards visibility on a single named flag (`{% if can_edit %}`). The handler computes the flag using [`../authz.py`](../authz.py) predicates; partials never introspect `current_user` to decide visibility. Backend authorization is enforced separately in the logic layer — the template guard is presentation only.
+Files prefixed with `_` (e.g. `_breadcrumb.html`, `_toolbar.html`, `_credential_row.html`) are partials, `{% include %}`d from full pages — never rendered directly by routes. A partial documents its required context in a `{# ... #}` comment at the top and guards visibility on a single named flag (`{% if can_edit %}`). The handler computes the flag using [`../authz.py`](../authz.py) predicates; partials never introspect `current_user` to decide visibility. Backend authorization is enforced separately in the logic layer — the template guard is presentation only.
 
 ## Shared macros (`_shared/`)
 

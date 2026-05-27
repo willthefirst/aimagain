@@ -5,7 +5,7 @@ Covers:
 - Create variants reject unknown fields (`extra="forbid"`).
 - Update variants raise `ValidationError` when no editable field is
   set (the at-least-one-field rule).
-- `ProviderRead` round-trips a nested dict through
+- `ClinicianRead` round-trips a nested dict through
   `model_validate`, including sub-entity lists.
 - `test_schema_literals_match_model_tuples` guards that `Literal[*TUPLE]`
   types stay aligned with the source-of-truth tuples in
@@ -20,15 +20,15 @@ import pytest
 from pydantic import ValidationError
 
 from src.domain.logic.clinicians.schema import (
-    ProviderCertificationCreate,
-    ProviderCertificationUpdate,
-    ProviderCreate,
-    ProviderEducationCreate,
-    ProviderEducationUpdate,
-    ProviderLicensureCreate,
-    ProviderLicensureUpdate,
-    ProviderRead,
-    ProviderUpdate,
+    ClinicianCertificationCreate,
+    ClinicianCertificationUpdate,
+    ClinicianCreate,
+    ClinicianEducationCreate,
+    ClinicianEducationUpdate,
+    ClinicianLicensureCreate,
+    ClinicianLicensureUpdate,
+    ClinicianRead,
+    ClinicianUpdate,
 )
 from src.domain.models.enums import (
     CERTIFICATION_TYPES,
@@ -46,11 +46,11 @@ def _now() -> datetime:
 
 
 def _clinician_create_kwargs(**overrides):
-    """Minimum-valid kwargs for `ProviderCreate`.
+    """Minimum-valid kwargs for `ClinicianCreate`.
 
     Location keys stay flat on the wire (form posts send
     ``location_city`` / ``location_state`` / ``location_zip`` at the
-    top level — #451). The ``ProviderCreate`` schema's
+    top level — #451). The ``ClinicianCreate`` schema's
     ``gather_flat_location`` pre-validator rolls them into the nested
     ``location`` value object before validation.
     """
@@ -71,7 +71,7 @@ def _clinician_create_kwargs(**overrides):
 
 def test_licensure_create_rejects_unknown_license_type():
     with pytest.raises(ValidationError):
-        ProviderLicensureCreate(
+        ClinicianLicensureCreate(
             license_type="not_a_real_type",
             license_number="L12345",
             issuing_state="CA",
@@ -80,7 +80,7 @@ def test_licensure_create_rejects_unknown_license_type():
 
 def test_licensure_create_rejects_invalid_state():
     with pytest.raises(ValidationError):
-        ProviderLicensureCreate(
+        ClinicianLicensureCreate(
             license_type="lcsw",
             license_number="L12345",
             issuing_state="ZZ",
@@ -89,7 +89,7 @@ def test_licensure_create_rejects_invalid_state():
 
 def test_education_create_rejects_unknown_education_type():
     with pytest.raises(ValidationError):
-        ProviderEducationCreate(
+        ClinicianEducationCreate(
             education_type="not_a_real_degree",
             institution="State U",
         )
@@ -97,7 +97,7 @@ def test_education_create_rejects_unknown_education_type():
 
 def test_certification_create_rejects_unknown_certification_type():
     with pytest.raises(ValidationError):
-        ProviderCertificationCreate(
+        ClinicianCertificationCreate(
             certification_type="not_a_real_cert",
             certifying_body="Some Body",
         )
@@ -105,7 +105,7 @@ def test_certification_create_rejects_unknown_certification_type():
 
 def test_clinician_create_rejects_invalid_in_person_sessions():
     with pytest.raises(ValidationError):
-        ProviderCreate(
+        ClinicianCreate(
             **_clinician_create_kwargs(in_person_sessions="maybe"),
         )
 
@@ -115,7 +115,7 @@ def test_clinician_create_rejects_invalid_in_person_sessions():
 
 def test_clinician_create_rejects_unknown_field():
     with pytest.raises(ValidationError):
-        ProviderCreate(
+        ClinicianCreate(
             **_clinician_create_kwargs(),
             stray_field="boom",
         )
@@ -123,7 +123,7 @@ def test_clinician_create_rejects_unknown_field():
 
 def test_licensure_create_rejects_unknown_field():
     with pytest.raises(ValidationError):
-        ProviderLicensureCreate(
+        ClinicianLicensureCreate(
             license_type="lcsw",
             license_number="L12345",
             issuing_state="CA",
@@ -137,10 +137,10 @@ def test_licensure_create_rejects_unknown_field():
 @pytest.mark.parametrize(
     "model_cls",
     [
-        ProviderUpdate,
-        ProviderLicensureUpdate,
-        ProviderEducationUpdate,
-        ProviderCertificationUpdate,
+        ClinicianUpdate,
+        ClinicianLicensureUpdate,
+        ClinicianEducationUpdate,
+        ClinicianCertificationUpdate,
     ],
 )
 def test_update_requires_at_least_one_field(model_cls):
@@ -156,7 +156,7 @@ def test_clinician_update_accepts_single_field():
     creates the nested block when a flat ``location_<sub>`` key is
     present)."""
     new_org = uuid.uuid4()
-    upd = ProviderUpdate(org_id=new_org)
+    upd = ClinicianUpdate(org_id=new_org)
     assert upd.org_id == new_org
     assert upd.location is None
 
@@ -169,20 +169,20 @@ def test_clinician_create_requires_org_id():
     kwargs = _clinician_create_kwargs()
     kwargs.pop("org_id")
     with pytest.raises(ValidationError):
-        ProviderCreate(**kwargs)
+        ClinicianCreate(**kwargs)
 
 
 def test_clinician_create_rejects_non_5_digit_zip():
     """Smoke test that the imported `ZipText` alias is wired up."""
     with pytest.raises(ValidationError):
-        ProviderCreate(**_clinician_create_kwargs(location_zip="123"))
+        ClinicianCreate(**_clinician_create_kwargs(location_zip="123"))
 
 
 def test_clinician_create_defaults_to_oon_only():
     """Insurance posture defaults to OON-only: empty carrier list +
     `accepts_out_of_network=True`. The OON default reflects that most
     practices accept out-of-network; opting out is the explicit choice."""
-    p = ProviderCreate(**_clinician_create_kwargs())
+    p = ClinicianCreate(**_clinician_create_kwargs())
     assert p.accepts_out_of_network is True
     assert p.in_network_carriers == []
     assert p.sliding_scale is False
@@ -192,7 +192,7 @@ def test_clinician_create_defaults_to_oon_only():
 def test_clinician_create_with_in_network_carriers():
     """A non-empty carrier list expresses in-network acceptance — no
     separate boolean needed."""
-    p = ProviderCreate(
+    p = ClinicianCreate(
         **_clinician_create_kwargs(
             in_network_carriers=["aetna", "cigna"],
         )
@@ -203,7 +203,7 @@ def test_clinician_create_with_in_network_carriers():
 def test_clinician_create_accepts_out_of_network_with_no_carriers():
     """OON-only is a valid posture: empty carrier list +
     `accepts_out_of_network=True`."""
-    p = ProviderCreate(
+    p = ClinicianCreate(
         **_clinician_create_kwargs(
             accepts_out_of_network=True,
             in_network_carriers=[],
@@ -215,7 +215,7 @@ def test_clinician_create_accepts_out_of_network_with_no_carriers():
 
 def test_clinician_create_rejects_unknown_carrier():
     with pytest.raises(ValidationError):
-        ProviderCreate(
+        ClinicianCreate(
             **_clinician_create_kwargs(
                 in_network_carriers=["not_a_real_carrier"],
             )
@@ -226,7 +226,7 @@ def test_clinician_create_coerces_scalar_carrier_to_singleton_list():
     """HTML form posts collapse a 1-checkbox-checked group to a scalar;
     the shared `_scalar_to_list` BeforeValidator wraps that case before
     the `Literal[*INSURANCE_CARRIERS]` member check fires."""
-    p = ProviderCreate(
+    p = ClinicianCreate(
         **_clinician_create_kwargs(
             in_network_carriers="aetna",
         )
@@ -236,14 +236,14 @@ def test_clinician_create_coerces_scalar_carrier_to_singleton_list():
 
 def test_clinician_update_accepts_carrier_list_patch():
     """Patching only the carrier list is fine — no cross-field rule."""
-    p = ProviderUpdate(in_network_carriers=["aetna"])
+    p = ClinicianUpdate(in_network_carriers=["aetna"])
     assert p.in_network_carriers == ["aetna"]
 
 
 def test_clinician_update_accepts_empty_carrier_list_patch():
     """Clearing the carrier list (setting to empty) is the patch shape
     for dropping in-network acceptance."""
-    p = ProviderUpdate(in_network_carriers=[])
+    p = ClinicianUpdate(in_network_carriers=[])
     assert p.in_network_carriers == []
 
 
@@ -252,18 +252,18 @@ def test_clinician_update_accepts_empty_carrier_list_patch():
 
 @pytest.mark.parametrize("npi", ["1234567890", "0000000000", "9999999999"])
 def test_clinician_create_accepts_10_digit_npi(npi):
-    p = ProviderCreate(**_clinician_create_kwargs(npi=npi))
+    p = ClinicianCreate(**_clinician_create_kwargs(npi=npi))
     assert p.npi == npi
 
 
 @pytest.mark.parametrize("blank", [None, "", "   "])
 def test_clinician_create_normalizes_blank_npi_to_none(blank):
-    p = ProviderCreate(**_clinician_create_kwargs(npi=blank))
+    p = ClinicianCreate(**_clinician_create_kwargs(npi=blank))
     assert p.npi is None
 
 
 def test_clinician_create_omitted_npi_defaults_to_none():
-    p = ProviderCreate(**_clinician_create_kwargs())
+    p = ClinicianCreate(**_clinician_create_kwargs())
     assert p.npi is None
 
 
@@ -272,24 +272,24 @@ def test_clinician_create_omitted_npi_defaults_to_none():
 )
 def test_clinician_create_rejects_malformed_npi(bad):
     with pytest.raises(ValidationError):
-        ProviderCreate(**_clinician_create_kwargs(npi=bad))
+        ClinicianCreate(**_clinician_create_kwargs(npi=bad))
 
 
 def test_clinician_update_accepts_npi_patch():
-    p = ProviderUpdate(npi="1234567890")
+    p = ClinicianUpdate(npi="1234567890")
     assert p.npi == "1234567890"
 
 
 def test_clinician_update_rejects_malformed_npi():
     with pytest.raises(ValidationError):
-        ProviderUpdate(npi="abc")
+        ClinicianUpdate(npi="abc")
 
 
 def test_clinician_read_round_trips_npi():
-    """`ProviderRead.model_validate` carries `npi` through unchanged."""
+    """`ClinicianRead.model_validate` carries `npi` through unchanged."""
     now = _now()
     pid = uuid.uuid4()
-    p = ProviderRead.model_validate(
+    p = ClinicianRead.model_validate(
         {
             "id": pid,
             "owner_id": uuid.uuid4(),
@@ -313,7 +313,7 @@ def test_clinician_read_round_trips_npi():
 
 
 def test_clinician_create_accepts_cost_and_sliding_scale():
-    p = ProviderCreate(
+    p = ClinicianCreate(
         **_clinician_create_kwargs(
             sliding_scale=True,
             cost="$200 - $400 per session",
@@ -333,7 +333,7 @@ def test_insurance_carriers_labels_cover_all_tokens():
 
 def test_clinician_create_accepts_all_insurance_carriers():
     """Every token in `INSURANCE_CARRIERS` validates on the wire."""
-    p = ProviderCreate(
+    p = ClinicianCreate(
         **_clinician_create_kwargs(
             in_network_carriers=list(INSURANCE_CARRIERS),
         )
@@ -342,7 +342,7 @@ def test_clinician_create_accepts_all_insurance_carriers():
 
 
 def test_clinician_create_accepts_nested_credential_lists():
-    p = ProviderCreate(
+    p = ClinicianCreate(
         **_clinician_create_kwargs(),
         licensures=[
             {
@@ -365,7 +365,7 @@ def test_clinician_create_accepts_nested_credential_lists():
 
 
 def test_clinician_create_defaults_credential_lists_to_empty():
-    p = ProviderCreate(**_clinician_create_kwargs())
+    p = ClinicianCreate(**_clinician_create_kwargs())
     assert p.licensures == []
     assert p.educations == []
     assert p.certifications == []
@@ -379,21 +379,21 @@ def test_clinician_create_requires_org_id_without_solo_practice():
     with pytest.raises(ValidationError):
         kwargs = _clinician_create_kwargs()
         del kwargs["org_id"]
-        ProviderCreate(**kwargs)
+        ClinicianCreate(**kwargs)
 
 
 def test_clinician_create_allows_missing_org_id_when_solo_practice():
     """solo_practice=True makes org_id optional at schema level."""
     kwargs = _clinician_create_kwargs()
     del kwargs["org_id"]
-    p = ProviderCreate(**kwargs, solo_practice=True)
+    p = ClinicianCreate(**kwargs, solo_practice=True)
     assert p.solo_practice is True
     assert p.org_id is None
 
 
 def test_clinician_create_solo_practice_excluded_from_model_dump():
     """solo_practice must not appear in model_dump() since it's handler-only."""
-    p = ProviderCreate(**_clinician_create_kwargs(), solo_practice=True)
+    p = ClinicianCreate(**_clinician_create_kwargs(), solo_practice=True)
     dumped = p.model_dump()
     assert "solo_practice" not in dumped
 
@@ -402,13 +402,13 @@ def test_clinician_create_solo_practice_excluded_from_model_dump():
 
 
 def test_clinician_read_validates_from_nested_dict():
-    """`ProviderRead.model_validate` should construct the nested
+    """`ClinicianRead.model_validate` should construct the nested
     sub-entity Read schemas without needing real ORM objects."""
-    provider_id = uuid.uuid4()
+    clinician_id = uuid.uuid4()
     org_id = uuid.uuid4()
     now = _now()
     payload = {
-        "id": provider_id,
+        "id": clinician_id,
         "owner_id": uuid.uuid4(),
         "created_at": now,
         "updated_at": now,
@@ -459,7 +459,7 @@ def test_clinician_read_validates_from_nested_dict():
         ],
     }
 
-    clinician = ProviderRead.model_validate(payload)
+    clinician = ClinicianRead.model_validate(payload)
 
     assert clinician.org_name == "Sunrise"
     assert clinician.org_id == org_id
@@ -492,20 +492,20 @@ def _literal_args(model_cls, field_name: str) -> tuple[str, ...]:
     "model_cls,field,expected",
     [
         # Create variants
-        (ProviderLicensureCreate, "license_type", LICENSE_TYPES),
-        (ProviderLicensureCreate, "issuing_state", US_STATES),
-        (ProviderEducationCreate, "education_type", EDUCATION_TYPES),
-        (ProviderCertificationCreate, "certification_type", CERTIFICATION_TYPES),
-        (ProviderCreate, "in_person_sessions", LOCATION_AVAILABILITY_OPTIONS),
-        (ProviderCreate, "virtual_sessions", LOCATION_AVAILABILITY_OPTIONS),
-        (ProviderCreate, "in_network_carriers", INSURANCE_CARRIERS),
+        (ClinicianLicensureCreate, "license_type", LICENSE_TYPES),
+        (ClinicianLicensureCreate, "issuing_state", US_STATES),
+        (ClinicianEducationCreate, "education_type", EDUCATION_TYPES),
+        (ClinicianCertificationCreate, "certification_type", CERTIFICATION_TYPES),
+        (ClinicianCreate, "in_person_sessions", LOCATION_AVAILABILITY_OPTIONS),
+        (ClinicianCreate, "virtual_sessions", LOCATION_AVAILABILITY_OPTIONS),
+        (ClinicianCreate, "in_network_carriers", INSURANCE_CARRIERS),
         # Update variants (Optional[Literal[*TUPLE]])
-        (ProviderLicensureUpdate, "license_type", LICENSE_TYPES),
-        (ProviderLicensureUpdate, "issuing_state", US_STATES),
-        (ProviderEducationUpdate, "education_type", EDUCATION_TYPES),
-        (ProviderCertificationUpdate, "certification_type", CERTIFICATION_TYPES),
-        (ProviderUpdate, "in_person_sessions", LOCATION_AVAILABILITY_OPTIONS),
-        # `ProviderUpdate.in_network_carriers` is
+        (ClinicianLicensureUpdate, "license_type", LICENSE_TYPES),
+        (ClinicianLicensureUpdate, "issuing_state", US_STATES),
+        (ClinicianEducationUpdate, "education_type", EDUCATION_TYPES),
+        (ClinicianCertificationUpdate, "certification_type", CERTIFICATION_TYPES),
+        (ClinicianUpdate, "in_person_sessions", LOCATION_AVAILABILITY_OPTIONS),
+        # `ClinicianUpdate.in_network_carriers` is
         # `list[Literal[*T]] | None`; the `_literal_args` helper doesn't
         # dig through the list-arm of the union, so the Create-variant
         # entry above is the lockstep guardrail for the carrier vocab.

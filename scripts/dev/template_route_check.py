@@ -49,7 +49,7 @@ def _load_collections() -> set[str]:
     Adding a new top-level entity automatically extends the lint —
     no per-script update needed.
 
-    Owned subentities (provider credentials) have ``url_collection``
+    Owned subentities (clinician credentials) have ``url_collection``
     too, but their routes nest under the parent (no top-level path
     starts with ``/licensures``), so they're filtered out.
     """

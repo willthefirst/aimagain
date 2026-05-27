@@ -6,8 +6,8 @@ The clinician edit page surfaces them as an inline list — same UX
 pattern as licensures — so each row CRUDs through its own URLs under
 ``/clinicians/{clinician_id}/affiliations/{affiliation_id}``.
 
-The fields mirror the per-role attributes on `ProviderCreate` /
-`ProviderUpdate` (`src/domain/logic/clinicians/schema.py`) — both
+The fields mirror the per-role attributes on `ClinicianCreate` /
+`ClinicianUpdate` (`src/domain/logic/clinicians/schema.py`) — both
 schemas land at the same SQLAlchemy table — except that there is no
 `(licensures|educations|certifications)` collection here (credentials
 are person-level, FK to `clinicians.id` after #635 PR A; they don't

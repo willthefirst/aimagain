@@ -1,13 +1,13 @@
-"""Consumer contract: filling and submitting the provider create form.
+"""Consumer contract: filling and submitting the clinician create form.
 
 Verifies that the HTMX-decorated form rendered by
-`templates/providers/form_new.html` (mounted via the
-`provider_create_form` stub on the consumer server) issues a
+`templates/clinicians/form_new.html` (mounted via the
+`clinician_create_form` stub on the consumer server) issues a
 `POST /clinicians` form-encoded request with the practice and
-availability fields the route's `ProviderCreate` schema expects.
+availability fields the route's `ClinicianCreate` schema expects.
 The contract surface is the form wiring (method, path, Content-Type,
 field names) — the response on success is a 201 with `HX-Redirect` to
-the new provider.
+the new clinician.
 """
 
 import pytest
@@ -15,11 +15,11 @@ from pact import Like
 from playwright.async_api import Page
 
 from tests.test_contract.constants import (
-    CONSUMER_NAME_PROVIDER_CREATE_FORM,
+    CLINICIAN_CREATE_API_PATH,
+    CLINICIAN_CREATE_FORM_PAGE_PATH,
+    CONSUMER_NAME_CLINICIAN_CREATE_FORM,
     NETWORK_TIMEOUT_MS,
-    PACT_PORT_PROVIDER_CREATE,
-    PROVIDER_CREATE_API_PATH,
-    PROVIDER_CREATE_FORM_PAGE_PATH,
+    PACT_PORT_CLINICIAN_CREATE,
     PROVIDER_NAME_PROVIDERS,
     PROVIDER_STATE_USER_CAN_CREATE_PROVIDER,
 )
@@ -31,23 +31,23 @@ from tests.test_contract.tests.shared.helpers import (
 
 @pytest.mark.parametrize(
     "origin_with_routes",
-    [{"provider_create_form": True, "auth_pages": False}],
+    [{"clinician_create_form": True, "auth_pages": False}],
     indirect=True,
 )
 @pytest.mark.asyncio(loop_scope="session")
-async def test_consumer_provider_create_form_submits(
+async def test_consumer_clinician_create_form_submits(
     origin_with_routes: str, page: Page
 ):
     """Fill the create form on the stubbed page; assert the intercepted
     request matches the contracted shape."""
     pact = setup_pact(
-        CONSUMER_NAME_PROVIDER_CREATE_FORM,
+        CONSUMER_NAME_CLINICIAN_CREATE_FORM,
         PROVIDER_NAME_PROVIDERS,
-        port=PACT_PORT_PROVIDER_CREATE,
+        port=PACT_PORT_CLINICIAN_CREATE,
     )
     mock_server_uri = pact.uri
-    form_page_url = f"{origin_with_routes}{PROVIDER_CREATE_FORM_PAGE_PATH}"
-    full_mock_url = f"{mock_server_uri}{PROVIDER_CREATE_API_PATH}"
+    form_page_url = f"{origin_with_routes}{CLINICIAN_CREATE_FORM_PAGE_PATH}"
+    full_mock_url = f"{mock_server_uri}{CLINICIAN_CREATE_API_PATH}"
 
     # Browser form submit sets Content-Type to
     # `application/x-www-form-urlencoded; charset=UTF-8`; pact-ruby's header
@@ -82,7 +82,7 @@ async def test_consumer_provider_create_form_submits(
         .upon_receiving("a request to create a provider profile via web form")
         .with_request(
             method="POST",
-            path=PROVIDER_CREATE_API_PATH,
+            path=CLINICIAN_CREATE_API_PATH,
             headers=expected_request_headers,
             body=expected_request_body,
         )
@@ -95,7 +95,7 @@ async def test_consumer_provider_create_form_submits(
 
     await setup_playwright_pact_interception(
         page=page,
-        api_path_to_intercept=PROVIDER_CREATE_API_PATH,
+        api_path_to_intercept=CLINICIAN_CREATE_API_PATH,
         mock_pact_url=full_mock_url,
         http_method="POST",
     )

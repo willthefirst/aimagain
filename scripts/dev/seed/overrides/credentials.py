@@ -20,9 +20,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.domain.models import (
     Clinician,
-    ProviderCertification,
-    ProviderEducation,
-    ProviderLicensure,
+    ClinicianCertification,
+    ClinicianEducation,
+    ClinicianLicensure,
 )
 from src.domain.models.enums import (
     CERTIFICATION_TYPES,
@@ -38,19 +38,19 @@ from ..vocab import CERTIFYING_BODIES, COLUMN_VOCAB, INSTITUTIONS
 from . import register
 
 
-@register(ProviderLicensure)
+@register(ClinicianLicensure)
 async def generate_licensures(
     rng: SeededRandom, pool: SeedPool, session: AsyncSession
-) -> list[ProviderLicensure]:
+) -> list[ClinicianLicensure]:
     clinicians: list[Clinician] = pool.all("clinicians")
     lo, hi = counts.LICENSURES_PER_CLINICIAN_RANGE
-    out: list[ProviderLicensure] = []
+    out: list[ClinicianLicensure] = []
     flat_index = 0
     for c_index, clinician in enumerate(clinicians):
         n = rng.int(lo, hi)
         for k in range(n):
-            row = ProviderLicensure(
-                id=deterministic_uuid("ProviderLicensure", c_index, k),
+            row = ClinicianLicensure(
+                id=deterministic_uuid("ClinicianLicensure", c_index, k),
                 clinician_id=clinician.id,
                 license_type=rng.round_robin(LICENSE_TYPES, flat_index),
                 license_number=COLUMN_VOCAB["license_number"](rng, flat_index),
@@ -68,19 +68,19 @@ async def generate_licensures(
     return out
 
 
-@register(ProviderEducation)
+@register(ClinicianEducation)
 async def generate_educations(
     rng: SeededRandom, pool: SeedPool, session: AsyncSession
-) -> list[ProviderEducation]:
+) -> list[ClinicianEducation]:
     clinicians: list[Clinician] = pool.all("clinicians")
     lo, hi = counts.EDUCATIONS_PER_CLINICIAN_RANGE
-    out: list[ProviderEducation] = []
+    out: list[ClinicianEducation] = []
     flat_index = 0
     for c_index, clinician in enumerate(clinicians):
         n = rng.int(lo, hi)
         for k in range(n):
-            row = ProviderEducation(
-                id=deterministic_uuid("ProviderEducation", c_index, k),
+            row = ClinicianEducation(
+                id=deterministic_uuid("ClinicianEducation", c_index, k),
                 clinician_id=clinician.id,
                 education_type=rng.round_robin(EDUCATION_TYPES, flat_index),
                 institution=rng.round_robin(INSTITUTIONS, flat_index),
@@ -99,19 +99,19 @@ async def generate_educations(
     return out
 
 
-@register(ProviderCertification)
+@register(ClinicianCertification)
 async def generate_certifications(
     rng: SeededRandom, pool: SeedPool, session: AsyncSession
-) -> list[ProviderCertification]:
+) -> list[ClinicianCertification]:
     clinicians: list[Clinician] = pool.all("clinicians")
     lo, hi = counts.CERTIFICATIONS_PER_CLINICIAN_RANGE
-    out: list[ProviderCertification] = []
+    out: list[ClinicianCertification] = []
     flat_index = 0
     for c_index, clinician in enumerate(clinicians):
         n = rng.int(lo, hi)
         for k in range(n):
-            row = ProviderCertification(
-                id=deterministic_uuid("ProviderCertification", c_index, k),
+            row = ClinicianCertification(
+                id=deterministic_uuid("ClinicianCertification", c_index, k),
                 clinician_id=clinician.id,
                 certification_type=rng.round_robin(CERTIFICATION_TYPES, flat_index),
                 certifying_body=rng.round_robin(CERTIFYING_BODIES, flat_index),

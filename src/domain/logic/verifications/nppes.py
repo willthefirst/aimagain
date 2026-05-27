@@ -45,7 +45,7 @@ async def nppes_lookup(npi: str, *, http: httpx.AsyncClient) -> NppesResult:
     """Look up `npi` against the NPPES public API.
 
     The orchestrator owns the `httpx.AsyncClient` — typically one client
-    per nightly-job run, reused across providers. 4xx/5xx, timeouts, and
+    per nightly-job run, reused across clinicians. 4xx/5xx, timeouts, and
     malformed payloads degrade to ``NppesResult(found=False, ...)`` plus
     a logged warning; this function never raises so the orchestrator can
     always persist a `Verification` row.

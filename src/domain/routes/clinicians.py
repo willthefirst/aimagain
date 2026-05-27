@@ -1,8 +1,8 @@
 from src.domain.specs.affiliation import AFFILIATION_ENTITY  # noqa: F401
 from src.domain.specs.clinician import CLINICIAN_ENTITY
-from src.domain.specs.provider_certification import CERTIFICATION_ENTITY  # noqa: F401
-from src.domain.specs.provider_education import EDUCATION_ENTITY  # noqa: F401
-from src.domain.specs.provider_licensure import LICENSURE_ENTITY  # noqa: F401
+from src.domain.specs.clinician_certification import CERTIFICATION_ENTITY  # noqa: F401
+from src.domain.specs.clinician_education import EDUCATION_ENTITY  # noqa: F401
+from src.domain.specs.clinician_licensure import LICENSURE_ENTITY  # noqa: F401
 from src.framework import register_entity
 from src.framework.dispatch.resource_routes import mount_entity
 

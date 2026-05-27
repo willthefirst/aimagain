@@ -16,18 +16,18 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from src.domain.models import User, UserFavorite
 from src.framework.audit.log import AuditLog
-from tests.helpers import create_test_user, make_provider_with_org
+from tests.helpers import create_test_user, make_clinician_with_org
 
 pytestmark = pytest.mark.asyncio
 
 
-async def _seed_provider(
+async def _seed_clinician(
     db_test_session_manager: async_sessionmaker[AsyncSession],
     *,
     practice_name: str = "Acme Health",
 ) -> uuid.UUID:
     owner = create_test_user(username=f"owner-{uuid.uuid4()}")
-    clinician = make_provider_with_org(owner_id=owner.id, practice_name=practice_name)
+    clinician = make_clinician_with_org(owner_id=owner.id, practice_name=practice_name)
     async with db_test_session_manager() as session:
         async with session.begin():
             session.add(owner)
@@ -40,10 +40,10 @@ async def test_add_favorite_returns_201_first_time(
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user: User,
 ):
-    provider_id = await _seed_provider(db_test_session_manager)
-    response = await authenticated_client.post(f"/users/me/favorites/{provider_id}")
+    clinician_id = await _seed_clinician(db_test_session_manager)
+    response = await authenticated_client.post(f"/users/me/favorites/{clinician_id}")
     assert response.status_code == 201
-    assert response.headers["HX-Redirect"] == f"/clinicians/{provider_id}"
+    assert response.headers["HX-Redirect"] == f"/clinicians/{clinician_id}"
     body = response.json()
     edge_id = uuid.UUID(body["id"])
 
@@ -59,7 +59,7 @@ async def test_add_favorite_returns_201_first_time(
         )
         assert row is not None
         assert row.user_id == logged_in_user.id
-        assert row.clinician_id == provider_id
+        assert row.clinician_id == clinician_id
 
 
 async def test_add_favorite_idempotent_returns_200(
@@ -67,12 +67,12 @@ async def test_add_favorite_idempotent_returns_200(
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user: User,
 ):
-    provider_id = await _seed_provider(db_test_session_manager)
-    first = await authenticated_client.post(f"/users/me/favorites/{provider_id}")
+    clinician_id = await _seed_clinician(db_test_session_manager)
+    first = await authenticated_client.post(f"/users/me/favorites/{clinician_id}")
     assert first.status_code == 201
     edge_id = uuid.UUID(first.json()["id"])
 
-    second = await authenticated_client.post(f"/users/me/favorites/{provider_id}")
+    second = await authenticated_client.post(f"/users/me/favorites/{clinician_id}")
     assert second.status_code == 200
     assert second.headers.get("HX-Refresh") == "true"
     assert uuid.UUID(second.json()["id"]) == edge_id
@@ -93,7 +93,7 @@ async def test_add_favorite_idempotent_returns_200(
         assert len(audit_rows) == 1
 
 
-async def test_add_favorite_provider_not_found(
+async def test_add_favorite_clinician_not_found(
     authenticated_client: AsyncClient,
     logged_in_user: User,
 ):
@@ -106,12 +106,12 @@ async def test_remove_favorite_returns_204(
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user: User,
 ):
-    provider_id = await _seed_provider(db_test_session_manager)
-    await authenticated_client.post(f"/users/me/favorites/{provider_id}")
+    clinician_id = await _seed_clinician(db_test_session_manager)
+    await authenticated_client.post(f"/users/me/favorites/{clinician_id}")
 
-    response = await authenticated_client.delete(f"/users/me/favorites/{provider_id}")
+    response = await authenticated_client.delete(f"/users/me/favorites/{clinician_id}")
     assert response.status_code == 204
-    assert response.headers["HX-Redirect"] == f"/clinicians/{provider_id}"
+    assert response.headers["HX-Redirect"] == f"/clinicians/{clinician_id}"
 
     async with db_test_session_manager() as session:
         rows = (
@@ -119,7 +119,7 @@ async def test_remove_favorite_returns_204(
                 await session.execute(
                     select(UserFavorite).filter(
                         UserFavorite.user_id == logged_in_user.id,
-                        UserFavorite.clinician_id == provider_id,
+                        UserFavorite.clinician_id == clinician_id,
                     )
                 )
             )
@@ -136,8 +136,8 @@ async def test_remove_favorite_idempotent_when_not_favorited(
 ):
     """Unfavoriting a clinician the user never favorited returns 204
     and writes no audit row."""
-    provider_id = await _seed_provider(db_test_session_manager)
-    response = await authenticated_client.delete(f"/users/me/favorites/{provider_id}")
+    clinician_id = await _seed_clinician(db_test_session_manager)
+    response = await authenticated_client.delete(f"/users/me/favorites/{clinician_id}")
     assert response.status_code == 204
 
     async with db_test_session_manager() as session:
@@ -161,7 +161,7 @@ async def test_list_my_favorites_renders_html(
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user: User,
 ):
-    first_id = await _seed_provider(
+    first_id = await _seed_clinician(
         db_test_session_manager, practice_name="First Favorite"
     )
     await authenticated_client.post(f"/users/me/favorites/{first_id}")
@@ -199,6 +199,6 @@ async def test_add_favorite_requires_auth(
     test_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],
 ):
-    provider_id = await _seed_provider(db_test_session_manager)
-    response = await test_client.post(f"/users/me/favorites/{provider_id}")
+    clinician_id = await _seed_clinician(db_test_session_manager)
+    response = await test_client.post(f"/users/me/favorites/{clinician_id}")
     assert response.status_code in (302, 401)

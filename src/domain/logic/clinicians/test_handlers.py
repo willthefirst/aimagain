@@ -20,10 +20,10 @@ from src.domain.logic.clinicians.handlers import (
 )
 from src.domain.logic.clinicians.repository import ClinicianRepository
 from src.domain.logic.clinicians.schema import (
-    ProviderCertificationCreate,
-    ProviderCreate,
-    ProviderEducationCreate,
-    ProviderLicensureCreate,
+    ClinicianCertificationCreate,
+    ClinicianCreate,
+    ClinicianEducationCreate,
+    ClinicianLicensureCreate,
 )
 from src.domain.logic.favorites.repository import UserFavoriteRepository
 from src.domain.logic.organizations.repository import OrganizationRepository
@@ -31,7 +31,7 @@ from src.domain.logic.users.repository import UserRepository
 from src.domain.logic.verifications.repository import VerificationRepository
 from src.domain.models import (
     Clinician,
-    ProviderLicensure,
+    ClinicianLicensure,
     User,
 )
 from src.domain.specs.clinician import CLINICIAN_ENTITY
@@ -42,11 +42,11 @@ from src.framework.dispatch.handlers import handle_create, handle_detail, handle
 from src.framework.http.exceptions import ForbiddenError, NotFoundError
 from tests.helpers import (
     create_test_user,
+    make_clinician_certification,
+    make_clinician_education,
+    make_clinician_licensure,
+    make_clinician_with_org,
     make_organization_row,
-    make_provider_certification,
-    make_provider_education,
-    make_provider_licensure,
-    make_provider_with_org,
 )
 
 pytestmark = pytest.mark.asyncio
@@ -91,7 +91,7 @@ async def _seed_clinician(
     with_education: bool = False,
     with_certification: bool = False,
 ) -> tuple[uuid.UUID, uuid.UUID | None, uuid.UUID | None, uuid.UUID | None]:
-    clinician = make_provider_with_org(owner_id=user_id)
+    clinician = make_clinician_with_org(owner_id=user_id)
     async with db_test_session_manager() as session:
         async with session.begin():
             session.add(clinician)
@@ -104,13 +104,13 @@ async def _seed_clinician(
     async with db_test_session_manager() as session:
         async with session.begin():
             if with_licensure:
-                lic = make_provider_licensure(clinician_id=clinician_id)
+                lic = make_clinician_licensure(clinician_id=clinician_id)
                 session.add(lic)
             if with_education:
-                edu = make_provider_education(clinician_id=clinician_id)
+                edu = make_clinician_education(clinician_id=clinician_id)
                 session.add(edu)
             if with_certification:
-                cert = make_provider_certification(clinician_id=clinician_id)
+                cert = make_clinician_certification(clinician_id=clinician_id)
                 session.add(cert)
         if with_licensure:
             await session.refresh(lic)
@@ -141,7 +141,7 @@ async def _seed_org(
     return org.id
 
 
-def _provider_create_payload(*, org_id: uuid.UUID, **overrides) -> ProviderCreate:
+def _clinician_create_payload(*, org_id: uuid.UUID, **overrides) -> ClinicianCreate:
     base = dict(
         org_id=org_id,
         location_city="Springfield",
@@ -151,7 +151,7 @@ def _provider_create_payload(*, org_id: uuid.UUID, **overrides) -> ProviderCreat
         virtual_sessions="no",
     )
     base.update(overrides)
-    return ProviderCreate(**base)
+    return ClinicianCreate(**base)
 
 
 async def _audit_rows_for(
@@ -210,7 +210,9 @@ async def test_list_clinicians_filters_by_license_type(
     async with db_test_session_manager() as session:
         async with session.begin():
             session.add(
-                make_provider_licensure(clinician_id=clinician_b_id, license_type="lpc")
+                make_clinician_licensure(
+                    clinician_id=clinician_b_id, license_type="lpc"
+                )
             )
 
     async with db_test_session_manager() as session:
@@ -460,7 +462,7 @@ async def test_create_clinician_persists_row_and_writes_audit(
 ):
     user = await _seed_user(db_test_session_manager)
     org_id = await _seed_org(db_test_session_manager, owner_id=user.id)
-    payload = _provider_create_payload(org_id=org_id)
+    payload = _clinician_create_payload(org_id=org_id)
 
     async with db_test_session_manager() as session:
         repo = ClinicianRepository(session)
@@ -486,7 +488,7 @@ async def test_create_clinician_persists_row_and_writes_audit(
     assert rows[0].action == AuditAction.CREATE_CLINICIAN
     assert rows[0].actor_id == user.id
     assert rows[0].before is None
-    # The audit snapshot mirrors `ProviderRead` — `org_name` is the
+    # The audit snapshot mirrors `ClinicianRead` — `org_name` is the
     # practice's display name post-#524.
     assert rows[0].after["org_name"] == "Acme Health"
     assert rows[0].after["org_id"] == str(org_id)
@@ -497,18 +499,18 @@ async def test_create_clinician_with_inline_children_captures_them_in_audit(
 ):
     user = await _seed_user(db_test_session_manager)
     org_id = await _seed_org(db_test_session_manager, owner_id=user.id)
-    payload = _provider_create_payload(
+    payload = _clinician_create_payload(
         org_id=org_id,
         licensures=[
-            ProviderLicensureCreate(
+            ClinicianLicensureCreate(
                 license_type="lcsw", license_number="L-1", issuing_state="IL"
             )
         ],
         educations=[
-            ProviderEducationCreate(education_type="msw", institution="State U")
+            ClinicianEducationCreate(education_type="msw", institution="State U")
         ],
         certifications=[
-            ProviderCertificationCreate(
+            ClinicianCertificationCreate(
                 certification_type="emdr", certifying_body="EMDRIA"
             )
         ],
@@ -542,8 +544,8 @@ async def test_create_clinician_with_inline_children_captures_them_in_audit(
         licensures = (
             (
                 await session.execute(
-                    select(ProviderLicensure).filter(
-                        ProviderLicensure.clinician_id == created.id
+                    select(ClinicianLicensure).filter(
+                        ClinicianLicensure.clinician_id == created.id
                     )
                 )
             )
@@ -571,7 +573,7 @@ async def test_create_clinician_allows_multiple_per_user(
         audit_repo = AuditRepository(session)
         second = await handle_create(
             CLINICIAN_ENTITY,
-            payload=_provider_create_payload(org_id=second_org_id),
+            payload=_clinician_create_payload(org_id=second_org_id),
             repo=repo,
             audit_repo=audit_repo,
             requesting_user=user,
