@@ -92,7 +92,7 @@ One word per concept, no synonyms. Replace any of the variants below in any new 
 | The post type announcing program-level intake | intake | enrollment, admission window |
 | The post type seeking placement for a client | referral | seeker post, lead |
 
-The model class `Provider` and the audit string `provider` are historical and kept on the Python side; user-facing copy says `clinician`. See `src/domain/specs/provider.py` for the rename rationale.
+The schema classes `ProviderCreate` / `ProviderRead` / `ProviderUpdate` and the credential model classes `ProviderLicensure` / `ProviderEducation` / `ProviderCertification` are historical names preserved on the Python side; user-facing copy says `clinician`.
 
 ### Shared microcopy
 

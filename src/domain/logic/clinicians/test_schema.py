@@ -45,7 +45,7 @@ def _now() -> datetime:
     return datetime.now(timezone.utc)
 
 
-def _provider_create_kwargs(**overrides):
+def _clinician_create_kwargs(**overrides):
     """Minimum-valid kwargs for `ProviderCreate`.
 
     Location keys stay flat on the wire (form posts send
@@ -103,20 +103,20 @@ def test_certification_create_rejects_unknown_certification_type():
         )
 
 
-def test_provider_create_rejects_invalid_in_person_sessions():
+def test_clinician_create_rejects_invalid_in_person_sessions():
     with pytest.raises(ValidationError):
         ProviderCreate(
-            **_provider_create_kwargs(in_person_sessions="maybe"),
+            **_clinician_create_kwargs(in_person_sessions="maybe"),
         )
 
 
 # --- extra="forbid" -----------------------------------------------------
 
 
-def test_provider_create_rejects_unknown_field():
+def test_clinician_create_rejects_unknown_field():
     with pytest.raises(ValidationError):
         ProviderCreate(
-            **_provider_create_kwargs(),
+            **_clinician_create_kwargs(),
             stray_field="boom",
         )
 
@@ -148,7 +148,7 @@ def test_update_requires_at_least_one_field(model_cls):
         model_cls()
 
 
-def test_provider_update_accepts_single_field():
+def test_clinician_update_accepts_single_field():
     """Sanity check: setting one field is enough — the rule fires only
     when *every* field is `None`. Post-#451 ``location`` is itself a
     nested :class:`LocationPartial`; when no location subkey is
@@ -164,47 +164,47 @@ def test_provider_update_accepts_single_field():
 # --- Create payload smoke tests -----------------------------------------
 
 
-def test_provider_create_requires_org_id():
+def test_clinician_create_requires_org_id():
     """``org_id`` is required on the wire (#524). Omitting it 422s."""
-    kwargs = _provider_create_kwargs()
+    kwargs = _clinician_create_kwargs()
     kwargs.pop("org_id")
     with pytest.raises(ValidationError):
         ProviderCreate(**kwargs)
 
 
-def test_provider_create_rejects_non_5_digit_zip():
+def test_clinician_create_rejects_non_5_digit_zip():
     """Smoke test that the imported `ZipText` alias is wired up."""
     with pytest.raises(ValidationError):
-        ProviderCreate(**_provider_create_kwargs(location_zip="123"))
+        ProviderCreate(**_clinician_create_kwargs(location_zip="123"))
 
 
-def test_provider_create_defaults_to_oon_only():
+def test_clinician_create_defaults_to_oon_only():
     """Insurance posture defaults to OON-only: empty carrier list +
     `accepts_out_of_network=True`. The OON default reflects that most
     practices accept out-of-network; opting out is the explicit choice."""
-    p = ProviderCreate(**_provider_create_kwargs())
+    p = ProviderCreate(**_clinician_create_kwargs())
     assert p.accepts_out_of_network is True
     assert p.in_network_carriers == []
     assert p.sliding_scale is False
     assert p.cost is None
 
 
-def test_provider_create_with_in_network_carriers():
+def test_clinician_create_with_in_network_carriers():
     """A non-empty carrier list expresses in-network acceptance — no
     separate boolean needed."""
     p = ProviderCreate(
-        **_provider_create_kwargs(
+        **_clinician_create_kwargs(
             in_network_carriers=["aetna", "cigna"],
         )
     )
     assert p.in_network_carriers == ["aetna", "cigna"]
 
 
-def test_provider_create_accepts_out_of_network_with_no_carriers():
+def test_clinician_create_accepts_out_of_network_with_no_carriers():
     """OON-only is a valid posture: empty carrier list +
     `accepts_out_of_network=True`."""
     p = ProviderCreate(
-        **_provider_create_kwargs(
+        **_clinician_create_kwargs(
             accepts_out_of_network=True,
             in_network_carriers=[],
         )
@@ -213,34 +213,34 @@ def test_provider_create_accepts_out_of_network_with_no_carriers():
     assert p.in_network_carriers == []
 
 
-def test_provider_create_rejects_unknown_carrier():
+def test_clinician_create_rejects_unknown_carrier():
     with pytest.raises(ValidationError):
         ProviderCreate(
-            **_provider_create_kwargs(
+            **_clinician_create_kwargs(
                 in_network_carriers=["not_a_real_carrier"],
             )
         )
 
 
-def test_provider_create_coerces_scalar_carrier_to_singleton_list():
+def test_clinician_create_coerces_scalar_carrier_to_singleton_list():
     """HTML form posts collapse a 1-checkbox-checked group to a scalar;
     the shared `_scalar_to_list` BeforeValidator wraps that case before
     the `Literal[*INSURANCE_CARRIERS]` member check fires."""
     p = ProviderCreate(
-        **_provider_create_kwargs(
+        **_clinician_create_kwargs(
             in_network_carriers="aetna",
         )
     )
     assert p.in_network_carriers == ["aetna"]
 
 
-def test_provider_update_accepts_carrier_list_patch():
+def test_clinician_update_accepts_carrier_list_patch():
     """Patching only the carrier list is fine — no cross-field rule."""
     p = ProviderUpdate(in_network_carriers=["aetna"])
     assert p.in_network_carriers == ["aetna"]
 
 
-def test_provider_update_accepts_empty_carrier_list_patch():
+def test_clinician_update_accepts_empty_carrier_list_patch():
     """Clearing the carrier list (setting to empty) is the patch shape
     for dropping in-network acceptance."""
     p = ProviderUpdate(in_network_carriers=[])
@@ -251,41 +251,41 @@ def test_provider_update_accepts_empty_carrier_list_patch():
 
 
 @pytest.mark.parametrize("npi", ["1234567890", "0000000000", "9999999999"])
-def test_provider_create_accepts_10_digit_npi(npi):
-    p = ProviderCreate(**_provider_create_kwargs(npi=npi))
+def test_clinician_create_accepts_10_digit_npi(npi):
+    p = ProviderCreate(**_clinician_create_kwargs(npi=npi))
     assert p.npi == npi
 
 
 @pytest.mark.parametrize("blank", [None, "", "   "])
-def test_provider_create_normalizes_blank_npi_to_none(blank):
-    p = ProviderCreate(**_provider_create_kwargs(npi=blank))
+def test_clinician_create_normalizes_blank_npi_to_none(blank):
+    p = ProviderCreate(**_clinician_create_kwargs(npi=blank))
     assert p.npi is None
 
 
-def test_provider_create_omitted_npi_defaults_to_none():
-    p = ProviderCreate(**_provider_create_kwargs())
+def test_clinician_create_omitted_npi_defaults_to_none():
+    p = ProviderCreate(**_clinician_create_kwargs())
     assert p.npi is None
 
 
 @pytest.mark.parametrize(
     "bad", ["123", "123456789", "12345678901", "12345abcde", "  123456 7890"]
 )
-def test_provider_create_rejects_malformed_npi(bad):
+def test_clinician_create_rejects_malformed_npi(bad):
     with pytest.raises(ValidationError):
-        ProviderCreate(**_provider_create_kwargs(npi=bad))
+        ProviderCreate(**_clinician_create_kwargs(npi=bad))
 
 
-def test_provider_update_accepts_npi_patch():
+def test_clinician_update_accepts_npi_patch():
     p = ProviderUpdate(npi="1234567890")
     assert p.npi == "1234567890"
 
 
-def test_provider_update_rejects_malformed_npi():
+def test_clinician_update_rejects_malformed_npi():
     with pytest.raises(ValidationError):
         ProviderUpdate(npi="abc")
 
 
-def test_provider_read_round_trips_npi():
+def test_clinician_read_round_trips_npi():
     """`ProviderRead.model_validate` carries `npi` through unchanged."""
     now = _now()
     pid = uuid.uuid4()
@@ -312,9 +312,9 @@ def test_provider_read_round_trips_npi():
     assert p.npi == "1234567890"
 
 
-def test_provider_create_accepts_cost_and_sliding_scale():
+def test_clinician_create_accepts_cost_and_sliding_scale():
     p = ProviderCreate(
-        **_provider_create_kwargs(
+        **_clinician_create_kwargs(
             sliding_scale=True,
             cost="$200 - $400 per session",
         )
@@ -331,19 +331,19 @@ def test_insurance_carriers_labels_cover_all_tokens():
     assert set(INSURANCE_CARRIER_LABELS) == set(INSURANCE_CARRIERS)
 
 
-def test_provider_create_accepts_all_insurance_carriers():
+def test_clinician_create_accepts_all_insurance_carriers():
     """Every token in `INSURANCE_CARRIERS` validates on the wire."""
     p = ProviderCreate(
-        **_provider_create_kwargs(
+        **_clinician_create_kwargs(
             in_network_carriers=list(INSURANCE_CARRIERS),
         )
     )
     assert p.in_network_carriers == list(INSURANCE_CARRIERS)
 
 
-def test_provider_create_accepts_nested_credential_lists():
+def test_clinician_create_accepts_nested_credential_lists():
     p = ProviderCreate(
-        **_provider_create_kwargs(),
+        **_clinician_create_kwargs(),
         licensures=[
             {
                 "license_type": "lcsw",
@@ -364,8 +364,8 @@ def test_provider_create_accepts_nested_credential_lists():
     assert p.certifications[0].certification_type == "emdr"
 
 
-def test_provider_create_defaults_credential_lists_to_empty():
-    p = ProviderCreate(**_provider_create_kwargs())
+def test_clinician_create_defaults_credential_lists_to_empty():
+    p = ProviderCreate(**_clinician_create_kwargs())
     assert p.licensures == []
     assert p.educations == []
     assert p.certifications == []
@@ -374,26 +374,26 @@ def test_provider_create_defaults_credential_lists_to_empty():
 # --- Solo practice path (#699) ------------------------------------------
 
 
-def test_provider_create_requires_org_id_without_solo_practice():
+def test_clinician_create_requires_org_id_without_solo_practice():
     """Without solo_practice=True, org_id is mandatory."""
     with pytest.raises(ValidationError):
-        kwargs = _provider_create_kwargs()
+        kwargs = _clinician_create_kwargs()
         del kwargs["org_id"]
         ProviderCreate(**kwargs)
 
 
-def test_provider_create_allows_missing_org_id_when_solo_practice():
+def test_clinician_create_allows_missing_org_id_when_solo_practice():
     """solo_practice=True makes org_id optional at schema level."""
-    kwargs = _provider_create_kwargs()
+    kwargs = _clinician_create_kwargs()
     del kwargs["org_id"]
     p = ProviderCreate(**kwargs, solo_practice=True)
     assert p.solo_practice is True
     assert p.org_id is None
 
 
-def test_provider_create_solo_practice_excluded_from_model_dump():
+def test_clinician_create_solo_practice_excluded_from_model_dump():
     """solo_practice must not appear in model_dump() since it's handler-only."""
-    p = ProviderCreate(**_provider_create_kwargs(), solo_practice=True)
+    p = ProviderCreate(**_clinician_create_kwargs(), solo_practice=True)
     dumped = p.model_dump()
     assert "solo_practice" not in dumped
 
@@ -401,7 +401,7 @@ def test_provider_create_solo_practice_excluded_from_model_dump():
 # --- Read from nested dict ----------------------------------------------
 
 
-def test_provider_read_validates_from_nested_dict():
+def test_clinician_read_validates_from_nested_dict():
     """`ProviderRead.model_validate` should construct the nested
     sub-entity Read schemas without needing real ORM objects."""
     provider_id = uuid.uuid4()
