@@ -96,7 +96,7 @@ async def handle_delete(
         # otherwise `/parents/A/children/B` would silently mutate a child
         # owned by parent B. Default convention: child holds `<parent.name>_id`
         # equal to `parent.id`. Specs with a shared non-parent FK
-        # (e.g. provider credentials FK to `clinicians.id`) override via
+        # (e.g. clinician credentials FK to `clinicians.id`) override via
         # `child_parent_match_attr`.
         if spec.child_parent_match_attr is not None:
             attr = spec.child_parent_match_attr

@@ -91,7 +91,7 @@ def _resolve_field(schema_cls: type[BaseModel], name: str) -> tuple[Any, bool]:
     :class:`BaseModel` (or ``BaseModel | None`` for partial-update
     variants). This is how flat form field names like ``location_city``
     resolve into the embedded ``location: Location`` value object on
-    the provider / client-referral schemas — the form template
+    the clinician / client-referral schemas — the form template
     keeps passing ``field_for(schema, 'location_city', ...)`` and we
     silently route into the sub-model.
 

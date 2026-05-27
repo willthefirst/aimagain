@@ -2,7 +2,7 @@
 
 Table-driven, deterministic; no I/O. The orchestrator (#528 / A4) feeds
 :func:`score_verification` the outputs of :func:`nppes_lookup` and
-:func:`oig_check`, plus the provider's first/last name as currently
+:func:`oig_check`, plus the clinician's first/last name as currently
 recorded, and gets back a :class:`Score` ready to persist on the
 `Verification` row.
 
@@ -10,7 +10,7 @@ Rules (in order):
 
 * `oig.match` → ``failed``, flag ``oig_excluded:{reason}``.
 * `not nppes.found` → ``failed``, flag ``nppes_npi_not_found``.
-* NPPES-vs-provider name similarity < ``_NAME_MATCH_THRESHOLD`` →
+* NPPES-vs-clinician name similarity < ``_NAME_MATCH_THRESHOLD`` →
   ``needs_review``, flag ``nppes_name_mismatch``.
 * Otherwise → ``verified``.
 

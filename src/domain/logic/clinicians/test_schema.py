@@ -1,4 +1,4 @@
-"""Tests for the provider wire schemas.
+"""Tests for the clinician wire schemas.
 
 Covers:
 - Controlled-vocabulary fields reject values outside their tuples.
@@ -459,14 +459,14 @@ def test_provider_read_validates_from_nested_dict():
         ],
     }
 
-    provider = ProviderRead.model_validate(payload)
+    clinician = ProviderRead.model_validate(payload)
 
-    assert provider.org_name == "Sunrise"
-    assert provider.org_id == org_id
-    assert len(provider.licensures) == 1
-    assert provider.licensures[0].license_type == "lcsw"
-    assert provider.educations[0].month_completed == "2010-05"
-    assert provider.certifications[0].expiration_date is None
+    assert clinician.org_name == "Sunrise"
+    assert clinician.org_id == org_id
+    assert len(clinician.licensures) == 1
+    assert clinician.licensures[0].license_type == "lcsw"
+    assert clinician.educations[0].month_completed == "2010-05"
+    assert clinician.certifications[0].expiration_date is None
 
 
 # --- Schema-literal vs model-tuple guardrail ----------------------------

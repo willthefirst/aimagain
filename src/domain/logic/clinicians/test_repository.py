@@ -5,7 +5,7 @@ CRUD (licensures, educations, certifications). The cascade-delete test
 verifies that deleting a clinician removes its credential rows via the
 combined ORM cascade and FK `ON DELETE CASCADE` (the test engine sets
 `PRAGMA foreign_keys = ON`). The list-with-filter tests cover the JOIN
-through `provider_licensures` and `.distinct()` de-dup behavior.
+through `provider_licensures` (credit model name) and `.distinct()` de-dup behavior.
 
 The Clinician's practice display name lives on
 ``clinician.org.name``; fixtures here use
@@ -52,7 +52,7 @@ async def _seed_user(
     return user
 
 
-async def _seed_provider(
+async def _seed_clinician(
     db_test_session_manager: async_sessionmaker[AsyncSession],
     *,
     owner_id: uuid.UUID,
@@ -64,21 +64,21 @@ async def _seed_provider(
     Org up when the Clinician is added."""
     async with db_test_session_manager() as session:
         async with session.begin():
-            provider = make_clinician_with_org(
+            clinician = make_clinician_with_org(
                 owner_id=owner_id, practice_name=practice_name, **overrides
             )
-            session.add(provider)
-    return provider
+            session.add(clinician)
+    return clinician
 
 
-# --- Provider CRUD --------------------------------------------------------
+# --- Clinician CRUD --------------------------------------------------------
 
 
-async def test_create_provider_persists_row(
+async def test_create_clinician_persists_row(
     db_test_session_manager: async_sessionmaker[AsyncSession],
 ):
     user = await _seed_user(db_test_session_manager)
-    created = await _seed_provider(
+    created = await _seed_clinician(
         db_test_session_manager, owner_id=user.id, practice_name="Acme Health"
     )
 
@@ -97,11 +97,11 @@ async def test_create_provider_persists_row(
         assert row.org.name == "Acme Health"
 
 
-async def test_get_by_id_finds_created_provider(
+async def test_get_by_id_finds_created_clinician(
     db_test_session_manager: async_sessionmaker[AsyncSession],
 ):
     user = await _seed_user(db_test_session_manager)
-    created = await _seed_provider(
+    created = await _seed_clinician(
         db_test_session_manager, owner_id=user.id, practice_name="Acme"
     )
 
@@ -112,11 +112,11 @@ async def test_get_by_id_finds_created_provider(
         assert found.id == created.id
 
 
-async def test_get_by_user_id_finds_created_provider(
+async def test_get_by_user_id_finds_created_clinician(
     db_test_session_manager: async_sessionmaker[AsyncSession],
 ):
     user = await _seed_user(db_test_session_manager)
-    await _seed_provider(db_test_session_manager, owner_id=user.id)
+    await _seed_clinician(db_test_session_manager, owner_id=user.id)
 
     async with db_test_session_manager() as session:
         repo = ClinicianRepository(session)
@@ -125,19 +125,19 @@ async def test_get_by_user_id_finds_created_provider(
         assert found.owner_id == user.id
 
 
-async def test_update_provider_changes_fields_visible_on_refetch(
+async def test_update_clinician_changes_fields_visible_on_refetch(
     db_test_session_manager: async_sessionmaker[AsyncSession],
 ):
     user = await _seed_user(db_test_session_manager)
-    created = await _seed_provider(
+    created = await _seed_clinician(
         db_test_session_manager, owner_id=user.id, practice_name="Original"
     )
 
     async with db_test_session_manager() as session:
         repo = ClinicianRepository(session)
-        provider = await repo.get_by_model_id(Clinician, created.id)
-        assert provider is not None
-        await repo.patch(provider, location_city="Chicago")
+        clinician = await repo.get_by_model_id(Clinician, created.id)
+        assert clinician is not None
+        await repo.patch(clinician, location_city="Chicago")
         await session.commit()
 
     async with db_test_session_manager() as session:
@@ -158,7 +158,7 @@ async def test_npi_round_trips(
 ):
     """A 10-digit `npi` persists and reads back unchanged."""
     user = await _seed_user(db_test_session_manager)
-    created = await _seed_provider(
+    created = await _seed_clinician(
         db_test_session_manager,
         owner_id=user.id,
         practice_name="NPI Test",
@@ -182,7 +182,7 @@ async def test_npi_defaults_to_null(
     db_test_session_manager: async_sessionmaker[AsyncSession],
 ):
     user = await _seed_user(db_test_session_manager)
-    created = await _seed_provider(
+    created = await _seed_clinician(
         db_test_session_manager, owner_id=user.id, practice_name="No NPI"
     )
 
@@ -204,7 +204,7 @@ async def test_insurance_fields_round_trip(
 ):
     """The five #449 insurance/payment columns persist + read back."""
     user = await _seed_user(db_test_session_manager)
-    created = await _seed_provider(
+    created = await _seed_clinician(
         db_test_session_manager,
         owner_id=user.id,
         practice_name="Insurance Test",
@@ -237,7 +237,7 @@ async def test_insurance_fields_default_to_oon_only(
     empty carrier list (no in-network) + `accepts_out_of_network=True`
     (most practices accept OON), no sliding scale."""
     user = await _seed_user(db_test_session_manager)
-    created = await _seed_provider(db_test_session_manager, owner_id=user.id)
+    created = await _seed_clinician(db_test_session_manager, owner_id=user.id)
 
     async with db_test_session_manager() as session:
         row = (
@@ -260,7 +260,8 @@ async def test_delete_clinician_cascades_to_credentials(
 ):
     """Deleting a Clinician cascades to its credential sub-rows via the
     ORM `cascade="all, delete-orphan"` on the clinician relationships.
-    Mirrors the model-level test in `test_provider_models.py`."""
+    Mirrors the model-level test in `test_provider_models.py` (model class names intentionally kept).
+    """
     user = await _seed_user(db_test_session_manager)
 
     async with db_test_session_manager() as session:
@@ -342,10 +343,10 @@ async def test_delete_clinician_cascades_to_credentials(
         assert len(certification_rows) == 0
 
 
-# --- list_clinicians (formerly list_providers; renamed in #642 PR 4) ------------------------------------------------------
+# --- list_clinicians -----------------------------------------------------------------------------------------------------
 
 
-async def test_list_providers_no_filters_returns_all(
+async def test_list_clinicians_no_filters_returns_all(
     db_test_session_manager: async_sessionmaker[AsyncSession],
 ):
     user_a = await _seed_user(db_test_session_manager)
@@ -360,11 +361,11 @@ async def test_list_providers_no_filters_returns_all(
 
     async with db_test_session_manager() as session:
         repo = ClinicianRepository(session)
-        providers = await repo.list_clinicians()
-        assert len(providers) == 2
+        clinicians = await repo.list_clinicians()
+        assert len(clinicians) == 2
 
 
-async def test_list_providers_filtered_by_license_type(
+async def test_list_clinicians_filtered_by_license_type(
     db_test_session_manager: async_sessionmaker[AsyncSession],
 ):
     user_a = await _seed_user(db_test_session_manager)
@@ -372,35 +373,35 @@ async def test_list_providers_filtered_by_license_type(
 
     async with db_test_session_manager() as session:
         async with session.begin():
-            provider_a = make_clinician_with_org(owner_id=user_a.id)
-            provider_b = make_clinician_with_org(
+            clinician_a = make_clinician_with_org(owner_id=user_a.id)
+            clinician_b = make_clinician_with_org(
                 owner_id=user_b.id, practice_name="Other"
             )
-            session.add_all([provider_a, provider_b])
+            session.add_all([clinician_a, clinician_b])
             await session.flush()
             session.add(
                 make_provider_licensure(
-                    clinician_id=provider_a.id,
+                    clinician_id=clinician_a.id,
                     license_type="lcsw",
                     issuing_state="IL",
                 )
             )
             session.add(
                 make_provider_licensure(
-                    clinician_id=provider_b.id,
+                    clinician_id=clinician_b.id,
                     license_type="lpc",
                     issuing_state="IL",
                 )
             )
-            keep_id = provider_a.id
+            keep_id = clinician_a.id
 
     async with db_test_session_manager() as session:
         repo = ClinicianRepository(session)
-        providers = await repo.list_clinicians(license_type=["lcsw"])
-        assert [p.id for p in providers] == [keep_id]
+        clinicians = await repo.list_clinicians(license_type=["lcsw"])
+        assert [p.id for p in clinicians] == [keep_id]
 
 
-async def test_list_providers_filtered_by_issuing_state(
+async def test_list_clinicians_filtered_by_issuing_state(
     db_test_session_manager: async_sessionmaker[AsyncSession],
 ):
     user_a = await _seed_user(db_test_session_manager)
@@ -408,57 +409,57 @@ async def test_list_providers_filtered_by_issuing_state(
 
     async with db_test_session_manager() as session:
         async with session.begin():
-            provider_a = make_clinician_with_org(owner_id=user_a.id)
-            provider_b = make_clinician_with_org(
+            clinician_a = make_clinician_with_org(owner_id=user_a.id)
+            clinician_b = make_clinician_with_org(
                 owner_id=user_b.id, practice_name="Other"
             )
-            session.add_all([provider_a, provider_b])
+            session.add_all([clinician_a, clinician_b])
             await session.flush()
             session.add(
                 make_provider_licensure(
-                    clinician_id=provider_a.id,
+                    clinician_id=clinician_a.id,
                     license_type="lcsw",
                     issuing_state="CA",
                 )
             )
             session.add(
                 make_provider_licensure(
-                    clinician_id=provider_b.id,
+                    clinician_id=clinician_b.id,
                     license_type="lcsw",
                     issuing_state="IL",
                 )
             )
-            keep_id = provider_a.id
+            keep_id = clinician_a.id
 
     async with db_test_session_manager() as session:
         repo = ClinicianRepository(session)
-        providers = await repo.list_clinicians(issuing_state=["CA"])
-        assert [p.id for p in providers] == [keep_id]
+        clinicians = await repo.list_clinicians(issuing_state=["CA"])
+        assert [p.id for p in clinicians] == [keep_id]
 
 
-async def test_list_providers_combined_filter_is_anded(
+async def test_list_clinicians_combined_filter_is_anded(
     db_test_session_manager: async_sessionmaker[AsyncSession],
 ):
-    """Both filters must match on the same licensure row to select a provider."""
+    """Both filters must match on the same licensure row to select a clinician."""
     user_a = await _seed_user(db_test_session_manager)
     user_b = await _seed_user(db_test_session_manager)
     user_c = await _seed_user(db_test_session_manager)
 
     async with db_test_session_manager() as session:
         async with session.begin():
-            provider_a = make_clinician_with_org(owner_id=user_a.id)
-            provider_b = make_clinician_with_org(
+            clinician_a = make_clinician_with_org(owner_id=user_a.id)
+            clinician_b = make_clinician_with_org(
                 owner_id=user_b.id, practice_name="Two"
             )
-            provider_c = make_clinician_with_org(
+            clinician_c = make_clinician_with_org(
                 owner_id=user_c.id, practice_name="Three"
             )
-            session.add_all([provider_a, provider_b, provider_c])
+            session.add_all([clinician_a, clinician_b, clinician_c])
             await session.flush()
             # A: matches both filters
             session.add(
                 make_provider_licensure(
-                    clinician_id=provider_a.id,
+                    clinician_id=clinician_a.id,
                     license_type="lcsw",
                     issuing_state="CA",
                 )
@@ -466,7 +467,7 @@ async def test_list_providers_combined_filter_is_anded(
             # B: matches license_type only
             session.add(
                 make_provider_licensure(
-                    clinician_id=provider_b.id,
+                    clinician_id=clinician_b.id,
                     license_type="lcsw",
                     issuing_state="IL",
                 )
@@ -474,22 +475,22 @@ async def test_list_providers_combined_filter_is_anded(
             # C: matches issuing_state only
             session.add(
                 make_provider_licensure(
-                    clinician_id=provider_c.id,
+                    clinician_id=clinician_c.id,
                     license_type="lpc",
                     issuing_state="CA",
                 )
             )
-            keep_id = provider_a.id
+            keep_id = clinician_a.id
 
     async with db_test_session_manager() as session:
         repo = ClinicianRepository(session)
-        providers = await repo.list_clinicians(
+        clinicians = await repo.list_clinicians(
             license_type=["lcsw"], issuing_state=["CA"]
         )
-        assert [p.id for p in providers] == [keep_id]
+        assert [p.id for p in clinicians] == [keep_id]
 
 
-async def test_list_for_verification_returns_non_deleted_providers(
+async def test_list_for_verification_returns_non_deleted_clinicians(
     db_test_session_manager: async_sessionmaker[AsyncSession],
 ):
     """Eligibility for nightly verification is `deleted_at IS NULL` — see
@@ -501,11 +502,11 @@ async def test_list_for_verification_returns_non_deleted_providers(
     user_b = await _seed_user(db_test_session_manager)
     user_c = await _seed_user(db_test_session_manager)
 
-    kept_a = await _seed_provider(db_test_session_manager, owner_id=user_a.id)
-    kept_b = await _seed_provider(
+    kept_a = await _seed_clinician(db_test_session_manager, owner_id=user_a.id)
+    kept_b = await _seed_clinician(
         db_test_session_manager, owner_id=user_b.id, practice_name="Other"
     )
-    deleted = await _seed_provider(
+    deleted = await _seed_clinician(
         db_test_session_manager, owner_id=user_c.id, practice_name="Gone"
     )
 
@@ -520,20 +521,20 @@ async def test_list_for_verification_returns_non_deleted_providers(
         assert {p.id for p in eligible} == {kept_a.id, kept_b.id}
 
 
-async def test_list_providers_distinct_when_multiple_licensures_match(
+async def test_list_clinicians_distinct_when_multiple_licensures_match(
     db_test_session_manager: async_sessionmaker[AsyncSession],
 ):
-    """A provider with two matching licensures must appear exactly once."""
+    """A clinician with two matching licensures must appear exactly once."""
     user = await _seed_user(db_test_session_manager)
 
     async with db_test_session_manager() as session:
         async with session.begin():
-            provider = make_clinician_with_org(owner_id=user.id)
-            session.add(provider)
+            clinician_row = make_clinician_with_org(owner_id=user.id)
+            session.add(clinician_row)
             await session.flush()
             session.add(
                 make_provider_licensure(
-                    clinician_id=provider.id,
+                    clinician_id=clinician_row.id,
                     license_type="lcsw",
                     issuing_state="IL",
                     license_number="L-1",
@@ -541,7 +542,7 @@ async def test_list_providers_distinct_when_multiple_licensures_match(
             )
             session.add(
                 make_provider_licensure(
-                    clinician_id=provider.id,
+                    clinician_id=clinician_row.id,
                     license_type="lcsw",
                     issuing_state="CA",
                     license_number="L-2",
@@ -550,8 +551,8 @@ async def test_list_providers_distinct_when_multiple_licensures_match(
 
     async with db_test_session_manager() as session:
         repo = ClinicianRepository(session)
-        providers = await repo.list_clinicians(license_type=["lcsw"])
-        assert len(providers) == 1
+        clinicians = await repo.list_clinicians(license_type=["lcsw"])
+        assert len(clinicians) == 1
 
 
 # --- Sub-table CRUD round-trips -----------------------------------------
@@ -561,13 +562,13 @@ async def test_licensure_crud_round_trip(
     db_test_session_manager: async_sessionmaker[AsyncSession],
 ):
     user = await _seed_user(db_test_session_manager)
-    provider = await _seed_provider(db_test_session_manager, owner_id=user.id)
+    clinician = await _seed_clinician(db_test_session_manager, owner_id=user.id)
 
     async with db_test_session_manager() as session:
         repo = ClinicianRepository(session)
-        provider = await repo.get_by_model_id(Clinician, provider.id)
+        clinician = await repo.get_by_model_id(Clinician, clinician.id)
         licensure = await repo.add_child(
-            provider,
+            clinician,
             "licensures",
             ProviderLicensure(
                 license_type="lcsw",
@@ -601,13 +602,13 @@ async def test_education_crud_round_trip(
     db_test_session_manager: async_sessionmaker[AsyncSession],
 ):
     user = await _seed_user(db_test_session_manager)
-    provider = await _seed_provider(db_test_session_manager, owner_id=user.id)
+    clinician = await _seed_clinician(db_test_session_manager, owner_id=user.id)
 
     async with db_test_session_manager() as session:
         repo = ClinicianRepository(session)
-        provider = await repo.get_by_model_id(Clinician, provider.id)
+        clinician = await repo.get_by_model_id(Clinician, clinician.id)
         education = await repo.add_child(
-            provider,
+            clinician,
             "educations",
             ProviderEducation(
                 education_type="msw",
@@ -640,13 +641,13 @@ async def test_certification_crud_round_trip(
     db_test_session_manager: async_sessionmaker[AsyncSession],
 ):
     user = await _seed_user(db_test_session_manager)
-    provider = await _seed_provider(db_test_session_manager, owner_id=user.id)
+    clinician = await _seed_clinician(db_test_session_manager, owner_id=user.id)
 
     async with db_test_session_manager() as session:
         repo = ClinicianRepository(session)
-        provider = await repo.get_by_model_id(Clinician, provider.id)
+        clinician = await repo.get_by_model_id(Clinician, clinician.id)
         cert = await repo.add_child(
-            provider,
+            clinician,
             "certifications",
             ProviderCertification(
                 certification_type="emdr",

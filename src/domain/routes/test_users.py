@@ -441,12 +441,12 @@ async def test_detail_hides_admin_actions_for_non_admin(
     assert tree.css_first(f"button[hx-put='/users/{target.id}/activation']") is None
 
 
-async def test_detail_shows_providers_empty_state(
+async def test_detail_shows_clinicians_empty_state(
     authenticated_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user: User,
 ):
-    """User with no providers → empty-state copy on the detail page."""
+    """User with no clinicians → empty-state copy on the detail page."""
     target = create_test_user(username=f"target-{uuid.uuid4()}")
     async with db_test_session_manager() as session:
         async with session.begin():
@@ -461,12 +461,12 @@ async def test_detail_shows_providers_empty_state(
     assert "No clinician entries yet" in empty.text()
 
 
-async def test_detail_lists_owned_providers(
+async def test_detail_lists_owned_clinicians(
     authenticated_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user: User,
 ):
-    """User with multiple providers → all are linked from the detail page."""
+    """User with multiple clinicians → all are linked from the detail page."""
     target = create_test_user(username=f"target-{uuid.uuid4()}")
     async with db_test_session_manager() as session:
         async with session.begin():
@@ -486,15 +486,15 @@ async def test_detail_lists_owned_providers(
     rows = tree.css("#user-detail-clinicians article.entity-card")
     assert len(rows) == 2
     # After #642 PR 3 the Practice cell anchors to the owning Org per
-    # affiliation (each Provider here has its own auto-built Org via
-    # `make_clinician_with_org`). The Provider id rides on the row's
-    # `data-row-id`; assert both Providers surface via that attribute.
+    # affiliation (each Clinician here has its own auto-built Org via
+    # `make_clinician_with_org`). The Clinician id rides on the row's
+    # `data-row-id`; assert both Clinicians surface via that attribute.
     row_ids = {row.attributes.get("data-row-id") for row in rows}
     assert row_ids == {str(first.id), str(second.id)}
 
 
-def _inline_create_provider_link(tree: HTMLParser):
-    """The detail page's Providers card renders the self-only Create
+def _inline_create_clinician_link(tree: HTMLParser):
+    """The detail page's Clinicians card renders the self-only Create
     CTA as `<a role="button">Create clinician</a>` inside the
     `.entity-card`'s `<footer>`. Distinct from the toolbar variant on
     `/users/{id}/clinicians` — this one is the profile inline preview."""
@@ -504,18 +504,18 @@ def _inline_create_provider_link(tree: HTMLParser):
     return None
 
 
-async def test_detail_shows_inline_create_provider_for_self(
+async def test_detail_shows_inline_create_clinician_for_self(
     authenticated_client: AsyncClient,
     logged_in_user: User,
 ):
     """`/users/me` (and `/users/{my_id}`) renders an inline 'Create
-    provider' button inside the Providers section so the profile is
+    clinician' button inside the Clinicians section so the profile is
     a self-discovery entry point — without the user clicking through
     to the dedicated `/users/me/clinicians` page."""
     response = await authenticated_client.get("/users/me")
     assert response.status_code == 200
     tree = HTMLParser(response.text)
-    action = _inline_create_provider_link(tree)
+    action = _inline_create_clinician_link(tree)
     assert action is not None, "self profile is missing inline Create clinician link"
     assert action.attributes.get("href") == "/clinicians/form"
 
@@ -575,7 +575,7 @@ async def test_users_me_onboarding_not_shown_for_other_users(
     ), "onboarding card unexpectedly shown on another user's profile"
 
 
-async def test_detail_omits_inline_create_provider_for_other_user(
+async def test_detail_omits_inline_create_clinician_for_other_user(
     authenticated_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user: User,
@@ -592,7 +592,7 @@ async def test_detail_omits_inline_create_provider_for_other_user(
     response = await authenticated_client.get(f"/users/{target.id}")
     assert response.status_code == 200
     tree = HTMLParser(response.text)
-    assert _inline_create_provider_link(tree) is None
+    assert _inline_create_clinician_link(tree) is None
 
 
 # --- Sign out -----------------------------------------------------------
@@ -941,7 +941,7 @@ async def test_delete_user_writes_audit_row(
         assert row.after is None
 
 
-# --- Providers ownership-subresource ----------------------------
+# --- Clinicians ownership-subresource ----------------------------
 
 
 async def _seed_user_clinician(
@@ -950,20 +950,20 @@ async def _seed_user_clinician(
     user_id: uuid.UUID,
     practice_name: str,
 ) -> uuid.UUID:
-    provider = make_clinician_with_org(owner_id=user_id, practice_name=practice_name)
+    clinician = make_clinician_with_org(owner_id=user_id, practice_name=practice_name)
     async with db_test_session_manager() as session:
         async with session.begin():
-            session.add(provider)
-        await session.refresh(provider)
-        return provider.id
+            session.add(clinician)
+        await session.refresh(clinician)
+        return clinician.id
 
 
-async def test_get_my_providers_empty_state(
+async def test_get_my_clinicians_empty_state(
     authenticated_client: AsyncClient,
     logged_in_user: User,
 ):
     """`GET /users/me/clinicians` renders the empty state when the
-    current user owns no providers."""
+    current user owns no clinicians."""
     response = await authenticated_client.get("/users/me/clinicians")
 
     assert response.status_code == 200
@@ -975,24 +975,24 @@ async def test_get_my_providers_empty_state(
     assert "have not created" in empty.text()
 
 
-def _create_provider_action(tree: HTMLParser):
+def _create_clinician_action(tree: HTMLParser):
     for anchor in tree.css('menu.toolbar-right > li > a[role="button"]'):
         if "Create clinician" in (anchor.text() or ""):
             return anchor
     return None
 
 
-async def test_get_my_providers_shows_create_action_in_toolbar(
+async def test_get_my_clinicians_shows_create_action_in_toolbar(
     authenticated_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user: User,
 ):
-    """Self viewing their own provider list sees a 'Create clinician'
+    """Self viewing their own clinician list sees a 'Create clinician'
     toolbar action — present both in the empty state and after the
-    user has created one (so they can create additional providers)."""
+    user has created one (so they can create additional clinicians)."""
     empty_response = await authenticated_client.get("/users/me/clinicians")
     empty_tree = HTMLParser(empty_response.text)
-    empty_action = _create_provider_action(empty_tree)
+    empty_action = _create_clinician_action(empty_tree)
     assert empty_action is not None
     assert empty_action.attributes.get("href") == "/clinicians/form"
 
@@ -1002,17 +1002,17 @@ async def test_get_my_providers_shows_create_action_in_toolbar(
 
     with_one_response = await authenticated_client.get("/users/me/clinicians")
     with_one_tree = HTMLParser(with_one_response.text)
-    assert _create_provider_action(with_one_tree) is not None
+    assert _create_clinician_action(with_one_tree) is not None
 
 
-async def test_get_user_providers_omits_create_action_for_other_user(
+async def test_get_user_clinicians_omits_create_action_for_other_user(
     authenticated_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user: User,
 ):
-    """An admin viewing another user's provider list does NOT see the
+    """An admin viewing another user's clinician list does NOT see the
     self-only 'Create clinician' toolbar action — admins manage their
-    own providers, not on behalf of others."""
+    own clinicians, not on behalf of others."""
     await promote_to_admin(db_test_session_manager, logged_in_user.email)
     target = create_test_user(username=f"target-{uuid.uuid4()}")
     async with db_test_session_manager() as session:
@@ -1022,10 +1022,10 @@ async def test_get_user_providers_omits_create_action_for_other_user(
     response = await authenticated_client.get(f"/users/{target.id}/clinicians")
     assert response.status_code == 200
     tree = HTMLParser(response.text)
-    assert _create_provider_action(tree) is None
+    assert _create_clinician_action(tree) is None
 
 
-async def test_get_user_providers_self(
+async def test_get_user_clinicians_self(
     authenticated_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user: User,
@@ -1042,12 +1042,12 @@ async def test_get_user_providers_self(
     assert len(tree.css("#user-clinicians-list article.entity-card")) == 1
 
 
-async def test_get_user_providers_admin_can_view_other(
+async def test_get_user_clinicians_admin_can_view_other(
     authenticated_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user: User,
 ):
-    """Admin can view another user's provider list."""
+    """Admin can view another user's clinician list."""
     await promote_to_admin(db_test_session_manager, logged_in_user.email)
     target = create_test_user(username=f"target-{uuid.uuid4()}")
     async with db_test_session_manager() as session:
@@ -1063,12 +1063,12 @@ async def test_get_user_providers_admin_can_view_other(
     assert len(tree.css("#user-clinicians-list article.entity-card")) == 1
 
 
-async def test_get_user_providers_non_admin_forbidden_for_other(
+async def test_get_user_clinicians_non_admin_forbidden_for_other(
     authenticated_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user: User,
 ):
-    """A non-admin user cannot view another user's provider list."""
+    """A non-admin user cannot view another user's clinician list."""
     target = create_test_user(username=f"target-{uuid.uuid4()}")
     async with db_test_session_manager() as session:
         async with session.begin():
@@ -1078,7 +1078,7 @@ async def test_get_user_providers_non_admin_forbidden_for_other(
     assert response.status_code == 403
 
 
-async def test_get_user_providers_404_for_unknown_user(
+async def test_get_user_clinicians_404_for_unknown_user(
     authenticated_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user: User,

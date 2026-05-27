@@ -2,7 +2,7 @@
 
 Covers what `field_spec` derives from a Pydantic field — required-ness,
 Literal → select, Annotated `HtmlPattern` markers — using a small
-in-test schema. The provider/new.html → `field_for` integration is
+in-test schema. The clinicians/form_new.html → `field_for` integration is
 exercised by the route test in `src/domain/routes/test_providers.py`.
 """
 

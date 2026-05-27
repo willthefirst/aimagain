@@ -3,7 +3,7 @@
 Home for `Annotated[T, AfterValidator(fn)]` aliases and small helpers
 that are used by 2+ schema modules. Keeping them here means a domain
 schema module never has to import primitives from a peer domain module
-(e.g. `provider.py` reaching into `post.py`).
+(e.g. `clinicians/schema.py` reaching into `posts/schema.py`).
 
 Trigger to add something here: a primitive is used by 2+ schema modules
 (rule of three, applied generously when callers would otherwise import
@@ -166,7 +166,7 @@ def _field_is_set(value) -> bool:
 
     Non-``None`` values count. A nested :class:`BaseModel` value (the
     typical case is :class:`~src.domain.logic.value_objects.location.LocationPartial`
-    on the provider / client-referral Update variants — #451) counts
+    on the clinician / client-referral Update variants — #451) counts
     only if at least one of *its* own fields is set; an all-``None``
     partial value-object is treated as the no-op patch ``None`` it
     semantically represents, so a PATCH that only sets

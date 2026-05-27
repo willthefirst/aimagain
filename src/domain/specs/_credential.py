@@ -1,12 +1,12 @@
-"""Factory for the provider-credential subentity specs.
+"""Factory for the clinician credential subentity specs.
 
-The three provider credentials (`licensure`, `education`, `certification`)
-have identical `EntitySpec` shape — owned subentities of `Provider`,
+The three clinician credentials (`licensure`, `education`, `certification`)
+have identical `EntitySpec` shape — owned subentities of `Clinician`,
 subrow-CRUD-only routes, parent-form redirect on every mutation,
 `assert_owner_or_admin` write_authz against the parent. They differ
 only in identity (name/model/id_param), audit-action enums, and schemas.
 
-`make_provider_credential_entity` is the single declaration of the
+`make_clinician_credential_entity` is the single declaration of the
 shared shape; the three spec modules pass the per-credential pieces
 through it.
 """
@@ -23,7 +23,7 @@ from src.framework.dispatch.entity_spec import (
 )
 
 
-def make_provider_credential_entity(
+def make_clinician_credential_entity(
     *,
     name: str,
     url_collection: str,

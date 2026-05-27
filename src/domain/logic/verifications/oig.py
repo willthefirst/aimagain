@@ -115,7 +115,7 @@ def _csv_path() -> str:
 def oig_check(*, first_name: str, last_name: str, npi: str | None) -> OigResult:
     """Check whether `(first_name, last_name)` or `npi` appears on the
     LEIE exclusion list. NPI hits win (higher confidence — NPIs are
-    unique to a provider); name-only hits fall through and are surfaced
+    unique to a clinician); name-only hits fall through and are surfaced
     with ``reason='name_match'`` so the reviewer knows.
     """
     index = _load_index(_csv_path())

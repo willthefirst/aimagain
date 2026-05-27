@@ -15,9 +15,9 @@ _ck = partial(named_check_in, _TABLE)
 class Organization(BaseModel):
     """First-class directory entity for clinics, group practices, health
     systems, and solo-practice shells. ``Organization.name`` is the
-    source of truth for the practice's display name; every Provider
-    points at exactly one Org via ``Provider.org_id`` and templates
-    read ``provider.org.name`` directly.
+    source of truth for the practice's display name; every Clinician
+    is linked to one or more Orgs via Affiliation and templates
+    read ``clinician.org.name`` directly.
 
     Hierarchy is modeled as a self-referential tree via ``parent_org_id``
     (nullable; a root org has ``parent_org_id IS NULL``). ``root_org_id``
@@ -63,9 +63,8 @@ class Organization(BaseModel):
     )
     # FK-side ``RESTRICT`` on Programs — deleting an Org with attached
     # Programs fails loudly rather than silently orphaning. The Org →
-    # Provider path moved to Org → Affiliation in #635 PR B (the
-    # `org_id` column was dropped from `providers`); callers that
-    # want "providers at this org" now navigate `org.affiliations` and
-    # read `affiliation.provider`. ORM relationships are read-only
+    # Clinician path is Org → Affiliation (#635 PR B);
+    # callers that want "clinicians at this org" navigate `org.affiliations`
+    # and read `affiliation.clinician`. ORM relationships are read-only
     # from the Org side.
     programs = relationship("Program", back_populates="organization")
