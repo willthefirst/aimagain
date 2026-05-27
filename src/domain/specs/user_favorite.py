@@ -27,7 +27,7 @@ from typing import Final
 from src.domain.logic.favorites.repository import get_user_favorite_repository
 from src.domain.logic.favorites.schema import UserFavoriteAuditSnapshot
 from src.domain.models import UserFavorite
-from src.domain.specs.provider import PROVIDER_ENTITY
+from src.domain.specs.clinician import CLINICIAN_ENTITY
 from src.domain.specs.user import USER_ENTITY
 from src.framework.audit.core import AuditAction, make_snapshotter
 from src.framework.dispatch.entity_spec import (
@@ -53,7 +53,7 @@ FAVORITE_ENTITY: Final[EntitySpec] = EntitySpec(
     name="user_favorite",
     url_collection="favorites",
     # The edge has a UUID PK on `UserFavorite.id`; the route file's
-    # URLs use `{provider_id}` (the to-side of the edge) instead. The
+    # URLs use `{clinician_id}` (the to-side of the edge) instead. The
     # spec declares the entity's PK name; URL grammar is the route
     # file's bespoke concern.
     id_param="favorite_id",
@@ -63,10 +63,10 @@ FAVORITE_ENTITY: Final[EntitySpec] = EntitySpec(
     edge_audit=FAVORITE_EDGE_AUDIT,
     relation=M2NRelation(
         from_entity=USER_ENTITY,
-        to_entity=PROVIDER_ENTITY,
+        to_entity=CLINICIAN_ENTITY,
         join_table="user_favorites",
         from_attr="user_id",
-        to_attr="provider_id",
+        to_attr="clinician_id",
     ),
     # Favorites doesn't use any `mount_*` helper — the route file is
     # hand-rolled. All `RouteSet` flags stay False; phase 2 may

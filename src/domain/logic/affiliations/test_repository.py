@@ -22,7 +22,7 @@ from src.domain.logic.affiliations.repository import (
     AffiliationRepository,
     get_affiliation_repository,
 )
-from src.domain.models import Affiliation, Organization, Provider, User
+from src.domain.models import Affiliation, Clinician, Organization, User
 from src.framework.persistence.dependencies import (
     UnknownRepoTypeError,
     resolver_for,
@@ -50,8 +50,8 @@ def test_repository_registers_with_dispatch_registry():
 
 @pytest.mark.asyncio
 async def test_repository_creates_and_fetches_affiliation(session):
-    """End-to-end repo smoke: persist a Provider (which auto-creates
-    one Affiliation via `Provider.__init__`), then create a second
+    """End-to-end repo smoke: persist a Clinician (which auto-creates
+    one Affiliation via `Clinician.__init__`), then create a second
     Affiliation through the repo and fetch both back."""
     user_id = uuid.uuid4()
     user = User(
@@ -80,7 +80,7 @@ async def test_repository_creates_and_fetches_affiliation(session):
         root_org_id=org_b_id,
         owner_id=user_id,
     )
-    provider = Provider(
+    clinician = Clinician(
         owner_id=user_id,
         org_id=org_a_id,
         location_city="Brooklyn",
@@ -92,13 +92,12 @@ async def test_repository_creates_and_fetches_affiliation(session):
         in_network_carriers=["aetna"],
         sliding_scale=False,
     )
-    session.add_all([user, org_a, org_b, provider])
+    session.add_all([user, org_a, org_b, clinician])
     await session.flush()
 
     repo = AffiliationRepository(session)
     new_aff = Affiliation(
-        provider_id=provider.id,
-        clinician_id=provider.clinician_id,
+        clinician_id=clinician.id,
         org_id=org_b_id,
         location_city="Manhattan",
         location_state="NY",

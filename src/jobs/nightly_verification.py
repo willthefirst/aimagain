@@ -1,22 +1,17 @@
-"""Nightly provider-verification job.
+"""Nightly clinician-verification job.
 
-Iterates every non-deleted `Provider` and calls
-`run_provider_verification(...)` (the orchestrator from #528) with
-`actor_id=None` — the audit framework treats `None` as the system actor
-(`AuditLog.actor_id` is nullable with `ON DELETE SET NULL`; see
-`src/framework/audit/log.py`).
+Iterates every non-deleted `Clinician` and calls
+`run_clinician_verification(...)` with `actor_id=None` — the audit
+framework treats `None` as the system actor.
 
-Each per-provider call owns its own transaction (the orchestrator
+Each per-clinician call owns its own transaction (the orchestrator
 commits before returning), so a mid-loop failure can only lose the
-provider it raised on — earlier providers' verification rows are durable
-and later providers still run. Failures are logged with the offending
-provider id; the loop never re-raises.
+clinician it raised on — earlier verification rows are durable and
+later clinicians still run. Failures are logged with the offending
+clinician id; the loop never re-raises.
 
-Sequential is intentional. NPPES is a free public registry with no
-documented rate limit; the LEIE check is local. The per-call timeout
-(see `_HTTP_TIMEOUT_SECONDS` in `src/domain/logic/verifications/handlers.py`)
-bounds total runtime. If the provider count grows past O(1000), revisit
-concurrency in a follow-up — don't bolt it on here.
+Sequential is intentional — NPPES is a free public registry with no
+documented rate limit and the per-call timeout bounds total runtime.
 """
 
 import logging
@@ -24,8 +19,8 @@ import logging
 import httpx
 
 from src.db import async_session_maker
-from src.domain.logic.providers.repository import ProviderRepository
-from src.domain.logic.verifications.handlers import run_provider_verification
+from src.domain.logic.clinicians.repository import ClinicianRepository
+from src.domain.logic.verifications.handlers import run_clinician_verification
 from src.domain.logic.verifications.repository import VerificationRepository
 from src.framework.audit.repository import AuditRepository
 
@@ -36,25 +31,25 @@ _HTTP_TIMEOUT_SECONDS = 10.0
 
 async def run_nightly_verification() -> None:
     async with async_session_maker() as session:
-        provider_repo = ProviderRepository(session)
+        clinician_repo = ClinicianRepository(session)
         verification_repo = VerificationRepository(session)
         audit_repo = AuditRepository(session)
-        providers = await provider_repo.list_for_verification()
+        clinicians = await clinician_repo.list_for_verification()
 
         async with httpx.AsyncClient(timeout=_HTTP_TIMEOUT_SECONDS) as http:
-            for provider in providers:
+            for clinician in clinicians:
                 try:
-                    await run_provider_verification(
-                        provider_id=provider.id,
+                    await run_clinician_verification(
+                        clinician_id=clinician.id,
                         verification_repo=verification_repo,
-                        provider_repo=provider_repo,
+                        clinician_repo=clinician_repo,
                         audit_repo=audit_repo,
                         http=http,
                         actor_id=None,
                     )
                 except Exception:
                     logger.exception(
-                        "nightly verification failed for provider=%s", provider.id
+                        "nightly verification failed for clinician=%s", clinician.id
                     )
 
-    logger.info("nightly verification completed: %d providers", len(providers))
+    logger.info("nightly verification completed: %d clinicians", len(clinicians))

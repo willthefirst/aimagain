@@ -2,9 +2,7 @@
 {%- from "_shared/_clinician_card.html" import clinician_card -%}
 {%- from "_shared/_breadcrumb.html" import breadcrumb -%}
 {# Subresource list — three-segment breadcrumb instead of the default
-   single-segment `resource_label`. The view-type template lets a child
-   override `{% block breadcrumb %}` directly when the shape doesn't
-   fit. #}
+   single-segment `resource_label`. #}
 {% block breadcrumb %}
   {{ breadcrumb([
     ("Users", entity_url('user') ),
@@ -20,9 +18,9 @@
   {% endif %}
 {% endblock %}
 {% block content %}
-  {% if providers %}
+  {% if clinicians %}
     <section id="user-clinicians-list">
-      {%- for provider in providers %}{{ clinician_card(provider) }}{%- endfor %}
+      {%- for clinician in clinicians %}{{ clinician_card(clinician) }}{%- endfor %}
       </section>
     {% else %}
       <p id="user-clinicians-empty">

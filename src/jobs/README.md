@@ -13,7 +13,7 @@ A job needs:
 
 That's two app-level dependencies plus a scheduler, which doesn't fit cleanly under `framework/` (which knows nothing about specs or domain data) or `domain/<entity>/` (jobs cut across entities).
 
-If a future job's logic is naturally owned by one entity (e.g. nightly verification belongs to providers), the **handler** can live under `src/domain/logic/<entity>/`; this directory just owns the scheduling glue that calls it.
+If a future job's logic is naturally owned by one entity (e.g. nightly verification belongs to clinicians), the **handler** can live under `src/domain/logic/<entity>/`; this directory just owns the scheduling glue that calls it.
 
 ## Rails
 
@@ -28,7 +28,7 @@ The `JOB_RUN_STARTED` action is bespoke (no spec home) — see [`../framework/au
 
 - `scheduler.py` — `make_scheduler()` constructs an `AsyncIOScheduler`; `register_jobs(scheduler)` adds every job. Kept separate so tests can introspect registrations without `.start()`-ing.
 - `hello_world.py` — smallest job that exercises the rails. Cadence comes from `JOBS_HELLO_WORLD_INTERVAL_MIN` (default `60`); set it to `1` locally to watch the audit row appear.
-- `nightly_verification.py` — runs the provider-verification orchestrator (`run_provider_verification` from [`../domain/logic/verifications/handlers.py`](../domain/logic/verifications/handlers.py)) for every non-deleted provider, sequentially, with `actor_id=None`. Schedule comes from `JOBS_NIGHTLY_VERIFICATION_CRON` (default `0 3 * * *` — daily at 03:00 server-local). Per-provider failures are logged and skipped; the loop never re-raises so one bad lookup can't strand the rest of the batch. Each per-provider call commits its own transaction inside the orchestrator.
+- `nightly_verification.py` — runs the clinician-verification orchestrator (`run_clinician_verification` from [`../domain/logic/verifications/handlers.py`](../domain/logic/verifications/handlers.py)) for every non-deleted clinician, sequentially, with `actor_id=None`. Schedule comes from `JOBS_NIGHTLY_VERIFICATION_CRON` (default `0 3 * * *` — daily at 03:00 server-local). Per-clinician failures are logged and skipped; the loop never re-raises so one bad lookup can't strand the rest of the batch. Each per-clinician call commits its own transaction inside the orchestrator.
 - `test_*.py` — colocated unit tests per the repo's [definition of done](../../CLAUDE.md#definition-of-done).
 
 ## Disabling the scheduler

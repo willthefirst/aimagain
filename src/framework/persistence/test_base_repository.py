@@ -14,12 +14,12 @@ import pytest
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from src.domain.models import Provider, ProviderLicensure, User
+from src.domain.models import Clinician, ProviderLicensure, User
 from src.framework.persistence.base_repository import BaseRepository
 from tests.helpers import (
     create_test_user,
+    make_clinician_with_org,
     make_provider_licensure,
-    make_provider_with_org,
 )
 
 pytestmark = pytest.mark.asyncio
@@ -168,7 +168,7 @@ async def test_count_respects_filters(
 async def test_count_respects_distinct_with_join(
     db_test_session_manager: async_sessionmaker[AsyncSession],
 ):
-    """`.distinct()` is load-bearing for `list_providers` — when a parent
+    """`.distinct()` is load-bearing for `list_clinicians` — when a parent
     has multiple matching child rows, the count must reflect distinct
     parents, not the join's cardinality."""
     owner = create_test_user(username=f"owner-{uuid.uuid4()}")
@@ -176,12 +176,12 @@ async def test_count_respects_distinct_with_join(
         async with session.begin():
             session.add(owner)
 
-    provider = make_provider_with_org(owner_id=owner.id)
+    clinician = make_clinician_with_org(owner_id=owner.id)
     async with db_test_session_manager() as session:
         async with session.begin():
-            session.add(provider)
-        await session.refresh(provider)
-        clinician_id = provider.clinician_id
+            session.add(clinician)
+        await session.refresh(clinician)
+        clinician_id = clinician.id
 
     # Two licensures matching `license_type='lcsw'` on the same provider.
     async with db_test_session_manager() as session:
@@ -202,10 +202,8 @@ async def test_count_respects_distinct_with_join(
             )
 
     stmt = (
-        select(Provider)
-        .join(
-            ProviderLicensure, ProviderLicensure.clinician_id == Provider.clinician_id
-        )
+        select(Clinician)
+        .join(ProviderLicensure, ProviderLicensure.clinician_id == Clinician.id)
         .filter(ProviderLicensure.license_type == "lcsw")
         .distinct()
     )
@@ -282,12 +280,12 @@ async def test_list_owned_by_returns_only_rows_owned_by_user(
     other = await _seed_users(db_test_session_manager, ["other"])
     async with db_test_session_manager() as session:
         async with session.begin():
-            session.add(make_provider_with_org(owner_id=owner[0].id))
-            session.add(make_provider_with_org(owner_id=other[0].id))
+            session.add(make_clinician_with_org(owner_id=owner[0].id))
+            session.add(make_clinician_with_org(owner_id=other[0].id))
 
     async with db_test_session_manager() as session:
         repo = BaseRepository(session)
-        rows = await repo.list_owned_by(Provider, owner[0].id)
+        rows = await repo.list_owned_by(Clinician, owner[0].id)
 
     assert len(rows) == 1
     assert rows[0].owner_id == owner[0].id
@@ -309,14 +307,14 @@ async def test_list_owned_by_orders_newest_first(
     async with db_test_session_manager() as session:
         async with session.begin():
             session.add(
-                make_provider_with_org(
+                make_clinician_with_org(
                     owner_id=owner[0].id,
                     practice_name="First",
                     created_at=earlier,
                 )
             )
             session.add(
-                make_provider_with_org(
+                make_clinician_with_org(
                     owner_id=owner[0].id,
                     practice_name="Second",
                     created_at=later,
@@ -325,7 +323,7 @@ async def test_list_owned_by_orders_newest_first(
 
     async with db_test_session_manager() as session:
         repo = BaseRepository(session)
-        rows = await repo.list_owned_by(Provider, owner[0].id)
+        rows = await repo.list_owned_by(Clinician, owner[0].id)
 
     assert [p.org.name for p in rows] == ["Second", "First"]
 
@@ -343,7 +341,7 @@ async def test_list_owned_by_honors_offset_and_limit(
         async with session.begin():
             for i, name in enumerate(["A", "B", "C", "D"]):
                 session.add(
-                    make_provider_with_org(
+                    make_clinician_with_org(
                         owner_id=owner[0].id,
                         practice_name=name,
                         created_at=base + timedelta(seconds=i),
@@ -352,7 +350,7 @@ async def test_list_owned_by_honors_offset_and_limit(
 
     async with db_test_session_manager() as session:
         repo = BaseRepository(session)
-        rows = await repo.list_owned_by(Provider, owner[0].id, offset=1, limit=2)
+        rows = await repo.list_owned_by(Clinician, owner[0].id, offset=1, limit=2)
 
     # Newest first: D, C, B, A — offset=1 limit=2 → C, B.
     assert [p.org.name for p in rows] == ["C", "B"]
@@ -365,6 +363,6 @@ async def test_list_owned_by_empty_when_user_owns_nothing(
 
     async with db_test_session_manager() as session:
         repo = BaseRepository(session)
-        rows = await repo.list_owned_by(Provider, owner[0].id)
+        rows = await repo.list_owned_by(Clinician, owner[0].id)
 
     assert list(rows) == []

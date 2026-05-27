@@ -20,19 +20,19 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from starlette.requests import Request
 
+from src.domain.logic.clinicians.repository import ClinicianRepository
 from src.domain.logic.favorites.handlers import (
     handle_add_favorite,
     handle_list_my_favorites,
     handle_remove_favorite,
 )
 from src.domain.logic.favorites.repository import UserFavoriteRepository
-from src.domain.logic.providers.repository import ProviderRepository
 from src.domain.models import User, UserFavorite
 from src.framework.audit.core import AuditAction
 from src.framework.audit.log import AuditLog
 from src.framework.audit.repository import AuditRepository
 from src.framework.http.exceptions import NotFoundError
-from tests.helpers import create_test_user, make_provider_with_org
+from tests.helpers import create_test_user, make_clinician_with_org
 
 pytestmark = pytest.mark.asyncio
 
@@ -68,7 +68,7 @@ async def _seed_provider(
     practice_name: str = "Acme Health",
 ):
     owner = create_test_user(username=f"owner-{uuid.uuid4()}")
-    provider = make_provider_with_org(owner_id=owner.id, practice_name=practice_name)
+    provider = make_clinician_with_org(owner_id=owner.id, practice_name=practice_name)
     async with db_test_session_manager() as session:
         async with session.begin():
             session.add(owner)
@@ -84,9 +84,9 @@ async def test_add_favorite_creates_edge_and_audits(
 
     async with db_test_session_manager() as session:
         edge = await handle_add_favorite(
-            provider_id=provider.id,
+            clinician_id=provider.id,
             repo=UserFavoriteRepository(session),
-            clinician_repo=ProviderRepository(session),
+            clinician_repo=ClinicianRepository(session),
             audit_repo=AuditRepository(session),
             requesting_user=user,
         )
@@ -122,9 +122,9 @@ async def test_add_favorite_is_idempotent_no_extra_audit(
 
     async with db_test_session_manager() as session:
         first = await handle_add_favorite(
-            provider_id=provider.id,
+            clinician_id=provider.id,
             repo=UserFavoriteRepository(session),
-            clinician_repo=ProviderRepository(session),
+            clinician_repo=ClinicianRepository(session),
             audit_repo=AuditRepository(session),
             requesting_user=user,
         )
@@ -132,9 +132,9 @@ async def test_add_favorite_is_idempotent_no_extra_audit(
 
     async with db_test_session_manager() as session:
         second = await handle_add_favorite(
-            provider_id=provider.id,
+            clinician_id=provider.id,
             repo=UserFavoriteRepository(session),
-            clinician_repo=ProviderRepository(session),
+            clinician_repo=ClinicianRepository(session),
             audit_repo=AuditRepository(session),
             requesting_user=user,
         )
@@ -173,9 +173,9 @@ async def test_add_favorite_provider_not_found(
     async with db_test_session_manager() as session:
         with pytest.raises(NotFoundError):
             await handle_add_favorite(
-                provider_id=uuid.uuid4(),
+                clinician_id=uuid.uuid4(),
                 repo=UserFavoriteRepository(session),
-                clinician_repo=ProviderRepository(session),
+                clinician_repo=ClinicianRepository(session),
                 audit_repo=AuditRepository(session),
                 requesting_user=user,
             )
@@ -189,9 +189,9 @@ async def test_remove_favorite_deletes_edge_and_audits(
 
     async with db_test_session_manager() as session:
         edge = await handle_add_favorite(
-            provider_id=provider.id,
+            clinician_id=provider.id,
             repo=UserFavoriteRepository(session),
-            clinician_repo=ProviderRepository(session),
+            clinician_repo=ClinicianRepository(session),
             audit_repo=AuditRepository(session),
             requesting_user=user,
         )
@@ -199,7 +199,7 @@ async def test_remove_favorite_deletes_edge_and_audits(
 
     async with db_test_session_manager() as session:
         await handle_remove_favorite(
-            provider_id=provider.id,
+            clinician_id=provider.id,
             repo=UserFavoriteRepository(session),
             audit_repo=AuditRepository(session),
             requesting_user=user,
@@ -242,7 +242,7 @@ async def test_remove_favorite_idempotent_no_audit_on_noop(
 
     async with db_test_session_manager() as session:
         await handle_remove_favorite(
-            provider_id=provider.id,
+            clinician_id=provider.id,
             repo=UserFavoriteRepository(session),
             audit_repo=AuditRepository(session),
             requesting_user=user,
@@ -275,16 +275,16 @@ async def test_list_my_favorites_returns_only_self_edges(
 
     async with db_test_session_manager() as session:
         await handle_add_favorite(
-            provider_id=mine.id,
+            clinician_id=mine.id,
             repo=UserFavoriteRepository(session),
-            clinician_repo=ProviderRepository(session),
+            clinician_repo=ClinicianRepository(session),
             audit_repo=AuditRepository(session),
             requesting_user=me,
         )
         await handle_add_favorite(
-            provider_id=theirs.id,
+            clinician_id=theirs.id,
             repo=UserFavoriteRepository(session),
-            clinician_repo=ProviderRepository(session),
+            clinician_repo=ClinicianRepository(session),
             audit_repo=AuditRepository(session),
             requesting_user=other,
         )
@@ -296,6 +296,6 @@ async def test_list_my_favorites_returns_only_self_edges(
             requesting_user=me,
         )
 
-    names = [p.org.name for p in context["providers"]]
+    names = [p.org.name for p in context["clinicians"]]
     assert names == ["Mine"]
     assert context["current_user"] == me

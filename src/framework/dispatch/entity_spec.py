@@ -1038,7 +1038,7 @@ class EntitySpec:
 # Canonical `AuthzPolicy` sentinel for owner-or-admin entities. Pairs
 # the raising form (`assert_owner_or_admin`) with the predicate form
 # (`is_owner_or_admin`) defined in `src/framework/authz.py`. Specs that
-# follow this rule (provider, post, all three credentials) declare
+# follow this rule (clinician, post, all three credentials) declare
 # `auth_policy=OWNER_OR_ADMIN` and the constructor expands the pair.
 #
 # The sentinel lives next to `AuthzPolicy` (not in `_authz.py`) because
@@ -1077,7 +1077,7 @@ class Redirects:
         Reads the id from ``kwargs[id_param]``. Used by providers
         (post-create / post-update redirect to their own edit form) and
         by all three credential subentities (which redirect to the
-        parent provider's edit form — `id_param` is the parent's).
+        parent clinician's edit form — `id_param` is the parent's).
         """
 
         def _redirect(**kwargs: Any) -> str:

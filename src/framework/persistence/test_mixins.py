@@ -52,7 +52,6 @@ def test_location_property_returns_dict_view():
     a = Affiliation(
         clinician_id="00000000-0000-0000-0000-000000000001",
         org_id="00000000-0000-0000-0000-000000000002",
-        provider_id="00000000-0000-0000-0000-000000000003",
         location_city="Boise",
         location_state="ID",
         location_zip="83702",

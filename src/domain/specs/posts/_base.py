@@ -38,13 +38,13 @@ Each face overrides:
 
 from typing import Final
 
+from src.domain.logic.clinicians.repository import ClinicianRepository
 from src.domain.logic.posts.repository import get_post_repository
 from src.domain.logic.posts.schema import (
     post_audit_snapshot,
     post_read_adapter,
 )
 from src.domain.logic.programs.repository import ProgramRepository
-from src.domain.logic.providers.repository import ProviderRepository
 from src.domain.models import POST_KINDS, Post
 from src.domain.models.enums import (
     CLIENT_AGE_GROUP_LABELS,
@@ -203,14 +203,14 @@ def _post_face(
         update_redirect=Redirects.to_detail(url_collection, "post_id"),
         # Same per-kind FK-ownership check as the old `POST_ENTITY` — the
         # dispatcher reads `payload.kind` and validates the kind-specific
-        # FK fields (clinician_opening's `provider_id`,
+        # FK fields (clinician_opening's `clinician_id`,
         # program_intake's `program_id`) against the requesting user's
         # ownership.
         payload_authz_path=(
             "src.domain.logic.posts.handlers._assert_post_payload_target_ownership"
         ),
         payload_authz_repos=(
-            ("provider_repo", ProviderRepository),
+            ("clinician_repo", ClinicianRepository),
             ("program_repo", ProgramRepository),
         ),
         discriminator=POST_KINDS,

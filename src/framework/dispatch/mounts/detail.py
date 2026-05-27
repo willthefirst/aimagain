@@ -27,7 +27,7 @@ def mount_detail(
     ``spec.detail_template`` with it.
 
     The multi-repo case (e.g. ``handle_get_user_detail`` takes both a
-    user repo and a provider repo) just requires the handler to declare
+    user repo and a clinician repo) just requires the handler to declare
     each repo as a typed param — the synthesis finds the resolver in
     the registry.
 

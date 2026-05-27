@@ -2,7 +2,7 @@
 
 from types import SimpleNamespace
 
-from src.domain.logic.providers.view import (
+from src.domain.logic.clinicians.view import (
     _insurance_summary,
     affiliation_card_view,
     provider_card_view,
@@ -50,11 +50,10 @@ def _stub_provider(**overrides):
     stacked-sections list. Pass ``affiliations=[_stub_affiliation(...)]``
     when exercising the detail-page's per-affiliation rendering.
     """
-    npi = overrides.pop("npi", None)
     defaults = dict(
         org_id="org-1",
         org=SimpleNamespace(name="Acme Counseling"),
-        clinician=SimpleNamespace(npi=npi),
+        npi=None,
         location_city="Brooklyn",
         location_state="NY",
         location_zip="11201",

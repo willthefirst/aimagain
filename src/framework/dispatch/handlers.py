@@ -202,7 +202,7 @@ async def handle_create(
                 requesting_user=requesting_user,
                 **(payload_authz_kwargs or {}),
             )
-        # Inline-child collections (e.g. provider's licensures /
+        # Inline-child collections (e.g. clinician's licensures /
         # educations / certifications) come in on the payload alongside
         # the parent's own fields. Exclude them from the parent
         # constructor, persist the parent, then append each child via
@@ -844,7 +844,7 @@ async def handle_detail(
     # whose value equals `requesting_user.id` when the viewer IS the
     # subject — for `owner_attr=None` (users — the row IS the user), the
     # rule reduces to `target.id == viewer.id`; for owned resources
-    # (provider, post), it uses the owner FK. The uniform rule lets every
+    # (clinician, post), it uses the owner FK. The uniform rule lets every
     # entity inherit `is_self` / `can_admin_actions` without per-entity glue.
     subject_attr = spec.owner_attr or "id"
     is_self = (

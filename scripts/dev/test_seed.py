@@ -102,7 +102,7 @@ async def _count_nulls(table_name: str, column_name: str) -> tuple[int, int]:
 async def test_seed_all_smoke(seeded_db):
     """The shared module seed populated the expected major tables."""
     assert await _count_table("organizations") >= 10
-    assert await _count_table("providers") >= 100
+    assert await _count_table("clinicians") >= 100
     assert await _count_table("affiliations") >= 100
 
 
@@ -200,17 +200,17 @@ async def test_organization_hierarchy_present(seeded_db):
     assert child_count >= 2, f"Expected ≥2 child organizations, got {child_count}"
 
 
-async def test_multi_affiliation_provider_present(seeded_db):
-    """At least one provider has 2+ affiliations — exercises the
-    `Provider.affiliations` 1:N edge."""
+async def test_multi_affiliation_clinician_present(seeded_db):
+    """At least one clinician has 2+ affiliations — exercises the
+    `Clinician.affiliations` 1:N edge."""
     async with async_test_sessionmaker() as session:
         subq = (
-            select(Affiliation.provider_id, func.count().label("n"))
-            .group_by(Affiliation.provider_id)
+            select(Affiliation.clinician_id, func.count().label("n"))
+            .group_by(Affiliation.clinician_id)
             .subquery()
         )
         result = await session.execute(
             select(func.count()).select_from(subq).where(subq.c.n >= 2)
         )
         multi = result.scalar_one()
-    assert multi >= 1, f"Expected ≥1 provider with 2+ affiliations, got {multi}"
+    assert multi >= 1, f"Expected ≥1 clinician with 2+ affiliations, got {multi}"

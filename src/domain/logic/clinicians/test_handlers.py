@@ -13,28 +13,28 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from starlette.requests import Request
 
-from src.domain.logic.favorites.repository import UserFavoriteRepository
-from src.domain.logic.organizations.repository import OrganizationRepository
-from src.domain.logic.providers.handlers import (
-    handle_list_user_providers,
-    provider_detail_extras,
-    provider_form_extras,
+from src.domain.logic.clinicians.handlers import (
+    clinician_detail_extras,
+    clinician_form_extras,
+    handle_list_user_clinicians,
 )
-from src.domain.logic.providers.repository import ProviderRepository
-from src.domain.logic.providers.schema import (
+from src.domain.logic.clinicians.repository import ClinicianRepository
+from src.domain.logic.clinicians.schema import (
     ProviderCertificationCreate,
     ProviderCreate,
     ProviderEducationCreate,
     ProviderLicensureCreate,
 )
+from src.domain.logic.favorites.repository import UserFavoriteRepository
+from src.domain.logic.organizations.repository import OrganizationRepository
 from src.domain.logic.users.repository import UserRepository
 from src.domain.logic.verifications.repository import VerificationRepository
 from src.domain.models import (
-    Provider,
+    Clinician,
     ProviderLicensure,
     User,
 )
-from src.domain.specs.provider import PROVIDER_ENTITY
+from src.domain.specs.clinician import CLINICIAN_ENTITY
 from src.framework.audit.core import AuditAction
 from src.framework.audit.log import AuditLog
 from src.framework.audit.repository import AuditRepository
@@ -97,7 +97,7 @@ async def _seed_provider(
             session.add(provider)
         await session.refresh(provider)
         provider_id = provider.id
-        clinician_id = provider.clinician_id
+        clinician_id = provider.id
 
     licensure_id: uuid.UUID | None = None
     education_id: uuid.UUID | None = None
@@ -181,9 +181,9 @@ async def test_list_providers_returns_persisted_rows(
     await _seed_provider(db_test_session_manager, user_id=user_b.id)
 
     async with db_test_session_manager() as session:
-        repo = ProviderRepository(session)
+        repo = ClinicianRepository(session)
         context = await handle_list(
-            PROVIDER_ENTITY,
+            CLINICIAN_ENTITY,
             request=_fake_request(),
             repo=repo,
             requesting_user=None,
@@ -209,19 +209,14 @@ async def test_list_providers_filters_by_license_type(
     # Add a non-matching licensure to provider_b
     async with db_test_session_manager() as session:
         async with session.begin():
-            clinician_b = (
-                await session.execute(
-                    select(Provider.clinician_id).where(Provider.id == provider_b)
-                )
-            ).scalar_one()
             session.add(
-                make_provider_licensure(clinician_id=clinician_b, license_type="lpc")
+                make_provider_licensure(clinician_id=provider_b, license_type="lpc")
             )
 
     async with db_test_session_manager() as session:
-        repo = ProviderRepository(session)
+        repo = ClinicianRepository(session)
         context = await handle_list(
-            PROVIDER_ENTITY,
+            CLINICIAN_ENTITY,
             request=_fake_request(),
             repo=repo,
             requesting_user=None,
@@ -239,12 +234,12 @@ async def test_get_provider_detail_returns_context(
 
     async with db_test_session_manager() as session:
         context = await handle_detail(
-            PROVIDER_ENTITY,
+            CLINICIAN_ENTITY,
             request=_fake_request(),
             target_id=provider_id,
-            repo=ProviderRepository(session),
+            repo=ClinicianRepository(session),
             requesting_user=user,
-            extras=provider_detail_extras,
+            extras=clinician_detail_extras,
             extra_kwargs={
                 "user_favorite_repo": UserFavoriteRepository(session),
                 "verification_repo": VerificationRepository(session),
@@ -274,12 +269,12 @@ async def test_get_provider_detail_404_for_unknown_id(
     async with db_test_session_manager() as session:
         with pytest.raises(NotFoundError):
             await handle_detail(
-                PROVIDER_ENTITY,
+                CLINICIAN_ENTITY,
                 request=_fake_request(),
                 target_id=uuid.uuid4(),
-                repo=ProviderRepository(session),
+                repo=ClinicianRepository(session),
                 requesting_user=user,
-                extras=provider_detail_extras,
+                extras=clinician_detail_extras,
                 extra_kwargs={
                     "user_favorite_repo": UserFavoriteRepository(session),
                     "verification_repo": VerificationRepository(session),
@@ -297,17 +292,17 @@ async def test_get_provider_detail_is_favorited_true_when_self_favorited(
 
     async with db_test_session_manager() as session:
         fav_repo = UserFavoriteRepository(session)
-        await fav_repo.add_favorite(user_id=user.id, provider_id=provider_id)
+        await fav_repo.add_favorite(user_id=user.id, clinician_id=provider_id)
         await session.commit()
 
     async with db_test_session_manager() as session:
         context = await handle_detail(
-            PROVIDER_ENTITY,
+            CLINICIAN_ENTITY,
             request=_fake_request(),
             target_id=provider_id,
-            repo=ProviderRepository(session),
+            repo=ClinicianRepository(session),
             requesting_user=user,
-            extras=provider_detail_extras,
+            extras=clinician_detail_extras,
             extra_kwargs={
                 "user_favorite_repo": UserFavoriteRepository(session),
                 "verification_repo": VerificationRepository(session),
@@ -320,7 +315,7 @@ async def test_get_provider_detail_is_favorited_false_for_anonymous_viewer(
     db_test_session_manager: async_sessionmaker[AsyncSession],
 ):
     """A `None` `requesting_user` never sees `is_favorited=True` — the
-    flag is meaningless without an actor. Today `PROVIDER_ENTITY.read_user_dep`
+    flag is meaningless without an actor. Today `CLINICIAN_ENTITY.read_user_dep`
     forces auth so this branch is defensive; the test pins the contract
     in case the read dep ever loosens."""
     other = await _seed_user(db_test_session_manager)
@@ -328,12 +323,12 @@ async def test_get_provider_detail_is_favorited_false_for_anonymous_viewer(
 
     async with db_test_session_manager() as session:
         context = await handle_detail(
-            PROVIDER_ENTITY,
+            CLINICIAN_ENTITY,
             request=_fake_request(),
             target_id=provider_id,
-            repo=ProviderRepository(session),
+            repo=ClinicianRepository(session),
             requesting_user=None,
-            extras=provider_detail_extras,
+            extras=clinician_detail_extras,
             extra_kwargs={
                 "user_favorite_repo": UserFavoriteRepository(session),
                 "verification_repo": VerificationRepository(session),
@@ -342,7 +337,7 @@ async def test_get_provider_detail_is_favorited_false_for_anonymous_viewer(
         assert context["is_favorited"] is False
 
 
-# --- handle_list_user_providers --------------------------------
+# --- handle_list_user_clinicians --------------------------------
 
 
 async def test_list_user_providers_self_returns_owned(
@@ -353,9 +348,9 @@ async def test_list_user_providers_self_returns_owned(
     second_id, *_ = await _seed_provider(db_test_session_manager, user_id=user.id)
 
     async with db_test_session_manager() as session:
-        provider_repo = ProviderRepository(session)
+        provider_repo = ClinicianRepository(session)
         user_repo = UserRepository(session)
-        context = await handle_list_user_providers(
+        context = await handle_list_user_clinicians(
             request=_fake_request(),
             user_id=user.id,
             repo=provider_repo,
@@ -365,7 +360,7 @@ async def test_list_user_providers_self_returns_owned(
 
     assert context["is_self"] is True
     assert context["target_user"].id == user.id
-    assert {p.id for p in context["providers"]} == {first_id, second_id}
+    assert {p.id for p in context["clinicians"]} == {first_id, second_id}
 
 
 async def test_list_user_providers_self_returns_empty_when_none(
@@ -374,9 +369,9 @@ async def test_list_user_providers_self_returns_empty_when_none(
     user = await _seed_user(db_test_session_manager)
 
     async with db_test_session_manager() as session:
-        provider_repo = ProviderRepository(session)
+        provider_repo = ClinicianRepository(session)
         user_repo = UserRepository(session)
-        context = await handle_list_user_providers(
+        context = await handle_list_user_clinicians(
             request=_fake_request(),
             user_id=user.id,
             repo=provider_repo,
@@ -385,7 +380,7 @@ async def test_list_user_providers_self_returns_empty_when_none(
         )
 
     assert context["is_self"] is True
-    assert list(context["providers"]) == []
+    assert list(context["clinicians"]) == []
 
 
 async def test_list_user_providers_admin_can_view_anyone(
@@ -396,9 +391,9 @@ async def test_list_user_providers_admin_can_view_anyone(
     provider_id, *_ = await _seed_provider(db_test_session_manager, user_id=target.id)
 
     async with db_test_session_manager() as session:
-        provider_repo = ProviderRepository(session)
+        provider_repo = ClinicianRepository(session)
         user_repo = UserRepository(session)
-        context = await handle_list_user_providers(
+        context = await handle_list_user_clinicians(
             request=_fake_request(),
             user_id=target.id,
             repo=provider_repo,
@@ -408,7 +403,7 @@ async def test_list_user_providers_admin_can_view_anyone(
 
     assert context["is_self"] is False
     assert context["target_user"].id == target.id
-    assert [p.id for p in context["providers"]] == [provider_id]
+    assert [p.id for p in context["clinicians"]] == [provider_id]
 
 
 async def test_list_user_providers_non_admin_cannot_view_other(
@@ -418,10 +413,10 @@ async def test_list_user_providers_non_admin_cannot_view_other(
     other = await _seed_user(db_test_session_manager)
 
     async with db_test_session_manager() as session:
-        provider_repo = ProviderRepository(session)
+        provider_repo = ClinicianRepository(session)
         user_repo = UserRepository(session)
         with pytest.raises(ForbiddenError):
-            await handle_list_user_providers(
+            await handle_list_user_clinicians(
                 request=_fake_request(),
                 user_id=target.id,
                 repo=provider_repo,
@@ -436,10 +431,10 @@ async def test_list_user_providers_404_when_target_user_missing(
     admin = await _seed_user(db_test_session_manager, is_superuser=True)
 
     async with db_test_session_manager() as session:
-        provider_repo = ProviderRepository(session)
+        provider_repo = ClinicianRepository(session)
         user_repo = UserRepository(session)
         with pytest.raises(NotFoundError):
-            await handle_list_user_providers(
+            await handle_list_user_clinicians(
                 request=_fake_request(),
                 user_id=uuid.uuid4(),
                 repo=provider_repo,
@@ -453,7 +448,7 @@ async def test_list_user_providers_404_when_target_user_missing(
 
 # Provider create goes through the framework's `handle_create`. The
 # inline-children loop now lives in `_generic.py`, driven by
-# `PROVIDER_ENTITY.children`.
+# `CLINICIAN_ENTITY.children`.
 async def test_create_provider_persists_row_and_writes_audit(
     db_test_session_manager: async_sessionmaker[AsyncSession],
 ):
@@ -462,10 +457,10 @@ async def test_create_provider_persists_row_and_writes_audit(
     payload = _provider_create_payload(org_id=org_id)
 
     async with db_test_session_manager() as session:
-        repo = ProviderRepository(session)
+        repo = ClinicianRepository(session)
         audit_repo = AuditRepository(session)
         created = await handle_create(
-            PROVIDER_ENTITY,
+            CLINICIAN_ENTITY,
             payload=payload,
             repo=repo,
             audit_repo=audit_repo,
@@ -514,10 +509,10 @@ async def test_create_provider_with_inline_children_captures_them_in_audit(
     )
 
     async with db_test_session_manager() as session:
-        repo = ProviderRepository(session)
+        repo = ClinicianRepository(session)
         audit_repo = AuditRepository(session)
         created = await handle_create(
-            PROVIDER_ENTITY,
+            CLINICIAN_ENTITY,
             payload=payload,
             repo=repo,
             audit_repo=audit_repo,
@@ -542,7 +537,7 @@ async def test_create_provider_with_inline_children_captures_them_in_audit(
             (
                 await session.execute(
                     select(ProviderLicensure).filter(
-                        ProviderLicensure.clinician_id == created.clinician_id
+                        ProviderLicensure.clinician_id == created.id
                     )
                 )
             )
@@ -564,10 +559,10 @@ async def test_create_provider_allows_multiple_per_user(
     )
 
     async with db_test_session_manager() as session:
-        repo = ProviderRepository(session)
+        repo = ClinicianRepository(session)
         audit_repo = AuditRepository(session)
         second = await handle_create(
-            PROVIDER_ENTITY,
+            CLINICIAN_ENTITY,
             payload=_provider_create_payload(org_id=second_org_id),
             repo=repo,
             audit_repo=audit_repo,
@@ -579,10 +574,10 @@ async def test_create_provider_allows_multiple_per_user(
     assert second.org.name == "Second Practice"
 
 
-# --- provider_form_extras (#533) -----------------------------------------
+# --- clinician_form_extras (#533) -----------------------------------------
 
 
-async def test_provider_form_extras_returns_owners_visible_orgs(
+async def test_clinician_form_extras_returns_owners_visible_orgs(
     db_test_session_manager: async_sessionmaker[AsyncSession],
 ):
     """Owner sees only the Orgs they own. Mirrors the previous
@@ -596,7 +591,7 @@ async def test_provider_form_extras_returns_owners_visible_orgs(
     async with db_test_session_manager() as session:
         org_repo = OrganizationRepository(session)
         # Create path: target is None.
-        result = await provider_form_extras(
+        result = await clinician_form_extras(
             target=None,
             requesting_user=owner,
             organization_repo=org_repo,
@@ -604,7 +599,7 @@ async def test_provider_form_extras_returns_owners_visible_orgs(
         assert [o.id for o in result["orgs"]] == [owned_id]
 
 
-async def test_provider_form_extras_superuser_sees_all_orgs(
+async def test_clinician_form_extras_superuser_sees_all_orgs(
     db_test_session_manager: async_sessionmaker[AsyncSession],
 ):
     """Superusers see every Org regardless of ownership — same
@@ -616,7 +611,7 @@ async def test_provider_form_extras_superuser_sees_all_orgs(
 
     async with db_test_session_manager() as session:
         org_repo = OrganizationRepository(session)
-        result = await provider_form_extras(
+        result = await clinician_form_extras(
             target=None,
             requesting_user=admin,
             organization_repo=org_repo,
@@ -626,7 +621,7 @@ async def test_provider_form_extras_superuser_sees_all_orgs(
         assert "Other Org" in org_names
 
 
-async def test_provider_form_extras_edit_path_passes_target(
+async def test_clinician_form_extras_edit_path_passes_target(
     db_test_session_manager: async_sessionmaker[AsyncSession],
 ):
     """On the edit path the framework passes the loaded Provider as
@@ -638,10 +633,10 @@ async def test_provider_form_extras_edit_path_passes_target(
     provider_id, *_ = await _seed_provider(db_test_session_manager, user_id=owner.id)
 
     async with db_test_session_manager() as session:
-        provider_repo = ProviderRepository(session)
-        provider = await provider_repo.get_by_model_id(Provider, provider_id)
+        provider_repo = ClinicianRepository(session)
+        provider = await provider_repo.get_by_model_id(Clinician, provider_id)
         org_repo = OrganizationRepository(session)
-        result = await provider_form_extras(
+        result = await clinician_form_extras(
             target=provider,
             requesting_user=owner,
             organization_repo=org_repo,

@@ -13,8 +13,8 @@ through it.
 
 from pydantic import BaseModel, TypeAdapter
 
-from src.domain.logic.providers.repository import get_provider_repository
-from src.domain.specs.provider import PROVIDER_ENTITY, _provider_form_redirect
+from src.domain.logic.clinicians.repository import get_clinician_repository
+from src.domain.specs.clinician import CLINICIAN_ENTITY, _clinician_form_redirect
 from src.framework.dispatch.entity_spec import (
     AUTHENTICATED,
     OWNER_OR_ADMIN,
@@ -52,15 +52,10 @@ def make_provider_credential_entity(
         url_collection=url_collection,
         id_param=id_param,
         model=model,
-        parent=PROVIDER_ENTITY,
-        # Credentials FK to `clinicians.id` after #635 PR A — they URL-mount
-        # under `/clinicians/{clinician_id}/...` (URL family renamed in
-        # #642 PR 4; the model class stays `Provider`) but their persisted FK
-        # isn't `provider_id`. The framework's URL-vs-row consistency check
-        # loads the parent and compares
-        # `child.clinician_id == provider.clinician_id`.
-        child_parent_match_attr="clinician_id",
-        repo_dep=get_provider_repository,
+        parent=CLINICIAN_ENTITY,
+        # Default check: `child.clinician_id == URL.clinician_id`
+        # (derived from `spec.parent.name` = "clinician"). No override needed.
+        repo_dep=get_clinician_repository,
         auth_deps=AUTHENTICATED,
         auth_policy=OWNER_OR_ADMIN,
         audit_action_stem=audit_stem,
@@ -68,11 +63,11 @@ def make_provider_credential_entity(
         update_adapter=update_adapter,
         read_schema=read_schema,
         # Subrow CRUD only — sub-rows aren't independently listed or
-        # detailed (they only appear in the parent provider's pages).
+        # detailed (they only appear in the parent clinician's pages).
         routes=RouteSet(create=True, update=True, delete=True),
         # Sub-row mutations send HTMX clients back to the parent edit
         # form so the user can keep editing.
-        create_redirect=_provider_form_redirect,
-        update_redirect=_provider_form_redirect,
-        delete_redirect=_provider_form_redirect,
+        create_redirect=_clinician_form_redirect,
+        update_redirect=_clinician_form_redirect,
+        delete_redirect=_clinician_form_redirect,
     )

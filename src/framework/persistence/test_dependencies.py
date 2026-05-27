@@ -9,13 +9,13 @@ are wired correctly.
 
 import pytest
 
+from src.domain.logic.clinicians.repository import (
+    ClinicianRepository,
+    get_clinician_repository,
+)
 from src.domain.logic.favorites.repository import (
     UserFavoriteRepository,
     get_user_favorite_repository,
-)
-from src.domain.logic.providers.repository import (
-    ProviderRepository,
-    get_provider_repository,
 )
 from src.domain.logic.users.repository import UserRepository, get_user_repository
 from src.framework.audit.repository import AuditRepository
@@ -91,7 +91,7 @@ def test_domain_resolvers_are_bound_by_their_module():
     binding, not the framework module."""
     pairs = [
         (UserRepository, get_user_repository),
-        (ProviderRepository, get_provider_repository),
+        (ClinicianRepository, get_clinician_repository),
         (UserFavoriteRepository, get_user_favorite_repository),
     ]
     for cls, public_resolver in pairs:
@@ -105,8 +105,8 @@ def test_generated_resolver_returns_an_instance():
     sentinel_session = object()
     user_repo = get_user_repository(session=sentinel_session)
     assert isinstance(user_repo, UserRepository)
-    provider_repo = get_provider_repository(session=sentinel_session)
-    assert isinstance(provider_repo, ProviderRepository)
+    provider_repo = get_clinician_repository(session=sentinel_session)
+    assert isinstance(provider_repo, ClinicianRepository)
 
 
 # --- make_repo_resolver -----------------------------------------------------

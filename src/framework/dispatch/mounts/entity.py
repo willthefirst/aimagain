@@ -96,7 +96,7 @@ def mount_entity(
     flow through. The target module is auto-detected from the
     `mount_entity` caller's frame — route files don't pass `module=`.
 
-    Per-viewer / per-list extras (e.g. provider's `is_favorited` flag,
+    Per-viewer / per-list extras (e.g. clinician's `is_favorited` flag,
     posts' `post_kinds` list) live on the spec as `detail_extras_path`
     / `list_extras_path` — dotted-string imports resolved lazily at
     mount time (same machinery `StateAxis.handler_path` uses). The
