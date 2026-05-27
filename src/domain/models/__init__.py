@@ -7,6 +7,9 @@ from src.framework.persistence.base_model import Base, BaseModel, metadata
 
 from .affiliations.affiliation import Affiliation
 from .clinicians.clinician import Clinician
+from .clinicians.clinician_certification import ClinicianCertification
+from .clinicians.clinician_education import ClinicianEducation
+from .clinicians.clinician_licensure import ClinicianLicensure
 from .enums import (
     CLIENT_AGE_GROUPS,
     INSURANCE_CARRIERS,
@@ -28,9 +31,6 @@ from .posts.post_kinds import (
 )
 from .posts.referral_detail import ReferralDetail
 from .programs.program import Program
-from .providers.provider_certification import ClinicianCertification
-from .providers.provider_education import ClinicianEducation
-from .providers.provider_licensure import ClinicianLicensure
 from .users.user import User
 from .verifications.verification import Verification
 

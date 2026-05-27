@@ -37,7 +37,7 @@ class ClinicianRepository(BaseRepository):
         limit: int | None = None,
     ) -> Sequence[Clinician]:
         """List directory entries newest first. Both filters are multi-select;
-        when set, joins through `provider_licensures` (SQL table) and distincts so a
+        when set, joins through `clinician_licensures` (SQL table) and distincts so a
         clinician with multiple matching licensures appears once."""
         stmt = select(Clinician)
         if license_type or issuing_state:

@@ -5,7 +5,7 @@ CRUD (licensures, educations, certifications). The cascade-delete test
 verifies that deleting a clinician removes its credential rows via the
 combined ORM cascade and FK `ON DELETE CASCADE` (the test engine sets
 `PRAGMA foreign_keys = ON`). The list-with-filter tests cover the JOIN
-through `provider_licensures` (credit model name) and `.distinct()` de-dup behavior.
+through `clinician_licensures` (SQL table) and `.distinct()` de-dup behavior.
 
 The Clinician's practice display name lives on
 ``clinician.org.name``; fixtures here use
@@ -260,7 +260,7 @@ async def test_delete_clinician_cascades_to_credentials(
 ):
     """Deleting a Clinician cascades to its credential sub-rows via the
     ORM `cascade="all, delete-orphan"` on the clinician relationships.
-    Mirrors the model-level test in `test_provider_models.py` (model class names intentionally kept).
+    Mirrors the model-level test in `test_clinician_models.py`.
     """
     user = await _seed_user(db_test_session_manager)
 
