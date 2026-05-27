@@ -267,7 +267,7 @@ async def test_get_organizations_form_resolves(
     """Pins the create-form URL the templates link to.
 
     The grammar mandates ``GET /<collection>/form`` (not ``/new``). A
-    prior set of provider/program templates linked to ``/organizations/new``,
+    prior set of clinician/program templates linked to ``/organizations/new``,
     which silently matched ``GET /organizations/{organization_id}`` and
     returned a UUID-parse 422 in prod. Keep this test alongside the
     `/new` should-not-resolve assertion in `test_routes_meta` once that

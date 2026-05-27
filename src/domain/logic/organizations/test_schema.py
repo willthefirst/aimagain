@@ -68,7 +68,7 @@ def test_update_rejects_empty_payload():
 
 def test_schema_type_literal_matches_enum_tuple():
     """Guardrail: every value in `ORGANIZATION_TYPES` is accepted by
-    the `OrganizationCreate.type` Literal. Mirrors the provider schema
+    the `OrganizationCreate.type` Literal. Mirrors the clinician schema
     guardrail style."""
     for t in ORGANIZATION_TYPES:
         OrganizationCreate(name="x", type=t)

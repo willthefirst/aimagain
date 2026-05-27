@@ -48,10 +48,10 @@ AFFILIATION_ENTITY: Final[EntitySpec] = EntitySpec(
     update_adapter=AffiliationUpdate,
     read_schema=AffiliationRead,
     # Sub-row CRUD only — affiliations are managed inline on the
-    # parent provider's edit page; no independent list/detail surface.
+    # parent clinician's edit page; no independent list/detail surface.
     routes=RouteSet(create=True, update=True, delete=True),
     # Sub-row mutations redirect HTMX clients back to the parent
-    # provider's edit form so the user keeps editing in place.
+    # clinician's edit form so the user keeps editing in place.
     create_redirect=_clinician_form_redirect,
     update_redirect=_clinician_form_redirect,
     delete_redirect=_clinician_form_redirect,

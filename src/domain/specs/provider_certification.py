@@ -1,6 +1,6 @@
-"""`CERTIFICATION_ENTITY`: provider's certification credential subentity.
+"""`CERTIFICATION_ENTITY`: clinician's certification credential subentity.
 
-Owned subentity of `Provider`. See `_credential.py` for the shared
+Owned subentity of `Clinician`. See `_credential.py` for the shared
 factory (parent chain, subrow-CRUD-only routes, parent-form redirect).
 """
 
@@ -12,10 +12,10 @@ from src.domain.logic.clinicians.schema import (
     ProviderCertificationUpdate,
 )
 from src.domain.models import ProviderCertification
-from src.domain.specs._credential import make_provider_credential_entity
+from src.domain.specs._credential import make_clinician_credential_entity
 from src.framework.dispatch.entity_spec import EntitySpec
 
-CERTIFICATION_ENTITY: Final[EntitySpec] = make_provider_credential_entity(
+CERTIFICATION_ENTITY: Final[EntitySpec] = make_clinician_credential_entity(
     name="provider_certification",
     url_collection="certifications",
     id_param="certification_id",

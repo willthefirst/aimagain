@@ -1,7 +1,7 @@
 """Route-level tests for `POST /clinicians/{provider_id}/verifications`.
 
 Covers the wire shape: superuser-only authorization, 404 on missing
-provider, 201 + `Location` header on the happy path, and a persisted
+clinician, 201 + `Location` header on the happy path, and a persisted
 `Verification` row after the call. Uses a `respx`-free `httpx.MockTransport`
 patched into the orchestrator's `httpx.AsyncClient` via a thin
 monkeypatched factory so the integration test never reaches the public
@@ -76,9 +76,9 @@ async def _seed_provider(
     async with db_test_session_manager() as session:
         async with session.begin():
             session.add(owner)
-            provider = make_provider_with_org(owner_id=owner.id, npi=npi)
-            session.add(provider)
-        return provider.id
+            clinician = make_provider_with_org(owner_id=owner.id, npi=npi)
+            session.add(clinician)
+        return clinician.id
 
 
 async def test_non_superuser_gets_403(

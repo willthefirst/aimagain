@@ -226,9 +226,9 @@ class ClinicianOpeningRead(_PostReadBase):
     referral_instructions: str | None = None
     website: str | None = None
     # Practice + location + delivery-format + insurance posture all live
-    # on the linked Provider (#448, #449). Read projections expose the
+    # on the linked Clinician (#448, #449). Read projections expose the
     # FK; templates dereference via
-    # `post.opening_detail.provider.<field>`.
+    # `post.opening_detail.clinician.<field>`.
     clinician_id: uuid.UUID
     desired_times: DesiredTimesField = []
     schedule_text: str | None = None
@@ -318,7 +318,7 @@ class ReferralCreate(FlatLocationSchema, WirePayload):
 
 class ClinicianOpeningCreate(WirePayload):
     """Create payload for `kind='clinician_opening'`. Field set follows
-    the provider-availability intake form."""
+    the clinician-availability intake form."""
 
     kind: Literal["clinician_opening"]
     subject: StrippedOptionalText = None
@@ -327,10 +327,10 @@ class ClinicianOpeningCreate(WirePayload):
     description: TextareaOptional = None
     referral_instructions: TextareaOptional = None
     website: UrlOptional = None
-    # FK to one of the requesting user's Provider profiles. The form
-    # restricts the dropdown to providers owned by the user; the route
+    # FK to one of the requesting user's Clinician profiles. The form
+    # restricts the dropdown to clinicians owned by the user; the route
     # handler also verifies ownership at write time so a wire-level
-    # attacker can't reference another user's provider.
+    # attacker can't reference another user's clinician.
     clinician_id: uuid.UUID
     desired_times: DesiredTimesField = []
     # Free-text companion to `desired_times` for cohort dates / fixed

@@ -183,7 +183,7 @@ async def test_count_respects_distinct_with_join(
         await session.refresh(clinician)
         clinician_id = clinician.id
 
-    # Two licensures matching `license_type='lcsw'` on the same provider.
+    # Two licensures matching `license_type='lcsw'` on the same clinician.
     async with db_test_session_manager() as session:
         async with session.begin():
             session.add(

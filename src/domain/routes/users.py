@@ -13,6 +13,6 @@ router = register_entity(USER_ENTITY)
 #     `handler_path`; the framework wraps it with the `forbid_self`
 #     self-target guard declared on the axis.
 #   - providers — related-list subresource, same `handler_path` path.
-# Detail extras (`user_detail_extras` + the provider repo it needs)
+# Detail extras (`user_detail_extras` + the clinician repo it needs)
 # live on the spec via `detail_extras_path`.
 mount_entity(router, USER_ENTITY)

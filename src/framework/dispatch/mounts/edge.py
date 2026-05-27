@@ -66,7 +66,7 @@ def mount_edge_routes(
     to_entity = entity.relation.to_entity
     to_collection = to_entity.url_collection
     # Handler kwarg name for the opposite-end repo follows the spec
-    # name convention: `provider_repo` for the provider entity, etc.
+    # name convention: `clinician_repo` for the clinician entity, etc.
     to_repo_kwarg = f"{to_entity.name}_repo"
     list_template = entity.templates.list
     user_dep = entity.read_user_dep
