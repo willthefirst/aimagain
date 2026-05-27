@@ -133,7 +133,7 @@ def test_referral_headline_falls_back_when_age_groups_empty():
 #
 # The view-model collapses three kind-specific detail shapes (CR has its
 # own location + a scalar gender; PA reads location + insurance off the
-# linked Provider; program reads identity off the linked Program) into
+# linked Clinician; program reads identity off the linked Program) into
 # one flat dict that templates iterate over. Tests below build a stub
 # post per kind and pin the dict's shape end-to-end. Templates are
 # tested separately at the route level.
@@ -337,7 +337,7 @@ def test_view_pa_headline_is_org_name_state_from_clinician():
 
 
 def test_view_pa_in_person_virtual_come_from_clinician():
-    """PA's session availability lives on the linked Provider, not on
+    """PA's session availability lives on the linked Clinician, not on
     the post's detail row. The view-model normalizes both kinds onto
     the same `in_person`/`virtual` keys so the card's modality chips
     read from one source."""
@@ -396,7 +396,7 @@ def test_view_pa_referral_none_when_both_empty():
 
 def test_view_pa_location_chunk_pulled_from_clinician():
     """PA's `location_chunk` reads city/state/zip from the linked
-    Provider so the listing card renders the same "Location" row
+    Clinician so the listing card renders the same "Location" row
     referral cards do. Detail page still gets the full address via
     `full_address` for the expanded rows."""
     v = post_card_view(_make_pa_post())
@@ -462,7 +462,7 @@ def test_view_program_organization_link_carries_org_id_and_name():
 def test_view_program_no_in_person_virtual_no_insurance_no_address():
     """Program-availability has no in-person/virtual posture (the
     Program doesn't track session format today), no insurance posture
-    (insurance lives on Provider, not Program), and no location of
+    (insurance lives on Clinician, not Program), and no location of
     its own (the linked Program's `state_preference` surfaces via
     `header_state` instead)."""
     v = post_card_view(_make_program_post())

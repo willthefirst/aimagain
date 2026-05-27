@@ -3,7 +3,7 @@
 Delegates to ``BaseRepository`` for the generic CRUD path the
 framework's mount layer calls. ``list_for_user`` is a domain-named
 entry point onto the framework's ``list_owned_by`` helper — same
-"owned rows newest first" shape Organization and Provider use.
+"owned rows newest first" shape Organization and Clinician use.
 """
 
 import uuid

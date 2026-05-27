@@ -241,7 +241,7 @@ emitted attribute string. #}
   </label>
 {%- endmacro %}
 {# `<select>` populated from a list of entity rows — the canonical
-   foreign-key picker (`org_id` on Provider/Program forms, `parent_org_id`
+   foreign-key picker (`org_id` on Clinician/Program forms, `parent_org_id`
    on Org forms, etc). Replaces hand-rolled per-template `<select>`s.
 
    `entities` is a sequence of objects with `.id` and `.name` (or
@@ -253,7 +253,7 @@ emitted attribute string. #}
    `blank_label=None` (default) renders Pico's disabled "--" placeholder
    when the field is required and unset; pass `blank_label="(root — no
    parent)"` to surface a real empty-value option (root organization,
-   the "(no provider)" branch, etc).
+   the "(no clinician)" branch, etc).
 
    `current` is the prefilled UUID/value (None on create, the persisted
    value on edit). String/UUID equality is handled by stringifying both

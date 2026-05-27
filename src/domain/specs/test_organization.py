@@ -62,7 +62,7 @@ def test_schemas_wired_correctly():
 
 def test_form_extras_path_drives_parent_org_picker():
     """Issue #581: the parent-Org picker is populated via the framework's
-    ``form_extras_path`` hook — same shape as Provider/Program."""
+    ``form_extras_path`` hook — same shape as Clinician/Program."""
     assert (
         ORGANIZATION_ENTITY.form_extras_path
         == "src.domain.logic.organizations.handlers.organization_form_extras"

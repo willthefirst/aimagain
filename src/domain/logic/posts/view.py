@@ -9,7 +9,7 @@ kinds model the underlying data asymmetrically:
     paired with a nullable `insurance_carrier`. The posture is derived
     from `network_preference` alone — the carrier doesn't change the
     badge.
-  * `opening` → linked `Provider` — the
+  * `opening` → linked `Clinician` — the
     `in_network_carriers` list (empty = no in-network) plus the
     `accepts_out_of_network` / `sliding_scale` booleans.
 
@@ -30,7 +30,7 @@ Genders that don't slot in naturally — `prefer_not_to_say`,
 card (`_item.html`) and the detail page (`detail.html`) read from. Each
 kind's underlying detail relationship has a different field set and
 naming — CR holds its own (city, state, zip) location and a single
-gender; PA reads location and insurance from the linked Provider;
+gender; PA reads location and insurance from the linked Clinician;
 program reads identity from the linked Program. The function collapses
 those three shapes into one flat dict so templates iterate over keys
 rather than branching on `post.kind`. Values that don't apply to a
@@ -171,7 +171,7 @@ def post_card_view(post) -> dict[str, Any]:
         in_person / virtual: the post's in-person/virtual posture as
             `LOCATION_AVAILABILITY_OPTIONS` values. CR reads them off
             its own detail row; PA reads them from the linked
-            Provider's session-availability fields. Program has no
+            Clinician's session-availability fields. Program has no
             in-person/virtual posture and returns ``None`` for both.
         services / settings: raw enum lists. PA + program carry
             ``settings``; CR's ``settings`` is empty.
@@ -185,7 +185,7 @@ def post_card_view(post) -> dict[str, Any]:
             ``insurance_posture_for_post`` returns.
         treatment_modality: free-text modality string or ``None``.
         location_chunk: ``{city, state, zip}`` for CR (from the
-            detail row) and PA (from the linked Provider) — the
+            detail row) and PA (from the linked Clinician) — the
             demographics-column icon-only row both render. ``None``
             for program (no location of its own; ``state_preference``
             still surfaces via ``header_state``).
@@ -196,7 +196,7 @@ def post_card_view(post) -> dict[str, Any]:
             for CR.
         desired_times: raw enum list of desired-time slots; empty if
             unset.
-        practice_link: ``{id, name}`` of PA's linked Provider's org;
+        practice_link: ``{id, name}`` of PA's linked Clinician's org;
             ``None`` for other kinds.
         program_link: ``{id, name}`` of program's linked Program;
             ``None`` for other kinds.
@@ -208,14 +208,14 @@ def post_card_view(post) -> dict[str, Any]:
             is one click from its org's detail page.
         full_address: ``"City, ST ZIP"`` string for the detail page's
             expanded location row. CR reads from its own location;
-            PA reads from the linked Provider; program returns
+            PA reads from the linked Clinician; program returns
             ``None``.
-        sliding_scale / cost: PA-only fields from the linked Provider;
+        sliding_scale / cost: PA-only fields from the linked Clinician;
             ``None`` for other kinds.
         network_preference / insurance_carrier: CR-only raw enum
             values from the detail row; ``None`` for other kinds.
         in_network_carriers / accepts_out_of_network: PA-only raw
-            values from the linked Provider. ``in_network_carriers``
+            values from the linked Clinician. ``in_network_carriers``
             comes back as an empty list when unset, matching the
             list/iteration convention; ``accepts_out_of_network`` is
             ``None`` for other kinds.

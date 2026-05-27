@@ -64,7 +64,7 @@ def test_list_excludes_self():
 
 def test_owner_attr_is_none():
     """Users aren't owned by another user — the resource *is* the user.
-    `owner_attr=None` distinguishes them from `Provider`/`Post` which
+    `owner_attr=None` distinguishes them from `Clinician`/`Post` which
     default to `"owner_id"`."""
     assert USER_ENTITY.owner_attr is None
 

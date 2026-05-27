@@ -105,7 +105,7 @@ NETWORK_PREFERENCES: Final[tuple[str, ...]] = (
     "no_preference",
 )
 
-# Carrier vocabulary for `Provider.in_network_carriers` and
+# Carrier vocabulary for `Clinician.in_network_carriers` and
 # `ReferralDetail.insurance_carrier`. Single-sourced so the
 # referral side (one carrier per patient) and the clinician side (the
 # list of carriers the practice accepts) share tokens. On the clinician
@@ -322,7 +322,7 @@ GENDER_LABELS: Final[dict[str, str]] = {
 #   * `referral` — `network_preference` enum
 #     (`in_network_required` / `in_network_preferred` / `no_preference`)
 #     paired with a nullable `insurance_carrier`.
-#   * `opening` → linked `Provider` carries the
+#   * `opening` → linked `Clinician` carries the
 #     `in_network_carriers` list (empty = no in-network) plus the
 #     `accepts_out_of_network` / `sliding_scale` booleans.
 #

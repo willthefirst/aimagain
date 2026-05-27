@@ -28,10 +28,10 @@ def _role_attr(clinician, attr, default=None):
 
 
 def _insurance_summary(clinician) -> str:
-    """Compose a single-string insurance phrase that unions a Provider's
+    """Compose a single-string insurance phrase that unions a Clinician's
     insurance posture across **every** affiliation it holds.
 
-    After #642 PR 3 the directory listing shows one row per Provider that
+    After #642 PR 3 the directory listing shows one row per Clinician that
     reflects all affiliations (not just the primary). The Insurance cell
     reads this phrase, so the summary unions across rows:
 
