@@ -22,7 +22,7 @@ def is_owner(obj, user: Actor | None, *, owner_attr: str = "owner_id") -> bool:
 
     `owner_attr` names the foreign-key column on `obj` that points at
     the owning user. Defaults to `"owner_id"`, which matches both
-    `Post.owner_id` and `Provider.owner_id`; the knob is kept for future
+    `Post.owner_id` and `Clinician.owner_id`; the knob is kept for future
     entities whose owner FK is not literally named `owner_id`.
     """
     if user is None:
@@ -91,9 +91,9 @@ async def list_visible_to(repo, user: "Actor", model, *, owner_attr: str = "owne
     """Return the rows of `model` a user may pick from in a form picker.
 
     Owners see only the rows they own; superusers see every row. Drives
-    every "your X" form-extras dropdown (Provider's Org picker,
+    every "your X" form-extras dropdown (Clinician's Org picker,
     Program's Org picker, Organization's parent-Org picker, post-kind
-    Provider/Program pickers) so the same boundary lives in one place.
+    Clinician/Program pickers) so the same boundary lives in one place.
 
     Calls `repo.list_for_user(user.id)` for the owner path and
     `repo.list_default(model, order_by=...)` for the superuser path
@@ -130,8 +130,8 @@ async def assert_fk_ownership(
       the FK) are a no-op.
 
     Used by every entity whose Create/Update payload carries an FK to
-    another user-owned entity (Provider→Org, Program→Org, post→
-    Provider/Program, etc.).
+    another user-owned entity (Clinician→Org, Program→Org, post→
+    Clinician/Program, etc.).
     """
     fk_id = getattr(payload, attr, None)
     if fk_id is None:

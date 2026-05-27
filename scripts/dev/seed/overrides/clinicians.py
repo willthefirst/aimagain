@@ -1,14 +1,14 @@
 """Clinician + Affiliation overrides.
 
 Cardinality:
-  - PROVIDER_COUNT Clinicians, each with `owner_id` assigned from the
+  - CLINICIAN_COUNT Clinicians, each with `owner_id` assigned from the
     users pool (round-robin) and `npi`/`first_name`/`last_name` from vocab.
-  - PROVIDER_COUNT base Affiliations + ~25% second Affiliations at a
+  - CLINICIAN_COUNT base Affiliations + ~25% second Affiliations at a
     different org — exercises multi-affiliation read paths.
 
 Coverage:
   - `location_state` round-robins all 51 US_STATES so every state
-    appears at least once (PROVIDER_COUNT > 51).
+    appears at least once (CLINICIAN_COUNT > 51).
   - `in_person_sessions` and `virtual_sessions` independently
     round-robin LOCATION_AVAILABILITY_OPTIONS — produces rows for
     (in-person only), (virtual only), (both), (please_contact).
@@ -38,7 +38,7 @@ async def generate_clinicians(
 ) -> list[Clinician]:
     users: list[User] = pool.all("users")
     out: list[Clinician] = []
-    for i in range(counts.PROVIDER_COUNT):
+    for i in range(counts.CLINICIAN_COUNT):
         cid = deterministic_uuid("Clinician", i)
         row = Clinician(
             id=cid,
@@ -115,7 +115,7 @@ async def generate_affiliations(
         aff_index += 1
 
         # ~25% of clinicians get a second affiliation at a different org.
-        if rng.bool(counts.PROVIDER_MULTI_AFFILIATION_RATE):
+        if rng.bool(counts.CLINICIAN_MULTI_AFFILIATION_RATE):
             secondary_id = deterministic_uuid("Affiliation", i, 1)
             other_org = orgs[(i + 7) % len(orgs)]  # +7 to avoid same-org
             kwargs2 = _affiliation_kwargs(rng, aff_index)

@@ -49,7 +49,7 @@ SKIP_TABLES: Final[frozenset[str]] = frozenset({"audit_log"})
 
 # Tables that need a second pass because their override depends on
 # rows that `metadata.sorted_tables` doesn't FK-order against them.
-# `posts` has no FK to `providers` or `programs`, but its `OpeningDetail`
+# `posts` has no FK to `clinicians` or `programs`, but its `OpeningDetail`
 # / `IntakeDetail` children do — so the Post override has to run AFTER
 # everything else, not in FK-topological order. Listed in the order
 # the post-pass should execute.
@@ -129,7 +129,7 @@ async def seed_all() -> int:
         # Phase 2: deferred tables whose override depends on rows the
         # FK graph doesn't force-order against them. Currently only
         # `posts` + its details (the Post override builds details inline
-        # and they FK back to providers/programs).
+        # and they FK back to clinicians/programs).
         for table_name in POST_PASS_TABLES:
             total += await _seed_table(table_name, rng, pool, session)
     print(

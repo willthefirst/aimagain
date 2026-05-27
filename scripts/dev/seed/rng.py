@@ -14,7 +14,7 @@ The helpers are deliberately small. The pattern they encode:
     (every enum value present) instead of probability.
 
   - `weighted_choice(values, weights)` — for distributions that
-    should not be uniform (most providers in CA/NY/TX, not 1/51 each).
+    should not be uniform (most clinicians in CA/NY/TX, not 1/51 each).
 
   - `subset(values, min_size, max_size)` — for JSON list columns
     (`age_groups`, `languages`, `services`, `settings`, `desired_times`,
