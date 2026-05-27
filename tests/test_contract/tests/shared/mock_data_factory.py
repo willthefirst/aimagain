@@ -321,7 +321,7 @@ class MockDataFactory:
             id=UUID("33333333-3333-3333-3333-333333333333"),
         )
         return {
-            "src.domain.routes.providers._handle_create_clinician": {
+            "src.domain.routes.clinicians._handle_create_clinician": {
                 "return_value_config": stub_provider
             }
         }
@@ -410,7 +410,7 @@ class MockDataFactory:
         # patches retarget here. The mount layer's `_resolve_handler`
         # reads from `__module__`.
         return {
-            "src.domain.routes.providers._handle_update_clinician": {
+            "src.domain.routes.clinicians._handle_update_clinician": {
                 "return_value_config": stub_provider
             }
         }
