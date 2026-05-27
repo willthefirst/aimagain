@@ -73,7 +73,7 @@ def scalar_to_list(v):
     arrives as a list.
 
     Used by every multi-checkbox field across domain schemas
-    (posts, providers, affiliations, ...). Each schema layers its own
+    (posts, clinicians, affiliations, ...). Each schema layers its own
     `Literal[*TUPLE]` over the shared coercion:
 
         MyField = Annotated[

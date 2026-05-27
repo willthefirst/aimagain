@@ -7,7 +7,7 @@ with stub child templates and asserting the breadcrumb segments, toolbar
 shape, and content block all land where the contract promises.
 
 Domain-template-side coverage lives in the route tests (e.g.
-``src/domain/routes/test_providers.py``); these tests cover the
+``src/domain/routes/test_clinicians.py``); these tests cover the
 view-type templates *in isolation* so a regression in the chrome shows
 up here even if no domain template has been wired into it yet.
 """
@@ -29,7 +29,7 @@ def _make_env() -> Environment:
     the stubs goes first; framework templates resolve through the
     fallback ``FileSystemLoader``. This is identical to how the real
     runtime resolves ``views/...`` from the framework root and
-    ``providers/list.html`` from the domain root.
+    ``clinicians/list.html`` from the domain root.
     """
     from jinja2 import ChoiceLoader
 
@@ -65,7 +65,7 @@ def _add_child(env: Environment, name: str, body: str) -> None:
 def test_list_view_renders_h1_in_toolbar_and_omits_breadcrumb() -> None:
     """``views/list.html`` puts the `resource_label` into the
     toolbar `<h1>` (the page title) and renders no breadcrumb —
-    a single-segment "Providers" trail would duplicate what the
+    a single-segment "Clinicians" trail would duplicate what the
     active global-nav tab already communicates, so list pages
     skip the breadcrumb entirely. The child only declares the
     label."""
@@ -75,7 +75,7 @@ def test_list_view_renders_h1_in_toolbar_and_omits_breadcrumb() -> None:
         "stub.html",
         """
         {% extends "views/list.html" %}
-        {% block resource_label %}Providers{% endblock %}
+        {% block resource_label %}Clinicians{% endblock %}
         {% block content %}<div id="body">ok</div>{% endblock %}
         """,
     )
@@ -92,7 +92,7 @@ def test_list_view_renders_h1_in_toolbar_and_omits_breadcrumb() -> None:
     # The heading lives in the toolbar `<h1>`.
     toolbar_h1 = tree.css_first("div.toolbar h1")
     assert toolbar_h1 is not None
-    assert toolbar_h1.text(strip=True) == "Providers"
+    assert toolbar_h1.text(strip=True) == "Clinicians"
     # Content block lands in the page body.
     assert '<div id="body">ok</div>' in html
 
@@ -158,7 +158,7 @@ def test_list_view_renders_actions_block_in_toolbar_right() -> None:
 def test_detail_view_renders_back_affordance_and_actions() -> None:
     """``views/detail.html`` builds `[(resource_label, resource_url)]`
     and the breadcrumb macro renders it as a single back affordance —
-    `<a class="breadcrumb-back" href="/providers">…Providers</a>`.
+    `<a class="breadcrumb-back" href="/clinicians">…Clinicians</a>`.
     Actions land inside the shared two-zone toolbar — empty left zone
     (no search link), and a `<menu class="toolbar-right">` carrying
     the `<li>` commands. Pins the "detail actions land at the same
@@ -170,10 +170,10 @@ def test_detail_view_renders_back_affordance_and_actions() -> None:
         "stub.html",
         """
         {% extends "views/detail.html" %}
-        {% set resource_url = "/providers" %}
-        {% block resource_label %}Providers{% endblock %}
+        {% set resource_url = "/clinicians" %}
+        {% block resource_label %}Clinicians{% endblock %}
         {% block current_label %}Sunrise Therapy{% endblock %}
-        {% block actions %}<li><a id="edit" href="/providers/1/form">Edit</a></li>{% endblock %}
+        {% block actions %}<li><a id="edit" href="/clinicians/1/form">Edit</a></li>{% endblock %}
         {% block content %}body{% endblock %}
         """,
     )
@@ -186,15 +186,15 @@ def test_detail_view_renders_back_affordance_and_actions() -> None:
 
     tree = HTMLParser(html)
     back = tree.css_first('nav[aria-label="breadcrumb"] a.breadcrumb-back')
-    assert back is not None and back.attributes.get("href") == "/providers"
+    assert back is not None and back.attributes.get("href") == "/clinicians"
     label = back.css_first("span.breadcrumb-back-label")
-    assert label is not None and label.text(strip=True) == "Providers"
+    assert label is not None and label.text(strip=True) == "Clinicians"
     assert "Sunrise Therapy" in html
     assert '<div class="toolbar">' in html
     assert '<menu class="toolbar-right">' in html
     # No search link on detail pages — left zone stays empty.
     assert 'class="toolbar-filter-link"' not in html
-    assert '<li><a id="edit" href="/providers/1/form">Edit</a></li>' in html
+    assert '<li><a id="edit" href="/clinicians/1/form">Edit</a></li>' in html
 
 
 def test_form_new_view_renders_create_heading_from_context() -> None:
@@ -209,8 +209,8 @@ def test_form_new_view_renders_create_heading_from_context() -> None:
         "stub.html",
         """
         {% extends "views/form_new.html" %}
-        {% set resource_url = "/providers" %}
-        {% block resource_label %}Providers{% endblock %}
+        {% set resource_url = "/clinicians" %}
+        {% block resource_label %}Clinicians{% endblock %}
         {% block content %}<form id="x"></form>{% endblock %}
         """,
     )
@@ -224,9 +224,9 @@ def test_form_new_view_renders_create_heading_from_context() -> None:
 
     tree = HTMLParser(html)
     back = tree.css_first('nav[aria-label="breadcrumb"] a.breadcrumb-back')
-    assert back is not None and back.attributes.get("href") == "/providers"
+    assert back is not None and back.attributes.get("href") == "/clinicians"
     label = back.css_first("span.breadcrumb-back-label")
-    assert label is not None and label.text(strip=True) == "Providers"
+    assert label is not None and label.text(strip=True) == "Clinicians"
     assert "<h1>Create clinician</h1>" in html
     assert '<form id="x"></form>' in html
 
@@ -293,9 +293,9 @@ def test_form_edit_view_renders_breadcrumb_and_edit_heading() -> None:
         "stub.html",
         """
         {% extends "views/form_edit.html" %}
-        {% set resource_url = "/providers" %}
-        {% set resource_detail_url = "/providers/42" %}
-        {% block resource_label %}Providers{% endblock %}
+        {% set resource_url = "/clinicians" %}
+        {% set resource_detail_url = "/clinicians/42" %}
+        {% block resource_label %}Clinicians{% endblock %}
         {% block current_label %}Sunrise Therapy{% endblock %}
         {% block content %}<form id="x"></form>{% endblock %}
         """,
@@ -312,7 +312,7 @@ def test_form_edit_view_renders_breadcrumb_and_edit_heading() -> None:
     back = tree.css_first('nav[aria-label="breadcrumb"] a.breadcrumb-back')
     assert back is not None, "form-edit must render a back affordance"
     assert (
-        back.attributes.get("href") == "/providers/42"
+        back.attributes.get("href") == "/clinicians/42"
     ), "back link points at the deepest clickable parent (the row's detail page)"
     label = back.css_first("span.breadcrumb-back-label")
     assert label is not None and label.text(strip=True) == "Sunrise Therapy"
@@ -388,7 +388,7 @@ def test_actions_buttons_fill_row_width_on_desktop() -> None:
 
 def test_actions_macro_supports_cancel_only_for_page_level_clusters() -> None:
     """The `actions` macro accepts `submit_label=None` so multi-section
-    pages (e.g. `providers/form_edit.html`) can render a page-level
+    pages (e.g. `clinicians/form_edit.html`) can render a page-level
     Cancel-only cluster without a redundant Save button. Pinned because
     the bare `<div class="form-actions">` that used to live in that
     template diverged from the macro's styling on the desktop width fix
@@ -448,7 +448,7 @@ def test_no_template_uses_danger_class() -> None:
 
 def test_list_page_heading_visible_on_mobile() -> None:
     """Regression for #588 — the list-page heading (`Organizations`,
-    `Posts`, `Providers`, `Users`) must stay visible at the 375px
+    `Posts`, `Clinicians`, `Users`) must stay visible at the 375px
     mobile viewport.
 
     Earlier the heading lived in a single-segment breadcrumb above
@@ -470,7 +470,7 @@ def test_list_page_heading_visible_on_mobile() -> None:
         "stub.html",
         """
         {% extends "views/list.html" %}
-        {% block resource_label %}Providers{% endblock %}
+        {% block resource_label %}Clinicians{% endblock %}
         {% block content %}body{% endblock %}
         """,
     )
@@ -483,7 +483,7 @@ def test_list_page_heading_visible_on_mobile() -> None:
     tree = HTMLParser(html)
     h1 = tree.css_first("div.toolbar h1")
     assert h1 is not None, "list-page heading must live in the toolbar <h1>"
-    assert h1.text(strip=True) == "Providers"
+    assert h1.text(strip=True) == "Clinicians"
 
     # The CSS must not blanket-hide the toolbar or its `<h1>` on
     # narrow viewports — the page heading has to stay visible.
@@ -514,8 +514,8 @@ def test_entity_form_page_caps_short_field_widths() -> None:
         "stub.html",
         """
         {% extends "views/form_new.html" %}
-        {% set resource_url = "/providers" %}
-        {% block resource_label %}Providers{% endblock %}
+        {% set resource_url = "/clinicians" %}
+        {% block resource_label %}Clinicians{% endblock %}
         {% block content %}<form id="x"></form>{% endblock %}
         """,
     )

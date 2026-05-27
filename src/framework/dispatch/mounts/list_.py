@@ -45,7 +45,7 @@ def mount_list(
 
     ``public=True`` overrides ``spec.read_user_dep`` for this mount only —
     used when a resource's list is public but its detail/form pages are
-    authenticated (e.g. providers). The handler should declare
+    authenticated (e.g. clinicians). The handler should declare
     ``requesting_user: User | None`` so the synthesis can pass ``None``
     for anonymous viewers.
     """

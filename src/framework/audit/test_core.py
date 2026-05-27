@@ -103,12 +103,12 @@ def test_make_audited_resource_accepts_prebuilt_callable():
 
 
 def test_make_audited_resource_honors_action_stem_override():
-    """`provider_licensure` -> `CREATE_LICENSURE` etc. — entity name and
+    """`clinician_licensure` -> `CREATE_LICENSURE` etc. — entity name and
     enum stem diverge, so the caller passes `action_stem` explicitly."""
     resource = make_audited_resource(
-        "provider_licensure", _ExampleSnapshot, action_stem="licensure"
+        "clinician_licensure", _ExampleSnapshot, action_stem="licensure"
     )
-    assert resource.type == "provider_licensure"
+    assert resource.type == "clinician_licensure"
     assert resource.create is AuditAction.CREATE_LICENSURE
     assert resource.update is AuditAction.UPDATE_LICENSURE
     assert resource.delete is AuditAction.DELETE_LICENSURE

@@ -3,7 +3,7 @@
 Templates that render an address row (`clinician.full_address`,
 `post.full_address`) read a pre-composed string instead of re-checking
 each location field. The composition logic was previously duplicated in
-`src/domain/logic/posts/view.py` and `src/domain/logic/providers/view.py`
+`src/domain/logic/posts/view.py` and `src/domain/logic/clinicians/view.py`
 because cross-cluster imports between domain logic modules aren't
 allowed — the framework is the right home for the shared shape.
 """

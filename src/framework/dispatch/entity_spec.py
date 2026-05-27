@@ -90,7 +90,7 @@ class Templates:
     `form_new` and `form_edit` correspond to the two `mount_form`
     variants (create form / edit form). Posts uses neither (handler
     returns `template_name` in context for per-kind dispatch);
-    providers uses both.
+    clinicians uses both.
 
     Per-field `None` means "default by convention" — `EntitySpec.__post_init__`
     fills it with ``f"{url_collection}/{verb}.html"`` for any verb the
@@ -321,7 +321,7 @@ class EntitySpec:
     # `list_<collection>` repo method. Required when `routes.list=True`
     # AND no custom `list_<collection>` exists on the repo; either
     # provide the ordering here or write the bespoke method. Specs whose
-    # repo defines `list_<collection>` (e.g. providers, with its
+    # repo defines `list_<collection>` (e.g. clinicians, with its
     # licensure-join filter) leave this `None` and the bespoke method
     # owns ordering inline.
     list_order_by: Any = None
@@ -332,7 +332,7 @@ class EntitySpec:
     # to compute `has_next`). When `None`, falls back to
     # `src.framework.dispatch.pagination.DEFAULT_PAGE_SIZE`. Override
     # per entity when the row shape calls for it (e.g. posts' rich
-    # `<li>` feed wants a smaller page than the providers table).
+    # `<li>` feed wants a smaller page than the clinicians table).
     page_size: int | None = None
 
     # Delete-route self guard ------------------------------------------
@@ -975,7 +975,7 @@ class EntitySpec:
 
         Consumers: the generic ``handle_create`` walks
         ``spec.children`` so the standard top-level create path appends
-        inline-child rows automatically (providers' credential lists).
+        inline-child rows automatically (clinicians' credential lists).
         Adding a fourth credential is a one-file change (the new spec)
         with no edit to the create handler.
         """
@@ -1072,7 +1072,7 @@ class Redirects:
     def to_edit_form(collection: str, id_param: str) -> Callable[..., str]:
         """Build a redirect callable producing ``/<collection>/{id}/form``.
 
-        Reads the id from ``kwargs[id_param]``. Used by providers
+        Reads the id from ``kwargs[id_param]``. Used by clinicians
         (post-create / post-update redirect to their own edit form) and
         by all three credential subentities (which redirect to the
         parent clinician's edit form — `id_param` is the parent's).

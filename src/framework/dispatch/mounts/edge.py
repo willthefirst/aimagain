@@ -38,7 +38,7 @@ def mount_edge_routes(
 
     Reads from the spec:
       - ``entity.relation.to_attr`` — path-param name (e.g.
-        ``"provider_id"``).
+        ``"clinician_id"``).
       - ``entity.relation.to_entity.url_collection`` — used for the
         HX-Redirect target (``"/{to_collection}/{id}"``).
       - ``entity.relation.to_entity.repo_dep`` — Depends for the
@@ -128,7 +128,7 @@ def mount_edge_routes(
         return created_response(id=edge.id, location=redirect, hx_redirect=redirect)
 
     # FastAPI's path-param introspection runs against the declared
-    # function signature. `**path_kwargs` doesn't expose `provider_id`
+    # function signature. `**path_kwargs` doesn't expose `clinician_id`
     # to FastAPI — fix by attaching an `inspect.Signature` that names
     # the to_attr explicitly. Same trick `_synthesize_route_fn` uses.
     _add_route.__signature__ = _edge_route_signature(  # type: ignore[attr-defined]

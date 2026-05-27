@@ -1,7 +1,7 @@
 """Tests for the `WirePayload`, `ReadProjection`, and `PartialUpdate` bases.
 
 Each base's behavior on a concrete entity schema is covered by the
-per-cluster test files (`schemas/providers/test_provider.py`,
+per-cluster test files (`schemas/clinicians/test_clinician.py`,
 `schemas/posts/test_post.py`). These tests pin the bases themselves so
 a regression that broke every concrete schema at once would be caught
 here, where the cause lives.

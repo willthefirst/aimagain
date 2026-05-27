@@ -139,4 +139,4 @@ def test_entity_form_url_edit_form_for_user():
 
 def test_entity_form_url_unknown_entity_raises():
     with pytest.raises(ValueError):
-        entity_form_url("provider_licensure_typo")
+        entity_form_url("clinician_licensure_typo")

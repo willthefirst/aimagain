@@ -70,7 +70,7 @@ ORGANIZATION_ENTITY: Final[EntitySpec] = EntitySpec(
     ),
     form_extras_repos=(("organization_repo", OrganizationRepository),),
     # Templates pull dropdown labels from the spec — same pattern as
-    # `PROVIDER_ENTITY.static_context` for credential vocabularies.
+    # `CLINICIAN_ENTITY.static_context` for credential vocabularies.
     static_context={
         "ORGANIZATION_TYPES": ORGANIZATION_TYPES,
         "ORGANIZATION_TYPES_LABELS": ORGANIZATION_TYPES_LABELS,

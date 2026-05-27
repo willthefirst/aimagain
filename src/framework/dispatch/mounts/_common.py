@@ -49,8 +49,8 @@ def path_segments_under_router(spec: ResourceSpec, *, with_id: bool) -> str:
     clinician routes and licensure-under-clinician routes). This function
     produces the rest:
 
-    ``/{provider_id}/licensures`` (no id) or
-    ``/{provider_id}/licensures/{licensure_id}`` (with id) for a
+    ``/{clinician_id}/licensures`` (no id) or
+    ``/{clinician_id}/licensures/{licensure_id}`` (with id) for a
     licensure spec whose parent is the clinician spec.
 
     For a top-level spec (no parent), returns ``""`` (no id) or
@@ -71,7 +71,7 @@ def path_segments_under_router(spec: ResourceSpec, *, with_id: bool) -> str:
 def parent_path_param_pairs(spec: ResourceSpec) -> tuple[tuple[str, type], ...]:
     """All parent id-params (excluding ``spec.id_param``) the route binds.
 
-    For a licensure spec under clinician, returns ``(("provider_id", UUID),)``.
+    For a licensure spec under clinician, returns ``(("clinician_id", UUID),)``.
     For a top-level spec, returns ``()``.
     """
     out: list[tuple[str, type]] = []
