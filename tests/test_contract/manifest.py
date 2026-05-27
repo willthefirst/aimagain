@@ -112,32 +112,30 @@ CONTRACT_PAIRS: list[ContractPair] = [
         pytest_marks=(pytest.mark.provider, pytest.mark.posts),
     ),
     ContractPair(
-        consumer_name="provider-create-form",
-        provider_name="providers-api",
+        consumer_name="clinician-create-form",
+        provider_name="clinicians-api",
         pact_port=1239,
         handler_mocks_factory=MockDataFactory.create_clinician_create_dependency_config,
         consumer_setup_fn=_setup_clinician_create_form_stub,
-        provider_state="User can create a provider",
-        pytest_marks=(pytest.mark.provider, pytest.mark.providers),
+        provider_state="User can create a clinician",
+        pytest_marks=(pytest.mark.provider, pytest.mark.clinicians),
     ),
-    # `provider-edit-form` covers the top-level `PATCH /clinicians/{id}`
-    # form. After #642 PR 1 a Provider may hold multiple Affiliations and
+    # `clinician-edit-form` covers the top-level `PATCH /clinicians/{id}`
+    # form. After #642 PR 1 a Clinician may hold multiple Affiliations and
     # this form's per-role fields (`location_*`, sessions, insurance,
-    # `sliding_scale`, `cost`) write through Provider per-role property
+    # `sliding_scale`, `cost`) write through Clinician per-role property
     # proxies to the primary (oldest) affiliation row — the wire shape
-    # is unchanged (#642 PR 4 renamed the URL family `/providers` →
-    # `/clinicians`; the participant names keep the Pact "provider"
-    # vocabulary for continuity). The sub-resource PATCH endpoint
+    # is unchanged. The sub-resource PATCH endpoint
     # `PATCH /clinicians/{id}/affiliations/{aff_id}` exists but has no
     # consumer UI today, so it is intentionally not contract-tested.
     ContractPair(
-        consumer_name="provider-edit-form",
-        provider_name="providers-api",
+        consumer_name="clinician-edit-form",
+        provider_name="clinicians-api",
         pact_port=1240,
         handler_mocks_factory=MockDataFactory.create_clinician_update_dependency_config,
         consumer_setup_fn=_setup_clinician_edit_form_stub,
-        provider_state="Provider 44444444-4444-4444-4444-444444444444 exists and is owned by the requester",
-        pytest_marks=(pytest.mark.provider, pytest.mark.providers),
+        provider_state="Clinician 44444444-4444-4444-4444-444444444444 exists and is owned by the requester",
+        pytest_marks=(pytest.mark.provider, pytest.mark.clinicians),
     ),
     ContractPair(
         consumer_name="organization-create-form",

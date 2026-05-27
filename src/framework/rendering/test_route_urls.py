@@ -69,11 +69,8 @@ def test_entity_url_uses_prefix_override_for_favorites():
 
 
 def test_entity_url_item_path_under_prefix_override():
-    provider_id = uuid.UUID("44444444-4444-4444-4444-444444444444")
-    assert (
-        entity_url("user_favorite", id=provider_id)
-        == f"/users/me/favorites/{provider_id}"
-    )
+    item_id = uuid.UUID("44444444-4444-4444-4444-444444444444")
+    assert entity_url("user_favorite", id=item_id) == f"/users/me/favorites/{item_id}"
 
 
 def test_entity_url_with_subresource():
