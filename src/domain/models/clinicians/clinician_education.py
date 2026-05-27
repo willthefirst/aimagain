@@ -7,7 +7,7 @@ from src.framework.persistence.base_model import BaseModel
 
 from ..enums import EDUCATION_TYPES, named_check_in
 
-_TABLE = "provider_educations"
+_TABLE = "clinician_educations"
 _ck = partial(named_check_in, _TABLE)
 
 
