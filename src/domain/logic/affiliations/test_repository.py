@@ -7,7 +7,7 @@ delete primitives work against it on the persisted ``affiliations``
 table.
 
 Route-level coverage of the sub-resource CRUD lives in
-``src/domain/routes/test_providers.py::test_*_affiliation_*``.
+``src/domain/routes/test_clinicians.py::test_*_affiliation_*``.
 """
 
 from __future__ import annotations

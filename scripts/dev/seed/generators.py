@@ -241,8 +241,8 @@ def build_row(
     """Generic introspection-driven row builder.
 
     Returns a transient instance with a deterministic PK; the runner
-    `session.merge`'s it for idempotency. Side rows (Provider's
-    auto-Clinician, hierarchy children) are the job of `overrides/`;
+    `session.merge`'s it for idempotency. Side rows (hierarchy children)
+    are the job of `overrides/`;
     this function only handles "single row, all columns from
     introspection."
     """

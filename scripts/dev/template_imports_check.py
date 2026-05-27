@@ -8,7 +8,7 @@ Templates live in two roots:
   entity; no cross-cluster constraint applies inside this root.
 - ``src/domain/templates/`` — per-entity pages. Domain clusters may nest:
 
-  * Top-level clusters: ``<entity>/`` (e.g. ``providers/``, ``users/``).
+  * Top-level clusters: ``<entity>/`` (e.g. ``clinicians/``, ``users/``).
   * Sub-cluster layout: ``<cluster>/<sub>/`` (e.g. ``posts/openings/``,
     ``posts/referrals/``). The cluster's ``_shared/`` partials live at
     ``<cluster>/_shared/``.

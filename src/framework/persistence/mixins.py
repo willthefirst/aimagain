@@ -24,7 +24,7 @@ from sqlalchemy.orm import declared_attr
 class LocationMixin:
     """``(city, state, zip)`` postal-address column group.
 
-    Mixed into :class:`~src.domain.models.providers.Provider` and
+    Mixed into :class:`~src.domain.models.clinicians.Clinician` and
     :class:`~src.domain.models.posts.referral_detail.ReferralDetail`.
     Both consumers want ``nullable=False`` on all three columns and a
     ``location_state`` CHECK constraint against ``US_STATES``; the
