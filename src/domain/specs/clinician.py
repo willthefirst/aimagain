@@ -124,7 +124,7 @@ CLINICIAN_ENTITY: Final[EntitySpec] = EntitySpec(
         "src.domain.logic.clinicians.handlers._assert_clinician_payload_org_ownership"
     ),
     payload_authz_repos=(("organization_repo", OrganizationRepository),),
-    # Provider templates render credential-type display labels and the
+    # Clinician templates render credential-type display labels and the
     # tuples behind the filter/select dropdowns. Tying them to the spec
     # (instead of Jinja globals) means a new credential-type tuple
     # doesn't need an edit in `core/templating.py`. The labels are

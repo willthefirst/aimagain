@@ -51,7 +51,7 @@ class Organization(BaseModel):
     user = relationship("User")
     # ``lazy="selectin"`` so the detail template can resolve the parent's
     # *name* without re-issuing IO inside Jinja (async sessions disallow
-    # implicit lazy-loads). Same pattern as ``Provider.org`` — any
+    # implicit lazy-loads). Same pattern as ``Clinician.org`` — any
     # relationship a template dereferences must be eagerly loaded at the
     # session boundary.
     parent = relationship(

@@ -15,7 +15,7 @@ A resource cluster `<entity>/` typically contains:
 - `form_edit.html` — extends `views/form_edit.html`. Declares `resource_label`, `current_label`, `resource_url`, `resource_detail_url`, and the form body in `content`.
 - `_<role>_actions.html` (cluster-local partial) — owner/admin action button clusters for the entity, `{% include %}`d from the detail page's `actions` block or the card footer on the list page.
 
-Subresource lists (e.g. `/users/{id}/clinicians`) override `{% block breadcrumb %}` to pass a multi-segment chain (`[("Users", …), (username, /users/<id>), ("Clinicians", None)]`); the breadcrumb macro renders only the deepest clickable parent as a back link, so the override's job is to shift the back target one level up the tree (here: back to the user) rather than to the collection. The page still inherits the list view's toolbar + content shape from `views/list.html`. See `users/providers_list.html` (file name retained — the directory cluster is still `providers/` because the model class is `Provider`; only the user-facing surface flipped in #642 PR 4).
+Subresource lists (e.g. `/users/{id}/clinicians`) override `{% block breadcrumb %}` to pass a multi-segment chain (`[("Users", …), (username, /users/<id>), ("Clinicians", None)]`); the breadcrumb macro renders only the deepest clickable parent as a back link, so the override's job is to shift the back target one level up the tree (here: back to the user) rather than to the collection. The page still inherits the list view's toolbar + content shape from `views/list.html`. See `users/clinicians_list.html`.
 
 Pages that don't fit the resource grammar — the `/auth/*` flow's centered single-card layout — extend `base.html` directly and compose the `_shared/` macros by hand.
 
@@ -92,7 +92,7 @@ One word per concept, no synonyms. Replace any of the variants below in any new 
 | The post type announcing program-level intake | intake | enrollment, admission window |
 | The post type seeking placement for a client | referral | seeker post, lead |
 
-The model class `Provider` and the audit string `provider` are historical and kept on the Python side; user-facing copy says `clinician`. See `src/domain/specs/provider.py` for the rename rationale.
+The schema classes `ProviderCreate` / `ProviderRead` / `ProviderUpdate` and the credential model classes `ProviderLicensure` / `ProviderEducation` / `ProviderCertification` are historical names preserved on the Python side; user-facing copy says `clinician`.
 
 ### Shared microcopy
 

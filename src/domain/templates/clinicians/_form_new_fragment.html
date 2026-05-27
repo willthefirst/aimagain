@@ -1,19 +1,16 @@
-{# Clinician (Provider) create-form fragment — just the `<form>`, no
+{# Clinician create-form fragment — just the `<form>`, no
    page chrome.
 
    Rendered in two contexts:
 
-   1. Included by `providers/form_new.html` (the full GET page).
+   1. Included by `clinicians/form_new.html` (the full GET page).
    2. Standalone by `mount_create._render_form_with_errors` on a
       validation-failure re-render. The path-derivation convention
       (`<dir>/_<name>_fragment.html`) requires this file's name.
 
    `with context` lets the form-field macros auto-resolve per-field
    `error=` / `current=` from the `form_errors` / `form_values`
-   injected by `mount_create` on a 422.
-
-   The underlying model class is still `Provider` — only the
-   user-facing surface flipped in #642 PR 4. #}
+   injected by `mount_create` on a 422. #}
 {%- from "_shared/form_fields.html" import entity_select_field, field_for, radio_bool_field, text_field with context -%}
 {%- from "_shared/form_meta.html" import form_with_errors with context -%}
 {%- from "_shared/form_copy.html" import cost_help, npi_help, org_picker_help -%}

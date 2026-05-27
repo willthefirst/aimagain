@@ -2,21 +2,17 @@
 
 The person behind a directory entry — license-holder, name on NPPES, owner of credentials.
 
-`Clinician` was carved out of [`../providers/provider.py`](../providers/provider.py) over the four-PR `Provider → Clinician + Affiliation` split (issue #629). PR 1 (this cluster's birth) moved the `npi` column off `providers`; the credential sub-tables ([`../providers/provider_licensure.py`](../providers/provider_licensure.py), `provider_education.py`, `provider_certification.py`) moved their FK from `providers.id` to `clinicians.id` in #635 PR A — credentials are person-level (a license follows the person across affiliations), and `Clinician` owns the relationships with `cascade="all, delete-orphan"`. See [`../providers/README.md`](../providers/README.md) for the cluster the split came out of, and [`../affiliations/README.md`](../affiliations/README.md) for the practice-role side.
+`Clinician` was carved out of `providers` over the `Provider → Clinician + Affiliation` split (issues #629, #635, #642). The credential sub-tables (`provider_licensure.py`, `provider_education.py`, `provider_certification.py` — class names preserved) have their FK on `clinicians.id`; credentials are person-level (a license follows the person across affiliations). `Clinician` owns the credential relationships with `cascade="all, delete-orphan"`. See [`../affiliations/README.md`](../affiliations/README.md) for the practice-role side.
 
 ## Model-vs-UI vocabulary
 
-This `Clinician` class is the **person row**: NPI, credentials. After #642 PR 4 the user-facing **directory** (URL family `/clinicians/...`, page labels, audit `resource_type`) uses the word "clinician" too — but its rows are `Provider` instances, not `Clinician` instances. The [`Provider`](../providers/provider.py) class remained the directory entry; only its UI surface flipped. See [`../providers/README.md`](../providers/README.md) "Model-vs-UI vocabulary" for the bridge — and the follow-up note about possibly merging the two model classes someday.
-
-So "Clinician" today means two things depending on the layer:
-- **In code** (`from src.domain.models import Clinician`): the person row defined in `clinician.py`.
-- **In URLs, templates, audit logs** (`/clinicians/...`, "Clinician not found", `resource_type="clinician"`): the directory entry, which is a `Provider` instance under the hood.
+This `Clinician` class is the **directory entry**: the row that `/clinicians/...` URLs, templates, and audit logs (`resource_type="clinician"`) refer to. It owns NPI, credentials, and affiliations. The legacy `Provider` class that previously held the directory role has been dropped; `Clinician` is now the single model for both the person and the directory entry.
 
 ## Files
 
-- `clinician.py` — `Clinician`. Holds `npi` (`Text`, nullable; `ck_clinicians_npi_format` CHECK enforces NULL or exactly 10 ASCII digits — defense-in-depth behind the Pydantic `_validate_npi`). `clinician.providers` is the back-relationship to `Provider` (1:many in the target model, 1:1 today through PR 4 — the FK on `providers.clinician_id` is non-UNIQUE so attaching a second provider is a data change, not a schema change). Also owns the credential lists: `clinician.licensures` / `.educations` / `.certifications` (`cascade="all, delete-orphan"`, `lazy="selectin"`) — `Provider.licensures` etc. are `@property` proxies delegating here so route handlers and templates keep their existing `provider.<credential>` shape. The framework's NPPES verification pipeline reads `clinician.npi` through the `Provider.clinician` join — no separate `Clinician` route surface.
-- `test_clinician.py` — model-layer regression coverage (auto-create-on-Provider-init, write-routing setter, the NPI CHECK constraint).
+- `clinician.py` — `Clinician`. Holds `npi` (`Text`, nullable; `ck_clinicians_npi_format` CHECK enforces NULL or exactly 10 ASCII digits — defense-in-depth behind the Pydantic `_validate_npi`). Owns the credential lists: `clinician.licensures` / `.educations` / `.certifications` (`cascade="all, delete-orphan"`, `lazy="selectin"`). Also owns `clinician.affiliations` (the per-(clinician × org) role rows). The NPPES verification pipeline reads `clinician.npi` directly.
+- `test_clinician.py` — model-layer regression coverage (NPI CHECK constraint, credential relationships).
 
 ## Why a separate cluster
 
-A `Clinician` is *the person*; a `Provider` (today) is *the person's role at one practice*. Conflating them on one table broke the multi-affiliation clinician (private practice + Tuesdays at a community clinic + telehealth contractor across two platforms). Splitting forces credentials to live with the person — so a clinician adding a second affiliation doesn't fragment their license list — and lets per-(clinician × org) attributes vary independently. The split is in progress; until it completes, `Provider` keeps the user-facing identity and surfaces person-attributes via `provider.clinician.X` proxies.
+A `Clinician` is *the person*; an `Affiliation` is *the person's role at one practice*. Separating them lets credentials live with the person (so adding a second affiliation doesn't fragment a license list) and lets per-(clinician × org) attributes vary independently across affiliations.

@@ -72,9 +72,9 @@ Examples:
     Detail toolbar (inside the entity's `{% block actions %}`):
         actions(
             wrapper="toolbar",
-            edit_url=entity_form_url('clinician', id=provider.id),
+            edit_url=entity_form_url('clinician', id=clinician.id),
             edit_label="Edit clinician",
-            delete_url=entity_url('clinician', id=provider.id),
+            delete_url=entity_url('clinician', id=clinician.id),
             delete_confirm="Permanently delete?",
         )
 #}

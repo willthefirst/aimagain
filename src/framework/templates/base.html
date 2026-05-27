@@ -65,7 +65,7 @@
       /* Card chrome (background, border, padding, rounded corners,
          tinted header/footer bands) is reserved for items inside a
          possible list of items — post-list cards, the per-affiliation
-         loop in `providers/detail.html`, etc. Those render as
+         loop in `clinicians/detail.html`, etc. Those render as
          `<article class="entity-card">` and pick up the chrome from
          Pico's default `<article>` element styling automatically; no
          rule below targets them. Single-item containers (detail-page
@@ -117,7 +117,7 @@
       .glyph-list { padding-left: 0; margin: 0; }
       /* Definition lists — the canonical "fact row" shape used by every
          list-card facts block and resource detail view (`_facts_block`,
-         `providers/detail`, `programs/detail`, `users/detail`,
+         `clinicians/detail`, `programs/detail`, `users/detail`,
          `organizations/detail`). Two rules to know:
 
            1) **Markup contract.** Templates wrap each `<dt>/<dd>` pair
@@ -529,7 +529,7 @@
           grid-template-columns: 1fr;
         }
       }
-      /* Credential rows (provider licensures / education / certifications)
+      /* Credential rows (clinician licensures / education / certifications)
          render as flat rows inside an outer `<section>` (edit or
          detail), so a card-on-card pattern would read as visual
          noise. The row's vocabulary is just a stacked

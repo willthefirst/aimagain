@@ -1,7 +1,7 @@
 """Wire schemas for the `Program` entity.
 
 A :class:`Program` is a treatment offering owned by an
-:class:`Organization`. The wire surface mirrors Provider's shape —
+:class:`Organization`. The wire surface mirrors Clinician's shape —
 ``ProgramRead`` carries an inline ``org_name`` (sourced from
 ``program.organization.name`` via ``from_attributes``) so templates
 and audit snapshots read a flat string without dereferencing the
@@ -13,7 +13,7 @@ schema's accepted values stay in lockstep with the DB CHECK
 constraint.
 
 No insurance fields — intentional grammar. Insurance is modeled on
-:class:`Provider` (who delivers care) and on per-Post detail rows;
+:class:`Clinician` (who delivers care) and on per-Post detail rows;
 Program is the offering, not the carrier of insurance.
 """
 

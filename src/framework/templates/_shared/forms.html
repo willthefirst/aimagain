@@ -2,14 +2,14 @@
 {# Single-fieldset add form. Wraps caller-supplied field markup in
 `<form><fieldset><legend>…</legend>{{ caller() }}</fieldset><button type="submit">…</button></form>`. Used by sub-resource sections that
 have the same shape (legend + flat field list + submit button), e.g. the
-licensure / education / certification add forms in providers/form_edit.html.
+licensure / education / certification add forms in clinicians/form_edit.html.
 
 Forms with multiple fieldsets or non-trivial structure should stay
 hand-rolled — this macro deliberately covers only the single-fieldset
 case.
 
 Example:
-  {% call inline_add_form("/clinicians/" ~ provider.id ~ "/licensures",
+  {% call inline_add_form("/clinicians/" ~ clinician.id ~ "/licensures",
                           "Add licensure", "Add licensure") %}
     {{ select_field(...) }}
     {{ text_field(...) }}
