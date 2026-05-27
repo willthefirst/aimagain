@@ -34,7 +34,7 @@ def mount_related_list(
 
     ``template`` is a per-mount kwarg (not on the spec) because related-list
     templates often live in the parent's namespace
-    (``users/providers_list.html``, not ``providers/list.html``) — making
+    (``users/clinicians_list.html``, not ``clinicians/list.html``) — making
     it a per-mount knob keeps both the parent and child specs reusable.
 
     Auth follows the parent's ``read_user_dep`` (the URL is rooted at the

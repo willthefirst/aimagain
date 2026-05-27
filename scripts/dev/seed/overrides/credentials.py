@@ -1,4 +1,4 @@
-"""Provider credentials override — fan-out N per clinician.
+"""Clinician credentials override — fan-out N per clinician.
 
 The generic generator would create exactly `COUNT` rows; for
 credentials we want a per-clinician fan-out instead (1-3 licensures,

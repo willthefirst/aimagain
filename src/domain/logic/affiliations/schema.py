@@ -1,13 +1,13 @@
-"""Wire schemas for the `Affiliation` sub-resource of `Provider`.
+"""Wire schemas for the `Affiliation` sub-resource of `Clinician`.
 
-A `Provider` may hold multiple `Affiliation` rows after #642 PR 1 (the
+A `Clinician` may hold multiple `Affiliation` rows after #642 PR 1 (the
 UNIQUE on `affiliations.provider_id` was dropped in `7c3c296c9429`).
 The clinician edit page surfaces them as an inline list — same UX
 pattern as licensures — so each row CRUDs through its own URLs under
 ``/clinicians/{clinician_id}/affiliations/{affiliation_id}``.
 
 The fields mirror the per-role attributes on `ProviderCreate` /
-`ProviderUpdate` (`src/domain/logic/providers/schema.py`) — both
+`ProviderUpdate` (`src/domain/logic/clinicians/schema.py`) — both
 schemas land at the same SQLAlchemy table — except that there is no
 `(licensures|educations|certifications)` collection here (credentials
 are person-level, FK to `clinicians.id` after #635 PR A; they don't

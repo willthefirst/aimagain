@@ -1,14 +1,13 @@
-"""`LICENSURE_ENTITY`: provider's licensure credential subentity.
+"""`LICENSURE_ENTITY`: clinician's licensure credential subentity.
 
-Owned subentity of `Provider`: routes nest under
+Owned subentity of `Clinician`: routes nest under
 ``/clinicians/{clinician_id}/licensures/{licensure_id}`` (URL family
-renamed in #642 PR 4; model class stays `Provider`). Shape is
-identical to the other provider credentials — see `_credential.py`
+renamed in #642 PR 4; model class stays `ProviderLicensure`). Shape is
+identical to the other clinician credentials — see `_credential.py`
 for the shared factory.
 
-Read by `src/domain/routes/providers.py` (derives `LICENSURE_SPEC` for
-the mount helpers) and `src/logic/providers/provider_processing.py`
-(reads `LICENSURE_ENTITY.audit` for the `mutate(...)` binding).
+Read by `src/domain/routes/clinicians.py` (derives `LICENSURE_SPEC` for
+the mount helpers).
 """
 
 from typing import Final

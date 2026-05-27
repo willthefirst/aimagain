@@ -46,7 +46,7 @@ def test_is_dynamic_url_recognises_template_only_urls():
     # Plain literal → in scope.
     assert _is_dynamic_url("/auth/forgot-password") is False
     # String concatenation → dynamic.
-    assert _is_dynamic_url('"/clinicians/" ~ provider.id ~ "/licensures"') is True
+    assert _is_dynamic_url('"/clinicians/" ~ clinician.id ~ "/licensures"') is True
 
 
 # --- Form extraction ----------------------------------------------------------

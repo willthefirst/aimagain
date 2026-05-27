@@ -106,8 +106,8 @@ async def read_home(
     _user=Depends(current_active_user),
     post_repo=Depends(get_post_repository),
 ):
-    providers = getattr(_user, "clinicians", [])
-    p = providers[0] if providers else None
+    clinicians = getattr(_user, "clinicians", [])
+    p = clinicians[0] if clinicians else None
     if p and (p.first_name or p.last_name):
         display_name = " ".join(filter(None, [p.first_name, p.last_name]))
     else:
