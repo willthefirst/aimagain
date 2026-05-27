@@ -13,12 +13,12 @@ from src.domain.models import (
 )
 from src.framework.audit.repository import AuditRepository
 from tests.helpers import (
+    clinician_payload,
     create_test_user,
+    make_clinician_with_org,
     make_organization_row,
     make_provider_licensure,
-    make_provider_with_org,
     promote_to_admin,
-    provider_payload,
 )
 
 pytestmark = pytest.mark.asyncio
@@ -50,7 +50,7 @@ async def _seed_provider_for(
     **overrides,
 ) -> uuid.UUID:
     """Insert a provider owned by `user_id` and return its id."""
-    provider = make_provider_with_org(owner_id=user_id, **overrides)
+    provider = make_clinician_with_org(owner_id=user_id, **overrides)
     async with db_test_session_manager() as session:
         async with session.begin():
             session.add(provider)
@@ -106,7 +106,7 @@ async def test_create_provider_happy_path(
     )
     response = await authenticated_client.post(
         "/clinicians",
-        data=provider_payload(org_id=str(org_id)),
+        data=clinician_payload(org_id=str(org_id)),
     )
 
     assert response.status_code == 201
@@ -153,7 +153,7 @@ async def test_create_provider_form_error_render_is_wired(
     org_id = await _seed_org(
         db_test_session_manager, owner_id=logged_in_user.id, name="Acme"
     )
-    payload = provider_payload(org_id=str(org_id))
+    payload = clinician_payload(org_id=str(org_id))
     payload["in_person_sessions"] = "not-a-valid-option"
     response = await authenticated_client.post(
         "/clinicians",
@@ -185,13 +185,13 @@ async def test_create_provider_allows_multiple_per_user(
         db_test_session_manager, owner_id=logged_in_user.id, name="Second"
     )
     first = await authenticated_client.post(
-        "/clinicians", data=provider_payload(org_id=str(org_first))
+        "/clinicians", data=clinician_payload(org_id=str(org_first))
     )
     assert first.status_code == 201
     first_id = uuid.UUID(first.json()["id"])
 
     second = await authenticated_client.post(
-        "/clinicians", data=provider_payload(org_id=str(org_second))
+        "/clinicians", data=clinician_payload(org_id=str(org_second))
     )
     assert second.status_code == 201
     second_id = uuid.UUID(second.json()["id"])
@@ -225,7 +225,7 @@ async def test_create_provider_rejects_org_owned_by_another_user(
     )
 
     response = await authenticated_client.post(
-        "/clinicians", data=provider_payload(org_id=str(other_org_id))
+        "/clinicians", data=clinician_payload(org_id=str(other_org_id))
     )
     assert response.status_code == 403
 
@@ -239,7 +239,7 @@ async def test_create_provider_rejects_nonexistent_org(
     would otherwise produce."""
     bogus = uuid.uuid4()
     response = await authenticated_client.post(
-        "/clinicians", data=provider_payload(org_id=str(bogus))
+        "/clinicians", data=clinician_payload(org_id=str(bogus))
     )
     assert response.status_code == 404
 
@@ -261,7 +261,7 @@ async def test_create_provider_allows_superuser_to_attach_to_any_org(
     )
 
     response = await authenticated_client.post(
-        "/clinicians", data=provider_payload(org_id=str(other_org_id))
+        "/clinicians", data=clinician_payload(org_id=str(other_org_id))
     )
     assert response.status_code == 201
 

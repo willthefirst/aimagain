@@ -1,0 +1,19 @@
+{% extends "views/list.html" %}
+{%- from "_shared/_clinician_card.html" import clinician_card -%}
+{% block resource_label %}Clinicians{% endblock %}
+{% block actions %}
+  {% if is_authenticated %}
+    <li>
+      <a href="{{ entity_form_url('clinician') }}" role="button">{{ entity_create_label("clinician") }}</a>
+    </li>
+  {% endif %}
+{% endblock %}
+{% block content %}
+  {% if clinicians %}
+    <section id="clinicians-list">
+      {%- for clinician in clinicians %}{{ clinician_card(clinician) }}{%- endfor %}
+      </section>
+    {% else %}
+      <p>No clinicians found.</p>
+    {% endif %}
+  {% endblock %}

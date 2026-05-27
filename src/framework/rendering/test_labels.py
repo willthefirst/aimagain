@@ -94,9 +94,9 @@ def test_edit_label_kind_locked_face_uses_bound_kind_label():
 
 
 def test_filter_label_uses_url_collection():
-    from src.domain.specs.provider import PROVIDER_ENTITY
+    from src.domain.specs.clinician import CLINICIAN_ENTITY
 
-    assert filter_label_for(PROVIDER_ENTITY) == "Filter clinicians"
+    assert filter_label_for(CLINICIAN_ENTITY) == "Filter clinicians"
 
 
 # --- Registry-driven structural pins -----------------------------------

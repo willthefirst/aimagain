@@ -28,21 +28,21 @@ No `/posts` collection or detail URL exists.
 """
 
 from . import (
+    clinicians,
     favorites,
     openings,
     organizations,
     programs,
-    providers,
     referrals,
     users,
 )
 
 __all__ = [
+    "clinicians",
     "favorites",
     "openings",
     "organizations",
     "programs",
-    "providers",
     "referrals",
     "users",
 ]

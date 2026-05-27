@@ -26,11 +26,11 @@ from src.domain.models import (
 from src.framework.persistence.base_repository import BaseRepository
 from tests.helpers import (
     create_test_user,
+    make_clinician_with_org,
     make_intake_detail,
     make_opening_detail,
     make_organization_row,
     make_program,
-    make_provider_with_org,
     make_referral_detail,
 )
 
@@ -53,7 +53,7 @@ async def _seed_owner_and_clinician(db_test_session_manager, **clinician_overrid
     in the DB to satisfy the FK.
     """
     owner = create_test_user(username=f"owner-{uuid.uuid4()}")
-    clinician = make_provider_with_org(owner_id=owner.id, **clinician_overrides)
+    clinician = make_clinician_with_org(owner_id=owner.id, **clinician_overrides)
     async with db_test_session_manager() as session:
         async with session.begin():
             session.add(owner)

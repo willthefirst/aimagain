@@ -21,8 +21,8 @@ import logging
 
 from pydantic import BaseModel
 
+from src.domain.logic.clinicians.repository import ClinicianRepository
 from src.domain.logic.programs.repository import ProgramRepository
-from src.domain.logic.providers.repository import ClinicianRepository
 from src.domain.models import Clinician, Program, User
 from src.framework.authz import assert_fk_ownership
 

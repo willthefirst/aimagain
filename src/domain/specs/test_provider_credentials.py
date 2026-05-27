@@ -11,7 +11,7 @@ every mutation, and the audit-action-stem override (the entity's
 
 import pytest
 
-from src.domain.specs.provider import PROVIDER_ENTITY
+from src.domain.specs.clinician import CLINICIAN_ENTITY
 from src.domain.specs.provider_certification import CERTIFICATION_ENTITY
 from src.domain.specs.provider_education import EDUCATION_ENTITY
 from src.domain.specs.provider_licensure import LICENSURE_ENTITY
@@ -37,7 +37,7 @@ def test_parent_is_provider_entity(entity, _stem):
     """The parent chain is what `mount_entity`'s parent-id-walk + the
     generic `handle_create`/`handle_update` subentity branch read.
     Pinning identity here means the chain can't silently re-root."""
-    assert entity.parent is PROVIDER_ENTITY
+    assert entity.parent is CLINICIAN_ENTITY
 
 
 @pytest.mark.parametrize("entity,_stem", CREDENTIALS)

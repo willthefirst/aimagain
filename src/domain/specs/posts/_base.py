@@ -38,13 +38,13 @@ Each face overrides:
 
 from typing import Final
 
+from src.domain.logic.clinicians.repository import ClinicianRepository
 from src.domain.logic.posts.repository import get_post_repository
 from src.domain.logic.posts.schema import (
     post_audit_snapshot,
     post_read_adapter,
 )
 from src.domain.logic.programs.repository import ProgramRepository
-from src.domain.logic.providers.repository import ClinicianRepository
 from src.domain.models import POST_KINDS, Post
 from src.domain.models.enums import (
     CLIENT_AGE_GROUP_LABELS,

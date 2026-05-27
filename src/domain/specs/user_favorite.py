@@ -27,7 +27,7 @@ from typing import Final
 from src.domain.logic.favorites.repository import get_user_favorite_repository
 from src.domain.logic.favorites.schema import UserFavoriteAuditSnapshot
 from src.domain.models import UserFavorite
-from src.domain.specs.provider import PROVIDER_ENTITY
+from src.domain.specs.clinician import CLINICIAN_ENTITY
 from src.domain.specs.user import USER_ENTITY
 from src.framework.audit.core import AuditAction, make_snapshotter
 from src.framework.dispatch.entity_spec import (
@@ -63,7 +63,7 @@ FAVORITE_ENTITY: Final[EntitySpec] = EntitySpec(
     edge_audit=FAVORITE_EDGE_AUDIT,
     relation=M2NRelation(
         from_entity=USER_ENTITY,
-        to_entity=PROVIDER_ENTITY,
+        to_entity=CLINICIAN_ENTITY,
         join_table="user_favorites",
         from_attr="user_id",
         to_attr="clinician_id",

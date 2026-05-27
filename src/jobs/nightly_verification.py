@@ -19,7 +19,7 @@ import logging
 import httpx
 
 from src.db import async_session_maker
-from src.domain.logic.providers.repository import ClinicianRepository
+from src.domain.logic.clinicians.repository import ClinicianRepository
 from src.domain.logic.verifications.handlers import run_clinician_verification
 from src.domain.logic.verifications.repository import VerificationRepository
 from src.framework.audit.repository import AuditRepository

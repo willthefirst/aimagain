@@ -9,7 +9,7 @@ from uuid import UUID
 
 import httpx
 
-from src.domain.logic.providers.repository import ClinicianRepository
+from src.domain.logic.clinicians.repository import ClinicianRepository
 from src.domain.logic.verifications.nppes import NppesResult, nppes_lookup
 from src.domain.logic.verifications.oig import oig_check
 from src.domain.logic.verifications.repository import VerificationRepository

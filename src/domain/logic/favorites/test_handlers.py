@@ -20,19 +20,19 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from starlette.requests import Request
 
+from src.domain.logic.clinicians.repository import ClinicianRepository
 from src.domain.logic.favorites.handlers import (
     handle_add_favorite,
     handle_list_my_favorites,
     handle_remove_favorite,
 )
 from src.domain.logic.favorites.repository import UserFavoriteRepository
-from src.domain.logic.providers.repository import ClinicianRepository
 from src.domain.models import User, UserFavorite
 from src.framework.audit.core import AuditAction
 from src.framework.audit.log import AuditLog
 from src.framework.audit.repository import AuditRepository
 from src.framework.http.exceptions import NotFoundError
-from tests.helpers import create_test_user, make_provider_with_org
+from tests.helpers import create_test_user, make_clinician_with_org
 
 pytestmark = pytest.mark.asyncio
 
@@ -68,7 +68,7 @@ async def _seed_provider(
     practice_name: str = "Acme Health",
 ):
     owner = create_test_user(username=f"owner-{uuid.uuid4()}")
-    provider = make_provider_with_org(owner_id=owner.id, practice_name=practice_name)
+    provider = make_clinician_with_org(owner_id=owner.id, practice_name=practice_name)
     async with db_test_session_manager() as session:
         async with session.begin():
             session.add(owner)
@@ -296,6 +296,6 @@ async def test_list_my_favorites_returns_only_self_edges(
             requesting_user=me,
         )
 
-    names = [p.org.name for p in context["providers"]]
+    names = [p.org.name for p in context["clinicians"]]
     assert names == ["Mine"]
     assert context["current_user"] == me

@@ -19,7 +19,7 @@ import pytest
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from src.domain.logic.providers.repository import ClinicianRepository
+from src.domain.logic.clinicians.repository import ClinicianRepository
 from src.domain.logic.verifications import oig as oig_module
 from src.domain.logic.verifications.handlers import (
     VERIFICATION_RESOURCE,
@@ -30,7 +30,7 @@ from src.domain.models import Clinician, User, Verification
 from src.framework.audit.log import AuditLog
 from src.framework.audit.repository import AuditRepository
 from src.framework.http.exceptions import NotFoundError
-from tests.helpers import create_test_user, make_provider_with_org
+from tests.helpers import create_test_user, make_clinician_with_org
 
 pytestmark = pytest.mark.asyncio
 
@@ -88,7 +88,7 @@ async def _seed_clinician(
     async with db_test_session_manager() as session:
         async with session.begin():
             session.add(owner)
-            clinician = make_provider_with_org(
+            clinician = make_clinician_with_org(
                 owner_id=owner.id,
                 npi=npi,
                 first_name=first_name,

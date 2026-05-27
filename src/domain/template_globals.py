@@ -15,6 +15,7 @@ Two trigger points cover the real load paths:
   global.
 """
 
+from src.domain.logic.clinicians.view import clinician_card_view
 from src.domain.logic.posts.schema import (
     ClinicianOpeningCreate,
     ProgramIntakeCreate,
@@ -27,7 +28,6 @@ from src.domain.logic.posts.view import (
     post_row_summary,
     referral_headline,
 )
-from src.domain.logic.providers.view import provider_card_view
 from src.domain.models import enums
 from src.framework.rendering.form_fields import register_choice_labels
 from src.framework.rendering.templating import register_template_globals
@@ -80,8 +80,8 @@ register_template_globals(
     INSURANCE_POSTURE_LABELS=enums.INSURANCE_POSTURE_LABELS,
     INSURANCE_POSTURE_ICONS=enums.INSURANCE_POSTURE_ICONS,
     # `LICENSE_TYPES`, `EDUCATION_TYPES`, `CERTIFICATION_TYPES` and
-    # their `_LABELS` are provider-only — they flow into the context
-    # via `PROVIDER_ENTITY.static_context` (merged by `handle_detail` /
+    # their `_LABELS` are clinician-only — they flow into the context
+    # via `CLINICIAN_ENTITY.static_context` (merged by `handle_detail` /
     # `handle_list` / `handle_get_edit_form`) so the spec is the single
     # binding site. `register_choice_labels(...)` for those tuples
     # stays below (the form-rendering macro looks up labels by tuple
@@ -111,10 +111,10 @@ register_template_globals(
     # `post_feed_headline(post)` — two-part "<identity> — <focus>" headline
     # for the feed-row component in home and browse list views.
     post_feed_headline=post_feed_headline,
-    # `provider_card_view(provider)` is the unified view-model
-    # `providers/detail.html` reads from — see its docstring in
-    # `src.domain.logic.providers.view`.
-    provider_card_view=provider_card_view,
+    # `clinician_card_view(clinician)` is the unified view-model
+    # `clinicians/detail.html` reads from — see its docstring in
+    # `src.domain.logic.clinicians.view`.
+    clinician_card_view=clinician_card_view,
 )
 
 # Register the choice-tuple → labels-dict mapping that `field_spec` uses

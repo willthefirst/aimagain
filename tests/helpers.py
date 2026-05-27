@@ -200,7 +200,7 @@ def make_opening_detail(*, clinician_id: UUID, **overrides: Any) -> OpeningDetai
 # turns "I forgot the FK" into a `TypeError` at the factory call site
 # instead of a `NOT NULL` violation at flush time.
 
-_PROVIDER_DEFAULTS: dict[str, Any] = {
+_CLINICIAN_DEFAULTS: dict[str, Any] = {
     "location_city": "Springfield",
     "location_state": "IL",
     "location_zip": "62701",
@@ -244,44 +244,47 @@ def _drop_none(d: dict[str, Any]) -> dict[str, Any]:
     return {k: v for k, v in d.items() if v is not None}
 
 
-def provider_payload(**overrides: Any) -> dict[str, Any]:
-    """Build a wire-valid `POST /providers` form-encoded payload.
+def clinician_payload(**overrides: Any) -> dict[str, Any]:
+    """Build a wire-valid `POST /clinicians` form-encoded payload.
     Returns a fresh flat dict each call. Sub-entity arrays are intentionally
     omitted — credentials are added via the dedicated sub-resource endpoints.
 
     ``org_id`` is required on the wire. Callers that hit a real DB must
     pass an existing Organization's id; pure schema-validation tests that
     don't persist can pass any UUID."""
-    return _drop_none({**_PROVIDER_DEFAULTS, **overrides})
+    return _drop_none({**_CLINICIAN_DEFAULTS, **overrides})
+
+
+# Backwards-compatible alias.
+provider_payload = clinician_payload
 
 
 def licensure_payload(**overrides: Any) -> dict[str, Any]:
-    """Build a wire-valid `POST /providers/{id}/licensures` payload."""
+    """Build a wire-valid `POST /clinicians/{id}/licensures` payload."""
     return _drop_none({**_PROVIDER_LICENSURE_DEFAULTS, **overrides})
 
 
 def education_payload(**overrides: Any) -> dict[str, Any]:
-    """Build a wire-valid `POST /providers/{id}/educations` payload."""
+    """Build a wire-valid `POST /clinicians/{id}/educations` payload."""
     return _drop_none({**_PROVIDER_EDUCATION_DEFAULTS, **overrides})
 
 
 def certification_payload(**overrides: Any) -> dict[str, Any]:
-    """Build a wire-valid `POST /providers/{id}/certifications` payload."""
+    """Build a wire-valid `POST /clinicians/{id}/certifications` payload."""
     return _drop_none({**_PROVIDER_CERTIFICATION_DEFAULTS, **overrides})
 
 
 def make_provider(*, owner_id: UUID, **overrides: Any) -> Clinician:
     """Build a `Clinician` ORM row with CHECK-valid defaults.
 
-    ``Clinician.org_id`` is NOT NULL (the former ``practice_name``
-    mirror was dropped). Callers persisting the returned row must pass
-    ``org_id=<existing-org.id>`` in ``overrides`` (Org persisted
+    ``Clinician.org_id`` is NOT NULL. Callers persisting the returned row
+    must pass ``org_id=<existing-org.id>`` in ``overrides`` (Org persisted
     separately via ``make_organization_row`` + ``session.add``), or use
-    :func:`make_provider_with_org` which builds the Org + Clinician in
+    :func:`make_clinician_with_org` which builds the Org + Clinician in
     one call. Bare ORM constructors without an ``org_id`` will trip the
     NOT NULL constraint at flush time.
     """
-    return Clinician(owner_id=owner_id, **{**_PROVIDER_DEFAULTS, **overrides})
+    return Clinician(owner_id=owner_id, **{**_CLINICIAN_DEFAULTS, **overrides})
 
 
 def make_organization_row(
@@ -339,9 +342,7 @@ def make_clinician_with_org(
     return clinician
 
 
-# Backwards-compatible alias — callers that haven't been updated yet can
-# still import ``make_provider_with_org``.
-make_provider_with_org = make_clinician_with_org
+make_provider_with_org = make_clinician_with_org  # backwards-compat alias
 
 
 def make_provider_licensure(
@@ -350,9 +351,7 @@ def make_provider_licensure(
     **overrides: Any,
 ) -> ProviderLicensure:
     """Build a `ProviderLicensure` ORM row with CHECK-valid defaults.
-    Credentials FK to `clinicians.id` after #635 PR A — pass
-    `clinician_id=provider.clinician_id` after the provider has been
-    flushed (or `provider.clinician.id` if the clinician is flushed)."""
+    Pass `clinician_id=clinician.id` after the clinician has been flushed."""
     return ProviderLicensure(
         clinician_id=clinician_id,
         **{**_PROVIDER_LICENSURE_DEFAULTS, **overrides},

@@ -14,7 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from src.domain.logic.verifications.repository import VerificationRepository
 from src.domain.models import Clinician, Verification
-from tests.helpers import create_test_user, make_provider_with_org
+from tests.helpers import create_test_user, make_clinician_with_org
 
 pytestmark = pytest.mark.asyncio
 
@@ -26,7 +26,7 @@ async def _seed_provider(
     async with db_test_session_manager() as session:
         async with session.begin():
             session.add(user)
-            provider = make_provider_with_org(owner_id=user.id)
+            provider = make_clinician_with_org(owner_id=user.id)
             session.add(provider)
     return provider
 

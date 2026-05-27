@@ -17,8 +17,8 @@ from uuid import UUID
 
 from fastapi import Request
 
+from src.domain.logic.clinicians.repository import ClinicianRepository
 from src.domain.logic.favorites.repository import UserFavoriteRepository
-from src.domain.logic.providers.repository import ClinicianRepository
 from src.domain.models import Clinician, User, UserFavorite
 from src.domain.specs.user_favorite import FAVORITE_ENTITY
 from src.framework.audit.core import record_audit
@@ -129,7 +129,7 @@ async def handle_list_my_favorites(
     )
     return {
         "request": request,
-        "providers": clinicians,  # template variable kept for backward compat
+        "clinicians": clinicians,
         "current_user": requesting_user,
         "page_meta": page_meta,
         "paginator_base_query": base_query(request),

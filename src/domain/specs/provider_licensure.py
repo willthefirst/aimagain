@@ -13,7 +13,7 @@ the mount helpers) and `src/logic/providers/provider_processing.py`
 
 from typing import Final
 
-from src.domain.logic.providers.schema import (
+from src.domain.logic.clinicians.schema import (
     ProviderLicensureCreate,
     ProviderLicensureRead,
     ProviderLicensureUpdate,

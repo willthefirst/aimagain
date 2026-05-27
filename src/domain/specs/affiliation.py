@@ -8,7 +8,7 @@ is independently created, updated, or deleted via the framework's
 sub-resource CRUD factories.
 
 Read by `src/domain/routes/providers.py` (registers the entity as an
-owned subentity of `PROVIDER_ENTITY` via `mount_entity`).
+owned subentity of `CLINICIAN_ENTITY` via `mount_entity`).
 
 A Clinician may hold multiple Affiliation rows; before that there was
 a UNIQUE constraint on the FK column.
@@ -23,7 +23,7 @@ from src.domain.logic.affiliations.schema import (
     AffiliationUpdate,
 )
 from src.domain.models import Affiliation
-from src.domain.specs.provider import PROVIDER_ENTITY, _provider_form_redirect
+from src.domain.specs.clinician import CLINICIAN_ENTITY, _clinician_form_redirect
 from src.framework.dispatch.entity_spec import (
     AUTHENTICATED,
     OWNER_OR_ADMIN,
@@ -36,7 +36,7 @@ AFFILIATION_ENTITY: Final[EntitySpec] = EntitySpec(
     url_collection="affiliations",
     id_param="affiliation_id",
     model=Affiliation,
-    parent=PROVIDER_ENTITY,
+    parent=CLINICIAN_ENTITY,
     # Default check compares `affiliation.clinician_id == parent.id`
     # (derived from `spec.parent.name` = "clinician"). That is exactly
     # the FK we have after removing `affiliations.provider_id`. No
@@ -52,7 +52,7 @@ AFFILIATION_ENTITY: Final[EntitySpec] = EntitySpec(
     routes=RouteSet(create=True, update=True, delete=True),
     # Sub-row mutations redirect HTMX clients back to the parent
     # provider's edit form so the user keeps editing in place.
-    create_redirect=_provider_form_redirect,
-    update_redirect=_provider_form_redirect,
-    delete_redirect=_provider_form_redirect,
+    create_redirect=_clinician_form_redirect,
+    update_redirect=_clinician_form_redirect,
+    delete_redirect=_clinician_form_redirect,
 )

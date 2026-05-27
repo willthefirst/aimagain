@@ -2,7 +2,7 @@
 
 from types import SimpleNamespace
 
-from src.domain.logic.providers.view import (
+from src.domain.logic.clinicians.view import (
     _insurance_summary,
     affiliation_card_view,
     provider_card_view,

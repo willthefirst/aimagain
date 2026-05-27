@@ -6,7 +6,7 @@ what's unique to favorites: the `EdgeAudit` verb→action map, the
 declaration (edges live outside `RouteSet`).
 """
 
-from src.domain.specs.provider import PROVIDER_ENTITY
+from src.domain.specs.clinician import CLINICIAN_ENTITY
 from src.domain.specs.user import USER_ENTITY
 from src.domain.specs.user_favorite import FAVORITE_EDGE_AUDIT, FAVORITE_ENTITY
 from src.framework.audit.core import AuditAction
@@ -41,7 +41,7 @@ def test_edge_audit_snapshot_callable():
 def test_relation_endpoints():
     assert FAVORITE_ENTITY.relation is not None
     assert FAVORITE_ENTITY.relation.from_entity is USER_ENTITY
-    assert FAVORITE_ENTITY.relation.to_entity is PROVIDER_ENTITY
+    assert FAVORITE_ENTITY.relation.to_entity is CLINICIAN_ENTITY
 
 
 def test_relation_join_shape():

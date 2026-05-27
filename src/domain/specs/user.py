@@ -10,8 +10,8 @@ Read by:
     projection, and `USER_ENTITY.state_axis("activation").action`
     for the activation audit row.
 
-The related-list subresource references `PROVIDER_ENTITY` from
-`src.domain.specs.provider` — the cross-spec reference stays
+The related-list subresource references `CLINICIAN_ENTITY` from
+`src.domain.specs.clinician` — the cross-spec reference stays
 inside `specs/` so the layer-direction inversion that
 A1 documented (`api/common -> api/routes`) is resolved.
 """
@@ -19,7 +19,7 @@ A1 documented (`api/common -> api/routes`) is resolved.
 from typing import Final
 
 from src.auth_config import current_active_user
-from src.domain.logic.providers.repository import ClinicianRepository
+from src.domain.logic.clinicians.repository import ClinicianRepository
 from src.domain.logic.users.repository import get_user_repository
 from src.domain.logic.users.schema import (
     UserActivationAuditSnapshot,
@@ -27,7 +27,7 @@ from src.domain.logic.users.schema import (
     UserAuditSnapshot,
 )
 from src.domain.models import User
-from src.domain.specs.provider import PROVIDER_ENTITY
+from src.domain.specs.clinician import CLINICIAN_ENTITY
 from src.framework.audit.core import AuditAction
 from src.framework.authz import is_self_or_admin
 from src.framework.dispatch.entity_spec import (
@@ -80,11 +80,11 @@ USER_ENTITY: Final[EntitySpec] = EntitySpec(
     ),
     subresources=(
         RelatedListSubresource(
-            child_spec=PROVIDER_ENTITY.to_resource_spec(),
-            template="users/providers_list.html",
+            child_spec=CLINICIAN_ENTITY.to_resource_spec(),
+            template="users/clinicians_list.html",
             singleton_alias=("me", current_active_user),
             handler_path=(
-                "src.domain.logic.providers.handlers.handle_list_user_providers"
+                "src.domain.logic.clinicians.handlers.handle_list_user_clinicians"
             ),
         ),
     ),

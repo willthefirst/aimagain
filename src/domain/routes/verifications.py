@@ -20,7 +20,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, Response, status
 
 from src.auth_config import current_admin_user
-from src.domain.logic.providers.repository import (
+from src.domain.logic.clinicians.repository import (
     ClinicianRepository,
     get_clinician_repository,
 )

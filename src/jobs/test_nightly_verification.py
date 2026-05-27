@@ -17,7 +17,7 @@ import pytest
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from src.jobs import nightly_verification
-from tests.helpers import create_test_user, make_provider_with_org
+from tests.helpers import create_test_user, make_clinician_with_org
 
 pytestmark = pytest.mark.asyncio
 
@@ -33,7 +33,7 @@ async def _seed_clinicians(
                 user = create_test_user(username=f"owner-{i}")
                 session.add(user)
                 await session.flush()
-                clinician = make_provider_with_org(
+                clinician = make_clinician_with_org(
                     owner_id=user.id, practice_name=f"Practice {i}"
                 )
                 session.add(clinician)

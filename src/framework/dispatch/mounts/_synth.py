@@ -261,7 +261,7 @@ def synthesize_route_fn(
 
         # Extra repos: resolve via the type registry. Includes `audit_repo`
         # and any per-handler additional repos (e.g. `user_favorite_repo`
-        # on the provider-detail handler).
+        # on the clinician-detail handler).
         if not isinstance(base_ann, type):
             raise MountError(
                 f"{handler.__qualname__} parameter {param_name!r} has "
