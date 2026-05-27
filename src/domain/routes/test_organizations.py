@@ -379,7 +379,7 @@ async def test_form_new_scopes_to_owned_orgs(
     logged_in_user: User,
 ):
     """Non-superusers see only Orgs they own in the picker — same scope
-    as the Program/Provider form pickers (see ``_orgs_visible_to``).
+    as the Clinician/Program form pickers (see ``_orgs_visible_to``).
 
     ``?type=solo_practice`` bypasses the type-picker (issue #704).
     """

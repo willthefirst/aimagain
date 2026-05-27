@@ -452,7 +452,7 @@ class ClinicianOpeningUpdate(PartialUpdate):
     description: TextareaOptional = None
     referral_instructions: TextareaOptional = None
     website: UrlOptional = None
-    # FK to a Provider profile owned by the requesting user. `None` =
+    # FK to a Clinician profile owned by the requesting user. `None` =
     # leave unchanged. The route handler verifies ownership on update.
     clinician_id: uuid.UUID | None = None
     desired_times: DesiredTimesField | None = None

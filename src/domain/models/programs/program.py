@@ -15,18 +15,18 @@ _ck = partial(named_check_in, _TABLE)
 class Program(BaseModel):
     """Structured treatment offering owned by an :class:`Organization` —
     e.g. an IOP cohort, a residential program, a day program. Distinct
-    from :class:`Provider`, which is a clinician; a Program is the
+    from :class:`Clinician`; a Program is the
     offering itself and may span multiple clinicians.
 
     ``state_preference`` is an explicit column on Program rather than a
     derived read of the parent Org's location — Programs may serve a
     different state than the Org's primary state (e.g. an Org in CA
     that runs a telehealth program for NY clients). The CHECK
-    constraint mirrors Provider's ``location_state`` against
+    constraint mirrors Clinician's ``location_state`` against
     :data:`US_STATES`.
 
     No insurance fields here — intentional grammar. Insurance is
-    modeled on the Provider (who delivers care) and on the Post (the
+    modeled on the Clinician (who delivers care) and on the Post (the
     referral situation), not on the Program.
     """
 
@@ -40,7 +40,7 @@ class Program(BaseModel):
     )
     user = relationship("User")
 
-    # The owning Organization. ``RESTRICT`` matches Provider.org_id —
+    # The owning Organization. ``RESTRICT`` matches Clinician affiliate org_id —
     # deleting an Org with Programs fails loudly rather than silently
     # orphaning them.
     org_id = Column(
@@ -70,7 +70,7 @@ class Program(BaseModel):
 
     # Defaults to True — most programs intake by default; opt-out is
     # the explicit choice. Matches the default-on shape used elsewhere
-    # for boolean posture columns (e.g. Provider.accepts_out_of_network).
+    # for boolean posture columns (e.g. Clinician.accepts_out_of_network).
     accepting_referrals = Column(
         Boolean, nullable=False, server_default=text("1"), default=True
     )

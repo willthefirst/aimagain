@@ -9,7 +9,7 @@ the ``root_org_id`` denormalization in lockstep with ``parent_org_id``:
 
 The invariant is documented in
 ``src/domain/models/organizations/README.md``. This is the only
-write path today; PR 4+ (Program) and PR 2 (Provider.org_id) will
+write path today; PR 4+ (Program) and PR 2 (Clinician org_id) will
 read the tree but won't widen the writer surface.
 """
 
@@ -25,7 +25,7 @@ from src.framework.persistence.dependencies import register_repository
 class OrganizationRepository(BaseRepository):
     async def list_for_user(self, user_id: uuid.UUID) -> Sequence[Organization]:
         """Lists every Organization owned by ``user_id``, newest first.
-        Drives the Provider create/edit form's Org-picker dropdown — users
+        Drives the Clinician create/edit form's Org-picker dropdown — users
         can only attach Providers to Orgs they own (#524 retro: Org
         ownership is the boundary for who may attach Providers, mirroring
         ``Organization.write_authz``)."""

@@ -1,4 +1,4 @@
-"""Entity-specific facts for the three provider-credential subentities.
+"""Entity-specific facts for the three clinician-credential subentities.
 
 Universal invariants (identity field shapes, audit-type-matches-name,
 audit-actions-derive-from-stem, template defaults, `to_resource_spec()`
@@ -46,7 +46,7 @@ def test_redirects_target_parent_form(entity, _stem):
     — the user keeps editing the parent clinician entry after each
     credential write. After #642 PR 4 the URL family is
     `/clinicians/{clinician_id}/...`; the Python model class stays
-    `Provider`."""
+    `Clinician`."""
     target = "/clinicians/abc-123/form"
     assert entity.create_redirect(clinician_id="abc-123") == target
     assert entity.update_redirect(clinician_id="abc-123") == target
