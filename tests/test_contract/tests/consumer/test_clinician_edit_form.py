@@ -30,12 +30,12 @@ from playwright.async_api import Page
 
 from tests.test_contract.constants import (
     CLINICIAN_EDIT_FORM_PAGE_PATH,
+    CLINICIAN_NAME_CLINICIANS,
     CLINICIAN_PATCH_API_PATH,
+    CLINICIAN_STATE_CLINICIAN_EXISTS_AND_OWNED,
     CONSUMER_NAME_CLINICIAN_EDIT_FORM,
     NETWORK_TIMEOUT_MS,
     PACT_PORT_CLINICIAN_EDIT,
-    PROVIDER_NAME_PROVIDERS,
-    PROVIDER_STATE_PROVIDER_EXISTS_AND_OWNED,
 )
 from tests.test_contract.tests.shared.helpers import (
     setup_pact,
@@ -56,7 +56,7 @@ async def test_consumer_clinician_edit_form_submits(
     intercepted PATCH matches the contracted shape."""
     pact = setup_pact(
         CONSUMER_NAME_CLINICIAN_EDIT_FORM,
-        PROVIDER_NAME_PROVIDERS,
+        CLINICIAN_NAME_CLINICIANS,
         port=PACT_PORT_CLINICIAN_EDIT,
     )
     mock_server_uri = pact.uri
@@ -95,8 +95,8 @@ async def test_consumer_clinician_edit_form_submits(
     )
 
     (
-        pact.given(PROVIDER_STATE_PROVIDER_EXISTS_AND_OWNED)
-        .upon_receiving("a request to patch a provider profile via web form")
+        pact.given(CLINICIAN_STATE_CLINICIAN_EXISTS_AND_OWNED)
+        .upon_receiving("a request to patch a clinician profile via web form")
         .with_request(
             method="PATCH",
             path=CLINICIAN_PATCH_API_PATH,
