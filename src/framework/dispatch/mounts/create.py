@@ -35,7 +35,7 @@ def mount_create(
     Defaults: ``Location: /<collection>/<new_id>``, ``HX-Redirect`` =
     ``spec.create_redirect(...)`` if set, else ``Location``. The
     ``create_redirect`` callable receives the new id under ``spec.id_param``
-    so it can build a per-resource target (e.g. providers redirect to
+    so it can build a per-resource target (e.g. clinicians redirect to
     ``/clinicians/{id}/form`` after create).
 
     Requires: ``spec.write_user_dep``, ``spec.create_adapter``.

@@ -34,9 +34,9 @@ def mount_delete(
 
     Sub-resources nest via ``spec.parent``. The router's prefix is the
     topmost ancestor's collection; the mount produces a path like
-    ``/{provider_id}/licensures/{licensure_id}`` for a licensure spec
+    ``/{clinician_id}/licensures/{licensure_id}`` for a licensure spec
     whose parent is the clinician spec. The handler receives every parent
-    id by its id_param name (e.g. ``provider_id=...``) plus the resource's
+    id by its id_param name (e.g. ``clinician_id=...``) plus the resource's
     own id (``licensure_id=...``).
     """
     if spec.write_user_dep is None:

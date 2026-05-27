@@ -58,8 +58,8 @@ def make_repo_resolver(cls: type[BaseRepository]) -> Callable[..., Any]:
 
 # Type → resolver registry consumed by the mount-layer signature
 # synthesis (see ``src/framework/dispatch/resource_routes.py``). A handler
-# param typed ``repo: ProviderRepository`` resolves to
-# ``Depends(_REPO_TYPE_RESOLVERS[ProviderRepository])`` automatically.
+# param typed ``repo: ClinicianRepository`` resolves to
+# ``Depends(_REPO_TYPE_RESOLVERS[ClinicianRepository])`` automatically.
 _REPO_TYPE_RESOLVERS: dict[type, Callable[..., Any]] = {}
 
 
@@ -69,12 +69,12 @@ def register_repository(cls: type[BaseRepository]) -> Callable[..., Any]:
     Called from each ``src/domain/logic/<entity>/repository.py`` after
     the class is declared::
 
-        class ProviderRepository(BaseRepository):
+        class ClinicianRepository(BaseRepository):
             ...
 
-        get_provider_repository = register_repository(ProviderRepository)
+        get_clinician_repository = register_repository(ClinicianRepository)
 
-    Spec files then ``from .repository import get_provider_repository``.
+    Spec files then ``from .repository import get_clinician_repository``.
     Returning the resolver lets the caller do register-and-bind in one
     line; the value is also accessible later via :func:`resolver_for`.
     """

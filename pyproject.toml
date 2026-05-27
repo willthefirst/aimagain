@@ -128,7 +128,7 @@ markers = [
     "auth: contract pairs whose provider is `auth-api`",
     "users: contract pairs whose provider is `users-api`",
     "posts: contract pairs whose provider is `posts-api`",
-    "providers: contract pairs whose provider is `providers-api`",
+    "clinicians: contract pairs whose provider is `clinicians-api`",
     "organizations: contract pairs whose provider is `organizations-api`",
     "programs: contract pairs whose provider is `programs-api`",
 ]

@@ -76,9 +76,9 @@ def mount_entity(
         `"create"`, `"update"`, `"delete"`, `"form_new"`, `"form_edit"`.
       - One per `state_axes[i].name` (e.g. `"activation"`).
       - One per `subresources[i].child_spec.collection` (e.g.
-        `"providers"` for the user → providers related list).
+        `"clinicians"` for the user → clinicians related list).
       - For each `owned_subentities[i]`: one per opted-in verb keyed
-        `f"{owned.name}.{verb}"` (e.g. `"provider_licensure.create"`).
+        `f"{owned.name}.{verb}"` (e.g. `"clinician_licensure.create"`).
         Verbs that match the generic CRUD-framework factories
         (`create`, `update`, `delete`, `detail`, `form_edit`) fall
         back to ``make_<verb>_handler(owned)`` when no explicit key

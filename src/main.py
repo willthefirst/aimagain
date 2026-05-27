@@ -45,8 +45,8 @@ async def lifespan(app: FastAPI):
     import os
 
     try:
-        # PROVIDER_TEST_MODE manages tables separately, so skip the check.
-        skip_table_check = os.getenv("PROVIDER_TEST_MODE") == "true"
+        # CLINICIAN_TEST_MODE manages tables separately, so skip the check.
+        skip_table_check = os.getenv("CLINICIAN_TEST_MODE") == "true"
         await check_database_health(skip_table_check=skip_table_check)
     except Exception as e:
         logger.error(f"Database health check failed: {e}")
