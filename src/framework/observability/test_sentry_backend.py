@@ -55,6 +55,21 @@ def test_init_app_passes_release_as_none_when_unset():
         assert mock_sdk.init.call_args.kwargs["release"] is None
 
 
+def test_init_app_skips_sdk_init_when_backend_dsn_empty():
+    """SentryBackend may be selected (e.g. browser-only DSN set) without a
+    backend DSN. In that case `init_app` must not call `sentry_sdk.init` —
+    passing an empty DSN would disable or misconfigure the SDK silently."""
+    with (
+        patch("src.framework.observability.sentry_backend.sentry_sdk") as mock_sdk,
+        patch("src.framework.observability.sentry_backend.settings") as mock_settings,
+    ):
+        mock_settings.SENTRY_DSN = ""
+
+        SentryBackend().init_app(FastAPI())
+
+        mock_sdk.init.assert_not_called()
+
+
 def test_set_user_includes_email_when_provided():
     with patch("src.framework.observability.sentry_backend.sentry_sdk") as mock_sdk:
         mock_sdk.set_user = MagicMock()
