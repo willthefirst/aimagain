@@ -1,92 +1,64 @@
-from sqlalchemy import CheckConstraint, Column, Text
+from sqlalchemy import CheckConstraint, Column, ForeignKey, Text
 from sqlalchemy.orm import relationship
+from sqlalchemy.types import Uuid
 
 from src.framework.persistence.base_model import BaseModel
 
 _TABLE = "clinicians"
 
-# `npi` is either NULL or exactly 10 ASCII digits — the NPPES registry
-# lookups expect that shape. SQLite-flavored `GLOB`; the project is
-# single-dialect (sqlite+aiosqlite for both dev and prod). The Pydantic
-# validator `_validate_npi` in `src/domain/logic/providers/schema.py`
-# is the wire-side enforcement; this CHECK is defense-in-depth and
-# mirrors the constraint that previously lived on `providers.npi`
-# (moved to `clinicians.npi` in the migration that introduced this
-# table — see #629 PR 1).
 _NPI_FORMAT_CHECK = CheckConstraint(
     "npi IS NULL OR (length(npi) = 10 "
     "AND npi GLOB '[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]')",
     name=f"ck_{_TABLE}_npi_format",
 )
 
+_PER_ROLE_ATTRS = (
+    "org_id",
+    "location_city",
+    "location_state",
+    "location_zip",
+    "in_person_sessions",
+    "virtual_sessions",
+    "accepts_out_of_network",
+    "in_network_carriers",
+    "sliding_scale",
+    "cost",
+)
+
 
 class Clinician(BaseModel):
     """The person behind a directory entry — license-holder, name on
-    NPPES, owner of credentials.
+    NPPES, owner of credentials and affiliations.
 
-    Today a `Provider` (the directory listing) carries both the person
-    attributes (NPI, licensures, education) and the practice-role
-    attributes (insurance, sliding scale, location, modality). That
-    fits a solo practitioner but breaks the multi-affiliation clinician
-    (private practice + community-clinic Tuesdays + telehealth
-    contracts). This entity is the first step of splitting those apart
-    (issue #629 PR 1): `Clinician` holds the person attributes that
-    are invariant across employers; `Provider` keeps the practice-role
-    attributes for now and will become an `Affiliation` (clinician ×
-    org) in PR 2.
-
-    For PR 1 every existing `Provider` row has exactly one
-    `Clinician` (1:1 backfill). The `clinician_id` FK on `Provider`
-    is NOT NULL but not yet UNIQUE — so the framework is ready for
-    PR 2's many-affiliations-per-clinician without an additional
-    migration to drop a unique constraint.
-
-    The directory's user-facing routes still read from `providers`;
-    `Clinician.npi` is currently surfaced via the
-    `Provider.clinician.npi` join in `ProviderRead`. The verification
-    pipeline (NPPES lookup) reads through the same join — it didn't
-    have a direct `Clinician` API before PR 1, and PR 1 leaves that
-    boundary untouched.
+    A Clinician holds the person-level attributes (NPI, name, credentials)
+    that are invariant across affiliations, plus `owner_id` (the user
+    account that manages this entry). Practice-role attributes (location,
+    insurance, modality) live on `Affiliation` — the (clinician × org)
+    join row. A clinician may hold multiple affiliations.
     """
 
     __tablename__ = _TABLE
     __table_args__ = (_NPI_FORMAT_CHECK,)
 
-    # National Provider Identifier — 10 ASCII digits, optional. Nullable
-    # because backfill is operator-driven (rows existed before NPI
-    # collection). No UNIQUE constraint yet — duplicates may exist
-    # before the field is curated; tighten once the data is clean.
-    npi = Column(Text, nullable=True)
+    owner_id = Column(
+        Uuid(as_uuid=True),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=True,
+    )
+    user = relationship("User", lazy="selectin", foreign_keys=[owner_id])
 
-    # Legal first / last name. Both nullable because existing rows
-    # predate the columns (backfill is operator-driven, same posture as
-    # `npi`). The verification pipeline reads through here for the
-    # NPPES + OIG name match — without these, every check routes to
-    # human review because the username fallback in `_clinician_names`
-    # scores far below threshold (see `handlers.py:_clinician_names`).
+    npi = Column(Text, nullable=True)
     first_name = Column(Text, nullable=True)
     last_name = Column(Text, nullable=True)
 
-    # Back-populates `Provider.clinician`. 1:many in the schema so PR 2
-    # can attach more `Provider` rows (which become `Affiliation`s) to
-    # one clinician without a relationship-cardinality migration. In
-    # PR 1 each clinician has exactly one provider (the row it was
-    # backfilled from).
-    providers = relationship(
-        "Provider",
+    affiliations = relationship(
+        "Affiliation",
         back_populates="clinician",
+        order_by="Affiliation.created_at",
         cascade="all, delete-orphan",
+        lazy="selectin",
     )
 
-    # Person-level credential lists. FKs moved from `providers.id` to
-    # `clinicians.id` in #635 PR A so a clinician's licenses /
-    # educations / certifications follow them across affiliations.
-    # CASCADE on the FK + delete-orphan here keeps the rows in
-    # lockstep — deleting the clinician wipes the credential lists.
-    # `Provider.licensures / educations / certifications` survive as
-    # `@property` proxies into these relationships, so route handlers,
-    # templates, and the framework's `repo.add_child(parent,
-    # "licensures", licensure)` path keep working unchanged.
     licensures = relationship(
         "ProviderLicensure",
         cascade="all, delete-orphan",
@@ -102,3 +74,146 @@ class Clinician(BaseModel):
         cascade="all, delete-orphan",
         lazy="selectin",
     )
+
+    def __init__(self, **kwargs):
+        from src.domain.models import Affiliation
+
+        per_role = {k: kwargs.pop(k) for k in list(_PER_ROLE_ATTRS) if k in kwargs}
+        super().__init__(**kwargs)
+        if per_role and not self.affiliations and "affiliations" not in kwargs:
+            self.affiliations = [
+                Affiliation(
+                    clinician=self,
+                    org_id=per_role.get("org_id"),
+                    location_city=per_role.get("location_city"),
+                    location_state=per_role.get("location_state"),
+                    location_zip=per_role.get("location_zip"),
+                    in_person_sessions=per_role.get("in_person_sessions"),
+                    virtual_sessions=per_role.get("virtual_sessions"),
+                    accepts_out_of_network=per_role.get("accepts_out_of_network", True),
+                    in_network_carriers=per_role.get("in_network_carriers") or [],
+                    sliding_scale=per_role.get("sliding_scale", False),
+                    cost=per_role.get("cost"),
+                )
+            ]
+
+    @property
+    def primary_affiliation(self):
+        return self.affiliations[0] if self.affiliations else None
+
+    @property
+    def org_id(self):
+        aff = self.primary_affiliation
+        return aff.org_id if aff is not None else None
+
+    @org_id.setter
+    def org_id(self, value) -> None:
+        if self.primary_affiliation is not None:
+            self.primary_affiliation.org_id = value
+
+    @property
+    def org(self):
+        aff = self.primary_affiliation
+        return aff.org if aff is not None else None
+
+    @org.setter
+    def org(self, value) -> None:
+        if self.primary_affiliation is not None:
+            self.primary_affiliation.org = value
+
+    @property
+    def org_name(self) -> str | None:
+        org = self.org
+        return org.name if org is not None else None
+
+    @property
+    def location_city(self) -> str | None:
+        aff = self.primary_affiliation
+        return aff.location_city if aff is not None else None
+
+    @location_city.setter
+    def location_city(self, value) -> None:
+        if self.primary_affiliation is not None:
+            self.primary_affiliation.location_city = value
+
+    @property
+    def location_state(self) -> str | None:
+        aff = self.primary_affiliation
+        return aff.location_state if aff is not None else None
+
+    @location_state.setter
+    def location_state(self, value) -> None:
+        if self.primary_affiliation is not None:
+            self.primary_affiliation.location_state = value
+
+    @property
+    def location_zip(self) -> str | None:
+        aff = self.primary_affiliation
+        return aff.location_zip if aff is not None else None
+
+    @location_zip.setter
+    def location_zip(self, value) -> None:
+        if self.primary_affiliation is not None:
+            self.primary_affiliation.location_zip = value
+
+    @property
+    def in_person_sessions(self) -> str | None:
+        aff = self.primary_affiliation
+        return aff.in_person_sessions if aff is not None else None
+
+    @in_person_sessions.setter
+    def in_person_sessions(self, value) -> None:
+        if self.primary_affiliation is not None:
+            self.primary_affiliation.in_person_sessions = value
+
+    @property
+    def virtual_sessions(self) -> str | None:
+        aff = self.primary_affiliation
+        return aff.virtual_sessions if aff is not None else None
+
+    @virtual_sessions.setter
+    def virtual_sessions(self, value) -> None:
+        if self.primary_affiliation is not None:
+            self.primary_affiliation.virtual_sessions = value
+
+    @property
+    def accepts_out_of_network(self) -> bool | None:
+        aff = self.primary_affiliation
+        return aff.accepts_out_of_network if aff is not None else None
+
+    @accepts_out_of_network.setter
+    def accepts_out_of_network(self, value) -> None:
+        if self.primary_affiliation is not None:
+            self.primary_affiliation.accepts_out_of_network = value
+
+    @property
+    def in_network_carriers(self) -> list:
+        aff = self.primary_affiliation
+        if aff is None or aff.in_network_carriers is None:
+            return []
+        return aff.in_network_carriers
+
+    @in_network_carriers.setter
+    def in_network_carriers(self, value) -> None:
+        if self.primary_affiliation is not None:
+            self.primary_affiliation.in_network_carriers = value
+
+    @property
+    def sliding_scale(self) -> bool | None:
+        aff = self.primary_affiliation
+        return aff.sliding_scale if aff is not None else None
+
+    @sliding_scale.setter
+    def sliding_scale(self, value) -> None:
+        if self.primary_affiliation is not None:
+            self.primary_affiliation.sliding_scale = value
+
+    @property
+    def cost(self) -> str | None:
+        aff = self.primary_affiliation
+        return aff.cost if aff is not None else None
+
+    @cost.setter
+    def cost(self, value) -> None:
+        if self.primary_affiliation is not None:
+            self.primary_affiliation.cost = value

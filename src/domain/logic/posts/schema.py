@@ -229,7 +229,7 @@ class ClinicianOpeningRead(_PostReadBase):
     # on the linked Provider (#448, #449). Read projections expose the
     # FK; templates dereference via
     # `post.opening_detail.provider.<field>`.
-    provider_id: uuid.UUID
+    clinician_id: uuid.UUID
     desired_times: DesiredTimesField = []
     schedule_text: str | None = None
     services: ServicesField = []
@@ -331,7 +331,7 @@ class ClinicianOpeningCreate(WirePayload):
     # restricts the dropdown to providers owned by the user; the route
     # handler also verifies ownership at write time so a wire-level
     # attacker can't reference another user's provider.
-    provider_id: uuid.UUID
+    clinician_id: uuid.UUID
     desired_times: DesiredTimesField = []
     # Free-text companion to `desired_times` for cohort dates / fixed
     # program hours. Single-line input; not a textarea.
@@ -352,7 +352,7 @@ class ClinicianOpeningCreate(WirePayload):
 
 class ProgramIntakeCreate(WirePayload):
     """Create payload for `kind='intake'`. Field set mirrors
-    :class:`ClinicianOpeningCreate` one-to-one but swaps the Provider
+    :class:`ClinicianOpeningCreate` one-to-one but swaps the Clinician
     FK for a Program FK — the referrer is choosing a Program (intake door),
     not a specific clinician."""
 
@@ -454,7 +454,7 @@ class ClinicianOpeningUpdate(PartialUpdate):
     website: UrlOptional = None
     # FK to a Provider profile owned by the requesting user. `None` =
     # leave unchanged. The route handler verifies ownership on update.
-    provider_id: uuid.UUID | None = None
+    clinician_id: uuid.UUID | None = None
     desired_times: DesiredTimesField | None = None
     schedule_text: StrippedOptionalText = None
     # `None` = leave unchanged; `min_length=1` rejects an explicit `[]`.
@@ -555,7 +555,7 @@ class ClinicianOpeningAuditSnapshot(_PostAuditSnapshotBase):
     website: str | None = None
     # Audit row records the FK, not the dereferenced practice fields —
     # standard pattern for relational audit snapshots.
-    provider_id: uuid.UUID
+    clinician_id: uuid.UUID
     desired_times: DesiredTimesField = []
     schedule_text: str | None = None
     services: ServicesField = []

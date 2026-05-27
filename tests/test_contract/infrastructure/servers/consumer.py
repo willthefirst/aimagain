@@ -205,7 +205,7 @@ def _setup_provider_create_form_stub(app: FastAPI) -> None:
             name="Acme Counseling",
         )
         return APIResponse.html_response(
-            template_name="providers/form_new.html",
+            template_name="clinicians/form_new.html",
             # `schema` is what the template's `field_for` macro
             # introspects to derive each control — same key the
             # production `make_new_form_handler` binds from
@@ -277,7 +277,7 @@ def _setup_provider_edit_form_stub(app: FastAPI) -> None:
             is_superuser=False,
         )
         return APIResponse.html_response(
-            template_name="providers/form_edit.html",
+            template_name="clinicians/form_edit.html",
             # The framework binds `context[spec.name] = target`; after
             # #642 PR 4 the entity name is "clinician" (the template
             # aliases it back to `provider` internally).

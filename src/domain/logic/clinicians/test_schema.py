@@ -19,7 +19,7 @@ from typing import get_args
 import pytest
 from pydantic import ValidationError
 
-from src.domain.logic.providers.schema import (
+from src.domain.logic.clinicians.schema import (
     ProviderCertificationCreate,
     ProviderCertificationUpdate,
     ProviderCreate,

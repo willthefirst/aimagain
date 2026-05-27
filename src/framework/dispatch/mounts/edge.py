@@ -42,7 +42,7 @@ def mount_edge_routes(
       - ``entity.relation.to_entity.url_collection`` — used for the
         HX-Redirect target (``"/{to_collection}/{id}"``).
       - ``entity.relation.to_entity.repo_dep`` — Depends for the
-        opposite-end repo (e.g. the provider repo on a favorite).
+        opposite-end repo (e.g. the clinician repo on a favorite).
       - ``entity.repo_dep`` — Depends for the edge repo.
       - ``entity.read_user_dep`` — auth dep for the requesting actor.
       - ``entity.templates.list`` — Jinja path for the list page.

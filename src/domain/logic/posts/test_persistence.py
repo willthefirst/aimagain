@@ -26,11 +26,11 @@ from src.domain.models import (
 from src.framework.persistence.base_repository import BaseRepository
 from tests.helpers import (
     create_test_user,
+    make_clinician_with_org,
     make_intake_detail,
     make_opening_detail,
     make_organization_row,
     make_program,
-    make_provider_with_org,
     make_referral_detail,
 )
 
@@ -45,20 +45,20 @@ async def _seed_owner(db_test_session_manager):
     return owner
 
 
-async def _seed_owner_and_provider(db_test_session_manager, **provider_overrides):
-    """Seed a User + a Provider owned by them. Returns `(owner, provider)`.
+async def _seed_owner_and_clinician(db_test_session_manager, **clinician_overrides):
+    """Seed a User + a Clinician owned by them. Returns `(owner, clinician)`.
 
-    PA detail rows point at a Provider via `provider_id` FK (#448); persistence
-    tests that flush a `OpeningDetail` need a real provider row
+    PA detail rows point at a Clinician via `clinician_id` FK; persistence
+    tests that flush a `OpeningDetail` need a real clinician row
     in the DB to satisfy the FK.
     """
     owner = create_test_user(username=f"owner-{uuid.uuid4()}")
-    provider = make_provider_with_org(owner_id=owner.id, **provider_overrides)
+    clinician = make_clinician_with_org(owner_id=owner.id, **clinician_overrides)
     async with db_test_session_manager() as session:
         async with session.begin():
             session.add(owner)
-            session.add(provider)
-    return owner, provider
+            session.add(clinician)
+    return owner, clinician
 
 
 async def _create_post(repo, post, detail):
@@ -294,14 +294,14 @@ async def test_delete_post_cascades_referral_detail(
 async def test_create_post_persists_parent_and_opening_detail(
     db_test_session_manager: async_sessionmaker[AsyncSession],
 ):
-    owner, provider = await _seed_owner_and_provider(
+    owner, clinician = await _seed_owner_and_clinician(
         db_test_session_manager, practice_name="Acme Health"
     )
 
     async with db_test_session_manager() as session:
         repo = BaseRepository(session)
         post = Post(kind="clinician_opening", owner_id=owner.id)
-        detail = make_opening_detail(provider_id=provider.id)
+        detail = make_opening_detail(clinician_id=clinician.id)
         created = await _create_post(repo, post, detail)
         await session.commit()
         post_id = created.id
@@ -324,21 +324,21 @@ async def test_create_post_persists_parent_and_opening_detail(
         assert post_row is not None
         assert post_row.kind == "clinician_opening"
         assert detail_row is not None
-        # Practice name lives on the linked Provider's Organization (#524).
-        assert detail_row.provider_id == provider.id
-        assert detail_row.provider.org.name == "Acme Health"
+        # Practice name lives on the linked Clinician's primary Affiliation's Organization.
+        assert detail_row.clinician_id == clinician.id
+        assert detail_row.clinician.org.name == "Acme Health"
 
 
 async def test_create_post_round_trips_free_text_fields(
     db_test_session_manager: async_sessionmaker[AsyncSession],
 ):
     """`description`, `referral_instructions`, `website` persist + read back."""
-    owner, provider = await _seed_owner_and_provider(db_test_session_manager)
+    owner, clinician = await _seed_owner_and_clinician(db_test_session_manager)
 
     async with db_test_session_manager() as session:
         repo = BaseRepository(session)
         detail = make_opening_detail(
-            provider_id=provider.id,
+            clinician_id=clinician.id,
             description="Lead pitch",
             referral_instructions="Email the coordinator",
             website="example.com",
@@ -371,7 +371,7 @@ async def test_create_post_free_text_fields_default_null(
 ):
     """Omitting the three new fields persists them as NULL — additive
     columns must not break a row that doesn't supply them."""
-    owner, provider = await _seed_owner_and_provider(
+    owner, clinician = await _seed_owner_and_clinician(
         db_test_session_manager, practice_name="No-extras"
     )
 
@@ -380,7 +380,7 @@ async def test_create_post_free_text_fields_default_null(
         created = await _create_post(
             repo,
             Post(kind="clinician_opening", owner_id=owner.id),
-            make_opening_detail(provider_id=provider.id),
+            make_opening_detail(clinician_id=clinician.id),
         )
         await session.commit()
         post_id = created.id
@@ -403,14 +403,14 @@ async def test_create_post_free_text_fields_default_null(
 async def test_update_post_writes_to_opening_detail(
     db_test_session_manager: async_sessionmaker[AsyncSession],
 ):
-    owner, provider = await _seed_owner_and_provider(db_test_session_manager)
+    owner, clinician = await _seed_owner_and_clinician(db_test_session_manager)
 
     async with db_test_session_manager() as session:
         repo = BaseRepository(session)
         created = await _create_post(
             repo,
             Post(kind="clinician_opening", owner_id=owner.id),
-            make_opening_detail(provider_id=provider.id, description="orig"),
+            make_opening_detail(clinician_id=clinician.id, description="orig"),
         )
         await session.commit()
         post_id = created.id
@@ -441,7 +441,7 @@ async def test_delete_post_cascades_opening_detail(
 ):
     """Deleting a opening parent removes its detail row via
     FK CASCADE."""
-    owner, provider = await _seed_owner_and_provider(
+    owner, clinician = await _seed_owner_and_clinician(
         db_test_session_manager, practice_name="Doomed"
     )
 
@@ -450,7 +450,7 @@ async def test_delete_post_cascades_opening_detail(
         created = await _create_post(
             repo,
             Post(kind="clinician_opening", owner_id=owner.id),
-            make_opening_detail(provider_id=provider.id),
+            make_opening_detail(clinician_id=clinician.id),
         )
         await session.commit()
         post_id = created.id

@@ -13,7 +13,7 @@ Per-kind structure:
 For each kind we generate the detail row via the generic builder (so
 new columns on detail tables auto-cover) and then patch a handful of
 fields the generic builder can't infer (description templates, FK to
-provider/program).
+clinician/program).
 
 `created_at` is spread across the last 180 days so the listings feed
 shows a believable spread.
@@ -24,11 +24,11 @@ from __future__ import annotations
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.domain.models import (
+    Clinician,
     IntakeDetail,
     OpeningDetail,
     Post,
     Program,
-    Provider,
     ReferralDetail,
     User,
 )
@@ -60,7 +60,7 @@ async def generate_posts(
     rng: SeededRandom, pool: SeedPool, session: AsyncSession
 ) -> list[Post]:
     users: list[User] = pool.all("users")
-    providers: list[Provider] = pool.all("providers")
+    clinicians: list[Clinician] = pool.all("clinicians")
     programs: list[Program] = pool.all("programs")
 
     out: list[Post] = []
@@ -90,7 +90,7 @@ async def generate_posts(
         _shift_created_at(post, days_ago=i % 180)
         detail = build_row(OpeningDetail, i, rng, pool)
         detail.post_id = post_id
-        detail.provider_id = providers[i % len(providers)].id
+        detail.clinician_id = clinicians[i % len(clinicians)].id
         detail.subject = None if rng.bool(0.2) else opening_subject(rng, i)
         # `description` is nullable — populate most rows for narrative,
         # leave a slice NULL so the empty-state card renders too.

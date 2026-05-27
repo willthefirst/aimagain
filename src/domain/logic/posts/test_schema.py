@@ -523,7 +523,7 @@ def test_post_update_opening_accepts_age_groups_only():
 @pytest.mark.parametrize(
     "missing_field",
     [
-        "provider_id",
+        "clinician_id",
         "age_groups",
     ],
 )
@@ -592,16 +592,14 @@ def test_post_update_opening_accepts_description_only():
     assert p.description == "Updated pitch."
 
 
-def test_post_update_opening_accepts_provider_id_only():
-    """A PATCH that only repoints `provider_id` is a valid partial update.
-    Replaces the pre-#449 `sliding_scale`-only test, since insurance posture
-    now lives on Provider."""
-    new_provider_id = uuid.uuid4()
+def test_post_update_opening_accepts_clinician_id_only():
+    """A PATCH that only repoints `clinician_id` is a valid partial update."""
+    new_clinician_id = uuid.uuid4()
     p = post_update_adapter.validate_python(
-        {"kind": "clinician_opening", "provider_id": str(new_provider_id)}
+        {"kind": "clinician_opening", "clinician_id": str(new_clinician_id)}
     )
     assert isinstance(p, ClinicianOpeningUpdate)
-    assert p.provider_id == new_provider_id
+    assert p.clinician_id == new_clinician_id
 
 
 def test_post_update_opening_strips_whitespace():
@@ -651,11 +649,10 @@ def test_audit_snapshot_for_opening_post():
     snap = post_audit_snapshot(post)
     assert snap["kind"] == "clinician_opening"
     assert snap["owner_id"] == str(owner_id)
-    # Per #448, the audit row records the FK to the Provider, not the
+    # The audit row records the FK to the Clinician, not the
     # dereferenced practice fields. Practice-name/location/sessions live
-    # on Provider now (and insurance posture / sliding-scale / cost live
-    # there as of #449) — snapshotted via that entity's audit path.
-    assert snap["provider_id"] == detail_attrs["provider_id"]
+    # on Clinician's Affiliation — snapshotted via that entity's audit path.
+    assert snap["clinician_id"] == detail_attrs["clinician_id"]
     assert "sliding_scale" not in snap
     assert "payment_situation" not in snap
     assert "cost" not in snap

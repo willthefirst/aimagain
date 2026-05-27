@@ -1,11 +1,10 @@
 """User-favorites orchestration handlers.
 
-A `UserFavorite` is a binary M:N edge between a `User` and a `Provider`.
+A `UserFavorite` is a binary M:N edge between a `User` and a `Clinician`.
 There is no update verb — favorites are immutable edges — so the audit
 discipline is satisfied via direct `record_audit(...)` calls rather than
-the `mutate(...)` context manager (which assumes a create/update/delete
-triple). Audit rows fire only on actual mutations: idempotent re-favorites
-and idempotent un-favorites are silent.
+the `mutate(...)` context manager. Audit rows fire only on actual mutations:
+idempotent re-favorites and idempotent un-favorites are silent.
 
 Self-only: all three handlers operate on the requesting user's edges; the
 route layer hard-codes the `/users/me/...` path prefix and sources the
@@ -18,9 +17,9 @@ from uuid import UUID
 
 from fastapi import Request
 
+from src.domain.logic.clinicians.repository import ClinicianRepository
 from src.domain.logic.favorites.repository import UserFavoriteRepository
-from src.domain.logic.providers.repository import ProviderRepository
-from src.domain.models import Provider, User, UserFavorite
+from src.domain.models import Clinician, User, UserFavorite
 from src.domain.specs.user_favorite import FAVORITE_ENTITY
 from src.framework.audit.core import record_audit
 from src.framework.audit.repository import AuditRepository
@@ -35,43 +34,33 @@ from src.framework.http.exceptions import NotFoundError
 
 logger = logging.getLogger(__name__)
 
-# Audit binding (resource_type, snapshot, verb→action map) lives on
-# the spec — see `src/domain/specs/user_favorite.py`. Handlers
-# read it via `FAVORITE_ENTITY.edge_audit`.
 _EDGE_AUDIT = FAVORITE_ENTITY.edge_audit
 
 
 async def handle_add_favorite(
-    provider_id: UUID,
+    clinician_id: UUID,
     repo: UserFavoriteRepository,
-    clinician_repo: ProviderRepository,
+    clinician_repo: ClinicianRepository,
     audit_repo: AuditRepository,
     requesting_user: User,
 ) -> UserFavorite:
-    """Add a favorite edge from the requesting user to `provider_id`.
+    """Add a favorite edge from the requesting user to `clinician_id`.
 
-    Idempotent: returns the existing edge unchanged if one already exists
-    (no audit row, no commit). Audited only on actual creation.
-
-    404 if the target provider does not exist — keeps the existence of a
-    deleted provider opaque to the favorites endpoint.
+    Idempotent: returns the existing edge unchanged if one already exists.
+    Audited only on actual creation. 404 if the clinician does not exist.
     """
-    # `clinician_repo` is the directory-listing entry repo — the underlying
-    # model class is still `Provider`; only the user-facing entity name
-    # flipped in #642 PR 4, which is what the framework's
-    # `to_repo_kwarg = f"{to_entity.name}_repo"` derivation reads.
-    provider = await clinician_repo.get_by_model_id(Provider, provider_id)
-    if provider is None:
+    clinician = await clinician_repo.get_by_model_id(Clinician, clinician_id)
+    if clinician is None:
         raise NotFoundError(detail="Clinician not found")
 
     existing = await repo.get_by_pair(
-        user_id=requesting_user.id, provider_id=provider_id
+        user_id=requesting_user.id, clinician_id=clinician_id
     )
     if existing is not None:
         return existing
 
     favorite = await repo.add_favorite(
-        user_id=requesting_user.id, provider_id=provider_id
+        user_id=requesting_user.id, clinician_id=clinician_id
     )
     await record_audit(
         audit_repo,
@@ -83,25 +72,24 @@ async def handle_add_favorite(
         after=_EDGE_AUDIT.snapshot(favorite),
     )
     await repo.session.commit()
-    logger.info(f"Handler: user {requesting_user.id} favorited provider {provider_id}")
+    logger.info(
+        f"Handler: user {requesting_user.id} favorited clinician {clinician_id}"
+    )
     return favorite
 
 
 async def handle_remove_favorite(
-    provider_id: UUID,
+    clinician_id: UUID,
     repo: UserFavoriteRepository,
     audit_repo: AuditRepository,
     requesting_user: User,
 ) -> None:
-    """Remove the favorite edge from the requesting user to `provider_id`.
+    """Remove the favorite edge from the requesting user to `clinician_id`.
 
-    Idempotent: no-op (no audit row, no commit) if the edge does not exist.
-    Audited only on actual deletion. No 404 if the user never favorited
-    the provider — the user clicked "unfavorite" and the end state matches
-    their intent.
+    Idempotent: no-op if the edge does not exist.
     """
     favorite = await repo.get_by_pair(
-        user_id=requesting_user.id, provider_id=provider_id
+        user_id=requesting_user.id, clinician_id=clinician_id
     )
     if favorite is None:
         return
@@ -120,7 +108,7 @@ async def handle_remove_favorite(
     )
     await repo.session.commit()
     logger.info(
-        f"Handler: user {requesting_user.id} unfavorited provider {provider_id}"
+        f"Handler: user {requesting_user.id} unfavorited clinician {clinician_id}"
     )
 
 
@@ -129,27 +117,19 @@ async def handle_list_my_favorites(
     repo: UserFavoriteRepository,
     requesting_user: User,
 ) -> dict[str, Any]:
-    """Page context for the self-only favorites listing. Returns the
-    providers the requesting user has favorited, newest-favoriting first.
-
-    Pagination: parses `?page=N` and asks the repo for `per_page + 1`
-    rows to compute `has_next`. Uses the framework's
-    `DEFAULT_PAGE_SIZE` — this is a bespoke handler so there's no
-    `EntitySpec.page_size` to consult.
-    """
     page_number = parse_page(request)
     per_page = DEFAULT_PAGE_SIZE
-    providers_plus_one = await repo.list_favorited_providers(
+    clinicians_plus_one = await repo.list_favorited_clinicians(
         requesting_user.id,
         offset=offset_for(page_number, per_page),
         limit=per_page + 1,
     )
-    providers, page_meta = paginate(
-        providers_plus_one, page=page_number, per_page=per_page
+    clinicians, page_meta = paginate(
+        clinicians_plus_one, page=page_number, per_page=per_page
     )
     return {
         "request": request,
-        "providers": providers,
+        "clinicians": clinicians,
         "current_user": requesting_user,
         "page_meta": page_meta,
         "paginator_base_query": base_query(request),

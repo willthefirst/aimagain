@@ -11,7 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from src.domain.models import User
 from src.framework.audit.log import AuditLog
 from src.framework.audit.repository import AuditRepository
-from tests.helpers import create_test_user, make_provider_with_org, promote_to_admin
+from tests.helpers import create_test_user, make_clinician_with_org, promote_to_admin
 
 # Mark all tests in this module as async
 pytestmark = pytest.mark.asyncio
@@ -471,8 +471,8 @@ async def test_detail_lists_owned_providers(
     async with db_test_session_manager() as session:
         async with session.begin():
             session.add(target)
-    first = make_provider_with_org(owner_id=target.id, practice_name="First")
-    second = make_provider_with_org(owner_id=target.id, practice_name="Second")
+    first = make_clinician_with_org(owner_id=target.id, practice_name="First")
+    second = make_clinician_with_org(owner_id=target.id, practice_name="Second")
     async with db_test_session_manager() as session:
         async with session.begin():
             session.add_all([first, second])
@@ -487,7 +487,7 @@ async def test_detail_lists_owned_providers(
     assert len(rows) == 2
     # After #642 PR 3 the Practice cell anchors to the owning Org per
     # affiliation (each Provider here has its own auto-built Org via
-    # `make_provider_with_org`). The Provider id rides on the row's
+    # `make_clinician_with_org`). The Provider id rides on the row's
     # `data-row-id`; assert both Providers surface via that attribute.
     row_ids = {row.attributes.get("data-row-id") for row in rows}
     assert row_ids == {str(first.id), str(second.id)}
@@ -944,13 +944,13 @@ async def test_delete_user_writes_audit_row(
 # --- Providers ownership-subresource ----------------------------
 
 
-async def _seed_user_provider(
+async def _seed_user_clinician(
     db_test_session_manager: async_sessionmaker[AsyncSession],
     *,
     user_id: uuid.UUID,
     practice_name: str,
 ) -> uuid.UUID:
-    provider = make_provider_with_org(owner_id=user_id, practice_name=practice_name)
+    provider = make_clinician_with_org(owner_id=user_id, practice_name=practice_name)
     async with db_test_session_manager() as session:
         async with session.begin():
             session.add(provider)
@@ -996,7 +996,7 @@ async def test_get_my_providers_shows_create_action_in_toolbar(
     assert empty_action is not None
     assert empty_action.attributes.get("href") == "/clinicians/form"
 
-    await _seed_user_provider(
+    await _seed_user_clinician(
         db_test_session_manager, user_id=logged_in_user.id, practice_name="First"
     )
 
@@ -1032,7 +1032,7 @@ async def test_get_user_providers_self(
 ):
     """`GET /users/{my_id}/clinicians` works for the current user
     (equivalent to the /me alias)."""
-    await _seed_user_provider(
+    await _seed_user_clinician(
         db_test_session_manager, user_id=logged_in_user.id, practice_name="Mine"
     )
 
@@ -1053,7 +1053,7 @@ async def test_get_user_providers_admin_can_view_other(
     async with db_test_session_manager() as session:
         async with session.begin():
             session.add(target)
-    await _seed_user_provider(
+    await _seed_user_clinician(
         db_test_session_manager, user_id=target.id, practice_name="Target Practice"
     )
 

@@ -1,7 +1,7 @@
-"""Verification override — one per (selected) provider; idempotent on PK.
+"""Verification override — one per (selected) clinician; idempotent on PK.
 
-Generic generator would pick a random provider per row; we want each
-Verification to FK to a *distinct* provider so the directory's "has
+Generic generator would pick a random clinician per row; we want each
+Verification to FK to a *distinct* clinician so the directory's "has
 verification" filter exercises both populated and empty cases.
 """
 
@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.domain.models import Provider, Verification
+from src.domain.models import Clinician, Verification
 from src.domain.models.enums import VERIFICATION_STATUSES
 
 from .. import counts
@@ -23,14 +23,14 @@ from . import register
 async def generate_verifications(
     rng: SeededRandom, pool: SeedPool, session: AsyncSession
 ) -> list[Verification]:
-    providers: list[Provider] = pool.all("providers")
-    target = min(counts.VERIFICATION_COUNT, len(providers))
+    clinicians: list[Clinician] = pool.all("clinicians")
+    target = min(counts.VERIFICATION_COUNT, len(clinicians))
     out: list[Verification] = []
     for i in range(target):
-        provider = providers[i]
+        clinician = clinicians[i]
         row = Verification(
             id=deterministic_uuid("Verification", i),
-            provider_id=provider.id,
+            clinician_id=clinician.id,
             status=rng.round_robin(VERIFICATION_STATUSES, i),
             flags=rng.nullable_subset(
                 JSON_LIST_SOURCE["flags"], min_size=0, max_size=3, p_empty=0.4

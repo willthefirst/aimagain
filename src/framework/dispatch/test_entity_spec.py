@@ -338,20 +338,20 @@ def test_edge_audit_alone_constructs():
 
 def test_m2n_relation_holds_endpoints_and_join_shape():
     user_spec = _make_spec(name="user", url_collection="users", id_param="user_id")
-    provider_spec = _make_spec(
-        name="provider", url_collection="providers", id_param="provider_id"
+    clinician_spec = _make_spec(
+        name="clinician", url_collection="clinicians", id_param="clinician_id"
     )
     relation = M2NRelation(
         from_entity=user_spec,
-        to_entity=provider_spec,
+        to_entity=clinician_spec,
         join_table="user_favorites",
         from_attr="user_id",
-        to_attr="provider_id",
+        to_attr="clinician_id",
     )
     spec = _make_spec(relation=relation)
     assert spec.relation is relation
     assert spec.relation.from_entity is user_spec
-    assert spec.relation.to_entity is provider_spec
+    assert spec.relation.to_entity is clinician_spec
     assert spec.relation.join_table == "user_favorites"
 
 
@@ -569,11 +569,11 @@ def test_read_schema_and_read_to_dict_mutually_exclusive():
 def test_audit_snapshot_defaults_to_read_schema_when_basemodel():
     """If a spec provides `read_schema=<BaseModel>` and no explicit
     `audit_snapshot`/`audit`, the constructor uses the read schema as
-    the audit snapshot. Mirrors the codebase convention: provider and
+    the audit snapshot. Mirrors the codebase convention: clinician and
     its credential sub-rows declare a `Read` schema that doubles as the
     audit-row projection."""
     spec = _make_spec(
-        name="provider_licensure",
+        name="clinician_licensure",
         read_schema=_DummyRead,
         audit_action_stem="licensure",
     )

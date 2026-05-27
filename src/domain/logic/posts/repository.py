@@ -7,7 +7,6 @@ from src.domain.models import (
     Affiliation,
     OpeningDetail,
     Post,
-    Provider,
     ReferralDetail,
     User,
 )
@@ -22,7 +21,7 @@ class PostRepository(BaseRepository):
     body means most predicates ``OR`` across two paths — the
     seeking side reads from ``ReferralDetail``, the offering
     side from ``OpeningDetail`` (and its linked
-    ``Provider``). Each post has a row in at most one of the two
+    ``Affiliation``). Each post has a row in at most one of the two
     detail tables, so the ``OR`` coalesces the two paths into a
     single "matches" boolean without duplicating rows.
 
@@ -35,7 +34,7 @@ class PostRepository(BaseRepository):
       ``username``.
     * ``state`` (Choice, multi) — ``location_state`` ``IN`` across
       ``ReferralDetail`` (seeking) and the offering side's
-      linked ``Provider``.
+      linked ``Affiliation``.
     * ``city`` (Text) — ILIKE substring across the same two location
       paths as ``state``.
     * ``age_group`` (Choice, multi) — JSON-array contains check on
@@ -86,18 +85,9 @@ class PostRepository(BaseRepository):
                 OpeningDetail.post_id == Post.id,
             )
         if needs_provider_join:
-            # The location columns moved off `providers` to `affiliations`
-            # in #635 PR B; join through the 1:1 `affiliations.provider_id`
-            # FK to reach them. The `Provider` join stays in case future
-            # state/city filters want to be Provider-attribute-conditional
-            # (e.g. only-non-deleted providers), but it isn't required by
-            # the current predicates.
             stmt = stmt.outerjoin(
-                Provider,
-                Provider.id == OpeningDetail.provider_id,
-            ).outerjoin(
                 Affiliation,
-                Affiliation.provider_id == Provider.id,
+                Affiliation.clinician_id == OpeningDetail.clinician_id,
             )
 
         if kind is not None:

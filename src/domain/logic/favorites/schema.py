@@ -18,5 +18,5 @@ from src.framework.schema_validators import ReadProjection
 class UserFavoriteAuditSnapshot(ReadProjection):
     id: uuid.UUID
     user_id: uuid.UUID
-    provider_id: uuid.UUID
+    clinician_id: uuid.UUID
     created_at: datetime

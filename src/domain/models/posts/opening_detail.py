@@ -10,10 +10,10 @@ _TABLE = "opening_details"
 class OpeningDetail(Base):
     """1:1 detail row for posts of kind = 'clinician_opening'.
 
-    Practice + location + delivery-format fields live on the linked
-    `Provider` via `provider_id`; insurance posture + sliding-scale +
-    cost also live on `Provider`. This row only carries fields that are
-    *per-announcement*, not steady-state practice properties.
+    Per-announcement fields live here. Practice-role attributes (location,
+    insurance, modality) are on the linked `Clinician`'s primary
+    `Affiliation`; this row carries only fields that are per-announcement,
+    not steady-state practice properties.
     """
 
     __tablename__ = _TABLE
@@ -24,26 +24,18 @@ class OpeningDetail(Base):
         primary_key=True,
     )
 
-    # FK to the practice this announcement is for. Practice name, location,
-    # and delivery format all live on the linked `Provider` — looked up via
-    # `provider.*` in templates and read projections.
-    provider_id = Column(
+    clinician_id = Column(
         Uuid(as_uuid=True),
-        ForeignKey("providers.id", ondelete="CASCADE"),
+        ForeignKey("clinicians.id", ondelete="CASCADE"),
         nullable=False,
     )
-    provider = relationship("Provider", lazy="selectin")
+    clinician = relationship("Clinician", lazy="selectin")
 
-    # Section 3 — availability
     desired_times = Column(
         JSON, nullable=False, server_default=text("'[]'"), default=list
     )
-    # Companion to `desired_times` for cohort dates / fixed program hours.
-    # The grid handles "what times of the week am I open"; this captions
-    # "May 25 cohort, M-F 9-5". Both can coexist.
     schedule_text = Column(Text, nullable=True)
 
-    # Section 4 — featured services
     services = Column(JSON, nullable=False, server_default=text("'[]'"), default=list)
     settings = Column(JSON, nullable=False, server_default=text("'[]'"), default=list)
     treatment_modality = Column(Text, nullable=True)
@@ -51,13 +43,8 @@ class OpeningDetail(Base):
     languages = Column(
         JSON, nullable=False, server_default=text("'[\"en\"]'"), default=lambda: ["en"]
     )
-    # Genders this practice serves. JSON-array of `GENDERS` tokens
-    # (vocabulary enforced on the wire by Pydantic, not via SQL CHECK —
-    # same shape as `services` / `settings` / `age_groups`). Empty list
-    # is allowed both at rest and on the wire — "no restriction stated."
     genders = Column(JSON, nullable=False, server_default=text("'[]'"), default=list)
 
-    # Section 6 — about (free-text core fields)
     subject = Column(Text, nullable=True)
     description = Column(Text, nullable=True)
     referral_instructions = Column(Text, nullable=True)

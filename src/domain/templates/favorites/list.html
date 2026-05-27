@@ -2,9 +2,9 @@
 {%- from "_shared/_clinician_card.html" import clinician_card -%}
 {% block resource_label %}Favorites{% endblock %}
 {% block content %}
-  {% if providers %}
+  {% if clinicians %}
     <section id="favorites-list">
-      {%- for provider in providers %}{{ clinician_card(provider) }}{%- endfor %}
+      {%- for clinician in clinicians %}{{ clinician_card(clinician) }}{%- endfor %}
       </section>
     {% else %}
       <p id="favorites-empty">

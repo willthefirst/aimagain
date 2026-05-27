@@ -19,18 +19,18 @@ import pytest
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from src.domain.logic.providers.repository import ProviderRepository
+from src.domain.logic.clinicians.repository import ClinicianRepository
 from src.domain.logic.verifications import oig as oig_module
 from src.domain.logic.verifications.handlers import (
     VERIFICATION_RESOURCE,
-    run_provider_verification,
+    run_clinician_verification,
 )
 from src.domain.logic.verifications.repository import VerificationRepository
-from src.domain.models import Provider, User, Verification
+from src.domain.models import Clinician, User, Verification
 from src.framework.audit.log import AuditLog
 from src.framework.audit.repository import AuditRepository
 from src.framework.http.exceptions import NotFoundError
-from tests.helpers import create_test_user, make_provider_with_org
+from tests.helpers import create_test_user, make_clinician_with_org
 
 pytestmark = pytest.mark.asyncio
 
@@ -76,26 +76,26 @@ def _nppes_basic_payload(*, first: str, last: str) -> dict[str, Any]:
     }
 
 
-async def _seed_provider(
+async def _seed_clinician(
     db_test_session_manager: async_sessionmaker[AsyncSession],
     *,
     npi: str | None = None,
     username: str = "owner",
     first_name: str | None = None,
     last_name: str | None = None,
-) -> tuple[Provider, User]:
+) -> tuple[Clinician, User]:
     owner = create_test_user(username=f"{username}-{uuid4()}")
     async with db_test_session_manager() as session:
         async with session.begin():
             session.add(owner)
-            provider = make_provider_with_org(
+            clinician = make_clinician_with_org(
                 owner_id=owner.id,
                 npi=npi,
                 first_name=first_name,
                 last_name=last_name,
             )
-            session.add(provider)
-    return provider, owner
+            session.add(clinician)
+    return clinician, owner
 
 
 # --- Status outcomes ----------------------------------------------------
@@ -109,7 +109,7 @@ async def test_run_returns_verified_when_clinician_name_matches_nppes(
     `_clinician_names` path that reads through to the linked Clinician
     instead of the historical username fallback (which scored too low
     to ever verify)."""
-    provider, _ = await _seed_provider(
+    clinician, _ = await _seed_clinician(
         db_test_session_manager,
         npi="1234567890",
         first_name="Eva",
@@ -119,10 +119,10 @@ async def test_run_returns_verified_when_clinician_name_matches_nppes(
 
     async with db_test_session_manager() as session:
         async with http:
-            verification = await run_provider_verification(
-                provider_id=provider.id,
+            verification = await run_clinician_verification(
+                clinician_id=clinician.id,
                 verification_repo=VerificationRepository(session),
-                provider_repo=ProviderRepository(session),
+                clinician_repo=ClinicianRepository(session),
                 audit_repo=AuditRepository(session),
                 http=http,
                 actor_id=None,
@@ -143,17 +143,17 @@ async def test_run_returns_needs_review_when_nppes_name_differs(
     """NPPES returns a name unrelated to the username → similarity is
     below threshold → `needs_review`. Confirms the orchestrator wires
     NPPES + scoring correctly."""
-    provider, _ = await _seed_provider(db_test_session_manager, npi="1234567890")
+    clinician, _ = await _seed_clinician(db_test_session_manager, npi="1234567890")
     http = _mock_http(
         {"1234567890": _nppes_basic_payload(first="Bartholomew", last="Jenkins")}
     )
 
     async with db_test_session_manager() as session:
         async with http:
-            verification = await run_provider_verification(
-                provider_id=provider.id,
+            verification = await run_clinician_verification(
+                clinician_id=clinician.id,
                 verification_repo=VerificationRepository(session),
-                provider_repo=ProviderRepository(session),
+                clinician_repo=ClinicianRepository(session),
                 audit_repo=AuditRepository(session),
                 http=http,
                 actor_id=None,
@@ -169,15 +169,15 @@ async def test_run_returns_needs_review_when_nppes_name_differs(
 async def test_run_returns_failed_when_nppes_not_found(
     db_test_session_manager: async_sessionmaker[AsyncSession],
 ):
-    provider, _ = await _seed_provider(db_test_session_manager, npi="9999999999")
+    clinician, _ = await _seed_clinician(db_test_session_manager, npi="9999999999")
     http = _mock_http({"9999999999": {"results": []}})
 
     async with db_test_session_manager() as session:
         async with http:
-            verification = await run_provider_verification(
-                provider_id=provider.id,
+            verification = await run_clinician_verification(
+                clinician_id=clinician.id,
                 verification_repo=VerificationRepository(session),
-                provider_repo=ProviderRepository(session),
+                clinician_repo=ClinicianRepository(session),
                 audit_repo=AuditRepository(session),
                 http=http,
                 actor_id=None,
@@ -194,17 +194,17 @@ async def test_run_returns_failed_when_oig_npi_match(
     """The LEIE fixture lists NPI `1111111111` (`EXCLUDED, ALICE`). OIG
     is a hard disqualifier — even if NPPES would succeed, the row is
     `failed` with an `oig_excluded:npi_match` flag."""
-    provider, _ = await _seed_provider(db_test_session_manager, npi="1111111111")
+    clinician, _ = await _seed_clinician(db_test_session_manager, npi="1111111111")
     http = _mock_http(
         {"1111111111": _nppes_basic_payload(first="Doesnt", last="Matter")}
     )
 
     async with db_test_session_manager() as session:
         async with http:
-            verification = await run_provider_verification(
-                provider_id=provider.id,
+            verification = await run_clinician_verification(
+                clinician_id=clinician.id,
                 verification_repo=VerificationRepository(session),
-                provider_repo=ProviderRepository(session),
+                clinician_repo=ClinicianRepository(session),
                 audit_repo=AuditRepository(session),
                 http=http,
                 actor_id=None,
@@ -218,19 +218,19 @@ async def test_run_returns_failed_when_oig_npi_match(
 async def test_run_skips_nppes_when_provider_has_no_npi(
     db_test_session_manager: async_sessionmaker[AsyncSession],
 ):
-    """`provider.npi is None` → NPPES is not called and the row flags
+    """`clinician.npi is None` → NPPES is not called and the row flags
     `nppes_skipped`. The orchestrator still produces a row (scoring
     routes "NPPES not found" → `failed` with the usual NPPES flag, plus
     the skip flag at the front)."""
-    provider, _ = await _seed_provider(db_test_session_manager, npi=None)
+    clinician, _ = await _seed_clinician(db_test_session_manager, npi=None)
     http = _mock_http({})  # no NPPES calls expected
 
     async with db_test_session_manager() as session:
         async with http:
-            verification = await run_provider_verification(
-                provider_id=provider.id,
+            verification = await run_clinician_verification(
+                clinician_id=clinician.id,
                 verification_repo=VerificationRepository(session),
-                provider_repo=ProviderRepository(session),
+                clinician_repo=ClinicianRepository(session),
                 audit_repo=AuditRepository(session),
                 http=http,
                 actor_id=None,
@@ -248,15 +248,15 @@ async def test_run_skips_nppes_when_provider_has_no_npi(
 async def test_run_writes_one_audit_row_with_create_action(
     db_test_session_manager: async_sessionmaker[AsyncSession],
 ):
-    provider, _ = await _seed_provider(db_test_session_manager, npi="1234567890")
+    clinician, _ = await _seed_clinician(db_test_session_manager, npi="1234567890")
     http = _mock_http({"1234567890": _nppes_basic_payload(first="X", last="Y")})
 
     async with db_test_session_manager() as session:
         async with http:
-            verification = await run_provider_verification(
-                provider_id=provider.id,
+            verification = await run_clinician_verification(
+                clinician_id=clinician.id,
                 verification_repo=VerificationRepository(session),
-                provider_repo=ProviderRepository(session),
+                clinician_repo=ClinicianRepository(session),
                 audit_repo=AuditRepository(session),
                 http=http,
                 actor_id=None,
@@ -289,15 +289,15 @@ async def test_run_persists_a_committed_row(
 ):
     """The orchestrator commits before returning. A fresh session in
     another connection must see the row."""
-    provider, _ = await _seed_provider(db_test_session_manager, npi="1234567890")
+    clinician, _ = await _seed_clinician(db_test_session_manager, npi="1234567890")
     http = _mock_http({"1234567890": _nppes_basic_payload(first="X", last="Y")})
 
     async with db_test_session_manager() as session:
         async with http:
-            verification = await run_provider_verification(
-                provider_id=provider.id,
+            verification = await run_clinician_verification(
+                clinician_id=clinician.id,
                 verification_repo=VerificationRepository(session),
-                provider_repo=ProviderRepository(session),
+                clinician_repo=ClinicianRepository(session),
                 audit_repo=AuditRepository(session),
                 http=http,
                 actor_id=None,
@@ -307,7 +307,7 @@ async def test_run_persists_a_committed_row(
     async with db_test_session_manager() as fresh:
         row = await fresh.get(Verification, verification_id)
         assert row is not None
-        assert row.provider_id == provider.id
+        assert row.clinician_id == clinician.id
 
 
 async def test_run_records_actor_id_when_provided(
@@ -319,15 +319,15 @@ async def test_run_records_actor_id_when_provided(
     async with db_test_session_manager() as session:
         async with session.begin():
             session.add(admin)
-    provider, _ = await _seed_provider(db_test_session_manager, npi="1234567890")
+    clinician, _ = await _seed_clinician(db_test_session_manager, npi="1234567890")
     http = _mock_http({"1234567890": _nppes_basic_payload(first="X", last="Y")})
 
     async with db_test_session_manager() as session:
         async with http:
-            verification = await run_provider_verification(
-                provider_id=provider.id,
+            verification = await run_clinician_verification(
+                clinician_id=clinician.id,
                 verification_repo=VerificationRepository(session),
-                provider_repo=ProviderRepository(session),
+                clinician_repo=ClinicianRepository(session),
                 audit_repo=AuditRepository(session),
                 http=http,
                 actor_id=admin.id,
@@ -349,7 +349,7 @@ async def test_run_records_actor_id_when_provided(
     assert row.actor_id == admin.id
 
 
-async def test_run_raises_not_found_for_missing_provider(
+async def test_run_raises_not_found_for_missing_clinician(
     db_test_session_manager: async_sessionmaker[AsyncSession],
 ):
     http = _mock_http({})
@@ -358,10 +358,10 @@ async def test_run_raises_not_found_for_missing_provider(
     async with db_test_session_manager() as session:
         async with http:
             with pytest.raises(NotFoundError):
-                await run_provider_verification(
-                    provider_id=bogus,
+                await run_clinician_verification(
+                    clinician_id=bogus,
                     verification_repo=VerificationRepository(session),
-                    provider_repo=ProviderRepository(session),
+                    clinician_repo=ClinicianRepository(session),
                     audit_repo=AuditRepository(session),
                     http=http,
                     actor_id=None,

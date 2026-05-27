@@ -1,15 +1,9 @@
 {% extends "views/detail.html" %}
 {%- from "_shared/actions.html" import actions -%}
 {%- from "_shared/sections.html" import fact -%}
-{%- from "providers/_credential_list.html" import credential_list -%}
-{%- from "providers/_credential_row.html" import credential_row -%}
-{# The framework binds `context[spec.name] = target`; after #642 PR 4 the
-   entity name is "clinician" so the row arrives as `clinician`. Alias it
-   to `provider` here so the rest of the template (and the
-   `provider_card_view` helper signature) keeps the Python-side
-   vocabulary — the underlying model class is still `Provider`. #}
-{% set provider = clinician %}
-{%- set view = provider_card_view(provider) -%}
+{%- from "clinicians/_credential_list.html" import credential_list -%}
+{%- from "clinicians/_credential_row.html" import credential_row -%}
+{%- set view = clinician_card_view(clinician) -%}
 {% block resource_label %}Clinicians{% endblock %}
 {# H1 is the clinician's name when set; falls back to the primary
    affiliation's organization name for legacy rows without name data.
@@ -17,10 +11,10 @@
    clinician practices at, so the org-as-H1 fallback only matters
    while the name backfill is in progress. #}
 {% block current_label %}
-  {% if provider.first_name and provider.last_name %}
-    {{ provider.first_name }} {{ provider.last_name }}
+  {% if clinician.first_name and clinician.last_name %}
+    {{ clinician.first_name }} {{ clinician.last_name }}
   {% else %}
-    {{ provider.org.name }}
+    {{ clinician.org.name }}
   {% endif %}
 {% endblock %}
 {% block subtitle %}
@@ -39,7 +33,7 @@
    resource actions" rule in
    [`../../../framework/templates/README.md`](../../../framework/templates/README.md).
    `can_edit` and `is_favorited` are computed by
-   handle_get_provider_detail; templates do not re-derive
+   handle_get_clinician_detail; templates do not re-derive
    authorization predicates inline. Each action is a `<li>` because
    the toolbar's right zone is a `<menu class="toolbar-right">` of
    commands. #}
@@ -48,53 +42,38 @@
       <li>
         <button type="button"
                 class="secondary outline"
-                hx-delete="{{ entity_url('user_favorite', id=provider.id) }}"
+                hx-delete="{{ entity_url('user_favorite', id=clinician.id) }}"
                 hx-confirm="Remove this clinician from your favorites?">Unfavorite</button>
       </li>
     {% else %}
       <li>
         <button type="button"
                 class="outline"
-                hx-post="{{ entity_url('user_favorite', id=provider.id) }}">Favorite</button>
+                hx-post="{{ entity_url('user_favorite', id=clinician.id) }}">Favorite</button>
       </li>
     {% endif %}
   {% endif %}
   {% if can_edit %}
     {{ actions(wrapper="toolbar",
-        edit_url=entity_form_url('clinician', id=provider.id) ,
+        edit_url=entity_form_url('clinician', id=clinician.id) ,
     edit_label="Edit clinician",
-    delete_url=entity_url('clinician', id=provider.id),
+    delete_url=entity_url('clinician', id=clinician.id),
     delete_confirm="Permanently delete this clinician? Credentials attached to them will be removed too. This cannot be undone.",
     ) }}
   {% endif %}
 {% endblock %}
-{# Provider detail uses the same `.entity-card` chrome the posts/detail
-   page does. After #642 PR 2 the page is **stacked sections**:
-
-     1. Header card — clinician identity (NPI). Reads naturally as
-        "here's this person".
-     2. One affiliation card per row in `view.affiliations` — each
-        carries the per-role attributes ("here are the practices they
-        work at") and links out to the owning Organization. Each card
-        is tagged `data-testid="affiliation-card"` so route-level
-        tests can count them without scraping the heading text.
-     3. Credentials (licensures, educations, certifications) — these
-        are **person-level** (FK to `clinicians.id` after #635 PR A),
-        shared across every affiliation, so they render once at the
-        bottom, not inside each affiliation card.
-
-   Per-kind branching and field selection live in
-   `src.domain.logic.providers.view.provider_card_view` /
-   `affiliation_card_view`, which collapse the brittle three-conditional
-   insurance phrase into one string and pre-resolve the location-
-   availability display labels. Templates never reach for
-   `affiliation.org.name` directly — they read `aff.org_name`. #}
+{# Detail page uses stacked sections:
+   1. Affiliation cards — one per row in `view.affiliations`.
+   2. Credentials (licensures, educations, certifications) — person-level,
+      shared across every affiliation, rendered once.
+   `clinician_card_view` / `affiliation_card_view` collapse field references
+   so templates don't carry display logic. #}
 {% block content %}
   {# Identity card collapsed: the toolbar H1 carries `view.practice_name`
    and the `subtitle` block above carries NPI. The page starts straight
    into the affiliation cards.
 
-   Stacked affiliation cards — one per row in `provider.affiliations`.
+   Stacked affiliation cards — one per row in `clinician.affiliations`.
    Reads as "At <Org A>: ... · At <Org B>: ...". Each card links its
    heading to the owning Organization so the cross-resource navigation
    the old (single-card) layout exposed via the "Organization" facts

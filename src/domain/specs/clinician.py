@@ -1,44 +1,37 @@
-"""`PROVIDER_ENTITY`: single declaration of the clinician directory resource.
+"""`CLINICIAN_ENTITY`: single declaration of the clinician directory resource.
 
 `#642 PR 4` renamed the user-facing surface (URL family + entity name)
-from "provider" to "clinician" while keeping the `Provider` Python class
-and its model file intact — the rename is templates/URLs/audit-resource-
-type only. The Python-side identity stays `PROVIDER_ENTITY`; the spec's
-`name="clinician"` flows to `entity_url('clinician', ...)`, the
-`/clinicians/...` URL family, and `audit.type="clinician"`. Enum names
-(`CREATE_PROVIDER` etc.) are pinned via `audit_action_stem="provider"`
-so historical audit rows keep their labels. See
-`src/domain/models/providers/README.md` for the model-vs-UI vocabulary
-gap.
+from "provider" to "clinician". Enum names (`CREATE_PROVIDER` etc.) are
+pinned via `audit_action_stem="provider"` so historical audit rows keep
+their labels. See `src/domain/models/providers/README.md` for the
+model-vs-UI vocabulary gap.
 
 Read by:
-  - `src/domain/routes/providers.py` — derives `PROVIDER_SPEC` for the
+  - `src/domain/routes/clinicians.py` — derives `CLINICIAN_SPEC` for the
     mount helpers and reads the list filters from `.filters`.
-  - `src/logic/providers/provider_processing.py` — reads
-    `PROVIDER_ENTITY.audit` for the `mutate(...)` resource binding.
   - `src/domain/specs/provider_licensure.py` /
     `provider_education.py` / `provider_certification.py` — set
-    ``parent=PROVIDER_ENTITY`` so the mount layer's parent-chain
+    ``parent=CLINICIAN_ENTITY`` so the mount layer's parent-chain
     machinery builds nested paths like
     ``/clinicians/{clinician_id}/licensures/{licensure_id}``.
   - `src/domain/specs/user.py` — the related-list subresource
-    `RelatedListSubresource(child_spec=PROVIDER_ENTITY.to_resource_spec(), ...)`
+    `RelatedListSubresource(child_spec=CLINICIAN_ENTITY.to_resource_spec(), ...)`
     on the user spec; closes the `api/common -> api/routes`
     inversion.
 """
 
 from typing import Final
 
-from src.domain.logic.favorites.repository import UserFavoriteRepository
-from src.domain.logic.organizations.repository import OrganizationRepository
-from src.domain.logic.providers.repository import get_provider_repository
-from src.domain.logic.providers.schema import (
+from src.domain.logic.clinicians.repository import get_clinician_repository
+from src.domain.logic.clinicians.schema import (
     ProviderCreate,
     ProviderRead,
     ProviderUpdate,
 )
+from src.domain.logic.favorites.repository import UserFavoriteRepository
+from src.domain.logic.organizations.repository import OrganizationRepository
 from src.domain.logic.verifications.repository import VerificationRepository
-from src.domain.models import Provider
+from src.domain.models import Clinician
 from src.domain.models.enums import (
     CERTIFICATION_TYPES,
     CERTIFICATION_TYPES_LABELS,
@@ -62,10 +55,13 @@ from src.framework.dispatch.filters import ChoiceFilter
 # keep editing the parent + its credentials. The same callable is reused
 # by the three credential subentities (their parent is this clinician
 # directory entry).
-_provider_form_redirect = Redirects.to_edit_form("clinicians", "clinician_id")
+_clinician_form_redirect = Redirects.to_edit_form("clinicians", "clinician_id")
+
+# Backward-compat alias for credential specs that import the old name.
+_provider_form_redirect = _clinician_form_redirect
 
 
-PROVIDER_ENTITY: Final[EntitySpec] = EntitySpec(
+CLINICIAN_ENTITY: Final[EntitySpec] = EntitySpec(
     name="clinician",
     url_collection="clinicians",
     id_param="clinician_id",
@@ -75,10 +71,8 @@ PROVIDER_ENTITY: Final[EntitySpec] = EntitySpec(
     # still equals `spec.name` ("clinician") so *new* rows record the
     # post-rename resource type while the action enum reads as the old name.
     audit_action_stem="provider",
-    model=Provider,
-    # `owner_attr` defaults to "owner_id" — providers track their
-    # owning user via Provider.owner_id.
-    repo_dep=get_provider_repository,
+    model=Clinician,
+    repo_dep=get_clinician_repository,
     auth_deps=AUTHENTICATED,
     auth_policy=OWNER_OR_ADMIN,
     create_adapter=ProviderCreate,
@@ -111,30 +105,22 @@ PROVIDER_ENTITY: Final[EntitySpec] = EntitySpec(
             multi=True,
         ),
     ),
-    create_redirect=_provider_form_redirect,
-    update_redirect=_provider_form_redirect,
+    create_redirect=_clinician_form_redirect,
+    update_redirect=_clinician_form_redirect,
     # Opt into the HX-Request re-render-on-validation-failure path —
     # see `EntitySpec.form_error_render`. On a Pydantic 422 the
-    # framework re-renders `providers/_form_new_fragment.html`
+    # framework re-renders `clinicians/_form_new_fragment.html`
     # with `form_errors` / `form_values` injected.
     form_error_render=True,
-    # Template paths are pinned explicitly because the directory cluster
-    # is still `templates/providers/` (the Python model file lives at
-    # `models/providers/provider.py` and the brief kept that filename
-    # stable), but the spec's `url_collection` is now `"clinicians"` —
-    # the default would resolve to `clinicians/<verb>.html` which doesn't
-    # exist. Every opt-in route gets an explicit path here; conformance
-    # tests (`test_spec_conformance.py::test_templates_default_by_convention_for_opted_in_verbs`)
-    # tolerate the divergence.
     templates=Templates(
-        list="providers/list.html",
-        detail="providers/detail.html",
-        form_new="providers/form_new.html",
-        form_edit="providers/form_edit.html",
-        search="providers/search.html",
+        list="clinicians/list.html",
+        detail="clinicians/detail.html",
+        form_new="clinicians/form_new.html",
+        form_edit="clinicians/form_edit.html",
+        search="clinicians/search.html",
     ),
     # Per-viewer detail extras live on the spec — see `EntitySpec`.
-    detail_extras_path="src.domain.logic.providers.handlers.provider_detail_extras",
+    detail_extras_path="src.domain.logic.clinicians.handlers.clinician_detail_extras",
     detail_extras_repos=(
         ("user_favorite_repo", UserFavoriteRepository),
         ("verification_repo", VerificationRepository),
@@ -143,11 +129,11 @@ PROVIDER_ENTITY: Final[EntitySpec] = EntitySpec(
     # the user's owned Organizations. The framework invokes the extras
     # callable on both the create path (target=None) and the edit path
     # (target=<row>) — see `EntitySpec.form_extras_path`.
-    form_extras_path="src.domain.logic.providers.handlers.provider_form_extras",
+    form_extras_path="src.domain.logic.clinicians.handlers.clinician_form_extras",
     form_extras_repos=(("organization_repo", OrganizationRepository),),
-    # Write-time check: a user may only attach a Provider to an Org they own.
+    # Write-time check: a user may only attach a Clinician to an Org they own.
     payload_authz_path=(
-        "src.domain.logic.providers.handlers._assert_provider_payload_org_ownership"
+        "src.domain.logic.clinicians.handlers._assert_clinician_payload_org_ownership"
     ),
     payload_authz_repos=(("organization_repo", OrganizationRepository),),
     # Provider templates render credential-type display labels and the
