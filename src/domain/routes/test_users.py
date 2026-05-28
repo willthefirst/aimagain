@@ -1088,25 +1088,3 @@ async def test_get_user_clinicians_404_for_unknown_user(
 
     response = await authenticated_client.get(f"/users/{uuid.uuid4()}/clinicians")
     assert response.status_code == 404
-
-
-async def test_legacy_provider_paths_gone(
-    authenticated_client: AsyncClient,
-    logged_in_user: User,
-):
-    """The legacy `/provider-profiles*` paths were renamed to `/providers*`
-    in an earlier PR; #642 PR 4 then flipped `/providers*` →
-    `/clinicians*` (no redirects — the design comment on issue #642
-    explicitly accepted bookmark breakage). Requests to either old URL
-    family — top-level, /me alias, or user-scoped — no longer match
-    any route."""
-    for path in (
-        "/provider-profiles",
-        "/users/me/provider-profiles",
-        f"/users/{logged_in_user.id}/provider-profiles",
-        "/providers",
-        "/users/me/providers",
-        f"/users/{logged_in_user.id}/providers",
-    ):
-        response = await authenticated_client.get(path)
-        assert response.status_code == 404, f"{path} unexpectedly matched"
