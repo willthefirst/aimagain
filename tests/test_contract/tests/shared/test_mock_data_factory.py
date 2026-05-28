@@ -147,14 +147,14 @@ def test_field_overrides_for_unknown_field_are_passed_through():
     """The factory doesn't filter overrides against the spec — a
     caller can attach an unrelated attribute (e.g. a relationship that
     isn't a column) and it ends up on the `SimpleNamespace`. Useful
-    for adding `provider` (PA) / `program` (program) relationships
+    for adding `clinician` (PA) / `program` (program) relationships
     that the column-driven defaults can't populate."""
     post = make_post_stub(
         "clinician_opening",
         owner_id=uuid.uuid4(),
-        provider=object(),  # arbitrary stand-in for the relationship
+        clinician=object(),  # arbitrary stand-in for the relationship
     )
-    assert post.opening_detail.provider is not None
+    assert post.opening_detail.clinician is not None
 
 
 # --- Acceptance: template render canary --------------------------------

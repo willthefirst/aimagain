@@ -26,7 +26,7 @@ def test_same_resource_import_is_allowed(tmp_path: Path) -> None:
 def test_shared_import_is_allowed(tmp_path: Path) -> None:
     root = tmp_path / "templates"
     a = _write(
-        root / "providers" / "edit.html",
+        root / "clinicians" / "edit.html",
         '{% from "_shared/form_fields.html" import f %}',
     )
     _write(root / "_shared" / "form_fields.html", "")
@@ -39,7 +39,7 @@ def test_shared_import_is_allowed(tmp_path: Path) -> None:
 def test_views_extends_is_allowed(tmp_path: Path) -> None:
     """`views/` is framework-level chrome; any entity may extend it."""
     root = tmp_path / "templates"
-    a = _write(root / "providers" / "list.html", '{% extends "views/list.html" %}')
+    a = _write(root / "clinicians" / "list.html", '{% extends "views/list.html" %}')
     _write(root / "views" / "list.html", "")
 
     violations = find_violations([a], root)
@@ -58,7 +58,7 @@ def test_two_template_roots_resolve_owning_resource(tmp_path: Path) -> None:
     )
     _write(framework_root / "base.html", "")
     domain_page = _write(
-        domain_root / "providers" / "list.html",
+        domain_root / "clinicians" / "list.html",
         '{% extends "views/list.html" %}\n'
         '{% from "_shared/_card.html" import card %}',
     )
@@ -86,7 +86,7 @@ def test_views_files_can_reference_anywhere(tmp_path: Path) -> None:
 
 def test_root_extends_is_allowed(tmp_path: Path) -> None:
     root = tmp_path / "templates"
-    a = _write(root / "providers" / "edit.html", '{% extends "base.html" %}')
+    a = _write(root / "clinicians" / "edit.html", '{% extends "base.html" %}')
 
     violations = find_violations([a], root)
 
@@ -96,7 +96,7 @@ def test_root_extends_is_allowed(tmp_path: Path) -> None:
 def test_cross_resource_from_is_flagged(tmp_path: Path) -> None:
     root = tmp_path / "templates"
     a = _write(
-        root / "providers" / "edit.html", '{%- from "posts/_form.html" import f -%}'
+        root / "clinicians" / "edit.html", '{%- from "posts/_form.html" import f -%}'
     )
 
     violations = find_violations([a], root)
@@ -105,9 +105,9 @@ def test_cross_resource_from_is_flagged(tmp_path: Path) -> None:
     v = violations[0]
     assert v.directive == "from"
     assert v.referenced == "posts/_form.html"
-    assert v.importing_dir == "providers/"
+    assert v.importing_dir == "clinicians/"
     assert v.referenced_dir == "posts/"
-    assert "providers/ → posts/" in v.message()
+    assert "clinicians/ → posts/" in v.message()
     assert "_shared/" in v.message()
 
 
@@ -126,7 +126,7 @@ def test_cross_resource_include_is_flagged(tmp_path: Path) -> None:
 def test_cross_resource_extends_is_flagged(tmp_path: Path) -> None:
     """A child template extending another resource's template is the same smell."""
     root = tmp_path / "templates"
-    a = _write(root / "users" / "list.html", '{% extends "providers/list.html" %}')
+    a = _write(root / "users" / "list.html", '{% extends "clinicians/list.html" %}')
 
     violations = find_violations([a], root)
 
@@ -137,7 +137,7 @@ def test_cross_resource_extends_is_flagged(tmp_path: Path) -> None:
 def test_cross_resource_import_directive_is_flagged(tmp_path: Path) -> None:
     """`{% import 'x' as y %}` is the same shape as `{% from %}` for layering purposes."""
     root = tmp_path / "templates"
-    a = _write(root / "providers" / "new.html", '{% import "posts/_form.html" as f %}')
+    a = _write(root / "clinicians" / "new.html", '{% import "posts/_form.html" as f %}')
 
     violations = find_violations([a], root)
 
@@ -159,7 +159,7 @@ def test_directive_spanning_newlines_is_caught(tmp_path: Path) -> None:
     """Jinja allows directives to break across lines; the regex uses DOTALL."""
     root = tmp_path / "templates"
     body = '{%-\n  from\n  "posts/_form.html"\n  import f\n-%}'
-    a = _write(root / "providers" / "edit.html", body)
+    a = _write(root / "clinicians" / "edit.html", body)
 
     violations = find_violations([a], root)
 
@@ -172,7 +172,7 @@ def test_multiple_violations_in_one_file(tmp_path: Path) -> None:
         '{% from "posts/_form.html" import x %}\n'
         '{% include "users/_admin_actions.html" %}\n'
     )
-    a = _write(root / "providers" / "edit.html", body)
+    a = _write(root / "clinicians" / "edit.html", body)
 
     violations = find_violations([a], root)
 
