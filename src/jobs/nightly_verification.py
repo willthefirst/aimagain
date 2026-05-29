@@ -20,13 +20,14 @@ import httpx
 
 from src.db import async_session_maker
 from src.domain.logic.clinicians.repository import ClinicianRepository
-from src.domain.logic.verifications.handlers import run_clinician_verification
+from src.domain.logic.verifications.handlers import (
+    HTTP_TIMEOUT_SECONDS,
+    run_clinician_verification,
+)
 from src.domain.logic.verifications.repository import VerificationRepository
 from src.framework.audit.repository import AuditRepository
 
 logger = logging.getLogger(__name__)
-
-_HTTP_TIMEOUT_SECONDS = 10.0
 
 
 async def run_nightly_verification() -> None:
@@ -36,7 +37,7 @@ async def run_nightly_verification() -> None:
         audit_repo = AuditRepository(session)
         clinicians = await clinician_repo.list_for_verification()
 
-        async with httpx.AsyncClient(timeout=_HTTP_TIMEOUT_SECONDS) as http:
+        async with httpx.AsyncClient(timeout=HTTP_TIMEOUT_SECONDS) as http:
             for clinician in clinicians:
                 try:
                     await run_clinician_verification(

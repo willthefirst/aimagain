@@ -11,11 +11,12 @@ The framework groups its code by concern:
 - **[`rendering/`](rendering/README.md)** — Jinja + form rendering. Templating env, view projections, the schema-driven form-field markers.
 - **[`observability/`](observability/README.md)** — provider-agnostic error tracking + tracing. `ObservabilityBackend` Protocol with Sentry + Noop implementations; the only place a provider SDK is imported.
 
-Plus three flat-at-root single-file modules used by everything:
+Plus four flat-at-root single-file modules used by everything:
 
 - `authz.py` — auth predicates (`is_owner_or_admin`, `is_admin`, `is_self_or_admin`) + the matching raising forms.
 - `schema_validators.py` — reusable Pydantic field validators (zip, phone, etc.).
 - `config.py` — settings singleton.
+- `type_utils.py` — `is_optional` / `strip_optional`: Python typing helpers for `T | None` detection and unwrapping, shared by `rendering/form_fields.py` and `dispatch/mounts/_synth.py`.
 
 ## What you usually need
 
