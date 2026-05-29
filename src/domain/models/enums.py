@@ -1,6 +1,16 @@
-"""Controlled-vocabulary tuples (Text+CHECK columns); paired *_LABELS dicts."""
+"""Controlled-vocabulary tuples (Text+CHECK columns); paired *_LABELS dicts.
+
+Vocabularies are migrating onto `LabeledChoice` (see `labeled_choice.py`): the
+class declares value + label + optional icon per member, and the historical
+`FOO` / `FOO_LABELS` / `FOO_ICONS` names are kept as derived aliases
+(`Cls.values()` / `.labels()` / `.icons()`) so every downstream consumer stays
+unchanged. Vocabularies not yet migrated keep the legacy parallel
+tuple-plus-dict shape.
+"""
 
 from typing import Final, NamedTuple
+
+from src.domain.models.labeled_choice import LabeledChoice
 
 
 class AgeGroup(NamedTuple):
@@ -73,11 +83,15 @@ US_STATES: Final[tuple[str, ...]] = (
     "WI",
     "WY",
 )
-LOCATION_AVAILABILITY_OPTIONS: Final[tuple[str, ...]] = (
-    "yes",
-    "no",
-    "please_contact",
-)
+
+
+class LocationAvailability(LabeledChoice):
+    yes = "yes", "Yes"
+    no = "no", "No"
+    please_contact = "please_contact", "Please contact"
+
+
+LOCATION_AVAILABILITY_OPTIONS: Final[tuple[str, ...]] = LocationAvailability.values()
 CLIENT_AGE_GROUPS: Final[tuple[str, ...]] = (
     "children_0_5",
     "children_6_10",
@@ -87,11 +101,19 @@ CLIENT_AGE_GROUPS: Final[tuple[str, ...]] = (
     "adults_25_64",
     "older_adults_65_plus",
 )
+
+
 # Spoken-language tokens used by the multi-valued `languages` field on
 # both post kinds. Tokens are ISO-639 codes; labels are the English
-# display names. The tuple starts minimal — covers every seed example
-# today — and grows as real posts demand more entries.
-LANGUAGES: Final[tuple[str, ...]] = ("en", "es")
+# display names. Starts minimal — covers every seed example today — and
+# grows as real posts demand more entries.
+class Language(LabeledChoice):
+    en = "en", "English"
+    es = "es", "Spanish"
+
+
+LANGUAGES: Final[tuple[str, ...]] = Language.values()
+
 
 # Referrer's posture toward in-network matching for a `referral`.
 # Paired with `insurance_carrier` (nullable, from `INSURANCE_CARRIERS`) on
@@ -99,11 +121,14 @@ LANGUAGES: Final[tuple[str, ...]] = ("en", "es")
 # `insurance_carrier` describes *which carrier* (null = self-pay /
 # unknown / no carrier). When `network_preference == 'no_preference'`
 # the carrier value is irrelevant — the form hides the control.
-NETWORK_PREFERENCES: Final[tuple[str, ...]] = (
-    "in_network_required",
-    "in_network_preferred",
-    "no_preference",
-)
+class NetworkPreference(LabeledChoice):
+    in_network_required = "in_network_required", "In-network required"
+    in_network_preferred = "in_network_preferred", "In-network preferred"
+    no_preference = "no_preference", "No preference / self-pay"
+
+
+NETWORK_PREFERENCES: Final[tuple[str, ...]] = NetworkPreference.values()
+
 
 # Carrier vocabulary for `Clinician.in_network_carriers` and
 # `ReferralDetail.insurance_carrier`. Single-sourced so the
@@ -111,19 +136,21 @@ NETWORK_PREFERENCES: Final[tuple[str, ...]] = (
 # list of carriers the practice accepts) share tokens. On the clinician
 # side an empty list means "no in-network"; nullable on the referral
 # side (null = self-pay / unknown / no carrier).
-INSURANCE_CARRIERS: Final[tuple[str, ...]] = (
-    "aetna",
-    "anthem_bcbs",
-    "cigna",
-    "kaiser",
-    "magellan",
-    "medicare",
-    "medicaid",
-    "optum",
-    "tricare",
-    "united_healthcare",
-    "other",
-)
+class InsuranceCarrier(LabeledChoice):
+    aetna = "aetna", "Aetna"
+    anthem_bcbs = "anthem_bcbs", "Anthem / BCBS"
+    cigna = "cigna", "Cigna"
+    kaiser = "kaiser", "Kaiser"
+    magellan = "magellan", "Magellan"
+    medicare = "medicare", "Medicare"
+    medicaid = "medicaid", "Medicaid"
+    optum = "optum", "Optum"
+    tricare = "tricare", "Tricare"
+    united_healthcare = "united_healthcare", "UnitedHealthcare"
+    other = "other", "Other"
+
+
+INSURANCE_CARRIERS: Final[tuple[str, ...]] = InsuranceCarrier.values()
 
 # Day × time-of-day grid for "when are you available". 14 tokens of the
 # form `<day>_<part>`. Day order is Mon→Sun (week-of-work convention from
@@ -145,20 +172,24 @@ DESIRED_TIME_SLOTS: Final[tuple[str, ...]] = tuple(
     f"{day}_{part}" for day in DESIRED_TIME_DAYS for part in DESIRED_TIME_PARTS
 )
 
+
 # Service-line categories. The same vocabulary appears on both forms:
 # optional `services` on `referral` (empty list allowed) and
 # required-min-1 `services` on `opening`. Required-ness
 # differs but the value set is shared, so the tuple is single-sourced.
-REFERRAL_SERVICES: Final[tuple[str, ...]] = (
-    "evaluation",
-    "medication_management",
-    "psychotherapy",
-    "case_management",
-    "allied_health",
-    "group_therapy",
-    "family_therapy",
-    "couples_therapy",
-)
+class ReferralService(LabeledChoice):
+    evaluation = "evaluation", "Evaluation", "clipboard-list"
+    medication_management = "medication_management", "Medication management", "pill"
+    psychotherapy = "psychotherapy", "Psychotherapy", "message-circle"
+    case_management = "case_management", "Case management", "briefcase"
+    allied_health = "allied_health", "Allied health", "heart-pulse"
+    group_therapy = "group_therapy", "Group therapy", "users"
+    family_therapy = "family_therapy", "Family therapy", "users-round"
+    couples_therapy = "couples_therapy", "Couples therapy", "heart-handshake"
+
+
+REFERRAL_SERVICES: Final[tuple[str, ...]] = ReferralService.values()
+
 
 # Gender identity vocabulary. Single-axis enum that folds trans/cis into
 # the value (`female` / `trans_female`) rather than splitting into two
@@ -170,60 +201,65 @@ REFERRAL_SERVICES: Final[tuple[str, ...]] = (
 # Used as a scalar on `referral` (`gender`: the client's identity)
 # and as a multi-value list on `opening` (`genders`: the
 # practice serves these).
-GENDERS: Final[tuple[str, ...]] = (
-    "female",
-    "male",
-    "non_binary",
-    "trans_female",
-    "trans_male",
-    "gender_diverse",
-    "prefer_not_to_say",
-)
+class Gender(LabeledChoice):
+    female = "female", "Female"
+    male = "male", "Male"
+    non_binary = "non_binary", "Non-binary"
+    trans_female = "trans_female", "Trans woman"
+    trans_male = "trans_male", "Trans man"
+    gender_diverse = "gender_diverse", "Gender-diverse"
+    prefer_not_to_say = "prefer_not_to_say", "Prefer not to say"
+
+
+GENDERS: Final[tuple[str, ...]] = Gender.values()
+
 
 # Treatment settings categories. `opening` only; required-min-1.
-TREATMENT_SETTINGS: Final[tuple[str, ...]] = (
-    "outpatient",
-    "iop",
-    "crisis_care",
-    "php",
-    "residential",
-    "day_program",
-)
+class TreatmentSetting(LabeledChoice):
+    outpatient = "outpatient", "Outpatient", "house"
+    iop = "iop", "IOP", "calendar-clock"
+    crisis_care = "crisis_care", "Crisis care", "siren"
+    php = "php", "PHP", "calendar-days"
+    residential = "residential", "Residential", "hospital"
+    day_program = "day_program", "Day program", "sun"
+
+
+TREATMENT_SETTINGS: Final[tuple[str, ...]] = TreatmentSetting.values()
+
 
 # Therapeutic modality vocabulary. Structured alternative to the legacy
 # `treatment_modality` free-text column; new posts use this multi-value
 # list for filterable, controlled-vocabulary modality data.
-TREATMENT_MODALITIES: Final[tuple[str, ...]] = (
-    "psychodynamic",
-    "emdr",
-    "ifs",
-    "somatic",
-    "cbt",
-    "dbt",
-    "act",
-    "motivational_interviewing",
-    "narrative",
-    "gottman",
-)
+class TreatmentModality(LabeledChoice):
+    psychodynamic = "psychodynamic", "Psychodynamic"
+    emdr = "emdr", "EMDR"
+    ifs = "ifs", "IFS"
+    somatic = "somatic", "Somatic"
+    cbt = "cbt", "CBT"
+    dbt = "dbt", "DBT"
+    act = "act", "ACT"
+    motivational_interviewing = "motivational_interviewing", "Motivational interviewing"
+    narrative = "narrative", "Narrative"
+    gottman = "gottman", "Gottman"
+
+
+TREATMENT_MODALITIES: Final[tuple[str, ...]] = TreatmentModality.values()
 
 
 # --- Display labels for select <option>s --------------------------------
 #
-# Where the storage value isn't directly usable as the dropdown label
-# (e.g. `children_0_5`, `in_network`), the labels live next to the tuple
-# they cover. The form-render macro in
+# The form-render macro in
 # `src/framework/templates/_shared/form_fields.html` looks up labels via these
-# dicts; missing keys fail at render time. A guardrail test in
-# `src/domain/logic/posts/test_schema.py` asserts every value in a tuple has a label.
+# `*_LABELS` dicts; missing keys fail at render time. Migrated vocabularies
+# derive their dict from the `LabeledChoice` class (`Cls.labels()`), so the
+# label can't drift from its value — the legacy vocabularies below still pair a
+# hand-written dict with a tuple, guarded by `test_labels_cover_their_tuples` in
+# `src/domain/logic/posts/test_schema.py`.
 #
 # `US_STATES` deliberately has no label dict — the value (USPS
 # abbreviation) is the right user-facing label.
 
-LOCATION_AVAILABILITY_LABELS: Final[dict[str, str]] = {
-    "yes": "Yes",
-    "no": "No",
-    "please_contact": "Please contact",
-}
+LOCATION_AVAILABILITY_LABELS: Final[dict[str, str]] = LocationAvailability.labels()
 # One AgeGroup row per `CLIENT_AGE_GROUPS` token, carrying every
 # display fact (singular noun, plural noun, numeric range). All other
 # dicts derive from this — adding a value means editing one row, not
@@ -247,25 +283,9 @@ CLIENT_AGE_GROUP_LABELS: Final[dict[str, str]] = {
 CLIENT_AGE_GROUP_LABELS_SINGULAR: Final[dict[str, str]] = {
     k: f"{g.singular} ({g.range})" for k, g in CLIENT_AGE_GROUPS_BY_KEY.items()
 }
-LANGUAGE_LABELS: Final[dict[str, str]] = {"en": "English", "es": "Spanish"}
-NETWORK_PREFERENCE_LABELS: Final[dict[str, str]] = {
-    "in_network_required": "In-network required",
-    "in_network_preferred": "In-network preferred",
-    "no_preference": "No preference / self-pay",
-}
-INSURANCE_CARRIER_LABELS: Final[dict[str, str]] = {
-    "aetna": "Aetna",
-    "anthem_bcbs": "Anthem / BCBS",
-    "cigna": "Cigna",
-    "kaiser": "Kaiser",
-    "magellan": "Magellan",
-    "medicare": "Medicare",
-    "medicaid": "Medicaid",
-    "optum": "Optum",
-    "tricare": "Tricare",
-    "united_healthcare": "UnitedHealthcare",
-    "other": "Other",
-}
+LANGUAGE_LABELS: Final[dict[str, str]] = Language.labels()
+NETWORK_PREFERENCE_LABELS: Final[dict[str, str]] = NetworkPreference.labels()
+INSURANCE_CARRIER_LABELS: Final[dict[str, str]] = InsuranceCarrier.labels()
 # Per-axis labels for the desired-times grid. The form-render macro
 # uses these for the row (day) and column (slot) headers; per-cell
 # labels aren't needed because the checkbox value carries the meaning.
@@ -304,45 +324,11 @@ DESIRED_TIME_SLOT_LABELS: Final[dict[str, str]] = {
     for day in DESIRED_TIME_DAYS
     for part in DESIRED_TIME_PARTS
 }
-REFERRAL_SERVICE_LABELS: Final[dict[str, str]] = {
-    "evaluation": "Evaluation",
-    "medication_management": "Medication management",
-    "psychotherapy": "Psychotherapy",
-    "case_management": "Case management",
-    "allied_health": "Allied health",
-    "group_therapy": "Group therapy",
-    "family_therapy": "Family therapy",
-    "couples_therapy": "Couples therapy",
-}
-TREATMENT_SETTINGS_LABELS: Final[dict[str, str]] = {
-    "outpatient": "Outpatient",
-    "iop": "IOP",
-    "crisis_care": "Crisis care",
-    "php": "PHP",
-    "residential": "Residential",
-    "day_program": "Day program",
-}
-TREATMENT_MODALITY_LABELS: Final[dict[str, str]] = {
-    "psychodynamic": "Psychodynamic",
-    "emdr": "EMDR",
-    "ifs": "IFS",
-    "somatic": "Somatic",
-    "cbt": "CBT",
-    "dbt": "DBT",
-    "act": "ACT",
-    "motivational_interviewing": "Motivational interviewing",
-    "narrative": "Narrative",
-    "gottman": "Gottman",
-}
-GENDER_LABELS: Final[dict[str, str]] = {
-    "female": "Female",
-    "male": "Male",
-    "non_binary": "Non-binary",
-    "trans_female": "Trans woman",
-    "trans_male": "Trans man",
-    "gender_diverse": "Gender-diverse",
-    "prefer_not_to_say": "Prefer not to say",
-}
+REFERRAL_SERVICE_LABELS: Final[dict[str, str]] = ReferralService.labels()
+TREATMENT_SETTINGS_LABELS: Final[dict[str, str]] = TreatmentSetting.labels()
+TREATMENT_MODALITY_LABELS: Final[dict[str, str]] = TreatmentModality.labels()
+GENDER_LABELS: Final[dict[str, str]] = Gender.labels()
+
 
 # --- Unified insurance posture -----------------------------------------
 #
@@ -360,30 +346,27 @@ GENDER_LABELS: Final[dict[str, str]] = {
 # `src/domain/logic/posts/view.py`. Adding a fifth state means: extend
 # this tuple, extend the labels + icons dicts, update the helper, and
 # the row macro picks it up.
-INSURANCE_POSTURES: Final[tuple[str, ...]] = (
-    "in_network",
-    "out_of_network",
-    "self_pay",
-    "please_contact",
-)
-INSURANCE_POSTURE_LABELS: Final[dict[str, str]] = {
-    "in_network": "In-network",
-    "out_of_network": "Out-of-network",
-    "self_pay": "Self-pay",
-    "please_contact": "Contact for insurance",
-}
+class InsurancePosture(LabeledChoice):
+    in_network = "in_network", "In-network", "shield-check"
+    out_of_network = "out_of_network", "Out-of-network", "shield"
+    self_pay = "self_pay", "Self-pay", "dollar-sign"
+    please_contact = "please_contact", "Contact for insurance", "circle-help"
+
+
+INSURANCE_POSTURES: Final[tuple[str, ...]] = InsurancePosture.values()
+INSURANCE_POSTURE_LABELS: Final[dict[str, str]] = InsurancePosture.labels()
 
 
 # --- Lucide icon names ------------------------------------------------
 #
-# Icon names are keyed by the same enum storage value as the matching
-# `*_LABELS` dict — renaming a *label* leaves these untouched; adding
-# or renaming an *enum value* touches the tuple, the labels dict, and
-# the icons dict in lockstep (the `test_icons_cover_their_tuples`
-# guardrail in `src/domain/logic/posts/test_schema.py` fails the build
-# if you forget one). Values are Lucide icon names (`lucide-static`
-# font CSS exposes them as `<i class="icon-<name>">`); the row macro
-# in `src/domain/templates/posts/_item.html` emits the `<i>` tag.
+# Icon names are keyed by the enum storage value. Values are Lucide icon
+# names (`lucide-static` font CSS exposes them as `<i class="icon-<name>">`);
+# the row macro in `src/domain/templates/posts/_item.html` emits the `<i>` tag.
+# Migrated vocabularies declare the icon as the third element of each
+# `LabeledChoice` member, so `Cls.icons()` is the dict — no separate structure
+# to keep in lockstep. The legacy `CLIENT_AGE_GROUP_ICONS` below still pairs a
+# hand-written dict with its tuple (guarded by `test_icons_cover_their_tuples`
+# in `src/domain/logic/posts/test_schema.py`).
 #
 # Multiple enum values may share an icon when the visual signal at
 # scan distance is the same — e.g. children_0_5 and children_6_10 both
@@ -398,30 +381,9 @@ CLIENT_AGE_GROUP_ICONS: Final[dict[str, str]] = {
     "adults_25_64": "user",
     "older_adults_65_plus": "user-round",
 }
-REFERRAL_SERVICE_ICONS: Final[dict[str, str]] = {
-    "evaluation": "clipboard-list",
-    "medication_management": "pill",
-    "psychotherapy": "message-circle",
-    "case_management": "briefcase",
-    "allied_health": "heart-pulse",
-    "group_therapy": "users",
-    "family_therapy": "users-round",
-    "couples_therapy": "heart-handshake",
-}
-TREATMENT_SETTINGS_ICONS: Final[dict[str, str]] = {
-    "outpatient": "house",
-    "iop": "calendar-clock",
-    "php": "calendar-days",
-    "crisis_care": "siren",
-    "residential": "hospital",
-    "day_program": "sun",
-}
-INSURANCE_POSTURE_ICONS: Final[dict[str, str]] = {
-    "in_network": "shield-check",
-    "out_of_network": "shield",
-    "self_pay": "dollar-sign",
-    "please_contact": "circle-help",
-}
+REFERRAL_SERVICE_ICONS: Final[dict[str, str]] = ReferralService.icons()
+TREATMENT_SETTINGS_ICONS: Final[dict[str, str]] = TreatmentSetting.icons()
+INSURANCE_POSTURE_ICONS: Final[dict[str, str]] = InsurancePosture.icons()
 
 # Organization kind. CHECK'd at the table level — empty-tuple growth
 # isn't a concern (the five tokens cover the directory's organization
