@@ -94,7 +94,9 @@
         </li>
         {% if clinicians %}
           <li>
-            <a href="{{ entity_form_url('opening') }}" role="button" class="outline">Post an opening</a>
+            <a href="{{ entity_form_url("post") }}?kind=clinician_opening"
+               role="button"
+               class="outline">Post an opening</a>
           </li>
         {% endif %}
       </ul>
