@@ -7,5 +7,9 @@
 {% from "posts/_form_referral.html" import referral_form with context %}
 {% block resource_label %}Posts{% endblock %}
 {% block content %}
-  {{ referral_form("post", entity_url('post') , entity_create_label('post', kind='referral'), schema=referral_create_schema, cancel_url=entity_url('post')) }}
+  {% if not current_user.clinicians %}
+    {% include "posts/_shared/_require_clinician_profile.html" %}
+  {% else %}
+    {{ referral_form("post", entity_url('post') , entity_create_label('post', kind='referral'), schema=referral_create_schema, cancel_url=entity_url('post')) }}
+  {% endif %}
 {% endblock %}

@@ -373,3 +373,41 @@ async def test_referral_create_form_error_render_is_wired(
     assert "<!DOCTYPE" not in response.text
     assert "<html" not in response.text
     assert "Bedlam Connect" not in response.text
+
+
+# --- Clinician-profile gate on create forms ------------------------------
+
+
+@pytest.mark.parametrize("kind", ["referral", "clinician_opening"])
+async def test_create_form_gate_shown_when_no_clinician_profile(
+    kind: str,
+    authenticated_client: AsyncClient,
+    logged_in_user,
+):
+    """GET /posts/form?kind=<kind> shows the clinician-profile gate when the
+    requesting user has no clinician profiles, not the create form."""
+    response = await authenticated_client.get(f"/posts/form?kind={kind}")
+    assert response.status_code == 200
+    assert "Create your clinician profile" in response.text
+    # The post-create form fields should not be rendered.
+    assert 'name="kind"' not in response.text
+
+
+@pytest.mark.parametrize("kind", ["referral", "clinician_opening"])
+async def test_create_form_shown_when_clinician_profile_exists(
+    kind: str,
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user,
+):
+    """GET /posts/form?kind=<kind> renders the create form once the user has
+    at least one clinician profile."""
+    clinician = make_clinician_with_org(owner_id=logged_in_user.id)
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            session.add(clinician)
+
+    response = await authenticated_client.get(f"/posts/form?kind={kind}")
+    assert response.status_code == 200
+    assert 'name="kind"' in response.text
+    assert "Create your clinician profile" not in response.text
