@@ -125,6 +125,7 @@ def test_post_create_referral_rejects_empty_description():
         "age_groups",
         "description",
         "network_preference",
+        "referring_clinician_id",
     ],
 )
 def test_post_create_referral_requires_all_required_fields(missing_field):
@@ -132,6 +133,39 @@ def test_post_create_referral_requires_all_required_fields(missing_field):
     payload.pop(missing_field)
     with pytest.raises(ValidationError):
         post_create_adapter.validate_python(payload)
+
+
+def test_post_create_referral_accepts_referring_clinician_id():
+    """`referring_clinician_id` round-trips as a UUID on Create."""
+    import uuid
+
+    cid = uuid.uuid4()
+    p = post_create_adapter.validate_python(
+        referral_payload(referring_clinician_id=str(cid))
+    )
+    assert isinstance(p, ReferralCreate)
+    assert p.referring_clinician_id == cid
+
+
+def test_post_update_referral_accepts_referring_clinician_id_only():
+    """`referring_clinician_id` alone is a valid partial update."""
+    import uuid
+
+    cid = uuid.uuid4()
+    p = post_update_adapter.validate_python(
+        {"kind": "referral", "referring_clinician_id": str(cid)}
+    )
+    assert isinstance(p, ReferralUpdate)
+    assert p.referring_clinician_id == cid
+
+
+def test_post_update_referral_referring_clinician_id_optional():
+    """`referring_clinician_id` omitted on PATCH is None (leave unchanged)."""
+    p = post_update_adapter.validate_python(
+        {"kind": "referral", "description": "updated"}
+    )
+    assert isinstance(p, ReferralUpdate)
+    assert p.referring_clinician_id is None
 
 
 def test_post_create_referral_optional_fields_default_none():

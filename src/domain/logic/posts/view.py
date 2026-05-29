@@ -227,6 +227,7 @@ def post_card_view(post) -> dict[str, Any]:
     base: dict[str, Any] = {
         "kind": kind,
         "kind_verb": _KIND_VERB.get(kind),
+        "subject": None,
         "headline": None,
         "header_state": None,
         "in_person": None,
@@ -260,6 +261,7 @@ def post_card_view(post) -> dict[str, Any]:
         if d is None:
             return base
         base.update(
+            subject=getattr(d, "subject", None),
             headline=referral_headline(d),
             in_person=getattr(d, "location_in_person", None),
             virtual=getattr(d, "location_virtual", None),
@@ -291,6 +293,7 @@ def post_card_view(post) -> dict[str, Any]:
             return base
         p = getattr(d, "clinician", None)
         base.update(
+            subject=getattr(d, "subject", None),
             headline=(p.org.name if p and getattr(p, "org", None) else None),
             # `header_state` stays None — opening's location lives in
             # the demographics column via `location_chunk` (same row
@@ -361,6 +364,7 @@ def post_card_view(post) -> dict[str, Any]:
             return base
         prog = getattr(d, "program", None)
         base.update(
+            subject=getattr(d, "subject", None),
             headline=(getattr(prog, "name", None) if prog else None),
             header_state=(getattr(prog, "state_preference", None) if prog else None),
             services=list(getattr(d, "services", None) or []),

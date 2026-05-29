@@ -315,6 +315,18 @@ def test_view_cr_no_referral_section():
     assert v["referral"] is None
 
 
+def test_view_cr_subject_when_set():
+    """`subject` propagates from the detail row into the view dict."""
+    v = post_card_view(_make_cr_post(subject="Anxiety + ADHD evaluation"))
+    assert v["subject"] == "Anxiety + ADHD evaluation"
+
+
+def test_view_cr_subject_none_when_absent():
+    """No subject on the detail row → `subject` key is None in view."""
+    v = post_card_view(_make_cr_post(subject=None))
+    assert v["subject"] is None
+
+
 # --- post_card_view: opening ------------------------------
 
 
@@ -392,6 +404,16 @@ def test_view_pa_referral_set_when_either_field_present():
 def test_view_pa_referral_none_when_both_empty():
     v = post_card_view(_make_pa_post(website=None, referral_instructions=None))
     assert v["referral"] is None
+
+
+def test_view_pa_subject_when_set():
+    v = post_card_view(_make_pa_post(subject="Spring intake cohort"))
+    assert v["subject"] == "Spring intake cohort"
+
+
+def test_view_pa_subject_none_when_absent():
+    v = post_card_view(_make_pa_post(subject=None))
+    assert v["subject"] is None
 
 
 def test_view_pa_location_chunk_pulled_from_clinician():
