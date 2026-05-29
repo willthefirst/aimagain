@@ -41,27 +41,10 @@ from src.domain.models.enums import (
     CLIENT_AGE_GROUPS_BY_KEY,
     DESIRED_TIME_SLOT_LABELS,
     DESIRED_TIME_SLOTS,
-    GENDER_LABELS,
     GENDERS,
-    INSURANCE_CARRIER_LABELS,
     INSURANCE_CARRIERS,
-    INSURANCE_POSTURE_ICONS,
-    INSURANCE_POSTURE_LABELS,
-    INSURANCE_POSTURES,
-    LANGUAGE_LABELS,
-    LANGUAGES,
-    LOCATION_AVAILABILITY_LABELS,
     LOCATION_AVAILABILITY_OPTIONS,
-    NETWORK_PREFERENCE_LABELS,
     NETWORK_PREFERENCES,
-    REFERRAL_SERVICE_ICONS,
-    REFERRAL_SERVICE_LABELS,
-    REFERRAL_SERVICES,
-    TREATMENT_MODALITIES,
-    TREATMENT_MODALITY_LABELS,
-    TREATMENT_SETTINGS,
-    TREATMENT_SETTINGS_ICONS,
-    TREATMENT_SETTINGS_LABELS,
 )
 from tests.helpers import opening_payload, referral_payload
 
@@ -952,26 +935,20 @@ def test_post_update_services_rejects_unknown_token(kind):
 @pytest.mark.parametrize(
     "values,labels",
     [
-        (LOCATION_AVAILABILITY_OPTIONS, LOCATION_AVAILABILITY_LABELS),
         (CLIENT_AGE_GROUPS, CLIENT_AGE_GROUP_LABELS),
         (CLIENT_AGE_GROUPS, CLIENT_AGE_GROUP_LABELS_SINGULAR),
         (CLIENT_AGE_GROUPS, CLIENT_AGE_GROUPS_BY_KEY),
-        (LANGUAGES, LANGUAGE_LABELS),
-        (NETWORK_PREFERENCES, NETWORK_PREFERENCE_LABELS),
-        (INSURANCE_CARRIERS, INSURANCE_CARRIER_LABELS),
         (DESIRED_TIME_SLOTS, DESIRED_TIME_SLOT_LABELS),
-        (REFERRAL_SERVICES, REFERRAL_SERVICE_LABELS),
-        (GENDERS, GENDER_LABELS),
-        (TREATMENT_SETTINGS, TREATMENT_SETTINGS_LABELS),
-        (TREATMENT_MODALITIES, TREATMENT_MODALITY_LABELS),
     ],
 )
 def test_labels_cover_their_tuples(values, labels):
-    """Each `*_LABELS` dict in `src/domain/models/enums.py` must have a
-    label for every value in its corresponding tuple. The form-render
-    macro looks labels up by value; an unmapped value would render with
-    a `KeyError` at request time. Catching it here keeps the failure
-    mode loud and offline."""
+    """Each legacy `*_LABELS` dict in `src/domain/models/enums.py` must
+    have a label for every value in its corresponding tuple. The
+    form-render macro looks labels up by value; an unmapped value would
+    render with a `KeyError` at request time. Catching it here keeps the
+    failure mode loud and offline. Vocabularies migrated to
+    `LabeledChoice` don't need this guard — their `*_LABELS` derives from
+    the same class as their values, so they can't drift."""
     assert set(labels) == set(values)
 
 
@@ -982,17 +959,15 @@ def test_labels_cover_their_tuples(values, labels):
     "values,icons",
     [
         (CLIENT_AGE_GROUPS, CLIENT_AGE_GROUP_ICONS),
-        (REFERRAL_SERVICES, REFERRAL_SERVICE_ICONS),
-        (TREATMENT_SETTINGS, TREATMENT_SETTINGS_ICONS),
-        (INSURANCE_POSTURES, INSURANCE_POSTURE_ICONS),
-        (INSURANCE_POSTURES, INSURANCE_POSTURE_LABELS),
     ],
 )
 def test_icons_cover_their_tuples(values, icons):
-    """Each `*_ICONS` dict in `src/domain/models/enums.py` must have an
-    icon name for every value in its corresponding tuple. The row macro
-    (`src/domain/templates/posts/_item.html`) looks icons up by value;
-    a missing key would render as `<i class="icon-">` (no glyph) at
-    request time. Catching it here keeps the failure mode loud and
-    offline — same pattern as `test_labels_cover_their_tuples` above."""
+    """Each legacy `*_ICONS` dict in `src/domain/models/enums.py` must
+    have an icon name for every value in its corresponding tuple. The row
+    macro (`src/domain/templates/posts/_item.html`) looks icons up by
+    value; a missing key would render as `<i class="icon-">` (no glyph)
+    at request time. Catching it here keeps the failure mode loud and
+    offline — same pattern as `test_labels_cover_their_tuples` above.
+    Vocabularies migrated to `LabeledChoice` declare the icon on the
+    member, so `Cls.icons()` can't drift from the value set."""
     assert set(icons) == set(values)
