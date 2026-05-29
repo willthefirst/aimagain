@@ -39,6 +39,7 @@ class OpeningDetail(Base):
     services = Column(JSON, nullable=False, server_default=text("'[]'"), default=list)
     settings = Column(JSON, nullable=False, server_default=text("'[]'"), default=list)
     treatment_modality = Column(Text, nullable=True)
+    modalities = Column(JSON, nullable=True, server_default=text("'[]'"), default=list)
     age_groups = Column(JSON, nullable=False, server_default=text("'[]'"), default=list)
     languages = Column(
         JSON, nullable=False, server_default=text("'[\"en\"]'"), default=lambda: ["en"]

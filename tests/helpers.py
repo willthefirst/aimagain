@@ -75,6 +75,7 @@ _REFERRAL_ORM_DEFAULTS: dict[str, Any] = {
     "description": "needs placement",
     "services": [],
     "treatment_modality": None,
+    "modalities": [],
     "network_preference": "in_network_required",
     "insurance_carrier": None,
     # FK fields: always None here. Add stub string UUIDs to _REFERRAL_WIRE_DEFAULTS instead.
@@ -102,6 +103,7 @@ _OPENING_DEFAULTS: dict[str, Any] = {
     # tests overriding `settings` can assume isn't already in the list.
     "settings": ["outpatient"],
     "treatment_modality": None,
+    "modalities": [],
     "age_groups": ["adults_25_64"],
     "languages": ["en"],
     # Empty allowed = "no restriction stated". Tests that exercise
@@ -155,6 +157,7 @@ _PROGRAM_AVAILABILITY_DEFAULTS: dict[str, Any] = {
     "services": ["evaluation"],
     "settings": ["outpatient"],
     "treatment_modality": None,
+    "modalities": [],
     "age_groups": ["adults_25_64"],
     "languages": ["en"],
     "genders": [],

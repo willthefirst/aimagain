@@ -60,7 +60,15 @@ the spec.
     </form>
   {% endblock %}
   {% macro _search_field(f, value) -%}
-    {%- if f.kind == "text" -%}
+    {%- if f.kind == "flag" -%}
+      <label>
+        <input type="checkbox"
+               name="{{ f.name }}"
+               value="1"
+               {% if value %}checked{% endif %} />
+        {{ f.label_checked or f.display_label }}
+      </label>
+    {%- elif f.kind == "text" -%}
       <label>
         {{ f.display_label }}
         <input type="search"

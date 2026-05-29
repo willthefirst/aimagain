@@ -136,3 +136,28 @@ class ChoiceFilter(Filter):
     @property
     def default(self) -> Any:
         return None
+
+
+@dataclass(frozen=True)
+class FlagFilter(Filter):
+    """Present-or-absent boolean rendered as a single labeled checkbox.
+
+    URL: ``?<name>=1`` when checked, omitted when unchecked. Absent param
+    means the filter is inactive. The repo receives the string ``"1"``
+    (truthy) or ``None`` (absent).
+
+    ``label_checked`` is the label rendered next to the checkbox. Falls
+    back to ``display_label`` when not set.
+    """
+
+    label_checked: str = ""
+
+    kind: ClassVar[str] = "flag"
+
+    @property
+    def annotation(self) -> Any:
+        return str | None
+
+    @property
+    def default(self) -> Any:
+        return None

@@ -1,10 +1,11 @@
 from collections.abc import Sequence
 from datetime import datetime
 
-from sqlalchemy import or_, select
+from sqlalchemy import and_, or_, select
 
 from src.domain.models import (
     Affiliation,
+    IntakeDetail,
     OpeningDetail,
     Post,
     ReferralDetail,
@@ -45,6 +46,21 @@ class PostRepository(BaseRepository):
       this table moves there.
     * ``language`` (Choice, multi) — same JSON contains pattern
       against both detail tables' ``languages``.
+    * ``geography`` (Text) — ILIKE across city, state, and zip on both
+      ``ReferralDetail`` (its own location) and ``Affiliation``
+      (opening/intake's linked practice location).
+    * ``include_telehealth`` (Flag) — when present, expands the
+      ``geography`` filter to also include openings where the linked
+      Affiliation has ``virtual_sessions='yes'`` in CA.
+    * ``level_of_care`` (Choice, multi) — ``settings`` JSON-array
+      contains check across ``OpeningDetail`` and ``IntakeDetail``
+      (``ReferralDetail`` has no settings field and is excluded when
+      this filter is active).
+    * ``modality`` (Choice, multi) — ``modalities`` JSON-array contains
+      check across all three detail tables.
+    * ``insurance`` (Choice, multi) — ``insurance_carrier`` exact match
+      on ``ReferralDetail`` OR ``in_network_carriers`` JSON-contains on
+      linked ``Affiliation``.
 
     Empty / absent filter values short-circuit (no WHERE clause), so
     URL params that aren't set carry no SQL cost. AND-combined across
@@ -61,6 +77,11 @@ class PostRepository(BaseRepository):
         city: str | None = None,
         age_group: list[str] | None = None,
         language: list[str] | None = None,
+        geography: str | None = None,
+        include_telehealth: str | None = None,
+        level_of_care: list[str] | None = None,
+        modality: list[str] | None = None,
+        insurance: list[str] | None = None,
         since: datetime | None = None,
         exclude_owner_id: int | None = None,
         offset: int = 0,
@@ -70,8 +91,24 @@ class PostRepository(BaseRepository):
 
         # Joins are added only when a filter that needs them is active,
         # so a bare `/posts` request stays a single-table read.
-        needs_detail_join = any((q, state, city, age_group, language))
-        needs_clinician_join = bool(state or city)
+        needs_detail_join = any(
+            (
+                q,
+                state,
+                city,
+                age_group,
+                language,
+                geography,
+                include_telehealth,
+                level_of_care,
+                modality,
+                insurance,
+            )
+        )
+        needs_clinician_join = bool(
+            state or city or geography or include_telehealth or insurance
+        )
+        needs_intake_join = bool(level_of_care or modality or insurance)
         needs_owner_join = bool(posted_by)
 
         if needs_owner_join:
@@ -88,6 +125,11 @@ class PostRepository(BaseRepository):
             stmt = stmt.outerjoin(
                 Affiliation,
                 Affiliation.clinician_id == OpeningDetail.clinician_id,
+            )
+        if needs_intake_join:
+            stmt = stmt.outerjoin(
+                IntakeDetail,
+                IntakeDetail.post_id == Post.id,
             )
 
         if kind is not None:
@@ -127,6 +169,55 @@ class PostRepository(BaseRepository):
             stmt = stmt.filter(_json_array_contains_any(age_group, "age_groups"))
         if language:
             stmt = stmt.filter(_json_array_contains_any(language, "languages"))
+
+        if geography:
+            needle = f"%{geography}%"
+            geo_clauses = [
+                ReferralDetail.location_city.ilike(needle),
+                ReferralDetail.location_state.ilike(needle),
+                ReferralDetail.location_zip.ilike(needle),
+                Affiliation.location_city.ilike(needle),
+                Affiliation.location_state.ilike(needle),
+                Affiliation.location_zip.ilike(needle),
+            ]
+            if include_telehealth:
+                geo_clauses.append(
+                    and_(
+                        Affiliation.virtual_sessions == "yes",
+                        Affiliation.location_state == "CA",
+                    )
+                )
+            stmt = stmt.filter(or_(*geo_clauses))
+        # include_telehealth alone (no geography) adds no constraint — it
+        # only expands the geography filter when both are active.
+
+        if level_of_care:
+            clauses = []
+            for v in level_of_care:
+                token = f'%"{v}"%'
+                clauses.append(
+                    or_(
+                        OpeningDetail.settings.like(token),
+                        IntakeDetail.settings.like(token),
+                    )
+                )
+            stmt = stmt.filter(or_(*clauses))
+
+        if modality:
+            stmt = stmt.filter(_json_array_contains_any_three(modality, "modalities"))
+
+        if insurance:
+            clauses = []
+            for v in insurance:
+                token = f'%"{v}"%'
+                clauses.append(
+                    or_(
+                        ReferralDetail.insurance_carrier == v,
+                        Affiliation.in_network_carriers.like(token),
+                    )
+                )
+            stmt = stmt.filter(or_(*clauses))
+
         if since is not None:
             stmt = stmt.filter(Post.created_at >= since)
         if exclude_owner_id is not None:
@@ -172,6 +263,23 @@ def _json_array_contains_any(values: list[str], column_name: str):
     for v in values:
         token = f'%"{v}"%'
         clauses.append(or_(cr_col.like(token), pa_col.like(token)))
+    return or_(*clauses)
+
+
+def _json_array_contains_any_three(values: list[str], column_name: str):
+    """Like ``_json_array_contains_any`` but also checks ``IntakeDetail``.
+
+    Used for fields that exist on all three detail tables (currently
+    ``modalities``). Requires ``IntakeDetail`` to be joined before the
+    predicate is applied.
+    """
+    cr_col = getattr(ReferralDetail, column_name)
+    pa_col = getattr(OpeningDetail, column_name)
+    pi_col = getattr(IntakeDetail, column_name)
+    clauses = []
+    for v in values:
+        token = f'%"{v}"%'
+        clauses.append(or_(cr_col.like(token), pa_col.like(token), pi_col.like(token)))
     return or_(*clauses)
 
 
