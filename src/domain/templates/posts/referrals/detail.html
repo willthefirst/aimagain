@@ -4,13 +4,11 @@
 {%- from "posts/_shared/_how_to_refer.html" import how_to_refer -%}
 {%- set view = post_card_view(referral) -%}
 {% block resource_label %}Referrals{% endblock %}
-{# The toolbar H1 carries the full identity string (`headline` plus
-   the optional `header_state` — e.g. "Will's Org, NY"); the
-   `subtitle` block below carries date + modality meta as `<span>`
-   items joined by the `.meta` rule's CSS-driven middot. The
-   entity-card body therefore needs no `<header>`. #}
+{# The toolbar H1 is the subject when set; falls back to the
+   demographics headline (`referral_headline`) so the card stays
+   meaningful even without a custom subject. #}
 {% block current_label %}
-  {{ view.headline or 'Referrals'|truncate(40) }}
+  {{ view.subject or view.headline or 'Referrals'|truncate(40) }}
   {% if view.header_state %}, {{ view.header_state }}{% endif %}
 {% endblock %}
 {% block subtitle %}
