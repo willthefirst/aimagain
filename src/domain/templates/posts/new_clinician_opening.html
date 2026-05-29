@@ -4,14 +4,14 @@
    sees the `form_errors` / `form_values` mount_create injects on a
    validation-failure re-render. Without this, the auto-resolution
    path silently no-ops on error and the user sees a blank form. #}
-{% from "posts/openings/_form_clinician_opening.html" import opening_form with context %}
-{% block resource_label %}Openings{% endblock %}
+{% from "posts/_form_clinician_opening.html" import opening_form with context %}
+{% block resource_label %}Posts{% endblock %}
 {% block content %}
   {% if not current_user.clinicians %}
     <p>
       Set up your clinician profile first — every opening is tied to one. <a href="{{ entity_form_url('clinician') }}">Create your clinician profile.</a>
     </p>
   {% else %}
-    {{ opening_form("post", entity_url('opening') , entity_create_label('opening', kind='clinician_opening'), schema=opening_create_schema, current_user=current_user, cancel_url=entity_url('opening')) }}
+    {{ opening_form("post", entity_url('post') , entity_create_label('post', kind='clinician_opening'), schema=opening_create_schema, current_user=current_user, cancel_url=entity_url('post')) }}
   {% endif %}
 {% endblock %}

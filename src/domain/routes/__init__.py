@@ -14,35 +14,26 @@ Non-entity routers (auth, fastapi-users-provided routers) are imported
 directly by :mod:`src.main` and not registered here — they aren't
 ``EntitySpec``-shaped.
 
-The `Post` SQLAlchemy supertype is internal-only; the URL layer
-exposes two families:
-
-  - :mod:`referrals` — kind-locked leaf (`/referrals`,
-    `kind='referral'`).
-  - :mod:`openings` — subset-supertype listing both availability
-    subkinds (`/openings`, `kind ∈ {clinician_opening,
-    program_intake}`). The old `/intakes` URL was folded into
-    `/openings` (commit history reachable for archaeology).
-
-No `/posts` collection or detail URL exists.
+The `Post` SQLAlchemy supertype is exposed under a single URL family
+(`/posts`, whole-supertype face) that lists every kind. The create
+form takes `?kind=<value>` and the discriminated-union body adapter
+dispatches POST/PATCH bodies by their declared `kind`.
 """
 
 from . import (
     clinicians,
     favorites,
-    openings,
     organizations,
+    posts,
     programs,
-    referrals,
     users,
 )
 
 __all__ = [
     "clinicians",
     "favorites",
-    "openings",
     "organizations",
+    "posts",
     "programs",
-    "referrals",
     "users",
 ]

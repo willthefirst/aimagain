@@ -58,11 +58,11 @@ The work is concentrated. For each step, also add or extend the colocated `test_
 
 For polymorphic entities the URL layer can expose its kinds in one of three face shapes, all driven by `EntitySpec`'s `discriminator=<registry>` plus one of:
 
-- **kind-locked leaf** (`discriminator_value="<one kind>"`) — single-kind URL family; list forces `kind = <value>`; detail/update/delete/edit-form 404 on kind mismatch; form_new skips the `?kind=` picker.
-- **subset-supertype** (`discriminator_values=("<a>", "<b>", ...)`) — one URL family listing a *subset* of kinds; create / edit dispatch by `?kind=X` on the URL (rejecting kinds outside the subset); detail/update/delete 404 unless the row's kind is in the subset.
-- **whole-supertype** (neither set) — one URL family listing every kind; not currently used in this codebase (the old `/posts` was removed).
+- **kind-locked leaf** (`discriminator_value="<one kind>"`) — single-kind URL family; list forces `kind = <value>`; detail/update/delete/edit-form 404 on kind mismatch; form_new skips the `?kind=` picker. Not currently used in this codebase.
+- **subset-supertype** (`discriminator_values=("<a>", "<b>", ...)`) — one URL family listing a *subset* of kinds; create / edit dispatch by `?kind=X` on the URL (rejecting kinds outside the subset); detail/update/delete 404 unless the row's kind is in the subset. Not currently used in this codebase.
+- **whole-supertype** (neither set) — one URL family listing every kind; create / edit dispatch by `?kind=X` on the URL.
 
-Today: `Post` exposed as `/referrals` (kind-locked leaf, `kind='referral'`) and `/openings` (subset-supertype over `(clinician_opening, program_intake)`). See [`domain/specs/posts/`](domain/specs/posts/), [`domain/models/posts/post_kinds.py`](domain/models/posts/post_kinds.py), and the `discriminator_value` docstring in [`framework/dispatch/entity_spec.py`](framework/dispatch/entity_spec.py) for the full contract.
+Today: `Post` is exposed as `/posts` (whole-supertype) — the single URL family lists every Post kind, and create / edit pick the per-kind template via `?kind=<value>`. See [`domain/specs/posts/`](domain/specs/posts/), [`domain/models/posts/post_kinds.py`](domain/models/posts/post_kinds.py), and the `discriminator_value` docstring in [`framework/dispatch/entity_spec.py`](framework/dispatch/entity_spec.py) for the full contract.
 
 ### Cross-cutting registries
 

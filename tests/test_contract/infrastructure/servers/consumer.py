@@ -120,17 +120,16 @@ def _setup_users_admin_actions_stub(app: FastAPI) -> None:
 
 
 def _setup_post_owner_actions_stub(app: FastAPI) -> None:
-    """Mount a stub page that renders the real `posts/referrals/detail.html`
+    """Mount a stub page that renders the real `posts/detail.html`
     template with hardcoded post + current_user, so the
     `posts/_shared/_owner_actions.html` partial is exercised without
     needing a database. The contract surface is the HTMX-decorated
     Delete button inside the partial; what we render here is the same
     partial production code paths render.
 
-    `referral` is the canonical kind for this contract — the
-    owner-actions partial is shared across both URL families and the
-    HTMX wire shape is identical, so picking one kind covers the
-    contract surface.
+    The owner-actions partial is kind-agnostic — any kind exercises
+    the same contract surface — so the stub picks `referral` as a
+    representative.
     """
     from ...tests.shared.mock_data_factory import make_post_stub
 
@@ -138,7 +137,7 @@ def _setup_post_owner_actions_stub(app: FastAPI) -> None:
         def __init__(self, **kwargs):
             self.__dict__.update(kwargs)
 
-    @app.get("/referrals/{post_id}")
+    @app.get("/posts/{post_id}")
     async def post_owner_actions_stub_page(request: Request, post_id: uuid.UUID):
         # `make_post_stub` populates the per-kind detail relationship
         # with realistic per-column defaults (JSON columns → `[]`,
@@ -162,15 +161,15 @@ def _setup_post_owner_actions_stub(app: FastAPI) -> None:
             is_superuser=True,
         )
         return APIResponse.html_response(
-            template_name="posts/referrals/detail.html",
-            # The detail template reads `referral` from context (the
+            template_name="posts/detail.html",
+            # The detail template reads `post` from context (the
             # framework injects it as `spec.name`); `entity_name` lets
-            # the shared `_owner_actions.html` partial build kind-aware
-            # URLs. `can_edit` mirrors what the production handler
-            # computes for an admin viewer.
+            # the shared `_owner_actions.html` partial build URLs.
+            # `can_edit` mirrors what the production handler computes
+            # for an admin viewer.
             context={
-                "referral": post,
-                "entity_name": "referral",
+                "post": post,
+                "entity_name": "post",
                 "current_user": current_user,
                 "can_edit": True,
             },

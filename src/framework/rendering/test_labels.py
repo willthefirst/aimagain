@@ -32,35 +32,28 @@ def test_create_label_uses_singular_label_for_non_polymorphic_spec():
 
 
 def test_create_label_uses_per_kind_list_label_when_kind_supplied():
-    """Subset-supertype face (`/openings`) renders the per-kind noun
-    when `kind=` is passed — what the picker option labels and the
+    """Whole-supertype face (`/posts`) renders the per-kind noun when
+    `kind=` is passed — what the picker option labels and the
     kind-specific form pages both call."""
-    from src.domain.specs.posts.opening import OPENING_ENTITY
+    from src.domain.specs.posts import POST_ENTITY
 
-    label = create_label_for(OPENING_ENTITY, kind="clinician_opening")
-    assert label == "Create clinician opening"
-
-    label = create_label_for(OPENING_ENTITY, kind="program_intake")
-    assert label == "Create program intake"
-
-
-def test_create_label_subset_supertype_no_kind_falls_back_to_singular():
-    """The umbrella `/openings/form` picker page (no `?kind=`) reads
-    `entity_create_label('opening')` → ``"Create opening"``. Same string
-    the list-page toolbar CTA uses."""
-    from src.domain.specs.posts.opening import OPENING_ENTITY
-
-    assert create_label_for(OPENING_ENTITY) == "Create opening"
+    assert create_label_for(POST_ENTITY, kind="referral") == "Create client referral"
+    assert (
+        create_label_for(POST_ENTITY, kind="clinician_opening")
+        == "Create clinician opening"
+    )
+    assert (
+        create_label_for(POST_ENTITY, kind="program_intake") == "Create program intake"
+    )
 
 
-def test_create_label_kind_locked_face_uses_bound_kind_label():
-    """Kind-locked leaf face (`/referrals`) always renders the bound
-    kind's label — `discriminator_value` wins so the picker option on
-    `/openings` and the form-page H1 on `/referrals/form` read the
-    same string even though they're built from different sides."""
-    from src.domain.specs.posts.referral import REFERRAL_ENTITY
+def test_create_label_whole_supertype_no_kind_falls_back_to_singular():
+    """The umbrella `/posts/form` picker page (no `?kind=`) reads
+    `entity_create_label('post')` → ``"Create post"``. Same string the
+    list-page toolbar CTA uses."""
+    from src.domain.specs.posts import POST_ENTITY
 
-    assert create_label_for(REFERRAL_ENTITY) == "Create client referral"
+    assert create_label_for(POST_ENTITY) == "Create post"
 
 
 def test_edit_label_uses_singular_label_for_non_polymorphic_spec():
@@ -70,27 +63,18 @@ def test_edit_label_uses_singular_label_for_non_polymorphic_spec():
 
 
 def test_edit_label_uses_per_kind_list_label_when_kind_supplied():
-    """The edit page for a subset-supertype face's row reads the
-    row's stored kind off the loaded target — `handle_get_edit_form`
-    derives this and passes it as `kind=`. Same per-kind noun the
-    create page uses for the matching form."""
-    from src.domain.specs.posts.opening import OPENING_ENTITY
+    """The edit page for a whole-supertype face's row reads the row's
+    stored kind off the loaded target — `handle_get_edit_form` derives
+    this and passes it as `kind=`. Same per-kind noun the create page
+    uses for the matching form."""
+    from src.domain.specs.posts import POST_ENTITY
 
-    assert edit_label_for(OPENING_ENTITY, kind="clinician_opening") == (
-        "Edit clinician opening"
+    assert edit_label_for(POST_ENTITY, kind="referral") == "Edit client referral"
+    assert (
+        edit_label_for(POST_ENTITY, kind="clinician_opening")
+        == "Edit clinician opening"
     )
-    assert edit_label_for(OPENING_ENTITY, kind="program_intake") == (
-        "Edit program intake"
-    )
-
-
-def test_edit_label_kind_locked_face_uses_bound_kind_label():
-    """Kind-locked leaf face (`/referrals`): the bound discriminator
-    wins, so the edit-page H1 reads "Edit client referral" regardless
-    of the row's identity string."""
-    from src.domain.specs.posts.referral import REFERRAL_ENTITY
-
-    assert edit_label_for(REFERRAL_ENTITY) == "Edit client referral"
+    assert edit_label_for(POST_ENTITY, kind="program_intake") == "Edit program intake"
 
 
 def test_filter_label_uses_url_collection():

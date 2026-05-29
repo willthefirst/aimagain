@@ -19,24 +19,21 @@ Subresource lists (e.g. `/users/{id}/clinicians`) override `{% block breadcrumb 
 
 Pages that don't fit the resource grammar — the `/auth/*` flow's centered single-card layout — extend `base.html` directly and compose the `_shared/` macros by hand.
 
-Post templates nest under a `posts/` cluster (sibling sub-clusters per URL family, plus a `_shared/` for cross-face partials):
+Post templates nest under a single `posts/` cluster — all per-kind templates live directly under it following the default `PostKindSpec` convention (no template path overrides), with a `_shared/` for cross-kind partials:
 
 ```
 posts/
-├── _shared/              ← cross-face partials (_item, _facts_block, _owner_actions, …)
-├── referrals/            ← /referrals face (kind-locked leaf, kind='referral')
-│   ├── list.html, detail.html, search.html, form_new.html, form_edit.html
-│   └── _form.html (create/edit form-body macro)
-└── openings/             ← /openings face (subset-supertype over clinician_opening + program_intake)
-    ├── list.html, detail.html, search.html
-    ├── form_new.html (picker), form_edit.html (kind-dispatch fallback)
-    ├── new_clinician_opening.html, edit_clinician_opening.html, _form_clinician_opening.html
-    └── new_program_intake.html, edit_program_intake.html, _form_program_intake.html
+├── _shared/              ← cross-kind partials (_item, _facts_block, _owner_actions, …)
+├── list.html, detail.html, search.html  ← whole-supertype /posts face
+├── form_new.html (picker), form_edit.html (kind-dispatch fallback)
+├── new_referral.html, edit_referral.html, _form_referral.html
+├── new_clinician_opening.html, edit_clinician_opening.html, _form_clinician_opening.html
+└── new_program_intake.html, edit_program_intake.html, _form_program_intake.html
 ```
 
-The handler sets `template_name = POST_KINDS[kind].create_template` (or `edit_template`) to pick the right per-subkind form by the `?kind=` URL param or the row's stored kind. The `_post_face` builder in [`../specs/posts/_base.py`](../specs/posts/_base.py) sets `templates=Templates(list="posts/<face>/list.html", …)` for each face's primary verbs.
+The handler sets `template_name = POST_KINDS[kind].create_template` (or `edit_template`) to pick the right per-kind form by the `?kind=` URL param or the row's stored kind. The post spec in [`../specs/posts/_base.py`](../specs/posts/_base.py) sets `templates=Templates(list="posts/list.html", …)` for the whole-supertype face's primary verbs.
 
-The cross-resource import lint ([`scripts/dev/template_imports_check.py`](../../../scripts/dev/template_imports_check.py)) permits a sub-cluster (`posts/<face>/`) to import from its parent cluster's `_shared/` (`posts/_shared/`) — that's how the per-face templates pull in shared post-card partials without crossing a boundary. Sibling sub-clusters (`posts/openings/` ↔ `posts/referrals/`) still can't import from each other.
+The cross-resource import lint ([`scripts/dev/template_imports_check.py`](../../../scripts/dev/template_imports_check.py)) permits per-kind templates in `posts/` to import from `posts/_shared/` — that's how the per-kind templates pull in shared post-card partials without crossing a boundary.
 
 The services list is the first row of `_facts_block`'s `<dl>` rather than its own partial (see #628).
 

@@ -51,8 +51,7 @@ async def test_base_template_renders_primary_nav_when_authenticated(
     assert nav_hrefs == [
         "/",
         "/home",
-        "/referrals",
-        "/openings",
+        "/posts",
         "/users/me",
         "#",
     ]
@@ -62,21 +61,14 @@ async def test_primary_nav_highlights_active_section(
     authenticated_client: AsyncClient,
     logged_in_user: User,
 ):
-    """The two journey tabs (Referrals / Openings) light on their own
-    list page and subpaths; the other tab does not."""
-    referrals = await authenticated_client.get("/referrals")
-    tree = HTMLParser(referrals.text)
+    """The Posts tab lights on its own list page and subpaths."""
+    posts = await authenticated_client.get("/posts")
+    tree = HTMLParser(posts.text)
     assert (
-        tree.css_first('nav[aria-label="Primary"] a[href="/referrals"]').attributes.get(
+        tree.css_first('nav[aria-label="Primary"] a[href="/posts"]').attributes.get(
             "aria-current"
         )
         == "page"
-    )
-    assert (
-        tree.css_first('nav[aria-label="Primary"] a[href="/openings"]').attributes.get(
-            "aria-current"
-        )
-        is None
     )
 
 

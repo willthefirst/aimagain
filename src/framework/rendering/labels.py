@@ -49,9 +49,9 @@ def entity_create_label(name: str, *, kind: str | None = None) -> str:
          opening"``, ``"program intake"``, ``"client referral"``). The
          result is ``"Create clinician opening"``.
       2. The spec is kind-locked (``discriminator_value`` set) → use
-         the bound kind's ``list_label``. So ``/referrals`` always
-         renders ``"Create client referral"`` regardless of what the
-         caller passes.
+         the bound kind's ``list_label``, regardless of what the caller
+         passes. No URL family uses this mode today, but the resolution
+         path is retained for any future single-kind face.
       3. Otherwise → ``"Create " + spec.singular_label`` (the default
          path for non-polymorphic entities and for the subset-supertype
          picker page).
@@ -127,11 +127,12 @@ def _noun_for(spec: "EntitySpec", *, kind: str | None) -> str:
     """
     if spec.discriminator is not None:
         # Kind-locked face: the bound discriminator_value wins even when
-        # the caller doesn't pass `kind`, so `/referrals/form` always
-        # reads "Create client referral" (matches the picker option on
-        # the umbrella page). `getattr` lets test specs use a minimal
-        # registry kind type without a `list_label` attribute and still
-        # round-trip through the helper.
+        # the caller doesn't pass `kind`, so a single-kind URL family's
+        # form page always reads the bound kind's label (matches the
+        # picker option on any umbrella page that points to it). No URL
+        # family uses this mode today. `getattr` lets test specs use a
+        # minimal registry kind type without a `list_label` attribute
+        # and still round-trip through the helper.
         effective_kind = kind or spec.discriminator_value
         if effective_kind is not None and effective_kind in spec.discriminator:
             kind_spec = spec.discriminator[effective_kind]

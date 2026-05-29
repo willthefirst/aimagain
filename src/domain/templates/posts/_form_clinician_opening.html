@@ -1,7 +1,7 @@
 {# Shared form body for `kind='clinician_opening'`.
 
-Used by both `posts/openings/new_clinician_opening.html` (create) and
-`posts/openings/edit_clinician_opening.html` (update). Caller passes:
+Used by both `posts/new_clinician_opening.html` (create) and
+`posts/edit_clinician_opening.html` (update). Caller passes:
 
   - `hx_method`: "post" or "patch"
   - `action`: the form submit URL
@@ -18,7 +18,7 @@ to the clinician-create flow when `current_user.clinicians` is empty.
 {# `with context` lets the form_fields macros auto-resolve per-field
    `error=`/`current=` from the `form_errors`/`form_values` injected into
    the render context by `mount_create` on a validation-failure
-   re-render (see `OPENING_ENTITY.form_error_render` + the docstring at
+   re-render (see `POST_ENTITY.form_error_render` + the docstring at
    the top of `_shared/form_fields.html`). No per-field error or value
    threading is required at the callsite; explicit overrides still win
    if a future caller needs them. #}
