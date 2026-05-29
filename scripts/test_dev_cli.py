@@ -5,7 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import List, Optional
 
-from scripts.dev_cli import CLIRunner, TestCommands
+from scripts.dev_cli import CLIRunner, SeedCommands, TestCommands
 
 
 def test_clirunner_resolves_project_root_from_cwd(tmp_path: Path, monkeypatch):
@@ -240,6 +240,25 @@ def test_run_tests_affected_full_suite_runs_pytest_with_no_paths(monkeypatch):
     rc = TestCommands(runner, quality).run_tests(affected=True, skip_lint=True)
     assert rc == 0
     assert runner.last_cmd == ["pytest"]
+
+
+# ---------------------------------------------------------------------------
+# SeedCommands._in_container
+# ---------------------------------------------------------------------------
+
+
+def test_in_container_true_when_dockerenv_exists():
+    import unittest.mock as mock
+
+    with mock.patch("os.path.exists", side_effect=lambda p: p == "/.dockerenv"):
+        assert SeedCommands._in_container() is True
+
+
+def test_in_container_false_when_dockerenv_absent():
+    import unittest.mock as mock
+
+    with mock.patch("os.path.exists", return_value=False):
+        assert SeedCommands._in_container() is False
 
 
 def test_run_tests_affected_empty_selection_skips_pytest(monkeypatch):
