@@ -24,7 +24,7 @@ logger = logging.getLogger(__name__)
 
 VERIFICATION_RESOURCE = make_audited_resource("verification", VerificationRead)
 
-_HTTP_TIMEOUT_SECONDS = 10.0
+HTTP_TIMEOUT_SECONDS = 10.0
 _NPPES_SKIPPED_FLAG = "nppes_skipped"
 _SKIPPED_NPPES = NppesResult(found=False, first_name=None, last_name=None, raw=None)
 
@@ -120,7 +120,7 @@ async def handle_create_clinician_verification(
     if not requesting_user.is_superuser:
         raise ForbiddenError(detail="Verification retrigger is admin-only")
 
-    async with httpx.AsyncClient(timeout=_HTTP_TIMEOUT_SECONDS) as http:
+    async with httpx.AsyncClient(timeout=HTTP_TIMEOUT_SECONDS) as http:
         return await run_clinician_verification(
             clinician_id=clinician_id,
             verification_repo=verification_repo,

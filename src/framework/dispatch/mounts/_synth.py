@@ -12,9 +12,8 @@ construction, kwarg routing.
 """
 
 import inspect
-import types
 from dataclasses import dataclass
-from typing import Any, Awaitable, Callable, Union, get_args, get_origin
+from typing import Any, Awaitable, Callable
 from uuid import UUID
 
 from fastapi import Depends, Query, Request
@@ -22,6 +21,7 @@ from pydantic import BaseModel, TypeAdapter
 
 from src.framework.dispatch.mounts._spec import _UNSET, QueryParam, ResourceSpec
 from src.framework.persistence.dependencies import UnknownRepoTypeError, resolver_for
+from src.framework.type_utils import is_optional, strip_optional
 
 
 class MountError(TypeError):
@@ -30,18 +30,6 @@ class MountError(TypeError):
     handler, the offending parameter, and (where applicable) the type
     that lacks a registry entry. App startup fails immediately rather
     than the first request 500-ing."""
-
-
-def is_optional(annotation: Any) -> tuple[bool, Any]:
-    """If `annotation` is `T | None` / `Optional[T]`, return `(True, T)`;
-    otherwise `(False, annotation)`. Handles both the 3.10+ pipe syntax
-    (`types.UnionType`) and `typing.Union[..., None]`."""
-    origin = get_origin(annotation)
-    if origin in (Union, types.UnionType):
-        args = [a for a in get_args(annotation) if a is not type(None)]
-        if len(args) == 1 and type(None) in get_args(annotation):
-            return True, args[0]
-    return False, annotation
 
 
 def is_pydantic_model(annotation: Any) -> bool:
@@ -156,7 +144,8 @@ def synthesize_route_fn(
         ):
             continue
         annotation = param.annotation
-        is_opt, base_ann = is_optional(annotation)
+        is_opt = is_optional(annotation)
+        base_ann = strip_optional(annotation) if is_opt else annotation
 
         # Handler-supplied: the response builder fills this kwarg before
         # calling the handler (e.g. alias routes derive `id_param` and
