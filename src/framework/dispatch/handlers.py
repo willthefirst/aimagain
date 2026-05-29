@@ -35,12 +35,13 @@ def _assert_kind_lock(spec: EntitySpec, target: Any) -> None:
       values.
     - Whole-supertype (neither set): no lock; any kind passes.
 
-    Used by detail / update / delete / form_edit so a row of one kind
-    can never be reached via another kind's URL family
-    (e.g. ``/referrals/{opening_id}`` 404s, or `/openings/{referral_id}`
-    404s on the subset face). The 404 surface (rather than 400) keeps
-    the wrong-family URL indistinguishable from a truly-missing row —
-    a stronger boundary than a leaky "exists but wrong family" signal."""
+    Used by detail / update / delete / form_edit on kind-locked or
+    subset-supertype faces so a row of the wrong kind can never be
+    reached via that face's URL family. The whole-supertype face
+    (e.g. ``/posts/{id}``) has no kind-lock and resolves any kind.
+    The 404 surface (rather than 400) keeps the wrong-family URL
+    indistinguishable from a truly-missing row — a stronger boundary
+    than a leaky "exists but wrong family" signal."""
     if spec.discriminator_value is None and spec.discriminator_values is None:
         return
     column = spec.discriminator.column
@@ -752,8 +753,8 @@ async def handle_get_new_form(
             context["schema"] = spec.create_adapter_class
         elif kind is not None:
             # Subset-supertype face restricts `?kind=` to its declared
-            # subset — a user typing `/openings/form?kind=referral` must
-            # be rejected, not silently routed to the referral template.
+            # subset — a user typing `?kind=<value-outside-subset>` must
+            # be rejected, not silently routed to that kind's template.
             if (
                 spec.discriminator_values is not None
                 and kind not in spec.discriminator_values

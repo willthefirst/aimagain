@@ -1,7 +1,7 @@
 {# Shared form body for `kind='program_intake'` (#541).
 
-Used by both `posts/openings/new_program_intake.html` (create) and
-`posts/openings/edit_program_intake.html` (update). Caller passes:
+Used by both `posts/new_program_intake.html` (create) and
+`posts/edit_program_intake.html` (update). Caller passes:
 
   - `hx_method`: "post" or "patch"
   - `action`: the form submit URL
@@ -13,8 +13,8 @@ Used by both `posts/openings/new_program_intake.html` (create) and
 
 The owning Org of each Program surfaces in the option label so the
 referrer sees "<Program> · <Org>" rather than two unrelated names.
-The wrapper templates `posts/openings/new_program_intake.html` /
-`posts/openings/edit_program_intake.html` redirect to the program-create flow
+The wrapper templates `posts/new_program_intake.html` /
+`posts/edit_program_intake.html` redirect to the program-create flow
 when `current_user.programs` is empty, so this macro always renders
 with at least one Program available.
 #}

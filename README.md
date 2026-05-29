@@ -21,11 +21,11 @@ After `dev seed` populates the seed admin user, bookmark:
 http://localhost:8000/dev/login-as-seed-user
 ```
 
-Hitting it issues the same session cookie a real login would (for the user named by `DEV_LOGIN_EMAIL`, defaulting to `admin@example.com`) and redirects to `/`, which forwards to the current default landing page (today: `/openings`). Saves a form submission every time you reopen the browser to the dev server. The route is only mounted when `ENVIRONMENT=development` — production never registers it. See [`src/domain/routes/dev_auth.py`](src/domain/routes/dev_auth.py) for the security guards.
+Hitting it issues the same session cookie a real login would (for the user named by `DEV_LOGIN_EMAIL`, defaulting to `admin@example.com`) and redirects to `/`, which forwards to the current default landing page (today: `/posts?kind=referral` — the single whole-supertype `/posts` family narrowed via the `?kind=` query). Saves a form submission every time you reopen the browser to the dev server. The route is only mounted when `ENVIRONMENT=development` — production never registers it. See [`src/domain/routes/dev_auth.py`](src/domain/routes/dev_auth.py) for the security guards.
 
 ### Playwright MCP for design review
 
-Claude Code can drive a real browser against the dev server to navigate, click, resize, and screenshot — useful for "load `/openings` at iPhone width and check the location row" tasks. The MCP entry is pre-configured in [`.claude/settings.json`](.claude/settings.json); the one-time browser install is:
+Claude Code can drive a real browser against the dev server to navigate, click, resize, and screenshot — useful for "load `/posts?kind=clinician_opening` at iPhone width and check the location row" tasks. The MCP entry is pre-configured in [`.claude/settings.json`](.claude/settings.json); the one-time browser install is:
 
 ```bash
 dev playwright-setup      # installs Chromium (~150MB)

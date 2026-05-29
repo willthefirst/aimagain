@@ -51,7 +51,7 @@
      `|safe` because djlint mangles a templated attribute *name*
      (`hx-{{ method }}`) — it sees the dynamic name as a value and
      line-wraps it. Same workaround as the entity forms in
-     `posts/referrals/_form.html` / `posts/openings/_form_clinician_opening.html`. #}
+     `posts/_form_referral.html` / `posts/_form_clinician_opening.html`. #}
   {%- set _hx_method_attr = 'hx-' ~ method ~ '="' ~ action ~ '"' -%}
   {%- set _json_ext = 'hx-ext="json-enc"' if json_enc else '' -%}
   <form {{ _hx_method_attr|safe }}

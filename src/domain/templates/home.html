@@ -3,10 +3,12 @@
 {% block title %}Home{% endblock %}
 {% block content %}
   <section style="display: flex; gap: 1rem; flex-wrap: wrap;">
-    <a href="{{ entity_form_url('referral') }}"
+    <a href="{{ entity_form_url("post") }}?kind=referral"
        role="button"
        class="outline">+ Post a referral</a>
-    <a href="{{ entity_form_url('opening') }}" role="button" class="outline">+ Post an opening</a>
+    <a href="{{ entity_form_url("post") }}?kind=clinician_opening"
+       role="button"
+       class="outline">+ Post an opening</a>
   </section>
   {% if my_posts %}
     <section>
@@ -14,12 +16,11 @@
                      justify-content: space-between;
                      align-items: baseline">
         <h2>My active posts</h2>
-        <a href="{{ entity_url('referral') }}">See all</a>
+        <a href="{{ entity_url('post') }}">See all</a>
       </header>
       <article class="post-feed-list">
         {%- for post in my_posts -%}
-          {%- set ename = "referral" if post.kind == "referral" else "opening" -%}
-          {{ post_feed_row(post, ename, show_poster=False) }}
+          {{ post_feed_row(post, "post", show_poster=False) }}
         {%- endfor -%}
       </article>
     </section>
@@ -30,7 +31,7 @@
                      justify-content: space-between;
                      align-items: baseline">
         <h2>Recent in the network</h2>
-        <a href="{{ entity_url('referral') }}">See all</a>
+        <a href="{{ entity_url('post') }}">See all</a>
       </header>
       <p style="font-size: 0.875rem;
                 color: var(--pico-muted-color);
@@ -38,13 +39,12 @@
         {# djlint:off #}
         Last 7 days, filtered to your saved searches and practice profile
         {%- if network_filter_chips %} — {{ network_filter_chips | join(" · ") }}{% endif %}.
-        <a href="{{ entity_url('referral') }}">Adjust filters</a>
+        <a href="{{ entity_url('post') }}">Adjust filters</a>
         {# djlint:on #}
       </p>
       <article class="post-feed-list">
         {%- for post in network_posts -%}
-          {%- set ename = "referral" if post.kind == "referral" else "opening" -%}
-          {{ post_feed_row(post, ename) }}
+          {{ post_feed_row(post, "post") }}
         {%- endfor -%}
       </article>
     </section>

@@ -74,24 +74,13 @@ def test_each_spec_detail_relationship_matches_kind_name():
 
 def test_template_paths_default_by_convention():
     """`create_template` / `edit_template` are derived from the kind
-    name when not explicitly set, following
-    `posts/new_<name>.html` / `posts/edit_<name>.html`.
-
-    Two availability subkinds (`clinician_opening`, `program_intake`)
-    are owned by the `/openings` face end-to-end and live under
-    `posts/openings/` rather than directly at `posts/`. The cross-
-    resource import lint allows `posts/openings/` to import from
-    `posts/_shared/`, so the nesting reflects the type hierarchy
-    without breaking the lint. The explicit overrides are pinned
-    below."""
-    expected_template_dirs = {
-        "clinician_opening": "posts/openings",
-        "program_intake": "posts/openings",
-    }
+    name when not explicitly set, following the convention
+    `posts/new_<name>.html` / `posts/edit_<name>.html`. Every kind
+    uses the default (no overrides) — the convention is the single
+    source of truth for which template file each kind ships."""
     for kind, spec in POST_KINDS.items():
-        dirname = expected_template_dirs.get(kind, "posts")
-        assert spec.create_template == f"{dirname}/new_{kind}.html"
-        assert spec.edit_template == f"{dirname}/edit_{kind}.html"
+        assert spec.create_template == f"posts/new_{kind}.html"
+        assert spec.edit_template == f"posts/edit_{kind}.html"
 
 
 def test_explicit_template_paths_override_convention():

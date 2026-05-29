@@ -11,7 +11,8 @@ Layout per row (four <td> cells):
   4. Age         — compact relative age via the `days_ago` filter;
                    muted via td:last-child in base.html.
 
-`entity_name` is the URL family ("referral", "opening", "intake"). #}
+`entity_name` is the URL family ("post" — the single whole-supertype
+family). #}
 {% macro post_row(post, entity_name) -%}
   {%- set summary = post_row_summary(post) -%}
   {%- if post.kind == "referral" -%}

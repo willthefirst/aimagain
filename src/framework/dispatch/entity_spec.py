@@ -388,16 +388,14 @@ class EntitySpec:
     #      update/delete/form_edit 404 unless `target.kind in <subset>`;
     #      create takes `kind` in the body (discriminated-union adapter
     #      enforces membership); form_new requires `?kind=<one of subset>`.
-    #      Used by an umbrella URL that owns multiple subkinds end-to-end
-    #      (e.g. `/openings` listing both clinician openings and program
-    #      intakes; same `?kind=X` discriminator pattern the old `/posts`
-    #      face used, just scoped to a subset).
+    #      An umbrella URL that owns a strict subset of the supertype's
+    #      kinds end-to-end; no URL family uses this mode today, but the
+    #      dispatch handlers and `_make_factory_handler` support it.
     #   3. **whole-supertype** — both fields `None`. List takes any kind;
     #      `?kind=` query param picks the create-form template; the
     #      discriminated-union adapter handles dispatch on POST/PATCH.
-    #      No URL family uses this mode today (the old `/posts` was
-    #      removed); the mode is retained because the dispatch handlers
-    #      and `_make_factory_handler` already fall through to it.
+    #      Used by `/posts`, which exposes every Post kind through a
+    #      single URL family.
     #
     # `discriminator_value` and `discriminator_values` are mutually
     # exclusive. Both require `discriminator` to be set. Validated in

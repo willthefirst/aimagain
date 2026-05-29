@@ -41,10 +41,10 @@ emits the modality `<span>`s; `_facts_block` emits the single `<dl>`
 body. Detail templates reuse the same `_facts_block` partial so
 list and detail share the same visual vocabulary.
 
-`entity_name` is the URL family the card links into — ``"referral"``,
-``"opening"``, or ``"intake"``. Each family's `list.html` passes its
-own name so the card's headline anchor resolves to the correct URL
-family (e.g. `/referrals/{id}` for referrals' list). #}
+`entity_name` is the URL family the card links into — ``"post"`` (the
+single whole-supertype family). The list template passes this name so
+the card's headline anchor resolves to `/posts/{id}` regardless of the
+post's kind. #}
 {%- from "_shared/_card.html" import card -%}
 {%- from "posts/_shared/_modality_chips.html" import modality_chips -%}
 {%- from "posts/_shared/_facts_block.html" import facts_block -%}

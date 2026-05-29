@@ -2,8 +2,8 @@
 
    Required context:
      post        — the post being acted on
-     entity_name — the URL family this post belongs to (``"referral"``,
-                   ``"opening"``, or ``"intake"``); injected by
+     entity_name — the URL family this post belongs to (``"post"`` —
+                   the single whole-supertype family); injected by
                    `handle_detail` from `spec.name`.
      can_edit    — boolean; the handler composes this via
                    `is_owner(post, user) or is_admin(user)` from

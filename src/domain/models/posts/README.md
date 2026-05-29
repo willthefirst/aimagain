@@ -49,13 +49,12 @@ The remaining layers (Pydantic schemas, repository dispatch, logic handlers, rou
 
 ## Removing a kind
 
-Inverse: delete the registry entry, the detail model file, the `relationship(...)` line on `Post`, the four Pydantic variant classes in `src/domain/logic/posts/schema.py`, the per-kind templates (under `src/domain/templates/posts/` by default; the two availability subkinds override to `src/domain/templates/openings/` — see `PostKindSpec.create_template` / `edit_template`), and ship a migration that drops the detail table and narrows the CHECK. If the kind was a member of the `/openings` subset face, also drop it from `OPENING_ENTITY.discriminator_values`. No edits in routes, repositories, or logic — see [`../../routes/openings.py`](../../routes/openings.py) and the per-kind schema in [`../../logic/posts/schema.py`](../../logic/posts/schema.py); both read from the registry. The retired `note` kind (removed in migration `c2d3e4f5a6b7`) is the canonical example of how clean this is when the registry is the only source of truth.
+Inverse: delete the registry entry, the detail model file, the `relationship(...)` line on `Post`, the four Pydantic variant classes in `src/domain/logic/posts/schema.py`, the per-kind templates (all per-kind templates live directly under `src/domain/templates/posts/` following the default `PostKindSpec` convention — no template path overrides), and ship a migration that drops the detail table and narrows the CHECK. No edits in routes, repositories, or logic — see [`../../routes/posts.py`](../../routes/posts.py) and the per-kind schema in [`../../logic/posts/schema.py`](../../logic/posts/schema.py); both read from the registry. The retired `note` kind (removed in migration `c2d3e4f5a6b7`) is the canonical example of how clean this is when the registry is the only source of truth.
 
 ## URL faces
 
-Two URL families expose the supertype:
+A single URL family exposes the supertype:
 
-- **`/referrals`** — kind-locked leaf (`kind='referral'`). Spec: `REFERRAL_ENTITY`.
-- **`/openings`** — subset-supertype listing both availability subkinds (`kind ∈ {clinician_opening, program_intake}`). Same `?kind=X` create/edit dispatch pattern the old whole-supertype `/posts` URL used, scoped to two of the three kinds. Spec: `OPENING_ENTITY`. The framework's third face mode (`discriminator_values=...`) is the mechanism — see [`src/framework/dispatch/entity_spec.py`](../../../framework/dispatch/entity_spec.py) `discriminator_value` docstring for all three modes.
+- **`/posts`** — whole-supertype face listing every kind (`kind ∈ {referral, clinician_opening, program_intake}`). The `?kind=X` query param narrows the list and drives create/edit dispatch to the per-kind detail model and template. Spec: `POST_ENTITY`. See [`src/framework/dispatch/entity_spec.py`](../../../framework/dispatch/entity_spec.py) `discriminator_value` docstring for the face-mode contract.
 
-`/intakes` was folded into `/openings` in commit `53fc7a71`; it is no longer mounted. The kind value `program_intake` survives unchanged; only the URL collection changed.
+The previous per-face URL families (`/referrals`, `/openings`, `/intakes`) were collapsed into the single `/posts` face; the kind values survive unchanged, only the URL collection changed.

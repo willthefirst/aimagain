@@ -313,9 +313,9 @@ def mount_entity(
             # registered kind.
             #
             # Subset-supertype faces (`discriminator_values` set) narrow
-            # the Literal to their declared subset — `/openings/form?kind=
-            # referral` 422s at the FastAPI param layer rather than
-            # reaching the handler.
+            # the Literal to their declared subset — a `?kind=` value
+            # outside the subset 422s at the FastAPI param layer rather
+            # than reaching the handler.
             #
             # Kind-locked faces (`discriminator_value` set) skip this
             # synthesis — there's no picker on a single-kind URL family;

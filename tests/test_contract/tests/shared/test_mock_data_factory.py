@@ -168,32 +168,19 @@ def test_stub_renders_detail_html_without_errors():
     crashes here at test time rather than waiting for a contract pair
     to fail with a Playwright timeout.
 
-    Two URL families exist: `/referrals` (kind-locked leaf) and
-    `/openings` (subset-supertype listing both availability subkinds).
-    The canary walks all three kinds; both availability subkinds
-    render through the same `openings/detail.html` because the
-    /openings face owns them end-to-end."""
+    The unified `/posts` URL family lists every kind; the canary walks
+    all three kinds through the single `posts/detail.html` template."""
     from src.framework.rendering.templating import templates
 
     env = templates.env
 
-    # Map kind -> (URL family, context variable name used by the
-    # template). The variable name is `spec.name` from the entity spec
-    # that owns the URL family. /referrals uses `referral`; /openings
-    # uses `opening` (singular umbrella term, both subkinds bind to it).
-    _KIND_TO_FAMILY_AND_VAR = {
-        "referral": ("referrals", "referral"),
-        "clinician_opening": ("openings", "opening"),
-        "program_intake": ("openings", "opening"),
-    }
+    template = env.get_template("posts/detail.html")
     for kind in _KINDS:
-        family, var = _KIND_TO_FAMILY_AND_VAR[kind]
-        template = env.get_template(f"posts/{family}/detail.html")
         post = make_post_stub(kind, owner_id=uuid.uuid4())
 
         class _RequestStub:
             class _Url:
-                path = f"/{family}/stub"
+                path = "/posts/stub"
 
             url = _Url()
 
@@ -204,13 +191,12 @@ def test_stub_renders_detail_html_without_errors():
 
             query_params = _QueryParams()
 
-        # The detail template reads the post under the face's
-        # `spec.name`-derived context key. /referrals uses `referral`;
-        # /openings uses `opening` (the umbrella name for both
-        # availability subkinds).
+        # The detail template reads the post under `post` (the
+        # framework injects it as `spec.name` = "post"); the same
+        # variable name covers every kind.
         html = template.render(
-            **{var: post},
-            entity_name=var,
+            post=post,
+            entity_name="post",
             request=_RequestStub(),
             can_edit=True,
             is_authenticated=True,

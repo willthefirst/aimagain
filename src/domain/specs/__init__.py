@@ -24,15 +24,14 @@ from .clinician_certification import CERTIFICATION_ENTITY
 from .clinician_education import EDUCATION_ENTITY
 from .clinician_licensure import LICENSURE_ENTITY
 from .organization import ORGANIZATION_ENTITY
-from .posts import OPENING_ENTITY, REFERRAL_ENTITY
+from .posts import POST_ENTITY
 from .program import PROGRAM_ENTITY
 from .user import USER_ENTITY
 from .user_favorite import FAVORITE_ENTITY
 
 ALL_ENTITY_SPECS: tuple[EntitySpec, ...] = (
     ORGANIZATION_ENTITY,
-    REFERRAL_ENTITY,
-    OPENING_ENTITY,
+    POST_ENTITY,
     PROGRAM_ENTITY,
     CLINICIAN_ENTITY,
     AFFILIATION_ENTITY,
@@ -51,9 +50,8 @@ __all__ = [
     "EDUCATION_ENTITY",
     "FAVORITE_ENTITY",
     "LICENSURE_ENTITY",
-    "OPENING_ENTITY",
     "ORGANIZATION_ENTITY",
+    "POST_ENTITY",
     "PROGRAM_ENTITY",
-    "REFERRAL_ENTITY",
     "USER_ENTITY",
 ]

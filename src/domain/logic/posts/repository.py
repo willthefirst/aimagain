@@ -135,13 +135,11 @@ class PostRepository(BaseRepository):
         stmt = stmt.order_by(Post.created_at.desc())
         return await self._list(stmt, offset=offset, limit=limit)
 
-    # The three URL families (`/referrals`, `/openings`, `/intakes`)
-    # all route their list through `list_posts` — the `kind` kwarg is
-    # forced by the framework's `discriminator_value` lock before the
-    # call lands here. `handle_list` looks up
-    # `repo.list_<spec.url_collection>`, so each face needs its own
-    # method name that delegates. Three thin shims keep the convention
-    # (one bespoke-named method per spec) without duplicating the SQL.
+    # The single `/posts` URL family lists every kind through
+    # `list_posts`. `handle_list` looks up
+    # `repo.list_<spec.url_collection>`, so the spec's `url_collection`
+    # ("posts") resolves directly to `list_posts`. The thin shims below
+    # remain for any callers still wired to the per-kind method names.
     async def list_referrals(self, **kwargs) -> Sequence[Post]:
         return await self.list_posts(**kwargs)
 

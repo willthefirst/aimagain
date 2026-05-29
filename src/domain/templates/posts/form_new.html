@@ -1,0 +1,35 @@
+{# Picker template for the /posts whole-supertype face.
+
+Reached when a user visits `/posts/form` without `?kind=` — the
+framework's `handle_get_new_form` falls through to
+`spec.templates.form_new` (this file) when no kind is specified.
+Labels are simplified ("Referral" / "Clinician" / "Organization")
+rather than the generated `entity_create_label` strings — the picker
+context already makes the action implicit and the short noun reads
+better. The H1 on the kind-specific form page still funnels through
+`entity_create_label` so the create button on the next page reads
+"Create client referral" / "Create clinician opening" /
+"Create program intake".
+#}
+{% extends "views/form_new.html" %}
+{% block resource_label %}Posts{% endblock %}
+{% block content %}
+  <a href="{{ entity_form_url("post") }}?kind=referral">
+    <hgroup>
+      <h2>Referral</h2>
+      <p>A client you're looking to place with another clinician.</p>
+    </hgroup>
+  </a>
+  <a href="{{ entity_form_url("post") }}?kind=clinician_opening">
+    <hgroup>
+      <h2>Clinician</h2>
+      <p>An individual clinician with availability on their caseload.</p>
+    </hgroup>
+  </a>
+  <a href="{{ entity_form_url("post") }}?kind=program_intake">
+    <hgroup>
+      <h2>Organization</h2>
+      <p>An organization's program announcing open intake slots.</p>
+    </hgroup>
+  </a>
+{% endblock %}

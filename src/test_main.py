@@ -35,18 +35,18 @@ async def test_home_page_requires_auth(test_client: AsyncClient):
 
 
 async def test_home_page_shows_post_buttons(authenticated_client: AsyncClient):
-    """The home page renders both action buttons linking to the correct
-    create-form URLs."""
+    """The home page renders kind-specific CTAs linking to the unified
+    `/posts/form` URL with the appropriate `?kind=` query parameter."""
     response = await authenticated_client.get("/home")
     assert response.status_code == 200
     tree = HTMLParser(response.text)
-    assert tree.css_first('a[href="/referrals/form"]') is not None
-    assert tree.css_first('a[href="/openings/form"]') is not None
+    assert tree.css_first('a[href="/posts/form?kind=referral"]') is not None
+    assert tree.css_first('a[href="/posts/form?kind=clinician_opening"]') is not None
 
 
 async def test_home_page_shows_primary_nav(authenticated_client: AsyncClient):
     """The home page passes current_user so is_authenticated=True and the
-    primary nav links (Home, Referrals, Openings, Profile, Sign out) render."""
+    primary nav links (Home, Posts, Profile, Sign out) render."""
     response = await authenticated_client.get("/home")
     assert response.status_code == 200
     tree = HTMLParser(response.text)
@@ -54,8 +54,7 @@ async def test_home_page_shows_primary_nav(authenticated_client: AsyncClient):
     assert nav is not None
     links = {a.attributes.get("href") for a in nav.css("a")}
     assert "/home" in links
-    assert "/referrals" in links
-    assert "/openings" in links
+    assert "/posts" in links
 
 
 # --- lifespan -----------------------------------------------------------
