@@ -3,7 +3,7 @@
 
 Layout per row:
 
-  [OPENING]  E. Stone · 2h ago
+  [OPENING|INTAKE]  E. Stone · 2h ago
   Headline text that wraps freely across the full width
   City, ST · In-person · Aetna
 
@@ -29,8 +29,8 @@ under the "Feed rows" section. #}
 {% macro post_feed_row(post, entity_name, show_poster=True) -%}
 {%- set view = post_card_view(post) -%}
 {%- set headline = post_feed_headline(post) -%}
-{%- set kind_class = "opening" if post.kind != "referral" else "referral" -%}
-{%- set kind_label = "Opening" if post.kind != "referral" else "Referral" -%}
+{%- set kind_class = "referral" if post.kind == "referral" else ("intake" if post.kind == "program_intake" else "opening") -%}
+{%- set kind_label = "Referral" if post.kind == "referral" else ("Intake" if post.kind == "program_intake" else "Opening") -%}
 <div class="post-feed-row" data-kind="{{ post.kind }}">
 {# ── Header: pill · poster · timestamp ───────────────────────── #}
 <div class="post-feed-header">
