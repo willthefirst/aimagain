@@ -59,7 +59,9 @@ def create_test_user(
 # hit the DB. Real round-trip tests pass an actual Clinician's id.
 _STUB_REFERRING_CLINICIAN_ID = uuid.UUID("00000000-0000-0000-0000-000000000002")
 
-_REFERRAL_DEFAULTS: dict[str, Any] = {
+# ORM factory defaults: FK fields must be None (nullable columns).
+# SQLAlchemy's UUID column type calls .hex on the value — plain strings blow up.
+_REFERRAL_ORM_DEFAULTS: dict[str, Any] = {
     "subject": None,
     "location_city": "Springfield",
     "location_state": "IL",
@@ -75,10 +77,15 @@ _REFERRAL_DEFAULTS: dict[str, Any] = {
     "treatment_modality": None,
     "network_preference": "in_network_required",
     "insurance_carrier": None,
-    # ORM factory default: nullable. Wire payload adds the stub UUID
-    # explicitly in `referral_payload()` below — same pattern as
-    # `opening_payload` and `clinician_id`.
+    # FK fields: always None here. Add stub string UUIDs to _REFERRAL_WIRE_DEFAULTS instead.
     "referring_clinician_id": None,
+}
+
+# Wire-payload defaults: FK fields as stub string UUIDs for Pydantic validation.
+# Tests that actually persist must override with a real DB-resident ID.
+_REFERRAL_WIRE_DEFAULTS: dict[str, Any] = {
+    **_REFERRAL_ORM_DEFAULTS,
+    "referring_clinician_id": str(_STUB_REFERRING_CLINICIAN_ID),
 }
 
 _OPENING_DEFAULTS: dict[str, Any] = {
@@ -108,12 +115,7 @@ def referral_payload(**overrides: Any) -> dict[str, Any]:
     Returns a fresh dict each call. `referring_clinician_id` defaults to
     a stub UUID that passes Pydantic validation but does *not* exist in
     the DB — tests that actually persist must pass a real id override."""
-    return {
-        "kind": "referral",
-        **_REFERRAL_DEFAULTS,
-        "referring_clinician_id": str(_STUB_REFERRING_CLINICIAN_ID),
-        **overrides,
-    }
+    return {"kind": "referral", **_REFERRAL_WIRE_DEFAULTS, **overrides}
 
 
 # Stub clinician_id for schema-validation tests that never hit the DB.
@@ -136,7 +138,7 @@ def opening_payload(**overrides: Any) -> dict[str, Any]:
 
 def make_referral_detail(**overrides: Any) -> ReferralDetail:
     """Build a `ReferralDetail` ORM row with spec-compliant defaults."""
-    return ReferralDetail(**{**_REFERRAL_DEFAULTS, **overrides})
+    return ReferralDetail(**{**_REFERRAL_ORM_DEFAULTS, **overrides})
 
 
 # Program-availability mirrors PA's shape: an FK to the target row plus the
