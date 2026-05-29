@@ -46,11 +46,11 @@ which FastAPI/Pydantic parses as a list.
     <label for="referring_clinician_id">
       Referring clinician *
       <select id="referring_clinician_id" name="referring_clinician_id" required>
-        {%- if not d %}<option value="" disabled selected>--</option>{%- endif %}
         {%- for c in current_user.clinicians %}
+          {%- set outer_first = loop.first %}
           {%- for aff in c.affiliations %}
             <option value="{{ c.id }}"
-                    {% if d and d.referring_clinician_id == c.id and loop.first %}selected{% endif %}>
+                    {% if (d and d.referring_clinician_id == c.id and loop.first) or (not d and outer_first and loop.first) %}selected{% endif %}>
               {{ aff.org.name }}
             </option>
           {%- endfor %}
