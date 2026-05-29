@@ -709,40 +709,13 @@
       }
 
       /* Filter form internals */
-      .posts-filter-summary {
-        font-size: 0.75rem;
-        text-transform: uppercase;
-        letter-spacing: 0.05em;
-        font-weight: 600;
-        cursor: pointer;
-        list-style: none;
-      }
-      fieldset.posts-filter-section {
-        border: none;
-        padding: 0;
-        margin: 0 0 1rem;
-      }
-      fieldset.posts-filter-section legend {
-        font-size: 0.75rem;
-        text-transform: uppercase;
-        letter-spacing: 0.05em;
-        font-weight: 600;
-        padding: 0;
-        margin-bottom: 0.25rem;
-      }
-      fieldset.posts-filter-section label {
-        display: flex;
-        gap: 0.4rem;
-        align-items: center;
-        margin-bottom: 0.15rem;
-        font-size: 0.875rem;
-      }
+      fieldset.posts-filter-section { padding: 0; margin-bottom: var(--pico-spacing); }
+      fieldset.posts-filter-section label { display: flex; align-items: center; }
       .posts-filter-scroll { max-height: 130px; overflow-y: auto; }
-      .posts-filter-more > summary { font-size: 0.8rem; cursor: pointer; }
       .posts-filter-actions {
         display: flex;
         flex-direction: column;
-        gap: 0.5rem;
+        gap: var(--pico-spacing);
         list-style: none;
         padding: 0;
         margin: 0;
