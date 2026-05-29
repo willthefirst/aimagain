@@ -495,6 +495,33 @@ def test_view_program_no_in_person_virtual_no_insurance_no_address():
     assert v["location_chunk"] is None
 
 
+# --- post_card_view: modalities -----------------------------------------
+
+
+def test_view_cr_modalities_populated():
+    post = _make_cr_post(modalities=["cbt", "dbt"])
+    v = post_card_view(post)
+    assert v["modalities"] == ["cbt", "dbt"]
+
+
+def test_view_cr_modalities_empty_by_default():
+    post = _make_cr_post(modalities=[])
+    v = post_card_view(post)
+    assert v["modalities"] == []
+
+
+def test_view_pa_modalities_populated():
+    post = _make_pa_post(modalities=["emdr", "ifs"])
+    v = post_card_view(post)
+    assert v["modalities"] == ["emdr", "ifs"]
+
+
+def test_view_program_modalities_populated():
+    post = _make_program_post(modalities=["somatic"])
+    v = post_card_view(post)
+    assert v["modalities"] == ["somatic"]
+
+
 # --- post_card_view: defensiveness --------------------------------------
 
 
