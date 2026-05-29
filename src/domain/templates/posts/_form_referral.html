@@ -88,7 +88,7 @@ which FastAPI/Pydantic parses as a list.
     <fieldset>
       <legend>Services</legend>
       {{ multi_select_field("services", "Services", REFERRAL_SERVICES, labels=REFERRAL_SERVICE_LABELS, current=d.services if d else None) }}
-      {{ text_field("treatment_modality", "Treatment modality", current=d.treatment_modality if d else None, required=false, help=modality_help() ) }}
+      {{ multi_select_field("modalities", "Treatment modalities", TREATMENT_MODALITIES, labels=TREATMENT_MODALITY_LABELS, current=d.modalities if d else None, required=false) }}
     </fieldset>
     {# Insurance: two controls. `network_preference` is the referrer's
      posture (always set); `insurance_carrier` is the client's carrier

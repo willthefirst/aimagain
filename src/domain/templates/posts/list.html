@@ -7,13 +7,144 @@
   </li>
 {% endblock %}
 {% block content %}
-  {% if posts %}
-    <article id="posts-list" class="post-feed-list">
-      {%- for post in posts %}{{ post_feed_row(post, entity_name) }}{%- endfor %}
-      </article>
-    {% else %}
-      {{ post_feed_empty("No posts match these filters." if active_filter_count else "No posts found.",
-            link_href=entity_url(entity_name) if active_filter_count else None
-      ) }}
-    {% endif %}
+  {%- set _list_url = entity_url("post") -%}
+  <div class="posts-browse-layout">
+    <aside class="posts-filter-sidebar">
+      <details class="posts-filter-disclosure">
+        <summary class="posts-filter-summary">
+          Filters
+          {% if active_filter_count %}({{ active_filter_count }}){% endif %}
+        </summary>
+        <form method="get" action="{{ _list_url }}" class="posts-filter-form">
+          {#-- 1. Type --#}
+          <fieldset class="posts-filter-section">
+            <legend>Type</legend>
+            {%- for v, l in (
+              ("referral",          "Client referrals"),
+              ("clinician_opening", "Clinician openings"),
+              ("program_intake",    "Program intakes"),
+              ) %}
+              <label>
+                <input type="checkbox"
+                       name="kind"
+                       value="{{ v }}"
+                       {% if v in (filter_values.get("kind") or []) %}checked{% endif %} />
+                {{ l }}
+              </label>
+            {%- endfor %}
+          </fieldset>
+          {#-- 2. Location --#}
+          <fieldset class="posts-filter-section">
+            <legend>Location</legend>
+            <label>
+              City, state, or ZIP
+              <input type="search"
+                     name="geography"
+                     value="{{ filter_values.get('geography') or '' }}"
+                     placeholder="e.g. Portland or 97201" />
+            </label>
+            <label>
+              <input type="checkbox"
+                     name="include_telehealth"
+                     value="1"
+                     {% if filter_values.get("include_telehealth") %}checked{% endif %} />
+              Include telehealth in CA {# title-case-ignore #}
+            </label>
+          </fieldset>
+          {#-- 3. Level of care (openings/intakes only) --#}
+          <fieldset class="posts-filter-section">
+            <legend>Level of care</legend>
+            {%- for v in TREATMENT_SETTINGS %}
+              <label>
+                <input type="checkbox"
+                       name="level_of_care"
+                       value="{{ v }}"
+                       {% if v in (filter_values.get("level_of_care") or []) %}checked{% endif %} />
+                {{ TREATMENT_SETTINGS_LABELS[v] }}
+              </label>
+            {%- endfor %}
+          </fieldset>
+          {#-- 4. Modality — first 8 inline, rest behind a Show-all disclosure --#}
+          <fieldset class="posts-filter-section">
+            <legend>Modality</legend>
+            {%- set modality_active = filter_values.get("modality") or [] %}
+            {%- set _cutoff = 8 %}
+            {%- for v in TREATMENT_MODALITIES %}
+              {%- if loop.index0 < _cutoff or v in modality_active %}
+                <label>
+                  <input type="checkbox"
+                         name="modality"
+                         value="{{ v }}"
+                         {% if v in modality_active %}checked{% endif %} />
+                  {{ TREATMENT_MODALITY_LABELS[v] }}
+                </label>
+              {%- endif %}
+            {%- endfor %}
+            {%- if TREATMENT_MODALITIES | length > _cutoff %}
+              <details class="posts-filter-more">
+                <summary>Show all ({{ TREATMENT_MODALITIES | length }})</summary>
+                <div class="posts-filter-scroll">
+                  {%- for v in TREATMENT_MODALITIES %}
+                    {%- if loop.index0 >= _cutoff and v not in modality_active %}
+                      <label>
+                        <input type="checkbox" name="modality" value="{{ v }}" />
+                        {{ TREATMENT_MODALITY_LABELS[v] }}
+                      </label>
+                    {%- endif %}
+                  {%- endfor %}
+                </div>
+              </details>
+            {%- endif %}
+          </fieldset>
+          {#-- 5. Populations (age_group) --#}
+          <fieldset class="posts-filter-section">
+            <legend>Populations</legend>
+            {%- for v in CLIENT_AGE_GROUPS %}
+              <label>
+                <input type="checkbox"
+                       name="age_group"
+                       value="{{ v }}"
+                       {% if v in (filter_values.get("age_group") or []) %}checked{% endif %} />
+                {{ CLIENT_AGE_GROUP_LABELS[v] }}
+              </label>
+            {%- endfor %}
+          </fieldset>
+          {#-- 6. Insurance --#}
+          <fieldset class="posts-filter-section">
+            <legend>Insurance</legend>
+            <div class="posts-filter-scroll">
+              {%- for v in INSURANCE_CARRIERS %}
+                <label>
+                  <input type="checkbox"
+                         name="insurance"
+                         value="{{ v }}"
+                         {% if v in (filter_values.get("insurance") or []) %}checked{% endif %} />
+                  {{ INSURANCE_CARRIER_LABELS[v] }}
+                </label>
+              {%- endfor %}
+            </div>
+          </fieldset>
+          <menu class="posts-filter-actions">
+            <li>
+              <button type="submit">Apply filters</button>
+            </li>
+            <li>
+              <a href="{{ _list_url }}" role="button" class="secondary outline">Clear all</a>
+            </li>
+          </menu>
+        </form>
+      </details>
+    </aside>
+    <div class="posts-results">
+      {% if posts %}
+        <article id="posts-list" class="post-feed-list">
+          {%- for post in posts %}{{ post_feed_row(post, entity_name) }}{%- endfor %}
+          </article>
+        {% else %}
+          {{ post_feed_empty("No posts match these filters." if active_filter_count else "No posts found.",
+                    link_href=entity_url(entity_name) if active_filter_count else None
+          ) }}
+        {% endif %}
+      </div>
+    </div>
   {% endblock %}

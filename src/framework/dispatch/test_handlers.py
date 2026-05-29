@@ -2438,6 +2438,9 @@ async def test_handle_list_echoes_filter_values_as_selected():
     )
     assert context["selected_kind"] == "alpha"
     assert context["selected_state"] is None
+    # The raw dict is also injected so list templates with inline filter
+    # sidebars can read all active values without unpacking selected_* vars.
+    assert context["filter_values"] == {"kind": "alpha", "state": None}
 
 
 async def test_handle_list_threads_filter_values_into_repo_call():

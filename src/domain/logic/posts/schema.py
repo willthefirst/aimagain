@@ -63,6 +63,7 @@ from src.domain.models.enums import (
     LOCATION_AVAILABILITY_OPTIONS,
     NETWORK_PREFERENCES,
     REFERRAL_SERVICES,
+    TREATMENT_MODALITIES,
     TREATMENT_SETTINGS,
 )
 from src.framework.rendering.form_fields import HtmlTextarea, HtmlUrl
@@ -142,6 +143,9 @@ RequiredAgeGroupsField = Annotated[AgeGroupsField, Field(min_length=1)]
 # normalization shape as services/settings/age_groups. Empty list is
 # allowed — "no restriction stated" / serves any gender.
 GendersField = Annotated[list[Literal[*GENDERS]], BeforeValidator(scalar_to_list)]
+ModalitiesField = Annotated[
+    list[Literal[*TREATMENT_MODALITIES]], BeforeValidator(scalar_to_list)
+]
 
 
 # --- Shared flatten helper ----------------------------------------------
@@ -208,6 +212,7 @@ class ReferralRead(_PostReadBase):
     description: str
     services: ServicesField = []
     treatment_modality: str | None = None
+    modalities: ModalitiesField = []
     # See :class:`ReferralCreate` for the carrier/preference split.
     network_preference: Literal[*NETWORK_PREFERENCES]
     insurance_carrier: OptionalInsuranceCarrier = None
@@ -240,6 +245,7 @@ class ClinicianOpeningRead(_PostReadBase):
     services: ServicesField = []
     settings: SettingsField = []
     treatment_modality: str | None = None
+    modalities: ModalitiesField = []
     age_groups: AgeGroupsField = []
     languages: LanguagesField = []
     genders: GendersField = []
@@ -261,6 +267,7 @@ class ProgramIntakeRead(_PostReadBase):
     services: ServicesField = []
     settings: SettingsField = []
     treatment_modality: str | None = None
+    modalities: ModalitiesField = []
     age_groups: AgeGroupsField = []
     languages: LanguagesField = []
     genders: GendersField = []
@@ -309,6 +316,7 @@ class ReferralCreate(FlatLocationSchema, WirePayload):
     description: StrippedText
     services: ServicesField = []
     treatment_modality: StrippedOptionalText = None
+    modalities: ModalitiesField = []
     # `network_preference` is the referrer's posture toward in-network
     # match (required). `insurance_carrier` is the patient's actual
     # carrier (nullable — null means self-pay / unknown / no carrier,
@@ -349,6 +357,7 @@ class ClinicianOpeningCreate(WirePayload):
     services: ServicesField = []
     settings: SettingsField = []
     treatment_modality: StrippedOptionalText = None
+    modalities: ModalitiesField = []
     # Required min-1 on the wire. No default; every PA post must declare
     # at least one bucket explicitly.
     age_groups: RequiredAgeGroupsField
@@ -381,6 +390,7 @@ class ProgramIntakeCreate(WirePayload):
     services: ServicesField = []
     settings: SettingsField = []
     treatment_modality: StrippedOptionalText = None
+    modalities: ModalitiesField = []
     # Required min-1 on the wire — mirrors PA's age_groups.
     age_groups: RequiredAgeGroupsField
     # Required min-1 on the wire — mirrors PA's languages.
@@ -436,6 +446,7 @@ class ReferralUpdate(FlatLocationSchema, PartialUpdate):
     description: StrippedText | None = None
     services: ServicesField | None = None
     treatment_modality: StrippedOptionalText = None
+    modalities: ModalitiesField | None = None
     # `None` = leave unchanged; any enum value sets it. Clearing the
     # carrier back to NULL via PATCH is not supported today (matches the
     # repo's "None means leave unchanged" semantic for optional fields).
@@ -465,6 +476,7 @@ class ClinicianOpeningUpdate(PartialUpdate):
     services: RequiredServicesField | None = None
     settings: RequiredSettingsField | None = None
     treatment_modality: StrippedOptionalText = None
+    modalities: ModalitiesField | None = None
     age_groups: RequiredAgeGroupsField | None = None
     # `None` = leave unchanged. `min_length=1` rejects an explicit `[]`,
     # mirroring `services`. Clearing the list is intentionally not
@@ -492,6 +504,7 @@ class ProgramIntakeUpdate(PartialUpdate):
     services: RequiredServicesField | None = None
     settings: RequiredSettingsField | None = None
     treatment_modality: StrippedOptionalText = None
+    modalities: ModalitiesField | None = None
     age_groups: RequiredAgeGroupsField | None = None
     languages: RequiredLanguagesField | None = None
     genders: GendersField | None = None
@@ -532,6 +545,7 @@ class ReferralAuditSnapshot(_PostAuditSnapshotBase):
     description: str
     services: ServicesField = []
     treatment_modality: str | None = None
+    modalities: ModalitiesField = []
     network_preference: Literal[*NETWORK_PREFERENCES]
     insurance_carrier: OptionalInsuranceCarrier = None
     referring_clinician_id: uuid.UUID | None = None
@@ -556,6 +570,7 @@ class ClinicianOpeningAuditSnapshot(_PostAuditSnapshotBase):
     services: ServicesField = []
     settings: SettingsField = []
     treatment_modality: str | None = None
+    modalities: ModalitiesField = []
     age_groups: AgeGroupsField = []
     languages: LanguagesField = []
     genders: GendersField = []
@@ -573,6 +588,7 @@ class ProgramIntakeAuditSnapshot(_PostAuditSnapshotBase):
     services: ServicesField = []
     settings: SettingsField = []
     treatment_modality: str | None = None
+    modalities: ModalitiesField = []
     age_groups: AgeGroupsField = []
     languages: LanguagesField = []
     genders: GendersField = []

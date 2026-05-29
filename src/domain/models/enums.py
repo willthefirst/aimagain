@@ -190,6 +190,22 @@ TREATMENT_SETTINGS: Final[tuple[str, ...]] = (
     "day_program",
 )
 
+# Therapeutic modality vocabulary. Structured alternative to the legacy
+# `treatment_modality` free-text column; new posts use this multi-value
+# list for filterable, controlled-vocabulary modality data.
+TREATMENT_MODALITIES: Final[tuple[str, ...]] = (
+    "psychodynamic",
+    "emdr",
+    "ifs",
+    "somatic",
+    "cbt",
+    "dbt",
+    "act",
+    "motivational_interviewing",
+    "narrative",
+    "gottman",
+)
+
 
 # --- Display labels for select <option>s --------------------------------
 #
@@ -305,6 +321,18 @@ TREATMENT_SETTINGS_LABELS: Final[dict[str, str]] = {
     "php": "PHP",
     "residential": "Residential",
     "day_program": "Day program",
+}
+TREATMENT_MODALITY_LABELS: Final[dict[str, str]] = {
+    "psychodynamic": "Psychodynamic",
+    "emdr": "EMDR",
+    "ifs": "IFS",
+    "somatic": "Somatic",
+    "cbt": "CBT",
+    "dbt": "DBT",
+    "act": "ACT",
+    "motivational_interviewing": "Motivational interviewing",
+    "narrative": "Narrative",
+    "gottman": "Gottman",
 }
 GENDER_LABELS: Final[dict[str, str]] = {
     "female": "Female",

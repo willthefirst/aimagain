@@ -66,6 +66,8 @@ register_template_globals(
     REFERRAL_SERVICE_LABELS=enums.REFERRAL_SERVICE_LABELS,
     TREATMENT_SETTINGS=enums.TREATMENT_SETTINGS,
     TREATMENT_SETTINGS_LABELS=enums.TREATMENT_SETTINGS_LABELS,
+    TREATMENT_MODALITIES=enums.TREATMENT_MODALITIES,
+    TREATMENT_MODALITY_LABELS=enums.TREATMENT_MODALITY_LABELS,
     GENDERS=enums.GENDERS,
     GENDER_LABELS=enums.GENDER_LABELS,
     # Lucide icon names per enum value — consumed by the listing-row
@@ -132,6 +134,7 @@ register_choice_labels(enums.NETWORK_PREFERENCES, enums.NETWORK_PREFERENCE_LABEL
 register_choice_labels(enums.INSURANCE_CARRIERS, enums.INSURANCE_CARRIER_LABELS)
 register_choice_labels(enums.REFERRAL_SERVICES, enums.REFERRAL_SERVICE_LABELS)
 register_choice_labels(enums.TREATMENT_SETTINGS, enums.TREATMENT_SETTINGS_LABELS)
+register_choice_labels(enums.TREATMENT_MODALITIES, enums.TREATMENT_MODALITY_LABELS)
 register_choice_labels(enums.GENDERS, enums.GENDER_LABELS)
 register_choice_labels(enums.LICENSE_TYPES, enums.LICENSE_TYPES_LABELS)
 register_choice_labels(enums.EDUCATION_TYPES, enums.EDUCATION_TYPES_LABELS)
