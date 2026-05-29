@@ -32,6 +32,13 @@ Members with an icon pass a third element; `icons()` then maps value -> icon
 
     ReferralService.icons()  # {"psychotherapy": "brain", ...}
 
+A vocabulary with no display labels (a status enum) declares value-only members;
+`label` then falls back to the value, so `labels()` stays total:
+
+    class VerificationStatus(LabeledChoice):
+        verified = "verified"
+        failed = "failed"
+
 A *leaf* — imports only the stdlib — so any model cluster can import it without
 cycling, same as `enums.py`.
 """
@@ -44,11 +51,14 @@ class LabeledChoice(enum.StrEnum):
     icon: "str | None"
 
     def __new__(
-        cls, value: str, label: str, icon: "str | None" = None
+        cls, value: str, label: "str | None" = None, icon: "str | None" = None
     ) -> "LabeledChoice":
         obj = str.__new__(cls, value)
         obj._value_ = value
-        obj.label = label
+        # A value-only member (`status = "verified"`) is a vocabulary with no
+        # display labels — `.label` falls back to the storage value so the
+        # derived `labels()` dict is still total.
+        obj.label = value if label is None else label
         obj.icon = icon
         return obj
 

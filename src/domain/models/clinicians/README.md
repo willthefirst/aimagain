@@ -16,7 +16,6 @@ This `Clinician` class is the **directory entry**: the row that `/clinicians/...
 - `clinician_certification.py` — `ClinicianCertification`. One row per professional certification. FK `clinician_id` → `clinicians.id` (CASCADE). `certification_type` CHECKs against `CERTIFICATION_TYPES`.
 - `test_clinician.py` — model-layer regression coverage (NPI CHECK constraint, credential relationships).
 - `test_clinician_models.py` — DB-layer coverage of the credential cluster.
-- `test_clinician_enums.py` — asserts every credential vocabulary value (`LICENSE_TYPES`, `EDUCATION_TYPES`, `CERTIFICATION_TYPES`) has a matching `*_LABELS` entry.
 
 ## Adding a new credential type
 
