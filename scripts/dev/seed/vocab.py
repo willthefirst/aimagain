@@ -39,6 +39,7 @@ from src.domain.models.enums import (
     LANGUAGES,
     LICENSE_TYPES,
     REFERRAL_SERVICES,
+    TREATMENT_MODALITIES,
     TREATMENT_SETTINGS,
     US_STATES,
 )
@@ -702,6 +703,7 @@ PLACEHOLDER_OK: Final[frozenset[str]] = frozenset(
 JSON_LIST_SOURCE: Final[dict[str, tuple[str, ...]]] = {
     "age_groups": CLIENT_AGE_GROUPS,
     "languages": LANGUAGES,
+    "modalities": TREATMENT_MODALITIES,
     "services": REFERRAL_SERVICES,
     "settings": TREATMENT_SETTINGS,
     "desired_times": DESIRED_TIME_SLOTS,
