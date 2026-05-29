@@ -56,11 +56,13 @@ to the clinician-create flow when `current_user.clinicians` is empty.
     <label for="clinician_id">
       Which practice?
       <select id="clinician_id" name="clinician_id" required>
-        {%- if not d %}<option value="" disabled selected>--</option>{%- endif %}
         {%- for c in current_user.clinicians %}
+          {%- set outer_first = loop.first %}
           {%- for aff in c.affiliations %}
             <option value="{{ c.id }}"
-                    {% if d and d.clinician_id == c.id and loop.first %}selected{% endif %}>{{ aff.org.name }}</option>
+                    {% if (d and d.clinician_id == c.id and loop.first) or (not d and outer_first and loop.first) %}selected{% endif %}>
+              {{ aff.org.name }}
+            </option>
           {%- endfor %}
         {%- endfor %}
       </select>
