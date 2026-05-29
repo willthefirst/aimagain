@@ -1,10 +1,11 @@
 """Schema-driven form-field rendering: Pydantic FieldInfo → dict for the `field_for` Jinja macro."""
 
 from dataclasses import dataclass
-from types import UnionType
-from typing import Any, Literal, Union, get_args, get_origin
+from typing import Any, Literal, get_args, get_origin
 
 from pydantic import BaseModel
+
+from src.framework.type_utils import is_optional, strip_optional
 
 
 @dataclass(frozen=True)
@@ -62,25 +63,6 @@ def register_choice_labels(
     _CHOICE_LABELS[tuple(choices)] = labels
 
 
-def _is_optional(annotation: Any) -> bool:
-    """`True` if `annotation` is `T | None` (either the PEP 604 union
-    or `typing.Union[T, None]`)."""
-    origin = get_origin(annotation)
-    if origin is Union or origin is UnionType:
-        return type(None) in get_args(annotation)
-    return False
-
-
-def _strip_optional(annotation: Any) -> Any:
-    """Return the non-None arm of a `T | None` annotation. If
-    `annotation` is a multi-arm union (`A | B | None`), returns the
-    union of the non-None arms."""
-    args = tuple(a for a in get_args(annotation) if a is not type(None))
-    if len(args) == 1:
-        return args[0]
-    return Union[args]  # type: ignore[return-value]
-
-
 def _resolve_field(schema_cls: type[BaseModel], name: str) -> tuple[Any, bool]:
     """Look up a field by name on a Pydantic schema. Returns
     ``(FieldInfo, parent_optional)``.
@@ -111,9 +93,9 @@ def _resolve_field(schema_cls: type[BaseModel], name: str) -> tuple[Any, bool]:
         if parent_name in fields:
             parent_field = fields[parent_name]
             parent_anno = parent_field.annotation
-            parent_optional = _is_optional(parent_anno)
+            parent_optional = is_optional(parent_anno)
             inner_parent = (
-                _strip_optional(parent_anno) if parent_optional else parent_anno
+                strip_optional(parent_anno) if parent_optional else parent_anno
             )
             if isinstance(inner_parent, type) and issubclass(inner_parent, BaseModel):
                 if sub_name in inner_parent.model_fields:
@@ -143,8 +125,8 @@ def field_spec(schema_cls: type[BaseModel], name: str) -> dict[str, Any]:
     """
     field, parent_optional = _resolve_field(schema_cls, name)
     annotation = field.annotation
-    optional = parent_optional or _is_optional(annotation)
-    inner = _strip_optional(annotation) if _is_optional(annotation) else annotation
+    optional = parent_optional or is_optional(annotation)
+    inner = strip_optional(annotation) if is_optional(annotation) else annotation
 
     # `list[Literal[*T]]` (with or without `| None`) is unambiguous —
     # it IS a multi-select. No marker needed to disambiguate, unlike
