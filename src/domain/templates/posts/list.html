@@ -37,18 +37,21 @@
           <fieldset class="posts-filter-section">
             <legend>Location</legend>
             <label>
-              City, state, or ZIP
+              City
               <input type="search"
-                     name="geography"
-                     value="{{ filter_values.get('geography') or '' }}"
-                     placeholder="e.g. Portland or 97201" />
+                     name="city"
+                     value="{{ filter_values.get('city') or '' }}"
+                     placeholder="e.g. Portland" />
             </label>
             <label>
-              <input type="checkbox"
-                     name="include_telehealth"
-                     value="1"
-                     {% if filter_values.get("include_telehealth") %}checked{% endif %} />
-              Include telehealth in CA {# title-case-ignore #}
+              State
+              <select name="state">
+                <option value="">Any</option>
+                {%- for s in US_STATES %}
+                  <option value="{{ s }}"
+                          {% if s in (filter_values.get('state') or []) %}selected{% endif %}>{{ s }}</option>
+                {%- endfor %}
+              </select>
             </label>
           </fieldset>
           {#-- 3. Level of care (openings/intakes only) --#}
