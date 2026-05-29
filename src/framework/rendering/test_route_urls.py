@@ -27,26 +27,22 @@ def test_entity_url_collection_path_for_clinician():
     assert entity_url("clinician") == "/clinicians"
 
 
-def test_entity_url_collection_path_for_referral():
-    assert entity_url("referral") == "/referrals"
-
-
-def test_entity_url_collection_path_for_opening():
-    """`/openings` is a subset-supertype face listing both
-    `clinician_opening` and `program_intake` subkinds. Entity name
-    stays singular ("opening" — the umbrella concept) following the
+def test_entity_url_collection_path_for_post():
+    """`/posts` is the whole-supertype face listing every kind
+    (`referral`, `clinician_opening`, `program_intake`). Entity name
+    stays singular ("post" — the umbrella concept) following the
     user/users naming convention."""
-    assert entity_url("opening") == "/openings"
+    assert entity_url("post") == "/posts"
 
 
-def test_no_intake_entity():
-    """The kind-locked `/intakes` URL family was folded into
-    `/openings` — no separate `intake` entity name exists. Verifies the
-    rename is complete (calling `entity_url("intake")` raises)."""
-    import pytest
-
-    with pytest.raises(ValueError, match="Unknown entity name 'intake'"):
-        entity_url("intake")
+def test_no_per_kind_entity_names():
+    """Per-kind URL families (`/referrals`, `/openings`, `/intakes`)
+    were folded into the single `/posts` face — `referral`, `opening`,
+    and `intake` are not entity names. Verifies the consolidation is
+    complete."""
+    for stale_name in ("referral", "opening", "intake"):
+        with pytest.raises(ValueError, match="Unknown entity name"):
+            entity_url(stale_name)
 
 
 def test_entity_url_collection_path_for_user():
@@ -118,15 +114,11 @@ def test_entity_form_url_create_form_for_clinician():
     assert entity_form_url("clinician") == "/clinicians/form"
 
 
-def test_entity_form_url_create_form_for_referral():
-    assert entity_form_url("referral") == "/referrals/form"
-
-
-def test_entity_form_url_create_form_for_opening():
-    """`/openings/form` is the create-form URL; the handler reads
-    `?kind=X` from the query string to dispatch to the subkind-specific
-    form template."""
-    assert entity_form_url("opening") == "/openings/form"
+def test_entity_form_url_create_form_for_post():
+    """`/posts/form` is the create-form URL; the handler reads
+    `?kind=X` from the query string to dispatch to the kind-specific
+    form template (or renders the picker when no kind is supplied)."""
+    assert entity_form_url("post") == "/posts/form"
 
 
 def test_entity_form_url_edit_form_for_user():

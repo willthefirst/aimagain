@@ -18,8 +18,8 @@ The macro reads view data via the `post_card_view(post)` global and the
 Parameters
   post        — any `Post` ORM instance (referral / clinician_opening /
                 program_intake).
-  entity_name — URL family string ("referral", "opening", "intake");
-                passed unchanged to `entity_url()`.
+  entity_name — URL family string ("post" — the single whole-supertype
+                family); passed unchanged to `entity_url()`.
   show_poster — when False the poster-name item is suppressed (useful for
                 "My active posts" where the viewer is the poster).
                 Defaults to True.

@@ -208,8 +208,8 @@ async def test_post_login_wrapper_htmx_success_sets_cookie_and_hx_redirect(
     test_client: AsyncClient, logged_in_user: User
 ):
     """HTMX-flagged POST + valid credentials → 204 + `Set-Cookie:
-    fastapiusersauth=...` + `HX-Redirect` (default `/referrals` per
-    `UserManager.on_after_login`). The wrapper converts the
+    fastapiusersauth=...` + `HX-Redirect` (default `/posts?kind=referral`
+    per `UserManager.on_after_login`). The wrapper converts the
     underlying 302+Location into 204+HX-Redirect for HTMX so the
     browser doesn't auto-follow before HTMX honors the navigation."""
     response = await test_client.post(
@@ -220,10 +220,10 @@ async def test_post_login_wrapper_htmx_success_sets_cookie_and_hx_redirect(
     assert response.status_code == 204
     assert "fastapiusersauth=" in response.headers.get("Set-Cookie", "")
     # `Location` is popped (auto-follow guard for HTMX); HX-Redirect
-    # takes over. `on_after_login` defaults to `/referrals` when no
-    # `?next=` is set.
+    # takes over. `on_after_login` defaults to `/posts?kind=referral`
+    # when no `?next=` is set.
     assert "Location" not in response.headers
-    assert response.headers.get("HX-Redirect") == "/referrals"
+    assert response.headers.get("HX-Redirect") == "/posts?kind=referral"
 
 
 async def test_post_login_wrapper_non_htmx_success_returns_302_redirect(
@@ -238,7 +238,7 @@ async def test_post_login_wrapper_non_htmx_success_returns_302_redirect(
         data={"username": logged_in_user.email, "password": "password123"},
     )
     assert response.status_code == 302
-    assert response.headers.get("Location") == "/referrals"
+    assert response.headers.get("Location") == "/posts?kind=referral"
     assert "fastapiusersauth=" in response.headers.get("Set-Cookie", "")
 
 
@@ -898,11 +898,12 @@ async def test_root_anonymous_returns_landing_page(test_client: AsyncClient):
     assert "support@bedlamhealth.com" in response.text
 
 
-async def test_root_authenticated_redirects_to_referrals(
+async def test_root_authenticated_redirects_to_posts_referrals(
     authenticated_client: AsyncClient,
 ):
-    """Authenticated GET / still redirects to /referrals — the
-    "find new clients" home (#692)."""
+    """Authenticated GET / redirects to `/posts?kind=referral` — the
+    "find new clients" home (#692), preserved as a kind-filter on the
+    unified `/posts` feed."""
     response = await authenticated_client.get("/", follow_redirects=False)
     assert response.status_code == 302
-    assert response.headers["location"] == "/referrals"
+    assert response.headers["location"] == "/posts?kind=referral"

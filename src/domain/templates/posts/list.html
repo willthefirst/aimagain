@@ -1,0 +1,19 @@
+{% extends "views/list.html" %}
+{%- from "posts/_shared/_feed_row.html" import post_feed_row, post_feed_empty with context -%}
+{% block resource_label %}Posts{% endblock %}
+{% block actions %}
+  <li>
+    <a href="{{ entity_form_url('post') }}" role="button">{{ entity_create_label("post") }}</a>
+  </li>
+{% endblock %}
+{% block content %}
+  {% if posts %}
+    <article id="posts-list" class="post-feed-list">
+      {%- for post in posts %}{{ post_feed_row(post, entity_name) }}{%- endfor %}
+      </article>
+    {% else %}
+      {{ post_feed_empty("No posts match these filters." if active_filter_count else "No posts found.",
+            link_href=entity_url(entity_name) if active_filter_count else None
+      ) }}
+    {% endif %}
+  {% endblock %}

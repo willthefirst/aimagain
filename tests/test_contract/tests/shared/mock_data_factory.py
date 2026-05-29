@@ -283,25 +283,23 @@ class MockDataFactory:
 
     @classmethod
     def create_post_delete_dependency_config(cls) -> Dict[str, Any]:
-        """Mock for the generic delete handler bound to the referral
-        URL family (the consumer-side owner-actions stub renders a
-        referral; see `_setup_post_owner_actions_stub`).
+        """Mock for the generic delete handler bound to the unified
+        `/posts` URL family (the consumer-side owner-actions stub
+        renders a referral-kind post via `posts/detail.html`; see
+        `_setup_post_owner_actions_stub`).
 
-        After the URL split (#628) the three post kinds each have
-        their own route module — `src.domain.routes.referrals` etc.
-        The route file binds `make_delete_handler(REFERRAL_ENTITY)`
-        and assigns it to the module-level `_handle_delete_referral`
-        attribute so test patches can target it (the mount layer's
-        `_resolve_handler` reads from the handler's `__module__`).
+        The route file `src.domain.routes.posts` binds
+        `make_delete_handler(POST_ENTITY)` and assigns it to the
+        module-level `_handle_delete_post` attribute so test patches
+        can target it (the mount layer's `_resolve_handler` reads from
+        the handler's `__module__`).
 
-        The route under test (`DELETE /referrals/{id}`) discards the
-        handler return value and emits a 204 with
-        `HX-Redirect: /referrals`, so `None` is a valid mock return.
+        The route under test (`DELETE /posts/{id}`) discards the
+        handler return value and emits a 204 with `HX-Redirect: /posts`,
+        so `None` is a valid mock return.
         """
         return {
-            "src.domain.routes.referrals._handle_delete_referral": {
-                "return_value_config": None
-            }
+            "src.domain.routes.posts._handle_delete_post": {"return_value_config": None}
         }
 
     @classmethod

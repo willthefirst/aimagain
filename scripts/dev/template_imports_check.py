@@ -8,10 +8,12 @@ Templates live in two roots:
   entity; no cross-cluster constraint applies inside this root.
 - ``src/domain/templates/`` — per-entity pages. Domain clusters may nest:
 
-  * Top-level clusters: ``<entity>/`` (e.g. ``clinicians/``, ``users/``).
-  * Sub-cluster layout: ``<cluster>/<sub>/`` (e.g. ``posts/openings/``,
-    ``posts/referrals/``). The cluster's ``_shared/`` partials live at
-    ``<cluster>/_shared/``.
+  * Top-level clusters: ``<entity>/`` (e.g. ``clinicians/``, ``users/``,
+    ``posts/``).
+  * Sub-cluster layout: ``<cluster>/<sub>/``. No entity currently uses
+    sub-clusters; the grammar is retained for future entities whose page
+    set is large enough to want a second level. The cluster's
+    ``_shared/`` partials live at ``<cluster>/_shared/``.
 
   A template at ``<a>/.../page.html`` may reference:
 
@@ -23,9 +25,9 @@ Templates live in two roots:
   * ``views/`` (the generic list/detail/form chrome).
 
   In particular: sibling sub-clusters cannot reach into each other
-  (``posts/openings/`` cannot import from ``posts/referrals/``), but a
+  (``<cluster>/<a>/`` cannot import from ``<cluster>/<b>/``), but a
   sub-cluster CAN import from its parent's shared partials
-  (``posts/openings/`` → ``posts/_shared/``).
+  (``<cluster>/<sub>/`` → ``<cluster>/_shared/``).
 
 The check accepts ``files or directories``; with no args it scans both
 roots.
@@ -114,11 +116,11 @@ def _is_allowed(importing: tuple[str, ...], referenced: tuple[str, ...]) -> bool
       3. Same directory — always fine.
       4. Ancestor — ``referenced`` is a proper prefix of ``importing``.
          (A template in a sub-cluster may import from its parent
-         cluster's directory: ``posts/openings/`` → ``posts/``.)
+         cluster's directory: ``<cluster>/<sub>/`` → ``<cluster>/``.)
       5. Sibling ``_shared/`` — ``referenced`` ends in ``_shared`` AND
          its parent is a prefix of ``importing``. (A sub-cluster may
          import from its parent cluster's ``_shared/``:
-         ``posts/openings/`` → ``posts/_shared/``.)
+         ``<cluster>/<sub>/`` → ``<cluster>/_shared/``.)
     """
     # Rule 1
     if referenced == ():

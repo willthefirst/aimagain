@@ -86,7 +86,7 @@ class UserManager(UUIDIDMixin, BaseUserManager[User, uuid.UUID]):
         print(f"User {user.id} has logged in.")
         # Post-login lands on the "find new clients" home — kept in
         # lockstep with `src/main.py:read_root`'s redirect target.
-        redirect_url = "/referrals"
+        redirect_url = "/posts?kind=referral"
         next_url = request.query_params.get("next")
         if next_url:
             # Security check: only allow relative URLs that start with "/"

@@ -15,10 +15,10 @@
    `with context` is required so the form_fields macros inside the
    form body auto-resolve `error=` / `current=` from `form_errors` /
    `form_values` (see the docstring at the top of `_shared/form_fields.html`). #}
-{%- from "posts/openings/_form_clinician_opening.html" import opening_form with context -%}
+{%- from "posts/_form_clinician_opening.html" import opening_form with context -%}
 {{ opening_form("post",
-entity_url('opening') ,
-entity_create_label('opening', kind='clinician_opening'),
+entity_url('post') ,
+entity_create_label('post', kind='clinician_opening'),
 schema=opening_create_schema,
 current_user=current_user,
-cancel_url=entity_url('opening')) }}
+cancel_url=entity_url('post')) }}

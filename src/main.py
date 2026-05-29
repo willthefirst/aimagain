@@ -149,12 +149,14 @@ async def read_home(
 
 @app.get("/")
 async def read_root(request: Request, user=Depends(current_optional_user)):
-    # Authenticated users land on `/referrals` — the "find new clients"
-    # home (see `src/auth_config.py:on_after_login` for the same bias).
-    # Anonymous visitors see the public landing page instead of being
-    # redirected to the login wall.
+    # Authenticated users land on `/posts?kind=referral` — the "find
+    # new clients" home (see `src/auth_config.py:on_after_login` for
+    # the same bias). The kind-filter pre-narrows the unified `/posts`
+    # feed to client referrals, preserving the journey bias from when
+    # `/referrals` was its own URL family. Anonymous visitors see the
+    # public landing page instead of being redirected to the login wall.
     if user is not None:
-        return RedirectResponse(url="/referrals", status_code=302)
+        return RedirectResponse(url="/posts?kind=referral", status_code=302)
     return APIResponse.html_response(
         template_name="landing.html",
         context={},

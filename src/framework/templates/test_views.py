@@ -232,13 +232,12 @@ def test_form_new_view_renders_create_heading_from_context() -> None:
 
 
 def test_primary_nav_excludes_non_journey_links_for_all_viewers() -> None:
-    """The primary nav promotes only the two journey surfaces
-    (`/referrals`, `/openings`). Non-journey URL families —
-    `/intakes`, `/clinicians` (Directory), and the admin trio
-    `/organizations` / `/programs` / `/users` — stay live and
-    reachable by URL/bookmark but are intentionally absent from the
-    chrome. Render twice (admin and non-admin) to pin that the
-    `is_admin` branch doesn't reintroduce them either."""
+    """The primary nav promotes only the unified `/posts` feed. Other
+    URL families (`/clinicians` Directory, `/organizations`,
+    `/programs`, `/users`) stay live and reachable by URL/bookmark but
+    are intentionally absent from the chrome. Render twice (admin and
+    non-admin) to pin that the `is_admin` branch doesn't reintroduce
+    them either."""
     env = _make_env()
     _add_child(
         env,
@@ -261,13 +260,11 @@ def test_primary_nav_excludes_non_journey_links_for_all_viewers() -> None:
         nav_links = {
             a.attributes.get("href") for a in tree.css('nav[aria-label="Primary"] a')
         }
-        # Both journey tabs are present.
-        assert "/referrals" in nav_links
-        assert "/openings" in nav_links
+        # Posts tab is present.
+        assert "/posts" in nav_links
         # Non-journey families are NOT in the primary nav (regardless of
         # admin flag).
         for absent in (
-            "/intakes",
             "/clinicians",
             "/organizations",
             "/programs",
@@ -680,27 +677,17 @@ def test_login_link_color_is_consistent_across_auth_pages() -> None:
 # --- Primary nav: section active-state + Login shortcut --------------
 
 
-def test_primary_nav_referrals_active_on_referrals_list() -> None:
-    """`/referrals` is the canonical Referrals URL — its tab is active."""
-    assert _active_tab_labels(_render_chrome("/referrals")) == ["Referrals"]
+def test_primary_nav_posts_active_on_posts_list() -> None:
+    """`/posts` is the canonical Posts URL — its tab is active."""
+    assert _active_tab_labels(_render_chrome("/posts")) == ["Posts"]
 
 
-def test_primary_nav_referrals_active_on_referrals_subpath() -> None:
-    """Subpaths under `/referrals` (detail, edit, form) keep the
-    Referrals tab lit — same path-prefix rule Directory uses."""
-    assert _active_tab_labels(_render_chrome("/referrals/42")) == ["Referrals"]
-    assert _active_tab_labels(_render_chrome("/referrals/42/form")) == ["Referrals"]
-    assert _active_tab_labels(_render_chrome("/referrals/form")) == ["Referrals"]
-
-
-def test_primary_nav_openings_active_on_openings_list() -> None:
-    """`/openings` is the canonical Openings URL."""
-    assert _active_tab_labels(_render_chrome("/openings")) == ["Openings"]
-
-
-def test_primary_nav_openings_active_on_openings_subpath() -> None:
-    assert _active_tab_labels(_render_chrome("/openings/42")) == ["Openings"]
-    assert _active_tab_labels(_render_chrome("/openings/42/form")) == ["Openings"]
+def test_primary_nav_posts_active_on_posts_subpath() -> None:
+    """Subpaths under `/posts` (detail, edit, form) keep the Posts tab
+    lit — same path-prefix rule Directory uses."""
+    assert _active_tab_labels(_render_chrome("/posts/42")) == ["Posts"]
+    assert _active_tab_labels(_render_chrome("/posts/42/form")) == ["Posts"]
+    assert _active_tab_labels(_render_chrome("/posts/form")) == ["Posts"]
 
 
 def test_primary_nav_no_tab_active_on_non_journey_paths() -> None:

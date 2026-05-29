@@ -737,9 +737,9 @@ def test_input_macros_no_with_context_silently_skip_auto_resolution() -> None:
     [
         # Every form-shaped template under domain/. Add new form
         # templates here so the orphan-small check runs against them.
-        "src/domain/templates/posts/openings/_form_clinician_opening.html",
-        "src/domain/templates/posts/openings/_form_program_intake.html",
-        "src/domain/templates/posts/referrals/_form.html",
+        "src/domain/templates/posts/_form_clinician_opening.html",
+        "src/domain/templates/posts/_form_program_intake.html",
+        "src/domain/templates/posts/_form_referral.html",
         "src/domain/templates/organizations/form_new.html",
         "src/domain/templates/organizations/form_edit.html",
         "src/domain/templates/clinicians/form_new.html",

@@ -1,9 +1,9 @@
 {# Generic list-view chrome.
 
-A list view (`/openings`, `/clinicians`, `/users`,
+A list view (`/posts`, `/clinicians`, `/users`,
 `/users/me/favorites`, `/users/{id}/clinicians`) renders the page
 heading + actions in a single toolbar row above the list body. No
-breadcrumb: a single-segment "Openings" trail duplicates what the
+breadcrumb: a single-segment "Posts" trail duplicates what the
 active global-nav tab already communicates (the breadcrumb guide
 flags this case explicitly), so list pages skip the breadcrumb
 block and let the `<h1>` in the toolbar carry the section name.
@@ -23,8 +23,8 @@ Child contract:
     content        — the list body (typically a
                      `<section id="<collection>-list">` of
                      `<article class="entity-card">` items rendered
-                     via `_shared/_card.html`; see `posts/openings/
-                     list.html` for the canonical example).
+                     via `_shared/_card.html`; see `posts/list.html`
+                     for the canonical example).
 
   Optional blocks:
     actions        — toolbar action `<menu>` content (Create

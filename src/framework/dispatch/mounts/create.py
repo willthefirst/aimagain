@@ -241,8 +241,8 @@ async def _render_form_with_errors(
 def _fragment_template_name(full_path: str) -> str:
     """Convert a full form-page template path to its fragment sibling.
 
-    `posts/openings/new_clinician_opening.html` →
-    `posts/openings/_new_clinician_opening_fragment.html`
+    `posts/new_clinician_opening.html` →
+    `posts/_new_clinician_opening_fragment.html`
 
     The fragment is a thin Jinja template that calls the same form
     macro the full page does, with no `extends` — so rendering it
