@@ -10,7 +10,7 @@
   {%- set _list_url = entity_url("post") -%}
   <div class="posts-browse-layout">
     <aside class="posts-filter-sidebar">
-      <details class="posts-filter-disclosure">
+      <details class="posts-filter-disclosure" open>
         <summary class="posts-filter-summary">
           Filters
           {% if active_filter_count %}({{ active_filter_count }}){% endif %}

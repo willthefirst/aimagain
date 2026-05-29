@@ -692,11 +692,10 @@
       .posts-filter-sidebar { flex: 0 0 220px; min-width: 0; }
       .posts-results { flex: 1 1 0; min-width: 0; }
 
-      /* Force the sidebar open on desktop — hide the <summary> toggle and
-         always show the form. On mobile the <details> stays closed by
-         default; the user taps the summary to reveal the form. */
+      /* On desktop hide the <summary> toggle — the <details open> is always
+         expanded so the form shows as a static sidebar. On mobile the
+         summary is visible; the user can tap it to collapse the form. */
       @media (min-width: 641px) {
-        .posts-filter-disclosure { display: block; }
         .posts-filter-disclosure > .posts-filter-summary { display: none; }
       }
       /* Narrow: stack sidebar full-width above results */
