@@ -8,9 +8,7 @@
 {% block resource_label %}Posts{% endblock %}
 {% block content %}
   {% if not current_user.clinicians %}
-    <p>
-      Set up your clinician profile first — every opening is tied to one. <a href="{{ entity_form_url('clinician') }}">Create your clinician profile.</a>
-    </p>
+    {% include "posts/_shared/_require_clinician_profile.html" %}
   {% else %}
     {{ opening_form("post", entity_url('post') , entity_create_label('post', kind='clinician_opening'), schema=opening_create_schema, current_user=current_user, cancel_url=entity_url('post')) }}
   {% endif %}

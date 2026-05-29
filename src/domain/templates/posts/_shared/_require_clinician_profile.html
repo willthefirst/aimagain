@@ -1,0 +1,7 @@
+{# Shown when `current_user` has no clinician profiles, blocking post creation.
+   Include this partial inside the `{% if not current_user.clinicians %}` branch
+   of any create-form template that requires a clinician profile to proceed.
+   Relies on `entity_form_url` from the calling template's context. #}
+<p>
+  Set up your clinician profile first. <a href="{{ entity_form_url('clinician') }}">Create your clinician profile.</a>
+</p>
