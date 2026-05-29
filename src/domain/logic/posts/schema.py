@@ -210,6 +210,10 @@ class ReferralRead(_PostReadBase):
     # See :class:`ReferralCreate` for the carrier/preference split.
     network_preference: Literal[*NETWORK_PREFERENCES]
     insurance_carrier: OptionalInsuranceCarrier = None
+    # FK to the Clinician the submitting user designated as referrer.
+    # Nullable on the read side — rows created before this field existed
+    # will have None here.
+    referring_clinician_id: uuid.UUID | None = None
 
     # Flat-on-dump: keep ``location_city`` / ``location_state`` /
     # ``location_zip`` at the top level of JSON responses. The parent's
@@ -314,6 +318,11 @@ class ReferralCreate(FlatLocationSchema, WirePayload):
     # decision.
     network_preference: Literal[*NETWORK_PREFERENCES]
     insurance_carrier: OptionalInsuranceCarrier = None
+    # FK to the Clinician the submitting user designates as referrer.
+    # Required on new referrals; the ownership check in
+    # `_assert_post_payload_target_ownership` verifies the user owns
+    # the clinician before persisting.
+    referring_clinician_id: uuid.UUID
 
 
 class ClinicianOpeningCreate(WirePayload):
@@ -442,6 +451,9 @@ class ReferralUpdate(FlatLocationSchema, PartialUpdate):
     # repo's "None means leave unchanged" semantic for optional fields).
     network_preference: Literal[*NETWORK_PREFERENCES] | None = None
     insurance_carrier: OptionalInsuranceCarrier = None
+    # `None` = leave unchanged. Ownership re-checked on update — a PATCH
+    # that repoints to a clinician the user doesn't own is 403.
+    referring_clinician_id: uuid.UUID | None = None
 
 
 class ClinicianOpeningUpdate(PartialUpdate):
@@ -540,6 +552,7 @@ class ReferralAuditSnapshot(_PostAuditSnapshotBase):
     treatment_modality: str | None = None
     network_preference: Literal[*NETWORK_PREFERENCES]
     insurance_carrier: OptionalInsuranceCarrier = None
+    referring_clinician_id: uuid.UUID | None = None
 
     # Flat-on-dump — see :class:`ReferralRead`.
     @model_serializer(mode="wrap")

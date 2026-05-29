@@ -1,6 +1,7 @@
 from functools import partial
 
 from sqlalchemy import JSON, Column, ForeignKey, Text, text
+from sqlalchemy.orm import relationship
 from sqlalchemy.types import Uuid
 
 from src.framework.persistence.base_model import Base
@@ -77,3 +78,18 @@ class ReferralDetail(LocationMixin, Base):
         Text, nullable=False, server_default=text("'no_preference'")
     )
     insurance_carrier = Column(Text, nullable=True)
+
+    # Section 6 — referring clinician. FK to the Clinician row the
+    # submitting user designates as the referrer. Nullable so existing
+    # rows (created before this field existed) stay valid; the Create
+    # schema requires it on new submissions.
+    referring_clinician_id = Column(
+        Uuid(as_uuid=True),
+        ForeignKey("clinicians.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    referring_clinician = relationship(
+        "Clinician",
+        foreign_keys=[referring_clinician_id],
+        lazy="selectin",
+    )

@@ -55,6 +55,10 @@ def create_test_user(
 # exercise route / repo / schema behavior, so these factories supply
 # spec-compliant defaults and let callers override per field.
 
+# Stub referring_clinician_id for schema-validation tests that never
+# hit the DB. Real round-trip tests pass an actual Clinician's id.
+_STUB_REFERRING_CLINICIAN_ID = uuid.UUID("00000000-0000-0000-0000-000000000002")
+
 _REFERRAL_DEFAULTS: dict[str, Any] = {
     "subject": None,
     "location_city": "Springfield",
@@ -71,6 +75,10 @@ _REFERRAL_DEFAULTS: dict[str, Any] = {
     "treatment_modality": None,
     "network_preference": "in_network_required",
     "insurance_carrier": None,
+    # ORM factory default: nullable. Wire payload adds the stub UUID
+    # explicitly in `referral_payload()` below — same pattern as
+    # `opening_payload` and `clinician_id`.
+    "referring_clinician_id": None,
 }
 
 _OPENING_DEFAULTS: dict[str, Any] = {
@@ -97,9 +105,15 @@ _OPENING_DEFAULTS: dict[str, Any] = {
 
 def referral_payload(**overrides: Any) -> dict[str, Any]:
     """Build a wire-valid `kind='referral'` create/update payload.
-    Returns a fresh dict each call. Pass overrides by field name to
-    customize."""
-    return {"kind": "referral", **_REFERRAL_DEFAULTS, **overrides}
+    Returns a fresh dict each call. `referring_clinician_id` defaults to
+    a stub UUID that passes Pydantic validation but does *not* exist in
+    the DB — tests that actually persist must pass a real id override."""
+    return {
+        "kind": "referral",
+        **_REFERRAL_DEFAULTS,
+        "referring_clinician_id": str(_STUB_REFERRING_CLINICIAN_ID),
+        **overrides,
+    }
 
 
 # Stub clinician_id for schema-validation tests that never hit the DB.

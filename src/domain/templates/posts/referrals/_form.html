@@ -39,6 +39,24 @@ which FastAPI/Pydantic parses as a list.
   {%- set _hx_attrs = "hx-target=\"this\" hx-swap=\"outerHTML\" hx-target-4xx=\"this\" hx-swap-4xx=\"outerHTML\"" -%}
   <form hx-{{ hx_method }}="{{ action }}" {{ _hx_attrs|safe }}>
     <input type="hidden" name="kind" value="referral" />
+    {# Referring clinician picker — required; populated from the
+       current user's owned clinicians. Each option value is the
+       clinician id; the label is the affiliated org name, mirroring
+       the PA form's practice-picker pattern. #}
+    <label for="referring_clinician_id">
+      Referring clinician *
+      <select id="referring_clinician_id" name="referring_clinician_id" required>
+        {%- if not d %}<option value="" disabled selected>--</option>{%- endif %}
+        {%- for c in current_user.clinicians %}
+          {%- for aff in c.affiliations %}
+            <option value="{{ c.id }}"
+                    {% if d and d.referring_clinician_id == c.id and loop.first %}selected{% endif %}>
+              {{ aff.org.name }}
+            </option>
+          {%- endfor %}
+        {%- endfor %}
+      </select>
+    </label>
     <label for="subject">
       Subject <small>(optional — leave blank to auto-generate)</small>
       <input type="text"
