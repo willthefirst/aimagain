@@ -471,18 +471,31 @@ class SeedCommands:
     def __init__(self, runner: CLIRunner):
         self.runner = runner
 
+    @staticmethod
+    def _in_container() -> bool:
+        """True when already running inside a Docker container."""
+        import os
+
+        return os.path.exists("/.dockerenv")
+
     def seed(self) -> int:
         # `dev seed` runs in a one-off `docker compose run --no-deps` container
         # that bypasses start-dev.sh, so migrations must be applied explicitly
         # here — otherwise a freshly added revision crashes seed against a
         # stale schema with a raw OperationalError.
+        #
+        # When invoked from *inside* a container (e.g. on the prod droplet via
+        # `docker exec … dev seed`), docker is not available so we skip the
+        # compose wrapper and run alembic + the seed script directly.
         from scripts.dev.migrate import run_alembic
+
+        in_container = self._in_container()
 
         print("🧱 Applying migrations before seeding...")
         rc = run_alembic(
             self.runner,
             ["upgrade", "head"],
-            mode="compose",
+            mode="host" if in_container else "compose",
             service_name=self.SERVICE_NAME,
         )
         if rc != 0:
@@ -490,9 +503,9 @@ class SeedCommands:
             return rc
 
         print("🌱 Seeding fixture users...")
-        seed_cmd = self.runner.wrap_for_compose(
-            self.SERVICE_NAME, ["python", "-m", "scripts.dev.seed"]
-        )
+        seed_cmd = ["python", "-m", "scripts.dev.seed"]
+        if not in_container:
+            seed_cmd = self.runner.wrap_for_compose(self.SERVICE_NAME, seed_cmd)
         return self.runner.run_command(seed_cmd)
 
 
