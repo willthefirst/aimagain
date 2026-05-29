@@ -68,6 +68,7 @@ class ReferralDetail(LocationMixin, Base):
     # Section 4 — services
     services = Column(JSON, nullable=False, server_default=text("'[]'"), default=list)
     treatment_modality = Column(Text, nullable=True)
+    modalities = Column(JSON, nullable=True, server_default=text("'[]'"), default=list)
 
     # Section 5 — insurance. Split into two concerns: `network_preference`
     # is the referrer's posture (mandatory / preferred / indifferent) and

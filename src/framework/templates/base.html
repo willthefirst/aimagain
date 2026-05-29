@@ -682,6 +682,68 @@
       @media (max-width: 640px) {
         .post-feed-row { padding: 0.75rem; }
       }
+
+      /* ---- Posts browse two-column layout -------------------------------- */
+      .posts-browse-layout {
+        display: flex;
+        gap: 1.5rem;
+        align-items: flex-start;
+      }
+      .posts-filter-sidebar { flex: 0 0 220px; min-width: 0; }
+      .posts-results { flex: 1 1 0; min-width: 0; }
+
+      /* Force the sidebar open on desktop — hide the <summary> toggle and
+         always show the form. On mobile the <details> stays closed by
+         default; the user taps the summary to reveal the form. */
+      @media (min-width: 641px) {
+        .posts-filter-disclosure { display: block; }
+        .posts-filter-disclosure > .posts-filter-summary { display: none; }
+      }
+      /* Narrow: stack sidebar full-width above results */
+      @media (max-width: 640px) {
+        .posts-browse-layout { flex-direction: column; }
+        .posts-filter-sidebar { flex: unset; width: 100%; }
+      }
+
+      /* Filter form internals */
+      .posts-filter-summary {
+        font-size: 0.75rem;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        font-weight: 600;
+        cursor: pointer;
+        list-style: none;
+      }
+      fieldset.posts-filter-section {
+        border: none;
+        padding: 0;
+        margin: 0 0 1rem;
+      }
+      fieldset.posts-filter-section legend {
+        font-size: 0.75rem;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        font-weight: 600;
+        padding: 0;
+        margin-bottom: 0.25rem;
+      }
+      fieldset.posts-filter-section label {
+        display: flex;
+        gap: 0.4rem;
+        align-items: center;
+        margin-bottom: 0.15rem;
+        font-size: 0.875rem;
+      }
+      .posts-filter-scroll { max-height: 130px; overflow-y: auto; }
+      .posts-filter-more > summary { font-size: 0.8rem; cursor: pointer; }
+      .posts-filter-actions {
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+        list-style: none;
+        padding: 0;
+        margin: 0;
+      }
     </style>
     <script src="https://unpkg.com/htmx.org@2.0.4"
             integrity="sha384-HGfztofotfshcF7+8n44JQL2oJmowVChPTg48S+jvZoztPfvwD79OC/LTtG6dMp+"

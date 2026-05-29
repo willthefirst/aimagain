@@ -29,8 +29,14 @@ from src.domain.models import POST_KINDS, Post
 from src.domain.models.enums import (
     CLIENT_AGE_GROUP_LABELS,
     CLIENT_AGE_GROUPS,
+    INSURANCE_CARRIER_LABELS,
+    INSURANCE_CARRIERS,
     LANGUAGE_LABELS,
     LANGUAGES,
+    TREATMENT_MODALITIES,
+    TREATMENT_MODALITY_LABELS,
+    TREATMENT_SETTINGS,
+    TREATMENT_SETTINGS_LABELS,
     US_STATES,
 )
 from src.framework.audit.core import make_audited_resource
@@ -42,7 +48,7 @@ from src.framework.dispatch.entity_spec import (
     RouteSet,
     Templates,
 )
-from src.framework.dispatch.filters import ChoiceFilter, TextFilter
+from src.framework.dispatch.filters import ChoiceFilter, FlagFilter, TextFilter
 
 POST_AUDITED_RESOURCE: Final = make_audited_resource(
     "post",
@@ -104,6 +110,38 @@ POST_ENTITY: Final[EntitySpec] = EntitySpec(
             name="language",
             label="Languages",
             choices=tuple((v, LANGUAGE_LABELS[v]) for v in LANGUAGES),
+            multi=True,
+        ),
+        TextFilter(
+            name="geography",
+            label="Location",
+            placeholder="City, state, or ZIP…",
+        ),
+        FlagFilter(
+            name="include_telehealth",
+            label="Telehealth",
+            label_checked="Include telehealth in CA",
+        ),
+        ChoiceFilter(
+            name="level_of_care",
+            label="Level of care",
+            choices=tuple(
+                (v, TREATMENT_SETTINGS_LABELS[v]) for v in TREATMENT_SETTINGS
+            ),
+            multi=True,
+        ),
+        ChoiceFilter(
+            name="modality",
+            label="Modality",
+            choices=tuple(
+                (v, TREATMENT_MODALITY_LABELS[v]) for v in TREATMENT_MODALITIES
+            ),
+            multi=True,
+        ),
+        ChoiceFilter(
+            name="insurance",
+            label="Insurance",
+            choices=tuple((v, INSURANCE_CARRIER_LABELS[v]) for v in INSURANCE_CARRIERS),
             multi=True,
         ),
     ),

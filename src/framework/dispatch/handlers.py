@@ -1018,9 +1018,13 @@ async def handle_list(
         "paginator_base_query": base_query(request),
     }
     # Filter echo — the list page's filter form preselects the active
-    # value by reading ``selected_<name>`` from the context.
+    # value by reading ``selected_<name>`` from the context. The raw
+    # dict is also injected as ``filter_values`` so list templates that
+    # render their own inline filter sidebar can read all active values
+    # in one place without unpacking each ``selected_*`` variable.
     for fname, fvalue in filter_values.items():
         context[f"selected_{fname}"] = fvalue
+    context["filter_values"] = filter_values
     declared = spec.declared_filters
     # `filters` stays for any legacy template still reading it.
     context["filters"] = declared

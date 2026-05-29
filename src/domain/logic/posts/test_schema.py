@@ -57,8 +57,11 @@ from src.domain.models.enums import (
     REFERRAL_SERVICE_ICONS,
     REFERRAL_SERVICE_LABELS,
     REFERRAL_SERVICES,
+    TREATMENT_MODALITIES,
+    TREATMENT_MODALITY_LABELS,
     TREATMENT_SETTINGS,
     TREATMENT_SETTINGS_ICONS,
+    TREATMENT_SETTINGS_LABELS,
 )
 from tests.helpers import opening_payload, referral_payload
 
@@ -959,6 +962,8 @@ def test_post_update_services_rejects_unknown_token(kind):
         (DESIRED_TIME_SLOTS, DESIRED_TIME_SLOT_LABELS),
         (REFERRAL_SERVICES, REFERRAL_SERVICE_LABELS),
         (GENDERS, GENDER_LABELS),
+        (TREATMENT_SETTINGS, TREATMENT_SETTINGS_LABELS),
+        (TREATMENT_MODALITIES, TREATMENT_MODALITY_LABELS),
     ],
 )
 def test_labels_cover_their_tuples(values, labels):
