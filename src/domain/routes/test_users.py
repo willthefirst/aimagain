@@ -543,6 +543,34 @@ async def test_users_me_shows_onboarding_create_clinician_cta_when_no_profile(
     assert "Create your clinician profile" in cta.text()
 
 
+async def test_users_me_onboarding_post_opening_cta_when_has_clinician(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user: User,
+):
+    """`GET /users/me` for a user with a clinician profile renders the
+    'Post an opening' CTA pointing at `/posts/form?kind=clinician_opening`.
+    Regression for the bug where the template called
+    `entity_form_url('opening')` after the opening entity was consolidated
+    into `/posts` — the ValueError crashed the page for any user who had
+    already created a clinician profile."""
+    clinician = make_clinician_with_org(owner_id=logged_in_user.id)
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            session.add(clinician)
+
+    response = await authenticated_client.get("/users/me")
+    assert response.status_code == 200, response.text
+    tree = HTMLParser(response.text)
+    cta = tree.css_first(
+        "section.entity-card a[href='/posts/form?kind=clinician_opening'][role='button']"
+    )
+    assert (
+        cta is not None
+    ), "onboarding card is missing 'Post an opening' CTA after having a clinician"
+    assert "Post an opening" in cta.text()
+
+
 async def test_users_me_onboarding_not_shown_for_other_users(
     authenticated_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],
