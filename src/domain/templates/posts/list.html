@@ -15,7 +15,7 @@
           Filters
           {% if active_filter_count %}({{ active_filter_count }}){% endif %}
         </summary>
-        <form method="get" action="{{ _list_url }}" class="posts-filter-form">
+        <form method="get" action="{{ _list_url }}">
           {#-- 1. Type --#}
           <fieldset class="posts-filter-section">
             <legend>Type</legend>
@@ -84,7 +84,7 @@
               {%- endif %}
             {%- endfor %}
             {%- if TREATMENT_MODALITIES | length > _cutoff %}
-              <details class="posts-filter-more">
+              <details>
                 <summary>Show all ({{ TREATMENT_MODALITIES | length }})</summary>
                 <div class="posts-filter-scroll">
                   {%- for v in TREATMENT_MODALITIES %}
