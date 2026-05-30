@@ -5,6 +5,8 @@ from types import SimpleNamespace
 import pytest
 
 from src.domain.logic.posts.view import (
+    _LIST_PASSTHROUGH,
+    _SCALAR_PASSTHROUGH,
     insurance_posture_for_post,
     post_card_view,
     post_feed_headline,
@@ -883,3 +885,57 @@ def test_feed_headline_opening_none_subject_falls_back_to_auto():
     post.opening_detail.subject = None
     headline = post_feed_headline(post)
     assert headline.startswith("Acme Counseling — ")
+
+
+# --- post_card_view: detail-row auto-forward ---------------------
+# The passthrough fields are copied off the detail row by a single
+# table-driven helper, not hand-listed per kind. These pin that
+# contract so a new passthrough field can't be silently dropped from
+# one kind's block: add it to `_SCALAR_PASSTHROUGH` / `_LIST_PASSTHROUGH`
+# and it forwards for every kind that has the attribute.
+
+
+@pytest.mark.parametrize(
+    "make_post",
+    [_make_cr_post, _make_pa_post, _make_program_post],
+    ids=["referral", "opening", "intake"],
+)
+def test_passthrough_keys_present_for_every_kind(make_post):
+    """Every declared passthrough field surfaces in the view for every
+    kind — scalars as a value-or-None key, lists as a (possibly empty)
+    list. `genders` is excluded: referral overrides it from its single
+    `gender` column, so its forwarded value is recomputed downstream."""
+    v = post_card_view(make_post())
+    for view_key in _SCALAR_PASSTHROUGH:
+        assert view_key in v
+    for view_key in _LIST_PASSTHROUGH:
+        assert isinstance(v[view_key], list)
+
+
+def test_passthrough_forwards_detail_values_for_opening():
+    """An opening's detail-row scalars/lists land on the view verbatim,
+    proving the helper reads the right attributes (no rename drift)."""
+    v = post_card_view(
+        _make_pa_post(
+            description="Forwarded description",
+            schedule_text="Forwarded schedule",
+            treatment_modality="ACT",
+            services=["psychotherapy", "group_therapy"],
+            settings=["group"],
+        )
+    )
+    assert v["description"] == "Forwarded description"
+    assert v["schedule_text"] == "Forwarded schedule"
+    assert v["treatment_modality"] == "ACT"
+    assert v["services"] == ["psychotherapy", "group_therapy"]
+    assert v["settings"] == ["group"]
+
+
+def test_passthrough_missing_attr_falls_back_to_base_default():
+    """A referral detail row has no `settings` / `schedule_text`
+    columns. The helper uses `getattr(..., None)`, so those keep the
+    base defaults (`[]` for lists, `None` for scalars) rather than
+    raising — that's why referral can share the same forwarding pass."""
+    v = post_card_view(_make_cr_post())
+    assert v["settings"] == []
+    assert v["schedule_text"] is None
