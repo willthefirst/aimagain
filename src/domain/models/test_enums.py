@@ -124,6 +124,25 @@ MIGRATED_VALUES = {
     ),
     # Value-only vocabulary — labels fall back to the storage value.
     e.VerificationStatus: ("verified", "needs_review", "failed"),
+    e.ClientAgeGroup: (
+        "children_0_5",
+        "children_6_10",
+        "preteens_11_13",
+        "adolescents_14_18",
+        "young_adults_19_24",
+        "adults_25_64",
+        "older_adults_65_plus",
+    ),
+    e.DesiredTimeDay: (
+        "monday",
+        "tuesday",
+        "wednesday",
+        "thursday",
+        "friday",
+        "saturday",
+        "sunday",
+    ),
+    e.DesiredTimePart: ("am", "pm"),
 }
 
 # Aliases that must equal the class derivation. (alias, class, kind).
@@ -159,6 +178,17 @@ ALIAS_BINDINGS = [
     (e.CERTIFICATION_TYPES_LABELS, e.CertificationType, "labels"),
     # Value-only — only a values alias exists (no `*_LABELS` dict).
     (e.VERIFICATION_STATUSES, e.VerificationStatus, "values"),
+    # Multi-attribute vocabularies — the standard-kind aliases still bind to
+    # `.values()` / `.labels()` / `.icons()`; the extra-attribute derivations
+    # (`*_BY_KEY`, `*_SINGULAR`, `*_SHORT_LABELS`, composite slots) are pinned
+    # in dedicated tests below.
+    (e.CLIENT_AGE_GROUPS, e.ClientAgeGroup, "values"),
+    (e.CLIENT_AGE_GROUP_LABELS, e.ClientAgeGroup, "labels"),
+    (e.CLIENT_AGE_GROUP_ICONS, e.ClientAgeGroup, "icons"),
+    (e.DESIRED_TIME_DAYS, e.DesiredTimeDay, "values"),
+    (e.DESIRED_TIME_DAY_LABELS, e.DesiredTimeDay, "labels"),
+    (e.DESIRED_TIME_PARTS, e.DesiredTimePart, "values"),
+    (e.DESIRED_TIME_PART_LABELS, e.DesiredTimePart, "labels"),
 ]
 
 
@@ -181,3 +211,45 @@ def test_alias_equals_class_derivation(alias, cls, kind):
 def test_icon_bearing_vocabularies_have_an_icon_per_member():
     for cls in (e.ReferralService, e.TreatmentSetting, e.InsurancePosture):
         assert all(icon is not None for icon in cls.icons().values())
+
+
+# --- Multi-attribute vocabularies ---------------------------------------
+# `ClientAgeGroup` / `DesiredTimeDay` carry display facts beyond
+# value+label+icon. The derivations below aren't `.values()`/`.labels()`/
+# `.icons()`, so they're pinned here rather than in `ALIAS_BINDINGS`.
+
+
+def test_client_age_group_carries_singular_plural_range():
+    g = e.ClientAgeGroup.children_0_5
+    assert (g.singular, g.plural, g.range) == ("Child", "Children", "0–5")
+    # `.label` is the plural+range form; `.label_singular` the singular+range.
+    assert g.label == "Children (0–5)"
+    assert g.label_singular == "Child (0–5)"
+
+
+def test_client_age_group_by_key_returns_members_with_attrs():
+    assert set(e.CLIENT_AGE_GROUPS_BY_KEY) == set(e.CLIENT_AGE_GROUPS)
+    m = e.CLIENT_AGE_GROUPS_BY_KEY["older_adults_65_plus"]
+    assert m is e.ClientAgeGroup.older_adults_65_plus
+    assert (m.singular, m.range) == ("Older adult", "65+")
+
+
+def test_client_age_group_singular_labels_derive_from_members():
+    assert e.CLIENT_AGE_GROUP_LABELS_SINGULAR == {
+        m.value: m.label_singular for m in e.ClientAgeGroup
+    }
+
+
+def test_desired_time_day_short_labels_derive_from_members():
+    assert e.DESIRED_TIME_DAY_SHORT_LABELS == {
+        m.value: m.short_label for m in e.DesiredTimeDay
+    }
+    assert e.DesiredTimeDay.thursday.short_label == "Th"
+
+
+def test_desired_time_slots_are_the_day_part_cross_product():
+    assert e.DESIRED_TIME_SLOTS == tuple(
+        f"{day}_{part}" for day in e.DESIRED_TIME_DAYS for part in e.DESIRED_TIME_PARTS
+    )
+    assert e.DESIRED_TIME_SLOT_LABELS["monday_am"] == "Monday AM"
+    assert set(e.DESIRED_TIME_SLOT_LABELS) == set(e.DESIRED_TIME_SLOTS)
