@@ -34,13 +34,6 @@ from src.domain.logic.posts.schema import (
     post_update_adapter,
 )
 from src.domain.models.enums import (
-    CLIENT_AGE_GROUP_ICONS,
-    CLIENT_AGE_GROUP_LABELS,
-    CLIENT_AGE_GROUP_LABELS_SINGULAR,
-    CLIENT_AGE_GROUPS,
-    CLIENT_AGE_GROUPS_BY_KEY,
-    DESIRED_TIME_SLOT_LABELS,
-    DESIRED_TIME_SLOTS,
     GENDERS,
     INSURANCE_CARRIERS,
     LOCATION_AVAILABILITY_OPTIONS,
@@ -929,45 +922,7 @@ def test_post_update_services_rejects_unknown_token(kind):
         post_update_adapter.validate_python({"kind": kind, "services": ["telekinesis"]})
 
 
-# --- Display labels cover their value tuples ----------------------------
-
-
-@pytest.mark.parametrize(
-    "values,labels",
-    [
-        (CLIENT_AGE_GROUPS, CLIENT_AGE_GROUP_LABELS),
-        (CLIENT_AGE_GROUPS, CLIENT_AGE_GROUP_LABELS_SINGULAR),
-        (CLIENT_AGE_GROUPS, CLIENT_AGE_GROUPS_BY_KEY),
-        (DESIRED_TIME_SLOTS, DESIRED_TIME_SLOT_LABELS),
-    ],
-)
-def test_labels_cover_their_tuples(values, labels):
-    """Each legacy `*_LABELS` dict in `src/domain/models/enums.py` must
-    have a label for every value in its corresponding tuple. The
-    form-render macro looks labels up by value; an unmapped value would
-    render with a `KeyError` at request time. Catching it here keeps the
-    failure mode loud and offline. Vocabularies migrated to
-    `LabeledChoice` don't need this guard — their `*_LABELS` derives from
-    the same class as their values, so they can't drift."""
-    assert set(labels) == set(values)
-
-
-# --- Listing-row icons cover their value tuples -------------------------
-
-
-@pytest.mark.parametrize(
-    "values,icons",
-    [
-        (CLIENT_AGE_GROUPS, CLIENT_AGE_GROUP_ICONS),
-    ],
-)
-def test_icons_cover_their_tuples(values, icons):
-    """Each legacy `*_ICONS` dict in `src/domain/models/enums.py` must
-    have an icon name for every value in its corresponding tuple. The row
-    macro (`src/domain/templates/posts/_item.html`) looks icons up by
-    value; a missing key would render as `<i class="icon-">` (no glyph)
-    at request time. Catching it here keeps the failure mode loud and
-    offline — same pattern as `test_labels_cover_their_tuples` above.
-    Vocabularies migrated to `LabeledChoice` declare the icon on the
-    member, so `Cls.icons()` can't drift from the value set."""
-    assert set(icons) == set(values)
+# Label/icon coverage for every vocabulary — including the multi-attribute
+# `ClientAgeGroup` / `DesiredTime*` — is pinned centrally in
+# `src/domain/models/test_enums.py`, since each `*_LABELS` / `*_ICONS` dict now
+# derives from its `LabeledChoice` class and so can't drift from the value set.
