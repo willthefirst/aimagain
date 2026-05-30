@@ -6,7 +6,7 @@
 {% macro filter_form(list_url, filter_values) %}
   <form method="get" action="{{ list_url }}">
     {#-- 1. Type --#}
-    <fieldset class="posts-filter-section">
+    <fieldset>
       <legend>Type</legend>
       {%- for v, l in (
         ("referral",          "Client referrals"),
@@ -23,16 +23,16 @@
       {%- endfor %}
     </fieldset>
     {#-- 2. Location --#}
-    <fieldset class="posts-filter-section">
+    <fieldset>
       <legend>Location</legend>
-      <label style="flex-direction: column; align-items: stretch;">
+      <label>
         City
         <input type="search"
                name="city"
                value="{{ filter_values.get('city') or '' }}"
                placeholder="e.g. Portland" />
       </label>
-      <label style="flex-direction: column; align-items: stretch;">
+      <label>
         State
         <select name="state">
           <option value="">Any</option>
@@ -44,7 +44,7 @@
       </label>
     </fieldset>
     {#-- 3. Level of care (openings/intakes only) --#}
-    <fieldset class="posts-filter-section">
+    <fieldset>
       <legend>Level of care</legend>
       {%- for v in TREATMENT_SETTINGS %}
         <label>
@@ -57,7 +57,7 @@
       {%- endfor %}
     </fieldset>
     {#-- 4. Modality --#}
-    <fieldset class="posts-filter-section">
+    <fieldset>
       <legend>Modality</legend>
       {%- set modality_active = filter_values.get("modality") or [] %}
       {%- for v in TREATMENT_MODALITIES %}
@@ -71,7 +71,7 @@
       {%- endfor %}
     </fieldset>
     {#-- 5. Populations (age_group) --#}
-    <fieldset class="posts-filter-section">
+    <fieldset>
       <legend>Populations</legend>
       {%- for v in CLIENT_AGE_GROUPS %}
         <label>
@@ -84,7 +84,7 @@
       {%- endfor %}
     </fieldset>
     {#-- 6. Insurance --#}
-    <fieldset class="posts-filter-section">
+    <fieldset>
       <legend>Insurance</legend>
       {%- for v in INSURANCE_CARRIERS %}
         <label>
@@ -96,7 +96,7 @@
         </label>
       {%- endfor %}
     </fieldset>
-    <menu class="posts-filter-actions">
+    <menu>
       <li>
         <button type="submit">Apply filters</button>
       </li>
