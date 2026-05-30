@@ -1,0 +1,3 @@
+# Dev-only templates contain fixture data that represents arbitrary
+# user-generated content. Title-case rules don't apply.
+*.html
