@@ -157,7 +157,7 @@ async def test_search_uses_shared_filter_form(
     logged_in_user,
 ):
     """`/posts/search` renders the same custom filter form component as the
-    list-page sidebar — `posts-filter-section` fieldsets for Type, Location,
+    list-page sidebar — `posts-filter-section` fieldsets for Kind, Location,
     Level of care, Modality, Populations, and Insurance — not the generic
     framework search form (`search-checkbox-fieldset`)."""
     response = await authenticated_client.get("/posts/search")
@@ -166,7 +166,7 @@ async def test_search_uses_shared_filter_form(
     sections = tree.css("fieldset.posts-filter-section")
     legends = [s.css_first("legend").text(strip=True) for s in sections]
     assert legends == [
-        "Type",
+        "Kind",
         "Location",
         "Level of care",
         "Modality",
@@ -193,7 +193,7 @@ async def test_list_sidebar_uses_shared_filter_form(
     sections = sidebar.css("fieldset.posts-filter-section")
     legends = [s.css_first("legend").text(strip=True) for s in sections]
     assert legends == [
-        "Type",
+        "Kind",
         "Location",
         "Level of care",
         "Modality",
