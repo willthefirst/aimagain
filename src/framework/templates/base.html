@@ -91,10 +91,7 @@
          would be excluded. Icons that genuinely need no trailing
          space (icon-only buttons, etc.) should override locally. */
       [class^="icon-"], [class*=" icon-"] {
-        font-size: 1.1em;
-        vertical-align: -0.05em;
-        line-height: 1;
-        color: inherit;
+        vertical-align: bottom;
         margin-inline-end: 0.25em;
       }
       /* `<ul class="glyph-list">` (rendered by the shared `icon_list`
@@ -689,7 +686,6 @@
         margin: 0 0.4em;
       }
       @media (max-width: 576px) {
-        .post-feed-type-tag,
         .post-feed-byline {
           flex-basis: 100%;
         }
@@ -723,11 +719,13 @@
       .post-feed-meta {
         display: flex;
         flex-wrap: wrap;
+        gap: 0 1em;
         color: var(--pico-muted-color);
       }
-      .post-feed-meta > span + span::before {
-        content: "·";
-        margin: 0 0.4em;
+      @media (max-width: 576px) {
+        .post-feed-meta {
+          flex-direction: column;
+        }
       }
       /* Empty state */
       .post-feed-empty { text-align: center; padding: 2rem 1rem; color: var(--pico-muted-color); }

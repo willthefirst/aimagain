@@ -378,24 +378,6 @@ INSURANCE_POSTURES: Final[tuple[str, ...]] = InsurancePosture.values()
 INSURANCE_POSTURE_LABELS: Final[dict[str, str]] = InsurancePosture.labels()
 
 
-# --- Lucide icon names ------------------------------------------------
-#
-# Icon names are keyed by the enum storage value. Values are Lucide icon
-# names (`lucide-static` font CSS exposes them as `<i class="icon-<name>">`);
-# the row macro in `src/domain/templates/posts/_item.html` emits the `<i>` tag.
-# Every vocabulary declares the icon on the `LabeledChoice` member, so
-# `Cls.icons()` is the dict — no separate structure to keep in lockstep.
-#
-# Multiple enum values may share an icon when the visual signal at
-# scan distance is the same — e.g. children_0_5 and children_6_10 both
-# read as "kid" in the row. The detail page still distinguishes via
-# `CLIENT_AGE_GROUP_LABELS`.
-CLIENT_AGE_GROUP_ICONS: Final[dict[str, str | None]] = ClientAgeGroup.icons()
-REFERRAL_SERVICE_ICONS: Final[dict[str, str]] = ReferralService.icons()
-TREATMENT_SETTINGS_ICONS: Final[dict[str, str]] = TreatmentSetting.icons()
-INSURANCE_POSTURE_ICONS: Final[dict[str, str]] = InsurancePosture.icons()
-
-
 # Organization kind. CHECK'd at the table level — empty-tuple growth
 # isn't a concern (the five tokens cover the directory's organization
 # universe today; expanding it means adding one member).

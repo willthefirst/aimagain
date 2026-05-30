@@ -27,3 +27,22 @@ Example:
 {# The Save / Cancel / Delete cluster at the bottom of every entity
 create/edit form lives in `_shared/actions.html::actions` (renamed from
 the former `form_actions`). Import from there. #}
+{# Single checkbox + label row for filter fieldsets.
+
+   Example:
+     {{ filter_checkbox('kind', v, l, checked=(v in active)) }}
+#}
+{% macro filter_checkbox(name, value, label, checked=False) %}
+  {# djlint:off #}<label><input type="checkbox" name="{{ name }}" value="{{ value }}"{% if checked %} checked{% endif %} />{{ label }}</label>{# djlint:on #}
+{% endmacro %}
+{# Fieldset legend with a leading Lucide icon.
+   djlint reformats <legend> as a block element, adding newlines that
+   render as visible whitespace before the icon. The pragma lives here
+   once so call sites stay clean.
+
+   Example:
+     {{ icon_legend("map-pin", "Location") }}
+#}
+{% macro icon_legend(icon, text) %}
+  {# djlint:off #}<legend><i class="icon-{{ icon }}"></i>{{ text }}</legend>{# djlint:on #}
+{% endmacro %}
