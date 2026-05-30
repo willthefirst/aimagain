@@ -73,14 +73,13 @@ under the "Feed rows" section. #}
 {%- if view.in_person == "yes" -%}{%- set _ = _mod.append("In-person") -%}{%- endif -%}
 {%- if view.virtual == "yes" -%}{%- set _ = _mod.append("Telehealth") -%}{%- endif -%}
 {%- if _mod -%}
-<span>{{ _mod | join(" · ") }}</span>
+<span><i class="icon-monitor"></i>{{ _mod | join(" · ") }}</span>
 {%- endif -%}
 {%- else -%}
 {%- if view.settings -%}
-<span>
+<span><i class="icon-layers"></i>
 {%- for s in view.settings[:3] -%}
-{%- if not loop.first %} ·
-{% endif -%}
+{%- if not loop.first %} · {% endif -%}
 {{ TREATMENT_SETTINGS_LABELS[s] }}
 {%- endfor -%}
 </span>
@@ -89,25 +88,23 @@ under the "Feed rows" section. #}
 {# Item 3 ── Insurance #}
 {%- if post.kind == "referral" -%}
 {%- if view.insurance_carrier -%}
-<span>{{ INSURANCE_CARRIER_LABELS[view.insurance_carrier] }}</span>
+<span><i class="icon-shield"></i>{{ INSURANCE_CARRIER_LABELS[view.insurance_carrier] }}</span>
 {%- elif view.network_preference == "no_preference" -%}
-<span>No insurance req.</span>
+<span><i class="icon-shield"></i>No insurance req.</span>
 {%- endif -%}
 {%- else -%}
 {%- if view.in_network_carriers -%}
-<span>
+<span><i class="icon-shield"></i>
 {%- for c in view.in_network_carriers[:2] -%}
-{%- if not loop.first %},
-{% endif -%}
+{%- if not loop.first %}, {% endif -%}
 {{ INSURANCE_CARRIER_LABELS[c] }}
 {%- endfor -%}
-{%- if view.in_network_carriers | length > 2 %} +{{ view.in_network_carriers | length - 2 }}
-{% endif -%}
+{%- if view.in_network_carriers | length > 2 %} +{{ view.in_network_carriers | length - 2 }}{% endif -%}
 </span>
 {%- elif view.accepts_out_of_network -%}
-<span>Out-of-network</span>
+<span><i class="icon-shield"></i>Out-of-network</span>
 {%- elif view.sliding_scale -%}
-<span>Sliding scale</span>
+<span><i class="icon-shield"></i>Sliding scale</span>
 {%- endif -%}
 {%- endif -%}
 </div>

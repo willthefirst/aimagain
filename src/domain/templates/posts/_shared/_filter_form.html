@@ -24,7 +24,7 @@
     </fieldset>
     {#-- 2. Location --#}
     <fieldset class="posts-filter-section">
-      <legend>Location</legend>
+      <legend><i class="icon-map-pin"></i>Location</legend>
       <label>
         City
         <input type="search"
@@ -45,7 +45,7 @@
     </fieldset>
     {#-- 3. Level of care (openings/intakes only) --#}
     <fieldset class="posts-filter-section">
-      <legend>Level of care</legend>
+      <legend><i class="icon-layers"></i>Level of care</legend>
       {%- for v in TREATMENT_SETTINGS %}
         <label>
           <input type="checkbox"
@@ -85,7 +85,7 @@
     </fieldset>
     {#-- 6. Insurance --#}
     <fieldset class="posts-filter-section">
-      <legend>Insurance</legend>
+      <legend><i class="icon-shield"></i>Insurance</legend>
       {%- for v in INSURANCE_CARRIERS %}
         <label>
           <input type="checkbox"
