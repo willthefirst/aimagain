@@ -152,6 +152,56 @@ async def test_search_form_renders_kind_filter(
     assert {"referral", "clinician_opening", "program_intake"} <= values
 
 
+async def test_search_uses_shared_filter_form(
+    authenticated_client: AsyncClient,
+    logged_in_user,
+):
+    """`/posts/search` renders the same custom filter form component as the
+    list-page sidebar — `posts-filter-section` fieldsets for Type, Location,
+    Level of care, Modality, Populations, and Insurance — not the generic
+    framework search form (`search-checkbox-fieldset`)."""
+    response = await authenticated_client.get("/posts/search")
+    assert response.status_code == 200
+    tree = HTMLParser(response.text)
+    sections = tree.css("fieldset.posts-filter-section")
+    legends = [s.css_first("legend").text(strip=True) for s in sections]
+    assert legends == [
+        "Type",
+        "Location",
+        "Level of care",
+        "Modality",
+        "Populations",
+        "Insurance",
+    ], f"Unexpected filter sections on /posts/search: {legends}"
+    # Generic framework fieldset class must not appear — the shared macro owns the form.
+    assert not tree.css(
+        "fieldset.search-checkbox-fieldset"
+    ), "/posts/search should not render the generic framework search form"
+
+
+async def test_list_sidebar_uses_shared_filter_form(
+    authenticated_client: AsyncClient,
+    logged_in_user,
+):
+    """`/posts` list sidebar renders the same `posts-filter-section` fieldsets
+    as `/posts/search`, confirming both surfaces share the same component."""
+    response = await authenticated_client.get("/posts")
+    assert response.status_code == 200
+    tree = HTMLParser(response.text)
+    sidebar = tree.css_first(".posts-filter-sidebar")
+    assert sidebar, "/posts did not render a .posts-filter-sidebar element"
+    sections = sidebar.css("fieldset.posts-filter-section")
+    legends = [s.css_first("legend").text(strip=True) for s in sections]
+    assert legends == [
+        "Type",
+        "Location",
+        "Level of care",
+        "Modality",
+        "Populations",
+        "Insurance",
+    ], f"Unexpected filter sections in /posts sidebar: {legends}"
+
+
 # --- List filter: ?kind= narrows the feed --------------------------------
 
 
