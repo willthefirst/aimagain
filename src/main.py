@@ -4,6 +4,7 @@ from datetime import datetime, timedelta, timezone
 
 from fastapi import Depends, FastAPI, HTTPException, Request, status
 from fastapi.responses import JSONResponse, RedirectResponse
+from fastapi.staticfiles import StaticFiles
 
 from src.auth_config import (
     auth_backend,
@@ -211,6 +212,15 @@ for _, _router in entity_registry.entries():
 # without monkeypatching the global `app` instance. See
 # `src/domain/routes/dev_auth.py` for the full security rationale.
 dev_auth.mount_dev_routes(app, environment=settings.ENVIRONMENT)
+
+# Static assets. Two mounts keep the framework/domain CSS boundary
+# visible at the URL level — framework primitives at /static/fw/,
+# site-specific styles at /static/domain/. Both directories are under
+# src/ so the files live next to the code they describe.
+app.mount("/static/fw", StaticFiles(directory="src/framework/static"), name="static_fw")
+app.mount(
+    "/static/domain", StaticFiles(directory="src/domain/static"), name="static_domain"
+)
 
 
 @app.get("/health")
