@@ -680,6 +680,17 @@
         content: "·";
         margin-right: 0.4em;
       }
+      @media (max-width: 576px) {
+        .post-feed-header {
+          display: flex;
+          flex-wrap: wrap;
+          align-items: center;
+          gap: 0.25em;
+        }
+        .post-feed-header > .post-feed-type-tag {
+          flex-basis: 100%;
+        }
+      }
       /* Headline link */
       .post-feed-headline-text { display: block; }
       /* Type-tag pill */
