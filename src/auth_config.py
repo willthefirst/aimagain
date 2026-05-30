@@ -103,7 +103,9 @@ async def get_user_manager(user_db: SQLAlchemyUserDatabase = Depends(get_user_db
     yield UserManager(user_db)
 
 
-transport = CookieTransport()
+transport = CookieTransport(
+    cookie_secure=settings.ENVIRONMENT != "development",
+)
 
 
 def get_strategy() -> JWTStrategy:
