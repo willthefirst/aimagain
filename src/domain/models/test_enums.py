@@ -79,6 +79,51 @@ MIGRATED_VALUES = {
         "self_pay",
         "please_contact",
     ),
+    e.OrganizationType: (
+        "solo_practice",
+        "group_practice",
+        "clinic",
+        "health_system",
+        "other",
+    ),
+    e.LicenseType: (
+        "lcsw",
+        "lpc",
+        "lmft",
+        "lmhc",
+        "lcpc",
+        "psyd",
+        "phd",
+        "md",
+        "do",
+        "np",
+        "pmhnp",
+        "other",
+    ),
+    e.EducationType: (
+        "ba_bs",
+        "ma_ms",
+        "msw",
+        "phd",
+        "psyd",
+        "md",
+        "do",
+        "edd",
+        "other",
+    ),
+    e.CertificationType: (
+        "emdr",
+        "dbt",
+        "cbt",
+        "gottman_1",
+        "gottman_2",
+        "gottman_3",
+        "cpr",
+        "ccatp",
+        "other",
+    ),
+    # Value-only vocabulary — labels fall back to the storage value.
+    e.VerificationStatus: ("verified", "needs_review", "failed"),
 }
 
 # Aliases that must equal the class derivation. (alias, class, kind).
@@ -104,6 +149,16 @@ ALIAS_BINDINGS = [
     (e.INSURANCE_POSTURES, e.InsurancePosture, "values"),
     (e.INSURANCE_POSTURE_LABELS, e.InsurancePosture, "labels"),
     (e.INSURANCE_POSTURE_ICONS, e.InsurancePosture, "icons"),
+    (e.ORGANIZATION_TYPES, e.OrganizationType, "values"),
+    (e.ORGANIZATION_TYPES_LABELS, e.OrganizationType, "labels"),
+    (e.LICENSE_TYPES, e.LicenseType, "values"),
+    (e.LICENSE_TYPES_LABELS, e.LicenseType, "labels"),
+    (e.EDUCATION_TYPES, e.EducationType, "values"),
+    (e.EDUCATION_TYPES_LABELS, e.EducationType, "labels"),
+    (e.CERTIFICATION_TYPES, e.CertificationType, "values"),
+    (e.CERTIFICATION_TYPES_LABELS, e.CertificationType, "labels"),
+    # Value-only — only a values alias exists (no `*_LABELS` dict).
+    (e.VERIFICATION_STATUSES, e.VerificationStatus, "values"),
 ]
 
 
