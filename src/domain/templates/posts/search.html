@@ -1,2 +1,4 @@
 {% extends "views/search.html" %}
+{%- from "posts/_shared/_filter_form.html" import filter_form -%}
 {% block resource_label %}Posts{% endblock %}
+{% block content %}{{ filter_form(list_action, filter_values) }}{% endblock %}
