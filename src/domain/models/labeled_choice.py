@@ -39,6 +39,12 @@ A vocabulary with no display labels (a status enum) declares value-only members;
         verified = "verified"
         failed = "failed"
 
+A vocabulary whose display facts are richer than value+label+icon (a cohort
+with a singular/plural noun and a numeric range, a weekday with both a long and
+a short label) subclasses with its own `__new__` that attaches the extra
+attributes — and still sets `label`/`icon` so the derived artifacts stay total.
+See `ClientAgeGroup` / `DesiredTimeDay` in `enums.py`.
+
 A *leaf* — imports only the stdlib — so any model cluster can import it without
 cycling, same as `enums.py`.
 """

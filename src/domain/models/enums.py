@@ -1,34 +1,21 @@
-"""Controlled-vocabulary tuples (Text+CHECK columns); paired *_LABELS dicts.
+"""Controlled-vocabulary `LabeledChoice` classes; derived tuple/dict aliases.
 
-Vocabularies are migrating onto `LabeledChoice` (see `labeled_choice.py`): the
-class declares value + label + optional icon per member, and the historical
+Every labeled vocabulary is a `LabeledChoice` subclass (see `labeled_choice.py`):
+the class declares value + label + optional icon per member, and the historical
 `FOO` / `FOO_LABELS` / `FOO_ICONS` names are kept as derived aliases
 (`Cls.values()` / `.labels()` / `.icons()`) so every downstream consumer stays
-unchanged. Vocabularies not yet migrated keep the legacy parallel
-tuple-plus-dict shape.
+unchanged. Vocabularies whose display facts are richer than value+label+icon
+(`ClientAgeGroup`, `DesiredTimeDay`) subclass with a custom `__new__` that
+attaches the extra attributes; their derived dicts read those off the members.
+
+`US_STATES` is the one plain tuple left: the value (USPS abbreviation) is its
+own user-facing label, so there's nothing to single-source — one structure, no
+parallel dict to drift from.
 """
 
-from typing import Final, NamedTuple
+from typing import Final
 
 from src.domain.models.labeled_choice import LabeledChoice
-
-
-class AgeGroup(NamedTuple):
-    """Display facts for a `CLIENT_AGE_GROUPS` token.
-
-    One row per age token, three columns: the singular noun (for CR
-    reads — one client), the plural noun (for PA reads — a cohort,
-    plus the filter dropdown / form checkbox vocabulary), and the
-    numeric range. The CR card's headline composer in
-    `domain/logic/posts/view.py` reads `singular` + `range` directly;
-    label dicts further down derive `"<noun> (<range>)"` for the read
-    paths that want a single ready-to-render string.
-    """
-
-    singular: str
-    plural: str
-    range: str
-
 
 US_STATES: Final[tuple[str, ...]] = (
     "AL",
@@ -92,15 +79,62 @@ class LocationAvailability(LabeledChoice):
 
 
 LOCATION_AVAILABILITY_OPTIONS: Final[tuple[str, ...]] = LocationAvailability.values()
-CLIENT_AGE_GROUPS: Final[tuple[str, ...]] = (
-    "children_0_5",
-    "children_6_10",
-    "preteens_11_13",
-    "adolescents_14_18",
-    "young_adults_19_24",
-    "adults_25_64",
-    "older_adults_65_plus",
-)
+
+
+# Client age cohorts. Richer than value+label+icon: each member carries a
+# singular noun, a plural noun, and a numeric range. The CR card's headline
+# composer in `domain/logic/posts/view.py` reads `.singular` + `.range`
+# directly ("<noun> <gender> (<range>)"); `.label` is the plural+range form
+# ("Children (0–5)") for PA listing rows and the filter dropdown, and
+# `.label_singular` is the singular+range form. Multiple members may share an
+# icon when they read the same at scan distance (children_0_5 / children_6_10).
+class ClientAgeGroup(LabeledChoice):
+    singular: str
+    plural: str
+    range: str
+    label_singular: str
+
+    children_0_5 = "children_0_5", "Child", "Children", "0–5", "baby"
+    children_6_10 = "children_6_10", "Child", "Children", "6–10", "baby"
+    preteens_11_13 = "preteens_11_13", "Preteen", "Preteens", "11–13", "graduation-cap"
+    adolescents_14_18 = (
+        "adolescents_14_18",
+        "Adolescent",
+        "Adolescents",
+        "14–18",
+        "graduation-cap",
+    )
+    young_adults_19_24 = (
+        "young_adults_19_24",
+        "Young adult",
+        "Young adults",
+        "19–24",
+        "user",
+    )
+    adults_25_64 = "adults_25_64", "Adult", "Adults", "25–64", "user"
+    older_adults_65_plus = (
+        "older_adults_65_plus",
+        "Older adult",
+        "Older adults",
+        "65+",
+        "user-round",
+    )
+
+    def __new__(
+        cls, value: str, singular: str, plural: str, range_: str, icon: str
+    ) -> "ClientAgeGroup":
+        obj = str.__new__(cls, value)
+        obj._value_ = value
+        obj.singular = singular
+        obj.plural = plural
+        obj.range = range_
+        obj.icon = icon
+        obj.label = f"{plural} ({range_})"
+        obj.label_singular = f"{singular} ({range_})"
+        return obj
+
+
+CLIENT_AGE_GROUPS: Final[tuple[str, ...]] = ClientAgeGroup.values()
 
 
 # Spoken-language tokens used by the multi-valued `languages` field on
@@ -152,22 +186,44 @@ class InsuranceCarrier(LabeledChoice):
 
 INSURANCE_CARRIERS: Final[tuple[str, ...]] = InsuranceCarrier.values()
 
+
 # Day × time-of-day grid for "when are you available". 14 tokens of the
 # form `<day>_<part>`. Day order is Mon→Sun (week-of-work convention from
 # the form spec); part order is am→pm so the rendered grid reads
 # left-to-right (am, pm columns) top-to-bottom (Mon→Sun rows). The two
-# axis tuples are exposed alongside the combined token list because the
-# form-render macro iterates the grid by (day row × part column).
-DESIRED_TIME_DAYS: Final[tuple[str, ...]] = (
-    "monday",
-    "tuesday",
-    "wednesday",
-    "thursday",
-    "friday",
-    "saturday",
-    "sunday",
-)
-DESIRED_TIME_PARTS: Final[tuple[str, ...]] = ("am", "pm")
+# axes are their own vocabularies; the combined slot tuple/labels below
+# derive from them so the grid stays single-sourced.
+#
+# `DesiredTimeDay` carries two labels: `.label` is the long form (read
+# views, slot labels) and `.short_label` is the one/two-char row header for
+# the compact `time_grid_field` checkbox grid (M/T/W/Th/F/Sat/Sun).
+class DesiredTimeDay(LabeledChoice):
+    short_label: str
+
+    monday = "monday", "Monday", "M"
+    tuesday = "tuesday", "Tuesday", "T"
+    wednesday = "wednesday", "Wednesday", "W"
+    thursday = "thursday", "Thursday", "Th"
+    friday = "friday", "Friday", "F"
+    saturday = "saturday", "Saturday", "Sat"
+    sunday = "sunday", "Sunday", "Sun"
+
+    def __new__(cls, value: str, label: str, short_label: str) -> "DesiredTimeDay":
+        obj = str.__new__(cls, value)
+        obj._value_ = value
+        obj.label = label
+        obj.short_label = short_label
+        obj.icon = None
+        return obj
+
+
+class DesiredTimePart(LabeledChoice):
+    am = "am", "AM"
+    pm = "pm", "PM"
+
+
+DESIRED_TIME_DAYS: Final[tuple[str, ...]] = DesiredTimeDay.values()
+DESIRED_TIME_PARTS: Final[tuple[str, ...]] = DesiredTimePart.values()
 DESIRED_TIME_SLOTS: Final[tuple[str, ...]] = tuple(
     f"{day}_{part}" for day in DESIRED_TIME_DAYS for part in DESIRED_TIME_PARTS
 )
@@ -250,72 +306,37 @@ TREATMENT_MODALITIES: Final[tuple[str, ...]] = TreatmentModality.values()
 #
 # The form-render macro in
 # `src/framework/templates/_shared/form_fields.html` looks up labels via these
-# `*_LABELS` dicts; missing keys fail at render time. Migrated vocabularies
-# derive their dict from the `LabeledChoice` class (`Cls.labels()`), so the
-# label can't drift from its value — the legacy vocabularies below still pair a
-# hand-written dict with a tuple, guarded by `test_labels_cover_their_tuples` in
-# `src/domain/logic/posts/test_schema.py`.
+# `*_LABELS` dicts; missing keys fail at render time. Every dict derives from a
+# `LabeledChoice` class (`Cls.labels()`, or a comprehension over the members for
+# the richer vocabularies), so the label can't drift from its value.
 #
 # `US_STATES` deliberately has no label dict — the value (USPS
 # abbreviation) is the right user-facing label.
 
 LOCATION_AVAILABILITY_LABELS: Final[dict[str, str]] = LocationAvailability.labels()
-# One AgeGroup row per `CLIENT_AGE_GROUPS` token, carrying every
-# display fact (singular noun, plural noun, numeric range). All other
-# dicts derive from this — adding a value means editing one row, not
-# six. The `*_LABELS` / `*_LABELS_SINGULAR` derivations are kept so
-# call sites that want a single ready-to-render string don't have to
-# format. Direct attribute access on the `AgeGroup` (e.g.
-# `CLIENT_AGE_GROUPS_BY_KEY[k].singular`) is the right shape for the
-# CR headline builder, which composes "<noun> <gender> (<range>)".
-CLIENT_AGE_GROUPS_BY_KEY: Final[dict[str, AgeGroup]] = {
-    "children_0_5": AgeGroup("Child", "Children", "0–5"),
-    "children_6_10": AgeGroup("Child", "Children", "6–10"),
-    "preteens_11_13": AgeGroup("Preteen", "Preteens", "11–13"),
-    "adolescents_14_18": AgeGroup("Adolescent", "Adolescents", "14–18"),
-    "young_adults_19_24": AgeGroup("Young adult", "Young adults", "19–24"),
-    "adults_25_64": AgeGroup("Adult", "Adults", "25–64"),
-    "older_adults_65_plus": AgeGroup("Older adult", "Older adults", "65+"),
+# `CLIENT_AGE_GROUPS_BY_KEY` maps each value to its `ClientAgeGroup` member,
+# whose `.singular` / `.plural` / `.range` the CR headline builder reads
+# directly ("<noun> <gender> (<range>)"). The two label dicts derive the
+# ready-to-render plural / singular "<noun> (<range>)" strings.
+CLIENT_AGE_GROUPS_BY_KEY: Final[dict[str, ClientAgeGroup]] = {
+    m.value: m for m in ClientAgeGroup
 }
-CLIENT_AGE_GROUP_LABELS: Final[dict[str, str]] = {
-    k: f"{g.plural} ({g.range})" for k, g in CLIENT_AGE_GROUPS_BY_KEY.items()
-}
+CLIENT_AGE_GROUP_LABELS: Final[dict[str, str]] = ClientAgeGroup.labels()
 CLIENT_AGE_GROUP_LABELS_SINGULAR: Final[dict[str, str]] = {
-    k: f"{g.singular} ({g.range})" for k, g in CLIENT_AGE_GROUPS_BY_KEY.items()
+    m.value: m.label_singular for m in ClientAgeGroup
 }
 LANGUAGE_LABELS: Final[dict[str, str]] = Language.labels()
 NETWORK_PREFERENCE_LABELS: Final[dict[str, str]] = NetworkPreference.labels()
 INSURANCE_CARRIER_LABELS: Final[dict[str, str]] = InsuranceCarrier.labels()
-# Per-axis labels for the desired-times grid. The form-render macro
-# uses these for the row (day) and column (slot) headers; per-cell
-# labels aren't needed because the checkbox value carries the meaning.
-# Two label maps for days. `DESIRED_TIME_DAY_LABELS` is the long
-# form used in read-views (detail pages, audit dumps via
-# `DESIRED_TIME_SLOT_LABELS`). `DESIRED_TIME_DAY_SHORT_LABELS` is the
-# row-header form used in the compact `time_grid_field` checkbox grid
-# (M/T/W/Th/F/Sat/Sun).
-DESIRED_TIME_DAY_LABELS: Final[dict[str, str]] = {
-    "monday": "Monday",
-    "tuesday": "Tuesday",
-    "wednesday": "Wednesday",
-    "thursday": "Thursday",
-    "friday": "Friday",
-    "saturday": "Saturday",
-    "sunday": "Sunday",
-}
+# Per-axis labels for the desired-times grid. The form-render macro uses these
+# for the row (day) and column headers. Days carry two labels: the long
+# `.label` (read views, slot labels below) and the compact `.short_label`
+# row-header (M/T/W/Th/F/Sat/Sun) for the `time_grid_field` checkbox grid.
+DESIRED_TIME_DAY_LABELS: Final[dict[str, str]] = DesiredTimeDay.labels()
 DESIRED_TIME_DAY_SHORT_LABELS: Final[dict[str, str]] = {
-    "monday": "M",
-    "tuesday": "T",
-    "wednesday": "W",
-    "thursday": "Th",
-    "friday": "F",
-    "saturday": "Sat",
-    "sunday": "Sun",
+    m.value: m.short_label for m in DesiredTimeDay
 }
-DESIRED_TIME_PART_LABELS: Final[dict[str, str]] = {
-    "am": "AM",
-    "pm": "PM",
-}
+DESIRED_TIME_PART_LABELS: Final[dict[str, str]] = DesiredTimePart.labels()
 # Combined per-token label, e.g. "Monday morning". Used wherever a
 # single value is rendered standalone (read views, audit dumps shown
 # in admin tooling).
@@ -362,25 +383,14 @@ INSURANCE_POSTURE_LABELS: Final[dict[str, str]] = InsurancePosture.labels()
 # Icon names are keyed by the enum storage value. Values are Lucide icon
 # names (`lucide-static` font CSS exposes them as `<i class="icon-<name>">`);
 # the row macro in `src/domain/templates/posts/_item.html` emits the `<i>` tag.
-# Migrated vocabularies declare the icon as the third element of each
-# `LabeledChoice` member, so `Cls.icons()` is the dict — no separate structure
-# to keep in lockstep. The legacy `CLIENT_AGE_GROUP_ICONS` below still pairs a
-# hand-written dict with its tuple (guarded by `test_icons_cover_their_tuples`
-# in `src/domain/logic/posts/test_schema.py`).
+# Every vocabulary declares the icon on the `LabeledChoice` member, so
+# `Cls.icons()` is the dict — no separate structure to keep in lockstep.
 #
 # Multiple enum values may share an icon when the visual signal at
 # scan distance is the same — e.g. children_0_5 and children_6_10 both
 # read as "kid" in the row. The detail page still distinguishes via
 # `CLIENT_AGE_GROUP_LABELS`.
-CLIENT_AGE_GROUP_ICONS: Final[dict[str, str]] = {
-    "children_0_5": "baby",
-    "children_6_10": "baby",
-    "preteens_11_13": "graduation-cap",
-    "adolescents_14_18": "graduation-cap",
-    "young_adults_19_24": "user",
-    "adults_25_64": "user",
-    "older_adults_65_plus": "user-round",
-}
+CLIENT_AGE_GROUP_ICONS: Final[dict[str, str | None]] = ClientAgeGroup.icons()
 REFERRAL_SERVICE_ICONS: Final[dict[str, str]] = ReferralService.icons()
 TREATMENT_SETTINGS_ICONS: Final[dict[str, str]] = TreatmentSetting.icons()
 INSURANCE_POSTURE_ICONS: Final[dict[str, str]] = InsurancePosture.icons()
