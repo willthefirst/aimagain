@@ -1,0 +1,182 @@
+/* Per-field width caps. The form container is already capped at
+   `--form-max-width` in framework.css, but inside that cap a 5-digit ZIP and
+   a 200-char Name still both render at the full container width —
+   a 5-character field stretching to 720px reads as sloppy (#585).
+   Cap each short input to a width that matches its expected
+   content. Scoped to `.entity-form-page` so search forms and any
+   other non-entity-form usage keep Pico's defaults.
+
+   Selectors target `name="…"` rather than introducing new utility
+   classes: the field name is already the canonical identifier
+   (it's what the schema validates and what the macro emits), so
+   caps tracking a renamed field is a single grep here, and new
+   forms that reuse the same field name pick up the cap for free.
+   `<select name="…">` and `<input name="…">` both apply.
+
+   Widths chosen for typical content (a few characters of padding
+   past the longest legitimate value): 5-digit ZIP ~100px, two-
+   letter state code ~100px, 10-digit NPI ~160px, ISO dates and
+   partial-dates ~180px, short numeric IDs ~160px. `max-width` (not
+   `width`) so the field can still shrink below the cap on narrow
+   viewports — the Pico-default `width: 100%` keeps the field
+   filling its column until the cap kicks in. */
+.entity-form-page input[name="location_zip"],
+.entity-form-page input[name="location_state"],
+.entity-form-page select[name="location_state"],
+.entity-form-page select[name="issuing_state"],
+.entity-form-page select[name="state_preference"] {
+  max-width: 8rem;
+}
+.entity-form-page input[name="npi"],
+.entity-form-page input[name="license_number"],
+.entity-form-page input[name="parent_org_id"],
+.entity-form-page input[name="expiration_date"],
+.entity-form-page input[name="month_completed"],
+.entity-form-page input[name="start_date"],
+.entity-form-page input[name="end_date"],
+.entity-form-page input[type="date"] {
+  max-width: 12rem;
+}
+.entity-form-page input[name="location_city"],
+.entity-form-page input[name="cost"],
+.entity-form-page input[name="treatment_modality"] {
+  max-width: 20rem;
+}
+/* Credential rows (clinician licensures / education / certifications)
+   render as flat rows inside an outer `<section>` (edit or
+   detail), so a card-on-card pattern would read as visual
+   noise. The row's vocabulary is just a stacked
+   `<strong>` + muted `<small>` on the left, optional Delete on
+   the right, with a hairline divider between entries. */
+.credential-list {
+  display: flex;
+  flex-direction: column;
+  margin-block: var(--pico-spacing);
+}
+.credential-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding-block: 0.5rem;
+}
+.credential-row + .credential-row {
+  border-top: 1px solid var(--pico-muted-border-color);
+}
+.credential-row-text {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  min-width: 0;
+}
+.credential-row-text > small {
+  color: var(--pico-muted-color);
+}
+.credential-row > button { margin: 0; flex: 0 0 auto; }
+/* Compact post-rows table — kind badge column and meta columns.
+   Pico's table defaults supply row dividers and cell padding;
+   these two rules handle only what Pico can't infer semantically:
+   the uppercase small-caps badge treatment on the first cell and
+   the muted-text/nowrap treatment on the trailing meta cells. */
+table.post-rows td:first-child {
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--pico-muted-color);
+  white-space: nowrap;
+  width: 5rem;
+}
+table.post-rows td:last-child,
+table.post-rows td:nth-last-child(2) {
+  color: var(--pico-muted-color);
+  font-size: 0.875rem;
+  white-space: nowrap;
+}
+/* ── Feed rows ────────────────────────────────────────────────
+   Each row is a vertical flex column: header line (pill + poster
+   + timestamp), then headline link, then meta strip. Container is
+   a Pico <article>; these rules add only the bespoke layout,
+   type-tag pill, and middot dividers. */
+.post-feed-row {
+  display: flex;
+  flex-direction: column;
+  border-top: 1px solid var(--pico-muted-border-color);
+}
+.post-feed-list .post-feed-row:first-child { border-top: none; }
+/* Header line — pill · poster · timestamp */
+.post-feed-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.25em;
+  color: var(--pico-muted-color);
+}
+.post-feed-byline > small + small::before {
+  content: "·";
+  margin: 0 0.4em;
+}
+@media (max-width: 576px) {
+  .post-feed-byline {
+    flex-basis: 100%;
+  }
+}
+/* Headline link */
+.post-feed-headline-text { display: block; }
+/* Type-tag pill */
+.post-feed-type-tag {
+  font-size: 0.625rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 0.15em 0.5em;
+  border-radius: 2em;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.post-feed-type-tag--referral {
+  color: var(--pico-muted-color);
+  background: color-mix(in srgb, var(--pico-muted-color) 8%, transparent);
+}
+.post-feed-type-tag--opening {
+  color: var(--pico-primary);
+  background: color-mix(in srgb, var(--pico-primary) 10%, transparent);
+}
+.post-feed-type-tag--intake {
+  color: var(--pico-secondary);
+  background: color-mix(in srgb, var(--pico-secondary) 10%, transparent);
+}
+/* Metadata strip */
+.post-feed-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 1em;
+  color: var(--pico-muted-color);
+}
+@media (max-width: 576px) {
+  .post-feed-meta {
+    flex-direction: column;
+  }
+}
+/* Empty state */
+.post-feed-empty { text-align: center; padding: 2rem 1rem; color: var(--pico-muted-color); }
+/* Viewed state — browser :visited on the headline link */
+.post-feed-headline-text:visited { color: var(--pico-muted-color); }
+/* Expressed-interest override */
+.post-feed-row--interest .post-feed-headline-text:visited { color: var(--pico-primary); }
+
+/* ---- Posts browse two-column layout -------------------------------- */
+.posts-browse-layout {
+  display: flex;
+  gap: 1.5rem;
+  align-items: flex-start;
+}
+.posts-filter-sidebar { flex: 0 0 220px; min-width: 0; }
+.posts-results { flex: 1 1 0; min-width: 0; }
+
+/* Narrow: stack sidebar full-width above results; hide inline form */
+@media (max-width: 640px) {
+  .posts-browse-layout { flex-direction: column; }
+  .posts-filter-sidebar { flex: unset; width: 100%; }
+  .posts-filter-form { display: none; }
+}
