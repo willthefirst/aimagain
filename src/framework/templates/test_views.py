@@ -327,32 +327,24 @@ def test_actions_buttons_fill_row_width_on_desktop() -> None:
     (fieldsets, inputs) filled the form. The Delete button keeps its
     content width (the `:not(.form-actions-destructive)` selector
     excludes it) and `margin-left: auto` pushes it to the far right.
-    Pinned against `base.html` so a future CSS edit that drops the
+    Pinned against `framework.css` so a future CSS edit that drops the
     grow rule fails here loudly."""
     import re
+    from pathlib import Path
 
-    env = _make_env()
-    _add_child(
-        env,
-        "stub.html",
-        """
-        {% extends "views/form_new.html" %}
-        {% set resource_url = "/widgets" %}
-        {% block resource_label %}Widgets{% endblock %}
-        {% block content %}<form></form>{% endblock %}
-        """,
-    )
-    html = env.get_template("stub.html").render(
-        request=_request_stub(),
-        is_authenticated=False,
-        is_development=False,
-    )
+    css = (
+        Path(__file__).parent.parent.parent
+        / "framework"
+        / "static"
+        / "css"
+        / "framework.css"
+    ).read_text()
     # The non-destructive Save/Cancel rule must `flex: 1` (any
     # `1 1 0` / `1` variant) so they grow. Match the property
     # against any value that starts with `1`.
     grow_rule = re.search(
         r"\.form-actions\s*>\s*button:not\(\.form-actions-destructive\)[^{]*\{[^}]*flex:\s*1",
-        html,
+        css,
         re.DOTALL,
     )
     assert grow_rule is not None, (
@@ -362,7 +354,7 @@ def test_actions_buttons_fill_row_width_on_desktop() -> None:
     )
     role_button_rule = re.search(
         r"\.form-actions\s*>\s*\[role=\"button\"\]:not\(\.form-actions-destructive\)[^{]*\{[^}]*flex:\s*1",
-        html,
+        css,
         re.DOTALL,
     )
     assert role_button_rule is not None, (
@@ -374,7 +366,7 @@ def test_actions_buttons_fill_row_width_on_desktop() -> None:
     # content width on the right edge.
     destructive_rule = re.search(
         r"\.form-actions\s*>\s*\.form-actions-destructive\b[^{]*\{[^}]*margin-left:\s*auto",
-        html,
+        css,
         re.DOTALL,
     )
     assert destructive_rule is not None, (
@@ -500,58 +492,46 @@ def test_entity_form_page_caps_short_field_widths() -> None:
     10-digit NPI, ISO date, short numeric ID) must carry a `max-width`
     cap so it doesn't stretch to the full form-container width on
     desktop. The cap is applied via `name`-attribute selectors in
-    `base.html` so per-template wiring isn't required — adding a field
+    `domain.css` so per-template wiring isn't required — adding a field
     with one of the capped names anywhere inside an `.entity-form-page`
     picks up the right width automatically."""
     import re
+    from pathlib import Path
 
-    env = _make_env()
-    _add_child(
-        env,
-        "stub.html",
-        """
-        {% extends "views/form_new.html" %}
-        {% set resource_url = "/clinicians" %}
-        {% block resource_label %}Clinicians{% endblock %}
-        {% block content %}<form id="x"></form>{% endblock %}
-        """,
-    )
-    html = env.get_template("stub.html").render(
-        request=_request_stub(),
-        is_authenticated=False,
-        is_development=False,
-    )
+    css = (
+        Path(__file__).parent.parent.parent / "domain" / "static" / "css" / "domain.css"
+    ).read_text()
 
     # The ZIP / state-code group caps at the narrow tier.
     narrow = re.search(
         r"\.entity-form-page\s+input\[name=\"location_zip\"\][^{]*\{[^}]*max-width:\s*8rem",
-        html,
+        css,
         re.DOTALL,
     )
     assert narrow is not None, (
-        "base.html must cap `location_zip` width inside `.entity-form-page` "
+        "domain.css must cap `location_zip` width inside `.entity-form-page` "
         "so a 5-digit ZIP doesn't stretch the form container (#585)"
     )
 
     # NPI + ISO-date group caps at the medium tier.
     medium = re.search(
         r"\.entity-form-page\s+input\[name=\"npi\"\][^{]*\{[^}]*max-width:\s*12rem",
-        html,
+        css,
         re.DOTALL,
     )
     assert medium is not None, (
-        "base.html must cap `npi` width inside `.entity-form-page` so a "
+        "domain.css must cap `npi` width inside `.entity-form-page` so a "
         "10-digit NPI doesn't stretch the form container (#585)"
     )
 
     # State <select> shares the narrow cap.
     state = re.search(
         r"\.entity-form-page\s+select\[name=\"location_state\"\][^{]*\{[^}]*max-width:\s*8rem",
-        html,
+        css,
         re.DOTALL,
     )
     assert state is not None, (
-        'base.html must cap `<select name="location_state">` width inside '
+        'domain.css must cap `<select name="location_state">` width inside '
         "`.entity-form-page` (#585)"
     )
 
@@ -559,11 +539,11 @@ def test_entity_form_page_caps_short_field_widths() -> None:
     # program start/end-date fields) picks up the cap without naming.
     date_input = re.search(
         r"\.entity-form-page\s+input\[type=\"date\"\][^{]*\{[^}]*max-width:\s*12rem",
-        html,
+        css,
         re.DOTALL,
     )
     assert date_input is not None, (
-        'base.html must cap `<input type="date">` width inside '
+        'domain.css must cap `<input type="date">` width inside '
         "`.entity-form-page` so program start/end dates don't stretch (#585)"
     )
 
