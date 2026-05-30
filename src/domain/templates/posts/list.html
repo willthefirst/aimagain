@@ -36,14 +36,14 @@
           {#-- 2. Location --#}
           <fieldset class="posts-filter-section">
             <legend>Location</legend>
-            <label>
+            <label style="flex-direction: column; align-items: stretch;">
               City
               <input type="search"
                      name="city"
                      value="{{ filter_values.get('city') or '' }}"
                      placeholder="e.g. Portland" />
             </label>
-            <label>
+            <label style="flex-direction: column; align-items: stretch;">
               State
               <select name="state">
                 <option value="">Any</option>
@@ -67,37 +67,19 @@
               </label>
             {%- endfor %}
           </fieldset>
-          {#-- 4. Modality — first 8 inline, rest behind a Show-all disclosure --#}
+          {#-- 4. Modality --#}
           <fieldset class="posts-filter-section">
             <legend>Modality</legend>
             {%- set modality_active = filter_values.get("modality") or [] %}
-            {%- set _cutoff = 8 %}
             {%- for v in TREATMENT_MODALITIES %}
-              {%- if loop.index0 < _cutoff or v in modality_active %}
-                <label>
-                  <input type="checkbox"
-                         name="modality"
-                         value="{{ v }}"
-                         {% if v in modality_active %}checked{% endif %} />
-                  {{ TREATMENT_MODALITY_LABELS[v] }}
-                </label>
-              {%- endif %}
+              <label>
+                <input type="checkbox"
+                       name="modality"
+                       value="{{ v }}"
+                       {% if v in modality_active %}checked{% endif %} />
+                {{ TREATMENT_MODALITY_LABELS[v] }}
+              </label>
             {%- endfor %}
-            {%- if TREATMENT_MODALITIES | length > _cutoff %}
-              <details>
-                <summary>Show all ({{ TREATMENT_MODALITIES | length }})</summary>
-                <div class="posts-filter-scroll">
-                  {%- for v in TREATMENT_MODALITIES %}
-                    {%- if loop.index0 >= _cutoff and v not in modality_active %}
-                      <label>
-                        <input type="checkbox" name="modality" value="{{ v }}" />
-                        {{ TREATMENT_MODALITY_LABELS[v] }}
-                      </label>
-                    {%- endif %}
-                  {%- endfor %}
-                </div>
-              </details>
-            {%- endif %}
           </fieldset>
           {#-- 5. Populations (age_group) --#}
           <fieldset class="posts-filter-section">
@@ -115,17 +97,15 @@
           {#-- 6. Insurance --#}
           <fieldset class="posts-filter-section">
             <legend>Insurance</legend>
-            <div class="posts-filter-scroll">
-              {%- for v in INSURANCE_CARRIERS %}
-                <label>
-                  <input type="checkbox"
-                         name="insurance"
-                         value="{{ v }}"
-                         {% if v in (filter_values.get("insurance") or []) %}checked{% endif %} />
-                  {{ INSURANCE_CARRIER_LABELS[v] }}
-                </label>
-              {%- endfor %}
-            </div>
+            {%- for v in INSURANCE_CARRIERS %}
+              <label>
+                <input type="checkbox"
+                       name="insurance"
+                       value="{{ v }}"
+                       {% if v in (filter_values.get("insurance") or []) %}checked{% endif %} />
+                {{ INSURANCE_CARRIER_LABELS[v] }}
+              </label>
+            {%- endfor %}
           </fieldset>
           <menu class="posts-filter-actions">
             <li>
