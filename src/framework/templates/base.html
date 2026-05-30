@@ -601,11 +601,14 @@
       .nav-menu-toggle::-webkit-details-marker { display: none; }
       .nav-menu-toggle::marker { display: none; }
       .nav-menu-toggle::after { display: none; }
-      /* Desktop: summary hidden, links always visible inline */
+      /* Desktop: summary hidden, links always visible inline.
+         #nav-menu is both a flex item (flex:1 fills remaining space) and
+         a flex container so margin-left:auto on the <ul> right-aligns it.
+         display:contents caused a Chrome bug where the <ul> got zero width. */
       @media (min-width: 641px) {
         .nav-menu-toggle { display: none; }
-        #nav-menu, #nav-menu[open] { display: contents; }
-        #nav-menu > ul { display: flex !important; list-style: none; padding: 0; margin: 0 0 0 auto; gap: 1rem; }
+        #nav-menu { flex: 1; display: flex; }
+        #nav-menu > ul { list-style: none; padding: 0; margin: 0 0 0 auto; gap: 1rem; display: flex; }
       }
       /* Mobile: hamburger shows, open menu covers full screen below nav */
       @media (max-width: 640px) {
@@ -835,7 +838,7 @@
       <nav aria-label="Primary" id="primary-nav">
         <a href="/"><strong>Bedlam Connect</strong></a>
         {% if is_authenticated %}
-          <details id="nav-menu">
+          <details id="nav-menu" open>
             <summary class="nav-menu-toggle" aria-label="Menu">
               <i class="icon-menu nav-menu-open-icon"></i>
               <i class="icon-x nav-menu-close-icon"></i>
@@ -857,6 +860,7 @@
               </li>
             </ul>
           </details>
+          <script>if(window.matchMedia("(max-width:640px)").matches)document.getElementById("nav-menu").removeAttribute("open");</script>
         {% endif %}
         {# Anonymous visitors get only the brand link. #}
       </nav>
