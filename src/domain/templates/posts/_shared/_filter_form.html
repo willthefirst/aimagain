@@ -6,7 +6,7 @@
 {% macro filter_form(list_url, filter_values) %}
   <form method="get" action="{{ list_url }}">
     {#-- 1. Type --#}
-    <fieldset>
+    <fieldset class="posts-filter-section">
       <legend>Type</legend>
       {%- for v, l in (
         ("referral",          "Client referrals"),
@@ -23,7 +23,7 @@
       {%- endfor %}
     </fieldset>
     {#-- 2. Location --#}
-    <fieldset>
+    <fieldset class="posts-filter-section">
       <legend>Location</legend>
       <label>
         City
@@ -44,7 +44,7 @@
       </label>
     </fieldset>
     {#-- 3. Level of care (openings/intakes only) --#}
-    <fieldset>
+    <fieldset class="posts-filter-section">
       <legend>Level of care</legend>
       {%- for v in TREATMENT_SETTINGS %}
         <label>
@@ -57,7 +57,7 @@
       {%- endfor %}
     </fieldset>
     {#-- 4. Modality --#}
-    <fieldset>
+    <fieldset class="posts-filter-section">
       <legend>Modality</legend>
       {%- set modality_active = filter_values.get("modality") or [] %}
       {%- for v in TREATMENT_MODALITIES %}
@@ -71,7 +71,7 @@
       {%- endfor %}
     </fieldset>
     {#-- 5. Populations (age_group) --#}
-    <fieldset>
+    <fieldset class="posts-filter-section">
       <legend>Populations</legend>
       {%- for v in CLIENT_AGE_GROUPS %}
         <label>
@@ -84,7 +84,7 @@
       {%- endfor %}
     </fieldset>
     {#-- 6. Insurance --#}
-    <fieldset>
+    <fieldset class="posts-filter-section">
       <legend>Insurance</legend>
       {%- for v in INSURANCE_CARRIERS %}
         <label>
