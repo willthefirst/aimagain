@@ -18,7 +18,13 @@ from src.domain import template_globals  # noqa: F401  # populates Jinja env glo
 from src.domain.logic.posts.repository import get_post_repository
 from src.domain.logic.users.schema import UserRead
 from src.domain.models.posts.post import Post
-from src.domain.routes import auth_pages, auth_routes, dev_auth, verifications
+from src.domain.routes import (
+    auth_pages,
+    auth_routes,
+    dev_auth,
+    dev_components,
+    verifications,
+)
 from src.framework.config import settings
 from src.framework.dispatch.registry import entity_registry
 from src.framework.http.middleware import StripEmptyQueryParamsMiddleware
@@ -212,6 +218,7 @@ for _, _router in entity_registry.entries():
 # without monkeypatching the global `app` instance. See
 # `src/domain/routes/dev_auth.py` for the full security rationale.
 dev_auth.mount_dev_routes(app, environment=settings.ENVIRONMENT)
+dev_components.mount_dev_components(app, environment=settings.ENVIRONMENT)
 
 # Static assets. Two mounts keep the framework/domain CSS boundary
 # visible at the URL level — framework primitives at /static/fw/,
