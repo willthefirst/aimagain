@@ -584,6 +584,47 @@
          of `<header>` and `<main>`). Centered chrome line, present on
          every page via the default `{% raw %}{% block footer %}{% endraw %}` body. */
       footer.container { text-align: center; }
+      /* Primary nav — brand always visible; links in a <details> so mobile
+         can collapse them behind a hamburger toggle. */
+      #primary-nav {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        padding-block: 0.5rem;
+      }
+      /* Primary nav hamburger — strip Pico's built-in chevron */
+      .nav-menu-toggle { list-style: none; margin-bottom: 0; }
+      #primary-nav > details { margin: 0; }
+      #primary-nav > details[open] > summary { margin-bottom: 0; }
+      .nav-menu-toggle::-webkit-details-marker { display: none; }
+      .nav-menu-toggle::marker { display: none; }
+      .nav-menu-toggle::after { display: none; }
+      /* Desktop: summary hidden, links always visible inline */
+      @media (min-width: 641px) {
+        .nav-menu-toggle { display: none; }
+        #nav-menu, #nav-menu[open] { display: contents; }
+        #nav-menu > ul { display: flex !important; list-style: none; padding: 0; margin: 0 0 0 auto; gap: 1rem; }
+      }
+      /* Mobile: hamburger shows, open menu covers full screen below nav */
+      @media (max-width: 640px) {
+        header.container { position: relative; }
+        #nav-menu:not([open]) .nav-menu-close-icon { display: none; }
+        #nav-menu[open] .nav-menu-open-icon { display: none; }
+        #nav-menu[open] > ul {
+          position: absolute;
+          top: 100%;
+          left: 0;
+          right: 0;
+          min-height: 100dvh;
+          z-index: 10;
+          background: var(--pico-background-color);
+          display: flex;
+          flex-direction: column;
+          list-style: none;
+          padding: 0;
+          margin: 0;
+        }
+      }
       /* Sticky-footer layout. The body is a three-row grid
          (`<header>` / `<main>` / `<footer>`) sized to the viewport, so
          short pages pin the footer at the bottom instead of leaving it
@@ -696,22 +737,17 @@
       .posts-filter-sidebar { flex: 0 0 220px; min-width: 0; }
       .posts-results { flex: 1 1 0; min-width: 0; }
 
-      /* On desktop hide the <summary> toggle — the <details open> is always
-         expanded so the form shows as a static sidebar. On mobile the
-         summary is visible; the user can tap it to collapse the form. */
-      @media (min-width: 641px) {
-        .posts-filter-disclosure > .posts-filter-summary { display: none; }
-      }
-      /* Narrow: stack sidebar full-width above results */
+      /* Narrow: stack sidebar full-width above results; hide inline form */
       @media (max-width: 640px) {
         .posts-browse-layout { flex-direction: column; }
         .posts-filter-sidebar { flex: unset; width: 100%; }
+        .posts-filter-form { display: none; }
       }
 
       /* Filter form internals */
       fieldset.posts-filter-section { padding: 0; margin-bottom: var(--pico-spacing); }
       fieldset.posts-filter-section label { display: flex; align-items: center; }
-.posts-filter-actions {
+      .posts-filter-actions {
         display: flex;
         flex-direction: column;
         gap: var(--pico-spacing);
@@ -814,38 +850,33 @@
     {%- set _posts_path = entity_url('post') -%}
     {%- set _on_posts = is_authenticated and (request.url.path == _posts_path or request.url.path.startswith(_posts_path + '/')) -%}
     <header class="container">
-      <nav aria-label="Primary">
-        <ul id="primary-nav">
-          <li>
-            <a href="/"><strong>Bedlam Connect</strong></a>
-          </li>
-          {% if is_authenticated %}
-            {# Flat nav: brand on the left, five links pushed right via
-             `margin-left: auto` on the first item. Sign-out uses
-             `hx-post` because the route returns `HX-Redirect`; HTMX
-             handles the full-page navigation to `/auth/login`.
-             Overflow on narrow viewports is a known follow-up — for
-             now the row may wrap or scroll horizontally on small
-             screens. #}
-            <li style="margin-left: auto;">
-              <a href="/home" {% if _on_home %}aria-current="page"{% endif %}>Home</a>
-            </li>
-            <li>
-              <a href="{{ entity_url('post') }}"
-                 {% if _on_posts %}aria-current="page"{% endif %}>Posts</a>
-            </li>
-            <li>
-              <a href="{{ entity_url('user', id='me') }}"
-                 {% if _on_profile %}aria-current="page"{% endif %}>Profile</a>
-            </li>
-            <li>
-              <a href="#" hx-post="/auth/sign-out">Sign out</a>
-            </li>
-          {% endif %}
-          {# Anonymous visitors get only the brand link; the chrome
-             carries no Login shortcut. Visitors enter the auth flow
-             from the landing page CTA. #}
-        </ul>
+      <nav aria-label="Primary" id="primary-nav">
+        <a href="/"><strong>Bedlam Connect</strong></a>
+        {% if is_authenticated %}
+          <details id="nav-menu">
+            <summary class="nav-menu-toggle" aria-label="Menu">
+              <i class="icon-menu nav-menu-open-icon"></i>
+              <i class="icon-x nav-menu-close-icon"></i>
+            </summary>
+            <ul>
+              <li>
+                <a href="/home" {% if _on_home %}aria-current="page"{% endif %}>Home</a>
+              </li>
+              <li>
+                <a href="{{ entity_url('post') }}"
+                   {% if _on_posts %}aria-current="page"{% endif %}>Posts</a>
+              </li>
+              <li>
+                <a href="{{ entity_url('user', id='me') }}"
+                   {% if _on_profile %}aria-current="page"{% endif %}>Profile</a>
+              </li>
+              <li>
+                <a href="#" hx-post="/auth/sign-out">Sign out</a>
+              </li>
+            </ul>
+          </details>
+        {% endif %}
+        {# Anonymous visitors get only the brand link. #}
       </nav>
     </header>
     <main class="container">
