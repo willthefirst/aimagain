@@ -45,9 +45,9 @@ under the "Feed rows" section. #}
 {%- else %}{{ post.owner.email }}
 {%- endif %}
 {%- endset -%}
-<small>{{ _poster_name | trim }}</small>
+{{ _poster_name | trim }}
 {%- endif -%}
-<small>{{ post.created_at | days_ago }}</small>
+{{ post.created_at | days_ago }}
 </div>
 {# ── Headline ─────────────────────────────────────────────────── #}
 <a href="{{ entity_url(entity_name, id=post.id) }}" class="post-feed-headline-text"><strong>{{ headline }}</strong></a>
