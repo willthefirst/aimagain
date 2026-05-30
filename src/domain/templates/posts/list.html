@@ -30,8 +30,8 @@
                     link_href=entity_url(entity_name) if active_filter_count else None
           ) }}
         {% endif %}
-      {%- if page_meta is defined %}{{ pagination(page_meta, paginator_base_query|default("")) }}{%- endif %}
+        {%- if page_meta is defined %}{{ pagination(page_meta, paginator_base_query|default("") ) }}{%- endif %}
+        </div>
       </div>
-    </div>
-  {% endblock %}
-{% block after_content %}{% endblock %}
+    {% endblock %}
+    {% block after_content %}{% endblock %}
