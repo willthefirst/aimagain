@@ -35,6 +35,7 @@ under the "Feed rows" section. #}
 {# ── Header: pill · poster · timestamp ───────────────────────── #}
 <div class="post-feed-header">
 <span class="post-feed-type-tag post-feed-type-tag--{{ kind_class }}">{{ kind_label }}</span>
+<span class="post-feed-byline">
 {%- if show_poster and post.owner -%}
 {%- set _fn = post.owner.first_name -%}
 {%- set _ln = post.owner.last_name -%}
@@ -48,6 +49,7 @@ under the "Feed rows" section. #}
 <small>{{ _poster_name | trim }}</small>
 {%- endif -%}
 <small>{{ post.created_at | days_ago }}</small>
+</span>
 </div>
 {# ── Headline ─────────────────────────────────────────────────── #}
 <a href="{{ entity_url(entity_name, id=post.id) }}" class="post-feed-headline-text"><strong>{{ headline }}</strong></a>
