@@ -141,6 +141,42 @@ def _referral_or_none(website: str | None, instructions: str | None) -> dict | N
     return {"website": website, "instructions": instructions}
 
 
+# Fields copied straight off the kind's detail row with no transform, as
+# `view_key -> detail_attribute`. `_forward_detail_passthrough` applies these
+# for every kind before its per-kind block fills in computed/relational fields.
+# A kind whose detail lacks an attribute (referral has no `settings` /
+# `schedule_text` / `genders`) just keeps the base default. Adding a plain
+# field to a post kind means one line here, not an edit to three per-kind
+# blocks — so a passthrough field can't be silently dropped from the view-model.
+_SCALAR_PASSTHROUGH: dict[str, str] = {
+    "subject": "subject",
+    "description": "description",
+    "schedule_text": "schedule_text",
+    "treatment_modality": "treatment_modality",
+}
+_LIST_PASSTHROUGH: dict[str, str] = {
+    "services": "services",
+    "settings": "settings",
+    "ages": "age_groups",
+    "languages": "languages",
+    "genders": "genders",
+    "modalities": "modalities",
+    "desired_times": "desired_times",
+}
+
+
+def _forward_detail_passthrough(base: dict[str, Any], d: Any) -> None:
+    """Copy every passthrough field off detail row ``d`` into ``base``.
+
+    Scalars land as-is (``None`` when absent); list fields are normalized to
+    a fresh list (``[]`` when absent or empty) so templates can iterate
+    without nullability handling. Mutates ``base`` in place."""
+    for view_key, attr in _SCALAR_PASSTHROUGH.items():
+        base[view_key] = getattr(d, attr, None)
+    for view_key, attr in _LIST_PASSTHROUGH.items():
+        base[view_key] = list(getattr(d, attr, None) or [])
+
+
 def post_card_view(post) -> dict[str, Any]:
     """Normalize a `Post` of any kind into the flat shape both the
     listing card and the detail page render from.
@@ -261,24 +297,19 @@ def post_card_view(post) -> dict[str, Any]:
         d = getattr(post, "referral_detail", None)
         if d is None:
             return base
+        _forward_detail_passthrough(base, d)
         base.update(
-            subject=getattr(d, "subject", None),
             headline=referral_headline(d),
             in_person=getattr(d, "location_in_person", None),
             virtual=getattr(d, "location_virtual", None),
-            services=list(getattr(d, "services", None) or []),
-            ages=list(getattr(d, "age_groups", None) or []),
-            languages=list(getattr(d, "languages", None) or []),
+            # CR holds a single `gender`; wrap it so templates iterate
+            # `genders` uniformly across kinds.
             genders=([d.gender] if getattr(d, "gender", None) else []),
-            treatment_modality=getattr(d, "treatment_modality", None),
-            modalities=list(getattr(d, "modalities", None) or []),
             location_chunk=_location_chunk(
                 getattr(d, "location_city", None),
                 getattr(d, "location_state", None),
                 getattr(d, "location_zip", None),
             ),
-            description=getattr(d, "description", None),
-            desired_times=list(getattr(d, "desired_times", None) or []),
             full_address=full_address(
                 getattr(d, "location_city", None),
                 getattr(d, "location_state", None),
@@ -293,9 +324,9 @@ def post_card_view(post) -> dict[str, Any]:
         d = getattr(post, "opening_detail", None)
         if d is None:
             return base
+        _forward_detail_passthrough(base, d)
         p = getattr(d, "clinician", None)
         base.update(
-            subject=getattr(d, "subject", None),
             headline=(p.org.name if p and getattr(p, "org", None) else None),
             # `header_state` stays None — opening's location lives in
             # the demographics column via `location_chunk` (same row
@@ -314,16 +345,6 @@ def post_card_view(post) -> dict[str, Any]:
             ),
             in_person=(getattr(p, "in_person_sessions", None) if p else None),
             virtual=(getattr(p, "virtual_sessions", None) if p else None),
-            services=list(getattr(d, "services", None) or []),
-            settings=list(getattr(d, "settings", None) or []),
-            ages=list(getattr(d, "age_groups", None) or []),
-            languages=list(getattr(d, "languages", None) or []),
-            genders=list(getattr(d, "genders", None) or []),
-            treatment_modality=getattr(d, "treatment_modality", None),
-            modalities=list(getattr(d, "modalities", None) or []),
-            description=getattr(d, "description", None),
-            schedule_text=getattr(d, "schedule_text", None),
-            desired_times=list(getattr(d, "desired_times", None) or []),
             practice_link=(
                 {"id": p.id, "name": p.org.name}
                 if p and getattr(p, "org", None) and getattr(p, "id", None)
@@ -365,21 +386,11 @@ def post_card_view(post) -> dict[str, Any]:
         d = getattr(post, "intake_detail", None)
         if d is None:
             return base
+        _forward_detail_passthrough(base, d)
         prog = getattr(d, "program", None)
         base.update(
-            subject=getattr(d, "subject", None),
             headline=(getattr(prog, "name", None) if prog else None),
             header_state=(getattr(prog, "state_preference", None) if prog else None),
-            services=list(getattr(d, "services", None) or []),
-            settings=list(getattr(d, "settings", None) or []),
-            ages=list(getattr(d, "age_groups", None) or []),
-            languages=list(getattr(d, "languages", None) or []),
-            genders=list(getattr(d, "genders", None) or []),
-            treatment_modality=getattr(d, "treatment_modality", None),
-            modalities=list(getattr(d, "modalities", None) or []),
-            description=getattr(d, "description", None),
-            schedule_text=getattr(d, "schedule_text", None),
-            desired_times=list(getattr(d, "desired_times", None) or []),
             program_link=(
                 {"id": prog.id, "name": prog.name}
                 if prog and getattr(prog, "id", None) and getattr(prog, "name", None)
