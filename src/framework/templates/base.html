@@ -674,9 +674,6 @@
       .post-feed-list .post-feed-row:first-child { border-top: none; }
       /* Header line — pill · poster · timestamp */
       .post-feed-header {
-        display: flex;
-        align-items: center;
-        gap: 0.5rem;
         color: var(--pico-muted-color);
       }
       .post-feed-header > small + small::before {
@@ -838,7 +835,7 @@
       <nav aria-label="Primary" id="primary-nav">
         <a href="/"><strong>Bedlam Connect</strong></a>
         {% if is_authenticated %}
-          <details id="nav-menu" open>
+          <details id="nav-menu">
             <summary class="nav-menu-toggle" aria-label="Menu">
               <i class="icon-menu nav-menu-open-icon"></i>
               <i class="icon-x nav-menu-close-icon"></i>
@@ -860,7 +857,15 @@
               </li>
             </ul>
           </details>
-          <script>if(window.matchMedia("(max-width:640px)").matches)document.getElementById("nav-menu").removeAttribute("open");</script>
+          <script>
+            (function () {
+              var mq = window.matchMedia("(min-width: 641px)");
+              var menu = document.getElementById("nav-menu");
+              function sync() { menu.open = mq.matches; }
+              sync();
+              mq.addEventListener("change", sync);
+            })();
+          </script>
         {% endif %}
         {# Anonymous visitors get only the brand link. #}
       </nav>
