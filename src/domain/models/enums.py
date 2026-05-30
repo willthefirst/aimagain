@@ -385,109 +385,86 @@ REFERRAL_SERVICE_ICONS: Final[dict[str, str]] = ReferralService.icons()
 TREATMENT_SETTINGS_ICONS: Final[dict[str, str]] = TreatmentSetting.icons()
 INSURANCE_POSTURE_ICONS: Final[dict[str, str]] = InsurancePosture.icons()
 
+
 # Organization kind. CHECK'd at the table level — empty-tuple growth
 # isn't a concern (the five tokens cover the directory's organization
-# universe today; expanding it means editing one tuple).
-ORGANIZATION_TYPES: Final[tuple[str, ...]] = (
-    "solo_practice",
-    "group_practice",
-    "clinic",
-    "health_system",
-    "other",
-)
-ORGANIZATION_TYPES_LABELS: Final[dict[str, str]] = {
-    "solo_practice": "Solo practice",
-    "group_practice": "Group practice",
-    "clinic": "Clinic",
-    "health_system": "Health system",
-    "other": "Other",
-}
+# universe today; expanding it means adding one member).
+class OrganizationType(LabeledChoice):
+    solo_practice = "solo_practice", "Solo practice"
+    group_practice = "group_practice", "Group practice"
+    clinic = "clinic", "Clinic"
+    health_system = "health_system", "Health system"
+    other = "other", "Other"
 
-LICENSE_TYPES: Final[tuple[str, ...]] = (
-    "lcsw",
-    "lpc",
-    "lmft",
-    "lmhc",
-    "lcpc",
-    "psyd",
-    "phd",
-    "md",
-    "do",
-    "np",
-    "pmhnp",
-    "other",
-)
-LICENSE_TYPES_LABELS: Final[dict[str, str]] = {
-    "lcsw": "Licensed Clinical Social Worker (LCSW)",
-    "lpc": "Licensed Professional Counselor (LPC)",
-    "lmft": "Licensed Marriage and Family Therapist (LMFT)",
-    "lmhc": "Licensed Mental Health Counselor (LMHC)",
-    "lcpc": "Licensed Clinical Professional Counselor (LCPC)",
-    "psyd": "Doctor of Psychology (PsyD)",
-    "phd": "Doctor of Philosophy (PhD)",
-    "md": "Medical Doctor (MD)",
-    "do": "Doctor of Osteopathic Medicine (DO)",
-    "np": "Nurse Practitioner (NP)",
-    "pmhnp": "Psychiatric Mental Health Nurse Practitioner (PMHNP)",
-    "other": "Other",
-}
 
-EDUCATION_TYPES: Final[tuple[str, ...]] = (
-    "ba_bs",
-    "ma_ms",
-    "msw",
-    "phd",
-    "psyd",
-    "md",
-    "do",
-    "edd",
-    "other",
-)
-EDUCATION_TYPES_LABELS: Final[dict[str, str]] = {
-    "ba_bs": "Bachelor's Degree (BA/BS)",
-    "ma_ms": "Master of Arts/Science (MA/MS)",
-    "msw": "Master of Social Work (MSW)",
-    "phd": "Doctor of Philosophy (PhD)",
-    "psyd": "Doctor of Psychology (PsyD)",
-    "md": "Medical Doctor (MD)",
-    "do": "Doctor of Osteopathic Medicine (DO)",
-    "edd": "Doctor of Education (EdD)",
-    "other": "Other",
-}
+ORGANIZATION_TYPES: Final[tuple[str, ...]] = OrganizationType.values()
+ORGANIZATION_TYPES_LABELS: Final[dict[str, str]] = OrganizationType.labels()
 
-CERTIFICATION_TYPES: Final[tuple[str, ...]] = (
-    "emdr",
-    "dbt",
-    "cbt",
-    "gottman_1",
-    "gottman_2",
-    "gottman_3",
-    "cpr",
-    "ccatp",
-    "other",
-)
+
+class LicenseType(LabeledChoice):
+    lcsw = "lcsw", "Licensed Clinical Social Worker (LCSW)"
+    lpc = "lpc", "Licensed Professional Counselor (LPC)"
+    lmft = "lmft", "Licensed Marriage and Family Therapist (LMFT)"
+    lmhc = "lmhc", "Licensed Mental Health Counselor (LMHC)"
+    lcpc = "lcpc", "Licensed Clinical Professional Counselor (LCPC)"
+    psyd = "psyd", "Doctor of Psychology (PsyD)"
+    phd = "phd", "Doctor of Philosophy (PhD)"
+    md = "md", "Medical Doctor (MD)"
+    do = "do", "Doctor of Osteopathic Medicine (DO)"
+    np = "np", "Nurse Practitioner (NP)"
+    pmhnp = "pmhnp", "Psychiatric Mental Health Nurse Practitioner (PMHNP)"
+    other = "other", "Other"
+
+
+LICENSE_TYPES: Final[tuple[str, ...]] = LicenseType.values()
+LICENSE_TYPES_LABELS: Final[dict[str, str]] = LicenseType.labels()
+
+
+class EducationType(LabeledChoice):
+    ba_bs = "ba_bs", "Bachelor's Degree (BA/BS)"
+    ma_ms = "ma_ms", "Master of Arts/Science (MA/MS)"
+    msw = "msw", "Master of Social Work (MSW)"
+    phd = "phd", "Doctor of Philosophy (PhD)"
+    psyd = "psyd", "Doctor of Psychology (PsyD)"
+    md = "md", "Medical Doctor (MD)"
+    do = "do", "Doctor of Osteopathic Medicine (DO)"
+    edd = "edd", "Doctor of Education (EdD)"
+    other = "other", "Other"
+
+
+EDUCATION_TYPES: Final[tuple[str, ...]] = EducationType.values()
+EDUCATION_TYPES_LABELS: Final[dict[str, str]] = EducationType.labels()
+
+
+class CertificationType(LabeledChoice):
+    emdr = "emdr", "EMDR"
+    dbt = "dbt", "DBT Certification"
+    cbt = "cbt", "CBT Certification"
+    gottman_1 = "gottman_1", "Gottman Method Level 1"
+    gottman_2 = "gottman_2", "Gottman Method Level 2"
+    gottman_3 = "gottman_3", "Gottman Method Level 3"
+    cpr = "cpr", "CPR Certified"
+    ccatp = "ccatp", "Certified Clinical Anxiety Treatment Professional (CCATP)"
+    other = "other", "Other"
+
+
+CERTIFICATION_TYPES: Final[tuple[str, ...]] = CertificationType.values()
+CERTIFICATION_TYPES_LABELS: Final[dict[str, str]] = CertificationType.labels()
+
 
 # Outcome of a single nightly verification attempt. `verified` —
 # all checks passed; `needs_review` — a soft mismatch worth a human look
 # (e.g. NPPES name similarity below threshold); `failed` — a hard
 # disqualifier (NPI not in NPPES, or an OIG/LEIE match). One row per
 # attempt is appended; the latest row's status is what the UI surfaces.
-VERIFICATION_STATUSES: Final[tuple[str, ...]] = (
-    "verified",
-    "needs_review",
-    "failed",
-)
-CERTIFICATION_TYPES_LABELS: Final[dict[str, str]] = {
-    "emdr": "EMDR",
-    "dbt": "DBT Certification",
-    "cbt": "CBT Certification",
-    "gottman_1": "Gottman Method Level 1",
-    "gottman_2": "Gottman Method Level 2",
-    "gottman_3": "Gottman Method Level 3",
-    "cpr": "CPR Certified",
-    "ccatp": "Certified Clinical Anxiety Treatment Professional (CCATP)",
-    "other": "Other",
-}
+# Value-only (no display labels) — `.labels()` falls back to the value.
+class VerificationStatus(LabeledChoice):
+    verified = "verified"
+    needs_review = "needs_review"
+    failed = "failed"
+
+
+VERIFICATION_STATUSES: Final[tuple[str, ...]] = VerificationStatus.values()
 
 
 def check_in_tuple_sql(column: str, values: tuple[str, ...]) -> str:

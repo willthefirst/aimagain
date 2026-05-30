@@ -23,8 +23,20 @@ class Service(LabeledChoice):
     case_management = "case_management", "Case management"
 
 
+class Status(LabeledChoice):
+    verified = "verified"
+    failed = "failed"
+
+
 def test_values_in_declaration_order():
     assert Modality.values() == ("emdr", "cbt")
+
+
+def test_value_only_member_labels_fall_back_to_value():
+    assert Status.values() == ("verified", "failed")
+    assert Status.labels() == {"verified": "verified", "failed": "failed"}
+    assert Status.verified.label == "verified"
+    assert Status.icons() == {"verified": None, "failed": None}
 
 
 def test_labels_map_value_to_label():
