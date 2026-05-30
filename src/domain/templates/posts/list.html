@@ -21,7 +21,7 @@
           {% if active_filter_count %}({{ active_filter_count }}){% endif %}
         </a>
       </hgroup>
-      {{ filter_form(_list_url, filter_values) }}
+      <div class="posts-filter-form">{{ filter_form(_list_url, filter_values) }}</div>
     </aside>
     <div class="posts-results">
       {% if posts %}
