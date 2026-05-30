@@ -31,7 +31,7 @@ under the "Feed rows" section. #}
 {%- set headline = post_feed_headline(post) -%}
 {%- set kind_class = "referral" if post.kind == "referral" else ("intake" if post.kind == "program_intake" else "opening") -%}
 {%- set kind_label = "Referral" if post.kind == "referral" else ("Intake" if post.kind == "program_intake" else "Opening") -%}
-<div class="post-feed-row" data-kind="{{ post.kind }}">
+<article class="post-feed-row" data-kind="{{ post.kind }}">
 {# ── Header: pill · poster · timestamp ───────────────────────── #}
 <div class="post-feed-header">
 <span class="post-feed-type-tag post-feed-type-tag--{{ kind_class }}">{{ kind_label }}</span>
@@ -109,13 +109,13 @@ under the "Feed rows" section. #}
 {%- endif -%}
 {%- endif -%}
 </div>
-</div>
+</article>
 {%- endmacro %}
 {% macro post_feed_empty(message="No recent posts match your filters.", link_href=None, link_label="See all recent activity →") -%}
-<div class="post-feed-empty">
+<article class="post-feed-empty">
 <p>{{ message }}</p>
 {%- if link_href -%}
 <a href="{{ link_href }}">{{ link_label }}</a>
 {%- endif -%}
-</div>
+</article>
 {%- endmacro %}

@@ -663,16 +663,12 @@
          + timestamp), then headline link, then meta strip. Container is
          a Pico <article>; these rules add only the bespoke layout,
          type-tag pill, and middot dividers. */
-      .post-feed-list { padding: 0; overflow: hidden; }
       .post-feed-row {
         display: flex;
         flex-direction: column;
-        gap: 0.3rem;
-        padding: 0.875rem 1rem;
         border-top: 1px solid var(--pico-muted-border-color);
       }
       .post-feed-list .post-feed-row:first-child { border-top: none; }
-      .post-feed-row--interest { opacity: 1; }
       /* Header line — pill · poster · timestamp */
       .post-feed-header {
         display: flex;
@@ -725,10 +721,6 @@
       .post-feed-headline-text:visited { color: var(--pico-muted-color); }
       /* Expressed-interest override */
       .post-feed-row--interest .post-feed-headline-text:visited { color: var(--pico-primary); }
-      /* Narrow screens */
-      @media (max-width: 640px) {
-        .post-feed-row { padding: 0.75rem; }
-      }
 
       /* ---- Posts browse two-column layout -------------------------------- */
       .posts-browse-layout {
@@ -744,18 +736,6 @@
         .posts-browse-layout { flex-direction: column; }
         .posts-filter-sidebar { flex: unset; width: 100%; }
         .posts-filter-form { display: none; }
-      }
-
-      /* Filter form internals */
-      fieldset.posts-filter-section { padding: 0; margin-bottom: var(--pico-spacing); }
-      fieldset.posts-filter-section label { display: flex; align-items: center; }
-      .posts-filter-actions {
-        display: flex;
-        flex-direction: column;
-        gap: var(--pico-spacing);
-        list-style: none;
-        padding: 0;
-        margin: 0;
       }
     </style>
     <script src="https://unpkg.com/htmx.org@2.0.4"
