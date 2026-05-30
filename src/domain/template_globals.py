@@ -70,17 +70,8 @@ register_template_globals(
     TREATMENT_MODALITY_LABELS=enums.TREATMENT_MODALITY_LABELS,
     GENDERS=enums.GENDERS,
     GENDER_LABELS=enums.GENDER_LABELS,
-    # Lucide icon names per enum value — consumed by the listing-row
-    # macro in `src/domain/templates/posts/_item.html`. Renaming a label
-    # leaves these untouched; adding/renaming an *enum value* must touch
-    # the icons dict too (`test_icons_cover_their_tuples` guard fires
-    # otherwise).
-    CLIENT_AGE_GROUP_ICONS=enums.CLIENT_AGE_GROUP_ICONS,
-    REFERRAL_SERVICE_ICONS=enums.REFERRAL_SERVICE_ICONS,
-    TREATMENT_SETTINGS_ICONS=enums.TREATMENT_SETTINGS_ICONS,
     INSURANCE_POSTURES=enums.INSURANCE_POSTURES,
     INSURANCE_POSTURE_LABELS=enums.INSURANCE_POSTURE_LABELS,
-    INSURANCE_POSTURE_ICONS=enums.INSURANCE_POSTURE_ICONS,
     # `LICENSE_TYPES`, `EDUCATION_TYPES`, `CERTIFICATION_TYPES` and
     # their `_LABELS` are clinician-only — they flow into the context
     # via `CLINICIAN_ENTITY.static_context` (merged by `handle_detail` /

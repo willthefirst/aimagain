@@ -22,9 +22,12 @@
    and the `value` argument is ignored. Without `{% call %}`, the
    `value` argument fills the `<dd>` (escaped by Jinja by default).
 #}
-{% macro fact(key, label, value="", dd_class=None) -%}
+{% macro fact(key, label, value="", dd_class=None, icon=None) -%}
   <div data-fact="{{ key }}">
-    <dt>{{ label }}</dt>
+    <dt>
+      {% if icon %}<i class="icon-{{ icon }}"></i>{% endif %}
+      {{ label }}
+    </dt>
     <dd {% if dd_class %}class="{{ dd_class }}"{% endif %}>
       {{ caller() if caller else value }}
     </dd>

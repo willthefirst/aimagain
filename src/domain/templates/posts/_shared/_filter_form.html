@@ -7,7 +7,9 @@
   <form method="get" action="{{ list_url }}">
     {#-- 1. Type --#}
     <fieldset class="posts-filter-section">
-      <legend>Type</legend>
+      <legend>
+        <i class="icon-tag"></i>Type
+      </legend>
       {%- for v, l in (
         ("referral",          "Client referrals"),
         ("clinician_opening", "Clinician openings"),
@@ -24,7 +26,9 @@
     </fieldset>
     {#-- 2. Location --#}
     <fieldset class="posts-filter-section">
-      <legend><i class="icon-map-pin"></i>Location</legend>
+      <legend>
+        <i class="icon-map-pin"></i>Location
+      </legend>
       <label>
         City
         <input type="search"
@@ -45,7 +49,9 @@
     </fieldset>
     {#-- 3. Level of care (openings/intakes only) --#}
     <fieldset class="posts-filter-section">
-      <legend><i class="icon-layers"></i>Level of care</legend>
+      <legend>
+        <i class="icon-layers"></i>Level of care
+      </legend>
       {%- for v in TREATMENT_SETTINGS %}
         <label>
           <input type="checkbox"
@@ -58,7 +64,9 @@
     </fieldset>
     {#-- 4. Modality --#}
     <fieldset class="posts-filter-section">
-      <legend>Modality</legend>
+      <legend>
+        <i class="icon-brain"></i>Modality
+      </legend>
       {%- set modality_active = filter_values.get("modality") or [] %}
       {%- for v in TREATMENT_MODALITIES %}
         <label>
@@ -72,7 +80,9 @@
     </fieldset>
     {#-- 5. Populations (age_group) --#}
     <fieldset class="posts-filter-section">
-      <legend>Populations</legend>
+      <legend>
+        <i class="icon-users"></i>Populations
+      </legend>
       {%- for v in CLIENT_AGE_GROUPS %}
         <label>
           <input type="checkbox"
@@ -85,7 +95,9 @@
     </fieldset>
     {#-- 6. Insurance --#}
     <fieldset class="posts-filter-section">
-      <legend><i class="icon-shield"></i>Insurance</legend>
+      <legend>
+        <i class="icon-shield"></i>Insurance
+      </legend>
       {%- for v in INSURANCE_CARRIERS %}
         <label>
           <input type="checkbox"
