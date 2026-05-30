@@ -1,0 +1,604 @@
+{# Dev-only component gallery. Renders every framework and domain visual
+   component with fixture data so they can be iterated in isolation.
+
+   Route: GET /dev/components  (only mounted in ENVIRONMENT=development)
+   Template context: see src/domain/routes/dev_components.py
+
+   Gallery CSS is inlined here (not in framework.css / domain.css) since
+it's dev-only chrome that should never ship to production. #}
+{%- from "_shared/_card.html" import card -%}
+{%- from "_shared/sections.html" import fact, list_or_empty -%}
+{%- from "_shared/form_fields.html" import text_field, select_field, multi_select_field, radio_bool_field, textarea_field -%}
+{%- from "_shared/actions.html" import actions -%}
+{%- from "_shared/forms.html" import filter_checkbox, icon_legend -%}
+{%- from "_shared/form_banner.html" import form_banner -%}
+{%- from "_shared/pagination.html" import pagination -%}
+{%- from "_shared/icon_list.html" import icon_list -%}
+{%- from "_shared/_toolbar.html" import page_toolbar -%}
+{%- from "_shared/_breadcrumb.html" import breadcrumb -%}
+{%- from "_shared/_clinician_card.html" import clinician_card -%}
+{% extends "base.html" %}
+{% block head %}
+  <style>
+  /* Gallery chrome — dev only, not in framework.css or domain.css */
+  .gallery-layout {
+    display: grid;
+    grid-template-columns: 180px 1fr;
+    gap: 2rem;
+    align-items: start;
+  }
+  .gallery-nav {
+    position: sticky;
+    top: 1rem;
+  }
+  .gallery-nav ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+  }
+  .gallery-nav a {
+    font-size: 0.8rem;
+    text-decoration: none;
+    color: var(--pico-muted-color);
+  }
+  .gallery-nav a:hover { color: var(--pico-color); }
+  .gallery-nav .gallery-nav-group {
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--pico-muted-color);
+    margin-top: 1rem;
+    margin-bottom: 0.25rem;
+  }
+  .gallery-section {
+    border-top: 1px solid var(--pico-muted-border-color);
+    padding-top: 2rem;
+    margin-top: 2rem;
+  }
+  .gallery-section:first-child { border-top: none; margin-top: 0; }
+  .gallery-section > h2 {
+    font-size: 0.8rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--pico-muted-color);
+    margin-bottom: 1rem;
+  }
+  .gallery-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+    align-items: flex-start;
+    margin-bottom: 1rem;
+  }
+  .gallery-token-table { width: 100%; border-collapse: collapse; font-size: 0.875rem; }
+  .gallery-token-table td { padding: 0.25rem 0.5rem; vertical-align: middle; }
+  .gallery-token-table td:first-child { font-family: monospace; color: var(--pico-muted-color); }
+  .gallery-token-swatch {
+    display: inline-block;
+    width: 1.25rem;
+    height: 1.25rem;
+    border-radius: 0.25rem;
+    border: 1px solid var(--pico-muted-border-color);
+    vertical-align: middle;
+    margin-right: 0.5rem;
+  }
+  .gallery-icon-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(9rem, 1fr));
+    gap: 0.5rem;
+  }
+  .gallery-icon-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.8rem;
+    color: var(--pico-muted-color);
+    padding: 0.25rem;
+  }
+  .gallery-icon-item i { font-size: 1.1em; color: var(--pico-color); }
+  @media (max-width: 640px) {
+    .gallery-layout { grid-template-columns: 1fr; }
+    .gallery-nav { position: static; }
+  }
+  </style>
+{% endblock %}
+{% block toolbar %}
+  {% call page_toolbar(heading="Component gallery") %}
+  {% endcall %}
+{% endblock %}
+{% block content %}
+  <div class="gallery-layout">
+    {# ── Sidebar nav ─────────────────────────────────────────────── #}
+    <nav class="gallery-nav" aria-label="Gallery sections">
+      <ul>
+        <li class="gallery-nav-group">Framework</li>
+        <li>
+          <a href="#tokens">Design tokens</a>
+        </li>
+        <li>
+          <a href="#typography">Typography</a>
+        </li>
+        <li>
+          <a href="#icons">Icons</a>
+        </li>
+        <li>
+          <a href="#cards">Cards</a>
+        </li>
+        <li>
+          <a href="#facts">Fact rows</a>
+        </li>
+        <li>
+          <a href="#meta">Meta list</a>
+        </li>
+        <li>
+          <a href="#glyph-list">Glyph list</a>
+        </li>
+        <li>
+          <a href="#forms">Form fields</a>
+        </li>
+        <li>
+          <a href="#form-banner">Form banner</a>
+        </li>
+        <li>
+          <a href="#actions">Actions</a>
+        </li>
+        <li>
+          <a href="#toolbar">Toolbar</a>
+        </li>
+        <li>
+          <a href="#breadcrumb">Breadcrumb</a>
+        </li>
+        <li>
+          <a href="#pagination">Pagination</a>
+        </li>
+        <li>
+          <a href="#checkboxes">Checkboxes</a>
+        </li>
+        <li class="gallery-nav-group">Domain</li>
+        <li>
+          <a href="#type-tags">Type-tag pills</a>
+        </li>
+        <li>
+          <a href="#feed-rows">Feed rows</a>
+        </li>
+        <li>
+          <a href="#credentials">Credential rows</a>
+        </li>
+        <li>
+          <a href="#browse-layout">Browse layout</a>
+        </li>
+      </ul>
+    </nav>
+    {# ── Main content ─────────────────────────────────────────────── #}
+    <div>
+      {# ═══════════════════════════════════════════════════════════ #}
+      {# FRAMEWORK COMPONENTS                                         #}
+      {# ═══════════════════════════════════════════════════════════ #}
+      <section class="gallery-section" id="tokens">
+        <h2>Design tokens</h2>
+        <table class="gallery-token-table">
+          <tr>
+            <td>--pico-spacing</td>
+            <td>0.75rem — base spacing unit</td>
+          </tr>
+          <tr>
+            <td>--pico-form-element-spacing-vertical</td>
+            <td>0.5rem</td>
+          </tr>
+          <tr>
+            <td>--pico-line-height</td>
+            <td>1.4</td>
+          </tr>
+          <tr>
+            <td>--pico-font-size-h1</td>
+            <td>1.75rem</td>
+          </tr>
+          <tr>
+            <td>--pico-font-size-h2</td>
+            <td>1.375rem</td>
+          </tr>
+          <tr>
+            <td>--pico-font-size-h3</td>
+            <td>1.125rem</td>
+          </tr>
+          <tr>
+            <td>--pico-font-size-h4</td>
+            <td>1rem (body size)</td>
+          </tr>
+          <tr>
+            <td>--form-max-width</td>
+            <td>720px — entity form cap</td>
+          </tr>
+          <tr>
+            <td>--pico-primary</td>
+            <td>
+              <span class="gallery-token-swatch" style="background:var(--pico-primary)"></span>Primary color
+            </td>
+          </tr>
+          <tr>
+            <td>--pico-secondary</td>
+            <td>
+              <span class="gallery-token-swatch" style="background:var(--pico-secondary)"></span>Secondary color
+            </td>
+          </tr>
+          <tr>
+            <td>--pico-muted-color</td>
+            <td>
+              <span class="gallery-token-swatch"
+                    style="background:var(--pico-muted-color)"></span>Muted text
+            </td>
+          </tr>
+          <tr>
+            <td>--pico-del-color</td>
+            <td>
+              <span class="gallery-token-swatch" style="background:var(--pico-del-color)"></span>Error / destructive
+            </td>
+          </tr>
+        </table>
+      </section>
+      <section class="gallery-section" id="typography">
+        <h2>Typography</h2>
+        <h1>H1 — page heading (1.75rem)</h1>
+        <h2>H2 — section heading (1.375rem)</h2>
+        <h3>H3 — card heading (1.125rem)</h3>
+        <h4>H4 — Sub-heading (1rem)</h4>
+        <p>
+          Body paragraph. <strong>Bold text.</strong> <em>Italic text.</em> <small>Small/muted text.</small> <code>inline code</code>. <mark>highlighted text.</mark>
+        </p>
+        <p>
+          <small>Small standalone — used for timestamps, helper text, muted metadata.</small>
+        </p>
+      </section>
+      <section class="gallery-section" id="icons">
+        <h2>Icons (Lucide static font)</h2>
+        <div class="gallery-icon-grid">
+          {% for name in ["map-pin", "shield", "shield-check", "graduation-cap", "baby",
+            "monitor", "layers", "chevron-left", "menu", "x",
+            "user", "heart", "search", "filter", "plus",
+            "pencil", "trash-2", "arrow-left", "check", "alert-circle"] %}
+            <div class="gallery-icon-item">
+              <i class="icon-{{ name }}"></i><code>{{ name }}</code>
+            </div>
+          {% endfor %}
+        </div>
+      </section>
+      <section class="gallery-section" id="cards">
+        <h2>Cards</h2>
+        <p>
+          <small>Rendered via <code>_shared/_card.html</code> → <code>card()</code> macro. Used by every list page.</small>
+        </p>
+        {# Full card with fact rows #}
+        {# title-case-ignore #}
+        {% call card(id="1", headline_url="/example/1", headline="Dr. Jane Smith", subtitle="Sunrise Therapy · San Francisco, CA") %}
+          <section class="entity-facts">
+            <dl>
+              <div data-fact="practice">
+                <dt>Practice</dt>
+                <dd>
+                  {# title-case-ignore #}Sunrise Therapy
+                </dd>
+              </div>
+              <div data-fact="location">
+                <dt>Location</dt>
+                <dd>
+                  {# title-case-ignore #}San Francisco, CA
+                </dd>
+              </div>
+              <div data-fact="licensed_in">
+                <dt>Licensed in</dt>
+                <dd>
+                  {# title-case-ignore #}CA, NY
+                </dd>
+              </div>
+            </dl>
+          </section>
+        {% endcall %}
+        {# Minimal card #}
+        {% call card(id="2", headline_url="/example/2", headline="Acme Counseling Center") %}
+          <section class="entity-facts">
+            <dl>
+              <div data-fact="location">
+                <dt>Location</dt>
+                <dd>
+                  {# title-case-ignore #}Oakland, CA
+                </dd>
+              </div>
+            </dl>
+          </section>
+        {% endcall %}
+      </section>
+      <section class="gallery-section" id="facts">
+        <h2>Fact rows</h2>
+        <p>
+          <small>Rendered via <code>sections.html</code> → <code>fact()</code> macro. Used in card bodies and detail pages.</small>
+        </p>
+        <dl>
+          {{ fact('name', 'Name', 'Dr. Jane Smith') }}
+          {{ fact('location', 'Location', 'San Francisco, CA') }}
+          {{ fact('license', 'Licensed in', 'CA, NY, WA') }}
+          {%- call fact("insurance", "Insurance") -%}
+            <span class="meta"><span>Aetna</span><span>Blue Cross</span></span>
+          {%- endcall %}
+          {{ fact('empty', 'Empty field', '') }}
+        </dl>
+      </section>
+      <section class="gallery-section" id="meta">
+        <h2>Meta list</h2>
+        <p>
+          <small>CSS class <code>.meta</code> — children joined with " · " via <code>::before</code> pseudo-element. Stacks vertically on mobile.</small>
+        </p>
+        <p class="meta">
+          <span>San Francisco, CA</span>
+          <span>In-person</span>
+          <span>Telehealth</span>
+          <span>Aetna</span>
+        </p>
+        <p class="meta">
+          <a href="#">Posts</a>
+          <span>2 days ago</span>
+        </p>
+      </section>
+      <section class="gallery-section" id="glyph-list">
+        <h2>Glyph list</h2>
+        <p>
+          <small>Rendered via <code>_shared/icon_list.html</code> → <code>icon_list()</code> macro. Lucide icon as bullet.</small>
+        </p>
+        {{ icon_list(fixture_icon_list) }}
+      </section>
+      <section class="gallery-section" id="forms">
+        <h2>Form fields</h2>
+        <p>
+          <small>Rendered via <code>_shared/form_fields.html</code> macros. Subgrid alignment requires <code>.entity-form-page</code> wrapper.</small>
+        </p>
+        <div class="entity-form-page">
+          <form>
+            {{ text_field("first_name", "First name", current="Jane", required=True) }}
+            {{ text_field("last_name", "Last name", current="Smith", required=True) }}
+            {{ text_field("npi", "NPI", required=False, help="10-digit National Provider Identifier. Leave blank to skip.") }}
+            {{ select_field("location_state", "State", fixture_choices, current="opt2") }}
+            {{ multi_select_field("services", "Services", fixture_choices, current=["opt1", "opt3"]) }}
+            {{ radio_bool_field("accepts_telehealth", "Telehealth?", current="yes") }}
+            {{ textarea_field("notes", "Notes", current="Sample notes text.", required=False, help="Any additional context.") }}
+          </form>
+        </div>
+        <h3 style="margin-top:1.5rem">Error state</h3>
+        <div class="entity-form-page">
+          <form>
+            {{ text_field("email", "Email", current="not-an-email", error="Enter a valid email address.", invalid=True) }}
+          </form>
+        </div>
+      </section>
+      <section class="gallery-section" id="form-banner">
+        <h2>Form banner</h2>
+        <p>
+          <small>Rendered via <code>_shared/form_banner.html</code> → <code>form_banner()</code>. used for form-level (non-field) errors.</small>
+        </p>
+        {{ form_banner("Invalid email or password. Please try again.") }}
+      </section>
+      <section class="gallery-section" id="actions">
+        <h2>Actions</h2>
+        <p>
+          <small>Rendered via <code>_shared/actions.html</code> → <code>actions()</code>. <code>wrapper="form"</code> for create/edit; <code>wrapper="toolbar"</code> for detail pages.</small>
+        </p>
+        <h3>Form mode (save + cancel + delete)</h3>
+        <div style="max-width:var(--form-max-width)">
+          {{ actions("Save changes", cancel_url="/example", delete_url="/example/1", delete_confirm="Delete this item?") }}
+        </div>
+        <h3 style="margin-top:1rem">Form mode (save + cancel only)</h3>
+        <div style="max-width:var(--form-max-width)">
+          {{ actions("Create clinician", cancel_url=entity_url('clinician') ) }}
+        </div>
+      </section>
+      <section class="gallery-section" id="toolbar">
+        <h2>Toolbar</h2>
+        <p>
+          <small>Rendered via <code>_shared/_toolbar.html</code> → <code>page_toolbar()</code>. every list and detail page uses this.</small>
+        </p>
+        <h3>List toolbar (heading + filter link + create)</h3>
+        {% call page_toolbar(heading="Clinicians", search_url=entity_url('clinician') ~ '/search', active_filters=(("Kind", "Referral"), ("State", "CA"))) %}
+          <li>
+            <a href="{{ entity_form_url('clinician') }}" role="button">Create clinician</a>
+          </li>
+        {% endcall %}
+        <h3 style="margin-top:1rem">Detail toolbar (heading + edit)</h3>
+        {% call page_toolbar(heading="Dr. Jane Smith") %}
+          <li>
+            <a href="{{ entity_form_url('clinician', id=1) }}"
+               role="button"
+               class="secondary outline">Edit</a>
+          </li>
+        {% endcall %}
+      </section>
+      <section class="gallery-section" id="breadcrumb">
+        <h2>Breadcrumb</h2>
+        <p>
+          <small>Rendered via <code>_shared/_breadcrumb.html</code> → <code>breadcrumb()</code>. single back-link to the deepest clickable parent.</small>
+        </p>
+        {{ breadcrumb(fixture_breadcrumb) }}
+      </section>
+      <section class="gallery-section" id="pagination">
+        <h2>Pagination</h2>
+        <p>
+          <small>Rendered via <code>_shared/pagination.html</code> → <code>pagination()</code>. emits nothing on single-page results.</small>
+        </p>
+        {{ pagination(fixture_page_meta, "kind=referral") }}
+      </section>
+      <section class="gallery-section" id="checkboxes">
+        <h2>Search checkboxes</h2>
+        <p>
+          <small>Rendered via <code>_shared/forms.html</code> → <code>filter_checkbox()</code>. used in filter sidebars and search pages.</small>
+        </p>
+        <h3>Single-column (default)</h3>
+        <fieldset class="search-checkbox-fieldset">
+          {{ icon_legend('filter', 'Kind') }}
+          {{ filter_checkbox("kind", "referral", "Referral", checked=True) }}
+          {{ filter_checkbox("kind", "clinician_opening", "Opening", checked=False) }}
+          {{ filter_checkbox("kind", "program_intake", "Intake", checked=False) }}
+        </fieldset>
+        <h3>
+          Grid layout (<code>.search-checkbox-grid</code>)
+        </h3>
+        <fieldset class="search-checkbox-fieldset search-checkbox-grid">
+          {{ icon_legend('map-pin', 'State') }}
+          {% for abbr, label in [("CA", "California"), ("NY", "New York"), ("TX", "Texas"), ("FL", "Florida"), ("WA", "Washington"), ("OR", "Oregon")] %}
+            {{ filter_checkbox("state", abbr, label, checked=(abbr == "CA") ) }}
+          {% endfor %}
+        </fieldset>
+      </section>
+      {# ═══════════════════════════════════════════════════════════ #}
+      {# DOMAIN COMPONENTS                                            #}
+      {# CSS lives in src/domain/static/css/domain.css               #}
+      {# ═══════════════════════════════════════════════════════════ #}
+      <section class="gallery-section" id="type-tags">
+        <h2>Type-tag pills</h2>
+        <p>
+          <small>CSS classes <code>.post-feed-type-tag--referral/opening/intake</code>. used in feed row headers.</small>
+        </p>
+        <div class="gallery-row">
+          <span class="post-feed-type-tag post-feed-type-tag--referral">Referral</span>
+          <span class="post-feed-type-tag post-feed-type-tag--opening">Opening</span>
+          <span class="post-feed-type-tag post-feed-type-tag--intake">Intake</span>
+        </div>
+      </section>
+      <section class="gallery-section" id="feed-rows">
+        <h2>Feed rows</h2>
+        <p>
+          <small>CSS classes in <code>domain.css</code>. template macro: <code>posts/_shared/_feed_row.html</code> → <code>post_feed_row()</code>.</small>
+        </p>
+        <div class="post-feed-list">
+          <article class="post-feed-row" data-kind="referral">
+            <div class="post-feed-header">
+              <span class="post-feed-type-tag post-feed-type-tag--referral">Referral</span>
+              <span class="post-feed-byline">
+                <small>A . Stone</small>
+                <small>2h ago</small>
+              </span>
+            </div>
+            <a href="#" class="post-feed-headline-text"><strong>Adult female (25–64) — psychotherapy, DBT</strong></a>
+            <div class="post-feed-meta">
+              <span><i class="icon-map-pin"></i>{# title-case-ignore #}San Francisco, CA</span>
+              <span><i class="icon-monitor"></i>In-person · Telehealth</span>
+              <span><i class="icon-shield"></i>Aetna</span>
+            </div>
+          </article>
+          <article class="post-feed-row" data-kind="clinician_opening">
+            <div class="post-feed-header">
+              <span class="post-feed-type-tag post-feed-type-tag--opening">Opening</span>
+              <span class="post-feed-byline">
+                <small>B . Chen</small>
+                <small>1d ago</small>
+              </span>
+            </div>
+            <a href="#"
+               class="post-feed-headline-text post-feed-headline-text:visited"><strong>{# title-case-ignore #}Sunrise Therapy — psychotherapy, outpatient</strong></a>
+            <div class="post-feed-meta">
+              <span><i class="icon-map-pin"></i>{# title-case-ignore #}Oakland, CA</span>
+              <span><i class="icon-layers"></i>Outpatient</span>
+              <span><i class="icon-shield"></i>Blue Cross · Aetna</span>
+            </div>
+          </article>
+          <article class="post-feed-row post-feed-row--interest"
+                   data-kind="program_intake">
+            <div class="post-feed-header">
+              <span class="post-feed-type-tag post-feed-type-tag--intake">Intake</span>
+              <span class="post-feed-byline">
+                <small>C . Rivera</small>
+                <small>3d ago</small>
+              </span>
+            </div>
+            {# title-case-ignore #}
+            <a href="#" class="post-feed-headline-text"><strong>Healing Path DBT Program — DBT, group therapy</strong></a>
+            <div class="post-feed-meta">
+              <span><i class="icon-map-pin"></i>{# title-case-ignore #}Berkeley, CA</span>
+              <span><i class="icon-layers"></i>Outpatient · Intensive outpatient</span>
+            </div>
+          </article>
+        </div>
+      </section>
+      <section class="gallery-section" id="credentials">
+        <h2>Credential rows</h2>
+        <p>
+          <small>CSS classes <code>.credential-list</code> / <code>.credential-row</code>. used in clinician edit and detail pages.</small>
+        </p>
+        <div class="credential-list">
+          <div class="credential-row">
+            <div class="credential-row-text">
+              <strong>LCSW</strong>
+              <small>California · Expires 2027-06-01</small>
+            </div>
+            <button class="outline secondary" type="button">Delete</button>
+          </div>
+          <div class="credential-row">
+            <div class="credential-row-text">
+              <strong>LMFT</strong>
+              <small>New York · Expires 2026-12-15</small>
+            </div>
+            <button class="outline secondary" type="button">Delete</button>
+          </div>
+          <div class="credential-row">
+            <div class="credential-row-text">
+              <strong>DBT intensive training</strong>
+              <small>Behavioral Tech Institute · Completed 2021-03</small>
+            </div>
+            <button class="outline secondary" type="button">Delete</button>
+          </div>
+        </div>
+      </section>
+      <section class="gallery-section" id="browse-layout">
+        <h2>Browse layout</h2>
+        <p>
+          <small>CSS classes <code>.posts-browse-layout</code> / <code>.posts-filter-sidebar</code> / <code>.posts-results</code>. 220px sidebar + flexible results; stacks on mobile.</small>
+        </p>
+        <div class="posts-browse-layout">
+          <aside class="posts-filter-sidebar">
+            <form class="posts-filter-form">
+              <fieldset class="search-checkbox-fieldset">
+                {{ icon_legend('filter', 'Kind') }}
+                {{ filter_checkbox("kind", "referral", "Referral", checked=True) }}
+                {{ filter_checkbox('kind', 'clinician_opening', 'Opening') }}
+                {{ filter_checkbox('kind', 'program_intake', 'Intake') }}
+              </fieldset>
+              <fieldset class="search-checkbox-fieldset">
+                {{ icon_legend('map-pin', 'State') }}
+                {{ filter_checkbox("state", "CA", "California", checked=True) }}
+                {{ filter_checkbox('state', 'NY', 'New York') }}
+              </fieldset>
+            </form>
+          </aside>
+          <div class="posts-results">
+            <div class="post-feed-list">
+              <article class="post-feed-row">
+                <div class="post-feed-header">
+                  <span class="post-feed-type-tag post-feed-type-tag--referral">Referral</span>
+                  <span class="post-feed-byline"><small>2h ago</small></span>
+                </div>
+                <a href="#" class="post-feed-headline-text"><strong>Adult female (25–64) — psychotherapy</strong></a>
+                <div class="post-feed-meta">
+                  <span><i class="icon-map-pin"></i>{# title-case-ignore #}San Francisco, CA</span>
+                </div>
+              </article>
+              <article class="post-feed-row">
+                <div class="post-feed-header">
+                  <span class="post-feed-type-tag post-feed-type-tag--opening">Opening</span>
+                  <span class="post-feed-byline"><small>1d ago</small></span>
+                </div>
+                {# title-case-ignore #}
+                <a href="#" class="post-feed-headline-text"><strong>Sunrise Therapy — outpatient</strong></a>
+                <div class="post-feed-meta">
+                  <span><i class="icon-map-pin"></i>{# title-case-ignore #}Oakland, CA</span>
+                </div>
+              </article>
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+    {# end main content #}
+  </div>
+  {# end gallery-layout #}
+{% endblock %}
