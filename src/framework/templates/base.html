@@ -316,6 +316,10 @@
          appears. Works on any tag (`<span>`, `<a>`, etc.) — the
          selector is purely structural. */
       .meta > * + *::before { content: " · "; }
+      @media (max-width: 576px) {
+        .meta { display: flex; flex-direction: column; gap: 0.15em; }
+        .meta > * + *::before { display: none; }
+      }
       /* Page-scoped zone bar. Every page renders one
          `<div class="toolbar">` carrying:
            `<h1>` — the page heading (left cell).
@@ -682,7 +686,7 @@
       }
       .post-feed-byline > small + small::before {
         content: "·";
-        margin-right: 0.4em;
+        margin: 0 0.4em;
       }
       @media (max-width: 576px) {
         .post-feed-type-tag,
