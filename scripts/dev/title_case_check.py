@@ -158,7 +158,13 @@ class TitleCaseChecker:
         "EMDR",  # Eye movement desensitization and reprocessing
         "IOP",  # Intensive outpatient program
         "NPI",  # National Provider Identifier
+        "LCSW",  # Licensed Clinical Social Worker
+        "LMFT",  # Licensed Marriage and Family Therapist
+        "LPC",  # Licensed Professional Counselor
+        "LMHC",  # Licensed Mental Health Counselor
         "MCP",  # Model Context Protocol (referenced in dev docs)
+        # UI libraries
+        "Lucide",  # icon library used throughout the app
         # Brand mark — the short form rendered on narrow viewports.
         # Multi-word brand phrases (e.g. "Bedlam Connect") live in
         # ``BRAND_PHRASES`` below; this entry covers the standalone
