@@ -1,5 +1,7 @@
 {% extends "views/list.html" %}
 {%- from "posts/_shared/_feed_row.html" import post_feed_row, post_feed_empty with context -%}
+{%- from "posts/_shared/_filter_form.html" import filter_form -%}
+{%- from "_shared/pagination.html" import pagination -%}
 {% block resource_label %}Posts{% endblock %}
 {% block actions %}
   <li>
@@ -15,107 +17,7 @@
           Filters
           {% if active_filter_count %}({{ active_filter_count }}){% endif %}
         </summary>
-        <form method="get" action="{{ _list_url }}">
-          {#-- 1. Type --#}
-          <fieldset class="posts-filter-section">
-            <legend>Type</legend>
-            {%- for v, l in (
-              ("referral",          "Client referrals"),
-              ("clinician_opening", "Clinician openings"),
-              ("program_intake",    "Program intakes"),
-              ) %}
-              <label>
-                <input type="checkbox"
-                       name="kind"
-                       value="{{ v }}"
-                       {% if v in (filter_values.get("kind") or []) %}checked{% endif %} />
-                {{ l }}
-              </label>
-            {%- endfor %}
-          </fieldset>
-          {#-- 2. Location --#}
-          <fieldset class="posts-filter-section">
-            <legend>Location</legend>
-            <label style="flex-direction: column; align-items: stretch;">
-              City
-              <input type="search"
-                     name="city"
-                     value="{{ filter_values.get('city') or '' }}"
-                     placeholder="e.g. Portland" />
-            </label>
-            <label style="flex-direction: column; align-items: stretch;">
-              State
-              <select name="state">
-                <option value="">Any</option>
-                {%- for s in US_STATES %}
-                  <option value="{{ s }}"
-                          {% if s in (filter_values.get('state') or []) %}selected{% endif %}>{{ s }}</option>
-                {%- endfor %}
-              </select>
-            </label>
-          </fieldset>
-          {#-- 3. Level of care (openings/intakes only) --#}
-          <fieldset class="posts-filter-section">
-            <legend>Level of care</legend>
-            {%- for v in TREATMENT_SETTINGS %}
-              <label>
-                <input type="checkbox"
-                       name="level_of_care"
-                       value="{{ v }}"
-                       {% if v in (filter_values.get("level_of_care") or []) %}checked{% endif %} />
-                {{ TREATMENT_SETTINGS_LABELS[v] }}
-              </label>
-            {%- endfor %}
-          </fieldset>
-          {#-- 4. Modality --#}
-          <fieldset class="posts-filter-section">
-            <legend>Modality</legend>
-            {%- set modality_active = filter_values.get("modality") or [] %}
-            {%- for v in TREATMENT_MODALITIES %}
-              <label>
-                <input type="checkbox"
-                       name="modality"
-                       value="{{ v }}"
-                       {% if v in modality_active %}checked{% endif %} />
-                {{ TREATMENT_MODALITY_LABELS[v] }}
-              </label>
-            {%- endfor %}
-          </fieldset>
-          {#-- 5. Populations (age_group) --#}
-          <fieldset class="posts-filter-section">
-            <legend>Populations</legend>
-            {%- for v in CLIENT_AGE_GROUPS %}
-              <label>
-                <input type="checkbox"
-                       name="age_group"
-                       value="{{ v }}"
-                       {% if v in (filter_values.get("age_group") or []) %}checked{% endif %} />
-                {{ CLIENT_AGE_GROUP_LABELS[v] }}
-              </label>
-            {%- endfor %}
-          </fieldset>
-          {#-- 6. Insurance --#}
-          <fieldset class="posts-filter-section">
-            <legend>Insurance</legend>
-            {%- for v in INSURANCE_CARRIERS %}
-              <label>
-                <input type="checkbox"
-                       name="insurance"
-                       value="{{ v }}"
-                       {% if v in (filter_values.get("insurance") or []) %}checked{% endif %} />
-                {{ INSURANCE_CARRIER_LABELS[v] }}
-              </label>
-            {%- endfor %}
-          </fieldset>
-          <menu class="posts-filter-actions">
-            <li>
-              <button type="submit">Apply filters</button>
-            </li>
-            <li>
-              <a href="{{ _list_url }}" role="button" class="secondary outline">Clear all</a>
-            </li>
-          </menu>
-        </form>
+        {{ filter_form(_list_url, filter_values) }}
       </details>
     </aside>
     <div class="posts-results">
@@ -128,6 +30,8 @@
                     link_href=entity_url(entity_name) if active_filter_count else None
           ) }}
         {% endif %}
+        {%- if page_meta is defined %}{{ pagination(page_meta, paginator_base_query|default("") ) }}{%- endif %}
+        </div>
       </div>
-    </div>
-  {% endblock %}
+    {% endblock %}
+    {% block after_content %}{% endblock %}
