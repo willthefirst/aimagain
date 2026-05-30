@@ -25,14 +25,14 @@
     {#-- 2. Location --#}
     <fieldset class="posts-filter-section">
       <legend>Location</legend>
-      <label style="flex-direction: column; align-items: stretch;">
+      <label>
         City
         <input type="search"
                name="city"
                value="{{ filter_values.get('city') or '' }}"
                placeholder="e.g. Portland" />
       </label>
-      <label style="flex-direction: column; align-items: stretch;">
+      <label>
         State
         <select name="state">
           <option value="">Any</option>
@@ -96,7 +96,7 @@
         </label>
       {%- endfor %}
     </fieldset>
-    <menu class="posts-filter-actions">
+    <menu>
       <li>
         <button type="submit">Apply filters</button>
       </li>

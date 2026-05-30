@@ -2,23 +2,26 @@
 {%- from "posts/_shared/_feed_row.html" import post_feed_row, post_feed_empty with context -%}
 {%- from "posts/_shared/_filter_form.html" import filter_form -%}
 {%- from "_shared/pagination.html" import pagination -%}
+{%- from "_shared/_toolbar.html" import page_toolbar -%}
 {% block resource_label %}Posts{% endblock %}
-{% block actions %}
-  <li>
-    <a href="{{ entity_form_url('post') }}" role="button">{{ entity_create_label("post") }}</a>
-  </li>
+{% block toolbar %}
+  {% call page_toolbar(heading="Posts") %}
+    <li>
+      <a href="{{ entity_form_url('post') }}" role="button">{{ entity_create_label("post") }}</a>
+    </li>
+  {% endcall %}
 {% endblock %}
+{% block actions %}{% endblock %}
 {% block content %}
   {%- set _list_url = entity_url("post") -%}
   <div class="posts-browse-layout">
     <aside class="posts-filter-sidebar">
-      <details class="posts-filter-disclosure" open>
-        <summary class="posts-filter-summary">
-          Filters
+      <hgroup>
+        <a href="{{ entity_url("post") }}/search">Filters
           {% if active_filter_count %}({{ active_filter_count }}){% endif %}
-        </summary>
-        {{ filter_form(_list_url, filter_values) }}
-      </details>
+        </a>
+      </hgroup>
+      {{ filter_form(_list_url, filter_values) }}
     </aside>
     <div class="posts-results">
       {% if posts %}

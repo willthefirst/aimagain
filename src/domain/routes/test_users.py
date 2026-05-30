@@ -24,13 +24,11 @@ async def test_base_template_renders_primary_nav_when_authenticated(
     authenticated_client: AsyncClient,
     logged_in_user: User,
 ):
-    """Authenticated pages render the primary nav as a single `<ul>`
-    with the brand on the left and five inline links pushed to the
-    right via `margin-left: auto` on the first link: Home, Referrals
-    (= "find new clients"), Openings (= "refer out a client"), Profile,
-    and Sign out. Other URL families — `/intakes`, `/clinicians`,
-    `/organizations`, `/programs`, `/users` — stay live and reachable
-    by URL/bookmark, but are no longer chrome-promoted.
+    """Authenticated pages render a primary nav with a brand link on the
+    left and a <details>/<summary> collapsible menu containing four
+    destination links: Home, Posts, Profile, and Sign out. The <details>
+    pattern supports a mobile hamburger toggle at narrow widths while
+    keeping all links visible inline on desktop via CSS.
 
     The "Create clinician" chrome CTA was removed in #697 — the
     /users/me onboarding checklist is the discoverable entry point."""
@@ -39,17 +37,18 @@ async def test_base_template_renders_primary_nav_when_authenticated(
     assert response.status_code == 200
     tree = HTMLParser(response.text)
     # "Create clinician" button no longer lives in the nav (#697).
-    cta_items = tree.css("#primary-nav > li > a[href='/clinicians/form']")
+    cta_items = tree.css("#primary-nav a[href='/clinicians/form']")
     assert len(cta_items) == 0, "Create-clinician CTA should be removed from nav (#697)"
-    # Profile link is one of the five inline nav links.
+    # Brand link is a direct child of the nav element.
+    assert tree.css_first('#primary-nav > a[href="/"]') is not None
+    # Profile link is in the collapsible nav menu.
     assert tree.css_first('#primary-nav a[href="/users/me"]') is not None
-    # All five authed-chrome destinations render in this exact order
-    # inside #primary-nav. Sign-out is the `#` placeholder href on the
+    # The four authed-chrome destinations render in this exact order
+    # inside #nav-menu. Sign-out is the `#` placeholder href on the
     # `<a hx-post>` that drives the HTMX POST.
-    nav_items = tree.css("#primary-nav > li > a")
+    nav_items = tree.css("#nav-menu ul li a")
     nav_hrefs = [a.attributes.get("href") for a in nav_items]
     assert nav_hrefs == [
-        "/",
         "/home",
         "/posts",
         "/users/me",
