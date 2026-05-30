@@ -24,10 +24,7 @@
 #}
 {% macro fact(key, label, value="", dd_class=None, icon=None) -%}
   <div data-fact="{{ key }}">
-    <dt>
-      {% if icon %}<i class="icon-{{ icon }}"></i>{% endif %}
-      {{ label }}
-    </dt>
+    {# djlint:off #}<dt>{% if icon %}<i class="icon-{{ icon }}"></i>{% endif %}{{ label }}</dt>{# djlint:on #}
     <dd {% if dd_class %}class="{{ dd_class }}"{% endif %}>
       {{ caller() if caller else value }}
     </dd>
