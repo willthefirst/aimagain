@@ -1,5 +1,5 @@
 {% extends "views/form_edit.html" %}
-{%- from "_shared/form_fields.html" import entity_select_field, form_section, radio_bool_field, select_field, text_field -%}
+{%- from "_shared/form_fields.html" import entity_select_field, form_section, checkbox_field, select_field, text_field -%}
 {%- from "_shared/form_copy.html" import org_picker_help -%}
 {%- from "_shared/actions.html" import actions -%}
 {% block resource_label %}Programs{% endblock %}
@@ -22,7 +22,7 @@
       {{ text_field("end_date", "End date", current=program.end_date, required=false, type="date") }}
     {% endcall %}
     {% call form_section("Intake") %}
-      {{ radio_bool_field("accepting_referrals", "Accepting referrals?", current=program.accepting_referrals, required=false) }}
+      {{ checkbox_field("accepting_referrals", "Currently accepting referrals", current=program.accepting_referrals) }}
     {% endcall %}
     {{ actions("Save changes",
         cancel_url=entity_url('program', id=program.id) ,

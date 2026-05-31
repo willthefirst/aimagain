@@ -8,7 +8,7 @@
 it's dev-only chrome that should never ship to production. #}
 {%- from "_shared/_card.html" import card -%}
 {%- from "_shared/sections.html" import fact, list_or_empty -%}
-{%- from "_shared/form_fields.html" import text_field, select_field, multi_select_field, radio_bool_field, textarea_field -%}
+{%- from "_shared/form_fields.html" import text_field, select_field, multi_select_field, checkbox_field, textarea_field -%}
 {%- from "_shared/actions.html" import actions -%}
 {%- from "_shared/forms.html" import filter_checkbox, icon_legend -%}
 {%- from "_shared/form_banner.html" import form_banner -%}
@@ -503,7 +503,7 @@ it's dev-only chrome that should never ship to production. #}
             {{ text_field("npi", "NPI", required=False, help="10-digit National Provider Identifier. Leave blank to skip.") }}
             {{ select_field("location_state", "State", fixture_choices, current="opt2") }}
             {{ multi_select_field("services", "Services", fixture_choices, current=["opt1", "opt3"]) }}
-            {{ radio_bool_field("accepts_telehealth", "Telehealth?", current="yes") }}
+            {{ checkbox_field("accepts_telehealth", "Offers telehealth", current=true) }}
             {{ textarea_field("notes", "Notes", current="Sample notes text.", required=False, help="Any additional context.") }}
           </form>
         </div>

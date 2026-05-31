@@ -1413,13 +1413,16 @@ async def test_get_clinician_form_renders(
     ), "virtual_sessions should have a pre-selected option"
     assert virtual_selected.attributes.get("value") == "yes"
     # Insurance & payment fieldset. The carrier multi-select speaks for
-    # the in-network signal (empty = no in-network); only OON and
-    # sliding-scale render as bool radios.
-    assert tree.css_first('input[type="radio"][name="accepts_in_network"]') is None
+    # the in-network signal (empty = no in-network); OON and sliding-scale
+    # render as feature-flag checkboxes (the visible `<input type="checkbox">`
+    # plus a sibling `<input type="hidden" value="false">` carrying the
+    # default-true round-trip — see `_shared/form_fields.html::checkbox_field`).
+    assert tree.css_first('input[type="checkbox"][name="accepts_in_network"]') is None
     assert (
-        tree.css_first('input[type="radio"][name="accepts_out_of_network"]') is not None
+        tree.css_first('input[type="checkbox"][name="accepts_out_of_network"]')
+        is not None
     )
-    assert tree.css_first('input[type="radio"][name="sliding_scale"]') is not None
+    assert tree.css_first('input[type="checkbox"][name="sliding_scale"]') is not None
     assert tree.css_first('input[name="cost"]') is not None
     carrier_select = tree.css_first('select[name="in_network_carriers"][multiple]')
     assert carrier_select is not None
